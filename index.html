@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-04-13-v213-openpd-live-history-fix";
+  const APP_VERSION = "2026-04-14-v217-prelim-court-display";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -577,7 +577,7 @@ body{overflow-x:hidden;}
 /* 승리팀: 파란 강조바 + 진하게 */
 .t-slot.wsl{background:linear-gradient(to right,#1565c0 3px,#dce8fb 3px);font-weight:800;color:#0c3880;padding-left:12px;}
 /* 패배팀: 흐리게 */
-.t-slot.loser{opacity:.5;background:#f4f6fb;color:var(--text3);}
+.t-slot.loser{opacity:.82;background:#f4f6fb;color:#4a5a73;}
 .t-slot.tbd{color:var(--text3);font-style:italic;background:var(--bg2);}
 .t-sn{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .t-ss{font-family:'Oswald',sans-serif;font-weight:800;font-size:.88rem;min-width:22px;text-align:right;}
@@ -1530,21 +1530,16 @@ body.slider-ready .page:not(.active){
     </div>
     <div class="card" style="padding:14px 16px;margin-bottom:14px;background:linear-gradient(135deg,#f8fbff,#fffdf5)">
       <div style="font-weight:800;font-size:.9rem;color:var(--primary-dark);margin-bottom:8px">🎾 대회 운영 코트 설정</div>
-      <div style="font-size:.76rem;color:var(--text2);line-height:1.65;margin-bottom:10px">코트군 이름과 면수를 입력하면 자동으로 <b>능동1~8</b> 같은 실제 코트 목록이 생성됩니다. 김해시 외 다른 대회도 여기서 직접 맞춰서 운영할 수 있습니다.</div>
+      <div style="font-size:.76rem;color:var(--text2);line-height:1.65;margin-bottom:10px">코트군은 <b>공용 저장 목록</b>에 먼저 저장해두고, 시합마다 필요한 코트군만 선택해서 사용합니다. 대회 화면에서는 선택/해제만 하고, 기존 코트군 수정·삭제는 관리창에서 합니다.</div>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
-        <input class="form-input" id="newCourtGroupName" placeholder="코트군 이름 (예: 능동, 국제, 메인코트)" style="flex:1;min-width:170px;font-size:.82rem">
+        <input class="form-input" id="newCourtGroupName" placeholder="새 코트군 이름 (예: 능동, 국제, 메인코트)" style="flex:1;min-width:170px;font-size:.82rem">
         <input class="form-input" type="number" min="1" id="newCourtGroupCount" placeholder="면수" style="width:88px;font-size:.82rem">
-        <button type="button" class="btn btn-primary" style="font-size:.78rem;padding:6px 12px;white-space:nowrap" onclick="addCourtGroup()">➕ 코트군 추가</button>
+        <button type="button" class="btn btn-primary" style="font-size:.78rem;padding:6px 12px;white-space:nowrap" onclick="addCourtGroup()">➕ 저장 후 선택</button>
+        <button type="button" class="btn btn-outline" style="font-size:.78rem;padding:6px 12px;white-space:nowrap" onclick="openCourtGroupCatalogModal()">🗂 코트군 관리</button>
       </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
-        <button type="button" class="btn btn-outline" style="font-size:.72rem;padding:3px 10px" onclick="addCourtPreset('능동',8)">능동 8면</button>
-        <button type="button" class="btn btn-outline" style="font-size:.72rem;padding:3px 10px" onclick="addCourtPreset('국제',8)">국제 8면</button>
-        <button type="button" class="btn btn-outline" style="font-size:.72rem;padding:3px 10px" onclick="addCourtPreset('금병',4)">금병 4면</button>
-        <button type="button" class="btn btn-outline" style="font-size:.72rem;padding:3px 10px" onclick="addCourtPreset('삼계',4)">삼계 4면</button>
-        <button type="button" class="btn btn-outline" style="font-size:.72rem;padding:3px 10px" onclick="addCourtPreset('메인코트',6)">메인코트 6면</button>
-      </div>
+      <div id="courtGroupPresetBar" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"></div>
       <div id="courtGroupList" style="display:flex;flex-direction:column;gap:8px"></div>
-      <div style="font-size:.7rem;color:var(--text3);margin-top:8px">코트군을 추가하지 않으면 기존 기본 코트 목록을 사용합니다.</div>
+      <div style="font-size:.7rem;color:var(--text3);margin-top:8px">선택한 코트군만 이 시합에 저장됩니다. 아무것도 선택하지 않으면 기본 코트 목록을 사용합니다.</div>
     </div>
     <div class="card" style="padding:14px 16px;margin-bottom:14px;background:linear-gradient(135deg,#f8fafc,#eef4ff)">
       <div class="form-group" style="margin-bottom:8px">
@@ -1817,10 +1812,6 @@ body.slider-ready .page:not(.active){
   </div>
   <div id="ptab-registry-content" style="display:none">
     <div class="card" style="margin-bottom:10px">
-      <div style="font-size:.78rem;color:var(--text2);line-height:1.6;margin-bottom:10px;padding:10px 12px;background:var(--panel2);border:1px solid var(--border);border-radius:12px">
-        참가자 목록은 일반 사용자도 보기 쉽게 <b>이름 검색 중심</b>으로 단순화했습니다.<br>
-        김해시 단체전 전용 항목(지역/전체 클럽/부클럽/빠른 추가/명단 관리)은 <b>관리자 설정 → 등록선수 관리</b>로 이동했습니다.
-      </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <select class="form-select" id="regYearSel" style="width:90px;font-weight:700" onchange="renderRegistryTab()"><option value="2026">2026년</option></select>
         <input type="text" class="form-input" id="regSearchInput" placeholder="🔍 이름 검색" oninput="renderRegistryTab()" style="flex:1;min-width:220px">
@@ -3136,6 +3127,9 @@ body.slider-ready .page:not(.active){
   </div>
 </div>
 
+
+<div class="modal-overlay" id="mCourtGroupCatalog"><div class="modal-box" style="max-width:720px"><div class="modal-header"><h3>🗂 코트군 관리</h3><button class="modal-close" onclick="cm('mCourtGroupCatalog')">✕</button></div><div class="modal-body"><div style="padding:10px 12px;background:linear-gradient(135deg,#eef4ff,#fffdf5);border:1px solid var(--border);border-radius:12px;font-size:.78rem;line-height:1.65;color:var(--text2);margin-bottom:12px">여기서 저장한 코트군은 <b>시합마다 선택해서 사용</b>합니다. 기존 저장 코트군은 여기서만 수정·삭제하고, 대회 화면에서는 선택/해제만 합니다.</div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px"><input class="form-input" id="cgCatalogNewName" placeholder="코트군 이름 (예: 능동, 국제, 메인코트)" style="flex:1;min-width:180px;font-size:.82rem"><input class="form-input" type="number" min="1" id="cgCatalogNewCount" placeholder="면수" style="width:90px;font-size:.82rem"><button type="button" class="btn btn-primary" style="font-size:.78rem;padding:6px 12px;white-space:nowrap" onclick="addCourtGroupCatalogItem()">➕ 저장</button></div><div id="courtGroupCatalogManageList" style="display:flex;flex-direction:column;gap:8px"></div></div><div class="modal-footer"><button class="btn btn-gray" onclick="cm('mCourtGroupCatalog')">닫기</button><button class="btn btn-primary" onclick="saveCourtGroupCatalogFromModal()">💾 저장</button></div></div></div>
+
 <div class="toast-container" id="TC"></div>
 <div class="sticky-alert-wrap" id="stickyAlertWrap" aria-live="polite" aria-atomic="true"></div>
 <button class="scroll-top" id="stBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
@@ -3221,6 +3215,17 @@ function getTournamentCourtList(tid, fallback=true){
   const list=expandCourtGroups(groups).flatMap(g=>g.courts||[]).map(String).filter(Boolean);
   return [...new Set(list)];
 }
+
+function formatTournamentCourtGroupsSummary(input, fallback=true){
+  const tid = typeof input==='string' ? input : '';
+  const groups = tid ? getTournamentCourtGroups(tid, fallback) : normalizeCourtGroups(input||[]);
+  if(!groups.length) return '기본 코트 사용';
+  return groups.map(g=>`${g.name} ${g.count}면`).join(' · ');
+}
+function getCourtGroupCatalog(){
+  const catalog=normalizeCourtGroups(G?.meta?.courtGroupCatalog||[]);
+  return catalog.length ? catalog : DEFAULT_COURT_GROUPS.map(g=>({name:g.title,count:(g.courts||[]).length}));
+}
 function getDraftCourtGroups(mode='create'){
   const raw = mode==='edit' ? (window._etCourtGroupList||[]) : _customCourtGroupList;
   return normalizeCourtGroups(raw);
@@ -3240,58 +3245,150 @@ function getAllKnownCourts(tid=''){
   const list=[...DEFAULT_COURT_LIST, ...getTournamentCourtList(tid,true)];
   return [...new Set(list.map(String).filter(Boolean))];
 }
+function renderCourtGroupPresetBar(mode='create'){
+  const targetId=mode==='edit' ? 'etCourtGroupPresetBar' : 'courtGroupPresetBar';
+  const el=ge(targetId);
+  if(!el) return;
+  const selected=getDraftCourtGroups(mode).map(g=>String(g.name));
+  const catalog=getCourtGroupCatalog();
+  el.innerHTML = catalog.map(g=>{
+    const active=selected.includes(String(g.name));
+    return `<button type="button" class="btn ${active?'btn-primary':'btn-outline'}" style="font-size:.72rem;padding:3px 10px" onclick="toggleCourtPresetSelection('${mode}',${JSON.stringify(g.name).replace(/"/g,'&quot;')})">${g.name} ${g.count}면${active?' ✓':''}</button>`;
+  }).join('') || '<div style="font-size:.75rem;color:var(--text3);padding:6px 0">저장된 코트군이 없습니다. 먼저 코트군을 저장해 주세요.</div>';
+}
 function renderCourtGroupManager(mode='create'){
-  const list=mode==='edit' ? (window._etCourtGroupList||[]) : _customCourtGroupList;
+  const list=getDraftCourtGroups(mode);
   const targetId=mode==='edit' ? 'etCourtGroupList' : 'courtGroupList';
   const el=ge(targetId);
   if(!el) return;
+  renderCourtGroupPresetBar(mode);
   if(!list.length){
-    el.innerHTML='<div style="font-size:.75rem;color:var(--text3);padding:8px 0">코트군을 추가해 주세요. 비워두면 기존 기본 코트 목록을 사용합니다.</div>';
+    el.innerHTML='<div style="font-size:.75rem;color:var(--text3);padding:8px 0">선택된 코트군이 없습니다. 위 저장 코트군 버튼에서 필요한 코트군만 선택하세요.</div>';
     return;
   }
-  el.innerHTML=list.map((g,i)=>`<div style="padding:9px 10px;background:var(--panel2);border:1px solid var(--border);border-radius:10px"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-weight:800;font-size:.84rem;min-width:90px">${g.name}</span><input class="form-input" value="${g.name}" style="flex:1;min-width:120px;font-size:.8rem;padding:6px 10px" onchange="setCourtGroupName('${mode}',${i},this.value)"><input class="form-input" type="number" min="1" value="${g.count}" style="width:90px;font-size:.8rem;padding:6px 10px" onchange="setCourtGroupCount('${mode}',${i},this.value)"><span class="badge bg-blue" style="font-size:.7rem">${Array.from({length:Math.max(1,parseInt(g.count||1)||1)},(_,idx)=>`${g.name}${idx+1}`).slice(0,4).join(', ')}${Number(g.count)>4?' ...':''}</span><button type="button" class="btn btn-danger" style="padding:3px 8px;font-size:.72rem" onclick="removeCourtGroup('${mode}',${i})">✕</button></div></div>`).join('');
+  el.innerHTML=list.map((g,i)=>`<div style="padding:9px 10px;background:var(--panel2);border:1px solid var(--border);border-radius:10px"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-weight:800;font-size:.84rem;min-width:90px">${g.name}</span><span class="badge bg-blue" style="font-size:.72rem">${g.count}면</span><span class="badge bg-gray" style="font-size:.7rem">${Array.from({length:Math.max(1,parseInt(g.count||1)||1)},(_,idx)=>`${g.name}${idx+1}`).slice(0,4).join(', ')}${Number(g.count)>4?' ...':''}</span><button type="button" class="btn btn-danger" style="padding:3px 8px;font-size:.72rem" onclick="removeCourtGroup('${mode}',${i})">선택 해제</button></div></div>`).join('');
 }
-function addCourtPreset(name,count,mode='create'){
+function toggleCourtPresetSelection(mode='create', name=''){
+  const catalog=getCourtGroupCatalog();
+  const found=catalog.find(g=>String(g.name)===String(name));
+  if(!found) return;
   const list=mode==='edit' ? (window._etCourtGroupList||(window._etCourtGroupList=[])) : _customCourtGroupList;
-  if(list.find(g=>String(g.name).trim()===String(name).trim())){ toast('이미 추가된 코트군입니다','info'); return; }
-  list.push({name:String(name).trim(), count:Math.max(1,parseInt(count||1)||1)});
+  const idx=list.findIndex(g=>String(g.name).trim()===String(name).trim());
+  if(idx>=0) list.splice(idx,1);
+  else list.push({name:found.name, count:found.count});
   renderCourtGroupManager(mode);
   if(mode==='edit') _renderEtDivList(); else _renderCustomDivList();
 }
-function addCourtGroup(mode='create'){
+async function persistCourtGroupCatalog(){
+  G.meta.courtGroupCatalog = normalizeCourtGroups(G.meta.courtGroupCatalog||[]);
+  await saveMeta();
+  renderCourtGroupPresetBar('create');
+  renderCourtGroupPresetBar('edit');
+}
+async function addCourtPreset(name,count,mode='create'){
+  const nm=String(name||'').trim();
+  const ct=Math.max(1,parseInt(count||1)||1);
+  if(!nm){ toast('코트군 이름을 입력해 주세요','error'); return; }
+  const catalog=getCourtGroupCatalog();
+  const exists=catalog.find(g=>String(g.name).trim()===nm);
+  if(!exists){
+    G.meta.courtGroupCatalog = [...catalog, {name:nm, count:ct}];
+    await persistCourtGroupCatalog();
+  }
+  const list=mode==='edit' ? (window._etCourtGroupList||(window._etCourtGroupList=[])) : _customCourtGroupList;
+  if(!list.find(g=>String(g.name).trim()===nm)) list.push({name:nm, count:exists?exists.count:ct});
+  renderCourtGroupManager(mode);
+  if(mode==='edit') _renderEtDivList(); else _renderCustomDivList();
+}
+async function addCourtGroup(mode='create'){
   const name=(ge(mode==='edit'?'etNewCourtGroupName':'newCourtGroupName')?.value||'').trim();
   const count=Math.max(1, parseInt(ge(mode==='edit'?'etNewCourtGroupCount':'newCourtGroupCount')?.value||'0')||0);
   if(!name){ toast('코트군 이름을 입력해 주세요','error'); return; }
   if(!count){ toast('면수를 입력해 주세요','error'); return; }
-  addCourtPreset(name,count,mode);
+  await addCourtPreset(name,count,mode);
   if(ge(mode==='edit'?'etNewCourtGroupName':'newCourtGroupName')) ge(mode==='edit'?'etNewCourtGroupName':'newCourtGroupName').value='';
   if(ge(mode==='edit'?'etNewCourtGroupCount':'newCourtGroupCount')) ge(mode==='edit'?'etNewCourtGroupCount':'newCourtGroupCount').value='';
 }
-function setCourtGroupName(mode, idx, value){
-  const list=mode==='edit' ? (window._etCourtGroupList||[]) : _customCourtGroupList;
-  const item=list[idx]; if(!item) return;
-  item.name=String(value||'').trim()||item.name;
-  renderCourtGroupManager(mode);
-  if(mode==='edit') _renderEtDivList(); else _renderCustomDivList();
-}
-function setCourtGroupCount(mode, idx, value){
-  const list=mode==='edit' ? (window._etCourtGroupList||[]) : _customCourtGroupList;
-  const item=list[idx]; if(!item) return;
-  item.count=Math.max(1, parseInt(value||'0')||1);
-  renderCourtGroupManager(mode);
-  if(mode==='edit') _renderEtDivList(); else _renderCustomDivList();
-}
+function setCourtGroupName(mode, idx, value){ return; }
+function setCourtGroupCount(mode, idx, value){ return; }
 function removeCourtGroup(mode, idx){
   const list=mode==='edit' ? (window._etCourtGroupList||[]) : _customCourtGroupList;
   list.splice(idx,1);
   renderCourtGroupManager(mode);
   if(mode==='edit') _renderEtDivList(); else _renderCustomDivList();
 }
+function resetCourtGroups(mode='create'){
+  if(mode==='edit') window._etCourtGroupList = [];
+  else _customCourtGroupList = [];
+  renderCourtGroupManager(mode);
+  if(mode==='edit') _renderEtDivList(); else _renderCustomDivList();
+}
+function openCourtGroupCatalogModal(){
+  window._courtGroupCatalogDraft = getCourtGroupCatalog().map(x=>({...x}));
+  renderCourtGroupCatalogManageList();
+  om('mCourtGroupCatalog');
+}
+function renderCourtGroupCatalogManageList(){
+  const el=ge('courtGroupCatalogManageList');
+  if(!el) return;
+  const list=window._courtGroupCatalogDraft||[];
+  if(!list.length){
+    el.innerHTML='<div style="font-size:.75rem;color:var(--text3);padding:8px 0">저장된 코트군이 없습니다.</div>';
+    return;
+  }
+  el.innerHTML=list.map((g,i)=>`<div style="padding:9px 10px;background:var(--panel2);border:1px solid var(--border);border-radius:10px"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><input class="form-input" value="${g.name}" style="flex:1;min-width:140px;font-size:.8rem;padding:6px 10px" onchange="updateCourtGroupCatalogDraft(${i},'name',this.value)"><input class="form-input" type="number" min="1" value="${g.count}" style="width:90px;font-size:.8rem;padding:6px 10px" onchange="updateCourtGroupCatalogDraft(${i},'count',this.value)"><span class="badge bg-blue" style="font-size:.7rem">${Array.from({length:Math.max(1,parseInt(g.count||1)||1)},(_,idx)=>`${g.name}${idx+1}`).slice(0,4).join(', ')}${Number(g.count)>4?' ...':''}</span><button type="button" class="btn btn-danger" style="padding:3px 8px;font-size:.72rem" onclick="deleteCourtGroupCatalogDraft(${i})">✕</button></div></div>`).join('');
+}
+function updateCourtGroupCatalogDraft(idx, field, value){
+  const list=window._courtGroupCatalogDraft||[];
+  if(!list[idx]) return;
+  if(field==='name') list[idx].name=String(value||'').trim()||list[idx].name;
+  if(field==='count') list[idx].count=Math.max(1,parseInt(value||'0')||1);
+  renderCourtGroupCatalogManageList();
+}
+function deleteCourtGroupCatalogDraft(idx){
+  const list=window._courtGroupCatalogDraft||[];
+  list.splice(idx,1);
+  renderCourtGroupCatalogManageList();
+}
+function addCourtGroupCatalogItem(){
+  const name=(ge('cgCatalogNewName')?.value||'').trim();
+  const count=Math.max(1,parseInt(ge('cgCatalogNewCount')?.value||'0')||0);
+  if(!name){ toast('코트군 이름을 입력해 주세요','error'); return; }
+  if(!count){ toast('면수를 입력해 주세요','error'); return; }
+  const list=window._courtGroupCatalogDraft||(window._courtGroupCatalogDraft=[]);
+  const idx=list.findIndex(g=>String(g.name).trim()===name);
+  if(idx>=0) list[idx].count=count;
+  else list.push({name,count});
+  if(ge('cgCatalogNewName')) ge('cgCatalogNewName').value='';
+  if(ge('cgCatalogNewCount')) ge('cgCatalogNewCount').value='';
+  renderCourtGroupCatalogManageList();
+}
+async function saveCourtGroupCatalogFromModal(){
+  const next=normalizeCourtGroups(window._courtGroupCatalogDraft||[]);
+  if(!next.length){ toast('코트군을 최소 1개 이상 저장해 주세요','error'); return; }
+  G.meta.courtGroupCatalog=next;
+  await persistCourtGroupCatalog();
+  ['create','edit'].forEach(mode=>{
+    const selected=getDraftCourtGroups(mode).filter(g=>next.some(c=>String(c.name)===String(g.name)));
+    if(mode==='edit') window._etCourtGroupList=selected;
+    else _customCourtGroupList=selected;
+    renderCourtGroupManager(mode);
+  });
+  cm('mCourtGroupCatalog');
+  toast('코트군 저장 완료 ✅','success');
+}
 window.addCourtGroup=addCourtGroup;
 window.addCourtPreset=addCourtPreset;
+window.toggleCourtPresetSelection=toggleCourtPresetSelection;
 window.setCourtGroupName=setCourtGroupName;
 window.setCourtGroupCount=setCourtGroupCount;
 window.removeCourtGroup=removeCourtGroup;
+window.openCourtGroupCatalogModal=openCourtGroupCatalogModal;
+window.updateCourtGroupCatalogDraft=updateCourtGroupCatalogDraft;
+window.deleteCourtGroupCatalogDraft=deleteCourtGroupCatalogDraft;
+window.addCourtGroupCatalogItem=addCourtGroupCatalogItem;
+window.saveCourtGroupCatalogFromModal=saveCourtGroupCatalogFromModal;
+window.resetCourtGroups=resetCourtGroups;
 
 // ── 커스텀 부서 목록 관리 (대회 생성용) ──────────────────────────
 let _customDivList = []; // [{name, rub, maxTeams}]
@@ -5354,6 +5451,8 @@ async function loadMeta(){
       if(typeof G.meta.allowPublicTeamRegistration!=='boolean') G.meta.allowPublicTeamRegistration=!!G.meta.allowPublicTeamRegistration;
       if(typeof G.meta.allowPublicResultEntry!=='boolean') G.meta.allowPublicResultEntry=!!G.meta.allowPublicResultEntry;
       if(!G.meta.appTitle) G.meta.appTitle='시합관리 시스템';
+      G.meta.courtGroupCatalog = normalizeCourtGroups(G.meta.courtGroupCatalog||[]);
+      if(!G.meta.courtGroupCatalog.length) G.meta.courtGroupCatalog = DEFAULT_COURT_GROUPS.map(g=>({name:g.title,count:(g.courts||[]).length}));
       if(!Number.isFinite(Number(G.meta.regSessionVersion))) G.meta.regSessionVersion=1;
       // 개인시합 기간 잠금 설정
       if(!G.meta.indivLockEnabled) G.meta.indivLockEnabled=false;
@@ -5361,7 +5460,7 @@ async function loadMeta(){
       if(!G.meta.indivLockEnd) G.meta.indivLockEnd='';
       markFbWriteCache('meta','config',{pw:G.meta.pw,regPw:(G.meta.regPw||'202601'),clubs:G.clubs,adminPhone:(G.meta.adminPhone||''),clubContacts:(G.meta.clubContacts||{}),clubEmails:(G.meta.clubEmails||{}),clubPasswords:(G.meta.clubPasswords||{}),clubPasswordCustom:(G.meta.clubPasswordCustom||{}),regDeadlineDt:(G.meta.regDeadlineDt||''),adminFloatingNotice:(G.meta.adminFloatingNotice||''),adminFloatingNoticeEnabled:!!G.meta.adminFloatingNoticeEnabled,onlineOrderEnabled:!!G.meta.onlineOrderEnabled,operatorPw:(G.meta.operatorPw||'2026court'),individualAutoCourtAssignEnabled:!!G.meta.individualAutoCourtAssignEnabled,usePlayerRegistry:!!G.meta.usePlayerRegistry,showAssociationDashboard:!!G.meta.showAssociationDashboard,useFixedClubs:!!G.meta.useFixedClubs,allowPublicTeamRegistration:!!G.meta.allowPublicTeamRegistration,allowPublicResultEntry:!!G.meta.allowPublicResultEntry,appTitle:(G.meta.appTitle||'시합관리 시스템'),regSessionVersion:Number(G.meta.regSessionVersion||1),drawHistoryPolicyVersion:Number(G.meta.drawHistoryPolicyVersion||0),indivLockEnabled:!!G.meta.indivLockEnabled,indivLockStart:(G.meta.indivLockStart||''),indivLockEnd:(G.meta.indivLockEnd||'')});
     }else{
-      await setDoc(doc(db,'meta','config'),{pw:'kimhae1234',regPw:'202601',clubs:G.clubs,adminPhone:'',clubContacts:{},clubPasswords:{},clubPasswordCustom:{},adminFloatingNotice:'',adminFloatingNoticeEnabled:false,onlineOrderEnabled:false,operatorPw:'2026court',individualAutoCourtAssignEnabled:false,regSessionVersion:1,drawHistoryPolicyVersion:0,usePlayerRegistry:false,showAssociationDashboard:false,useFixedClubs:false,allowPublicTeamRegistration:false,allowPublicResultEntry:false,appTitle:'시합관리 시스템'});
+      await setDoc(doc(db,'meta','config'),{pw:'kimhae1234',regPw:'202601',clubs:G.clubs,adminPhone:'',clubContacts:{},clubPasswords:{},clubPasswordCustom:{},adminFloatingNotice:'',adminFloatingNoticeEnabled:false,onlineOrderEnabled:false,operatorPw:'2026court',individualAutoCourtAssignEnabled:false,regSessionVersion:1,drawHistoryPolicyVersion:0,usePlayerRegistry:false,showAssociationDashboard:false,useFixedClubs:false,allowPublicTeamRegistration:false,allowPublicResultEntry:false,appTitle:'시합관리 시스템',courtGroupCatalog:DEFAULT_COURT_GROUPS.map(g=>({name:g.title,count:(g.courts||[]).length}))});
     }
   }catch(e){}
 
@@ -5404,6 +5503,7 @@ async function saveMeta(){
     allowPublicTeamRegistration:!!G.meta.allowPublicTeamRegistration,
     allowPublicResultEntry:!!G.meta.allowPublicResultEntry,
     appTitle:(G.meta.appTitle||'시합관리 시스템'),
+    courtGroupCatalog: normalizeCourtGroups(G.meta.courtGroupCatalog||[]),
     regSessionVersion:Number(G.meta.regSessionVersion||1),
     drawHistoryPolicyVersion:Number(G.meta.drawHistoryPolicyVersion||0),
     indivLockEnabled:!!G.meta.indivLockEnabled,
@@ -9429,6 +9529,7 @@ function renderTL(){
     const tc=Object.keys(G.teams).filter(k=>k.startsWith(t.id+'_')).reduce((s,k)=>s+(G.teams[k]||[]).length,0);
     return`<div class="tc"><div class="tc-hdr"><h3>${t.name}</h3><span class="sbadge ${sm[t.status]||'s-open'}">${sl2[t.status]||'접수중'}</span></div>
     <div class="tc-body"><div class="tc-meta"><span class="tc-mi">📅 ${t.date}</span>${t.venue?`<span class="tc-mi">📍 ${t.venue}</span>`:''}<span class="tc-mi">${(t.type||'team')==='individual_pair'?'🎾 개인전':'👥 단체전'}</span><span class="tc-mi">👥 ${tc}${(t.type||'team')==='individual_pair'?'조':'팀'}</span></div>
+    <div style="font-size:.76rem;color:var(--text2);margin-bottom:8px;line-height:1.5">🎾 코트군: <b>${formatTournamentCourtGroupsSummary(t.courtGroups||[], true)}</b></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">${(t.divisions||[]).map(d=>`<span class="dpill ${dc(d)}" style="cursor:pointer" onclick="openRoster('${t.id}','${d}')">${dl(d)} <small>${(G.teams[t.id+'_'+d]||[]).length}팀</small></span>`).join('')}</div>
     ${canManageTournament(t)?`<div class="tc-acts"><select class="form-select" style="width:auto;padding:5px 8px;font-size:.75rem" onchange="chgTS('${t.id}',this.value)"><option value="open" ${t.status==='open'?'selected':''}>접수중</option><option value="closed" ${t.status==='closed'?'selected':''}>마감</option><option value="ongoing" ${t.status==='ongoing'?'selected':''}>진행중</option><option value="finished" ${t.status==='finished'?'selected':''}>종료</option></select><button class="btn btn-outline" style="font-size:.75rem;padding:5px 10px" onclick="openTD('${t.id}')">⚙️ 설정</button><button class="btn btn-primary" style="font-size:.75rem;padding:5px 10px" onclick="openET('${t.id}')">✏️ 편집</button><button class="btn btn-danger" style="font-size:.75rem;padding:5px 10px" onclick="delT('${t.id}')">삭제</button></div>`:
     `<div class="tc-acts"><button class="btn btn-outline" style="font-size:.75rem" onclick="openTD('${t.id}')">상세보기</button></div>`}</div></div>`;
@@ -9530,9 +9631,17 @@ function openET(tid){
         <input class="form-input" id="etNewCourtGroupName" placeholder="코트군 이름" style="flex:1;min-width:150px;font-size:.82rem">
         <input class="form-input" type="number" min="1" id="etNewCourtGroupCount" placeholder="면수" style="width:86px;font-size:.82rem">
         <button type="button" class="btn btn-primary" style="font-size:.76rem;padding:5px 10px;white-space:nowrap" onclick="addCourtGroup('edit')">➕ 추가</button>
+        <button type="button" class="btn btn-gray" style="font-size:.76rem;padding:5px 10px;white-space:nowrap" onclick="resetCourtGroups('edit')">전체 삭제</button>
       </div>
-      <div id="etCourtGroupList" style="display:flex;flex-direction:column;gap:8px"></div>
-      <div style="font-size:.7rem;color:var(--text3);margin-top:6px">편집 후 저장하면 이 대회의 코트 구조 전체가 갱신됩니다.</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+        <button type="button" class="btn btn-outline" style="font-size:.72rem;padding:3px 10px" onclick="addCourtPreset('능동',8,'edit')">능동 8면</button>
+        <button type="button" class="btn btn-outline" style="font-size:.72rem;padding:3px 10px" onclick="addCourtPreset('국제',8,'edit')">국제 8면</button>
+        <button type="button" class="btn btn-outline" style="font-size:.72rem;padding:3px 10px" onclick="addCourtPreset('금병',4,'edit')">금병 4면</button>
+        <button type="button" class="btn btn-outline" style="font-size:.72rem;padding:3px 10px" onclick="addCourtPreset('삼계',4,'edit')">삼계 4면</button>
+        <button type="button" class="btn btn-outline" style="font-size:.72rem;padding:3px 10px" onclick="addCourtPreset('메인코트',6,'edit')">메인코트 6면</button>
+      </div>
+      <div id="etCourtGroupPresetBar" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"></div><div id="etCourtGroupList" style="display:flex;flex-direction:column;gap:8px"></div>
+      <div style="font-size:.7rem;color:var(--text3);margin-top:6px">기존 코트군 이름/면수 수정, 개별 삭제, 전체 삭제 후 저장하면 이 대회 코트 구조가 그대로 반영됩니다.</div>
     </div>
     <div class="form-group"><label class="form-label">부서 &amp; 복식 수</label>
       <div style="display:flex;flex-wrap:wrap;gap:5px;margin:8px 0 10px">
@@ -9680,6 +9789,15 @@ function openTD(tid){
     <td>${AD?`<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start"><button class="btn btn-outline" style="padding:3px 8px;font-size:.7rem" onclick="applyRec('${tid}','${d}')">추천</button><label style="display:flex;gap:6px;align-items:center;font-size:.72rem"><input type="checkbox" id="cFmt_${tid}_${d}" checked>방식</label><label style="display:flex;gap:6px;align-items:center;font-size:.72rem"><input type="checkbox" id="cGs_${tid}_${d}" checked>조</label><label style="display:flex;gap:6px;align-items:center;font-size:.72rem"><input type="checkbox" id="cAdv_${tid}_${d}" checked>진출</label></div>`:''}</td></tr>`;
   }).join('');
   ge('mTDB').innerHTML=`<div style="font-size:.88rem;margin-bottom:10px"><b>📅 ${t.date}</b>${t.venue?' | 📍 '+t.venue:''}</div>
+    <div class="card" style="box-shadow:none;padding:12px;margin-bottom:10px">
+      <div class="card-title">🎾 코트군 설정</div>
+      <div style="font-size:.84rem;color:var(--text2);line-height:1.7">
+        현재 저장된 코트군: <b>${formatTournamentCourtGroupsSummary(t.courtGroups||[], true)}</b>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:10px">
+        ${canEditTournament?`<button class="btn btn-primary" onclick="cm('mTD');openET('${tid}')">✏️ 코트군 수정/삭제</button>`:''}
+      </div>
+    </div>
     <div class="card" style="box-shadow:none;padding:12px"><div class="card-title">⚙️ 부서별 설정</div>
     <div class="table-wrap"><table><thead><tr><th>부서</th><th>팀수</th><th>방식</th><th>조당</th><th>본선진출</th><th>10팀 미만 3위</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
     ${AD?`<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><button class="btn btn-outline" onclick="openClubMgr()">🏟 클럽</button><button class="btn btn-primary" onclick="saveDivS('${tid}')">💾 저장</button></div>`:''}
@@ -13399,15 +13517,20 @@ function renderCombinedBracketSection(tid, div){
       const stats = calcGS(key, gi, grp.teams, teams);
       const grpDone = grpMs.length>0 && grpMs.every(m=>getMatchResultState(key,m).done);
       const adv = cfg.advance || 2;
+      const grpCourts = getGroupDisplayCourts(key, gi);
+      const grpCourtLine = grpCourts.length
+        ? `<div style="margin:8px 0 10px;padding:7px 10px;border-radius:10px;background:#f8fbff;border:1px solid #dbeafe;font-size:.72rem;font-weight:800;color:#1565c0;line-height:1.5">🎾 배정 코트: ${grpCourts.join(' / ')}</div>`
+        : `<div style="margin:8px 0 10px;padding:7px 10px;border-radius:10px;background:#f8fafc;border:1px dashed #cbd5e1;font-size:.72rem;font-weight:700;color:#64748b;line-height:1.5">🎾 배정 코트: 미배정</div>`;
       groupsHTML += `<div style="background:white;border-radius:12px;border:1px solid #dbeafe;box-shadow:0 2px 10px rgba(21,101,192,.08);min-width:220px;flex:1;overflow:hidden">
-        <div style="background:linear-gradient(90deg,#1565c0,#1e88e5);color:white;padding:9px 12px;display:flex;justify-content:space-between;align-items:center">
+        <div style="background:linear-gradient(90deg,#1565c0,#1e88e5);color:white;padding:9px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px">
           <div style="font-weight:800">${grpLabel(gi)}</div>
-          <div style="font-size:.68rem;display:flex;gap:4px;align-items:center;flex-wrap:wrap">
-            ${(grp.courts||[]).map(c=>`<span style="background:rgba(255,255,255,.22);padding:2px 6px;border-radius:999px">🎾${c}</span>`).join('')}
+          <div style="font-size:.68rem;display:flex;gap:4px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+            ${grpCourts.length ? `<span style="background:rgba(255,255,255,.22);padding:2px 8px;border-radius:999px;font-weight:800">🎾 ${grpCourts.join(' / ')}</span>` : `<span style="background:rgba(255,255,255,.14);padding:2px 8px;border-radius:999px">코트 미배정</span>`}
             <span style="background:${grpDone?'#43a047':'rgba(255,255,255,.18)'};padding:2px 6px;border-radius:999px">${grpDone?'완료':'진행중'}</span>
           </div>
         </div>
         <div style="padding:10px 12px">
+          ${grpCourtLine}
           ${stats.map((s,r)=>{
             const isAdv = grpDone && r<adv;
             return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:${r<stats.length-1?'1px solid #f1f5f9':'none'}">
@@ -13502,62 +13625,48 @@ function getRoundTheme(roundIndex,totalRounds){
 }
 
 function getRoundCardTheme(roundIndex,totalRounds){
+  // 색약 친화: 라운드 구분은 색상이 아닌 테두리 굵기/명도로만 처리
+  // 결승(금색 강조) / 준결승~이하(네이비 블루 계열 명도 단계)
   const ri = Number(roundIndex||0);
   const total = Math.max(1, Number(totalRounds||1));
-  if(total >= 7 && ri === 0){
-    return {
-      cardBg:'#f3e8ff', cardAltBg:'#faf5ff', cardBorder:'#c084fc',
-      slotWinBg:'linear-gradient(to right,#9333ea 4px,#f5e8ff 4px)', winColor:'#6b21a8',
-      mutedColor:'#a78bfa', lineColor:'#c084fc'
-    };
-  }
   const roundSize = Math.pow(2, total - ri);
+  // 결승
   if(ri >= total - 1 || roundSize === 2){
     return {
-      cardBg:'#fff7dd', cardAltBg:'#fffdf3', cardBorder:'#facc15',
-      slotWinBg:'linear-gradient(to right,#d4a017 4px,#fff5cc 4px)', winColor:'#a16207',
-      mutedColor:'#d4a017', lineColor:'#facc15'
+      cardBg:'#fff8e6', cardAltBg:'#fffdf5', cardBorder:'#d4a017',
+      slotWinBg:'linear-gradient(to right,#b8860b 4px,#fff3cc 4px)', winColor:'#7a5500',
+      mutedColor:'#888', lineColor:'#d4a017'
     };
   }
+  // 준결승
   if(total >= 3 && ri === total - 2){
     return {
-      cardBg:'#eef2ff', cardAltBg:'#f8faff', cardBorder:'#818cf8',
-      slotWinBg:'linear-gradient(to right,#2563eb 4px,#e8efff 4px)', winColor:'#1d4ed8',
-      mutedColor:'#818cf8', lineColor:'#818cf8'
+      cardBg:'#eef2ff', cardAltBg:'#f5f8ff', cardBorder:'#1d4ed8',
+      slotWinBg:'linear-gradient(to right,#1d4ed8 4px,#dbeafe 4px)', winColor:'#1e3a8a',
+      mutedColor:'#6b85b8', lineColor:'#1d4ed8'
     };
   }
+  // 8강
   if(roundSize === 8){
     return {
-      cardBg:'#fff7ed', cardAltBg:'#fffaf5', cardBorder:'#fdba74',
-      slotWinBg:'linear-gradient(to right,#ea580c 4px,#ffedd5 4px)', winColor:'#c2410c',
-      mutedColor:'#fb923c', lineColor:'#fdba74'
+      cardBg:'#f0f4ff', cardAltBg:'#f7faff', cardBorder:'#4066c0',
+      slotWinBg:'linear-gradient(to right,#3355b0 4px,#dce4f8 4px)', winColor:'#1e3070',
+      mutedColor:'#7a90bb', lineColor:'#4066c0'
     };
   }
+  // 16강
   if(roundSize === 16){
     return {
-      cardBg:'#f0fdf4', cardAltBg:'#f7fff9', cardBorder:'#86efac',
-      slotWinBg:'linear-gradient(to right,#16a34a 4px,#dcfce7 4px)', winColor:'#15803d',
-      mutedColor:'#86efac', lineColor:'#86efac'
+      cardBg:'#f3f6fc', cardAltBg:'#f9fbff', cardBorder:'#6080b8',
+      slotWinBg:'linear-gradient(to right,#4060a8 4px,#e0e8f8 4px)', winColor:'#2a4080',
+      mutedColor:'#8fa0c0', lineColor:'#6080b8'
     };
   }
-  if(roundSize === 32){
-    return {
-      cardBg:'#ecfeff', cardAltBg:'#f7feff', cardBorder:'#67e8f9',
-      slotWinBg:'linear-gradient(to right,#0891b2 4px,#cffafe 4px)', winColor:'#0f766e',
-      mutedColor:'#67e8f9', lineColor:'#67e8f9'
-    };
-  }
-  if(roundSize === 64){
-    return {
-      cardBg:'#eff6ff', cardAltBg:'#f8fbff', cardBorder:'#60a5fa',
-      slotWinBg:'linear-gradient(to right,#2563eb 4px,#dbeafe 4px)', winColor:'#1d4ed8',
-      mutedColor:'#60a5fa', lineColor:'#60a5fa'
-    };
-  }
+  // 32강 이상
   return {
-    cardBg:'#f8fafc', cardAltBg:'#ffffff', cardBorder:'#cbd5e1',
-    slotWinBg:'linear-gradient(to right,#64748b 4px,#e2e8f0 4px)', winColor:'#334155',
-    mutedColor:'#94a3b8', lineColor:'#cbd5e1'
+    cardBg:'#f6f8fc', cardAltBg:'#ffffff', cardBorder:'#8aa0c8',
+    slotWinBg:'linear-gradient(to right,#5070a8 4px,#e4ecf8 4px)', winColor:'#304870',
+    mutedColor:'#9db0c8', lineColor:'#8aa0c8'
   };
 }
 
@@ -20312,11 +20421,8 @@ function buildPH(name,p){
         ${divTags?`<div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:3px">${divTags}</div>`:''}
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:14px">
+    <div style="display:grid;grid-template-columns:repeat(1,1fr);gap:6px;margin-bottom:14px">
       <div class="psm"><div class="psm-val">${totalGames}</div><div class="psm-label">총참가</div></div>
-      <div class="psm"><div class="psm-val" style="color:var(--success)">${p.wins||0}</div><div class="psm-label">팀승</div></div>
-      <div class="psm"><div class="psm-val" style="color:var(--danger)">${p.losses||0}</div><div class="psm-label">팀패</div></div>
-      <div class="psm"><div class="psm-val">${wr}%</div><div class="psm-label">승률</div></div>
     </div>
     <div style="font-size:.78rem;font-weight:700;color:var(--primary-dark);margin-bottom:6px">📋 대회 이력 및 순위</div>
     <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">${histHtml}</div>`;
@@ -25468,7 +25574,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 .bv-slot:last-child{border-bottom:none;}
 .bv-slot .nm{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;}
 .bv-slot .sc{font-family:'Oswald',sans-serif;font-weight:800;min-width:22px;text-align:right;color:var(--primary);font-size:.82rem;}
-.bv-slot.win{background:#dce8fb;color:var(--success);}
+.bv-slot.win{background:#dce8fb;color:#1e3a8a;}
 .bv-slot.win .nm{font-weight:800;}
 .bv-slot.tbd{background:var(--bg2);color:var(--text3);font-style:italic;}
 .bv-slot.bye-slot{background:#f0fdf4;color:#16a34a;font-style:italic;font-size:.7rem;}
@@ -26215,23 +26321,25 @@ function _prelimPopupContext(){
 }
 function _prelimMemberHtml(team, key, ti){
   const esc = _prelimEsc;
-  if(!team) return '<div class="player-name">-</div>';
+  if(!team) return '<div class="player-line">-</div>';
 
   const players = Array.isArray(team.players) ? team.players.filter(Boolean) : [];
   const club = String(team.club || '').trim();
 
   if(Array.isArray(team.individualPlayers) && team.individualPlayers.length){
-    const parts = team.individualPlayers.slice(0,2).map(p=>{
-      const nm = String(p?.name || '').trim();
-      const c = String(p?.clubsRaw || p?.club || '').trim();
-      return `<div class="player-name">${esc(nm || '-')}</div>${c ? `<div class="player-club">${esc(c)}</div>` : ''}`;
-    }).join('<div class="player-gap"></div>');
-    return parts || '<div class="player-name">-</div>';
+    const names = team.individualPlayers.slice(0,2).map(p=>String(p?.name || '').trim() || '-').filter(Boolean);
+    const clubs = team.individualPlayers.slice(0,2).map(p=>String(p?.clubsRaw || p?.club || '').trim()).filter(Boolean);
+    return `
+      <div class="player-line">${esc(names.join(' / ') || '-')}</div>
+      ${clubs.length ? `<div class="player-club inline">${esc(clubs.join(' / '))}</div>` : ''}
+    `;
   }
 
   if(players.length){
-    const pairs = players.map(nm => `<div class="player-name">${esc(nm)}</div>`).join('');
-    return `${pairs}${club ? `<div class="player-club">${esc(club)}</div>` : ''}`;
+    return `
+      <div class="player-line">${esc(players.join(' / '))}</div>
+      ${club ? `<div class="player-club inline">${esc(club)}</div>` : ''}
+    `;
   }
 
   let fallback = '-';
@@ -26240,7 +26348,7 @@ function _prelimMemberHtml(team, key, ti){
   }catch(e){
     fallback = team?.club || team?.name || '-';
   }
-  return `<div class="player-name">${esc(fallback)}</div>`;
+  return `<div class="player-line">${esc(fallback)}</div>`;
 }
 function _buildPrelimSectionsHtml(ctx){
   const {tid, tournament, selectedDivs} = ctx;
@@ -26251,10 +26359,22 @@ function _buildPrelimSectionsHtml(ctx){
     const draw = G.draws?.[key] || {};
     const teams = G.teams?.[key] || [];
     const groups = Array.isArray(draw.groups) ? draw.groups : [];
+    const maxTeamsInGroup = groups.reduce((mx, grp) => {
+      const ids = Array.isArray(grp?.teams) ? grp.teams : (Array.isArray(grp) ? grp : []);
+      return Math.max(mx, ids.length || 0);
+    }, 0);
+    const gridClass = maxTeamsInGroup <= 2 && groups.length >= 5 ? 'group-grid cols-5' : 'group-grid';
 
     const groupHtml = groups.map((grp, gi) => {
       const teamIds = Array.isArray(grp?.teams) ? grp.teams : (Array.isArray(grp) ? grp : []);
-      const courts = Array.isArray(grp?.courts) ? grp.courts.filter(Boolean) : [];
+      const ownCourts = Array.isArray(grp?.courts) ? grp.courts.filter(Boolean) : [];
+      const linkedCourts = (typeof getGroupDisplayCourts === 'function' ? getGroupDisplayCourts(key, gi) : []).filter(Boolean);
+      const liveMatchCourts = (G.matches?.[key] || [])
+        .filter(m => m && String(m.phase||'') === 'group' && Number(m.group) === Number(gi))
+        .flatMap(m => Array.isArray(m.courts) ? m.courts : (m.court ? [m.court] : []))
+        .map(String)
+        .filter(Boolean);
+      const courts = [...new Set([...linkedCourts, ...ownCourts, ...liveMatchCourts])];
       const memo = String(grp?.memo || '').trim();
 
       const teamRows = teamIds.map((ti, idx) => {
@@ -26271,12 +26391,13 @@ function _buildPrelimSectionsHtml(ctx){
         <div class="group-card">
           <div class="group-head">
             <div class="group-name">${gi+1}조</div>
-            ${courts.length ? `<div class="group-court">🎾 ${esc(courts.join(' / '))}</div>` : ``}
+            <div class="group-court">${courts.length ? `🎾 ${esc(courts.join(' / '))}` : '코트 미배정'}</div>
           </div>
+          <div class="group-court-row">🎾 배정 코트: ${courts.length ? esc(courts.join(' / ')) : '미배정'}</div>
           ${memo ? renderNoticeTicker(memo,'📢 공지(조)') : ``}
           <table class="group-table">
             <thead>
-              <tr><th style="width:52px">번호</th><th>선수</th></tr>
+              <tr><th style="width:18px">No</th><th>선수</th></tr>
             </thead>
             <tbody>
               ${teamRows}
@@ -26290,7 +26411,7 @@ function _buildPrelimSectionsHtml(ctx){
       <section class="page">
         <div class="sheet-title">${esc(tournament.name)}</div>
         <div class="sheet-sub">${esc(divName)} 예선 조 편성표${tournament.date ? ` · ${esc(tournament.date)}` : ''}</div>
-        <div class="group-grid">${groupHtml}</div>
+        <div class="${gridClass}">${groupHtml}</div>
       </section>
     `;
   }).join('<div class="page-break"></div>');
@@ -26311,162 +26432,110 @@ function _buildPrelimPopupHtml(ctx, mode){
 <title>${title}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-  @page { size: A4 portrait; margin: 12mm; }
-  *{ box-sizing:border-box; }
+  /* ── A4 인쇄 최적화: 80팀 기준 1~2장 출력 ── */
+  @page { size: A4 portrait; margin: 7mm 8mm; }
+  *{ box-sizing:border-box; margin:0; padding:0; }
   body{
     margin:0;
     background:#eef3f8;
     color:#111827;
     font-family:'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR',sans-serif;
+    font-size:8.5pt;
+    line-height:1.3;
   }
   .toolbar{
-    position:sticky;
-    top:0;
-    z-index:10;
-    display:flex;
-    justify-content:flex-end;
-    gap:8px;
-    padding:12px 14px;
-    background:#0f1e3a;
+    position:sticky; top:0; z-index:10;
+    display:flex; justify-content:flex-end; gap:8px;
+    padding:8px 12px; background:#0f1e3a;
   }
   .toolbar button{
-    border:none;
-    border-radius:10px;
-    padding:10px 14px;
-    font-size:13px;
-    font-weight:800;
-    cursor:pointer;
-    background:#ffffff;
-    color:#0f1e3a;
+    border:none; border-radius:8px; padding:7px 14px;
+    font-size:12px; font-weight:800; cursor:pointer;
+    background:#fff; color:#0f1e3a;
   }
   .page{
     width:210mm;
-    min-height:297mm;
-    margin:14px auto;
+    margin:12px auto;
     background:#fff;
-    padding:14mm 12mm;
-    box-shadow:0 8px 30px rgba(15,30,58,.15);
+    padding:6mm 7mm 5mm;
+    box-shadow:0 4px 20px rgba(15,30,58,.12);
   }
   .sheet-title{
-    font-size:22px;
-    font-weight:900;
-    color:#0f1e3a;
-    text-align:center;
-    margin-bottom:6px;
+    font-size:13pt; font-weight:900; color:#0f1e3a;
+    text-align:center; margin-bottom:2px;
   }
   .sheet-sub{
-    font-size:13px;
-    color:#475569;
-    text-align:center;
-    margin-bottom:14px;
+    font-size:8pt; color:#475569;
+    text-align:center; margin-bottom:7px;
   }
+  /* 조 수에 따라 열 수 자동 조정 */
   .group-grid{
     display:grid;
-    grid-template-columns:repeat(2, minmax(0, 1fr));
-    gap:12px;
+    grid-template-columns:repeat(4, minmax(0,1fr));
+    gap:4px;
+  }
+  .group-grid.cols-5{
+    grid-template-columns:repeat(5, minmax(0,1fr));
   }
   .group-card{
-    border:1.5px solid #cbd5e1;
-    border-radius:12px;
+    border:1px solid #94a3b8;
+    border-radius:4px;
     overflow:hidden;
     break-inside:avoid;
     page-break-inside:avoid;
     background:#fff;
   }
   .group-head{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    gap:8px;
-    padding:10px 12px;
-    background:#0f1e3a;
-    color:#fff;
+    display:flex; justify-content:space-between; align-items:center;
+    gap:4px; padding:3px 5px;
+    background:#0f1e3a; color:#fff;
   }
-  .group-name{
-    font-size:17px;
-    font-weight:900;
-  }
-  .group-court{
-    font-size:11px;
+  .group-name{ font-size:8.5pt; font-weight:900; }
+  .group-court{ font-size:6.5pt; font-weight:700; opacity:.9; white-space:nowrap; }
+  .group-court-row{
+    padding:2px 5px;
+    font-size:6.8pt;
     font-weight:800;
-    opacity:.95;
-    white-space:nowrap;
+    color:#1e3a8a;
+    background:#e8f0fe;
+    border-bottom:1px solid #bfcfee;
+    text-align:center;
+    letter-spacing:.01em;
   }
-  
-.notice-ticker{position:relative;overflow:hidden;width:100%;max-width:100%;border-radius:12px;padding:9px 12px;background:linear-gradient(135deg,#fff1f2,#ffe4e6 55%,#fff7ed);border:2px solid #fb7185;color:#9f1239;font-weight:900;box-shadow:0 4px 12px rgba(244,63,94,.12);}
-.notice-ticker.track-compact{display:block;width:100%;padding:7px 12px;border-radius:999px;vertical-align:middle;}
-.notice-ticker .notice-ticker-inner{display:inline-flex;align-items:center;gap:30px;white-space:nowrap;min-width:max-content;will-change:transform;animation:noticeTickerMove 11s linear infinite;}
-.notice-ticker .notice-ticker-copy{display:inline-flex;align-items:center;gap:30px;white-space:nowrap;}
-.notice-ticker .notice-ticker-label{flex:0 0 auto;font-size:.82rem;font-weight:900;color:#be123c;}
-.notice-ticker .notice-ticker-text{display:inline-block;white-space:nowrap;font-size:.9rem;font-weight:900;letter-spacing:-.01em;}
-@keyframes noticeTickerMove{0%{transform:translateX(100%)}100%{transform:translateX(-100%)}}
 
-.group-memo{
-    padding:7px 10px;
-    font-size:11px;
-    line-height:1.5;
-    color:#8a6412;
-    background:#fff8df;
-    border-bottom:1px solid #f3d27a;
-    font-weight:800;
+  .notice-ticker{ display:none; } /* 인쇄에서 공지 티커 숨김 */
+  .group-memo{
+    padding:2px 5px; font-size:7pt; color:#8a6412;
+    background:#fff8df; border-bottom:1px solid #f3d27a; font-weight:700;
   }
-  .group-table{
-    width:100%;
-    border-collapse:collapse;
-  }
+  .group-table{ width:100%; border-collapse:collapse; }
   .group-table th,
   .group-table td{
     border-top:1px solid #e2e8f0;
-    padding:9px 10px;
-    font-size:13px;
-    vertical-align:top;
-  }
-  .group-table th{
-    background:#f8fafc;
-    color:#334155;
-    font-weight:900;
-    text-align:center;
-  }
-  .group-table td.num{
-    text-align:center;
-    font-weight:900;
-    color:#0f1e3a;
+    padding:2px 4px;
+    font-size:7.5pt;
     vertical-align:middle;
   }
-  .group-table td.name{
-    font-weight:800;
-    line-height:1.5;
-    word-break:keep-all;
+  .group-table th{
+    background:#f1f5f9; color:#334155; font-weight:900; text-align:center;
+    padding:2px 4px; font-size:7pt;
   }
-  .player-name{
-    font-weight:800;
-    font-size:14px;
-    line-height:1.45;
-    color:#0f172a;
+  .group-table td.num{
+    text-align:center; font-weight:900; color:#0f1e3a;
+    width:18px; font-size:7.5pt;
   }
-  .player-gap{
-    height:6px;
-  }
-  .player-club{
-    margin-top:2px;
-    font-size:11px;
-    color:#64748b;
-    font-weight:700;
-  }
-  .page-break{
-    page-break-before:always;
-    break-before:page;
-  }
+  .group-table td.name{ font-weight:700; line-height:1.15; word-break:keep-all; }
+  .player-line{ font-weight:900; font-size:7.15pt; line-height:1.2; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .player-club{ margin-top:1px; font-size:6.1pt; color:#64748b; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .player-club.inline{ letter-spacing:-.01em; }
+  .page-break{ page-break-before:always; break-before:page; }
+
   @media print{
-    body{ background:#fff; }
+    body{ background:#fff; font-size:8pt; }
     .toolbar{ display:none; }
-    .page{
-      width:auto;
-      min-height:auto;
-      margin:0;
-      padding:0;
-      box-shadow:none;
-    }
+    .page{ width:auto; margin:0; padding:5mm 6mm 4mm; box-shadow:none; }
+    .group-grid{ gap:3px; }
+    .group-grid.cols-5{ grid-template-columns:repeat(5, minmax(0,1fr)); }
   }
 </style>
 </head>
