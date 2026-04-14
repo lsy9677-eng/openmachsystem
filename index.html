@@ -1758,6 +1758,88 @@ body{
   .help-grid{grid-template-columns:1fr}
 }
 
+
+/* Bottom Tab Bar */
+.bottom-tab-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: #0f172a;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  z-index: 9999;
+  border-top: 1px solid #334155;
+}
+.bottom-tab-bar button {
+  background: none;
+  border: none;
+  color: #cbd5f5;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.bottom-tab-bar button.active {
+  color: #facc15;
+}
+body {
+  padding-bottom: 70px;
+}
+
+
+/* Mobile bottom navigation upgrade */
+@media (max-width: 768px){
+  .nav-tabs{
+    display:none !important;
+  }
+  .bottom-tab-bar{
+    position:fixed;
+    left:0; right:0; bottom:0;
+    height:64px;
+    display:flex;
+    justify-content:space-around;
+    align-items:center;
+    background:linear-gradient(180deg,#0b1732 0%, #0f1e3a 100%);
+    border-top:1px solid rgba(255,255,255,.12);
+    box-shadow:0 -6px 20px rgba(0,0,0,.18);
+    z-index:99999;
+    padding-bottom:env(safe-area-inset-bottom, 0px);
+  }
+  .bottom-tab-bar button{
+    flex:1 1 16.66%;
+    height:100%;
+    background:none;
+    border:none;
+    color:rgba(255,255,255,.72);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:3px;
+    font-size:11px;
+    font-weight:700;
+    line-height:1.1;
+  }
+  .bottom-tab-bar button .icon{
+    font-size:16px;
+    line-height:1;
+  }
+  .bottom-tab-bar button.active{
+    color:#facc15;
+  }
+  body{
+    padding-bottom:74px !important;
+  }
+}
+@media (min-width: 769px){
+  .bottom-tab-bar{
+    display:none !important;
+  }
+}
+
 </style>
 
 <!-- PWA -->
@@ -6477,6 +6559,88 @@ function sl(s){let el=ge('gLd');if(!el){el=document.createElement('div');el.id='
   #mainStep2 > div > div:last-child > div:first-child{
     font-size:.86rem!important;
     margin-bottom:4px!important;
+  }
+}
+
+
+/* Bottom Tab Bar */
+.bottom-tab-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: #0f172a;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  z-index: 9999;
+  border-top: 1px solid #334155;
+}
+.bottom-tab-bar button {
+  background: none;
+  border: none;
+  color: #cbd5f5;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.bottom-tab-bar button.active {
+  color: #facc15;
+}
+body {
+  padding-bottom: 70px;
+}
+
+
+/* Mobile bottom navigation upgrade */
+@media (max-width: 768px){
+  .nav-tabs{
+    display:none !important;
+  }
+  .bottom-tab-bar{
+    position:fixed;
+    left:0; right:0; bottom:0;
+    height:64px;
+    display:flex;
+    justify-content:space-around;
+    align-items:center;
+    background:linear-gradient(180deg,#0b1732 0%, #0f1e3a 100%);
+    border-top:1px solid rgba(255,255,255,.12);
+    box-shadow:0 -6px 20px rgba(0,0,0,.18);
+    z-index:99999;
+    padding-bottom:env(safe-area-inset-bottom, 0px);
+  }
+  .bottom-tab-bar button{
+    flex:1 1 16.66%;
+    height:100%;
+    background:none;
+    border:none;
+    color:rgba(255,255,255,.72);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:3px;
+    font-size:11px;
+    font-weight:700;
+    line-height:1.1;
+  }
+  .bottom-tab-bar button .icon{
+    font-size:16px;
+    line-height:1;
+  }
+  .bottom-tab-bar button.active{
+    color:#facc15;
+  }
+  body{
+    padding-bottom:74px !important;
+  }
+}
+@media (min-width: 769px){
+  .bottom-tab-bar{
+    display:none !important;
   }
 }
 
@@ -26332,6 +26496,88 @@ document.addEventListener('DOMContentLoaded',()=>{
   }
 }
 
+
+/* Bottom Tab Bar */
+.bottom-tab-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: #0f172a;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  z-index: 9999;
+  border-top: 1px solid #334155;
+}
+.bottom-tab-bar button {
+  background: none;
+  border: none;
+  color: #cbd5f5;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.bottom-tab-bar button.active {
+  color: #facc15;
+}
+body {
+  padding-bottom: 70px;
+}
+
+
+/* Mobile bottom navigation upgrade */
+@media (max-width: 768px){
+  .nav-tabs{
+    display:none !important;
+  }
+  .bottom-tab-bar{
+    position:fixed;
+    left:0; right:0; bottom:0;
+    height:64px;
+    display:flex;
+    justify-content:space-around;
+    align-items:center;
+    background:linear-gradient(180deg,#0b1732 0%, #0f1e3a 100%);
+    border-top:1px solid rgba(255,255,255,.12);
+    box-shadow:0 -6px 20px rgba(0,0,0,.18);
+    z-index:99999;
+    padding-bottom:env(safe-area-inset-bottom, 0px);
+  }
+  .bottom-tab-bar button{
+    flex:1 1 16.66%;
+    height:100%;
+    background:none;
+    border:none;
+    color:rgba(255,255,255,.72);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:3px;
+    font-size:11px;
+    font-weight:700;
+    line-height:1.1;
+  }
+  .bottom-tab-bar button .icon{
+    font-size:16px;
+    line-height:1;
+  }
+  .bottom-tab-bar button.active{
+    color:#facc15;
+  }
+  body{
+    padding-bottom:74px !important;
+  }
+}
+@media (min-width: 769px){
+  .bottom-tab-bar{
+    display:none !important;
+  }
+}
+
 </style>
 
 <script>
@@ -27142,6 +27388,88 @@ function _buildPrelimPopupHtml(ctx, mode){
     .group-grid{ gap:3px; }
     .group-grid.cols-5{ grid-template-columns:repeat(5, minmax(0,1fr)); }
   }
+
+/* Bottom Tab Bar */
+.bottom-tab-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: #0f172a;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  z-index: 9999;
+  border-top: 1px solid #334155;
+}
+.bottom-tab-bar button {
+  background: none;
+  border: none;
+  color: #cbd5f5;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.bottom-tab-bar button.active {
+  color: #facc15;
+}
+body {
+  padding-bottom: 70px;
+}
+
+
+/* Mobile bottom navigation upgrade */
+@media (max-width: 768px){
+  .nav-tabs{
+    display:none !important;
+  }
+  .bottom-tab-bar{
+    position:fixed;
+    left:0; right:0; bottom:0;
+    height:64px;
+    display:flex;
+    justify-content:space-around;
+    align-items:center;
+    background:linear-gradient(180deg,#0b1732 0%, #0f1e3a 100%);
+    border-top:1px solid rgba(255,255,255,.12);
+    box-shadow:0 -6px 20px rgba(0,0,0,.18);
+    z-index:99999;
+    padding-bottom:env(safe-area-inset-bottom, 0px);
+  }
+  .bottom-tab-bar button{
+    flex:1 1 16.66%;
+    height:100%;
+    background:none;
+    border:none;
+    color:rgba(255,255,255,.72);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:3px;
+    font-size:11px;
+    font-weight:700;
+    line-height:1.1;
+  }
+  .bottom-tab-bar button .icon{
+    font-size:16px;
+    line-height:1;
+  }
+  .bottom-tab-bar button.active{
+    color:#facc15;
+  }
+  body{
+    padding-bottom:74px !important;
+  }
+}
+@media (min-width: 769px){
+  .bottom-tab-bar{
+    display:none !important;
+  }
+}
+
 </style>
 </head>
 <body>
@@ -27169,9 +27497,103 @@ function _buildPrelimPopupHtml(ctx, mode){
       }
     }
   ${scriptClose}
-</body>
-</html>`;
-}
+
+
+
+<div class="bottom-tab-bar" id="bottomTabBar">
+  <button data-target="home"><span class="icon">🏠</span><span>홈</span></button>
+  <button data-target="tournament"><span class="icon">🏆</span><span>대회관리</span></button>
+  <button data-target="register"><span class="icon">📋</span><span>팀등록</span></button>
+  <button data-target="bracket"><span class="icon">🎾</span><span>대진표</span></button>
+  <button data-target="players"><span class="icon">👤</span><span>기록</span></button>
+  <button data-target="results"><span class="icon">📊</span><span>결과</span></button>
+</div>
+
+<script>
+(function(){
+  function getTopTabs(){
+    return Array.from(document.querySelectorAll('.nav-tab, .top-nav-tab, .menu-tab'));
+  }
+
+  function normalizeText(t){
+    return (t || '').replace(/\s+/g,'').trim();
+  }
+
+  function clickTopTabByTarget(target){
+    const map = {
+      home: ['홈'],
+      tournament: ['대회관리'],
+      register: ['팀등록'],
+      bracket: ['대진표'],
+      players: ['참가기록','참가자기록'],
+      results: ['시합결과']
+    };
+    const wanted = map[target] || [];
+    const tabs = getTopTabs();
+    for(const tab of tabs){
+      const txt = normalizeText(tab.textContent);
+      if(wanted.some(w => txt.includes(normalizeText(w)))){
+        tab.click();
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function detectActiveTarget(){
+    const tabs = getTopTabs();
+    for(const tab of tabs){
+      if(tab.classList.contains('active')){
+        const txt = normalizeText(tab.textContent);
+        if(txt.includes('홈')) return 'home';
+        if(txt.includes('대회관리')) return 'tournament';
+        if(txt.includes('팀등록')) return 'register';
+        if(txt.includes('대진표')) return 'bracket';
+        if(txt.includes('참가기록') || txt.includes('참가자기록')) return 'players';
+        if(txt.includes('시합결과')) return 'results';
+      }
+    }
+    return 'home';
+  }
+
+  function syncBottomTabs(){
+    const active = detectActiveTarget();
+    document.querySelectorAll('#bottomTabBar button').forEach(btn=>{
+      btn.classList.toggle('active', btn.dataset.target === active);
+    });
+  }
+
+  function initBottomTabs(){
+    const buttons = document.querySelectorAll('#bottomTabBar button');
+    buttons.forEach(btn=>{
+      btn.addEventListener('click', function(e){
+        e.preventDefault();
+        clickTopTabByTarget(btn.dataset.target);
+        setTimeout(syncBottomTabs, 50);
+        setTimeout(syncBottomTabs, 250);
+      });
+    });
+
+    const tabs = getTopTabs();
+    tabs.forEach(tab=>{
+      tab.addEventListener('click', function(){
+        setTimeout(syncBottomTabs, 10);
+        setTimeout(syncBottomTabs, 150);
+      });
+    });
+
+    syncBottomTabs();
+
+    const obs = new MutationObserver(syncBottomTabs);
+    tabs.forEach(tab=>obs.observe(tab, {attributes:true, attributeFilter:['class']}));
+  }
+
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', initBottomTabs);
+  }else{
+    initBottomTabs();
+  }
+})();
 
 function exportPrelimSheet(){
   try{
@@ -27210,12 +27632,8 @@ function exportPrelimImage(){
   }
 }
 
-
-</script>
-
-
-<script>
 (function mobileBackNavigationLayer(){
+
   if(window.__mobileBackNavigationLayerInstalled) return;
   window.__mobileBackNavigationLayerInstalled = true;
 
@@ -27612,6 +28030,105 @@ document.addEventListener('DOMContentLoaded', function(){
     }catch(e){}
   }, 900);
 });
+</script>
+
+
+
+
+<div class="bottom-tab-bar" id="bottomTabBar">
+  <button data-target="home"><span class="icon">🏠</span><span>홈</span></button>
+  <button data-target="tournament"><span class="icon">🏆</span><span>대회관리</span></button>
+  <button data-target="register"><span class="icon">📋</span><span>팀등록</span></button>
+  <button data-target="bracket"><span class="icon">🎾</span><span>대진표</span></button>
+  <button data-target="players"><span class="icon">👤</span><span>기록</span></button>
+  <button data-target="results"><span class="icon">📊</span><span>결과</span></button>
+</div>
+
+<script>
+(function(){
+  function getTopTabs(){
+    return Array.from(document.querySelectorAll('.nav-tab, .top-nav-tab, .menu-tab'));
+  }
+
+  function normalizeText(t){
+    return (t || '').replace(/\s+/g,'').trim();
+  }
+
+  function clickTopTabByTarget(target){
+    const map = {
+      home: ['홈'],
+      tournament: ['대회관리'],
+      register: ['팀등록'],
+      bracket: ['대진표'],
+      players: ['참가기록','참가자기록'],
+      results: ['시합결과']
+    };
+    const wanted = map[target] || [];
+    const tabs = getTopTabs();
+    for(const tab of tabs){
+      const txt = normalizeText(tab.textContent);
+      if(wanted.some(w => txt.includes(normalizeText(w)))){
+        tab.click();
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function detectActiveTarget(){
+    const tabs = getTopTabs();
+    for(const tab of tabs){
+      if(tab.classList.contains('active')){
+        const txt = normalizeText(tab.textContent);
+        if(txt.includes('홈')) return 'home';
+        if(txt.includes('대회관리')) return 'tournament';
+        if(txt.includes('팀등록')) return 'register';
+        if(txt.includes('대진표')) return 'bracket';
+        if(txt.includes('참가기록') || txt.includes('참가자기록')) return 'players';
+        if(txt.includes('시합결과')) return 'results';
+      }
+    }
+    return 'home';
+  }
+
+  function syncBottomTabs(){
+    const active = detectActiveTarget();
+    document.querySelectorAll('#bottomTabBar button').forEach(btn=>{
+      btn.classList.toggle('active', btn.dataset.target === active);
+    });
+  }
+
+  function initBottomTabs(){
+    const buttons = document.querySelectorAll('#bottomTabBar button');
+    buttons.forEach(btn=>{
+      btn.addEventListener('click', function(e){
+        e.preventDefault();
+        clickTopTabByTarget(btn.dataset.target);
+        setTimeout(syncBottomTabs, 50);
+        setTimeout(syncBottomTabs, 250);
+      });
+    });
+
+    const tabs = getTopTabs();
+    tabs.forEach(tab=>{
+      tab.addEventListener('click', function(){
+        setTimeout(syncBottomTabs, 10);
+        setTimeout(syncBottomTabs, 150);
+      });
+    });
+
+    syncBottomTabs();
+
+    const obs = new MutationObserver(syncBottomTabs);
+    tabs.forEach(tab=>obs.observe(tab, {attributes:true, attributeFilter:['class']}));
+  }
+
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', initBottomTabs);
+  }else{
+    initBottomTabs();
+  }
+})();
 </script>
 
 </body>
