@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-04-15-v227-wait-timer-fix";
+  const APP_VERSION = "2026-04-15-v228-elapsed-timer-fix";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -7043,7 +7043,8 @@ function courtBoardClockTick(){
 }
 function startCourtBoardClock(){
   if(_courtClockTimer) clearInterval(_courtClockTimer);
-  // 즉시 실행하면 renderBracket 직후라 0분으로 표시됨 → 첫 틱은 60초 후
+  // 렌더 직후 즉시 한 번 틱 실행 → 렌더링이 반복돼도 경과시간이 리셋되지 않음
+  courtBoardClockTick();
   _courtClockTimer = setInterval(courtBoardClockTick, 60000);
 }
 window.courtBoardClockTick = courtBoardClockTick;
