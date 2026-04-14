@@ -1,30 +1,12 @@
 {
-  "name": "시합관리 시스템",
-  "short_name": "230MATCH",
+  "name": "230MATCH",
+  "short_name": "230",
   "start_url": "/",
-  "scope": "/",
   "display": "standalone",
   "background_color": "#0f1e3a",
   "theme_color": "#0f1e3a",
-  "description": "테니스 시합 관리 및 대진표 운영 시스템",
   "icons": [
-    {
-      "src": "icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
-    }
+    {"src":"icon-192.png","sizes":"192x192","type":"image/png"},
+    {"src":"icon-512.png","sizes":"512x512","type":"image/png"}
   ]
 }
