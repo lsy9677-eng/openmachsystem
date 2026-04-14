@@ -13061,13 +13061,28 @@ function rebuildIndividualAutoCourtAssignmentsForKey(key){
   return changed;
 }
 
+const __autoCourtSaveTimers = Object.create(null);
+const __autoCourtSaveInflight = Object.create(null);
 function scheduleAutoCourtAssignmentSave(key){
-  // 2026-04 hotfix: 자동 코트배정은 렌더 중 Firestore write를 발생시키지 않는다.
-  // 화면 표시용으로만 재계산하고, 실제 저장은 결과입력/수동저장 등 기존 저장 경로에서만 일어난다.
-  return false;
+  if(!key) return false;
+  try{ if(__autoCourtSaveTimers[key]) clearTimeout(__autoCourtSaveTimers[key]); }catch(e){}
+  __autoCourtSaveTimers[key]=setTimeout(async ()=>{
+    if(__autoCourtSaveInflight[key]) return;
+    __autoCourtSaveInflight[key]=true;
+    try{
+      await stM(key);
+    }catch(e){
+      console.warn('auto court assignment save failed', key, e);
+    }finally{
+      __autoCourtSaveInflight[key]=false;
+    }
+  }, 80);
+  return true;
 }
 function ensureIndividualAutoCourtAssignmentsForKey(key){
-  return rebuildIndividualAutoCourtAssignmentsForKey(key);
+  const changed = rebuildIndividualAutoCourtAssignmentsForKey(key);
+  if(changed) scheduleAutoCourtAssignmentSave(key);
+  return changed;
 }
 window.toggleIndividualAutoCourtAssign = async function toggleIndividualAutoCourtAssign(){
   if(!AD){ toast('관리자만 변경할 수 있습니다','info'); return; }
@@ -19093,6 +19108,13 @@ async function saveM3(){
   m.rubbers=newRb;
   if(G.meta.onlineOrderEnabled && orderState.bothSubmitted) syncRevealedOrderIntoMatchRubbers(key,m);
   m.winner=hasFinalWinner ? (sc1>sc2?m.t1:m.t2) : null;
+  if(hasFinalWinner){
+    if(!m.completedAt) m.completedAt=new Date().toISOString();
+    if(!m.resultSavedAt) m.resultSavedAt=m.completedAt;
+  }else{
+    delete m.completedAt;
+    delete m.resultSavedAt;
+  }
 
   const adjustPlayerStatsForUnfinalized = async () => {
     if(prevW==null) return;
