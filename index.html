@@ -26645,5 +26645,161 @@ function exportPrelimImage(){
 </script>
 
 
+<script>
+(function mobileBackNavigationLayer(){
+  if(window.__mobileBackNavigationLayerInstalled) return;
+  window.__mobileBackNavigationLayerInstalled = true;
+
+  const APP_NAV_NS = '__app_nav__';
+  let suppressHistoryPush = false;
+  let popHandling = false;
+  let modalSeq = 0;
+
+  function currentPage(){
+    return document.querySelector('.page.active')?.id?.replace('page-','') || 'home';
+  }
+  function openModalIds(){
+    return [...document.querySelectorAll('.modal-overlay.open')].map(el => el.id).filter(Boolean);
+  }
+  function topModalId(){
+    const ids = openModalIds();
+    return ids.length ? ids[ids.length-1] : '';
+  }
+  function cloneState(base){
+    const src = (base && typeof base === 'object') ? base : (history.state && typeof history.state === 'object' ? history.state : {});
+    return { ...src };
+  }
+  function applyPageState(page){
+    const target = String(page || 'home');
+    const fn = window.__appOriginalShowPage || window.showPage;
+    if(typeof fn !== 'function') return;
+    suppressHistoryPush = true;
+    try{ fn(target); } finally { suppressHistoryPush = false; }
+  }
+  function replaceBaseState(page){
+    const state = { [APP_NAV_NS]: true, type: 'page', page: String(page || currentPage()), modalId: '' };
+    try{ history.replaceState(state, '', '#' + state.page); }catch(e){}
+  }
+  function pushPageState(page){
+    const target = String(page || currentPage());
+    const st = history.state || {};
+    if(st && st[APP_NAV_NS] && st.type === 'page' && st.page === target) return;
+    try{ history.pushState({ [APP_NAV_NS]: true, type: 'page', page: target, modalId: '' }, '', '#' + target); }catch(e){}
+  }
+  function pushModalState(id){
+    const mid = String(id || '');
+    if(!mid) return;
+    const st = history.state || {};
+    if(st && st[APP_NAV_NS] && st.type === 'modal' && st.modalId === mid) return;
+    try{ history.pushState({ [APP_NAV_NS]: true, type: 'modal', page: currentPage(), modalId: mid, seq: ++modalSeq }, '', '#' + currentPage()); }catch(e){}
+  }
+  function closeTopModalDirect(preferredId){
+    const target = preferredId || topModalId();
+    if(!target) return false;
+    try{
+      if(typeof window.cm === 'function') window.cm(target);
+      else document.getElementById(target)?.classList.remove('open');
+    }catch(e){
+      document.getElementById(target)?.classList.remove('open');
+    }
+    return true;
+  }
+
+  replaceBaseState(currentPage());
+
+  const priorShowPage = window.showPage;
+  if(typeof priorShowPage === 'function'){
+    window.__appOriginalShowPage = priorShowPage;
+    window.showPage = function(name){
+      const prev = currentPage();
+      const res = priorShowPage.apply(this, arguments);
+      const next = currentPage();
+      if(!popHandling){
+        if(next !== prev && !suppressHistoryPush){
+          pushPageState(next);
+        }else if(!history.state || !history.state[APP_NAV_NS]){
+          replaceBaseState(next);
+        }
+      }
+      return res;
+    };
+  }
+
+  const priorOm = window.om;
+  if(typeof priorOm === 'function'){
+    window.__appOriginalOm = priorOm;
+    window.om = function(id){
+      const alreadyOpen = !!document.getElementById(id)?.classList.contains('open');
+      const res = priorOm.apply(this, arguments);
+      if(!popHandling && !alreadyOpen && document.getElementById(id)?.classList.contains('open')){
+        pushModalState(id);
+      }
+      return res;
+    };
+  }
+
+  const priorCm = window.cm;
+  if(typeof priorCm === 'function'){
+    window.__appOriginalCm = priorCm;
+    window.cm = function(id){
+      const beforeTop = topModalId();
+      const target = String(id || beforeTop || '');
+      const res = priorCm.apply(this, arguments);
+      const afterIds = openModalIds();
+      const closedTop = target && beforeTop === target && !afterIds.includes(target);
+      if(!popHandling && closedTop){
+        const st = history.state || {};
+        if(st && st[APP_NAV_NS] && st.type === 'modal' && st.modalId === target){
+          try{ history.back(); }catch(e){}
+        }else if(!st || !st[APP_NAV_NS]){
+          replaceBaseState(currentPage());
+        }
+      }
+      return res;
+    };
+  }
+
+  window.addEventListener('popstate', function(ev){
+    const state = ev.state || {};
+    popHandling = true;
+    try{
+      if(state && state[APP_NAV_NS]){
+        const page = String(state.page || currentPage() || 'home');
+        const wantModal = String(state.modalId || '');
+        const openIds = openModalIds();
+        if(wantModal){
+          while(openIds.length){
+            const top = topModalId();
+            if(top === wantModal) break;
+            if(!closeTopModalDirect(top)) break;
+            openIds.pop();
+          }
+          applyPageState(page);
+          if(!document.getElementById(wantModal)?.classList.contains('open') && typeof window.__appOriginalOm === 'function'){
+            window.__appOriginalOm(wantModal);
+          }
+        }else{
+          while(topModalId()){
+            if(!closeTopModalDirect(topModalId())) break;
+          }
+          applyPageState(page);
+        }
+      }else{
+        const openTop = topModalId();
+        if(openTop){
+          closeTopModalDirect(openTop);
+          replaceBaseState(currentPage());
+        }else{
+          applyPageState('home');
+          replaceBaseState('home');
+        }
+      }
+    }finally{
+      popHandling = false;
+    }
+  });
+})();
+</script>
+
 </body>
 </html>
