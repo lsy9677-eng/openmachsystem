@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-04-14-v218-ui-refresh-230match";
+  const APP_VERSION = "2026-04-14-v219-230match-pwa-icon-refresh";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -1712,12 +1712,12 @@ body{
   const defs = [
     ['link', { rel:'manifest', href:'./manifest.json' }],
     ['meta', { name:'theme-color', content:'#0f1e3a' }],
-    ['link', { rel:'apple-touch-icon', href:'./icon-180.png' }],
-    ['link', { rel:'icon', type:'image/png', sizes:'192x192', href:'./icon-192.png' }],
-    ['link', { rel:'icon', type:'image/png', sizes:'512x512', href:'./icon-512.png' }],
+    ['link', { rel:'apple-touch-icon', href:'./icon-180.png?v=230match' }],
+    ['link', { rel:'icon', type:'image/png', sizes:'192x192', href:'./icon-192.png?v=230match' }],
+    ['link', { rel:'icon', type:'image/png', sizes:'512x512', href:'./icon-512.png?v=230match' }],
     ['meta', { name:'apple-mobile-web-app-capable', content:'yes' }],
     ['meta', { name:'apple-mobile-web-app-status-bar-style', content:'default' }],
-    ['meta', { name:'apple-mobile-web-app-title', content:'시합관리 시스템' }]
+    ['meta', { name:'apple-mobile-web-app-title', content:'230MATCH' }]
   ];
   defs.forEach(([tag, attrs])=>{
     const el = document.createElement(tag);
@@ -25653,26 +25653,17 @@ document.addEventListener('DOMContentLoaded',()=>{
 </script>
 
 <script>
-  // 배포 안정화 모드: 기존 service worker 자동 해제 + 캐시 정리
-  // 이번 버전은 새 service worker를 다시 등록하지 않습니다.
-  if ("serviceWorker" in navigator) {
+  // PWA 서비스워커 등록
+  if ("serviceWorker" in navigator && location.protocol !== "file:") {
     window.addEventListener("load", async () => {
       try {
-        const regs = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(regs.map(r => r.unregister()));
-      } catch (_) {}
-
-      try {
-        if ("caches" in window) {
-          const keys = await caches.keys();
-          await Promise.all(keys.map(k => caches.delete(k)));
-        }
-      } catch (_) {}
+        const reg = await navigator.serviceWorker.register("./sw.js?v=230match", { scope: "./" });
+        try { await reg.update(); } catch(_) {}
+      } catch (e) {
+        console.warn("service worker register failed", e);
+      }
     });
   }
-
-
-
 </script>
 <script>
 /* ===============================
