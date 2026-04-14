@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-04-14-v220-help-center-sms-court";
+  const APP_VERSION = "2026-04-15-v222-manual-assign-priority-fix";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -5287,22 +5287,49 @@ async function moveCourtQueueCard(key, mid, targetCourt){
     m.manualSharedHold=true;
     m.manualCourtPinnedAt=new Date().toISOString();
   }
+  const nowIso = new Date().toISOString();
   if(isIndividualByKey(key) && isIndividualAutoCourtAssignEnabled()){
     if(court){
+      // [BUG FIX] rebuild 전에 m.courts/m.court를 즉시 설정해두어야
+      // renderBracket() 시점에 snapshot에서 카드가 사라지지 않는다.
+      m.courts=[court];
+      m.court=court;
+      if(!m.courtAssignedAt) m.courtAssignedAt=nowIso;
+      // rebuild: 전체 재계산 (수동 pinned를 우선 배치)
       ensureIndividualAutoCourtAssignmentsForKey(key);
+      // rebuild 후에도 m.courts가 올바르게 설정됐는지 보장
+      if(!Array.isArray(m.courts)||!m.courts.length){ m.courts=[court]; m.court=court; }
     }else{
       m.courts=[];
       m.court='';
       delete m.courtAssignedAt;
       delete m.autoCourtLabel;
+      // 공용대기로 이동 시 waitingFirstAt 초기화
+      delete m.waitingFirstAt;
     }
   }else{
     if(court){
+      const prevCourt=String(m.court||'').trim();
+      const isNewCourt = prevCourt!==court;
       m.courts=[court];
       m.court=court;
-      m.courtAssignedAt=new Date().toISOString();
+      if(!m.courtAssignedAt || isNewCourt) m.courtAssignedAt=nowIso;
+      // [BUG FIX] 코트 대기열(2번째 이후)로 이동할 때 waitingFirstAt 기록
+      // getCourtStatusSnapshot에서 related[0]=current, 나머지=waiting이므로
+      // 현재 그 코트에 이미 진행중 경기가 있으면 대기 상태임
+      const currentOnCourt=(G.matches[key]||[]).find(x=>
+        x.winner==null && String(x.id)!==String(mid) &&
+        (Array.isArray(x.courts)?x.courts:[x.court||'']).includes(court) &&
+        String(x.courtQueueOrder||x.courtAssignedAt||'') < String(m.courtAssignedAt||nowIso)
+      );
+      if(currentOnCourt){
+        if(!m.waitingFirstAt) m.waitingFirstAt=nowIso;
+      }else{
+        // 현재 경기로 직접 배정되는 경우 waitingFirstAt 불필요
+        delete m.waitingFirstAt;
+      }
     }else{
-      m.courts=[]; m.court=''; delete m.courtAssignedAt;
+      m.courts=[]; m.court=''; delete m.courtAssignedAt; delete m.waitingFirstAt;
     }
   }
   sl(true);
@@ -12620,6 +12647,9 @@ function rebuildIndividualAutoCourtAssignmentsForKey(key){
     m.courtQueueOrder=queueOrder;
     if(item.autoLabel) m.autoCourtLabel=item.autoLabel; else delete m.autoCourtLabel;
     m.manualSharedHold=false;
+    // [BUG FIX] rebuild 시 prevState에 저장된 waitingFirstAt/lastWaitingFirstAt 복원
+    if(prev.waitingFirstAt) m.waitingFirstAt=prev.waitingFirstAt; else delete m.waitingFirstAt;
+    if(prev.lastWaitingFirstAt) m.lastWaitingFirstAt=prev.lastWaitingFirstAt; else delete m.lastWaitingFirstAt;
     assignedIds.add(String(m.id));
   };
 
@@ -12747,17 +12777,17 @@ function rebuildIndividualAutoCourtAssignmentsForKey(key){
     const preservedMainCount = preservedItems.filter(item=>String(item?.match?.phase||'')!=='group').length;
     const freshMainCount = visibleItems.filter(item=>String(item?.match?.phase||'')!=='group').length;
 
+    // [BUG FIX] 수동 배정(manualItems)은 슬롯 제한 없이 항상 최우선으로 assign한다.
+    // 기존에는 (2 - preservedItems - visibleItems) 슬롯이 남을 때만 assign되어
+    // 코트에 이미 2경기가 있으면 수동 배정 카드가 완전히 무시되는 버그가 있었다.
+    manualItems.forEach(item=>assign(court,item,true));
+
     if(preservedItems.length){
       hasPendingGroups = hasPendingGroups || preservedItems.some(item=>String(item?.match?.phase||'')==='group');
       preservedItems.forEach(item=>assign(court,item));
       visibleItems.forEach(item=>assign(court,item));
-      manualItems.slice(0, Math.max(0, 2 - preservedItems.length - visibleItems.length)).forEach(item=>assign(court,item,true));
       const alreadyFilledMain = preservedMainCount + freshMainCount;
-      // 공용대기 채우기 여유 계산: fixedItems(코트 전담 그룹 경기)는 제외하고
-      // preservedItems(이전 배정 보존 경기)만 기준으로 한다.
-      // fixedItems는 이 코트 전담 그룹의 경기이므로 공용대기 슬롯과 무관하다.
       const alreadyFilledGroup = preservedItems.filter(item=>String(item?.match?.phase||'')==='group').length;
-      // 빈 코트가 먼저 채워져야 하므로, 이미 진행중/배정된 코트의 추가 대기 채우기는 2차 패스로 미룬다.
       delayedFillBusyCourts.push({
         court,
         maxFill: groupWorkActive ? 0 : Math.max(0, 1 - alreadyFilledMain),
@@ -12768,13 +12798,8 @@ function rebuildIndividualAutoCourtAssignmentsForKey(key){
     if(items.length){
       hasPendingGroups = hasPendingGroups || items.some(item=>String(item?.match?.phase||'')==='group');
       visibleItems.forEach(item=>assign(court,item));
-      manualItems.slice(0, Math.max(0, 2 - visibleItems.length)).forEach(item=>assign(court,item,true));
       const alreadyFilledMain = freshMainCount;
-      // fixedItems는 이 코트 전담 그룹의 경기. 공용대기 슬롯은 fixedItems 중
-      // 마지막 대기 경기 이후부터 가능하므로, preserved가 없는 경우(신규 배정)
-      // 공용대기 채우기 여유를 1로 고정해 1경기를 당겨온다.
       const alreadyFilledGroup = Math.min(1, items.filter(item=>String(item?.match?.phase||'')==='group').length);
-      // 빈 코트 우선 원칙: 현재 경기/배정이 있는 코트의 추가 대기는 나중에 채운다.
       delayedFillBusyCourts.push({
         court,
         maxFill: groupWorkActive ? 0 : Math.max(0, 1 - alreadyFilledMain),
@@ -12783,16 +12808,11 @@ function rebuildIndividualAutoCourtAssignmentsForKey(key){
       return;
     }
     // 예선(group) 작업이 남아 있을 때만 빈 코트에 공용대기 1경기를 먼저 올린다.
-    // 본선(main/playin)은 아래 stageQueues 라운드로빈 단계에서 한 번에 균등 배정해야 한다.
-    // 여기서 먼저 3개씩 채워버리면 1,2번 코트에만 몰리고 7,8번 코트가 비게 된다.
     const filledFromPending = groupWorkActive ? appendNextPendingToCourt(court, 1) : false;
     if(filledFromPending){
-      manualItems.forEach(item=>assign(court,item,true));
-      return;
+      return; // manualItems는 이미 위에서 assign 완료
     }
-    if(manualItems.length){
-      deferredManualByCourt[court]=manualItems;
-    }
+    // manualItems는 이미 위에서 assign 완료 - deferredManualByCourt 불필요
   });
   if(sharedCarry.length) sharedEntries.push(...sharedCarry);
   delayedFillBusyCourts.forEach(({court,maxFill})=>{
