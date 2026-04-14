@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-04-15-v222-manual-assign-priority-fix";
+  const APP_VERSION = "2026-04-15-v224-elapsed-clock-fix";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -6950,29 +6950,27 @@ function buildElapsedMetaLine(iso='', mode='assigned'){
   const clock=formatClockTime(iso);
   const mins=getElapsedMinutesSince(iso);
   const badge=getDelayBadgeMeta(mins, mode);
-  if(!clock && !mins) return {text:'', badge:null, mins:0, mode, label:'', clock:'', duration:'', prefix:''};
-  // prefix 명확화:
-  //   assigned  → "배정" (코트 배정/시합 시작 시각)
-  //   waiting1  → "대기시작" (대기1번이 된 시각)
-  //   wait_placed → "대기배치" (대기열에 들어간 시각)
+  if(!clock && !mins) return {text:'', badge:null, mins:0, mode, label:'', clock:'', duration:'', prefix:'', _iso:''};
   const prefix=mode==='waiting1' ? '대기시작' : mode==='wait_placed' ? '대기배치' : '배정';
   const label=`${prefix} ${clock||'-'} · ${mins}분 경과`;
-  return {text:label, badge, mins, mode, label, clock:clock||'-', duration:`${mins}분 경과`, prefix};
+  return {text:label, badge, mins, mode, label, clock:clock||'-', duration:`${mins}분 경과`, prefix, _iso:String(iso||'')};
 }
 function renderElapsedMetaBlocks(items=[], color='var(--text2)'){
   const list=(items||[]).filter(x=>x && (x.clock || x.duration));
   if(!list.length) return '';
-  // 한 줄 인라인: "배정 10:41 · 3분 경과 ⚠️..." 형태로 옆에 표시
+  // data-iso 속성 추가 → courtBoardClockTick()이 30초마다 경과시간만 DOM 업데이트
+  // 각 파트를 개별 span으로 분리하여 타이머가 elapsed-duration만 정확히 갱신할 수 있게 함
   return `<div style="margin-top:3px;display:flex;align-items:center;flex-wrap:wrap;gap:4px">${list.map(it=>{
     const tone=it.badge?.color || color;
     const border=it.badge?.bd || 'rgba(148,163,184,.32)';
     const bg=it.badge?.bg || 'rgba(255,255,255,.55)';
     const label=it.prefix || (it.mode==='waiting1' ? '대기1' : '배정');
-    // 시간 + 경과를 하나의 인라인 칩으로 합침
-    const parts=[`🕒 ${esc(label)} ${esc(it.clock||'-')}`];
-    if(it.duration) parts.push(esc(it.duration));
-    if(it.badge?.text) parts.push(`⚠️ ${esc(it.badge.text)}`);
-    return `<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:999px;background:${bg};border:1px solid ${border};font-size:.67rem;font-weight:800;color:${tone};line-height:1.3;white-space:nowrap">${parts.join(' · ')}</span>`;
+    const isoAttr=it._iso ? ` data-iso="${esc(it._iso)}" data-label="${esc(label)}"` : '';
+    // 각 파트를 개별 span으로 감싸서 타이머가 elapsed-duration만 안전하게 교체하도록 함
+    const clockSpan=`<span class="elapsed-clock">🕒 ${esc(label)} ${esc(it.clock||'-')}</span>`;
+    const durSpan=`<span class="elapsed-sep"> · </span><span class="elapsed-duration">${esc(it.duration||'0분 경과')}</span>`;
+    const badgeSpan=it.badge?.text ? `<span class="elapsed-sep"> · </span><span class="elapsed-badge-text">⚠️ ${esc(it.badge.text)}</span>` : '';
+    return `<span class="elapsed-chip"${isoAttr} style="display:inline-flex;align-items:center;gap:0;padding:2px 7px;border-radius:999px;background:${bg};border:1px solid ${border};font-size:.67rem;font-weight:800;color:${tone};line-height:1.3;white-space:nowrap">${clockSpan}${durSpan}${badgeSpan}</span>`;
   }).join('')}</div>`;
 }
 function isSameMinuteTime(a='', b=''){
@@ -6984,6 +6982,73 @@ function isSameMinuteTime(a='', b=''){
     return Math.floor(ta/60000)===Math.floor(tb/60000);
   }catch(e){ return false; }
 }
+// ── 코트 현황판 경과시간 실시간 갱신 타이머 ─────────────────────────────
+// renderElapsedMetaBlocks가 생성한 .elapsed-chip[data-iso] 요소를
+// 30초마다 DOM에서 직접 업데이트 → renderBracket 전체 재호출 없이 시간 갱신
+let _courtClockTimer = null;
+function courtBoardClockTick(){
+  try{
+    document.querySelectorAll('.elapsed-chip[data-iso]').forEach(el=>{
+      const iso = el.getAttribute('data-iso');
+      if(!iso) return;
+      const ts = new Date(iso).getTime();
+      if(!Number.isFinite(ts)) return;
+      const mins = Math.max(0, Math.floor((Date.now() - ts) / 60000));
+
+      // ① elapsed-duration span만 교체 (배정시각 clock span은 절대 건드리지 않음)
+      const durEl = el.querySelector('.elapsed-duration');
+      if(durEl) durEl.textContent = `${mins}분 경과`;
+
+      // ② 지연 배지 텍스트 교체 (elapsed-badge-text span)
+      let badgeText='', badgeColor='', badgeBg='', badgeBd='';
+      if(mins>=60){ badgeText='장기 지연'; badgeColor='#991b1b'; badgeBg='#fee2e2'; badgeBd='#fca5a5'; }
+      else if(mins>=45){ badgeText='확인 필요'; badgeColor='#b45309'; badgeBg='#fff7ed'; badgeBd='#fdba74'; }
+      else if(mins>=30){ badgeText='지연 의심'; badgeColor='#92400e'; badgeBg='#fffbeb'; badgeBd='#fcd34d'; }
+
+      // ③ 칩 테두리/배경색 갱신
+      if(badgeText){
+        el.style.background = badgeBg;
+        el.style.borderColor = badgeBd;
+        el.style.color = badgeColor;
+      } else {
+        el.style.background = '';
+        el.style.borderColor = '';
+        el.style.color = '';
+      }
+
+      // ④ 배지 span 갱신 (elapsed-badge-text: 렌더링 시 생성된 것 재활용)
+      const badgeTextEl = el.querySelector('.elapsed-badge-text');
+      const badgeSepEl  = badgeTextEl ? badgeTextEl.previousElementSibling : null;
+      if(badgeText){
+        if(badgeTextEl){
+          badgeTextEl.textContent = '⚠️ ' + badgeText;
+        } else {
+          // 렌더링 시 배지가 없었는데 임계치 초과한 경우 동적 추가
+          const sep = document.createElement('span');
+          sep.className = 'elapsed-sep';
+          sep.textContent = ' · ';
+          const badge = document.createElement('span');
+          badge.className = 'elapsed-badge-text';
+          badge.textContent = '⚠️ ' + badgeText;
+          el.appendChild(sep);
+          el.appendChild(badge);
+        }
+      } else if(badgeTextEl){
+        // 임계치 미만으로 내려간 경우 배지 제거
+        if(badgeSepEl && badgeSepEl.classList.contains('elapsed-sep')) badgeSepEl.remove();
+        badgeTextEl.remove();
+      }
+    });
+  }catch(e){ console.warn('courtBoardClockTick error', e); }
+}
+function startCourtBoardClock(){
+  if(_courtClockTimer) clearInterval(_courtClockTimer);
+  // 즉시 실행하면 renderBracket 직후라 0분으로 표시됨 → 첫 틱은 60초 후
+  _courtClockTimer = setInterval(courtBoardClockTick, 60000);
+}
+window.courtBoardClockTick = courtBoardClockTick;
+window.startCourtBoardClock = startCourtBoardClock;
+// ─────────────────────────────────────────────────────────────────────────────
 function captureCourtNotificationState(){
   try{ return buildCourtNotificationStateMap(G.matches||{}); }catch(e){ return {}; }
 }
@@ -11841,6 +11906,8 @@ function renderBracket(){
   requestAnimationFrame(()=>{
     updateOperationSticky();
     autoFocusMainBracketTrees();
+    // 코트 현황판 경과시간 실시간 갱신 타이머 시작
+    if(typeof startCourtBoardClock==='function') startCourtBoardClock();
   });
 }
 
@@ -12638,8 +12705,12 @@ function rebuildIndividualAutoCourtAssignmentsForKey(key){
     const nextCourts=JSON.stringify([String(court)]);
     const prev=prevState.get(String(m.id)) || {courts:'[]', assignedAt:'', queueOrder:'', waitingFirstAt:'', lastWaitingFirstAt:'', autoLabel:'', manualCourtTarget:'', manualCourtPinnedAt:'', manualSharedHold:false};
     const sameCourt = prev.courts===nextCourts;
-    const realAssignedAt = (sameCourt && prev.assignedAt) ? prev.assignedAt : new Date().toISOString();
-    const queueOrder = (sameCourt && prev.queueOrder) ? prev.queueOrder : seqTs;
+    const hadPrevCourt = !!(prev.courts && prev.courts!=='[]');
+    // 경과시간이 렌더 때마다 0으로 리셋되지 않도록
+    // 기존에 한 번이라도 코트에 올라간 경기면 assignedAt/queueOrder를 최대한 유지한다.
+    // 실제 새 경기(이전 코트 없음)일 때만 현재 시각을 새로 넣는다.
+    const realAssignedAt = (hadPrevCourt && prev.assignedAt) ? prev.assignedAt : new Date().toISOString();
+    const queueOrder = (sameCourt && prev.queueOrder) ? prev.queueOrder : (prev.queueOrder || seqTs);
     if(prev.courts!==nextCourts || prev.assignedAt!==realAssignedAt || prev.queueOrder!==queueOrder || prev.autoLabel!==String(item.autoLabel||'')) changed=true;
     m.courts=[String(court)];
     m.court=String(court);
@@ -12846,8 +12917,8 @@ function rebuildIndividualAutoCourtAssignmentsForKey(key){
     if(firstWaiting){
       const prev=prevState.get(String(firstWaiting.id)) || {waitingFirstAt:'', courts:'[]'};
       const currentCourts=JSON.stringify(Array.isArray(firstWaiting.courts)?firstWaiting.courts:(firstWaiting.court?[firstWaiting.court]:[]));
-      if(prev.waitingFirstAt && prev.courts===currentCourts){
-        firstWaiting.waitingFirstAt=prev.waitingFirstAt;
+      if((prev.waitingFirstAt || prev.lastWaitingFirstAt) && prev.courts===currentCourts){
+        firstWaiting.waitingFirstAt=prev.waitingFirstAt || prev.lastWaitingFirstAt;
       }else{
         firstWaiting.waitingFirstAt=new Date().toISOString();
         changed=true;
