@@ -1434,6 +1434,7 @@ body.slider-ready .page:not(.active){
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://developers.kakao.com/sdk/js/kakao.min.js"></script>
+  <!-- DEPLOY_BUNDLE_READY -->
 </head>
 <body>
 <header class="app-header">
@@ -25358,26 +25359,17 @@ document.addEventListener('DOMContentLoaded',()=>{
 </script>
 
 <script>
-  // 배포 안정화 모드: 기존 service worker 자동 해제 + 캐시 정리
-  // 이번 버전은 새 service worker를 다시 등록하지 않습니다.
+  // 배포용 service worker 등록
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", async () => {
       try {
-        const regs = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(regs.map(r => r.unregister()));
-      } catch (_) {}
-
-      try {
-        if ("caches" in window) {
-          const keys = await caches.keys();
-          await Promise.all(keys.map(k => caches.delete(k)));
-        }
-      } catch (_) {}
+        const reg = await navigator.serviceWorker.register("./sw.js?v=2026-04-14-v217-prelim-court-display");
+        console.log("SW registered:", reg.scope);
+      } catch (err) {
+        console.warn("SW registration failed:", err);
+      }
     });
   }
-
-
-
 </script>
 <script>
 /* ===============================
