@@ -27652,11 +27652,9 @@ function exportPrelimImage(){
     const ids = openModalIds();
     return ids.length ? ids[ids.length-1] : '';
   }
-  function isAppState(st){
-    return !!(st && typeof st === 'object' && st[APP_NAV_NS]);
-  }
-  function isHomeGuardState(st){
-    return isAppState(st) && st.type === 'guard' && String(st.page || 'home') === 'home';
+  function cloneState(base){
+    const src = (base && typeof base === 'object') ? base : (history.state && typeof history.state === 'object' ? history.state : {});
+    return { ...src };
   }
   function applyPageState(page){
     const target = String(page || 'home');
@@ -27666,33 +27664,27 @@ function exportPrelimImage(){
     try{ fn(target); } finally { suppressHistoryPush = false; }
   }
   function replaceBaseState(page){
-    const target = String(page || currentPage() || 'home');
-    try{ history.replaceState({ [APP_NAV_NS]: true, type: 'page', page: target, modalId: '' }, '', '#' + target); }catch(e){}
+    const target = String(page || currentPage());
+    const state = { [APP_NAV_NS]: true, type: 'page', page: target, modalId: '', guard: target === 'home' ? 1 : 0 };
+    try{ history.replaceState(state, '', '#' + target); }catch(e){}
+  }
+  function ensureHomeGuard(){
+    const st = history.state || {};
+    if(currentPage() !== 'home') return;
+    if(st && st[APP_NAV_NS] && st.type === 'page' && st.page === 'home' && st.guard === 2) return;
+    try{ history.pushState({ [APP_NAV_NS]: true, type: 'page', page: 'home', modalId: '', guard: 2 }, '', '#home'); }catch(e){}
   }
   function pushPageState(page){
-    const target = String(page || currentPage() || 'home');
+    const target = String(page || currentPage());
     const st = history.state || {};
-    if(isAppState(st) && st.type === 'page' && st.page === target) return;
-    try{ history.pushState({ [APP_NAV_NS]: true, type: 'page', page: target, modalId: '' }, '', '#' + target); }catch(e){}
-  }
-  function pushHomeGuardState(force){
-    if(currentPage() !== 'home') return;
-    if(topModalId()) return;
-    const st = history.state || {};
-    if(!force && isHomeGuardState(st)) return;
-    try{ history.pushState({ [APP_NAV_NS]: true, type: 'guard', page: 'home', modalId: '', seq: ++modalSeq }, '', '#home'); }catch(e){}
-  }
-  function ensureHomeGuardState(force){
-    if(popHandling) return;
-    if(currentPage() === 'home' && !topModalId()){
-      pushHomeGuardState(!!force);
-    }
+    if(st && st[APP_NAV_NS] && st.type === 'page' && st.page === target && (!target || target !== 'home' || st.guard === 2)) return;
+    try{ history.pushState({ [APP_NAV_NS]: true, type: 'page', page: target, modalId: '', guard: target === 'home' ? 2 : 0 }, '', '#' + target); }catch(e){}
   }
   function pushModalState(id){
     const mid = String(id || '');
     if(!mid) return;
     const st = history.state || {};
-    if(isAppState(st) && st.type === 'modal' && st.modalId === mid) return;
+    if(st && st[APP_NAV_NS] && st.type === 'modal' && st.modalId === mid) return;
     try{ history.pushState({ [APP_NAV_NS]: true, type: 'modal', page: currentPage(), modalId: mid, seq: ++modalSeq }, '', '#' + currentPage()); }catch(e){}
   }
   function closeTopModalDirect(preferredId){
@@ -27708,7 +27700,7 @@ function exportPrelimImage(){
   }
 
   replaceBaseState(currentPage());
-  ensureHomeGuardState(true);
+  if(currentPage() === 'home') ensureHomeGuard();
 
   const priorShowPage = window.showPage;
   if(typeof priorShowPage === 'function'){
@@ -27720,11 +27712,12 @@ function exportPrelimImage(){
       if(!popHandling){
         if(next !== prev && !suppressHistoryPush){
           pushPageState(next);
-        }else if(!isAppState(history.state)){
+          if(next === 'home') ensureHomeGuard();
+        }else if(!history.state || !history.state[APP_NAV_NS]){
           replaceBaseState(next);
-        }
-        if(next === 'home' && !topModalId()){
-          ensureHomeGuardState();
+          if(next === 'home') ensureHomeGuard();
+        }else if(next === 'home'){
+          ensureHomeGuard();
         }
       }
       return res;
@@ -27755,11 +27748,13 @@ function exportPrelimImage(){
       const closedTop = target && beforeTop === target && !afterIds.includes(target);
       if(!popHandling && closedTop){
         const st = history.state || {};
-        if(isAppState(st) && st.type === 'modal' && st.modalId === target){
+        if(st && st[APP_NAV_NS] && st.type === 'modal' && st.modalId === target){
           try{ history.back(); }catch(e){}
-        }else{
-          if(!isAppState(st)) replaceBaseState(currentPage());
-          if(currentPage() === 'home' && !topModalId()) ensureHomeGuardState();
+        }else if(!st || !st[APP_NAV_NS]){
+          replaceBaseState(currentPage());
+          if(currentPage() === 'home') ensureHomeGuard();
+        }else if(currentPage() === 'home'){
+          ensureHomeGuard();
         }
       }
       return res;
@@ -27770,23 +27765,16 @@ function exportPrelimImage(){
     const state = ev.state || {};
     popHandling = true;
     try{
-      if(isAppState(state)){
+      if(state && state[APP_NAV_NS]){
         const page = String(state.page || currentPage() || 'home');
         const wantModal = String(state.modalId || '');
-
-        if(state.type === 'guard'){
-          while(topModalId()){
-            if(!closeTopModalDirect(topModalId())) break;
-          }
-          applyPageState('home');
-          replaceBaseState('home');
-          pushHomeGuardState(true);
-          return;
-        }
-
+        const openIds = openModalIds();
         if(wantModal){
-          while(topModalId() && topModalId() !== wantModal){
-            if(!closeTopModalDirect(topModalId())) break;
+          while(openIds.length){
+            const top = topModalId();
+            if(top === wantModal) break;
+            if(!closeTopModalDirect(top)) break;
+            openIds.pop();
           }
           applyPageState(page);
           if(!document.getElementById(wantModal)?.classList.contains('open') && typeof window.__appOriginalOm === 'function'){
@@ -27797,27 +27785,26 @@ function exportPrelimImage(){
             if(!closeTopModalDirect(topModalId())) break;
           }
           applyPageState(page);
+          replaceBaseState(page);
+          if(page === 'home') ensureHomeGuard();
         }
       }else{
         const openTop = topModalId();
         if(openTop){
           closeTopModalDirect(openTop);
+          replaceBaseState(currentPage());
+          if(currentPage() === 'home') ensureHomeGuard();
+        }else{
+          applyPageState('home');
+          replaceBaseState('home');
+          ensureHomeGuard();
         }
-        applyPageState('home');
-        replaceBaseState('home');
-        pushHomeGuardState(true);
       }
     }finally{
       popHandling = false;
     }
   });
-
-  document.addEventListener('visibilitychange', function(){
-    if(document.visibilityState === 'visible'){
-      ensureHomeGuardState();
-    }
-  });
-})();;
+})();
 </script>
 
 
