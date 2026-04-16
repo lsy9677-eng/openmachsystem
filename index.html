@@ -2191,10 +2191,10 @@ body {
     <div class="login-menu-wrap js-mini-menu" id="bracketSaveMenuWrap">
       <button class="btn btn-outline" style="font-size:.78rem;padding:5px 12px" onclick="toggleBracketSaveMenu(event)">💾 저장하기</button>
       <div class="login-menu-panel" id="bracketSaveMenuPanel" style="min-width:210px">
-        <button class="btn-sm login-menu-item" onclick="closeBracketSaveMenu();bracketToImage()" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">🖼️ 이미지 저장</button>
-        <button class="btn-sm login-menu-item" onclick="closeBracketSaveMenu();bracketToPDF()" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">📄 PDF 저장</button>
-        <button class="btn-sm login-menu-item" onclick="closeBracketSaveMenu();exportPrelimSheet()" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">📄 예선표(A4) 출력</button>
-        <button class="btn-sm login-menu-item" onclick="closeBracketSaveMenu();exportPrelimImage()" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">🖼️ 예선표 저장</button>
+        <button class="btn-sm login-menu-item" onclick="event.stopPropagation();closeBracketSaveMenu();bracketToImage()" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">🖼️ 이미지 저장</button>
+        <button class="btn-sm login-menu-item" onclick="event.stopPropagation();closeBracketSaveMenu();bracketToPDF()" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">📄 PDF 저장</button>
+        <button class="btn-sm login-menu-item" onclick="event.stopPropagation();closeBracketSaveMenu();exportPrelimSheet()" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">📄 예선표(A4) 출력</button>
+        <button class="btn-sm login-menu-item" onclick="event.stopPropagation();closeBracketSaveMenu();exportPrelimImage()" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">🖼️ 예선표 저장</button>
       </div>
     </div>
   </div>
@@ -27271,7 +27271,7 @@ function _buildPrelimPopupHtml(ctx, mode){
   const sections = _buildPrelimSectionsHtml(ctx);
   const title = mode === 'image' ? '예선 조 편성표 이미지' : '예선 조 편성표';
   const actionBtn = mode === 'image'
-    ? '<button onclick="saveAsImage()">🖼️ 이미지 저장</button>'
+    ? '<button onclick="saveAsImage(event)">🖼️ 이미지 저장</button>'
     : '<button onclick="window.print()">🖨️ 인쇄</button>';
   const scriptOpen = '<scr' + 'ipt';
   const scriptClose = '</scr' + 'ipt>';
@@ -27283,7 +27283,6 @@ function _buildPrelimPopupHtml(ctx, mode){
 <title>${title}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-  /* ── A4 인쇄 최적화: 80팀 기준 1~2장 출력 ── */
   @page { size: A4 portrait; margin: 7mm 8mm; }
   *{ box-sizing:border-box; margin:0; padding:0; }
   body{
@@ -27319,7 +27318,6 @@ function _buildPrelimPopupHtml(ctx, mode){
     font-size:8pt; color:#475569;
     text-align:center; margin-bottom:7px;
   }
-  /* 조 수에 따라 열 수 자동 조정 */
   .group-grid{
     display:grid;
     grid-template-columns:repeat(4, minmax(0,1fr));
@@ -27353,8 +27351,7 @@ function _buildPrelimPopupHtml(ctx, mode){
     text-align:center;
     letter-spacing:.01em;
   }
-
-  .notice-ticker{ display:none; } /* 인쇄에서 공지 티커 숨김 */
+  .notice-ticker{ display:none; }
   .group-memo{
     padding:2px 5px; font-size:7pt; color:#8a6412;
     background:#fff8df; border-bottom:1px solid #f3d27a; font-weight:700;
@@ -27380,7 +27377,6 @@ function _buildPrelimPopupHtml(ctx, mode){
   .player-club{ margin-top:1px; font-size:6.1pt; color:#64748b; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .player-club.inline{ letter-spacing:-.01em; }
   .page-break{ page-break-before:always; break-before:page; }
-
   @media print{
     body{ background:#fff; font-size:8pt; }
     .toolbar{ display:none; }
@@ -27388,88 +27384,6 @@ function _buildPrelimPopupHtml(ctx, mode){
     .group-grid{ gap:3px; }
     .group-grid.cols-5{ grid-template-columns:repeat(5, minmax(0,1fr)); }
   }
-
-/* Bottom Tab Bar */
-.bottom-tab-bar {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 60px;
-  background: #0f172a;
-  display: flex;
-  justify-content: space-around;
-  align-items: center;
-  z-index: 9999;
-  border-top: 1px solid #334155;
-}
-.bottom-tab-bar button {
-  background: none;
-  border: none;
-  color: #cbd5f5;
-  font-size: 12px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-.bottom-tab-bar button.active {
-  color: #facc15;
-}
-body {
-  padding-bottom: 70px;
-}
-
-
-/* Mobile bottom navigation upgrade */
-@media (max-width: 768px){
-  .nav-tabs{
-    display:none !important;
-  }
-  .bottom-tab-bar{
-    position:fixed;
-    left:0; right:0; bottom:0;
-    height:64px;
-    display:flex;
-    justify-content:space-around;
-    align-items:center;
-    background:linear-gradient(180deg,#0b1732 0%, #0f1e3a 100%);
-    border-top:1px solid rgba(255,255,255,.12);
-    box-shadow:0 -6px 20px rgba(0,0,0,.18);
-    z-index:99999;
-    padding-bottom:env(safe-area-inset-bottom, 0px);
-  }
-  .bottom-tab-bar button{
-    flex:1 1 16.66%;
-    height:100%;
-    background:none;
-    border:none;
-    color:rgba(255,255,255,.72);
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    justify-content:center;
-    gap:3px;
-    font-size:11px;
-    font-weight:700;
-    line-height:1.1;
-  }
-  .bottom-tab-bar button .icon{
-    font-size:16px;
-    line-height:1;
-  }
-  .bottom-tab-bar button.active{
-    color:#facc15;
-  }
-  body{
-    padding-bottom:74px !important;
-  }
-}
-@media (min-width: 769px){
-  .bottom-tab-bar{
-    display:none !important;
-  }
-}
-
 </style>
 </head>
 <body>
@@ -27480,11 +27394,12 @@ body {
   <div id="captureRoot">${sections}</div>
   ${scriptOpen} src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js">${scriptClose}
   ${scriptOpen}>
-    async function saveAsImage(){
+    async function saveAsImage(ev){
       try{
+        if(ev && ev.stopPropagation) ev.stopPropagation();
         const root = document.getElementById('captureRoot');
         if(!root) return;
-        const canvas = await html2canvas(root,{scale:2,backgroundColor:'#eef3f8',useCORS:true,logging:false});
+        const canvas = await html2canvas(root,{scale:2,backgroundColor:'#eef3f8',useCORS:true,logging:false,windowWidth:Math.max(document.documentElement.clientWidth, root.scrollWidth || 0)});
         const a = document.createElement('a');
         a.href = canvas.toDataURL('image/png');
         a.download = 'prelim_sheet.png';
@@ -27497,103 +27412,9 @@ body {
       }
     }
   ${scriptClose}
-
-
-
-<div class="bottom-tab-bar" id="bottomTabBar">
-  <button data-target="home"><span class="icon">🏠</span><span>홈</span></button>
-  <button data-target="tournament"><span class="icon">🏆</span><span>대회관리</span></button>
-  <button data-target="register"><span class="icon">📋</span><span>팀등록</span></button>
-  <button data-target="bracket"><span class="icon">🎾</span><span>대진표</span></button>
-  <button data-target="players"><span class="icon">👤</span><span>기록</span></button>
-  <button data-target="results"><span class="icon">📊</span><span>결과</span></button>
-</div>
-
-<script>
-(function(){
-  function getTopTabs(){
-    return Array.from(document.querySelectorAll('.nav-tab, .top-nav-tab, .menu-tab'));
-  }
-
-  function normalizeText(t){
-    return (t || '').replace(/\s+/g,'').trim();
-  }
-
-  function clickTopTabByTarget(target){
-    const map = {
-      home: ['홈'],
-      tournament: ['대회관리'],
-      register: ['팀등록'],
-      bracket: ['대진표'],
-      players: ['참가기록','참가자기록'],
-      results: ['시합결과']
-    };
-    const wanted = map[target] || [];
-    const tabs = getTopTabs();
-    for(const tab of tabs){
-      const txt = normalizeText(tab.textContent);
-      if(wanted.some(w => txt.includes(normalizeText(w)))){
-        tab.click();
-        return true;
-      }
-    }
-    return false;
-  }
-
-  function detectActiveTarget(){
-    const tabs = getTopTabs();
-    for(const tab of tabs){
-      if(tab.classList.contains('active')){
-        const txt = normalizeText(tab.textContent);
-        if(txt.includes('홈')) return 'home';
-        if(txt.includes('대회관리')) return 'tournament';
-        if(txt.includes('팀등록')) return 'register';
-        if(txt.includes('대진표')) return 'bracket';
-        if(txt.includes('참가기록') || txt.includes('참가자기록')) return 'players';
-        if(txt.includes('시합결과')) return 'results';
-      }
-    }
-    return 'home';
-  }
-
-  function syncBottomTabs(){
-    const active = detectActiveTarget();
-    document.querySelectorAll('#bottomTabBar button').forEach(btn=>{
-      btn.classList.toggle('active', btn.dataset.target === active);
-    });
-  }
-
-  function initBottomTabs(){
-    const buttons = document.querySelectorAll('#bottomTabBar button');
-    buttons.forEach(btn=>{
-      btn.addEventListener('click', function(e){
-        e.preventDefault();
-        clickTopTabByTarget(btn.dataset.target);
-        setTimeout(syncBottomTabs, 50);
-        setTimeout(syncBottomTabs, 250);
-      });
-    });
-
-    const tabs = getTopTabs();
-    tabs.forEach(tab=>{
-      tab.addEventListener('click', function(){
-        setTimeout(syncBottomTabs, 10);
-        setTimeout(syncBottomTabs, 150);
-      });
-    });
-
-    syncBottomTabs();
-
-    const obs = new MutationObserver(syncBottomTabs);
-    tabs.forEach(tab=>obs.observe(tab, {attributes:true, attributeFilter:['class']}));
-  }
-
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', initBottomTabs);
-  }else{
-    initBottomTabs();
-  }
-})();
+</body>
+</html>`;
+}
 
 function exportPrelimSheet(){
   try{
