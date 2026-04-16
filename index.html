@@ -1261,14 +1261,17 @@ body.slider-ready .page:not(.active){
   #mDraw .modal-header,#mMain .modal-header{border-radius:0!important;padding:12px 14px!important;}
   #mDraw .modal-body,#mMain .modal-body{
     padding:12px!important;
-    max-height:calc(100vh - 122px)!important;
+    max-height:calc(100vh - 186px)!important;
     overflow-y:auto!important;
     -webkit-overflow-scrolling:touch;
   }
   #mDraw .modal-footer,#mMain .modal-footer{
     padding:10px 12px!important;
+    padding-bottom:calc(10px + env(safe-area-inset-bottom, 0px))!important;
     gap:8px!important;
     flex-wrap:nowrap!important;
+    position:relative;
+    z-index:1;
   }
   #mDraw .modal-footer .btn,#mMain .modal-footer .btn{
     flex:1 1 0;
@@ -1840,7 +1843,10 @@ body {
     color:#facc15;
   }
   body{
-    padding-bottom:74px !important;
+    padding-bottom:120px !important;
+  }
+  .main-content{
+    padding-bottom:130px !important;
   }
 }
 @media (min-width: 769px){
@@ -6490,14 +6496,17 @@ function sl(s){let el=ge('gLd');if(!el){el=document.createElement('div');el.id='
   #mDraw .modal-header,#mMain .modal-header{border-radius:0!important;padding:12px 14px!important;}
   #mDraw .modal-body,#mMain .modal-body{
     padding:12px!important;
-    max-height:calc(100vh - 122px)!important;
+    max-height:calc(100vh - 186px)!important;
     overflow-y:auto!important;
     -webkit-overflow-scrolling:touch;
   }
   #mDraw .modal-footer,#mMain .modal-footer{
     padding:10px 12px!important;
+    padding-bottom:calc(10px + env(safe-area-inset-bottom, 0px))!important;
     gap:8px!important;
     flex-wrap:nowrap!important;
+    position:relative;
+    z-index:1;
   }
   #mDraw .modal-footer .btn,#mMain .modal-footer .btn{
     flex:1 1 0;
@@ -26424,14 +26433,17 @@ document.addEventListener('DOMContentLoaded',()=>{
   #mDraw .modal-header,#mMain .modal-header{border-radius:0!important;padding:12px 14px!important;}
   #mDraw .modal-body,#mMain .modal-body{
     padding:12px!important;
-    max-height:calc(100vh - 122px)!important;
+    max-height:calc(100vh - 186px)!important;
     overflow-y:auto!important;
     -webkit-overflow-scrolling:touch;
   }
   #mDraw .modal-footer,#mMain .modal-footer{
     padding:10px 12px!important;
+    padding-bottom:calc(10px + env(safe-area-inset-bottom, 0px))!important;
     gap:8px!important;
     flex-wrap:nowrap!important;
+    position:relative;
+    z-index:1;
   }
   #mDraw .modal-footer .btn,#mMain .modal-footer .btn{
     flex:1 1 0;
