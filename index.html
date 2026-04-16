@@ -27633,238 +27633,199 @@ function exportPrelimImage(){
 }
 
 (function mobileBackNavigationLayer(){
-
   if(window.__mobileBackNavigationLayerInstalled) return;
   window.__mobileBackNavigationLayerInstalled = true;
 
-  const APP_NAV_NS = '__app_nav__';
-  const HOME_GUARD_DEPTH = 2;
-  let suppressHistoryPush = false;
-  let popHandling = false;
-  let modalSeq = 0;
-  let internalHashUpdate = false;
+  const APP_NAV_NS='__appNav';
+  const ROOT_GUARD='__home_guard__';
+  let suppressPush=false;
+  let syncingModal=false;
+  let modalSeq=0;
 
   function currentPage(){
-    return document.querySelector('.page.active')?.id?.replace('page-','') || 'home';
+    return document.querySelector('.page.active')?.id?.replace('page-','') ||
+           document.querySelector('.nav-tab.active')?.dataset?.page || 'home';
   }
-  function pageEl(page){
-    return document.getElementById('page-' + String(page || 'home'));
+  function getActiveModalId(){
+    const arr=[...document.querySelectorAll('.modal-overlay.open')].map(el=>el.id).filter(Boolean);
+    return arr.length ? arr[arr.length-1] : '';
   }
-  function openModalIds(){
-    return [...document.querySelectorAll('.modal-overlay.open')].map(el => el.id).filter(Boolean);
-  }
-  function topModalId(){
-    const ids = openModalIds();
-    return ids.length ? ids[ids.length - 1] : '';
-  }
-  function navHashForState(state){
-    if(!state || !state[APP_NAV_NS]) return '#app-home';
-    if(state.type === 'modal'){
-      return '#app-modal-' + encodeURIComponent(String(state.modalId || ''));
-    }
-    const page = String(state.page || 'home');
-    const guard = Number(state.guard || 0);
-    return guard > 0 ? ('#app-' + page + '-g' + guard) : ('#app-' + page);
-  }
-  function setHashSilently(hash){
+  function closeTopModal(){
+    const top=getActiveModalId();
+    if(!top) return false;
     try{
-      internalHashUpdate = true;
-      const target = String(hash || '#app-home');
-      if(location.hash !== target){
-        history.replaceState(history.state, '', target);
-      }
-    }catch(e){}
-    setTimeout(()=>{ internalHashUpdate = false; }, 0);
-  }
-  function replaceBaseState(page, guard){
-    const target = String(page || currentPage() || 'home');
-    const g = Number(guard || 0);
-    const state = { [APP_NAV_NS]: true, type: 'page', page: target, modalId: '', guard: g };
-    try{ history.replaceState(state, '', navHashForState(state)); }catch(e){}
-  }
-  function pushPageState(page, guard){
-    const target = String(page || currentPage() || 'home');
-    const g = Number(guard || 0);
-    const st = history.state || {};
-    if(st && st[APP_NAV_NS] && st.type === 'page' && st.page === target && Number(st.guard || 0) === g) return;
-    const state = { [APP_NAV_NS]: true, type: 'page', page: target, modalId: '', guard: g };
-    try{ history.pushState(state, '', navHashForState(state)); }catch(e){}
-  }
-  function pushModalState(id){
-    const mid = String(id || '');
-    if(!mid) return;
-    const st = history.state || {};
-    if(st && st[APP_NAV_NS] && st.type === 'modal' && st.modalId === mid) return;
-    const state = { [APP_NAV_NS]: true, type: 'modal', page: currentPage(), modalId: mid, seq: ++modalSeq };
-    try{ history.pushState(state, '', navHashForState(state)); }catch(e){}
-  }
-  function ensureHomeGuard(force){
-    if(currentPage() !== 'home') return;
-    const st = history.state || {};
-    const curGuard = Number(st.guard || 0);
-    if(!force && st && st[APP_NAV_NS] && st.type === 'page' && st.page === 'home' && curGuard >= HOME_GUARD_DEPTH) return;
-    if(!st || !st[APP_NAV_NS] || st.type !== 'page' || st.page !== 'home'){
-      replaceBaseState('home', 0);
-    }
-    for(let g = Math.max(1, curGuard + 1); g <= HOME_GUARD_DEPTH; g++){
-      pushPageState('home', g);
-    }
-  }
-  function applyPageState(page){
-    const target = String(page || 'home');
-    const fn = window.__appOriginalShowPage || window.showPage;
-    if(typeof fn !== 'function') return;
-    suppressHistoryPush = true;
-    try{ fn(target); } finally { suppressHistoryPush = false; }
-  }
-  function syncBottomTabs(){
-    const page = currentPage();
-    document.querySelectorAll('#bottomTabBar button').forEach(btn=>{
-      const tgt = btn.dataset.target;
-      const norm = tgt === 'results' ? 'ranking' : tgt;
-      btn.classList.toggle('active', norm === page);
-    });
-  }
-  function closeTopModalDirect(preferredId){
-    const target = String(preferredId || topModalId() || '');
-    if(!target) return false;
-    try{
-      if(typeof window.__appOriginalCm === 'function') window.__appOriginalCm(target);
-      else if(typeof window.cm === 'function') window.cm(target);
-      else document.getElementById(target)?.classList.remove('open');
+      if(typeof window.__appOriginalCm==='function') window.__appOriginalCm(top);
+      else if(typeof window.cm==='function') window.cm(top);
+      else document.getElementById(top)?.classList.remove('open');
     }catch(e){
-      document.getElementById(target)?.classList.remove('open');
+      document.getElementById(top)?.classList.remove('open');
     }
     return true;
   }
-  function clearAllOpenModals(){
-    let safe = 20;
-    while(topModalId() && safe-- > 0){
-      if(!closeTopModalDirect(topModalId())) break;
+  function syncModalStateTo(targetModalId=''){
+    const current=getActiveModalId();
+    if(current===String(targetModalId||'')) return;
+    syncingModal = true;
+    try{
+      document.querySelectorAll('.modal-overlay.open').forEach(el=>{
+        if(!targetModalId || el.id!==targetModalId){
+          try{
+            if(typeof window.__appOriginalCm==='function') window.__appOriginalCm(el.id);
+            else if(typeof window.cm==='function') window.cm(el.id);
+            else el.classList.remove('open');
+          }catch(e){ el.classList.remove('open'); }
+        }
+      });
+      if(targetModalId){
+        const target=document.getElementById(targetModalId);
+        if(target && !target.classList.contains('open')){
+          try{
+            if(typeof window.__appOriginalOm==='function') window.__appOriginalOm(targetModalId);
+            else if(typeof window.om==='function') window.om(targetModalId);
+            else target.classList.add('open');
+          }catch(e){ target.classList.add('open'); }
+        }
+      }
+    }finally{
+      syncingModal = false;
     }
   }
-  function handleState(state){
-    const st = state || {};
-    if(st && st[APP_NAV_NS]){
-      const page = String(st.page || currentPage() || 'home');
-      const wantModal = String(st.modalId || '');
-      if(wantModal){
-        applyPageState(page);
-        const openIds = openModalIds();
-        for(let i = openIds.length - 1; i >= 0; i--){
-          const id = openIds[i];
-          if(id === wantModal) break;
-          closeTopModalDirect(id);
-        }
-        if(!document.getElementById(wantModal)?.classList.contains('open')){
-          try{
-            if(typeof window.__appOriginalOm === 'function') window.__appOriginalOm(wantModal);
-            else if(typeof window.om === 'function') window.om(wantModal);
-            else document.getElementById(wantModal)?.classList.add('open');
-          }catch(e){
-            document.getElementById(wantModal)?.classList.add('open');
-          }
-        }
-      }else{
-        clearAllOpenModals();
-        applyPageState(page);
-        replaceBaseState(page, Number(st.guard || 0));
-        if(page === 'home') ensureHomeGuard(false);
-      }
+  function buildState(page, modalId='', isGuard=false){
+    return { [APP_NAV_NS]: true, page: String(page||'home'), modalId: String(modalId||''), guard: isGuard ? ROOT_GUARD : '' };
+  }
+  function appPushHistoryState(page, modalId='', isGuard=false){
+    try{
+      const state=buildState(page, modalId, isGuard);
+      const hash='#'+encodeURIComponent(String(page||'home'));
+      history.pushState(state, '', hash);
+    }catch(e){}
+  }
+  function appReplaceHistoryState(page, modalId='', isGuard=false){
+    try{
+      const state=buildState(page, modalId, isGuard);
+      const hash='#'+encodeURIComponent(String(page||'home'));
+      history.replaceState(state, '', hash);
+    }catch(e){}
+  }
+  function ensureAppHistoryReady(force){
+    const cur=currentPage();
+    const st=history.state||{};
+    if(force || !st || !st[APP_NAV_NS]){
+      appReplaceHistoryState(cur, '', false);
+      appPushHistoryState(cur, '', cur==='home');
+      return;
+    }
+    if(cur==='home' && st.guard!==ROOT_GUARD){
+      appPushHistoryState('home', '', true);
+    }
+  }
+  function applyPage(page){
+    const fn=window.__appOriginalShowPage || window.showPage;
+    if(typeof fn!=='function') return;
+    suppressPush=true;
+    try{ fn(String(page||'home')); }finally{ suppressPush=false; }
+    syncBottomTabs();
+  }
+  function syncBottomTabs(){
+    const page=currentPage();
+    document.querySelectorAll('#bottomTabBar button').forEach(btn=>{
+      const tgt=(btn.dataset.target==='results'?'ranking':btn.dataset.target)||'home';
+      btn.classList.toggle('active', tgt===page);
+    });
+  }
+  function handleAppPopState(ev){
+    const state=ev?.state;
+    if(!state || !state[APP_NAV_NS]){
+      suppressPush=true;
+      try{ syncModalStateTo(''); applyPage('home'); }finally{ suppressPush=false; }
+      appPushHistoryState('home', '', true);
       syncBottomTabs();
       return;
     }
-
-    if(topModalId()){
-      closeTopModalDirect(topModalId());
-      replaceBaseState(currentPage(), currentPage() === 'home' ? 0 : 0);
-      if(currentPage() === 'home') ensureHomeGuard(true);
-    }else{
-      applyPageState('home');
-      replaceBaseState('home', 0);
-      ensureHomeGuard(true);
+    const targetPage=String(state.page||'home');
+    const targetModal=String(state.modalId||'');
+    suppressPush=true;
+    try{
+      syncModalStateTo(targetModal);
+      applyPage(targetPage);
+    }finally{
+      suppressPush=false;
+    }
+    if(state.guard===ROOT_GUARD){
+      appPushHistoryState(targetPage, targetModal, true);
     }
     syncBottomTabs();
   }
 
-  replaceBaseState(currentPage(), currentPage() === 'home' ? 0 : 0);
-  if(currentPage() === 'home') ensureHomeGuard(true);
-  syncBottomTabs();
-
-  const priorShowPage = window.showPage;
-  if(typeof priorShowPage === 'function'){
-    window.__appOriginalShowPage = priorShowPage;
-    window.showPage = function(name){
-      const prev = currentPage();
-      const res = priorShowPage.apply(this, arguments);
-      const next = currentPage();
-      syncBottomTabs();
-      if(!popHandling){
-        if(next !== prev && !suppressHistoryPush){
-          pushPageState(next, next === 'home' ? HOME_GUARD_DEPTH : 0);
-          if(next === 'home') ensureHomeGuard(true);
-        }else if(!history.state || !history.state[APP_NAV_NS]){
-          replaceBaseState(next, next === 'home' ? 0 : 0);
-          if(next === 'home') ensureHomeGuard(true);
-        }else if(next === 'home'){
-          ensureHomeGuard(false);
-        }
-      }
-      return res;
-    };
-  }
-
-  const priorOm = window.om;
-  if(typeof priorOm === 'function'){
-    window.__appOriginalOm = priorOm;
-    window.om = function(id){
-      const alreadyOpen = !!document.getElementById(id)?.classList.contains('open');
-      const res = priorOm.apply(this, arguments);
-      if(!popHandling && !alreadyOpen && document.getElementById(id)?.classList.contains('open')){
-        pushModalState(id);
-      }
-      return res;
-    };
-  }
-
-  const priorCm = window.cm;
-  if(typeof priorCm === 'function'){
-    window.__appOriginalCm = priorCm;
-    window.cm = function(id){
-      const beforeTop = topModalId();
-      const target = String(id || beforeTop || '');
-      const res = priorCm.apply(this, arguments);
-      const closedTop = target && beforeTop === target && !openModalIds().includes(target);
-      if(!popHandling && closedTop){
-        const st = history.state || {};
-        if(st && st[APP_NAV_NS] && st.type === 'modal' && st.modalId === target){
-          try{ history.back(); }catch(e){}
-        }else{
-          replaceBaseState(currentPage(), currentPage() === 'home' ? 0 : 0);
-          if(currentPage() === 'home') ensureHomeGuard(true);
-        }
-        syncBottomTabs();
-      }
-      return res;
-    };
-  }
-
-  window.addEventListener('popstate', function(ev){
-    popHandling = true;
-    try{ handleState(ev.state || {}); }
-    finally{ popHandling = false; }
-  });
-
+  window.addEventListener('popstate', handleAppPopState);
   window.addEventListener('hashchange', function(){
-    if(internalHashUpdate) return;
-    const st = history.state || {};
-    if(st && st[APP_NAV_NS]) return;
-    popHandling = true;
-    try{ handleState(st); }
-    finally{ popHandling = false; }
+    if(history.state && history.state[APP_NAV_NS]) return;
+    handleAppPopState({state: history.state});
   });
 
-  document.addEventListener('DOMContentLoaded', syncBottomTabs);
+  const priorShowPage=window.showPage;
+  if(typeof priorShowPage==='function'){
+    window.__appOriginalShowPage=priorShowPage;
+    window.showPage=function(name){
+      const prev=currentPage();
+      const res=priorShowPage.apply(this, arguments);
+      const next=currentPage();
+      syncBottomTabs();
+      if(!suppressPush){
+        if(next!==prev){
+          appPushHistoryState(next, '', next==='home');
+        }else if(!history.state || !history.state[APP_NAV_NS]){
+          ensureAppHistoryReady(true);
+        }
+      }
+      return res;
+    };
+  }
+
+  const priorOm=window.om;
+  if(typeof priorOm==='function'){
+    window.__appOriginalOm=priorOm;
+    window.om=function(id){
+      const wasOpen=!!document.getElementById(id)?.classList.contains('open');
+      const res=priorOm.apply(this, arguments);
+      if(!suppressPush && !syncingModal && !wasOpen && document.getElementById(id)?.classList.contains('open')){
+        appPushHistoryState(currentPage(), String(id||''), false);
+      }
+      return res;
+    };
+  }
+
+  const priorCm=window.cm;
+  if(typeof priorCm==='function'){
+    window.__appOriginalCm=priorCm;
+    window.cm=function(id){
+      const before=getActiveModalId();
+      const target=String(id||before||'');
+      const res=priorCm.apply(this, arguments);
+      if(!suppressPush && !syncingModal && target && before===target && getActiveModalId()!==target){
+        try{ history.back(); }catch(e){}
+      }
+      return res;
+    };
+  }
+
+  document.addEventListener('click', function(e){
+    const btn=e.target.closest('#bottomTabBar button');
+    if(btn){
+      setTimeout(syncBottomTabs, 30);
+      setTimeout(syncBottomTabs, 180);
+    }
+  }, true);
+
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded', function(){ ensureAppHistoryReady(true); syncBottomTabs(); });
+  }else{
+    ensureAppHistoryReady(true); syncBottomTabs();
+  }
+
+  window.addEventListener('pageshow', function(){
+    setTimeout(function(){ ensureAppHistoryReady(false); syncBottomTabs(); }, 0);
+  });
 })();
 </script>
 
