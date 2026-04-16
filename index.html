@@ -1030,6 +1030,22 @@ body{overflow-x:hidden;}
 .home-click-card:hover,.home-click-chip:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(15,30,58,.12);}
 .home-click-card:active,.home-click-chip:active{transform:translateY(0);}
 
+.home-quick-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;}
+.home-quick-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:96px;border:1px solid rgba(15,30,58,.08);border-radius:18px;background:linear-gradient(180deg,#ffffff 0%,#f7faff 100%);box-shadow:0 10px 24px rgba(15,30,58,.07);font-family:'Noto Sans KR',sans-serif;font-size:.9rem;font-weight:800;color:#10213f;cursor:pointer;transition:transform .16s ease, box-shadow .16s ease, border-color .16s ease;}
+.home-quick-btn:hover{transform:translateY(-2px);box-shadow:0 14px 28px rgba(15,30,58,.12);border-color:rgba(15,30,58,.14);}
+.home-quick-btn span{font-size:.84rem;line-height:1.3;}
+.home-panel{display:flex;flex-direction:column;gap:10px;}
+.home-panel-box{padding:12px 14px;border:1px solid rgba(15,30,58,.08);border-radius:14px;background:linear-gradient(180deg,#ffffff 0%,#f8fbff 100%);}
+.home-panel-title{font-size:.8rem;font-weight:900;color:#10213f;margin-bottom:8px;display:flex;align-items:center;gap:6px;}
+.home-panel-list{display:flex;flex-direction:column;gap:8px;}
+.home-panel-row{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:9px 10px;border-radius:12px;background:#fff;border:1px solid rgba(15,30,58,.07);}
+.home-panel-row-main{min-width:0;flex:1;}
+.home-panel-row-title{font-size:.82rem;font-weight:800;color:#10213f;line-height:1.35;word-break:keep-all;}
+.home-panel-row-sub{font-size:.74rem;color:#526079;margin-top:4px;line-height:1.45;}
+.home-panel-badge{display:inline-flex;align-items:center;justify-content:center;padding:5px 9px;border-radius:999px;background:#eff6ff;color:#1d4ed8;font-size:.72rem;font-weight:900;white-space:nowrap;}
+.home-empty-note{font-size:.78rem;color:#64748b;line-height:1.6;padding:10px 12px;border-radius:12px;background:#f8fafc;border:1px dashed #cbd5e1;}
+@media(max-width:680px){.home-quick-grid{grid-template-columns:repeat(2,minmax(0,1fr));}.home-quick-btn{min-height:82px;border-radius:16px;}.home-quick-btn span{font-size:.8rem;}}
+
 
 
 /* === mobile gesture hints === */
@@ -1968,16 +1984,27 @@ body {
   </div>
 
   <div class="card fade-in home-status-card" id="homeAssocCard">
-    <div class="card-title">📊 시합관리 시스템 현황</div>
+    <div class="card-title">📊 지금 시합 한눈에 보기</div>
     <div class="g4 home-stats">
-      <div class="stat-card home-click-card" onclick="goHomeMetric('assoc_clubs')"><div class="stat-label">등록 클럽</div><div class="stat-val" id="sClubs">0</div></div>
-      <div class="stat-card home-click-card" onclick="goHomeMetric('courts')"><div class="stat-label">소속 코트</div><div class="stat-val" id="sTeams">0</div></div>
-      <div class="stat-card home-click-card" onclick="goHomeMetric('assoc_players')"><div class="stat-label">등록 선수</div><div class="stat-val" id="sMatches">0</div></div>
-      <div class="stat-card home-click-card" onclick="goHomeMetric('reg2026')"><div class="stat-label">2026 인원</div><div class="stat-val" id="sPlayers">0</div></div>
+      <div class="stat-card home-click-card" onclick="goHomeMetric('live_matches')"><div class="stat-label">진행 경기</div><div class="stat-val" id="sClubs">0</div></div>
+      <div class="stat-card home-click-card" onclick="goHomeMetric('waiting_matches')"><div class="stat-label">대기 경기</div><div class="stat-val" id="sTeams">0</div></div>
+      <div class="stat-card home-click-card" onclick="goHomeMetric('active_courts')"><div class="stat-label">사용 중 코트</div><div class="stat-val" id="sMatches">0</div></div>
+      <div class="stat-card home-click-card" onclick="goHomeMetric('remaining_matches')"><div class="stat-label">남은 경기</div><div class="stat-val" id="sPlayers">0</div></div>
     </div>
   </div>
+
+  <div class="card fade-in">
+    <div class="card-title">⚡ 빠른 메뉴</div>
+    <div class="home-quick-grid">
+      <button class="home-quick-btn" onclick="openHomeRegister()">📋<span>팀 등록</span></button>
+      <button class="home-quick-btn" onclick="openHomeBracket()">🎲<span>대진표 보기</span></button>
+      <button class="home-quick-btn" onclick="openHomeCourtInfo()">🎾<span>코트 현황</span></button>
+      <button class="home-quick-btn" onclick="openHomeGuideAction()">📌<span>대회 요강</span></button>
+    </div>
+  </div>
+
   <div class="g2">
-    <div class="card fade-in"><div class="card-title">📌 현재 시합 운영</div><div id="homeTournInfo"><p class="muted">등록된 대회가 없습니다</p></div></div>
+    <div class="card fade-in"><div class="card-title">📌 참가자 안내 / 현재 시합</div><div id="homeTournInfo"><p class="muted">등록된 대회가 없습니다</p></div></div>
   </div>
   
   <div class="card fade-in">
@@ -1993,12 +2020,12 @@ body {
     </div>
   </div>
 
-  <div class="card fade-in"><div class="card-title">🏆 현재 부서 진행 현황</div><div class="g2" id="homeDivStatus"></div></div>
+  <div class="card fade-in"><div class="card-title">🏆 참가 부서 / 진행 현황</div><div class="g2" id="homeDivStatus"></div></div>
 
   <!-- 등록선수 현황 버튼 (항상 표시) -->
   <div class="card fade-in" id="homeRegViewerCard" style="padding:12px 16px">
     <button class="btn btn-outline" style="width:100%;padding:12px;font-size:.88rem;font-weight:600" onclick="showPage('players');switchPlayersTab('registry')">
-      🧾 <span class="reg-year-label">등록선수</span> 현황 보기
+      🧾 <span class="reg-year-label">선수 / 참가 기록</span> 보기
       <span id="homeRegCount" style="margin-left:6px;background:var(--primary);color:white;font-size:.72rem;padding:2px 8px;border-radius:20px;font-weight:700"></span>
     </button>
   </div>
@@ -4089,6 +4116,7 @@ function setPersonalMatchPhone(raw=''){
   try{ localStorage.setItem(PERSONAL_MATCH_PHONE_KEY, digits); }catch(e){}
   toast('내 경기 전화번호를 저장했습니다 ✅','success');
   try{ renderBracket(); }catch(e){}
+  try{ upDash(); }catch(e){}
   return true;
 }
 function promptPersonalMatchPhone(){
@@ -4101,6 +4129,7 @@ function clearPersonalMatchPhone(){
   try{ localStorage.removeItem(PERSONAL_MATCH_PHONE_KEY); }catch(e){}
   toast('저장된 전화번호를 지웠습니다','success');
   try{ renderBracket(); }catch(e){}
+  try{ upDash(); }catch(e){}
 }
 function teamHasPersonalPhone(team, digits=''){
   const target=normalizePhoneDigits(digits);
@@ -4313,6 +4342,35 @@ function renderPersonalMatchBanner(tid, targetDivs=[]){
     ? (cards || '')
     : `<div style="font-size:.88rem;color:#1e3a8a;font-weight:700">저장된 번호와 일치하는 현재 대회 경기가 없습니다</div>`;
   return `<div style="padding:10px 12px;background:linear-gradient(135deg,#eef4ff,#fffdf5);border:1.5px solid #93c5fd;border-radius:10px;margin-bottom:10px"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:${(nextCard||cardsHtml)?8:0}px"><div><div class="my-match-panel-title">📱 개인전 내 경기 모아보기</div><div style="font-size:.8rem;color:#1e3a8a;margin-top:4px;line-height:1.6">저장 번호: <b>${saved}</b> · 현재 대회 ${rows.length}경기</div></div>${headerBtns}</div>${nextCard}${cardsHtml}</div>`;
+}
+
+function renderHomePersonalMatchBanner(tid, targetDivs=[]){
+  const t=(G.tournaments||[]).find(x=>x.id===tid);
+  if(!t || getTournamentTypeById(tid)!=='individual_pair') return '';
+  const digits=getPersonalMatchPhone();
+  const saved=formatPhoneLoose(digits);
+  const rows=digits?getPersonalizedIndividualMatches(tid,targetDivs,digits):[];
+  const rowsWithStatus=rows.map(row=>({ ...row, status:getPersonalMatchStatusLabel(row.key,row.match) }));
+  const nextRow=getPersonalNextMatchRow(rowsWithStatus);
+  const nextCard=renderPersonalNextMatchCard(nextRow);
+  const headerBtns=`<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"><button class="my-match-toggle-btn" onclick="event.stopPropagation();promptPersonalMatchPhone()" style="border:1px solid #2563eb;border-radius:999px;background:white;color:#1d4ed8;cursor:pointer">${saved?'📱 번호 변경':'📱 전화번호 입력'}</button>${saved?'<button class="my-match-toggle-btn" onclick="event.stopPropagation();clearPersonalMatchPhone()" style="border:1px solid #64748b;border-radius:999px;background:white;color:#475569;cursor:pointer">초기화</button>':''}</div>`;
+  if(!saved){
+    return `<div class="home-panel-box"><div class="home-panel-title">📱 내 경기 빠르게 찾기</div><div class="home-empty-note" style="border-style:solid;background:linear-gradient(135deg,#eef4ff,#fffdf5);border-color:#93c5fd;color:#1e3a8a"><div style="font-weight:900;color:#10213f;margin-bottom:6px">전화번호를 한 번 저장하면 홈과 대진표에서 내 경기를 바로 강조해 보여줍니다.</div><div style="font-size:.76rem;line-height:1.6">참가 등록 때 입력한 번호를 이 기기에 저장하는 방식이라 로그인은 필요하지 않습니다.</div><div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:10px">${headerBtns}</div></div></div>`;
+  }
+  const matchSet=new Set(rowsWithStatus.map(row=>`${row.key}__${String(row.matchId||'')}`));
+  const extraCards=rowsWithStatus
+    .filter(row=>!(nextRow && String(nextRow.matchId||nextRow.match?.id||nextRow.match?._id||'')===String(row.matchId||row.match?.id||row.match?._id||'') && String(nextRow.div||'')===String(row.div||'')))
+    .slice(0,2)
+    .map(row=>{
+      const m=row.match, key=row.key, status=row.status||getPersonalMatchStatusLabel(key,m);
+      const matchId=String(row?.matchId||m?.id||m?._id||'').trim();
+      const info=describeCourtBoardMatch(key,m);
+      const n1=tdn(row.team1,key,m.t1)||'?';
+      const n2=tdn(row.team2,key,m.t2)||'?';
+      const sub=[dl(row.div), info?.label, info?.detail].filter(Boolean).join(' · ');
+      return `<div class="home-panel-row" onclick="goBracketMatch('${tid}','${row.div}','${matchId}')" style="border-color:${status.code==='live'?'#f59e0b':'#93c5fd'};background:linear-gradient(135deg,#ffffff,#f8fbff)"><div class="home-panel-row-main"><div class="home-panel-row-title">${n1} vs ${n2}</div><div class="home-panel-row-sub">${esc(sub)}</div></div><span class="home-panel-badge" style="background:${status.bg};color:${status.tone};border:1px solid ${status.border}">${status.code==='done'?'완료':'내 경기'}</span></div>`;
+    }).join('');
+  return `<div class="home-panel-box"><div class="home-panel-title">📱 내 경기 빠르게 보기</div><div style="font-size:.76rem;color:#1e3a8a;line-height:1.6;margin-bottom:8px">저장 번호: <b>${saved}</b> · 현재 대회 ${rows.length}경기</div>${nextCard || '<div class="home-empty-note">아직 저장된 번호와 일치하는 현재 경기가 없습니다.</div>'}${extraCards?`<div class="home-panel-list">${extraCards}</div>`:''}<div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:10px">${headerBtns}</div></div>`;
 }
 window.promptPersonalMatchPhone = promptPersonalMatchPhone;
 window.clearPersonalMatchPhone = clearPersonalMatchPhone;
@@ -9851,15 +9909,47 @@ function pickDefaultTournamentId(){
 }
 
 
+function openHomeRegister(){
+  const currentTid = pickDefaultTournamentId();
+  showPage('register');
+  const el=ge('regTS');
+  if(el && currentTid){ el.value=currentTid; onRegTC(); }
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function openHomeBracket(){
+  const currentTid = pickDefaultTournamentId();
+  showPage('bracket');
+  const ts=ge('bTS');
+  if(ts && currentTid){ ts.value=currentTid; onBTC(); }
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function openHomeCourtInfo(){
+  if(typeof openCourtInfoModal==='function'){ openCourtInfoModal(); return; }
+  showPage('bracket');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function openHomeGuideAction(){
+  const at=G.tournaments.find(t=>t.status==='ongoing')||G.tournaments.find(t=>t.status==='open')||G.tournaments[0];
+  if(at && typeof openGuide==='function'){ openGuide(at.id); return; }
+  toast('열린 대회가 아직 없습니다','info');
+}
 function goHomeMetric(kind){
   const currentTid = pickDefaultTournamentId();
   switch(kind){
     case 'current_clubs':
     case 'current_teams': {
-      showPage('register');
-      const el=ge('regTS');
-      if(el && currentTid){ el.value=currentTid; onRegTC(); }
-      window.scrollTo({top:0,behavior:'smooth'});
+      openHomeRegister();
+      break;
+    }
+    case 'live_matches':
+    case 'waiting_matches':
+    case 'remaining_matches': {
+      openHomeBracket();
+      break;
+    }
+    case 'active_courts':
+    case 'courts': {
+      openHomeCourtInfo();
       break;
     }
     case 'assoc_clubs':
@@ -9874,15 +9964,15 @@ function goHomeMetric(kind){
       window.scrollTo({top:0,behavior:'smooth'});
       break;
     }
-    case 'courts': {
-      openCourtInfoModal();
-      break;
-    }
     default:
       break;
   }
 }
 window.goHomeMetric = goHomeMetric;
+window.openHomeRegister = openHomeRegister;
+window.openHomeBracket = openHomeBracket;
+window.openHomeCourtInfo = openHomeCourtInfo;
+window.openHomeGuideAction = openHomeGuideAction;
 
 function openSupportModal(){
   const phone = (G.meta.adminPhone||'').trim();
@@ -20758,30 +20848,22 @@ function upLog(){ return; }
 
 
 function upDash(){
-  // ── 홈 현황판 4개: 2026년 협회 전체 기준 ──────────────────
   const reg2026 = (G_REGISTRY&&G_REGISTRY[2026]) || [];
-  const assocClubs = new Set(reg2026.map(m=>m.club).filter(Boolean));
-  const assocPlayers = reg2026.length;
-
-  // 등록 팀수: G.teams 전체 (현재까지 등록된 모든 팀)
   let assocTeams = 0;
   Object.values(G.teams||{}).forEach(arr=>{ assocTeams += (arr||[]).length; });
-  const totalCourts = getTotalCourtCount();
-
-  ge('sClubs').textContent = assocClubs.size || 0;
-  ge('sTeams').textContent = totalCourts;
-  ge('sMatches').textContent = reg2026.length;
-  ge('sPlayers').textContent = assocPlayers;
   ge('regBadge').textContent = assocTeams;
-  const assocCard=ge('homeAssocCard'); if(assocCard) assocCard.style.display = G.meta.showAssociationDashboard ? '' : 'none';
+  const assocCard=ge('homeAssocCard'); if(assocCard) assocCard.style.display = '';
 
-  // ── 현재 대회 섹션 ──────────────────────────────────────────
   const at=G.tournaments.find(t=>t.status==='ongoing')||G.tournaments.find(t=>t.status==='open')||G.tournaments[0];
   if(at){
     const currentTeams=(at.divisions||[]).flatMap(d=>G.teams[at.id+'_'+d]||[]);
     const currentClubSet=new Set();
     const currentPlayerSet=new Set();
-    let currentMatchCount=0;
+    const liveRows=[];
+    const waitRows=[];
+    let remainingMatches=0;
+    let completedMatches=0;
+    const activeCourtSet=new Set();
 
     currentTeams.forEach(team=>{
       const bc=baseClub(team?.club||'') || (team?.club||'');
@@ -20792,9 +20874,54 @@ function upDash(){
       });
     });
 
+    const personalDigits=getPersonalMatchPhone();
+    const personalRows=(getTournamentTypeById(at.id)==='individual_pair' && personalDigits)
+      ? getPersonalizedIndividualMatches(at.id, at.divisions||[], personalDigits)
+      : [];
+    const personalMatchSet=new Set(personalRows.map(row=>`${row.key}__${String(row.matchId||'')}`));
+    const matchTitle=(key,m)=>{
+      try{
+        const info=describeCourtBoardMatch(key,m);
+        const title=String(info?.title||'').trim();
+        const raw=String(info?.rawTitle||'').trim();
+        if(title && title!=='TBD vs TBD') return title;
+        if(raw && raw!=='TBD vs TBD') return raw;
+        return '경기 정보 확인';
+      }catch(e){ return '경기 정보 확인'; }
+    };
+    const pushUnique=(arr,item)=>{
+      if(!arr.some(v=>String(v.id||'')===String(item.id||''))) arr.push(item);
+    };
+
     (at.divisions||[]).forEach(d=>{
-      (G.matches[at.id+'_'+d]||[]).forEach(m=>{
-        if(m && getMatchResultState(at.id+'_'+d,m).done && !m.bye) currentMatchCount++;
+      const key=`${at.id}_${d}`;
+      (G.matches[key]||[]).forEach(m=>{
+        if(!m || m.bye) return;
+        const st=getMatchResultState(key,m);
+        if(st.done){ completedMatches++; return; }
+        remainingMatches++;
+        const hasCourt=!!String(m.court||'').trim() || (Array.isArray(m.courts)&&m.courts.length>0);
+        const isShared=!!m.manualSharedHold || (!hasCourt && !!String(m.courtAssignedAt||'').trim());
+        const isWaiting=!!String(m.waitingFirstAt||'').trim() || !!String(m.manualCourtTarget||'').trim() || isShared;
+        const courtLabel=String(m.court||((Array.isArray(m.courts)&&m.courts[0])||m.manualCourtTarget||'')).trim();
+        const info=describeCourtBoardMatch(key,m);
+        const stableMid=String(m?.id||m?._id||'').trim();
+        const personalKey=`${key}__${stableMid}`;
+        const isMine=stableMid ? personalMatchSet.has(personalKey) : false;
+        const title=(matchTitle(key,m) || '').trim() || '경기 정보 확인';
+        const baseSubParts=[dl(d)];
+        if(info?.label) baseSubParts.push(info.label);
+        if(courtLabel) baseSubParts.push(`🎾 ${courtLabel}`);
+        else if(isShared) baseSubParts.push('공용 대기');
+        else if(info?.detail) baseSubParts.push(info.detail);
+        const item={id:stableMid||(`${key}_${d}_${Math.random()}`), key, mid:stableMid, title, sub:baseSubParts.join(' · '), court:courtLabel||'', div:d, mine:isMine};
+        if(hasCourt && !isWaiting){ if(courtLabel) activeCourtSet.add(courtLabel); pushUnique(liveRows,item); }
+        else if(isWaiting || hasCourt){
+          const waitSubParts=[dl(d)];
+          if(info?.label) waitSubParts.push(info.label);
+          waitSubParts.push(courtLabel?`🎾 ${courtLabel} 대기`:'공용 대기');
+          pushUnique(waitRows,{...item, sub:waitSubParts.join(' · ')});
+        }
       });
     });
 
@@ -20803,19 +20930,44 @@ function upDash(){
     ge('heroStatus').textContent='📌 '+slbl[at.status];
     ge('heroClubs').innerHTML=`🏟 참가 <b>${currentClubSet.size}</b>개 클럽`;
     ge('heroTeams').innerHTML=`👥 참가 <b>${currentTeams.length}</b>팀 · 인원 <b>${currentPlayerSet.size}</b>명`;
+
+    ge('sClubs').textContent = liveRows.length || 0;
+    ge('sTeams').textContent = waitRows.length || 0;
+    ge('sMatches').textContent = activeCourtSet.size || 0;
+    ge('sPlayers').textContent = remainingMatches || 0;
+
     const homeTours = getHomeVisibleTournaments();
-    ge('homeTournInfo').innerHTML=`<div style="display:flex;flex-direction:column;gap:8px">
-      <div style="font-weight:700;font-size:1rem">${at.name}</div>
-      <div style="font-size:.82rem;color:var(--text2)">📅 ${at.date||'-'}${at.venue?' | 📍 '+at.venue:''}</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <span class="hero-chip home-click-chip" style="background:var(--panel2);color:var(--primary-dark);border:1px solid var(--border)" onclick="goHomeMetric('current_clubs')">🏟 ${currentClubSet.size}개 클럽</span>
-        <span class="hero-chip home-click-chip" style="background:var(--panel2);color:var(--primary-dark);border:1px solid var(--border)" onclick="goHomeMetric('current_teams')">👥 ${currentTeams.length}팀</span>
-        <span class="hero-chip home-click-chip" style="background:var(--panel2);color:var(--primary-dark);border:1px solid var(--border)" onclick="goHomeMetric('current_teams')">🧍 ${currentPlayerSet.size}명</span>
+    const mineChip=(row)=>row.mine?'<span class="home-panel-badge" style="background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe">내 경기</span>':'';
+    const rowClick=(row)=>row.mid?`goBracketMatch('${at.id}','${row.div}','${row.mid}')`:'openHomeBracket()';
+    const liveHtml = liveRows.length ? liveRows.slice(0,4).map((row,idx)=>`<div class="home-panel-row" onclick="${rowClick(row)}"><div class="home-panel-row-main"><div class="home-panel-row-title">${esc(row.title)}</div><div class="home-panel-row-sub">${esc(row.sub)}</div></div><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end">${mineChip(row)}<span class="home-panel-badge">진행 ${idx+1}</span></div></div>`).join('') : '<div class="home-empty-note">지금 표시할 진행중 경기가 없어요. 대진표에서 배정 상태를 확인해 주세요.</div>';
+    const waitHtml = waitRows.length ? waitRows.slice(0,4).map((row,idx)=>`<div class="home-panel-row" onclick="${rowClick(row)}"><div class="home-panel-row-main"><div class="home-panel-row-title">${esc(row.title)}</div><div class="home-panel-row-sub">${esc(row.sub)}</div></div><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end">${mineChip(row)}<span class="home-panel-badge" style="background:#fff7ed;color:#9a3412">대기 ${idx+1}</span></div></div>`).join('') : '<div class="home-empty-note">대기중 경기가 없어요. 코트 현황 또는 대진표에서 다음 순서를 확인해 주세요.</div>';
+    const personalHomeBanner = renderHomePersonalMatchBanner(at.id, at.divisions||[]);
+
+    ge('homeTournInfo').innerHTML=`<div class="home-panel">
+      <div class="home-panel-box">
+        <div style="font-weight:800;font-size:1rem;color:#10213f">${esc(at.name)}</div>
+        <div style="font-size:.82rem;color:var(--text2);margin-top:6px">📅 ${esc(at.date||'-')}${at.venue?' · 📍 '+esc(at.venue):''}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
+          <span class="hero-chip home-click-chip" style="background:var(--panel2);color:var(--primary-dark);border:1px solid var(--border)" onclick="goHomeMetric('current_clubs')">🏟 ${currentClubSet.size}개 클럽</span>
+          <span class="hero-chip home-click-chip" style="background:var(--panel2);color:var(--primary-dark);border:1px solid var(--border)" onclick="goHomeMetric('current_teams')">👥 ${currentTeams.length}팀</span>
+          <span class="hero-chip home-click-chip" style="background:var(--panel2);color:var(--primary-dark);border:1px solid var(--border)" onclick="goHomeMetric('remaining_matches')">🏁 남은 경기 ${remainingMatches}</span>
+          <span class="hero-chip home-click-chip" style="background:var(--panel2);color:var(--primary-dark);border:1px solid var(--border)" onclick="goHomeMetric('live_matches')">🎾 진행 ${liveRows.length}</span>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">${at.divisions.map(d=>`<span class="dpill ${dc(d)}" style="cursor:pointer" onclick="openRoster('${at.id}','${d}')">${dl(d)} <small>${(G.teams[at.id+'_'+d]||[]).length}팀</small></span>`).join('')}</div>
+        <div style="margin-top:10px;font-size:.78rem;color:#526079;line-height:1.6">참가자는 홈에서 <b>진행 경기 / 대기 경기 / 코트 현황</b>만 빠르게 보고, 자세한 내용은 대진표에서 확인하면 됩니다.</div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn btn-outline" style="font-size:.78rem;padding:5px 11px" onclick="openHomeGuideAction()">📌 요강 보기</button><button class="btn btn-outline" style="font-size:.78rem;padding:5px 11px" onclick="openHomeBracket()">🎲 대진표 바로가기</button></div>
+        ${at.notice?`<div style="margin-top:10px;font-size:.78rem;background:var(--panel2);padding:8px;border-radius:var(--radius);border:1px solid var(--border);white-space:pre-line">${at.notice}</div>`:''}
       </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap">${at.divisions.map(d=>`<span class="dpill ${dc(d)}" style="cursor:pointer" onclick="openRoster('${at.id}','${d}')">${dl(d)} <small>${(G.teams[at.id+'_'+d]||[]).length}팀</small></span>`).join('')}</div>
-      ${homeTours.length ? `<div style="margin-top:2px;padding:8px 10px;background:var(--panel2);border:1px solid var(--border);border-radius:10px"><div style="font-size:.76rem;font-weight:800;color:var(--primary-dark);margin-bottom:6px">📋 현재 접수중/진행중 대회 (날짜 빠른순)</div><div style="display:flex;flex-direction:column;gap:6px">${homeTours.map(t=>`<div onclick="showPage('register');const el=ge('regTS');if(el){el.value='${t.id}';onRegTC();}window.scrollTo({top:0,behavior:'smooth'});" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 9px;background:#fff;border:1px solid var(--border);border-radius:8px"><div style="font-size:.8rem;font-weight:700;color:var(--text)">• ${esc(t.name||'')}</div><div style="font-size:.72rem;color:var(--text2);white-space:nowrap">${esc(t.date||'-')} · ${String(t.status||'')==='ongoing'?'진행중':'접수중'}</div></div>`).join('')}</div></div>` : ''}
-      <div style="display:flex;justify-content:flex-end"><button class="btn btn-outline" style="font-size:.78rem;padding:5px 11px" onclick="openGuide('${at.id}')">📌 요강 보기</button></div>
-      ${at.notice?`<div style="font-size:.78rem;background:var(--panel2);padding:8px;border-radius:var(--radius);border:1px solid var(--border);white-space:pre-line">${at.notice}</div>`:''}
+      ${personalHomeBanner||''}
+      <div class="home-panel-box">
+        <div class="home-panel-title">🎾 지금 진행중 경기</div>
+        <div class="home-panel-list">${liveHtml}</div>
+      </div>
+      <div class="home-panel-box">
+        <div class="home-panel-title">⏳ 다음 순서 / 대기 경기</div>
+        <div class="home-panel-list">${waitHtml}</div>
+      </div>
+      ${homeTours.length ? `<div class="home-panel-box"><div class="home-panel-title">📋 현재 접수중 / 진행중 대회</div><div class="home-panel-list">${homeTours.map(t=>`<div class="home-panel-row" onclick="showPage('register');const el=ge('regTS');if(el){el.value='${t.id}';onRegTC();}window.scrollTo({top:0,behavior:'smooth'});"><div class="home-panel-row-main"><div class="home-panel-row-title">${esc(t.name||'')}</div><div class="home-panel-row-sub">${esc(t.date||'-')} · ${String(t.status||'')==='ongoing'?'진행중':'접수중'}</div></div><span class="home-panel-badge">바로가기</span></div>`).join('')}</div></div>` : ''}
     </div>`;
     ge('homeDivStatus').innerHTML=at.divisions.map(d=>{
       const k=`${at.id}_${d}`;
@@ -20887,6 +21039,10 @@ function upDash(){
     ge('heroTitle').textContent=getAppTitle();
     ge('heroStatus').textContent='대회 준비중';
     ge('heroClubs').textContent='🏟 현재 참가 -';
+    ge('sClubs').textContent='0';
+    ge('sTeams').textContent='0';
+    ge('sMatches').textContent='0';
+    ge('sPlayers').textContent='0';
     ge('heroTeams').textContent='👥 현재 참가 -';
     ge('homeTournInfo').innerHTML='<p class="muted">등록된 대회가 없습니다</p>';
     ge('homeDivStatus').innerHTML='';
