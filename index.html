@@ -27638,23 +27638,77 @@ function exportPrelimImage(){
   window.__mobileBackNavigationLayerInstalled = true;
 
   const APP_NAV_NS = '__app_nav__';
+  const HOME_GUARD_DEPTH = 2;
   let suppressHistoryPush = false;
   let popHandling = false;
   let modalSeq = 0;
+  let internalHashUpdate = false;
 
   function currentPage(){
     return document.querySelector('.page.active')?.id?.replace('page-','') || 'home';
+  }
+  function pageEl(page){
+    return document.getElementById('page-' + String(page || 'home'));
   }
   function openModalIds(){
     return [...document.querySelectorAll('.modal-overlay.open')].map(el => el.id).filter(Boolean);
   }
   function topModalId(){
     const ids = openModalIds();
-    return ids.length ? ids[ids.length-1] : '';
+    return ids.length ? ids[ids.length - 1] : '';
   }
-  function cloneState(base){
-    const src = (base && typeof base === 'object') ? base : (history.state && typeof history.state === 'object' ? history.state : {});
-    return { ...src };
+  function navHashForState(state){
+    if(!state || !state[APP_NAV_NS]) return '#app-home';
+    if(state.type === 'modal'){
+      return '#app-modal-' + encodeURIComponent(String(state.modalId || ''));
+    }
+    const page = String(state.page || 'home');
+    const guard = Number(state.guard || 0);
+    return guard > 0 ? ('#app-' + page + '-g' + guard) : ('#app-' + page);
+  }
+  function setHashSilently(hash){
+    try{
+      internalHashUpdate = true;
+      const target = String(hash || '#app-home');
+      if(location.hash !== target){
+        history.replaceState(history.state, '', target);
+      }
+    }catch(e){}
+    setTimeout(()=>{ internalHashUpdate = false; }, 0);
+  }
+  function replaceBaseState(page, guard){
+    const target = String(page || currentPage() || 'home');
+    const g = Number(guard || 0);
+    const state = { [APP_NAV_NS]: true, type: 'page', page: target, modalId: '', guard: g };
+    try{ history.replaceState(state, '', navHashForState(state)); }catch(e){}
+  }
+  function pushPageState(page, guard){
+    const target = String(page || currentPage() || 'home');
+    const g = Number(guard || 0);
+    const st = history.state || {};
+    if(st && st[APP_NAV_NS] && st.type === 'page' && st.page === target && Number(st.guard || 0) === g) return;
+    const state = { [APP_NAV_NS]: true, type: 'page', page: target, modalId: '', guard: g };
+    try{ history.pushState(state, '', navHashForState(state)); }catch(e){}
+  }
+  function pushModalState(id){
+    const mid = String(id || '');
+    if(!mid) return;
+    const st = history.state || {};
+    if(st && st[APP_NAV_NS] && st.type === 'modal' && st.modalId === mid) return;
+    const state = { [APP_NAV_NS]: true, type: 'modal', page: currentPage(), modalId: mid, seq: ++modalSeq };
+    try{ history.pushState(state, '', navHashForState(state)); }catch(e){}
+  }
+  function ensureHomeGuard(force){
+    if(currentPage() !== 'home') return;
+    const st = history.state || {};
+    const curGuard = Number(st.guard || 0);
+    if(!force && st && st[APP_NAV_NS] && st.type === 'page' && st.page === 'home' && curGuard >= HOME_GUARD_DEPTH) return;
+    if(!st || !st[APP_NAV_NS] || st.type !== 'page' || st.page !== 'home'){
+      replaceBaseState('home', 0);
+    }
+    for(let g = Math.max(1, curGuard + 1); g <= HOME_GUARD_DEPTH; g++){
+      pushPageState('home', g);
+    }
   }
   function applyPageState(page){
     const target = String(page || 'home');
@@ -27663,44 +27717,79 @@ function exportPrelimImage(){
     suppressHistoryPush = true;
     try{ fn(target); } finally { suppressHistoryPush = false; }
   }
-  function replaceBaseState(page){
-    const target = String(page || currentPage());
-    const state = { [APP_NAV_NS]: true, type: 'page', page: target, modalId: '', guard: target === 'home' ? 1 : 0 };
-    try{ history.replaceState(state, '', '#' + target); }catch(e){}
-  }
-  function ensureHomeGuard(){
-    const st = history.state || {};
-    if(currentPage() !== 'home') return;
-    if(st && st[APP_NAV_NS] && st.type === 'page' && st.page === 'home' && st.guard === 2) return;
-    try{ history.pushState({ [APP_NAV_NS]: true, type: 'page', page: 'home', modalId: '', guard: 2 }, '', '#home'); }catch(e){}
-  }
-  function pushPageState(page){
-    const target = String(page || currentPage());
-    const st = history.state || {};
-    if(st && st[APP_NAV_NS] && st.type === 'page' && st.page === target && (!target || target !== 'home' || st.guard === 2)) return;
-    try{ history.pushState({ [APP_NAV_NS]: true, type: 'page', page: target, modalId: '', guard: target === 'home' ? 2 : 0 }, '', '#' + target); }catch(e){}
-  }
-  function pushModalState(id){
-    const mid = String(id || '');
-    if(!mid) return;
-    const st = history.state || {};
-    if(st && st[APP_NAV_NS] && st.type === 'modal' && st.modalId === mid) return;
-    try{ history.pushState({ [APP_NAV_NS]: true, type: 'modal', page: currentPage(), modalId: mid, seq: ++modalSeq }, '', '#' + currentPage()); }catch(e){}
+  function syncBottomTabs(){
+    const page = currentPage();
+    document.querySelectorAll('#bottomTabBar button').forEach(btn=>{
+      const tgt = btn.dataset.target;
+      const norm = tgt === 'results' ? 'ranking' : tgt;
+      btn.classList.toggle('active', norm === page);
+    });
   }
   function closeTopModalDirect(preferredId){
-    const target = preferredId || topModalId();
+    const target = String(preferredId || topModalId() || '');
     if(!target) return false;
     try{
-      if(typeof window.cm === 'function') window.cm(target);
+      if(typeof window.__appOriginalCm === 'function') window.__appOriginalCm(target);
+      else if(typeof window.cm === 'function') window.cm(target);
       else document.getElementById(target)?.classList.remove('open');
     }catch(e){
       document.getElementById(target)?.classList.remove('open');
     }
     return true;
   }
+  function clearAllOpenModals(){
+    let safe = 20;
+    while(topModalId() && safe-- > 0){
+      if(!closeTopModalDirect(topModalId())) break;
+    }
+  }
+  function handleState(state){
+    const st = state || {};
+    if(st && st[APP_NAV_NS]){
+      const page = String(st.page || currentPage() || 'home');
+      const wantModal = String(st.modalId || '');
+      if(wantModal){
+        applyPageState(page);
+        const openIds = openModalIds();
+        for(let i = openIds.length - 1; i >= 0; i--){
+          const id = openIds[i];
+          if(id === wantModal) break;
+          closeTopModalDirect(id);
+        }
+        if(!document.getElementById(wantModal)?.classList.contains('open')){
+          try{
+            if(typeof window.__appOriginalOm === 'function') window.__appOriginalOm(wantModal);
+            else if(typeof window.om === 'function') window.om(wantModal);
+            else document.getElementById(wantModal)?.classList.add('open');
+          }catch(e){
+            document.getElementById(wantModal)?.classList.add('open');
+          }
+        }
+      }else{
+        clearAllOpenModals();
+        applyPageState(page);
+        replaceBaseState(page, Number(st.guard || 0));
+        if(page === 'home') ensureHomeGuard(false);
+      }
+      syncBottomTabs();
+      return;
+    }
 
-  replaceBaseState(currentPage());
-  if(currentPage() === 'home') ensureHomeGuard();
+    if(topModalId()){
+      closeTopModalDirect(topModalId());
+      replaceBaseState(currentPage(), currentPage() === 'home' ? 0 : 0);
+      if(currentPage() === 'home') ensureHomeGuard(true);
+    }else{
+      applyPageState('home');
+      replaceBaseState('home', 0);
+      ensureHomeGuard(true);
+    }
+    syncBottomTabs();
+  }
+
+  replaceBaseState(currentPage(), currentPage() === 'home' ? 0 : 0);
+  if(currentPage() === 'home') ensureHomeGuard(true);
+  syncBottomTabs();
 
   const priorShowPage = window.showPage;
   if(typeof priorShowPage === 'function'){
@@ -27709,15 +27798,16 @@ function exportPrelimImage(){
       const prev = currentPage();
       const res = priorShowPage.apply(this, arguments);
       const next = currentPage();
+      syncBottomTabs();
       if(!popHandling){
         if(next !== prev && !suppressHistoryPush){
-          pushPageState(next);
-          if(next === 'home') ensureHomeGuard();
+          pushPageState(next, next === 'home' ? HOME_GUARD_DEPTH : 0);
+          if(next === 'home') ensureHomeGuard(true);
         }else if(!history.state || !history.state[APP_NAV_NS]){
-          replaceBaseState(next);
-          if(next === 'home') ensureHomeGuard();
+          replaceBaseState(next, next === 'home' ? 0 : 0);
+          if(next === 'home') ensureHomeGuard(true);
         }else if(next === 'home'){
-          ensureHomeGuard();
+          ensureHomeGuard(false);
         }
       }
       return res;
@@ -27744,66 +27834,37 @@ function exportPrelimImage(){
       const beforeTop = topModalId();
       const target = String(id || beforeTop || '');
       const res = priorCm.apply(this, arguments);
-      const afterIds = openModalIds();
-      const closedTop = target && beforeTop === target && !afterIds.includes(target);
+      const closedTop = target && beforeTop === target && !openModalIds().includes(target);
       if(!popHandling && closedTop){
         const st = history.state || {};
         if(st && st[APP_NAV_NS] && st.type === 'modal' && st.modalId === target){
           try{ history.back(); }catch(e){}
-        }else if(!st || !st[APP_NAV_NS]){
-          replaceBaseState(currentPage());
-          if(currentPage() === 'home') ensureHomeGuard();
-        }else if(currentPage() === 'home'){
-          ensureHomeGuard();
+        }else{
+          replaceBaseState(currentPage(), currentPage() === 'home' ? 0 : 0);
+          if(currentPage() === 'home') ensureHomeGuard(true);
         }
+        syncBottomTabs();
       }
       return res;
     };
   }
 
   window.addEventListener('popstate', function(ev){
-    const state = ev.state || {};
     popHandling = true;
-    try{
-      if(state && state[APP_NAV_NS]){
-        const page = String(state.page || currentPage() || 'home');
-        const wantModal = String(state.modalId || '');
-        const openIds = openModalIds();
-        if(wantModal){
-          while(openIds.length){
-            const top = topModalId();
-            if(top === wantModal) break;
-            if(!closeTopModalDirect(top)) break;
-            openIds.pop();
-          }
-          applyPageState(page);
-          if(!document.getElementById(wantModal)?.classList.contains('open') && typeof window.__appOriginalOm === 'function'){
-            window.__appOriginalOm(wantModal);
-          }
-        }else{
-          while(topModalId()){
-            if(!closeTopModalDirect(topModalId())) break;
-          }
-          applyPageState(page);
-          replaceBaseState(page);
-          if(page === 'home') ensureHomeGuard();
-        }
-      }else{
-        const openTop = topModalId();
-        if(openTop){
-          closeTopModalDirect(openTop);
-          replaceBaseState(currentPage());
-          if(currentPage() === 'home') ensureHomeGuard();
-        }else{
-          applyPageState('home');
-          replaceBaseState('home');
-          ensureHomeGuard();
-        }
-      }
-    }finally{
-      popHandling = false;
-    }
+    try{ handleState(ev.state || {}); }
+    finally{ popHandling = false; }
   });
+
+  window.addEventListener('hashchange', function(){
+    if(internalHashUpdate) return;
+    const st = history.state || {};
+    if(st && st[APP_NAV_NS]) return;
+    popHandling = true;
+    try{ handleState(st); }
+    finally{ popHandling = false; }
+  });
+
+  document.addEventListener('DOMContentLoaded', syncBottomTabs);
 })();
 </script>
 
