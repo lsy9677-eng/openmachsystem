@@ -27636,221 +27636,225 @@ function exportPrelimImage(){
   if(window.__mobileBackNavigationLayerInstalled) return;
   window.__mobileBackNavigationLayerInstalled = true;
 
-  const APP_NAV_NS='__appNav';
-  const ROOT_GUARD='__home_guard__';
-  let suppressPush=false;
-  let syncingModal=false;
-  let navSeq=0;
+  /* ── 핵심 전략 ──────────────────────────────────────────────
+     히스토리 스택을 항상 최소 2단계 이상 유지한다.
+     [ base(replace) | home | home-guard(top) ]
+     popstate 발생 시:
+       1) 팝업 열려있으면 → 팝업 닫고 guard 다시 push
+       2) 홈이 아닌 탭이면 → 홈으로 이동하고 guard 다시 push
+       3) 홈(guard 포함)이면 → 홈 유지하고 guard 다시 push (절대 닫히지 않음)
+  ─────────────────────────────────────────────────────────── */
 
-  function currentPage(){
+  const NS = '__appNav2';
+  let busy = false;
+  let syncingModal = false;
+  let seq = 0;
+
+  /* ── 현재 상태 읽기 ── */
+  function curPage(){
     return document.querySelector('.page.active')?.id?.replace('page-','') ||
            document.querySelector('.nav-tab.active')?.dataset?.page || 'home';
   }
-  function currentModal(){
-    const opens=[...document.querySelectorAll('.modal-overlay.open')].map(el=>el.id).filter(Boolean);
-    return opens.length ? opens[opens.length-1] : '';
+  function curModal(){
+    const list = [...document.querySelectorAll('.modal-overlay.open')]
+                  .map(el=>el.id).filter(Boolean);
+    return list.length ? list[list.length-1] : '';
   }
-  function appHash(page, modalId, seq, isGuard){
-    const parts=['app', page||'home'];
-    if(modalId) parts.push('m-'+String(modalId));
-    if(isGuard) parts.push('guard');
-    parts.push(String(seq||0));
-    return '#'+parts.join('-');
+
+  /* ── 히스토리 조작 ── */
+  function mkState(page, modal, isGuard){
+    return { [NS]:true, page:String(page||'home'),
+             modal:String(modal||''), guard:!!isGuard, seq:++seq };
   }
-  function buildState(page, modalId='', isGuard=false){
-    navSeq += 1;
-    return {
-      [APP_NAV_NS]: true,
-      page: String(page||'home'),
-      modalId: String(modalId||''),
-      guard: isGuard ? ROOT_GUARD : '',
-      seq: navSeq
-    };
-  }
-  function appPushHistoryState(page, modalId='', isGuard=false){
-    try{
-      const state=buildState(page, modalId, isGuard);
-      history.pushState(state, '', appHash(state.page, state.modalId, state.seq, isGuard));
+  function push(page, modal, isGuard){
+    try{ history.pushState(mkState(page,modal,isGuard),'',
+           '#nav-'+(page||'home')+(isGuard?'-guard':'')+(modal?'-'+modal:'')+'-'+seq);
     }catch(e){}
   }
-  function appReplaceHistoryState(page, modalId='', isGuard=false){
-    try{
-      const state=buildState(page, modalId, isGuard);
-      history.replaceState(state, '', appHash(state.page, state.modalId, state.seq, isGuard));
+  function replace(page, modal, isGuard){
+    try{ history.replaceState(mkState(page,modal,isGuard),'',
+           '#nav-'+(page||'home')+(isGuard?'-guard':'')+(modal?'-'+modal:'')+'-'+seq);
     }catch(e){}
   }
-  function ensureHistory(force){
-    const cur=currentPage();
-    const modal=currentModal();
-    const st=history.state||{};
-    if(force || !st || !st[APP_NAV_NS]){
-      appReplaceHistoryState(cur, '', false);
-      if(modal) appPushHistoryState(cur, modal, false);
-      // 홈 guard: 뒤로가기로 앱을 닫을 수 없도록 guard를 2개 쌓음
-      appPushHistoryState('home', '', false);
-      appPushHistoryState('home', '', true);
-      return;
-    }
-    if(cur==='home' && !modal && st.guard!==ROOT_GUARD){
-      appPushHistoryState('home', '', true);
-    }
+
+  /* ── 스택을 안전한 상태로 초기화 ──
+     스택: [base] → [home] → [home-guard]  (top)
+     어떤 상황에서도 뒤로가기 1번으로는 앱 밖으로 못 나감 */
+  function buildSafeStack(){
+    const p = curPage();
+    const m = curModal();
+    replace('home','',false);          // base (가장 아래)
+    if(p !== 'home') push(p, m, false); // 현재 페이지
+    else if(m)       push('home', m, false);
+    push('home','',true);              // guard (top) ← 여기서 뒤로가기 눌러도 home으로 돌아옴
   }
-  function syncBottomTabs(){
-    const page=currentPage();
-    document.querySelectorAll('#bottomTabBar button').forEach(btn=>{
-      const target=(btn.dataset.target==='results'?'ranking':btn.dataset.target)||'home';
-      btn.classList.toggle('active', target===page);
-    });
-  }
+
+  /* ── 페이지/모달 실제 적용 ── */
   function applyPage(page){
-    const fn=window.__appOriginalShowPage || window.showPage;
-    if(typeof fn!=='function') return;
-    suppressPush=true;
-    try{ fn(String(page||'home')); }finally{ suppressPush=false; }
-    syncBottomTabs();
+    const fn = window.__appOriginalShowPage || window.showPage;
+    if(typeof fn !== 'function') return;
+    busy = true;
+    try{ fn(String(page||'home')); }finally{ busy = false; }
+    syncTabs();
   }
-  function closeModalDirect(id){
+  function closeModal(id){
     if(!id) return;
-    const el=document.getElementById(id);
+    const el = document.getElementById(id);
     if(!el) return;
     try{
       if(typeof window.__appOriginalCm==='function') window.__appOriginalCm(id);
       else el.classList.remove('open');
     }catch(e){ el.classList.remove('open'); }
   }
-  function openModalDirect(id){
+  function openModal(id){
     if(!id) return;
-    const el=document.getElementById(id);
+    const el = document.getElementById(id);
     if(!el) return;
     try{
       if(typeof window.__appOriginalOm==='function') window.__appOriginalOm(id);
       else el.classList.add('open');
     }catch(e){ el.classList.add('open'); }
   }
-  function syncModalState(targetModal=''){
-    const cur=currentModal();
-    if(cur===String(targetModal||'')) return;
-    syncingModal=true;
+  function applyModal(targetModal){
+    const cur = curModal();
+    if(cur === String(targetModal||'')) return;
+    syncingModal = true;
     try{
       document.querySelectorAll('.modal-overlay.open').forEach(el=>{
-        if(!targetModal || el.id!==targetModal) closeModalDirect(el.id);
+        if(el.id !== targetModal) closeModal(el.id);
       });
-      if(targetModal) openModalDirect(targetModal);
-    }finally{
-      syncingModal=false;
-    }
+      if(targetModal) openModal(targetModal);
+    }finally{ syncingModal = false; }
   }
-  function restoreFromState(state){
-    if(!state || !state[APP_NAV_NS]){
-      suppressPush=true;
-      try{ syncModalState(''); applyPage('home'); }finally{ suppressPush=false; }
-      ensureHistory(true);
-      syncBottomTabs();
+  function syncTabs(){
+    const page = curPage();
+    document.querySelectorAll('#bottomTabBar button').forEach(btn=>{
+      const t = (btn.dataset.target==='results'?'ranking':btn.dataset.target)||'home';
+      btn.classList.toggle('active', t===page);
+    });
+  }
+
+  /* ── popstate 핸들러 ──
+     어떤 state가 와도 절대 앱 밖으로 안 나가게 한다 */
+  window.addEventListener('popstate', function(ev){
+    const st = ev.state;
+
+    /* 앱 외부 state(null 또는 NS 없음) → 즉시 스택 재건 */
+    if(!st || !st[NS]){
+      busy = true;
+      try{ applyModal(''); applyPage('home'); }finally{ busy=false; }
+      buildSafeStack();
+      syncTabs();
       return;
     }
-    suppressPush=true;
-    try{
-      applyPage(state.page || 'home');
-      syncModalState(state.modalId || '');
-    }finally{
-      suppressPush=false;
-    }
-    if(state.guard===ROOT_GUARD){
-      // guard 상태에서 뒤로가기 → 홈으로 유지하고 guard 다시 2개 쌓기
-      appPushHistoryState('home', '', false);
-      appPushHistoryState('home', '', true);
-    } else if((state.page==='home' || !state.page) && !state.modalId){
-      // 홈의 non-guard 상태로 popstate → guard 다시 쌓아서 앱 안에 머물게 함
-      appPushHistoryState('home', '', true);
-    }
-    syncBottomTabs();
-  }
-  function activeModalList(){
-    return [...document.querySelectorAll('.modal-overlay.open')].map(el=>el.id).filter(Boolean);
-  }
 
-  window.addEventListener('popstate', function(ev){
-    restoreFromState(ev.state);
-  });
-  window.addEventListener('hashchange', function(){
-    if(history.state && history.state[APP_NAV_NS]) return;
-    restoreFromState(history.state);
+    const modal = curModal();
+    const page  = curPage();
+
+    /* ① 팝업이 열려 있으면 → 팝업만 닫고 guard 재push */
+    if(modal){
+      busy = true;
+      try{ applyModal(''); }finally{ busy=false; }
+      push(curPage(),'',false);
+      push('home','',true);
+      syncTabs();
+      return;
+    }
+
+    /* ② 홈이 아닌 탭 → 홈으로 이동하고 guard 재push */
+    if(page !== 'home'){
+      busy = true;
+      try{ applyPage('home'); }finally{ busy=false; }
+      push('home','',false);
+      push('home','',true);
+      syncTabs();
+      return;
+    }
+
+    /* ③ 이미 홈 (guard든 아니든) → 그냥 guard 재push (절대 닫히지 않음) */
+    push('home','',false);
+    push('home','',true);
+    syncTabs();
   });
 
-  const priorShowPage=window.showPage;
-  if(typeof priorShowPage==='function'){
-    window.__appOriginalShowPage=priorShowPage;
-    window.showPage=function(name){
-      const prev=currentPage();
-      const res=priorShowPage.apply(this, arguments);
-      const next=currentPage();
-      syncBottomTabs();
-      if(!suppressPush){
-        const modal=currentModal();
-        if(next!==prev || !history.state || !history.state[APP_NAV_NS]){
-          appPushHistoryState(next, modal, false);
-          if(next==='home' && !modal){
-            appPushHistoryState('home', '', true);
-          }
+  /* ── showPage 래퍼 ── */
+  const _showPage = window.showPage;
+  if(typeof _showPage==='function'){
+    window.__appOriginalShowPage = _showPage;
+    window.showPage = function(name){
+      const prev = curPage();
+      const res  = _showPage.apply(this, arguments);
+      const next = curPage();
+      syncTabs();
+      if(!busy){
+        const m = curModal();
+        if(next !== prev || !history.state?.[NS]){
+          push(next, m, false);
+          if(next==='home' && !m) push('home','',true);
         }
       }
       return res;
     };
   }
 
-  const priorOm=window.om;
-  if(typeof priorOm==='function'){
-    window.__appOriginalOm=priorOm;
-    window.om=function(id){
-      const before=currentModal();
-      const res=priorOm.apply(this, arguments);
-      const after=currentModal();
-      if(!suppressPush && !syncingModal && after && after!==before){
-        appPushHistoryState(currentPage(), after, false);
+  /* ── om(모달열기) 래퍼 ── */
+  const _om = window.om;
+  if(typeof _om==='function'){
+    window.__appOriginalOm = _om;
+    window.om = function(id){
+      const before = curModal();
+      const res    = _om.apply(this, arguments);
+      const after  = curModal();
+      if(!busy && !syncingModal && after && after!==before){
+        push(curPage(), after, false);
       }
       return res;
     };
   }
 
-  const priorCm=window.cm;
-  if(typeof priorCm==='function'){
-    window.__appOriginalCm=priorCm;
-    window.cm=function(id){
-      const before=currentModal();
-      const target=String(id||before||'');
-      const res=priorCm.apply(this, arguments);
-      const after=currentModal();
-      if(!suppressPush && !syncingModal && target && before===target && after!==target){
-        const page=currentPage();
-        appPushHistoryState(page, after||'', page==='home' && !after);
+  /* ── cm(모달닫기) 래퍼 ── */
+  const _cm = window.cm;
+  if(typeof _cm==='function'){
+    window.__appOriginalCm = _cm;
+    window.cm = function(id){
+      const before = curModal();
+      const target = String(id||before||'');
+      const res    = _cm.apply(this, arguments);
+      const after  = curModal();
+      if(!busy && !syncingModal && target && before===target && after!==target){
+        const p = curPage();
+        push(p, after||'', false);
+        if(p==='home' && !after) push('home','',true);
       }
       return res;
     };
   }
 
+  /* ── 바텀탭 / nav-tab 클릭 후 동기화 ── */
   document.addEventListener('click', function(e){
-    const btn=e.target.closest('#bottomTabBar button');
-    if(btn){
-      const target=(btn.dataset.target==='results'?'ranking':btn.dataset.target)||'home';
-      setTimeout(()=>{ syncBottomTabs(); ensureHistory(false); }, 30);
-      setTimeout(()=>{ syncBottomTabs(); }, 180);
-      return;
-    }
-    const pageLink=e.target.closest('.nav-tab,[onclick*="showPage("],button[onclick*="showPage("]');
-    if(pageLink){
-      setTimeout(()=>{ syncBottomTabs(); ensureHistory(false); }, 30);
+    const btn = e.target.closest('#bottomTabBar button');
+    if(btn){ setTimeout(()=>{ syncTabs(); }, 50); return; }
+    if(e.target.closest('.nav-tab,[onclick*="showPage("]')){
+      setTimeout(()=>{ syncTabs(); }, 50);
     }
   }, true);
 
+  /* ── 초기 스택 구성 ── */
+  function init(){
+    buildSafeStack();
+    syncTabs();
+  }
   if(document.readyState==='loading'){
-    document.addEventListener('DOMContentLoaded', function(){ ensureHistory(true); syncBottomTabs(); });
+    document.addEventListener('DOMContentLoaded', init);
   }else{
-    ensureHistory(true); syncBottomTabs();
+    init();
   }
 
+  /* ── bfcache 복귀 시 재초기화 ── */
   window.addEventListener('pageshow', function(ev){
-    setTimeout(function(){ ensureHistory(true); syncBottomTabs(); }, 0);
+    setTimeout(function(){ buildSafeStack(); syncTabs(); }, 0);
   });
+
 })();
 </script>
 
