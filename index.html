@@ -27640,84 +27640,65 @@ function exportPrelimImage(){
   const ROOT_GUARD='__home_guard__';
   let suppressPush=false;
   let syncingModal=false;
-  let modalSeq=0;
+  let navSeq=0;
 
   function currentPage(){
     return document.querySelector('.page.active')?.id?.replace('page-','') ||
            document.querySelector('.nav-tab.active')?.dataset?.page || 'home';
   }
-  function getActiveModalId(){
-    const arr=[...document.querySelectorAll('.modal-overlay.open')].map(el=>el.id).filter(Boolean);
-    return arr.length ? arr[arr.length-1] : '';
+  function currentModal(){
+    const opens=[...document.querySelectorAll('.modal-overlay.open')].map(el=>el.id).filter(Boolean);
+    return opens.length ? opens[opens.length-1] : '';
   }
-  function closeTopModal(){
-    const top=getActiveModalId();
-    if(!top) return false;
-    try{
-      if(typeof window.__appOriginalCm==='function') window.__appOriginalCm(top);
-      else if(typeof window.cm==='function') window.cm(top);
-      else document.getElementById(top)?.classList.remove('open');
-    }catch(e){
-      document.getElementById(top)?.classList.remove('open');
-    }
-    return true;
-  }
-  function syncModalStateTo(targetModalId=''){
-    const current=getActiveModalId();
-    if(current===String(targetModalId||'')) return;
-    syncingModal = true;
-    try{
-      document.querySelectorAll('.modal-overlay.open').forEach(el=>{
-        if(!targetModalId || el.id!==targetModalId){
-          try{
-            if(typeof window.__appOriginalCm==='function') window.__appOriginalCm(el.id);
-            else if(typeof window.cm==='function') window.cm(el.id);
-            else el.classList.remove('open');
-          }catch(e){ el.classList.remove('open'); }
-        }
-      });
-      if(targetModalId){
-        const target=document.getElementById(targetModalId);
-        if(target && !target.classList.contains('open')){
-          try{
-            if(typeof window.__appOriginalOm==='function') window.__appOriginalOm(targetModalId);
-            else if(typeof window.om==='function') window.om(targetModalId);
-            else target.classList.add('open');
-          }catch(e){ target.classList.add('open'); }
-        }
-      }
-    }finally{
-      syncingModal = false;
-    }
+  function appHash(page, modalId, seq, isGuard){
+    const parts=['app', page||'home'];
+    if(modalId) parts.push('m-'+String(modalId));
+    if(isGuard) parts.push('guard');
+    parts.push(String(seq||0));
+    return '#'+parts.join('-');
   }
   function buildState(page, modalId='', isGuard=false){
-    return { [APP_NAV_NS]: true, page: String(page||'home'), modalId: String(modalId||''), guard: isGuard ? ROOT_GUARD : '' };
+    navSeq += 1;
+    return {
+      [APP_NAV_NS]: true,
+      page: String(page||'home'),
+      modalId: String(modalId||''),
+      guard: isGuard ? ROOT_GUARD : '',
+      seq: navSeq
+    };
   }
   function appPushHistoryState(page, modalId='', isGuard=false){
     try{
       const state=buildState(page, modalId, isGuard);
-      const hash='#'+encodeURIComponent(String(page||'home'));
-      history.pushState(state, '', hash);
+      history.pushState(state, '', appHash(state.page, state.modalId, state.seq, isGuard));
     }catch(e){}
   }
   function appReplaceHistoryState(page, modalId='', isGuard=false){
     try{
       const state=buildState(page, modalId, isGuard);
-      const hash='#'+encodeURIComponent(String(page||'home'));
-      history.replaceState(state, '', hash);
+      history.replaceState(state, '', appHash(state.page, state.modalId, state.seq, isGuard));
     }catch(e){}
   }
-  function ensureAppHistoryReady(force){
+  function ensureHistory(force){
     const cur=currentPage();
+    const modal=currentModal();
     const st=history.state||{};
     if(force || !st || !st[APP_NAV_NS]){
       appReplaceHistoryState(cur, '', false);
-      appPushHistoryState(cur, '', cur==='home');
+      appPushHistoryState(cur, modal, false);
+      if(cur==='home' && !modal) appPushHistoryState('home', '', true);
       return;
     }
-    if(cur==='home' && st.guard!==ROOT_GUARD){
+    if(cur==='home' && !modal && st.guard!==ROOT_GUARD){
       appPushHistoryState('home', '', true);
     }
+  }
+  function syncBottomTabs(){
+    const page=currentPage();
+    document.querySelectorAll('#bottomTabBar button').forEach(btn=>{
+      const target=(btn.dataset.target==='results'?'ranking':btn.dataset.target)||'home';
+      btn.classList.toggle('active', target===page);
+    });
   }
   function applyPage(page){
     const fn=window.__appOriginalShowPage || window.showPage;
@@ -27726,41 +27707,67 @@ function exportPrelimImage(){
     try{ fn(String(page||'home')); }finally{ suppressPush=false; }
     syncBottomTabs();
   }
-  function syncBottomTabs(){
-    const page=currentPage();
-    document.querySelectorAll('#bottomTabBar button').forEach(btn=>{
-      const tgt=(btn.dataset.target==='results'?'ranking':btn.dataset.target)||'home';
-      btn.classList.toggle('active', tgt===page);
-    });
+  function closeModalDirect(id){
+    if(!id) return;
+    const el=document.getElementById(id);
+    if(!el) return;
+    try{
+      if(typeof window.__appOriginalCm==='function') window.__appOriginalCm(id);
+      else el.classList.remove('open');
+    }catch(e){ el.classList.remove('open'); }
   }
-  function handleAppPopState(ev){
-    const state=ev?.state;
+  function openModalDirect(id){
+    if(!id) return;
+    const el=document.getElementById(id);
+    if(!el) return;
+    try{
+      if(typeof window.__appOriginalOm==='function') window.__appOriginalOm(id);
+      else el.classList.add('open');
+    }catch(e){ el.classList.add('open'); }
+  }
+  function syncModalState(targetModal=''){
+    const cur=currentModal();
+    if(cur===String(targetModal||'')) return;
+    syncingModal=true;
+    try{
+      document.querySelectorAll('.modal-overlay.open').forEach(el=>{
+        if(!targetModal || el.id!==targetModal) closeModalDirect(el.id);
+      });
+      if(targetModal) openModalDirect(targetModal);
+    }finally{
+      syncingModal=false;
+    }
+  }
+  function restoreFromState(state){
     if(!state || !state[APP_NAV_NS]){
       suppressPush=true;
-      try{ syncModalStateTo(''); applyPage('home'); }finally{ suppressPush=false; }
-      appPushHistoryState('home', '', true);
+      try{ syncModalState(''); applyPage('home'); }finally{ suppressPush=false; }
+      ensureHistory(true);
       syncBottomTabs();
       return;
     }
-    const targetPage=String(state.page||'home');
-    const targetModal=String(state.modalId||'');
     suppressPush=true;
     try{
-      syncModalStateTo(targetModal);
-      applyPage(targetPage);
+      applyPage(state.page || 'home');
+      syncModalState(state.modalId || '');
     }finally{
       suppressPush=false;
     }
     if(state.guard===ROOT_GUARD){
-      appPushHistoryState(targetPage, targetModal, true);
+      appPushHistoryState('home', '', true);
     }
     syncBottomTabs();
   }
+  function activeModalList(){
+    return [...document.querySelectorAll('.modal-overlay.open')].map(el=>el.id).filter(Boolean);
+  }
 
-  window.addEventListener('popstate', handleAppPopState);
+  window.addEventListener('popstate', function(ev){
+    restoreFromState(ev.state);
+  });
   window.addEventListener('hashchange', function(){
     if(history.state && history.state[APP_NAV_NS]) return;
-    handleAppPopState({state: history.state});
+    restoreFromState(history.state);
   });
 
   const priorShowPage=window.showPage;
@@ -27772,10 +27779,10 @@ function exportPrelimImage(){
       const next=currentPage();
       syncBottomTabs();
       if(!suppressPush){
-        if(next!==prev){
-          appPushHistoryState(next, '', next==='home');
-        }else if(!history.state || !history.state[APP_NAV_NS]){
-          ensureAppHistoryReady(true);
+        const modal=currentModal();
+        if(next!==prev || !history.state || !history.state[APP_NAV_NS]){
+          appPushHistoryState(next, modal, false);
+          if(next==='home' && !modal) appPushHistoryState('home', '', true);
         }
       }
       return res;
@@ -27786,10 +27793,11 @@ function exportPrelimImage(){
   if(typeof priorOm==='function'){
     window.__appOriginalOm=priorOm;
     window.om=function(id){
-      const wasOpen=!!document.getElementById(id)?.classList.contains('open');
+      const before=currentModal();
       const res=priorOm.apply(this, arguments);
-      if(!suppressPush && !syncingModal && !wasOpen && document.getElementById(id)?.classList.contains('open')){
-        appPushHistoryState(currentPage(), String(id||''), false);
+      const after=currentModal();
+      if(!suppressPush && !syncingModal && after && after!==before){
+        appPushHistoryState(currentPage(), after, false);
       }
       return res;
     };
@@ -27799,11 +27807,13 @@ function exportPrelimImage(){
   if(typeof priorCm==='function'){
     window.__appOriginalCm=priorCm;
     window.cm=function(id){
-      const before=getActiveModalId();
+      const before=currentModal();
       const target=String(id||before||'');
       const res=priorCm.apply(this, arguments);
-      if(!suppressPush && !syncingModal && target && before===target && getActiveModalId()!==target){
-        try{ history.back(); }catch(e){}
+      const after=currentModal();
+      if(!suppressPush && !syncingModal && target && before===target && after!==target){
+        const page=currentPage();
+        appPushHistoryState(page, after||'', page==='home' && !after);
       }
       return res;
     };
@@ -27812,19 +27822,25 @@ function exportPrelimImage(){
   document.addEventListener('click', function(e){
     const btn=e.target.closest('#bottomTabBar button');
     if(btn){
-      setTimeout(syncBottomTabs, 30);
-      setTimeout(syncBottomTabs, 180);
+      const target=(btn.dataset.target==='results'?'ranking':btn.dataset.target)||'home';
+      setTimeout(()=>{ syncBottomTabs(); ensureHistory(false); }, 30);
+      setTimeout(()=>{ syncBottomTabs(); }, 180);
+      return;
+    }
+    const pageLink=e.target.closest('.nav-tab,[onclick*="showPage("],button[onclick*="showPage("]');
+    if(pageLink){
+      setTimeout(()=>{ syncBottomTabs(); ensureHistory(false); }, 30);
     }
   }, true);
 
   if(document.readyState==='loading'){
-    document.addEventListener('DOMContentLoaded', function(){ ensureAppHistoryReady(true); syncBottomTabs(); });
+    document.addEventListener('DOMContentLoaded', function(){ ensureHistory(true); syncBottomTabs(); });
   }else{
-    ensureAppHistoryReady(true); syncBottomTabs();
+    ensureHistory(true); syncBottomTabs();
   }
 
   window.addEventListener('pageshow', function(){
-    setTimeout(function(){ ensureAppHistoryReady(false); syncBottomTabs(); }, 0);
+    setTimeout(function(){ ensureHistory(false); syncBottomTabs(); }, 0);
   });
 })();
 </script>
