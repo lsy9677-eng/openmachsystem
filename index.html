@@ -27685,8 +27685,10 @@ function exportPrelimImage(){
     const st=history.state||{};
     if(force || !st || !st[APP_NAV_NS]){
       appReplaceHistoryState(cur, '', false);
-      appPushHistoryState(cur, modal, false);
-      if(cur==='home' && !modal) appPushHistoryState('home', '', true);
+      if(modal) appPushHistoryState(cur, modal, false);
+      // 홈 guard: 뒤로가기로 앱을 닫을 수 없도록 guard를 2개 쌓음
+      appPushHistoryState('home', '', false);
+      appPushHistoryState('home', '', true);
       return;
     }
     if(cur==='home' && !modal && st.guard!==ROOT_GUARD){
@@ -27754,6 +27756,11 @@ function exportPrelimImage(){
       suppressPush=false;
     }
     if(state.guard===ROOT_GUARD){
+      // guard 상태에서 뒤로가기 → 홈으로 유지하고 guard 다시 2개 쌓기
+      appPushHistoryState('home', '', false);
+      appPushHistoryState('home', '', true);
+    } else if((state.page==='home' || !state.page) && !state.modalId){
+      // 홈의 non-guard 상태로 popstate → guard 다시 쌓아서 앱 안에 머물게 함
       appPushHistoryState('home', '', true);
     }
     syncBottomTabs();
@@ -27782,7 +27789,9 @@ function exportPrelimImage(){
         const modal=currentModal();
         if(next!==prev || !history.state || !history.state[APP_NAV_NS]){
           appPushHistoryState(next, modal, false);
-          if(next==='home' && !modal) appPushHistoryState('home', '', true);
+          if(next==='home' && !modal){
+            appPushHistoryState('home', '', true);
+          }
         }
       }
       return res;
@@ -27839,8 +27848,8 @@ function exportPrelimImage(){
     ensureHistory(true); syncBottomTabs();
   }
 
-  window.addEventListener('pageshow', function(){
-    setTimeout(function(){ ensureHistory(false); syncBottomTabs(); }, 0);
+  window.addEventListener('pageshow', function(ev){
+    setTimeout(function(){ ensureHistory(true); syncBottomTabs(); }, 0);
   });
 })();
 </script>
