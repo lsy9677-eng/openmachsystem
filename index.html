@@ -23,10 +23,8 @@
 
       // Cache Storage(PWA/서비스워커 캐시 포함) 삭제 시도
       const bust = () => {
-        const url = new URL(location.href);
-        url.searchParams.set("v", Date.now().toString());
-        location.replace(url.toString());
-      };
+        location.reload();
+};
 
       if ("caches" in window) {
         caches.keys()
