@@ -519,7 +519,7 @@ body{overflow-x:hidden;}
 .op-sticky-ribbon .closex:hover{background:rgba(15,30,58,.2);} 
 .op-side-ribbon .mini{font-size:.66rem;font-weight:800;opacity:.9}
 .op-side-ribbon .sub{display:none}
-.br-floating-notice{position:fixed;left:50%;top:100px;transform:translateX(-50%);z-index:3000;display:none;align-items:center;gap:10px;min-width:min(760px,calc(100vw - 20px));max-width:min(960px,calc(100vw - 20px));padding:10px 14px;border-radius:14px;border:2px solid #d4a017;background:linear-gradient(135deg,#fff8df,#ffe68a);color:#4a3510;box-shadow:0 12px 30px rgba(15,30,58,.28);font-weight:900;cursor:move;touch-action:none;user-select:none}
+.br-floating-notice{position:fixed;left:50%;top:100px;transform:translateX(-50%);z-index:3000;display:none;align-items:center;gap:10px;min-width:min(760px,calc(100vw - 20px));max-width:min(960px,calc(100vw - 20px));padding:10px 14px;border-radius:14px;border:2px solid #d4a017;background:linear-gradient(135deg,#fff8df,#ffe68a);color:#4a3510;box-shadow:0 12px 30px rgba(15,30,58,.28);font-weight:900;cursor:move;touch-action:none;user-select:none;-webkit-user-select:none}
 .br-floating-notice.show{display:flex !important}
 .br-floating-notice .tag{flex:0 0 auto;padding:4px 10px;border-radius:999px;background:#0f1e3a;color:#fff;font-size:.76rem;letter-spacing:.02em}
 .br-floating-notice .text{flex:1;min-width:0;overflow:hidden;position:relative;height:1.45em;display:flex;align-items:center}
@@ -532,7 +532,7 @@ body{overflow-x:hidden;}
 @media(max-width:680px){
   .op-division-banner{top:84px;padding:9px 11px}
   .op-side-ribbon{left:4px;top:76px;font-size:.7rem;padding:5px 8px;gap:4px;max-width:150px;border-radius:12px}
-  .br-floating-notice{top:86px;left:50% !important;right:auto !important;min-width:calc(100vw - 12px);max-width:calc(100vw - 12px);padding:8px 10px;gap:7px;border-radius:12px;cursor:default;touch-action:auto}
+  .br-floating-notice{top:86px;min-width:calc(100vw - 12px);max-width:calc(100vw - 12px);padding:8px 10px;gap:7px;border-radius:12px;cursor:move;touch-action:none}
   .br-floating-notice .tag{font-size:.66rem;padding:3px 8px}
   .br-floating-notice .text{height:1.35em}
   .br-floating-notice .text .msg{font-size:.8rem}
@@ -9983,8 +9983,7 @@ function isFloatingNoticeMobile(){
   try{ return window.matchMedia('(max-width:680px)').matches; }catch(e){ return window.innerWidth<=680; }
 }
 function getDefaultFloatingNoticePosition(){
-  if(isFloatingNoticeMobile()) return null;
-  return {left:null, top:100};
+  return {left:null, top:isFloatingNoticeMobile()?86:100};
 }
 function saveFloatingNoticePosition(pos){
   try{ localStorage.setItem(FLOATING_NOTICE_POS_KEY, JSON.stringify(pos||{})); }catch(e){}
@@ -9999,37 +9998,34 @@ function loadFloatingNoticePosition(){
   }catch(e){ return null; }
 }
 function clampFloatingNoticePosition(el, pos){
-  if(!el || !pos || isFloatingNoticeMobile()) return getDefaultFloatingNoticePosition();
+  if(!el) return getDefaultFloatingNoticePosition();
   const rect=el.getBoundingClientRect();
-  const width=Math.max(rect.width||el.offsetWidth||0, 240);
+  const width=Math.max(rect.width||el.offsetWidth||0, Math.min(window.innerWidth-12,240));
   const height=Math.max(rect.height||el.offsetHeight||0, 48);
-  const margin=8;
+  const margin=isFloatingNoticeMobile()?6:8;
   const maxLeft=Math.max(margin, window.innerWidth - width - margin);
   const maxTop=Math.max(margin, window.innerHeight - height - margin);
-  const left=Math.min(Math.max(Number(pos.left||0), margin), maxLeft);
-  const top=Math.min(Math.max(Number(pos.top||100), margin), maxTop);
+  const fallback=getDefaultFloatingNoticePosition();
+  const hasLeft = pos && pos.left!==null && pos.left!==undefined && pos.left!=='';
+  const rawLeft = hasLeft ? Number(pos.left) : NaN;
+  const rawTop = pos && pos.top!==undefined && pos.top!==null && pos.top!=='' ? Number(pos.top) : Number(fallback.top||100);
+  const left = Number.isFinite(rawLeft) ? Math.min(Math.max(rawLeft, margin), maxLeft) : null;
+  const top = Math.min(Math.max(rawTop, margin), maxTop);
   return {left, top};
 }
 function applyFloatingNoticePosition(el, pos){
   if(!el) return;
-  if(isFloatingNoticeMobile()){
-    el.style.left='50%';
-    el.style.right='';
-    el.style.top='86px';
-    el.style.transform='translateX(-50%)';
-    return;
-  }
   const next=clampFloatingNoticePosition(el, pos || loadFloatingNoticePosition() || getDefaultFloatingNoticePosition());
   if(next && Number.isFinite(next.left)){
-    el.style.left=next.left + 'px';
-    el.style.top=next.top + 'px';
-    el.style.right='';
-    el.style.transform='none';
+    el.style.setProperty('left', next.left + 'px', 'important');
+    el.style.setProperty('top', next.top + 'px', 'important');
+    el.style.setProperty('right', '', 'important');
+    el.style.setProperty('transform', 'none', 'important');
   }else{
-    el.style.left='50%';
-    el.style.top='100px';
-    el.style.right='';
-    el.style.transform='translateX(-50%)';
+    el.style.setProperty('left', '50%', 'important');
+    el.style.setProperty('top', (isFloatingNoticeMobile()?86:100) + 'px', 'important');
+    el.style.setProperty('right', '', 'important');
+    el.style.setProperty('transform', 'translateX(-50%)', 'important');
   }
 }
 function enableFloatingNoticeDrag(el){
@@ -10038,13 +10034,12 @@ function enableFloatingNoticeDrag(el){
   let active=false, sx=0, sy=0, sl=0, st=0;
   const stop=()=>{ active=false; };
   const move=(clientX, clientY)=>{
-    if(!active || isFloatingNoticeMobile()) return;
+    if(!active) return;
     const left=sl + (clientX - sx);
     const top=st + (clientY - sy);
     applyFloatingNoticePosition(el, {left, top});
   };
   el.addEventListener('mousedown', (e)=>{
-    if(isFloatingNoticeMobile()) return;
     const target=e.target;
     if(target && target.closest('.btnx')) return;
     active=true;
@@ -10064,7 +10059,6 @@ function enableFloatingNoticeDrag(el){
     document.body.style.userSelect='';
   });
   el.addEventListener('touchstart', (e)=>{
-    if(isFloatingNoticeMobile()) return;
     const target=e.target;
     if(target && target.closest('.btnx')) return;
     const t=e.touches && e.touches[0];
@@ -10073,13 +10067,22 @@ function enableFloatingNoticeDrag(el){
     const rect=el.getBoundingClientRect();
     sx=t.clientX; sy=t.clientY; sl=rect.left; st=rect.top;
     applyFloatingNoticePosition(el, {left:rect.left, top:rect.top});
-  }, {passive:true});
+    e.preventDefault();
+  }, {passive:false});
   window.addEventListener('touchmove', (e)=>{
     const t=e.touches && e.touches[0];
     if(!t) return;
     move(t.clientX, t.clientY);
-  }, {passive:true});
+    if(active) e.preventDefault();
+  }, {passive:false});
   window.addEventListener('touchend', ()=>{
+    if(active){
+      const rect=el.getBoundingClientRect();
+      saveFloatingNoticePosition({left:rect.left, top:rect.top});
+    }
+    stop();
+  });
+  window.addEventListener('touchcancel', ()=>{
     if(active){
       const rect=el.getBoundingClientRect();
       saveFloatingNoticePosition({left:rect.left, top:rect.top});
