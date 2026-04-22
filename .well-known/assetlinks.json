@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.tennis230.match",
+      "sha256_cert_fingerprints": [
+        "B1:6E:BA:96:9C:12:C6:2C:15:52:BD:08:FF:5B:9E:FC:74:DE:A6:63:04:98:3A:15:E9:D0:AF:C6:AD:3E:2D:BF"
+      ]
+    }
+  }
+]
