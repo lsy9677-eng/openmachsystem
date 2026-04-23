@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-04-15-v228-elapsed-timer-fix";
+  const APP_VERSION = "2026-04-23-v229-current-match-timer-fix";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -13548,11 +13548,17 @@ function rebuildIndividualAutoCourtAssignmentsForKey(key){
     if(!queue.length) return;
     const current=queue[0];
     if(current){
-      const prevCurrent=prevState.get(String(current.id)) || {waitingFirstAt:'', lastWaitingFirstAt:'', courts:'[]'};
+      const prevCurrent=prevState.get(String(current.id)) || {assignedAt:'', waitingFirstAt:'', lastWaitingFirstAt:'', courts:'[]'};
       const currentCourts=JSON.stringify(Array.isArray(current.courts)?current.courts:(current.court?[current.court]:[]));
-      if(prevCurrent.waitingFirstAt && prevCurrent.courts===currentCourts){
+      const sameCourtQueue = prevCurrent.courts===currentCourts;
+      if(prevCurrent.waitingFirstAt && sameCourtQueue){
         current.lastWaitingFirstAt=prevCurrent.waitingFirstAt;
-      }else if(prevCurrent.lastWaitingFirstAt && prevCurrent.courts===currentCourts){
+        const promotedAt = new Date().toISOString();
+        if(String(current.courtAssignedAt||'') !== promotedAt){
+          current.courtAssignedAt = promotedAt;
+          changed = true;
+        }
+      }else if(prevCurrent.lastWaitingFirstAt && sameCourtQueue){
         current.lastWaitingFirstAt=prevCurrent.lastWaitingFirstAt;
       }else{
         delete current.lastWaitingFirstAt;
