@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-04-23-v230-individual-pin-fix-local-clubpw";
+  const APP_VERSION = "2026-04-23-v230-individual-result-pin-and-court-timer-fix";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -4551,6 +4551,9 @@ let TM=false; // 승인된 시합관리자 로그인 상태
 let LOGIN_PORTAL_MODE='operator'; // 'operator' | 'developer'
 
 function getCurrentUid(){ return auth?.currentUser?.uid || ''; }
+function hasFirebaseStaffWriteAuth(){
+  return !!(AD || TM);
+}
 function isTournamentOwner(t){
   const uid=getCurrentUid();
   if(!uid || !t) return false;
@@ -8131,7 +8134,7 @@ function onRegLoginClubChange(){
   const hint = ge('regLoginHint');
   if(!hint) return;
   if(!club){ hint.textContent=''; return; }
-  const storedPw = getEffectiveClubPassword(club)||'';
+  const storedPw = (G.meta.clubPasswords||{})[club]||'';
   if(storedPw){
     hint.textContent='✅ 클럽 전용 비밀번호로 로그인하세요.';
     hint.style.color='var(--success)';
@@ -8146,54 +8149,13 @@ Object.defineProperty(window,'FORCE_PW_CLUB',{get:()=>FORCE_PW_CLUB,set:(v)=>{FO
 function getRegSessionVersion(){
   return Number(G?.meta?.regSessionVersion||1);
 }
-const LOCAL_CLUB_PW_KEY='OAI_LOCAL_CLUB_PASSWORDS_V1';
-function getLocalClubPasswordStore(){
-  try{
-    const raw=localStorage.getItem(LOCAL_CLUB_PW_KEY);
-    const parsed=raw?JSON.parse(raw):{};
-    return parsed && typeof parsed==='object' ? parsed : {};
-  }catch(e){ return {}; }
-}
-function saveLocalClubPasswordStore(store){
-  try{ localStorage.setItem(LOCAL_CLUB_PW_KEY, JSON.stringify(store||{})); }catch(e){}
-}
-function setLocalClubPassword(club,pw,isCustom=true){
-  const c=String(club||'').trim();
-  if(!c) return;
-  const store=getLocalClubPasswordStore();
-  if(!store.passwords || typeof store.passwords!=='object') store.passwords={};
-  if(!store.custom || typeof store.custom!=='object') store.custom={};
-  store.passwords[c]=String(pw||'');
-  store.custom[c]=!!isCustom;
-  saveLocalClubPasswordStore(store);
-}
-function getLocalClubPassword(club){
-  const c=String(club||'').trim();
-  const store=getLocalClubPasswordStore();
-  return String(store?.passwords?.[c]||'');
-}
-function getLocalClubPasswordCustom(club){
-  const c=String(club||'').trim();
-  const store=getLocalClubPasswordStore();
-  return !!store?.custom?.[c];
-}
-function getEffectiveClubPassword(club){
-  return getLocalClubPassword(club) || String((G.meta.clubPasswords||{})[club]||'');
-}
 function isClubPasswordCustom(club){
-  return getLocalClubPasswordCustom(club) || !!((G.meta.clubPasswordCustom||{})[club]);
+  return !!((G.meta.clubPasswordCustom||{})[club]);
 }
 function getClubTempPassword(club){
   const contacts=G.meta.clubContacts||{};
   if(contacts[club]) return String(contacts[club]).replace(/[^0-9]/g,'').slice(-4);
   return G.meta.regPw||'';
-}
-function applyClubPasswordLocally(club,pw,isCustom=true){
-  if(!G.meta.clubPasswords || typeof G.meta.clubPasswords!=='object') G.meta.clubPasswords={};
-  if(!G.meta.clubPasswordCustom || typeof G.meta.clubPasswordCustom!=='object') G.meta.clubPasswordCustom={};
-  G.meta.clubPasswords[club]=String(pw||'');
-  G.meta.clubPasswordCustom[club]=!!isCustom;
-  setLocalClubPassword(club,pw,isCustom);
 }
 function openForceClubPwModal(club){
   FORCE_PW_CLUB=club;
@@ -8223,7 +8185,10 @@ async function saveForcedClubPassword(){
   if(pw1===tempPw){ if(msg){msg.textContent='임시 비밀번호와 동일한 값은 사용할 수 없습니다.'; msg.style.color='var(--danger)';} return; }
   sl(true);
   try{
-    applyClubPasswordLocally(club,pw1,true);
+    if(!G.meta.clubPasswords) G.meta.clubPasswords={};
+    if(!G.meta.clubPasswordCustom) G.meta.clubPasswordCustom={};
+    G.meta.clubPasswords[club]=pw1;
+    G.meta.clubPasswordCustom[club]=true;
     await saveMeta();
     sl(false);
     cm('mForceClubPw');
@@ -8233,14 +8198,6 @@ async function saveForcedClubPassword(){
     renderAdminContactList();
   }catch(e){
     sl(false);
-    if(/Missing or insufficient permissions|permission-denied/i.test(String(e?.message||e||''))){
-      applyClubPasswordLocally(club,pw1,true);
-      cm('mForceClubPw');
-      const _club=club; FORCE_PW_CLUB='';
-      _completeRegLogin(_club);
-      toast('클럽 비밀번호를 이 기기에 저장했습니다 ✅ 배포 테스트용으로는 바로 사용 가능합니다.','success');
-      return;
-    }
     if(msg){msg.textContent='저장 실패: '+e.message; msg.style.color='var(--danger)';}
   }
 }
@@ -8252,10 +8209,10 @@ function doRegLogin(){
   if(!club){ toast('클럽을 선택해주세요','error'); return; }
   if(!pw)  { toast('비밀번호를 입력해주세요','error'); return; }
 
-  const storedPw = getEffectiveClubPassword(club) || '';
+  const storedPw = (G.meta.clubPasswords||{})[club] || '';
   const fallback = G.meta.regPw || '202601';
   const valid    = storedPw || fallback;
-  const isCustom = isClubPasswordCustom(club);
+  const isCustom = !!((G.meta.clubPasswordCustom||{})[club]);
 
   if(pw !== valid){
     toast('비밀번호가 틀렸습니다', 'error');
@@ -8322,7 +8279,7 @@ Object.defineProperty(window,'CHANGE_PW_CLUB',{get:()=>CHANGE_PW_CLUB,set:(v)=>{
 
 function shouldPromptPwChange(club){
   // isCustom=false면 아직 전용 비번 미설정
-  const isCustom = isClubPasswordCustom(club);
+  const isCustom = !!(G.meta.clubPasswordCustom||{})[club];
   if(isCustom) return false;
   // localStorage로 "이미 건너뜀" 체크 (기기별)
   const skipped = localStorage.getItem('pw_skip_'+club);
@@ -8383,7 +8340,10 @@ async function saveChangePw(){
   }
   sl(true);
   try{
-    applyClubPasswordLocally(club,pw1,true);
+    if(!G.meta.clubPasswords) G.meta.clubPasswords={};
+    if(!G.meta.clubPasswordCustom) G.meta.clubPasswordCustom={};
+    G.meta.clubPasswords[club]=pw1;
+    G.meta.clubPasswordCustom[club]=true;
     await saveMeta();
     sl(false);
     localStorage.removeItem('pw_skip_'+club);
@@ -8393,14 +8353,6 @@ async function saveChangePw(){
     try{ renderAdminContactList(); }catch(e){}
   }catch(e){
     sl(false);
-    if(/Missing or insufficient permissions|permission-denied/i.test(String(e?.message||e||''))){
-      applyClubPasswordLocally(club,pw1,true);
-      localStorage.removeItem('pw_skip_'+club);
-      CHANGE_PW_CLUB='';
-      cm('mChangePw');
-      toast('비밀번호를 이 기기에 저장했습니다 ✅ 현재 기기에서는 바로 새 비밀번호로 로그인됩니다.','success');
-      return;
-    }
     if(msg){msg.textContent='저장 실패: '+e.message; msg.style.color='var(--danger)';}
   }
 }
@@ -13677,14 +13629,12 @@ function rebuildIndividualAutoCourtAssignmentsForKey(key){
       const prevCurrent=prevState.get(String(current.id)) || {assignedAt:'', waitingFirstAt:'', lastWaitingFirstAt:'', courts:'[]'};
       const currentCourts=JSON.stringify(Array.isArray(current.courts)?current.courts:(current.court?[current.court]:[]));
       const sameCourtQueue = prevCurrent.courts===currentCourts;
-      const wasActuallyWaiting = !!(prevCurrent.waitingFirstAt && sameCourtQueue && String(prevCurrent.assignedAt||'')===String(prevCurrent.waitingFirstAt||''));
+      const wasActuallyWaiting = !!(prevCurrent.waitingFirstAt && sameCourtQueue);
       if(wasActuallyWaiting){
         current.lastWaitingFirstAt=prevCurrent.waitingFirstAt;
         const promotedAt = new Date().toISOString();
-        if(String(current.courtAssignedAt||'') !== promotedAt){
-          current.courtAssignedAt = promotedAt;
-          changed = true;
-        }
+        current.courtAssignedAt = promotedAt;
+        changed = true;
       }else if(prevCurrent.lastWaitingFirstAt && sameCourtQueue){
         current.lastWaitingFirstAt=prevCurrent.lastWaitingFirstAt;
       }else{
@@ -19412,14 +19362,9 @@ function ensureM3AdminSubmitButtons(){
 function openM3(key,mid){
   const m=(G.matches[key]||[]).find(m=>m.id===mid);if(!m)return;
   const indivAuth=getIndividualResultAuthState(key,m);
-  const canDirectorEdit=canEditMatchByDirector(key,m);
-  if(!(AD||canDirectorEdit||indivAuth.allowed||isPublicResultEntryEnabled())){
+  if(!(AD||canEditMatchByDirector(key,m)||indivAuth.allowed||isPublicResultEntryEnabled())){
     toast(isIndividualByKey(key)?'개인전은 참가자 비밀번호 또는 운영 권한이 있을 때만 결과 입력할 수 있습니다':'해당 경기 참가팀 로그인 또는 운영 권한이 필요합니다','error');
     return;
-  }
-  if(isIndividualByKey(key) && !AD && !OP && !canDirectorEdit){
-    const pinState=promptIndividualResultPinForMatch(key,m,false);
-    if(!pinState) return;
   }
   const {t1,t2}=getMatchTeamObjects(key,m);
   if(!t1 && !t2){toast('팀 정보를 찾을 수 없음','error');return;}
@@ -19867,12 +19812,24 @@ async function saveM3(){
   const list=G.matches[key]||[];const idx=list.findIndex(m=>m.id===mid);if(idx<0)return;
   const m=list[idx];
   const indivAuth=getIndividualResultAuthState(key,m);
-  const canStandardEdit=(AD||OP||canEditMatchByDirector(key,m));
+  const canLocalMatchEdit=(OP||canEditMatchByDirector(key,m));
+  const canStandardEdit=(AD||TM||canLocalMatchEdit);
+  const canDirectFirestoreWrite=hasFirebaseStaffWriteAuth();
   let participantWinnerAuth=null;
   let participantWinnerPin='';
-  if(isIndividualByKey(key) && !canStandardEdit){
-    if(!indivAuth.allowed){toast('참가자 등록 비밀번호가 설정되지 않아 결과를 저장할 수 없습니다','error');return;}
-  }else if(!canStandardEdit){toast('해당 경기 참가 클럽의 경기이사·경기진행자·관리자만 저장할 수 있습니다','error');return;}
+  if(isIndividualByKey(key)){
+    if(!(canStandardEdit || indivAuth.allowed || isPublicResultEntryEnabled())){
+      toast('개인전은 참가자 비밀번호 또는 운영 권한이 있을 때만 결과 입력할 수 있습니다','error');
+      return;
+    }
+    if(!canDirectFirestoreWrite && !indivAuth.allowed){
+      toast('참가자 등록 비밀번호가 설정되지 않아 결과를 저장할 수 없습니다','error');
+      return;
+    }
+  }else if(!canStandardEdit){
+    toast('해당 경기 참가 클럽의 경기이사·경기진행자·관리자만 저장할 수 있습니다','error');
+    return;
+  }
   const {t1,t2}=getMatchTeamObjects(key,m); if(!t1 && !t2) return;
   const [tid,div]=key.split('_');
   const tObj=G.tournaments.find(t=>t.id===tid);
@@ -19958,25 +19915,34 @@ async function saveM3(){
   const isTieState=(sc1===sc2);
   const hasFinalWinner=!isTieState && (sc1>=needWins || sc2>=needWins);
 
-  if(isIndividualByKey(key) && !canStandardEdit){
+  if(isIndividualByKey(key) && !canDirectFirestoreWrite){
     if(!hasFinalWinner){
-      toast('개인전 참가자는 승패가 확정된 최종 결과만 저장할 수 있습니다. 중간 스코어 저장은 운영자만 가능합니다.','error');
+      toast('개인전 결과 입력은 승패가 확정된 결과만 저장할 수 있습니다','error');
       return;
     }
     const scoreText=getIndividualActualScoreText({rubbers:newRb}) || `${sc1}:${sc2}`;
     const winnerSide=getIndividualWinnerSideByScoreText(scoreText) || (sc1>sc2?1:2);
-    const pinState=promptIndividualResultPinForMatch(key,m,false) || promptIndividualResultPinForMatch(key,m,true);
-    if(!pinState){
+    const promptLabel=(OP||canEditMatchByDirector(key,m))
+      ? '개인전 승리팀 참가자의 등록 비밀번호 4자리를 입력하세요'
+      : '참가자 등록 시 입력한 비밀번호 4자리를 입력하세요';
+    const inputPw=String(prompt(promptLabel)||'').replace(/\D/g,'').slice(0,4);
+    if(inputPw.length!==4){
+      toast('비밀번호 4자리를 정확히 입력해야 합니다','error');
       return;
     }
-    const authSide=Number(pinState.side||0);
+    const pw1=String(indivAuth.pw1||'').replace(/\D/g,'');
+    const pw2=String(indivAuth.pw2||'').replace(/\D/g,'');
+    const authSide=inputPw===pw1?1:inputPw===pw2?2:0;
+    if(!authSide){
+      toast('비밀번호가 일치하지 않습니다','error');
+      return;
+    }
     if(authSide!==winnerSide){
-      clearIndividualResultPinCache(key,m);
       toast('승리팀 참가자 비밀번호일 때만 결과 저장할 수 있습니다','error');
       return;
     }
     await ensureParticipantAnonymousAuth({ key, mid, side:authSide, mode:'individual_result' });
-    participantWinnerPin=String(pinState.pin||'').replace(/\D/g,'').slice(0,4);
+    participantWinnerPin=inputPw;
     participantWinnerAuth={authSide, scoreText};
   }
 
@@ -20035,7 +20001,6 @@ async function saveM3(){
     if(hasFinalWinner){
       if(participantDirectSave){
         await persistSingleMatchDocPublic(key, m, participantWinnerPin);
-        clearIndividualResultPinCache(key,m);
         wroteMatches=true;
       }else{
         if(isIndividualByKey(key)){
@@ -20834,29 +20799,6 @@ function getIndividualResultAuthState(key,m){
     const pw2=String(t2?.editPin||'').replace(/\D/g,'');
     return {allowed:!!(pw1||pw2), reason:(pw1||pw2)?'pin':'no_pin', team1:t1, team2:t2, pw1, pw2};
   }catch(e){ return {allowed:false, reason:'error'}; }
-}
-
-const INDIV_RESULT_PIN_CACHE = {};
-function getIndividualPinCacheKey(key,m){
-  return `${String(key||'')}__${String(m?.id||m?._id||'')}`;
-}
-function clearIndividualResultPinCache(key,m){
-  delete INDIV_RESULT_PIN_CACHE[getIndividualPinCacheKey(key,m)];
-}
-function promptIndividualResultPinForMatch(key,m,force=false){
-  const cacheKey=getIndividualPinCacheKey(key,m);
-  if(!force && INDIV_RESULT_PIN_CACHE[cacheKey]) return INDIV_RESULT_PIN_CACHE[cacheKey];
-  const auth=getIndividualResultAuthState(key,m);
-  if(!auth.allowed) return null;
-  const raw=String(window.prompt('참가자 등록 시 입력한 비밀번호 4자리를 입력하세요')||'').replace(/\D/g,'').slice(0,4);
-  if(raw.length!==4){ toast('비밀번호 4자리를 정확히 입력해야 합니다','error'); return null; }
-  const pw1=String(auth.pw1||'').replace(/\D/g,'');
-  const pw2=String(auth.pw2||'').replace(/\D/g,'');
-  const side=raw===pw1?1:raw===pw2?2:0;
-  if(!side){ toast('비밀번호가 일치하지 않습니다','error'); return null; }
-  const saved={pin:raw, side};
-  INDIV_RESULT_PIN_CACHE[cacheKey]=saved;
-  return saved;
 }
 function getIndividualActualScoreText(m){
   try{
