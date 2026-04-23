@@ -6374,6 +6374,43 @@ async function persistSingleMatchDoc(key, matchObj){
   G._matchIdsByKey[key]=ids;
   try{ cacheTournamentBundleFromMemory(tid); }catch(e){}
 }
+async function persistSingleMatchDocPublic(key, matchObj, enteredPin=''){
+  const {tid,div}=_k2td(key);
+  if(!matchObj) return;
+  if(!matchObj._id) matchObj._id=_mid();
+  const nowIso=new Date().toISOString();
+  const publicPayload={
+    tournamentId:tid,
+    division:div,
+    winner:(matchObj.winner ?? null),
+    sc1:Number(matchObj.sc1||0),
+    sc2:Number(matchObj.sc2||0),
+    rubbers:Array.isArray(matchObj.rubbers)?matchObj.rubbers:[],
+    completedAt:matchObj.completedAt||nowIso,
+    completedBy:'public_pin',
+    publicResultSavedAt:nowIso,
+    publicResultPin:String(enteredPin||'').replace(/\D/g,'').slice(0,4),
+    updatedAt:nowIso
+  };
+  await setDoc(doc(db,'matches',matchObj._id), publicPayload, {merge:true});
+  matchObj.completedBy='public_pin';
+  matchObj.publicResultSavedAt=nowIso;
+  matchObj.publicResultPin=publicPayload.publicResultPin;
+  matchObj.updatedAt=nowIso;
+  const cur=G.matches[key]||[];
+  const docsForHash=cur.map(x=>{
+    const cloned={...x};
+    delete cloned._id;
+    cloned.tournamentId=tid;
+    cloned.division=div;
+    return normalizeMatchPayloadForHash(cloned);
+  });
+  const ids=[...new Set(cur.map(x=>x._id).filter(Boolean))].sort();
+  markFbWriteCache('matches', key, {docs:docsForHash, ids, deleted:[]});
+  if(!G._matchIdsByKey) G._matchIdsByKey={};
+  G._matchIdsByKey[key]=ids;
+  try{ cacheTournamentBundleFromMemory(tid); }catch(e){}
+}
 const __PLAYER_WRITE_QUEUE = new Set();
 let __PLAYER_WRITE_TIMER = null;
 async function flushQueuedPlayers(){
@@ -13551,7 +13588,8 @@ function rebuildIndividualAutoCourtAssignmentsForKey(key){
       const prevCurrent=prevState.get(String(current.id)) || {assignedAt:'', waitingFirstAt:'', lastWaitingFirstAt:'', courts:'[]'};
       const currentCourts=JSON.stringify(Array.isArray(current.courts)?current.courts:(current.court?[current.court]:[]));
       const sameCourtQueue = prevCurrent.courts===currentCourts;
-      if(prevCurrent.waitingFirstAt && sameCourtQueue){
+      const wasActuallyWaiting = !!(prevCurrent.waitingFirstAt && sameCourtQueue && String(prevCurrent.assignedAt||'')===String(prevCurrent.waitingFirstAt||''));
+      if(wasActuallyWaiting){
         current.lastWaitingFirstAt=prevCurrent.waitingFirstAt;
         const promotedAt = new Date().toISOString();
         if(String(current.courtAssignedAt||'') !== promotedAt){
@@ -19737,6 +19775,7 @@ async function saveM3(){
   const indivAuth=getIndividualResultAuthState(key,m);
   const canStandardEdit=(AD||OP||canEditMatchByDirector(key,m));
   let participantWinnerAuth=null;
+  let participantWinnerPin='';
   if(isIndividualByKey(key) && !canStandardEdit){
     if(!indivAuth.allowed){toast('참가자 등록 비밀번호가 설정되지 않아 결과를 저장할 수 없습니다','error');return;}
   }else if(!canStandardEdit){toast('해당 경기 참가 클럽의 경기이사·경기진행자·관리자만 저장할 수 있습니다','error');return;}
@@ -19804,6 +19843,7 @@ async function saveM3(){
   }
 
   const prevW=m.winner;
+  const participantDirectSave = !!participantWinnerAuth;
 
   if(validScoreCount===0){
     if(prevW!=null && !m.bye){toast('이미 결과가 확정된 경기는 점수 없이 저장할 수 없습니다','error');return;}
@@ -19847,6 +19887,7 @@ async function saveM3(){
       toast('승리팀 참가자 비밀번호일 때만 결과 저장할 수 있습니다','error');
       return;
     }
+    participantWinnerPin=inputPw;
     participantWinnerAuth={authSide, scoreText};
   }
 
@@ -19884,8 +19925,10 @@ async function saveM3(){
     if(affected.size) enqueuePlayerPersist([...affected], 15000);
   };
 
-  if(hasFinalWinner) await updPS(key,m,prevW);
-  else await adjustPlayerStatsForUnfinalized();
+  if(!participantDirectSave){
+    if(hasFinalWinner) await updPS(key,m,prevW);
+    else await adjustPlayerStatsForUnfinalized();
+  }
 
   const finishedCourts = hasFinalWinner ? (Array.isArray(m.courts) ? m.courts : (m.court ? [m.court] : [])) : [];
 
@@ -19901,36 +19944,45 @@ async function saveM3(){
       // 종료 후 새 코트 배정/대기 배정 알림만 유지합니다.
     }
     if(hasFinalWinner){
-      if(isIndividualByKey(key)){
-        let syncedMain=false;
-        if(m.phase==='group') syncedMain = syncIndividualMainBracketFromPrelim(key);
-        const autoChanged = isIndividualAutoCourtAssignEnabled() ? ensureIndividualAutoCourtAssignmentsForKey(key) : false;
-        if(syncedMain || autoChanged){
-          await stM(key);
+      if(participantDirectSave){
+        await persistSingleMatchDocPublic(key, m, participantWinnerPin);
+        wroteMatches=true;
+      }else{
+        if(isIndividualByKey(key)){
+          let syncedMain=false;
+          if(m.phase==='group') syncedMain = syncIndividualMainBracketFromPrelim(key);
+          const autoChanged = isIndividualAutoCourtAssignEnabled() ? ensureIndividualAutoCourtAssignmentsForKey(key) : false;
+          if(syncedMain || autoChanged){
+            await stM(key);
+            wroteMatches=true;
+          }
+        }
+        if(!wroteMatches && m.phase!=='main'){
+          await persistSingleMatchDoc(key, m);
           wroteMatches=true;
         }
-      }
-      if(!wroteMatches && m.phase!=='main'){
-        await persistSingleMatchDoc(key, m);
-        wroteMatches=true;
-      }
-      await fbLog(`결과: ${dn1} ${alertScoreText} ${dn2}`,'⚡');
-      if(m.phase==='main'){
-        await autoAdv(key,m.id);
-        wroteMatches=true;
+        try{ await fbLog(`결과: ${dn1} ${alertScoreText} ${dn2}`,'⚡'); }catch(_e){ console.warn('fbLog skipped', _e); }
+        if(m.phase==='main'){
+          await autoAdv(key,m.id);
+          wroteMatches=true;
+        }
       }
     }else if(isTieState){
       if(!wroteMatches){
         await persistSingleMatchDoc(key, m);
         wroteMatches=true;
       }
-      await fbLog(`실시간점수: ${dn1} ${alertScoreText} ${dn2} (동점 진행중)`,'📝');
+      if(!participantDirectSave){
+        try{ await fbLog(`실시간점수: ${dn1} ${alertScoreText} ${dn2} (동점 진행중)`,'📝'); }catch(_e){ console.warn('fbLog skipped', _e); }
+      }
     }else{
       if(!wroteMatches){
         await persistSingleMatchDoc(key, m);
         wroteMatches=true;
       }
-      await fbLog(`실시간점수: ${dn1} ${alertScoreText} ${dn2}`,'📝');
+      if(!participantDirectSave){
+        try{ await fbLog(`실시간점수: ${dn1} ${alertScoreText} ${dn2}`,'📝'); }catch(_e){ console.warn('fbLog skipped', _e); }
+      }
     }
     dispatchLocalCourtNotificationAlerts(prevCourtState);
     sl(false);cm('mM3');toast(hasFinalWinner ? '결과 저장 ✅' : (isTieState ? '동점 상태로 실시간 스코어 저장 ✅' : '실시간 스코어 저장 ✅'),'success');renderBracket();
