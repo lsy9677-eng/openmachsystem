@@ -6377,11 +6377,8 @@ async function persistSingleMatchDoc(key, matchObj){
 async function persistSingleMatchDocPublic(key, matchObj, enteredPin=''){
   const {tid,div}=_k2td(key);
   if(!matchObj) return;
-  if(!matchObj._id) matchObj._id=_mid();
   const nowIso=new Date().toISOString();
   const publicPayload={
-    tournamentId:tid,
-    division:div,
     winner:(matchObj.winner ?? null),
     sc1:Number(matchObj.sc1||0),
     sc2:Number(matchObj.sc2||0),
@@ -6389,14 +6386,16 @@ async function persistSingleMatchDocPublic(key, matchObj, enteredPin=''){
     completedAt:matchObj.completedAt||nowIso,
     completedBy:'public_pin',
     publicResultSavedAt:nowIso,
-    publicResultPin:String(enteredPin||'').replace(/\D/g,'').slice(0,4),
-    updatedAt:nowIso
+    publicResultPin:String(enteredPin||'').replace(/\D/g,'').slice(0,4)
   };
-  await setDoc(doc(db,'matches',matchObj._id), publicPayload, {merge:true});
+  if(matchObj._id){
+    await updateDoc(doc(db,'matches',matchObj._id), publicPayload);
+  }else{
+    throw new Error('기존 경기 문서 ID가 없어 참가자 결과 저장을 할 수 없습니다. 관리자 저장은 가능하지만, 참가자 저장 규칙은 기존 경기 문서 update만 허용하도록 맞춰야 합니다.');
+  }
   matchObj.completedBy='public_pin';
   matchObj.publicResultSavedAt=nowIso;
   matchObj.publicResultPin=publicPayload.publicResultPin;
-  matchObj.updatedAt=nowIso;
   const cur=G.matches[key]||[];
   const docsForHash=cur.map(x=>{
     const cloned={...x};
