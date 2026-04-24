@@ -1938,6 +1938,13 @@ body {
   }
 }
 
+
+/* PC 저장하기 드롭다운이 화면 오른쪽에서 잘리지 않도록 저장 메뉴만 우측 정렬 */
+#bracketSaveMenuWrap .login-menu-panel{left:auto !important;right:0 !important;max-width:min(260px,calc(100vw - 24px));}
+@media(max-width:560px){
+  #bracketSaveMenuWrap .login-menu-panel{left:auto !important;right:0 !important;max-width:min(240px,78vw);}
+}
+
 </style>
 <!-- PWA -->
 <script>
@@ -4281,7 +4288,7 @@ function renderPersonalMatchBanner(tid, targetDivs=[]){
     const amIWinner=!!(status.winSide && row.mySide===status.winSide);
     const isNext=nextRow && String(nextRow.match?.id||'')===String(m.id||'') && String(nextRow.div||'')===String(row.div||'');
     const orderSummary=(function(){
-      if(!G.meta.onlineOrderEnabled) return '';
+      if(!G.meta.onlineOrderEnabled || getTournamentTypeById(tid)==='individual_pair') return '';
       const st=getOnlineOrderState(key,m);
       const mySubmitted=row.mySide===1?st.s1:st.s2;
       const oppSubmitted=row.mySide===1?st.s2:st.s1;
