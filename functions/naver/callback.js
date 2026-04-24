@@ -2,7 +2,7 @@ function base64UrlEncode(input) {
   let bytes;
   if (typeof input === "string") {
     bytes = new TextEncoder().encode(input);
-  } else {
+  } else { 
     bytes = input;
   }
 
