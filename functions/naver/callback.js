@@ -13,8 +13,8 @@ export async function onRequest(context) {
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       grant_type: "authorization_code",
-      client_id: CLIENT_ID,
-      client_secret: CLIENT_SECRET,
+      const CLIENT_ID = "vMR8P7qHK56NBDIiEpqg";
+      client_secret: "QHCMiQsekX";
       code,
       state
     })
