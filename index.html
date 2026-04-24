@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-04-24-v230-no-kakao-naver-popup-userbadge-v2";
+  const APP_VERSION = "2026-04-24-v230-no-kakao-naver-self-redirect-userbadge-v3";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -4673,7 +4673,7 @@ function isStandaloneAppMode(){
 }
 function getSocialLoginReturnUrl(provider='naver', popup=false){
   // 소셜 로그인 후 /naver/login 또는 /naver/callback 경로에 남지 않도록 항상 앱 루트로 복귀시킨다.
-  // 네이버 로그인은 가능하면 별도 팝업에서 처리해 PWA/TWA 상단 주소창이 본 화면을 덮지 않게 한다.
+  // 별도 팝업을 쓰지 않고 현재 창에서 처리해 PC에서 새 창이 남는 문제를 방지한다.
   const u = new URL('/', location.origin);
   u.searchParams.set('socialReturn', provider);
   u.searchParams.set('standalone', isStandaloneAppMode() ? '1' : '0');
@@ -4692,16 +4692,11 @@ function cleanupSocialReturnUrl(){
 async function loginWithNaver(){
   try{
     sessionStorage.setItem('NAVER_LOGIN_STARTED_IN_STANDALONE', isStandaloneAppMode() ? '1' : '0');
-    const returnUrl = getSocialLoginReturnUrl('naver', true);
+    sessionStorage.setItem('NAVER_LOGIN_RETURNING_TO_ROOT', '1');
+    const returnUrl = getSocialLoginReturnUrl('naver', false);
     const loginUrl = '/naver/login?returnUrl=' + encodeURIComponent(returnUrl);
-    const w = window.open(loginUrl, 'naverLoginPopup', 'width=430,height=720,menubar=no,toolbar=no,location=no,status=no,scrollbars=yes,resizable=yes');
-    if(!w || w.closed || typeof w.closed === 'undefined'){
-      // 팝업이 차단된 경우만 현재 창 이동으로 fallback
-      location.href = loginUrl;
-    }else{
-      try{ w.focus(); }catch(_e){}
-      toast('네이버 로그인 창에서 인증을 완료해 주세요.','info');
-    }
+    toast('네이버 로그인 화면으로 이동합니다. 인증 후 자동으로 앱으로 돌아옵니다.','info');
+    setTimeout(()=>{ location.assign(loginUrl); }, 120);
   }catch(e){
     toast('네이버 로그인 시작 실패: '+(e?.message||e),'error');
   }
@@ -4752,6 +4747,7 @@ async function handleSocialCustomTokenRedirect(){
       socialProviderId:socialProviderId || ''
     });
     refreshGoogleLoginUI(cred.user);
+    try{ cm('mAdminSignup'); }catch(_e){}
     sl(false);
     history.replaceState(null,'',location.origin+location.pathname);
     toast((provider==='naver'?'네이버':(provider==='kakao'?'카카오':'소셜'))+' 로그인 완료 ✅','success');
