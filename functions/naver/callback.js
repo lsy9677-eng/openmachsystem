@@ -5,7 +5,7 @@ export async function onRequest(context) {
   const state = url.searchParams.get("state");
 
   const CLIENT_ID = "vMR8P7qHK56NBDIiEpqg";
-  const CLIENT_SECRET = "QHCMiQsekX";
+  const CLIENT_SECRET = "네이버_CLIENT_SECRET";
   const REDIRECT_URI = "https://tennis230.pages.dev/naver/callback";
 
   const tokenRes = await fetch("https://nid.naver.com/oauth2.0/token", {
