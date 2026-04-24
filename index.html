@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-04-24-v230-naver-pages-functions-auth-v2";
+  const APP_VERSION = "2026-04-24-v230-login-menu-cleanup-v1";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -102,6 +102,9 @@ body{font-family:'Noto Sans KR',sans-serif;background:linear-gradient(180deg,#f4
 .login-menu-panel{position:absolute;right:0;top:calc(100% + 8px);display:none;flex-direction:column;gap:8px;min-width:190px;padding:10px;background:rgba(9,18,37,.98);border:1px solid rgba(255,255,255,.12);border-radius:14px;box-shadow:0 14px 32px rgba(0,0,0,.28);z-index:1400}
 .login-menu-wrap.open .login-menu-panel{display:flex}
 .login-menu-panel .login-menu-item{width:100%;justify-content:flex-start;padding:8px 12px;font-size:.76rem;min-height:36px;border-radius:10px}
+.login-menu-panel .login-menu-item#googleLoginBtn,
+.login-menu-panel .login-menu-item#naverLoginBtn{display:none !important;}
+.login-menu-panel .login-menu-sep{height:1px;background:rgba(255,255,255,.10);margin:2px 0;}
 .login-menu-panel #regClubNameBadge{display:none;max-width:100%;text-align:left}
 @media(max-width:680px){
   .login-menu-btn{min-width:auto}
@@ -1978,7 +1981,7 @@ body {
 <div class="logo-icon" style="display:none">🎾</div>
 <div class="logo-text"><h1>시합관리 시스템</h1><p>230MATCH TOURNAMENT</p></div>
 </div>
-<div class="header-actions"><span class="admin-badge" id="regLoginBadge" style="display:none;background:var(--success);color:#fff;font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:999px">클럽</span><span class="admin-badge" id="opLoginBadge" style="display:none;background:#1565c0;color:#fff;font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:999px">진행자</span><span class="admin-badge" id="adminBadge">관리자</span><button class="btn-sm admin-only" id="adminSettingsBtn" onclick="openAdminSettings()">⚙️</button><button class="btn-sm" id="manualToggleBtn" onclick="openHelpCenter()" style="background:#fff;color:#0f1e3a;border:1.5px solid rgba(255,255,255,.42);font-weight:900">📘 가이드</button><div class="login-menu-wrap" id="loginMenuWrap"><button class="btn-sm login-menu-btn" id="loginMenuBtn" onclick="toggleLoginMenu(event)" style="background:#fff;color:#0f1e3a;border:1.5px solid rgba(255,255,255,.42);font-weight:900">🔐 로그인 메뉴</button><div class="login-menu-panel" id="loginMenuPanel"><span id="regClubNameBadge" style="display:none;background:var(--success);color:#fff;font-size:.75rem;font-weight:900;padding:7px 10px;border-radius:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span><button class="btn-sm login-menu-item" id="regToggleBtn" onclick="toggleReg()" style="background:var(--success);color:#fff;border:none">🏆 팀담당 로그인</button><button class="btn-sm login-menu-item" id="opToggleBtn" onclick="toggleOperator()" style="background:#1565c0;color:#fff;border:none">🎾 진행자 로그인</button><button class="btn-sm login-menu-item" id="googleLoginBtn" onclick="loginWithGoogle()" style="display:none;background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">🔵 구글 로그인</button><button class="btn-sm login-menu-item" id="naverLoginBtn" onclick="loginWithNaver()" style="display:none;background:#03c75a;color:#fff;border:1px solid rgba(3,199,90,.35)">🟢 네이버 로그인</button><button class="btn-sm login-menu-item" id="googleLogoutBtn" onclick="logoutGoogleUser()" style="display:none;background:#f8fafc;color:#475569;border:1px solid rgba(15,30,58,.12)">🚪 구글 로그아웃</button><button class="btn-sm login-menu-item" id="myProfileBtn" onclick="openMyProfileModal()" style="display:none;background:#eef4ff;color:#12306b;border:1px solid rgba(18,48,107,.12)">👤 내 정보 설정</button><button class="btn-sm login-menu-item" id="adminSignupBtn" onclick="toggleAdminSignup()" style="background:#eef4ff;color:#12306b;border:1px solid rgba(18,48,107,.12)">📝 회원가입</button><button class="btn-sm login-menu-item" id="adminToggleBtn" onclick="toggleTournamentManagerLogin()" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">🧑‍💼 운영자 로그인</button><button class="btn-sm login-menu-item" id="developerToggleBtn" onclick="toggleDeveloperLogin()" style="background:#0f1e3a;color:#fff;border:1px solid rgba(255,255,255,.12)">🛠️ 개발자 로그인</button></div></div></div>
+<div class="header-actions"><span class="admin-badge" id="regLoginBadge" style="display:none;background:var(--success);color:#fff;font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:999px">클럽</span><span class="admin-badge" id="opLoginBadge" style="display:none;background:#1565c0;color:#fff;font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:999px">진행자</span><span class="admin-badge" id="adminBadge">관리자</span><button class="btn-sm admin-only" id="adminSettingsBtn" onclick="openAdminSettings()">⚙️</button><button class="btn-sm" id="manualToggleBtn" onclick="openHelpCenter()" style="background:#fff;color:#0f1e3a;border:1.5px solid rgba(255,255,255,.42);font-weight:900">📘 가이드</button><div class="login-menu-wrap" id="loginMenuWrap"><button class="btn-sm login-menu-btn" id="loginMenuBtn" onclick="toggleLoginMenu(event)" style="background:#fff;color:#0f1e3a;border:1.5px solid rgba(255,255,255,.42);font-weight:900">🔐 로그인</button><div class="login-menu-panel" id="loginMenuPanel"><span id="regClubNameBadge" style="display:none;background:var(--success);color:#fff;font-size:.75rem;font-weight:900;padding:7px 10px;border-radius:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span><button class="btn-sm login-menu-item" id="regToggleBtn" onclick="toggleReg()" style="background:var(--success);color:#fff;border:none">🏆 경기이사 로그인</button><button class="btn-sm login-menu-item" id="opToggleBtn" onclick="toggleOperator()" style="background:#1565c0;color:#fff;border:none">🎾 진행자 로그인</button><button class="btn-sm login-menu-item" id="googleLoginBtn" onclick="loginWithGoogle()" style="display:none;background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">🔵 구글 로그인</button><button class="btn-sm login-menu-item" id="naverLoginBtn" onclick="loginWithNaver()" style="display:none;background:#03c75a;color:#fff;border:1px solid rgba(3,199,90,.35)">🟢 네이버 로그인</button><button class="btn-sm login-menu-item" id="googleLogoutBtn" onclick="logoutGoogleUser()" style="display:none;background:#f8fafc;color:#475569;border:1px solid rgba(15,30,58,.12)">🚪 구글 로그아웃</button><button class="btn-sm login-menu-item" id="myProfileBtn" onclick="openMyProfileModal()" style="display:none;background:#eef4ff;color:#12306b;border:1px solid rgba(18,48,107,.12)">👤 내 정보 설정</button><button class="btn-sm login-menu-item" id="adminSignupBtn" onclick="toggleAdminSignup()" style="background:#eef4ff;color:#12306b;border:1px solid rgba(18,48,107,.12)">👤 회원가입 / 일반 로그인</button><button class="btn-sm login-menu-item" id="adminToggleBtn" onclick="toggleTournamentManagerLogin()" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">🧑‍💼 운영자 로그인</button><button class="btn-sm login-menu-item" id="developerToggleBtn" onclick="toggleDeveloperLogin()" style="background:#0f1e3a;color:#fff;border:1px solid rgba(255,255,255,.12)">🛠️ 개발자 로그인</button></div></div></div>
 </div>
 <nav class="nav-tabs">
 <div class="nav-tab active" data-page="home" onclick="showPage('home')">🏠 홈</div>
@@ -2157,9 +2160,9 @@ body {
 <div id="regLoginPrompt" style="display:none">
 <div style="padding:20px 16px;background:linear-gradient(135deg,#e3f2fd,#bbdefb);border-radius:var(--radius-lg);border:2px solid var(--primary-light);text-align:center;margin-bottom:16px">
 <div style="font-size:2rem;margin-bottom:8px">📋</div>
-<div style="font-weight:700;font-size:.95rem;color:var(--primary-dark);margin-bottom:6px">팀 등록을 하려면 로그인이 필요합니다</div>
-<div style="font-size:.78rem;color:var(--text2);margin-bottom:14px;line-height:1.5">로그인 방식 대회에서는 팀 담당자 비밀번호를 입력하세요</div>
-<button class="btn btn-primary" onclick="toggleReg()" style="padding:10px 28px;font-size:.9rem">🏆 팀담당 로그인</button>
+<div style="font-weight:700;font-size:.95rem;color:var(--primary-dark);margin-bottom:6px">팀 등록을 하려면 경기이사 로그인이 필요합니다</div>
+<div style="font-size:.78rem;color:var(--text2);margin-bottom:14px;line-height:1.5">로그인 방식 대회에서는 경기이사 비밀번호를 입력하세요</div>
+<button class="btn btn-primary" onclick="toggleReg()" style="padding:10px 28px;font-size:.9rem">🏆 경기이사 로그인</button>
 </div>
 </div>
 <div class="card">
@@ -2427,7 +2430,7 @@ body {
 <div class="modal-overlay" id="mAdminSignup"><div class="modal-box"><div class="modal-header"><h3>📝 회원가입 / 간편 로그인</h3><button class="modal-close" onclick="cm('mAdminSignup')">✕</button></div><div class="modal-body"><div style="padding:10px 12px;background:linear-gradient(135deg,#eef4ff,#fffdf5);border:1px solid var(--border);border-radius:10px;margin-bottom:12px;font-size:.78rem;color:var(--text2);line-height:1.6">일반회원은 로그인 후 개인전 참가·본인 정보 관리가 가능합니다. 클럽 경기이사와 시합관리자는 가입 후 총괄 관리자 승인이 필요합니다.</div><div style="padding:12px 14px;border:1.5px solid #dbeafe;background:#f8fbff;border-radius:14px;margin-bottom:14px"><div style="font-weight:900;font-size:.9rem;color:#0f1e3a;margin-bottom:8px">간편 가입 / 로그인</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-outline" id="signupGoogleLoginBtn" onclick="loginWithGoogle()" style="flex:1;min-width:150px;background:#fff;color:#0f1e3a;border:1.5px solid #cbd5e1">🔵 Google로 계속하기</button><button class="btn btn-gray" disabled style="flex:1;min-width:130px;opacity:.55">🟡 Kakao 준비중</button><button class="btn btn-outline" id="signupNaverLoginBtn" onclick="loginWithNaver()" style="flex:1;min-width:130px;background:#03c75a;color:#fff;border:1.5px solid #03c75a">🟢 Naver로 계속하기</button></div><div id="signupGoogleStatus" style="font-size:.74rem;color:var(--text3);line-height:1.5;margin-top:8px">현재는 구글·네이버 로그인을 적용했습니다. 카카오는 다음 단계에서 같은 위치에 추가 예정입니다.</div></div><div style="height:1px;background:var(--border);margin:12px 0"></div><div style="font-weight:900;font-size:.88rem;color:var(--primary-dark);margin-bottom:8px">이메일 일반 회원가입 / 로그인</div><div class="form-group"><label class="form-label">가입 유형</label><select class="form-select" id="signupRole" onchange="updateSignupRoleHint()"><option value="member">일반회원</option><option value="club_director">클럽 경기이사 신청</option><option value="tournament_admin">시합관리자 신청</option></select></div><div class="form-group"><label class="form-label">이름 <span style="font-size:.72rem;color:var(--text3);font-weight:500">(선수 등록용 한글 이름)</span></label><input class="form-input" id="signupName" placeholder="예: 홍길동"/></div><div class="frow"><div class="form-group"><label class="form-label">전화번호</label><input class="form-input" id="signupPhone" inputmode="tel" placeholder="예: 010-1234-5678"/></div><div class="form-group"><label class="form-label">소속 클럽</label><input class="form-input" id="signupClub" placeholder="예: 모던"/></div></div><div class="form-group"><label class="form-label">구력</label><input class="form-input" id="signupCareer" placeholder="예: 24.07 / 3년"/></div><div class="form-group"><label class="form-label">이메일</label><input class="form-input" id="signupEmail" onkeydown="if(event.key==='Enter')ge('signupPw').focus()" placeholder="이메일" type="email"/></div><div class="form-group"><label class="form-label">비밀번호</label><input class="form-input" id="signupPw" onkeydown="if(event.key==='Enter')ge('signupPw2').focus()" placeholder="비밀번호 6자 이상" type="password"/></div><div class="form-group"><label class="form-label">비밀번호 확인 <span style="font-size:.72rem;color:var(--text3);font-weight:400">회원가입 때만 입력</span></label><input class="form-input" id="signupPw2" onkeydown="if(event.key==='Enter')doSignup()" placeholder="비밀번호 다시 입력" type="password"/></div><div id="signupHint" style="font-size:.74rem;color:var(--text3);line-height:1.5">일반회원은 가입 즉시 사용 가능합니다. 경기이사/시합관리자는 승인 후 권한이 활성화됩니다.</div></div><div class="modal-footer"><button class="btn btn-gray" onclick="cm('mAdminSignup')">취소</button><button class="btn btn-outline" onclick="doMemberEmailLogin()">이메일 로그인</button><button class="btn btn-primary" onclick="doSignup()">회원가입</button></div></div></div>
 <div class="modal-overlay" id="mMyProfile"><div class="modal-box" style="max-width:540px"><div class="modal-header"><h3>👤 내 정보 설정</h3><button class="modal-close" onclick="cm('mMyProfile')">✕</button></div><div class="modal-body"><div style="padding:10px 12px;background:linear-gradient(135deg,#eef4ff,#fffdf5);border:1px solid var(--border);border-radius:10px;margin-bottom:12px;font-size:.78rem;color:var(--text2);line-height:1.6">소속 클럽, 구력, 전화번호는 개인전 참가 기록과 단체전 권한 확인에 사용됩니다.</div><div class="form-group"><label class="form-label">이름</label><input class="form-input" id="profileName" placeholder="예: 홍길동"/></div><div class="frow"><div class="form-group"><label class="form-label">전화번호</label><input class="form-input" id="profilePhone" inputmode="tel" placeholder="예: 010-1234-5678"/></div><div class="form-group"><label class="form-label">소속 클럽</label><input class="form-input" id="profileClub" placeholder="예: 모던"/></div></div><div class="form-group"><label class="form-label">구력</label><input class="form-input" id="profileCareer" placeholder="예: 24.07 / 3년"/></div><div class="form-group"><label class="form-label">회원 유형</label><select class="form-select" id="profileRole" disabled><option value="member">일반회원</option><option value="club_director">클럽 경기이사</option><option value="tournament_admin">시합관리자</option><option value="admin">개발자/총괄관리자</option></select></div><div id="profileStatus" style="font-size:.74rem;color:var(--text3);line-height:1.5"></div></div><div class="modal-footer"><button class="btn btn-gray" onclick="cm('mMyProfile')">닫기</button><button class="btn btn-primary" onclick="saveMyProfile()">💾 저장</button></div></div></div>
 <!-- 팀등록 로그인 모달 -->
-<div class="modal-overlay" id="mRegLogin"><div class="modal-box"><div class="modal-header"><h3>🏆 클럽 로그인</h3><button class="modal-close" onclick="cm('mRegLogin')">✕</button></div>
+<div class="modal-overlay" id="mRegLogin"><div class="modal-box"><div class="modal-header"><h3>🏆 경기이사 로그인</h3><button class="modal-close" onclick="cm('mRegLogin')">✕</button></div>
 <div class="modal-body">
 <div style="padding:10px 12px;background:linear-gradient(135deg,#e8f5e9,#c8e6c9);border-radius:10px;margin-bottom:14px;font-size:.8rem;color:#2e7d32;line-height:1.5">
     📌 경기이사 전용 로그인입니다. 클럽을 선택하고 비밀번호를 입력하세요.
@@ -2528,7 +2531,7 @@ body {
 </div>
 <div style="border-left:3px solid #d4a017;padding:10px 12px;margin-bottom:10px;background:#fffbeb;border-radius:0 8px 8px 0">
 <div style="font-weight:700;font-size:.84rem;color:#92400e;margin-bottom:5px">Q. 로그아웃은 어떻게 하나요</div>
-<div style="font-size:.78rem;color:#374151;line-height:1.6">상단 버튼이 <b>🏆 클럽 로그아웃</b> 또는 <b>🎾 진행자 로그아웃</b>으로 바뀌어 있으면 해당 버튼을 클릭하면 됩니다. 로그아웃 후에는 일반 관람 모드로 돌아갑니다.</div>
+<div style="font-size:.78rem;color:#374151;line-height:1.6">상단 버튼이 <b>🏆 경기이사 로그아웃</b> 또는 <b>🎾 진행자 로그아웃</b>으로 바뀌어 있으면 해당 버튼을 클릭하면 됩니다. 로그아웃 후에는 일반 관람 모드로 돌아갑니다.</div>
 </div>
 <div style="border-left:3px solid #d4a017;padding:10px 12px;margin-bottom:10px;background:#fffbeb;border-radius:0 8px 8px 0">
 <div style="font-weight:700;font-size:.84rem;color:#92400e;margin-bottom:5px">Q. 로그인이 자꾸 풀려요</div>
@@ -2563,13 +2566,13 @@ body {
 <!-- 탭1: 클럽 로그인 -->
 <div id="mTabC1" style="padding:16px">
 <div style="background:#e8f5e9;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:.82rem;color:#1b5e20;line-height:1.6;font-weight:700">
-    🏆 클럽 로그인은 경기이사 전용입니다
+    🏆 경기이사 로그인은 클럽 경기이사 전용입니다
   </div>
 <div style="display:flex;flex-direction:column;gap:14px">
 <div style="display:flex;gap:12px;align-items:flex-start">
 <div style="flex-shrink:0;width:26px;height:26px;border-radius:50%;background:#2e7d32;color:#fff;font-size:.78rem;font-weight:800;display:flex;align-items:center;justify-content:center">1</div>
 <div>
-<div style="font-weight:700;font-size:.88rem;margin-bottom:3px">화면 오른쪽 위 <span style="background:#2e7d32;color:#fff;padding:2px 8px;border-radius:6px;font-size:.75rem;font-weight:700">🏆 클럽 로그인</span> 클릭</div>
+<div style="font-weight:700;font-size:.88rem;margin-bottom:3px">화면 오른쪽 위 <span style="background:#2e7d32;color:#fff;padding:2px 8px;border-radius:6px;font-size:.75rem;font-weight:700">🏆 경기이사 로그인</span> 클릭</div>
 <div style="font-size:.80rem;color:#555;line-height:1.5">일반 사용자와 구분된 경기이사 전용 버튼입니다.</div>
 </div>
 </div>
@@ -4513,8 +4516,9 @@ function refreshGoogleLoginUI(user=CURRENT_APP_USER){
     const naverBtn=ge('naverLoginBtn');
     const logoutBtn=ge('googleLogoutBtn');
     const profileBtn=ge('myProfileBtn');
-    if(loginBtn) loginBtn.style.display=user?'none':'';
-    if(naverBtn) naverBtn.style.display=user?'none':'';
+    // 로그인 메뉴 단순화: 구글/네이버 개별 버튼은 숨기고, 회원가입/일반 로그인 안에서만 노출
+    if(loginBtn) loginBtn.style.display='none';
+    if(naverBtn) naverBtn.style.display='none';
     if(profileBtn) profileBtn.style.display=user?'':'none';
     if(logoutBtn){
       logoutBtn.style.display=user?'':'none';
@@ -6857,7 +6861,7 @@ function onDU(){
     if(isDirectorSessionValid()){
       REG=true;
       REG_CLUB = localStorage.getItem('reg_club')||'';
-      ge('regToggleBtn') && (ge('regToggleBtn').textContent='🏆 클럽 로그아웃');
+      ge('regToggleBtn') && (ge('regToggleBtn').textContent='🏆 경기이사 로그아웃');
       ge('regToggleBtn') && (ge('regToggleBtn').style.background='#388e3c');
       const _badge = ge('regLoginBadge');
       if(_badge){
@@ -8576,11 +8580,11 @@ async function doLogin(){
 // ── 팀등록 로그인 함수들 ──────────────────────
 function toggleReg(){ closeLoginMenu();
   if(!isTeamDirectorLoginEnabled()){
-    toast('팀담당 로그인 기능이 현재 비활성화되어 있습니다','info');
+    toast('경기이사 로그인 기능이 현재 비활성화되어 있습니다','info');
     return;
   }
   if(!shouldShowTeamDirectorLogin()){
-    toast('팀담당 로그인은 단체전에서만 사용합니다','info');
+    toast('경기이사 로그인은 단체전에서만 사용합니다','info');
     return;
   }
   if(REG && !AD){
@@ -8589,7 +8593,7 @@ function toggleReg(){ closeLoginMenu();
     localStorage.removeItem('reg');
     localStorage.removeItem('reg_club');
     localStorage.removeItem('reg_session_version');
-    ge('regToggleBtn').textContent='🏆 클럽 로그인';
+    ge('regToggleBtn').textContent='🏆 경기이사 로그인';
     ge('regToggleBtn').style.background='var(--success)';
     ge('regLoginBadge') && (ge('regLoginBadge').style.display='none');
     ge('aoReg') && (ge('aoReg').style.display='none');
@@ -8687,7 +8691,7 @@ async function saveForcedClubPassword(){
 }
 
 function doRegLogin(){
-  if(!isTeamDirectorLoginEnabled()){ toast('팀담당 로그인 기능이 현재 비활성화되어 있습니다','info'); return; }
+  if(!isTeamDirectorLoginEnabled()){ toast('경기이사 로그인 기능이 현재 비활성화되어 있습니다','info'); return; }
   const pw   = (ge('regPwInput')?.value||'').trim();
   const club = (ge('regClubLogin')?.value||'').trim();
   if(!club){ toast('클럽을 선택해주세요','error'); return; }
@@ -9034,13 +9038,13 @@ function buildTeamDirectorLoginPanelHTML(){
   return `
     <div class="form-group" data-settings-block="team-login-panel" style="margin-bottom:16px">
       <div style="padding:14px;background:linear-gradient(135deg,#eefbf4,#fffdf5);border:1.5px solid #86efac;border-radius:12px">
-        <div style="font-weight:800;font-size:.9rem;color:#166534;margin-bottom:6px">🏆 팀담당 로그인 사용</div>
-        <div style="font-size:.75rem;color:var(--text2);line-height:1.65;margin-bottom:10px">단체전에서만 쓰는 로그인입니다. 끄면 로그인 메뉴와 등록 안내에서 팀담당 로그인이 숨겨집니다.</div>
+        <div style="font-weight:800;font-size:.9rem;color:#166534;margin-bottom:6px">🏆 경기이사 로그인 사용</div>
+        <div style="font-size:.75rem;color:var(--text2);line-height:1.65;margin-bottom:10px">단체전에서만 쓰는 로그인입니다. 끄면 로그인 메뉴와 등록 안내에서 경기이사 로그인이 숨겨집니다.</div>
         <label style="display:flex;align-items:center;gap:8px;font-size:.82rem;font-weight:800;cursor:pointer;margin-bottom:8px">
-          <input type="checkbox" id="metaAllowTeamDirectorLogin"> 단체전 팀담당 로그인 기능 사용
+          <input type="checkbox" id="metaAllowTeamDirectorLogin"> 단체전 경기이사 로그인 기능 사용
         </label>
         <div style="font-size:.72rem;color:var(--text3);line-height:1.6;margin-bottom:10px">
-          • OFF: 팀담당 로그인 숨김, 공개접수 또는 관리자 등록만 허용
+          • OFF: 경기이사 로그인 숨김, 공개접수 또는 관리자 등록만 허용
           • ON: 클럽 경기이사가 로그인 후 팀 등록 / 오더 제출 가능
         </div>
         <div style="display:flex;justify-content:flex-end">
@@ -9060,7 +9064,7 @@ async function saveTeamDirectorLoginSettings(){
     applyRegLoginUI();
     renderRegisterDivisionOverview();
     renderRL();
-    toast('팀담당 로그인 설정 저장 완료 ✅','success');
+    toast('경기이사 로그인 설정 저장 완료 ✅','success');
   }catch(e){
     sl(false);
     toast('저장 실패: '+e.message,'error');
@@ -9149,7 +9153,7 @@ function ensureAdminSettingsStructured(){
 
   const sectionHeads = {
     common: buildAdminSettingsSectionTitle('⚙️','공통 / 운영 설정','앱 공통 설정과 운영 연락/공지 관련 항목입니다.'),
-    team: buildAdminSettingsSectionTitle('👥','단체전 설정','팀담당 로그인, 온라인 오더, 클럽 경기이사 관리처럼 단체전 운영에 직접 연결되는 항목입니다.'),
+    team: buildAdminSettingsSectionTitle('👥','단체전 설정','경기이사 로그인, 온라인 오더, 클럽 경기이사 관리처럼 단체전 운영에 직접 연결되는 항목입니다.'),
     individual: buildAdminSettingsSectionTitle('🎾','개인전 설정','개인전 전용 자동 코트배정과 개인시합 잠금 항목을 따로 뺐습니다.'),
     developer: buildAdminSettingsSectionTitle('🛠','개발자 / 데이터 관리','승인, 백업, 과거 데이터, 전체 정리처럼 운영 핵심 외의 관리 항목입니다.')
   };
@@ -12246,7 +12250,7 @@ function selectRegDivision(div){
   const tid=ge('regTS')?.value||'';
   const t=G.tournaments.find(x=>x.id===tid);
   if(!t){ toast('대회를 먼저 선택하세요','info'); return; }
-  if(!(AD||REG||isPublicTeamRegistrationEnabled()||!isTeamDirectorLoginEnabled()) && !isIndividualTournament(t)){ toast('팀담당 로그인 후 등록할 수 있습니다','info'); return; }
+  if(!(AD||REG||isPublicTeamRegistrationEnabled()||!isTeamDirectorLoginEnabled()) && !isIndividualTournament(t)){ toast('경기이사 로그인 후 등록할 수 있습니다','info'); return; }
   if(!AD && t.status!=='open'){ toast('접수중 대회만 등록 가능합니다','error'); return; }
   const ds=ge('regDS');
   if(ds) ds.value=div;
@@ -12342,7 +12346,7 @@ function renderRL(){
     msg.style.display='block';
     msg.innerHTML=isIndividual
       ? '현재는 참가 접수할 수 없는 상태입니다.'
-      : (!isTeamDirectorLoginEnabled() ? '현재 팀담당 로그인이 꺼져 있어 공개/관리자 등록만 가능합니다.' : (isPublicTeamRegistrationEnabled() ? '현재 팀 등록은 공개 접수 방식입니다. 클럽/팀명을 직접 입력해 접수할 수 있습니다.' : '📋 팀 등록을 하려면 상단의 <b>팀담당 로그인</b>이 필요합니다.'));
+      : (!isTeamDirectorLoginEnabled() ? '현재 경기이사 로그인이 꺼져 있어 공개/관리자 등록만 가능합니다.' : (isPublicTeamRegistrationEnabled() ? '현재 팀 등록은 공개 접수 방식입니다. 클럽/팀명을 직접 입력해 접수할 수 있습니다.' : '📋 팀 등록을 하려면 상단의 <b>경기이사 로그인</b>이 필요합니다.'));
   }else if(lock){
     msg.style.display='block';
     msg.innerHTML = `⛔ 현재 선택한 대회는 <b>${t?.status==='finished'?'종료':t?.status==='closed'?'마감':'접수중 아님'}</b> 상태라 ${isIndividual?'참가 접수':'팀 등록'}이 비활성화 됩니다.<br>상단에서 <b>접수중 대회</b>를 선택해 주세요.`;
