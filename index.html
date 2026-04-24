@@ -2,7 +2,7 @@
 
 <html lang="ko">
 <head>
-<meta charset="utf-8"/> 
+<meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <meta content="no-store, no-cache, must-revalidate, max-age=0" http-equiv="Cache-Control"/>
 <meta content="no-cache" http-equiv="Pragma"/>
@@ -105,6 +105,13 @@ body{font-family:'Noto Sans KR',sans-serif;background:linear-gradient(180deg,#f4
 .login-menu-panel .login-menu-item#googleLoginBtn,
 .login-menu-panel .login-menu-item#naverLoginBtn{display:none !important;}
 .login-menu-panel .login-menu-sep{height:1px;background:rgba(255,255,255,.10);margin:2px 0;}
+.login-menu-panel-clean{min-width:220px;}
+.login-menu-main-item{font-weight:900 !important;justify-content:space-between !important;}
+.login-menu-arrow{margin-left:auto;font-size:.72rem;opacity:.86;}
+.role-login-panel{display:none;flex-direction:column;gap:8px;padding:8px;margin-top:-2px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);}
+.login-menu-wrap.role-open .role-login-panel{display:flex;}
+.login-menu-wrap.role-open #roleLoginArrow{transform:rotate(180deg);}
+
 .login-menu-panel #regClubNameBadge{display:none;max-width:100%;text-align:left}
 @media(max-width:680px){
   .login-menu-btn{min-width:auto}
@@ -1981,7 +1988,7 @@ body {
 <div class="logo-icon" style="display:none">🎾</div>
 <div class="logo-text"><h1>시합관리 시스템</h1><p>230MATCH TOURNAMENT</p></div>
 </div>
-<div class="header-actions"><span class="admin-badge" id="regLoginBadge" style="display:none;background:var(--success);color:#fff;font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:999px">클럽</span><span class="admin-badge" id="opLoginBadge" style="display:none;background:#1565c0;color:#fff;font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:999px">진행자</span><span class="admin-badge" id="adminBadge">관리자</span><button class="btn-sm admin-only" id="adminSettingsBtn" onclick="openAdminSettings()">⚙️</button><button class="btn-sm" id="manualToggleBtn" onclick="openHelpCenter()" style="background:#fff;color:#0f1e3a;border:1.5px solid rgba(255,255,255,.42);font-weight:900">📘 가이드</button><div class="login-menu-wrap" id="loginMenuWrap"><button class="btn-sm login-menu-btn" id="loginMenuBtn" onclick="toggleLoginMenu(event)" style="background:#fff;color:#0f1e3a;border:1.5px solid rgba(255,255,255,.42);font-weight:900">🔐 로그인</button><div class="login-menu-panel" id="loginMenuPanel"><span id="regClubNameBadge" style="display:none;background:var(--success);color:#fff;font-size:.75rem;font-weight:900;padding:7px 10px;border-radius:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span><button class="btn-sm login-menu-item" id="regToggleBtn" onclick="toggleReg()" style="background:var(--success);color:#fff;border:none">🏆 경기이사 로그인</button><button class="btn-sm login-menu-item" id="opToggleBtn" onclick="toggleOperator()" style="background:#1565c0;color:#fff;border:none">🎾 진행자 로그인</button><button class="btn-sm login-menu-item" id="googleLoginBtn" onclick="loginWithGoogle()" style="display:none;background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">🔵 구글 로그인</button><button class="btn-sm login-menu-item" id="kakaoLoginBtn" onclick="loginWithKakao()" style="display:none;background:#fee500;color:#191919;border:1px solid rgba(25,25,25,.12)">🟡 카카오 로그인</button><button class="btn-sm login-menu-item" id="naverLoginBtn" onclick="loginWithNaver()" style="display:none;background:#03c75a;color:#fff;border:1px solid rgba(3,199,90,.35)">🟢 네이버 로그인</button><button class="btn-sm login-menu-item" id="googleLogoutBtn" onclick="logoutGoogleUser()" style="display:none;background:#f8fafc;color:#475569;border:1px solid rgba(15,30,58,.12)">🚪 구글 로그아웃</button><button class="btn-sm login-menu-item" id="myProfileBtn" onclick="openMyProfileModal()" style="display:none;background:#eef4ff;color:#12306b;border:1px solid rgba(18,48,107,.12)">👤 내 정보 설정</button><button class="btn-sm login-menu-item" id="adminSignupBtn" onclick="toggleAdminSignup()" style="background:#eef4ff;color:#12306b;border:1px solid rgba(18,48,107,.12)">👤 회원가입 / 일반 로그인</button><button class="btn-sm login-menu-item" id="adminToggleBtn" onclick="toggleTournamentManagerLogin()" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">🧑‍💼 운영자 로그인</button><button class="btn-sm login-menu-item" id="developerToggleBtn" onclick="toggleDeveloperLogin()" style="background:#0f1e3a;color:#fff;border:1px solid rgba(255,255,255,.12)">🛠️ 개발자 로그인</button></div></div></div>
+<div class="header-actions"><span class="admin-badge" id="regLoginBadge" style="display:none;background:var(--success);color:#fff;font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:999px">클럽</span><span class="admin-badge" id="opLoginBadge" style="display:none;background:#1565c0;color:#fff;font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:999px">진행자</span><span class="admin-badge" id="adminBadge">관리자</span><button class="btn-sm admin-only" id="adminSettingsBtn" onclick="openAdminSettings()">⚙️</button><button class="btn-sm" id="manualToggleBtn" onclick="openHelpCenter()" style="background:#fff;color:#0f1e3a;border:1.5px solid rgba(255,255,255,.42);font-weight:900">📘 가이드</button><div class="login-menu-wrap" id="loginMenuWrap"><button class="btn-sm login-menu-btn" id="loginMenuBtn" onclick="toggleLoginMenu(event)" style="background:#fff;color:#0f1e3a;border:1.5px solid rgba(255,255,255,.42);font-weight:900">🔐 로그인</button><div class="login-menu-panel login-menu-panel-clean" id="loginMenuPanel"><span id="regClubNameBadge" style="display:none;background:var(--success);color:#fff;font-size:.75rem;font-weight:900;padding:7px 10px;border-radius:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span><button class="btn-sm login-menu-item login-menu-main-item" id="roleLoginMenuBtn" onclick="toggleRoleLoginPanel(event)" style="background:linear-gradient(135deg,#0f1e3a,#1b2f5a);color:#fff;border:1px solid rgba(255,255,255,.14)">🔑 권한별 로그인 <span class="login-menu-arrow" id="roleLoginArrow">▾</span></button><div class="role-login-panel" id="roleLoginPanel"><button class="btn-sm login-menu-item" id="regToggleBtn" onclick="closeLoginMenu();toggleReg()" style="background:var(--success);color:#fff;border:none">🏆 경기이사 로그인</button><button class="btn-sm login-menu-item" id="opToggleBtn" onclick="closeLoginMenu();toggleOperator()" style="background:#1565c0;color:#fff;border:none">🎾 진행자 로그인</button><button class="btn-sm login-menu-item" id="adminToggleBtn" onclick="closeLoginMenu();toggleTournamentManagerLogin()" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">🧑‍💼 운영자 로그인</button><button class="btn-sm login-menu-item" id="developerToggleBtn" onclick="closeLoginMenu();toggleDeveloperLogin()" style="background:#0f1e3a;color:#fff;border:1px solid rgba(255,255,255,.12)">🛠️ 개발자 로그인</button></div><div class="login-menu-sep"></div><button class="btn-sm login-menu-item login-menu-main-item" id="adminSignupBtn" onclick="closeLoginMenu();toggleAdminSignup()" style="background:#eef4ff;color:#12306b;border:1px solid rgba(18,48,107,.12)">👤 회원가입 / 간편 로그인</button><button class="btn-sm login-menu-item" id="myProfileBtn" onclick="closeLoginMenu();openMyProfileModal()" style="display:none;background:#eef4ff;color:#12306b;border:1px solid rgba(18,48,107,.12)">👤 내 정보 설정</button><button class="btn-sm login-menu-item" id="googleLogoutBtn" onclick="closeLoginMenu();logoutGoogleUser()" style="display:none;background:#f8fafc;color:#475569;border:1px solid rgba(15,30,58,.12)">🚪 로그아웃</button><button class="btn-sm login-menu-item" id="googleLoginBtn" onclick="loginWithGoogle()" style="display:none;background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">🔵 구글 로그인</button><button class="btn-sm login-menu-item" id="kakaoLoginBtn" onclick="loginWithKakao()" style="display:none;background:#fee500;color:#191919;border:1px solid rgba(25,25,25,.12)">🟡 카카오 로그인</button><button class="btn-sm login-menu-item" id="naverLoginBtn" onclick="loginWithNaver()" style="display:none;background:#03c75a;color:#fff;border:1px solid rgba(3,199,90,.35)">🟢 네이버 로그인</button></div></div></div>
 </div>
 <nav class="nav-tabs">
 <div class="nav-tab active" data-page="home" onclick="showPage('home')">🏠 홈</div>
@@ -4556,8 +4563,9 @@ function refreshGoogleLoginUI(user=CURRENT_APP_USER){
     const naverBtn=ge('naverLoginBtn');
     const logoutBtn=ge('googleLogoutBtn');
     const profileBtn=ge('myProfileBtn');
-    // 로그인 메뉴 단순화: 구글/네이버 개별 버튼은 숨기고, 회원가입/일반 로그인 안에서만 노출
+    // 로그인 메뉴 단순화: 소셜 로그인은 회원가입/일반 로그인 안에서만 노출
     if(loginBtn) loginBtn.style.display='none';
+    if(kakaoBtn) kakaoBtn.style.display='none';
     if(naverBtn) naverBtn.style.display='none';
     if(profileBtn) profileBtn.style.display=user?'':'none';
     if(logoutBtn){
@@ -7193,9 +7201,18 @@ function toggleLoginMenu(ev){
   if(!wrap) return;
   wrap.classList.toggle('open');
 }
+function toggleRoleLoginPanel(ev){
+  try{ ev?.stopPropagation?.(); }catch(e){}
+  const wrap=ge('loginMenuWrap');
+  if(!wrap) return;
+  wrap.classList.toggle('role-open');
+}
 function closeLoginMenu(){
   const wrap=ge('loginMenuWrap');
-  if(wrap) wrap.classList.remove('open');
+  if(wrap){
+    wrap.classList.remove('open');
+    wrap.classList.remove('role-open');
+  }
 }
 document.addEventListener('click',(e)=>{
   const wrap=ge('loginMenuWrap');
@@ -7205,6 +7222,7 @@ document.addEventListener('click',(e)=>{
   });
 });
 window.toggleLoginMenu = toggleLoginMenu;
+window.toggleRoleLoginPanel = toggleRoleLoginPanel;
 window.closeLoginMenu = closeLoginMenu;
 
 function toggleMiniMenu(ev, wrapId){
