@@ -1,5 +1,5 @@
 export async function onRequest(context) {
-  const CLIENT_ID = "YOUR_CLIENT_ID";
+  const CLIENT_ID = "vMR8P7qHK56NBDIiEpqg";
   const REDIRECT_URI = "https://tennis230.pages.dev/naver/callback";
 
   const state = Math.random().toString(36).substring(2);
