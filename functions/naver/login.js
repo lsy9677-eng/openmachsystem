@@ -6,5 +6,5 @@ export async function onRequest(context) {
 
   const url = `https://nid.naver.com/oauth2.0/authorize?response_type=code&client_id=${CLIENT_ID}&redirect_uri=${REDIRECT_URI}&state=${state}`;
 
-  return Response.redirect(url, 302);
+  return Response.redirect(url, 302); 
 }
