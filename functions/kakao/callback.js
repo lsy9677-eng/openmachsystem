@@ -145,6 +145,10 @@ export async function onRequestGet(context) {
     const account = me.kakao_account || {};
     const profile = account.profile || {};
     const socialId = String(me.id);
+
+    // 이메일/전화번호 권한이 없어도 로그인은 통과시킨다.
+    // Firebase Auth는 email이 필수가 아니며, custom token uid만 있으면 됨.
+    // 앱 내부에서 이름/전화번호/클럽은 별도 내 정보 설정에서 받는 구조가 맞다.
     const email = account.email || `kakao_${socialId}@kakao.local`;
     const name = profile.nickname || account.name || '';
     const phone = account.phone_number || '';
