@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-04-24-v230-no-kakao-naver-self-redirect-userbadge-v3";
+  const APP_VERSION = "2026-04-24-v230-no-kakao-naver-persistent-login-v4";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -4517,12 +4517,19 @@ function grpLabel(gi){ return `${Number(gi)+1}조`; }
 import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import{getFirestore,collection,doc,getDoc,getDocs,setDoc,addDoc,updateDoc,deleteDoc,onSnapshot,query,orderBy,limit,serverTimestamp,writeBatch,where,documentId}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import{getStorage,ref,uploadBytes,getDownloadURL,deleteObject,listAll}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
-import{getAuth,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut,onAuthStateChanged,signInAnonymously,GoogleAuthProvider,signInWithPopup,signInWithRedirect,getRedirectResult,signInWithCustomToken}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import{getAuth,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut,onAuthStateChanged,signInAnonymously,GoogleAuthProvider,signInWithPopup,signInWithRedirect,getRedirectResult,signInWithCustomToken,setPersistence,browserLocalPersistence}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 const FB={apiKey:"AIzaSyAbc17RiYyxCqgbMBkxkMoiRdNTmy2q65w",authDomain:"open-match-manager.firebaseapp.com",projectId:"open-match-manager",storageBucket:"open-match-manager.firebasestorage.app",messagingSenderId:"195671806262",appId:"1:195671806262:web:89691574839266cea1a397"};
 const _app=initializeApp(FB);
 const db=getFirestore(_app);
 const storage=getStorage(_app);
 const auth=getAuth(_app);
+let AUTH_PERSISTENCE_READY=false;
+const AUTH_PERSISTENCE_PROMISE=setPersistence(auth, browserLocalPersistence)
+  .then(()=>{ AUTH_PERSISTENCE_READY=true; })
+  .catch((e)=>{ console.warn('auth persistence local failed', e); });
+async function ensureAuthLocalPersistence(){
+  try{ if(!AUTH_PERSISTENCE_READY) await AUTH_PERSISTENCE_PROMISE; }catch(e){}
+}
 const googleProvider=new GoogleAuthProvider();
 googleProvider.setCustomParameters({prompt:'select_account'});
 let CURRENT_APP_USER=null;
@@ -4735,6 +4742,7 @@ async function handleSocialCustomTokenRedirect(){
     }
     if(!token) return;
     sl(true);
+    await ensureAuthLocalPersistence();
     const cred=await signInWithCustomToken(auth, token);
     CURRENT_APP_USER=cred.user;
     const prof=await ensureUserProfileDoc(cred.user,{
@@ -4750,6 +4758,7 @@ async function handleSocialCustomTokenRedirect(){
     try{ cm('mAdminSignup'); }catch(_e){}
     sl(false);
     history.replaceState(null,'',location.origin+location.pathname);
+    try{ localStorage.setItem('memberLoginProvider', provider||'social'); localStorage.setItem('memberLoginAt', new Date().toISOString()); }catch(_e){}
     toast((provider==='naver'?'네이버':(provider==='kakao'?'카카오':'소셜'))+' 로그인 완료 ✅','success');
     try{ refreshIndividualAuthGate(); renderRL(); }catch(_e){}
     try{
@@ -4827,10 +4836,12 @@ async function loginWithGoogle(){
     sl(true);
     let cred=null;
     try{
+      await ensureAuthLocalPersistence();
       cred=await signInWithPopup(auth, googleProvider);
     }catch(e){
       const msg=String(e?.code||e?.message||'');
       if(/popup|blocked|cancelled|closed/i.test(msg)){
+        await ensureAuthLocalPersistence();
         await signInWithRedirect(auth, googleProvider);
         return;
       }
@@ -4840,6 +4851,7 @@ async function loginWithGoogle(){
     const prof=await ensureUserProfileDoc(cred.user);
     refreshGoogleLoginUI(cred.user);
     sl(false);
+    try{ localStorage.setItem('memberLoginProvider','google'); localStorage.setItem('memberLoginAt', new Date().toISOString()); }catch(_e){}
     toast('구글 로그인 완료 ✅','success');
     try{ refreshIndividualAuthGate(); renderRL(); }catch(_e){}
   }catch(e){
@@ -4851,6 +4863,7 @@ async function logoutGoogleUser(){
   try{
     sl(true);
     await signOut(auth);
+    try{ localStorage.removeItem('memberLoginProvider'); localStorage.removeItem('memberLoginAt'); }catch(_e){}
     CURRENT_APP_USER=null;
     CURRENT_APP_PROFILE=null;
     PARTICIPANT_LOGIN=null;
@@ -4917,6 +4930,7 @@ async function ensureParticipantAnonymousAuth(meta={}){
     return current;
   }
   try{
+    await ensureAuthLocalPersistence();
     const cred=await signInAnonymously(auth);
     PARTICIPANT_LOGIN={
       uid:cred?.user?.uid||'',
