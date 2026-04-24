@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-04-24-v230-no-kakao-login-naver-return-v1";
+  const APP_VERSION = "2026-04-24-v230-no-kakao-naver-popup-userbadge-v2";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -4526,6 +4526,7 @@ const auth=getAuth(_app);
 const googleProvider=new GoogleAuthProvider();
 googleProvider.setCustomParameters({prompt:'select_account'});
 let CURRENT_APP_USER=null;
+let CURRENT_APP_PROFILE=null;
 async function ensureUserProfileDoc(user, extra={}){
   if(!user || !user.uid) return null;
   const refDoc=doc(db,'users',user.uid);
@@ -4555,7 +4556,16 @@ async function ensureUserProfileDoc(user, extra={}){
   if(!snap || !snap.exists()) base.createdAt=base.updatedAt;
   await setDoc(refDoc, base, {merge:true});
   try{ syncProfilePhoneToPersonalMatch(base, {render:false}); }catch(e){}
+  try{ if((auth?.currentUser?.uid||CURRENT_APP_USER?.uid||'')===user.uid) CURRENT_APP_PROFILE=base; }catch(e){}
   return base;
+}
+function getLoggedInUserLabel(user=CURRENT_APP_USER){
+  try{
+    const p=CURRENT_APP_PROFILE||{};
+    const raw=(p.name||p.displayName||p.socialName||user?.displayName||user?.email||'회원').trim();
+    const name=raw.includes('@') ? raw.split('@')[0] : raw;
+    return name ? `${name}님` : '회원님';
+  }catch(e){ return '회원님'; }
 }
 function refreshGoogleLoginUI(user=CURRENT_APP_USER){
   try{
@@ -4563,18 +4573,27 @@ function refreshGoogleLoginUI(user=CURRENT_APP_USER){
     const naverBtn=ge('naverLoginBtn');
     const logoutBtn=ge('googleLogoutBtn');
     const profileBtn=ge('myProfileBtn');
+    const menuBtn=ge('loginMenuBtn');
+    const memberName=getLoggedInUserLabel(user);
     // 로그인 메뉴 단순화: 소셜 로그인은 회원가입/일반 로그인 안에서만 노출
     if(loginBtn) loginBtn.style.display='none';
     if(naverBtn) naverBtn.style.display='none';
-    if(profileBtn) profileBtn.style.display=user?'':'none';
+    if(profileBtn){
+      profileBtn.style.display=user?'':'none';
+      if(user) profileBtn.textContent=`👤 내 정보 설정 (${memberName})`;
+    }
+    if(menuBtn){
+      menuBtn.textContent=user?`👤 ${memberName}`:'🔐 로그인';
+      menuBtn.title=user?'로그인됨 · 내 정보/로그아웃 메뉴':'로그인';
+    }
     if(logoutBtn){
       logoutBtn.style.display=user?'':'none';
-      logoutBtn.textContent=user?`🚪 ${user.displayName||user.email||'소셜'} 로그아웃`:'🚪 로그아웃';
+      logoutBtn.textContent=user?`🚪 ${memberName} 로그아웃`:'🚪 로그아웃';
     }
     const badge=ge('regLoginBadge');
     if(badge && user && !REG){
       badge.style.display='inline-flex';
-      badge.textContent=(user?.providerData?.[0]?.providerId==='password')?'회원':'소셜';
+      badge.textContent=memberName;
       badge.classList.add('show');
     }else if(badge && !REG){
       badge.style.display='none';
@@ -4652,12 +4671,13 @@ function isStandaloneAppMode(){
     return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true || document.referrer.startsWith('android-app://');
   }catch(e){ return false; }
 }
-function getSocialLoginReturnUrl(provider='naver'){
+function getSocialLoginReturnUrl(provider='naver', popup=false){
   // 소셜 로그인 후 /naver/login 또는 /naver/callback 경로에 남지 않도록 항상 앱 루트로 복귀시킨다.
-  // PWA/TWA에서는 같은 origin의 루트로 돌아와야 앱 화면 유지 가능성이 가장 높다.
+  // 네이버 로그인은 가능하면 별도 팝업에서 처리해 PWA/TWA 상단 주소창이 본 화면을 덮지 않게 한다.
   const u = new URL('/', location.origin);
   u.searchParams.set('socialReturn', provider);
   u.searchParams.set('standalone', isStandaloneAppMode() ? '1' : '0');
+  if(popup) u.searchParams.set('socialPopup','1');
   u.searchParams.set('t', String(Date.now()));
   return u.toString();
 }
@@ -4672,8 +4692,16 @@ function cleanupSocialReturnUrl(){
 async function loginWithNaver(){
   try{
     sessionStorage.setItem('NAVER_LOGIN_STARTED_IN_STANDALONE', isStandaloneAppMode() ? '1' : '0');
-    const returnUrl = getSocialLoginReturnUrl('naver');
-    location.href = '/naver/login?returnUrl=' + encodeURIComponent(returnUrl);
+    const returnUrl = getSocialLoginReturnUrl('naver', true);
+    const loginUrl = '/naver/login?returnUrl=' + encodeURIComponent(returnUrl);
+    const w = window.open(loginUrl, 'naverLoginPopup', 'width=430,height=720,menubar=no,toolbar=no,location=no,status=no,scrollbars=yes,resizable=yes');
+    if(!w || w.closed || typeof w.closed === 'undefined'){
+      // 팝업이 차단된 경우만 현재 창 이동으로 fallback
+      location.href = loginUrl;
+    }else{
+      try{ w.focus(); }catch(_e){}
+      toast('네이버 로그인 창에서 인증을 완료해 주세요.','info');
+    }
   }catch(e){
     toast('네이버 로그인 시작 실패: '+(e?.message||e),'error');
   }
@@ -4682,6 +4710,16 @@ async function loginWithNaver(){
 async function loginWithKakao(){
   toast('카카오 로그인은 제거되었습니다. 구글/네이버 또는 이메일 로그인을 사용하세요.','info');
 }
+window.addEventListener('message', async (ev)=>{
+  try{
+    if(ev.origin!==location.origin) return;
+    const data=ev.data||{};
+    if(data.type==='SOCIAL_LOGIN_DONE'){
+      toast((data.provider==='naver'?'네이버':'소셜')+' 로그인 완료 ✅','success');
+      setTimeout(()=>{ try{ location.reload(); }catch(_e){} }, 350);
+    }
+  }catch(e){}
+});
 async function handleSocialCustomTokenRedirect(){
   try{
     const hashText=location.hash && location.hash.startsWith('#') ? location.hash.slice(1) : '';
@@ -4689,6 +4727,7 @@ async function handleSocialCustomTokenRedirect(){
     const searchParams=new URLSearchParams(location.search||'');
     const token=hashParams.get('customToken') || hashParams.get('firebaseToken') || searchParams.get('customToken') || searchParams.get('firebaseToken');
     const provider=hashParams.get('provider') || searchParams.get('provider') || 'custom';
+    const isPopupReturn = searchParams.get('socialPopup')==='1';
     const socialName=hashParams.get('socialName') || searchParams.get('socialName') || '';
     const socialPhone=hashParams.get('socialPhone') || searchParams.get('socialPhone') || '';
     const socialEmail=hashParams.get('socialEmail') || searchParams.get('socialEmail') || '';
@@ -4717,7 +4756,12 @@ async function handleSocialCustomTokenRedirect(){
     history.replaceState(null,'',location.origin+location.pathname);
     toast((provider==='naver'?'네이버':(provider==='kakao'?'카카오':'소셜'))+' 로그인 완료 ✅','success');
     try{ refreshIndividualAuthGate(); renderRL(); }catch(_e){}
-    try{ if(!(prof?.name) || !(prof?.club) || !(prof?.career)) setTimeout(()=>openMyProfileModal(), 350); }catch(_e){}
+    try{
+      if(isPopupReturn && window.opener && !window.opener.closed){
+        window.opener.postMessage({type:'SOCIAL_LOGIN_DONE', provider}, location.origin);
+        setTimeout(()=>window.close(), 250);
+      }
+    }catch(_e){}
   }catch(e){
     sl(false);
     toast('소셜 로그인 처리 실패: '+(e?.message||e),'error');
@@ -4801,7 +4845,6 @@ async function loginWithGoogle(){
     refreshGoogleLoginUI(cred.user);
     sl(false);
     toast('구글 로그인 완료 ✅','success');
-    try{ if(!(prof?.name) || !(prof?.club) || !(prof?.career)) setTimeout(()=>openMyProfileModal(), 350); }catch(_e){}
     try{ refreshIndividualAuthGate(); renderRL(); }catch(_e){}
   }catch(e){
     sl(false);
@@ -4813,6 +4856,7 @@ async function logoutGoogleUser(){
     sl(true);
     await signOut(auth);
     CURRENT_APP_USER=null;
+    CURRENT_APP_PROFILE=null;
     PARTICIPANT_LOGIN=null;
     refreshGoogleLoginUI(null);
     sl(false);
@@ -4898,10 +4942,7 @@ window.ensureParticipantAnonymousAuth = ensureParticipantAnonymousAuth;
 onAuthStateChanged(auth, async (user)=>{
   try{
     CURRENT_APP_USER = (user && !user.isAnonymous) ? user : null;
-    if(CURRENT_APP_USER){ try{ await ensureUserProfileDoc(CURRENT_APP_USER); }catch(_e){} }
-    refreshGoogleLoginUI(CURRENT_APP_USER);
-    CURRENT_APP_USER = (user && !user.isAnonymous) ? user : null;
-    if(CURRENT_APP_USER) await ensureUserProfileDoc(CURRENT_APP_USER).catch(()=>{});
+    if(CURRENT_APP_USER){ try{ CURRENT_APP_PROFILE=await ensureUserProfileDoc(CURRENT_APP_USER); }catch(_e){} } else { CURRENT_APP_PROFILE=null; }
     refreshGoogleLoginUI(CURRENT_APP_USER);
     const isAdmin = user ? await verifyFirebaseAdmin(user) : false;
     const tmProfile = (!isAdmin && user) ? await getApprovedTournamentManagerProfile(user) : null;
@@ -4930,7 +4971,7 @@ onAuthStateChanged(auth, async (user)=>{
 getRedirectResult(auth).then(async (result)=>{
   if(result?.user){
     CURRENT_APP_USER=result.user;
-    await ensureUserProfileDoc(result.user).catch(()=>{});
+    CURRENT_APP_PROFILE=await ensureUserProfileDoc(result.user).catch(()=>null);
     refreshGoogleLoginUI(result.user);
     toast('구글 로그인 완료 ✅','success');
   }
@@ -8284,11 +8325,9 @@ async function doSignup(){
     ['signupEmail','signupPw','signupPw2'].forEach(id=>{ if(ge(id)) ge(id).value=''; });
     cm('mAdminSignup');
     if(role==='member'){
-      toast('일반회원 가입 완료 ✅','success');
-      setTimeout(()=>openMyProfileModal(), 250);
+      toast('일반회원 가입 완료 ✅ · 로그인 메뉴의 내 정보 설정에서 이름/전화번호/클럽을 저장해 주세요.','success');
     }else{
-      toast('회원가입 완료. 총괄 관리자 승인 후 권한이 활성화됩니다.','success');
-      setTimeout(()=>openMyProfileModal(), 250);
+      toast('회원가입 완료. 총괄 관리자 승인 후 권한이 활성화됩니다. 내 정보는 로그인 메뉴에서 수정할 수 있습니다.','success');
     }
   }catch(e){
     sl(false);
@@ -8372,6 +8411,8 @@ async function saveMyProfile(){
   try{
     const profilePayload={name, displayName:name||user.displayName||'', phone, club, career, updatedAt:new Date().toISOString()};
     await setDoc(doc(db,'users',user.uid), profilePayload, {merge:true});
+    CURRENT_APP_PROFILE={...(CURRENT_APP_PROFILE||{}), ...profilePayload};
+    refreshGoogleLoginUI(user);
     try{ syncProfilePhoneToPersonalMatch(profilePayload, {render:true}); }catch(e){}
     sl(false);
     cm('mMyProfile');
