@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-04-24-v230-login-menu-cleanup-v1";
+  const APP_VERSION = "2026-04-24-v230-no-kakao-login-naver-return-v1";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -1950,6 +1950,7 @@ body {
     ['link', { rel:'apple-touch-icon', href:'./icon-180.png' }],
     ['link', { rel:'icon', type:'image/png', sizes:'192x192', href:'./icon-192.png' }],
     ['link', { rel:'icon', type:'image/png', sizes:'512x512', href:'./icon-512.png' }],
+    ['meta', { name:'mobile-web-app-capable', content:'yes' }],
     ['meta', { name:'apple-mobile-web-app-capable', content:'yes' }],
     ['meta', { name:'apple-mobile-web-app-status-bar-style', content:'default' }],
     ['meta', { name:'apple-mobile-web-app-title', content:'시합관리 시스템' }]
@@ -1988,7 +1989,7 @@ body {
 <div class="logo-icon" style="display:none">🎾</div>
 <div class="logo-text"><h1>시합관리 시스템</h1><p>230MATCH TOURNAMENT</p></div>
 </div>
-<div class="header-actions"><span class="admin-badge" id="regLoginBadge" style="display:none;background:var(--success);color:#fff;font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:999px">클럽</span><span class="admin-badge" id="opLoginBadge" style="display:none;background:#1565c0;color:#fff;font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:999px">진행자</span><span class="admin-badge" id="adminBadge">관리자</span><button class="btn-sm admin-only" id="adminSettingsBtn" onclick="openAdminSettings()">⚙️</button><button class="btn-sm" id="manualToggleBtn" onclick="openHelpCenter()" style="background:#fff;color:#0f1e3a;border:1.5px solid rgba(255,255,255,.42);font-weight:900">📘 가이드</button><div class="login-menu-wrap" id="loginMenuWrap"><button class="btn-sm login-menu-btn" id="loginMenuBtn" onclick="toggleLoginMenu(event)" style="background:#fff;color:#0f1e3a;border:1.5px solid rgba(255,255,255,.42);font-weight:900">🔐 로그인</button><div class="login-menu-panel login-menu-panel-clean" id="loginMenuPanel"><span id="regClubNameBadge" style="display:none;background:var(--success);color:#fff;font-size:.75rem;font-weight:900;padding:7px 10px;border-radius:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span><button class="btn-sm login-menu-item login-menu-main-item" id="roleLoginMenuBtn" onclick="toggleRoleLoginPanel(event)" style="background:linear-gradient(135deg,#0f1e3a,#1b2f5a);color:#fff;border:1px solid rgba(255,255,255,.14)">🔑 권한별 로그인 <span class="login-menu-arrow" id="roleLoginArrow">▾</span></button><div class="role-login-panel" id="roleLoginPanel"><button class="btn-sm login-menu-item" id="regToggleBtn" onclick="closeLoginMenu();toggleReg()" style="background:var(--success);color:#fff;border:none">🏆 경기이사 로그인</button><button class="btn-sm login-menu-item" id="opToggleBtn" onclick="closeLoginMenu();toggleOperator()" style="background:#1565c0;color:#fff;border:none">🎾 진행자 로그인</button><button class="btn-sm login-menu-item" id="adminToggleBtn" onclick="closeLoginMenu();toggleTournamentManagerLogin()" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">🧑‍💼 운영자 로그인</button><button class="btn-sm login-menu-item" id="developerToggleBtn" onclick="closeLoginMenu();toggleDeveloperLogin()" style="background:#0f1e3a;color:#fff;border:1px solid rgba(255,255,255,.12)">🛠️ 개발자 로그인</button></div><div class="login-menu-sep"></div><button class="btn-sm login-menu-item login-menu-main-item" id="adminSignupBtn" onclick="closeLoginMenu();toggleAdminSignup()" style="background:#eef4ff;color:#12306b;border:1px solid rgba(18,48,107,.12)">👤 회원가입 / 간편 로그인</button><button class="btn-sm login-menu-item" id="myProfileBtn" onclick="closeLoginMenu();openMyProfileModal()" style="display:none;background:#eef4ff;color:#12306b;border:1px solid rgba(18,48,107,.12)">👤 내 정보 설정</button><button class="btn-sm login-menu-item" id="googleLogoutBtn" onclick="closeLoginMenu();logoutGoogleUser()" style="display:none;background:#f8fafc;color:#475569;border:1px solid rgba(15,30,58,.12)">🚪 로그아웃</button><button class="btn-sm login-menu-item" id="googleLoginBtn" onclick="loginWithGoogle()" style="display:none;background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">🔵 구글 로그인</button><button class="btn-sm login-menu-item" id="kakaoLoginBtn" onclick="loginWithKakao()" style="display:none;background:#fee500;color:#191919;border:1px solid rgba(25,25,25,.12)">🟡 카카오 로그인</button><button class="btn-sm login-menu-item" id="naverLoginBtn" onclick="loginWithNaver()" style="display:none;background:#03c75a;color:#fff;border:1px solid rgba(3,199,90,.35)">🟢 네이버 로그인</button></div></div></div>
+<div class="header-actions"><span class="admin-badge" id="regLoginBadge" style="display:none;background:var(--success);color:#fff;font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:999px">클럽</span><span class="admin-badge" id="opLoginBadge" style="display:none;background:#1565c0;color:#fff;font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:999px">진행자</span><span class="admin-badge" id="adminBadge">관리자</span><button class="btn-sm admin-only" id="adminSettingsBtn" onclick="openAdminSettings()">⚙️</button><button class="btn-sm" id="manualToggleBtn" onclick="openHelpCenter()" style="background:#fff;color:#0f1e3a;border:1.5px solid rgba(255,255,255,.42);font-weight:900">📘 가이드</button><div class="login-menu-wrap" id="loginMenuWrap"><button class="btn-sm login-menu-btn" id="loginMenuBtn" onclick="toggleLoginMenu(event)" style="background:#fff;color:#0f1e3a;border:1.5px solid rgba(255,255,255,.42);font-weight:900">🔐 로그인</button><div class="login-menu-panel login-menu-panel-clean" id="loginMenuPanel"><span id="regClubNameBadge" style="display:none;background:var(--success);color:#fff;font-size:.75rem;font-weight:900;padding:7px 10px;border-radius:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span><button class="btn-sm login-menu-item login-menu-main-item" id="roleLoginMenuBtn" onclick="toggleRoleLoginPanel(event)" style="background:linear-gradient(135deg,#0f1e3a,#1b2f5a);color:#fff;border:1px solid rgba(255,255,255,.14)">🔑 권한별 로그인 <span class="login-menu-arrow" id="roleLoginArrow">▾</span></button><div class="role-login-panel" id="roleLoginPanel"><button class="btn-sm login-menu-item" id="regToggleBtn" onclick="closeLoginMenu();toggleReg()" style="background:var(--success);color:#fff;border:none">🏆 경기이사 로그인</button><button class="btn-sm login-menu-item" id="opToggleBtn" onclick="closeLoginMenu();toggleOperator()" style="background:#1565c0;color:#fff;border:none">🎾 진행자 로그인</button><button class="btn-sm login-menu-item" id="adminToggleBtn" onclick="closeLoginMenu();toggleTournamentManagerLogin()" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">🧑‍💼 운영자 로그인</button><button class="btn-sm login-menu-item" id="developerToggleBtn" onclick="closeLoginMenu();toggleDeveloperLogin()" style="background:#0f1e3a;color:#fff;border:1px solid rgba(255,255,255,.12)">🛠️ 개발자 로그인</button></div><div class="login-menu-sep"></div><button class="btn-sm login-menu-item login-menu-main-item" id="adminSignupBtn" onclick="closeLoginMenu();toggleAdminSignup()" style="background:#eef4ff;color:#12306b;border:1px solid rgba(18,48,107,.12)">👤 회원가입 / 간편 로그인</button><button class="btn-sm login-menu-item" id="myProfileBtn" onclick="closeLoginMenu();openMyProfileModal()" style="display:none;background:#eef4ff;color:#12306b;border:1px solid rgba(18,48,107,.12)">👤 내 정보 설정</button><button class="btn-sm login-menu-item" id="googleLogoutBtn" onclick="closeLoginMenu();logoutGoogleUser()" style="display:none;background:#f8fafc;color:#475569;border:1px solid rgba(15,30,58,.12)">🚪 로그아웃</button><button class="btn-sm login-menu-item" id="googleLoginBtn" onclick="loginWithGoogle()" style="display:none;background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">🔵 구글 로그인</button><button class="btn-sm login-menu-item" id="naverLoginBtn" onclick="loginWithNaver()" style="display:none;background:#03c75a;color:#fff;border:1px solid rgba(3,199,90,.35)">🟢 네이버 로그인</button></div></div></div>
 </div>
 <nav class="nav-tabs">
 <div class="nav-tab active" data-page="home" onclick="showPage('home')">🏠 홈</div>
@@ -2434,7 +2435,7 @@ body {
 </div>
 </main>
 <div class="modal-overlay" id="mAdmin"><div class="modal-box"><div class="modal-header"><h3 id="adminLoginTitle">🧑‍💼 운영자 로그인</h3><button class="modal-close" onclick="cm('mAdmin')">✕</button></div><div class="modal-body"><div id="adminLoginDesc" style="padding:10px 12px;background:linear-gradient(135deg,#eef4ff,#fffdf5);border:1px solid var(--border);border-radius:10px;margin-bottom:12px;font-size:.78rem;color:var(--text2);line-height:1.6">승인된 <b>시합관리자</b> 계정으로 로그인합니다. 승인 전에는 대회 생성과 운영 기능을 사용할 수 없습니다.</div><div class="form-group"><label class="form-label" id="adminEmailLabel">이메일</label><input class="form-input" id="adminEmail" onkeydown="if(event.key==='Enter')ge('adminPw').focus()" placeholder="운영자 이메일" type="email"/></div><div class="form-group"><label class="form-label">비밀번호</label><input class="form-input" id="adminPw" onkeydown="if(event.key==='Enter')doLogin()" placeholder="Firebase Auth 비밀번호" type="password"/></div><div id="adminLoginHint" style="font-size:.74rem;color:var(--text3);line-height:1.5">회원가입 후 총괄 관리자 승인까지 끝나야 운영자 로그인이 활성화됩니다.</div></div><div class="modal-footer"><button class="btn btn-gray" onclick="cm('mAdmin')">취소</button><button class="btn btn-primary" id="adminLoginSubmitBtn" onclick="doLogin()">로그인</button></div></div></div>
-<div class="modal-overlay" id="mAdminSignup"><div class="modal-box"><div class="modal-header"><h3>📝 회원가입 / 간편 로그인</h3><button class="modal-close" onclick="cm('mAdminSignup')">✕</button></div><div class="modal-body"><div style="padding:10px 12px;background:linear-gradient(135deg,#eef4ff,#fffdf5);border:1px solid var(--border);border-radius:10px;margin-bottom:12px;font-size:.78rem;color:var(--text2);line-height:1.6">일반회원은 로그인 후 개인전 참가·본인 정보 관리가 가능합니다. 클럽 경기이사와 시합관리자는 가입 후 총괄 관리자 승인이 필요합니다.</div><div style="padding:12px 14px;border:1.5px solid #dbeafe;background:#f8fbff;border-radius:14px;margin-bottom:14px"><div style="font-weight:900;font-size:.9rem;color:#0f1e3a;margin-bottom:8px">간편 가입 / 로그인</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-outline" id="signupGoogleLoginBtn" onclick="loginWithGoogle()" style="flex:1;min-width:150px;background:#fff;color:#0f1e3a;border:1.5px solid #cbd5e1">🔵 Google로 계속하기</button><button class="btn btn-outline" id="signupKakaoLoginBtn" onclick="loginWithKakao()" style="flex:1;min-width:130px;background:#fee500;color:#191919;border:1.5px solid #fee500">🟡 Kakao로 계속하기</button><button class="btn btn-outline" id="signupNaverLoginBtn" onclick="loginWithNaver()" style="flex:1;min-width:130px;background:#03c75a;color:#fff;border:1.5px solid #03c75a">🟢 Naver로 계속하기</button></div><div id="signupGoogleStatus" style="font-size:.74rem;color:var(--text3);line-height:1.5;margin-top:8px">현재는 구글·카카오·네이버 로그인을 적용했습니다.</div></div><div style="height:1px;background:var(--border);margin:12px 0"></div><div style="font-weight:900;font-size:.88rem;color:var(--primary-dark);margin-bottom:8px">이메일 일반 회원가입 / 로그인</div><div class="form-group"><label class="form-label">가입 유형</label><select class="form-select" id="signupRole" onchange="updateSignupRoleHint()"><option value="member">일반회원</option><option value="club_director">클럽 경기이사 신청</option><option value="tournament_admin">시합관리자 신청</option></select></div><div class="form-group"><label class="form-label">이름 <span style="font-size:.72rem;color:var(--text3);font-weight:500">(선수 등록용 한글 이름)</span></label><input class="form-input" id="signupName" placeholder="예: 홍길동"/></div><div class="frow"><div class="form-group"><label class="form-label">전화번호</label><input class="form-input" id="signupPhone" inputmode="tel" placeholder="예: 010-1234-5678"/></div><div class="form-group"><label class="form-label">소속 클럽</label><input class="form-input" id="signupClub" placeholder="예: 모던"/></div></div><div class="form-group"><label class="form-label">구력</label><input class="form-input" id="signupCareer" placeholder="예: 24.07 / 3년"/></div><div class="form-group"><label class="form-label">이메일</label><input class="form-input" id="signupEmail" onkeydown="if(event.key==='Enter')ge('signupPw').focus()" placeholder="이메일" type="email"/></div><div class="form-group"><label class="form-label">비밀번호</label><input class="form-input" id="signupPw" onkeydown="if(event.key==='Enter')ge('signupPw2').focus()" placeholder="비밀번호 6자 이상" type="password"/></div><div class="form-group"><label class="form-label">비밀번호 확인 <span style="font-size:.72rem;color:var(--text3);font-weight:400">회원가입 때만 입력</span></label><input class="form-input" id="signupPw2" onkeydown="if(event.key==='Enter')doSignup()" placeholder="비밀번호 다시 입력" type="password"/></div><div id="signupHint" style="font-size:.74rem;color:var(--text3);line-height:1.5">일반회원은 가입 즉시 사용 가능합니다. 경기이사/시합관리자는 승인 후 권한이 활성화됩니다.</div></div><div class="modal-footer"><button class="btn btn-gray" onclick="cm('mAdminSignup')">취소</button><button class="btn btn-outline" onclick="doMemberEmailLogin()">이메일 로그인</button><button class="btn btn-primary" onclick="doSignup()">회원가입</button></div></div></div>
+<div class="modal-overlay" id="mAdminSignup"><div class="modal-box"><div class="modal-header"><h3>📝 회원가입 / 간편 로그인</h3><button class="modal-close" onclick="cm('mAdminSignup')">✕</button></div><div class="modal-body"><div style="padding:10px 12px;background:linear-gradient(135deg,#eef4ff,#fffdf5);border:1px solid var(--border);border-radius:10px;margin-bottom:12px;font-size:.78rem;color:var(--text2);line-height:1.6">일반회원은 로그인 후 개인전 참가·본인 정보 관리가 가능합니다. 클럽 경기이사와 시합관리자는 가입 후 총괄 관리자 승인이 필요합니다.</div><div style="padding:12px 14px;border:1.5px solid #dbeafe;background:#f8fbff;border-radius:14px;margin-bottom:14px"><div style="font-weight:900;font-size:.9rem;color:#0f1e3a;margin-bottom:8px">간편 가입 / 로그인</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-outline" id="signupGoogleLoginBtn" onclick="loginWithGoogle()" style="flex:1;min-width:150px;background:#fff;color:#0f1e3a;border:1.5px solid #cbd5e1">🔵 Google로 계속하기</button><button class="btn btn-outline" id="signupNaverLoginBtn" onclick="loginWithNaver()" style="flex:1;min-width:130px;background:#03c75a;color:#fff;border:1.5px solid #03c75a">🟢 Naver로 계속하기</button></div><div id="signupGoogleStatus" style="font-size:.74rem;color:var(--text3);line-height:1.5;margin-top:8px">현재는 구글·네이버 로그인을 적용했습니다.</div></div><div style="height:1px;background:var(--border);margin:12px 0"></div><div style="font-weight:900;font-size:.88rem;color:var(--primary-dark);margin-bottom:8px">이메일 일반 회원가입 / 로그인</div><div class="form-group"><label class="form-label">가입 유형</label><select class="form-select" id="signupRole" onchange="updateSignupRoleHint()"><option value="member">일반회원</option><option value="club_director">클럽 경기이사 신청</option><option value="tournament_admin">시합관리자 신청</option></select></div><div class="form-group"><label class="form-label">이름 <span style="font-size:.72rem;color:var(--text3);font-weight:500">(선수 등록용 한글 이름)</span></label><input class="form-input" id="signupName" placeholder="예: 홍길동"/></div><div class="frow"><div class="form-group"><label class="form-label">전화번호</label><input class="form-input" id="signupPhone" inputmode="tel" placeholder="예: 010-1234-5678"/></div><div class="form-group"><label class="form-label">소속 클럽</label><input class="form-input" id="signupClub" placeholder="예: 모던"/></div></div><div class="form-group"><label class="form-label">구력</label><input class="form-input" id="signupCareer" placeholder="예: 24.07 / 3년"/></div><div class="form-group"><label class="form-label">이메일</label><input class="form-input" id="signupEmail" onkeydown="if(event.key==='Enter')ge('signupPw').focus()" placeholder="이메일" type="email"/></div><div class="form-group"><label class="form-label">비밀번호</label><input class="form-input" id="signupPw" onkeydown="if(event.key==='Enter')ge('signupPw2').focus()" placeholder="비밀번호 6자 이상" type="password"/></div><div class="form-group"><label class="form-label">비밀번호 확인 <span style="font-size:.72rem;color:var(--text3);font-weight:400">회원가입 때만 입력</span></label><input class="form-input" id="signupPw2" onkeydown="if(event.key==='Enter')doSignup()" placeholder="비밀번호 다시 입력" type="password"/></div><div id="signupHint" style="font-size:.74rem;color:var(--text3);line-height:1.5">일반회원은 가입 즉시 사용 가능합니다. 경기이사/시합관리자는 승인 후 권한이 활성화됩니다.</div></div><div class="modal-footer"><button class="btn btn-gray" onclick="cm('mAdminSignup')">취소</button><button class="btn btn-outline" onclick="doMemberEmailLogin()">이메일 로그인</button><button class="btn btn-primary" onclick="doSignup()">회원가입</button></div></div></div>
 <div class="modal-overlay" id="mMyProfile"><div class="modal-box" style="max-width:540px"><div class="modal-header"><h3>👤 내 정보 설정</h3><button class="modal-close" onclick="cm('mMyProfile')">✕</button></div><div class="modal-body"><div style="padding:10px 12px;background:linear-gradient(135deg,#eef4ff,#fffdf5);border:1px solid var(--border);border-radius:10px;margin-bottom:12px;font-size:.78rem;color:var(--text2);line-height:1.6">소속 클럽, 구력, 전화번호는 개인전 참가 기록과 단체전 권한 확인에 사용됩니다.</div><div class="form-group"><label class="form-label">이름</label><input class="form-input" id="profileName" placeholder="예: 홍길동"/></div><div class="frow"><div class="form-group"><label class="form-label">전화번호</label><input class="form-input" id="profilePhone" inputmode="tel" placeholder="예: 010-1234-5678"/></div><div class="form-group"><label class="form-label">소속 클럽</label><input class="form-input" id="profileClub" placeholder="예: 모던"/></div></div><div class="form-group"><label class="form-label">구력</label><input class="form-input" id="profileCareer" placeholder="예: 24.07 / 3년"/></div><div class="form-group"><label class="form-label">회원 유형</label><select class="form-select" id="profileRole" disabled><option value="member">일반회원</option><option value="club_director">클럽 경기이사</option><option value="tournament_admin">시합관리자</option><option value="admin">개발자/총괄관리자</option></select></div><div id="profileStatus" style="font-size:.74rem;color:var(--text3);line-height:1.5"></div></div><div class="modal-footer"><button class="btn btn-gray" onclick="cm('mMyProfile')">닫기</button><button class="btn btn-primary" onclick="saveMyProfile()">💾 저장</button></div></div></div>
 <!-- 팀등록 로그인 모달 -->
 <div class="modal-overlay" id="mRegLogin"><div class="modal-box"><div class="modal-header"><h3>🏆 경기이사 로그인</h3><button class="modal-close" onclick="cm('mRegLogin')">✕</button></div>
@@ -3173,7 +3174,7 @@ body {
 <div class="form-group" style="border-top:1px solid var(--border);padding-top:14px;margin-bottom:16px">
 <div style="font-weight:700;font-size:.88rem;margin-bottom:6px;color:var(--primary-dark)">🟢 네이버 로그인 설정</div>
 <div style="font-size:.72rem;color:var(--text3);margin-bottom:10px;line-height:1.6">이 버전은 <b>Cloudflare Pages Functions</b> 방식입니다. GitHub 루트의 <b>/functions/naver/login.js</b>, <b>/functions/naver/callback.js</b>가 배포되면 자동으로 <b>/naver/login</b> 경로를 사용합니다. 별도 Worker 주소 저장은 필요 없습니다.</div>
-<button class="btn btn-outline" onclick="location.href='/naver/login?returnUrl='+encodeURIComponent(location.origin+location.pathname)" style="white-space:nowrap">🟢 네이버 로그인 테스트</button>
+<button class="btn btn-outline" onclick="loginWithNaver()" style="white-space:nowrap">🟢 네이버 로그인 테스트</button>
 </div>
 <!-- 팀등록 비밀번호 관리 -->
 <div class="form-group" style="border-top:1px solid var(--border);padding-top:14px;margin-bottom:16px">
@@ -4559,13 +4560,11 @@ async function ensureUserProfileDoc(user, extra={}){
 function refreshGoogleLoginUI(user=CURRENT_APP_USER){
   try{
     const loginBtn=ge('googleLoginBtn');
-    const kakaoBtn=ge('kakaoLoginBtn');
     const naverBtn=ge('naverLoginBtn');
     const logoutBtn=ge('googleLogoutBtn');
     const profileBtn=ge('myProfileBtn');
     // 로그인 메뉴 단순화: 소셜 로그인은 회원가입/일반 로그인 안에서만 노출
     if(loginBtn) loginBtn.style.display='none';
-    if(kakaoBtn) kakaoBtn.style.display='none';
     if(naverBtn) naverBtn.style.display='none';
     if(profileBtn) profileBtn.style.display=user?'':'none';
     if(logoutBtn){
@@ -4598,7 +4597,7 @@ function refreshSignupGoogleStatus(user=CURRENT_APP_USER){
       st.innerHTML=`✅ 현재 로그인: <b>${esc(user.displayName||user.email||'구글 계정')}</b><br>이 계정으로 개인전 참가 접수·수정·결과입력이 연결됩니다.`;
       st.style.color='#166534';
     }else{
-      st.textContent='현재는 구글·카카오·네이버 로그인을 적용했습니다.';
+      st.textContent='현재는 구글·네이버 로그인을 적용했습니다.';
       st.style.color='var(--text3)';
     }
   }catch(e){}
@@ -4631,7 +4630,7 @@ function refreshIndividualAuthGate(){
     if(!logged && !AD){
       if(form) form.style.display='none';
       prompt.style.display='block';
-      prompt.innerHTML=`<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap"><div style="flex:1;min-width:220px"><div style="font-weight:900;font-size:1rem;color:#0f1e3a;margin-bottom:6px">🔐 개인전 참가 접수는 회원가입/로그인이 먼저 필요합니다</div><div style="font-size:.82rem;color:#1e3a8a;line-height:1.65">소셜 계정으로 로그인하면 이 계정이 참가팀의 <b>ownerUid</b>로 저장됩니다.<br>이후 참가 수정·삭제와 경기 결과 입력 권한이 이 계정 기준으로 확인됩니다.</div></div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end"><button class="btn btn-primary" onclick="loginWithGoogle()" style="background:#2563eb;color:#fff">🔵 Google로 회원가입/로그인</button><button class="btn btn-primary" onclick="loginWithKakao()" style="background:#fee500;color:#191919">🟡 Kakao로 로그인</button><button class="btn btn-outline" onclick="toggleAdminSignup()">다른 가입 방식 보기</button></div></div>`;
+      prompt.innerHTML=`<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap"><div style="flex:1;min-width:220px"><div style="font-weight:900;font-size:1rem;color:#0f1e3a;margin-bottom:6px">🔐 개인전 참가 접수는 회원가입/로그인이 먼저 필요합니다</div><div style="font-size:.82rem;color:#1e3a8a;line-height:1.65">소셜 계정으로 로그인하면 이 계정이 참가팀의 <b>ownerUid</b>로 저장됩니다.<br>이후 참가 수정·삭제와 경기 결과 입력 권한이 이 계정 기준으로 확인됩니다.</div></div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end"><button class="btn btn-primary" onclick="loginWithGoogle()" style="background:#2563eb;color:#fff">🔵 Google로 회원가입/로그인</button><button class="btn btn-outline" onclick="toggleAdminSignup()">다른 가입 방식 보기</button></div></div>`;
     }else{
       prompt.style.display='none';
       if(form) form.style.display='block';
@@ -4648,9 +4647,32 @@ function getSocialLoginWorkerBase(){
 function setNaverLoginWorkerUrl(url){
   toast('이 버전은 Pages Functions 방식이라 Worker 주소 설정이 필요 없습니다 ✅','success');
 }
+function isStandaloneAppMode(){
+  try{
+    return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true || document.referrer.startsWith('android-app://');
+  }catch(e){ return false; }
+}
+function getSocialLoginReturnUrl(provider='naver'){
+  // 소셜 로그인 후 /naver/login 또는 /naver/callback 경로에 남지 않도록 항상 앱 루트로 복귀시킨다.
+  // PWA/TWA에서는 같은 origin의 루트로 돌아와야 앱 화면 유지 가능성이 가장 높다.
+  const u = new URL('/', location.origin);
+  u.searchParams.set('socialReturn', provider);
+  u.searchParams.set('standalone', isStandaloneAppMode() ? '1' : '0');
+  u.searchParams.set('t', String(Date.now()));
+  return u.toString();
+}
+function cleanupSocialReturnUrl(){
+  try{
+    const u = new URL(location.href);
+    if(u.searchParams.has('socialReturn') || u.searchParams.has('standalone')){
+      history.replaceState(null,'', location.origin + location.pathname);
+    }
+  }catch(e){}
+}
 async function loginWithNaver(){
   try{
-    const returnUrl = location.origin + location.pathname;
+    sessionStorage.setItem('NAVER_LOGIN_STARTED_IN_STANDALONE', isStandaloneAppMode() ? '1' : '0');
+    const returnUrl = getSocialLoginReturnUrl('naver');
     location.href = '/naver/login?returnUrl=' + encodeURIComponent(returnUrl);
   }catch(e){
     toast('네이버 로그인 시작 실패: '+(e?.message||e),'error');
@@ -4658,12 +4680,7 @@ async function loginWithNaver(){
 }
 
 async function loginWithKakao(){
-  try{
-    const returnUrl = location.origin + location.pathname;
-    location.href = '/kakao/login?returnUrl=' + encodeURIComponent(returnUrl);
-  }catch(e){
-    toast('카카오 로그인 시작 실패: '+(e?.message||e),'error');
-  }
+  toast('카카오 로그인은 제거되었습니다. 구글/네이버 또는 이메일 로그인을 사용하세요.','info');
 }
 async function handleSocialCustomTokenRedirect(){
   try{
@@ -4919,6 +4936,7 @@ getRedirectResult(auth).then(async (result)=>{
   }
 }).catch(e=>console.warn('google redirect result failed', e));
 handleSocialCustomTokenRedirect();
+cleanupSocialReturnUrl();
 const FIRESTORE_WRITE_TRACE = /[?&]debugWrites=1(?:&|$)/.test(location.search);
 if(FIRESTORE_WRITE_TRACE){
   const wrapTrace=(name, fn)=>async (...args)=>{
