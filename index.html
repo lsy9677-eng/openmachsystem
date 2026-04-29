@@ -99,7 +99,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:linear-gradient(180deg,#f4
 .btn-sm.active{background:var(--accent);border-color:var(--accent);color:var(--text);}
 .login-menu-wrap{position:relative;flex:0 0 auto;}
 .login-menu-btn{min-width:102px;}
-.login-menu-panel{position:absolute;right:0;top:calc(100% + 8px);display:none;flex-direction:column;gap:8px;min-width:190px;padding:10px;background:rgba(9,18,37,.98);border:1px solid rgba(255,255,255,.12);border-radius:14px;box-shadow:0 14px 32px rgba(0,0,0,.28);z-index:1400}
+.login-menu-panel{position:absolute;right:0;top:calc(100% + 8px);display:none;flex-direction:column;gap:8px;min-width:190px;padding:10px;background:rgba(9,18,37,.98);border:1px solid rgba(255,255,255,.12);border-radius:14px;box-shadow:0 14px 32px rgba(0,0,0,.28);z-index:1400;max-height:min(78vh,520px);overflow-y:auto;overscroll-behavior:contain;}
 .login-menu-wrap.open .login-menu-panel{display:flex}
 .login-menu-panel .login-menu-item{width:100%;justify-content:flex-start;padding:8px 12px;font-size:.76rem;min-height:36px;border-radius:10px}
 .login-menu-panel .login-menu-item#googleLoginBtn,
@@ -115,7 +115,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:linear-gradient(180deg,#f4
 .login-menu-panel #regClubNameBadge{display:none;max-width:100%;text-align:left}
 @media(max-width:680px){
   .login-menu-btn{min-width:auto}
-  .login-menu-panel{right:0;left:auto;min-width:176px;padding:9px;border-radius:12px}
+  .login-menu-panel{right:0;left:auto;min-width:176px;padding:9px;border-radius:12px;max-height:min(72vh,480px);overflow-y:auto;}
   .login-menu-panel .login-menu-item{font-size:.72rem;min-height:34px;padding:7px 10px}
 }
 
@@ -4450,14 +4450,11 @@ function isPublicTeamRegistrationEnabled(){ return !!G?.meta?.allowPublicTeamReg
 function isPublicResultEntryEnabled(){ return !!G?.meta?.allowPublicResultEntry; }
 function shouldShowTeamDirectorLogin(){
   if(!isTeamDirectorLoginEnabled()) return false;
-  const p=getCurrentPageName?.()||'';
-  const pageTid=getSelectedTournamentIdForPage?.(p)||'';
-  if(pageTid){
-    return getTournamentTypeById(pageTid)!=='individual_pair';
-  }
-  const active=(G.tournaments||[]).filter(t=>['open','ongoing'].includes(String(t.status||'')));
-  if(active.length) return active.some(t=>!isIndividualTournament(t));
-  return (G.tournaments||[]).some(t=>!isIndividualTournament(t));
+  // 로그인 버튼은 특정 페이지/개인전 선택 상태와 무관하게 항상 접근 가능해야 한다.
+  // 실제 사용 가능 여부는 로그인 모달과 권한 체크에서 다시 판단한다.
+  const tournaments=G.tournaments||[];
+  if(!tournaments.length) return true;
+  return tournaments.some(t=>!isIndividualTournament(t));
 }
 function refreshTeamDirectorLoginVisibility(){
   const visible=shouldShowTeamDirectorLogin();
@@ -4570,6 +4567,10 @@ async function ensureUserProfileDoc(user, extra={}){
     phone:keepText(extra.phone, prev.phone||''),
     club:keepText(extra.club, prev.club||''),
     career:keepText(extra.career, prev.career||''),
+    clubVerified: extra.clubVerified !== undefined ? !!extra.clubVerified : !!prev.clubVerified,
+    verifiedClub: keepText(extra.verifiedClub, prev.verifiedClub||''),
+    verifiedAt: keepText(extra.verifiedAt, prev.verifiedAt||''),
+    verifiedByPin: extra.verifiedByPin !== undefined ? !!extra.verifiedByPin : !!prev.verifiedByPin,
     clubRole:keepText(extra.clubRole, prev.clubRole||''),
     socialName:keepText(extra.socialName, prev.socialName||''),
     socialPhone:keepText(extra.socialPhone, prev.socialPhone||''),
@@ -4603,12 +4604,14 @@ function refreshGoogleLoginUI(user=CURRENT_APP_USER){
     const profileBtn=ge('myProfileBtn');
     const menuBtn=ge('loginMenuBtn');
     const memberName=getLoggedInUserLabel(user);
+    const hasAnyLogin = !!(user || REG || OP || AD || TM);
     // 로그인 메뉴 단순화: 소셜 로그인은 회원가입/일반 로그인 안에서만 노출
     if(loginBtn) loginBtn.style.display='none';
     if(naverBtn) naverBtn.style.display='none';
     if(profileBtn){
-      profileBtn.style.display=user?'':'none';
-      if(user) profileBtn.textContent=`👤 내 정보 설정 (${memberName})`;
+      profileBtn.style.display=hasAnyLogin?'':'none';
+      profileBtn.textContent=user ? `👤 내 정보 설정 (${memberName})` : '👤 내 정보 설정';
+      profileBtn.title=user ? '개인 계정 프로필을 수정합니다' : '개인 정보 저장은 네이버/구글/이메일 로그인 연결이 필요합니다';
     }
     if(menuBtn){
       menuBtn.textContent=user?`👤 ${memberName}`:'🔐 로그인';
@@ -4628,6 +4631,7 @@ function refreshGoogleLoginUI(user=CURRENT_APP_USER){
       badge.classList.remove('show');
     }
     refreshSignupGoogleStatus(user);
+    try{ updateMyClubUI(); }catch(e){}
     refreshIndividualAuthGate();
   }catch(e){}
 }
@@ -8015,6 +8019,7 @@ function refreshRoleUI(){
   const adminToggle = ge('adminToggleBtn');
 
   refreshTeamDirectorLoginVisibility();
+  try{ refreshGoogleLoginUI(CURRENT_APP_USER); }catch(e){}
   if(REG && !AD && !TM){
     // 클럽 로그인 중: 진행자·관리자 버튼 숨기고 클럽명 표시
     if(opToggle) opToggle.style.display = 'none';
@@ -8405,25 +8410,186 @@ async function getMyProfileDoc(){
   const snap=await getDoc(refDoc).catch(()=>null);
   return snap && snap.exists() ? snap.data() : await ensureUserProfileDoc(user);
 }
+function ensureProfileRoleOptions(){
+  const sel=ge('profileRole');
+  if(!sel) return;
+  const opts={
+    member:'일반회원',
+    club_director:'클럽 경기이사',
+    operator:'경기진행자',
+    tournament_admin:'시합관리자',
+    admin:'개발자/총괄관리자'
+  };
+  Object.entries(opts).forEach(([value,label])=>{
+    if(![...sel.options].some(o=>o.value===value)){
+      const opt=document.createElement('option');
+      opt.value=value;
+      opt.textContent=label;
+      sel.appendChild(opt);
+    }
+  });
+}
+
+function getProfileBaseClub(profile={}){
+  return baseClub(profile?.club||'') || String(profile?.club||'').trim();
+}
+function getVerifiedUserClubBase(profile=CURRENT_APP_PROFILE||{}){
+  const club=getProfileBaseClub(profile);
+  const verified=baseClub(profile?.verifiedClub||'') || String(profile?.verifiedClub||'').trim();
+  return (club && verified && club===verified && profile?.clubVerified===true) ? club : '';
+}
+function isCurrentUserClubVerifiedForClub(club){
+  const profile=CURRENT_APP_PROFILE||{};
+  const wanted=baseClub(club||'') || String(club||'').trim();
+  return !!(wanted && getVerifiedUserClubBase(profile)===wanted);
+}
+function getClubPasswordForVerification(club){
+  const c=String(club||'').trim();
+  if(!c) return '';
+  const stored=(G.meta.clubPasswords||{})[c] || '';
+  if(stored) return String(stored);
+  const temp=getClubTempPassword(c)||'';
+  return String(temp || G.meta.regPw || '');
+}
+function getCurrentActorClub(){
+  if(REG && REG_CLUB) return REG_CLUB;
+  const verified=getVerifiedUserClubBase(CURRENT_APP_PROFILE||{});
+  return verified || String(CURRENT_APP_PROFILE?.club||'').trim();
+}
+function getCurrentActorName(){
+  if(AD) return '관리자';
+  if(TM) return '운영자';
+  if(OP) return '경기진행자';
+  if(REG && REG_CLUB) return `${REG_CLUB} 경기이사`;
+  return String(CURRENT_APP_PROFILE?.name||CURRENT_APP_PROFILE?.displayName||auth?.currentUser?.displayName||auth?.currentUser?.email||'일반회원').trim();
+}
+function buildActorAudit(action='save'){
+  const user=auth?.currentUser && !auth.currentUser.isAnonymous ? auth.currentUser : null;
+  const role=AD?'admin':TM?'tournament_admin':OP?'operator':REG?'club_director':'club_member';
+  return {
+    action,
+    uid:user?.uid||'',
+    email:user?.email||'',
+    name:getCurrentActorName(),
+    club:getCurrentActorClub(),
+    role,
+    at:new Date().toISOString()
+  };
+}
+function attachMatchAudit(matchObj, action='save'){
+  if(!matchObj) return matchObj;
+  const audit=buildActorAudit(action);
+  matchObj.updatedByUid=audit.uid;
+  matchObj.updatedByName=audit.name;
+  matchObj.updatedByClub=audit.club;
+  matchObj.updatedByRole=audit.role;
+  matchObj.lastAction=action;
+  matchObj.lastActionAt=audit.at;
+  if(!Array.isArray(matchObj.auditLog)) matchObj.auditLog=[];
+  matchObj.auditLog.push(audit);
+  if(matchObj.auditLog.length>20) matchObj.auditLog=matchObj.auditLog.slice(-20);
+  return matchObj;
+}
+function isCurrentUserInMatchClub(key,m){
+  const club=getProfileBaseClub(CURRENT_APP_PROFILE||{});
+  if(!club || !m) return false;
+  const {c1,c2}=getMatchBaseClubs(key,m);
+  return club===c1 || club===c2;
+}
+function getCurrentUserMatchSide(key,m){
+  const club=getVerifiedUserClubBase(CURRENT_APP_PROFILE||{});
+  if(!club || !m) return 0;
+  const {c1,c2}=getMatchBaseClubs(key,m);
+  if(c1===club) return 1;
+  if(c2===club) return 2;
+  return 0;
+}
+async function verifyMyClubPinFromProfile(){
+  const user=auth.currentUser;
+  if(!user || user.isAnonymous){ toast('먼저 네이버/구글/이메일로 로그인해 주세요','info'); return; }
+  const profile=await getMyProfileDoc();
+  const club=String(ge('profileClub')?.value||profile?.club||'').trim();
+  const pin=String(ge('profileClubPin')?.value||'').trim();
+  if(!club){ toast('소속 클럽을 먼저 입력해 주세요','error'); return; }
+  if(!pin){ toast('클럽 PIN을 입력해 주세요','error'); return; }
+  const expected=getClubPasswordForVerification(club);
+  if(!expected){ toast('아직 이 클럽의 PIN이 설정되지 않았습니다. 경기이사에게 문의해 주세요','error'); return; }
+  if(pin!==expected){ toast('클럽 PIN이 맞지 않습니다','error'); ge('profileClubPin')?.select(); return; }
+  const payload={club, clubVerified:true, verifiedClub:club, verifiedAt:new Date().toISOString(), verifiedByPin:true, updatedAt:new Date().toISOString()};
+  sl(true);
+  try{
+    await setDoc(doc(db,'users',user.uid), payload, {merge:true});
+    CURRENT_APP_PROFILE={...(CURRENT_APP_PROFILE||{}), ...(profile||{}), ...payload};
+    sl(false);
+    toast(`${club} 클럽 인증 완료 ✅ 오더 제출과 결과 저장이 가능합니다`,'success');
+    try{ refreshGoogleLoginUI(user); }catch(e){}
+    try{ renderBracket(); renderRL(); }catch(e){}
+    openMyProfileModal();
+  }catch(e){ sl(false); toast('클럽 인증 저장 실패: '+(e?.message||e),'error'); }
+}
+async function ensureMemberClubVerifiedForMatch(key,m,actionLabel='저장'){
+  if(AD || TM || OP || (REG&&REG_CLUB)) return true;
+  const user=auth.currentUser;
+  if(!user || user.isAnonymous) return false;
+  let profile=CURRENT_APP_PROFILE || await getMyProfileDoc();
+  CURRENT_APP_PROFILE=profile;
+  if(!isCurrentUserInMatchClub(key,m)) return false;
+  const club=String(profile?.club||'').trim();
+  if(isCurrentUserClubVerifiedForClub(club)) return true;
+  const pin=window.prompt(`${club} 클럽 PIN을 입력하면 ${actionLabel}할 수 있습니다.\n한 번 인증하면 이 계정에 저장됩니다.`, '');
+  if(pin===null) return false;
+  const expected=getClubPasswordForVerification(club);
+  if(!expected || String(pin).trim()!==String(expected)){
+    toast('클럽 PIN이 맞지 않습니다','error');
+    return false;
+  }
+  const payload={clubVerified:true, verifiedClub:club, verifiedAt:new Date().toISOString(), verifiedByPin:true, updatedAt:new Date().toISOString()};
+  await setDoc(doc(db,'users',user.uid), payload, {merge:true});
+  CURRENT_APP_PROFILE={...(CURRENT_APP_PROFILE||{}), ...payload};
+  toast(`${club} 클럽 인증 완료 ✅`,'success');
+  return true;
+}
+window.verifyMyClubPinFromProfile=verifyMyClubPinFromProfile;
+
+function getUnifiedProfileRole(profile={}){
+  if(AD) return 'admin';
+  if(TM) return 'tournament_admin';
+  if(OP) return 'operator';
+  if(REG) return 'club_director';
+  return String(profile?.role||'member');
+}
+function getUnifiedProfileStatus(profile={}){
+  const role=getUnifiedProfileRole(profile);
+  if(role==='admin') return '개발자/총괄관리자: 전체 관리 권한이 활성화되어 있습니다.';
+  if(role==='tournament_admin') return '시합관리자: 대회 생성과 운영 권한이 활성화되어 있습니다.';
+  if(role==='operator') return '경기진행자: 대진표 운영과 결과 입력 권한이 활성화되어 있습니다. 개인 정보 저장은 네이버/구글/이메일 계정에 연결됩니다.';
+  if(role==='club_director') return `${REG_CLUB?REG_CLUB+' ':''}클럽 경기이사: 팀 등록과 오더 권한이 활성화되어 있습니다. 개인 정보 저장은 네이버/구글/이메일 계정에 연결됩니다.`;
+  const club=String(profile?.club||'').trim();
+  if(club && profile?.clubVerified===true && (baseClub(profile?.verifiedClub||'')===baseClub(club))) return `일반회원: ${club} 클럽 인증 완료 — 오더 제출과 결과 저장이 가능합니다.`;
+  if(club) return `일반회원: ${club} 클럽 경기 보기 가능 — 클럽 PIN 인증 후 오더 제출과 결과 저장이 가능합니다.<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input class="form-input" id="profileClubPin" type="password" inputmode="numeric" placeholder="클럽 PIN 입력" style="max-width:180px;min-height:36px;padding:7px 10px;font-size:.82rem"><button class="btn btn-primary" type="button" onclick="verifyMyClubPinFromProfile()" style="min-height:36px;padding:7px 12px;font-size:.82rem">클럽 PIN 인증</button></div>`;
+  return '일반회원: 개인전 참가와 본인 정보 관리가 가능합니다. 소속 클럽을 저장하면 내 클럽 경기를 자동으로 볼 수 있습니다.';
+}
 async function openMyProfileModal(){
   const user=auth.currentUser;
-  if(!user || user.isAnonymous){ toast('먼저 로그인해 주세요','error'); toggleAdminSignup(); return; }
+  if(!user || user.isAnonymous){
+    const roleMsg=(REG||OP)?'권한 로그인은 되어 있지만, 내 정보 저장은 개인 계정 연결이 필요합니다. 네이버/구글/이메일로 한 번 로그인해 주세요.':'먼저 로그인해 주세요';
+    toast(roleMsg,'info');
+    toggleAdminSignup();
+    return;
+  }
   sl(true);
   try{
     const profile=await getMyProfileDoc() || {};
+    ensureProfileRoleOptions();
     if(ge('profileName')) ge('profileName').value=profile.name||profile.displayName||user.displayName||'';
     if(ge('profilePhone')) ge('profilePhone').value=formatPhoneLoose(profile.phone||'');
     try{ syncProfilePhoneToPersonalMatch(profile, {render:false}); }catch(e){}
     if(ge('profileClub')) ge('profileClub').value=profile.club||'';
     if(ge('profileCareer')) ge('profileCareer').value=profile.career||'';
-    if(ge('profileRole')) ge('profileRole').value=profile.role||'member';
+    if(ge('profileRole')) ge('profileRole').value=getUnifiedProfileRole(profile);
     const status=ge('profileStatus');
     if(status){
-      const role=profile.role||'member';
-      const approved=profile.approved===true;
-      status.innerHTML = role==='member'
-        ? '일반회원: 개인전 참가와 본인 정보 관리가 가능합니다.'
-        : `${role==='club_director'?'클럽 경기이사':'시합관리자'} 신청 상태: <b style="color:${approved?'#166534':'#b45309'}">${approved?'승인됨':'승인 대기'}</b>`;
+      status.innerHTML = getUnifiedProfileStatus(profile);
     }
     sl(false);
     om('mMyProfile');
@@ -8440,9 +8606,25 @@ async function saveMyProfile(){
   if(phone && phone.replace(/[^0-9]/g,'').length<9){ toast('전화번호를 확인해 주세요','error'); return; }
   sl(true);
   try{
-    const profilePayload={name, displayName:name||user.displayName||'', phone, club, career, updatedAt:new Date().toISOString()};
+    const prevProfile=await getMyProfileDoc().catch(()=>({})) || {};
+    const prevClub=String(prevProfile.club||'').trim();
+    const clubChanged=baseClub(prevClub)!==baseClub(club||'');
+    const profilePayload={
+      name,
+      displayName:name||prevProfile.displayName||user.displayName||'',
+      phone,
+      club,
+      career,
+      updatedAt:new Date().toISOString()
+    };
+    if(clubChanged){
+      profilePayload.clubVerified=false;
+      profilePayload.verifiedClub='';
+      profilePayload.verifiedAt='';
+      profilePayload.verifiedByPin=false;
+    }
     await setDoc(doc(db,'users',user.uid), profilePayload, {merge:true});
-    CURRENT_APP_PROFILE={...(CURRENT_APP_PROFILE||{}), ...profilePayload};
+    CURRENT_APP_PROFILE={...(CURRENT_APP_PROFILE||{}), ...prevProfile, ...profilePayload};
     refreshGoogleLoginUI(user);
     try{ syncProfilePhoneToPersonalMatch(profilePayload, {render:true, force:true}); }catch(e){}
     sl(false);
@@ -12368,25 +12550,26 @@ function renderRegisterDivisionOverview(){
     return (order[a]||99)-(order[b]||99);
   });
   // 필터 안내 배너
-  const _filterBanner = (MY_CLUB_FILTER && REG_CLUB)
+  const _filterBanner = (MY_CLUB_FILTER && getMyClubContextClub())
     ? `<div style="padding:8px 12px;background:#dcfce7;border:1.5px solid #16a34a;border-radius:10px;font-size:.8rem;color:#166534;font-weight:600;margin-bottom:10px">
-        🏆 ${REG_CLUB} 팀만 표시 중 (같은 클럽 다른 팀은 숨김) &nbsp;<button onclick="toggleMyClubFilter('register')" style="font-size:.74rem;padding:2px 8px;border:1px solid #16a34a;border-radius:999px;background:white;color:#166534;cursor:pointer">전체 보기</button>
+        🏆 ${getMyClubContextClub()} 팀만 표시 중 (같은 클럽 다른 팀은 숨김) &nbsp;<button onclick="toggleMyClubFilter('register')" style="font-size:.74rem;padding:2px 8px;border:1px solid #16a34a;border-radius:999px;background:white;color:#166534;cursor:pointer">전체 보기</button>
       </div>` : '';
   box.innerHTML=_filterBanner+divisions.map(div=>{
     const key=tid+'_'+div;
     const allTeams=G.teams[key]||[];
     // 내 클럽 필터 ON 시 내 클럽 팀만 표시
-    const bc = REG_CLUB ? baseClub(REG_CLUB) : '';
+    const _ctxClub=getMyClubContextClub();
+    const bc = _ctxClub ? baseClub(_ctxClub) : '';
     const teams = (MY_CLUB_FILTER && bc)
       ? allTeams
           .map((tm,origIdx)=>({...tm,_origIdx:origIdx}))
-          .filter(tm=>baseClub(tm.club||'')===bc || tm.club===REG_CLUB)
+          .filter(tm=>baseClub(tm.club||'')===bc || tm.club===_ctxClub)
       : allTeams.map((tm,origIdx)=>({...tm,_origIdx:origIdx}));
     const totalPlayers=teams.reduce((s,tm)=>s+((tm.players||[]).length),0);
     const isSel=selected===div;
     const canRegister=isIndividualTournament(t) ? isOpen : ((AD||REG||isPublicTeamRegistrationEnabled()||!isTeamDirectorLoginEnabled()) && (AD||isOpen) && (AD||!isRegDeadlinePassed()));
     // 내 클럽 필터 ON 시 내 클럽이 있는 부서만 강조
-    const hasMyTeam = bc && allTeams.some(tm=>baseClub(tm.club||'')===bc||tm.club===REG_CLUB);
+    const hasMyTeam = bc && allTeams.some(tm=>baseClub(tm.club||'')===bc||tm.club===_ctxClub);
     const borderColor = MY_CLUB_FILTER && hasMyTeam ? '#16a34a' : isSel ? '#d4a017' : '#dbe4f0';
     return `<div class="card" style="margin-bottom:14px;border-top:3px solid ${borderColor}">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px">
@@ -13215,8 +13398,9 @@ function renderBracket(){
   }
   const _personalBanner = renderPersonalMatchBanner(tid, targetDivs);
 
-  if(MY_CLUB_FILTER&&REG_CLUB){
-    const _mbc=baseClub(REG_CLUB);
+  if(MY_CLUB_FILTER&&getMyClubContextClub()){
+    const _ctxClub=getMyClubContextClub();
+    const _mbc=baseClub(_ctxClub);
     const _atid=ge('brTS').value;
     const _at=G.tournaments.find(t=>t.id===_atid);
     let _myMatchCards='';
@@ -20491,8 +20675,11 @@ async function saveM3(){
       return;
     }
   }else if(!canStandardEdit){
-    toast('해당 경기 참가 클럽의 경기이사·경기진행자·관리자만 저장할 수 있습니다','error');
-    return;
+    const ok=await ensureMemberClubVerifiedForMatch(key,m,'결과 저장');
+    if(!ok){
+      toast('해당 경기 참가 클럽의 경기이사·인증회원·경기진행자·관리자만 저장할 수 있습니다','error');
+      return;
+    }
   }
   const {t1,t2}=getMatchTeamObjects(key,m); if(!t1 && !t2) return;
   const [tid,div]=key.split('_');
@@ -20564,6 +20751,7 @@ async function saveM3(){
     if(!pairChanged){toast('변경된 페어가 없습니다','info');return;}
     m.rubbers=newRb;
     m.winner=null;
+    attachMatchAudit(m, 'pair_save');
     sl(true);
     try{
       await persistSingleMatchDoc(key, m);
@@ -20610,6 +20798,7 @@ async function saveM3(){
   m.rubbers=newRb;
   if(G.meta.onlineOrderEnabled && orderState.bothSubmitted) syncRevealedOrderIntoMatchRubbers(key,m);
   m.winner=hasFinalWinner ? (sc1>sc2?m.t1:m.t2) : null;
+  attachMatchAudit(m, hasFinalWinner?'result_save':'score_save');
   if(hasFinalWinner){
     if(!m.completedAt) m.completedAt=new Date().toISOString();
     if(!m.resultSavedAt) m.resultSavedAt=m.completedAt;
@@ -21106,22 +21295,32 @@ function persistMyClubFilterState(v){
 function clearMyClubFilterState(){ return persistMyClubFilterState(false); }
 loadMyClubFilterState();
 
+function getMyClubContextClub(){
+  if(REG && REG_CLUB) return REG_CLUB;
+  const user=auth?.currentUser;
+  if(user && !user.isAnonymous){
+    return String(CURRENT_APP_PROFILE?.club||'').trim();
+  }
+  return '';
+}
+
 // 로그인/로그아웃 시 내 클럽 UI 갱신
 function updateMyClubUI(){
-  const club = REG_CLUB;
+  const club = getMyClubContextClub();
+  const hasClubContext = !AD && !!club;
   const isReg = REG && !AD && club;
 
   // 각 탭 버튼 표시/숨김
   const regBar = ge('myClubRegBar');
   const bracketBar = ge('myClubBracketBar');
-  if(regBar) regBar.style.display = isReg ? 'block' : 'none';
-  if(bracketBar) bracketBar.style.display = isReg ? 'block' : 'none';
+  if(regBar) regBar.style.display = hasClubContext ? 'block' : 'none';
+  if(bracketBar) bracketBar.style.display = hasClubContext ? 'block' : 'none';
 
   // 홈 카드 표시/숨김
   const homeCard = ge('myClubHomeCard');
-  if(homeCard) homeCard.style.display = isReg ? 'block' : 'none';
+  if(homeCard) homeCard.style.display = hasClubContext ? 'block' : 'none';
 
-  if(isReg){
+  if(hasClubContext){
     const titleEl = ge('myClubCardTitle');
     if(titleEl) titleEl.textContent = `🏆 ${club} 현황`;
     updateFilterBtnUI('register', MY_CLUB_FILTER);
@@ -21148,7 +21347,7 @@ function updateMyClubUI(){
 
 // 홈 내 클럽 카드 내용 갱신
 function updateMyClubHomeCard(){
-  const club = REG_CLUB;
+  const club = getMyClubContextClub();
   const body = ge('myClubHomeBody');
   if(!body || !club) return;
 
@@ -21419,12 +21618,14 @@ function toggleMyClubFilter(tab, forceOn){
 
 function canEditMatchByDirector(key,m){
   if(AD || OP || isPublicResultEntryEnabled()) return true;
-  if(!REG || !REG_CLUB || !m) return false;
+  if(!m) return false;
   const teams=G.teams[key]||[];
   const t1=teams[m.t1]??teams.find(t=>t.id===m.t1||t.name===m.t1);
   const t2=teams[m.t2]??teams.find(t=>t.id===m.t2||t.name===m.t2);
-  const bc=baseClub(REG_CLUB||'');
-  return !!(bc && ((t1 && baseClub(t1.club||'')===bc) || (t2 && baseClub(t2.club||'')===bc)));
+  const regBc=baseClub(REG_CLUB||'');
+  if(REG && regBc && ((t1 && baseClub(t1.club||'')===regBc) || (t2 && baseClub(t2.club||'')===regBc))) return true;
+  const memberBc=getVerifiedUserClubBase(CURRENT_APP_PROFILE||{});
+  return !!(memberBc && ((t1 && baseClub(t1.club||'')===memberBc) || (t2 && baseClub(t2.club||'')===memberBc)));
 }
 
 
@@ -21442,8 +21643,9 @@ function getMatchBaseClubs(key,m){
 
 function getDirectorMatchSide(key,m){
   if(AD) return 0;
-  if(!(REG&&REG_CLUB&&m)) return 0;
-  const myBase=baseClub(REG_CLUB)||REG_CLUB;
+  if(!m) return 0;
+  const myBase=(REG&&REG_CLUB) ? (baseClub(REG_CLUB)||REG_CLUB) : getVerifiedUserClubBase(CURRENT_APP_PROFILE||{});
+  if(!myBase) return 0;
   const {c1,c2}=getMatchBaseClubs(key,m);
   if(c1===myBase) return 1;
   if(c2===myBase) return 2;
@@ -21657,8 +21859,11 @@ async function submitSavedOrderFromCard(tid,div,mid){
   const m=list.find(x=>x.id===mid);
   if(!m){ toast('경기 정보를 찾을 수 없습니다','error'); return; }
   if(!G.meta.onlineOrderEnabled){ toast('온라인 오더 제출 기능이 꺼져 있습니다','info'); return; }
-  if(!(REG && REG_CLUB) && !AD && !OP){ toast('클럽 로그인 후 사용해 주세요','info'); return; }
-  if(!(AD || OP || canEditMatchByDirector(key,m))){ toast('해당 경기 참가 클럽만 제출할 수 있습니다','error'); return; }
+  if(!(REG && REG_CLUB) && !AD && !OP && !isCurrentUserInMatchClub(key,m)){ toast('클럽 로그인 또는 소속 클럽 회원 로그인 후 사용해 주세요','info'); return; }
+  if(!(AD || OP || canEditMatchByDirector(key,m))){
+    const ok=await ensureMemberClubVerifiedForMatch(key,m,'오더 제출');
+    if(!ok){ toast('해당 경기 참가 클럽만 제출할 수 있습니다','error'); return; }
+  }
   const info=getMySavedOrderDraftInfo(key,m,REG_CLUB||'');
   if(!info.hasDraft){ toast('먼저 오더쓰기에서 임시저장해 주세요','info'); return; }
   if(info.submitted){ toast('이미 제출완료 상태입니다','info'); return; }
@@ -21675,10 +21880,11 @@ async function submitSavedOrderFromCard(tid,div,mid){
   }
   if(!m.orderSubmissions||typeof m.orderSubmissions!=='object') m.orderSubmissions={};
   const nowIso=new Date().toISOString();
-  m.orderSubmissions[payload.base]={ club:payload.club||payload.base, side:payload.side, submittedAt:nowIso, rubbers:payload.rubbers };
+  { const audit=buildActorAudit('order_submit_saved'); m.orderSubmissions[payload.base]={ club:payload.club||payload.base, side:payload.side, submittedAt:nowIso, submittedByUid:audit.uid, submittedByName:audit.name, submittedByClub:audit.club, submittedByRole:audit.role, rubbers:payload.rubbers }; }
   m.orderSubmitted=true;
   m.orderSubmittedAt=nowIso;
-  m.orderSubmittedBy=REG_CLUB||'경기이사';
+  m.orderSubmittedBy=getCurrentActorClub()||REG_CLUB||'클럽 인증회원';
+  attachMatchAudit(m, 'order_submit_saved');
   syncRevealedOrderIntoMatchRubbers(key,m);
   sl(true);
   try{
@@ -21851,7 +22057,10 @@ async function submitOnlineOrder(sideOnly=null){
   const list=G.matches[key]||[]; const idx=list.findIndex(x=>x.id===mid); if(idx<0) return;
   const m=list[idx];
   if(!G.meta.onlineOrderEnabled){ toast('온라인 오더 제출 기능이 비활성화되어 있습니다','info'); return; }
-  if(!(AD || canEditMatchByDirector(key,m))){ toast('해당 경기 참가 클럽의 경기이사·경기진행자·관리자만 제출할 수 있습니다','error'); return; }
+  if(!(AD || canEditMatchByDirector(key,m))){
+    const ok=await ensureMemberClubVerifiedForMatch(key,m,'오더 제출');
+    if(!ok){ toast('해당 경기 참가 클럽의 경기이사·인증회원·경기진행자·관리자만 제출할 수 있습니다','error'); return; }
+  }
   const st=getOnlineOrderState(key,m);
   if(st.bothSubmitted && !AD){ toast('양쪽 오더가 이미 공개되었습니다. 오더 수정은 관리자 초기화 후 가능합니다','info'); return; }
   if(!m.orderSubmissions||typeof m.orderSubmissions!=='object') m.orderSubmissions={};
@@ -21886,7 +22095,7 @@ async function submitOnlineOrder(sideOnly=null){
     }
   }else{
     const payload=collectMyOnlineOrderFromModal(key,mid); if(!payload) return;
-    payloads.push({side:payload.mySide,base:payload.myBase,rubbers:payload.rubbers,club:REG_CLUB||payload.myBase});
+    payloads.push({side:payload.mySide,base:payload.myBase,rubbers:payload.rubbers,club:getCurrentActorClub()||payload.myBase});
   }
 
   for(const payload of payloads){
@@ -21903,17 +22112,23 @@ async function submitOnlineOrder(sideOnly=null){
 
   const nowIso=new Date().toISOString();
   payloads.forEach(payload=>{
+    const audit=buildActorAudit('order_submit');
     m.orderSubmissions[payload.base]={
       club:payload.club||payload.base,
       side:payload.side,
       submittedAt:nowIso,
+      submittedByUid:audit.uid,
+      submittedByName:audit.name,
+      submittedByClub:audit.club,
+      submittedByRole:audit.role,
       rubbers:payload.rubbers
     };
   });
   // legacy fields 유지
   m.orderSubmitted=true;
   m.orderSubmittedAt=nowIso;
-  m.orderSubmittedBy=AD?'관리자':(OP?'경기진행자':(REG_CLUB||'경기이사'));
+  m.orderSubmittedBy=AD?'관리자':(OP?'경기진행자':(getCurrentActorClub()||'클럽 인증회원'));
+  attachMatchAudit(m, 'order_submit');
   syncRevealedOrderIntoMatchRubbers(key,m);
   sl(true);
   try{
