@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-04-24-v230-no-kakao-naver-persistent-login-v4";
+  const APP_VERSION = "2026-04-29-v230-profile-preserve-phone-reset-v1";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -4030,6 +4030,7 @@ function formatPhoneLoose(raw=''){
 
 const PERSONAL_MATCH_PHONE_KEY='kimhae_personal_match_phone_v1';
 const MY_PROFILE_PHONE_CACHE_KEY='kimhae_my_profile_phone_v1';
+const PERSONAL_MATCH_PHONE_AUTO_DISABLED_KEY='kimhae_personal_match_phone_auto_disabled_v1';
 function normalizePhoneDigits(raw=''){
   return String(raw||'').replace(/[^0-9]/g,'');
 }
@@ -4048,8 +4049,11 @@ function syncProfilePhoneToPersonalMatch(profile={}, opts={}){
   const digits=cacheProfilePhoneDigits(profile?.phone || profile?.mobile || profile?.phoneNumber || '');
   if(!digits) return '';
   try{
-    const current=normalizePhoneDigits(localStorage.getItem(PERSONAL_MATCH_PHONE_KEY)||'');
-    if(current!==digits) localStorage.setItem(PERSONAL_MATCH_PHONE_KEY, digits);
+    if(opts.force || localStorage.getItem(PERSONAL_MATCH_PHONE_AUTO_DISABLED_KEY)!=='1'){
+      const current=normalizePhoneDigits(localStorage.getItem(PERSONAL_MATCH_PHONE_KEY)||'');
+      if(current!==digits) localStorage.setItem(PERSONAL_MATCH_PHONE_KEY, digits);
+      localStorage.removeItem(PERSONAL_MATCH_PHONE_AUTO_DISABLED_KEY);
+    }
   }catch(e){}
   if(opts.render){
     try{ renderBracket(); }catch(e){}
@@ -4060,14 +4064,16 @@ function syncProfilePhoneToPersonalMatch(profile={}, opts={}){
 function getPersonalMatchPhone(){
   try{
     const local=normalizePhoneDigits(localStorage.getItem(PERSONAL_MATCH_PHONE_KEY)||'');
-    return local || getCachedProfilePhoneDigits();
+    if(local) return local;
+    if(localStorage.getItem(PERSONAL_MATCH_PHONE_AUTO_DISABLED_KEY)==='1') return '';
+    return getCachedProfilePhoneDigits();
   }catch(e){return getCachedProfilePhoneDigits();}
 }
 function setPersonalMatchPhone(raw='', opts={}){
   const digits=normalizePhoneDigits(raw);
   const silent=!!opts.silent;
   if(digits.length<9){ if(!silent) toast('전화번호를 다시 확인해 주세요','error'); return false; }
-  try{ localStorage.setItem(PERSONAL_MATCH_PHONE_KEY, digits); }catch(e){}
+  try{ localStorage.setItem(PERSONAL_MATCH_PHONE_KEY, digits); localStorage.removeItem(PERSONAL_MATCH_PHONE_AUTO_DISABLED_KEY); }catch(e){}
   if(!silent) toast('내 경기 전화번호를 저장했습니다 ✅','success');
   if(opts.render!==false){
     try{ renderBracket(); }catch(e){}
@@ -4082,10 +4088,11 @@ function promptPersonalMatchPhone(){
   setPersonalMatchPhone(raw);
 }
 function clearPersonalMatchPhone(){
-  try{ localStorage.removeItem(PERSONAL_MATCH_PHONE_KEY); }catch(e){}
-  toast('저장된 내 경기 전화번호를 지웠습니다. 내 정보에 저장된 번호가 있으면 다시 자동 적용됩니다.','success');
-  const cached=getCachedProfilePhoneDigits();
-  if(cached){ try{ localStorage.setItem(PERSONAL_MATCH_PHONE_KEY, cached); }catch(e){} }
+  try{
+    localStorage.removeItem(PERSONAL_MATCH_PHONE_KEY);
+    localStorage.setItem(PERSONAL_MATCH_PHONE_AUTO_DISABLED_KEY,'1');
+  }catch(e){}
+  toast('이 기기에서 내 경기 전화번호 표시를 초기화했습니다. 다시 입력하거나 내 정보를 저장하면 재적용됩니다.','success');
   try{ renderBracket(); }catch(e){}
   try{ upDash(); }catch(e){}
 }
@@ -4546,26 +4553,33 @@ async function ensureUserProfileDoc(user, extra={}){
   const refDoc=doc(db,'users',user.uid);
   const snap=await getDoc(refDoc).catch(()=>null);
   const prev=(snap && snap.exists()) ? snap.data() : {};
+  const keepText=(incoming, fallback='')=>{
+    const v=String(incoming ?? '').trim();
+    return v ? incoming : (fallback ?? '');
+  };
   const base={
+    ...extra,
     uid:user.uid,
-    email:user.email||prev.email||'',
-    displayName:user.displayName||prev.displayName||'',
-    photoURL:user.photoURL||prev.photoURL||'',
-    provider:extra.provider || prev.provider || 'google',
-    role:extra.role || prev.role || 'member',
+    email:keepText(extra.email, user.email||prev.email||''),
+    displayName:keepText(extra.displayName, user.displayName||prev.displayName||''),
+    photoURL:keepText(extra.photoURL, user.photoURL||prev.photoURL||''),
+    provider:keepText(extra.provider, prev.provider||'google'),
+    role:keepText(extra.role, prev.role||'member'),
     approved:extra.approved !== undefined ? extra.approved : (prev.approved!==undefined ? prev.approved : true),
-    name:extra.name || prev.name || user.displayName || '',
-    phone:extra.phone || prev.phone || '',
-    club:extra.club || prev.club || '',
-    career:extra.career || prev.career || '',
-    clubRole:extra.clubRole || prev.clubRole || '',
+    name:keepText(extra.name, prev.name||user.displayName||''),
+    phone:keepText(extra.phone, prev.phone||''),
+    club:keepText(extra.club, prev.club||''),
+    career:keepText(extra.career, prev.career||''),
+    clubRole:keepText(extra.clubRole, prev.clubRole||''),
+    socialName:keepText(extra.socialName, prev.socialName||''),
+    socialPhone:keepText(extra.socialPhone, prev.socialPhone||''),
+    socialProviderId:keepText(extra.socialProviderId, prev.socialProviderId||''),
     clubDirectorRequested:extra.clubDirectorRequested !== undefined ? extra.clubDirectorRequested : !!prev.clubDirectorRequested,
     clubDirectorApproved:extra.clubDirectorApproved !== undefined ? extra.clubDirectorApproved : !!prev.clubDirectorApproved,
     tournamentAdminRequested:extra.tournamentAdminRequested !== undefined ? extra.tournamentAdminRequested : !!prev.tournamentAdminRequested,
     tournamentAdminApproved:extra.tournamentAdminApproved !== undefined ? extra.tournamentAdminApproved : !!prev.tournamentAdminApproved,
     lastLoginAt:new Date().toISOString(),
-    updatedAt:new Date().toISOString(),
-    ...extra
+    updatedAt:new Date().toISOString()
   };
   if(!snap || !snap.exists()) base.createdAt=base.updatedAt;
   await setDoc(refDoc, base, {merge:true});
@@ -8430,7 +8444,7 @@ async function saveMyProfile(){
     await setDoc(doc(db,'users',user.uid), profilePayload, {merge:true});
     CURRENT_APP_PROFILE={...(CURRENT_APP_PROFILE||{}), ...profilePayload};
     refreshGoogleLoginUI(user);
-    try{ syncProfilePhoneToPersonalMatch(profilePayload, {render:true}); }catch(e){}
+    try{ syncProfilePhoneToPersonalMatch(profilePayload, {render:true, force:true}); }catch(e){}
     sl(false);
     cm('mMyProfile');
     toast('내 정보 저장 완료 ✅ · 내 경기 보기 번호도 자동 적용됐습니다','success');
