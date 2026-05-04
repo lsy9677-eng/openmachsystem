@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-04-29-v230-profile-preserve-phone-reset-v1";
+  const APP_VERSION = "2026-05-04-v231-delete-tournament-fix-v1";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -11596,62 +11596,141 @@ async function chgTS(tid,s){
 async function delT(tid){
   const t=G.tournaments.find(x=>x.id===tid);
   if(!t || !assertTournamentManagePermission(t,'삭제')) return;
-  if(!confirm('대회를 삭제하시겠습니까?\n⚠️ 관련 경기기록, 팀등록, 선수 이력도 함께 삭제됩니다.'))return;
+
+  const divList=[...new Set([
+    ...(Array.isArray(t.divisions)?t.divisions:[]),
+    ...Object.keys(G.teams||{}).filter(k=>_k2td(k).tid===tid).map(k=>_k2td(k).div),
+    ...Object.keys(G.matches||{}).filter(k=>_k2td(k).tid===tid).map(k=>_k2td(k).div),
+    ...Object.keys(G.draws||{}).filter(k=>_k2td(k).tid===tid).map(k=>_k2td(k).div)
+  ].filter(Boolean))];
+  const keys=divList.map(d=>tid+'_'+d);
+
+  const msg=[
+    `"${t.name||'선택한 대회'}" 대회를 삭제합니다.`,
+    '',
+    '삭제 항목:',
+    '• 대회 정보',
+    '• 팀 등록 / 참가 신청',
+    '• 예선·본선 추첨 결과',
+    '• 경기 기록 / 코트 배정 / 오더 정보',
+    '• 선수 출전 이력과 승패 반영분',
+    '',
+    '계속하시겠습니까?'
+  ].join('\n');
+  if(!confirm(msg)) return;
+
   sl(true);
   try{
-    const keys=['금','은','동','테린이','여성부'].map(d=>tid+'_'+d);
-    // ① 매치 승패 차감
+    if(!auth.currentUser){
+      throw new Error('Firebase 로그인 세션이 없습니다. 개발자 로그인을 다시 해주세요.');
+    }
+
+    // ① 메모리에 올라온 경기 결과 기준으로 선수 승패 차감
     for(const key of keys) await resetMatchRecords(key);
-    // ② registrations 삭제
+
+    // ② Firestore에 실제 저장된 참가/경기/추첨 문서 수집
     const regSnap=await getDocs(query(collection(db,'registrations'),where('tournamentId','==',tid)));
-    // ③ players.history에서 해당 tid 제거
+    const matchSnap=await getDocs(query(collection(db,'matches'),where('tournamentId','==',tid)));
+    let drawSnap={docs:[]};
+    try{ drawSnap=await getDocs(query(collection(db,'draws'),where(documentId(),'>=',tid+'_'),where(documentId(),'<=',tid+'_'+'\uf8ff'))); }catch(_e){ drawSnap={docs:[]}; }
+    let drawHistorySnap={docs:[]};
+    try{ drawHistorySnap=await getDocs(query(collection(db,'drawHistory'),where('tournamentId','==',tid))); }catch(_e){ drawHistorySnap={docs:[]}; }
+
+    // ③ 선수 history 제거. 단체전(players) + 개인전(individualPlayers) 모두 처리
     const affectedPlayerKeys=new Set();
-    regSnap.docs.forEach(d=>{
-      const reg=d.data()||{};
-      (reg.players||[]).forEach(pn=>{
-        const bc=baseClub(reg.club||'');
-        const pk=pKey(pn,bc);
+    const markPlayerAffected=(name, club)=>{
+      const pn=String(name||'').trim();
+      if(!pn) return;
+      const bc=baseClub(club||'');
+      const candidates=[pKey(pn,bc), getPlayerKey(pn,bc), pn].filter(Boolean);
+      candidates.forEach(pk=>{
         if(G.players[pk]){
           G.players[pk].history=(G.players[pk].history||[]).filter(h=>h.tid!==tid);
           affectedPlayerKeys.add(pk);
         }
       });
+    };
+    regSnap.docs.forEach(d=>{
+      const reg=d.data()||{};
+      (reg.players||[]).forEach(pn=>markPlayerAffected(pn, reg.club||''));
+      (reg.individualPlayers||[]).forEach(p=>{
+        const clubRaw=p?.clubsRaw || (Array.isArray(p?.clubs)?p.clubs[0]:'') || reg.club || '';
+        markPlayerAffected(p?.name||'', clubRaw);
+      });
     });
-    // ④ Firestore batch 삭제
-    const batch=writeBatch(db);
-    batch.delete(doc(db,'tournaments',tid));
-    keys.forEach(k=>{batch.delete(doc(db,'teams',k));batch.delete(doc(db,'draws',k));batch.delete(doc(db,'matches',k));});
-    regSnap.docs.forEach(d=>batch.delete(doc(db,'registrations',d.id)));
-    await batch.commit();
-    // ⑤ 선수 저장 or 완전삭제 (신규선수: history 없고 승패 0이면 명단에서 삭제)
+
+    // ④ 삭제 대상 문서: 신규 컬렉션 방식 + 구버전 key 문서 둘 다 제거
+    const refs=[];
+    const addRef=(r)=>{ if(r) refs.push(r); };
+    addRef(doc(db,'tournaments',tid));
+    addRef(doc(db,'tourGuides',tid));
+    keys.forEach(k=>{
+      addRef(doc(db,'teams',k));
+      addRef(doc(db,'draws',k));
+      addRef(doc(db,'matches',k));
+    });
+    regSnap.docs.forEach(d=>addRef(d.ref));
+    matchSnap.docs.forEach(d=>addRef(d.ref));
+    drawSnap.docs.forEach(d=>addRef(d.ref));
+    drawHistorySnap.docs.forEach(d=>addRef(d.ref));
+
+    // Firestore batch는 500개 제한이 있으므로 450개 단위로 나눠 커밋
+    for(let i=0;i<refs.length;i+=450){
+      const batch=writeBatch(db);
+      refs.slice(i,i+450).forEach(r=>batch.delete(r));
+      await batch.commit();
+    }
+
+    // ⑤ 선수 저장 또는 완전삭제
     if(affectedPlayerKeys.size>0){
       const toDelete=[], toSave=[];
       for(const pk of affectedPlayerKeys){
         const p=G.players[pk]; if(!p) continue;
         if((p.history||[]).length===0 && (p.wins||0)===0 && (p.losses||0)===0){
           toDelete.push(pk);
-        } else {
+        }else{
           toSave.push(pk);
         }
       }
       if(toSave.length>0) await Promise.all(toSave.map(pk=>stP(pk)));
       if(toDelete.length>0){
-        await Promise.all(toDelete.map(pk=>
-          deleteDoc(doc(db,'players',pk.replace(/[/.#$[\]]/g,'_'))).catch(()=>{})
-        ));
+        await Promise.all(toDelete.map(pk=>deleteDoc(doc(db,'players',pk.replace(/[/.#$[\]]/g,'_'))).catch(()=>{})));
         toDelete.forEach(pk=>{ delete G.players[pk]; });
       }
     }
-    // ⑥ 로컬 상태 정리
-    const keys2=['금','은','동','테린이','여성부'].map(d=>tid+'_'+d);
-    keys2.forEach(key=>{
-      delete G.teams[key]; delete G.draws[key]; delete G.matches[key];
+
+    // ⑥ 로컬 상태/캐시 정리
+    keys.forEach(key=>{
+      delete G.teams[key];
+      delete G.draws[key];
+      delete G.matches[key];
       if(G._regIdsByKey) delete G._regIdsByKey[key];
+      if(G._matchIdsByKey) delete G._matchIdsByKey[key];
+      try{ delete TOURNAMENT_BUNDLE_MEM[tid]; }catch(_e){}
     });
-    G.tournaments=(G.tournaments||[]).filter(t=>t.id!==tid);
-    sl(false);toast('대회 및 관련 기록 삭제 완료','info');
-    renderTL(); renderBracket();
-  }catch(e){sl(false);toast('삭제 실패: '+e.message,'error');console.error(e);}
+    G.tournaments=(G.tournaments||[]).filter(x=>x.id!==tid);
+    try{
+      const all=readTournamentBundleCache();
+      delete all[tid];
+      writeTournamentBundleCache(all);
+    }catch(_e){}
+
+    sl(false);
+    toast('대회 및 관련 기록 삭제 완료','success');
+    try{ await fbLog('대회 삭제: '+(t.name||tid),'🗑️'); }catch(_e){}
+    renderTL();
+    popSel();
+    renderBracket();
+    try{ renderRanking(); }catch(_e){}
+  }catch(e){
+    sl(false);
+    const raw=String(e?.message||e||'');
+    const msg=/permission|권한|Missing or insufficient/i.test(raw)
+      ? '삭제 실패: Firestore 권한이 거부되었습니다. 개발자 계정으로 다시 로그인했는지, admins/users 권한 문서가 있는지 확인해 주세요.'
+      : '삭제 실패: '+raw;
+    toast(msg,'error');
+    console.error('delT failed', e);
+  }
 }
 
 function openET(tid){
