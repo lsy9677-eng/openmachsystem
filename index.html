@@ -6466,7 +6466,7 @@ async function initFB(){
 
     // 대회 목록만 실시간 유지
     onSnapshot(query(collection(db,'tournaments'),orderBy('createdAt','desc')), async s=>{
-      G.tournaments=s.docs.map(d=>({id:d.id,...d.data()}));
+      G.tournaments=s.docs.map(d=>({id:d.id,...d.data()})).filter(t=>!t.deleted);
       try{
         const activeTid = getRealtimeTargetTournamentId() || null;
         await syncTournamentDataForPage(getCurrentPageName(), activeTid, false);
@@ -11723,13 +11723,51 @@ async function delT(tid){
     renderBracket();
     try{ renderRanking(); }catch(_e){}
   }catch(e){
-    sl(false);
     const raw=String(e?.message||e||'');
-    const msg=/permission|권한|Missing or insufficient/i.test(raw)
-      ? '삭제 실패: Firestore 권한이 거부되었습니다. 개발자 계정으로 다시 로그인했는지, admins/users 권한 문서가 있는지 확인해 주세요.'
-      : '삭제 실패: '+raw;
-    toast(msg,'error');
+    const isPerm=/permission|권한|Missing or insufficient/i.test(raw) || e?.code==='permission-denied';
     console.error('delT failed', e);
+
+    // 일부 Firestore 규칙은 update는 허용하지만 delete/query delete는 막는 구조일 수 있음.
+    // 이 경우 사용자가 보는 대회 목록에서는 즉시 사라지도록 soft delete로 대체한다.
+    if(isPerm){
+      try{
+        await updateDoc(doc(db,'tournaments',tid),{
+          deleted:true,
+          deletedAt:new Date().toISOString(),
+          deletedByUid:auth?.currentUser?.uid||'',
+          deletedByRole:AD?'developer':(TM?'manager':(OP?'operator':'unknown')),
+          status:'deleted'
+        });
+        G.tournaments=(G.tournaments||[]).filter(x=>x.id!==tid);
+        keys.forEach(key=>{
+          delete G.teams[key];
+          delete G.draws[key];
+          delete G.matches[key];
+          if(G._regIdsByKey) delete G._regIdsByKey[key];
+          if(G._matchIdsByKey) delete G._matchIdsByKey[key];
+        });
+        try{
+          const all=readTournamentBundleCache();
+          delete all[tid];
+          writeTournamentBundleCache(all);
+          delete TOURNAMENT_BUNDLE_MEM[tid];
+        }catch(_e){}
+        sl(false);
+        toast('Firestore 삭제 권한은 거부되어 대회를 숨김 삭제로 처리했습니다 ✅', 'success');
+        renderTL();
+        popSel();
+        renderBracket();
+        try{ renderRanking(); }catch(_e){}
+        return;
+      }catch(e2){
+        sl(false);
+        console.error('delT soft delete fallback failed', e2);
+        toast('삭제 실패: Firestore 규칙이 delete뿐 아니라 tournaments 업데이트도 막고 있습니다. Firebase 규칙에서 개발자 UID 삭제/수정 권한을 열어야 합니다.', 'error');
+        return;
+      }
+    }
+    sl(false);
+    toast('삭제 실패: '+raw,'error');
   }
 }
 
