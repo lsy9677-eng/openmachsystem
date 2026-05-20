@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-05-21-v242-pc-center-layout-fix";
+  const APP_VERSION = "2026-05-21-v245-individual-cleanup-from-v242";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -30629,5 +30629,261 @@ body.slider-ready .page.active{
 }
 </style>
 
+
+
+<!-- v245: 230MATCH 개인전 전용 1차 정리 - 김해시 단체전 UI 숨김 + 참가자 기록 공개 범위 정리 -->
+<style id="v245IndividualCleanupStyle">
+/* 개인전 앱에서는 김해시 단체전 전용 UI를 기본적으로 숨긴다 */
+#myClubHomeCard,
+#myClubRegBar,
+#myClubBracketBar,
+#regLoginPrompt,
+#mDirectorManual,
+#mOperatorManual,
+#mFAQ,
+#mTapOrder,
+#regContactRow,
+#terineeModeSel,
+#regLoginStatusBar,
+#myClubHomeBody,
+#myClubCardTitle,
+#opToggleBtn,
+#regToggleBtn,
+#roleLoginPanel #regToggleBtn,
+#roleLoginPanel #opToggleBtn,
+#regLoginBadge,
+#opLoginBadge,
+#regClubNameBadge,
+#mRegLogin,
+#mOpLogin,
+#onlineOrderEnabled,
+#onlineOrderEnabled + *,
+#adminContactList,
+#adminDirectorEmailSection,
+#noticeContactBtns {
+  display:none !important;
+}
+
+/* 일반회원에게는 참가자 기록 중심만 노출: 참가자 목록/관리/엑셀은 관리자 전용 */
+body:not(.admin-mode) #ptab-registry,
+body:not(.admin-mode) #ptab-registry-content,
+body:not(.admin-mode) #playerPageBtns,
+body:not(.admin-mode) #registryActionBtns,
+body:not(.admin-mode) #regTabQuickAdd,
+body:not(.admin-mode) #mRegistryMgr,
+body:not(.admin-mode) #mQuickAddPlayer {
+  display:none !important;
+}
+
+body:not(.admin-mode) #ptab-records {
+  border-bottom-color:var(--primary) !important;
+  color:var(--primary) !important;
+  font-weight:900 !important;
+}
+
+/* 개인전에서는 팀전/오더/클럽 모아보기 문구 버튼 숨김 처리 */
+.v245-team-only-hidden { display:none !important; }
+
+/* 개인전 접수 용어 정리 */
+.v245-register-title::after { content:""; }
+
+/* 개인전 전용 생성 화면: 팀전 선택은 숨김, 개인전 고정처럼 보이게 */
+#tType option[value="team"] { display:none !important; }
+#tType { font-weight:900; }
+
+/* 참가자 기록 검색 카드는 일반회원에게도 보기 좋게 유지 */
+#ptab-records-content .card:first-child {
+  border:1px solid rgba(15,30,58,.08);
+  background:linear-gradient(180deg,#fff,#f8fbff);
+}
+
+/* PC 중앙 정렬 유지 */
+@media (min-width:769px){
+  main.main-content{max-width:1140px !important;margin-left:auto !important;margin-right:auto !important;}
+}
+@media (max-width:768px){
+  main.main-content{width:100% !important;max-width:100% !important;margin-left:0 !important;margin-right:0 !important;}
+}
+</style>
+<script id="v245IndividualCleanupScript">
+(function(){
+  'use strict';
+  var HIDE_TEXT_PATTERNS = [
+    /내\s*팀\s*보기/,
+    /바로\s*오더쓰기/,
+    /오더\s*입력/,
+    /오더\s*쓰기/,
+    /오더\s*제출/,
+    /오더\s*수정/,
+    /오더\/기록확인입력/,
+    /클럽\s*사용안내/,
+    /경기이사\s*로그인/,
+    /경기진행자\s*로그인/,
+    /진행자\s*로그인/,
+    /클럽\s*로그인/,
+    /클럽\s*모아보기/
+  ];
+  var KEEP_TEXT_PATTERNS = [/운영자\s*로그인/, /개발자\s*로그인/, /회원가입/, /내\s*정보/];
+
+  function $(id){ return document.getElementById(id); }
+  function txt(el){ return (el && (el.innerText || el.textContent) || '').trim(); }
+  function shouldKeep(el){
+    var t = txt(el);
+    return KEEP_TEXT_PATTERNS.some(function(re){ return re.test(t); });
+  }
+  function shouldHideByText(el){
+    if(!el || shouldKeep(el)) return false;
+    var t = txt(el);
+    if(!t) return false;
+    return HIDE_TEXT_PATTERNS.some(function(re){ return re.test(t); });
+  }
+  function hideTeamOnlyNodes(root){
+    root = root || document;
+    var nodes = root.querySelectorAll('button, a, .btn, .btn-sm, .home-quick-btn, .nav-tab, .home-panel-row, .home-panel-badge, [onclick]');
+    nodes.forEach(function(el){
+      try{
+        if(shouldHideByText(el)) el.classList.add('v245-team-only-hidden');
+      }catch(e){}
+    });
+
+    // 상단 역할 로그인 패널에서 경기이사/진행자만 제거하고 운영자/개발자는 유지
+    ['regToggleBtn','opToggleBtn','regLoginBadge','opLoginBadge','myClubRegBar','myClubBracketBar','myClubHomeCard'].forEach(function(id){
+      var el=$(id); if(el) el.classList.add('v245-team-only-hidden');
+    });
+
+    // 홈 현재 시합 카드 내부의 팀전 버튼만 제거
+    root.querySelectorAll('[onclick]').forEach(function(el){
+      var oc = String(el.getAttribute('onclick')||'');
+      if(/openMyClub|goMyClub|Order|order|M3|TapOrder|toggleReg\(|toggleOperator\(/.test(oc)){
+        if(!/toggleTournamentManagerLogin|toggleDeveloperLogin/.test(oc)) el.classList.add('v245-team-only-hidden');
+      }
+    });
+  }
+
+  function renameLabels(root){
+    root = root || document;
+    var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+    var n;
+    while((n = walker.nextNode())){
+      var v = n.nodeValue;
+      if(!v || !v.trim()) continue;
+      var next = v
+        .replace(/팀등록/g,'참가접수')
+        .replace(/팀 등록/g,'참가 접수')
+        .replace(/등록 팀 현황/g,'참가자 현황')
+        .replace(/팀 수정/g,'참가자 수정')
+        .replace(/팀 번호/g,'접수 번호')
+        .replace(/선수 현황/g,'참가자 기록')
+        .replace(/등록선수 현황/g,'참가자 목록')
+        .replace(/선수 \/ 참가 기록/g,'참가자 기록')
+        .replace(/선수 기록/g,'참가자 기록')
+        .replace(/선수 상세/g,'참가자 상세')
+        .replace(/선수 정보 수정/g,'참가자 정보 수정')
+        .replace(/선수 명단/g,'참가자 명단')
+        .replace(/선수 추가/g,'참가자 추가');
+      if(next !== v) n.nodeValue = next;
+    }
+
+    var pageTitle = $('playerPageTitle');
+    if(pageTitle) pageTitle.textContent = '참가자 기록';
+    var navRegister = document.querySelector('.nav-tab[data-page="register"]');
+    if(navRegister){
+      var badge = $('regBadge');
+      navRegister.innerHTML = '📋 참가접수 ' + (badge ? '<span class="nbadge" id="regBadge">'+badge.textContent+'</span>' : '');
+    }
+    var navPlayers = document.querySelector('.nav-tab[data-page="players"]');
+    if(navPlayers) navPlayers.textContent = '🧾 참가자기록';
+    var bottom = document.querySelector('.bottom-tab-bar');
+    if(bottom){
+      bottom.querySelectorAll('button').forEach(function(b){
+        b.innerHTML = b.innerHTML.replace(/팀등록/g,'접수').replace(/선수현황/g,'기록');
+      });
+    }
+  }
+
+  function forceIndividualTournamentMode(){
+    var type = $('tType');
+    if(type){
+      type.value = 'individual_pair';
+      Array.prototype.forEach.call(type.options, function(op){
+        if(op.value === 'team') op.hidden = true;
+      });
+      try{ if(typeof window.updateTournamentTypeUI === 'function') window.updateTournamentTypeUI(); }catch(e){}
+    }
+    var note = $('tTypeNote');
+    if(note){
+      note.innerHTML = '개인전 모드: <b>2인 페어 참가</b>, 후보 없음, 참가자 중심 접수/대진표/결과 입력으로 운영합니다.';
+    }
+  }
+
+  function restrictParticipantTabs(){
+    var isAdmin = document.body.classList.contains('admin-mode') || !!window.AD;
+    var recordsBtn = $('ptab-records');
+    var registryBtn = $('ptab-registry');
+    var records = $('ptab-records-content');
+    var registry = $('ptab-registry-content');
+    if(!isAdmin){
+      if(registryBtn) registryBtn.style.display = 'none';
+      if(registry) registry.style.display = 'none';
+      if(recordsBtn) recordsBtn.classList.add('active');
+      if(records) records.style.display = '';
+    }else{
+      if(registryBtn) registryBtn.style.display = '';
+    }
+  }
+
+  function cleanupAdminSettings(){
+    var labels = ['온라인 오더 제출 설정','팀등록 비밀번호 관리','클럽 경기이사 연락처 관리','경기이사에게 공지 문자 보내기','경기진행자 비밀번호'];
+    document.querySelectorAll('#mAdminSettings .form-group').forEach(function(box){
+      var t = txt(box);
+      if(labels.some(function(label){return t.indexOf(label)>=0;})){
+        box.classList.add('v245-team-only-hidden');
+      }
+    });
+  }
+
+  function apply(){
+    try{ renameLabels(document); }catch(e){}
+    try{ forceIndividualTournamentMode(); }catch(e){}
+    try{ restrictParticipantTabs(); }catch(e){}
+    try{ hideTeamOnlyNodes(document); }catch(e){}
+    try{ cleanupAdminSettings(); }catch(e){}
+  }
+
+  // 기존 함수가 화면을 다시 그린 뒤에도 정리되도록 래핑
+  function wrap(name){
+    try{
+      var old = window[name];
+      if(typeof old !== 'function' || old.__v245Wrapped) return;
+      var fn = function(){
+        var r = old.apply(this, arguments);
+        setTimeout(apply, 0);
+        setTimeout(apply, 120);
+        return r;
+      };
+      fn.__v245Wrapped = true;
+      window[name] = fn;
+    }catch(e){}
+  }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    apply();
+    ['showPage','renderBracket','renderRL','renderHome','upDash','renderTournaments','switchPlayersTab','openAdminSettings'].forEach(wrap);
+    setTimeout(apply, 200);
+    setTimeout(apply, 800);
+    setTimeout(apply, 1800);
+
+    try{
+      var mo = new MutationObserver(function(){
+        clearTimeout(window.__v245ApplyTimer);
+        window.__v245ApplyTimer = setTimeout(apply, 80);
+      });
+      mo.observe(document.body, {childList:true, subtree:true});
+    }catch(e){}
+  });
+
+  window.__v245ApplyIndividualCleanup = apply;
+})();
+</script>
 </body>
 </html>
