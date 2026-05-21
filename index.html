@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-05-21-v302-main-result-button-stable-body";
+  const APP_VERSION = "2026-05-21-v310-push-fix-restore-data";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -5835,6 +5835,28 @@ body {
   </div>
 </div>
 
+
+<div class="modal-overlay" id="mPushRequired">
+  <div class="modal-box" style="max-width:520px">
+    <div class="modal-header" style="background:#2563eb">
+      <h3>🔔 경기 알림 설정</h3>
+      <button class="modal-close" onclick="closePushRequiredModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="padding:12px 14px;border:1.5px solid #93c5fd;background:#eff6ff;border-radius:14px;font-size:.84rem;line-height:1.7;color:#1e40af;font-weight:800;margin-bottom:12px">
+        경기 시작, 코트 대기, 경기 배정 알림을 받으려면 알림 설정이 필요합니다.
+      </div>
+      <div id="pushRequiredStatus" style="font-size:.78rem;color:var(--text2);line-height:1.6;margin-bottom:12px">알림을 허용하면 해당 경기/조/코트 카드 대상자에게만 알림이 발송됩니다.</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <button class="btn btn-primary" onclick="requestMatchPushPermission()" style="background:#2563eb;color:white">🔔 경기 알림 받기</button>
+        <button class="btn btn-gray" onclick="setMatchPushOptOut(true)">알림 거부</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-gray" onclick="closePushRequiredModal()">닫기</button>
+    </div>
+  </div>
+</div>
 <div class="toast-container" id="TC"></div>
 <div aria-atomic="true" aria-live="polite" class="sticky-alert-wrap" id="stickyAlertWrap"></div>
 <button class="scroll-top" id="stBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
@@ -6810,7 +6832,7 @@ const _app=initializeApp(FB);
 const db=getFirestore(_app);
 const storage=getStorage(_app);
 const auth=getAuth(_app);
-// ── 230MATCH 알림알림 준비 코드 ─────────────────────────────
+// ── 230MATCH 알림 준비 코드 ─────────────────────────────
 // Firebase Console → Cloud Messaging → 웹 알림 인증서(VAPID Key)
 const FCM_VAPID_KEY="BC6CE16CvIlfyPjaSel4nTHCxNga27BgXcb0Gnw2vY9qqOlzavmDGYJrY8mt2GUCwO5vraWXMKjamw_BPPG4RPk";
 let FCM_MESSAGING=null;
@@ -6829,11 +6851,11 @@ function getPushDeviceLabel(){
   return 'Web';
 }
 async function getFcmMessagingSafe(){
-  if(location.protocol==='file:') throw new Error('로컬 파일에서는 알림알림을 테스트할 수 없습니다. 배포 주소에서 테스트하세요.');
+  if(location.protocol==='file:') throw new Error('로컬 파일에서는 알림을 테스트할 수 없습니다. 배포 주소에서 테스트하세요.');
   if(!('Notification' in window)) throw new Error('이 브라우저는 알림을 지원하지 않습니다.');
   if(!('serviceWorker' in navigator)) throw new Error('이 브라우저는 서비스워커를 지원하지 않습니다.');
   const supported=await isSupported().catch(()=>false);
-  if(!supported) throw new Error('현재 브라우저/환경에서는 Firebase 알림알림을 지원하지 않습니다.');
+  if(!supported) throw new Error('현재 브라우저/환경에서는 Firebase 알림을 지원하지 않습니다.');
   if(!FCM_MESSAGING) FCM_MESSAGING=getMessaging(_app);
   return FCM_MESSAGING;
 }
@@ -6860,13 +6882,15 @@ async function saveCurrentFcmToken(token){
     uid,
     token,
     enabled:true,
+    invalid:false,
+    disabledByUser:false,
     app:'230MATCH',
     appTitle:getAppTitle ? getAppTitle() : '230MATCH',
     name:profile.name||profile.displayName||user.displayName||'',
     phone:profile.phone||'',
     phoneDigits:String(profile.phone||'').replace(/[^0-9]/g,''),
     club:profile.club||'',
-    clubKey:String(profile.club||'').trim().toLowerCase(),
+    clubKey:String(profile.club||'').trim().toLowerCase().replace(/\s+/g,''),
     role:profile.role||'member',
     device:getPushDeviceLabel(),
     userAgent:navigator.userAgent||'',
@@ -6875,7 +6899,8 @@ async function saveCurrentFcmToken(token){
     updatedAtText:new Date().toISOString()
   };
   await setDoc(doc(db,'pushTokens',fcmTokenDocId(uid,token)),payload,{merge:true});
-  await setDoc(doc(db,'users',uid),{pushEnabled:true,lastPushToken:token,lastPushTokenUpdatedAt:serverTimestamp(),updatedAt:new Date().toISOString()},{merge:true});
+  await setDoc(doc(db,'users',uid),{pushEnabled:true,pushDenied:false,lastPushToken:token,lastPushTokenUpdatedAt:serverTimestamp(),updatedAt:new Date().toISOString()},{merge:true});
+  try{ localStorage.removeItem('matchPushOptOut'); }catch(e){}
   return true;
 }
 async function requestMatchPushPermission(){
@@ -6903,14 +6928,16 @@ async function requestMatchPushPermission(){
     const saved=await saveCurrentFcmToken(token);
     if(saved){
       localStorage.setItem('matchPushEnabled','1');
+      localStorage.removeItem('matchPushOptOut');
+      closePushRequiredModal();
       const ps=ge('pushStatus'); if(ps) ps.innerHTML='✅ 경기 알림이 켜졌습니다. 이 계정/기기 토큰이 Firebase에 저장되어 자동 알림을 받을 준비가 되었습니다.';
       toast('경기 알림 설정 완료 ✅','success');
       setupFcmForegroundListener();
     }
   }catch(e){
     console.warn('requestMatchPushPermission failed',e);
-    toast('알림알림 설정 실패: '+(e?.message||e),'error');
-    const ps=ge('pushStatus'); if(ps) ps.innerHTML='⚠️ 알림알림 설정 실패: '+esc(e?.message||e);
+    toast('알림 설정 실패: '+(e?.message||e),'error');
+    const ps=ge('pushStatus'); if(ps) ps.innerHTML='⚠️ 알림 설정 실패: '+esc(e?.message||e);
   }
 }
 async function setupFcmForegroundListener(){
@@ -6937,8 +6964,10 @@ function updatePushStatusLabel(){
     const ps=ge('pushStatus');
     if(!ps) return;
     const enabled=localStorage.getItem('matchPushEnabled')==='1';
+    const denied=localStorage.getItem('matchPushOptOut')==='1';
     const perm=('Notification' in window)?Notification.permission:'unsupported';
     if(perm==='granted' && enabled) ps.innerHTML='✅ 이 기기는 경기 알림이 켜져 있습니다.';
+    else if(denied) ps.innerHTML='🔕 경기 알림을 거부 설정했습니다. 다시 받으려면 알림 받기를 눌러 주세요.';
     else if(perm==='denied') ps.innerHTML='🔕 브라우저에서 알림이 차단되어 있습니다. 브라우저 설정에서 알림 허용이 필요합니다.';
     else ps.innerHTML='🔔 코트 배정/대기/경기 시작 알림을 받으려면 알림을 켜 주세요.';
   }catch(e){}
@@ -6946,13 +6975,54 @@ function updatePushStatusLabel(){
 
 function renderInlinePushEnableButton(){
   return `<div style="margin-top:10px;padding:10px 12px;background:linear-gradient(135deg,#eef4ff,#fffdf5);border:1px solid var(--border);border-radius:12px">
-    <div style="font-size:.82rem;font-weight:900;color:var(--primary-dark);margin-bottom:6px">🔔 경기 알림</div>
+    <div style="font-size:.82rem;font-weight:900;color:var(--primary-dark);margin-bottom:6px">🔔 경기 알림 설정</div>
     <div id="pushStatus" style="font-size:.74rem;color:var(--text2);line-height:1.5;margin-bottom:8px">코트 배정/대기/경기 시작 알림을 받으려면 알림을 켜 주세요.</div>
-    <button class="btn btn-outline" onclick="requestMatchPushPermission()" style="width:100%;font-size:.84rem">🔔 경기 알림 받기</button>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><button class="btn btn-outline" onclick="requestMatchPushPermission()" style="width:100%;font-size:.84rem">🔔 알림 받기</button><button class="btn btn-gray" onclick="setMatchPushOptOut(true)" style="width:100%;font-size:.84rem">🔕 알림 거부</button></div>
   </div>`;
 }
 
 
+
+
+function closePushRequiredModal(){
+  try{ cm('mPushRequired'); }catch(e){ const m=ge('mPushRequired'); if(m) m.classList.remove('open'); }
+}
+function shouldShowPushSetupPrompt(){
+  try{
+    const u=auth.currentUser || CURRENT_APP_USER;
+    if(!u || u.isAnonymous) return false;
+    if(localStorage.getItem('matchPushOptOut')==='1') return false;
+    if(('Notification' in window) && Notification.permission==='granted' && localStorage.getItem('matchPushEnabled')==='1') return false;
+    return true;
+  }catch(e){ return false; }
+}
+function showMandatoryPushSetupPrompt(reason='login'){
+  try{
+    if(!shouldShowPushSetupPrompt()) return;
+    const st=ge('pushRequiredStatus');
+    if(st) st.innerHTML='로그인/회원가입이 완료되었습니다. 경기 배정·대기·시작 알림을 받으려면 알림을 켜 주세요.<br><b>알림은 전체가 아니라 해당 경기/조/코트 카드 대상자에게만 발송되도록 제한했습니다.</b>';
+    om('mPushRequired');
+  }catch(e){}
+}
+async function setMatchPushOptOut(flag=true){
+  try{
+    const u=auth.currentUser || CURRENT_APP_USER;
+    localStorage.setItem('matchPushOptOut', flag?'1':'0');
+    if(flag) localStorage.removeItem('matchPushEnabled');
+    if(u && !u.isAnonymous){
+      await setDoc(doc(db,'users',u.uid),{pushEnabled:false,pushDenied:!!flag,pushDeniedAt:flag?serverTimestamp():null,updatedAt:new Date().toISOString()},{merge:true});
+      const snap=await getDocs(collection(db,'pushTokens')).catch(()=>null);
+      if(snap){
+        const writes=[];
+        snap.forEach(d=>{ const x=d.data()||{}; if(String(x.uid||'')===String(u.uid||'')) writes.push(setDoc(doc(db,'pushTokens',d.id),{enabled:false,disabledByUser:!!flag,updatedAtText:new Date().toISOString()},{merge:true})); });
+        await Promise.all(writes);
+      }
+    }
+    updatePushStatusLabel();
+    closePushRequiredModal();
+    toast(flag?'경기 알림을 거부 설정했습니다. 내 정보 설정에서 다시 켤 수 있습니다.':'경기 알림 거부 설정을 해제했습니다.','success');
+  }catch(e){ toast('알림 거부 설정 실패: '+(e?.message||e),'error'); }
+}
 async function sendFcmPushToken(token, title, body, data={}){
   const res=await fetch('/api/send-push',{
     method:'POST',
@@ -7024,9 +7094,52 @@ function getTeamPushPhoneDigits(team){
   }catch(e){}
   return [...new Set(phones.map(v=>String(v||'').replace(/[^0-9]/g,'')).filter(v=>v.length>=9))];
 }
+
+function isIndividualPushKey(key=''){
+  try{ return getTournamentTypeById(String(key||'').split('_')[0]||'')==='individual_pair'; }catch(e){ return false; }
+}
+function pushTokenMatchesTargetsForKey(key,x,targets={}){
+  const pd=String(x?.phoneDigits||'').replace(/[^0-9]/g,'');
+  const uid=String(x?.uid||'');
+  if(isIndividualPushKey(key)){
+    return (pd && (targets.phoneDigits||[]).includes(pd)) || (uid && (targets.uids||[]).includes(uid));
+  }
+  const ck=normalizePushKey(x?.clubKey||x?.club||'');
+  return (ck && (targets.clubKeys||[]).includes(ck)) || (pd && (targets.phoneDigits||[]).includes(pd)) || (uid && (targets.uids||[]).includes(uid));
+}
+function formatCourtDisplayName(court=''){
+  const raw=String(court||'').trim();
+  if(!raw) return '';
+  const m=raw.match(/^([가-힣A-Za-z]+)\s*(\d+)$/);
+  if(m) return `${m[1]} ${m[2]}번코트`;
+  return /코트/.test(raw) ? raw : `${raw} 코트`;
+}
+function getAutoPushContextForMatch(key,m){
+  const st=getDerivedQueueStatusForMatch(key,m)||getPersonalMatchStatusLabel(key,m);
+  const courts=(getMatchCourtsForStatusBoard(key,m)||[]).map(String).filter(Boolean);
+  const court=(courts[0]||String(st?.text||'').match(/🎾\s*([^·]+)/)?.[1]||'').trim();
+  const queuePos=Number(st?.waitingOrder||0)||0;
+  const code=String(st?.code||'');
+  return {court, courtLabel:formatCourtDisplayName(court), queuePos, code};
+}
+function buildAutoMatchPushMessage(key,m){
+  const {t1,t2}=getMatchTeamObjects(key,m);
+  const n1=tdn(t1,key,m?.t1)||'1팀';
+  const n2=tdn(t2,key,m?.t2)||'2팀';
+  const titleBase=`${n1} vs ${n2}`;
+  const ctx=getAutoPushContextForMatch(key,m);
+  if(ctx.queuePos>0){
+    return {title:'⏳ 코트 대기 알림', body:`${titleBase} ${ctx.courtLabel?ctx.courtLabel+' ':''}대기 ${ctx.queuePos}번입니다.`};
+  }
+  if(ctx.code==='start_soon' || ctx.code==='live' || ctx.court){
+    return {title:'🎾 경기 시작 알림', body:`${ctx.courtLabel?ctx.courtLabel+'에서 ':''}${titleBase} 경기 시작하오니 5분 내로 출전 바랍니다.`};
+  }
+  return {title:'경기 안내', body:`${titleBase} 경기 안내입니다.`};
+}
 function getMatchPushTargets(key,m){
   const {t1,t2}=getMatchTeamObjects(key,m);
-  const clubKeys=[...getTeamPushTargetKeys(t1),...getTeamPushTargetKeys(t2)];
+  const individual=isIndividualPushKey(key) || [t1,t2].some(t=>t?.tournamentType==='individual_pair'||Array.isArray(t?.individualPlayers));
+  const clubKeys=individual ? [] : [...getTeamPushTargetKeys(t1),...getTeamPushTargetKeys(t2)];
   const phoneDigits=[...getTeamPushPhoneDigits(t1),...getTeamPushPhoneDigits(t2)];
   const uids=[];
   [t1,t2].forEach(t=>{ if(t?.ownerUid) uids.push(String(t.ownerUid)); });
@@ -7077,7 +7190,7 @@ async function openAdminBroadcastPushModal(){
   const title=ge('manualPushTitle'), body=ge('manualPushBody'), target=ge('manualPushTarget');
   if(title) title.value='230MATCH 공지';
   if(body) body.value=String(G?.meta?.adminFloatingNotice||'').trim() || '';
-  if(target) target.textContent='전체 알림알림 수신자';
+  if(target) target.textContent='전체 알림 수신자';
   window._manualPushContext={type:'all'};
   om('mManualPush');
 }
@@ -7086,10 +7199,11 @@ async function openManualMatchPush(key,mid){
   const m=(G.matches[key]||[]).find(x=>String(x.id)===String(mid));
   if(!m){ toast('경기를 찾을 수 없습니다','error'); return; }
   const {t1,t2}=getMatchTeamObjects(key,m);
+  const auto=buildAutoMatchPushMessage(key,m);
   const title=ge('manualPushTitle'), body=ge('manualPushBody'), target=ge('manualPushTarget');
-  if(title) title.value='경기 안내';
-  if(body) body.value=`${tdn(t1,key,m.t1)||'1팀'} vs ${tdn(t2,key,m.t2)||'2팀'} 경기 안내입니다.`;
-  if(target) target.textContent=`해당 경기 참가자/팀: ${tdn(t1,key,m.t1)||'1팀'} vs ${tdn(t2,key,m.t2)||'2팀'}`;
+  if(title) title.value=auto.title;
+  if(body) body.value=auto.body;
+  if(target) target.textContent=`해당 경기 카드 대상자만: ${tdn(t1,key,m.t1)||'1팀'} vs ${tdn(t2,key,m.t2)||'2팀'}`;
   window._manualPushContext={type:'match',key,mid};
   om('mManualPush');
 }
@@ -7162,38 +7276,17 @@ async function sendManualPushFromModal(){
     }else if(ctx.type==='match'){
       const m=(G.matches[ctx.key]||[]).find(x=>String(x.id)===String(ctx.mid));
       const targets=getMatchPushTargets(ctx.key,m);
-      docs=await getEnabledPushTokenDocs(x=>{
-        const ck=normalizePushKey(x.clubKey||x.club||'');
-        const pd=String(x.phoneDigits||'').replace(/[^0-9]/g,'');
-        const uid=String(x.uid||'');
-        return (ck && targets.clubKeys.includes(ck)) || (pd && targets.phoneDigits.includes(pd)) || (uid && targets.uids.includes(uid));
-      });
+      docs=await getEnabledPushTokenDocs(x=>pushTokenMatchesTargetsForKey(ctx.key,x,targets));
     }else if(ctx.type==='team'){
       const team=(G.teams[ctx.key]||[])[Number(ctx.idx)];
-      const clubKeys=getTeamPushTargetKeys(team);
-      const phones=getTeamPushPhoneDigits(team);
-      const uids=[String(team?.ownerUid||'')].filter(Boolean);
-      docs=await getEnabledPushTokenDocs(x=>{
-        const ck=normalizePushKey(x.clubKey||x.club||'');
-        const pd=String(x.phoneDigits||'').replace(/[^0-9]/g,'');
-        const uid=String(x.uid||'');
-        return (ck && clubKeys.includes(ck)) || (pd && phones.includes(pd)) || (uid && uids.includes(uid));
-      });
+      const targets={clubKeys:isIndividualPushKey(ctx.key)?[]:getTeamPushTargetKeys(team), phoneDigits:getTeamPushPhoneDigits(team), uids:[String(team?.ownerUid||'')].filter(Boolean)};
+      docs=await getEnabledPushTokenDocs(x=>pushTokenMatchesTargetsForKey(ctx.key,x,targets));
     }else if(ctx.type==='group'){
       const ms=(G.matches[ctx.key]||[]).filter(m=>m && m.phase==='group' && Number(m.group)===Number(ctx.gi));
       const targetSet={clubKeys:new Set(), phoneDigits:new Set(), uids:new Set()};
-      ms.forEach(m=>{
-        const t=getMatchPushTargets(ctx.key,m);
-        (t.clubKeys||[]).forEach(v=>targetSet.clubKeys.add(v));
-        (t.phoneDigits||[]).forEach(v=>targetSet.phoneDigits.add(v));
-        (t.uids||[]).forEach(v=>targetSet.uids.add(v));
-      });
-      docs=await getEnabledPushTokenDocs(x=>{
-        const ck=normalizePushKey(x.clubKey||x.club||'');
-        const pd=String(x.phoneDigits||'').replace(/[^0-9]/g,'');
-        const uid=String(x.uid||'');
-        return (ck && targetSet.clubKeys.has(ck)) || (pd && targetSet.phoneDigits.has(pd)) || (uid && targetSet.uids.has(uid));
-      });
+      ms.forEach(m=>{ const t=getMatchPushTargets(ctx.key,m); (t.clubKeys||[]).forEach(v=>targetSet.clubKeys.add(v)); (t.phoneDigits||[]).forEach(v=>targetSet.phoneDigits.add(v)); (t.uids||[]).forEach(v=>targetSet.uids.add(v)); });
+      const targets={clubKeys:[...targetSet.clubKeys], phoneDigits:[...targetSet.phoneDigits], uids:[...targetSet.uids]};
+      docs=await getEnabledPushTokenDocs(x=>pushTokenMatchesTargetsForKey(ctx.key,x,targets));
     }
     if(!docs.length){ sl(false); toast('발송 대상 알림 토큰이 없습니다','info'); return; }
     const res=await sendPushToTokenDocs(docs,title,body,{type:'manual_push',target:ctx.type});
@@ -7221,7 +7314,7 @@ function ensureAdminPushControls(){
     box.id='adminPushControlBox';
     box.className='form-group';
     box.style.cssText='margin-bottom:16px;padding:14px;background:linear-gradient(135deg,#eef4ff,#fffdf5);border:1.5px solid #93c5fd;border-radius:12px';
-    box.innerHTML=`<div style="font-weight:800;font-size:.9rem;color:#1d4ed8;margin-bottom:8px">🔔 관리자 알림알림 발송</div><div style="font-size:.75rem;color:var(--text2);line-height:1.7;margin-bottom:10px">알림알림을 켠 전체 사용자에게 공지를 발송합니다. 경기 카드/명단 카드에서는 해당 대상에게만 보낼 수 있습니다.</div><button class="btn btn-primary" onclick="openAdminBroadcastPushModal()" style="width:100%;background:#2563eb">📢 전체 알림 공지 보내기</button>`;
+    box.innerHTML=`<div style="font-weight:800;font-size:.9rem;color:#1d4ed8;margin-bottom:8px">🔔 관리자 알림 발송</div><div style="font-size:.75rem;color:var(--text2);line-height:1.7;margin-bottom:10px">알림을 켠 전체 사용자에게 공지를 발송합니다. 경기 카드/명단 카드에서는 해당 대상에게만 보낼 수 있습니다.</div><button class="btn btn-primary" onclick="openAdminBroadcastPushModal()" style="width:100%;background:#2563eb">📢 전체 알림 공지 보내기</button>`;
     body.prepend(box);
   }catch(e){}
 }
@@ -7245,6 +7338,9 @@ function openMatchPushPromptAfterRegistration(){
 }
 
 window.requestMatchPushPermission=requestMatchPushPermission;
+window.closePushRequiredModal=closePushRequiredModal;
+window.showMandatoryPushSetupPrompt=showMandatoryPushSetupPrompt;
+window.setMatchPushOptOut=setMatchPushOptOut;
 window.setupFcmForegroundListener=setupFcmForegroundListener;
 window.updatePushStatusLabel=updatePushStatusLabel;
 window.openMatchPushPromptAfterRegistration=openMatchPushPromptAfterRegistration;
@@ -7509,6 +7605,7 @@ async function handleSocialCustomTokenRedirect(){
     history.replaceState(null,'',location.origin+location.pathname);
     try{ localStorage.setItem('memberLoginProvider', provider||'social'); localStorage.setItem('memberLoginAt', new Date().toISOString()); }catch(_e){}
     toast((provider==='naver'?'네이버':(provider==='kakao'?'카카오':'소셜'))+' 로그인 완료 ✅','success');
+    setTimeout(()=>showMandatoryPushSetupPrompt(provider||'social'),650);
     try{ refreshIndividualAuthGate(); renderRL(); }catch(_e){}
     try{
       if(isPopupReturn && window.opener && !window.opener.closed){
@@ -7602,6 +7699,7 @@ async function loginWithGoogle(){
     sl(false);
     try{ localStorage.setItem('memberLoginProvider','google'); localStorage.setItem('memberLoginAt', new Date().toISOString()); }catch(_e){}
     toast('구글 로그인 완료 ✅','success');
+    setTimeout(()=>showMandatoryPushSetupPrompt('google'),650);
     try{ refreshIndividualAuthGate(); renderRL(); }catch(_e){}
   }catch(e){
     sl(false);
@@ -7703,6 +7801,7 @@ onAuthStateChanged(auth, async (user)=>{
     CURRENT_APP_USER = (user && !user.isAnonymous) ? user : null;
     if(CURRENT_APP_USER){ try{ CURRENT_APP_PROFILE=await ensureUserProfileDoc(CURRENT_APP_USER); }catch(_e){} } else { CURRENT_APP_PROFILE=null; }
     refreshGoogleLoginUI(CURRENT_APP_USER);
+    if(CURRENT_APP_USER && !sessionStorage.getItem('pushPromptShownThisSession')){ sessionStorage.setItem('pushPromptShownThisSession','1'); setTimeout(()=>showMandatoryPushSetupPrompt('auth_state'),900); }
     const isAdmin = user ? await verifyFirebaseAdmin(user) : false;
     const tmProfile = (!isAdmin && user) ? await getApprovedTournamentManagerProfile(user) : null;
     if(isAdmin){
@@ -7733,6 +7832,7 @@ getRedirectResult(auth).then(async (result)=>{
     CURRENT_APP_PROFILE=await ensureUserProfileDoc(result.user).catch(()=>null);
     refreshGoogleLoginUI(result.user);
     toast('구글 로그인 완료 ✅','success');
+    setTimeout(()=>showMandatoryPushSetupPrompt('google_redirect'),650);
   }
 }).catch(e=>console.warn('google redirect result failed', e));
 handleSocialCustomTokenRedirect();
@@ -14188,7 +14288,8 @@ function buildCourtSmsAlertPayloads(prevMap,nextMap){
   return payloads;
 }
 function enqueueCourtSmsAlertsFromState(prevMap,nextMap){
-  buildCourtSmsAlertPayloads(prevMap,nextMap).forEach(payload=>enqueueStickyAlert(payload,'info'));
+  // v310: 자동 문자 팝업은 중단. 상태 변경 시 자동 푸시 대기열만 유지하고, 문자는 카드의 📨 버튼으로 수동 발송한다.
+  buildCourtSmsAlertPayloads(prevMap,nextMap);
 }
 
 function sendCourtCardSms(key, mid, statusKind='queue_registered', court='', queuePos=0){
@@ -27348,8 +27449,16 @@ function toast(msg,type='info'){
     return;
   }
   const c=ge('TC');
+  if(!c) return;
   const el=document.createElement('div');
   el.className='toast '+type;
+  const isPushSuccess = type==='success' && /알림|푸시|FCM/i.test(String(msg||''));
+  if(isPushSuccess){
+    el.style.cssText='max-width:min(520px,calc(100vw - 32px));padding:12px 14px;gap:10px;align-items:flex-start;';
+    el.innerHTML=`<div style="flex:1;line-height:1.55">✅ ${msg}</div><button type="button" onclick="this.closest('.toast')?.remove()" style="border:1px solid rgba(255,255,255,.45);background:rgba(255,255,255,.18);color:#fff;border-radius:999px;padding:6px 12px;font-size:.78rem;font-weight:900;cursor:pointer;white-space:nowrap">확인</button>`;
+    c.appendChild(el);
+    return;
+  }
   el.innerHTML=`${type==='success'?'✅':type==='error'?'❌':'ℹ️'} ${msg}`;
   c.appendChild(el);
   setTimeout(()=>{el.style.cssText='opacity:0;transform:translateX(30px);transition:all .3s';setTimeout(()=>el.remove(),300)},3000);
@@ -32156,7 +32265,7 @@ body {
         <div class="pwa-install-icon">📱</div>
         <div class="pwa-install-main">
           <div class="pwa-install-title">230테니스 매치를 설치하면 더 편합니다</div>
-          <div class="pwa-install-desc">내 경기 보기, 코트 배정 확인, 경기 결과 입력, 알림알림을 앱처럼 사용할 수 있습니다.</div>
+          <div class="pwa-install-desc">내 경기 보기, 코트 배정 확인, 경기 결과 입력, 알림을 앱처럼 사용할 수 있습니다.</div>
           <div class="pwa-install-actions">
             <button type="button" class="pwa-install-primary" id="pwaInstallNowBtn">홈화면 설치</button>
             <a class="pwa-install-store" id="pwaPlayStoreBtn" href="${PLAY_STORE_SEARCH}" target="_blank" rel="noopener">플레이스토어 설치</a>
