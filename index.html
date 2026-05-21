@@ -34210,6 +34210,263 @@ try{
 
 
 
+
+
+<style id="v319MobileRegisterAndBackFixStyle">
+/* v319: 모바일 접수 카드 정렬 + 긴 클럽명/페어명 가독성 보정 */
+@media(max-width:680px){
+  #page-register .rr-team-card.individual-entry-card{
+    border-radius:16px !important;
+    overflow:hidden !important;
+    background:#071026 !important;
+    border:1px solid rgba(255,255,255,.08) !important;
+    box-shadow:0 8px 18px rgba(15,30,58,.16) !important;
+  }
+  #page-register .rr-team-card.individual-entry-card .rr-team-header{
+    display:grid !important;
+    grid-template-columns:auto minmax(0,1fr) !important;
+    grid-template-areas:
+      "num name"
+      "actions actions" !important;
+    align-items:start !important;
+    gap:8px 10px !important;
+    padding:11px 12px !important;
+    background:#071026 !important;
+  }
+  #page-register .rr-team-card.individual-entry-card .rr-team-info{
+    display:contents !important;
+  }
+  #page-register .rr-team-card.individual-entry-card .rr-team-num{
+    grid-area:num !important;
+    width:28px !important;
+    height:28px !important;
+    margin-top:1px !important;
+    background:rgba(255,255,255,.18) !important;
+    color:#fff !important;
+    font-size:.78rem !important;
+    flex:none !important;
+  }
+  #page-register .rr-team-card.individual-entry-card .rr-team-name,
+  #page-register .rr-team-card.individual-entry-card .individual-entry-title{
+    grid-area:name !important;
+    display:block !important;
+    min-width:0 !important;
+    width:100% !important;
+    color:#fff !important;
+    font-size:1.02rem !important;
+    line-height:1.42 !important;
+    font-weight:900 !important;
+    white-space:normal !important;
+    word-break:keep-all !important;
+    overflow-wrap:anywhere !important;
+    text-overflow:clip !important;
+    overflow:visible !important;
+  }
+  #page-register .individual-entry-title .entry-pair-line{
+    display:block !important;
+    min-width:0 !important;
+    padding:1px 0 !important;
+  }
+  #page-register .individual-entry-title .entry-pair-line + .entry-pair-line{
+    margin-top:2px !important;
+    padding-top:4px !important;
+    border-top:1px dashed rgba(255,255,255,.14) !important;
+  }
+  #page-register .individual-entry-title .entry-player-name{
+    font-weight:1000 !important;
+  }
+  #page-register .individual-entry-title .entry-player-club{
+    display:inline-block !important;
+    margin-left:4px !important;
+    color:#dbeafe !important;
+    font-size:.86em !important;
+    font-weight:800 !important;
+    opacity:.95 !important;
+  }
+  #page-register .rr-team-card.individual-entry-card .rr-admin-btns{
+    grid-area:actions !important;
+    display:grid !important;
+    grid-template-columns:1fr 1fr 1fr !important;
+    width:100% !important;
+    gap:7px !important;
+    margin-top:3px !important;
+  }
+  #page-register .rr-team-card.individual-entry-card .rr-admin-btns .btn,
+  #page-register .rr-team-card.individual-entry-card .rr-btn-edit,
+  #page-register .rr-team-card.individual-entry-card .rr-btn-del{
+    width:100% !important;
+    min-height:38px !important;
+    height:38px !important;
+    padding:6px 4px !important;
+    border-radius:11px !important;
+    font-size:.75rem !important;
+    font-weight:900 !important;
+    white-space:nowrap !important;
+    justify-content:center !important;
+  }
+  #page-register .rr-team-card:not(.individual-entry-card) .rr-team-header{
+    align-items:flex-start !important;
+    gap:8px !important;
+  }
+  #page-register .rr-team-card:not(.individual-entry-card) .rr-team-name{
+    white-space:normal !important;
+    word-break:keep-all !important;
+    overflow-wrap:anywhere !important;
+    line-height:1.35 !important;
+  }
+}
+@media(max-width:390px){
+  #page-register .rr-team-card.individual-entry-card .rr-team-header{
+    padding:10px 10px !important;
+    gap:7px 8px !important;
+  }
+  #page-register .rr-team-card.individual-entry-card .rr-team-name,
+  #page-register .rr-team-card.individual-entry-card .individual-entry-title{
+    font-size:.95rem !important;
+  }
+  #page-register .rr-team-card.individual-entry-card .rr-admin-btns{
+    gap:5px !important;
+  }
+  #page-register .rr-team-card.individual-entry-card .rr-admin-btns .btn,
+  #page-register .rr-team-card.individual-entry-card .rr-btn-edit,
+  #page-register .rr-team-card.individual-entry-card .rr-btn-del{
+    min-height:35px !important;
+    height:35px !important;
+    font-size:.68rem !important;
+  }
+}
+</style>
+
+<script id="v319AndroidBackAndMobileRegisterFixScript">
+(function(){
+  'use strict';
+
+  function escHtml(s){
+    return String(s==null?'':s).replace(/[&<>'"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c];});
+  }
+
+  function splitPlayerClub(seg){
+    var t=String(seg||'').trim();
+    var m=t.match(/^(.*?)(\s*\([^)]*\))\s*$/);
+    if(!m) return '<span class="entry-player-name">'+escHtml(t)+'</span>';
+    return '<span class="entry-player-name">'+escHtml(m[1].trim())+'</span><span class="entry-player-club">'+escHtml(m[2].trim())+'</span>';
+  }
+
+  function enhanceMobileRegistrationCards(){
+    try{
+      document.querySelectorAll('#page-register .rr-team-card.individual-entry-card .individual-entry-title').forEach(function(el){
+        var raw=(el.getAttribute('data-v319-raw') || el.textContent || '').replace(/\s+/g,' ').trim();
+        if(!raw) return;
+        if(!el.getAttribute('data-v319-raw')) el.setAttribute('data-v319-raw', raw);
+        var parts=raw.split('/').map(function(x){return x.trim();}).filter(Boolean);
+        if(parts.length>=2){
+          el.innerHTML=parts.map(function(part){return '<span class="entry-pair-line">'+splitPlayerClub(part)+'</span>';}).join('');
+        }
+      });
+    }catch(e){ console.warn('enhanceMobileRegistrationCards failed', e); }
+  }
+  window.enhanceMobileRegistrationCards = enhanceMobileRegistrationCards;
+
+  function wrapRenderFunction(name){
+    try{
+      var fn=window[name];
+      if(typeof fn!=='function' || fn.__v319Wrapped) return;
+      var wrapped=function(){
+        var ret=fn.apply(this, arguments);
+        setTimeout(enhanceMobileRegistrationCards, 0);
+        setTimeout(enhanceMobileRegistrationCards, 120);
+        return ret;
+      };
+      wrapped.__v319Wrapped=true;
+      window[name]=wrapped;
+    }catch(e){}
+  }
+
+  function isModalOpen(el){
+    if(!el) return false;
+    if(el.classList && el.classList.contains('open')) return true;
+    if(el.classList && el.classList.contains('show')) return true;
+    var st='';
+    try{ st=getComputedStyle(el).display; }catch(e){}
+    return st && st!=='none';
+  }
+  function getTopOpenModal(){
+    var list=[].slice.call(document.querySelectorAll('.modal-overlay, #matchListPopup'));
+    for(var i=list.length-1;i>=0;i--){ if(isModalOpen(list[i])) return list[i]; }
+    return null;
+  }
+  function closeTopModal(modal){
+    try{
+      if(!modal) return false;
+      if(modal.id==='matchListPopup' && typeof window.closeMatchListPopup==='function') window.closeMatchListPopup();
+      else if(typeof window.forceCloseModal==='function') window.forceCloseModal(modal.id);
+      else if(typeof window.cm==='function') window.cm(modal.id);
+      else { modal.classList.remove('open','show'); modal.style.display='none'; }
+      return true;
+    }catch(e){ return false; }
+  }
+  function activePage(){
+    return document.querySelector('.page.active')?.id?.replace('page-','') || 'home';
+  }
+
+  function initBackHandler(){
+    if(window.__v319BackHandlerInstalled) return;
+    window.__v319BackHandlerInstalled=true;
+    var internal=false;
+    var origShow=window.showPage;
+    if(typeof origShow==='function' && !origShow.__v319HistoryWrapped){
+      var wrappedShow=function(n){
+        var before=activePage();
+        var ret=origShow.apply(this, arguments);
+        var after=activePage();
+        if(!internal && after && after!==before){
+          try{ history.pushState({appPage:after, v319:true}, '', location.href); }catch(e){}
+        }
+        return ret;
+      };
+      wrappedShow.__v319HistoryWrapped=true;
+      window.showPage=wrappedShow;
+    }
+    try{ history.replaceState({appPage:activePage(), v319:true}, '', location.href); }catch(e){}
+
+    window.addEventListener('popstate', function(ev){
+      var modal=getTopOpenModal();
+      if(modal){
+        closeTopModal(modal);
+        try{ history.pushState({appPage:activePage(), v319:true}, '', location.href); }catch(e){}
+        return;
+      }
+      var target=ev.state && ev.state.appPage;
+      if(target && document.getElementById('page-'+target) && typeof origShow==='function'){
+        internal=true;
+        try{ origShow(target); }finally{ internal=false; }
+        return;
+      }
+      var cur=activePage();
+      if(cur!=='home' && typeof origShow==='function'){
+        internal=true;
+        try{ origShow('home'); }finally{ internal=false; }
+        try{ history.pushState({appPage:'home', v319:true}, '', location.href); }catch(e){}
+      }else{
+        try{ history.pushState({appPage:cur, v319:true}, '', location.href); }catch(e){}
+        if(typeof window.toast==='function') window.toast('뒤로가기는 먼저 창을 닫거나 홈으로 이동합니다. 종료는 한 번 더 시도해 주세요.','info');
+      }
+    });
+  }
+
+  function init(){
+    wrapRenderFunction('renderRL');
+    wrapRenderFunction('renderRegisterDivisionOverview');
+    enhanceMobileRegistrationCards();
+    setTimeout(enhanceMobileRegistrationCards, 500);
+    initBackHandler();
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+</script>
+
+
 <script id="v291PushUiGuardScript">
 (function(){
   'use strict';
