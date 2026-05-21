@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-05-21-v261-records-menu-stable";
+  const APP_VERSION = "2026-05-21-v262-push-complete";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -11756,6 +11756,8 @@ async function enqueueMatchPushNotification(kind,key,m,meta={}){
     };
     const docId=makePushNotificationDocId(payload);
     await setDoc(doc(db,'pushNotifications',docId), payload, {merge:true});
+    // 실제 발송은 Firebase Cloud Functions(onCreate trigger)가 pushNotifications 문서를 감지해 처리합니다.
+    // 같은 docId로 중복 생성되는 이벤트는 Firestore trigger가 다시 실행되지 않아 중복 발송을 방지합니다.
     console.log('push notification queued', docId, payload);
     return true;
   }catch(e){
