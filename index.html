@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-05-21-v310-push-fix-restore-data";
+  const APP_VERSION = "2026-05-21-v311-push-require-confirm";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -6903,6 +6903,33 @@ async function saveCurrentFcmToken(token){
   try{ localStorage.removeItem('matchPushOptOut'); }catch(e){}
   return true;
 }
+
+function showReceivedPushConfirmAlert(title='230MATCH 알림', body=''){
+  try{
+    const wrap=ge('stickyAlertWrap');
+    if(!wrap){ alert(`${title}${body?'\n'+body:''}`); return; }
+    wrap.setAttribute('data-action-type','received_push');
+    wrap.innerHTML=`<div class="sticky-alert-card">
+      <div class="sticky-alert-title">🔔 ${esc(title)}</div>
+      <div class="sticky-alert-msg">${esc(body||'')}</div>
+      <div class="sticky-alert-actions"><button type="button" class="sticky-alert-btn primary" onclick="window.closeReceivedPushConfirmAlert()">확인</button></div>
+    </div>`;
+    wrap.className='sticky-alert-wrap show';
+  }catch(e){ try{ alert(`${title}${body?'\n'+body:''}`); }catch(_e){} }
+}
+function closeReceivedPushConfirmAlert(){
+  try{
+    const wrap=ge('stickyAlertWrap');
+    if(wrap && String(wrap.getAttribute('data-action-type')||'')==='received_push'){
+      wrap.classList.remove('show');
+      wrap.innerHTML='';
+      wrap.removeAttribute('data-action-type');
+    }
+  }catch(e){}
+}
+window.showReceivedPushConfirmAlert=showReceivedPushConfirmAlert;
+window.closeReceivedPushConfirmAlert=closeReceivedPushConfirmAlert;
+
 async function requestMatchPushPermission(){
   try{
     const user=auth.currentUser || CURRENT_APP_USER;
@@ -6947,14 +6974,31 @@ async function setupFcmForegroundListener(){
     onMessage(messaging,(payload)=>{
       const title=payload?.notification?.title || payload?.data?.title || '230MATCH 알림';
       const body=payload?.notification?.body || payload?.data?.body || '';
-      toast(`🔔 ${title}${body?' - '+body:''}`,'info');
+      const data={...(payload?.data||{}), title, body, requireInteraction:'true'};
       try{
-        if(Notification.permission==='granted' && document.visibilityState==='hidden'){
+        if(Notification.permission==='granted'){
           navigator.serviceWorker.getRegistration('/').then(reg=>{
-            reg?.showNotification(title,{body,icon:'/icon-192.png',badge:'/icon-192.png',data:payload?.data||{}});
-          });
+            if(reg){
+              reg.showNotification(title,{
+                body,
+                icon:'/icon-192.png',
+                badge:'/icon-192.png',
+                tag:String(data.matchId||data.mid||data.type||'230match')+'_'+Date.now(),
+                renotify:true,
+                requireInteraction:true,
+                actions:[{action:'confirm', title:'확인'}],
+                data
+              });
+            }else{
+              showReceivedPushConfirmAlert(title, body);
+            }
+          }).catch(()=>showReceivedPushConfirmAlert(title, body));
+        }else{
+          showReceivedPushConfirmAlert(title, body);
         }
-      }catch(e){}
+      }catch(e){
+        showReceivedPushConfirmAlert(title, body);
+      }
     });
     FCM_FOREGROUND_READY=true;
   }catch(e){ console.warn('foreground messaging not ready',e); }
@@ -7027,7 +7071,25 @@ async function sendFcmPushToken(token, title, body, data={}){
   const res=await fetch('/api/send-push',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({token,title,body,data})
+    body:JSON.stringify({
+      token,
+      title,
+      body,
+      data:{...(data||{}), title, body, requireInteraction:'true'},
+      requireInteraction:true,
+      actions:[{action:'confirm', title:'확인'}],
+      webpush:{
+        notification:{
+          title,
+          body,
+          icon:'/icon-192.png',
+          badge:'/icon-192.png',
+          requireInteraction:true,
+          actions:[{action:'confirm', title:'확인'}]
+        },
+        fcmOptions:{link:'/' }
+      }
+    })
   });
   const txt=await res.text().catch(()=>'');
   let parsed=null;
@@ -7155,7 +7217,7 @@ async function sendPushToTokenDocs(tokenDocs, title, body, data={}){
   let ok=0, fail=0, stale=0;
   for(const x of uniq){
     try{
-      await sendFcmPushToken(x.token,title,body,data);
+      await sendFcmPushToken(x.token,title,body,{...(data||{}),requireInteraction:'true'});
       ok++;
     }catch(e){
       if(e?.isUnregistered){
@@ -7182,7 +7244,7 @@ async function sendRegistrationCompletePush(team,t,div){
     if(!tokens.length) return;
     const title='참가 접수 완료 ✅';
     const body=`${t?.name||'대회'} ${dl(div)} 접수가 완료되었습니다.`;
-    await sendPushToTokenDocs(tokens,title,body,{type:'registration_complete',tid:t?.id||'',division:div});
+    await sendPushToTokenDocs(tokens,title,body,{type:'registration_complete',tid:t?.id||'',division:div,requireInteraction:'true'});
   }catch(e){ console.warn('registration push skipped', e); }
 }
 async function openAdminBroadcastPushModal(){
@@ -14242,6 +14304,8 @@ async function enqueueMatchPushNotification(kind,key,m,meta={}){
       targetClubs:targets.clubs,
       targetUids:targets.uids,
       targetNames:targets.names,
+      requireInteraction:true,
+      notificationActions:[{action:'confirm', title:'확인'}],
       createdBy:getCurrentUid ? getCurrentUid() : '',
       createdAt:serverTimestamp(),
       createdAtText:new Date().toISOString()
