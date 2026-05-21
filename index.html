@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-05-21-v312-push-toggle-stable";
+  const APP_VERSION = "2026-05-21-v315-push-sms-fallback";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -5830,6 +5830,9 @@ body {
       <div class="form-group"><label class="form-label">제목</label><input class="form-input" id="manualPushTitle" placeholder="예: 경기 안내"></div>
       <div class="form-group"><label class="form-label">내용</label><textarea class="form-textarea" id="manualPushBody" rows="5" placeholder="알림으로 보낼 내용을 입력하세요"></textarea></div>
       <div style="font-size:.74rem;color:var(--text3);line-height:1.6">※ 알림을 허용한 사용자에게만 발송됩니다. 차단된 휴대폰에는 보낼 수 없습니다.</div>
+      <div id="manualPushFallbackBox" style="margin-top:10px;padding:10px 12px;border:1.5px solid #f59e0b;background:#fff7ed;border-radius:12px;font-size:.76rem;color:#92400e;line-height:1.6;font-weight:800">
+        📨 푸시 알림이 안 되는 대상자는 발송 후 문자 대체 버튼이 자동으로 표시됩니다.
+      </div>
     </div>
     <div class="modal-footer"><button class="btn btn-gray" onclick="cm('mManualPush')">취소</button><button class="btn btn-primary" onclick="sendManualPushFromModal()">🔔 발송</button></div>
   </div>
@@ -7412,6 +7415,7 @@ async function openAdminBroadcastPushModal(){
   if(target) target.textContent='전체 알림 수신자';
   window._manualPushContext={type:'all'};
   om('mManualPush');
+  setTimeout(updateManualPushFallbackPreview,80);
 }
 async function openManualMatchPush(key,mid){
   if(!(AD||TM||OP)){ toast('운영 권한 필요','info'); return; }
@@ -7425,6 +7429,7 @@ async function openManualMatchPush(key,mid){
   if(target) target.textContent=`해당 경기 카드 대상자만: ${tdn(t1,key,m.t1)||'1팀'} vs ${tdn(t2,key,m.t2)||'2팀'}`;
   window._manualPushContext={type:'match',key,mid};
   om('mManualPush');
+  setTimeout(updateManualPushFallbackPreview,80);
 }
 async function openManualTeamPush(key,idx){
   if(!(AD||TM||OP)){ toast('운영 권한 필요','info'); return; }
@@ -7436,6 +7441,7 @@ async function openManualTeamPush(key,idx){
   if(target) target.textContent=`명단 카드: ${team.entryLabel||team.pairLabel||tdn(team,key,idx)||'참가자'}`;
   window._manualPushContext={type:'team',key,idx:Number(idx)};
   om('mManualPush');
+  setTimeout(updateManualPushFallbackPreview,80);
 }
 
 function canShowMatchActionButtons(){
@@ -7464,6 +7470,7 @@ async function openGroupManualPush(key, gi){
   if(target) target.textContent=`${grpLabel(Number(gi))} 참가자/팀 전체`;
   window._manualPushContext={type:'group',key,gi:Number(gi)};
   om('mManualPush');
+  setTimeout(updateManualPushFallbackPreview,80);
 }
 function renderGroupQuickActionButtons(key, gi){
   if(!canShowMatchActionButtons()) return '';
@@ -7481,6 +7488,122 @@ function renderGroupQuickActionButtons(key, gi){
   return `<div class="v300-group-actions" data-team-count="${teamCount}" style="display:grid;grid-template-columns:repeat(${teamCount<=2?3:2},minmax(0,1fr));gap:8px;padding:10px 12px;border-top:1px solid var(--border);background:linear-gradient(135deg,#f8fbff,#fffdf5)">${resultBtn}${gameBtn}${alarmBtn}</div>`;
 }
 
+
+function uniqueSmsRecipientsByPhone(recipients=[]){
+  const seen=new Set();
+  return (recipients||[]).map(r=>({
+    name:String(r?.name||'').trim()||'대상자',
+    phone:formatPhoneLoose(r?.phone||''),
+    club:String(r?.club||'').trim(),
+    role:String(r?.role||'').trim()
+  })).filter(r=>{
+    const d=String(r.phone||'').replace(/[^0-9]/g,'');
+    if(d.length<9 || seen.has(d)) return false;
+    seen.add(d);
+    return true;
+  });
+}
+function getManualPushSmsFallbackRecipients(ctx={}){
+  try{
+    if(ctx.type==='match'){
+      const m=(G.matches[ctx.key]||[]).find(x=>String(x.id)===String(ctx.mid));
+      return uniqueSmsRecipientsByPhone(getMatchNotificationRecipients(ctx.key,m));
+    }
+    if(ctx.type==='team'){
+      const team=(G.teams[ctx.key]||[])[Number(ctx.idx)];
+      if(!team) return [];
+      if(team?.tournamentType==='individual_pair' || Array.isArray(team?.individualPlayers)){
+        return uniqueSmsRecipientsByPhone(getIndividualPlayers(team).slice(0,2).filter(p=>p?.receiveOrderSms!==false).map((p,i)=>({name:p?.name||`참가자${i+1}`, phone:p?.phone||'', club:p?.clubsRaw||''})));
+      }
+      const club=String(team?.club||'').trim();
+      const phone=formatPhoneLoose(team?.phone || (G.meta?.clubContacts||{})[club] || '');
+      return uniqueSmsRecipientsByPhone([{name:team?.entryLabel||team?.pairLabel||club||'팀', phone, club}]);
+    }
+    if(ctx.type==='group'){
+      const ms=(G.matches[ctx.key]||[]).filter(m=>m && m.phase==='group' && Number(m.group)===Number(ctx.gi));
+      return uniqueSmsRecipientsByPhone(ms.flatMap(m=>getMatchNotificationRecipients(ctx.key,m)));
+    }
+    if(ctx.type==='all'){
+      const contacts=G.meta?.clubContacts||{};
+      return uniqueSmsRecipientsByPhone(Object.entries(contacts).map(([club,phone])=>({name:club, club, phone, role:'captain'})));
+    }
+  }catch(e){ console.warn('fallback sms recipients failed', e); }
+  return [];
+}
+function recipientHasPushTokenDoc(recipient, docs=[]){
+  const phone=String(recipient?.phone||'').replace(/[^0-9]/g,'');
+  const club=normalizePushKey(recipient?.club||'');
+  return (docs||[]).some(x=>{
+    const xp=String(x?.phoneDigits||'').replace(/[^0-9]/g,'');
+    const xc=normalizePushKey(x?.clubKey||x?.club||'');
+    if(phone && xp && phone===xp) return true;
+    if(club && xc && club===xc) return true;
+    return false;
+  });
+}
+function getPushUnavailableSmsRecipients(recipients=[], docs=[]){
+  return uniqueSmsRecipientsByPhone(recipients).filter(r=>!recipientHasPushTokenDoc(r,docs));
+}
+async function getManualPushTargetTokenDocs(ctx={}){
+  if(ctx.type==='all') return await getEnabledPushTokenDocs();
+  if(ctx.type==='match'){
+    const m=(G.matches[ctx.key]||[]).find(x=>String(x.id)===String(ctx.mid));
+    const targets=getMatchPushTargets(ctx.key,m);
+    return await getEnabledPushTokenDocs(x=>pushTokenMatchesTargetsForKey(ctx.key,x,targets));
+  }
+  if(ctx.type==='team'){
+    const team=(G.teams[ctx.key]||[])[Number(ctx.idx)];
+    const targets={clubKeys:isIndividualPushKey(ctx.key)?[]:getTeamPushTargetKeys(team), phoneDigits:getTeamPushPhoneDigits(team), uids:[String(team?.ownerUid||'')].filter(Boolean)};
+    return await getEnabledPushTokenDocs(x=>pushTokenMatchesTargetsForKey(ctx.key,x,targets));
+  }
+  if(ctx.type==='group'){
+    const ms=(G.matches[ctx.key]||[]).filter(m=>m && m.phase==='group' && Number(m.group)===Number(ctx.gi));
+    const targetSet={clubKeys:new Set(), phoneDigits:new Set(), uids:new Set()};
+    ms.forEach(m=>{ const t=getMatchPushTargets(ctx.key,m); (t.clubKeys||[]).forEach(v=>targetSet.clubKeys.add(v)); (t.phoneDigits||[]).forEach(v=>targetSet.phoneDigits.add(v)); (t.uids||[]).forEach(v=>targetSet.uids.add(v)); });
+    const targets={clubKeys:[...targetSet.clubKeys], phoneDigits:[...targetSet.phoneDigits], uids:[...targetSet.uids]};
+    return await getEnabledPushTokenDocs(x=>pushTokenMatchesTargetsForKey(ctx.key,x,targets));
+  }
+  return [];
+}
+function showPushSmsFallbackAlert(ctx={}, recipients=[], body=''){
+  try{
+    const list=uniqueSmsRecipientsByPhone(recipients);
+    if(!list.length) return false;
+    const names=list.slice(0,5).map(r=>`${r.name}${r.phone?`(${r.phone})`:''}`).join(', ');
+    const more=list.length>5?` 외 ${list.length-5}명`:'';
+    const label=ctx.type==='group' ? '조 참가자' : (ctx.type==='match' ? '경기 대상자' : (ctx.type==='team' ? '명단 대상자' : '전체 대상자'));
+    enqueueStickyAlert({
+      title:'📨 푸시 불가 문자 대체',
+      msg:`${label} 중 푸시 알림 미설정/토큰 없음 ${list.length}명은 문자로 보내세요.\n${names}${more}`,
+      type:'info',
+      actionType:'sms_approval',
+      smsRecipients:list,
+      smsBody:body,
+      tid:ctx.key?_k2td(ctx.key).tid:'',
+      div:ctx.key?_k2td(ctx.key).div:'',
+      matchId:ctx.mid||'',
+      dedupeKey:`push_sms_fallback:${ctx.type||'all'}:${ctx.key||''}:${ctx.mid||''}:${ctx.gi??''}:${Date.now()}`
+    });
+    return true;
+  }catch(e){ console.warn('showPushSmsFallbackAlert failed', e); return false; }
+}
+async function updateManualPushFallbackPreview(){
+  try{
+    const box=ge('manualPushFallbackBox');
+    if(!box) return;
+    const ctx=window._manualPushContext||{type:'all'};
+    if(!(AD||TM||OP)){ box.innerHTML='운영 권한이 있어야 알림/문자 대체를 사용할 수 있습니다.'; return; }
+    const recipients=getManualPushSmsFallbackRecipients(ctx);
+    let docs=[];
+    try{ docs=await getManualPushTargetTokenDocs(ctx); }catch(e){ docs=[]; }
+    const fallback=getPushUnavailableSmsRecipients(recipients,docs);
+    const pushCount=(docs||[]).length;
+    const smsCount=fallback.length;
+    const names=fallback.slice(0,4).map(r=>`${r.name}${r.phone?`(${r.phone})`:''}`).join(', ');
+    box.innerHTML = `🔔 푸시 가능 기기 ${pushCount}개 · 📨 문자 대체 ${smsCount}명${smsCount?`<br><span style="font-weight:700">대체 대상: ${esc(names)}${smsCount>4?' 외 '+(smsCount-4)+'명':''}</span>`:''}<br><span style="font-weight:700;color:#9a3412">발송 후 푸시 불가 대상은 문자 버튼이 자동 표시됩니다.</span>`;
+  }catch(e){ console.warn('manual push preview failed', e); }
+}
+
 async function sendManualPushFromModal(){
   try{
     if(!(AD||TM||OP)){ toast('운영 권한 필요','error'); return; }
@@ -7489,25 +7612,20 @@ async function sendManualPushFromModal(){
     const body=(ge('manualPushBody')?.value||'').trim();
     if(!body){ toast('보낼 내용을 입력하세요','error'); return; }
     sl(true);
-    let docs=[];
-    if(ctx.type==='all'){
-      docs=await getEnabledPushTokenDocs();
-    }else if(ctx.type==='match'){
-      const m=(G.matches[ctx.key]||[]).find(x=>String(x.id)===String(ctx.mid));
-      const targets=getMatchPushTargets(ctx.key,m);
-      docs=await getEnabledPushTokenDocs(x=>pushTokenMatchesTargetsForKey(ctx.key,x,targets));
-    }else if(ctx.type==='team'){
-      const team=(G.teams[ctx.key]||[])[Number(ctx.idx)];
-      const targets={clubKeys:isIndividualPushKey(ctx.key)?[]:getTeamPushTargetKeys(team), phoneDigits:getTeamPushPhoneDigits(team), uids:[String(team?.ownerUid||'')].filter(Boolean)};
-      docs=await getEnabledPushTokenDocs(x=>pushTokenMatchesTargetsForKey(ctx.key,x,targets));
-    }else if(ctx.type==='group'){
-      const ms=(G.matches[ctx.key]||[]).filter(m=>m && m.phase==='group' && Number(m.group)===Number(ctx.gi));
-      const targetSet={clubKeys:new Set(), phoneDigits:new Set(), uids:new Set()};
-      ms.forEach(m=>{ const t=getMatchPushTargets(ctx.key,m); (t.clubKeys||[]).forEach(v=>targetSet.clubKeys.add(v)); (t.phoneDigits||[]).forEach(v=>targetSet.phoneDigits.add(v)); (t.uids||[]).forEach(v=>targetSet.uids.add(v)); });
-      const targets={clubKeys:[...targetSet.clubKeys], phoneDigits:[...targetSet.phoneDigits], uids:[...targetSet.uids]};
-      docs=await getEnabledPushTokenDocs(x=>pushTokenMatchesTargetsForKey(ctx.key,x,targets));
+    const docs=await getManualPushTargetTokenDocs(ctx);
+    const smsRecipients=getManualPushSmsFallbackRecipients(ctx);
+    const fallbackRecipients=getPushUnavailableSmsRecipients(smsRecipients,docs);
+    if(!docs.length){
+      sl(false);
+      cm('mManualPush');
+      if(fallbackRecipients.length){
+        toast(`푸시 대상 없음 · 문자 대체 ${fallbackRecipients.length}명`,'info');
+        showPushSmsFallbackAlert(ctx,fallbackRecipients,body);
+      }else{
+        toast('발송 대상 알림 토큰과 문자 번호가 없습니다','info');
+      }
+      return;
     }
-    if(!docs.length){ sl(false); toast('발송 대상 알림 토큰이 없습니다','info'); return; }
     const res=await sendPushToTokenDocs(docs,title,body,{type:'manual_push',target:ctx.type});
     sl(false);
     cm('mManualPush');
@@ -7515,7 +7633,12 @@ async function sendManualPushFromModal(){
       const extra=[];
       if(res.stale) extra.push(`만료토큰 정리 ${res.stale}`);
       if(res.fail) extra.push(`실패 ${res.fail}`);
+      if(fallbackRecipients.length) extra.push(`문자대체 ${fallbackRecipients.length}명`);
       toast(`알림 발송 완료: 성공 ${res.ok}${extra.length?' / '+extra.join(' / '):''}`,'success');
+      if(fallbackRecipients.length) showPushSmsFallbackAlert(ctx,fallbackRecipients,body);
+    }else if((res.stale>0 || res.fail>0) && fallbackRecipients.length){
+      toast(`푸시 성공 0명 · 문자 대체 ${fallbackRecipients.length}명`,'info');
+      showPushSmsFallbackAlert(ctx,fallbackRecipients,body);
     }else if(res.stale>0 && res.fail===0){
       toast(`유효한 알림 수신자가 없습니다. 만료된 기기 토큰 ${res.stale}개를 정리했습니다.`,'info');
     }else if(res.fail>0){
@@ -7565,6 +7688,8 @@ window.openGroupManualPush=openGroupManualPush;
 window.openManualMatchPush=openManualMatchPush;
 window.openManualTeamPush=openManualTeamPush;
 window.sendManualPushFromModal=sendManualPushFromModal;
+window.updateManualPushFallbackPreview=updateManualPushFallbackPreview;
+window.showPushSmsFallbackAlert=showPushSmsFallbackAlert;
 window.openAdminBroadcastPushModal=openAdminBroadcastPushModal;
 
 setTimeout(()=>{try{ setupFcmForegroundListener(); updatePushStatusLabel(); }catch(e){}},1800);
