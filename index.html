@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-05-21-v264-push-manual-result-card";
+  const APP_VERSION = "2026-05-21-v290-modal-close-fix";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -66,6 +66,625 @@ document.addEventListener('DOMContentLoaded', ()=>{setTimeout(applySimpleOrderMo
 
 
 
+
+
+setInterval(()=>{try{fixIndividualPrelimCardOverflow()}catch(e){}},1200);
+
+
+function forcePrelimRankCourtVisible(){
+  try{
+    document.querySelectorAll('.indiv-prelim-grid .grp-standings, .indiv-prelim-grid .standings, .indiv-prelim-grid .rank-box, .indiv-prelim-grid .ranking-box, .indiv-prelim-grid .grp-ranking').forEach(el=>{
+      el.style.display='block';
+      el.style.visibility='visible';
+      el.style.opacity='1';
+    });
+    normalizeCourtAssignmentChips();
+    ensureGroupMatchToggles();
+  }catch(e){}
+}
+window.forcePrelimRankCourtVisible=forcePrelimRankCourtVisible;
+document.addEventListener('DOMContentLoaded',()=>setTimeout(forcePrelimRankCourtVisible,500));
+setInterval(()=>{try{forcePrelimRankCourtVisible()}catch(e){}},1500);
+
+
+
+function getMatchAssignedCourtLabelFromElement(card){
+  try{
+    const raw=(card.innerText||'').replace(/\s+/g,' ');
+    const m=raw.match(/(?:경기코트|코트|배정코트)\s*[:：]?\s*([가-힣A-Za-z0-9_-]*\d+|국제\d+|능동\d+|장유\d+)/);
+    if(m && m[1]) return m[1];
+    const cls=card.className||'';
+    return '';
+  }catch(e){ return ''; }
+}
+
+function normalizeCourtAssignmentChips(){
+  try{
+    document.querySelectorAll('.indiv-prelim-grid .m3card, .indiv-prelim-grid .match-card').forEach(card=>{
+      const txt=(card.innerText||'');
+      const hasAssigned=/경기코트\s*[^\n]*\d+|코트\s*[^\n]*\d+|국제\d+|능동\d+|장유\d+/.test(txt);
+      if(!hasAssigned) return;
+      card.querySelectorAll('button,span,div').forEach(el=>{
+        const t=(el.textContent||'').trim();
+        if(/조코트\s*미배정|코트\s*미배정|미배정/.test(t) && !/경기코트\s*국제\d+|코트\s*국제\d+/.test(t)){
+          el.classList.add('is-assigned');
+          el.style.display='none';
+        }
+      });
+    });
+  }catch(e){}
+}
+
+function toggleGroupMatchList(btn){
+  try{
+    const card=btn.closest('.grp-card') || btn.parentElement;
+    if(!card) return;
+    const sec=card.querySelector('.grp-matches-section');
+    if(!sec) return;
+    const opened=sec.classList.toggle('force-show');
+    btn.textContent=opened?'📂 경기목록 접기':'📋 경기목록 보기';
+    normalizeCourtAssignmentChips();
+  }catch(e){}
+}
+window.toggleGroupMatchList=toggleGroupMatchList;
+
+function ensureGroupMatchToggles(){
+  try{
+    document.querySelectorAll('.indiv-prelim-grid .grp-card').forEach(card=>{
+      const sec=card.querySelector('.grp-matches-section');
+      if(!sec) return;
+      let btn=card.querySelector(':scope > .grp-matches-toggle');
+      if(!btn){
+        btn=document.createElement('button');
+        btn.type='button';
+        btn.className='grp-matches-toggle';
+        btn.textContent=sec.classList.contains('force-show')?'📂 경기목록 접기':'📋 경기목록 보기';
+        btn.onclick=function(){ toggleGroupMatchList(btn); };
+        card.insertBefore(btn, sec);
+      }
+    });
+  }catch(e){}
+}
+window.ensureGroupMatchToggles=ensureGroupMatchToggles;
+document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{ensureGroupMatchToggles();normalizeCourtAssignmentChips();},700));
+setInterval(()=>{try{ensureGroupMatchToggles();normalizeCourtAssignmentChips();}catch(e){}},1200);
+
+
+function getGroupTeamCount(card){
+  try{
+    const rows=[...card.querySelectorAll('.gs-row')];
+    if(rows.length) return rows.length;
+    const raw=(card.innerText||'');
+    const nums=[...raw.matchAll(/(^|\n|\s)(\d+)번\s+/g)].map(m=>Number(m[2])).filter(Boolean);
+    return nums.length ? Math.max(...nums) : 0;
+  }catch(e){ return 0; }
+}
+
+function compactGroupActionButtons(){
+  try{
+    document.querySelectorAll('.indiv-prelim-grid .grp-card').forEach(card=>{
+      if(card.querySelector('.v275-group-actions')) return;
+
+      const resultBtn=[...card.querySelectorAll('button')].find(b=>/이\s*조\s*결과|결과\s*입력/.test((b.textContent||'').trim()));
+      const pushBtn=[...card.querySelectorAll('button')].find(b=>/이\s*조\s*푸시|푸시/.test((b.textContent||'').trim()) && !/경기목록/.test((b.textContent||'').trim()));
+      let listBtn=card.querySelector(':scope > .grp-matches-toggle') || [...card.querySelectorAll('button')].find(b=>/경기목록/.test((b.textContent||'').trim()));
+
+      if(!pushBtn && !resultBtn && !listBtn) return;
+
+      const teamCount=getGroupTeamCount(card);
+      const actionRow=document.createElement('div');
+      actionRow.className='v275-group-actions';
+
+      if(resultBtn){
+        if(teamCount>=3){
+          resultBtn.style.display='none';
+        }else{
+          resultBtn.textContent='⚡ 결과';
+          resultBtn.classList.add('btn');
+          actionRow.appendChild(resultBtn);
+        }
+      }
+
+      if(pushBtn){
+        pushBtn.textContent='🔔 푸시';
+        pushBtn.classList.add('btn');
+        actionRow.appendChild(pushBtn);
+      }
+
+      if(listBtn){
+        listBtn.textContent='📂 목록';
+        listBtn.classList.add('btn');
+        listBtn.style.display='inline-flex';
+        actionRow.appendChild(listBtn);
+      }
+
+      if(actionRow.children.length===2) actionRow.classList.add('two-actions');
+      if(actionRow.children.length>0){
+        const sec=card.querySelector('.grp-matches-section');
+        if(sec) card.insertBefore(actionRow, sec);
+        else card.appendChild(actionRow);
+      }
+    });
+  }catch(e){ console.warn('compactGroupActionButtons failed', e); }
+}
+window.compactGroupActionButtons=compactGroupActionButtons;
+document.addEventListener('DOMContentLoaded',()=>setTimeout(compactGroupActionButtons,700));
+setInterval(()=>{try{compactGroupActionButtons()}catch(e){}},1200);
+
+
+function rebuildCompactGroupActionButtonsFinal(){
+  try{
+    document.querySelectorAll('.indiv-prelim-grid .grp-card').forEach(card=>{
+      const oldRows=[...card.querySelectorAll('.v275-group-actions')];
+      const oldButtons=[];
+      oldRows.forEach(row=>{
+        [...row.querySelectorAll('button')].forEach(b=>oldButtons.push(b));
+        row.remove();
+      });
+
+      const buttons=[...card.querySelectorAll('button')].concat(oldButtons);
+      const resultBtn=buttons.find(b=>/이\s*조\s*결과|결과\s*입력|^\s*⚡\s*결과/.test((b.textContent||'').trim()));
+      const pushBtn=buttons.find(b=>/이\s*조\s*푸시|^\s*🔔\s*푸시|푸시/.test((b.textContent||'').trim()) && !/경기목록|목록/.test((b.textContent||'').trim()));
+      let listBtn=buttons.find(b=>/경기목록|목록/.test((b.textContent||'').trim()));
+
+      if(!listBtn){
+        const sec=card.querySelector('.grp-matches-section');
+        if(sec){
+          listBtn=document.createElement('button');
+          listBtn.type='button';
+          listBtn.className='grp-matches-toggle';
+          listBtn.onclick=function(){ toggleGroupMatchList(listBtn); };
+        }
+      }
+
+      const teamCount=(typeof getGroupTeamCount==='function') ? getGroupTeamCount(card) : 0;
+      const row=document.createElement('div');
+      row.className='v275-group-actions';
+
+      if(resultBtn && teamCount<3){
+        resultBtn.textContent='⚡ 결과';
+        resultBtn.style.display='inline-flex';
+        row.appendChild(resultBtn);
+      }else if(resultBtn){
+        resultBtn.style.display='none';
+      }
+
+      if(pushBtn){
+        pushBtn.textContent='🔔 푸시';
+        pushBtn.style.display='inline-flex';
+        row.appendChild(pushBtn);
+      }
+
+      if(listBtn){
+        const sec=card.querySelector('.grp-matches-section');
+        listBtn.textContent=(sec && sec.classList.contains('force-show'))?'📂 접기':'📋 목록';
+        listBtn.classList.add('grp-matches-toggle');
+        listBtn.style.display='inline-flex';
+        listBtn.onclick=function(){ 
+          if(typeof toggleGroupMatchList==='function') toggleGroupMatchList(listBtn);
+          setTimeout(rebuildCompactGroupActionButtonsFinal,0);
+        };
+        row.appendChild(listBtn);
+      }
+
+      if(row.children.length===2) row.classList.add('two-actions');
+      if(row.children.length){
+        const sec=card.querySelector('.grp-matches-section');
+        if(sec) card.insertBefore(row, sec);
+        else card.appendChild(row);
+      }
+    });
+  }catch(e){ console.warn('rebuildCompactGroupActionButtonsFinal failed', e); }
+}
+window.rebuildCompactGroupActionButtonsFinal=rebuildCompactGroupActionButtonsFinal;
+document.addEventListener('DOMContentLoaded',()=>setTimeout(rebuildCompactGroupActionButtonsFinal,800));
+setInterval(()=>{try{rebuildCompactGroupActionButtonsFinal()}catch(e){}},1500);
+
+
+function cleanMatchListLayoutFinal(){
+  try{
+    document.querySelectorAll('.indiv-prelim-grid .grp-matches-section.force-show .m3team, .indiv-prelim-grid .grp-matches-section.force-show .match-team').forEach(team=>{
+      const candidates=[...team.querySelectorAll('.m3tnm,.match-team-name,.match-team-players,b,strong')];
+      if(candidates.length){
+        const first=candidates[0];
+        first.style.display='block';
+        first.style.whiteSpace='nowrap';
+        first.style.overflow='hidden';
+        first.style.textOverflow='ellipsis';
+        first.style.writingMode='horizontal-tb';
+      }
+    });
+
+    // 액션줄 버튼 텍스트를 짧게 고정
+    document.querySelectorAll('.indiv-prelim-grid .v275-group-actions button').forEach(btn=>{
+      const t=(btn.textContent||'').trim();
+      if(/결과/.test(t)) btn.textContent='⚡결과';
+      else if(/푸시/.test(t)) btn.textContent='🔔푸시';
+      else if(/접기/.test(t)) btn.textContent='📂접기';
+      else if(/목록/.test(t)) btn.textContent='📋목록';
+    });
+  }catch(e){}
+}
+window.cleanMatchListLayoutFinal=cleanMatchListLayoutFinal;
+document.addEventListener('DOMContentLoaded',()=>setTimeout(cleanMatchListLayoutFinal,900));
+setInterval(()=>{try{cleanMatchListLayoutFinal()}catch(e){}},1200);
+
+
+function stabilizeGroupButtonsAndMatchList(){
+  try{
+    document.querySelectorAll('.indiv-prelim-grid .v275-group-actions').forEach(row=>{
+      row.style.position='static';
+      row.style.transform='none';
+      row.style.width='100%';
+      row.style.margin='0';
+      row.querySelectorAll('button').forEach(btn=>{
+        btn.style.position='static';
+        btn.style.transform='none';
+        const t=(btn.textContent||'').trim();
+        if(/결과/.test(t)) btn.textContent='⚡ 결과';
+        else if(/푸시/.test(t)) btn.textContent='🔔 푸시';
+        else if(/접기/.test(t)) btn.textContent='📂 접기';
+        else if(/목록/.test(t)) btn.textContent='📋 목록';
+      });
+    });
+
+    document.querySelectorAll('.indiv-prelim-grid .grp-card').forEach(card=>{
+      const sec=card.querySelector('.grp-matches-section.force-show');
+      if(sec){
+        card.style.gridColumn='1 / -1';
+        sec.querySelectorAll('.m3tnm,.match-team-name,.match-team-players').forEach(el=>{
+          el.style.whiteSpace='normal';
+          el.style.overflow='visible';
+          el.style.textOverflow='clip';
+          el.style.wordBreak='keep-all';
+          el.style.overflowWrap='anywhere';
+        });
+      }else{
+        card.style.gridColumn='';
+      }
+    });
+  }catch(e){}
+}
+window.stabilizeGroupButtonsAndMatchList=stabilizeGroupButtonsAndMatchList;
+
+// 기존 주기적 재배치 함수가 버튼을 흔드는 원인이라 안정화 함수로 덮어씀
+try{
+  window.rebuildCompactGroupActionButtonsFinal = stabilizeGroupButtonsAndMatchList;
+  window.cleanMatchListLayoutFinal = stabilizeGroupButtonsAndMatchList;
+}catch(e){}
+
+document.addEventListener('DOMContentLoaded',()=>setTimeout(stabilizeGroupButtonsAndMatchList,600));
+setInterval(()=>{try{stabilizeGroupButtonsAndMatchList()}catch(e){}},1500);
+
+
+function applyRecommendedGroupResultStructure(){
+  try{
+    document.querySelectorAll('.indiv-prelim-grid .grp-card').forEach(card=>{
+      const teamCount = (typeof getGroupTeamCount==='function') ? getGroupTeamCount(card) : card.querySelectorAll('.gs-row').length;
+      card.classList.remove('group-size-2','group-size-3','group-size-4','group-size-5');
+      card.classList.add('group-size-'+Math.min(Math.max(teamCount||0,2),5));
+
+      const row=card.querySelector('.v275-group-actions');
+      if(row){
+        const resultBtn=[...row.querySelectorAll('button')].find(b=>/결과/.test((b.textContent||'')));
+        const pushBtn=[...row.querySelectorAll('button')].find(b=>/푸시/.test((b.textContent||'')));
+        const listBtn=[...row.querySelectorAll('button')].find(b=>/목록|접기/.test((b.textContent||'')));
+
+        if(resultBtn){
+          resultBtn.classList.add('result-fast-btn');
+          resultBtn.textContent='⚡ 결과';
+          resultBtn.style.display = teamCount>=3 ? 'none' : 'inline-flex';
+        }
+        if(pushBtn) pushBtn.textContent='🔔 푸시';
+        if(listBtn) listBtn.textContent = /접기/.test(listBtn.textContent||'') ? '📂 접기' : '📋 목록';
+
+        row.classList.toggle('two-actions', teamCount>=3);
+      }
+    });
+  }catch(e){}
+}
+
+function simplifyRankingStatsToDiffOnly(){
+  try{
+    document.querySelectorAll('.indiv-prelim-grid .gs-row').forEach(row=>{
+      const stats=row.querySelector('.gs-stats');
+      if(!stats) return;
+
+      let winText='', lossText='', diffNum=null;
+      [...stats.querySelectorAll('span,div,b')].forEach(el=>{
+        const t=(el.textContent||'').trim();
+        if(/^승\s*\d+/.test(t)) winText=t.replace(/\s+/g,'');
+        if(/^패\s*\d+/.test(t)) lossText=t.replace(/\s+/g,'');
+        const m=t.match(/게임득실\s*([+-]?\d+)/);
+        if(m) diffNum=Number(m[1]);
+        if(/게임득\s*\d+|게임실\s*\d+/.test(t)){
+          el.classList.add('hide-game-detail');
+        }
+      });
+
+      if(diffNum===null){
+        const raw=stats.innerText||'';
+        const m=raw.match(/게임득실\s*([+-]?\d+)/);
+        if(m) diffNum=Number(m[1]);
+      }
+
+      let badge=stats.querySelector('.simple-diff-badge');
+      if(diffNum!==null){
+        if(!badge){
+          badge=document.createElement('span');
+          badge.className='simple-diff-badge';
+          stats.appendChild(badge);
+        }
+        badge.classList.toggle('negative', diffNum<0);
+        badge.classList.toggle('zero', diffNum===0);
+        badge.textContent='득실 '+(diffNum>0?('+'+diffNum):String(diffNum));
+      }
+
+      // 승/패/득실만 재배치
+      [...stats.querySelectorAll('span,div,b')].forEach(el=>{
+        const t=(el.textContent||'').trim();
+        if(/게임득\s*\d+|게임실\s*\d+/.test(t)) el.style.display='none';
+      });
+    });
+  }catch(e){}
+}
+
+function applyV280RecommendedUi(){
+  applyRecommendedGroupResultStructure();
+  simplifyRankingStatsToDiffOnly();
+}
+window.applyV280RecommendedUi=applyV280RecommendedUi;
+document.addEventListener('DOMContentLoaded',()=>setTimeout(applyV280RecommendedUi,800));
+setInterval(()=>{try{applyV280RecommendedUi()}catch(e){}},1500);
+
+
+function v281EnsurePopupShell(){
+  let pop=document.getElementById('matchListPopup');
+  if(pop) return pop;
+  pop=document.createElement('div');
+  pop.id='matchListPopup';
+  pop.innerHTML=`
+    <div class="mlp-box">
+      <div class="mlp-head">
+        <div id="matchListPopupTitle">📋 경기 목록</div>
+        <button type="button" class="mlp-close" onclick="closeMatchListPopup()">×</button>
+      </div>
+      <div class="mlp-body" id="matchListPopupBody"></div>
+    </div>`;
+  document.body.appendChild(pop);
+  pop.addEventListener('click',e=>{ if(e.target===pop) closeMatchListPopup(); });
+  return pop;
+}
+function closeMatchListPopup(){
+  const pop=document.getElementById('matchListPopup');
+  if(pop) pop.classList.remove('show');
+}
+window.closeMatchListPopup=closeMatchListPopup;
+
+function v281Text(el){
+  return (el?.textContent||'').replace(/\s+/g,' ').trim();
+}
+
+/* ── 팀명 정제: 대회명·상태·이모지 등 불필요 텍스트 제거 ── */
+function v281CleanTeamName(s){
+  return (s||'')
+    .replace(/영남권\s*지역신인부/g,'')
+    .replace(/[가-힣A-Za-z0-9\s·ㆍ-]*(?:신인부|지역신인부|오픈부|금배부|은배부|동배부|테린이부|개인전|단체전)/g,'')
+    .replace(/모던클럽배\s*테니스대회/g,'')
+    .replace(/\d+경기/g,'')
+    .replace(/국제\s*\d+/g,'')
+    .replace(/[🏆✅✏️🔔📢🎾📋⚡🚀🔥🔑]/gu,'')
+    .replace(/완료|대기중|대기|시합중|진행중/g,'')
+    .replace(/결과\s*수정하기|결과수정|결과입력|결과\s*입력하기/g,'')
+    .replace(/푸시|공지\(경기\)\s*입력|공지\(경기\)\s*수정/g,'')
+    .replace(/경기코트\s*[가-힣A-Za-z0-9_-]+/g,'')
+    .replace(/코트배정|코트\s*[가-힣A-Za-z0-9_-]+/g,'')
+    .replace(/승\s*\d+|패\s*\d+|게임득실\s*[+-]?\d+|게임득\s*\d+|게임실\s*\d+/g,'')
+    .replace(/\d+\s*[:：]\s*\d+/g,'')
+    .replace(/\d+번/g,'')
+    .replace(/\d+위/g,'')
+    .replace(/\s+/g,' ')
+    .trim();
+}
+
+/* ── G.matches에서 data-match-id로 매치 데이터 조회 ── */
+function v281FindMatchData(matchEl){
+  try{
+    if(typeof G==='undefined') return null;
+    const mid=matchEl.getAttribute('data-match-id');
+    if(!mid) return null;
+    for(const [key,list] of Object.entries(G.matches||{})){
+      const m=(list||[]).find(x=>String(x.id)===String(mid));
+      if(m) return {m,key};
+    }
+  }catch(e){}
+  return null;
+}
+
+/* ── 팀 인덱스로 실제 이름 반환 ── */
+function v281GetTeamName(key,teamIdx){
+  try{
+    const team=(G.teams[key]||[])[teamIdx];
+    if(!team) return null;
+    const isIndiv=team.tournamentType==='individual_pair'||Array.isArray(team.individualPlayers);
+    if(isIndiv){
+      const ps=(typeof getIndividualPlayers==='function')
+        ? getIndividualPlayers(team).slice(0,2).map(p=>String(p?.name||'').replace(/\s*\([^)]*\)$/,'').trim()).filter(Boolean)
+        : (team.players||[]).slice(0,2).map(v=>String(v||'').trim()).filter(Boolean);
+      if(ps.length) return ps.join(' / ');
+      return team.pairLabel||team.entryLabel||null;
+    }
+    return (typeof tdn==='function')?tdn(team,key,teamIdx):(team.club||null);
+  }catch(e){ return null; }
+}
+
+function v281ExtractScore(card){
+  const raw=v281Text(card);
+  const m=raw.match(/(\d+)\s*[:：]\s*(\d+)/);
+  return m?`${m[1]}:${m[2]}`:'';
+}
+
+function v281BuildPopupCardFromMatch(matchEl,idx){
+  const resultBtn=[...matchEl.querySelectorAll('button')].find(b=>/결과|수정/.test(v281Text(b)));
+  const pushBtn=[...matchEl.querySelectorAll('button')].find(b=>/푸시/.test(v281Text(b)));
+  const raw=v281Text(matchEl);
+
+  /* 팀명: G.matches 데이터 우선 → DOM fallback */
+  let t1='',t2='';
+  const found=v281FindMatchData(matchEl);
+  if(found){
+    const {m,key}=found;
+    t1=v281GetTeamName(key,m.t1)||'';
+    t2=v281GetTeamName(key,m.t2)||'';
+    if(!t1&&m.label1) t1=String(m.label1);
+    if(!t2&&m.label2) t2=String(m.label2);
+  }
+  /* DOM fallback: m3tnm → m3hdr span "A vs B" */
+  if(!t1||!t2){
+    const tnms=[...matchEl.querySelectorAll('.m3tnm')];
+    if(tnms.length>=2){
+      if(!t1) t1=v281Text(tnms[0]).replace(/^🏆\s*/,'').replace(/\s*🏆$/,'');
+      if(!t2) t2=v281Text(tnms[1]).replace(/^🏆\s*/,'').replace(/\s*🏆$/,'');
+    } else {
+      const hdr=matchEl.querySelector('.m3hdr');
+      if(hdr){
+        const spans=[...hdr.querySelectorAll('span')];
+        for(const sp of spans){
+          const t=(sp.textContent||'').replace(/\s+/g,' ').trim();
+          const mm=t.match(/^(.+?)\s+vs\s+(.+)$/i);
+          if(mm){ if(!t1) t1=mm[1]; if(!t2) t2=mm[2]; break; }
+        }
+      }
+    }
+  }
+  t1=v281CleanTeamName(t1)||'팀 A';
+  t2=v281CleanTeamName(t2)||'팀 B';
+
+  const score=v281ExtractScore(matchEl);
+  const status=/완료/.test(raw)?'완료':(/시합중|진행/.test(raw)?'시합중':'대기');
+  const statusIcon=status==='완료'?'✅':status==='시합중'?'🔥':'⏳';
+  const statusStyle=status==='완료'
+    ?'background:#dcfce7;color:#15803d;border-color:#86efac;'
+    :status==='시합중'
+    ?'background:#fef3c7;color:#92400e;border-color:#fcd34d;'
+    :'background:#f1f5f9;color:#475569;border-color:#cbd5e1;';
+  const court=(raw.match(/(?:경기코트|코트)\s*[:：]?\s*([가-힣A-Za-z0-9_-]*\d+)/)||[])[1]||'';
+
+  const card=document.createElement('div');
+  card.className='mlp-card';
+  card.innerHTML=`
+    <div class="mlp-meta">
+      <span class="mlp-chip" style="font-weight:900;font-size:.75rem">${idx+1}경기</span>
+      <span class="mlp-chip" style="${statusStyle}font-weight:900;font-size:.75rem">${statusIcon} ${status}</span>
+      ${court?`<span class="mlp-chip" style="background:#eff6ff;color:#1d4ed8;border-color:#93c5fd;font-weight:900;font-size:.75rem">🎾 ${court}</span>`:''}
+    </div>
+    <div class="mlp-teams">
+      <div class="mlp-team">${t1}</div>
+      <div class="mlp-vs">VS</div>
+      <div class="mlp-team">${t2}</div>
+    </div>
+    ${score?`<div class="mlp-score">${score}</div>`:''}
+    <div class="mlp-actions">
+      <button type="button" class="btn btn-primary" style="background:linear-gradient(135deg,#1d4ed8,#2563eb);color:#fff;font-weight:900;border:0;border-radius:12px;min-height:44px;font-size:.9rem">✏️ 결과입력</button>
+      <button type="button" class="btn btn-outline" style="background:#eff6ff;color:#1d4ed8;border:1.5px solid #93c5fd;font-weight:900;border-radius:12px;min-height:44px;font-size:.9rem">🔔 푸시</button>
+    </div>`;
+  const btns=card.querySelectorAll('.mlp-actions button');
+  btns[0].onclick=()=>{ closeMatchListPopup(); if(resultBtn) resultBtn.click(); };
+  btns[1].onclick=()=>{ if(pushBtn) pushBtn.click(); };
+  return card;
+}
+
+function openGroupMatchListPopupFromButton(btn){
+  const grpCard=btn.closest('.grp-card');
+  if(!grpCard) return;
+  const pop=v281EnsurePopupShell();
+  const body=document.getElementById('matchListPopupBody');
+  const title=document.getElementById('matchListPopupTitle');
+
+  /* 타이틀: grp-hdr 첫 번째 span(조 이름)만 가져옴 */
+  const hdr=grpCard.querySelector('.grp-hdr');
+  const firstSpan=hdr?hdr.querySelector('span'):null;
+  let grpName=firstSpan?v281Text(firstSpan):'경기 목록';
+  grpName=(grpName||'').replace(/영남권\s*지역신인부/g,'').replace(/[가-힣A-Za-z0-9\s·ㆍ-]*(?:신인부|지역신인부|오픈부|금배부|은배부|동배부|테린이부|개인전|단체전)/g,'').replace(/\s+/g,' ').trim();
+  if(!grpName || !/조|경기/.test(grpName)) grpName='경기 목록';
+  title.textContent='📋 '+(grpName==='경기 목록'?grpName:(grpName+' 경기 목록'));
+
+  body.innerHTML='';
+  const matches=[...grpCard.querySelectorAll('.grp-matches-section .m3card,.grp-matches-section .match-card')];
+  if(!matches.length){
+    body.innerHTML='<div class="mlp-card" style="text-align:center;font-weight:900;color:#64748b">표시할 경기 목록이 없습니다.</div>';
+  }else{
+    matches.forEach((m,i)=>body.appendChild(v281BuildPopupCardFromMatch(m,i)));
+  }
+  pop.classList.add('show');
+}
+window.openGroupMatchListPopupFromButton=openGroupMatchListPopupFromButton;
+
+function v281CompactStats(){
+  try{
+    document.querySelectorAll('.indiv-prelim-grid .gs-stats').forEach(stats=>{
+      let win='', loss='', diff=null;
+      const raw=(stats.textContent||'').replace(/\s+/g,' ');
+      const wm=raw.match(/승\s*(\d+)/);
+      const lm=raw.match(/패\s*(\d+)/);
+      const dm=raw.match(/게임득실\s*([+-]?\d+)|득실\s*([+-]?\d+)/);
+      if(wm) win=`승 ${wm[1]}`;
+      if(lm) loss=`패 ${lm[1]}`;
+      if(dm) diff=Number(dm[1]||dm[2]);
+
+      stats.innerHTML='';
+      if(win){
+        const s=document.createElement('span'); s.className='badge'; s.textContent=win; stats.appendChild(s);
+      }
+      if(loss){
+        const s=document.createElement('span'); s.className='badge'; s.textContent=loss; stats.appendChild(s);
+      }
+      if(diff!==null && !Number.isNaN(diff)){
+        const s=document.createElement('span');
+        s.className='simple-diff-badge '+(diff<0?'negative':diff===0?'zero':'');
+        s.textContent='득실 '+(diff>0?`+${diff}`:String(diff));
+        stats.appendChild(s);
+      }
+    });
+  }catch(e){}
+}
+
+function v281ApplyRecommendedLayout(){
+  try{
+    document.querySelectorAll('.indiv-prelim-grid .grp-card').forEach(card=>{
+      const teamCount=(typeof getGroupTeamCount==='function') ? getGroupTeamCount(card) : card.querySelectorAll('.gs-row').length;
+      const row=card.querySelector('.v275-group-actions');
+      if(row){
+        const resultBtn=[...row.querySelectorAll('button')].find(b=>/결과/.test(v281Text(b)));
+        const pushBtn=[...row.querySelectorAll('button')].find(b=>/푸시/.test(v281Text(b)));
+        const listBtn=[...row.querySelectorAll('button')].find(b=>/목록|접기/.test(v281Text(b)));
+        if(resultBtn){
+          resultBtn.style.display=teamCount>=3?'none':'flex';
+          resultBtn.textContent='⚡ 결과';
+        }
+        if(pushBtn) pushBtn.textContent='🔔 푸시';
+        if(listBtn){
+          listBtn.style.display='flex';
+          listBtn.textContent='📋 경기';
+          listBtn.onclick=function(ev){ ev.preventDefault(); ev.stopPropagation(); openGroupMatchListPopupFromButton(listBtn); };
+        }
+        row.classList.toggle('two-actions', teamCount>=3);
+      }
+      const sec=card.querySelector('.grp-matches-section');
+      if(sec) sec.classList.remove('force-show');
+    });
+    v281CompactStats();
+  }catch(e){}
+}
+window.v281ApplyRecommendedLayout=v281ApplyRecommendedLayout;
+
+// 기존 접기/펼치기 동작을 팝업으로 대체
+try{
+  window.toggleGroupMatchList=function(btn){ openGroupMatchListPopupFromButton(btn); };
+}catch(e){}
+
+document.addEventListener('DOMContentLoaded',()=>setTimeout(v281ApplyRecommendedLayout,700));
+setInterval(()=>{try{v281ApplyRecommendedLayout()}catch(e){}},1200);
 
 </script>
 <style>
@@ -2136,6 +2755,1612 @@ body {
   .hero-title{ overflow-wrap:anywhere; word-break:keep-all; }
 }
 </style>
+
+<style id="v267ResultModalFooterFix">
+#mM3 .modal-header{gap:10px}
+#mM3 .modal-header h3{min-width:0;flex:1 1 auto;line-height:1.35;word-break:keep-all}
+#mM3 .modal-header .modal-close{flex:0 0 30px;width:30px;height:30px}
+#mM3Footer{
+  display:grid !important;
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  position:sticky !important;
+  bottom:0 !important;
+  z-index:20 !important;
+  background:#fff !important;
+  border-top:1px solid var(--border) !important;
+}
+#mM3Footer #mM3CloseBtn{display:inline-flex !important}
+.m3-inline-result-actions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin-top:14px;
+  padding:12px;
+  border-radius:14px;
+  background:linear-gradient(135deg,#f8fbff,#fffdf5);
+  border:1.5px solid #dbe7ff;
+}
+.m3-inline-result-actions .btn{width:100%;min-height:44px;font-size:.9rem;font-weight:900;border-radius:12px}
+@media(max-width:768px){
+  #mM3.modal-overlay{
+    align-items:flex-end !important;
+    padding:8px 8px calc(76px + env(safe-area-inset-bottom,0px)) 8px !important;
+  }
+  #mM3 .modal-box{
+    max-height:calc(100vh - 92px - env(safe-area-inset-bottom,0px)) !important;
+    border-radius:18px 18px 0 0 !important;
+    overflow:hidden !important;
+  }
+  #mM3 .modal-body{
+    max-height:calc(100vh - 220px - env(safe-area-inset-bottom,0px)) !important;
+    overflow-y:auto !important;
+    -webkit-overflow-scrolling:touch;
+  }
+  #mM3Footer{padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px)) 12px !important}
+}
+</style>
+
+
+<style id="v269ResultSaveAlwaysVisible">
+#mM3Footer{
+  display:grid !important;
+  grid-template-columns:1fr 1fr !important;
+  gap:10px !important;
+  position:sticky !important;
+  bottom:0 !important;
+  z-index:50 !important;
+  background:#fff !important;
+  border-top:1px solid var(--border) !important;
+  padding:12px 16px !important;
+}
+#mM3Footer #mM3SaveResultBtn,
+#mM3Footer #mM3CloseBtn{
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  min-height:44px !important;
+  width:100% !important;
+  font-size:.92rem !important;
+  font-weight:900 !important;
+  border-radius:12px !important;
+}
+#mM3Footer #mM3SaveResultBtn{
+  background:linear-gradient(135deg,#facc15,#d97706) !important;
+  color:#111827 !important;
+  border:1px solid #d97706 !important;
+}
+#mM3Footer #mM3SaveResultBtn::before{
+  content:"💾 ";
+}
+#mM3Footer #mM3CloseBtn{
+  background:#eef2f7 !important;
+  color:#334155 !important;
+  border:1px solid #cbd5e1 !important;
+}
+@media(max-width:768px){
+  #mM3Footer{
+    padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px)) 12px !important;
+  }
+}
+</style>
+
+
+<style id="v271CardOverflowAndSingleFooterFix">
+/* 결과입력 모달: 중복 저장/닫기 제거, 하단 버튼만 유지 */
+#mM3 .m3-inline-result-actions{
+  display:none !important;
+}
+#mM3Footer{
+  display:grid !important;
+  grid-template-columns:1fr 1fr !important;
+  gap:10px !important;
+  position:sticky !important;
+  bottom:0 !important;
+  z-index:80 !important;
+  background:#fff !important;
+  border-top:1px solid var(--border) !important;
+  padding:12px 16px !important;
+}
+#mM3Footer #mM3SaveResultBtn,
+#mM3Footer #mM3CloseBtn{
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  width:100% !important;
+  min-height:46px !important;
+  font-size:.94rem !important;
+  font-weight:900 !important;
+  border-radius:12px !important;
+}
+#mM3Footer #mM3SaveResultBtn{
+  background:linear-gradient(135deg,#facc15,#d97706) !important;
+  color:#111827 !important;
+  border:1px solid #d97706 !important;
+}
+#mM3Footer #mM3SaveResultBtn::before{
+  content:"" !important;
+}
+#mM3Footer #mM3CloseBtn{
+  background:#eef2f7 !important;
+  color:#334155 !important;
+  border:1px solid #cbd5e1 !important;
+}
+
+/* 개인전 예선 카드 잘림 방지 */
+.indiv-prelim-grid{
+  grid-template-columns:repeat(auto-fit,minmax(320px,1fr)) !important;
+  overflow:visible !important;
+}
+.indiv-prelim-grid .grp-card{
+  min-width:0 !important;
+  width:100% !important;
+  overflow:hidden !important;
+}
+.indiv-prelim-grid .grp-matches-section,
+.indiv-prelim-grid .grp-matches-section.force-show{
+  overflow:visible !important;
+}
+.indiv-prelim-grid .m3card,
+.indiv-prelim-grid .match-card{
+  width:100% !important;
+  max-width:100% !important;
+  min-width:0 !important;
+  overflow:hidden !important;
+}
+.indiv-prelim-grid .m3body,
+.indiv-prelim-grid .match-teams,
+.indiv-prelim-grid .match-team{
+  min-width:0 !important;
+}
+.indiv-prelim-grid .m3sc-row{
+  grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) !important;
+}
+.indiv-prelim-grid .m3tnm,
+.indiv-prelim-grid .match-team-name,
+.indiv-prelim-grid .match-team-players{
+  overflow:hidden !important;
+  text-overflow:ellipsis !important;
+  word-break:keep-all !important;
+}
+.indiv-prelim-grid .m3tnm{
+  white-space:nowrap !important;
+}
+.indiv-prelim-grid .rb-sc-row{
+  grid-template-columns:minmax(0,1fr) 20px minmax(0,1fr) !important;
+}
+.indiv-prelim-grid .btn{
+  max-width:100% !important;
+}
+@media(max-width:900px){
+  .indiv-prelim-grid{
+    grid-template-columns:1fr !important;
+  }
+}
+@media(max-width:680px){
+  #mM3.modal-overlay{
+    padding:8px 8px calc(76px + env(safe-area-inset-bottom,0px)) 8px !important;
+  }
+  #mM3 .modal-box{
+    max-height:calc(100vh - 92px - env(safe-area-inset-bottom,0px)) !important;
+  }
+  #mM3 .modal-body{
+    max-height:calc(100vh - 224px - env(safe-area-inset-bottom,0px)) !important;
+  }
+  #mM3Footer{
+    padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px)) 12px !important;
+  }
+}
+</style>
+
+
+<style id="v272TwoColumnMobileCards">
+/* 모바일 개인전 예선카드 2열 유지 */
+@media(max-width:680px){
+  .indiv-prelim-grid{
+    display:grid !important;
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+    gap:10px !important;
+    align-items:start !important;
+  }
+
+  .indiv-prelim-grid .grp-card{
+    width:100% !important;
+    min-width:0 !important;
+    border-radius:14px !important;
+    overflow:hidden !important;
+  }
+
+  .indiv-prelim-grid .grp-hdr{
+    padding:8px 8px !important;
+    min-height:auto !important;
+  }
+
+  .indiv-prelim-grid .grp-hdr > div:first-child > span:first-child{
+    font-size:.96rem !important;
+  }
+
+  .indiv-prelim-grid .grp-hdr > div:first-child span:not(:first-child){
+    font-size:.62rem !important;
+  }
+
+  .indiv-prelim-grid .gs-row{
+    padding:8px 8px !important;
+  }
+
+  .indiv-prelim-grid .gs-nm{
+    font-size:.82rem !important;
+    line-height:1.25 !important;
+    word-break:keep-all !important;
+  }
+
+  .indiv-prelim-grid .gs-stats{
+    font-size:.68rem !important;
+    gap:4px !important;
+    flex-wrap:wrap !important;
+  }
+
+  .indiv-prelim-grid .btn{
+    min-height:34px !important;
+    font-size:.72rem !important;
+    padding:6px 6px !important;
+  }
+
+  .indiv-prelim-grid .indiv-group-action-inline{
+    padding:8px !important;
+  }
+
+  .indiv-prelim-grid .grp-matches-section.force-show{
+    padding:8px !important;
+  }
+
+  .indiv-prelim-grid .m3tnm,
+  .indiv-prelim-grid .match-team-name{
+    font-size:.76rem !important;
+  }
+}
+</style>
+
+
+<style id="v273RankCourtAlwaysVisibleFix">
+/* 예선 순위현황/경기목록은 렌더링 갱신 후에도 항상 표시 */
+.indiv-prelim-grid .grp-standings,
+.indiv-prelim-grid .standings,
+.indiv-prelim-grid .rank-box,
+.indiv-prelim-grid .ranking-box,
+.indiv-prelim-grid .grp-ranking,
+.indiv-prelim-grid .grp-matches-section,
+.indiv-prelim-grid .grp-matches-section.force-show{
+  display:block !important;
+  visibility:visible !important;
+  opacity:1 !important;
+}
+
+/* 경기 카드의 코트 배정/상태 배지는 항상 보이게 */
+.indiv-prelim-grid .m3card [class*="court"],
+.indiv-prelim-grid .match-card [class*="court"],
+.indiv-prelim-grid .m3card [class*="Court"],
+.indiv-prelim-grid .match-card [class*="Court"],
+.indiv-prelim-grid .court-chip,
+.indiv-prelim-grid .match-court-chip,
+.indiv-prelim-grid .m3-court-chip{
+  display:inline-flex !important;
+  visibility:visible !important;
+  opacity:1 !important;
+}
+
+/* 모바일 2열에서 코트 배정 줄이 잘리지 않도록 */
+@media(max-width:680px){
+  .indiv-prelim-grid .m3meta,
+  .indiv-prelim-grid .match-meta,
+  .indiv-prelim-grid .m3tags,
+  .indiv-prelim-grid .match-tags{
+    display:flex !important;
+    flex-wrap:wrap !important;
+    gap:5px !important;
+    visibility:visible !important;
+    opacity:1 !important;
+    max-height:none !important;
+    overflow:visible !important;
+  }
+
+  .indiv-prelim-grid .grp-matches-section.force-show{
+    max-height:none !important;
+    overflow:visible !important;
+  }
+
+  .indiv-prelim-grid .m3card,
+  .indiv-prelim-grid .match-card{
+    min-height:auto !important;
+  }
+}
+</style>
+
+
+<style id="v274CollapsibleMatchListAndCourtFix">
+/* 모바일 2열에서는 경기목록 기본 접힘: 순위현황 중심 */
+@media(max-width:680px){
+  .indiv-prelim-grid .grp-matches-section:not(.force-show){
+    display:none !important;
+  }
+  .indiv-prelim-grid .grp-matches-toggle{
+    display:flex !important;
+    width:100% !important;
+    justify-content:center !important;
+    align-items:center !important;
+    min-height:34px !important;
+    margin:8px 8px 10px 8px !important;
+    padding:6px 8px !important;
+    border-radius:10px !important;
+    border:1px solid #bfdbfe !important;
+    background:#eff6ff !important;
+    color:#1d4ed8 !important;
+    font-size:.72rem !important;
+    font-weight:900 !important;
+  }
+  .indiv-prelim-grid .grp-matches-section.force-show{
+    display:block !important;
+    max-height:none !important;
+    overflow:visible !important;
+  }
+  .indiv-prelim-grid .m3meta,
+  .indiv-prelim-grid .match-meta,
+  .indiv-prelim-grid .m3tags,
+  .indiv-prelim-grid .match-tags{
+    display:flex !important;
+    flex-wrap:wrap !important;
+    align-items:center !important;
+    gap:5px !important;
+    max-height:none !important;
+    overflow:visible !important;
+  }
+}
+
+/* PC/태블릿에서는 토글 버튼은 작게 보이되, 경기목록은 기존 흐름 유지 */
+@media(min-width:681px){
+  .indiv-prelim-grid .grp-matches-toggle{
+    display:none !important;
+  }
+}
+
+/* 미배정 칩이 실제 코트 배정 후 남아 보이지 않도록 */
+.match-court-missing.is-assigned,
+.court-missing.is-assigned,
+.badge-court-missing.is-assigned{
+  display:none !important;
+}
+</style>
+
+
+<style id="v275CompactGroupActions">
+/* 조 카드 액션 버튼 한 줄 정리 */
+.indiv-prelim-grid .v275-group-actions{
+  display:grid !important;
+  grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+  gap:6px !important;
+  padding:8px !important;
+  border-top:1px solid #e5e7eb !important;
+  background:linear-gradient(135deg,#ffffff,#f8fbff) !important;
+}
+
+.indiv-prelim-grid .v275-group-actions.two-actions{
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+}
+
+.indiv-prelim-grid .v275-group-actions .btn,
+.indiv-prelim-grid .v275-group-actions button{
+  width:100% !important;
+  min-height:34px !important;
+  height:34px !important;
+  padding:5px 4px !important;
+  border-radius:10px !important;
+  font-size:.68rem !important;
+  font-weight:900 !important;
+  white-space:nowrap !important;
+  overflow:hidden !important;
+  text-overflow:ellipsis !important;
+  margin:0 !important;
+}
+
+/* 기존 세로 버튼 여백 제거 */
+.indiv-prelim-grid .indiv-group-action-inline{
+  padding:0 !important;
+  margin:0 !important;
+}
+
+.indiv-prelim-grid .grp-matches-toggle{
+  margin:0 !important;
+}
+
+/* 모바일 2열에서 버튼이 카드 폭을 밀어내지 않게 */
+@media(max-width:680px){
+  .indiv-prelim-grid .v275-group-actions{
+    gap:5px !important;
+    padding:7px !important;
+  }
+  .indiv-prelim-grid .v275-group-actions .btn,
+  .indiv-prelim-grid .v275-group-actions button{
+    min-height:32px !important;
+    height:32px !important;
+    font-size:.64rem !important;
+    padding:4px 3px !important;
+  }
+}
+</style>
+
+
+<style id="v276CleanMatchCardList">
+/* 경기목록 안 경기카드 정렬 정리 */
+.indiv-prelim-grid .grp-matches-section.force-show{
+  padding:8px !important;
+  background:#f8fafc !important;
+}
+
+.indiv-prelim-grid .grp-matches-section.force-show .m3card,
+.indiv-prelim-grid .grp-matches-section.force-show .match-card{
+  display:block !important;
+  width:100% !important;
+  max-width:100% !important;
+  min-width:0 !important;
+  margin:0 0 8px 0 !important;
+  padding:10px !important;
+  border-radius:12px !important;
+  border:1px solid #dbeafe !important;
+  background:#fff !important;
+  overflow:hidden !important;
+  box-sizing:border-box !important;
+}
+
+.indiv-prelim-grid .grp-matches-section.force-show .m3head,
+.indiv-prelim-grid .grp-matches-section.force-show .match-head,
+.indiv-prelim-grid .grp-matches-section.force-show .m3meta,
+.indiv-prelim-grid .grp-matches-section.force-show .match-meta,
+.indiv-prelim-grid .grp-matches-section.force-show .m3tags,
+.indiv-prelim-grid .grp-matches-section.force-show .match-tags{
+  display:flex !important;
+  flex-wrap:wrap !important;
+  align-items:center !important;
+  gap:5px !important;
+  margin-bottom:6px !important;
+  max-width:100% !important;
+  overflow:visible !important;
+}
+
+.indiv-prelim-grid .grp-matches-section.force-show .m3sc-row,
+.indiv-prelim-grid .grp-matches-section.force-show .rb-sc-row,
+.indiv-prelim-grid .grp-matches-section.force-show .match-teams{
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) 22px minmax(0,1fr) !important;
+  gap:6px !important;
+  align-items:stretch !important;
+  width:100% !important;
+  max-width:100% !important;
+  overflow:hidden !important;
+}
+
+.indiv-prelim-grid .grp-matches-section.force-show .m3team,
+.indiv-prelim-grid .grp-matches-section.force-show .match-team{
+  min-width:0 !important;
+  width:100% !important;
+  padding:8px 6px !important;
+  border-radius:10px !important;
+  text-align:center !important;
+  overflow:hidden !important;
+}
+
+.indiv-prelim-grid .grp-matches-section.force-show .m3tnm,
+.indiv-prelim-grid .grp-matches-section.force-show .match-team-name,
+.indiv-prelim-grid .grp-matches-section.force-show .match-team-players{
+  display:block !important;
+  max-width:100% !important;
+  white-space:nowrap !important;
+  overflow:hidden !important;
+  text-overflow:ellipsis !important;
+  font-size:.72rem !important;
+  line-height:1.25 !important;
+  font-weight:900 !important;
+}
+
+.indiv-prelim-grid .grp-matches-section.force-show .m3vs,
+.indiv-prelim-grid .grp-matches-section.force-show .vs{
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  font-size:.8rem !important;
+  font-weight:900 !important;
+  color:#64748b !important;
+  min-width:22px !important;
+}
+
+.indiv-prelim-grid .grp-matches-section.force-show .m3actions,
+.indiv-prelim-grid .grp-matches-section.force-show .match-actions{
+  display:grid !important;
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  gap:6px !important;
+  margin-top:8px !important;
+}
+
+.indiv-prelim-grid .grp-matches-section.force-show .m3actions .btn,
+.indiv-prelim-grid .grp-matches-section.force-show .match-actions .btn,
+.indiv-prelim-grid .grp-matches-section.force-show button{
+  min-height:30px !important;
+  padding:4px 5px !important;
+  font-size:.66rem !important;
+  border-radius:9px !important;
+  white-space:nowrap !important;
+}
+
+/* 경기목록 안에서는 너무 긴 설명/세로 텍스트 방지 */
+.indiv-prelim-grid .grp-matches-section.force-show br{
+  display:none !important;
+}
+</style>
+
+
+<style id="v277MobileCardCleanFinal">
+/* 조 카드 상단 액션: 한 줄만, 기존 중복 버튼은 숨김 */
+.indiv-prelim-grid .indiv-group-action-inline,
+.indiv-prelim-grid .grp-card > button:not(.grp-matches-toggle),
+.indiv-prelim-grid .grp-card > .btn:not(.grp-matches-toggle){
+  display:none !important;
+}
+
+.indiv-prelim-grid .v275-group-actions{
+  display:grid !important;
+  grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+  gap:5px !important;
+  padding:7px !important;
+  border-top:1px solid #e5e7eb !important;
+  background:#fff !important;
+}
+
+.indiv-prelim-grid .v275-group-actions.two-actions{
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+}
+
+.indiv-prelim-grid .v275-group-actions button{
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  width:100% !important;
+  height:32px !important;
+  min-height:32px !important;
+  padding:3px 4px !important;
+  margin:0 !important;
+  border-radius:9px !important;
+  font-size:.64rem !important;
+  font-weight:900 !important;
+  white-space:nowrap !important;
+  overflow:hidden !important;
+  text-overflow:ellipsis !important;
+}
+
+/* 경기목록 토글은 액션줄 안에 있을 때만 보이게 */
+.indiv-prelim-grid .grp-card > .grp-matches-toggle{
+  display:none !important;
+}
+.indiv-prelim-grid .v275-group-actions .grp-matches-toggle{
+  display:inline-flex !important;
+}
+
+/* 경기목록 내부: 2열 카드에서 선수명이 세로/반쪽으로 깨지는 것 방지 */
+.indiv-prelim-grid .grp-matches-section.force-show{
+  padding:8px !important;
+  background:#f8fafc !important;
+  overflow:hidden !important;
+}
+
+.indiv-prelim-grid .grp-matches-section.force-show .m3card,
+.indiv-prelim-grid .grp-matches-section.force-show .match-card{
+  width:100% !important;
+  max-width:100% !important;
+  min-width:0 !important;
+  padding:9px !important;
+  margin:0 0 8px 0 !important;
+  border-radius:12px !important;
+  overflow:hidden !important;
+  box-sizing:border-box !important;
+}
+
+.indiv-prelim-grid .grp-matches-section.force-show .m3sc-row,
+.indiv-prelim-grid .grp-matches-section.force-show .rb-sc-row,
+.indiv-prelim-grid .grp-matches-section.force-show .match-teams{
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) 18px minmax(0,1fr) !important;
+  gap:5px !important;
+  align-items:stretch !important;
+  width:100% !important;
+  overflow:hidden !important;
+}
+
+.indiv-prelim-grid .grp-matches-section.force-show .m3team,
+.indiv-prelim-grid .grp-matches-section.force-show .match-team{
+  min-width:0 !important;
+  width:100% !important;
+  padding:7px 4px !important;
+  border-radius:10px !important;
+  overflow:hidden !important;
+}
+
+.indiv-prelim-grid .grp-matches-section.force-show .m3tnm,
+.indiv-prelim-grid .grp-matches-section.force-show .match-team-name,
+.indiv-prelim-grid .grp-matches-section.force-show .match-team-players{
+  display:block !important;
+  width:100% !important;
+  max-width:100% !important;
+  white-space:nowrap !important;
+  overflow:hidden !important;
+  text-overflow:ellipsis !important;
+  word-break:keep-all !important;
+  font-size:.68rem !important;
+  line-height:1.22 !important;
+  font-weight:900 !important;
+  writing-mode:horizontal-tb !important;
+}
+
+.indiv-prelim-grid .grp-matches-section.force-show .m3vs,
+.indiv-prelim-grid .grp-matches-section.force-show .vs{
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  min-width:18px !important;
+  font-size:.72rem !important;
+  font-weight:900 !important;
+  color:#64748b !important;
+}
+
+/* 너무 좁은 폰에서도 2열은 유지하되 경기목록 내부만 더 압축 */
+@media(max-width:430px){
+  .indiv-prelim-grid{
+    gap:8px !important;
+  }
+  .indiv-prelim-grid .grp-matches-section.force-show .m3sc-row,
+  .indiv-prelim-grid .grp-matches-section.force-show .rb-sc-row,
+  .indiv-prelim-grid .grp-matches-section.force-show .match-teams{
+    grid-template-columns:minmax(0,1fr) 16px minmax(0,1fr) !important;
+    gap:3px !important;
+  }
+  .indiv-prelim-grid .grp-matches-section.force-show .m3tnm,
+  .indiv-prelim-grid .grp-matches-section.force-show .match-team-name,
+  .indiv-prelim-grid .grp-matches-section.force-show .match-team-players{
+    font-size:.62rem !important;
+  }
+}
+</style>
+
+
+<style id="v278CleanListRowLayout">
+/* 조 카드 버튼: 결과/푸시/목록 3개를 같은 줄에 고정 */
+.indiv-prelim-grid .v275-group-actions{
+  display:grid !important;
+  grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+  gap:6px !important;
+  padding:8px !important;
+  background:#fff !important;
+  border-top:1px solid #e5e7eb !important;
+}
+.indiv-prelim-grid .v275-group-actions.two-actions{
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+}
+.indiv-prelim-grid .v275-group-actions button{
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  width:100% !important;
+  min-width:0 !important;
+  height:34px !important;
+  min-height:34px !important;
+  margin:0 !important;
+  padding:0 4px !important;
+  border-radius:10px !important;
+  font-size:.65rem !important;
+  font-weight:900 !important;
+  line-height:1 !important;
+  white-space:nowrap !important;
+  overflow:hidden !important;
+  text-overflow:clip !important;
+}
+
+/* 기존 중복/밀린 버튼 강제 제거 */
+.indiv-prelim-grid .grp-card > .indiv-group-action-inline,
+.indiv-prelim-grid .grp-card > .grp-matches-toggle,
+.indiv-prelim-grid .grp-card > button:not(.grp-matches-toggle){
+  display:none !important;
+}
+
+/* 경기목록은 카드형이 아니라 간결한 한 줄 경기표로 */
+.indiv-prelim-grid .grp-matches-section.force-show{
+  padding:8px !important;
+  background:#f8fafc !important;
+  border-top:1px solid #e5e7eb !important;
+  overflow:hidden !important;
+}
+
+.indiv-prelim-grid .grp-matches-section.force-show .m3card,
+.indiv-prelim-grid .grp-matches-section.force-show .match-card{
+  display:block !important;
+  width:100% !important;
+  max-width:100% !important;
+  min-width:0 !important;
+  margin:0 0 8px 0 !important;
+  padding:8px !important;
+  border-radius:12px !important;
+  border:1px solid #dbeafe !important;
+  background:#fff !important;
+  box-sizing:border-box !important;
+  overflow:hidden !important;
+}
+
+/* 제목/배지 줄 */
+.indiv-prelim-grid .grp-matches-section.force-show .m3head,
+.indiv-prelim-grid .grp-matches-section.force-show .match-head,
+.indiv-prelim-grid .grp-matches-section.force-show .m3meta,
+.indiv-prelim-grid .grp-matches-section.force-show .match-meta,
+.indiv-prelim-grid .grp-matches-section.force-show .m3tags,
+.indiv-prelim-grid .grp-matches-section.force-show .match-tags{
+  display:flex !important;
+  flex-wrap:wrap !important;
+  gap:4px !important;
+  align-items:center !important;
+  margin:0 0 6px 0 !important;
+  max-height:none !important;
+  overflow:visible !important;
+  font-size:.62rem !important;
+}
+
+/* 팀 영역: 세로 박스 금지, 한 줄 대진표 */
+.indiv-prelim-grid .grp-matches-section.force-show .m3sc-row,
+.indiv-prelim-grid .grp-matches-section.force-show .rb-sc-row,
+.indiv-prelim-grid .grp-matches-section.force-show .match-teams{
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) 18px minmax(0,1fr) !important;
+  gap:4px !important;
+  align-items:center !important;
+  width:100% !important;
+  max-width:100% !important;
+  overflow:hidden !important;
+  margin:6px 0 !important;
+}
+
+.indiv-prelim-grid .grp-matches-section.force-show .m3team,
+.indiv-prelim-grid .grp-matches-section.force-show .match-team{
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  min-width:0 !important;
+  width:100% !important;
+  min-height:36px !important;
+  padding:5px 4px !important;
+  border-radius:9px !important;
+  overflow:hidden !important;
+  box-sizing:border-box !important;
+}
+
+/* 팀명은 한 줄 말줄임. 세로 글자/쪼개짐 방지 */
+.indiv-prelim-grid .grp-matches-section.force-show .m3tnm,
+.indiv-prelim-grid .grp-matches-section.force-show .match-team-name,
+.indiv-prelim-grid .grp-matches-section.force-show .match-team-players{
+  display:block !important;
+  width:100% !important;
+  max-width:100% !important;
+  min-width:0 !important;
+  white-space:nowrap !important;
+  overflow:hidden !important;
+  text-overflow:ellipsis !important;
+  word-break:keep-all !important;
+  writing-mode:horizontal-tb !important;
+  font-size:.68rem !important;
+  line-height:1.15 !important;
+  font-weight:900 !important;
+  text-align:center !important;
+}
+
+/* 팀 박스 안의 부가정보는 모바일 목록에서 숨김: 정렬 깨짐 원인 */
+.indiv-prelim-grid .grp-matches-section.force-show .m3team small,
+.indiv-prelim-grid .grp-matches-section.force-show .m3team .muted,
+.indiv-prelim-grid .grp-matches-section.force-show .match-team small,
+.indiv-prelim-grid .grp-matches-section.force-show .match-team .muted,
+.indiv-prelim-grid .grp-matches-section.force-show .m3team div:not(.m3tnm):not(.match-team-name):not(.match-team-players),
+.indiv-prelim-grid .grp-matches-section.force-show .match-team div:not(.m3tnm):not(.match-team-name):not(.match-team-players){
+  display:none !important;
+}
+
+.indiv-prelim-grid .grp-matches-section.force-show .m3vs,
+.indiv-prelim-grid .grp-matches-section.force-show .vs{
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  min-width:18px !important;
+  font-size:.7rem !important;
+  font-weight:900 !important;
+  color:#64748b !important;
+}
+
+/* 경기목록 내부 버튼도 한 줄 정렬 */
+.indiv-prelim-grid .grp-matches-section.force-show .m3actions,
+.indiv-prelim-grid .grp-matches-section.force-show .match-actions{
+  display:grid !important;
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  gap:5px !important;
+  margin-top:6px !important;
+}
+.indiv-prelim-grid .grp-matches-section.force-show button{
+  min-height:30px !important;
+  padding:3px 5px !important;
+  border-radius:8px !important;
+  font-size:.62rem !important;
+  font-weight:900 !important;
+  white-space:nowrap !important;
+}
+
+/* 너무 좁은 2열에서도 틀어지지 않도록 */
+@media(max-width:430px){
+  .indiv-prelim-grid .v275-group-actions{
+    gap:4px !important;
+    padding:6px !important;
+  }
+  .indiv-prelim-grid .v275-group-actions button{
+    height:31px !important;
+    min-height:31px !important;
+    font-size:.6rem !important;
+    padding:0 2px !important;
+  }
+  .indiv-prelim-grid .grp-matches-section.force-show .m3sc-row,
+  .indiv-prelim-grid .grp-matches-section.force-show .rb-sc-row,
+  .indiv-prelim-grid .grp-matches-section.force-show .match-teams{
+    grid-template-columns:minmax(0,1fr) 14px minmax(0,1fr) !important;
+    gap:3px !important;
+  }
+  .indiv-prelim-grid .grp-matches-section.force-show .m3team,
+  .indiv-prelim-grid .grp-matches-section.force-show .match-team{
+    min-height:34px !important;
+    padding:4px 2px !important;
+  }
+  .indiv-prelim-grid .grp-matches-section.force-show .m3tnm,
+  .indiv-prelim-grid .grp-matches-section.force-show .match-team-name,
+  .indiv-prelim-grid .grp-matches-section.force-show .match-team-players{
+    font-size:.6rem !important;
+  }
+}
+</style>
+
+
+<style id="v279StableButtonsWideMatchList">
+/* 버튼이 렌더링마다 위치 바뀌지 않게 액션줄 고정 */
+.indiv-prelim-grid .v275-group-actions{
+  display:grid !important;
+  grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+  gap:6px !important;
+  padding:8px !important;
+  margin:0 !important;
+  position:static !important;
+  transform:none !important;
+  width:100% !important;
+  box-sizing:border-box !important;
+}
+.indiv-prelim-grid .v275-group-actions.two-actions{
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+}
+.indiv-prelim-grid .v275-group-actions button{
+  position:static !important;
+  transform:none !important;
+  width:100% !important;
+  min-width:0 !important;
+  height:34px !important;
+  min-height:34px !important;
+  margin:0 !important;
+  padding:0 4px !important;
+  white-space:nowrap !important;
+}
+
+/* 목록을 펼친 조는 2열 폭이 아니라 한 줄 전체 폭을 사용 */
+.indiv-prelim-grid .grp-card:has(.grp-matches-section.force-show){
+  grid-column:1 / -1 !important;
+}
+
+/* 경기목록은 넓어진 카드 안에서 보기 좋게 */
+.indiv-prelim-grid .grp-matches-section.force-show{
+  display:block !important;
+  padding:10px !important;
+  background:#f8fafc !important;
+  overflow:visible !important;
+}
+
+/* 경기목록 카드: 내용 안 잘리게 */
+.indiv-prelim-grid .grp-matches-section.force-show .m3card,
+.indiv-prelim-grid .grp-matches-section.force-show .match-card{
+  width:100% !important;
+  max-width:100% !important;
+  padding:10px !important;
+  overflow:visible !important;
+  box-sizing:border-box !important;
+}
+
+/* 팀 이름을 자르지 말고 2줄까지 허용 */
+.indiv-prelim-grid .grp-matches-section.force-show .m3tnm,
+.indiv-prelim-grid .grp-matches-section.force-show .match-team-name,
+.indiv-prelim-grid .grp-matches-section.force-show .match-team-players{
+  white-space:normal !important;
+  overflow:visible !important;
+  text-overflow:clip !important;
+  word-break:keep-all !important;
+  overflow-wrap:anywhere !important;
+  line-height:1.25 !important;
+  font-size:.78rem !important;
+  max-height:none !important;
+}
+
+/* 목록 안 팀 박스는 세로 카드가 아니라 가로 대진 */
+.indiv-prelim-grid .grp-matches-section.force-show .m3sc-row,
+.indiv-prelim-grid .grp-matches-section.force-show .rb-sc-row,
+.indiv-prelim-grid .grp-matches-section.force-show .match-teams{
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) 28px minmax(0,1fr) !important;
+  gap:8px !important;
+  align-items:center !important;
+  width:100% !important;
+  overflow:visible !important;
+}
+.indiv-prelim-grid .grp-matches-section.force-show .m3team,
+.indiv-prelim-grid .grp-matches-section.force-show .match-team{
+  min-height:48px !important;
+  padding:8px 6px !important;
+  overflow:visible !important;
+}
+.indiv-prelim-grid .grp-matches-section.force-show .m3vs,
+.indiv-prelim-grid .grp-matches-section.force-show .vs{
+  min-width:28px !important;
+  font-size:.9rem !important;
+}
+
+/* 펼친 상태에서는 기존 숨김 규칙보다 목록 카드 정보 보존 우선 */
+.indiv-prelim-grid .grp-matches-section.force-show .m3team div,
+.indiv-prelim-grid .grp-matches-section.force-show .match-team div{
+  max-height:none !important;
+}
+
+/* 아주 좁은 화면에서도 펼친 목록은 넓은 카드라 글자 보존 */
+@media(max-width:430px){
+  .indiv-prelim-grid .grp-card:has(.grp-matches-section.force-show){
+    grid-column:1 / -1 !important;
+  }
+  .indiv-prelim-grid .grp-matches-section.force-show .m3sc-row,
+  .indiv-prelim-grid .grp-matches-section.force-show .rb-sc-row,
+  .indiv-prelim-grid .grp-matches-section.force-show .match-teams{
+    grid-template-columns:minmax(0,1fr) 24px minmax(0,1fr) !important;
+    gap:6px !important;
+  }
+  .indiv-prelim-grid .grp-matches-section.force-show .m3tnm,
+  .indiv-prelim-grid .grp-matches-section.force-show .match-team-name,
+  .indiv-prelim-grid .grp-matches-section.force-show .match-team-players{
+    font-size:.74rem !important;
+  }
+}
+</style>
+
+
+<style id="v280RecommendedResultAndStats">
+/* 추천 구조: 2팀 조만 빠른 결과, 3팀 이상은 경기목록에서 경기별 입력 */
+.indiv-prelim-grid .grp-card.group-size-3 .v275-group-actions,
+.indiv-prelim-grid .grp-card.group-size-4 .v275-group-actions,
+.indiv-prelim-grid .grp-card.group-size-5 .v275-group-actions{
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+}
+.indiv-prelim-grid .grp-card.group-size-3 .v275-group-actions button.result-fast-btn,
+.indiv-prelim-grid .grp-card.group-size-4 .v275-group-actions button.result-fast-btn,
+.indiv-prelim-grid .grp-card.group-size-5 .v275-group-actions button.result-fast-btn{
+  display:none !important;
+}
+
+/* 순위현황은 간결하게: 승패 + 득실만 */
+.indiv-prelim-grid .gs-stats .game-win,
+.indiv-prelim-grid .gs-stats .game-loss,
+.indiv-prelim-grid .gs-stats .stat-game-win,
+.indiv-prelim-grid .gs-stats .stat-game-loss,
+.indiv-prelim-grid .gs-stats span{
+  font-size:.68rem !important;
+}
+
+/* JS에서 표시할 간결 득실 배지 */
+.indiv-prelim-grid .simple-diff-badge{
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  min-height:22px !important;
+  padding:2px 7px !important;
+  border-radius:8px !important;
+  font-size:.68rem !important;
+  font-weight:900 !important;
+  background:#eef2ff !important;
+  color:#1d4ed8 !important;
+  border:1px solid #bfdbfe !important;
+}
+.indiv-prelim-grid .simple-diff-badge.negative{
+  background:#fff1f2 !important;
+  color:#dc2626 !important;
+  border-color:#fecaca !important;
+}
+.indiv-prelim-grid .simple-diff-badge.zero{
+  background:#f1f5f9 !important;
+  color:#475569 !important;
+  border-color:#cbd5e1 !important;
+}
+
+/* 기존 게임득/게임실 배지는 숨기고 득실만 남김 */
+.indiv-prelim-grid .hide-game-detail{
+  display:none !important;
+}
+</style>
+
+
+<style id="v281MatchListPopupCompactRank">
+/* 조 카드 안에서는 경기목록을 펼치지 않고 팝업으로만 표시 */
+.indiv-prelim-grid .grp-matches-section{
+  display:none !important;
+}
+
+/* 조 카드 버튼은 흔들림 없이 한 줄 고정 */
+.indiv-prelim-grid .v275-group-actions{
+  display:grid !important;
+  grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+  gap:6px !important;
+  padding:8px !important;
+  margin:0 !important;
+  width:100% !important;
+  box-sizing:border-box !important;
+  position:static !important;
+  transform:none !important;
+  background:#fff !important;
+}
+.indiv-prelim-grid .v275-group-actions.two-actions{
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+}
+.indiv-prelim-grid .v275-group-actions button{
+  position:static !important;
+  transform:none !important;
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  width:100% !important;
+  height:34px !important;
+  min-height:34px !important;
+  margin:0 !important;
+  padding:0 4px !important;
+  border-radius:10px !important;
+  font-size:.66rem !important;
+  font-weight:900 !important;
+  white-space:nowrap !important;
+}
+
+/* 순위현황 간결화: 승패 + 득실만 */
+.indiv-prelim-grid .gs-stats{
+  display:flex !important;
+  flex-wrap:wrap !important;
+  gap:5px !important;
+  align-items:center !important;
+}
+.indiv-prelim-grid .gs-stats .hide-game-detail{
+  display:none !important;
+}
+.indiv-prelim-grid .gs-stats .simple-diff-badge{
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  min-height:22px !important;
+  padding:2px 7px !important;
+  border-radius:8px !important;
+  font-size:.68rem !important;
+  font-weight:900 !important;
+  background:#eef2ff !important;
+  color:#1d4ed8 !important;
+  border:1px solid #bfdbfe !important;
+}
+.indiv-prelim-grid .gs-stats .simple-diff-badge.negative{
+  background:#fff1f2 !important;
+  color:#dc2626 !important;
+  border-color:#fecaca !important;
+}
+.indiv-prelim-grid .gs-stats .simple-diff-badge.zero{
+  background:#f1f5f9 !important;
+  color:#475569 !important;
+  border-color:#cbd5e1 !important;
+}
+
+/* 경기목록 팝업 */
+#matchListPopup{
+  position:fixed;
+  inset:0;
+  z-index:9998;
+  display:none;
+  align-items:flex-end;
+  justify-content:center;
+  background:rgba(15,23,42,.58);
+  padding:14px;
+}
+#matchListPopup.show{
+  display:flex;
+}
+#matchListPopup .mlp-box{
+  width:min(720px,100%);
+  max-height:min(82vh,760px);
+  background:#fff;
+  border-radius:20px 20px 0 0;
+  box-shadow:0 -20px 60px rgba(15,23,42,.25);
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+}
+#matchListPopup .mlp-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:14px 16px;
+  background:#0f1f3d;
+  color:#fff;
+  font-weight:900;
+}
+#matchListPopup .mlp-close{
+  width:34px;
+  height:34px;
+  border-radius:10px;
+  border:0;
+  background:rgba(255,255,255,.12);
+  color:#fff;
+  font-size:1.1rem;
+  font-weight:900;
+}
+#matchListPopup .mlp-body{
+  padding:12px;
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+  background:#f8fafc;
+}
+#matchListPopup .mlp-card{
+  background:#fff;
+  border:1px solid #dbeafe;
+  border-radius:14px;
+  padding:12px;
+  margin-bottom:10px;
+}
+#matchListPopup .mlp-meta{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  margin-bottom:8px;
+}
+#matchListPopup .mlp-chip{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:24px;
+  padding:3px 8px;
+  border-radius:999px;
+  border:1px solid #cbd5e1;
+  background:#f8fafc;
+  font-size:.72rem;
+  font-weight:900;
+  color:#334155;
+}
+#matchListPopup .mlp-teams{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 34px minmax(0,1fr);
+  gap:8px;
+  align-items:center;
+}
+#matchListPopup .mlp-team{
+  min-width:0;
+  border:1px solid #dbeafe;
+  border-radius:12px;
+  background:#f8fbff;
+  padding:10px 8px;
+  text-align:center;
+  font-weight:900;
+  line-height:1.3;
+  word-break:keep-all;
+  overflow-wrap:anywhere;
+}
+#matchListPopup .mlp-vs{
+  text-align:center;
+  font-weight:900;
+  color:#64748b;
+}
+#matchListPopup .mlp-score{
+  margin-top:8px;
+  text-align:center;
+  font-size:1.05rem;
+  font-weight:1000;
+  color:#dc2626;
+}
+#matchListPopup .mlp-actions{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
+  margin-top:10px;
+}
+#matchListPopup .mlp-actions button{
+  min-height:38px;
+  border-radius:10px;
+  font-weight:900;
+  font-size:.82rem;
+}
+@media(max-width:680px){
+  #matchListPopup{
+    padding:8px 8px calc(76px + env(safe-area-inset-bottom,0px)) 8px;
+  }
+  #matchListPopup .mlp-box{
+    max-height:calc(100vh - 96px - env(safe-area-inset-bottom,0px));
+  }
+}
+</style>
+
+
+<style id="v282EmergencyPopupCardFix">
+/* 팝업 경기카드 강제 재정렬 */
+#matchListPopup .mlp-card *{
+  writing-mode:horizontal-tb !important;
+}
+#matchListPopup .mlp-card{
+  overflow:hidden !important;
+}
+#matchListPopup .mlp-meta{
+  display:flex !important;
+  flex-wrap:wrap !important;
+  gap:6px !important;
+}
+#matchListPopup .mlp-teams{
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) 34px minmax(0,1fr) !important;
+  gap:10px !important;
+  align-items:center !important;
+}
+#matchListPopup .mlp-team{
+  min-width:0 !important;
+  width:100% !important;
+  padding:14px 10px !important;
+  border-radius:14px !important;
+  background:#f8fbff !important;
+  border:1px solid #cfe0ff !important;
+  text-align:center !important;
+  overflow:hidden !important;
+}
+#matchListPopup .mlp-team *{
+  display:block !important;
+  white-space:normal !important;
+  overflow:visible !important;
+  text-overflow:clip !important;
+  word-break:keep-all !important;
+  overflow-wrap:anywhere !important;
+  line-height:1.35 !important;
+}
+#matchListPopup .mlp-vs{
+  font-size:1rem !important;
+  font-weight:1000 !important;
+}
+#matchListPopup .mlp-score{
+  font-size:1.4rem !important;
+  margin-top:10px !important;
+}
+#matchListPopup .mlp-actions{
+  display:grid !important;
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  gap:8px !important;
+}
+#matchListPopup .mlp-actions button{
+  min-height:42px !important;
+  font-size:.84rem !important;
+  font-weight:900 !important;
+}
+</style>
+
+
+<style id="v287CleanMatchTitleNoDivision">
+/* v287: 경기목록/결과입력 화면에서 부서명 중복 노출 제거 + 카드형 정리 */
+#matchListPopupTitle,
+#mM3T{
+  word-break:keep-all !important;
+  line-height:1.35 !important;
+}
+#matchListPopup .mlp-head{
+  min-height:52px !important;
+}
+#matchListPopup .mlp-card{
+  border:1.5px solid #dbeafe !important;
+  box-shadow:0 8px 18px rgba(15,30,58,.06) !important;
+}
+#matchListPopup .mlp-teams{
+  margin-top:4px !important;
+}
+#matchListPopup .mlp-team{
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  min-height:64px !important;
+  font-size:.92rem !important;
+  color:#0f172a !important;
+}
+#mM3 .m3hdr .m3badge{
+  font-size:.82rem !important;
+  border-radius:999px !important;
+}
+#mM3 .m3body > div:last-child{
+  margin-bottom:0 !important;
+}
+</style>
+<script id="v287CleanMatchTitleNoDivisionScript">
+(function(){
+  const DIVISION_NOISE_RE = /영남권\s*지역신인부|[가-힣A-Za-z0-9\s·ㆍ-]*(?:신인부|지역신인부|오픈부|금배부|은배부|동배부|테린이부|개인전|단체전)/g;
+  function cleanDivisionNoiseText(s){
+    return String(s||'').replace(DIVISION_NOISE_RE,'').replace(/\s+/g,' ').trim();
+  }
+  function cleanM3AndMatchPopupNoise(){
+    try{
+      const title=document.getElementById('mM3T');
+      if(title){
+        title.textContent=cleanDivisionNoiseText(title.textContent)
+          .replace(/^⚡\s*·\s*/,'⚡ ')
+          .replace(/^📝\s*·\s*/,'📝 ')
+          .replace(/\s+vs\s+/i,' vs ')
+          .trim();
+      }
+      document.querySelectorAll('#mM3 .m3badge, #matchListPopup .mlp-chip').forEach(el=>{
+        const before=(el.textContent||'').trim();
+        const after=cleanDivisionNoiseText(before);
+        if(before && !after && /신인부|금배부|은배부|동배부|테린이부|오픈부|개인전|단체전/.test(before)){
+          el.style.display='none';
+        }else if(after && after!==before){
+          el.textContent=after;
+        }
+      });
+      document.querySelectorAll('#matchListPopup .mlp-team').forEach(el=>{
+        const after=cleanDivisionNoiseText(el.textContent);
+        if(after && after!==el.textContent.trim()) el.textContent=after;
+      });
+      const popTitle=document.getElementById('matchListPopupTitle');
+      if(popTitle){
+        const cleaned=cleanDivisionNoiseText(popTitle.textContent).replace(/\s+/g,' ').trim();
+        if(cleaned) popTitle.textContent=cleaned;
+      }
+    }catch(e){}
+  }
+  window.cleanM3AndMatchPopupNoise=cleanM3AndMatchPopupNoise;
+  document.addEventListener('DOMContentLoaded',()=>setInterval(cleanM3AndMatchPopupNoise,500));
+})();
+</script>
+
+<style id="v288ResultModalCleanRolePush">
+/* v289 safety: v288 cleanup must never hide modal shell/body/footer. */
+#mM3.v288-hidden,
+#mM3 .modal-box.v288-hidden,
+#mM3 .modal-body.v288-hidden,
+#mM3 #mM3B.v288-hidden,
+#mM3 .modal-footer.v288-hidden{
+  display:flex !important;
+}
+#mM3 .modal-box.v288-hidden{display:block !important;}
+#mM3 #mM3B.v288-hidden{display:block !important;}
+#mM3 .modal-footer.v288-hidden{display:grid !important;}
+
+/* v288: 결과입력/경기목록 정리
+   - JS 텍스트 노출 방지용 script escape 적용
+   - 결과입력 모달에서 경기 공지 제거
+   - 코트 배정이 있으면 조코트 미배정 제거
+   - 일반회원에게 푸시 버튼 숨김
+   - 모달 제목/팀명에서 부서명·클럽 괄호 중복 제거 */
+#mM3 .v288-hidden,
+#matchListPopup .v288-hidden{
+  display:none !important;
+}
+body:not(.admin-mode):not(.operator-mode):not(.tm-mode) #matchListPopup .mlp-actions button:nth-child(2),
+body:not(.admin-mode):not(.operator-mode):not(.tm-mode) #matchListPopup .mlp-actions .push-btn,
+body:not(.admin-mode):not(.operator-mode):not(.tm-mode) .indiv-prelim-grid .v275-group-actions button[data-v288-push="1"],
+body:not(.admin-mode):not(.operator-mode):not(.tm-mode) .indiv-prelim-grid .v275-group-actions button.v288-push-btn{
+  display:none !important;
+}
+body:not(.admin-mode):not(.operator-mode):not(.tm-mode) #matchListPopup .mlp-actions{
+  grid-template-columns:1fr !important;
+}
+#mM3 .modal-header h3{
+  font-size:.96rem !important;
+  line-height:1.35 !important;
+  word-break:keep-all !important;
+}
+#mM3 .m3body{
+  padding:14px !important;
+}
+#mM3 .v288-match-summary{
+  border:1.5px solid #dbeafe;
+  border-radius:14px;
+  background:#f8fbff;
+  padding:12px;
+  margin-bottom:12px;
+}
+#mM3 .v288-match-summary .v288-teams{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 34px minmax(0,1fr);
+  gap:10px;
+  align-items:center;
+}
+#mM3 .v288-match-summary .v288-team{
+  min-height:54px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:10px 8px;
+  border:1px solid #dbeafe;
+  border-radius:12px;
+  background:#fff;
+  font-weight:900;
+  color:#0f172a;
+  text-align:center;
+  line-height:1.35;
+  word-break:keep-all;
+  overflow-wrap:anywhere;
+}
+#mM3 .v288-match-summary .v288-vs{
+  text-align:center;
+  font-weight:1000;
+  color:#64748b;
+}
+#mM3 .v288-court-chip{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:26px;
+  padding:4px 10px;
+  border-radius:999px;
+  background:#eff6ff;
+  color:#1d4ed8;
+  border:1px solid #93c5fd;
+  font-size:.76rem;
+  font-weight:900;
+  margin-bottom:8px;
+}
+</style>
+<script id="v288ResultModalCleanRolePushScript">
+(function(){
+  const DIV_NOISE = /영남권\s*지역신인부|[가-힣A-Za-z0-9\s·ㆍ-]*(?:신인부|지역신인부|오픈부|금배부|은배부|동배부|테린이부|개인전|단체전)/g;
+  const ROLE_OK = () => document.body.classList.contains('admin-mode') || document.body.classList.contains('operator-mode') || document.body.classList.contains('tm-mode');
+  function cleanName(s){
+    return String(s||'')
+      .replace(DIV_NOISE,' ')
+      .replace(/\([^)]*\)/g,' ')
+      .replace(/조코트\s*미배정|코트\s*미배정|미배정/g,' ')
+      .replace(/경기\s*공지/g,' ')
+      .replace(/공지\(경기\)\s*입력|공지\(경기\)\s*수정/g,' ')
+      .replace(/\s+/g,' ')
+      .trim();
+  }
+  function assignedCourtText(root){
+    const raw=String(root?.innerText||'');
+    const m=raw.match(/(?:경기코트|배정코트|코트)\s*[:：]?\s*([가-힣A-Za-z0-9_-]*\d+)/);
+    return m ? m[1] : '';
+  }
+  function removeTextElement(el){
+    if(!el) return;
+    const box = el.closest('.form-group,.m3-notice,.notice-box') || el;
+    box.classList.add('v288-hidden');
+    box.style.display='none';
+  }
+  function hideNoticeFields(){
+    const root=document.getElementById('mM3');
+    if(!root) return;
+    root.querySelectorAll('label,.form-label').forEach(el=>{
+      const t=(el.textContent||'').trim();
+      if(/^📢?\s*경기\s*공지$/.test(t) || /^경기\s*공지$/.test(t) || /경기\s*공지/.test(t)){
+        const container=el.closest('.form-group') || el.parentElement;
+        if(container){
+          container.classList.add('v288-hidden');
+          container.style.display='none';
+        }
+      }
+    });
+    root.querySelectorAll('textarea').forEach(ta=>{
+      const ph=(ta.getAttribute('placeholder')||'');
+      const label=(ta.closest('.form-group')?.innerText||'');
+      if(/운영\s*메모|경기\s*공지|코트\s*대기|입장/.test(ph+label)){
+        const container=ta.closest('.form-group') || ta.parentElement;
+        if(container){
+          container.classList.add('v288-hidden');
+          container.style.display='none';
+        }
+      }
+    });
+  }
+  function hideUnneededChips(){
+    const root=document.getElementById('mM3');
+    if(!root) return;
+    const court=assignedCourtText(root);
+    root.querySelectorAll('span,button,.badge,.m3badge,.mlp-chip').forEach(el=>{
+      const t=(el.textContent||'').trim();
+      if(/조코트\s*미배정|코트\s*미배정|미배정/.test(t)){
+        if(court || /경기코트|코트\s*[가-힣A-Za-z0-9_-]*\d+/.test(root.innerText||'')){
+          el.classList.add('v288-hidden');
+          el.style.display='none';
+        }
+      }
+      if(!ROLE_OK() && /푸시|🔔/.test(t) && el.tagName==='BUTTON'){
+        el.classList.add('v288-hidden');
+        el.style.display='none';
+      }
+    });
+  }
+  function cleanTitles(){
+    const title=document.getElementById('mM3T');
+    if(title){
+      let t=cleanName(title.textContent)
+        .replace(/^⚡\s*/,'')
+        .replace(/^📝\s*/,'')
+        .replace(/\s*[—-]\s*결과입력\s*$/,'')
+        .trim();
+      if(t && /vs/i.test(t)) title.textContent='⚡ '+t+' — 결과입력';
+      else if(/결과/.test(title.textContent||'')) title.textContent='⚡ 경기 결과 입력';
+    }
+    const popTitle=document.getElementById('matchListPopupTitle');
+    if(popTitle){
+      let t=cleanName(popTitle.textContent);
+      const m=t.match(/(\d+)\s*조/);
+      popTitle.textContent=m ? `📋 ${m[1]}조 경기 목록` : '📋 경기 목록';
+    }
+  }
+  function normalizePushButtons(){
+    document.querySelectorAll('.indiv-prelim-grid .v275-group-actions button, #matchListPopup .mlp-actions button').forEach(btn=>{
+      const t=(btn.textContent||'').trim();
+      if(/푸시|🔔/.test(t)){
+        btn.dataset.v288Push='1';
+        btn.classList.add('v288-push-btn');
+        if(!ROLE_OK()){
+          btn.style.display='none';
+          btn.classList.add('v288-hidden');
+        }
+      }
+    });
+  }
+  function extractModalTeams(){
+    const root=document.getElementById('mM3');
+    if(!root) return null;
+    const title=document.getElementById('mM3T');
+    let raw=String(title?.textContent||'');
+    raw=cleanName(raw).replace(/^⚡\s*/,'').replace(/^📝\s*/,'').replace(/\s*[—-]\s*결과입력\s*$/,'').trim();
+    let m=raw.match(/(.+?)\s+vs\s+(.+)/i);
+    if(m) return [cleanName(m[1]), cleanName(m[2])];
+    const cards=[...root.querySelectorAll('.m3tnm,.match-team-name,.match-team-players,b,strong')].map(x=>cleanName(x.textContent)).filter(Boolean);
+    if(cards.length>=2) return [cards[0],cards[1]];
+    return null;
+  }
+  function buildCleanSummary(){
+    const root=document.getElementById('mM3');
+    const body=document.getElementById('mM3B');
+    if(!root || !body || body.querySelector('.v288-match-summary')) return;
+    const teams=extractModalTeams();
+    if(!teams) return;
+    const court=assignedCourtText(root);
+    const div=document.createElement('div');
+    div.className='v288-match-summary';
+    div.innerHTML=(court?`<div class="v288-court-chip">🎾 경기코트 ${court}</div>`:'')+
+      `<div class="v288-teams"><div class="v288-team">${teams[0]}</div><div class="v288-vs">VS</div><div class="v288-team">${teams[1]}</div></div>`;
+    const firstScore=body.querySelector('.rb-blk,.m3card,.score-inputs') || body.firstChild;
+    if(firstScore) body.insertBefore(div, firstScore);
+    else body.prepend(div);
+  }
+  function runClean(){
+    try{
+      cleanTitles();
+      hideNoticeFields();
+      hideUnneededChips();
+      normalizePushButtons();
+      buildCleanSummary();
+    }catch(e){}
+  }
+  window.v288CleanResultModal=runClean;
+  document.addEventListener('DOMContentLoaded',()=>{
+    setInterval(runClean, 350);
+    setTimeout(runClean, 80);
+    setTimeout(runClean, 500);
+  });
+  document.addEventListener('click',()=>setTimeout(runClean,80),true);
+})();
+</script>
+
 </head>
 <body>
 <header class="app-header">
@@ -4981,6 +7206,44 @@ async function openManualTeamPush(key,idx){
   window._manualPushContext={type:'team',key,idx:Number(idx)};
   om('mManualPush');
 }
+
+function canShowMatchActionButtons(){
+  try{ return !!(AD||TM||OP||canManageBracket()); }catch(e){ return !!(AD||TM||OP); }
+}
+function getGroupFirstMatchForAction(key, gi){
+  try{
+    const list=(G.matches[key]||[]).filter(m=>m && m.phase==='group' && Number(m.group)===Number(gi));
+    if(!list.length) return null;
+    const pending=list.find(m=>!(getMatchResultState(key,m)||{}).done);
+    return pending || list[0];
+  }catch(e){ return null; }
+}
+function openGroupFirstMatchResult(key, gi){
+  const m=getGroupFirstMatchForAction(key, gi);
+  if(!m){ toast('이 조의 경기 카드를 찾을 수 없습니다','info'); return; }
+  openM3(key, String(m.id));
+}
+async function openGroupManualPush(key, gi){
+  if(!canShowMatchActionButtons()){ toast('운영 권한 필요','info'); return; }
+  const ms=(G.matches[key]||[]).filter(m=>m && m.phase==='group' && Number(m.group)===Number(gi));
+  if(!ms.length){ toast('이 조의 경기 대상이 없습니다','info'); return; }
+  const title=ge('manualPushTitle'), body=ge('manualPushBody'), target=ge('manualPushTarget');
+  if(title) title.value='예선 조 경기 안내';
+  if(body) body.value=`${grpLabel(Number(gi))} 경기 안내입니다.`;
+  if(target) target.textContent=`${grpLabel(Number(gi))} 참가자/팀 전체`;
+  window._manualPushContext={type:'group',key,gi:Number(gi)};
+  om('mManualPush');
+}
+function renderGroupQuickActionButtons(key, gi){
+  if(!canShowMatchActionButtons()) return '';
+  const m=getGroupFirstMatchForAction(key, gi);
+  if(!m) return '';
+  return `<div style="display:flex;gap:8px;flex-wrap:wrap;padding:10px 12px;border-top:1px solid var(--border);background:linear-gradient(135deg,#f8fbff,#fffdf5)">
+    <button class="btn btn-accent" style="flex:1;min-width:130px;padding:10px 12px;font-size:.86rem;font-weight:900;border-radius:12px" onclick="openGroupFirstMatchResult('${key}',${Number(gi)})">⚡ 이 조 결과 입력</button>
+    <button class="btn btn-outline" style="flex:1;min-width:130px;padding:10px 12px;font-size:.86rem;font-weight:900;border-radius:12px;background:#eff6ff;color:#1d4ed8;border-color:#93c5fd" onclick="openGroupManualPush('${key}',${Number(gi)})">🔔 이 조 푸시</button>
+  </div>`;
+}
+
 async function sendManualPushFromModal(){
   try{
     if(!(AD||TM||OP)){ toast('운영 권한 필요','error'); return; }
@@ -5011,6 +7274,21 @@ async function sendManualPushFromModal(){
         const pd=String(x.phoneDigits||'').replace(/[^0-9]/g,'');
         const uid=String(x.uid||'');
         return (ck && clubKeys.includes(ck)) || (pd && phones.includes(pd)) || (uid && uids.includes(uid));
+      });
+    }else if(ctx.type==='group'){
+      const ms=(G.matches[ctx.key]||[]).filter(m=>m && m.phase==='group' && Number(m.group)===Number(ctx.gi));
+      const targetSet={clubKeys:new Set(), phoneDigits:new Set(), uids:new Set()};
+      ms.forEach(m=>{
+        const t=getMatchPushTargets(ctx.key,m);
+        (t.clubKeys||[]).forEach(v=>targetSet.clubKeys.add(v));
+        (t.phoneDigits||[]).forEach(v=>targetSet.phoneDigits.add(v));
+        (t.uids||[]).forEach(v=>targetSet.uids.add(v));
+      });
+      docs=await getEnabledPushTokenDocs(x=>{
+        const ck=normalizePushKey(x.clubKey||x.club||'');
+        const pd=String(x.phoneDigits||'').replace(/[^0-9]/g,'');
+        const uid=String(x.uid||'');
+        return (ck && targetSet.clubKeys.has(ck)) || (pd && targetSet.phoneDigits.has(pd)) || (uid && targetSet.uids.has(uid));
       });
     }
     if(!docs.length){ sl(false); toast('발송 대상 푸시 토큰이 없습니다','info'); return; }
@@ -5056,6 +7334,14 @@ window.setupFcmForegroundListener=setupFcmForegroundListener;
 window.updatePushStatusLabel=updatePushStatusLabel;
 window.openMatchPushPromptAfterRegistration=openMatchPushPromptAfterRegistration;
 window.renderInlinePushEnableButton=renderInlinePushEnableButton;
+
+window.openGroupFirstMatchResult=openGroupFirstMatchResult;
+window.openGroupManualPush=openGroupManualPush;
+window.openManualMatchPush=openManualMatchPush;
+window.openManualTeamPush=openManualTeamPush;
+window.sendManualPushFromModal=sendManualPushFromModal;
+window.openAdminBroadcastPushModal=openAdminBroadcastPushModal;
+
 setTimeout(()=>{try{ setupFcmForegroundListener(); updatePushStatusLabel(); }catch(e){}},1800);
 let AUTH_PERSISTENCE_READY=false;
 const AUTH_PERSISTENCE_PROMISE=setPersistence(auth, browserLocalPersistence)
@@ -6731,7 +9017,7 @@ function renderCourtStatusBoard(key, div){
           ${sharedWaiting.length>sharedWaitingDefaultVisibleCount?`<button class="btn btn-outline" type="button" style="font-size:.68rem;padding:4px 9px;min-height:28px;border-color:#e8b353;color:#9a6400;background:#fff7df" onclick="toggleCourtBoardSharedExpanded('${key}')">${sharedWaitingExpanded?`접기 (${sharedWaiting.length})`:`더보기 +${sharedWaitingHiddenCount}`}</button>`:''}
         </div>
       </div>
-      ${sharedWaitingVisible.length?`<div class="shared-wait-stack">${sharedWaitingVisible.map((w,idx)=>{ const wi=describeCourtBoardMatch(key,w); const priority=idx+1; const headline=((wi.title&&wi.title!=='TBD vs TBD')?wi.title:((wi.rawTitle&&wi.rawTitle!=='TBD vs TBD')?wi.rawTitle:(wi.autoTitle||'경기 대기'))); const targetCourt=String(w.__sharedCourtLabel||'').trim(); const detailParts=[wi.label, targetCourt?`${targetCourt} 배정예정`:'공용 대기']; const isManual=!!w.manualSharedHold || !!String(w.manualCourtTarget||'').trim(); const assignedElapsed = buildElapsedMetaLine(w.courtAssignedAt||'', 'wait_placed'); const metaEntries=[]; if(assignedElapsed.clock) metaEntries.push({...assignedElapsed, prefix:'대기배치'}); return `<div class="court-wait-card" draggable="${canManageBracket()?'true':'false'}" ondragstart="onCourtCardDragStart(event,'${key}','${String(w.id)}')" ondragend="onCourtCardDragEnd(event)" style="padding:8px 10px;border-radius:10px;background:${getCourtBoardPhaseColor(wi,w).bg};border:2px solid ${getCourtBoardPhaseColor(wi,w).bd}"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px"><div style="min-width:0;flex:1"><div style="font-size:.78rem;font-weight:900;color:${getCourtBoardPhaseColor(wi,w).fg};line-height:1.35;word-break:keep-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(headline)}</div><div style="font-size:.72rem;color:${getCourtBoardPhaseColor(wi,w).fg};margin-top:3px">${esc(detailParts.join(' · '))}</div>${renderElapsedMetaBlocks(metaEntries, getCourtBoardPhaseColor(wi,w).fg)}<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px">${canManageBracket()?`<button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="sendCourtCardSms('${key}','${String(w.id)}','${targetCourt?'court_changed':'queue_registered'}','${targetCourt}',${priority})">📨 문자</button>`:''}<button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="showCourtMovePicker('${key}','${String(w.id)}')">코트 선택</button></div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px"><span class="court-wait-priority">${priority}</span>${assignedElapsed.badge?`<span class="badge" style="font-size:.66rem;padding:3px 7px;background:${assignedElapsed.badge.bg};color:${assignedElapsed.badge.color};border:1px solid ${assignedElapsed.badge.bd}">${assignedElapsed.badge.text}</span>`:''}${isManual?'<span class="badge bg-blue" style="font-size:.66rem;padding:3px 7px">수동</span>':''}</div></div></div>`; }).join('')}</div>${sharedWaitingHiddenCount?`<div style="margin-top:8px;font-size:.74rem;color:#9a6400;font-weight:700">아래 더보기로 나머지 ${sharedWaitingHiddenCount}경기 확인</div>`:''}`:`<div style="padding:10px 12px;border:1px dashed #f6d28b;border-radius:10px;background:#fff;font-size:.78rem;color:#9a6400">여기로 카드를 옮기면 공용 대기 상태로 유지됩니다.</div>`}
+      ${sharedWaitingVisible.length?`<div class="shared-wait-stack">${sharedWaitingVisible.map((w,idx)=>{ const wi=describeCourtBoardMatch(key,w); const priority=idx+1; const headline=((wi.title&&wi.title!=='TBD vs TBD')?wi.title:((wi.rawTitle&&wi.rawTitle!=='TBD vs TBD')?wi.rawTitle:(wi.autoTitle||'경기 대기'))); const targetCourt=String(w.__sharedCourtLabel||'').trim(); const detailParts=[wi.label, targetCourt?`${targetCourt} 배정예정`:'공용 대기']; const isManual=!!w.manualSharedHold || !!String(w.manualCourtTarget||'').trim(); const assignedElapsed = buildElapsedMetaLine(w.courtAssignedAt||'', 'wait_placed'); const metaEntries=[]; if(assignedElapsed.clock) metaEntries.push({...assignedElapsed, prefix:'대기배치'}); return `<div class="court-wait-card" draggable="${canManageBracket()?'true':'false'}" ondragstart="onCourtCardDragStart(event,'${key}','${String(w.id)}')" ondragend="onCourtCardDragEnd(event)" style="padding:8px 10px;border-radius:10px;background:${getCourtBoardPhaseColor(wi,w).bg};border:2px solid ${getCourtBoardPhaseColor(wi,w).bd}"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px"><div style="min-width:0;flex:1"><div style="font-size:.78rem;font-weight:900;color:${getCourtBoardPhaseColor(wi,w).fg};line-height:1.35;word-break:keep-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(headline)}</div><div style="font-size:.72rem;color:${getCourtBoardPhaseColor(wi,w).fg};margin-top:3px">${esc(detailParts.join(' · '))}</div>${renderElapsedMetaBlocks(metaEntries, getCourtBoardPhaseColor(wi,w).fg)}<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px">${canShowMatchActionButtons()?`<button class="btn btn-accent" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="openM3('${key}','${String(w.id)}')">⚡ 결과</button><button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap;background:#eff6ff;color:#1d4ed8;border-color:#93c5fd" onclick="openManualMatchPush('${key}','${String(w.id)}')">🔔 푸시</button>`:''}${canManageBracket()?`<button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="sendCourtCardSms('${key}','${String(w.id)}','${targetCourt?'court_changed':'queue_registered'}','${targetCourt}',${priority})">📨 문자</button>`:''}<button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="showCourtMovePicker('${key}','${String(w.id)}')">코트 선택</button></div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px"><span class="court-wait-priority">${priority}</span>${assignedElapsed.badge?`<span class="badge" style="font-size:.66rem;padding:3px 7px;background:${assignedElapsed.badge.bg};color:${assignedElapsed.badge.color};border:1px solid ${assignedElapsed.badge.bd}">${assignedElapsed.badge.text}</span>`:''}${isManual?'<span class="badge bg-blue" style="font-size:.66rem;padding:3px 7px">수동</span>':''}</div></div></div>`; }).join('')}</div>${sharedWaitingHiddenCount?`<div style="margin-top:8px;font-size:.74rem;color:#9a6400;font-weight:700">아래 더보기로 나머지 ${sharedWaitingHiddenCount}경기 확인</div>`:''}`:`<div style="padding:10px 12px;border:1px dashed #f6d28b;border-radius:10px;background:#fff;font-size:.78rem;color:#9a6400">여기로 카드를 옮기면 공용 대기 상태로 유지됩니다.</div>`}
       <div class="court-drop-hint">카드를 각 코트로 드래그하거나, 코트 선택 버튼으로 수동 배정할 수 있습니다. 코트에서 다시 이 영역으로 드래그하거나 공용 대기를 선택하면 복귀합니다.</div>
     </div>`;
   const cards=hasCourts ? processedItems.map(item=>{
@@ -6750,7 +9036,7 @@ function renderCourtStatusBoard(key, div){
     // 현재경기: 시합시작 시각 1개만 표시
     if(currentElapsed.clock) currentMetaEntries.push({...currentElapsed, prefix:'시합시작'});
     const line = info
-      ? `<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px"><div style="font-size:.84rem;font-weight:900;color:var(--primary-dark);line-height:1.35;flex:1;word-break:keep-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(info.title)}</div><div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;justify-content:flex-end">${isCurrentManual?'<span class="badge bg-blue" style="font-size:.66rem;padding:3px 7px">수동</span>':''}${currentElapsed.badge?`<span class="badge" style="font-size:.66rem;padding:3px 7px;background:${currentElapsed.badge.bg};color:${currentElapsed.badge.color};border:1px solid ${currentElapsed.badge.bd}">${currentElapsed.badge.text}</span>`:''}</div></div>${phaseChip}${renderElapsedMetaBlocks(currentMetaEntries, currentElapsed.badge?currentElapsed.badge.color:'var(--text2)')}<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px">${canManageBracket()?`<button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="sendCourtCardSms('${key}','${String(item.current?.id||'')}','match_started','${String(item.court||'')}',0)">📨 문자</button>`:''}</div>`
+      ? `<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px"><div style="font-size:.84rem;font-weight:900;color:var(--primary-dark);line-height:1.35;flex:1;word-break:keep-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(info.title)}</div><div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;justify-content:flex-end">${isCurrentManual?'<span class="badge bg-blue" style="font-size:.66rem;padding:3px 7px">수동</span>':''}${currentElapsed.badge?`<span class="badge" style="font-size:.66rem;padding:3px 7px;background:${currentElapsed.badge.bg};color:${currentElapsed.badge.color};border:1px solid ${currentElapsed.badge.bd}">${currentElapsed.badge.text}</span>`:''}</div></div>${phaseChip}${renderElapsedMetaBlocks(currentMetaEntries, currentElapsed.badge?currentElapsed.badge.color:'var(--text2)')}<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px">${canShowMatchActionButtons()?`<button class="btn btn-accent" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="openM3('${key}','${String(item.current?.id||'')}')">⚡ 결과</button><button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap;background:#eff6ff;color:#1d4ed8;border-color:#93c5fd" onclick="openManualMatchPush('${key}','${String(item.current?.id||'')}')">🔔 푸시</button>`:''}${canManageBracket()?`<button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="sendCourtCardSms('${key}','${String(item.current?.id||'')}','match_started','${String(item.court||'')}',0)">📨 문자</button>`:''}</div>`
       : `<div style="font-size:.84rem;font-weight:800;color:#64748b;line-height:1.45">배정된 진행 경기 없음</div>
          <div style="font-size:.74rem;color:var(--text3);margin-top:4px">경기 코트 배정을 하면 이 코트에 표시됩니다.</div>`;
     const waitingList=[...(item.__visibleWaiting||[])];
@@ -6767,7 +9053,7 @@ function renderCourtStatusBoard(key, div){
               if(waitElapsed.clock) metaEntries.push({...waitElapsed, prefix:'대기시작'});
               return `<div class="court-wait-card" draggable="${canManageBracket()?'true':'false'}" ondragstart="onCourtCardDragStart(event,'${key}','${String(w.id)}')" ondragend="onCourtCardDragEnd(event)" style="padding:8px 10px;border-radius:10px;background:${getCourtBoardPhaseColor(wi,w).bg};border:2px solid ${getCourtBoardPhaseColor(wi,w).bd}">
                 <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
-                  <div style="min-width:0;flex:1"><div style="font-size:.78rem;font-weight:900;color:${getCourtBoardPhaseColor(wi,w).fg};line-height:1.35;word-break:keep-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(wi.title)}</div><div style="font-size:.72rem;color:${getCourtBoardPhaseColor(wi,w).fg};margin-top:3px">${esc([wi.label, '대기중'].filter(Boolean).join(' · '))}</div>${renderElapsedMetaBlocks(metaEntries, getCourtBoardPhaseColor(wi,w).fg)}<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px">${canManageBracket()?`<button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="sendCourtCardSms('${key}','${String(w.id)}','court_changed','${String(item.court||'')}',${priority})">📨 문자</button>`:''}<button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="showCourtMovePicker('${key}','${String(w.id)}')">코트 선택</button></div></div>
+                  <div style="min-width:0;flex:1"><div style="font-size:.78rem;font-weight:900;color:${getCourtBoardPhaseColor(wi,w).fg};line-height:1.35;word-break:keep-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(wi.title)}</div><div style="font-size:.72rem;color:${getCourtBoardPhaseColor(wi,w).fg};margin-top:3px">${esc([wi.label, '대기중'].filter(Boolean).join(' · '))}</div>${renderElapsedMetaBlocks(metaEntries, getCourtBoardPhaseColor(wi,w).fg)}<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px">${canShowMatchActionButtons()?`<button class="btn btn-accent" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="openM3('${key}','${String(w.id)}')">⚡ 결과</button><button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap;background:#eff6ff;color:#1d4ed8;border-color:#93c5fd" onclick="openManualMatchPush('${key}','${String(w.id)}')">🔔 푸시</button>`:''}${canManageBracket()?`<button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="sendCourtCardSms('${key}','${String(w.id)}','court_changed','${String(item.court||'')}',${priority})">📨 문자</button>`:''}<button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="showCourtMovePicker('${key}','${String(w.id)}')">코트 선택</button></div></div>
                   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px"><span class="court-wait-priority">${priority}</span>${waitElapsed.badge?`<span class="badge" style="font-size:.66rem;padding:3px 7px;background:${waitElapsed.badge.bg};color:${waitElapsed.badge.color};border:1px solid ${waitElapsed.badge.bd}">${waitElapsed.badge.text}</span>`:''}${isManual?'<span class="badge bg-blue" style="font-size:.66rem;padding:3px 7px">수동</span>':''}</div>
                 </div>
               </div>`;
@@ -15715,7 +18001,7 @@ function renderBracketHTMLForDiv(tid,div,isAll){
             <div class="gs-stats">${s.rank==null?'<span style="color:var(--text3)">경기 전</span>':`<><span>${s.w}승 ${s.l}패</span><span style="color:${s.diff>0?'#1565c0':s.diff<0?'#c62828':'var(--text2)'}">득실 ${s.diff>0?'+':''}${s.diff}</span></>`}</div>
           </div>`.replace('<>','').replace('</>','');
         });
-        html+=`</div><div class="grp-matches-section"><div class="grp-matches-label">📋 경기 목록</div>`;
+        html+=`</div>${renderGroupQuickActionButtons(key,gi)}<div class="grp-matches-section"><div class="grp-matches-label">📋 경기 목록</div>`;
       }else{
         const indivRows=stats.map((s,r)=>{
           const team=teams[s.teamIdx]||{};
@@ -15751,6 +18037,7 @@ function renderBracketHTMLForDiv(tid,div,isAll){
           ${quickMatchPanel}
           <div style="padding:9px 12px;font-size:.8rem;font-weight:900;color:var(--primary-dark);background:linear-gradient(135deg,#f8fafc,#eef4ff);border-bottom:1px solid var(--border)">📋 순위 현황</div>
           ${indivRows}
+          ${renderGroupQuickActionButtons(key,gi)}
         </div>
         <div id="indivGroupMatches_${key}_${gi}" class="grp-matches-section" style="padding-top:12px;display:${indivCollapsed?'none':'block'}"><div class="grp-matches-label">📋 경기 목록</div>`;
       }
@@ -16318,7 +18605,7 @@ function mCard(m,key,dn1,dn2,done,sc1,sc2,label){
     <div class="m3body">
       ${matchMemo?renderNoticeTicker(matchMemo,'📢 공지(경기)'):''}${orderTeamStatus}${matchQueueChips}${done?`<div class="m3sc-row"><div class="m3tnm ${wn1?'win':'lose'}">${wn1?'🏆 ':''} ${dn1}</div><div class="m3sc">${sc1}:${sc2}</div><div class="m3tnm ${wn2?'win':'lose'}">${dn2} ${wn2?' 🏆':''}</div></div>`:`<div style="text-align:center;color:var(--text3);font-size:.8rem;margin:${(orderTeamStatus||matchQueueChips)?'0':'0'} 0 6px">경기 대기중</div>`}
     <div style="font-size:.7rem;font-weight:700;color:var(--text2);margin-bottom:5px">${dbl}복식 상세 (6게임 선취 승리 · 타이브렉)</div>
-    <div class="rb-rows">${rbH}</div></div></div>`;
+    <div class="rb-rows">${rbH}</div>${(AD||TM||OP||canManageBracket()||canDirEdit)?`<button class="btn ${done?'btn-gray':'btn-accent'}" style="width:100%;margin-top:10px;padding:11px 12px;font-size:.92rem;font-weight:900;border-radius:12px" onclick="openM3('${key}','${m.id}')">${done?'✏️ 결과 수정하기':'⚡ 결과 입력하기'}</button>`:''}</div></div>`;
 }
 
 
@@ -21033,11 +23320,57 @@ function ensureM3AdminSubmitButtons(){
   return {homeBtn,awayBtn};
 }
 
+
+
+function fixIndividualPrelimCardOverflow(){
+  try{
+    document.querySelectorAll('.indiv-prelim-grid .grp-card, .indiv-prelim-grid .m3card, .indiv-prelim-grid .match-card').forEach(el=>{
+      el.style.maxWidth='100%';
+      el.style.minWidth='0';
+      el.style.overflow='hidden';
+    });
+  }catch(e){}
+}
+window.fixIndividualPrelimCardOverflow=fixIndividualPrelimCardOverflow;
+document.addEventListener('DOMContentLoaded',()=>setTimeout(fixIndividualPrelimCardOverflow,300));
+
+function ensureM3ResultFooterButtons(){
+  try{
+    const footer=ge('mM3Footer');
+    const saveBtn=ge('mM3SaveResultBtn');
+    const closeBtn=ge('mM3CloseBtn');
+    if(!footer) return;
+
+    document.querySelectorAll('#mM3 .m3-inline-result-actions').forEach(el=>{
+      el.style.display='none';
+      el.remove();
+    });
+
+    footer.style.display='grid';
+    footer.style.gridTemplateColumns='1fr 1fr';
+    footer.style.gap='10px';
+
+    if(saveBtn){
+      saveBtn.style.display='inline-flex';
+      saveBtn.disabled=false;
+      saveBtn.innerHTML='💾 결과 저장';
+      saveBtn.onclick=function(){ saveM3(); };
+    }
+    if(closeBtn){
+      closeBtn.style.display='inline-flex';
+      closeBtn.innerHTML='닫기';
+      closeBtn.onclick=function(){ cm('mM3'); };
+    }
+  }catch(e){ console.warn('ensureM3ResultFooterButtons failed', e); }
+}
+window.ensureM3ResultFooterButtons=ensureM3ResultFooterButtons;
+
 function openM3(key,mid){
   const m=(G.matches[key]||[]).find(m=>m.id===mid);if(!m)return;
   const indivAuth=getIndividualResultAuthState(key,m);
-  if(!(AD||TM||canEditMatchByDirector(key,m)||indivAuth.allowed||isPublicResultEntryEnabled())){
-    toast(isIndividualByKey(key)?'개인전은 참가자 비밀번호 또는 운영 권한이 있을 때만 결과 입력할 수 있습니다':'해당 경기 참가팀 로그인 또는 운영 권한이 필요합니다','error');
+  // v289: 개인전은 결과 입력창 자체는 열리게 둔다. 저장 권한은 saveM3에서 다시 검증한다.
+  if(!(AD||TM||canEditMatchByDirector(key,m)||indivAuth.allowed||isPublicResultEntryEnabled()||isIndividualByKey(key))){
+    toast('해당 경기 참가팀 로그인 또는 운영 권한이 필요합니다','error');
     return;
   }
   const {t1,t2}=getMatchTeamObjects(key,m);
@@ -21064,13 +23397,13 @@ function openM3(key,mid){
   // ── 제목 동적 설정 ──
   const titleEl=ge('mM3T');
   if(isIndividualMode){
-    titleEl.textContent=`⚡ ${dl(div)} · ${dn1} vs ${dn2} — 결과입력`;
+    titleEl.textContent=`⚡ ${dn1} vs ${dn2} — 결과입력`;
   } else if(useOrderHere){
     if(st.bothSubmitted) titleEl.textContent=`📝 ${dl(div)} · ${dn1} vs ${dn2} — 오더/기록확인입력`;
     else if(st.mySubmitted) titleEl.textContent=`📝 ${dl(div)} · ${dn1} vs ${dn2} — 오더/기록확인입력`;
     else titleEl.textContent=`📝 ${dl(div)} · ${dn1} vs ${dn2} — 오더 입력·제출`;
   } else {
-    titleEl.textContent=`⚡ ${dl(div)} · ${dn1} vs ${dn2}`;
+    titleEl.textContent=`⚡ ${dn1} vs ${dn2}`;
   }
 
   // ── footer 버튼 상태 제어 ──
@@ -21169,10 +23502,8 @@ function openM3(key,mid){
     const sideLabel2=getIndividualSideLabel(key,m,m.t2)||'2번';
     const grpCourts=(m.phase==='group' && m.group!=null)?((G.draws[key]?.groups?.[Number(m.group)]?.courts)||[]):[];
     const matchCourts=Array.isArray(m.courts)?m.courts:(m.court?[m.court]:[]);
-    html=`<div style="margin-bottom:10px;padding:12px 14px;border-radius:14px;background:linear-gradient(135deg,#f8fbff,#eef4ff);border:1.5px solid #bfdbfe;font-size:.8rem;font-weight:800;color:#1d4ed8;line-height:1.6">📌 개인전은 오더 제출이 없습니다. 점수만 입력하면 됩니다.</div>
-    <div class="m3card" style="border:1.5px solid var(--border);box-shadow:none">
-      <div class="m3hdr ${divisionHeaderClass(div)}" style="justify-content:flex-start;gap:8px;flex-wrap:wrap">
-        <span class="m3badge">${dl(div)}</span>
+    html=`<div class="m3card" style="border:1.5px solid var(--border);box-shadow:none">
+      <div class="m3hdr" style="justify-content:flex-start;gap:8px;flex-wrap:wrap">
         <span class="m3badge" style="background:${getRoundVisualTheme(roundLabel, m.phase||'').chipBg};color:${getRoundVisualTheme(roundLabel, m.phase||'').chipFg};border:1px solid ${getRoundVisualTheme(roundLabel, m.phase||'').bd}">${roundLabel}</span>
       </div>
       <div class="m3body" style="padding:12px 12px 14px">
@@ -21210,8 +23541,14 @@ function openM3(key,mid){
       </div>
     </div>`;
     ge('mM3B').innerHTML=html;
-    om('mM3');
-    refreshAllOrderChipAvailability();
+    try{
+      const closeBtn=ge('mM3CloseBtn');
+      const saveResultBtn=ge('mM3SaveResultBtn');
+      if(closeBtn){ closeBtn.style.display='inline-flex'; closeBtn.textContent='닫기'; }
+      if(saveResultBtn){ saveResultBtn.style.display='inline-flex'; saveResultBtn.textContent='💾 결과저장'; saveResultBtn.disabled=false; }
+    }catch(_e){}
+    om('mM3'); ensureM3ResultFooterButtons();
+    refreshAllOrderChipAvailability(); ensureM3ResultFooterButtons();
     return;
   }
 
@@ -21226,7 +23563,7 @@ function openM3(key,mid){
     else statusText='📝 관리자만 전체 오더를 확인할 수 있습니다.';
   }
   html=`<div style="display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center;margin-bottom:14px;padding:14px 16px;background:var(--primary);color:white;border-radius:var(--radius-lg)" class="${divisionHeaderClass(div)}"><div style="font-weight:800;font-size:1.08rem;line-height:1.35">${dn1}</div><div style="font-size:1.25rem;font-weight:900;opacity:.9">VS</div><div style="font-weight:800;font-size:1.08rem;text-align:right;line-height:1.35">${dn2}</div></div>
-  ${isIndividualMode?`<div style="margin-bottom:12px;padding:10px 12px;border-radius:12px;border:1px solid #bfdbfe;background:linear-gradient(135deg,#f8fbff,#eef6ff);font-size:.78rem;font-weight:800;color:#1d4ed8;line-height:1.6">📌 개인전은 오더 제출이 없습니다. 팀(페어)이 이미 확정되어 있으므로 점수만 입력하면 됩니다.</div>`:`<div style="margin-bottom:12px;padding:10px 12px;border-radius:12px;border:1px solid #dbeafe;background:linear-gradient(135deg,#f8fbff,#eef6ff);font-size:.78rem;font-weight:800;color:#1d4ed8;line-height:1.6">📌 오더는 각 복식에서 선수 2명을 선택한 뒤 하단의 제출 버튼으로 제출합니다. 진행자/관리자는 한 팀만 대리제출도 가능합니다.</div>`}
+  ${isIndividualMode?``:`<div style="margin-bottom:12px;padding:10px 12px;border-radius:12px;border:1px solid #dbeafe;background:linear-gradient(135deg,#f8fbff,#eef6ff);font-size:.78rem;font-weight:800;color:#1d4ed8;line-height:1.6">📌 오더는 각 복식에서 선수 2명을 선택한 뒤 하단의 제출 버튼으로 제출합니다. 진행자/관리자는 한 팀만 대리제출도 가능합니다.</div>`}
   <div style="font-size:.9rem;color:var(--text2);margin-bottom:12px;padding:10px 12px;background:var(--panel2);border-radius:var(--radius);border:1px solid var(--border);font-weight:700">💡 선수 2명 클릭 선택 후 스코어 버튼으로 입력 (동점 불가) · 점수를 아직 안 넣어도 페어만 먼저 저장할 수 있습니다.${useOrderHere && !st.bothSubmitted?`
   <span style="display:block;margin-top:4px;color:#b45309">제출 전에는 자유 수정 가능 · 제출 후에는 내 오더가 저장되며 · 양팀 제출 완료 후에는 완전 잠금됩니다.${isOperator?'<br><span style="color:#1d4ed8">경기진행자는 제출 전에도 양팀 명단은 볼 수 있지만, 제출 완료된 팀의 오더 선택은 양팀 모두 제출될 때까지 숨겨집니다.</span>':''}</span>`:''}</div>
   ${(useOrderHere?`<div id="mM3SubmitStatusCard" style="margin-bottom:12px;padding:12px 13px;border-radius:14px;border:2px solid ${st.bothSubmitted?'#16a34a':(st.mySubmitted?'#d4a017':'#93c5fd')};background:${st.bothSubmitted?'linear-gradient(135deg,#ecfdf5,#dcfce7)':(st.mySubmitted?'linear-gradient(135deg,#fff7dd,#ffefb0)':'linear-gradient(135deg,#eff6ff,#f8fbff)')}"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap"><div style="font-size:.82rem;line-height:1.6;color:var(--text2)"><div style="font-size:.9rem;font-weight:900;color:${st.bothSubmitted?'#166534':(st.mySubmitted?'#8a6412':'#1d4ed8')}">${st.bothSubmitted?'🔒 제출 완료 상태':(st.mySubmitted?'📤 내팀 제출 완료':'✍️ 제출 전 상태')}</div><div style="margin-top:4px">${statusText}</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><span style="display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:999px;font-size:.74rem;font-weight:800;border:1.5px solid ${st.s1?'#16a34a':'#cbd5e1'};background:${st.s1?'#dcfce7':'#f8fafc'};color:${st.s1?'#166534':'#475569'}">${dn1} · ${st.s1?'✅ 제출완료':'⏳ 미제출'}</span><span style="display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:999px;font-size:.74rem;font-weight:800;border:1.5px solid ${st.s2?'#16a34a':'#cbd5e1'};background:${st.s2?'#dcfce7':'#f8fafc'};color:${st.s2?'#166534':'#475569'}">${dn2} · ${st.s2?'✅ 제출완료':'⏳ 미제출'}</span>${st.bothSubmitted?'<span style="display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:999px;font-size:.74rem;font-weight:800;border:1.5px solid #16a34a;background:#bbf7d0;color:#166534">🔓 양팀 공개됨</span>':''}</div></div><div style="padding:6px 10px;border-radius:999px;font-size:.72rem;font-weight:900;background:${st.bothSubmitted?'#166534':(st.mySubmitted?'#8a6412':'#1d4ed8')};color:#fff">${st.bothSubmitted?'수정 불가':(st.mySubmitted?'상대 제출 대기':'작성 가능')}</div></div></div>`:'')}
@@ -21325,8 +23662,12 @@ function openM3(key,mid){
       ensureM3OperatorSubmitButtons();
     }catch(_e){}
   },0);
-  om('mM3');
-  refreshAllOrderChipAvailability();
+  om('mM3'); ensureM3ResultFooterButtons();
+  try{
+    const closeBtn=ge('mM3CloseBtn');
+    if(closeBtn){ closeBtn.style.display='inline-flex'; closeBtn.textContent='닫기'; }
+  }catch(_e){}
+  refreshAllOrderChipAvailability(); ensureM3ResultFooterButtons();
   requestAnimationFrame(()=>applyLastOrderIfEmpty(key, m, dbl, st));
 }
 
@@ -21451,7 +23792,7 @@ function choosePlayerFromDropdown(cid, player){
   if(selected.length>=2){ toast('이 복식조는 이미 2명 선택되었습니다','info'); return; }
   selected.push(player);
   setPickerSelected(cid, selected);
-  refreshAllOrderChipAvailability();
+  refreshAllOrderChipAvailability(); ensureM3ResultFooterButtons();
   const list=ge(cid+'_list');
   if(list && selected.length>=2){
     list.classList.remove('open');
@@ -21461,7 +23802,7 @@ function choosePlayerFromDropdown(cid, player){
 }
 function removeSelectedPlayerFromDropdown(cid, player){
   setPickerSelected(cid, getPickerSelected(cid).filter(p=>p!==player));
-  refreshAllOrderChipAvailability();
+  refreshAllOrderChipAvailability(); ensureM3ResultFooterButtons();
   syncGhostScoreFromPickers(cid);
 }
 function refreshOrderChipAvailability(sidePrefix){
@@ -27995,7 +30336,7 @@ function applyTapOrderSelections(){
     setPickerSelected(`rp${st.side}_${r}`, arr);
     renderPlayerDropdown(`rp${st.side}_${r}`);
   }
-  refreshAllOrderChipAvailability();
+  refreshAllOrderChipAvailability(); ensureM3ResultFooterButtons();
   cm('mTapOrder');
   toast('선수 입력 적용 완료 ✅','success');
 }
@@ -28166,7 +30507,7 @@ function _orderPhotoApplySelection(side, assignments){
     setPickerSelected(`rp${side}_${idx}`, (players||[]).slice(0,2));
     renderPlayerDropdown(`rp${side}_${idx}`);
   });
-  refreshAllOrderChipAvailability();
+  refreshAllOrderChipAvailability(); ensureM3ResultFooterButtons();
 }
 function _orderPhotoBestCandidate(sourceText, unused, lineText=''){
   let best=null, bestScore=0;
@@ -29941,6 +32282,1303 @@ function _buildPrelimPopupHtml(ctx, mode){
     .group-grid.cols-5{ grid-template-columns:repeat(5, minmax(0,1fr)); }
   }
 </style>
+
+<style id="v267ResultModalFooterFix">
+#mM3 .modal-header{gap:10px}
+#mM3 .modal-header h3{min-width:0;flex:1 1 auto;line-height:1.35;word-break:keep-all}
+#mM3 .modal-header .modal-close{flex:0 0 30px;width:30px;height:30px}
+#mM3Footer{
+  display:grid !important;
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  position:sticky !important;
+  bottom:0 !important;
+  z-index:20 !important;
+  background:#fff !important;
+  border-top:1px solid var(--border) !important;
+}
+#mM3Footer #mM3CloseBtn{display:inline-flex !important}
+.m3-inline-result-actions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin-top:14px;
+  padding:12px;
+  border-radius:14px;
+  background:linear-gradient(135deg,#f8fbff,#fffdf5);
+  border:1.5px solid #dbe7ff;
+}
+.m3-inline-result-actions .btn{width:100%;min-height:44px;font-size:.9rem;font-weight:900;border-radius:12px}
+@media(max-width:768px){
+  #mM3.modal-overlay{
+    align-items:flex-end !important;
+    padding:8px 8px calc(76px + env(safe-area-inset-bottom,0px)) 8px !important;
+  }
+  #mM3 .modal-box{
+    max-height:calc(100vh - 92px - env(safe-area-inset-bottom,0px)) !important;
+    border-radius:18px 18px 0 0 !important;
+    overflow:hidden !important;
+  }
+  #mM3 .modal-body{
+    max-height:calc(100vh - 220px - env(safe-area-inset-bottom,0px)) !important;
+    overflow-y:auto !important;
+    -webkit-overflow-scrolling:touch;
+  }
+  #mM3Footer{padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px)) 12px !important}
+}
+</style>
+
+
+<style id="v269ResultSaveAlwaysVisible">
+#mM3Footer{
+  display:grid !important;
+  grid-template-columns:1fr 1fr !important;
+  gap:10px !important;
+  position:sticky !important;
+  bottom:0 !important;
+  z-index:50 !important;
+  background:#fff !important;
+  border-top:1px solid var(--border) !important;
+  padding:12px 16px !important;
+}
+#mM3Footer #mM3SaveResultBtn,
+#mM3Footer #mM3CloseBtn{
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  min-height:44px !important;
+  width:100% !important;
+  font-size:.92rem !important;
+  font-weight:900 !important;
+  border-radius:12px !important;
+}
+#mM3Footer #mM3SaveResultBtn{
+  background:linear-gradient(135deg,#facc15,#d97706) !important;
+  color:#111827 !important;
+  border:1px solid #d97706 !important;
+}
+#mM3Footer #mM3SaveResultBtn::before{
+  content:"💾 ";
+}
+#mM3Footer #mM3CloseBtn{
+  background:#eef2f7 !important;
+  color:#334155 !important;
+  border:1px solid #cbd5e1 !important;
+}
+@media(max-width:768px){
+  #mM3Footer{
+    padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px)) 12px !important;
+  }
+}
+</style>
+
+
+<style id="v271CardOverflowAndSingleFooterFix">
+/* 결과입력 모달: 중복 저장/닫기 제거, 하단 버튼만 유지 */
+#mM3 .m3-inline-result-actions{
+  display:none !important;
+}
+#mM3Footer{
+  display:grid !important;
+  grid-template-columns:1fr 1fr !important;
+  gap:10px !important;
+  position:sticky !important;
+  bottom:0 !important;
+  z-index:80 !important;
+  background:#fff !important;
+  border-top:1px solid var(--border) !important;
+  padding:12px 16px !important;
+}
+#mM3Footer #mM3SaveResultBtn,
+#mM3Footer #mM3CloseBtn{
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  width:100% !important;
+  min-height:46px !important;
+  font-size:.94rem !important;
+  font-weight:900 !important;
+  border-radius:12px !important;
+}
+#mM3Footer #mM3SaveResultBtn{
+  background:linear-gradient(135deg,#facc15,#d97706) !important;
+  color:#111827 !important;
+  border:1px solid #d97706 !important;
+}
+#mM3Footer #mM3SaveResultBtn::before{
+  content:"" !important;
+}
+#mM3Footer #mM3CloseBtn{
+  background:#eef2f7 !important;
+  color:#334155 !important;
+  border:1px solid #cbd5e1 !important;
+}
+
+/* 개인전 예선 카드 잘림 방지 */
+.indiv-prelim-grid{
+  grid-template-columns:repeat(auto-fit,minmax(320px,1fr)) !important;
+  overflow:visible !important;
+}
+.indiv-prelim-grid .grp-card{
+  min-width:0 !important;
+  width:100% !important;
+  overflow:hidden !important;
+}
+.indiv-prelim-grid .grp-matches-section,
+.indiv-prelim-grid .grp-matches-section.force-show{
+  overflow:visible !important;
+}
+.indiv-prelim-grid .m3card,
+.indiv-prelim-grid .match-card{
+  width:100% !important;
+  max-width:100% !important;
+  min-width:0 !important;
+  overflow:hidden !important;
+}
+.indiv-prelim-grid .m3body,
+.indiv-prelim-grid .match-teams,
+.indiv-prelim-grid .match-team{
+  min-width:0 !important;
+}
+.indiv-prelim-grid .m3sc-row{
+  grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) !important;
+}
+.indiv-prelim-grid .m3tnm,
+.indiv-prelim-grid .match-team-name,
+.indiv-prelim-grid .match-team-players{
+  overflow:hidden !important;
+  text-overflow:ellipsis !important;
+  word-break:keep-all !important;
+}
+.indiv-prelim-grid .m3tnm{
+  white-space:nowrap !important;
+}
+.indiv-prelim-grid .rb-sc-row{
+  grid-template-columns:minmax(0,1fr) 20px minmax(0,1fr) !important;
+}
+.indiv-prelim-grid .btn{
+  max-width:100% !important;
+}
+@media(max-width:900px){
+  .indiv-prelim-grid{
+    grid-template-columns:1fr !important;
+  }
+}
+@media(max-width:680px){
+  #mM3.modal-overlay{
+    padding:8px 8px calc(76px + env(safe-area-inset-bottom,0px)) 8px !important;
+  }
+  #mM3 .modal-box{
+    max-height:calc(100vh - 92px - env(safe-area-inset-bottom,0px)) !important;
+  }
+  #mM3 .modal-body{
+    max-height:calc(100vh - 224px - env(safe-area-inset-bottom,0px)) !important;
+  }
+  #mM3Footer{
+    padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px)) 12px !important;
+  }
+}
+</style>
+
+
+<style id="v272TwoColumnMobileCards">
+/* 모바일 개인전 예선카드 2열 유지 */
+@media(max-width:680px){
+  .indiv-prelim-grid{
+    display:grid !important;
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+    gap:10px !important;
+    align-items:start !important;
+  }
+
+  .indiv-prelim-grid .grp-card{
+    width:100% !important;
+    min-width:0 !important;
+    border-radius:14px !important;
+    overflow:hidden !important;
+  }
+
+  .indiv-prelim-grid .grp-hdr{
+    padding:8px 8px !important;
+    min-height:auto !important;
+  }
+
+  .indiv-prelim-grid .grp-hdr > div:first-child > span:first-child{
+    font-size:.96rem !important;
+  }
+
+  .indiv-prelim-grid .grp-hdr > div:first-child span:not(:first-child){
+    font-size:.62rem !important;
+  }
+
+  .indiv-prelim-grid .gs-row{
+    padding:8px 8px !important;
+  }
+
+  .indiv-prelim-grid .gs-nm{
+    font-size:.82rem !important;
+    line-height:1.25 !important;
+    word-break:keep-all !important;
+  }
+
+  .indiv-prelim-grid .gs-stats{
+    font-size:.68rem !important;
+    gap:4px !important;
+    flex-wrap:wrap !important;
+  }
+
+  .indiv-prelim-grid .btn{
+    min-height:34px !important;
+    font-size:.72rem !important;
+    padding:6px 6px !important;
+  }
+
+  .indiv-prelim-grid .indiv-group-action-inline{
+    padding:8px !important;
+  }
+
+  .indiv-prelim-grid .grp-matches-section.force-show{
+    padding:8px !important;
+  }
+
+  .indiv-prelim-grid .m3tnm,
+  .indiv-prelim-grid .match-team-name{
+    font-size:.76rem !important;
+  }
+}
+</style>
+
+
+<style id="v273RankCourtAlwaysVisibleFix">
+/* 예선 순위현황/경기목록은 렌더링 갱신 후에도 항상 표시 */
+.indiv-prelim-grid .grp-standings,
+.indiv-prelim-grid .standings,
+.indiv-prelim-grid .rank-box,
+.indiv-prelim-grid .ranking-box,
+.indiv-prelim-grid .grp-ranking,
+.indiv-prelim-grid .grp-matches-section,
+.indiv-prelim-grid .grp-matches-section.force-show{
+  display:block !important;
+  visibility:visible !important;
+  opacity:1 !important;
+}
+
+/* 경기 카드의 코트 배정/상태 배지는 항상 보이게 */
+.indiv-prelim-grid .m3card [class*="court"],
+.indiv-prelim-grid .match-card [class*="court"],
+.indiv-prelim-grid .m3card [class*="Court"],
+.indiv-prelim-grid .match-card [class*="Court"],
+.indiv-prelim-grid .court-chip,
+.indiv-prelim-grid .match-court-chip,
+.indiv-prelim-grid .m3-court-chip{
+  display:inline-flex !important;
+  visibility:visible !important;
+  opacity:1 !important;
+}
+
+/* 모바일 2열에서 코트 배정 줄이 잘리지 않도록 */
+@media(max-width:680px){
+  .indiv-prelim-grid .m3meta,
+  .indiv-prelim-grid .match-meta,
+  .indiv-prelim-grid .m3tags,
+  .indiv-prelim-grid .match-tags{
+    display:flex !important;
+    flex-wrap:wrap !important;
+    gap:5px !important;
+    visibility:visible !important;
+    opacity:1 !important;
+    max-height:none !important;
+    overflow:visible !important;
+  }
+
+  .indiv-prelim-grid .grp-matches-section.force-show{
+    max-height:none !important;
+    overflow:visible !important;
+  }
+
+  .indiv-prelim-grid .m3card,
+  .indiv-prelim-grid .match-card{
+    min-height:auto !important;
+  }
+}
+</style>
+
+
+<style id="v274CollapsibleMatchListAndCourtFix">
+/* 모바일 2열에서는 경기목록 기본 접힘: 순위현황 중심 */
+@media(max-width:680px){
+  .indiv-prelim-grid .grp-matches-section:not(.force-show){
+    display:none !important;
+  }
+  .indiv-prelim-grid .grp-matches-toggle{
+    display:flex !important;
+    width:100% !important;
+    justify-content:center !important;
+    align-items:center !important;
+    min-height:34px !important;
+    margin:8px 8px 10px 8px !important;
+    padding:6px 8px !important;
+    border-radius:10px !important;
+    border:1px solid #bfdbfe !important;
+    background:#eff6ff !important;
+    color:#1d4ed8 !important;
+    font-size:.72rem !important;
+    font-weight:900 !important;
+  }
+  .indiv-prelim-grid .grp-matches-section.force-show{
+    display:block !important;
+    max-height:none !important;
+    overflow:visible !important;
+  }
+  .indiv-prelim-grid .m3meta,
+  .indiv-prelim-grid .match-meta,
+  .indiv-prelim-grid .m3tags,
+  .indiv-prelim-grid .match-tags{
+    display:flex !important;
+    flex-wrap:wrap !important;
+    align-items:center !important;
+    gap:5px !important;
+    max-height:none !important;
+    overflow:visible !important;
+  }
+}
+
+/* PC/태블릿에서는 토글 버튼은 작게 보이되, 경기목록은 기존 흐름 유지 */
+@media(min-width:681px){
+  .indiv-prelim-grid .grp-matches-toggle{
+    display:none !important;
+  }
+}
+
+/* 미배정 칩이 실제 코트 배정 후 남아 보이지 않도록 */
+.match-court-missing.is-assigned,
+.court-missing.is-assigned,
+.badge-court-missing.is-assigned{
+  display:none !important;
+}
+</style>
+
+
+<style id="v275CompactGroupActions">
+/* 조 카드 액션 버튼 한 줄 정리 */
+.indiv-prelim-grid .v275-group-actions{
+  display:grid !important;
+  grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+  gap:6px !important;
+  padding:8px !important;
+  border-top:1px solid #e5e7eb !important;
+  background:linear-gradient(135deg,#ffffff,#f8fbff) !important;
+}
+
+.indiv-prelim-grid .v275-group-actions.two-actions{
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+}
+
+.indiv-prelim-grid .v275-group-actions .btn,
+.indiv-prelim-grid .v275-group-actions button{
+  width:100% !important;
+  min-height:34px !important;
+  height:34px !important;
+  padding:5px 4px !important;
+  border-radius:10px !important;
+  font-size:.68rem !important;
+  font-weight:900 !important;
+  white-space:nowrap !important;
+  overflow:hidden !important;
+  text-overflow:ellipsis !important;
+  margin:0 !important;
+}
+
+/* 기존 세로 버튼 여백 제거 */
+.indiv-prelim-grid .indiv-group-action-inline{
+  padding:0 !important;
+  margin:0 !important;
+}
+
+.indiv-prelim-grid .grp-matches-toggle{
+  margin:0 !important;
+}
+
+/* 모바일 2열에서 버튼이 카드 폭을 밀어내지 않게 */
+@media(max-width:680px){
+  .indiv-prelim-grid .v275-group-actions{
+    gap:5px !important;
+    padding:7px !important;
+  }
+  .indiv-prelim-grid .v275-group-actions .btn,
+  .indiv-prelim-grid .v275-group-actions button{
+    min-height:32px !important;
+    height:32px !important;
+    font-size:.64rem !important;
+    padding:4px 3px !important;
+  }
+}
+</style>
+
+
+<style id="v276CleanMatchCardList">
+/* 경기목록 안 경기카드 정렬 정리 */
+.indiv-prelim-grid .grp-matches-section.force-show{
+  padding:8px !important;
+  background:#f8fafc !important;
+}
+
+.indiv-prelim-grid .grp-matches-section.force-show .m3card,
+.indiv-prelim-grid .grp-matches-section.force-show .match-card{
+  display:block !important;
+  width:100% !important;
+  max-width:100% !important;
+  min-width:0 !important;
+  margin:0 0 8px 0 !important;
+  padding:10px !important;
+  border-radius:12px !important;
+  border:1px solid #dbeafe !important;
+  background:#fff !important;
+  overflow:hidden !important;
+  box-sizing:border-box !important;
+}
+
+.indiv-prelim-grid .grp-matches-section.force-show .m3head,
+.indiv-prelim-grid .grp-matches-section.force-show .match-head,
+.indiv-prelim-grid .grp-matches-section.force-show .m3meta,
+.indiv-prelim-grid .grp-matches-section.force-show .match-meta,
+.indiv-prelim-grid .grp-matches-section.force-show .m3tags,
+.indiv-prelim-grid .grp-matches-section.force-show .match-tags{
+  display:flex !important;
+  flex-wrap:wrap !important;
+  align-items:center !important;
+  gap:5px !important;
+  margin-bottom:6px !important;
+  max-width:100% !important;
+  overflow:visible !important;
+}
+
+.indiv-prelim-grid .grp-matches-section.force-show .m3sc-row,
+.indiv-prelim-grid .grp-matches-section.force-show .rb-sc-row,
+.indiv-prelim-grid .grp-matches-section.force-show .match-teams{
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) 22px minmax(0,1fr) !important;
+  gap:6px !important;
+  align-items:stretch !important;
+  width:100% !important;
+  max-width:100% !important;
+  overflow:hidden !important;
+}
+
+.indiv-prelim-grid .grp-matches-section.force-show .m3team,
+.indiv-prelim-grid .grp-matches-section.force-show .match-team{
+  min-width:0 !important;
+  width:100% !important;
+  padding:8px 6px !important;
+  border-radius:10px !important;
+  text-align:center !important;
+  overflow:hidden !important;
+}
+
+.indiv-prelim-grid .grp-matches-section.force-show .m3tnm,
+.indiv-prelim-grid .grp-matches-section.force-show .match-team-name,
+.indiv-prelim-grid .grp-matches-section.force-show .match-team-players{
+  display:block !important;
+  max-width:100% !important;
+  white-space:nowrap !important;
+  overflow:hidden !important;
+  text-overflow:ellipsis !important;
+  font-size:.72rem !important;
+  line-height:1.25 !important;
+  font-weight:900 !important;
+}
+
+.indiv-prelim-grid .grp-matches-section.force-show .m3vs,
+.indiv-prelim-grid .grp-matches-section.force-show .vs{
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  font-size:.8rem !important;
+  font-weight:900 !important;
+  color:#64748b !important;
+  min-width:22px !important;
+}
+
+.indiv-prelim-grid .grp-matches-section.force-show .m3actions,
+.indiv-prelim-grid .grp-matches-section.force-show .match-actions{
+  display:grid !important;
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  gap:6px !important;
+  margin-top:8px !important;
+}
+
+.indiv-prelim-grid .grp-matches-section.force-show .m3actions .btn,
+.indiv-prelim-grid .grp-matches-section.force-show .match-actions .btn,
+.indiv-prelim-grid .grp-matches-section.force-show button{
+  min-height:30px !important;
+  padding:4px 5px !important;
+  font-size:.66rem !important;
+  border-radius:9px !important;
+  white-space:nowrap !important;
+}
+
+/* 경기목록 안에서는 너무 긴 설명/세로 텍스트 방지 */
+.indiv-prelim-grid .grp-matches-section.force-show br{
+  display:none !important;
+}
+</style>
+
+
+<style id="v277MobileCardCleanFinal">
+/* 조 카드 상단 액션: 한 줄만, 기존 중복 버튼은 숨김 */
+.indiv-prelim-grid .indiv-group-action-inline,
+.indiv-prelim-grid .grp-card > button:not(.grp-matches-toggle),
+.indiv-prelim-grid .grp-card > .btn:not(.grp-matches-toggle){
+  display:none !important;
+}
+
+.indiv-prelim-grid .v275-group-actions{
+  display:grid !important;
+  grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+  gap:5px !important;
+  padding:7px !important;
+  border-top:1px solid #e5e7eb !important;
+  background:#fff !important;
+}
+
+.indiv-prelim-grid .v275-group-actions.two-actions{
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+}
+
+.indiv-prelim-grid .v275-group-actions button{
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  width:100% !important;
+  height:32px !important;
+  min-height:32px !important;
+  padding:3px 4px !important;
+  margin:0 !important;
+  border-radius:9px !important;
+  font-size:.64rem !important;
+  font-weight:900 !important;
+  white-space:nowrap !important;
+  overflow:hidden !important;
+  text-overflow:ellipsis !important;
+}
+
+/* 경기목록 토글은 액션줄 안에 있을 때만 보이게 */
+.indiv-prelim-grid .grp-card > .grp-matches-toggle{
+  display:none !important;
+}
+.indiv-prelim-grid .v275-group-actions .grp-matches-toggle{
+  display:inline-flex !important;
+}
+
+/* 경기목록 내부: 2열 카드에서 선수명이 세로/반쪽으로 깨지는 것 방지 */
+.indiv-prelim-grid .grp-matches-section.force-show{
+  padding:8px !important;
+  background:#f8fafc !important;
+  overflow:hidden !important;
+}
+
+.indiv-prelim-grid .grp-matches-section.force-show .m3card,
+.indiv-prelim-grid .grp-matches-section.force-show .match-card{
+  width:100% !important;
+  max-width:100% !important;
+  min-width:0 !important;
+  padding:9px !important;
+  margin:0 0 8px 0 !important;
+  border-radius:12px !important;
+  overflow:hidden !important;
+  box-sizing:border-box !important;
+}
+
+.indiv-prelim-grid .grp-matches-section.force-show .m3sc-row,
+.indiv-prelim-grid .grp-matches-section.force-show .rb-sc-row,
+.indiv-prelim-grid .grp-matches-section.force-show .match-teams{
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) 18px minmax(0,1fr) !important;
+  gap:5px !important;
+  align-items:stretch !important;
+  width:100% !important;
+  overflow:hidden !important;
+}
+
+.indiv-prelim-grid .grp-matches-section.force-show .m3team,
+.indiv-prelim-grid .grp-matches-section.force-show .match-team{
+  min-width:0 !important;
+  width:100% !important;
+  padding:7px 4px !important;
+  border-radius:10px !important;
+  overflow:hidden !important;
+}
+
+.indiv-prelim-grid .grp-matches-section.force-show .m3tnm,
+.indiv-prelim-grid .grp-matches-section.force-show .match-team-name,
+.indiv-prelim-grid .grp-matches-section.force-show .match-team-players{
+  display:block !important;
+  width:100% !important;
+  max-width:100% !important;
+  white-space:nowrap !important;
+  overflow:hidden !important;
+  text-overflow:ellipsis !important;
+  word-break:keep-all !important;
+  font-size:.68rem !important;
+  line-height:1.22 !important;
+  font-weight:900 !important;
+  writing-mode:horizontal-tb !important;
+}
+
+.indiv-prelim-grid .grp-matches-section.force-show .m3vs,
+.indiv-prelim-grid .grp-matches-section.force-show .vs{
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  min-width:18px !important;
+  font-size:.72rem !important;
+  font-weight:900 !important;
+  color:#64748b !important;
+}
+
+/* 너무 좁은 폰에서도 2열은 유지하되 경기목록 내부만 더 압축 */
+@media(max-width:430px){
+  .indiv-prelim-grid{
+    gap:8px !important;
+  }
+  .indiv-prelim-grid .grp-matches-section.force-show .m3sc-row,
+  .indiv-prelim-grid .grp-matches-section.force-show .rb-sc-row,
+  .indiv-prelim-grid .grp-matches-section.force-show .match-teams{
+    grid-template-columns:minmax(0,1fr) 16px minmax(0,1fr) !important;
+    gap:3px !important;
+  }
+  .indiv-prelim-grid .grp-matches-section.force-show .m3tnm,
+  .indiv-prelim-grid .grp-matches-section.force-show .match-team-name,
+  .indiv-prelim-grid .grp-matches-section.force-show .match-team-players{
+    font-size:.62rem !important;
+  }
+}
+</style>
+
+
+<style id="v278CleanListRowLayout">
+/* 조 카드 버튼: 결과/푸시/목록 3개를 같은 줄에 고정 */
+.indiv-prelim-grid .v275-group-actions{
+  display:grid !important;
+  grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+  gap:6px !important;
+  padding:8px !important;
+  background:#fff !important;
+  border-top:1px solid #e5e7eb !important;
+}
+.indiv-prelim-grid .v275-group-actions.two-actions{
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+}
+.indiv-prelim-grid .v275-group-actions button{
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  width:100% !important;
+  min-width:0 !important;
+  height:34px !important;
+  min-height:34px !important;
+  margin:0 !important;
+  padding:0 4px !important;
+  border-radius:10px !important;
+  font-size:.65rem !important;
+  font-weight:900 !important;
+  line-height:1 !important;
+  white-space:nowrap !important;
+  overflow:hidden !important;
+  text-overflow:clip !important;
+}
+
+/* 기존 중복/밀린 버튼 강제 제거 */
+.indiv-prelim-grid .grp-card > .indiv-group-action-inline,
+.indiv-prelim-grid .grp-card > .grp-matches-toggle,
+.indiv-prelim-grid .grp-card > button:not(.grp-matches-toggle){
+  display:none !important;
+}
+
+/* 경기목록은 카드형이 아니라 간결한 한 줄 경기표로 */
+.indiv-prelim-grid .grp-matches-section.force-show{
+  padding:8px !important;
+  background:#f8fafc !important;
+  border-top:1px solid #e5e7eb !important;
+  overflow:hidden !important;
+}
+
+.indiv-prelim-grid .grp-matches-section.force-show .m3card,
+.indiv-prelim-grid .grp-matches-section.force-show .match-card{
+  display:block !important;
+  width:100% !important;
+  max-width:100% !important;
+  min-width:0 !important;
+  margin:0 0 8px 0 !important;
+  padding:8px !important;
+  border-radius:12px !important;
+  border:1px solid #dbeafe !important;
+  background:#fff !important;
+  box-sizing:border-box !important;
+  overflow:hidden !important;
+}
+
+/* 제목/배지 줄 */
+.indiv-prelim-grid .grp-matches-section.force-show .m3head,
+.indiv-prelim-grid .grp-matches-section.force-show .match-head,
+.indiv-prelim-grid .grp-matches-section.force-show .m3meta,
+.indiv-prelim-grid .grp-matches-section.force-show .match-meta,
+.indiv-prelim-grid .grp-matches-section.force-show .m3tags,
+.indiv-prelim-grid .grp-matches-section.force-show .match-tags{
+  display:flex !important;
+  flex-wrap:wrap !important;
+  gap:4px !important;
+  align-items:center !important;
+  margin:0 0 6px 0 !important;
+  max-height:none !important;
+  overflow:visible !important;
+  font-size:.62rem !important;
+}
+
+/* 팀 영역: 세로 박스 금지, 한 줄 대진표 */
+.indiv-prelim-grid .grp-matches-section.force-show .m3sc-row,
+.indiv-prelim-grid .grp-matches-section.force-show .rb-sc-row,
+.indiv-prelim-grid .grp-matches-section.force-show .match-teams{
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) 18px minmax(0,1fr) !important;
+  gap:4px !important;
+  align-items:center !important;
+  width:100% !important;
+  max-width:100% !important;
+  overflow:hidden !important;
+  margin:6px 0 !important;
+}
+
+.indiv-prelim-grid .grp-matches-section.force-show .m3team,
+.indiv-prelim-grid .grp-matches-section.force-show .match-team{
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  min-width:0 !important;
+  width:100% !important;
+  min-height:36px !important;
+  padding:5px 4px !important;
+  border-radius:9px !important;
+  overflow:hidden !important;
+  box-sizing:border-box !important;
+}
+
+/* 팀명은 한 줄 말줄임. 세로 글자/쪼개짐 방지 */
+.indiv-prelim-grid .grp-matches-section.force-show .m3tnm,
+.indiv-prelim-grid .grp-matches-section.force-show .match-team-name,
+.indiv-prelim-grid .grp-matches-section.force-show .match-team-players{
+  display:block !important;
+  width:100% !important;
+  max-width:100% !important;
+  min-width:0 !important;
+  white-space:nowrap !important;
+  overflow:hidden !important;
+  text-overflow:ellipsis !important;
+  word-break:keep-all !important;
+  writing-mode:horizontal-tb !important;
+  font-size:.68rem !important;
+  line-height:1.15 !important;
+  font-weight:900 !important;
+  text-align:center !important;
+}
+
+/* 팀 박스 안의 부가정보는 모바일 목록에서 숨김: 정렬 깨짐 원인 */
+.indiv-prelim-grid .grp-matches-section.force-show .m3team small,
+.indiv-prelim-grid .grp-matches-section.force-show .m3team .muted,
+.indiv-prelim-grid .grp-matches-section.force-show .match-team small,
+.indiv-prelim-grid .grp-matches-section.force-show .match-team .muted,
+.indiv-prelim-grid .grp-matches-section.force-show .m3team div:not(.m3tnm):not(.match-team-name):not(.match-team-players),
+.indiv-prelim-grid .grp-matches-section.force-show .match-team div:not(.m3tnm):not(.match-team-name):not(.match-team-players){
+  display:none !important;
+}
+
+.indiv-prelim-grid .grp-matches-section.force-show .m3vs,
+.indiv-prelim-grid .grp-matches-section.force-show .vs{
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  min-width:18px !important;
+  font-size:.7rem !important;
+  font-weight:900 !important;
+  color:#64748b !important;
+}
+
+/* 경기목록 내부 버튼도 한 줄 정렬 */
+.indiv-prelim-grid .grp-matches-section.force-show .m3actions,
+.indiv-prelim-grid .grp-matches-section.force-show .match-actions{
+  display:grid !important;
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  gap:5px !important;
+  margin-top:6px !important;
+}
+.indiv-prelim-grid .grp-matches-section.force-show button{
+  min-height:30px !important;
+  padding:3px 5px !important;
+  border-radius:8px !important;
+  font-size:.62rem !important;
+  font-weight:900 !important;
+  white-space:nowrap !important;
+}
+
+/* 너무 좁은 2열에서도 틀어지지 않도록 */
+@media(max-width:430px){
+  .indiv-prelim-grid .v275-group-actions{
+    gap:4px !important;
+    padding:6px !important;
+  }
+  .indiv-prelim-grid .v275-group-actions button{
+    height:31px !important;
+    min-height:31px !important;
+    font-size:.6rem !important;
+    padding:0 2px !important;
+  }
+  .indiv-prelim-grid .grp-matches-section.force-show .m3sc-row,
+  .indiv-prelim-grid .grp-matches-section.force-show .rb-sc-row,
+  .indiv-prelim-grid .grp-matches-section.force-show .match-teams{
+    grid-template-columns:minmax(0,1fr) 14px minmax(0,1fr) !important;
+    gap:3px !important;
+  }
+  .indiv-prelim-grid .grp-matches-section.force-show .m3team,
+  .indiv-prelim-grid .grp-matches-section.force-show .match-team{
+    min-height:34px !important;
+    padding:4px 2px !important;
+  }
+  .indiv-prelim-grid .grp-matches-section.force-show .m3tnm,
+  .indiv-prelim-grid .grp-matches-section.force-show .match-team-name,
+  .indiv-prelim-grid .grp-matches-section.force-show .match-team-players{
+    font-size:.6rem !important;
+  }
+}
+</style>
+
+
+<style id="v279StableButtonsWideMatchList">
+/* 버튼이 렌더링마다 위치 바뀌지 않게 액션줄 고정 */
+.indiv-prelim-grid .v275-group-actions{
+  display:grid !important;
+  grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+  gap:6px !important;
+  padding:8px !important;
+  margin:0 !important;
+  position:static !important;
+  transform:none !important;
+  width:100% !important;
+  box-sizing:border-box !important;
+}
+.indiv-prelim-grid .v275-group-actions.two-actions{
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+}
+.indiv-prelim-grid .v275-group-actions button{
+  position:static !important;
+  transform:none !important;
+  width:100% !important;
+  min-width:0 !important;
+  height:34px !important;
+  min-height:34px !important;
+  margin:0 !important;
+  padding:0 4px !important;
+  white-space:nowrap !important;
+}
+
+/* 목록을 펼친 조는 2열 폭이 아니라 한 줄 전체 폭을 사용 */
+.indiv-prelim-grid .grp-card:has(.grp-matches-section.force-show){
+  grid-column:1 / -1 !important;
+}
+
+/* 경기목록은 넓어진 카드 안에서 보기 좋게 */
+.indiv-prelim-grid .grp-matches-section.force-show{
+  display:block !important;
+  padding:10px !important;
+  background:#f8fafc !important;
+  overflow:visible !important;
+}
+
+/* 경기목록 카드: 내용 안 잘리게 */
+.indiv-prelim-grid .grp-matches-section.force-show .m3card,
+.indiv-prelim-grid .grp-matches-section.force-show .match-card{
+  width:100% !important;
+  max-width:100% !important;
+  padding:10px !important;
+  overflow:visible !important;
+  box-sizing:border-box !important;
+}
+
+/* 팀 이름을 자르지 말고 2줄까지 허용 */
+.indiv-prelim-grid .grp-matches-section.force-show .m3tnm,
+.indiv-prelim-grid .grp-matches-section.force-show .match-team-name,
+.indiv-prelim-grid .grp-matches-section.force-show .match-team-players{
+  white-space:normal !important;
+  overflow:visible !important;
+  text-overflow:clip !important;
+  word-break:keep-all !important;
+  overflow-wrap:anywhere !important;
+  line-height:1.25 !important;
+  font-size:.78rem !important;
+  max-height:none !important;
+}
+
+/* 목록 안 팀 박스는 세로 카드가 아니라 가로 대진 */
+.indiv-prelim-grid .grp-matches-section.force-show .m3sc-row,
+.indiv-prelim-grid .grp-matches-section.force-show .rb-sc-row,
+.indiv-prelim-grid .grp-matches-section.force-show .match-teams{
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) 28px minmax(0,1fr) !important;
+  gap:8px !important;
+  align-items:center !important;
+  width:100% !important;
+  overflow:visible !important;
+}
+.indiv-prelim-grid .grp-matches-section.force-show .m3team,
+.indiv-prelim-grid .grp-matches-section.force-show .match-team{
+  min-height:48px !important;
+  padding:8px 6px !important;
+  overflow:visible !important;
+}
+.indiv-prelim-grid .grp-matches-section.force-show .m3vs,
+.indiv-prelim-grid .grp-matches-section.force-show .vs{
+  min-width:28px !important;
+  font-size:.9rem !important;
+}
+
+/* 펼친 상태에서는 기존 숨김 규칙보다 목록 카드 정보 보존 우선 */
+.indiv-prelim-grid .grp-matches-section.force-show .m3team div,
+.indiv-prelim-grid .grp-matches-section.force-show .match-team div{
+  max-height:none !important;
+}
+
+/* 아주 좁은 화면에서도 펼친 목록은 넓은 카드라 글자 보존 */
+@media(max-width:430px){
+  .indiv-prelim-grid .grp-card:has(.grp-matches-section.force-show){
+    grid-column:1 / -1 !important;
+  }
+  .indiv-prelim-grid .grp-matches-section.force-show .m3sc-row,
+  .indiv-prelim-grid .grp-matches-section.force-show .rb-sc-row,
+  .indiv-prelim-grid .grp-matches-section.force-show .match-teams{
+    grid-template-columns:minmax(0,1fr) 24px minmax(0,1fr) !important;
+    gap:6px !important;
+  }
+  .indiv-prelim-grid .grp-matches-section.force-show .m3tnm,
+  .indiv-prelim-grid .grp-matches-section.force-show .match-team-name,
+  .indiv-prelim-grid .grp-matches-section.force-show .match-team-players{
+    font-size:.74rem !important;
+  }
+}
+</style>
+
+
+<style id="v280RecommendedResultAndStats">
+/* 추천 구조: 2팀 조만 빠른 결과, 3팀 이상은 경기목록에서 경기별 입력 */
+.indiv-prelim-grid .grp-card.group-size-3 .v275-group-actions,
+.indiv-prelim-grid .grp-card.group-size-4 .v275-group-actions,
+.indiv-prelim-grid .grp-card.group-size-5 .v275-group-actions{
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+}
+.indiv-prelim-grid .grp-card.group-size-3 .v275-group-actions button.result-fast-btn,
+.indiv-prelim-grid .grp-card.group-size-4 .v275-group-actions button.result-fast-btn,
+.indiv-prelim-grid .grp-card.group-size-5 .v275-group-actions button.result-fast-btn{
+  display:none !important;
+}
+
+/* 순위현황은 간결하게: 승패 + 득실만 */
+.indiv-prelim-grid .gs-stats .game-win,
+.indiv-prelim-grid .gs-stats .game-loss,
+.indiv-prelim-grid .gs-stats .stat-game-win,
+.indiv-prelim-grid .gs-stats .stat-game-loss,
+.indiv-prelim-grid .gs-stats span{
+  font-size:.68rem !important;
+}
+
+/* JS에서 표시할 간결 득실 배지 */
+.indiv-prelim-grid .simple-diff-badge{
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  min-height:22px !important;
+  padding:2px 7px !important;
+  border-radius:8px !important;
+  font-size:.68rem !important;
+  font-weight:900 !important;
+  background:#eef2ff !important;
+  color:#1d4ed8 !important;
+  border:1px solid #bfdbfe !important;
+}
+.indiv-prelim-grid .simple-diff-badge.negative{
+  background:#fff1f2 !important;
+  color:#dc2626 !important;
+  border-color:#fecaca !important;
+}
+.indiv-prelim-grid .simple-diff-badge.zero{
+  background:#f1f5f9 !important;
+  color:#475569 !important;
+  border-color:#cbd5e1 !important;
+}
+
+/* 기존 게임득/게임실 배지는 숨기고 득실만 남김 */
+.indiv-prelim-grid .hide-game-detail{
+  display:none !important;
+}
+</style>
+
+
+<style id="v281MatchListPopupCompactRank">
+/* 조 카드 안에서는 경기목록을 펼치지 않고 팝업으로만 표시 */
+.indiv-prelim-grid .grp-matches-section{
+  display:none !important;
+}
+
+/* 조 카드 버튼은 흔들림 없이 한 줄 고정 */
+.indiv-prelim-grid .v275-group-actions{
+  display:grid !important;
+  grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+  gap:6px !important;
+  padding:8px !important;
+  margin:0 !important;
+  width:100% !important;
+  box-sizing:border-box !important;
+  position:static !important;
+  transform:none !important;
+  background:#fff !important;
+}
+.indiv-prelim-grid .v275-group-actions.two-actions{
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+}
+.indiv-prelim-grid .v275-group-actions button{
+  position:static !important;
+  transform:none !important;
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  width:100% !important;
+  height:34px !important;
+  min-height:34px !important;
+  margin:0 !important;
+  padding:0 4px !important;
+  border-radius:10px !important;
+  font-size:.66rem !important;
+  font-weight:900 !important;
+  white-space:nowrap !important;
+}
+
+/* 순위현황 간결화: 승패 + 득실만 */
+.indiv-prelim-grid .gs-stats{
+  display:flex !important;
+  flex-wrap:wrap !important;
+  gap:5px !important;
+  align-items:center !important;
+}
+.indiv-prelim-grid .gs-stats .hide-game-detail{
+  display:none !important;
+}
+.indiv-prelim-grid .gs-stats .simple-diff-badge{
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  min-height:22px !important;
+  padding:2px 7px !important;
+  border-radius:8px !important;
+  font-size:.68rem !important;
+  font-weight:900 !important;
+  background:#eef2ff !important;
+  color:#1d4ed8 !important;
+  border:1px solid #bfdbfe !important;
+}
+.indiv-prelim-grid .gs-stats .simple-diff-badge.negative{
+  background:#fff1f2 !important;
+  color:#dc2626 !important;
+  border-color:#fecaca !important;
+}
+.indiv-prelim-grid .gs-stats .simple-diff-badge.zero{
+  background:#f1f5f9 !important;
+  color:#475569 !important;
+  border-color:#cbd5e1 !important;
+}
+
+/* 경기목록 팝업 */
+#matchListPopup{
+  position:fixed;
+  inset:0;
+  z-index:9998;
+  display:none;
+  align-items:flex-end;
+  justify-content:center;
+  background:rgba(15,23,42,.58);
+  padding:14px;
+}
+#matchListPopup.show{
+  display:flex;
+}
+#matchListPopup .mlp-box{
+  width:min(720px,100%);
+  max-height:min(82vh,760px);
+  background:#fff;
+  border-radius:20px 20px 0 0;
+  box-shadow:0 -20px 60px rgba(15,23,42,.25);
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+}
+#matchListPopup .mlp-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:14px 16px;
+  background:#0f1f3d;
+  color:#fff;
+  font-weight:900;
+}
+#matchListPopup .mlp-close{
+  width:34px;
+  height:34px;
+  border-radius:10px;
+  border:0;
+  background:rgba(255,255,255,.12);
+  color:#fff;
+  font-size:1.1rem;
+  font-weight:900;
+}
+#matchListPopup .mlp-body{
+  padding:12px;
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+  background:#f8fafc;
+}
+#matchListPopup .mlp-card{
+  background:#fff;
+  border:1px solid #dbeafe;
+  border-radius:14px;
+  padding:12px;
+  margin-bottom:10px;
+}
+#matchListPopup .mlp-meta{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  margin-bottom:8px;
+}
+#matchListPopup .mlp-chip{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:24px;
+  padding:3px 8px;
+  border-radius:999px;
+  border:1px solid #cbd5e1;
+  background:#f8fafc;
+  font-size:.72rem;
+  font-weight:900;
+  color:#334155;
+}
+#matchListPopup .mlp-teams{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 34px minmax(0,1fr);
+  gap:8px;
+  align-items:center;
+}
+#matchListPopup .mlp-team{
+  min-width:0;
+  border:1px solid #dbeafe;
+  border-radius:12px;
+  background:#f8fbff;
+  padding:10px 8px;
+  text-align:center;
+  font-weight:900;
+  line-height:1.3;
+  word-break:keep-all;
+  overflow-wrap:anywhere;
+}
+#matchListPopup .mlp-vs{
+  text-align:center;
+  font-weight:900;
+  color:#64748b;
+}
+#matchListPopup .mlp-score{
+  margin-top:8px;
+  text-align:center;
+  font-size:1.05rem;
+  font-weight:1000;
+  color:#dc2626;
+}
+#matchListPopup .mlp-actions{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
+  margin-top:10px;
+}
+#matchListPopup .mlp-actions button{
+  min-height:38px;
+  border-radius:10px;
+  font-weight:900;
+  font-size:.82rem;
+}
+@media(max-width:680px){
+  #matchListPopup{
+    padding:8px 8px calc(76px + env(safe-area-inset-bottom,0px)) 8px;
+  }
+  #matchListPopup .mlp-box{
+    max-height:calc(100vh - 96px - env(safe-area-inset-bottom,0px));
+  }
+}
+</style>
+
+
+<style id="v282EmergencyPopupCardFix">
+/* 팝업 경기카드 강제 재정렬 */
+#matchListPopup .mlp-card *{
+  writing-mode:horizontal-tb !important;
+}
+#matchListPopup .mlp-card{
+  overflow:hidden !important;
+}
+#matchListPopup .mlp-meta{
+  display:flex !important;
+  flex-wrap:wrap !important;
+  gap:6px !important;
+}
+#matchListPopup .mlp-teams{
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) 34px minmax(0,1fr) !important;
+  gap:10px !important;
+  align-items:center !important;
+}
+#matchListPopup .mlp-team{
+  min-width:0 !important;
+  width:100% !important;
+  padding:14px 10px !important;
+  border-radius:14px !important;
+  background:#f8fbff !important;
+  border:1px solid #cfe0ff !important;
+  text-align:center !important;
+  overflow:hidden !important;
+}
+#matchListPopup .mlp-team *{
+  display:block !important;
+  white-space:normal !important;
+  overflow:visible !important;
+  text-overflow:clip !important;
+  word-break:keep-all !important;
+  overflow-wrap:anywhere !important;
+  line-height:1.35 !important;
+}
+#matchListPopup .mlp-vs{
+  font-size:1rem !important;
+  font-weight:1000 !important;
+}
+#matchListPopup .mlp-score{
+  font-size:1.4rem !important;
+  margin-top:10px !important;
+}
+#matchListPopup .mlp-actions{
+  display:grid !important;
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  gap:8px !important;
+}
+#matchListPopup .mlp-actions button{
+  min-height:42px !important;
+  font-size:.84rem !important;
+  font-weight:900 !important;
+}
+</style>
+
 </head>
 <body>
   <div class="toolbar">
@@ -29997,6 +33635,196 @@ function _buildPrelimPopupHtml(ctx, mode){
   }
 }
 </style>
+
+
+
+
+
+<style id="v286CleanMatchPopupCards">
+#matchListPopup{z-index:2147482600 !important;}
+#matchListPopup .mlp-box{border-radius:18px 18px 0 0 !important;background:#f8fafc !important;}
+#matchListPopup .mlp-head{background:#0f1e3a !important;padding:14px 16px !important;}
+#matchListPopupTitle{font-size:.98rem !important;font-weight:1000 !important;letter-spacing:-.02em !important;}
+#matchListPopup .mlp-body{padding:12px !important;background:#f8fafc !important;}
+#matchListPopup .mlp-card{border:1.5px solid #bfdbfe !important;border-radius:16px !important;background:#fff !important;padding:12px !important;margin-bottom:12px !important;box-shadow:0 8px 18px rgba(15,30,58,.08) !important;}
+#matchListPopup .mlp-meta{display:flex !important;gap:6px !important;flex-wrap:wrap !important;margin-bottom:10px !important;}
+#matchListPopup .mlp-chip{min-height:24px !important;padding:3px 9px !important;border-radius:999px !important;font-size:.72rem !important;font-weight:1000 !important;background:#f8fafc !important;color:#334155 !important;border:1px solid #cbd5e1 !important;}
+#matchListPopup .mlp-chip.done{background:#dcfce7 !important;color:#15803d !important;border-color:#86efac !important;}
+#matchListPopup .mlp-chip.live{background:#fef3c7 !important;color:#92400e !important;border-color:#fcd34d !important;}
+#matchListPopup .mlp-chip.court{background:#eff6ff !important;color:#1d4ed8 !important;border-color:#93c5fd !important;}
+#matchListPopup .mlp-versus-card{display:grid !important;grid-template-columns:minmax(0,1fr) 36px minmax(0,1fr) !important;gap:8px !important;align-items:stretch !important;}
+#matchListPopup .mlp-team-card{min-width:0 !important;border:1.5px solid #dbeafe !important;border-radius:14px !important;background:linear-gradient(180deg,#ffffff,#f8fbff) !important;padding:12px 8px !important;text-align:center !important;display:flex !important;align-items:center !important;justify-content:center !important;min-height:66px !important;}
+#matchListPopup .mlp-team-name{font-size:.94rem !important;font-weight:1000 !important;line-height:1.35 !important;color:#0f172a !important;word-break:keep-all !important;overflow-wrap:anywhere !important;writing-mode:horizontal-tb !important;}
+#matchListPopup .mlp-vs{display:flex !important;align-items:center !important;justify-content:center !important;font-size:.86rem !important;font-weight:1000 !important;color:#64748b !important;}
+#matchListPopup .mlp-score{margin:10px 0 0 !important;text-align:center !important;font-size:1.32rem !important;font-weight:1000 !important;color:#dc2626 !important;line-height:1 !important;}
+#matchListPopup .mlp-actions{display:grid !important;grid-template-columns:repeat(2,minmax(0,1fr)) !important;gap:8px !important;margin-top:12px !important;}
+#matchListPopup .mlp-actions button{min-height:42px !important;border-radius:12px !important;font-size:.86rem !important;font-weight:1000 !important;}
+@media(max-width:680px){
+  #matchListPopup{padding:8px 8px calc(76px + env(safe-area-inset-bottom,0px)) 8px !important;}
+  #matchListPopup .mlp-box{max-height:calc(100vh - 96px - env(safe-area-inset-bottom,0px)) !important;}
+  #matchListPopup .mlp-team-card{min-height:58px !important;padding:10px 7px !important;}
+  #matchListPopup .mlp-team-name{font-size:.88rem !important;}
+}
+</style>
+
+<script id="v286CleanMatchPopupCardsScript">
+(function(){
+  const DROP_RE = /영남권\s*지역신인부|지역신인부|모던클럽배\s*테니스대회|제\s*1\s*회|2026|대회\s*개요/gi;
+  function escHtml(s){
+    return String(s||'').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  }
+  function cleanName(raw){
+    return String(raw||'')
+      .replace(DROP_RE,'')
+      .replace(/[🏆✅✏️🔔📢🎾📋⚡🚀🔥🔑⏳]/gu,' ')
+      .replace(/\b\d+\s*경기\b/g,' ')
+      .replace(/\b(?:완료|대기중|대기|시합중|진행중)\b/g,' ')
+      .replace(/결과\s*수정하기|결과수정|결과\s*입력하기|결과입력|푸시/g,' ')
+      .replace(/(?:경기코트|배정코트|코트)\s*[:：]?\s*[가-힣A-Za-z0-9_-]*\d+/g,' ')
+      .replace(/승\s*\d+|패\s*\d+|게임득실\s*[+-]?\d+|게임득\s*\d+|게임실\s*\d+|득실\s*[+-]?\d+/g,' ')
+      .replace(/\d+\s*[:：]\s*\d+/g,' ')
+      .replace(/^\s*\d+\s*(?:번|위)?\s*/g,'')
+      .replace(/\s+/g,' ')
+      .trim();
+  }
+  function matchData(matchEl){
+    try{
+      if(typeof G==='undefined') return null;
+      const mid = matchEl.getAttribute('data-match-id') || matchEl.dataset?.matchId || '';
+      if(!mid) return null;
+      for(const [key,list] of Object.entries(G.matches||{})){
+        const m=(list||[]).find(x=>String(x?.id||x?._id||'')===String(mid));
+        if(m) return {key,m};
+      }
+    }catch(e){}
+    return null;
+  }
+  function getTeamNameFromData(key, idx){
+    try{
+      const team=(G.teams?.[key]||[])[idx];
+      if(!team) return '';
+      if(Array.isArray(team.individualPlayers) && team.individualPlayers.length){
+        const names=team.individualPlayers.slice(0,2).map(p=>String(p?.name||'').trim()).filter(Boolean);
+        if(names.length) return names.join(' / ');
+      }
+      if(Array.isArray(team.players) && team.players.length){
+        const names=team.players.slice(0,2).map(v=>String(v||'').trim()).filter(Boolean);
+        if(names.length) return names.join(' / ');
+      }
+      if(typeof tdn==='function') return tdn(team,key,idx)||'';
+      return team.pairLabel||team.entryLabel||team.club||team.name||'';
+    }catch(e){return '';}
+  }
+  function namesFromStandings(groupCard, raw){
+    try{
+      const rows=[...groupCard.querySelectorAll('.gs-row')];
+      const names=rows.map(row=>cleanName((row.querySelector('.gs-nm')||row).textContent)).filter(Boolean);
+      if(names.length<2) return null;
+      const nums=[...String(raw||'').matchAll(/(\d+)\s*번/g)].map(m=>parseInt(m[1],10)).filter(Boolean);
+      const a=nums[0] ? names[nums[0]-1] : names[0];
+      const b=nums[1] ? names[nums[1]-1] : names[1];
+      return (a&&b) ? [a,b] : null;
+    }catch(e){return null;}
+  }
+  function extractTeamNames(matchEl){
+    const raw=(matchEl.innerText||'').replace(/\s+/g,' ');
+    const found=matchData(matchEl);
+    if(found){
+      const a=cleanName(getTeamNameFromData(found.key, found.m.t1) || found.m.label1 || '');
+      const b=cleanName(getTeamNameFromData(found.key, found.m.t2) || found.m.label2 || '');
+      if(a && b) return [a,b];
+    }
+    const teamEls=[...matchEl.querySelectorAll('.m3team,.match-team')];
+    if(teamEls.length>=2){
+      const names=teamEls.slice(0,2).map(team=>cleanName((team.querySelector('.m3tnm,.match-team-name,.match-team-players,b,strong')||team).textContent));
+      if(names[0] && names[1] && !/^팀\s*[AB]?$/.test(names[0]) && !/^팀\s*[AB]?$/.test(names[1])) return names;
+    }
+    const group=matchEl.closest('.grp-card');
+    const standings=group ? namesFromStandings(group, raw) : null;
+    if(standings) return standings;
+    const vs=cleanName(raw).match(/(.+?)\s+VS\s+(.+)/i);
+    if(vs) return [cleanName(vs[1]), cleanName(vs[2])];
+    return ['1번팀','2번팀'];
+  }
+  function extractCourt(raw){
+    const s=String(raw||'').replace(DROP_RE,' ');
+    const m=s.match(/(?:경기코트|배정코트|코트)\s*[:：]?\s*([가-힣A-Za-z0-9_-]*\d+)/);
+    return m ? m[1] : '';
+  }
+  function extractStatus(raw){
+    const s=String(raw||'');
+    if(/완료/.test(s)) return {text:'완료', cls:'done', icon:'✅'};
+    if(/시합중|진행/.test(s)) return {text:'시합중', cls:'live', icon:'🔥'};
+    return {text:'대기', cls:'', icon:'⏳'};
+  }
+  window.v281BuildPopupCardFromMatch = function(matchEl, idx){
+    const raw=(matchEl.innerText||'').replace(/\s+/g,' ');
+    const names=extractTeamNames(matchEl).map(cleanName);
+    const t1=names[0] || '팀 A';
+    const t2=names[1] || '팀 B';
+    const scoreMatch=raw.match(/(\d+)\s*[:：]\s*(\d+)/);
+    const score=scoreMatch ? `${scoreMatch[1]}:${scoreMatch[2]}` : '';
+    const court=extractCourt(raw);
+    const status=extractStatus(raw);
+    const resultBtn=[...matchEl.querySelectorAll('button')].find(b=>/결과|수정/.test((b.textContent||'')));
+    const pushBtn=[...matchEl.querySelectorAll('button')].find(b=>/푸시/.test((b.textContent||'')));
+    const card=document.createElement('div');
+    card.className='mlp-card';
+    card.innerHTML=`
+      <div class="mlp-meta">
+        <span class="mlp-chip">${idx+1}경기</span>
+        <span class="mlp-chip ${status.cls}">${status.icon} ${status.text}</span>
+        ${court?`<span class="mlp-chip court">🎾 ${escHtml(court)}</span>`:''}
+      </div>
+      <div class="mlp-versus-card">
+        <div class="mlp-team-card"><div class="mlp-team-name">${escHtml(t1)}</div></div>
+        <div class="mlp-vs">VS</div>
+        <div class="mlp-team-card"><div class="mlp-team-name">${escHtml(t2)}</div></div>
+      </div>
+      ${score?`<div class="mlp-score">${score}</div>`:''}
+      <div class="mlp-actions">
+        <button type="button" class="btn btn-primary">✏️ 결과입력</button>
+        <button type="button" class="btn btn-outline">🔔 푸시</button>
+      </div>`;
+    const buttons=card.querySelectorAll('.mlp-actions button');
+    if(buttons[0]) buttons[0].onclick=()=>{
+      try{ if(typeof closeMatchListPopup==='function') closeMatchListPopup(); }catch(e){}
+      setTimeout(()=>{ if(resultBtn) resultBtn.click(); }, 30);
+    };
+    if(buttons[1]) buttons[1].onclick=()=>{ if(pushBtn) pushBtn.click(); };
+    if(!pushBtn && buttons[1]) buttons[1].style.opacity='.45';
+    return card;
+  };
+  window.openGroupMatchListPopupFromButton = function(btn){
+    const grpCard=btn.closest('.grp-card');
+    if(!grpCard) return;
+    const pop=(typeof v281EnsurePopupShell==='function') ? v281EnsurePopupShell() : document.getElementById('matchListPopup');
+    const body=document.getElementById('matchListPopupBody');
+    const title=document.getElementById('matchListPopupTitle');
+    let grpName='경기 목록';
+    const hdr=grpCard.querySelector('.grp-hdr');
+    const first=hdr ? hdr.querySelector('span') : null;
+    if(first) grpName=cleanName(first.textContent)||'경기 목록';
+    const gm=String(grpCard.innerText||'').match(/(\d+)\s*조/);
+    if(gm) grpName=`${gm[1]}조`;
+    if(title) title.textContent = `📋 ${grpName} 경기 목록`;
+    if(body){
+      body.innerHTML='';
+      const matches=[...grpCard.querySelectorAll('.grp-matches-section .m3card,.grp-matches-section .match-card')];
+      if(!matches.length){
+        body.innerHTML='<div class="mlp-card" style="text-align:center;font-weight:900;color:#64748b">표시할 경기 목록이 없습니다.</div>';
+      }else{
+        matches.forEach((m,i)=>body.appendChild(window.v281BuildPopupCardFromMatch(m,i)));
+      }
+    }
+    if(pop) pop.classList.add('show');
+  };
+  window.toggleGroupMatchList = function(btn){ window.openGroupMatchListPopupFromButton(btn); };
+  document.addEventListener('DOMContentLoaded',()=>{
+    setTimeout(()=>{try{ if(typeof v281ApplyRecommendedLayout==='function') v281ApplyRecommendedLayout(); }catch(e){}},300);
+  });
+})();
+<\/script>
 
 </body>
 </html>`;
@@ -31282,5 +35110,540 @@ body:not(.admin-mode):not(.tm-mode) #bottomTabBar button[data-target="players"]{
   }catch(e){}
 })();
 </script>
+
+<script id="v283FinalPopupTeamNameFixScript">
+function v283CleanNameText(raw){
+  return String(raw||'')
+    .replace(/\s+/g,' ')
+    .replace(/^[\s\d위번팀·.:：-]+/g,'')
+    .replace(/모던\s*·\s*모던/g,'')
+    .replace(/\b승\s*\d+\b/g,'')
+    .replace(/\b패\s*\d+\b/g,'')
+    .replace(/게임득실\s*[+-]?\d+/g,'')
+    .replace(/게임득\s*\d+/g,'')
+    .replace(/게임실\s*[+-]?\d+/g,'')
+    .replace(/득실\s*[+-]?\d+/g,'')
+    .replace(/\d+\s*[:：]\s*\d+/g,'')
+    .replace(/결과입력|결과수정|푸시|대기|완료|시합중|경기코트|조코트 미배정|공지\(경기\) 입력/g,'')
+    .replace(/\s+/g,' ')
+    .trim();
+}
+function v283NamesFromGroupCard(groupCard){
+  try{
+    const rows=[...groupCard.querySelectorAll('.gs-row')];
+    const names=rows.map(row=>{
+      const nm=row.querySelector('.gs-nm');
+      let txt=v283CleanNameText(nm ? nm.textContent : row.textContent);
+      txt=txt.replace(/^\d+위\s*/,'').trim();
+      return txt;
+    }).filter(Boolean);
+    if(names.length>=2) return names;
+  }catch(e){}
+  return [];
+}
+function v281ExtractTeamNames(card){
+  try{
+    const teams=[...card.querySelectorAll('.m3team,.match-team')];
+    let names=[];
+    if(teams.length>=2){
+      names=teams.slice(0,2).map(team=>{
+        const picked=team.querySelector('.m3tnm,.match-team-name,.match-team-players,b,strong');
+        return v283CleanNameText(picked ? picked.textContent : team.textContent);
+      });
+    }
+    names=names.map(n=>String(n||'').trim());
+    const generic=(n)=>!n || /^\d+번?팀?$/.test(n) || /^[12]번$/.test(n) || /^팀$/.test(n);
+    if(names.length<2 || generic(names[0]) || generic(names[1])){
+      const group=card.closest('.grp-card');
+      const groupNames=group ? v283NamesFromGroupCard(group) : [];
+      if(groupNames.length>=2){
+        const raw=(card.innerText||'').replace(/\s+/g,' ');
+        const nums=[...raw.matchAll(/(\d+)\s*번/g)].map(m=>parseInt(m[1],10)).filter(n=>n>0);
+        const a=nums[0] ? groupNames[nums[0]-1] : groupNames[0];
+        const b=nums[1] ? groupNames[nums[1]-1] : groupNames[1];
+        if(a && b) return [a,b];
+      }
+    }
+    if(names.length>=2 && !generic(names[0]) && !generic(names[1])) return [names[0],names[1]];
+    const raw=v283CleanNameText(card.innerText||'');
+    const vs=raw.match(/(.+?)\s+VS\s+(.+)/i);
+    if(vs) return [v283CleanNameText(vs[1]), v283CleanNameText(vs[2])];
+  }catch(e){}
+  return ['1번팀','2번팀'];
+}
+function v281BuildPopupCardFromMatch(matchEl,idx){
+  const [t1,t2]=v281ExtractTeamNames(matchEl);
+  const raw=(matchEl.innerText||'').replace(/\s+/g,' ');
+  const scoreMatch=raw.match(/(\d+)\s*[:：]\s*(\d+)/);
+  const score=scoreMatch ? `${scoreMatch[1]}:${scoreMatch[2]}` : '';
+  const status=/완료/.test(raw)?'완료':(/시합중|진행/.test(raw)?'시합중':'대기');
+  const court=(raw.match(/(?:경기코트|코트)\s*[:：]?\s*([가-힣A-Za-z0-9_-]*\d+)/)||[])[1] || '';
+  const resultBtn=[...matchEl.querySelectorAll('button')].find(b=>/결과|수정/.test((b.textContent||'')));
+  const pushBtn=[...matchEl.querySelectorAll('button')].find(b=>/푸시/.test((b.textContent||'')));
+  const card=document.createElement('div');
+  card.className='mlp-card';
+  card.innerHTML=`
+    <div class="mlp-meta">
+      <span class="mlp-chip">${idx+1}경기</span>
+      <span class="mlp-chip">${status}</span>
+      ${court?`<span class="mlp-chip">🎾 ${court}</span>`:''}
+    </div>
+    <div class="mlp-teams">
+      <div class="mlp-team">${t1}</div>
+      <div class="mlp-vs">VS</div>
+      <div class="mlp-team">${t2}</div>
+    </div>
+    ${score?`<div class="mlp-score">${score}</div>`:''}
+    <div class="mlp-actions">
+      <button type="button" class="btn btn-primary">✏️ 결과입력</button>
+      <button type="button" class="btn btn-outline">🔔 푸시</button>
+    </div>`;
+  const buttons=card.querySelectorAll('.mlp-actions button');
+  if(buttons[0]) buttons[0].onclick=()=>{ if(resultBtn) resultBtn.click(); };
+  if(buttons[1]) buttons[1].onclick=()=>{ if(pushBtn) pushBtn.click(); };
+  return card;
+}
+</script>
+
+
+<style id="v286CleanMatchPopupCards">
+#matchListPopup{z-index:2147482600 !important;}
+#matchListPopup .mlp-box{border-radius:18px 18px 0 0 !important;background:#f8fafc !important;}
+#matchListPopup .mlp-head{background:#0f1e3a !important;padding:14px 16px !important;}
+#matchListPopupTitle{font-size:.98rem !important;font-weight:1000 !important;letter-spacing:-.02em !important;}
+#matchListPopup .mlp-body{padding:12px !important;background:#f8fafc !important;}
+#matchListPopup .mlp-card{border:1.5px solid #bfdbfe !important;border-radius:16px !important;background:#fff !important;padding:12px !important;margin-bottom:12px !important;box-shadow:0 8px 18px rgba(15,30,58,.08) !important;}
+#matchListPopup .mlp-meta{display:flex !important;gap:6px !important;flex-wrap:wrap !important;margin-bottom:10px !important;}
+#matchListPopup .mlp-chip{min-height:24px !important;padding:3px 9px !important;border-radius:999px !important;font-size:.72rem !important;font-weight:1000 !important;background:#f8fafc !important;color:#334155 !important;border:1px solid #cbd5e1 !important;}
+#matchListPopup .mlp-chip.done{background:#dcfce7 !important;color:#15803d !important;border-color:#86efac !important;}
+#matchListPopup .mlp-chip.live{background:#fef3c7 !important;color:#92400e !important;border-color:#fcd34d !important;}
+#matchListPopup .mlp-chip.court{background:#eff6ff !important;color:#1d4ed8 !important;border-color:#93c5fd !important;}
+#matchListPopup .mlp-versus-card{display:grid !important;grid-template-columns:minmax(0,1fr) 36px minmax(0,1fr) !important;gap:8px !important;align-items:stretch !important;}
+#matchListPopup .mlp-team-card{min-width:0 !important;border:1.5px solid #dbeafe !important;border-radius:14px !important;background:linear-gradient(180deg,#ffffff,#f8fbff) !important;padding:12px 8px !important;text-align:center !important;display:flex !important;align-items:center !important;justify-content:center !important;min-height:66px !important;}
+#matchListPopup .mlp-team-name{font-size:.94rem !important;font-weight:1000 !important;line-height:1.35 !important;color:#0f172a !important;word-break:keep-all !important;overflow-wrap:anywhere !important;writing-mode:horizontal-tb !important;}
+#matchListPopup .mlp-vs{display:flex !important;align-items:center !important;justify-content:center !important;font-size:.86rem !important;font-weight:1000 !important;color:#64748b !important;}
+#matchListPopup .mlp-score{margin:10px 0 0 !important;text-align:center !important;font-size:1.32rem !important;font-weight:1000 !important;color:#dc2626 !important;line-height:1 !important;}
+#matchListPopup .mlp-actions{display:grid !important;grid-template-columns:repeat(2,minmax(0,1fr)) !important;gap:8px !important;margin-top:12px !important;}
+#matchListPopup .mlp-actions button{min-height:42px !important;border-radius:12px !important;font-size:.86rem !important;font-weight:1000 !important;}
+@media(max-width:680px){
+  #matchListPopup{padding:8px 8px calc(76px + env(safe-area-inset-bottom,0px)) 8px !important;}
+  #matchListPopup .mlp-box{max-height:calc(100vh - 96px - env(safe-area-inset-bottom,0px)) !important;}
+  #matchListPopup .mlp-team-card{min-height:58px !important;padding:10px 7px !important;}
+  #matchListPopup .mlp-team-name{font-size:.88rem !important;}
+}
+</style>
+
+<script id="v286CleanMatchPopupCardsScript">
+(function(){
+  const DROP_RE = /영남권\s*지역신인부|지역신인부|모던클럽배\s*테니스대회|제\s*1\s*회|2026|대회\s*개요/gi;
+  function escHtml(s){
+    return String(s||'').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  }
+  function cleanName(raw){
+    return String(raw||'')
+      .replace(DROP_RE,'')
+      .replace(/[🏆✅✏️🔔📢🎾📋⚡🚀🔥🔑⏳]/gu,' ')
+      .replace(/\b\d+\s*경기\b/g,' ')
+      .replace(/\b(?:완료|대기중|대기|시합중|진행중)\b/g,' ')
+      .replace(/결과\s*수정하기|결과수정|결과\s*입력하기|결과입력|푸시/g,' ')
+      .replace(/(?:경기코트|배정코트|코트)\s*[:：]?\s*[가-힣A-Za-z0-9_-]*\d+/g,' ')
+      .replace(/승\s*\d+|패\s*\d+|게임득실\s*[+-]?\d+|게임득\s*\d+|게임실\s*\d+|득실\s*[+-]?\d+/g,' ')
+      .replace(/\d+\s*[:：]\s*\d+/g,' ')
+      .replace(/^\s*\d+\s*(?:번|위)?\s*/g,'')
+      .replace(/\s+/g,' ')
+      .trim();
+  }
+  function matchData(matchEl){
+    try{
+      if(typeof G==='undefined') return null;
+      const mid = matchEl.getAttribute('data-match-id') || matchEl.dataset?.matchId || '';
+      if(!mid) return null;
+      for(const [key,list] of Object.entries(G.matches||{})){
+        const m=(list||[]).find(x=>String(x?.id||x?._id||'')===String(mid));
+        if(m) return {key,m};
+      }
+    }catch(e){}
+    return null;
+  }
+  function getTeamNameFromData(key, idx){
+    try{
+      const team=(G.teams?.[key]||[])[idx];
+      if(!team) return '';
+      if(Array.isArray(team.individualPlayers) && team.individualPlayers.length){
+        const names=team.individualPlayers.slice(0,2).map(p=>String(p?.name||'').trim()).filter(Boolean);
+        if(names.length) return names.join(' / ');
+      }
+      if(Array.isArray(team.players) && team.players.length){
+        const names=team.players.slice(0,2).map(v=>String(v||'').trim()).filter(Boolean);
+        if(names.length) return names.join(' / ');
+      }
+      if(typeof tdn==='function') return tdn(team,key,idx)||'';
+      return team.pairLabel||team.entryLabel||team.club||team.name||'';
+    }catch(e){return '';}
+  }
+  function namesFromStandings(groupCard, raw){
+    try{
+      const rows=[...groupCard.querySelectorAll('.gs-row')];
+      const names=rows.map(row=>cleanName((row.querySelector('.gs-nm')||row).textContent)).filter(Boolean);
+      if(names.length<2) return null;
+      const nums=[...String(raw||'').matchAll(/(\d+)\s*번/g)].map(m=>parseInt(m[1],10)).filter(Boolean);
+      const a=nums[0] ? names[nums[0]-1] : names[0];
+      const b=nums[1] ? names[nums[1]-1] : names[1];
+      return (a&&b) ? [a,b] : null;
+    }catch(e){return null;}
+  }
+  function extractTeamNames(matchEl){
+    const raw=(matchEl.innerText||'').replace(/\s+/g,' ');
+    const found=matchData(matchEl);
+    if(found){
+      const a=cleanName(getTeamNameFromData(found.key, found.m.t1) || found.m.label1 || '');
+      const b=cleanName(getTeamNameFromData(found.key, found.m.t2) || found.m.label2 || '');
+      if(a && b) return [a,b];
+    }
+    const teamEls=[...matchEl.querySelectorAll('.m3team,.match-team')];
+    if(teamEls.length>=2){
+      const names=teamEls.slice(0,2).map(team=>cleanName((team.querySelector('.m3tnm,.match-team-name,.match-team-players,b,strong')||team).textContent));
+      if(names[0] && names[1] && !/^팀\s*[AB]?$/.test(names[0]) && !/^팀\s*[AB]?$/.test(names[1])) return names;
+    }
+    const group=matchEl.closest('.grp-card');
+    const standings=group ? namesFromStandings(group, raw) : null;
+    if(standings) return standings;
+    const vs=cleanName(raw).match(/(.+?)\s+VS\s+(.+)/i);
+    if(vs) return [cleanName(vs[1]), cleanName(vs[2])];
+    return ['1번팀','2번팀'];
+  }
+  function extractCourt(raw){
+    const s=String(raw||'').replace(DROP_RE,' ');
+    const m=s.match(/(?:경기코트|배정코트|코트)\s*[:：]?\s*([가-힣A-Za-z0-9_-]*\d+)/);
+    return m ? m[1] : '';
+  }
+  function extractStatus(raw){
+    const s=String(raw||'');
+    if(/완료/.test(s)) return {text:'완료', cls:'done', icon:'✅'};
+    if(/시합중|진행/.test(s)) return {text:'시합중', cls:'live', icon:'🔥'};
+    return {text:'대기', cls:'', icon:'⏳'};
+  }
+  window.v281BuildPopupCardFromMatch = function(matchEl, idx){
+    const raw=(matchEl.innerText||'').replace(/\s+/g,' ');
+    const names=extractTeamNames(matchEl).map(cleanName);
+    const t1=names[0] || '팀 A';
+    const t2=names[1] || '팀 B';
+    const scoreMatch=raw.match(/(\d+)\s*[:：]\s*(\d+)/);
+    const score=scoreMatch ? `${scoreMatch[1]}:${scoreMatch[2]}` : '';
+    const court=extractCourt(raw);
+    const status=extractStatus(raw);
+    const resultBtn=[...matchEl.querySelectorAll('button')].find(b=>/결과|수정/.test((b.textContent||'')));
+    const pushBtn=[...matchEl.querySelectorAll('button')].find(b=>/푸시/.test((b.textContent||'')));
+    const card=document.createElement('div');
+    card.className='mlp-card';
+    card.innerHTML=`
+      <div class="mlp-meta">
+        <span class="mlp-chip">${idx+1}경기</span>
+        <span class="mlp-chip ${status.cls}">${status.icon} ${status.text}</span>
+        ${court?`<span class="mlp-chip court">🎾 ${escHtml(court)}</span>`:''}
+      </div>
+      <div class="mlp-versus-card">
+        <div class="mlp-team-card"><div class="mlp-team-name">${escHtml(t1)}</div></div>
+        <div class="mlp-vs">VS</div>
+        <div class="mlp-team-card"><div class="mlp-team-name">${escHtml(t2)}</div></div>
+      </div>
+      ${score?`<div class="mlp-score">${score}</div>`:''}
+      <div class="mlp-actions">
+        <button type="button" class="btn btn-primary">✏️ 결과입력</button>
+        <button type="button" class="btn btn-outline">🔔 푸시</button>
+      </div>`;
+    const buttons=card.querySelectorAll('.mlp-actions button');
+    if(buttons[0]) buttons[0].onclick=()=>{
+      try{ if(typeof closeMatchListPopup==='function') closeMatchListPopup(); }catch(e){}
+      setTimeout(()=>{ if(resultBtn) resultBtn.click(); }, 30);
+    };
+    if(buttons[1]) buttons[1].onclick=()=>{ if(pushBtn) pushBtn.click(); };
+    if(!pushBtn && buttons[1]) buttons[1].style.opacity='.45';
+    return card;
+  };
+  window.openGroupMatchListPopupFromButton = function(btn){
+    const grpCard=btn.closest('.grp-card');
+    if(!grpCard) return;
+    const pop=(typeof v281EnsurePopupShell==='function') ? v281EnsurePopupShell() : document.getElementById('matchListPopup');
+    const body=document.getElementById('matchListPopupBody');
+    const title=document.getElementById('matchListPopupTitle');
+    let grpName='경기 목록';
+    const hdr=grpCard.querySelector('.grp-hdr');
+    const first=hdr ? hdr.querySelector('span') : null;
+    if(first) grpName=cleanName(first.textContent)||'경기 목록';
+    const gm=String(grpCard.innerText||'').match(/(\d+)\s*조/);
+    if(gm) grpName=`${gm[1]}조`;
+    if(title) title.textContent = `📋 ${grpName} 경기 목록`;
+    if(body){
+      body.innerHTML='';
+      const matches=[...grpCard.querySelectorAll('.grp-matches-section .m3card,.grp-matches-section .match-card')];
+      if(!matches.length){
+        body.innerHTML='<div class="mlp-card" style="text-align:center;font-weight:900;color:#64748b">표시할 경기 목록이 없습니다.</div>';
+      }else{
+        matches.forEach((m,i)=>body.appendChild(window.v281BuildPopupCardFromMatch(m,i)));
+      }
+    }
+    if(pop) pop.classList.add('show');
+  };
+  window.toggleGroupMatchList = function(btn){ window.openGroupMatchListPopupFromButton(btn); };
+  document.addEventListener('DOMContentLoaded',()=>{
+    setTimeout(()=>{try{ if(typeof v281ApplyRecommendedLayout==='function') v281ApplyRecommendedLayout(); }catch(e){}},300);
+  });
+})();
+</script>
+
+
+
+<script id="v289ResultOpenFixScript">
+(function(){
+  'use strict';
+  if(window.__v289ResultOpenFixInstalled) return;
+  window.__v289ResultOpenFixInstalled = true;
+
+  function modalOpen(id){
+    var el=document.getElementById(id);
+    return !!(el && el.classList.contains('open'));
+  }
+  function normalizeId(v){ return String(v==null?'':v); }
+  function findMatchByElement(matchEl){
+    try{
+      var mid=normalizeId(matchEl && (matchEl.getAttribute('data-match-id') || (matchEl.dataset&&matchEl.dataset.matchId)));
+      if(!mid && matchEl){
+        var btn=Array.prototype.slice.call(matchEl.querySelectorAll('button')).find(function(b){
+          return /openM3\(['"][^'"]+['"],\s*['"][^'"]+['"]\)/.test(String(b.getAttribute('onclick')||''));
+        });
+        var onclick=String(btn && btn.getAttribute('onclick') || '');
+        var mt=onclick.match(/openM3\(['"]([^'"]+)['"],\s*['"]([^'"]+)['"]\)/);
+        if(mt) return {key:mt[1], mid:mt[2]};
+      }
+      if(!mid || typeof G==='undefined') return null;
+      var matches=G.matches||{};
+      for(var key in matches){
+        var list=matches[key]||[];
+        for(var i=0;i<list.length;i++){
+          var m=list[i]||{};
+          if(normalizeId(m.id||m._id)===mid) return {key:key, mid:normalizeId(m.id||m._id)};
+        }
+      }
+    }catch(e){}
+    return null;
+  }
+  function openResultForMatchElement(matchEl, fallbackButton){
+    var info=findMatchByElement(matchEl);
+    var before=modalOpen('mM3');
+    try{
+      if(info && typeof window.openM3==='function'){
+        window.openM3(info.key, info.mid);
+      }else if(fallbackButton){
+        fallbackButton.click();
+      }
+    }catch(err){
+      try{ console.warn('v289 result open failed', err); }catch(e){}
+      try{ if(fallbackButton) fallbackButton.click(); }catch(e){}
+    }
+    setTimeout(function(){
+      if(modalOpen('mM3')){
+        try{ if(typeof window.closeMatchListPopup==='function') window.closeMatchListPopup(); }catch(e){}
+        try{ if(typeof window.v288CleanResultModal==='function') window.v288CleanResultModal(); }catch(e){}
+      }else if(!before){
+        try{ if(typeof window.toast==='function') window.toast('결과 입력창을 열 수 없습니다. 로그인/권한 또는 경기 정보를 확인해 주세요.','info'); }catch(e){}
+      }
+    },140);
+  }
+
+  function installPopupBuilderGuard(){
+    var oldBuild=window.v281BuildPopupCardFromMatch;
+    if(typeof oldBuild!=='function' || oldBuild.__v289Wrapped) return;
+    var wrapped=function(matchEl, idx){
+      var card = oldBuild(matchEl, idx);
+      if(!card) return card;
+      try{
+        var resultBtn=Array.prototype.slice.call(matchEl.querySelectorAll('button')).find(function(b){return /결과|수정/.test((b.textContent||''));});
+        var action=card.querySelector('.mlp-actions button:first-child');
+        if(action){
+          action.onclick=function(ev){
+            try{ ev.preventDefault(); ev.stopPropagation(); }catch(e){}
+            openResultForMatchElement(matchEl,resultBtn);
+          };
+        }
+        var push=card.querySelector('.mlp-actions button:nth-child(2)');
+        var isManager=document.body.classList.contains('admin-mode')||document.body.classList.contains('operator-mode')||document.body.classList.contains('tm-mode');
+        if(push && !isManager){
+          push.style.display='none';
+          var actions=card.querySelector('.mlp-actions');
+          if(actions) actions.style.gridTemplateColumns='1fr';
+        }
+      }catch(e){}
+      return card;
+    };
+    wrapped.__v289Wrapped=true;
+    window.v281BuildPopupCardFromMatch=wrapped;
+  }
+
+  function protectOpenedResultModal(){
+    if(!modalOpen('mM3')) return;
+    var m=document.getElementById('mM3');
+    var box=m && m.querySelector('.modal-box');
+    var body=document.getElementById('mM3B');
+    var footer=document.getElementById('mM3Footer');
+    if(m){ m.classList.remove('v288-hidden'); m.style.display='flex'; }
+    if(box){ box.classList.remove('v288-hidden'); box.style.display=''; }
+    if(body){ body.classList.remove('v288-hidden'); body.style.display=''; }
+    if(footer){ footer.classList.remove('v288-hidden'); footer.style.display='grid'; }
+    try{ if(typeof window.v288CleanResultModal==='function') window.v288CleanResultModal(); }catch(e){}
+  }
+
+  document.addEventListener('click', function(ev){
+    try{
+      var btn=ev.target && ev.target.closest && ev.target.closest('button');
+      if(!btn) return;
+      var text=(btn.textContent||'').trim();
+      if(!/결과\s*(입력|수정)?|결과입력|결과수정/.test(text)) return;
+      setTimeout(protectOpenedResultModal,160);
+      setTimeout(protectOpenedResultModal,450);
+    }catch(e){}
+  }, true);
+
+  function init(){ installPopupBuilderGuard(); protectOpenedResultModal(); }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', init); else init();
+  try{
+    new MutationObserver(function(){
+      clearTimeout(window.__v289ResultOpenFixTimer);
+      window.__v289ResultOpenFixTimer=setTimeout(function(){installPopupBuilderGuard(); protectOpenedResultModal();},80);
+    }).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style']});
+  }catch(e){}
+})();
+</script>
+
+
+<script id="v290ModalCloseFixScript">
+(function(){
+  'use strict';
+  if(window.__v290ModalCloseFixInstalled) return;
+  window.__v290ModalCloseFixInstalled = true;
+
+  function getOverlay(id){
+    if(!id) return document.querySelector('.modal-overlay.open') || document.getElementById('mM3');
+    return document.getElementById(String(id));
+  }
+
+  function resetModalInlineState(overlay){
+    if(!overlay) return;
+    overlay.classList.remove('open');
+    overlay.style.display = '';
+    overlay.removeAttribute('aria-modal');
+    overlay.removeAttribute('role');
+
+    var box = overlay.querySelector('.modal-box');
+    if(box){
+      box.classList.remove('fullscreen');
+      box.classList.remove('v288-hidden');
+      box.style.display = '';
+    }
+
+    var body = overlay.querySelector('.modal-body');
+    if(body){
+      body.classList.remove('v288-hidden');
+      body.style.display = '';
+    }
+
+    var footer = overlay.querySelector('.modal-footer');
+    if(footer){
+      footer.classList.remove('v288-hidden');
+      footer.style.display = '';
+    }
+
+    overlay.querySelectorAll('.modal-close[title="전체화면"]').forEach(function(b){ b.textContent='⛶'; });
+  }
+
+  function forceCloseModal(id){
+    var overlay = getOverlay(id);
+    if(!overlay) return false;
+    resetModalInlineState(overlay);
+
+    // 결과입력 모달은 v289 보호 스크립트가 inline display:flex를 남길 수 있어 한 번 더 정리한다.
+    if(String(id||'') === 'mM3' || overlay.id === 'mM3'){
+      setTimeout(function(){
+        var m=document.getElementById('mM3');
+        if(m && !m.classList.contains('open')){
+          m.style.display='';
+          var box=m.querySelector('.modal-box'); if(box) box.style.display='';
+          var body=document.getElementById('mM3B'); if(body) body.style.display='';
+          var footer=document.getElementById('mM3Footer'); if(footer) footer.style.display='';
+        }
+      }, 90);
+    }
+    return true;
+  }
+
+  function forceOpenModal(id){
+    var overlay = document.getElementById(String(id||''));
+    if(!overlay) return false;
+    overlay.style.display='';
+    overlay.classList.add('open');
+    var box=overlay.querySelector('.modal-box');
+    if(box){ box.classList.remove('v288-hidden'); box.style.display=''; }
+    var body=overlay.querySelector('.modal-body');
+    if(body){ body.classList.remove('v288-hidden'); body.style.display=''; }
+    var footer=overlay.querySelector('.modal-footer');
+    if(footer){ footer.classList.remove('v288-hidden'); footer.style.display=''; }
+    return true;
+  }
+
+  var previousCm = window.cm;
+  window.cm = function(id){
+    var ret;
+    try{
+      if(typeof previousCm === 'function' && previousCm !== window.cm){
+        ret = previousCm.apply(this, arguments);
+      }
+    }catch(e){}
+    forceCloseModal(id);
+    return ret;
+  };
+
+  var previousOm = window.om;
+  window.om = function(id){
+    var ret;
+    try{
+      if(typeof previousOm === 'function' && previousOm !== window.om){
+        ret = previousOm.apply(this, arguments);
+      }
+    }catch(e){}
+    forceOpenModal(id);
+    return ret;
+  };
+
+  window.forceCloseModal = forceCloseModal;
+  window.forceOpenModal = forceOpenModal;
+
+  document.addEventListener('click', function(ev){
+    var target = ev.target;
+    if(!target || !target.closest) return;
+    var btn = target.closest('button');
+    if(!btn) return;
+    var modal = btn.closest('.modal-overlay');
+    if(!modal) return;
+    var text = String(btn.textContent || '').replace(/\s+/g,' ').trim();
+    var onclick = String(btn.getAttribute('onclick') || '');
+    var isCloseButton = btn.classList.contains('modal-close') || btn.id === 'mM3CloseBtn' || /^닫기$|^×$|^✕$|^X$/i.test(text) || /cm\(['"][^'"]+['"]\)/.test(onclick);
+    if(!isCloseButton) return;
+
+    ev.preventDefault();
+    ev.stopPropagation();
+    forceCloseModal(modal.id);
+  }, true);
+
+  document.addEventListener('keydown', function(ev){
+    if(ev.key !== 'Escape') return;
+    var open = document.querySelector('.modal-overlay.open');
+    if(open){
+      ev.preventDefault();
+      forceCloseModal(open.id);
+    }
+  });
+})();
+</script>
+
 </body>
 </html>
