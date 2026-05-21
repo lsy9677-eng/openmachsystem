@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-05-21-v261-records-menu-stable";
+  const APP_VERSION = "2026-05-21-v264-push-manual-result-card";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -3730,6 +3730,23 @@ body {
 </div>
 </div>
 <div class="modal-overlay" id="mCourtGroupCatalog"><div class="modal-box" style="max-width:720px"><div class="modal-header"><h3>🗂 코트군 관리</h3><button class="modal-close" onclick="cm('mCourtGroupCatalog')">✕</button></div><div class="modal-body"><div style="padding:10px 12px;background:linear-gradient(135deg,#eef4ff,#fffdf5);border:1px solid var(--border);border-radius:12px;font-size:.78rem;line-height:1.65;color:var(--text2);margin-bottom:12px">여기서 저장한 코트군은 <b>시합마다 선택해서 사용</b>합니다. 기존 저장 코트군은 여기서만 수정·삭제하고, 대회 화면에서는 선택/해제만 합니다.</div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px"><input class="form-input" id="cgCatalogNewName" placeholder="코트군 이름 (예: 능동, 국제, 메인코트)" style="flex:1;min-width:180px;font-size:.82rem"/><input class="form-input" id="cgCatalogNewCount" min="1" placeholder="면수" style="width:90px;font-size:.82rem" type="number"/><button class="btn btn-primary" onclick="addCourtGroupCatalogItem()" style="font-size:.78rem;padding:6px 12px;white-space:nowrap" type="button">➕ 저장</button></div><div id="courtGroupCatalogManageList" style="display:flex;flex-direction:column;gap:8px"></div></div><div class="modal-footer"><button class="btn btn-gray" onclick="cm('mCourtGroupCatalog')">닫기</button><button class="btn btn-primary" onclick="saveCourtGroupCatalogFromModal()">💾 저장</button></div></div></div>
+
+<div class="modal-overlay" id="mManualPush">
+  <div class="modal-box" style="max-width:540px">
+    <div class="modal-header" style="background:#2563eb">
+      <h3>🔔 푸시알림 발송</h3>
+      <button class="modal-close" onclick="cm('mManualPush')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="manualPushTarget" style="padding:9px 11px;background:#eff6ff;border:1px solid #93c5fd;border-radius:10px;font-size:.8rem;font-weight:900;color:#1d4ed8;margin-bottom:10px">발송 대상</div>
+      <div class="form-group"><label class="form-label">제목</label><input class="form-input" id="manualPushTitle" placeholder="예: 경기 안내"></div>
+      <div class="form-group"><label class="form-label">내용</label><textarea class="form-textarea" id="manualPushBody" rows="5" placeholder="푸시로 보낼 내용을 입력하세요"></textarea></div>
+      <div style="font-size:.74rem;color:var(--text3);line-height:1.6">※ 알림을 허용한 사용자에게만 발송됩니다. 차단된 휴대폰에는 보낼 수 없습니다.</div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-gray" onclick="cm('mManualPush')">취소</button><button class="btn btn-primary" onclick="sendManualPushFromModal()">🔔 발송</button></div>
+  </div>
+</div>
+
 <div class="toast-container" id="TC"></div>
 <div aria-atomic="true" aria-live="polite" class="sticky-alert-wrap" id="stickyAlertWrap"></div>
 <button class="scroll-top" id="stBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
@@ -4788,7 +4805,7 @@ async function requestMatchPushPermission(){
     const messaging=await getFcmMessagingSafe();
     const permission=await Notification.requestPermission();
     if(permission!=='granted'){
-      toast('알림을 허용해야 경기 시작/코트 배정 알림을 받을 수 있습니다.','info');
+      toast('알림 허용을 눌러야 경기 알림을 받을 수 있습니다.','info');
       const ps=ge('pushStatus'); if(ps) ps.innerHTML='🔕 알림 권한이 허용되지 않았습니다.';
       return;
     }
@@ -4846,6 +4863,175 @@ function renderInlinePushEnableButton(){
     <button class="btn btn-outline" onclick="requestMatchPushPermission()" style="width:100%;font-size:.84rem">🔔 경기 알림 받기</button>
   </div>`;
 }
+
+
+async function sendFcmPushToken(token, title, body, data={}){
+  const res=await fetch('/api/send-push',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({token,title,body,data})
+  });
+  const txt=await res.text().catch(()=>'');
+  if(!res.ok) throw new Error(txt || ('HTTP '+res.status));
+  return txt;
+}
+async function getEnabledPushTokenDocs(filterFn=null){
+  if(!(AD||TM||OP)) throw new Error('운영 권한이 필요합니다.');
+  const snap=await getDocs(collection(db,'pushTokens'));
+  const out=[];
+  snap.forEach(d=>{
+    const x={id:d.id,...(d.data()||{})};
+    if(!x.enabled || !x.token) return;
+    if(filterFn && !filterFn(x)) return;
+    out.push(x);
+  });
+  return out;
+}
+function normalizePushKey(v=''){
+  return String(v||'').trim().toLowerCase().replace(/\s+/g,'');
+}
+function getTeamPushTargetKeys(team){
+  const keys=[];
+  try{
+    if(team?.club) keys.push(team.club);
+    if(Array.isArray(team?.clubTokens)) keys.push(...team.clubTokens);
+    if(Array.isArray(team?.individualPlayers)){
+      team.individualPlayers.forEach(p=>{
+        if(p?.clubsRaw) keys.push(p.clubsRaw);
+        if(Array.isArray(p?.clubs)) keys.push(...p.clubs);
+      });
+    }
+  }catch(e){}
+  return [...new Set(keys.map(normalizePushKey).filter(Boolean))];
+}
+function getTeamPushPhoneDigits(team){
+  const phones=[];
+  try{
+    if(team?.phone) phones.push(team.phone);
+    if(Array.isArray(team?.individualPlayers)) team.individualPlayers.forEach(p=>{ if(p?.phone) phones.push(p.phone); });
+  }catch(e){}
+  return [...new Set(phones.map(v=>String(v||'').replace(/[^0-9]/g,'')).filter(v=>v.length>=9))];
+}
+function getMatchPushTargets(key,m){
+  const {t1,t2}=getMatchTeamObjects(key,m);
+  const clubKeys=[...getTeamPushTargetKeys(t1),...getTeamPushTargetKeys(t2)];
+  const phoneDigits=[...getTeamPushPhoneDigits(t1),...getTeamPushPhoneDigits(t2)];
+  const uids=[];
+  [t1,t2].forEach(t=>{ if(t?.ownerUid) uids.push(String(t.ownerUid)); });
+  return {clubKeys:[...new Set(clubKeys)], phoneDigits:[...new Set(phoneDigits)], uids:[...new Set(uids)]};
+}
+async function sendPushToTokenDocs(tokenDocs, title, body, data={}){
+  const uniq=[];
+  const seen=new Set();
+  (tokenDocs||[]).forEach(x=>{
+    const token=String(x?.token||'').trim();
+    if(token && !seen.has(token)){ seen.add(token); uniq.push(x); }
+  });
+  let ok=0, fail=0;
+  for(const x of uniq){
+    try{ await sendFcmPushToken(x.token,title,body,data); ok++; }
+    catch(e){ fail++; console.warn('push send failed', e); }
+  }
+  return {ok, fail, total:uniq.length};
+}
+async function sendRegistrationCompletePush(team,t,div){
+  try{
+    const uid=String(team?.ownerUid||auth?.currentUser?.uid||'');
+    const phones=getTeamPushPhoneDigits(team);
+    const tokens=await getEnabledPushTokenDocs(x=>{
+      const xu=String(x.uid||'');
+      const xp=String(x.phoneDigits||'').replace(/[^0-9]/g,'');
+      return (uid && xu===uid) || (xp && phones.includes(xp));
+    });
+    if(!tokens.length) return;
+    const title='참가 접수 완료 ✅';
+    const body=`${t?.name||'대회'} ${dl(div)} 접수가 완료되었습니다.`;
+    await sendPushToTokenDocs(tokens,title,body,{type:'registration_complete',tid:t?.id||'',division:div});
+  }catch(e){ console.warn('registration push skipped', e); }
+}
+async function openAdminBroadcastPushModal(){
+  if(!(AD||TM)){ toast('개발자 또는 운영자 로그인 필요','info'); return; }
+  const title=ge('manualPushTitle'), body=ge('manualPushBody'), target=ge('manualPushTarget');
+  if(title) title.value='230MATCH 공지';
+  if(body) body.value=String(G?.meta?.adminFloatingNotice||'').trim() || '';
+  if(target) target.textContent='전체 푸시알림 수신자';
+  window._manualPushContext={type:'all'};
+  om('mManualPush');
+}
+async function openManualMatchPush(key,mid){
+  if(!(AD||TM||OP)){ toast('운영 권한 필요','info'); return; }
+  const m=(G.matches[key]||[]).find(x=>String(x.id)===String(mid));
+  if(!m){ toast('경기를 찾을 수 없습니다','error'); return; }
+  const {t1,t2}=getMatchTeamObjects(key,m);
+  const title=ge('manualPushTitle'), body=ge('manualPushBody'), target=ge('manualPushTarget');
+  if(title) title.value='경기 안내';
+  if(body) body.value=`${tdn(t1,key,m.t1)||'1팀'} vs ${tdn(t2,key,m.t2)||'2팀'} 경기 안내입니다.`;
+  if(target) target.textContent=`해당 경기 참가자/팀: ${tdn(t1,key,m.t1)||'1팀'} vs ${tdn(t2,key,m.t2)||'2팀'}`;
+  window._manualPushContext={type:'match',key,mid};
+  om('mManualPush');
+}
+async function openManualTeamPush(key,idx){
+  if(!(AD||TM||OP)){ toast('운영 권한 필요','info'); return; }
+  const team=(G.teams[key]||[])[Number(idx)];
+  if(!team){ toast('명단을 찾을 수 없습니다','error'); return; }
+  const title=ge('manualPushTitle'), body=ge('manualPushBody'), target=ge('manualPushTarget');
+  if(title) title.value='참가자 안내';
+  if(body) body.value=`${team.entryLabel||team.pairLabel||tdn(team,key,idx)||'참가자'} 안내입니다.`;
+  if(target) target.textContent=`명단 카드: ${team.entryLabel||team.pairLabel||tdn(team,key,idx)||'참가자'}`;
+  window._manualPushContext={type:'team',key,idx:Number(idx)};
+  om('mManualPush');
+}
+async function sendManualPushFromModal(){
+  try{
+    if(!(AD||TM||OP)){ toast('운영 권한 필요','error'); return; }
+    const ctx=window._manualPushContext||{type:'all'};
+    const title=(ge('manualPushTitle')?.value||'230MATCH 알림').trim();
+    const body=(ge('manualPushBody')?.value||'').trim();
+    if(!body){ toast('보낼 내용을 입력하세요','error'); return; }
+    sl(true);
+    let docs=[];
+    if(ctx.type==='all'){
+      docs=await getEnabledPushTokenDocs();
+    }else if(ctx.type==='match'){
+      const m=(G.matches[ctx.key]||[]).find(x=>String(x.id)===String(ctx.mid));
+      const targets=getMatchPushTargets(ctx.key,m);
+      docs=await getEnabledPushTokenDocs(x=>{
+        const ck=normalizePushKey(x.clubKey||x.club||'');
+        const pd=String(x.phoneDigits||'').replace(/[^0-9]/g,'');
+        const uid=String(x.uid||'');
+        return (ck && targets.clubKeys.includes(ck)) || (pd && targets.phoneDigits.includes(pd)) || (uid && targets.uids.includes(uid));
+      });
+    }else if(ctx.type==='team'){
+      const team=(G.teams[ctx.key]||[])[Number(ctx.idx)];
+      const clubKeys=getTeamPushTargetKeys(team);
+      const phones=getTeamPushPhoneDigits(team);
+      const uids=[String(team?.ownerUid||'')].filter(Boolean);
+      docs=await getEnabledPushTokenDocs(x=>{
+        const ck=normalizePushKey(x.clubKey||x.club||'');
+        const pd=String(x.phoneDigits||'').replace(/[^0-9]/g,'');
+        const uid=String(x.uid||'');
+        return (ck && clubKeys.includes(ck)) || (pd && phones.includes(pd)) || (uid && uids.includes(uid));
+      });
+    }
+    if(!docs.length){ sl(false); toast('발송 대상 푸시 토큰이 없습니다','info'); return; }
+    const res=await sendPushToTokenDocs(docs,title,body,{type:'manual_push',target:ctx.type});
+    sl(false);
+    cm('mManualPush');
+    toast(`푸시 발송 완료: 성공 ${res.ok} / 실패 ${res.fail}`,'success');
+  }catch(e){ sl(false); console.error(e); toast('푸시 발송 실패: '+(e?.message||e),'error'); }
+}
+function ensureAdminPushControls(){
+  try{
+    const body=document.querySelector('#mAdminSettings .modal-body');
+    if(!body || ge('adminPushControlBox')) return;
+    const box=document.createElement('div');
+    box.id='adminPushControlBox';
+    box.className='form-group';
+    box.style.cssText='margin-bottom:16px;padding:14px;background:linear-gradient(135deg,#eef4ff,#fffdf5);border:1.5px solid #93c5fd;border-radius:12px';
+    box.innerHTML=`<div style="font-weight:800;font-size:.9rem;color:#1d4ed8;margin-bottom:8px">🔔 관리자 푸시알림 발송</div><div style="font-size:.75rem;color:var(--text2);line-height:1.7;margin-bottom:10px">푸시알림을 켠 전체 사용자에게 공지를 발송합니다. 경기 카드/명단 카드에서는 해당 대상에게만 보낼 수 있습니다.</div><button class="btn btn-primary" onclick="openAdminBroadcastPushModal()" style="width:100%;background:#2563eb">📢 전체 푸시 공지 보내기</button>`;
+    body.prepend(box);
+  }catch(e){}
+}
 function openMatchPushPromptAfterRegistration(){
   try{
     if(!('Notification' in window)) return;
@@ -4870,52 +5056,7 @@ window.setupFcmForegroundListener=setupFcmForegroundListener;
 window.updatePushStatusLabel=updatePushStatusLabel;
 window.openMatchPushPromptAfterRegistration=openMatchPushPromptAfterRegistration;
 window.renderInlinePushEnableButton=renderInlinePushEnableButton;
-
-// 🔔 앱 진입 시 자동 알림 권한 요청 (1회)
-async function autoRequestPushPermissionOnce(){
-  try{
-    if(location.protocol==='file:') return;
-    if(!('Notification' in window)) return;
-
-    const alreadyAsked = localStorage.getItem('autoPushAskedV2') === '1';
-    const enabled = localStorage.getItem('matchPushEnabled') === '1';
-
-    if(enabled) return;
-
-    // 이미 차단된 경우
-    if(Notification.permission === 'denied'){
-      const ps=ge('pushStatus');
-      if(ps){
-        ps.innerHTML='🔕 브라우저에서 알림이 차단되었습니다. 휴대폰 설정 → Chrome → 알림 허용 후 다시 시도해주세요.';
-      }
-      return;
-    }
-
-    // 최초 1회만 자동 요청
-    if(alreadyAsked) return;
-
-    localStorage.setItem('autoPushAskedV2','1');
-
-    setTimeout(async ()=>{
-      try{
-        await requestMatchPushPermission();
-      }catch(e){
-        console.warn('auto push request failed', e);
-      }
-    }, 1200);
-
-  }catch(e){
-    console.warn('autoRequestPushPermissionOnce error', e);
-  }
-}
-
-setTimeout(()=>{
-  try{
-    setupFcmForegroundListener();
-    updatePushStatusLabel();
-    autoRequestPushPermissionOnce();
-  }catch(e){}
-},1800);
+setTimeout(()=>{try{ setupFcmForegroundListener(); updatePushStatusLabel(); }catch(e){}},1800);
 let AUTH_PERSISTENCE_READY=false;
 const AUTH_PERSISTENCE_PROMISE=setPersistence(auth, browserLocalPersistence)
   .then(()=>{ AUTH_PERSISTENCE_READY=true; })
@@ -9970,6 +10111,7 @@ window.switchAdminSettingsTab = switchAdminSettingsTab;
 function openAdminSettings(){
   if(!(AD||TM)){toast('개발자 또는 운영자 로그인 필요','info');return;}
   ensureAdminSettingsStructured();
+  ensureAdminPushControls();
   // 입력 초기화
   ['aspCur','aspNew','aspNew2'].forEach(id=>{const el=ge(id);if(el)el.value='';});
   const ap=ge('adminPhoneInput'); if(ap) ap.value=(G.meta.adminPhone||'');
@@ -13040,6 +13182,7 @@ function buildRegisterRosterGrid(tid,div,teams,key){
     const canManageTeam = isIndividual ? (AD || isRegistrationOwner(team)) : (AD || (REG && _myClub && _myClub === _teamClub && !_deadlinePassed));
     const adminBtns=canManageTeam?`<div class="rr-admin-btns">
       <button class="btn rr-btn-edit" style="background:#f8fafc;color:#0f1e3a;border:1px solid #cbd5e1" onclick="openETeam('${esc(key)}',${realIdx})">✏️ 수정</button>
+      <button class="btn rr-btn-edit" style="background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd" onclick="openManualTeamPush('${esc(key)}',${realIdx})">🔔 푸시</button>
       <button class="btn btn-danger rr-btn-del" onclick="delTeam('${esc(key)}',${realIdx})">🗑 삭제</button>
     </div>`:'';
 
@@ -13466,6 +13609,7 @@ async function registerTeam(){
   renderRL();
   renderRegisterDivisionOverview();
   toast(isIndividual?'참가 접수 완료 ✅':'팀 등록 완료 ✅','success');
+  try{ await sendRegistrationCompletePush(newTeam,t,div); }catch(e){ console.warn('registration complete push failed', e); }
   if(isIndividual){
     try{ openMatchPushPromptAfterRegistration(); }catch(e){}
   }
@@ -15503,7 +15647,7 @@ function renderBracketHTMLForDiv(tid,div,isAll){
         const qName2 = qT2 ? tdn(qT2,key,qm.t2) : 'TBD';
         const qCourts = getMatchCourtsForStatusBoard(key,qm)||[];
         const qGrpCourts = getGroupDisplayCourts(key, gi)||[];
-        const qCanEdit = !!(AD||canEditMatchByDirector(key,qm)||getIndividualResultAuthState(key,qm).allowed||isPublicResultEntryEnabled());
+        const qCanEdit = !!(AD||TM||canEditMatchByDirector(key,qm)||getIndividualResultAuthState(key,qm).allowed||isPublicResultEntryEnabled());
         const qAction = qCanEdit ? `openM3('${key}','${qm.id}')` : `toggleIndividualGroupMatches('${key}',${gi})`;
         const qScore = qst.done ? `${qst.disp1??qst.sc1??0}:${qst.disp2??qst.sc2??0}` : (qst.started ? `${qst.disp1??qst.sc1??0}:${qst.disp2??qst.sc2??0}` : '- : -');
         const qStatusText = qst.done ? '경기완료' : (qst.started ? '진행중' : '결과 미입력');
@@ -16024,7 +16168,10 @@ function mCard(m,key,dn1,dn2,done,sc1,sc2,label){
     done=st2.done; sc1=st2.sc1; sc2=st2.sc2;
     const canDirEdit=canEditMatchByDirector(key,m);
     const indivAuth=getIndividualResultAuthState(key,m);
-    const btn=(AD||canDirEdit||indivAuth.allowed)?`<button class="btn ${done?'btn-gray':'btn-accent'}" style="padding:5px 12px;font-size:.77rem;white-space:nowrap" onclick="openM3('${key}','${m.id}')">${done?'✏️ 결과수정':'⚡ 결과입력'}</button>`:'';
+    const canInputIndivResult=(AD||TM||OP||canManageBracket()||canDirEdit||indivAuth.allowed);
+    const btn=canInputIndivResult?`<button class="btn ${done?'btn-gray':'btn-accent'}" style="padding:5px 12px;font-size:.77rem;white-space:nowrap" onclick="openM3('${key}','${m.id}')">${done?'✏️ 결과수정':'⚡ 결과입력'}</button>`:'';
+    const bottomResultBtn=canInputIndivResult?`<button class="btn ${done?'btn-gray':'btn-accent'}" style="width:100%;margin-top:10px;padding:11px 12px;font-size:.92rem;font-weight:900;border-radius:12px" onclick="openM3('${key}','${m.id}')">${done?'✏️ 결과 수정하기':'⚡ 결과 입력하기'}</button>`:'';
+    const pushBtn=(AD||TM||OP)?`<button class="btn btn-outline" style="padding:5px 10px;font-size:.75rem;white-space:nowrap;background:#eff6ff;color:#1d4ed8;border-color:#93c5fd" onclick="openManualMatchPush('${key}','${m.id}')">🔔 푸시</button>`:'';
     const sideLabel1=getIndividualSideLabel(key,m,m.t1)||'1번';
     const sideLabel2=getIndividualSideLabel(key,m,m.t2)||'2번';
     const grpCourts=(m.phase==='group' && m.group!=null)?((G.draws[key]?.groups?.[Number(m.group)]?.courts)||[]):[];
@@ -16059,11 +16206,11 @@ function mCard(m,key,dn1,dn2,done,sc1,sc2,label){
       <div class="m3body" style="padding:12px 14px">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px">
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span class="m3badge">${dl(div)}</span><span class="m3badge">${label||'1경기'}</span></div>
-          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">${done?`<span class="badge bg-green" style="font-size:.78rem;padding:3px 9px">완료</span>`:`<span class="badge bg-gray" style="font-size:.78rem;padding:3px 9px">대기</span>`}${btn}</div>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">${done?`<span class="badge bg-green" style="font-size:.78rem;padding:3px 9px">완료</span>`:`<span class="badge bg-gray" style="font-size:.78rem;padding:3px 9px">대기</span>`}${btn}${typeof pushBtn!=='undefined'?pushBtn:''}</div>
         </div>
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:10px">${groupCourtUI}${matchCourtUI}${matchMemoUI}${grpCourtShareBadges}</div>
         ${matchMemo?renderNoticeTicker(matchMemo,'📢 공지(경기)'):''}
-        <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:stretch;margin-bottom:8px">
+        <div style="display:grid;grid-template-columns:minmax(92px,1fr) 26px minmax(92px,1fr);gap:8px;align-items:stretch;margin-bottom:8px;min-width:0">
           <div style="${sideWrap1Style}">
             <div style="font-size:.74rem;font-weight:900;color:var(--primary);margin-bottom:6px">${sideLabel1}</div>
             <div style="padding:10px;border-radius:10px;background:#f8fafc;border:1px solid var(--border);text-align:center;line-height:1.35;min-width:0;overflow:hidden">
@@ -16083,6 +16230,7 @@ function mCard(m,key,dn1,dn2,done,sc1,sc2,label){
           </div>
         </div>
         <div style="display:flex;align-items:center;justify-content:center;gap:14px;font-size:1.1rem;font-weight:900;color:${done?(wn1?'var(--success)':wn2?'var(--danger)':'var(--primary)'):'var(--text2)'}">${done?`${dispSc1}:${dispSc2}`:'- : -'}</div>
+        ${bottomResultBtn}
       </div>
     </div>`;
   }
@@ -16152,8 +16300,9 @@ function mCard(m,key,dn1,dn2,done,sc1,sc2,label){
       ? (_ost2.bothSubmitted ? '📝 오더/기록확인입력' : (_ost2.mySubmitted ? '📝 오더/기록확인입력' : '📝 오더 입력·제출'))
       : '⚡ 결과입력';
   const _btnStyle = done ? 'btn-gray' : (useOrderHere ? (_ost2.bothSubmitted||_ost2.mySubmitted ? 'btn-primary' : 'btn-accent') : 'btn-accent');
-  const btn=(AD||canDirEdit)?`<button class="btn ${_btnStyle}" style="padding:5px 12px;font-size:.77rem;white-space:nowrap" onclick="openM3('${key}','${m.id}')">${_btnLabel}</button>`:'';
+  const btn=(AD||TM||canDirEdit)?`<button class="btn ${_btnStyle}" style="padding:5px 12px;font-size:.77rem;white-space:nowrap" onclick="openM3('${key}','${m.id}')">${_btnLabel}</button>`:'';
   const memoBtn=canManageBracket()?`<button class="btn btn-outline" style="padding:5px 10px;font-size:.75rem;white-space:nowrap;background:#fff;color:${matchMemo?'#7a5600':'var(--primary-dark)'};border-color:${matchMemo?'#f6d365':'var(--border)'}" onclick="openMatchMemoModal('${key}','${m.id}')">📢 공지(경기)${matchMemo?' 수정':' 입력'}</button>`:'';
+  const pushBtn=(AD||TM||OP)?`<button class="btn btn-outline" style="padding:5px 10px;font-size:.75rem;white-space:nowrap;background:#eff6ff;color:#1d4ed8;border-color:#93c5fd" onclick="openManualMatchPush('${key}','${m.id}')">🔔 푸시</button>`:'';
   const orderBadge=useOrderHere?getOnlineOrderStatusBadgeHTML(key,m):'';
   const orderTeamStatus=useOrderHere?getOnlineOrderTeamStatusHTML(key,m):'';
   const unlockBtn=(AD&&useOrderHere)?`<button class="btn btn-outline" style="padding:5px 10px;font-size:.75rem;white-space:nowrap;background:#fff;color:#8a6412;border-color:#d4a017" onclick="CM_key='${key}';CM_id='${m.id}';confirmUnlockOrder()">🔓 오더초기화</button>`:'';
@@ -16165,7 +16314,7 @@ function mCard(m,key,dn1,dn2,done,sc1,sc2,label){
   const _isOtherM=MY_CLUB_FILTER&&_bc2&&!_isMyCM;
   const teamCardStyleBase=`${_isMyCM?'border:2.5px solid #16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.15);':''}${_isOtherM?'opacity:0.35;':''}`;
   const teamWinTint=done&&wn1?'background:linear-gradient(135deg,#f7fff9,#eefbf3);border-color:#86efac;':done&&wn2?'background:linear-gradient(135deg,#fff7f7,#fef2f2);border-color:#fecaca;':'';
-  return`<div class="m3card" id="${getMatchCardDomId(key,m.id)}" data-match-id="${m.id}" style="${teamCardStyleBase}${teamWinTint}"><div class="m3hdr ${divisionHeaderClass(div)}" style="${_isMyCM?'background:linear-gradient(90deg,#14532d,#166534)':''}"><div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap"><span class="m3badge">${dl(div)}</span><span class="m3badge">${label}</span><span style="font-size:1.08rem;font-weight:800">${dn1} vs ${dn2}</span></div><div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;justify-content:flex-end">${grpCourtBadge} ${grpCourtShareBadge} ${matchMemoBadge} ${courtUI} ${orderBadge} ${done?'<span class="badge bg-green" style="font-size:.82rem;padding:3px 9px">완료</span>':(st2.started?`<span style="font-size:.82rem;opacity:.95;font-weight:700;color:#ffd166">진행중 ${st2.disp1??st2.sc1}:${st2.disp2??st2.sc2}</span>`:'<span style="font-size:.86rem;opacity:.8;font-weight:600">대기중</span>')} ${unlockBtn} ${memoBtn} ${btn}</div></div>
+  return`<div class="m3card" id="${getMatchCardDomId(key,m.id)}" data-match-id="${m.id}" style="${teamCardStyleBase}${teamWinTint}"><div class="m3hdr ${divisionHeaderClass(div)}" style="${_isMyCM?'background:linear-gradient(90deg,#14532d,#166534)':''}"><div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap"><span class="m3badge">${dl(div)}</span><span class="m3badge">${label}</span><span style="font-size:1.08rem;font-weight:800">${dn1} vs ${dn2}</span></div><div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;justify-content:flex-end">${grpCourtBadge} ${grpCourtShareBadge} ${matchMemoBadge} ${courtUI} ${orderBadge} ${done?'<span class="badge bg-green" style="font-size:.82rem;padding:3px 9px">완료</span>':(st2.started?`<span style="font-size:.82rem;opacity:.95;font-weight:700;color:#ffd166">진행중 ${st2.disp1??st2.sc1}:${st2.disp2??st2.sc2}</span>`:'<span style="font-size:.86rem;opacity:.8;font-weight:600">대기중</span>')} ${unlockBtn} ${memoBtn} ${btn}${typeof pushBtn!=='undefined'?pushBtn:''}</div></div>
     <div class="m3body">
       ${matchMemo?renderNoticeTicker(matchMemo,'📢 공지(경기)'):''}${orderTeamStatus}${matchQueueChips}${done?`<div class="m3sc-row"><div class="m3tnm ${wn1?'win':'lose'}">${wn1?'🏆 ':''} ${dn1}</div><div class="m3sc">${sc1}:${sc2}</div><div class="m3tnm ${wn2?'win':'lose'}">${dn2} ${wn2?' 🏆':''}</div></div>`:`<div style="text-align:center;color:var(--text3);font-size:.8rem;margin:${(orderTeamStatus||matchQueueChips)?'0':'0'} 0 6px">경기 대기중</div>`}
     <div style="font-size:.7rem;font-weight:700;color:var(--text2);margin-bottom:5px">${dbl}복식 상세 (6게임 선취 승리 · 타이브렉)</div>
@@ -20887,7 +21036,7 @@ function ensureM3AdminSubmitButtons(){
 function openM3(key,mid){
   const m=(G.matches[key]||[]).find(m=>m.id===mid);if(!m)return;
   const indivAuth=getIndividualResultAuthState(key,m);
-  if(!(AD||canEditMatchByDirector(key,m)||indivAuth.allowed||isPublicResultEntryEnabled())){
+  if(!(AD||TM||canEditMatchByDirector(key,m)||indivAuth.allowed||isPublicResultEntryEnabled())){
     toast(isIndividualByKey(key)?'개인전은 참가자 비밀번호 또는 운영 권한이 있을 때만 결과 입력할 수 있습니다':'해당 경기 참가팀 로그인 또는 운영 권한이 필요합니다','error');
     return;
   }
@@ -22344,7 +22493,7 @@ function toggleMyClubFilter(tab, forceOn){
 }
 
 function canEditMatchByDirector(key,m){
-  if(AD || OP || isPublicResultEntryEnabled()) return true;
+  if(AD || TM || OP || isPublicResultEntryEnabled()) return true;
   if(!m) return false;
   const teams=G.teams[key]||[];
   const t1=teams[m.t1]??teams.find(t=>t.id===m.t1||t.name===m.t1);
@@ -28457,7 +28606,7 @@ function closeReorderPopup() {
   ge('reorderOverlay')?.remove();
 }
 
-Object.assign(window,{ closeStickyAlert, goToStickyAlertMatch, toggleModalFullscreen, setModalFullscreenState, openQuickAddPlayer, quickAddPlayer, fillAdminPlayerClub, adminAddPlayer, openSupportModal, sendSupportSMS, saveAdminPhone, 
+Object.assign(window,{ openAdminBroadcastPushModal, openManualMatchPush, openManualTeamPush, sendManualPushFromModal, closeStickyAlert, goToStickyAlertMatch, toggleModalFullscreen, setModalFullscreenState, openQuickAddPlayer, quickAddPlayer, fillAdminPlayerClub, adminAddPlayer, openSupportModal, sendSupportSMS, saveAdminPhone, 
   showPage,toggleAdmin,doLogin,openAdminSettings,saveAdminPassword,goBracket,onGuideFilesSelected,removeGuideFile,openGuide,loadHistFromDB,uploadHistFromExcel,previewHistExcel,renderGuidePreview,onHistGuideFilesSelected,uploadHistGuideFiles,manageHistGuide,deleteHistGuideFile,removeHistGuidePending,
   createTournament,renderTL,chgTS,delT,openET,saveET,openTD,applyRec,saveDivS,
   onRegTC,renderRL,renderRegisterDivisionOverview,selectRegDivision,registerTeam,delTeam,phint,openPHist,openETeam,saveETeam,etUpdateSlots,updateRegisterSlots,
