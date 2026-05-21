@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-05-21-v317-push-stats-dashboard";
+  const APP_VERSION = "2026-05-22-v318-push-permission-fallback-close";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -5865,6 +5865,7 @@ body {
   <div class="modal-box" style="max-width:560px">
     <div class="modal-header" style="background:#1d4ed8">
       <h3>🔔 경기 알림 필수 정보 설정</h3>
+      <button class="modal-close" onclick="closeRequiredProfileModal()">✕</button>
     </div>
     <div class="modal-body">
       <div style="padding:12px 14px;border:1.5px solid #93c5fd;background:#eff6ff;border-radius:14px;font-size:.84rem;line-height:1.7;color:#1e40af;font-weight:800;margin-bottom:12px">
@@ -5880,7 +5881,7 @@ body {
     </div>
     <div class="modal-footer" style="display:grid;grid-template-columns:1.5fr 1fr;gap:8px">
       <button class="btn btn-primary" onclick="saveRequiredProfileAndPush('enable')" style="background:#2563eb;color:#fff">💾 저장하고 알림 켜기</button>
-      <button class="btn btn-gray" onclick="saveRequiredProfileAndPush('deny')">알림 거부하고 저장</button>
+      <button class="btn btn-gray" onclick="saveRequiredProfileAndPush('deny')">문자 대체로 저장</button>
     </div>
   </div>
 </div>
@@ -6963,29 +6964,106 @@ function closeReceivedPushConfirmAlert(){
 window.showReceivedPushConfirmAlert=showReceivedPushConfirmAlert;
 window.closeReceivedPushConfirmAlert=closeReceivedPushConfirmAlert;
 
+
+function getPushPermissionTroubleshootingHtml(){
+  return '📵 현재 기기에서 앱 푸시 알림 권한이 차단되어 있습니다.<br>' +
+    '이 경우 경기 알림은 <b>문자 대체 대상</b>으로 저장됩니다.<br><br>' +
+    '<b>다시 푸시를 켜려면</b><br>' +
+    '① Android 설정 → 앱 → Chrome 또는 230MATCH/230매치 → 알림 허용<br>' +
+    '② Chrome → 사이트 설정 → 알림 → tennis230.pages.dev 허용<br>' +
+    '③ 앱을 완전히 닫았다가 다시 열기<br><br>' +
+    '※ Play스토어 설치앱이 알림 목록에 따로 안 보이면 Chrome 또는 사이트 알림 권한으로 관리되는 경우가 많습니다.';
+}
+function normalizePushPermissionError(e){
+  const raw=String(e?.code||e?.message||e||'');
+  if(/permission-blocked|permission.*blocked|not granted|denied/i.test(raw)){
+    return {
+      blocked:true,
+      message:'기기/브라우저 알림 권한이 차단되어 푸시를 켤 수 없습니다. 문자 대체 대상으로 저장합니다.',
+      raw
+    };
+  }
+  return {blocked:false,message:raw,raw};
+}
+async function markCurrentUserPushSmsFallback(reason='permission_blocked', rawMessage=''){
+  try{
+    const user=auth.currentUser || CURRENT_APP_USER;
+    if(!user || user.isAnonymous) return;
+    localStorage.removeItem('matchPushEnabled');
+    localStorage.setItem('matchPushOptOut','1');
+    window.LAST_PUSH_PERMISSION_BLOCKED=true;
+    await setDoc(doc(db,'users',user.uid),{
+      pushEnabled:false,
+      pushDenied:true,
+      pushSetupCompleted:true,
+      pushSetupChoice:'sms_fallback',
+      pushPermission:(('Notification' in window)?Notification.permission:'unsupported'),
+      pushBlockedReason:reason,
+      pushBlockedMessage:String(rawMessage||''),
+      pushFallbackSms:true,
+      pushFallbackAt:serverTimestamp(),
+      updatedAt:new Date().toISOString()
+    },{merge:true});
+    CURRENT_APP_PROFILE={...(CURRENT_APP_PROFILE||{}), pushEnabled:false, pushDenied:true, pushSetupCompleted:true, pushSetupChoice:'sms_fallback', pushFallbackSms:true};
+  }catch(e){ console.warn('mark push fallback failed', e); }
+}
+function closeRequiredProfileModal(){
+  try{ cm('mRequiredProfile'); }catch(e){ const m=ge('mRequiredProfile'); if(m) m.classList.remove('open'); }
+}
+window.closeRequiredProfileModal=closeRequiredProfileModal;
+
 async function requestMatchPushPermission(){
+  window.LAST_PUSH_PERMISSION_BLOCKED=false;
   try{
     const user=auth.currentUser || CURRENT_APP_USER;
     if(!user || user.isAnonymous){
       toast('먼저 회원가입/로그인 후 알림을 켜 주세요.','info');
       try{ toggleAdminSignup(); }catch(e){}
-      return;
+      return false;
+    }
+    if(!('Notification' in window)){
+      await markCurrentUserPushSmsFallback('notification_unsupported','Notification API unsupported');
+      const html='이 기기는 웹 푸시 알림을 지원하지 않아 문자 대체 대상으로 저장됩니다.';
+      const ps=ge('pushStatus'); if(ps) ps.innerHTML='📵 '+html;
+      const rps=ge('reqPushStatus'); if(rps) rps.innerHTML='📵 '+html;
+      toast('이 기기는 푸시 미지원 · 문자 대체로 저장됨','info');
+      updatePushStatusLabel();
+      return false;
     }
     if(!FCM_VAPID_KEY || FCM_VAPID_KEY.includes('PASTE')){
       toast('VAPID Key가 설정되지 않았습니다. Firebase 웹 알림 인증서 키를 먼저 넣어 주세요.','error');
-      return;
-    }
-    const messaging=await getFcmMessagingSafe();
-    const permission=await Notification.requestPermission();
-    if(permission!=='granted'){
-      try{ await setDoc(doc(db,'users',user.uid),{pushEnabled:false,pushDenied:true,pushPermission:permission||'default',pushSetupAttemptedAt:serverTimestamp(),updatedAt:new Date().toISOString()},{merge:true}); }catch(_e){}
-      toast('알림 허용을 눌러야 경기 알림을 받을 수 있습니다.','info');
-      const ps=ge('pushStatus'); if(ps) ps.innerHTML='🔕 알림 권한이 허용되지 않았습니다.';
-      const rps=ge('reqPushStatus'); if(rps) rps.innerHTML='🔕 기기 알림 권한이 허용되지 않았습니다. 브라우저/앱 알림을 허용한 뒤 다시 눌러 주세요.';
       return false;
     }
+
+    const permission=await Notification.requestPermission();
+    if(permission!=='granted'){
+      await markCurrentUserPushSmsFallback('permission_'+(permission||'default'),'Notification permission: '+permission);
+      const guide=getPushPermissionTroubleshootingHtml();
+      toast('알림 권한이 차단되어 문자 대체 대상으로 저장했습니다.','info');
+      const ps=ge('pushStatus'); if(ps) ps.innerHTML='🔕 '+guide;
+      const rps=ge('reqPushStatus'); if(rps) rps.innerHTML='🔕 '+guide;
+      updatePushStatusLabel();
+      return false;
+    }
+
+    const messaging=await getFcmMessagingSafe();
     const swReg=await ensureFcmServiceWorker();
-    const token=await getToken(messaging,{vapidKey:FCM_VAPID_KEY,serviceWorkerRegistration:swReg});
+    let token='';
+    try{
+      token=await getToken(messaging,{vapidKey:FCM_VAPID_KEY,serviceWorkerRegistration:swReg});
+    }catch(tokenErr){
+      const info=normalizePushPermissionError(tokenErr);
+      if(info.blocked){
+        await markCurrentUserPushSmsFallback('fcm_permission_blocked',info.raw);
+        const guide=getPushPermissionTroubleshootingHtml();
+        toast('알림 권한이 차단되어 문자 대체 대상으로 저장했습니다.','info');
+        const ps=ge('pushStatus'); if(ps) ps.innerHTML='🔕 '+guide;
+        const rps=ge('reqPushStatus'); if(rps) rps.innerHTML='🔕 '+guide;
+        updatePushStatusLabel();
+        return false;
+      }
+      throw tokenErr;
+    }
     if(!token) throw new Error('FCM token을 발급받지 못했습니다. 브라우저 알림 권한을 확인하세요.');
     const saved=await saveCurrentFcmToken(token);
     if(saved){
@@ -7000,6 +7078,16 @@ async function requestMatchPushPermission(){
     return false;
   }catch(e){
     console.warn('requestMatchPushPermission failed',e);
+    const info=normalizePushPermissionError(e);
+    if(info.blocked){
+      await markCurrentUserPushSmsFallback('permission_blocked_catch',info.raw);
+      const guide=getPushPermissionTroubleshootingHtml();
+      toast('알림 권한이 차단되어 문자 대체 대상으로 저장했습니다.','info');
+      const ps=ge('pushStatus'); if(ps) ps.innerHTML='🔕 '+guide;
+      const rps=ge('reqPushStatus'); if(rps) rps.innerHTML='🔕 '+guide;
+      updatePushStatusLabel();
+      return false;
+    }
     toast('알림 설정 실패: '+(e?.message||e),'error');
     const ps=ge('pushStatus'); if(ps) ps.innerHTML='⚠️ 알림 설정 실패: '+esc(e?.message||e);
     const rps=ge('reqPushStatus'); if(rps) rps.innerHTML='⚠️ 알림 설정 실패: '+esc(e?.message||e);
@@ -7191,7 +7279,13 @@ async function saveRequiredProfileAndPush(mode='enable'){
       return true;
     }
     const st=ge('reqPushStatus');
-    if(st) st.innerHTML='정보는 저장되었습니다. 알림 권한 허용이 아직 완료되지 않았습니다. <b>저장하고 알림 켜기</b>를 다시 눌러 주세요.';
+    if(window.LAST_PUSH_PERMISSION_BLOCKED){
+      CURRENT_APP_PROFILE={...(CURRENT_APP_PROFILE||{}), pushSetupCompleted:true, pushSetupChoice:'sms_fallback', pushEnabled:false, pushDenied:true, pushFallbackSms:true};
+      if(st) st.innerHTML='정보는 저장되었습니다. 현재 기기에서 푸시 알림이 차단되어 <b>문자 대체 대상</b>으로 저장했습니다.<br><button type="button" class="btn btn-gray" style="margin-top:8px;width:100%" onclick="closeRequiredProfileModal()">닫기</button>';
+      toast('필수 정보 저장 완료 · 푸시는 문자 대체로 처리됩니다.','success');
+      return true;
+    }
+    if(st) st.innerHTML='정보는 저장되었습니다. 알림 권한 허용이 아직 완료되지 않았습니다. 다시 시도하거나 알림 거부하고 저장을 선택할 수 있습니다.';
     return false;
   }catch(e){
     sl(false);
