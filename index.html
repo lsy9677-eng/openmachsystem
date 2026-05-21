@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-05-21-v311-push-require-confirm";
+  const APP_VERSION = "2026-05-21-v312-push-toggle-stable";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -4680,7 +4680,7 @@ body {
 </main>
 <div class="modal-overlay" id="mAdmin"><div class="modal-box"><div class="modal-header"><h3 id="adminLoginTitle">🧑‍💼 운영자 로그인</h3><button class="modal-close" onclick="cm('mAdmin')">✕</button></div><div class="modal-body"><div id="adminLoginDesc" style="padding:10px 12px;background:linear-gradient(135deg,#eef4ff,#fffdf5);border:1px solid var(--border);border-radius:10px;margin-bottom:12px;font-size:.78rem;color:var(--text2);line-height:1.6">승인된 <b>시합관리자</b> 계정으로 로그인합니다. 승인 전에는 대회 생성과 운영 기능을 사용할 수 없습니다.</div><div class="form-group"><label class="form-label" id="adminEmailLabel">이메일</label><input class="form-input" id="adminEmail" onkeydown="if(event.key==='Enter')ge('adminPw').focus()" placeholder="운영자 이메일" type="email"/></div><div class="form-group"><label class="form-label">비밀번호</label><input class="form-input" id="adminPw" onkeydown="if(event.key==='Enter')doLogin()" placeholder="Firebase Auth 비밀번호" type="password"/></div><div id="adminLoginHint" style="font-size:.74rem;color:var(--text3);line-height:1.5">회원가입 후 총괄 관리자 승인까지 끝나야 운영자 로그인이 활성화됩니다.</div></div><div class="modal-footer"><button class="btn btn-gray" onclick="cm('mAdmin')">취소</button><button class="btn btn-primary" id="adminLoginSubmitBtn" onclick="doLogin()">로그인</button></div></div></div>
 <div class="modal-overlay" id="mAdminSignup"><div class="modal-box"><div class="modal-header"><h3>📝 회원가입 / 간편 로그인</h3><button class="modal-close" onclick="cm('mAdminSignup')">✕</button></div><div class="modal-body"><div style="padding:10px 12px;background:linear-gradient(135deg,#eef4ff,#fffdf5);border:1px solid var(--border);border-radius:10px;margin-bottom:12px;font-size:.78rem;color:var(--text2);line-height:1.6">일반회원은 로그인 후 개인전 참가·본인 정보 관리가 가능합니다. 클럽 경기이사와 시합관리자는 가입 후 총괄 관리자 승인이 필요합니다.</div><div style="padding:12px 14px;border:1.5px solid #dbeafe;background:#f8fbff;border-radius:14px;margin-bottom:14px"><div style="font-weight:900;font-size:.9rem;color:#0f1e3a;margin-bottom:8px">간편 가입 / 로그인</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-outline" id="signupGoogleLoginBtn" onclick="loginWithGoogle()" style="flex:1;min-width:150px;background:#fff;color:#0f1e3a;border:1.5px solid #cbd5e1">🔵 Google로 계속하기</button><button class="btn btn-outline" id="signupNaverLoginBtn" onclick="loginWithNaver()" style="flex:1;min-width:130px;background:#03c75a;color:#fff;border:1.5px solid #03c75a">🟢 Naver로 계속하기</button></div><div id="signupGoogleStatus" style="font-size:.74rem;color:var(--text3);line-height:1.5;margin-top:8px">현재는 구글·네이버 로그인을 적용했습니다.</div></div><div style="height:1px;background:var(--border);margin:12px 0"></div><div style="font-weight:900;font-size:.88rem;color:var(--primary-dark);margin-bottom:8px">이메일 일반 회원가입 / 로그인</div><div class="form-group"><label class="form-label">가입 유형</label><select class="form-select" id="signupRole" onchange="updateSignupRoleHint()"><option value="member">일반회원</option><option value="club_director">클럽 경기이사 신청</option><option value="tournament_admin">시합관리자 신청</option></select></div><div class="form-group"><label class="form-label">이름 <span style="font-size:.72rem;color:var(--text3);font-weight:500">(선수 등록용 한글 이름)</span></label><input class="form-input" id="signupName" placeholder="예: 홍길동"/></div><div class="frow"><div class="form-group"><label class="form-label">전화번호</label><input class="form-input" id="signupPhone" inputmode="tel" placeholder="예: 010-1234-5678"/></div><div class="form-group"><label class="form-label">소속 클럽</label><input class="form-input" id="signupClub" placeholder="예: 모던"/></div></div><div class="form-group"><label class="form-label">구력</label><input class="form-input" id="signupCareer" placeholder="예: 24.07 / 3년"/></div><div class="form-group"><label class="form-label">이메일</label><input class="form-input" id="signupEmail" onkeydown="if(event.key==='Enter')ge('signupPw').focus()" placeholder="이메일" type="email"/></div><div class="form-group"><label class="form-label">비밀번호</label><input class="form-input" id="signupPw" onkeydown="if(event.key==='Enter')ge('signupPw2').focus()" placeholder="비밀번호 6자 이상" type="password"/></div><div class="form-group"><label class="form-label">비밀번호 확인 <span style="font-size:.72rem;color:var(--text3);font-weight:400">회원가입 때만 입력</span></label><input class="form-input" id="signupPw2" onkeydown="if(event.key==='Enter')doSignup()" placeholder="비밀번호 다시 입력" type="password"/></div><div id="signupHint" style="font-size:.74rem;color:var(--text3);line-height:1.5">일반회원은 가입 즉시 사용 가능합니다. 경기이사/시합관리자는 승인 후 권한이 활성화됩니다.</div></div><div class="modal-footer"><button class="btn btn-gray" onclick="cm('mAdminSignup')">취소</button><button class="btn btn-outline" onclick="doMemberEmailLogin()">이메일 로그인</button><button class="btn btn-primary" onclick="doSignup()">회원가입</button></div></div></div>
-<div class="modal-overlay" id="mMyProfile"><div class="modal-box" style="max-width:540px"><div class="modal-header"><h3>👤 내 정보 설정</h3><button class="modal-close" onclick="cm('mMyProfile')">✕</button></div><div class="modal-body"><div style="padding:10px 12px;background:linear-gradient(135deg,#eef4ff,#fffdf5);border:1px solid var(--border);border-radius:10px;margin-bottom:12px;font-size:.78rem;color:var(--text2);line-height:1.6">소속 클럽, 구력, 전화번호는 개인전 참가 기록과 단체전 권한 확인에 사용됩니다.</div><div class="form-group"><label class="form-label">이름</label><input class="form-input" id="profileName" placeholder="예: 홍길동"/></div><div class="frow"><div class="form-group"><label class="form-label">전화번호</label><input class="form-input" id="profilePhone" inputmode="tel" placeholder="예: 010-1234-5678"/></div><div class="form-group"><label class="form-label">소속 클럽</label><input class="form-input" id="profileClub" placeholder="예: 모던"/></div></div><div class="form-group"><label class="form-label">구력</label><input class="form-input" id="profileCareer" placeholder="예: 24.07 / 3년"/></div><div class="form-group"><label class="form-label">회원 유형</label><select class="form-select" id="profileRole" disabled><option value="member">일반회원</option><option value="club_director">클럽 경기이사</option><option value="tournament_admin">시합관리자</option><option value="admin">개발자/총괄관리자</option></select></div><div id="profileStatus" style="font-size:.74rem;color:var(--text3);line-height:1.5"></div><div style="margin-top:12px;padding:10px 12px;background:linear-gradient(135deg,#eef4ff,#fffdf5);border:1px solid var(--border);border-radius:12px"><div style="font-size:.82rem;font-weight:900;color:var(--primary-dark);margin-bottom:6px">🔔 경기 알림</div><div id="pushStatus" style="font-size:.74rem;color:var(--text2);line-height:1.5;margin-bottom:8px">코트 배정/대기/경기 시작 알림을 받으려면 알림을 켜 주세요.</div><button class="btn btn-outline" onclick="requestMatchPushPermission()" style="width:100%;font-size:.84rem">🔔 경기 알림 받기</button></div></div><div class="modal-footer"><button class="btn btn-gray" onclick="cm('mMyProfile')">닫기</button><button class="btn btn-primary" onclick="saveMyProfile()">💾 저장</button></div></div></div>
+<div class="modal-overlay" id="mMyProfile"><div class="modal-box" style="max-width:540px"><div class="modal-header"><h3>👤 내 정보 설정</h3><button class="modal-close" onclick="cm('mMyProfile')">✕</button></div><div class="modal-body"><div style="padding:10px 12px;background:linear-gradient(135deg,#eef4ff,#fffdf5);border:1px solid var(--border);border-radius:10px;margin-bottom:12px;font-size:.78rem;color:var(--text2);line-height:1.6">소속 클럽, 구력, 전화번호는 개인전 참가 기록과 단체전 권한 확인에 사용됩니다.</div><div class="form-group"><label class="form-label">이름</label><input class="form-input" id="profileName" placeholder="예: 홍길동"/></div><div class="frow"><div class="form-group"><label class="form-label">전화번호</label><input class="form-input" id="profilePhone" inputmode="tel" placeholder="예: 010-1234-5678"/></div><div class="form-group"><label class="form-label">소속 클럽</label><input class="form-input" id="profileClub" placeholder="예: 모던"/></div></div><div class="form-group"><label class="form-label">구력</label><input class="form-input" id="profileCareer" placeholder="예: 24.07 / 3년"/></div><div class="form-group"><label class="form-label">회원 유형</label><select class="form-select" id="profileRole" disabled><option value="member">일반회원</option><option value="club_director">클럽 경기이사</option><option value="tournament_admin">시합관리자</option><option value="admin">개발자/총괄관리자</option></select></div><div id="profileStatus" style="font-size:.74rem;color:var(--text3);line-height:1.5"></div><div style="margin-top:12px;padding:10px 12px;background:linear-gradient(135deg,#eef4ff,#fffdf5);border:1px solid var(--border);border-radius:12px"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px"><div style="font-size:.82rem;font-weight:900;color:var(--primary-dark)">🔔 경기 알림</div><span id="pushStateBadge" style="display:inline-flex;align-items:center;justify-content:center;padding:3px 9px;border-radius:999px;background:#f1f5f9;color:#475569;font-size:.7rem;font-weight:900;border:1px solid #cbd5e1">확인중</span></div><div id="pushStatus" style="font-size:.74rem;color:var(--text2);line-height:1.5;margin-bottom:8px">코트 배정/대기/경기 시작 알림을 받으려면 알림을 켜 주세요.</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><button id="pushEnableBtn" class="btn btn-primary" onclick="requestMatchPushPermission()" style="width:100%;font-size:.84rem;background:#2563eb;color:#fff">🔔 켜기</button><button id="pushDisableBtn" class="btn btn-gray" onclick="setMatchPushOptOut(true)" style="width:100%;font-size:.84rem">🔕 끄기</button></div></div></div><div class="modal-footer"><button class="btn btn-gray" onclick="cm('mMyProfile')">닫기</button><button class="btn btn-primary" onclick="saveMyProfile()">💾 저장</button></div></div></div>
 <!-- 팀등록 로그인 모달 -->
 <div class="modal-overlay" id="mRegLogin"><div class="modal-box"><div class="modal-header"><h3>🏆 경기이사 로그인</h3><button class="modal-close" onclick="cm('mRegLogin')">✕</button></div>
 <div class="modal-body">
@@ -5857,6 +5857,30 @@ body {
     </div>
   </div>
 </div>
+
+<div class="modal-overlay" id="mRequiredProfile">
+  <div class="modal-box" style="max-width:560px">
+    <div class="modal-header" style="background:#1d4ed8">
+      <h3>🔔 경기 알림 필수 정보 설정</h3>
+    </div>
+    <div class="modal-body">
+      <div style="padding:12px 14px;border:1.5px solid #93c5fd;background:#eff6ff;border-radius:14px;font-size:.84rem;line-height:1.7;color:#1e40af;font-weight:800;margin-bottom:12px">
+        경기 시작·코트 배정·대기 알림과 내 경기 확인을 위해 아래 정보를 완료해 주세요.
+      </div>
+      <div style="font-size:.74rem;color:var(--text2);line-height:1.6;margin-bottom:12px">
+        휴대폰 번호는 선수/경기 매칭용이고, 실제 푸시 수신은 기기 알림 권한 허용이 필요합니다.
+      </div>
+      <div class="form-group"><label class="form-label">이름 <span class="req">*</span></label><input class="form-input" id="reqProfileName" placeholder="예: 홍길동"></div>
+      <div class="frow"><div class="form-group"><label class="form-label">휴대폰 번호 <span class="req">*</span></label><input class="form-input" id="reqProfilePhone" inputmode="tel" placeholder="예: 010-1234-5678"></div><div class="form-group"><label class="form-label">소속 클럽 <span class="req">*</span></label><input class="form-input" id="reqProfileClub" placeholder="예: 모던 / 개인"></div></div>
+      <div class="form-group"><label class="form-label">구력 <span style="font-size:.72rem;color:var(--text3);font-weight:400">선택</span></label><input class="form-input" id="reqProfileCareer" placeholder="예: 24.07 / 3년"></div>
+      <div id="reqPushStatus" style="padding:10px 12px;border-radius:12px;background:#fff7ed;border:1px solid #fdba74;font-size:.78rem;color:#92400e;line-height:1.6;margin-top:8px">알림을 받으려면 저장 후 기기 알림 권한을 허용해 주세요.</div>
+    </div>
+    <div class="modal-footer" style="display:grid;grid-template-columns:1.5fr 1fr;gap:8px">
+      <button class="btn btn-primary" onclick="saveRequiredProfileAndPush('enable')" style="background:#2563eb;color:#fff">💾 저장하고 알림 켜기</button>
+      <button class="btn btn-gray" onclick="saveRequiredProfileAndPush('deny')">알림 거부하고 저장</button>
+    </div>
+  </div>
+</div>
 <div class="toast-container" id="TC"></div>
 <div aria-atomic="true" aria-live="polite" class="sticky-alert-wrap" id="stickyAlertWrap"></div>
 <button class="scroll-top" id="stBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
@@ -6898,9 +6922,15 @@ async function saveCurrentFcmToken(token){
     updatedAt:serverTimestamp(),
     updatedAtText:new Date().toISOString()
   };
-  await setDoc(doc(db,'pushTokens',fcmTokenDocId(uid,token)),payload,{merge:true});
-  await setDoc(doc(db,'users',uid),{pushEnabled:true,pushDenied:false,lastPushToken:token,lastPushTokenUpdatedAt:serverTimestamp(),updatedAt:new Date().toISOString()},{merge:true});
-  try{ localStorage.removeItem('matchPushOptOut'); }catch(e){}
+  const tokenDocId=fcmTokenDocId(uid,token);
+  await setDoc(doc(db,'pushTokens',tokenDocId),payload,{merge:true});
+  await setDoc(doc(db,'users',uid),{pushEnabled:true,pushDenied:false,pushSetupCompleted:true,pushSetupChoice:'enabled',pushPermission:'granted',lastPushToken:token,lastPushTokenDocId:tokenDocId,lastPushTokenUpdatedAt:serverTimestamp(),updatedAt:new Date().toISOString()},{merge:true});
+  CURRENT_APP_PROFILE={...(CURRENT_APP_PROFILE||{}), pushEnabled:true, pushDenied:false, pushSetupCompleted:true, pushSetupChoice:'enabled', pushPermission:'granted', lastPushTokenDocId:tokenDocId};
+  try{
+    localStorage.setItem('matchPushLastToken', token);
+    localStorage.setItem('matchPushLastTokenDocId', tokenDocId);
+    localStorage.removeItem('matchPushOptOut');
+  }catch(e){}
   return true;
 }
 
@@ -6945,9 +6975,11 @@ async function requestMatchPushPermission(){
     const messaging=await getFcmMessagingSafe();
     const permission=await Notification.requestPermission();
     if(permission!=='granted'){
+      try{ await setDoc(doc(db,'users',user.uid),{pushEnabled:false,pushDenied:true,pushPermission:permission||'default',pushSetupAttemptedAt:serverTimestamp(),updatedAt:new Date().toISOString()},{merge:true}); }catch(_e){}
       toast('알림 허용을 눌러야 경기 알림을 받을 수 있습니다.','info');
       const ps=ge('pushStatus'); if(ps) ps.innerHTML='🔕 알림 권한이 허용되지 않았습니다.';
-      return;
+      const rps=ge('reqPushStatus'); if(rps) rps.innerHTML='🔕 기기 알림 권한이 허용되지 않았습니다. 브라우저/앱 알림을 허용한 뒤 다시 눌러 주세요.';
+      return false;
     }
     const swReg=await ensureFcmServiceWorker();
     const token=await getToken(messaging,{vapidKey:FCM_VAPID_KEY,serviceWorkerRegistration:swReg});
@@ -6957,14 +6989,18 @@ async function requestMatchPushPermission(){
       localStorage.setItem('matchPushEnabled','1');
       localStorage.removeItem('matchPushOptOut');
       closePushRequiredModal();
-      const ps=ge('pushStatus'); if(ps) ps.innerHTML='✅ 경기 알림이 켜졌습니다. 이 계정/기기 토큰이 Firebase에 저장되어 자동 알림을 받을 준비가 되었습니다.';
+      updatePushStatusLabel();
       toast('경기 알림 설정 완료 ✅','success');
       setupFcmForegroundListener();
+      return true;
     }
+    return false;
   }catch(e){
     console.warn('requestMatchPushPermission failed',e);
     toast('알림 설정 실패: '+(e?.message||e),'error');
     const ps=ge('pushStatus'); if(ps) ps.innerHTML='⚠️ 알림 설정 실패: '+esc(e?.message||e);
+    const rps=ge('reqPushStatus'); if(rps) rps.innerHTML='⚠️ 알림 설정 실패: '+esc(e?.message||e);
+    return false;
   }
 }
 async function setupFcmForegroundListener(){
@@ -7005,23 +7041,43 @@ async function setupFcmForegroundListener(){
 }
 function updatePushStatusLabel(){
   try{
-    const ps=ge('pushStatus');
-    if(!ps) return;
     const enabled=localStorage.getItem('matchPushEnabled')==='1';
     const denied=localStorage.getItem('matchPushOptOut')==='1';
     const perm=('Notification' in window)?Notification.permission:'unsupported';
-    if(perm==='granted' && enabled) ps.innerHTML='✅ 이 기기는 경기 알림이 켜져 있습니다.';
-    else if(denied) ps.innerHTML='🔕 경기 알림을 거부 설정했습니다. 다시 받으려면 알림 받기를 눌러 주세요.';
-    else if(perm==='denied') ps.innerHTML='🔕 브라우저에서 알림이 차단되어 있습니다. 브라우저 설정에서 알림 허용이 필요합니다.';
-    else ps.innerHTML='🔔 코트 배정/대기/경기 시작 알림을 받으려면 알림을 켜 주세요.';
+    const isOn = perm==='granted' && enabled && !denied;
+    const psList=document.querySelectorAll('#pushStatus');
+    const msg = isOn
+      ? '✅ 이 기기는 경기 알림이 켜져 있습니다. 경기 배정·대기·시작 알림을 받을 수 있습니다.'
+      : denied
+        ? '🔕 경기 알림이 꺼져 있습니다. 다시 받으려면 켜기를 눌러 주세요.'
+        : perm==='denied'
+          ? '🔕 브라우저에서 알림이 차단되어 있습니다. 브라우저 설정에서 알림 허용이 필요합니다.'
+          : '🔔 경기 배정·대기·시작 알림을 받으려면 알림을 켜 주세요.';
+    psList.forEach(ps=>{ ps.innerHTML=msg; ps.style.color=isOn?'#166534':(denied||perm==='denied'?'#991b1b':'var(--text2)'); ps.style.fontWeight=isOn?'800':'600'; });
+    document.querySelectorAll('#pushStateBadge').forEach(b=>{
+      b.textContent=isOn?'켜짐':'꺼짐';
+      b.style.background=isOn?'#dcfce7':'#f1f5f9';
+      b.style.color=isOn?'#166534':'#475569';
+      b.style.borderColor=isOn?'#86efac':'#cbd5e1';
+    });
+    document.querySelectorAll('#pushEnableBtn').forEach(btn=>{
+      btn.textContent=isOn?'✅ 켜짐':'🔔 켜기';
+      btn.disabled=isOn;
+      btn.style.opacity=isOn?'.72':'1';
+    });
+    document.querySelectorAll('#pushDisableBtn').forEach(btn=>{
+      btn.textContent=isOn?'🔕 끄기':'꺼짐';
+      btn.disabled=!isOn && (denied || perm==='denied');
+      btn.style.opacity=btn.disabled?'.72':'1';
+    });
   }catch(e){}
 }
 
 function renderInlinePushEnableButton(){
   return `<div style="margin-top:10px;padding:10px 12px;background:linear-gradient(135deg,#eef4ff,#fffdf5);border:1px solid var(--border);border-radius:12px">
-    <div style="font-size:.82rem;font-weight:900;color:var(--primary-dark);margin-bottom:6px">🔔 경기 알림 설정</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px"><div style="font-size:.82rem;font-weight:900;color:var(--primary-dark)">🔔 경기 알림 설정</div><span id="pushStateBadge" style="display:inline-flex;align-items:center;justify-content:center;padding:3px 9px;border-radius:999px;background:#f1f5f9;color:#475569;font-size:.7rem;font-weight:900;border:1px solid #cbd5e1">확인중</span></div>
     <div id="pushStatus" style="font-size:.74rem;color:var(--text2);line-height:1.5;margin-bottom:8px">코트 배정/대기/경기 시작 알림을 받으려면 알림을 켜 주세요.</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><button class="btn btn-outline" onclick="requestMatchPushPermission()" style="width:100%;font-size:.84rem">🔔 알림 받기</button><button class="btn btn-gray" onclick="setMatchPushOptOut(true)" style="width:100%;font-size:.84rem">🔕 알림 거부</button></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><button id="pushEnableBtn" class="btn btn-primary" onclick="requestMatchPushPermission()" style="width:100%;font-size:.84rem;background:#2563eb;color:#fff">🔔 켜기</button><button id="pushDisableBtn" class="btn btn-gray" onclick="setMatchPushOptOut(true)" style="width:100%;font-size:.84rem">🔕 끄기</button></div>
   </div>`;
 }
 
@@ -7031,41 +7087,142 @@ function renderInlinePushEnableButton(){
 function closePushRequiredModal(){
   try{ cm('mPushRequired'); }catch(e){ const m=ge('mPushRequired'); if(m) m.classList.remove('open'); }
 }
+function isRequiredProfileComplete(profile={}){
+  try{
+    const name=String(profile?.name||profile?.displayName||'').trim();
+    const phoneDigits=String(profile?.phone||profile?.mobile||'').replace(/[^0-9]/g,'');
+    const club=String(profile?.club||'').trim();
+    return !!(name && phoneDigits.length>=9 && club);
+  }catch(e){ return false; }
+}
+function isPushSetupComplete(profile={}){
+  try{
+    if(profile?.pushSetupCompleted===true) return true;
+    if(profile?.pushEnabled===true && ('Notification' in window) && Notification.permission==='granted') return true;
+    if(profile?.pushDenied===true && profile?.pushSetupChoice==='denied') return true;
+    return false;
+  }catch(e){ return false; }
+}
 function shouldShowPushSetupPrompt(){
   try{
     const u=auth.currentUser || CURRENT_APP_USER;
     if(!u || u.isAnonymous) return false;
-    if(localStorage.getItem('matchPushOptOut')==='1') return false;
+    const p=CURRENT_APP_PROFILE||{};
+    if(!isRequiredProfileComplete(p)) return true;
+    if(!isPushSetupComplete(p)) return true;
     if(('Notification' in window) && Notification.permission==='granted' && localStorage.getItem('matchPushEnabled')==='1') return false;
-    return true;
+    return false;
   }catch(e){ return false; }
 }
-function showMandatoryPushSetupPrompt(reason='login'){
+async function showRequiredProfileSetupPrompt(reason='login'){
   try{
+    const u=auth.currentUser || CURRENT_APP_USER;
+    if(!u || u.isAnonymous) return;
+    let p=CURRENT_APP_PROFILE || await getMyProfileDoc().catch(()=>({})) || {};
+    CURRENT_APP_PROFILE={...(CURRENT_APP_PROFILE||{}), ...(p||{})};
     if(!shouldShowPushSetupPrompt()) return;
-    const st=ge('pushRequiredStatus');
-    if(st) st.innerHTML='로그인/회원가입이 완료되었습니다. 경기 배정·대기·시작 알림을 받으려면 알림을 켜 주세요.<br><b>알림은 전체가 아니라 해당 경기/조/코트 카드 대상자에게만 발송되도록 제한했습니다.</b>';
-    om('mPushRequired');
-  }catch(e){}
+    if(ge('reqProfileName')) ge('reqProfileName').value=p.name||p.displayName||u.displayName||'';
+    if(ge('reqProfilePhone')) ge('reqProfilePhone').value=formatPhoneLoose(p.phone||p.mobile||'');
+    if(ge('reqProfileClub')) ge('reqProfileClub').value=p.club||'';
+    if(ge('reqProfileCareer')) ge('reqProfileCareer').value=p.career||'';
+    const st=ge('reqPushStatus');
+    if(st){
+      const missing=[];
+      if(!String(p.name||p.displayName||u.displayName||'').trim()) missing.push('이름');
+      if(String(p.phone||p.mobile||'').replace(/[^0-9]/g,'').length<9) missing.push('휴대폰 번호');
+      if(!String(p.club||'').trim()) missing.push('소속 클럽');
+      if(!isPushSetupComplete(p)) missing.push('알림 설정');
+      st.innerHTML='필수 완료 항목: <b>'+esc(missing.join(', ')||'확인 완료')+'</b><br>알림은 해당 경기/조/코트 카드 대상자에게만 발송됩니다.';
+    }
+    try{ cm('mPushRequired'); }catch(_e){}
+    try{ cm('mAdminSignup'); }catch(_e){}
+    om('mRequiredProfile');
+  }catch(e){ console.warn('showRequiredProfileSetupPrompt failed', e); }
 }
+function showMandatoryPushSetupPrompt(reason='login'){
+  try{ showRequiredProfileSetupPrompt(reason); }catch(e){}
+}
+async function saveRequiredProfileAndPush(mode='enable'){
+  const user=auth.currentUser || CURRENT_APP_USER;
+  if(!user || user.isAnonymous){ toast('먼저 로그인해 주세요','error'); return false; }
+  const name=(ge('reqProfileName')?.value||'').trim();
+  const phone=formatPhoneLoose(ge('reqProfilePhone')?.value||'');
+  const phoneDigits=phone.replace(/[^0-9]/g,'');
+  const club=(ge('reqProfileClub')?.value||'').trim();
+  const career=normalizeCareerValue(ge('reqProfileCareer')?.value||'');
+  if(!name){ toast('이름을 입력해 주세요','error'); ge('reqProfileName')?.focus(); return false; }
+  if(phoneDigits.length<9){ toast('휴대폰 번호를 확인해 주세요','error'); ge('reqProfilePhone')?.focus(); return false; }
+  if(!club){ toast('소속 클럽을 입력해 주세요. 무소속이면 개인으로 입력하세요.','error'); ge('reqProfileClub')?.focus(); return false; }
+  sl(true);
+  try{
+    const payload={
+      name,
+      displayName:name,
+      phone,
+      phoneDigits,
+      club,
+      clubKey:String(club).trim().toLowerCase().replace(/\s+/g,''),
+      career,
+      requiredProfileCompleted:true,
+      requiredProfileCompletedAt:serverTimestamp(),
+      updatedAt:new Date().toISOString()
+    };
+    await setDoc(doc(db,'users',user.uid), payload, {merge:true});
+    CURRENT_APP_PROFILE={...(CURRENT_APP_PROFILE||{}), ...payload};
+    try{ syncProfilePhoneToPersonalMatch(payload, {render:true, force:true}); }catch(e){}
+    refreshGoogleLoginUI(user);
+    sl(false);
+    if(mode==='deny'){
+      await setMatchPushOptOut(true);
+      await setDoc(doc(db,'users',user.uid),{pushSetupCompleted:true,pushSetupChoice:'denied',pushPermission:(('Notification' in window)?Notification.permission:'unsupported'),updatedAt:new Date().toISOString()},{merge:true});
+      CURRENT_APP_PROFILE={...(CURRENT_APP_PROFILE||{}), pushSetupCompleted:true, pushSetupChoice:'denied', pushDenied:true, pushEnabled:false};
+      cm('mRequiredProfile');
+      toast('필수 정보 저장 완료 · 알림은 꺼짐으로 저장했습니다.','success');
+      return true;
+    }
+    const ok=await requestMatchPushPermission();
+    if(ok){
+      CURRENT_APP_PROFILE={...(CURRENT_APP_PROFILE||{}), pushSetupCompleted:true, pushSetupChoice:'enabled', pushEnabled:true, pushDenied:false};
+      cm('mRequiredProfile');
+      toast('필수 정보와 경기 알림 설정 완료 ✅','success');
+      return true;
+    }
+    const st=ge('reqPushStatus');
+    if(st) st.innerHTML='정보는 저장되었습니다. 알림 권한 허용이 아직 완료되지 않았습니다. <b>저장하고 알림 켜기</b>를 다시 눌러 주세요.';
+    return false;
+  }catch(e){
+    sl(false);
+    toast('필수 정보 저장 실패: '+(e?.message||e),'error');
+    return false;
+  }
+}
+window.saveRequiredProfileAndPush=saveRequiredProfileAndPush;
+
 async function setMatchPushOptOut(flag=true){
   try{
     const u=auth.currentUser || CURRENT_APP_USER;
     localStorage.setItem('matchPushOptOut', flag?'1':'0');
     if(flag) localStorage.removeItem('matchPushEnabled');
+    if(!flag){
+      updatePushStatusLabel();
+      return requestMatchPushPermission();
+    }
     if(u && !u.isAnonymous){
-      await setDoc(doc(db,'users',u.uid),{pushEnabled:false,pushDenied:!!flag,pushDeniedAt:flag?serverTimestamp():null,updatedAt:new Date().toISOString()},{merge:true});
-      const snap=await getDocs(collection(db,'pushTokens')).catch(()=>null);
-      if(snap){
-        const writes=[];
-        snap.forEach(d=>{ const x=d.data()||{}; if(String(x.uid||'')===String(u.uid||'')) writes.push(setDoc(doc(db,'pushTokens',d.id),{enabled:false,disabledByUser:!!flag,updatedAtText:new Date().toISOString()},{merge:true})); });
-        await Promise.all(writes);
-      }
+      await setDoc(doc(db,'users',u.uid),{pushEnabled:false,pushDenied:true,pushSetupCompleted:true,pushSetupChoice:'denied',pushPermission:(('Notification' in window)?Notification.permission:'unsupported'),pushDeniedAt:serverTimestamp(),updatedAt:new Date().toISOString()},{merge:true});
+      CURRENT_APP_PROFILE={...(CURRENT_APP_PROFILE||{}), pushEnabled:false, pushDenied:true, pushSetupCompleted:true, pushSetupChoice:'denied'};
+      try{
+        const tokenDocId=localStorage.getItem('matchPushLastTokenDocId')||'';
+        const token=localStorage.getItem('matchPushLastToken')||'';
+        const id=tokenDocId || (token ? fcmTokenDocId(u.uid, token) : '');
+        if(id){
+          await setDoc(doc(db,'pushTokens',id),{enabled:false,disabledByUser:true,updatedAt:serverTimestamp(),updatedAtText:new Date().toISOString()},{merge:true});
+        }
+      }catch(e){ console.warn('disable current push token skipped', e); }
     }
     updatePushStatusLabel();
     closePushRequiredModal();
-    toast(flag?'경기 알림을 거부 설정했습니다. 내 정보 설정에서 다시 켤 수 있습니다.':'경기 알림 거부 설정을 해제했습니다.','success');
-  }catch(e){ toast('알림 거부 설정 실패: '+(e?.message||e),'error'); }
+    toast('경기 알림을 껐습니다. 내 정보 설정에서 다시 켤 수 있습니다.','success');
+  }catch(e){ toast('알림 설정 변경 실패: '+(e?.message||e),'error'); }
 }
 async function sendFcmPushToken(token, title, body, data={}){
   const res=await fetch('/api/send-push',{
@@ -7388,18 +7545,13 @@ function openMatchPushPromptAfterRegistration(){
     const last=already?Number(already):0;
     if(last && Date.now()-last < 1000*60*60*6) return;
     localStorage.setItem('matchPushPromptShownAt', String(Date.now()));
-    const msg='참가 접수가 완료되었습니다. 코트 배정·대기·경기 시작 알림을 휴대폰으로 받으려면 알림을 켜 주세요.';
-    if(typeof window.confirm==='function'){
-      setTimeout(()=>{
-        try{
-          if(window.confirm(msg+'\n\n지금 경기 알림을 켤까요?')) requestMatchPushPermission();
-        }catch(e){}
-      },350);
-    }
+    showMandatoryPushSetupPrompt('registration');
   }catch(e){ console.warn('push prompt skipped', e); }
 }
 
 window.requestMatchPushPermission=requestMatchPushPermission;
+window.showRequiredProfileSetupPrompt=showRequiredProfileSetupPrompt;
+window.isRequiredProfileComplete=isRequiredProfileComplete;
 window.closePushRequiredModal=closePushRequiredModal;
 window.showMandatoryPushSetupPrompt=showMandatoryPushSetupPrompt;
 window.setMatchPushOptOut=setMatchPushOptOut;
@@ -7461,6 +7613,13 @@ async function ensureUserProfileDoc(user, extra={}){
     clubDirectorApproved:extra.clubDirectorApproved !== undefined ? extra.clubDirectorApproved : !!prev.clubDirectorApproved,
     tournamentAdminRequested:extra.tournamentAdminRequested !== undefined ? extra.tournamentAdminRequested : !!prev.tournamentAdminRequested,
     tournamentAdminApproved:extra.tournamentAdminApproved !== undefined ? extra.tournamentAdminApproved : !!prev.tournamentAdminApproved,
+    requiredProfileCompleted: extra.requiredProfileCompleted !== undefined ? !!extra.requiredProfileCompleted : !!prev.requiredProfileCompleted,
+    pushEnabled: extra.pushEnabled !== undefined ? !!extra.pushEnabled : !!prev.pushEnabled,
+    pushDenied: extra.pushDenied !== undefined ? !!extra.pushDenied : !!prev.pushDenied,
+    pushSetupCompleted: extra.pushSetupCompleted !== undefined ? !!extra.pushSetupCompleted : !!prev.pushSetupCompleted,
+    pushSetupChoice: keepText(extra.pushSetupChoice, prev.pushSetupChoice||''),
+    pushPermission: keepText(extra.pushPermission, prev.pushPermission||''),
+    lastPushTokenDocId: keepText(extra.lastPushTokenDocId, prev.lastPushTokenDocId||''),
     lastLoginAt:new Date().toISOString(),
     updatedAt:new Date().toISOString()
   };
@@ -7667,7 +7826,7 @@ async function handleSocialCustomTokenRedirect(){
     history.replaceState(null,'',location.origin+location.pathname);
     try{ localStorage.setItem('memberLoginProvider', provider||'social'); localStorage.setItem('memberLoginAt', new Date().toISOString()); }catch(_e){}
     toast((provider==='naver'?'네이버':(provider==='kakao'?'카카오':'소셜'))+' 로그인 완료 ✅','success');
-    setTimeout(()=>showMandatoryPushSetupPrompt(provider||'social'),650);
+    setTimeout(()=>showRequiredProfileSetupPrompt(provider||'social'),650);
     try{ refreshIndividualAuthGate(); renderRL(); }catch(_e){}
     try{
       if(isPopupReturn && window.opener && !window.opener.closed){
@@ -7761,7 +7920,7 @@ async function loginWithGoogle(){
     sl(false);
     try{ localStorage.setItem('memberLoginProvider','google'); localStorage.setItem('memberLoginAt', new Date().toISOString()); }catch(_e){}
     toast('구글 로그인 완료 ✅','success');
-    setTimeout(()=>showMandatoryPushSetupPrompt('google'),650);
+    setTimeout(()=>showRequiredProfileSetupPrompt('google'),650);
     try{ refreshIndividualAuthGate(); renderRL(); }catch(_e){}
   }catch(e){
     sl(false);
@@ -7863,7 +8022,7 @@ onAuthStateChanged(auth, async (user)=>{
     CURRENT_APP_USER = (user && !user.isAnonymous) ? user : null;
     if(CURRENT_APP_USER){ try{ CURRENT_APP_PROFILE=await ensureUserProfileDoc(CURRENT_APP_USER); }catch(_e){} } else { CURRENT_APP_PROFILE=null; }
     refreshGoogleLoginUI(CURRENT_APP_USER);
-    if(CURRENT_APP_USER && !sessionStorage.getItem('pushPromptShownThisSession')){ sessionStorage.setItem('pushPromptShownThisSession','1'); setTimeout(()=>showMandatoryPushSetupPrompt('auth_state'),900); }
+    if(CURRENT_APP_USER && !sessionStorage.getItem('pushPromptShownThisSession')){ sessionStorage.setItem('pushPromptShownThisSession','1'); setTimeout(()=>showRequiredProfileSetupPrompt('auth_state'),900); }
     const isAdmin = user ? await verifyFirebaseAdmin(user) : false;
     const tmProfile = (!isAdmin && user) ? await getApprovedTournamentManagerProfile(user) : null;
     if(isAdmin){
@@ -7894,7 +8053,7 @@ getRedirectResult(auth).then(async (result)=>{
     CURRENT_APP_PROFILE=await ensureUserProfileDoc(result.user).catch(()=>null);
     refreshGoogleLoginUI(result.user);
     toast('구글 로그인 완료 ✅','success');
-    setTimeout(()=>showMandatoryPushSetupPrompt('google_redirect'),650);
+    setTimeout(()=>showRequiredProfileSetupPrompt('google_redirect'),650);
   }
 }).catch(e=>console.warn('google redirect result failed', e));
 handleSocialCustomTokenRedirect();
@@ -11507,8 +11666,11 @@ async function saveMyProfile(){
       name,
       displayName:name||prevProfile.displayName||user.displayName||'',
       phone,
+      phoneDigits:phone.replace(/[^0-9]/g,''),
       club,
+      clubKey:String(club||'').trim().toLowerCase().replace(/\s+/g,''),
       career,
+      requiredProfileCompleted: !!(name && phone.replace(/[^0-9]/g,'').length>=9 && club),
       updatedAt:new Date().toISOString()
     };
     if(clubChanged){
@@ -27517,15 +27679,10 @@ function toast(msg,type='info'){
   const el=document.createElement('div');
   el.className='toast '+type;
   const isPushSuccess = type==='success' && /알림|푸시|FCM/i.test(String(msg||''));
-  if(isPushSuccess){
-    el.style.cssText='max-width:min(520px,calc(100vw - 32px));padding:12px 14px;gap:10px;align-items:flex-start;';
-    el.innerHTML=`<div style="flex:1;line-height:1.55">✅ ${msg}</div><button type="button" onclick="this.closest('.toast')?.remove()" style="border:1px solid rgba(255,255,255,.45);background:rgba(255,255,255,.18);color:#fff;border-radius:999px;padding:6px 12px;font-size:.78rem;font-weight:900;cursor:pointer;white-space:nowrap">확인</button>`;
-    c.appendChild(el);
-    return;
-  }
   el.innerHTML=`${type==='success'?'✅':type==='error'?'❌':'ℹ️'} ${msg}`;
   c.appendChild(el);
-  setTimeout(()=>{el.style.cssText='opacity:0;transform:translateX(30px);transition:all .3s';setTimeout(()=>el.remove(),300)},3000);
+  const delay=isPushSuccess?2200:3000;
+  setTimeout(()=>{el.style.cssText='opacity:0;transform:translateX(30px);transition:all .3s';setTimeout(()=>el.remove(),300)},delay);
 }
 
 
