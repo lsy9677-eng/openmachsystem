@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-05-21-v245-individual-cleanup-from-v242";
+  const APP_VERSION = "2026-05-21-v261-records-menu-stable";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -2108,6 +2108,34 @@ body {
 }
 </style>
 
+
+<style id="v258MobileBottomNavCss">
+@media (max-width: 768px){
+  body{ padding-bottom: calc(82px + env(safe-area-inset-bottom, 0px)) !important; }
+  #bottomTabBar.bottom-tab-bar{
+    position:fixed !important;
+    left:max(8px, env(safe-area-inset-left, 0px)) !important;
+    right:max(8px, env(safe-area-inset-right, 0px)) !important;
+    bottom:max(8px, env(safe-area-inset-bottom, 0px)) !important;
+    z-index:2147483000 !important;
+    display:grid !important;
+    grid-template-columns:repeat(6, minmax(0,1fr)) !important;
+    height:64px !important;
+    pointer-events:auto !important;
+    touch-action:manipulation !important;
+  }
+  #bottomTabBar button{
+    width:100% !important;
+    min-width:0 !important;
+    height:64px !important;
+    pointer-events:auto !important;
+    touch-action:manipulation !important;
+    -webkit-tap-highlight-color:transparent;
+  }
+  #bottomTabBar button span:last-child{ font-size:11px !important; white-space:nowrap !important; }
+  .hero-title{ overflow-wrap:anywhere; word-break:keep-all; }
+}
+</style>
 </head>
 <body>
 <header class="app-header">
@@ -4679,7 +4707,7 @@ const storage=getStorage(_app);
 const auth=getAuth(_app);
 // ── 230MATCH 푸시알림 준비 코드 ─────────────────────────────
 // Firebase Console → Cloud Messaging → 웹 푸시 인증서(VAPID Key)
-const FCM_VAPID_KEY="BC6CE16CvIIfyPjaSeI4nTHCxNga27BgXcb0Gnw2vY9qqOlzavmDGYJY8mt2GUCwO5vraWXMKjamw_BPPG4RPk";
+const FCM_VAPID_KEY="BC6CE16CvllfyPjaSeI4nTHCxNga27BgXcbOGnw2vY9qqOlzavmDGYJrY8mt2GUCwO5vraWXMKjamw_BPPG4RPk";
 let FCM_MESSAGING=null;
 let FCM_FOREGROUND_READY=false;
 function fcmTokenDocId(uid, token){
@@ -6929,7 +6957,7 @@ function applyIndivLock(){
 
   // 잠금 중 대상 탭에 있으면 홈으로 이동
   if(shouldHide){
-    const lockPages = ['tournament','players'];
+    const lockPages = ['tournament'];
     const curPage = document.querySelector('.nav-tab.active')?.dataset?.page;
     if(curPage && lockPages.includes(curPage)){
       try{ showPage('home'); }catch(e){}
@@ -8301,7 +8329,7 @@ function canManageBracket(){ return !!(AD || OP); }
 function refreshRoleUI(){
   const opPages=['tournament','register','players'];
   // 개인시합 잠금 탭 목록
-  const lockPages=['tournament','players'];
+  const lockPages=['tournament'];
   const isAdmin = document.body.classList.contains('admin-mode');
   const isTournamentManager = !!TM;
   const lockActive = isIndivLockActive() && !isAdmin;
@@ -23351,6 +23379,18 @@ function resolvePlayerDisplayClubInfo(name,p,preferClub=''){
   const fallbackMain=normalizeClub((preferClub||p?.club||pKeyParse(p?.key||'').club||((p?.clubs||[])[0])||'').trim());
   return {mainClub:fallbackMain, subClubs:[], registryRow:null, registryDriven:false};
 }
+
+function canSeeParticipantPhones(){
+  return !!(document.body.classList.contains('admin-mode') || document.body.classList.contains('tm-mode'));
+}
+function maskParticipantPhone(raw=''){
+  const digits=String(raw||'').replace(/[^0-9]/g,'');
+  if(!digits) return '';
+  if(canSeeParticipantPhones()) return formatPhoneLoose(digits);
+  if(digits.length>=11) return `${digits.slice(0,3)}-****-${digits.slice(-4)}`;
+  if(digits.length>=8) return `${digits.slice(0,3)}-***-${digits.slice(-4)}`;
+  return '비공개';
+}
 function buildPH(name,p){
   const safeName=cleanName(pKeyParse(name||'').name||name||'');
   const wr=p.wins+p.losses>0?Math.round(p.wins/(p.wins+p.losses)*100):0;
@@ -23423,13 +23463,16 @@ function buildPH(name,p){
     .map(([d,c])=>`<span class="dpill ${dc(d)}" style="font-size:.62rem;padding:2px 7px">${dl(d)} ${c}회</span>`)
     .join('');
 
+  const profilePhoneRaw=formatPhoneLoose(String(p.phone||''));
+  const profilePhoneVisible=profilePhoneRaw ? maskParticipantPhone(profilePhoneRaw) : '';
+
   return`<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
       <div style="width:46px;height:46px;background:var(--primary);color:white;border-radius:50%;font-size:1.2rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${safeName.charAt(0)}</div>
       <div style="flex:1">
         <b style="font-size:1.1rem">${safeName}</b>
         <div style="font-size:.75rem;color:var(--text2);margin-top:2px">주클럽: ${clubInfo.mainClub||'-'}</div>
         ${clubInfo.subClubs.length?`<div style="font-size:.75rem;margin-top:3px;display:flex;align-items:center;gap:4px;flex-wrap:wrap"><span style="color:#7c3aed;font-weight:600">부클럽:</span><span class="sub-badge" style="font-size:.72rem">${clubInfo.subClubs.join(', ')}</span></div>`:''}
-        ${(p.phone||p.career)?`<div style="font-size:.75rem;color:var(--text2);margin-top:2px;display:flex;gap:10px;flex-wrap:wrap">${p.phone?`<span>📱 ${p.phone}</span>`:''}${p.career?`<span>⏱ 구력 ${p.career}</span>`:''}</div>`:''}
+        ${(profilePhoneVisible||p.career)?`<div style="font-size:.75rem;color:var(--text2);margin-top:2px;display:flex;gap:10px;flex-wrap:wrap">${profilePhoneVisible?`<span>📱 ${profilePhoneVisible}</span>`:''}${p.career?`<span>⏱ 구력 ${p.career}</span>`:''}</div>`:''}
         ${divTags?`<div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:3px">${divTags}</div>`:''}
       </div>
     </div>
@@ -23645,7 +23688,7 @@ function getPlayerRecordSummary(name, club, playerObj, histRecs){
   const totalCount=allHist.length;
   const lastDate=(allHist||[]).map(h=>String(h?.date||'')).filter(Boolean).sort().slice(-1)[0]||'';
   const phoneList=getPlayerRecordPhoneCandidates(name, p, club);
-  const displayPhone=phoneList[0] ? formatPhoneLoose(phoneList[0]) : '';
+  const displayPhone=phoneList[0] ? maskParticipantPhone(phoneList[0]) : '';
   return { totalCount, dCnt, bestRank, lastDate, phoneList, displayPhone };
 }
 function matchesPlayerRecordFilters(name, club, summary){
@@ -30254,97 +30297,91 @@ document.addEventListener('DOMContentLoaded', function(){
 });
 </script>
 <div class="bottom-tab-bar" id="bottomTabBar">
-<button data-target="home"><span class="icon">🏠</span><span>홈</span></button>
-<button data-target="tournament"><span class="icon">🏆</span><span>대회관리</span></button>
-<button data-target="register"><span class="icon">📋</span><span>팀등록</span></button>
-<button data-target="bracket"><span class="icon">🎾</span><span>대진표</span></button>
-<button data-target="players"><span class="icon">👤</span><span>기록</span></button>
-<button data-target="results"><span class="icon">📊</span><span>결과</span></button>
+<button type="button" data-target="home"><span class="icon">🏠</span><span>홈</span></button>
+<button type="button" data-target="tournament"><span class="icon">🏆</span><span>대회관리</span></button>
+<button type="button" data-target="register"><span class="icon">📋</span><span>참가접수</span></button>
+<button type="button" data-target="bracket"><span class="icon">🎾</span><span>대진표</span></button>
+<button type="button" data-target="players"><span class="icon">👤</span><span>기록</span></button>
+<button type="button" data-target="results"><span class="icon">📊</span><span>결과</span></button>
 </div>
-<script>
+<script id="v258BottomNavDirectFix">
 (function(){
-  function getTopTabs(){
-    return Array.from(document.querySelectorAll('.nav-tab, .top-nav-tab, .menu-tab'));
+  if(window.__v258BottomNavDirectFix) return;
+  window.__v258BottomNavDirectFix = true;
+
+  const targetToPage = {
+    home: 'home',
+    tournament: 'tournament',
+    register: 'register',
+    bracket: 'bracket',
+    players: 'players',
+    results: 'ranking',
+    ranking: 'ranking'
+  };
+
+  function pageFor(target){
+    return targetToPage[String(target || '').trim()] || 'home';
   }
 
-  function normalizeText(t){
-    return (t || '').replace(/\s+/g,'').trim();
+  function currentPage(){
+    const p = document.querySelector('.page.active');
+    if(p && p.id) return p.id.replace(/^page-/, '');
+    const tab = document.querySelector('.nav-tab.active[data-page]');
+    return tab ? tab.dataset.page : 'home';
   }
 
-  function clickTopTabByTarget(target){
-    const map = {
-      home: ['홈'],
-      tournament: ['대회관리'],
-      register: ['팀등록'],
-      bracket: ['대진표'],
-      players: ['참가기록','참가자기록'],
-      results: ['시합결과']
-    };
-    const wanted = map[target] || [];
-    const tabs = getTopTabs();
-    for(const tab of tabs){
-      const txt = normalizeText(tab.textContent);
-      if(wanted.some(w => txt.includes(normalizeText(w)))){
-        tab.click();
-        return true;
-      }
-    }
-    return false;
-  }
-
-  function detectActiveTarget(){
-    const tabs = getTopTabs();
-    for(const tab of tabs){
-      if(tab.classList.contains('active')){
-        const txt = normalizeText(tab.textContent);
-        if(txt.includes('홈')) return 'home';
-        if(txt.includes('대회관리')) return 'tournament';
-        if(txt.includes('팀등록')) return 'register';
-        if(txt.includes('대진표')) return 'bracket';
-        if(txt.includes('참가기록') || txt.includes('참가자기록')) return 'players';
-        if(txt.includes('시합결과')) return 'results';
-      }
-    }
-    return 'home';
-  }
-
-  function syncBottomTabs(){
-    const active = detectActiveTarget();
-    document.querySelectorAll('#bottomTabBar button').forEach(btn=>{
-      btn.classList.toggle('active', btn.dataset.target === active);
+  function syncBottomTabs(page){
+    page = page || currentPage();
+    const activeTarget = page === 'ranking' ? 'results' : page;
+    document.querySelectorAll('#bottomTabBar button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.target === activeTarget);
     });
   }
 
-  function initBottomTabs(){
-    const buttons = document.querySelectorAll('#bottomTabBar button');
-    buttons.forEach(btn=>{
-      btn.addEventListener('click', function(e){
+  function go(target){
+    const page = pageFor(target);
+    try{
+      if(typeof window.showPage === 'function'){
+        window.showPage(page);
+      }else{
+        document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+        const targetPage = document.getElementById('page-' + page);
+        if(targetPage) targetPage.classList.add('active');
+        document.querySelectorAll('.nav-tab[data-page]').forEach(tab => {
+          tab.classList.toggle('active', tab.dataset.page === page);
+        });
+      }
+      if(page === 'players' && typeof window.switchPlayersTab === 'function'){
+        try{ window.switchPlayersTab('records'); }catch(e){}
+      }
+      if(page === 'ranking' && typeof window.renderRanking === 'function'){
+        try{ window.renderRanking(); }catch(e){}
+      }
+      syncBottomTabs(page);
+      window.scrollTo({top:0, behavior:'auto'});
+    }catch(err){
+      console.error('bottom nav error', err);
+    }
+  }
+
+  function init(){
+    document.querySelectorAll('#bottomTabBar button').forEach(btn => {
+      const handler = function(e){
         e.preventDefault();
-        clickTopTabByTarget(btn.dataset.target);
-        setTimeout(syncBottomTabs, 50);
-        setTimeout(syncBottomTabs, 250);
-      });
+        e.stopPropagation();
+        go(btn.dataset.target);
+      };
+      btn.addEventListener('pointerup', handler, {passive:false});
+      btn.addEventListener('click', handler, {passive:false});
     });
-
-    const tabs = getTopTabs();
-    tabs.forEach(tab=>{
-      tab.addEventListener('click', function(){
-        setTimeout(syncBottomTabs, 10);
-        setTimeout(syncBottomTabs, 150);
-      });
+    document.querySelectorAll('.nav-tab[data-page]').forEach(tab => {
+      tab.addEventListener('click', function(){ setTimeout(() => syncBottomTabs(), 0); }, true);
     });
-
     syncBottomTabs();
-
-    const obs = new MutationObserver(syncBottomTabs);
-    tabs.forEach(tab=>obs.observe(tab, {attributes:true, attributeFilter:['class']}));
   }
 
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', initBottomTabs);
-  }else{
-    initBottomTabs();
-  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
 })();
 </script>
 
@@ -30883,6 +30920,161 @@ body:not(.admin-mode) #ptab-records {
   });
 
   window.__v245ApplyIndividualCleanup = apply;
+})();
+</script>
+
+
+<!-- v261: 일반회원 메뉴/기록 안정화 + 전화번호 마스킹 -->
+<style id="v261RecordsMenuStableStyle">
+body:not(.admin-mode):not(.tm-mode) .nav-tab[data-page="tournament"],
+body:not(.admin-mode):not(.tm-mode) #bottomTabBar button[data-target="tournament"]{
+  display:none !important;
+}
+body:not(.admin-mode):not(.tm-mode) .nav-tab[data-page="players"],
+body:not(.admin-mode):not(.tm-mode) #bottomTabBar button[data-target="players"]{
+  display:flex !important;
+}
+@media (max-width:768px){
+  body:not(.admin-mode):not(.tm-mode) #bottomTabBar.bottom-tab-bar{
+    grid-template-columns:repeat(5,minmax(0,1fr)) !important;
+  }
+  body.admin-mode #bottomTabBar.bottom-tab-bar,
+  body.tm-mode #bottomTabBar.bottom-tab-bar{
+    grid-template-columns:repeat(6,minmax(0,1fr)) !important;
+  }
+}
+</style>
+<script id="v261RecordsMenuStableScript">
+(function(){
+  'use strict';
+  if(window.__v261RecordsMenuStable) return;
+  window.__v261RecordsMenuStable = true;
+
+  function isManager(){
+    return document.body.classList.contains('admin-mode') || document.body.classList.contains('tm-mode');
+  }
+  function currentPage(){
+    var p=document.querySelector('.page.active');
+    return p && p.id ? p.id.replace(/^page-/,'') : 'home';
+  }
+  function qs(sel){ return Array.prototype.slice.call(document.querySelectorAll(sel)); }
+
+  function ensureRecordsTabDefault(){
+    try{
+      var recBtn=document.getElementById('ptab-records');
+      var regBtn=document.getElementById('ptab-registry');
+      var rec=document.getElementById('ptab-records-content');
+      var reg=document.getElementById('ptab-registry-content');
+      if(!isManager()){
+        if(recBtn){ recBtn.style.display=''; recBtn.classList.add('active'); }
+        if(regBtn){ regBtn.classList.remove('active'); regBtn.style.display='none'; }
+        if(rec) rec.style.display='';
+        if(reg) reg.style.display='none';
+      }
+      if(typeof window.switchPlayersTab==='function'){
+        try{ window.switchPlayersTab('records'); }catch(e){}
+      }
+    }catch(e){}
+  }
+
+  function syncMenu(){
+    var manager=isManager();
+    qs('.nav-tab[data-page="tournament"], #bottomTabBar button[data-target="tournament"]').forEach(function(el){
+      el.style.display = manager ? '' : 'none';
+    });
+    qs('.nav-tab[data-page="players"], #bottomTabBar button[data-target="players"]').forEach(function(el){
+      el.style.display = '';
+    });
+    var navPlayers=document.querySelector('.nav-tab[data-page="players"]');
+    if(navPlayers) navPlayers.textContent='🧾 참가자기록';
+    var bottomPlayers=document.querySelector('#bottomTabBar button[data-target="players"] span:last-child');
+    if(bottomPlayers) bottomPlayers.textContent='기록';
+    if(!manager && currentPage()==='tournament' && typeof window.showPage==='function'){
+      setTimeout(function(){ try{ window.showPage('home'); }catch(e){} },0);
+    }
+    var page=currentPage();
+    var activeTarget=(page==='ranking')?'results':page;
+    qs('#bottomTabBar button').forEach(function(btn){ btn.classList.toggle('active', btn.dataset.target===activeTarget); });
+    if(page==='players') ensureRecordsTabDefault();
+  }
+
+  function forceActivatePage(page){
+    try{
+      qs('.page').forEach(function(p){ p.classList.remove('active'); });
+      qs('.nav-tab').forEach(function(t){ t.classList.remove('active'); });
+      var target=document.getElementById('page-'+page);
+      var tab=document.querySelector('.nav-tab[data-page="'+page+'"]');
+      if(target) target.classList.add('active');
+      if(tab){ tab.classList.add('active'); tab.style.display=''; }
+      qs('.swipe-dot').forEach(function(d){ d.classList.toggle('active', d.dataset.page===page); });
+      if(page==='players') ensureRecordsTabDefault();
+      window.scrollTo({top:0,behavior:'auto'});
+    }catch(e){}
+  }
+
+  function wrapShowPage(){
+    var old=window.showPage;
+    if(typeof old!=='function' || old.__v261Wrapped) return;
+    var fn=function(page){
+      var requested=String(page||'home');
+      if(requested==='tournament' && !isManager()){
+        try{ if(typeof window.toast==='function') window.toast('대회관리는 운영자 전용 메뉴입니다','info'); }catch(e){}
+        requested='home';
+      }
+      var r=old.apply(this, [requested]);
+      if(requested==='players'){
+        setTimeout(function(){ forceActivatePage('players'); syncMenu(); },0);
+        setTimeout(function(){ forceActivatePage('players'); syncMenu(); },120);
+      }else{
+        setTimeout(syncMenu,0); setTimeout(syncMenu,120);
+      }
+      return r;
+    };
+    fn.__v261Wrapped=true;
+    window.showPage=fn;
+  }
+
+  function bindMenuGuards(){
+    qs('#bottomTabBar button[data-target="tournament"], .nav-tab[data-page="tournament"]').forEach(function(el){
+      if(el.__v261TournamentGuard) return;
+      el.__v261TournamentGuard=true;
+      ['click','pointerup'].forEach(function(type){
+        el.addEventListener(type, function(e){
+          if(!isManager()){
+            e.preventDefault(); e.stopImmediatePropagation();
+            if(typeof window.showPage==='function') window.showPage('home');
+          }
+        }, true);
+      });
+    });
+    qs('#bottomTabBar button[data-target="players"], .nav-tab[data-page="players"]').forEach(function(el){
+      if(el.__v261PlayersGuard) return;
+      el.__v261PlayersGuard=true;
+      ['click','pointerup'].forEach(function(type){
+        el.addEventListener(type, function(e){
+          e.preventDefault(); e.stopImmediatePropagation();
+          if(typeof window.showPage==='function') window.showPage('players');
+          else forceActivatePage('players');
+        }, true);
+      });
+    });
+  }
+
+  function init(){
+    wrapShowPage();
+    bindMenuGuards();
+    syncMenu();
+    setTimeout(syncMenu,200);
+    setTimeout(syncMenu,900);
+    setTimeout(syncMenu,1800);
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', init); else init();
+  try{
+    new MutationObserver(function(){
+      clearTimeout(window.__v261MenuTimer);
+      window.__v261MenuTimer=setTimeout(function(){ bindMenuGuards(); syncMenu(); },60);
+    }).observe(document.body,{attributes:true,attributeFilter:['class'],childList:true,subtree:true});
+  }catch(e){}
 })();
 </script>
 </body>
