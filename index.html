@@ -6679,6 +6679,67 @@ function getIndividualDisplayLine(team){
   const note=String(team?.note||'').trim();
   return `${parts.join(' / ')}${note?` · ${note}`:''}`.trim();
 }
+function getLoggedInProfileForIndividualAutofill(){
+  const user = (typeof auth!=='undefined' && auth?.currentUser && !auth.currentUser.isAnonymous) ? auth.currentUser : (CURRENT_APP_USER||null);
+  const p = CURRENT_APP_PROFILE || {};
+  const name = String(p.name || p.displayName || user?.displayName || '').trim();
+  const phone = formatPhoneLoose(String(p.phone || p.mobile || p.phoneNumber || '').trim());
+  const club = String(p.club || p.verifiedClub || '').trim();
+  const career = normalizeCareerValue(p.career || p.tennisCareer || '');
+  return {user, name, phone, club, career};
+}
+function setInputValueIfEmpty(id, value){
+  const el=ge(id);
+  if(!el || !value) return false;
+  if(String(el.value||'').trim()) return false;
+  el.value=value;
+  el.classList.add('auto-filled-from-login');
+  return true;
+}
+function autoFillIndividualPrimaryParticipant(force=false){
+  try{
+    const tid=ge('regTS')?.value||'';
+    const t=(G.tournaments||[]).find(x=>x.id===tid);
+    if(!isIndividualTournament(t)) return;
+    const box=ge('individualSimpleFields');
+    if(!box) return;
+    const prof=getLoggedInProfileForIndividualAutofill();
+    if(!prof.user) return;
+
+    const already=box.dataset.loginAutofillUid===String(prof.user.uid||'');
+    const fields=['ip1name','p1phone','p1club','p1career'];
+    const hasManual=fields.some(id=>String(ge(id)?.value||'').trim()) && !already;
+    if(hasManual && !force) return;
+
+    if(force){
+      if(ge('ip1name')) ge('ip1name').value='';
+      if(ge('p1phone')) ge('p1phone').value='';
+      if(ge('p1club')) ge('p1club').value='';
+      if(ge('p1career')) ge('p1career').value='';
+    }
+    setInputValueIfEmpty('ip1name', prof.name);
+    setInputValueIfEmpty('p1phone', prof.phone);
+    setInputValueIfEmpty('p1club', prof.club || '개인');
+    setInputValueIfEmpty('p1career', prof.career);
+    box.dataset.loginAutofillUid=String(prof.user.uid||'');
+
+    const note=ge('individualAutofillNote');
+    if(note){
+      const missing=[];
+      if(!String(ge('ip1name')?.value||'').trim()) missing.push('이름');
+      if(!String(ge('p1phone')?.value||'').trim()) missing.push('전화번호');
+      if(!String(ge('p1club')?.value||'').trim()) missing.push('클럽');
+      note.innerHTML = missing.length
+        ? `⚠️ 로그인 정보 중 <b>${missing.join(', ')}</b>이 비어 있습니다. 위 1번 참가자 정보를 확인해 주세요.`
+        : '✅ 로그인한 회원 정보가 1번 참가자에 자동 입력되었습니다. 2번 참가자만 입력하면 됩니다.';
+      note.style.background = missing.length ? '#fff7ed' : '#ecfdf5';
+      note.style.borderColor = missing.length ? '#fdba74' : '#86efac';
+      note.style.color = missing.length ? '#92400e' : '#166534';
+    }
+  }catch(e){ console.warn('autoFillIndividualPrimaryParticipant failed', e); }
+}
+window.autoFillIndividualPrimaryParticipant=autoFillIndividualPrimaryParticipant;
+
 function ensureIndividualSimpleFields(){
   const anchor=ge('regPlayerSlots');
   if(!anchor) return;
@@ -6689,10 +6750,16 @@ function ensureIndividualSimpleFields(){
     box.style.marginTop='10px';
     anchor.insertAdjacentElement('afterend', box);
   }
+  if(box.dataset.built === '1' && ge('ip1name') && ge('ip2name')){
+    setTimeout(()=>autoFillIndividualPrimaryParticipant(false),0);
+    return;
+  }
+  box.dataset.built='1';
   box.innerHTML=`
     <div style="display:grid;grid-template-columns:1fr;gap:10px">
       <div style="padding:10px 12px;background:var(--panel2);border:1px solid var(--border);border-radius:12px">
-        <div style="font-size:.82rem;font-weight:800;color:var(--primary-dark);margin-bottom:8px">1번 참가자</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px"><div style="font-size:.82rem;font-weight:800;color:var(--primary-dark)">1번 참가자</div><button type="button" class="btn btn-outline" onclick="autoFillIndividualPrimaryParticipant(true)" style="min-height:30px;padding:4px 9px;font-size:.72rem;border-radius:999px">👤 내 정보 다시 불러오기</button></div>
+        <div id="individualAutofillNote" style="margin-bottom:8px;padding:8px 10px;border:1.5px solid #86efac;background:#ecfdf5;color:#166534;border-radius:10px;font-size:.76rem;font-weight:800;line-height:1.55">로그인 정보가 있으면 1번 참가자에 자동 입력됩니다.</div>
         <div class="frow">
           <div class="form-group" style="margin-bottom:8px"><label class="form-label">이름<span class="req">*</span></label><input class="form-input" id="ip1name" placeholder="예: 이상영"></div>
           <div class="form-group" style="margin-bottom:8px"><label class="form-label">클럽명<span class="req">*</span></label><input class="form-input" id="p1club" placeholder="예: 모던,나이스"></div>
@@ -6740,6 +6807,7 @@ function toggleIndividualSimpleFields(isIndividual){
     ensureIndividualSimpleFields();
     box=ge('individualSimpleFields');
     if(box) box.style.display='block';
+    setTimeout(()=>autoFillIndividualPrimaryParticipant(false),0);
     const slots=ge('regPlayerSlots');
     if(slots) slots.style.display='none';
   }else{
@@ -7481,8 +7549,45 @@ async function sendPushToTokenDocs(tokenDocs, title, body, data={}){
   }
   return {ok, fail, stale, total:uniq.length};
 }
+
+function getAutoNotificationSettings(){
+  const defaults={
+    registration:true,
+    courtWaiting:true,
+    courtChanged:true,
+    matchStart:true,
+    matchComplete:false,
+    orderSubmitted:true
+  };
+  const raw=(G&&G.meta&&G.meta.autoNotificationSettings&&typeof G.meta.autoNotificationSettings==='object') ? G.meta.autoNotificationSettings : {};
+  return {...defaults, ...raw};
+}
+function isAutoNotificationEnabled(type){
+  const st=getAutoNotificationSettings();
+  if(type==='registration' || type==='registration_complete') return st.registration!==false;
+  if(type==='waiting_registered' || type==='court_waiting' || type==='courtWaiting') return st.courtWaiting!==false;
+  if(type==='court_changed' || type==='court_assigned' || type==='courtChanged') return st.courtChanged!==false;
+  if(type==='match_started' || type==='matchStart' || type==='start') return st.matchStart!==false;
+  if(type==='match_completed' || type==='matchComplete' || type==='complete') return st.matchComplete!==false;
+  if(type==='order_submitted' || type==='orderSubmitted' || type==='order') return st.orderSubmitted!==false;
+  return true;
+}
+function getAutoNotificationKindLabel(kind=''){
+  const k=String(kind||'');
+  if(k==='registration' || k==='registration_complete') return '접수 완료';
+  if(k==='waiting_registered' || k==='court_waiting') return '코트 대기 배정';
+  if(k==='court_changed' || k==='court_assigned') return '코트 변경/배정';
+  if(k==='match_started') return '경기 시작';
+  if(k==='match_completed') return '경기 완료';
+  if(k==='order_submitted') return '오더 제출';
+  return k||'자동 알림';
+}
+window.getAutoNotificationSettings=getAutoNotificationSettings;
+window.isAutoNotificationEnabled=isAutoNotificationEnabled;
+
 async function sendRegistrationCompletePush(team,t,div){
   try{
+    if(!isAutoNotificationEnabled('registration')) return;
     const uid=String(team?.ownerUid||auth?.currentUser?.uid||'');
     const phones=getTeamPushPhoneDigits(team);
     const tokens=await getEnabledPushTokenDocs(x=>{
@@ -7807,6 +7912,91 @@ async function sendManualPushFromModal(){
     }
   }catch(e){ sl(false); console.error(e); toast('알림 발송 실패: '+(e?.message||e),'error'); }
 }
+
+function buildAutoNotificationSettingsPanelHTML(){
+  const st=getAutoNotificationSettings();
+  const row=(id,label,desc,checked)=>`
+    <label style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-top:1px dashed rgba(15,30,58,.12);cursor:pointer">
+      <input type="checkbox" id="${id}" ${checked?'checked':''} style="margin-top:3px;accent-color:#2563eb">
+      <span style="display:block;flex:1;min-width:0">
+        <span style="display:block;font-size:.82rem;font-weight:900;color:#0f1e3a">${label}</span>
+        <span style="display:block;font-size:.72rem;color:var(--text2);line-height:1.5;margin-top:2px">${desc}</span>
+      </span>
+    </label>`;
+  return `<div id="autoNotificationSettingsBox" class="form-group" style="margin-bottom:16px;padding:14px;background:linear-gradient(135deg,#f8fbff,#fffdf5);border:1.5px solid #93c5fd;border-radius:12px">
+    <div style="font-weight:900;font-size:.9rem;color:#1d4ed8;margin-bottom:7px">🤖 자동 알림 설정</div>
+    <div style="font-size:.75rem;color:var(--text2);line-height:1.7;margin-bottom:8px">접수 완료, 코트 배정/대기, 경기 시작 등 자동으로 나가는 알림을 항목별로 켜고 끕니다. 꺼도 카드의 🔔 알림 버튼으로 수동 발송은 가능합니다.</div>
+    ${row('autoNotifyRegistration','접수 완료 알림','회원이 참가 접수를 완료했을 때 본인에게 접수 완료 알림을 보냅니다.',st.registration!==false)}
+    ${row('autoNotifyCourtWaiting','코트 대기 배정 알림','경기가 특정 코트 대기열에 새로 들어갔을 때 대상자에게 알림을 보냅니다.',st.courtWaiting!==false)}
+    ${row('autoNotifyCourtChanged','코트 변경/배정 알림','대기 코트 또는 대기 순번이 바뀌었을 때 대상자에게 알림을 보냅니다.',st.courtChanged!==false)}
+    ${row('autoNotifyMatchStart','경기 시작 알림','경기가 현재 경기/곧 시작 상태로 올라왔을 때 대상자에게 알림을 보냅니다.',st.matchStart!==false)}
+    ${row('autoNotifyOrderSubmitted','오더 제출 알림','상대팀 오더 제출 등 오더 관련 자동 화면 알림을 표시합니다.',st.orderSubmitted!==false)}
+    ${row('autoNotifyMatchComplete','경기 완료 알림','결과 저장 후 완료 알림을 자동으로 보내는 항목입니다. 현재는 기본 OFF를 권장합니다.',st.matchComplete===true)}
+    <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:10px">
+      <button class="btn btn-gray" onclick="resetAutoNotificationSettingsToDefault()" style="font-size:.78rem;padding:6px 10px">기본값</button>
+      <button class="btn btn-primary" onclick="saveAutoNotificationSettings()" style="font-size:.78rem;padding:6px 12px;background:#2563eb;color:#fff">💾 자동 알림 설정 저장</button>
+    </div>
+    <div id="autoNotificationSettingsStatus" style="font-size:.72rem;color:var(--text3);line-height:1.5;margin-top:8px">권장: 접수/코트대기/코트변경/경기시작 ON, 경기완료 OFF</div>
+  </div>`;
+}
+function readAutoNotificationSettingsFromForm(){
+  return {
+    registration:!!ge('autoNotifyRegistration')?.checked,
+    courtWaiting:!!ge('autoNotifyCourtWaiting')?.checked,
+    courtChanged:!!ge('autoNotifyCourtChanged')?.checked,
+    matchStart:!!ge('autoNotifyMatchStart')?.checked,
+    orderSubmitted:!!ge('autoNotifyOrderSubmitted')?.checked,
+    matchComplete:!!ge('autoNotifyMatchComplete')?.checked
+  };
+}
+function refreshAutoNotificationSettingsForm(){
+  const st=getAutoNotificationSettings();
+  const set=(id,val)=>{ const el=ge(id); if(el) el.checked=!!val; };
+  set('autoNotifyRegistration', st.registration!==false);
+  set('autoNotifyCourtWaiting', st.courtWaiting!==false);
+  set('autoNotifyCourtChanged', st.courtChanged!==false);
+  set('autoNotifyMatchStart', st.matchStart!==false);
+  set('autoNotifyOrderSubmitted', st.orderSubmitted!==false);
+  set('autoNotifyMatchComplete', st.matchComplete===true);
+}
+async function saveAutoNotificationSettings(){
+  if(!(AD||TM)){ toast('개발자 또는 운영자 로그인 필요','info'); return; }
+  G.meta.autoNotificationSettings=readAutoNotificationSettingsFromForm();
+  sl(true);
+  try{
+    await saveMeta();
+    sl(false);
+    const on=Object.entries(getAutoNotificationSettings()).filter(([k,v])=>v!==false).map(([k])=>k).length;
+    const off=Object.entries(getAutoNotificationSettings()).filter(([k,v])=>v===false).map(([k])=>k).length;
+    const status=ge('autoNotificationSettingsStatus');
+    if(status) status.textContent=`저장됨 · 켜짐 ${on}개 / 꺼짐 ${off}개`;
+    toast('자동 알림 설정 저장 완료 ✅','success');
+  }catch(e){
+    sl(false); toast('저장 실패: '+(e?.message||e),'error');
+  }
+}
+async function resetAutoNotificationSettingsToDefault(){
+  if(!(AD||TM)){ toast('개발자 또는 운영자 로그인 필요','info'); return; }
+  G.meta.autoNotificationSettings={registration:true,courtWaiting:true,courtChanged:true,matchStart:true,orderSubmitted:true,matchComplete:false};
+  refreshAutoNotificationSettingsForm();
+  await saveAutoNotificationSettings();
+}
+function injectAutoNotificationSettingsBox(){
+  try{
+    const body=document.querySelector('#mAdminSettings .modal-body');
+    if(!body || ge('autoNotificationSettingsBox')) return;
+    const box=document.createElement('div');
+    box.innerHTML=buildAutoNotificationSettingsPanelHTML();
+    const target=ge('adminSettingsSection_common') || body;
+    const ref=target.querySelector('#adminPushControlBox') || target.firstChild;
+    if(ref && ref.parentNode===target) target.insertBefore(box.firstElementChild, ref.nextSibling);
+    else target.prepend(box.firstElementChild);
+  }catch(e){ console.warn('injectAutoNotificationSettingsBox failed', e); }
+}
+window.saveAutoNotificationSettings=saveAutoNotificationSettings;
+window.resetAutoNotificationSettingsToDefault=resetAutoNotificationSettingsToDefault;
+window.refreshAutoNotificationSettingsForm=refreshAutoNotificationSettingsForm;
+
 function ensureAdminPushControls(){
   try{
     const body=document.querySelector('#mAdminSettings .modal-body');
@@ -7817,6 +8007,8 @@ function ensureAdminPushControls(){
     box.style.cssText='margin-bottom:16px;padding:14px;background:linear-gradient(135deg,#eef4ff,#fffdf5);border:1.5px solid #93c5fd;border-radius:12px';
     box.innerHTML=`<div style="font-weight:800;font-size:.9rem;color:#1d4ed8;margin-bottom:8px">🔔 관리자 알림 발송</div><div style="font-size:.75rem;color:var(--text2);line-height:1.7;margin-bottom:10px">알림을 켠 전체 사용자에게 공지를 발송합니다. 경기 카드/명단 카드에서는 해당 대상에게만 보낼 수 있습니다.</div><button class="btn btn-primary" onclick="openAdminBroadcastPushModal()" style="width:100%;background:#2563eb">📢 전체 알림 공지 보내기</button>`;
     body.prepend(box);
+    injectAutoNotificationSettingsBox();
+    refreshAutoNotificationSettingsForm();
   }catch(e){}
 }
 function openMatchPushPromptAfterRegistration(){
@@ -8629,7 +8821,7 @@ Object.defineProperty(window,'REG_CLUB',{get:()=>REG_CLUB,set:(v)=>{REG_CLUB=v;}
 // ── 과거 대회 내장 데이터 ─────────────────────────────────
 let HIST_DATA = []; // 과거 대회 데이터는 엑셀/Firestore로 관리
 
-let G={meta:{pw:'kimhae1234',regPw:'202601',memberRegistry2026:[],clubContacts:{},clubEmails:{},clubPasswords:{},clubPasswordCustom:{},regDeadlineDt:'',onlineOrderEnabled:false,operatorPw:'2026court',individualAutoCourtAssignEnabled:false,regSessionVersion:1,drawHistoryPolicyVersion:0,usePlayerRegistry:false,showAssociationDashboard:false,useFixedClubs:false,allowTeamDirectorLogin:true,allowPublicTeamRegistration:false,allowPublicResultEntry:false,appTitle:'시합관리 시스템'},clubs:[],tournaments:[],teams:{},draws:{},matches:{},players:{},log:[],drawHistories:{}};
+let G={meta:{pw:'kimhae1234',regPw:'202601',memberRegistry2026:[],clubContacts:{},clubEmails:{},clubPasswords:{},clubPasswordCustom:{},regDeadlineDt:'',onlineOrderEnabled:false,operatorPw:'2026court',individualAutoCourtAssignEnabled:false,regSessionVersion:1,drawHistoryPolicyVersion:0,usePlayerRegistry:false,showAssociationDashboard:false,useFixedClubs:false,allowTeamDirectorLogin:true,allowPublicTeamRegistration:false,allowPublicResultEntry:false,appTitle:'시합관리 시스템',autoNotificationSettings:{registration:true,courtWaiting:true,courtChanged:true,matchStart:true,orderSubmitted:true,matchComplete:false}},clubs:[],tournaments:[],teams:{},draws:{},matches:{},players:{},log:[],drawHistories:{}};
 const PLAYER_CACHE_KEY='OAI_PLAYER_CACHE_V1';
 const PLAYER_CACHE_TTL=1000*60*60*12;
 const TOURNAMENT_BUNDLE_CACHE_KEY='OAI_TOURNAMENT_BUNDLE_CACHE_V3';
@@ -10068,7 +10260,7 @@ async function loadMeta(){
       const d=s.data();
       // memberRegistry2026은 meta/config에서 제외 → memberRegistries/2026 에서만 관리
       const {memberRegistry2026:_mr, ...dClean}=d;
-      G.meta={pw:'kimhae1234',regPw:'202601',memberRegistry2026:[],clubContacts:{},clubEmails:{},clubPasswords:{},clubPasswordCustom:{},adminFloatingNotice:'',adminFloatingNoticeEnabled:false,onlineOrderEnabled:false,operatorPw:'2026court',allowTeamDirectorLogin:true,individualAutoCourtAssignEnabled:false,regSessionVersion:1,usePlayerRegistry:false,showAssociationDashboard:false,useFixedClubs:false,allowPublicTeamRegistration:false,allowPublicResultEntry:false,appTitle:'시합관리 시스템',...dClean};
+      G.meta={pw:'kimhae1234',regPw:'202601',memberRegistry2026:[],clubContacts:{},clubEmails:{},clubPasswords:{},clubPasswordCustom:{},adminFloatingNotice:'',adminFloatingNoticeEnabled:false,onlineOrderEnabled:false,operatorPw:'2026court',allowTeamDirectorLogin:true,individualAutoCourtAssignEnabled:false,regSessionVersion:1,usePlayerRegistry:false,showAssociationDashboard:false,useFixedClubs:false,allowPublicTeamRegistration:false,allowPublicResultEntry:false,appTitle:'시합관리 시스템',autoNotificationSettings:{registration:true,courtWaiting:true,courtChanged:true,matchStart:true,orderSubmitted:true,matchComplete:false},...dClean};
       if(Array.isArray(d.clubs)){
         G.clubs=d.clubs.map(x=>String(x||'').trim()).filter(Boolean);
       }
@@ -10092,6 +10284,8 @@ async function loadMeta(){
       if(typeof G.meta.allowPublicTeamRegistration!=='boolean') G.meta.allowPublicTeamRegistration=!!G.meta.allowPublicTeamRegistration;
       if(typeof G.meta.allowPublicResultEntry!=='boolean') G.meta.allowPublicResultEntry=!!G.meta.allowPublicResultEntry;
       if(!G.meta.appTitle) G.meta.appTitle='시합관리 시스템';
+      if(!G.meta.autoNotificationSettings || typeof G.meta.autoNotificationSettings!=='object') G.meta.autoNotificationSettings={registration:true,courtWaiting:true,courtChanged:true,matchStart:true,orderSubmitted:true,matchComplete:false};
+      G.meta.autoNotificationSettings={registration:G.meta.autoNotificationSettings.registration!==false,courtWaiting:G.meta.autoNotificationSettings.courtWaiting!==false,courtChanged:G.meta.autoNotificationSettings.courtChanged!==false,matchStart:G.meta.autoNotificationSettings.matchStart!==false,orderSubmitted:G.meta.autoNotificationSettings.orderSubmitted!==false,matchComplete:G.meta.autoNotificationSettings.matchComplete===true};
       G.meta.courtGroupCatalog = normalizeCourtGroups(G.meta.courtGroupCatalog||[]);
       if(!G.meta.courtGroupCatalog.length) G.meta.courtGroupCatalog = DEFAULT_COURT_GROUPS.map(g=>({name:g.title,count:(g.courts||[]).length}));
       if(!Number.isFinite(Number(G.meta.regSessionVersion))) G.meta.regSessionVersion=1;
@@ -10099,9 +10293,9 @@ async function loadMeta(){
       if(!G.meta.indivLockEnabled) G.meta.indivLockEnabled=false;
       if(!G.meta.indivLockStart) G.meta.indivLockStart='';
       if(!G.meta.indivLockEnd) G.meta.indivLockEnd='';
-      markFbWriteCache('meta','config',{pw:G.meta.pw,regPw:(G.meta.regPw||'202601'),clubs:G.clubs,adminPhone:(G.meta.adminPhone||''),clubContacts:(G.meta.clubContacts||{}),clubEmails:(G.meta.clubEmails||{}),clubPasswords:(G.meta.clubPasswords||{}),clubPasswordCustom:(G.meta.clubPasswordCustom||{}),regDeadlineDt:(G.meta.regDeadlineDt||''),adminFloatingNotice:(G.meta.adminFloatingNotice||''),adminFloatingNoticeEnabled:!!G.meta.adminFloatingNoticeEnabled,onlineOrderEnabled:!!G.meta.onlineOrderEnabled,operatorPw:(G.meta.operatorPw||'2026court'),individualAutoCourtAssignEnabled:!!G.meta.individualAutoCourtAssignEnabled,usePlayerRegistry:!!G.meta.usePlayerRegistry,showAssociationDashboard:!!G.meta.showAssociationDashboard,useFixedClubs:!!G.meta.useFixedClubs,allowTeamDirectorLogin:!!G.meta.allowTeamDirectorLogin,allowPublicTeamRegistration:!!G.meta.allowPublicTeamRegistration,allowPublicResultEntry:!!G.meta.allowPublicResultEntry,appTitle:(G.meta.appTitle||'시합관리 시스템'),regSessionVersion:Number(G.meta.regSessionVersion||1),drawHistoryPolicyVersion:Number(G.meta.drawHistoryPolicyVersion||0),indivLockEnabled:!!G.meta.indivLockEnabled,indivLockStart:(G.meta.indivLockStart||''),indivLockEnd:(G.meta.indivLockEnd||'')});
+      markFbWriteCache('meta','config',{pw:G.meta.pw,regPw:(G.meta.regPw||'202601'),clubs:G.clubs,adminPhone:(G.meta.adminPhone||''),clubContacts:(G.meta.clubContacts||{}),clubEmails:(G.meta.clubEmails||{}),clubPasswords:(G.meta.clubPasswords||{}),clubPasswordCustom:(G.meta.clubPasswordCustom||{}),regDeadlineDt:(G.meta.regDeadlineDt||''),adminFloatingNotice:(G.meta.adminFloatingNotice||''),adminFloatingNoticeEnabled:!!G.meta.adminFloatingNoticeEnabled,onlineOrderEnabled:!!G.meta.onlineOrderEnabled,operatorPw:(G.meta.operatorPw||'2026court'),individualAutoCourtAssignEnabled:!!G.meta.individualAutoCourtAssignEnabled,usePlayerRegistry:!!G.meta.usePlayerRegistry,showAssociationDashboard:!!G.meta.showAssociationDashboard,useFixedClubs:!!G.meta.useFixedClubs,allowTeamDirectorLogin:!!G.meta.allowTeamDirectorLogin,allowPublicTeamRegistration:!!G.meta.allowPublicTeamRegistration,allowPublicResultEntry:!!G.meta.allowPublicResultEntry,appTitle:(G.meta.appTitle||'시합관리 시스템'),regSessionVersion:Number(G.meta.regSessionVersion||1),drawHistoryPolicyVersion:Number(G.meta.drawHistoryPolicyVersion||0),indivLockEnabled:!!G.meta.indivLockEnabled,indivLockStart:(G.meta.indivLockStart||''),indivLockEnd:(G.meta.indivLockEnd||''),autoNotificationSettings:getAutoNotificationSettings()});
     }else{
-      await setDoc(doc(db,'meta','config'),{pw:'kimhae1234',regPw:'202601',clubs:G.clubs,adminPhone:'',clubContacts:{},clubPasswords:{},clubPasswordCustom:{},adminFloatingNotice:'',adminFloatingNoticeEnabled:false,onlineOrderEnabled:false,operatorPw:'2026court',allowTeamDirectorLogin:true,individualAutoCourtAssignEnabled:false,regSessionVersion:1,drawHistoryPolicyVersion:0,usePlayerRegistry:false,showAssociationDashboard:false,useFixedClubs:false,allowPublicTeamRegistration:false,allowPublicResultEntry:false,appTitle:'시합관리 시스템',courtGroupCatalog:DEFAULT_COURT_GROUPS.map(g=>({name:g.title,count:(g.courts||[]).length}))});
+      await setDoc(doc(db,'meta','config'),{pw:'kimhae1234',regPw:'202601',clubs:G.clubs,adminPhone:'',clubContacts:{},clubPasswords:{},clubPasswordCustom:{},adminFloatingNotice:'',adminFloatingNoticeEnabled:false,onlineOrderEnabled:false,operatorPw:'2026court',allowTeamDirectorLogin:true,individualAutoCourtAssignEnabled:false,regSessionVersion:1,drawHistoryPolicyVersion:0,usePlayerRegistry:false,showAssociationDashboard:false,useFixedClubs:false,allowPublicTeamRegistration:false,allowPublicResultEntry:false,appTitle:'시합관리 시스템',courtGroupCatalog:DEFAULT_COURT_GROUPS.map(g=>({name:g.title,count:(g.courts||[]).length})),autoNotificationSettings:{registration:true,courtWaiting:true,courtChanged:true,matchStart:true,orderSubmitted:true,matchComplete:false}});
     }
   }catch(e){}
 
@@ -10136,6 +10330,7 @@ async function saveMeta(){
     adminFloatingNotice:(G.meta.adminFloatingNotice||''),
     adminFloatingNoticeEnabled:!!G.meta.adminFloatingNoticeEnabled,
     onlineOrderEnabled:!!G.meta.onlineOrderEnabled,
+    autoNotificationSettings:getAutoNotificationSettings(),
     operatorPw:(G.meta.operatorPw||'2026court'),
     individualAutoCourtAssignEnabled:!!G.meta.individualAutoCourtAssignEnabled,
     usePlayerRegistry:!!G.meta.usePlayerRegistry,
@@ -13165,6 +13360,8 @@ function openAdminSettings(){
   if(!(AD||TM)){toast('개발자 또는 운영자 로그인 필요','info');return;}
   ensureAdminSettingsStructured();
   ensureAdminPushControls();
+  injectAutoNotificationSettingsBox();
+  refreshAutoNotificationSettingsForm();
   // 입력 초기화
   ['aspCur','aspNew','aspNew2'].forEach(id=>{const el=ge(id);if(el)el.value='';});
   const ap=ge('adminPhoneInput'); if(ap) ap.value=(G.meta.adminPhone||'');
@@ -14963,6 +15160,10 @@ function makePushNotificationDocId(payload={}){
 }
 async function enqueueMatchPushNotification(kind,key,m,meta={}){
   try{
+    if(!isAutoNotificationEnabled(kind)){
+      console.log('auto push disabled by setting', getAutoNotificationKindLabel(kind), kind);
+      return false;
+    }
     // 운영자/진행자/관리자 조작에 의해 발생한 코트 배정/경기 시작 이벤트만 자동 알림 대기열에 넣는다.
     if(!canManageBracket()) return false;
     const recipients=(kind==='match_completed') ? getMatchResultNotificationRecipients(key,m) : getMatchNotificationRecipients(key,m);
@@ -16659,7 +16860,11 @@ async function registerTeam(){
   }
 
   for(let i=1;i<=12;i++){const el=ge('p'+i);if(el){el.value='';const h=ge('h'+i);if(h)h.innerHTML='';}}
-  ['ip1name','ip2name','p1club','p2club','p1phone','p2phone','pNote','pEditPin','regClubText'].forEach(id=>{ if(ge(id)) ge(id).value=''; });
+  // 개인전 접수 후에는 파트너(2번)와 비고만 초기화하고, 1번 참가자는 로그인 정보로 다시 채웁니다.
+  ['ip2name','p2club','p2phone','p2career','pNote','pEditPin','regClubText'].forEach(id=>{ if(ge(id)) ge(id).value=''; });
+  ['p2receiveOrderSms','p2receiveResultSms'].forEach(id=>{ if(ge(id)) ge(id).checked=true; });
+  if(isIndividual) setTimeout(()=>autoFillIndividualPrimaryParticipant(true),0);
+  else ['ip1name','p1club','p1phone','p1career'].forEach(id=>{ if(ge(id)) ge(id).value=''; });
   ['p1receiveOrderSms','p1receiveResultSms','p2receiveOrderSms','p2receiveResultSms'].forEach(id=>{ if(ge(id)) ge(id).checked=true; });
   sl(false);
   renderRL();
@@ -28066,6 +28271,7 @@ function shouldNotifyForOrderAlert(prevState,nextState,submittedSide){
   return true;
 }
 function processOnlineOrderAlerts(prevMap,newMatchesObj){
+  if(!isAutoNotificationEnabled('order_submitted')) return;
   const nextMap=buildMatchAlertStateMap(newMatchesObj||{});
   Object.entries(nextMap).forEach(([mid,nextState])=>{
     const prevState=prevMap[mid];
