@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-05-21-v290-modal-close-fix";
+  const APP_VERSION = "2026-05-21-v302-main-result-button-stable-body";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -68,7 +68,7 @@ document.addEventListener('DOMContentLoaded', ()=>{setTimeout(applySimpleOrderMo
 
 
 
-setInterval(()=>{try{fixIndividualPrelimCardOverflow()}catch(e){}},1200);
+// v299: removed repeated UI polling for overflow fix.
 
 
 function forcePrelimRankCourtVisible(){
@@ -84,7 +84,7 @@ function forcePrelimRankCourtVisible(){
 }
 window.forcePrelimRankCourtVisible=forcePrelimRankCourtVisible;
 document.addEventListener('DOMContentLoaded',()=>setTimeout(forcePrelimRankCourtVisible,500));
-setInterval(()=>{try{forcePrelimRankCourtVisible()}catch(e){}},1500);
+// v299: removed repeated UI polling for prelim court visibility.
 
 
 
@@ -147,7 +147,7 @@ function ensureGroupMatchToggles(){
 }
 window.ensureGroupMatchToggles=ensureGroupMatchToggles;
 document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{ensureGroupMatchToggles();normalizeCourtAssignmentChips();},700));
-setInterval(()=>{try{ensureGroupMatchToggles();normalizeCourtAssignmentChips();}catch(e){}},1200);
+// v299: removed repeated UI polling for group toggles.
 
 
 function getGroupTeamCount(card){
@@ -166,7 +166,7 @@ function compactGroupActionButtons(){
       if(card.querySelector('.v275-group-actions')) return;
 
       const resultBtn=[...card.querySelectorAll('button')].find(b=>/이\s*조\s*결과|결과\s*입력/.test((b.textContent||'').trim()));
-      const pushBtn=[...card.querySelectorAll('button')].find(b=>/이\s*조\s*푸시|푸시/.test((b.textContent||'').trim()) && !/경기목록/.test((b.textContent||'').trim()));
+      const pushBtn=[...card.querySelectorAll('button')].find(b=>/이\s*조\s*알림|알림/.test((b.textContent||'').trim()) && !/경기목록/.test((b.textContent||'').trim()));
       let listBtn=card.querySelector(':scope > .grp-matches-toggle') || [...card.querySelectorAll('button')].find(b=>/경기목록/.test((b.textContent||'').trim()));
 
       if(!pushBtn && !resultBtn && !listBtn) return;
@@ -186,7 +186,7 @@ function compactGroupActionButtons(){
       }
 
       if(pushBtn){
-        pushBtn.textContent='🔔 푸시';
+        pushBtn.textContent='🔔 알림';
         pushBtn.classList.add('btn');
         actionRow.appendChild(pushBtn);
       }
@@ -209,7 +209,7 @@ function compactGroupActionButtons(){
 }
 window.compactGroupActionButtons=compactGroupActionButtons;
 document.addEventListener('DOMContentLoaded',()=>setTimeout(compactGroupActionButtons,700));
-setInterval(()=>{try{compactGroupActionButtons()}catch(e){}},1200);
+// v299: removed repeated UI polling for compact buttons.
 
 
 function rebuildCompactGroupActionButtonsFinal(){
@@ -224,7 +224,7 @@ function rebuildCompactGroupActionButtonsFinal(){
 
       const buttons=[...card.querySelectorAll('button')].concat(oldButtons);
       const resultBtn=buttons.find(b=>/이\s*조\s*결과|결과\s*입력|^\s*⚡\s*결과/.test((b.textContent||'').trim()));
-      const pushBtn=buttons.find(b=>/이\s*조\s*푸시|^\s*🔔\s*푸시|푸시/.test((b.textContent||'').trim()) && !/경기목록|목록/.test((b.textContent||'').trim()));
+      const pushBtn=buttons.find(b=>/이\s*조\s*알림|^\s*🔔\s*알림|알림/.test((b.textContent||'').trim()) && !/경기목록|목록/.test((b.textContent||'').trim()));
       let listBtn=buttons.find(b=>/경기목록|목록/.test((b.textContent||'').trim()));
 
       if(!listBtn){
@@ -250,7 +250,7 @@ function rebuildCompactGroupActionButtonsFinal(){
       }
 
       if(pushBtn){
-        pushBtn.textContent='🔔 푸시';
+        pushBtn.textContent='🔔 알림';
         pushBtn.style.display='inline-flex';
         row.appendChild(pushBtn);
       }
@@ -278,7 +278,7 @@ function rebuildCompactGroupActionButtonsFinal(){
 }
 window.rebuildCompactGroupActionButtonsFinal=rebuildCompactGroupActionButtonsFinal;
 document.addEventListener('DOMContentLoaded',()=>setTimeout(rebuildCompactGroupActionButtonsFinal,800));
-setInterval(()=>{try{rebuildCompactGroupActionButtonsFinal()}catch(e){}},1500);
+// v299: removed repeated UI polling for button rebuild.
 
 
 function cleanMatchListLayoutFinal(){
@@ -299,7 +299,7 @@ function cleanMatchListLayoutFinal(){
     document.querySelectorAll('.indiv-prelim-grid .v275-group-actions button').forEach(btn=>{
       const t=(btn.textContent||'').trim();
       if(/결과/.test(t)) btn.textContent='⚡결과';
-      else if(/푸시/.test(t)) btn.textContent='🔔푸시';
+      else if(/알림/.test(t)) btn.textContent='🔔알림';
       else if(/접기/.test(t)) btn.textContent='📂접기';
       else if(/목록/.test(t)) btn.textContent='📋목록';
     });
@@ -307,7 +307,7 @@ function cleanMatchListLayoutFinal(){
 }
 window.cleanMatchListLayoutFinal=cleanMatchListLayoutFinal;
 document.addEventListener('DOMContentLoaded',()=>setTimeout(cleanMatchListLayoutFinal,900));
-setInterval(()=>{try{cleanMatchListLayoutFinal()}catch(e){}},1200);
+// v299: removed repeated UI polling for match list layout.
 
 
 function stabilizeGroupButtonsAndMatchList(){
@@ -322,7 +322,7 @@ function stabilizeGroupButtonsAndMatchList(){
         btn.style.transform='none';
         const t=(btn.textContent||'').trim();
         if(/결과/.test(t)) btn.textContent='⚡ 결과';
-        else if(/푸시/.test(t)) btn.textContent='🔔 푸시';
+        else if(/알림/.test(t)) btn.textContent='🔔 알림';
         else if(/접기/.test(t)) btn.textContent='📂 접기';
         else if(/목록/.test(t)) btn.textContent='📋 목록';
       });
@@ -354,7 +354,7 @@ try{
 }catch(e){}
 
 document.addEventListener('DOMContentLoaded',()=>setTimeout(stabilizeGroupButtonsAndMatchList,600));
-setInterval(()=>{try{stabilizeGroupButtonsAndMatchList()}catch(e){}},1500);
+// v299: removed repeated UI polling for group button stabilization.
 
 
 function applyRecommendedGroupResultStructure(){
@@ -367,7 +367,7 @@ function applyRecommendedGroupResultStructure(){
       const row=card.querySelector('.v275-group-actions');
       if(row){
         const resultBtn=[...row.querySelectorAll('button')].find(b=>/결과/.test((b.textContent||'')));
-        const pushBtn=[...row.querySelectorAll('button')].find(b=>/푸시/.test((b.textContent||'')));
+        const pushBtn=[...row.querySelectorAll('button')].find(b=>/알림/.test((b.textContent||'')));
         const listBtn=[...row.querySelectorAll('button')].find(b=>/목록|접기/.test((b.textContent||'')));
 
         if(resultBtn){
@@ -375,7 +375,7 @@ function applyRecommendedGroupResultStructure(){
           resultBtn.textContent='⚡ 결과';
           resultBtn.style.display = teamCount>=3 ? 'none' : 'inline-flex';
         }
-        if(pushBtn) pushBtn.textContent='🔔 푸시';
+        if(pushBtn) pushBtn.textContent='🔔 알림';
         if(listBtn) listBtn.textContent = /접기/.test(listBtn.textContent||'') ? '📂 접기' : '📋 목록';
 
         row.classList.toggle('two-actions', teamCount>=3);
@@ -435,7 +435,7 @@ function applyV280RecommendedUi(){
 }
 window.applyV280RecommendedUi=applyV280RecommendedUi;
 document.addEventListener('DOMContentLoaded',()=>setTimeout(applyV280RecommendedUi,800));
-setInterval(()=>{try{applyV280RecommendedUi()}catch(e){}},1500);
+// v299: removed repeated UI polling for recommended UI.
 
 
 function v281EnsurePopupShell(){
@@ -476,7 +476,7 @@ function v281CleanTeamName(s){
     .replace(/[🏆✅✏️🔔📢🎾📋⚡🚀🔥🔑]/gu,'')
     .replace(/완료|대기중|대기|시합중|진행중/g,'')
     .replace(/결과\s*수정하기|결과수정|결과입력|결과\s*입력하기/g,'')
-    .replace(/푸시|공지\(경기\)\s*입력|공지\(경기\)\s*수정/g,'')
+    .replace(/알림|공지\(경기\)\s*입력|공지\(경기\)\s*수정/g,'')
     .replace(/경기코트\s*[가-힣A-Za-z0-9_-]+/g,'')
     .replace(/코트배정|코트\s*[가-힣A-Za-z0-9_-]+/g,'')
     .replace(/승\s*\d+|패\s*\d+|게임득실\s*[+-]?\d+|게임득\s*\d+|게임실\s*\d+/g,'')
@@ -526,7 +526,7 @@ function v281ExtractScore(card){
 
 function v281BuildPopupCardFromMatch(matchEl,idx){
   const resultBtn=[...matchEl.querySelectorAll('button')].find(b=>/결과|수정/.test(v281Text(b)));
-  const pushBtn=[...matchEl.querySelectorAll('button')].find(b=>/푸시/.test(v281Text(b)));
+  const pushBtn=[...matchEl.querySelectorAll('button')].find(b=>/알림/.test(v281Text(b)));
   const raw=v281Text(matchEl);
 
   /* 팀명: G.matches 데이터 우선 → DOM fallback */
@@ -586,7 +586,7 @@ function v281BuildPopupCardFromMatch(matchEl,idx){
     ${score?`<div class="mlp-score">${score}</div>`:''}
     <div class="mlp-actions">
       <button type="button" class="btn btn-primary" style="background:linear-gradient(135deg,#1d4ed8,#2563eb);color:#fff;font-weight:900;border:0;border-radius:12px;min-height:44px;font-size:.9rem">✏️ 결과입력</button>
-      <button type="button" class="btn btn-outline" style="background:#eff6ff;color:#1d4ed8;border:1.5px solid #93c5fd;font-weight:900;border-radius:12px;min-height:44px;font-size:.9rem">🔔 푸시</button>
+      <button type="button" class="btn btn-outline" style="background:#eff6ff;color:#1d4ed8;border:1.5px solid #93c5fd;font-weight:900;border-radius:12px;min-height:44px;font-size:.9rem">🔔 알림</button>
     </div>`;
   const btns=card.querySelectorAll('.mlp-actions button');
   btns[0].onclick=()=>{ closeMatchListPopup(); if(resultBtn) resultBtn.click(); };
@@ -656,13 +656,13 @@ function v281ApplyRecommendedLayout(){
       const row=card.querySelector('.v275-group-actions');
       if(row){
         const resultBtn=[...row.querySelectorAll('button')].find(b=>/결과/.test(v281Text(b)));
-        const pushBtn=[...row.querySelectorAll('button')].find(b=>/푸시/.test(v281Text(b)));
+        const pushBtn=[...row.querySelectorAll('button')].find(b=>/알림/.test(v281Text(b)));
         const listBtn=[...row.querySelectorAll('button')].find(b=>/목록|접기/.test(v281Text(b)));
         if(resultBtn){
           resultBtn.style.display=teamCount>=3?'none':'flex';
           resultBtn.textContent='⚡ 결과';
         }
-        if(pushBtn) pushBtn.textContent='🔔 푸시';
+        if(pushBtn) pushBtn.textContent='🔔 알림';
         if(listBtn){
           listBtn.style.display='flex';
           listBtn.textContent='📋 경기';
@@ -684,7 +684,7 @@ try{
 }catch(e){}
 
 document.addEventListener('DOMContentLoaded',()=>setTimeout(v281ApplyRecommendedLayout,700));
-setInterval(()=>{try{v281ApplyRecommendedLayout()}catch(e){}},1200);
+// v299: removed repeated UI polling for popup compact layout.
 
 </script>
 <style>
@@ -3429,7 +3429,7 @@ body {
 
 
 <style id="v278CleanListRowLayout">
-/* 조 카드 버튼: 결과/푸시/목록 3개를 같은 줄에 고정 */
+/* 조 카드 버튼: 결과/알림/목록 3개를 같은 줄에 고정 */
 .indiv-prelim-grid .v275-group-actions{
   display:grid !important;
   grid-template-columns:repeat(3,minmax(0,1fr)) !important;
@@ -4123,244 +4123,107 @@ body {
     }catch(e){}
   }
   window.cleanM3AndMatchPopupNoise=cleanM3AndMatchPopupNoise;
-  document.addEventListener('DOMContentLoaded',()=>setInterval(cleanM3AndMatchPopupNoise,500));
+  document.addEventListener('DOMContentLoaded',()=>{ setTimeout(cleanM3AndMatchPopupNoise,0); });
 })();
 </script>
 
-<style id="v288ResultModalCleanRolePush">
-/* v289 safety: v288 cleanup must never hide modal shell/body/footer. */
-#mM3.v288-hidden,
-#mM3 .modal-box.v288-hidden,
-#mM3 .modal-body.v288-hidden,
-#mM3 #mM3B.v288-hidden,
-#mM3 .modal-footer.v288-hidden{
+<style id="v295StableMainResultButtonStyle">
+.v295-main-result-btn{display:flex!important;visibility:visible!important;opacity:1!important;}
+#bracketContent .m3card[data-key][data-match-id] .v295-main-result-btn{position:relative!important;z-index:5!important;}
+</style>
+<style id="v302MainResultStableBodyStyle">
+/* v302: 본선 결과 버튼은 카드 본문 하단에 고정. flex header 줄바꿈 영향 제거 */
+.v302-main-result-body-action{
+  display:grid !important;
+  grid-template-columns:1fr;
+  gap:0;
+  margin:10px 0 0 !important;
+}
+.v302-main-result-body-action .btn{
+  width:100% !important;
+  min-height:42px !important;
+  border-radius:12px !important;
+  font-size:.86rem !important;
+  font-weight:900 !important;
   display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
 }
-#mM3 .modal-box.v288-hidden{display:block !important;}
-#mM3 #mM3B.v288-hidden{display:block !important;}
-#mM3 .modal-footer.v288-hidden{display:grid !important;}
-
-/* v288: 결과입력/경기목록 정리
-   - JS 텍스트 노출 방지용 script escape 적용
-   - 결과입력 모달에서 경기 공지 제거
-   - 코트 배정이 있으면 조코트 미배정 제거
-   - 일반회원에게 푸시 버튼 숨김
-   - 모달 제목/팀명에서 부서명·클럽 괄호 중복 제거 */
-#mM3 .v288-hidden,
-#matchListPopup .v288-hidden{
-  display:none !important;
-}
-body:not(.admin-mode):not(.operator-mode):not(.tm-mode) #matchListPopup .mlp-actions button:nth-child(2),
-body:not(.admin-mode):not(.operator-mode):not(.tm-mode) #matchListPopup .mlp-actions .push-btn,
-body:not(.admin-mode):not(.operator-mode):not(.tm-mode) .indiv-prelim-grid .v275-group-actions button[data-v288-push="1"],
-body:not(.admin-mode):not(.operator-mode):not(.tm-mode) .indiv-prelim-grid .v275-group-actions button.v288-push-btn{
-  display:none !important;
-}
-body:not(.admin-mode):not(.operator-mode):not(.tm-mode) #matchListPopup .mlp-actions{
-  grid-template-columns:1fr !important;
-}
-#mM3 .modal-header h3{
-  font-size:.96rem !important;
-  line-height:1.35 !important;
-  word-break:keep-all !important;
-}
-#mM3 .m3body{
-  padding:14px !important;
-}
-#mM3 .v288-match-summary{
-  border:1.5px solid #dbeafe;
-  border-radius:14px;
-  background:#f8fbff;
-  padding:12px;
-  margin-bottom:12px;
-}
-#mM3 .v288-match-summary .v288-teams{
-  display:grid;
-  grid-template-columns:minmax(0,1fr) 34px minmax(0,1fr);
-  gap:10px;
-  align-items:center;
-}
-#mM3 .v288-match-summary .v288-team{
-  min-height:54px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  padding:10px 8px;
-  border:1px solid #dbeafe;
-  border-radius:12px;
-  background:#fff;
-  font-weight:900;
-  color:#0f172a;
-  text-align:center;
-  line-height:1.35;
-  word-break:keep-all;
-  overflow-wrap:anywhere;
-}
-#mM3 .v288-match-summary .v288-vs{
-  text-align:center;
-  font-weight:1000;
-  color:#64748b;
-}
-#mM3 .v288-court-chip{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  min-height:26px;
-  padding:4px 10px;
-  border-radius:999px;
-  background:#eff6ff;
-  color:#1d4ed8;
-  border:1px solid #93c5fd;
-  font-size:.76rem;
-  font-weight:900;
-  margin-bottom:8px;
+@media(max-width:680px){
+  .v302-main-result-body-action .btn{min-height:40px !important;font-size:.82rem !important;}
 }
 </style>
-<script id="v288ResultModalCleanRolePushScript">
-(function(){
-  const DIV_NOISE = /영남권\s*지역신인부|[가-힣A-Za-z0-9\s·ㆍ-]*(?:신인부|지역신인부|오픈부|금배부|은배부|동배부|테린이부|개인전|단체전)/g;
-  const ROLE_OK = () => document.body.classList.contains('admin-mode') || document.body.classList.contains('operator-mode') || document.body.classList.contains('tm-mode');
-  function cleanName(s){
-    return String(s||'')
-      .replace(DIV_NOISE,' ')
-      .replace(/\([^)]*\)/g,' ')
-      .replace(/조코트\s*미배정|코트\s*미배정|미배정/g,' ')
-      .replace(/경기\s*공지/g,' ')
-      .replace(/공지\(경기\)\s*입력|공지\(경기\)\s*수정/g,' ')
-      .replace(/\s+/g,' ')
-      .trim();
-  }
-  function assignedCourtText(root){
-    const raw=String(root?.innerText||'');
-    const m=raw.match(/(?:경기코트|배정코트|코트)\s*[:：]?\s*([가-힣A-Za-z0-9_-]*\d+)/);
-    return m ? m[1] : '';
-  }
-  function removeTextElement(el){
-    if(!el) return;
-    const box = el.closest('.form-group,.m3-notice,.notice-box') || el;
-    box.classList.add('v288-hidden');
-    box.style.display='none';
-  }
-  function hideNoticeFields(){
-    const root=document.getElementById('mM3');
-    if(!root) return;
-    root.querySelectorAll('label,.form-label').forEach(el=>{
-      const t=(el.textContent||'').trim();
-      if(/^📢?\s*경기\s*공지$/.test(t) || /^경기\s*공지$/.test(t) || /경기\s*공지/.test(t)){
-        const container=el.closest('.form-group') || el.parentElement;
-        if(container){
-          container.classList.add('v288-hidden');
-          container.style.display='none';
-        }
-      }
-    });
-    root.querySelectorAll('textarea').forEach(ta=>{
-      const ph=(ta.getAttribute('placeholder')||'');
-      const label=(ta.closest('.form-group')?.innerText||'');
-      if(/운영\s*메모|경기\s*공지|코트\s*대기|입장/.test(ph+label)){
-        const container=ta.closest('.form-group') || ta.parentElement;
-        if(container){
-          container.classList.add('v288-hidden');
-          container.style.display='none';
-        }
-      }
-    });
-  }
-  function hideUnneededChips(){
-    const root=document.getElementById('mM3');
-    if(!root) return;
-    const court=assignedCourtText(root);
-    root.querySelectorAll('span,button,.badge,.m3badge,.mlp-chip').forEach(el=>{
-      const t=(el.textContent||'').trim();
-      if(/조코트\s*미배정|코트\s*미배정|미배정/.test(t)){
-        if(court || /경기코트|코트\s*[가-힣A-Za-z0-9_-]*\d+/.test(root.innerText||'')){
-          el.classList.add('v288-hidden');
-          el.style.display='none';
-        }
-      }
-      if(!ROLE_OK() && /푸시|🔔/.test(t) && el.tagName==='BUTTON'){
-        el.classList.add('v288-hidden');
-        el.style.display='none';
-      }
-    });
-  }
-  function cleanTitles(){
-    const title=document.getElementById('mM3T');
-    if(title){
-      let t=cleanName(title.textContent)
-        .replace(/^⚡\s*/,'')
-        .replace(/^📝\s*/,'')
-        .replace(/\s*[—-]\s*결과입력\s*$/,'')
-        .trim();
-      if(t && /vs/i.test(t)) title.textContent='⚡ '+t+' — 결과입력';
-      else if(/결과/.test(title.textContent||'')) title.textContent='⚡ 경기 결과 입력';
-    }
-    const popTitle=document.getElementById('matchListPopupTitle');
-    if(popTitle){
-      let t=cleanName(popTitle.textContent);
-      const m=t.match(/(\d+)\s*조/);
-      popTitle.textContent=m ? `📋 ${m[1]}조 경기 목록` : '📋 경기 목록';
-    }
-  }
-  function normalizePushButtons(){
-    document.querySelectorAll('.indiv-prelim-grid .v275-group-actions button, #matchListPopup .mlp-actions button').forEach(btn=>{
-      const t=(btn.textContent||'').trim();
-      if(/푸시|🔔/.test(t)){
-        btn.dataset.v288Push='1';
-        btn.classList.add('v288-push-btn');
-        if(!ROLE_OK()){
-          btn.style.display='none';
-          btn.classList.add('v288-hidden');
-        }
-      }
-    });
-  }
-  function extractModalTeams(){
-    const root=document.getElementById('mM3');
-    if(!root) return null;
-    const title=document.getElementById('mM3T');
-    let raw=String(title?.textContent||'');
-    raw=cleanName(raw).replace(/^⚡\s*/,'').replace(/^📝\s*/,'').replace(/\s*[—-]\s*결과입력\s*$/,'').trim();
-    let m=raw.match(/(.+?)\s+vs\s+(.+)/i);
-    if(m) return [cleanName(m[1]), cleanName(m[2])];
-    const cards=[...root.querySelectorAll('.m3tnm,.match-team-name,.match-team-players,b,strong')].map(x=>cleanName(x.textContent)).filter(Boolean);
-    if(cards.length>=2) return [cards[0],cards[1]];
-    return null;
-  }
-  function buildCleanSummary(){
-    const root=document.getElementById('mM3');
-    const body=document.getElementById('mM3B');
-    if(!root || !body || body.querySelector('.v288-match-summary')) return;
-    const teams=extractModalTeams();
-    if(!teams) return;
-    const court=assignedCourtText(root);
-    const div=document.createElement('div');
-    div.className='v288-match-summary';
-    div.innerHTML=(court?`<div class="v288-court-chip">🎾 경기코트 ${court}</div>`:'')+
-      `<div class="v288-teams"><div class="v288-team">${teams[0]}</div><div class="v288-vs">VS</div><div class="v288-team">${teams[1]}</div></div>`;
-    const firstScore=body.querySelector('.rb-blk,.m3card,.score-inputs') || body.firstChild;
-    if(firstScore) body.insertBefore(div, firstScore);
-    else body.prepend(div);
-  }
-  function runClean(){
-    try{
-      cleanTitles();
-      hideNoticeFields();
-      hideUnneededChips();
-      normalizePushButtons();
-      buildCleanSummary();
-    }catch(e){}
-  }
-  window.v288CleanResultModal=runClean;
-  document.addEventListener('DOMContentLoaded',()=>{
-    setInterval(runClean, 350);
-    setTimeout(runClean, 80);
-    setTimeout(runClean, 500);
-  });
-  document.addEventListener('click',()=>setTimeout(runClean,80),true);
-})();
-</script>
+<style id="v292MainResultButtonFixStyle">
+.js-main-tree-scroll .btn.btn-accent,.js-main-tree-scroll .btn.btn-gray{box-shadow:none !important}
+</style>
 
+<style id="v300CompactTreeGroupAlarmStyle">
+/* v300: source-level layout, no 반복 보정 */
+.main-tree-card{padding-bottom:0 !important;margin-bottom:8px !important;}
+.js-main-tree-scroll{padding-bottom:0 !important;margin-bottom:0 !important;overflow-y:hidden !important;}
+.v300-group-actions button{min-height:40px !important;white-space:nowrap !important;}
+#mM3 .v300-result-summary{margin-bottom:12px !important;}
+#mM3 .v300-score-card .m3body{padding:0 !important;}
+@media(max-width:680px){
+  .v300-group-actions{gap:6px !important;padding:8px !important;}
+  .v300-group-actions button{font-size:.78rem !important;min-width:0 !important;padding:8px 6px !important;}
+  #mM3 .v300-result-summary{padding:10px 12px !important;}
+}
+</style>
+
+<style id="v301MainResultButtonFixedStyle">
+/* v301: 본선/진출전/3·4위전 결과 버튼은 경기 카드 상단 액션에 1개만 고정 표시 */
+.v301-result-action-btn{
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  visibility:visible !important;
+  opacity:1 !important;
+  min-height:34px !important;
+  padding:6px 12px !important;
+  border-radius:10px !important;
+  font-size:.78rem !important;
+  font-weight:900 !important;
+  white-space:nowrap !important;
+  position:relative !important;
+  z-index:10 !important;
+}
+.v301-result-action-row{gap:7px !important;}
+@media(max-width:680px){
+  .v301-result-action-btn{
+    min-height:34px !important;
+    padding:6px 10px !important;
+    font-size:.76rem !important;
+  }
+}
+</style>
+
+<style id="v307PrelimToggleAndVisibilityFix">
+/* v307: 예선 섹션/개인전 경기목록 토글 안정화 */
+.indiv-prelim-grid[style*="display: none"]{display:none !important;}
+.indiv-prelim-grid .grp-matches-section.force-show,
+.indiv-prelim-grid .grp-matches-section[style*="display: block"]{
+  display:block !important;
+  visibility:visible !important;
+  opacity:1 !important;
+}
+.indiv-prelim-grid .grp-matches-section:not(.force-show)[style*="display: none"]{
+  display:none !important;
+}
+</style>
+
+
+<style id="v308FinalMemberMainPrelimFlowStyle">
+/* v308: 일반회원 본선관리 표시 + 예선 경기목록 복구 + 흐름 클릭 이동 */
+.v308-flow-step{cursor:pointer;transition:transform .12s ease, filter .12s ease;}
+.v308-flow-step:hover{transform:translateY(-1px);filter:brightness(1.03);}
+.v308-main-round-shortcuts{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:10px 0 2px;padding:9px 10px;border-radius:12px;background:linear-gradient(135deg,#fffdf5,#f8fbff);border:1px solid #dbe7ff;}
+.v308-main-round-shortcuts .v308-round-chip{border:1.5px solid #d4a017;background:#fff;color:#7a5600;border-radius:999px;padding:6px 10px;font-size:.76rem;font-weight:900;cursor:pointer;min-height:32px;}
+.v308-main-round-shortcuts .v308-round-chip:hover{background:#fff7dd;}
+.indiv-prelim-grid .grp-card .indiv-group-action-inline{display:block !important;visibility:visible !important;opacity:1 !important;}
+.indiv-prelim-grid .grp-matches-section.force-show{display:block !important;visibility:visible !important;opacity:1 !important;}
+@media(max-width:680px){.v308-main-round-shortcuts{gap:5px;padding:8px}.v308-main-round-shortcuts .v308-round-chip{font-size:.72rem;padding:6px 8px}}
+</style>
 </head>
 <body>
 <header class="app-header">
@@ -4817,7 +4680,7 @@ body:not(.admin-mode):not(.operator-mode):not(.tm-mode) #matchListPopup .mlp-act
 </main>
 <div class="modal-overlay" id="mAdmin"><div class="modal-box"><div class="modal-header"><h3 id="adminLoginTitle">🧑‍💼 운영자 로그인</h3><button class="modal-close" onclick="cm('mAdmin')">✕</button></div><div class="modal-body"><div id="adminLoginDesc" style="padding:10px 12px;background:linear-gradient(135deg,#eef4ff,#fffdf5);border:1px solid var(--border);border-radius:10px;margin-bottom:12px;font-size:.78rem;color:var(--text2);line-height:1.6">승인된 <b>시합관리자</b> 계정으로 로그인합니다. 승인 전에는 대회 생성과 운영 기능을 사용할 수 없습니다.</div><div class="form-group"><label class="form-label" id="adminEmailLabel">이메일</label><input class="form-input" id="adminEmail" onkeydown="if(event.key==='Enter')ge('adminPw').focus()" placeholder="운영자 이메일" type="email"/></div><div class="form-group"><label class="form-label">비밀번호</label><input class="form-input" id="adminPw" onkeydown="if(event.key==='Enter')doLogin()" placeholder="Firebase Auth 비밀번호" type="password"/></div><div id="adminLoginHint" style="font-size:.74rem;color:var(--text3);line-height:1.5">회원가입 후 총괄 관리자 승인까지 끝나야 운영자 로그인이 활성화됩니다.</div></div><div class="modal-footer"><button class="btn btn-gray" onclick="cm('mAdmin')">취소</button><button class="btn btn-primary" id="adminLoginSubmitBtn" onclick="doLogin()">로그인</button></div></div></div>
 <div class="modal-overlay" id="mAdminSignup"><div class="modal-box"><div class="modal-header"><h3>📝 회원가입 / 간편 로그인</h3><button class="modal-close" onclick="cm('mAdminSignup')">✕</button></div><div class="modal-body"><div style="padding:10px 12px;background:linear-gradient(135deg,#eef4ff,#fffdf5);border:1px solid var(--border);border-radius:10px;margin-bottom:12px;font-size:.78rem;color:var(--text2);line-height:1.6">일반회원은 로그인 후 개인전 참가·본인 정보 관리가 가능합니다. 클럽 경기이사와 시합관리자는 가입 후 총괄 관리자 승인이 필요합니다.</div><div style="padding:12px 14px;border:1.5px solid #dbeafe;background:#f8fbff;border-radius:14px;margin-bottom:14px"><div style="font-weight:900;font-size:.9rem;color:#0f1e3a;margin-bottom:8px">간편 가입 / 로그인</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-outline" id="signupGoogleLoginBtn" onclick="loginWithGoogle()" style="flex:1;min-width:150px;background:#fff;color:#0f1e3a;border:1.5px solid #cbd5e1">🔵 Google로 계속하기</button><button class="btn btn-outline" id="signupNaverLoginBtn" onclick="loginWithNaver()" style="flex:1;min-width:130px;background:#03c75a;color:#fff;border:1.5px solid #03c75a">🟢 Naver로 계속하기</button></div><div id="signupGoogleStatus" style="font-size:.74rem;color:var(--text3);line-height:1.5;margin-top:8px">현재는 구글·네이버 로그인을 적용했습니다.</div></div><div style="height:1px;background:var(--border);margin:12px 0"></div><div style="font-weight:900;font-size:.88rem;color:var(--primary-dark);margin-bottom:8px">이메일 일반 회원가입 / 로그인</div><div class="form-group"><label class="form-label">가입 유형</label><select class="form-select" id="signupRole" onchange="updateSignupRoleHint()"><option value="member">일반회원</option><option value="club_director">클럽 경기이사 신청</option><option value="tournament_admin">시합관리자 신청</option></select></div><div class="form-group"><label class="form-label">이름 <span style="font-size:.72rem;color:var(--text3);font-weight:500">(선수 등록용 한글 이름)</span></label><input class="form-input" id="signupName" placeholder="예: 홍길동"/></div><div class="frow"><div class="form-group"><label class="form-label">전화번호</label><input class="form-input" id="signupPhone" inputmode="tel" placeholder="예: 010-1234-5678"/></div><div class="form-group"><label class="form-label">소속 클럽</label><input class="form-input" id="signupClub" placeholder="예: 모던"/></div></div><div class="form-group"><label class="form-label">구력</label><input class="form-input" id="signupCareer" placeholder="예: 24.07 / 3년"/></div><div class="form-group"><label class="form-label">이메일</label><input class="form-input" id="signupEmail" onkeydown="if(event.key==='Enter')ge('signupPw').focus()" placeholder="이메일" type="email"/></div><div class="form-group"><label class="form-label">비밀번호</label><input class="form-input" id="signupPw" onkeydown="if(event.key==='Enter')ge('signupPw2').focus()" placeholder="비밀번호 6자 이상" type="password"/></div><div class="form-group"><label class="form-label">비밀번호 확인 <span style="font-size:.72rem;color:var(--text3);font-weight:400">회원가입 때만 입력</span></label><input class="form-input" id="signupPw2" onkeydown="if(event.key==='Enter')doSignup()" placeholder="비밀번호 다시 입력" type="password"/></div><div id="signupHint" style="font-size:.74rem;color:var(--text3);line-height:1.5">일반회원은 가입 즉시 사용 가능합니다. 경기이사/시합관리자는 승인 후 권한이 활성화됩니다.</div></div><div class="modal-footer"><button class="btn btn-gray" onclick="cm('mAdminSignup')">취소</button><button class="btn btn-outline" onclick="doMemberEmailLogin()">이메일 로그인</button><button class="btn btn-primary" onclick="doSignup()">회원가입</button></div></div></div>
-<div class="modal-overlay" id="mMyProfile"><div class="modal-box" style="max-width:540px"><div class="modal-header"><h3>👤 내 정보 설정</h3><button class="modal-close" onclick="cm('mMyProfile')">✕</button></div><div class="modal-body"><div style="padding:10px 12px;background:linear-gradient(135deg,#eef4ff,#fffdf5);border:1px solid var(--border);border-radius:10px;margin-bottom:12px;font-size:.78rem;color:var(--text2);line-height:1.6">소속 클럽, 구력, 전화번호는 개인전 참가 기록과 단체전 권한 확인에 사용됩니다.</div><div class="form-group"><label class="form-label">이름</label><input class="form-input" id="profileName" placeholder="예: 홍길동"/></div><div class="frow"><div class="form-group"><label class="form-label">전화번호</label><input class="form-input" id="profilePhone" inputmode="tel" placeholder="예: 010-1234-5678"/></div><div class="form-group"><label class="form-label">소속 클럽</label><input class="form-input" id="profileClub" placeholder="예: 모던"/></div></div><div class="form-group"><label class="form-label">구력</label><input class="form-input" id="profileCareer" placeholder="예: 24.07 / 3년"/></div><div class="form-group"><label class="form-label">회원 유형</label><select class="form-select" id="profileRole" disabled><option value="member">일반회원</option><option value="club_director">클럽 경기이사</option><option value="tournament_admin">시합관리자</option><option value="admin">개발자/총괄관리자</option></select></div><div id="profileStatus" style="font-size:.74rem;color:var(--text3);line-height:1.5"></div><div style="margin-top:12px;padding:10px 12px;background:linear-gradient(135deg,#eef4ff,#fffdf5);border:1px solid var(--border);border-radius:12px"><div style="font-size:.82rem;font-weight:900;color:var(--primary-dark);margin-bottom:6px">🔔 경기 푸시알림</div><div id="pushStatus" style="font-size:.74rem;color:var(--text2);line-height:1.5;margin-bottom:8px">코트 배정/대기/경기 시작 알림을 받으려면 알림을 켜 주세요.</div><button class="btn btn-outline" onclick="requestMatchPushPermission()" style="width:100%;font-size:.84rem">🔔 경기 알림 받기</button></div></div><div class="modal-footer"><button class="btn btn-gray" onclick="cm('mMyProfile')">닫기</button><button class="btn btn-primary" onclick="saveMyProfile()">💾 저장</button></div></div></div>
+<div class="modal-overlay" id="mMyProfile"><div class="modal-box" style="max-width:540px"><div class="modal-header"><h3>👤 내 정보 설정</h3><button class="modal-close" onclick="cm('mMyProfile')">✕</button></div><div class="modal-body"><div style="padding:10px 12px;background:linear-gradient(135deg,#eef4ff,#fffdf5);border:1px solid var(--border);border-radius:10px;margin-bottom:12px;font-size:.78rem;color:var(--text2);line-height:1.6">소속 클럽, 구력, 전화번호는 개인전 참가 기록과 단체전 권한 확인에 사용됩니다.</div><div class="form-group"><label class="form-label">이름</label><input class="form-input" id="profileName" placeholder="예: 홍길동"/></div><div class="frow"><div class="form-group"><label class="form-label">전화번호</label><input class="form-input" id="profilePhone" inputmode="tel" placeholder="예: 010-1234-5678"/></div><div class="form-group"><label class="form-label">소속 클럽</label><input class="form-input" id="profileClub" placeholder="예: 모던"/></div></div><div class="form-group"><label class="form-label">구력</label><input class="form-input" id="profileCareer" placeholder="예: 24.07 / 3년"/></div><div class="form-group"><label class="form-label">회원 유형</label><select class="form-select" id="profileRole" disabled><option value="member">일반회원</option><option value="club_director">클럽 경기이사</option><option value="tournament_admin">시합관리자</option><option value="admin">개발자/총괄관리자</option></select></div><div id="profileStatus" style="font-size:.74rem;color:var(--text3);line-height:1.5"></div><div style="margin-top:12px;padding:10px 12px;background:linear-gradient(135deg,#eef4ff,#fffdf5);border:1px solid var(--border);border-radius:12px"><div style="font-size:.82rem;font-weight:900;color:var(--primary-dark);margin-bottom:6px">🔔 경기 알림</div><div id="pushStatus" style="font-size:.74rem;color:var(--text2);line-height:1.5;margin-bottom:8px">코트 배정/대기/경기 시작 알림을 받으려면 알림을 켜 주세요.</div><button class="btn btn-outline" onclick="requestMatchPushPermission()" style="width:100%;font-size:.84rem">🔔 경기 알림 받기</button></div></div><div class="modal-footer"><button class="btn btn-gray" onclick="cm('mMyProfile')">닫기</button><button class="btn btn-primary" onclick="saveMyProfile()">💾 저장</button></div></div></div>
 <!-- 팀등록 로그인 모달 -->
 <div class="modal-overlay" id="mRegLogin"><div class="modal-box"><div class="modal-header"><h3>🏆 경기이사 로그인</h3><button class="modal-close" onclick="cm('mRegLogin')">✕</button></div>
 <div class="modal-body">
@@ -5959,13 +5822,13 @@ body:not(.admin-mode):not(.operator-mode):not(.tm-mode) #matchListPopup .mlp-act
 <div class="modal-overlay" id="mManualPush">
   <div class="modal-box" style="max-width:540px">
     <div class="modal-header" style="background:#2563eb">
-      <h3>🔔 푸시알림 발송</h3>
+      <h3>🔔 경기 알림 발송</h3>
       <button class="modal-close" onclick="cm('mManualPush')">✕</button>
     </div>
     <div class="modal-body">
       <div id="manualPushTarget" style="padding:9px 11px;background:#eff6ff;border:1px solid #93c5fd;border-radius:10px;font-size:.8rem;font-weight:900;color:#1d4ed8;margin-bottom:10px">발송 대상</div>
       <div class="form-group"><label class="form-label">제목</label><input class="form-input" id="manualPushTitle" placeholder="예: 경기 안내"></div>
-      <div class="form-group"><label class="form-label">내용</label><textarea class="form-textarea" id="manualPushBody" rows="5" placeholder="푸시로 보낼 내용을 입력하세요"></textarea></div>
+      <div class="form-group"><label class="form-label">내용</label><textarea class="form-textarea" id="manualPushBody" rows="5" placeholder="알림으로 보낼 내용을 입력하세요"></textarea></div>
       <div style="font-size:.74rem;color:var(--text3);line-height:1.6">※ 알림을 허용한 사용자에게만 발송됩니다. 차단된 휴대폰에는 보낼 수 없습니다.</div>
     </div>
     <div class="modal-footer"><button class="btn btn-gray" onclick="cm('mManualPush')">취소</button><button class="btn btn-primary" onclick="sendManualPushFromModal()">🔔 발송</button></div>
@@ -6947,8 +6810,8 @@ const _app=initializeApp(FB);
 const db=getFirestore(_app);
 const storage=getStorage(_app);
 const auth=getAuth(_app);
-// ── 230MATCH 푸시알림 준비 코드 ─────────────────────────────
-// Firebase Console → Cloud Messaging → 웹 푸시 인증서(VAPID Key)
+// ── 230MATCH 알림알림 준비 코드 ─────────────────────────────
+// Firebase Console → Cloud Messaging → 웹 알림 인증서(VAPID Key)
 const FCM_VAPID_KEY="BC6CE16CvIlfyPjaSel4nTHCxNga27BgXcb0Gnw2vY9qqOlzavmDGYJrY8mt2GUCwO5vraWXMKjamw_BPPG4RPk";
 let FCM_MESSAGING=null;
 let FCM_FOREGROUND_READY=false;
@@ -6966,11 +6829,11 @@ function getPushDeviceLabel(){
   return 'Web';
 }
 async function getFcmMessagingSafe(){
-  if(location.protocol==='file:') throw new Error('로컬 파일에서는 푸시알림을 테스트할 수 없습니다. 배포 주소에서 테스트하세요.');
+  if(location.protocol==='file:') throw new Error('로컬 파일에서는 알림알림을 테스트할 수 없습니다. 배포 주소에서 테스트하세요.');
   if(!('Notification' in window)) throw new Error('이 브라우저는 알림을 지원하지 않습니다.');
   if(!('serviceWorker' in navigator)) throw new Error('이 브라우저는 서비스워커를 지원하지 않습니다.');
   const supported=await isSupported().catch(()=>false);
-  if(!supported) throw new Error('현재 브라우저/환경에서는 Firebase 푸시알림을 지원하지 않습니다.');
+  if(!supported) throw new Error('현재 브라우저/환경에서는 Firebase 알림알림을 지원하지 않습니다.');
   if(!FCM_MESSAGING) FCM_MESSAGING=getMessaging(_app);
   return FCM_MESSAGING;
 }
@@ -7024,7 +6887,7 @@ async function requestMatchPushPermission(){
       return;
     }
     if(!FCM_VAPID_KEY || FCM_VAPID_KEY.includes('PASTE')){
-      toast('VAPID Key가 설정되지 않았습니다. Firebase 웹 푸시 인증서 키를 먼저 넣어 주세요.','error');
+      toast('VAPID Key가 설정되지 않았습니다. Firebase 웹 알림 인증서 키를 먼저 넣어 주세요.','error');
       return;
     }
     const messaging=await getFcmMessagingSafe();
@@ -7040,14 +6903,14 @@ async function requestMatchPushPermission(){
     const saved=await saveCurrentFcmToken(token);
     if(saved){
       localStorage.setItem('matchPushEnabled','1');
-      const ps=ge('pushStatus'); if(ps) ps.innerHTML='✅ 경기 푸시알림이 켜졌습니다. 이 계정/기기 토큰이 Firebase에 저장되어 자동 알림을 받을 준비가 되었습니다.';
-      toast('경기 푸시알림 설정 완료 ✅','success');
+      const ps=ge('pushStatus'); if(ps) ps.innerHTML='✅ 경기 알림이 켜졌습니다. 이 계정/기기 토큰이 Firebase에 저장되어 자동 알림을 받을 준비가 되었습니다.';
+      toast('경기 알림 설정 완료 ✅','success');
       setupFcmForegroundListener();
     }
   }catch(e){
     console.warn('requestMatchPushPermission failed',e);
-    toast('푸시알림 설정 실패: '+(e?.message||e),'error');
-    const ps=ge('pushStatus'); if(ps) ps.innerHTML='⚠️ 푸시알림 설정 실패: '+esc(e?.message||e);
+    toast('알림알림 설정 실패: '+(e?.message||e),'error');
+    const ps=ge('pushStatus'); if(ps) ps.innerHTML='⚠️ 알림알림 설정 실패: '+esc(e?.message||e);
   }
 }
 async function setupFcmForegroundListener(){
@@ -7075,7 +6938,7 @@ function updatePushStatusLabel(){
     if(!ps) return;
     const enabled=localStorage.getItem('matchPushEnabled')==='1';
     const perm=('Notification' in window)?Notification.permission:'unsupported';
-    if(perm==='granted' && enabled) ps.innerHTML='✅ 이 기기는 경기 푸시알림이 켜져 있습니다.';
+    if(perm==='granted' && enabled) ps.innerHTML='✅ 이 기기는 경기 알림이 켜져 있습니다.';
     else if(perm==='denied') ps.innerHTML='🔕 브라우저에서 알림이 차단되어 있습니다. 브라우저 설정에서 알림 허용이 필요합니다.';
     else ps.innerHTML='🔔 코트 배정/대기/경기 시작 알림을 받으려면 알림을 켜 주세요.';
   }catch(e){}
@@ -7083,7 +6946,7 @@ function updatePushStatusLabel(){
 
 function renderInlinePushEnableButton(){
   return `<div style="margin-top:10px;padding:10px 12px;background:linear-gradient(135deg,#eef4ff,#fffdf5);border:1px solid var(--border);border-radius:12px">
-    <div style="font-size:.82rem;font-weight:900;color:var(--primary-dark);margin-bottom:6px">🔔 경기 푸시알림</div>
+    <div style="font-size:.82rem;font-weight:900;color:var(--primary-dark);margin-bottom:6px">🔔 경기 알림</div>
     <div id="pushStatus" style="font-size:.74rem;color:var(--text2);line-height:1.5;margin-bottom:8px">코트 배정/대기/경기 시작 알림을 받으려면 알림을 켜 주세요.</div>
     <button class="btn btn-outline" onclick="requestMatchPushPermission()" style="width:100%;font-size:.84rem">🔔 경기 알림 받기</button>
   </div>`;
@@ -7097,8 +6960,32 @@ async function sendFcmPushToken(token, title, body, data={}){
     body:JSON.stringify({token,title,body,data})
   });
   const txt=await res.text().catch(()=>'');
-  if(!res.ok) throw new Error(txt || ('HTTP '+res.status));
-  return txt;
+  let parsed=null;
+  try{ parsed=txt ? JSON.parse(txt) : null; }catch(e){}
+  if(!res.ok){
+    const code=String(parsed?.error?.errorCode || parsed?.error?.code || parsed?.errorCode || parsed?.code || '');
+    const msg=String(parsed?.error?.message || parsed?.message || txt || ('HTTP '+res.status));
+    const err=new Error(msg);
+    err.status=res.status;
+    err.errorCode=code;
+    err.raw=txt;
+    err.isUnregistered=/UNREGISTERED|NOT_FOUND|Device\s+unregistered|registration-token-not-registered|Requested\s+entity\s+was\s+not\s+found/i.test(code+' '+msg+' '+txt);
+    throw err;
+  }
+  return parsed || txt;
+}
+async function markInvalidPushTokenDoc(tokenDoc, reason='UNREGISTERED'){
+  try{
+    if(!tokenDoc?.id) return;
+    await setDoc(doc(db,'pushTokens',tokenDoc.id),{
+      enabled:false,
+      invalid:true,
+      invalidReason:reason,
+      invalidAt:serverTimestamp(),
+      invalidAtText:new Date().toISOString(),
+      updatedAtText:new Date().toISOString()
+    },{merge:true});
+  }catch(e){ console.warn('invalid push token cleanup skipped', e); }
 }
 async function getEnabledPushTokenDocs(filterFn=null){
   if(!(AD||TM||OP)) throw new Error('운영 권한이 필요합니다.');
@@ -7152,12 +7039,23 @@ async function sendPushToTokenDocs(tokenDocs, title, body, data={}){
     const token=String(x?.token||'').trim();
     if(token && !seen.has(token)){ seen.add(token); uniq.push(x); }
   });
-  let ok=0, fail=0;
+  let ok=0, fail=0, stale=0;
   for(const x of uniq){
-    try{ await sendFcmPushToken(x.token,title,body,data); ok++; }
-    catch(e){ fail++; console.warn('push send failed', e); }
+    try{
+      await sendFcmPushToken(x.token,title,body,data);
+      ok++;
+    }catch(e){
+      if(e?.isUnregistered){
+        stale++;
+        await markInvalidPushTokenDoc(x, e.errorCode || 'UNREGISTERED');
+        console.warn('stale push token disabled', x.id || x.uid || '', e.message || e);
+      }else{
+        fail++;
+        console.warn('push send failed', e);
+      }
+    }
   }
-  return {ok, fail, total:uniq.length};
+  return {ok, fail, stale, total:uniq.length};
 }
 async function sendRegistrationCompletePush(team,t,div){
   try{
@@ -7179,7 +7077,7 @@ async function openAdminBroadcastPushModal(){
   const title=ge('manualPushTitle'), body=ge('manualPushBody'), target=ge('manualPushTarget');
   if(title) title.value='230MATCH 공지';
   if(body) body.value=String(G?.meta?.adminFloatingNotice||'').trim() || '';
-  if(target) target.textContent='전체 푸시알림 수신자';
+  if(target) target.textContent='전체 알림알림 수신자';
   window._manualPushContext={type:'all'};
   om('mManualPush');
 }
@@ -7236,12 +7134,18 @@ async function openGroupManualPush(key, gi){
 }
 function renderGroupQuickActionButtons(key, gi){
   if(!canShowMatchActionButtons()) return '';
-  const m=getGroupFirstMatchForAction(key, gi);
-  if(!m) return '';
-  return `<div style="display:flex;gap:8px;flex-wrap:wrap;padding:10px 12px;border-top:1px solid var(--border);background:linear-gradient(135deg,#f8fbff,#fffdf5)">
-    <button class="btn btn-accent" style="flex:1;min-width:130px;padding:10px 12px;font-size:.86rem;font-weight:900;border-radius:12px" onclick="openGroupFirstMatchResult('${key}',${Number(gi)})">⚡ 이 조 결과 입력</button>
-    <button class="btn btn-outline" style="flex:1;min-width:130px;padding:10px 12px;font-size:.86rem;font-weight:900;border-radius:12px;background:#eff6ff;color:#1d4ed8;border-color:#93c5fd" onclick="openGroupManualPush('${key}',${Number(gi)})">🔔 이 조 푸시</button>
-  </div>`;
+  const ms=(G.matches[key]||[]).filter(m=>m && m.phase==='group' && Number(m.group)===Number(gi));
+  if(!ms.length) return '';
+  const grp=G.draws[key]?.groups?.[Number(gi)] || null;
+  const teamCount = Array.isArray(grp?.teams) && grp.teams.length
+    ? grp.teams.length
+    : [...new Set(ms.flatMap(m=>[m.t1,m.t2]).filter(v=>v!==null&&v!==undefined))].length;
+  const resultBtn = teamCount<=2
+    ? `<button class="btn btn-accent" style="flex:1;min-width:86px;padding:10px 12px;font-size:.86rem;font-weight:900;border-radius:12px" onclick="openGroupFirstMatchResult('${key}',${Number(gi)})">⚡ 결과</button>`
+    : '';
+  const gameBtn = `<button class="btn btn-outline" style="flex:1;min-width:86px;padding:10px 12px;font-size:.86rem;font-weight:900;border-radius:12px;background:#fff;color:#1d4ed8;border-color:#93c5fd" onclick="openGroupMatchListPopupFromButton(this)">📋 경기</button>`;
+  const alarmBtn = `<button class="btn btn-outline" style="flex:1;min-width:86px;padding:10px 12px;font-size:.86rem;font-weight:900;border-radius:12px;background:#eff6ff;color:#1d4ed8;border-color:#93c5fd" onclick="openGroupManualPush('${key}',${Number(gi)})">🔔 알림</button>`;
+  return `<div class="v300-group-actions" data-team-count="${teamCount}" style="display:grid;grid-template-columns:repeat(${teamCount<=2?3:2},minmax(0,1fr));gap:8px;padding:10px 12px;border-top:1px solid var(--border);background:linear-gradient(135deg,#f8fbff,#fffdf5)">${resultBtn}${gameBtn}${alarmBtn}</div>`;
 }
 
 async function sendManualPushFromModal(){
@@ -7291,12 +7195,23 @@ async function sendManualPushFromModal(){
         return (ck && targetSet.clubKeys.has(ck)) || (pd && targetSet.phoneDigits.has(pd)) || (uid && targetSet.uids.has(uid));
       });
     }
-    if(!docs.length){ sl(false); toast('발송 대상 푸시 토큰이 없습니다','info'); return; }
+    if(!docs.length){ sl(false); toast('발송 대상 알림 토큰이 없습니다','info'); return; }
     const res=await sendPushToTokenDocs(docs,title,body,{type:'manual_push',target:ctx.type});
     sl(false);
     cm('mManualPush');
-    toast(`푸시 발송 완료: 성공 ${res.ok} / 실패 ${res.fail}`,'success');
-  }catch(e){ sl(false); console.error(e); toast('푸시 발송 실패: '+(e?.message||e),'error'); }
+    if(res.ok>0){
+      const extra=[];
+      if(res.stale) extra.push(`만료토큰 정리 ${res.stale}`);
+      if(res.fail) extra.push(`실패 ${res.fail}`);
+      toast(`알림 발송 완료: 성공 ${res.ok}${extra.length?' / '+extra.join(' / '):''}`,'success');
+    }else if(res.stale>0 && res.fail===0){
+      toast(`유효한 알림 수신자가 없습니다. 만료된 기기 토큰 ${res.stale}개를 정리했습니다.`,'info');
+    }else if(res.fail>0){
+      toast(`알림 발송 실패: 수신자 ${res.fail}명 전송 실패`,'error');
+    }else{
+      toast('발송 가능한 알림 수신자가 없습니다.','info');
+    }
+  }catch(e){ sl(false); console.error(e); toast('알림 발송 실패: '+(e?.message||e),'error'); }
 }
 function ensureAdminPushControls(){
   try{
@@ -7306,7 +7221,7 @@ function ensureAdminPushControls(){
     box.id='adminPushControlBox';
     box.className='form-group';
     box.style.cssText='margin-bottom:16px;padding:14px;background:linear-gradient(135deg,#eef4ff,#fffdf5);border:1.5px solid #93c5fd;border-radius:12px';
-    box.innerHTML=`<div style="font-weight:800;font-size:.9rem;color:#1d4ed8;margin-bottom:8px">🔔 관리자 푸시알림 발송</div><div style="font-size:.75rem;color:var(--text2);line-height:1.7;margin-bottom:10px">푸시알림을 켠 전체 사용자에게 공지를 발송합니다. 경기 카드/명단 카드에서는 해당 대상에게만 보낼 수 있습니다.</div><button class="btn btn-primary" onclick="openAdminBroadcastPushModal()" style="width:100%;background:#2563eb">📢 전체 푸시 공지 보내기</button>`;
+    box.innerHTML=`<div style="font-weight:800;font-size:.9rem;color:#1d4ed8;margin-bottom:8px">🔔 관리자 알림알림 발송</div><div style="font-size:.75rem;color:var(--text2);line-height:1.7;margin-bottom:10px">알림알림을 켠 전체 사용자에게 공지를 발송합니다. 경기 카드/명단 카드에서는 해당 대상에게만 보낼 수 있습니다.</div><button class="btn btn-primary" onclick="openAdminBroadcastPushModal()" style="width:100%;background:#2563eb">📢 전체 알림 공지 보내기</button>`;
     body.prepend(box);
   }catch(e){}
 }
@@ -9017,7 +8932,7 @@ function renderCourtStatusBoard(key, div){
           ${sharedWaiting.length>sharedWaitingDefaultVisibleCount?`<button class="btn btn-outline" type="button" style="font-size:.68rem;padding:4px 9px;min-height:28px;border-color:#e8b353;color:#9a6400;background:#fff7df" onclick="toggleCourtBoardSharedExpanded('${key}')">${sharedWaitingExpanded?`접기 (${sharedWaiting.length})`:`더보기 +${sharedWaitingHiddenCount}`}</button>`:''}
         </div>
       </div>
-      ${sharedWaitingVisible.length?`<div class="shared-wait-stack">${sharedWaitingVisible.map((w,idx)=>{ const wi=describeCourtBoardMatch(key,w); const priority=idx+1; const headline=((wi.title&&wi.title!=='TBD vs TBD')?wi.title:((wi.rawTitle&&wi.rawTitle!=='TBD vs TBD')?wi.rawTitle:(wi.autoTitle||'경기 대기'))); const targetCourt=String(w.__sharedCourtLabel||'').trim(); const detailParts=[wi.label, targetCourt?`${targetCourt} 배정예정`:'공용 대기']; const isManual=!!w.manualSharedHold || !!String(w.manualCourtTarget||'').trim(); const assignedElapsed = buildElapsedMetaLine(w.courtAssignedAt||'', 'wait_placed'); const metaEntries=[]; if(assignedElapsed.clock) metaEntries.push({...assignedElapsed, prefix:'대기배치'}); return `<div class="court-wait-card" draggable="${canManageBracket()?'true':'false'}" ondragstart="onCourtCardDragStart(event,'${key}','${String(w.id)}')" ondragend="onCourtCardDragEnd(event)" style="padding:8px 10px;border-radius:10px;background:${getCourtBoardPhaseColor(wi,w).bg};border:2px solid ${getCourtBoardPhaseColor(wi,w).bd}"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px"><div style="min-width:0;flex:1"><div style="font-size:.78rem;font-weight:900;color:${getCourtBoardPhaseColor(wi,w).fg};line-height:1.35;word-break:keep-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(headline)}</div><div style="font-size:.72rem;color:${getCourtBoardPhaseColor(wi,w).fg};margin-top:3px">${esc(detailParts.join(' · '))}</div>${renderElapsedMetaBlocks(metaEntries, getCourtBoardPhaseColor(wi,w).fg)}<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px">${canShowMatchActionButtons()?`<button class="btn btn-accent" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="openM3('${key}','${String(w.id)}')">⚡ 결과</button><button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap;background:#eff6ff;color:#1d4ed8;border-color:#93c5fd" onclick="openManualMatchPush('${key}','${String(w.id)}')">🔔 푸시</button>`:''}${canManageBracket()?`<button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="sendCourtCardSms('${key}','${String(w.id)}','${targetCourt?'court_changed':'queue_registered'}','${targetCourt}',${priority})">📨 문자</button>`:''}<button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="showCourtMovePicker('${key}','${String(w.id)}')">코트 선택</button></div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px"><span class="court-wait-priority">${priority}</span>${assignedElapsed.badge?`<span class="badge" style="font-size:.66rem;padding:3px 7px;background:${assignedElapsed.badge.bg};color:${assignedElapsed.badge.color};border:1px solid ${assignedElapsed.badge.bd}">${assignedElapsed.badge.text}</span>`:''}${isManual?'<span class="badge bg-blue" style="font-size:.66rem;padding:3px 7px">수동</span>':''}</div></div></div>`; }).join('')}</div>${sharedWaitingHiddenCount?`<div style="margin-top:8px;font-size:.74rem;color:#9a6400;font-weight:700">아래 더보기로 나머지 ${sharedWaitingHiddenCount}경기 확인</div>`:''}`:`<div style="padding:10px 12px;border:1px dashed #f6d28b;border-radius:10px;background:#fff;font-size:.78rem;color:#9a6400">여기로 카드를 옮기면 공용 대기 상태로 유지됩니다.</div>`}
+      ${sharedWaitingVisible.length?`<div class="shared-wait-stack">${sharedWaitingVisible.map((w,idx)=>{ const wi=describeCourtBoardMatch(key,w); const priority=idx+1; const headline=((wi.title&&wi.title!=='TBD vs TBD')?wi.title:((wi.rawTitle&&wi.rawTitle!=='TBD vs TBD')?wi.rawTitle:(wi.autoTitle||'경기 대기'))); const targetCourt=String(w.__sharedCourtLabel||'').trim(); const detailParts=[wi.label, targetCourt?`${targetCourt} 배정예정`:'공용 대기']; const isManual=!!w.manualSharedHold || !!String(w.manualCourtTarget||'').trim(); const assignedElapsed = buildElapsedMetaLine(w.courtAssignedAt||'', 'wait_placed'); const metaEntries=[]; if(assignedElapsed.clock) metaEntries.push({...assignedElapsed, prefix:'대기배치'}); return `<div class="court-wait-card" draggable="${canManageBracket()?'true':'false'}" ondragstart="onCourtCardDragStart(event,'${key}','${String(w.id)}')" ondragend="onCourtCardDragEnd(event)" style="padding:8px 10px;border-radius:10px;background:${getCourtBoardPhaseColor(wi,w).bg};border:2px solid ${getCourtBoardPhaseColor(wi,w).bd}"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px"><div style="min-width:0;flex:1"><div style="font-size:.78rem;font-weight:900;color:${getCourtBoardPhaseColor(wi,w).fg};line-height:1.35;word-break:keep-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(headline)}</div><div style="font-size:.72rem;color:${getCourtBoardPhaseColor(wi,w).fg};margin-top:3px">${esc(detailParts.join(' · '))}</div>${renderElapsedMetaBlocks(metaEntries, getCourtBoardPhaseColor(wi,w).fg)}<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px">${canShowMatchActionButtons()?`<button class="btn btn-accent" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="openM3('${key}','${String(w.id)}')">⚡ 결과</button><button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap;background:#eff6ff;color:#1d4ed8;border-color:#93c5fd" onclick="openManualMatchPush('${key}','${String(w.id)}')">🔔 알림</button>`:''}${canManageBracket()?`<button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="sendCourtCardSms('${key}','${String(w.id)}','${targetCourt?'court_changed':'queue_registered'}','${targetCourt}',${priority})">📨 문자</button>`:''}<button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="showCourtMovePicker('${key}','${String(w.id)}')">코트 선택</button></div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px"><span class="court-wait-priority">${priority}</span>${assignedElapsed.badge?`<span class="badge" style="font-size:.66rem;padding:3px 7px;background:${assignedElapsed.badge.bg};color:${assignedElapsed.badge.color};border:1px solid ${assignedElapsed.badge.bd}">${assignedElapsed.badge.text}</span>`:''}${isManual?'<span class="badge bg-blue" style="font-size:.66rem;padding:3px 7px">수동</span>':''}</div></div></div>`; }).join('')}</div>${sharedWaitingHiddenCount?`<div style="margin-top:8px;font-size:.74rem;color:#9a6400;font-weight:700">아래 더보기로 나머지 ${sharedWaitingHiddenCount}경기 확인</div>`:''}`:`<div style="padding:10px 12px;border:1px dashed #f6d28b;border-radius:10px;background:#fff;font-size:.78rem;color:#9a6400">여기로 카드를 옮기면 공용 대기 상태로 유지됩니다.</div>`}
       <div class="court-drop-hint">카드를 각 코트로 드래그하거나, 코트 선택 버튼으로 수동 배정할 수 있습니다. 코트에서 다시 이 영역으로 드래그하거나 공용 대기를 선택하면 복귀합니다.</div>
     </div>`;
   const cards=hasCourts ? processedItems.map(item=>{
@@ -9036,7 +8951,7 @@ function renderCourtStatusBoard(key, div){
     // 현재경기: 시합시작 시각 1개만 표시
     if(currentElapsed.clock) currentMetaEntries.push({...currentElapsed, prefix:'시합시작'});
     const line = info
-      ? `<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px"><div style="font-size:.84rem;font-weight:900;color:var(--primary-dark);line-height:1.35;flex:1;word-break:keep-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(info.title)}</div><div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;justify-content:flex-end">${isCurrentManual?'<span class="badge bg-blue" style="font-size:.66rem;padding:3px 7px">수동</span>':''}${currentElapsed.badge?`<span class="badge" style="font-size:.66rem;padding:3px 7px;background:${currentElapsed.badge.bg};color:${currentElapsed.badge.color};border:1px solid ${currentElapsed.badge.bd}">${currentElapsed.badge.text}</span>`:''}</div></div>${phaseChip}${renderElapsedMetaBlocks(currentMetaEntries, currentElapsed.badge?currentElapsed.badge.color:'var(--text2)')}<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px">${canShowMatchActionButtons()?`<button class="btn btn-accent" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="openM3('${key}','${String(item.current?.id||'')}')">⚡ 결과</button><button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap;background:#eff6ff;color:#1d4ed8;border-color:#93c5fd" onclick="openManualMatchPush('${key}','${String(item.current?.id||'')}')">🔔 푸시</button>`:''}${canManageBracket()?`<button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="sendCourtCardSms('${key}','${String(item.current?.id||'')}','match_started','${String(item.court||'')}',0)">📨 문자</button>`:''}</div>`
+      ? `<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px"><div style="font-size:.84rem;font-weight:900;color:var(--primary-dark);line-height:1.35;flex:1;word-break:keep-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(info.title)}</div><div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;justify-content:flex-end">${isCurrentManual?'<span class="badge bg-blue" style="font-size:.66rem;padding:3px 7px">수동</span>':''}${currentElapsed.badge?`<span class="badge" style="font-size:.66rem;padding:3px 7px;background:${currentElapsed.badge.bg};color:${currentElapsed.badge.color};border:1px solid ${currentElapsed.badge.bd}">${currentElapsed.badge.text}</span>`:''}</div></div>${phaseChip}${renderElapsedMetaBlocks(currentMetaEntries, currentElapsed.badge?currentElapsed.badge.color:'var(--text2)')}<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px">${canShowMatchActionButtons()?`<button class="btn btn-accent" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="openM3('${key}','${String(item.current?.id||'')}')">⚡ 결과</button><button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap;background:#eff6ff;color:#1d4ed8;border-color:#93c5fd" onclick="openManualMatchPush('${key}','${String(item.current?.id||'')}')">🔔 알림</button>`:''}${canManageBracket()?`<button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="sendCourtCardSms('${key}','${String(item.current?.id||'')}','match_started','${String(item.court||'')}',0)">📨 문자</button>`:''}</div>`
       : `<div style="font-size:.84rem;font-weight:800;color:#64748b;line-height:1.45">배정된 진행 경기 없음</div>
          <div style="font-size:.74rem;color:var(--text3);margin-top:4px">경기 코트 배정을 하면 이 코트에 표시됩니다.</div>`;
     const waitingList=[...(item.__visibleWaiting||[])];
@@ -9053,7 +8968,7 @@ function renderCourtStatusBoard(key, div){
               if(waitElapsed.clock) metaEntries.push({...waitElapsed, prefix:'대기시작'});
               return `<div class="court-wait-card" draggable="${canManageBracket()?'true':'false'}" ondragstart="onCourtCardDragStart(event,'${key}','${String(w.id)}')" ondragend="onCourtCardDragEnd(event)" style="padding:8px 10px;border-radius:10px;background:${getCourtBoardPhaseColor(wi,w).bg};border:2px solid ${getCourtBoardPhaseColor(wi,w).bd}">
                 <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
-                  <div style="min-width:0;flex:1"><div style="font-size:.78rem;font-weight:900;color:${getCourtBoardPhaseColor(wi,w).fg};line-height:1.35;word-break:keep-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(wi.title)}</div><div style="font-size:.72rem;color:${getCourtBoardPhaseColor(wi,w).fg};margin-top:3px">${esc([wi.label, '대기중'].filter(Boolean).join(' · '))}</div>${renderElapsedMetaBlocks(metaEntries, getCourtBoardPhaseColor(wi,w).fg)}<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px">${canShowMatchActionButtons()?`<button class="btn btn-accent" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="openM3('${key}','${String(w.id)}')">⚡ 결과</button><button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap;background:#eff6ff;color:#1d4ed8;border-color:#93c5fd" onclick="openManualMatchPush('${key}','${String(w.id)}')">🔔 푸시</button>`:''}${canManageBracket()?`<button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="sendCourtCardSms('${key}','${String(w.id)}','court_changed','${String(item.court||'')}',${priority})">📨 문자</button>`:''}<button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="showCourtMovePicker('${key}','${String(w.id)}')">코트 선택</button></div></div>
+                  <div style="min-width:0;flex:1"><div style="font-size:.78rem;font-weight:900;color:${getCourtBoardPhaseColor(wi,w).fg};line-height:1.35;word-break:keep-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(wi.title)}</div><div style="font-size:.72rem;color:${getCourtBoardPhaseColor(wi,w).fg};margin-top:3px">${esc([wi.label, '대기중'].filter(Boolean).join(' · '))}</div>${renderElapsedMetaBlocks(metaEntries, getCourtBoardPhaseColor(wi,w).fg)}<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px">${canShowMatchActionButtons()?`<button class="btn btn-accent" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="openM3('${key}','${String(w.id)}')">⚡ 결과</button><button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap;background:#eff6ff;color:#1d4ed8;border-color:#93c5fd" onclick="openManualMatchPush('${key}','${String(w.id)}')">🔔 알림</button>`:''}${canManageBracket()?`<button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="sendCourtCardSms('${key}','${String(w.id)}','court_changed','${String(item.court||'')}',${priority})">📨 문자</button>`:''}<button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="showCourtMovePicker('${key}','${String(w.id)}')">코트 선택</button></div></div>
                   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px"><span class="court-wait-priority">${priority}</span>${waitElapsed.badge?`<span class="badge" style="font-size:.66rem;padding:3px 7px;background:${waitElapsed.badge.bg};color:${waitElapsed.badge.color};border:1px solid ${waitElapsed.badge.bd}">${waitElapsed.badge.text}</span>`:''}${isManual?'<span class="badge bg-blue" style="font-size:.66rem;padding:3px 7px">수동</span>':''}</div>
                 </div>
               </div>`;
@@ -10248,12 +10163,13 @@ window.clearIndivOperatorFilters = clearIndivOperatorFilters;
 
 let INDIV_FILTER_PICKER_STATE = null;
 function getIndivFilterHeading(){
-  return (AD || OP) ? '🎯 해당 경기·코트·본선구간 골라 운영하기' : '🎯 해당 경기·코트·본선구간 골라보기';
+  return '🎯 해당 경기·코트·본선구간 골라 운영하기';
 }
 function getIndivFilterSubheading(){
-  return (AD || OP)
-    ? '조, 코트, 본선 구간은 중복 선택 가능합니다. 이 설정은 보기용이며 실제 코트 배정·자동배정·저장 데이터는 바꾸지 않습니다.'
-    : '보고 싶은 조, 코트, 본선 구간만 골라서 화면을 간단하게 볼 수 있습니다.';
+  return '조, 코트, 본선 구간은 중복 선택 가능합니다. 이 설정은 보기용이며 실제 코트 배정·자동배정·저장 데이터는 바꾸지 않습니다.';
+}
+function canUseIndivOperationControls(){
+  return !!(AD || TM || OP);
 }
 function closeIndivFilterPicker(){
   INDIV_FILTER_PICKER_STATE = null;
@@ -10310,6 +10226,7 @@ function renderIndivFilterPicker(){
   }
 }
 function openIndivFilterPicker(key){
+  if(!canUseIndivOperationControls()){ try{ toast('운영 권한에서만 사용할 수 있습니다','info'); }catch(e){} return; }
   closeIndivFilterPicker();
   const current = ensureOperatorFilters(key);
   INDIV_FILTER_PICKER_STATE = {
@@ -10388,6 +10305,7 @@ function getOperationViewMode(key){
   return String((window.__OP_VIEW_MODE && window.__OP_VIEW_MODE[key]) || 'all');
 }
 function setOperationViewMode(key, mode){
+  if(!canUseIndivOperationControls()){ try{ toast('운영 권한에서만 사용할 수 있습니다','info'); }catch(e){} return; }
   if(!window.__OP_VIEW_MODE) window.__OP_VIEW_MODE={};
   const next = ['all','group','main'].includes(String(mode)) ? String(mode) : 'all';
   window.__OP_VIEW_MODE[key]=next;
@@ -10402,6 +10320,7 @@ function shouldShowMainByOperationMode(key){
   return mode==='all' || mode==='main';
 }
 function renderOperationViewButtons(key){
+  if(!canUseIndivOperationControls()) return '';
   const mode=getOperationViewMode(key);
   return `<div style="margin:10px 0 12px;padding:12px 14px;border:1px solid #dbe7ff;border-radius:14px;background:linear-gradient(135deg,#fff,#f8fbff)">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
@@ -14196,7 +14115,7 @@ function makePushNotificationDocId(payload={}){
 }
 async function enqueueMatchPushNotification(kind,key,m,meta={}){
   try{
-    // 운영자/진행자/관리자 조작에 의해 발생한 코트 배정/경기 시작 이벤트만 자동 푸시 대기열에 넣는다.
+    // 운영자/진행자/관리자 조작에 의해 발생한 코트 배정/경기 시작 이벤트만 자동 알림 대기열에 넣는다.
     if(!canManageBracket()) return false;
     const recipients=(kind==='match_completed') ? getMatchResultNotificationRecipients(key,m) : getMatchNotificationRecipients(key,m);
     const targets=buildMatchPushTargetInfo(key,m,recipients);
@@ -15468,7 +15387,7 @@ function buildRegisterRosterGrid(tid,div,teams,key){
     const canManageTeam = isIndividual ? (AD || isRegistrationOwner(team)) : (AD || (REG && _myClub && _myClub === _teamClub && !_deadlinePassed));
     const adminBtns=canManageTeam?`<div class="rr-admin-btns">
       <button class="btn rr-btn-edit" style="background:#f8fafc;color:#0f1e3a;border:1px solid #cbd5e1" onclick="openETeam('${esc(key)}',${realIdx})">✏️ 수정</button>
-      <button class="btn rr-btn-edit" style="background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd" onclick="openManualTeamPush('${esc(key)}',${realIdx})">🔔 푸시</button>
+      <button class="btn rr-btn-edit" style="background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd" onclick="openManualTeamPush('${esc(key)}',${realIdx})">🔔 알림</button>
       <button class="btn btn-danger rr-btn-del" onclick="delTeam('${esc(key)}',${realIdx})">🗑 삭제</button>
     </div>`:'';
 
@@ -17064,11 +16983,9 @@ function hasMainBracketForKey(key){
 }
 function togglePrelimSection(key){
   window.BRACKET_PRELIM_TOGGLE = window.BRACKET_PRELIM_TOGGLE || {};
-  const hasMainBracket = hasMainBracketForKey(key);
-  const defaultCollapsed = !!hasMainBracket;
   const current = Object.prototype.hasOwnProperty.call(window.BRACKET_PRELIM_TOGGLE, key)
     ? !!window.BRACKET_PRELIM_TOGGLE[key]
-    : defaultCollapsed;
+    : getPrelimCollapsedState(key, hasMainBracketForKey(key), false);
   window.BRACKET_PRELIM_TOGGLE[key] = !current;
   renderBracket();
 }
@@ -17085,10 +17002,18 @@ function isMainStatusRoundCollapsed(key, round, autoCollapsed){
   const rk = `${key}__${round}`;
   return Object.prototype.hasOwnProperty.call(map, rk) ? !!map[rk] : !!autoCollapsed;
 }
+function getMainStatusRoundAutoCollapsed(key, round){
+  try{
+    const ms=(G.matches?.[key]||[]).filter(m=>m && String(m.phase||'')==='main' && Number(m.round||0)===Number(round));
+    if(!ms.length) return false;
+    const active=ms.filter(m=>!m.bye && !getMatchResultState(key,m).done);
+    return active.length===0;
+  }catch(e){ return false; }
+}
 function toggleMainStatusRound(key, round){
   window.MAIN_STATUS_ROUND_TOGGLE = window.MAIN_STATUS_ROUND_TOGGLE || {};
   const rk = `${key}__${round}`;
-  const current = !!window.MAIN_STATUS_ROUND_TOGGLE[rk];
+  const current = isMainStatusRoundCollapsed(key, round, getMainStatusRoundAutoCollapsed(key, round));
   window.MAIN_STATUS_ROUND_TOGGLE[rk] = !current;
   renderBracket();
 }
@@ -17100,7 +17025,7 @@ function isMainStatusDoneMatchCollapsed(key, round, autoCollapsed){
 function toggleMainStatusDoneMatches(key, round){
   window.MAIN_STATUS_DONE_MATCH_TOGGLE = window.MAIN_STATUS_DONE_MATCH_TOGGLE || {};
   const rk = `${key}__${round}`;
-  const current = !!window.MAIN_STATUS_DONE_MATCH_TOGGLE[rk];
+  const current = isMainStatusDoneMatchCollapsed(key, round, true);
   window.MAIN_STATUS_DONE_MATCH_TOGGLE[rk] = !current;
   renderBracket();
 }
@@ -17721,6 +17646,7 @@ function renderIndividualMobilePrelimSummary(key){
     const pct=all.length ? Math.round(done*1000/all.length)/10 : 0;
     const groupCount=(G.draws[key]?.groups||[]).length || 0;
     const safeKey=String(key).replace(/[^a-zA-Z0-9_-]/g,'_');
+    const showSearch = true; // v306: 참가자 이름 검색은 일반회원에게도 노출
     return `<div class="indiv-prelim-overview-card">
       <div class="indiv-prelim-overview-head">
         <div class="indiv-prelim-overview-title">예선 진행률 (${pct}%)</div>
@@ -17730,7 +17656,7 @@ function renderIndividualMobilePrelimSummary(key){
         <div class="indiv-prelim-progress"><div style="width:${Math.max(0,Math.min(100,pct))}%"></div></div>
       </div>
       <div style="font-size:.76rem;color:#64748b;font-weight:800;margin-top:8px">총 ${groupCount}개 조 · 완료 ${done}경기 · 잔여 ${Math.max(0,all.length-done)}경기</div>
-      <div class="indiv-prelim-search"><input id="indivPrelimSearch_${safeKey}" oninput="filterIndividualPrelimCards('${key}',this.value)" placeholder="참가자 이름을 입력하세요"/><span class="icon">⌕</span></div>
+      ${showSearch ? `<div class="indiv-prelim-search"><input id="indivPrelimSearch_${safeKey}" oninput="filterIndividualPrelimCards('${key}',this.value)" placeholder="참가자 이름을 입력하세요"/><span class="icon">⌕</span></div>` : ''}
     </div>`;
   }catch(e){ return ''; }
 }
@@ -17790,9 +17716,11 @@ function renderBracketHTMLForDiv(tid,div,isAll){
   const latestPrelimSavedDraw=(G.drawHistories[key]||[]).filter(it=>!it.deleted && String(it.mode||'')!=='main').slice().sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')))[0]||null;
   const prelimMenuWrapId = `prelimMenuWrap_${key.replace(/[^a-zA-Z0-9_-]/g,'_')}`;
   const mainMenuWrapId = `mainMenuWrap_${key.replace(/[^a-zA-Z0-9_-]/g,'_')}`;
+  const showPrelimDrawManageMenus = !isIndivKey || canManageBracket();
+  const showMainDrawManageMenus = true; // 개인전 일반회원도 본선 추첨관리(결과/기록 보기)는 표시
   const topActions=`<div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;max-width:100%">
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end">
-        <div class="login-menu-wrap js-mini-menu" id="${prelimMenuWrapId}">
+        ${showPrelimDrawManageMenus ? `<div class="login-menu-wrap js-mini-menu" id="${prelimMenuWrapId}">
           <button class="btn btn-outline" style="padding:4px 10px;font-size:.72rem;min-height:34px;white-space:nowrap;font-weight:800" onclick="toggleMiniMenu(event,'${prelimMenuWrapId}')">🎲 예선 추첨 관리</button>
           <div class="login-menu-panel" style="min-width:210px">
             ${canManageBracket()?`<button class="btn-sm login-menu-item" onclick="closeMiniMenu('${prelimMenuWrapId}');${prelimRedrawAction}" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">${draw?'🎲 예선 재추첨':'🎲 예선 추첨 시작'}</button>`:''}
@@ -17800,8 +17728,8 @@ function renderBracketHTMLForDiv(tid,div,isAll){
             <button class="btn-sm login-menu-item" onclick="closeMiniMenu('${prelimMenuWrapId}');openDrawHistory('${tid}','${div}','prelim')" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">🗂 예선 추첨 기록</button>
             ${canManageBracket()?`<button class="btn-sm login-menu-item" onclick="closeMiniMenu('${prelimMenuWrapId}');resetPrelimDrawOnly('${key}')" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">♻️ 예선 초기화</button>`:''}
           </div>
-        </div>
-        ${isGroupKO ? `<div class="login-menu-wrap js-mini-menu" id="${mainMenuWrapId}">
+        </div>` : ``}
+        ${isGroupKO && showMainDrawManageMenus ? `<div class="login-menu-wrap js-mini-menu" id="${mainMenuWrapId}">
           <button class="btn btn-outline" style="padding:4px 10px;font-size:.72rem;min-height:34px;white-space:nowrap;font-weight:800;${canMainRedraw?'':'opacity:.5;cursor:not-allowed;'}" onclick="${canMainRedraw?`toggleMiniMenu(event,'${mainMenuWrapId}')`:`toast('예선을 먼저 완료하세요','info')`}">🏆 본선 추첨 관리</button>
           <div class="login-menu-panel" style="min-width:210px">
             ${canManageBracket()?`<button class="btn-sm login-menu-item" onclick="closeMiniMenu('${mainMenuWrapId}');buildMain('${tid}','${div}')" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12);${canMainRedraw?'':'opacity:.5;cursor:not-allowed;'}" ${canMainRedraw?'':'disabled'}>${latestMainSavedDraw || mMs.length ? '🎲 본선 재추첨' : '🎲 본선 추첨 시작'}</button>`:''}
@@ -17843,11 +17771,13 @@ function renderBracketHTMLForDiv(tid,div,isAll){
     </div>
     `}
     <div class="sf-flow" style="margin-top:12px">
-      <div class="sf-step"><div class="sf-dot ${s1?'sf-done':'sf-pend'}">${s1?'✓':1}</div><div class="sf-lbl">${isIndivKey?'접수':'팀등록'}<br>${teams.length}${isIndivKey?'조':'팀'}</div></div>
-      <div class="sf-step"><div class="sf-dot ${s2?'sf-done':'sf-pend'}">${s2?'✓':2}</div><div class="sf-lbl">추첨<br>${s2?'완료':'대기'}</div></div>
-      <div class="sf-step"><div class="sf-dot ${s3?'sf-done':s2?'sf-active':'sf-pend'}">${s3?'✓':3}</div><div class="sf-lbl">예선<br>${gMs.length?gDone+'/'+gMs.length:'미시작'}</div></div>
-      ${isGroupKO?`<div class="sf-step" style="cursor:pointer" onclick="jumpToMainBracketSection('${tid}','${div}')"><div class="sf-dot ${s4?'sf-done':s3?'sf-active':'sf-pend'}">${s4?'🏆':4}</div><div class="sf-lbl">본선<br>${shownMainTotal?shownMainDone+'/'+shownMainTotal:'미시작'}</div></div>`:''}
-    </div></div>`;
+      <div class="sf-step v308-flow-step" title="참가자 목록으로 이동" onclick="jumpToRegisterEntryList('${key}')"><div class="sf-dot ${s1?'sf-done':'sf-pend'}">${s1?'✓':1}</div><div class="sf-lbl">${isIndivKey?'접수':'팀등록'}<br>${teams.length}${isIndivKey?'조':'팀'}</div></div>
+      <div class="sf-step v308-flow-step" title="예선 추첨/결과 위치로 이동" onclick="jumpToPrelimSection('${key}')"><div class="sf-dot ${s2?'sf-done':'sf-pend'}">${s2?'✓':2}</div><div class="sf-lbl">추첨<br>${s2?'완료':'대기'}</div></div>
+      <div class="sf-step v308-flow-step" title="예선 진행 경기로 이동" onclick="jumpToPrelimActiveMatch('${key}')"><div class="sf-dot ${s3?'sf-done':s2?'sf-active':'sf-pend'}">${s3?'✓':3}</div><div class="sf-lbl">예선<br>${gMs.length?gDone+'/'+gMs.length:'미시작'}</div></div>
+      ${isGroupKO?`<div class="sf-step v308-flow-step" title="본선 진행 경기/대진표로 이동" onclick="jumpToMainActiveMatch('${key}')"><div class="sf-dot ${s4?'sf-done':s3?'sf-active':'sf-pend'}">${s4?'🏆':4}</div><div class="sf-lbl">본선<br>${shownMainTotal?shownMainDone+'/'+shownMainTotal:'미시작'}</div></div>`:''}
+    </div>
+    ${renderMainRoundShortcutChips(key,mMs,tid,div)}
+  </div>`;
 
   html += renderMatchProgressSummary(key);
   if(isIndivKey) html += renderIndividualMobilePrelimSummary(key);
@@ -17858,7 +17788,7 @@ function renderBracketHTMLForDiv(tid,div,isAll){
     const selectedMainMatches=getSelectedMainMatchFilters(key)||[];
     const selectedMainBlocks=getDisplayMainBlockFilters(key)||[];
     const hasFilterTargets = !!((draw?.groups?.length||0) || getMainBracketBlockList(key).length || getCourtGroupsForTournamentOrKey(key, true).some(g => (g.courts||[]).length));
-    if(hasFilterTargets){
+    if(canUseIndivOperationControls() && hasFilterTargets){
       const summaryText = formatIndivFilterSummary(key);
       html += `<div style="margin:10px 0 12px;padding:12px 14px;border:1px solid #dbe7ff;border-radius:14px;background:linear-gradient(135deg,#fff,#f8fbff)">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
@@ -17904,7 +17834,7 @@ function renderBracketHTMLForDiv(tid,div,isAll){
     html+=`<div class="sec-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
       <span>${isIndividualByKey(key)?'📋 예선 경기표':'📋 예선 조별 대진표'}</span>
     </div>`;
-    html+=`<div id="${prelimToggleId}" class="${isIndivKey?'indiv-prelim-grid':'prelim-standard-grid'}" style="display:${prelimCollapsed?'none':'block'}">`;
+    html+=`<div id="${prelimToggleId}" class="${isIndivKey?'indiv-prelim-grid':'prelim-standard-grid'}" style="display:${prelimCollapsed?'none':(isIndivKey?'grid':'block')} !important">`;
     draw.groups.forEach((grp,gi)=>{
       if(visibleGroupIndexes.length && !visibleGroupIndexes.includes(Number(gi))) return;
       const adv=cfg.advance||2;
@@ -18039,7 +17969,7 @@ function renderBracketHTMLForDiv(tid,div,isAll){
           ${indivRows}
           ${renderGroupQuickActionButtons(key,gi)}
         </div>
-        <div id="indivGroupMatches_${key}_${gi}" class="grp-matches-section" style="padding-top:12px;display:${indivCollapsed?'none':'block'}"><div class="grp-matches-label">📋 경기 목록</div>`;
+        <div id="indivGroupMatches_${key}_${gi}" class="grp-matches-section ${indivCollapsed?'':'force-show'}" style="padding-top:12px;display:${indivCollapsed?'none':'block'} !important"><div class="grp-matches-label">📋 경기 목록</div>`;
       }
       sortGroupMatchesForDisplay(key, gi, gms).filter(m=>isMatchVisibleByCourtFilter(key,m)).forEach(m=>{
         const mt1=teams[m.t1],mt2=teams[m.t2];
@@ -18273,6 +18203,107 @@ function renderBracketHTMLForDiv(tid,div,isAll){
   return html;
 }
 
+
+function v308RoundLabelFromIndex(totalR, idx){
+  if(idx===totalR-1) return '결승';
+  return `${Math.pow(2,totalR-idx)}강`;
+}
+function renderMainRoundShortcutChips(key,mMs,tid,div){
+  try{
+    const main=(mMs||[]).filter(m=>m && String(m.phase||'')==='main');
+    if(!main.length) return '';
+    const rounds=[...new Set(main.map(m=>Number(m.round||0)))].sort((a,b)=>a-b);
+    if(!rounds.length) return '';
+    const totalR=rounds.length;
+    return `<div class="v308-main-round-shortcuts"><span style="font-size:.76rem;font-weight:900;color:var(--primary-dark);margin-right:2px">🏆 본선 바로가기</span>${rounds.map((r,idx)=>`<button type="button" class="v308-round-chip" onclick="jumpToMainRound('${key}',${r})">${v308RoundLabelFromIndex(totalR,idx)}</button>`).join('')}</div>`;
+  }catch(e){ return ''; }
+}
+window.renderMainRoundShortcutChips=renderMainRoundShortcutChips;
+
+function v308PrepareBracketKey(key){
+  try{
+    const info=(typeof _k2td==='function') ? _k2td(key) : {tid:String(key||'').split('_')[0], div:String(key||'').split('_').slice(1).join('_')};
+    if(typeof showPage==='function') showPage('bracket');
+    const ts=ge('brTS');
+    if(ts && info.tid){ ts.value=info.tid; try{ if(typeof onBrTC==='function') onBrTC(); }catch(_e){} }
+    try{ if(typeof setBracketSelectedDivs==='function' && info.div) setBracketSelectedDivs([info.div], info.tid); }catch(_e){}
+    return info;
+  }catch(e){ return {tid:'',div:''}; }
+}
+function v308FocusEl(el){
+  if(!el) return;
+  try{ el.scrollIntoView({behavior:'smooth', block:'center'}); }catch(_e){ try{ el.scrollIntoView(); }catch(__e){} }
+  try{ el.classList.add('match-focus-pulse'); setTimeout(()=>el.classList.remove('match-focus-pulse'),1800); }catch(_e){}
+}
+function jumpToRegisterEntryList(key){
+  const info=v308PrepareBracketKey(key);
+  try{ if(typeof renderBracket==='function') renderBracket(); }catch(_e){}
+  setTimeout(()=>{
+    const entry=ge(`entryList_${key}`);
+    if(entry){ entry.style.display=''; entry.closest('div')?.querySelector('button') && (entry.closest('div').querySelector('button').textContent='📁 참가자 목록 접기'); v308FocusEl(entry); return; }
+    const bc=ge('bracketContent');
+    v308FocusEl(bc);
+  },180);
+}
+function jumpToPrelimSection(key){
+  const info=v308PrepareBracketKey(key);
+  window.BRACKET_PRELIM_TOGGLE = window.BRACKET_PRELIM_TOGGLE || {};
+  window.BRACKET_PRELIM_TOGGLE[key]=false;
+  try{ if(typeof renderBracket==='function') renderBracket(); }catch(_e){}
+  setTimeout(()=>{
+    const sec=ge(_prelimToggleId(key));
+    if(sec){ sec.style.setProperty('display', sec.classList.contains('indiv-prelim-grid')?'grid':'block','important'); v308FocusEl(sec); return; }
+    v308FocusEl(ge('bracketContent'));
+  },220);
+}
+function jumpToPrelimActiveMatch(key){
+  const info=v308PrepareBracketKey(key);
+  const list=(G.matches?.[key]||[]).filter(m=>m && String(m.phase||'')==='group');
+  const target=list.find(m=>!getMatchResultState(key,m).done) || list[0];
+  if(target && typeof goBracketMatch==='function'){
+    goBracketMatch(info.tid, info.div, target.id);
+    return;
+  }
+  jumpToPrelimSection(key);
+}
+function jumpToMainActiveMatch(key){
+  const info=v308PrepareBracketKey(key);
+  const list=(G.matches?.[key]||[]).filter(m=>m && ['playin','main','bronze'].includes(String(m.phase||'')) && !m.bye);
+  const target=list.find(m=>!getMatchResultState(key,m).done) || list[0];
+  if(target && typeof goBracketMatch==='function'){
+    window.BRACKET_MAIN_TOGGLE = window.BRACKET_MAIN_TOGGLE || {};
+    window.BRACKET_MAIN_TOGGLE[key]=false;
+    goBracketMatch(info.tid, info.div, target.id);
+    return;
+  }
+  try{ jumpToMainBracketSection(info.tid, info.div); }catch(_e){}
+}
+function jumpToMainRound(key, round){
+  const info=v308PrepareBracketKey(key);
+  window.BRACKET_MAIN_TOGGLE = window.BRACKET_MAIN_TOGGLE || {};
+  window.BRACKET_MAIN_TOGGLE[key]=false;
+  try{ if(typeof renderBracket==='function') renderBracket(); }catch(_e){}
+  setTimeout(()=>{
+    try{
+      const matches=(G.matches?.[key]||[]).filter(m=>m && String(m.phase||'')==='main');
+      const rounds=[...new Set(matches.map(m=>Number(m.round||0)))].sort((a,b)=>a-b);
+      const idx=Math.max(0, rounds.indexOf(Number(round)));
+      const scroll=[...document.querySelectorAll('.js-main-tree-scroll')].find(el=>String(el.dataset.key||'')===String(key));
+      if(scroll){
+        scroll.scrollLeft=Math.max(0, idx*216);
+        v308FocusEl(scroll.closest('.main-tree-card')||scroll);
+        return;
+      }
+    }catch(_e){}
+    try{ jumpToMainBracketSection(info.tid, info.div); }catch(_e){}
+  },260);
+}
+window.jumpToRegisterEntryList=jumpToRegisterEntryList;
+window.jumpToPrelimSection=jumpToPrelimSection;
+window.jumpToPrelimActiveMatch=jumpToPrelimActiveMatch;
+window.jumpToMainActiveMatch=jumpToMainActiveMatch;
+window.jumpToMainRound=jumpToMainRound;
+
 function calcFinalRanks(key,teams,mMs){
   try{
     const mainList=getMainOnlyMatches(mMs);
@@ -18425,11 +18456,11 @@ function toggleIndividualGroupMatches(key,gi){
     const box=ge(`indivGroupMatches_${key}_${gi}`);
     const btn=ge(`indivGroupToggle_${key}_${gi}`);
     if(!box||!btn) return;
-    const hidden=box.style.display==='none';
-    const nextOpen=hidden;
-    box.style.display=nextOpen?'block':'none';
-    btn.textContent=nextOpen?'📂 경기 접기':'📂 경기 보기';
+    const nextOpen=!isIndividualGroupMatchesOpen(key, gi);
     setIndividualGroupMatchesOpen(key, gi, nextOpen);
+    box.classList.toggle('force-show', nextOpen);
+    box.style.setProperty('display', nextOpen ? 'block' : 'none', 'important');
+    btn.textContent=nextOpen?'📂 경기 접기':'📂 경기 보기';
   }catch(e){}
 }
 
@@ -18455,10 +18486,14 @@ function mCard(m,key,dn1,dn2,done,sc1,sc2,label){
     done=st2.done; sc1=st2.sc1; sc2=st2.sc2;
     const canDirEdit=canEditMatchByDirector(key,m);
     const indivAuth=getIndividualResultAuthState(key,m);
-    const canInputIndivResult=(AD||TM||OP||canManageBracket()||canDirEdit||indivAuth.allowed);
-    const btn=canInputIndivResult?`<button class="btn ${done?'btn-gray':'btn-accent'}" style="padding:5px 12px;font-size:.77rem;white-space:nowrap" onclick="openM3('${key}','${m.id}')">${done?'✏️ 결과수정':'⚡ 결과입력'}</button>`:'';
-    const bottomResultBtn=canInputIndivResult?`<button class="btn ${done?'btn-gray':'btn-accent'}" style="width:100%;margin-top:10px;padding:11px 12px;font-size:.92rem;font-weight:900;border-radius:12px" onclick="openM3('${key}','${m.id}')">${done?'✏️ 결과 수정하기':'⚡ 결과 입력하기'}</button>`:'';
-    const pushBtn=(AD||TM||OP)?`<button class="btn btn-outline" style="padding:5px 10px;font-size:.75rem;white-space:nowrap;background:#eff6ff;color:#1d4ed8;border-color:#93c5fd" onclick="openManualMatchPush('${key}','${m.id}')">🔔 푸시</button>`:'';
+    const canInputIndivResult=true;
+    const resultActionLabel = done ? '✏️ 결과 수정' : '⚡ 결과 입력';
+    const isMainLikeIndiv = ['main','playin','bronze'].includes(String(m.phase||''));
+    // v302: 본선/진출전/3·4위전은 헤더 flex 영역에 결과 버튼을 두지 않는다.
+    // 헤더 폭/렌더링 상태에 따라 보였다가 사라지는 현상이 있어, 본문 하단 고정 버튼만 사용한다.
+    const btn=(!isMainLikeIndiv && canInputIndivResult)?`<button type="button" class="btn ${done?'btn-gray':'btn-accent'} v301-result-action-btn" data-v301-result="1" onclick="openM3('${key}','${m.id}')">${resultActionLabel}</button>`:'';
+    const bottomResultBtn=(isMainLikeIndiv && canInputIndivResult)?`<div class="v302-main-result-body-action"><button type="button" class="btn ${done?'btn-gray':'btn-accent'} v302-main-result-btn" data-v302-result="1" onclick="openM3('${key}','${m.id}')">${resultActionLabel}</button></div>`:'';
+    const pushBtn=(AD||TM||OP)?`<button class="btn btn-outline" style="padding:5px 10px;font-size:.75rem;white-space:nowrap;background:#eff6ff;color:#1d4ed8;border-color:#93c5fd" onclick="openManualMatchPush('${key}','${m.id}')">🔔 알림</button>`:'';
     const sideLabel1=getIndividualSideLabel(key,m,m.t1)||'1번';
     const sideLabel2=getIndividualSideLabel(key,m,m.t2)||'2번';
     const grpCourts=(m.phase==='group' && m.group!=null)?((G.draws[key]?.groups?.[Number(m.group)]?.courts)||[]):[];
@@ -18489,11 +18524,11 @@ function mCard(m,key,dn1,dn2,done,sc1,sc2,label){
     const dispSc1=st2.disp1??sc1, dispSc2=st2.disp2??sc2;
     const sideWrap1Style=done&&wn1?'padding:10px;border:1.5px solid #86efac;border-radius:12px;background:linear-gradient(135deg,#ecfdf5,#dcfce7);min-width:0;overflow:hidden':done&&wn2?'padding:10px;border:1.5px solid #fecaca;border-radius:12px;background:linear-gradient(135deg,#fff7f7,#fef2f2);min-width:0;overflow:hidden':'padding:10px;border:1.5px solid var(--border);border-radius:12px;background:#fff;min-width:0;overflow:hidden';
     const sideWrap2Style=done&&wn2?'padding:10px;border:1.5px solid #86efac;border-radius:12px;background:linear-gradient(135deg,#ecfdf5,#dcfce7);min-width:0;overflow:hidden':done&&wn1?'padding:10px;border:1.5px solid #fecaca;border-radius:12px;background:linear-gradient(135deg,#fff7f7,#fef2f2);min-width:0;overflow:hidden':'padding:10px;border:1.5px solid var(--border);border-radius:12px;background:#fff;min-width:0;overflow:hidden';
-    return `<div class="m3card" id="${getMatchCardDomId(key,m.id)}" data-match-id="${m.id}" style="${done?(wn1?'border:2px solid #86efac;box-shadow:0 0 0 3px rgba(22,163,74,.08)':wn2?'border:2px solid #86efac;box-shadow:0 0 0 3px rgba(22,163,74,.08)':''):(MY_CLUB_FILTER?'':'border:1.5px solid var(--border);box-shadow:none')}">
+    return `<div class="m3card" id="${getMatchCardDomId(key,m.id)}" data-key="${key}" data-match-id="${m.id}" style="${done?(wn1?'border:2px solid #86efac;box-shadow:0 0 0 3px rgba(22,163,74,.08)':wn2?'border:2px solid #86efac;box-shadow:0 0 0 3px rgba(22,163,74,.08)':''):(MY_CLUB_FILTER?'':'border:1.5px solid var(--border);box-shadow:none')}">
       <div class="m3body" style="padding:12px 14px">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px">
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span class="m3badge">${dl(div)}</span><span class="m3badge">${label||'1경기'}</span></div>
-          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">${done?`<span class="badge bg-green" style="font-size:.78rem;padding:3px 9px">완료</span>`:`<span class="badge bg-gray" style="font-size:.78rem;padding:3px 9px">대기</span>`}${btn}${typeof pushBtn!=='undefined'?pushBtn:''}</div>
+          <div class="v301-result-action-row" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">${done?`<span class="badge bg-green" style="font-size:.78rem;padding:3px 9px">완료</span>`:`<span class="badge bg-gray" style="font-size:.78rem;padding:3px 9px">대기</span>`}${btn}${typeof pushBtn!=='undefined'?pushBtn:''}</div>
         </div>
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:10px">${groupCourtUI}${matchCourtUI}${matchMemoUI}${grpCourtShareBadges}</div>
         ${matchMemo?renderNoticeTicker(matchMemo,'📢 공지(경기)'):''}
@@ -18579,6 +18614,7 @@ function mCard(m,key,dn1,dn2,done,sc1,sc2,label){
   const matchQueueStatus = !done ? getPersonalMatchStatusLabel(key,m) : null;
   const matchQueueChips = (!done && matchQueueStatus) ? `<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:${orderTeamStatus?'8px':'0'} 0 8px"><span style="display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;background:${matchQueueStatus.bg};border:1px solid ${matchQueueStatus.border};font-size:.78rem;font-weight:900;color:${matchQueueStatus.tone}">${matchQueueStatus.text}</span>${getPersonalMatchStartSoonChip(matchQueueStatus)}</div>` : '';
   const canDirEdit=canEditMatchByDirector(key,m);
+  const canInputResultHere = true;
   const useOrderHere=!!G.meta.onlineOrderEnabled && !isIndividualByKey(key);
   const _ost2 = useOrderHere ? getOnlineOrderState(key,m) : null;
   const _btnLabel = done
@@ -18587,9 +18623,9 @@ function mCard(m,key,dn1,dn2,done,sc1,sc2,label){
       ? (_ost2.bothSubmitted ? '📝 오더/기록확인입력' : (_ost2.mySubmitted ? '📝 오더/기록확인입력' : '📝 오더 입력·제출'))
       : '⚡ 결과입력';
   const _btnStyle = done ? 'btn-gray' : (useOrderHere ? (_ost2.bothSubmitted||_ost2.mySubmitted ? 'btn-primary' : 'btn-accent') : 'btn-accent');
-  const btn=(AD||TM||canDirEdit)?`<button class="btn ${_btnStyle}" style="padding:5px 12px;font-size:.77rem;white-space:nowrap" onclick="openM3('${key}','${m.id}')">${_btnLabel}</button>`:'';
+  const btn=canInputResultHere?`<button type="button" class="btn ${_btnStyle} v301-result-action-btn" data-v301-result="1" onclick="openM3('${key}','${m.id}')">${_btnLabel}</button>`:'';
   const memoBtn=canManageBracket()?`<button class="btn btn-outline" style="padding:5px 10px;font-size:.75rem;white-space:nowrap;background:#fff;color:${matchMemo?'#7a5600':'var(--primary-dark)'};border-color:${matchMemo?'#f6d365':'var(--border)'}" onclick="openMatchMemoModal('${key}','${m.id}')">📢 공지(경기)${matchMemo?' 수정':' 입력'}</button>`:'';
-  const pushBtn=(AD||TM||OP)?`<button class="btn btn-outline" style="padding:5px 10px;font-size:.75rem;white-space:nowrap;background:#eff6ff;color:#1d4ed8;border-color:#93c5fd" onclick="openManualMatchPush('${key}','${m.id}')">🔔 푸시</button>`:'';
+  const pushBtn=(AD||TM||OP)?`<button class="btn btn-outline" style="padding:5px 10px;font-size:.75rem;white-space:nowrap;background:#eff6ff;color:#1d4ed8;border-color:#93c5fd" onclick="openManualMatchPush('${key}','${m.id}')">🔔 알림</button>`:'';
   const orderBadge=useOrderHere?getOnlineOrderStatusBadgeHTML(key,m):'';
   const orderTeamStatus=useOrderHere?getOnlineOrderTeamStatusHTML(key,m):'';
   const unlockBtn=(AD&&useOrderHere)?`<button class="btn btn-outline" style="padding:5px 10px;font-size:.75rem;white-space:nowrap;background:#fff;color:#8a6412;border-color:#d4a017" onclick="CM_key='${key}';CM_id='${m.id}';confirmUnlockOrder()">🔓 오더초기화</button>`:'';
@@ -18601,11 +18637,11 @@ function mCard(m,key,dn1,dn2,done,sc1,sc2,label){
   const _isOtherM=MY_CLUB_FILTER&&_bc2&&!_isMyCM;
   const teamCardStyleBase=`${_isMyCM?'border:2.5px solid #16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.15);':''}${_isOtherM?'opacity:0.35;':''}`;
   const teamWinTint=done&&wn1?'background:linear-gradient(135deg,#f7fff9,#eefbf3);border-color:#86efac;':done&&wn2?'background:linear-gradient(135deg,#fff7f7,#fef2f2);border-color:#fecaca;':'';
-  return`<div class="m3card" id="${getMatchCardDomId(key,m.id)}" data-match-id="${m.id}" style="${teamCardStyleBase}${teamWinTint}"><div class="m3hdr ${divisionHeaderClass(div)}" style="${_isMyCM?'background:linear-gradient(90deg,#14532d,#166534)':''}"><div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap"><span class="m3badge">${dl(div)}</span><span class="m3badge">${label}</span><span style="font-size:1.08rem;font-weight:800">${dn1} vs ${dn2}</span></div><div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;justify-content:flex-end">${grpCourtBadge} ${grpCourtShareBadge} ${matchMemoBadge} ${courtUI} ${orderBadge} ${done?'<span class="badge bg-green" style="font-size:.82rem;padding:3px 9px">완료</span>':(st2.started?`<span style="font-size:.82rem;opacity:.95;font-weight:700;color:#ffd166">진행중 ${st2.disp1??st2.sc1}:${st2.disp2??st2.sc2}</span>`:'<span style="font-size:.86rem;opacity:.8;font-weight:600">대기중</span>')} ${unlockBtn} ${memoBtn} ${btn}${typeof pushBtn!=='undefined'?pushBtn:''}</div></div>
+  return`<div class="m3card" id="${getMatchCardDomId(key,m.id)}" data-key="${key}" data-match-id="${m.id}" style="${teamCardStyleBase}${teamWinTint}"><div class="m3hdr ${divisionHeaderClass(div)}" style="${_isMyCM?'background:linear-gradient(90deg,#14532d,#166534)':''}"><div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap"><span class="m3badge">${dl(div)}</span><span class="m3badge">${label}</span><span style="font-size:1.08rem;font-weight:800">${dn1} vs ${dn2}</span></div><div class="v301-result-action-row" style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;justify-content:flex-end">${grpCourtBadge} ${grpCourtShareBadge} ${matchMemoBadge} ${courtUI} ${orderBadge} ${done?'<span class="badge bg-green" style="font-size:.82rem;padding:3px 9px">완료</span>':(st2.started?`<span style="font-size:.82rem;opacity:.95;font-weight:700;color:#ffd166">진행중 ${st2.disp1??st2.sc1}:${st2.disp2??st2.sc2}</span>`:'<span style="font-size:.86rem;opacity:.8;font-weight:600">대기중</span>')} ${unlockBtn} ${memoBtn} ${btn}${typeof pushBtn!=='undefined'?pushBtn:''}</div></div>
     <div class="m3body">
       ${matchMemo?renderNoticeTicker(matchMemo,'📢 공지(경기)'):''}${orderTeamStatus}${matchQueueChips}${done?`<div class="m3sc-row"><div class="m3tnm ${wn1?'win':'lose'}">${wn1?'🏆 ':''} ${dn1}</div><div class="m3sc">${sc1}:${sc2}</div><div class="m3tnm ${wn2?'win':'lose'}">${dn2} ${wn2?' 🏆':''}</div></div>`:`<div style="text-align:center;color:var(--text3);font-size:.8rem;margin:${(orderTeamStatus||matchQueueChips)?'0':'0'} 0 6px">경기 대기중</div>`}
     <div style="font-size:.7rem;font-weight:700;color:var(--text2);margin-bottom:5px">${dbl}복식 상세 (6게임 선취 승리 · 타이브렉)</div>
-    <div class="rb-rows">${rbH}</div>${(AD||TM||OP||canManageBracket()||canDirEdit)?`<button class="btn ${done?'btn-gray':'btn-accent'}" style="width:100%;margin-top:10px;padding:11px 12px;font-size:.92rem;font-weight:900;border-radius:12px" onclick="openM3('${key}','${m.id}')">${done?'✏️ 결과 수정하기':'⚡ 결과 입력하기'}</button>`:''}</div></div>`;
+    <div class="rb-rows">${rbH}</div></div></div>`;
 }
 
 
@@ -18943,10 +18979,10 @@ function renderBracketTree(key,mMs,teams){
   if(!totalR) return '';
 
   // ── 상수 ───────────────────────────────────────────────
-  const CARD_H  = 72;
+  const CARD_H  = 84;   // 결과 버튼을 가지형 카드에서 제거했으므로 실제 카드 높이에 맞춤
   const CARD_W  = 168;
   const COL_GAP = 48;
-  const ROW_GAP = 14;   // 같은 라운드 카드 간 세로 간격
+  const ROW_GAP = 10;   // 같은 라운드 카드 간 세로 간격
   const TITLE_H = 28;
   const COL_W   = CARD_W + COL_GAP;
 
@@ -18982,7 +19018,7 @@ function renderBracketTree(key,mMs,teams){
   }
 
   const svgW = totalR * COL_W - COL_GAP + 4;
-  const svgH = totalH + TITLE_H + 16;
+  const svgH = totalH + TITLE_H + 6;
 
   // ── SVG 연결선 ────────────────────────────────────────
   function getWinnerOf(rIdx, mIdx){
@@ -19103,6 +19139,9 @@ function renderBracketTree(key,mMs,teams){
       const slot1Op  = wn2 ? '.45' : '1';
       const slot2Op  = wn1 ? '.45' : '1';
       const courtChip = getBracketTreeCourtStatusChip(key,m);
+      // 가지형 대진표는 결과 현황용 카드가 아니므로 버튼을 넣지 않는다.
+      // 결과 입력은 아래 본선 경기 현황 카드에서 1개만 제공한다.
+      const treeResultBtnHtml = '';
       const chipHtml = courtChip ? `<div style="position:absolute;left:6px;right:6px;top:6px;display:flex;justify-content:flex-start;pointer-events:none;z-index:2"><span class="${courtChip.kind==='live'?'live-blink':''}" style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:999px;font-size:.62rem;font-weight:900;line-height:1;background:${courtChip.kind==='live'?'#dcfce7':'#fff7ed'};color:${courtChip.kind==='live'?'#166534':'#9a3412'};border:1px solid ${courtChip.kind==='live'?'#86efac':'#fdba74'};box-shadow:0 2px 6px rgba(15,30,58,.12)">${courtChip.text}</span></div>` : '';
 
       cardsHtml += `<div style="position:absolute;left:${xLeft}px;top:${top}px;width:${CARD_W}px;border:1.5px solid ${borderClr};border-left:4px solid ${borderClr};border-radius:7px;overflow:hidden;background:${roundTheme.cardAltBg};box-shadow:${shadowClr}">
@@ -19115,6 +19154,7 @@ function renderBracketTree(key,mMs,teams){
           <span style="font-size:.78rem;font-weight:${slot2Fw};color:${slot2Clr};flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${wn2?'🏆 ':''}${dn2}</span>
           ${sc2!==null?`<span style="font-family:'Oswald',sans-serif;font-weight:800;font-size:.9rem;color:${wn2?'#0c3880':'#94a3b8'};min-width:22px;text-align:right;flex-shrink:0">${sc2}</span>`:''}
         </div>
+        ${treeResultBtnHtml}
       </div>`;
     });
   });
@@ -19158,7 +19198,7 @@ function renderBracketTree(key,mMs,teams){
 
   const focusRoundIndex=getBracketTreeFocusRoundIndex(key, roundsMs);
   const focusLeft=focusRoundIndex * COL_W;
-  return `<div class="card" style="padding:8px 4px"><div class="js-main-tree-scroll" data-key="${key}" data-focus-round="${focusRoundIndex}" data-focus-left="${focusLeft}" style="overflow-x:auto;padding-bottom:8px"><div style="display:flex;align-items:flex-start;gap:0">
+  return `<div class="card main-tree-card" style="padding:8px 4px 0;margin-bottom:8px"><div class="js-main-tree-scroll" data-key="${key}" data-focus-round="${focusRoundIndex}" data-focus-left="${focusLeft}" style="overflow-x:auto;overflow-y:hidden;padding-bottom:0;margin-bottom:0"><div style="display:flex;align-items:flex-start;gap:0">
     <div style="position:relative;width:${svgW}px;height:${svgH}px;min-width:${svgW}px;flex-shrink:0">
       ${titlesHtml}
       <svg style="position:absolute;left:0;top:0;width:${svgW}px;height:${svgH}px;overflow:visible;pointer-events:none" xmlns="http://www.w3.org/2000/svg">${svgLines}</svg>
@@ -22980,7 +23020,7 @@ function renderMainPreviewHTML(matchSlots,n,isPreview,playInMatches=[]){
   // ── 전체 SVG 캔버스 크기 ──────────────────────────────
   const totalH = firstCount * CARD_H + Math.max(0, firstCount - 1) * ROW_GAP;
   const svgW = rounds * COL_W - COL_GAP + 4;
-  const svgH = totalH + TITLE_H + 16;
+  const svgH = totalH + TITLE_H + 6;
 
   // ── SVG 선 생성 ───────────────────────────────────────
   // 각 라운드 카드에서 다음 라운드 카드로 연결
@@ -23502,27 +23542,21 @@ function openM3(key,mid){
     const sideLabel2=getIndividualSideLabel(key,m,m.t2)||'2번';
     const grpCourts=(m.phase==='group' && m.group!=null)?((G.draws[key]?.groups?.[Number(m.group)]?.courts)||[]):[];
     const matchCourts=Array.isArray(m.courts)?m.courts:(m.court?[m.court]:[]);
-    html=`<div class="m3card" style="border:1.5px solid var(--border);box-shadow:none">
-      <div class="m3hdr" style="justify-content:flex-start;gap:8px;flex-wrap:wrap">
-        <span class="m3badge" style="background:${getRoundVisualTheme(roundLabel, m.phase||'').chipBg};color:${getRoundVisualTheme(roundLabel, m.phase||'').chipFg};border:1px solid ${getRoundVisualTheme(roundLabel, m.phase||'').bd}">${roundLabel}</span>
+    const courtLabel = matchCourts.length ? `경기코트 ${matchCourts.join('/')}` : (grpCourts.length ? `조코트 ${grpCourts.join('/')}` : '');
+    html=`<div class="v300-result-summary" style="margin-bottom:12px;padding:12px 14px;border-radius:14px;border:1.5px solid #dbeafe;background:#f8fbff">
+      <textarea id="mM3MatchMemo" style="display:none">${existingMatchMemo||''}</textarea>
+      ${courtLabel?`<div style="display:inline-flex;align-items:center;justify-content:center;min-height:26px;padding:4px 10px;border-radius:999px;background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd;font-size:.76rem;font-weight:900;margin-bottom:8px">🎾 ${courtLabel}</div>`:''}
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) 34px minmax(0,1fr);gap:10px;align-items:center">
+        <div style="min-height:54px;display:flex;align-items:center;justify-content:center;padding:10px 8px;border:1px solid #dbeafe;border-radius:12px;background:#fff;font-weight:900;color:#0f172a;text-align:center;line-height:1.35;word-break:keep-all;overflow-wrap:anywhere">${p1v.length?p1v.join(' / '):dn1}</div>
+        <div style="text-align:center;font-weight:1000;color:#64748b">VS</div>
+        <div style="min-height:54px;display:flex;align-items:center;justify-content:center;padding:10px 8px;border:1px solid #dbeafe;border-radius:12px;background:#fff;font-weight:900;color:#0f172a;text-align:center;line-height:1.35;word-break:keep-all;overflow-wrap:anywhere">${p2v.length?p2v.join(' / '):dn2}</div>
       </div>
-      <div class="m3body" style="padding:12px 12px 14px">
-        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:12px">${m.phase==='group'&&m.group!=null?`<button type="button" onclick="openGroupCourtModal('${key}',${Number(m.group)})" style="padding:5px 12px;font-size:.78rem;white-space:nowrap;background:#fff;color:var(--primary-dark);border:1.5px solid var(--border);border-radius:999px;font-weight:800">🎾 조코트 ${grpCourts.length?grpCourts.join('/'): '미배정'}</button>`:''}<button type="button" onclick="openMatchCourtModal('${key}','${m.id}')" style="padding:5px 12px;font-size:.78rem;white-space:nowrap;background:#fff;color:var(--primary-dark);border:1.5px solid var(--border);border-radius:999px;font-weight:800">🎾 경기코트 ${matchCourts.length?matchCourts.join('/'): '미배정'}</button></div>
-        <div class="form-group" style="margin-bottom:12px"><label class="form-label">📢 경기 공지</label><textarea class="form-textarea" id="mM3MatchMemo" placeholder="예: 2번 코트 대기 / 5분 뒤 입장 / 운영 메모 등">${existingMatchMemo||''}</textarea></div>
-        <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:stretch;margin-bottom:12px">
-          <div style="padding:10px;border-radius:12px;border:1.5px solid var(--border);background:#fff">
-            <div style="font-size:.74rem;font-weight:800;color:var(--primary);margin-bottom:6px">${sideLabel1}</div>
-            <div id="rp1_0" style="display:none" data-selected="${encodeURIComponent(JSON.stringify(p1v))}"></div>
-            <div style="padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;background:#f8fafc;font-size:.92rem;color:var(--text);font-weight:900;line-height:1.5;text-align:center">${p1v.length?p1v.join(' / '):'선수 정보 없음'}</div>
-          </div>
-          <div style="display:flex;align-items:center;justify-content:center;font-size:1.15rem;font-weight:900;color:var(--text3)">VS</div>
-          <div style="padding:10px;border-radius:12px;border:1.5px solid var(--border);background:#fff">
-            <div style="font-size:.74rem;font-weight:800;color:var(--primary);margin-bottom:6px">${sideLabel2}</div>
-            <div id="rp2_0" style="display:none" data-selected="${encodeURIComponent(JSON.stringify(p2v))}"></div>
-            <div style="padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;background:#f8fafc;font-size:.92rem;color:var(--text);font-weight:900;line-height:1.5;text-align:center">${p2v.length?p2v.join(' / '):'선수 정보 없음'}</div>
-          </div>
-        </div>
-        <div style="padding:12px;border-radius:12px;background:#fff;border:1.5px solid var(--border)">
+    </div>
+    <div class="m3card v300-score-card" style="border:0;box-shadow:none;background:transparent;margin:0">
+      <div class="m3body" style="padding:0">
+        <div id="rp1_0" style="display:none" data-selected="${encodeURIComponent(JSON.stringify(p1v))}"></div>
+        <div id="rp2_0" style="display:none" data-selected="${encodeURIComponent(JSON.stringify(p2v))}"></div>
+        <div style="padding:12px;border-radius:14px;background:#fff;border:1.5px solid var(--border)">
           <div style="font-size:.92rem;font-weight:900;color:var(--primary-dark);margin-bottom:10px">${roundLabel}</div>
           <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center">
             <div>
@@ -23821,6 +23855,28 @@ function tC(cid,player){
   else choosePlayerFromDropdown(cid,player);
 }
 
+function closeResultModalAfterSave(){
+  try{
+    cm('mM3');
+    const el=ge('mM3');
+    if(el){
+      el.classList.remove('open');
+      el.style.display='none';
+    }
+    setTimeout(()=>{
+      try{
+        const m=ge('mM3');
+        if(m){
+          m.classList.remove('open');
+          m.style.display='none';
+        }
+      }catch(_e){}
+    }, 80);
+  }catch(e){
+    try{ const el=document.getElementById('mM3'); if(el){ el.classList.remove('open'); el.style.display='none'; } }catch(_e){}
+  }
+}
+
 async function saveM3(){
   const prevCourtState=captureCourtNotificationState();
   const key=CM_key,mid=CM_id;if(!key||!mid)return;
@@ -23923,7 +23979,7 @@ async function saveM3(){
     try{
       await persistSingleMatchDoc(key, m);
       saveLastOrderFromPicker(key, m);
-      sl(false);cm('mM3');toast('페어 저장 완료 ✅','success');renderBracket();
+      sl(false);closeResultModalAfterSave();toast('페어 저장 완료 ✅','success');renderBracket();
     }catch(e){sl(false);toast('저장 실패: '+e.message,'error');}
     return;
   }
@@ -24062,7 +24118,7 @@ async function saveM3(){
       }
     }
     dispatchLocalCourtNotificationAlerts(prevCourtState);
-    sl(false);cm('mM3');toast(hasFinalWinner ? '결과 저장 ✅' : (isTieState ? '동점 상태로 실시간 스코어 저장 ✅' : '실시간 스코어 저장 ✅'),'success');renderBracket();
+    sl(false);closeResultModalAfterSave();toast(hasFinalWinner ? '결과 저장 ✅' : (isTieState ? '동점 상태로 실시간 스코어 저장 ✅' : '실시간 스코어 저장 ✅'),'success');renderBracket();
   }catch(e){sl(false);toast('저장 실패: '+e.message,'error');}
 }
 
@@ -31931,2403 +31987,42 @@ body {
 
 
 </script>
-<script>
+<script id="v291RecoveredUtilityScript">
 (function(){
-  const HINT_KEYS = {
-    swipe: 'kimhae_mobile_swipe_hint_v1',
-    bracket: 'kimhae_bracket_scroll_hint_v1'
-  };
-  let hintTimer = null;
-
-  function isMobileHintUI(){
+  'use strict';
+  function safeToast(msg,type){ try{ if(typeof window.toast==='function') window.toast(msg,type||'info'); else console.log(msg); }catch(e){} }
+  window.exportPrelimSheet = function(){
     try{
-      return window.matchMedia('(pointer: coarse)').matches || window.innerWidth <= 900;
-    }catch(e){
-      return window.innerWidth <= 900;
-    }
-  }
-
-  function ensureHintEl(){
-    let el = document.getElementById('pageGestureHint');
-    if(el) return el;
-    el = document.createElement('div');
-    el.id = 'pageGestureHint';
-    el.className = 'page-gesture-hint';
-    document.body.appendChild(el);
-    return el;
-  }
-
-  function hideGestureHint(){
-    const el = document.getElementById('pageGestureHint');
-    if(!el) return;
-    el.classList.remove('show');
-  }
-
-  function showGestureHint(kind, mainText, subText, duration){
-    if(!isMobileHintUI()) return;
-    const el = ensureHintEl();
-    el.className = 'page-gesture-hint ' + (kind || '');
-    el.innerHTML = `${mainText}${subText ? `<span class="sub">${subText}</span>` : ''}`;
-    clearTimeout(hintTimer);
-    requestAnimationFrame(()=>el.classList.add('show'));
-    hintTimer = setTimeout(hideGestureHint, duration || 2400);
-  }
-
-  function maybeShowSwipeHint(page){
-    if(!['home','tournament','register'].includes(page)) return;
-    if(localStorage.getItem(HINT_KEYS.swipe) === '1') return;
-    localStorage.setItem(HINT_KEYS.swipe, '1');
-    showGestureHint('swipe','↔ 좌우로 넘겨서 이동할 수 있어요','홈 · 대회관리 · 팀등록에서만 지원됩니다.',2600);
-  }
-
-  function maybeShowBracketHint(page){
-    if(page !== 'bracket') return;
-    if(localStorage.getItem(HINT_KEYS.bracket) === '1') return;
-    localStorage.setItem(HINT_KEYS.bracket, '1');
-    showGestureHint('bracket','👉 대진표는 좌우로 드래그해서 보세요','대진표 · 선수현황 · 시합결과는 페이지 스와이프가 꺼져 있습니다.',2800);
-  }
-
-  function runPageHints(page){
-    if(!isMobileHintUI()) return;
-    if(['players','ranking'].includes(page)) hideGestureHint();
-    setTimeout(()=>{
-      maybeShowSwipeHint(page);
-      maybeShowBracketHint(page);
-    }, 180);
-  }
-
-  const originalShowPage = window.showPage;
-  if(typeof originalShowPage === 'function'){
-    window.showPage = function(name){
-      const res = originalShowPage.apply(this, arguments);
-      runPageHints(name);
-      return res;
-    };
-  }
-
-  window.hideGestureHint = hideGestureHint;
-  window.runPageHints = runPageHints;
-
-  const initialPage = document.querySelector('.page.active')?.id?.replace('page-','') || 'home';
-  if(document.readyState === 'complete'){
-    runPageHints(initialPage);
-  }else{
-    window.addEventListener('load', ()=>runPageHints(initialPage), {once:true});
-  }
+      if(typeof window.bracketToPDF==='function') return window.bracketToPDF();
+      window.print();
+    }catch(e){ safeToast('예선표 출력 기능을 실행할 수 없습니다. 대진표 저장하기를 이용해 주세요.','info'); }
+  };
+  window.exportPrelimImage = function(){
+    try{
+      if(typeof window.bracketToImage==='function') return window.bracketToImage();
+    }catch(e){}
+    safeToast('예선표 이미지 저장은 대진표 저장하기의 이미지 저장을 이용해 주세요.','info');
+  };
+  window.openHelpCenter = function(){
+    try{
+      if(typeof window.cm==='function') window.cm('mManualChooser');
+      if(document.getElementById('mManualChooser') && typeof window.om==='function') return window.om('mManualChooser');
+      if(document.getElementById('mFAQ') && typeof window.om==='function') return window.om('mFAQ');
+    }catch(e){}
+  };
+  window.openGuideManual = function(role){
+    try{
+      if(document.getElementById('mDirectorManual') && role==='user') return window.om('mDirectorManual');
+      if(document.getElementById('mOperatorManual')) return window.om('mOperatorManual');
+      if(document.getElementById('mFAQ')) return window.om('mFAQ');
+    }catch(e){}
+  };
+  window.openQuickTutorial = function(role){ window.openGuideManual(role||'user'); };
+  window.closeQuickTutorial = function(){ try{ window.cm('mQuickTutorial'); }catch(e){} };
+  window.restartQuickTutorial = function(){};
+  window.prevQuickTutorial = function(){};
+  window.nextQuickTutorial = function(){};
 })();
-
-
-
-
-
-function _prelimEsc(v=''){
-  return String(v ?? '')
-    .replace(/&/g,'&amp;')
-    .replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;');
-}
-function _prelimPopupContext(){
-  const tid = ge('brTS')?.value || '';
-  if(!tid){
-    toast('대회를 먼저 선택하세요','error');
-    return null;
-  }
-  const tournament = (G.tournaments||[]).find(t=>t.id===tid);
-  if(!tournament){
-    toast('대회 정보를 찾을 수 없습니다','error');
-    return null;
-  }
-
-  let selectedDivs = [];
-  if(Array.isArray(window.BR_MULTI_DIVS) && window.BR_MULTI_DIVS.length){
-    selectedDivs = window.BR_MULTI_DIVS.filter(v => v && v !== '__ALL__' && v !== '전체');
-  }
-  if(!selectedDivs.length){
-    const brds = ge('brDS')?.value || '';
-    if(brds && brds !== '__ALL__' && brds !== '전체') selectedDivs = [brds];
-  }
-
-  const allDivs = Array.isArray(tournament.divisions) ? tournament.divisions.filter(Boolean) : [];
-  const hasGroups = (divName) => {
-    const key = tid + '_' + divName;
-    const draw = G.draws?.[key];
-    return !!(draw && Array.isArray(draw.groups) && draw.groups.length);
-  };
-
-  if(!selectedDivs.length){
-    selectedDivs = allDivs.filter(hasGroups);
-  }else{
-    selectedDivs = selectedDivs.filter(hasGroups);
-  }
-
-  if(!selectedDivs.length){
-    toast('예선 추첨된 부서가 없습니다','error');
-    return null;
-  }
-  return {tid, tournament, selectedDivs};
-}
-function _prelimMemberHtml(team, key, ti){
-  const esc = _prelimEsc;
-  if(!team) return '<div class="player-line">-</div>';
-
-  const players = Array.isArray(team.players) ? team.players.filter(Boolean) : [];
-  const club = String(team.club || '').trim();
-
-  if(Array.isArray(team.individualPlayers) && team.individualPlayers.length){
-    const names = team.individualPlayers.slice(0,2).map(p=>String(p?.name || '').trim() || '-').filter(Boolean);
-    const clubs = team.individualPlayers.slice(0,2).map(p=>String(p?.clubsRaw || p?.club || '').trim()).filter(Boolean);
-    return `
-      <div class="player-line">${esc(names.join(' / ') || '-')}</div>
-      ${clubs.length ? `<div class="player-club inline">${esc(clubs.join(' / '))}</div>` : ''}
-    `;
-  }
-
-  if(players.length){
-    return `
-      <div class="player-line">${esc(players.join(' / '))}</div>
-      ${club ? `<div class="player-club inline">${esc(club)}</div>` : ''}
-    `;
-  }
-
-  let fallback = '-';
-  try{
-    fallback = typeof tdn === 'function' ? tdn(team, key, ti) : (team?.club || team?.name || '-');
-  }catch(e){
-    fallback = team?.club || team?.name || '-';
-  }
-  return `<div class="player-line">${esc(fallback)}</div>`;
-}
-function _buildPrelimSectionsHtml(ctx){
-  const {tid, tournament, selectedDivs} = ctx;
-  const esc = _prelimEsc;
-
-  return selectedDivs.map(divName => {
-    const key = tid + '_' + divName;
-    const draw = G.draws?.[key] || {};
-    const teams = G.teams?.[key] || [];
-    const groups = Array.isArray(draw.groups) ? draw.groups : [];
-    const maxTeamsInGroup = groups.reduce((mx, grp) => {
-      const ids = Array.isArray(grp?.teams) ? grp.teams : (Array.isArray(grp) ? grp : []);
-      return Math.max(mx, ids.length || 0);
-    }, 0);
-    const gridClass = maxTeamsInGroup <= 2 && groups.length >= 5 ? 'group-grid cols-5' : 'group-grid';
-
-    const groupHtml = groups.map((grp, gi) => {
-      const teamIds = Array.isArray(grp?.teams) ? grp.teams : (Array.isArray(grp) ? grp : []);
-      const ownCourts = Array.isArray(grp?.courts) ? grp.courts.filter(Boolean) : [];
-      const linkedCourts = (typeof getGroupDisplayCourts === 'function' ? getGroupDisplayCourts(key, gi) : []).filter(Boolean);
-      const liveMatchCourts = (G.matches?.[key] || [])
-        .filter(m => m && String(m.phase||'') === 'group' && Number(m.group) === Number(gi))
-        .flatMap(m => Array.isArray(m.courts) ? m.courts : (m.court ? [m.court] : []))
-        .map(String)
-        .filter(Boolean);
-      const courts = [...new Set([...linkedCourts, ...ownCourts, ...liveMatchCourts])];
-      const memo = String(grp?.memo || '').trim();
-
-      const teamRows = teamIds.map((ti, idx) => {
-        const team = teams[ti];
-        return `
-          <tr>
-            <td class="num">${idx+1}</td>
-            <td class="name">${_prelimMemberHtml(team, key, ti)}</td>
-          </tr>
-        `;
-      }).join('');
-
-      return `
-        <div class="group-card">
-          <div class="group-head">
-            <div class="group-name">${gi+1}조</div>
-            <div class="group-court">${courts.length ? `🎾 ${esc(courts.join(' / '))}` : '코트 미배정'}</div>
-          </div>
-          <div class="group-court-row">🎾 배정 코트: ${courts.length ? esc(courts.join(' / ')) : '미배정'}</div>
-          ${memo ? renderNoticeTicker(memo,'📢 공지(조)') : ``}
-          <table class="group-table">
-            <thead>
-              <tr><th style="width:18px">No</th><th>선수</th></tr>
-            </thead>
-            <tbody>
-              ${teamRows}
-            </tbody>
-          </table>
-        </div>
-      `;
-    }).join('');
-
-    return `
-      <section class="page">
-        <div class="sheet-title">${esc(tournament.name)}</div>
-        <div class="sheet-sub">${esc(divName)} 예선 조 편성표${tournament.date ? ` · ${esc(tournament.date)}` : ''}</div>
-        <div class="${gridClass}">${groupHtml}</div>
-      </section>
-    `;
-  }).join('<div class="page-break"></div>');
-}
-function _buildPrelimPopupHtml(ctx, mode){
-  const sections = _buildPrelimSectionsHtml(ctx);
-  const title = mode === 'image' ? '예선 조 편성표 이미지' : '예선 조 편성표';
-  const actionBtn = mode === 'image'
-    ? '<button onclick="saveAsImage(event)">🖼️ 이미지 저장</button>'
-    : '<button onclick="window.print()">🖨️ 인쇄</button>';
-  const scriptOpen = '<scr' + 'ipt';
-  const scriptClose = '</scr' + 'ipt>';
-
-  return `<!DOCTYPE html>
-<html lang="ko">
-<head>
-<meta charset="utf-8">
-<title>${title}</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<style>
-  @page { size: A4 portrait; margin: 7mm 8mm; }
-  *{ box-sizing:border-box; margin:0; padding:0; }
-  body{
-    margin:0;
-    background:#eef3f8;
-    color:#111827;
-    font-family:'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR',sans-serif;
-    font-size:8.5pt;
-    line-height:1.3;
-  }
-  .toolbar{
-    position:sticky; top:0; z-index:10;
-    display:flex; justify-content:flex-end; gap:8px;
-    padding:8px 12px; background:#0f1e3a;
-  }
-  .toolbar button{
-    border:none; border-radius:8px; padding:7px 14px;
-    font-size:12px; font-weight:800; cursor:pointer;
-    background:#fff; color:#0f1e3a;
-  }
-  .page{
-    width:210mm;
-    margin:12px auto;
-    background:#fff;
-    padding:6mm 7mm 5mm;
-    box-shadow:0 4px 20px rgba(15,30,58,.12);
-  }
-  .sheet-title{
-    font-size:13pt; font-weight:900; color:#0f1e3a;
-    text-align:center; margin-bottom:2px;
-  }
-  .sheet-sub{
-    font-size:8pt; color:#475569;
-    text-align:center; margin-bottom:7px;
-  }
-  .group-grid{
-    display:grid;
-    grid-template-columns:repeat(4, minmax(0,1fr));
-    gap:4px;
-  }
-  .group-grid.cols-5{
-    grid-template-columns:repeat(5, minmax(0,1fr));
-  }
-  .group-card{
-    border:1px solid #94a3b8;
-    border-radius:4px;
-    overflow:hidden;
-    break-inside:avoid;
-    page-break-inside:avoid;
-    background:#fff;
-  }
-  .group-head{
-    display:flex; justify-content:space-between; align-items:center;
-    gap:4px; padding:3px 5px;
-    background:#0f1e3a; color:#fff;
-  }
-  .group-name{ font-size:8.5pt; font-weight:900; }
-  .group-court{ font-size:6.5pt; font-weight:700; opacity:.9; white-space:nowrap; }
-  .group-court-row{
-    padding:2px 5px;
-    font-size:6.8pt;
-    font-weight:800;
-    color:#1e3a8a;
-    background:#e8f0fe;
-    border-bottom:1px solid #bfcfee;
-    text-align:center;
-    letter-spacing:.01em;
-  }
-  .notice-ticker{ display:none; }
-  .group-memo{
-    padding:2px 5px; font-size:7pt; color:#8a6412;
-    background:#fff8df; border-bottom:1px solid #f3d27a; font-weight:700;
-  }
-  .group-table{ width:100%; border-collapse:collapse; }
-  .group-table th,
-  .group-table td{
-    border-top:1px solid #e2e8f0;
-    padding:2px 4px;
-    font-size:7.5pt;
-    vertical-align:middle;
-  }
-  .group-table th{
-    background:#f1f5f9; color:#334155; font-weight:900; text-align:center;
-    padding:2px 4px; font-size:7pt;
-  }
-  .group-table td.num{
-    text-align:center; font-weight:900; color:#0f1e3a;
-    width:18px; font-size:7.5pt;
-  }
-  .group-table td.name{ font-weight:700; line-height:1.15; word-break:keep-all; }
-  .player-line{ font-weight:900; font-size:7.15pt; line-height:1.2; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .player-club{ margin-top:1px; font-size:6.1pt; color:#64748b; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .player-club.inline{ letter-spacing:-.01em; }
-  .page-break{ page-break-before:always; break-before:page; }
-  @media print{
-    body{ background:#fff; font-size:8pt; }
-    .toolbar{ display:none; }
-    .page{ width:auto; margin:0; padding:5mm 6mm 4mm; box-shadow:none; }
-    .group-grid{ gap:3px; }
-    .group-grid.cols-5{ grid-template-columns:repeat(5, minmax(0,1fr)); }
-  }
-</style>
-
-<style id="v267ResultModalFooterFix">
-#mM3 .modal-header{gap:10px}
-#mM3 .modal-header h3{min-width:0;flex:1 1 auto;line-height:1.35;word-break:keep-all}
-#mM3 .modal-header .modal-close{flex:0 0 30px;width:30px;height:30px}
-#mM3Footer{
-  display:grid !important;
-  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
-  position:sticky !important;
-  bottom:0 !important;
-  z-index:20 !important;
-  background:#fff !important;
-  border-top:1px solid var(--border) !important;
-}
-#mM3Footer #mM3CloseBtn{display:inline-flex !important}
-.m3-inline-result-actions{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:8px;
-  margin-top:14px;
-  padding:12px;
-  border-radius:14px;
-  background:linear-gradient(135deg,#f8fbff,#fffdf5);
-  border:1.5px solid #dbe7ff;
-}
-.m3-inline-result-actions .btn{width:100%;min-height:44px;font-size:.9rem;font-weight:900;border-radius:12px}
-@media(max-width:768px){
-  #mM3.modal-overlay{
-    align-items:flex-end !important;
-    padding:8px 8px calc(76px + env(safe-area-inset-bottom,0px)) 8px !important;
-  }
-  #mM3 .modal-box{
-    max-height:calc(100vh - 92px - env(safe-area-inset-bottom,0px)) !important;
-    border-radius:18px 18px 0 0 !important;
-    overflow:hidden !important;
-  }
-  #mM3 .modal-body{
-    max-height:calc(100vh - 220px - env(safe-area-inset-bottom,0px)) !important;
-    overflow-y:auto !important;
-    -webkit-overflow-scrolling:touch;
-  }
-  #mM3Footer{padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px)) 12px !important}
-}
-</style>
-
-
-<style id="v269ResultSaveAlwaysVisible">
-#mM3Footer{
-  display:grid !important;
-  grid-template-columns:1fr 1fr !important;
-  gap:10px !important;
-  position:sticky !important;
-  bottom:0 !important;
-  z-index:50 !important;
-  background:#fff !important;
-  border-top:1px solid var(--border) !important;
-  padding:12px 16px !important;
-}
-#mM3Footer #mM3SaveResultBtn,
-#mM3Footer #mM3CloseBtn{
-  display:inline-flex !important;
-  align-items:center !important;
-  justify-content:center !important;
-  min-height:44px !important;
-  width:100% !important;
-  font-size:.92rem !important;
-  font-weight:900 !important;
-  border-radius:12px !important;
-}
-#mM3Footer #mM3SaveResultBtn{
-  background:linear-gradient(135deg,#facc15,#d97706) !important;
-  color:#111827 !important;
-  border:1px solid #d97706 !important;
-}
-#mM3Footer #mM3SaveResultBtn::before{
-  content:"💾 ";
-}
-#mM3Footer #mM3CloseBtn{
-  background:#eef2f7 !important;
-  color:#334155 !important;
-  border:1px solid #cbd5e1 !important;
-}
-@media(max-width:768px){
-  #mM3Footer{
-    padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px)) 12px !important;
-  }
-}
-</style>
-
-
-<style id="v271CardOverflowAndSingleFooterFix">
-/* 결과입력 모달: 중복 저장/닫기 제거, 하단 버튼만 유지 */
-#mM3 .m3-inline-result-actions{
-  display:none !important;
-}
-#mM3Footer{
-  display:grid !important;
-  grid-template-columns:1fr 1fr !important;
-  gap:10px !important;
-  position:sticky !important;
-  bottom:0 !important;
-  z-index:80 !important;
-  background:#fff !important;
-  border-top:1px solid var(--border) !important;
-  padding:12px 16px !important;
-}
-#mM3Footer #mM3SaveResultBtn,
-#mM3Footer #mM3CloseBtn{
-  display:inline-flex !important;
-  align-items:center !important;
-  justify-content:center !important;
-  width:100% !important;
-  min-height:46px !important;
-  font-size:.94rem !important;
-  font-weight:900 !important;
-  border-radius:12px !important;
-}
-#mM3Footer #mM3SaveResultBtn{
-  background:linear-gradient(135deg,#facc15,#d97706) !important;
-  color:#111827 !important;
-  border:1px solid #d97706 !important;
-}
-#mM3Footer #mM3SaveResultBtn::before{
-  content:"" !important;
-}
-#mM3Footer #mM3CloseBtn{
-  background:#eef2f7 !important;
-  color:#334155 !important;
-  border:1px solid #cbd5e1 !important;
-}
-
-/* 개인전 예선 카드 잘림 방지 */
-.indiv-prelim-grid{
-  grid-template-columns:repeat(auto-fit,minmax(320px,1fr)) !important;
-  overflow:visible !important;
-}
-.indiv-prelim-grid .grp-card{
-  min-width:0 !important;
-  width:100% !important;
-  overflow:hidden !important;
-}
-.indiv-prelim-grid .grp-matches-section,
-.indiv-prelim-grid .grp-matches-section.force-show{
-  overflow:visible !important;
-}
-.indiv-prelim-grid .m3card,
-.indiv-prelim-grid .match-card{
-  width:100% !important;
-  max-width:100% !important;
-  min-width:0 !important;
-  overflow:hidden !important;
-}
-.indiv-prelim-grid .m3body,
-.indiv-prelim-grid .match-teams,
-.indiv-prelim-grid .match-team{
-  min-width:0 !important;
-}
-.indiv-prelim-grid .m3sc-row{
-  grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) !important;
-}
-.indiv-prelim-grid .m3tnm,
-.indiv-prelim-grid .match-team-name,
-.indiv-prelim-grid .match-team-players{
-  overflow:hidden !important;
-  text-overflow:ellipsis !important;
-  word-break:keep-all !important;
-}
-.indiv-prelim-grid .m3tnm{
-  white-space:nowrap !important;
-}
-.indiv-prelim-grid .rb-sc-row{
-  grid-template-columns:minmax(0,1fr) 20px minmax(0,1fr) !important;
-}
-.indiv-prelim-grid .btn{
-  max-width:100% !important;
-}
-@media(max-width:900px){
-  .indiv-prelim-grid{
-    grid-template-columns:1fr !important;
-  }
-}
-@media(max-width:680px){
-  #mM3.modal-overlay{
-    padding:8px 8px calc(76px + env(safe-area-inset-bottom,0px)) 8px !important;
-  }
-  #mM3 .modal-box{
-    max-height:calc(100vh - 92px - env(safe-area-inset-bottom,0px)) !important;
-  }
-  #mM3 .modal-body{
-    max-height:calc(100vh - 224px - env(safe-area-inset-bottom,0px)) !important;
-  }
-  #mM3Footer{
-    padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px)) 12px !important;
-  }
-}
-</style>
-
-
-<style id="v272TwoColumnMobileCards">
-/* 모바일 개인전 예선카드 2열 유지 */
-@media(max-width:680px){
-  .indiv-prelim-grid{
-    display:grid !important;
-    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
-    gap:10px !important;
-    align-items:start !important;
-  }
-
-  .indiv-prelim-grid .grp-card{
-    width:100% !important;
-    min-width:0 !important;
-    border-radius:14px !important;
-    overflow:hidden !important;
-  }
-
-  .indiv-prelim-grid .grp-hdr{
-    padding:8px 8px !important;
-    min-height:auto !important;
-  }
-
-  .indiv-prelim-grid .grp-hdr > div:first-child > span:first-child{
-    font-size:.96rem !important;
-  }
-
-  .indiv-prelim-grid .grp-hdr > div:first-child span:not(:first-child){
-    font-size:.62rem !important;
-  }
-
-  .indiv-prelim-grid .gs-row{
-    padding:8px 8px !important;
-  }
-
-  .indiv-prelim-grid .gs-nm{
-    font-size:.82rem !important;
-    line-height:1.25 !important;
-    word-break:keep-all !important;
-  }
-
-  .indiv-prelim-grid .gs-stats{
-    font-size:.68rem !important;
-    gap:4px !important;
-    flex-wrap:wrap !important;
-  }
-
-  .indiv-prelim-grid .btn{
-    min-height:34px !important;
-    font-size:.72rem !important;
-    padding:6px 6px !important;
-  }
-
-  .indiv-prelim-grid .indiv-group-action-inline{
-    padding:8px !important;
-  }
-
-  .indiv-prelim-grid .grp-matches-section.force-show{
-    padding:8px !important;
-  }
-
-  .indiv-prelim-grid .m3tnm,
-  .indiv-prelim-grid .match-team-name{
-    font-size:.76rem !important;
-  }
-}
-</style>
-
-
-<style id="v273RankCourtAlwaysVisibleFix">
-/* 예선 순위현황/경기목록은 렌더링 갱신 후에도 항상 표시 */
-.indiv-prelim-grid .grp-standings,
-.indiv-prelim-grid .standings,
-.indiv-prelim-grid .rank-box,
-.indiv-prelim-grid .ranking-box,
-.indiv-prelim-grid .grp-ranking,
-.indiv-prelim-grid .grp-matches-section,
-.indiv-prelim-grid .grp-matches-section.force-show{
-  display:block !important;
-  visibility:visible !important;
-  opacity:1 !important;
-}
-
-/* 경기 카드의 코트 배정/상태 배지는 항상 보이게 */
-.indiv-prelim-grid .m3card [class*="court"],
-.indiv-prelim-grid .match-card [class*="court"],
-.indiv-prelim-grid .m3card [class*="Court"],
-.indiv-prelim-grid .match-card [class*="Court"],
-.indiv-prelim-grid .court-chip,
-.indiv-prelim-grid .match-court-chip,
-.indiv-prelim-grid .m3-court-chip{
-  display:inline-flex !important;
-  visibility:visible !important;
-  opacity:1 !important;
-}
-
-/* 모바일 2열에서 코트 배정 줄이 잘리지 않도록 */
-@media(max-width:680px){
-  .indiv-prelim-grid .m3meta,
-  .indiv-prelim-grid .match-meta,
-  .indiv-prelim-grid .m3tags,
-  .indiv-prelim-grid .match-tags{
-    display:flex !important;
-    flex-wrap:wrap !important;
-    gap:5px !important;
-    visibility:visible !important;
-    opacity:1 !important;
-    max-height:none !important;
-    overflow:visible !important;
-  }
-
-  .indiv-prelim-grid .grp-matches-section.force-show{
-    max-height:none !important;
-    overflow:visible !important;
-  }
-
-  .indiv-prelim-grid .m3card,
-  .indiv-prelim-grid .match-card{
-    min-height:auto !important;
-  }
-}
-</style>
-
-
-<style id="v274CollapsibleMatchListAndCourtFix">
-/* 모바일 2열에서는 경기목록 기본 접힘: 순위현황 중심 */
-@media(max-width:680px){
-  .indiv-prelim-grid .grp-matches-section:not(.force-show){
-    display:none !important;
-  }
-  .indiv-prelim-grid .grp-matches-toggle{
-    display:flex !important;
-    width:100% !important;
-    justify-content:center !important;
-    align-items:center !important;
-    min-height:34px !important;
-    margin:8px 8px 10px 8px !important;
-    padding:6px 8px !important;
-    border-radius:10px !important;
-    border:1px solid #bfdbfe !important;
-    background:#eff6ff !important;
-    color:#1d4ed8 !important;
-    font-size:.72rem !important;
-    font-weight:900 !important;
-  }
-  .indiv-prelim-grid .grp-matches-section.force-show{
-    display:block !important;
-    max-height:none !important;
-    overflow:visible !important;
-  }
-  .indiv-prelim-grid .m3meta,
-  .indiv-prelim-grid .match-meta,
-  .indiv-prelim-grid .m3tags,
-  .indiv-prelim-grid .match-tags{
-    display:flex !important;
-    flex-wrap:wrap !important;
-    align-items:center !important;
-    gap:5px !important;
-    max-height:none !important;
-    overflow:visible !important;
-  }
-}
-
-/* PC/태블릿에서는 토글 버튼은 작게 보이되, 경기목록은 기존 흐름 유지 */
-@media(min-width:681px){
-  .indiv-prelim-grid .grp-matches-toggle{
-    display:none !important;
-  }
-}
-
-/* 미배정 칩이 실제 코트 배정 후 남아 보이지 않도록 */
-.match-court-missing.is-assigned,
-.court-missing.is-assigned,
-.badge-court-missing.is-assigned{
-  display:none !important;
-}
-</style>
-
-
-<style id="v275CompactGroupActions">
-/* 조 카드 액션 버튼 한 줄 정리 */
-.indiv-prelim-grid .v275-group-actions{
-  display:grid !important;
-  grid-template-columns:repeat(3,minmax(0,1fr)) !important;
-  gap:6px !important;
-  padding:8px !important;
-  border-top:1px solid #e5e7eb !important;
-  background:linear-gradient(135deg,#ffffff,#f8fbff) !important;
-}
-
-.indiv-prelim-grid .v275-group-actions.two-actions{
-  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
-}
-
-.indiv-prelim-grid .v275-group-actions .btn,
-.indiv-prelim-grid .v275-group-actions button{
-  width:100% !important;
-  min-height:34px !important;
-  height:34px !important;
-  padding:5px 4px !important;
-  border-radius:10px !important;
-  font-size:.68rem !important;
-  font-weight:900 !important;
-  white-space:nowrap !important;
-  overflow:hidden !important;
-  text-overflow:ellipsis !important;
-  margin:0 !important;
-}
-
-/* 기존 세로 버튼 여백 제거 */
-.indiv-prelim-grid .indiv-group-action-inline{
-  padding:0 !important;
-  margin:0 !important;
-}
-
-.indiv-prelim-grid .grp-matches-toggle{
-  margin:0 !important;
-}
-
-/* 모바일 2열에서 버튼이 카드 폭을 밀어내지 않게 */
-@media(max-width:680px){
-  .indiv-prelim-grid .v275-group-actions{
-    gap:5px !important;
-    padding:7px !important;
-  }
-  .indiv-prelim-grid .v275-group-actions .btn,
-  .indiv-prelim-grid .v275-group-actions button{
-    min-height:32px !important;
-    height:32px !important;
-    font-size:.64rem !important;
-    padding:4px 3px !important;
-  }
-}
-</style>
-
-
-<style id="v276CleanMatchCardList">
-/* 경기목록 안 경기카드 정렬 정리 */
-.indiv-prelim-grid .grp-matches-section.force-show{
-  padding:8px !important;
-  background:#f8fafc !important;
-}
-
-.indiv-prelim-grid .grp-matches-section.force-show .m3card,
-.indiv-prelim-grid .grp-matches-section.force-show .match-card{
-  display:block !important;
-  width:100% !important;
-  max-width:100% !important;
-  min-width:0 !important;
-  margin:0 0 8px 0 !important;
-  padding:10px !important;
-  border-radius:12px !important;
-  border:1px solid #dbeafe !important;
-  background:#fff !important;
-  overflow:hidden !important;
-  box-sizing:border-box !important;
-}
-
-.indiv-prelim-grid .grp-matches-section.force-show .m3head,
-.indiv-prelim-grid .grp-matches-section.force-show .match-head,
-.indiv-prelim-grid .grp-matches-section.force-show .m3meta,
-.indiv-prelim-grid .grp-matches-section.force-show .match-meta,
-.indiv-prelim-grid .grp-matches-section.force-show .m3tags,
-.indiv-prelim-grid .grp-matches-section.force-show .match-tags{
-  display:flex !important;
-  flex-wrap:wrap !important;
-  align-items:center !important;
-  gap:5px !important;
-  margin-bottom:6px !important;
-  max-width:100% !important;
-  overflow:visible !important;
-}
-
-.indiv-prelim-grid .grp-matches-section.force-show .m3sc-row,
-.indiv-prelim-grid .grp-matches-section.force-show .rb-sc-row,
-.indiv-prelim-grid .grp-matches-section.force-show .match-teams{
-  display:grid !important;
-  grid-template-columns:minmax(0,1fr) 22px minmax(0,1fr) !important;
-  gap:6px !important;
-  align-items:stretch !important;
-  width:100% !important;
-  max-width:100% !important;
-  overflow:hidden !important;
-}
-
-.indiv-prelim-grid .grp-matches-section.force-show .m3team,
-.indiv-prelim-grid .grp-matches-section.force-show .match-team{
-  min-width:0 !important;
-  width:100% !important;
-  padding:8px 6px !important;
-  border-radius:10px !important;
-  text-align:center !important;
-  overflow:hidden !important;
-}
-
-.indiv-prelim-grid .grp-matches-section.force-show .m3tnm,
-.indiv-prelim-grid .grp-matches-section.force-show .match-team-name,
-.indiv-prelim-grid .grp-matches-section.force-show .match-team-players{
-  display:block !important;
-  max-width:100% !important;
-  white-space:nowrap !important;
-  overflow:hidden !important;
-  text-overflow:ellipsis !important;
-  font-size:.72rem !important;
-  line-height:1.25 !important;
-  font-weight:900 !important;
-}
-
-.indiv-prelim-grid .grp-matches-section.force-show .m3vs,
-.indiv-prelim-grid .grp-matches-section.force-show .vs{
-  display:flex !important;
-  align-items:center !important;
-  justify-content:center !important;
-  font-size:.8rem !important;
-  font-weight:900 !important;
-  color:#64748b !important;
-  min-width:22px !important;
-}
-
-.indiv-prelim-grid .grp-matches-section.force-show .m3actions,
-.indiv-prelim-grid .grp-matches-section.force-show .match-actions{
-  display:grid !important;
-  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
-  gap:6px !important;
-  margin-top:8px !important;
-}
-
-.indiv-prelim-grid .grp-matches-section.force-show .m3actions .btn,
-.indiv-prelim-grid .grp-matches-section.force-show .match-actions .btn,
-.indiv-prelim-grid .grp-matches-section.force-show button{
-  min-height:30px !important;
-  padding:4px 5px !important;
-  font-size:.66rem !important;
-  border-radius:9px !important;
-  white-space:nowrap !important;
-}
-
-/* 경기목록 안에서는 너무 긴 설명/세로 텍스트 방지 */
-.indiv-prelim-grid .grp-matches-section.force-show br{
-  display:none !important;
-}
-</style>
-
-
-<style id="v277MobileCardCleanFinal">
-/* 조 카드 상단 액션: 한 줄만, 기존 중복 버튼은 숨김 */
-.indiv-prelim-grid .indiv-group-action-inline,
-.indiv-prelim-grid .grp-card > button:not(.grp-matches-toggle),
-.indiv-prelim-grid .grp-card > .btn:not(.grp-matches-toggle){
-  display:none !important;
-}
-
-.indiv-prelim-grid .v275-group-actions{
-  display:grid !important;
-  grid-template-columns:repeat(3,minmax(0,1fr)) !important;
-  gap:5px !important;
-  padding:7px !important;
-  border-top:1px solid #e5e7eb !important;
-  background:#fff !important;
-}
-
-.indiv-prelim-grid .v275-group-actions.two-actions{
-  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
-}
-
-.indiv-prelim-grid .v275-group-actions button{
-  display:inline-flex !important;
-  align-items:center !important;
-  justify-content:center !important;
-  width:100% !important;
-  height:32px !important;
-  min-height:32px !important;
-  padding:3px 4px !important;
-  margin:0 !important;
-  border-radius:9px !important;
-  font-size:.64rem !important;
-  font-weight:900 !important;
-  white-space:nowrap !important;
-  overflow:hidden !important;
-  text-overflow:ellipsis !important;
-}
-
-/* 경기목록 토글은 액션줄 안에 있을 때만 보이게 */
-.indiv-prelim-grid .grp-card > .grp-matches-toggle{
-  display:none !important;
-}
-.indiv-prelim-grid .v275-group-actions .grp-matches-toggle{
-  display:inline-flex !important;
-}
-
-/* 경기목록 내부: 2열 카드에서 선수명이 세로/반쪽으로 깨지는 것 방지 */
-.indiv-prelim-grid .grp-matches-section.force-show{
-  padding:8px !important;
-  background:#f8fafc !important;
-  overflow:hidden !important;
-}
-
-.indiv-prelim-grid .grp-matches-section.force-show .m3card,
-.indiv-prelim-grid .grp-matches-section.force-show .match-card{
-  width:100% !important;
-  max-width:100% !important;
-  min-width:0 !important;
-  padding:9px !important;
-  margin:0 0 8px 0 !important;
-  border-radius:12px !important;
-  overflow:hidden !important;
-  box-sizing:border-box !important;
-}
-
-.indiv-prelim-grid .grp-matches-section.force-show .m3sc-row,
-.indiv-prelim-grid .grp-matches-section.force-show .rb-sc-row,
-.indiv-prelim-grid .grp-matches-section.force-show .match-teams{
-  display:grid !important;
-  grid-template-columns:minmax(0,1fr) 18px minmax(0,1fr) !important;
-  gap:5px !important;
-  align-items:stretch !important;
-  width:100% !important;
-  overflow:hidden !important;
-}
-
-.indiv-prelim-grid .grp-matches-section.force-show .m3team,
-.indiv-prelim-grid .grp-matches-section.force-show .match-team{
-  min-width:0 !important;
-  width:100% !important;
-  padding:7px 4px !important;
-  border-radius:10px !important;
-  overflow:hidden !important;
-}
-
-.indiv-prelim-grid .grp-matches-section.force-show .m3tnm,
-.indiv-prelim-grid .grp-matches-section.force-show .match-team-name,
-.indiv-prelim-grid .grp-matches-section.force-show .match-team-players{
-  display:block !important;
-  width:100% !important;
-  max-width:100% !important;
-  white-space:nowrap !important;
-  overflow:hidden !important;
-  text-overflow:ellipsis !important;
-  word-break:keep-all !important;
-  font-size:.68rem !important;
-  line-height:1.22 !important;
-  font-weight:900 !important;
-  writing-mode:horizontal-tb !important;
-}
-
-.indiv-prelim-grid .grp-matches-section.force-show .m3vs,
-.indiv-prelim-grid .grp-matches-section.force-show .vs{
-  display:flex !important;
-  align-items:center !important;
-  justify-content:center !important;
-  min-width:18px !important;
-  font-size:.72rem !important;
-  font-weight:900 !important;
-  color:#64748b !important;
-}
-
-/* 너무 좁은 폰에서도 2열은 유지하되 경기목록 내부만 더 압축 */
-@media(max-width:430px){
-  .indiv-prelim-grid{
-    gap:8px !important;
-  }
-  .indiv-prelim-grid .grp-matches-section.force-show .m3sc-row,
-  .indiv-prelim-grid .grp-matches-section.force-show .rb-sc-row,
-  .indiv-prelim-grid .grp-matches-section.force-show .match-teams{
-    grid-template-columns:minmax(0,1fr) 16px minmax(0,1fr) !important;
-    gap:3px !important;
-  }
-  .indiv-prelim-grid .grp-matches-section.force-show .m3tnm,
-  .indiv-prelim-grid .grp-matches-section.force-show .match-team-name,
-  .indiv-prelim-grid .grp-matches-section.force-show .match-team-players{
-    font-size:.62rem !important;
-  }
-}
-</style>
-
-
-<style id="v278CleanListRowLayout">
-/* 조 카드 버튼: 결과/푸시/목록 3개를 같은 줄에 고정 */
-.indiv-prelim-grid .v275-group-actions{
-  display:grid !important;
-  grid-template-columns:repeat(3,minmax(0,1fr)) !important;
-  gap:6px !important;
-  padding:8px !important;
-  background:#fff !important;
-  border-top:1px solid #e5e7eb !important;
-}
-.indiv-prelim-grid .v275-group-actions.two-actions{
-  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
-}
-.indiv-prelim-grid .v275-group-actions button{
-  display:flex !important;
-  align-items:center !important;
-  justify-content:center !important;
-  width:100% !important;
-  min-width:0 !important;
-  height:34px !important;
-  min-height:34px !important;
-  margin:0 !important;
-  padding:0 4px !important;
-  border-radius:10px !important;
-  font-size:.65rem !important;
-  font-weight:900 !important;
-  line-height:1 !important;
-  white-space:nowrap !important;
-  overflow:hidden !important;
-  text-overflow:clip !important;
-}
-
-/* 기존 중복/밀린 버튼 강제 제거 */
-.indiv-prelim-grid .grp-card > .indiv-group-action-inline,
-.indiv-prelim-grid .grp-card > .grp-matches-toggle,
-.indiv-prelim-grid .grp-card > button:not(.grp-matches-toggle){
-  display:none !important;
-}
-
-/* 경기목록은 카드형이 아니라 간결한 한 줄 경기표로 */
-.indiv-prelim-grid .grp-matches-section.force-show{
-  padding:8px !important;
-  background:#f8fafc !important;
-  border-top:1px solid #e5e7eb !important;
-  overflow:hidden !important;
-}
-
-.indiv-prelim-grid .grp-matches-section.force-show .m3card,
-.indiv-prelim-grid .grp-matches-section.force-show .match-card{
-  display:block !important;
-  width:100% !important;
-  max-width:100% !important;
-  min-width:0 !important;
-  margin:0 0 8px 0 !important;
-  padding:8px !important;
-  border-radius:12px !important;
-  border:1px solid #dbeafe !important;
-  background:#fff !important;
-  box-sizing:border-box !important;
-  overflow:hidden !important;
-}
-
-/* 제목/배지 줄 */
-.indiv-prelim-grid .grp-matches-section.force-show .m3head,
-.indiv-prelim-grid .grp-matches-section.force-show .match-head,
-.indiv-prelim-grid .grp-matches-section.force-show .m3meta,
-.indiv-prelim-grid .grp-matches-section.force-show .match-meta,
-.indiv-prelim-grid .grp-matches-section.force-show .m3tags,
-.indiv-prelim-grid .grp-matches-section.force-show .match-tags{
-  display:flex !important;
-  flex-wrap:wrap !important;
-  gap:4px !important;
-  align-items:center !important;
-  margin:0 0 6px 0 !important;
-  max-height:none !important;
-  overflow:visible !important;
-  font-size:.62rem !important;
-}
-
-/* 팀 영역: 세로 박스 금지, 한 줄 대진표 */
-.indiv-prelim-grid .grp-matches-section.force-show .m3sc-row,
-.indiv-prelim-grid .grp-matches-section.force-show .rb-sc-row,
-.indiv-prelim-grid .grp-matches-section.force-show .match-teams{
-  display:grid !important;
-  grid-template-columns:minmax(0,1fr) 18px minmax(0,1fr) !important;
-  gap:4px !important;
-  align-items:center !important;
-  width:100% !important;
-  max-width:100% !important;
-  overflow:hidden !important;
-  margin:6px 0 !important;
-}
-
-.indiv-prelim-grid .grp-matches-section.force-show .m3team,
-.indiv-prelim-grid .grp-matches-section.force-show .match-team{
-  display:flex !important;
-  align-items:center !important;
-  justify-content:center !important;
-  min-width:0 !important;
-  width:100% !important;
-  min-height:36px !important;
-  padding:5px 4px !important;
-  border-radius:9px !important;
-  overflow:hidden !important;
-  box-sizing:border-box !important;
-}
-
-/* 팀명은 한 줄 말줄임. 세로 글자/쪼개짐 방지 */
-.indiv-prelim-grid .grp-matches-section.force-show .m3tnm,
-.indiv-prelim-grid .grp-matches-section.force-show .match-team-name,
-.indiv-prelim-grid .grp-matches-section.force-show .match-team-players{
-  display:block !important;
-  width:100% !important;
-  max-width:100% !important;
-  min-width:0 !important;
-  white-space:nowrap !important;
-  overflow:hidden !important;
-  text-overflow:ellipsis !important;
-  word-break:keep-all !important;
-  writing-mode:horizontal-tb !important;
-  font-size:.68rem !important;
-  line-height:1.15 !important;
-  font-weight:900 !important;
-  text-align:center !important;
-}
-
-/* 팀 박스 안의 부가정보는 모바일 목록에서 숨김: 정렬 깨짐 원인 */
-.indiv-prelim-grid .grp-matches-section.force-show .m3team small,
-.indiv-prelim-grid .grp-matches-section.force-show .m3team .muted,
-.indiv-prelim-grid .grp-matches-section.force-show .match-team small,
-.indiv-prelim-grid .grp-matches-section.force-show .match-team .muted,
-.indiv-prelim-grid .grp-matches-section.force-show .m3team div:not(.m3tnm):not(.match-team-name):not(.match-team-players),
-.indiv-prelim-grid .grp-matches-section.force-show .match-team div:not(.m3tnm):not(.match-team-name):not(.match-team-players){
-  display:none !important;
-}
-
-.indiv-prelim-grid .grp-matches-section.force-show .m3vs,
-.indiv-prelim-grid .grp-matches-section.force-show .vs{
-  display:flex !important;
-  align-items:center !important;
-  justify-content:center !important;
-  min-width:18px !important;
-  font-size:.7rem !important;
-  font-weight:900 !important;
-  color:#64748b !important;
-}
-
-/* 경기목록 내부 버튼도 한 줄 정렬 */
-.indiv-prelim-grid .grp-matches-section.force-show .m3actions,
-.indiv-prelim-grid .grp-matches-section.force-show .match-actions{
-  display:grid !important;
-  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
-  gap:5px !important;
-  margin-top:6px !important;
-}
-.indiv-prelim-grid .grp-matches-section.force-show button{
-  min-height:30px !important;
-  padding:3px 5px !important;
-  border-radius:8px !important;
-  font-size:.62rem !important;
-  font-weight:900 !important;
-  white-space:nowrap !important;
-}
-
-/* 너무 좁은 2열에서도 틀어지지 않도록 */
-@media(max-width:430px){
-  .indiv-prelim-grid .v275-group-actions{
-    gap:4px !important;
-    padding:6px !important;
-  }
-  .indiv-prelim-grid .v275-group-actions button{
-    height:31px !important;
-    min-height:31px !important;
-    font-size:.6rem !important;
-    padding:0 2px !important;
-  }
-  .indiv-prelim-grid .grp-matches-section.force-show .m3sc-row,
-  .indiv-prelim-grid .grp-matches-section.force-show .rb-sc-row,
-  .indiv-prelim-grid .grp-matches-section.force-show .match-teams{
-    grid-template-columns:minmax(0,1fr) 14px minmax(0,1fr) !important;
-    gap:3px !important;
-  }
-  .indiv-prelim-grid .grp-matches-section.force-show .m3team,
-  .indiv-prelim-grid .grp-matches-section.force-show .match-team{
-    min-height:34px !important;
-    padding:4px 2px !important;
-  }
-  .indiv-prelim-grid .grp-matches-section.force-show .m3tnm,
-  .indiv-prelim-grid .grp-matches-section.force-show .match-team-name,
-  .indiv-prelim-grid .grp-matches-section.force-show .match-team-players{
-    font-size:.6rem !important;
-  }
-}
-</style>
-
-
-<style id="v279StableButtonsWideMatchList">
-/* 버튼이 렌더링마다 위치 바뀌지 않게 액션줄 고정 */
-.indiv-prelim-grid .v275-group-actions{
-  display:grid !important;
-  grid-template-columns:repeat(3,minmax(0,1fr)) !important;
-  gap:6px !important;
-  padding:8px !important;
-  margin:0 !important;
-  position:static !important;
-  transform:none !important;
-  width:100% !important;
-  box-sizing:border-box !important;
-}
-.indiv-prelim-grid .v275-group-actions.two-actions{
-  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
-}
-.indiv-prelim-grid .v275-group-actions button{
-  position:static !important;
-  transform:none !important;
-  width:100% !important;
-  min-width:0 !important;
-  height:34px !important;
-  min-height:34px !important;
-  margin:0 !important;
-  padding:0 4px !important;
-  white-space:nowrap !important;
-}
-
-/* 목록을 펼친 조는 2열 폭이 아니라 한 줄 전체 폭을 사용 */
-.indiv-prelim-grid .grp-card:has(.grp-matches-section.force-show){
-  grid-column:1 / -1 !important;
-}
-
-/* 경기목록은 넓어진 카드 안에서 보기 좋게 */
-.indiv-prelim-grid .grp-matches-section.force-show{
-  display:block !important;
-  padding:10px !important;
-  background:#f8fafc !important;
-  overflow:visible !important;
-}
-
-/* 경기목록 카드: 내용 안 잘리게 */
-.indiv-prelim-grid .grp-matches-section.force-show .m3card,
-.indiv-prelim-grid .grp-matches-section.force-show .match-card{
-  width:100% !important;
-  max-width:100% !important;
-  padding:10px !important;
-  overflow:visible !important;
-  box-sizing:border-box !important;
-}
-
-/* 팀 이름을 자르지 말고 2줄까지 허용 */
-.indiv-prelim-grid .grp-matches-section.force-show .m3tnm,
-.indiv-prelim-grid .grp-matches-section.force-show .match-team-name,
-.indiv-prelim-grid .grp-matches-section.force-show .match-team-players{
-  white-space:normal !important;
-  overflow:visible !important;
-  text-overflow:clip !important;
-  word-break:keep-all !important;
-  overflow-wrap:anywhere !important;
-  line-height:1.25 !important;
-  font-size:.78rem !important;
-  max-height:none !important;
-}
-
-/* 목록 안 팀 박스는 세로 카드가 아니라 가로 대진 */
-.indiv-prelim-grid .grp-matches-section.force-show .m3sc-row,
-.indiv-prelim-grid .grp-matches-section.force-show .rb-sc-row,
-.indiv-prelim-grid .grp-matches-section.force-show .match-teams{
-  display:grid !important;
-  grid-template-columns:minmax(0,1fr) 28px minmax(0,1fr) !important;
-  gap:8px !important;
-  align-items:center !important;
-  width:100% !important;
-  overflow:visible !important;
-}
-.indiv-prelim-grid .grp-matches-section.force-show .m3team,
-.indiv-prelim-grid .grp-matches-section.force-show .match-team{
-  min-height:48px !important;
-  padding:8px 6px !important;
-  overflow:visible !important;
-}
-.indiv-prelim-grid .grp-matches-section.force-show .m3vs,
-.indiv-prelim-grid .grp-matches-section.force-show .vs{
-  min-width:28px !important;
-  font-size:.9rem !important;
-}
-
-/* 펼친 상태에서는 기존 숨김 규칙보다 목록 카드 정보 보존 우선 */
-.indiv-prelim-grid .grp-matches-section.force-show .m3team div,
-.indiv-prelim-grid .grp-matches-section.force-show .match-team div{
-  max-height:none !important;
-}
-
-/* 아주 좁은 화면에서도 펼친 목록은 넓은 카드라 글자 보존 */
-@media(max-width:430px){
-  .indiv-prelim-grid .grp-card:has(.grp-matches-section.force-show){
-    grid-column:1 / -1 !important;
-  }
-  .indiv-prelim-grid .grp-matches-section.force-show .m3sc-row,
-  .indiv-prelim-grid .grp-matches-section.force-show .rb-sc-row,
-  .indiv-prelim-grid .grp-matches-section.force-show .match-teams{
-    grid-template-columns:minmax(0,1fr) 24px minmax(0,1fr) !important;
-    gap:6px !important;
-  }
-  .indiv-prelim-grid .grp-matches-section.force-show .m3tnm,
-  .indiv-prelim-grid .grp-matches-section.force-show .match-team-name,
-  .indiv-prelim-grid .grp-matches-section.force-show .match-team-players{
-    font-size:.74rem !important;
-  }
-}
-</style>
-
-
-<style id="v280RecommendedResultAndStats">
-/* 추천 구조: 2팀 조만 빠른 결과, 3팀 이상은 경기목록에서 경기별 입력 */
-.indiv-prelim-grid .grp-card.group-size-3 .v275-group-actions,
-.indiv-prelim-grid .grp-card.group-size-4 .v275-group-actions,
-.indiv-prelim-grid .grp-card.group-size-5 .v275-group-actions{
-  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
-}
-.indiv-prelim-grid .grp-card.group-size-3 .v275-group-actions button.result-fast-btn,
-.indiv-prelim-grid .grp-card.group-size-4 .v275-group-actions button.result-fast-btn,
-.indiv-prelim-grid .grp-card.group-size-5 .v275-group-actions button.result-fast-btn{
-  display:none !important;
-}
-
-/* 순위현황은 간결하게: 승패 + 득실만 */
-.indiv-prelim-grid .gs-stats .game-win,
-.indiv-prelim-grid .gs-stats .game-loss,
-.indiv-prelim-grid .gs-stats .stat-game-win,
-.indiv-prelim-grid .gs-stats .stat-game-loss,
-.indiv-prelim-grid .gs-stats span{
-  font-size:.68rem !important;
-}
-
-/* JS에서 표시할 간결 득실 배지 */
-.indiv-prelim-grid .simple-diff-badge{
-  display:inline-flex !important;
-  align-items:center !important;
-  justify-content:center !important;
-  min-height:22px !important;
-  padding:2px 7px !important;
-  border-radius:8px !important;
-  font-size:.68rem !important;
-  font-weight:900 !important;
-  background:#eef2ff !important;
-  color:#1d4ed8 !important;
-  border:1px solid #bfdbfe !important;
-}
-.indiv-prelim-grid .simple-diff-badge.negative{
-  background:#fff1f2 !important;
-  color:#dc2626 !important;
-  border-color:#fecaca !important;
-}
-.indiv-prelim-grid .simple-diff-badge.zero{
-  background:#f1f5f9 !important;
-  color:#475569 !important;
-  border-color:#cbd5e1 !important;
-}
-
-/* 기존 게임득/게임실 배지는 숨기고 득실만 남김 */
-.indiv-prelim-grid .hide-game-detail{
-  display:none !important;
-}
-</style>
-
-
-<style id="v281MatchListPopupCompactRank">
-/* 조 카드 안에서는 경기목록을 펼치지 않고 팝업으로만 표시 */
-.indiv-prelim-grid .grp-matches-section{
-  display:none !important;
-}
-
-/* 조 카드 버튼은 흔들림 없이 한 줄 고정 */
-.indiv-prelim-grid .v275-group-actions{
-  display:grid !important;
-  grid-template-columns:repeat(3,minmax(0,1fr)) !important;
-  gap:6px !important;
-  padding:8px !important;
-  margin:0 !important;
-  width:100% !important;
-  box-sizing:border-box !important;
-  position:static !important;
-  transform:none !important;
-  background:#fff !important;
-}
-.indiv-prelim-grid .v275-group-actions.two-actions{
-  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
-}
-.indiv-prelim-grid .v275-group-actions button{
-  position:static !important;
-  transform:none !important;
-  display:flex !important;
-  align-items:center !important;
-  justify-content:center !important;
-  width:100% !important;
-  height:34px !important;
-  min-height:34px !important;
-  margin:0 !important;
-  padding:0 4px !important;
-  border-radius:10px !important;
-  font-size:.66rem !important;
-  font-weight:900 !important;
-  white-space:nowrap !important;
-}
-
-/* 순위현황 간결화: 승패 + 득실만 */
-.indiv-prelim-grid .gs-stats{
-  display:flex !important;
-  flex-wrap:wrap !important;
-  gap:5px !important;
-  align-items:center !important;
-}
-.indiv-prelim-grid .gs-stats .hide-game-detail{
-  display:none !important;
-}
-.indiv-prelim-grid .gs-stats .simple-diff-badge{
-  display:inline-flex !important;
-  align-items:center !important;
-  justify-content:center !important;
-  min-height:22px !important;
-  padding:2px 7px !important;
-  border-radius:8px !important;
-  font-size:.68rem !important;
-  font-weight:900 !important;
-  background:#eef2ff !important;
-  color:#1d4ed8 !important;
-  border:1px solid #bfdbfe !important;
-}
-.indiv-prelim-grid .gs-stats .simple-diff-badge.negative{
-  background:#fff1f2 !important;
-  color:#dc2626 !important;
-  border-color:#fecaca !important;
-}
-.indiv-prelim-grid .gs-stats .simple-diff-badge.zero{
-  background:#f1f5f9 !important;
-  color:#475569 !important;
-  border-color:#cbd5e1 !important;
-}
-
-/* 경기목록 팝업 */
-#matchListPopup{
-  position:fixed;
-  inset:0;
-  z-index:9998;
-  display:none;
-  align-items:flex-end;
-  justify-content:center;
-  background:rgba(15,23,42,.58);
-  padding:14px;
-}
-#matchListPopup.show{
-  display:flex;
-}
-#matchListPopup .mlp-box{
-  width:min(720px,100%);
-  max-height:min(82vh,760px);
-  background:#fff;
-  border-radius:20px 20px 0 0;
-  box-shadow:0 -20px 60px rgba(15,23,42,.25);
-  overflow:hidden;
-  display:flex;
-  flex-direction:column;
-}
-#matchListPopup .mlp-head{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:10px;
-  padding:14px 16px;
-  background:#0f1f3d;
-  color:#fff;
-  font-weight:900;
-}
-#matchListPopup .mlp-close{
-  width:34px;
-  height:34px;
-  border-radius:10px;
-  border:0;
-  background:rgba(255,255,255,.12);
-  color:#fff;
-  font-size:1.1rem;
-  font-weight:900;
-}
-#matchListPopup .mlp-body{
-  padding:12px;
-  overflow-y:auto;
-  -webkit-overflow-scrolling:touch;
-  background:#f8fafc;
-}
-#matchListPopup .mlp-card{
-  background:#fff;
-  border:1px solid #dbeafe;
-  border-radius:14px;
-  padding:12px;
-  margin-bottom:10px;
-}
-#matchListPopup .mlp-meta{
-  display:flex;
-  flex-wrap:wrap;
-  gap:6px;
-  margin-bottom:8px;
-}
-#matchListPopup .mlp-chip{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  min-height:24px;
-  padding:3px 8px;
-  border-radius:999px;
-  border:1px solid #cbd5e1;
-  background:#f8fafc;
-  font-size:.72rem;
-  font-weight:900;
-  color:#334155;
-}
-#matchListPopup .mlp-teams{
-  display:grid;
-  grid-template-columns:minmax(0,1fr) 34px minmax(0,1fr);
-  gap:8px;
-  align-items:center;
-}
-#matchListPopup .mlp-team{
-  min-width:0;
-  border:1px solid #dbeafe;
-  border-radius:12px;
-  background:#f8fbff;
-  padding:10px 8px;
-  text-align:center;
-  font-weight:900;
-  line-height:1.3;
-  word-break:keep-all;
-  overflow-wrap:anywhere;
-}
-#matchListPopup .mlp-vs{
-  text-align:center;
-  font-weight:900;
-  color:#64748b;
-}
-#matchListPopup .mlp-score{
-  margin-top:8px;
-  text-align:center;
-  font-size:1.05rem;
-  font-weight:1000;
-  color:#dc2626;
-}
-#matchListPopup .mlp-actions{
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:8px;
-  margin-top:10px;
-}
-#matchListPopup .mlp-actions button{
-  min-height:38px;
-  border-radius:10px;
-  font-weight:900;
-  font-size:.82rem;
-}
-@media(max-width:680px){
-  #matchListPopup{
-    padding:8px 8px calc(76px + env(safe-area-inset-bottom,0px)) 8px;
-  }
-  #matchListPopup .mlp-box{
-    max-height:calc(100vh - 96px - env(safe-area-inset-bottom,0px));
-  }
-}
-</style>
-
-
-<style id="v282EmergencyPopupCardFix">
-/* 팝업 경기카드 강제 재정렬 */
-#matchListPopup .mlp-card *{
-  writing-mode:horizontal-tb !important;
-}
-#matchListPopup .mlp-card{
-  overflow:hidden !important;
-}
-#matchListPopup .mlp-meta{
-  display:flex !important;
-  flex-wrap:wrap !important;
-  gap:6px !important;
-}
-#matchListPopup .mlp-teams{
-  display:grid !important;
-  grid-template-columns:minmax(0,1fr) 34px minmax(0,1fr) !important;
-  gap:10px !important;
-  align-items:center !important;
-}
-#matchListPopup .mlp-team{
-  min-width:0 !important;
-  width:100% !important;
-  padding:14px 10px !important;
-  border-radius:14px !important;
-  background:#f8fbff !important;
-  border:1px solid #cfe0ff !important;
-  text-align:center !important;
-  overflow:hidden !important;
-}
-#matchListPopup .mlp-team *{
-  display:block !important;
-  white-space:normal !important;
-  overflow:visible !important;
-  text-overflow:clip !important;
-  word-break:keep-all !important;
-  overflow-wrap:anywhere !important;
-  line-height:1.35 !important;
-}
-#matchListPopup .mlp-vs{
-  font-size:1rem !important;
-  font-weight:1000 !important;
-}
-#matchListPopup .mlp-score{
-  font-size:1.4rem !important;
-  margin-top:10px !important;
-}
-#matchListPopup .mlp-actions{
-  display:grid !important;
-  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
-  gap:8px !important;
-}
-#matchListPopup .mlp-actions button{
-  min-height:42px !important;
-  font-size:.84rem !important;
-  font-weight:900 !important;
-}
-</style>
-
-</head>
-<body>
-  <div class="toolbar">
-    ${actionBtn}
-    <button onclick="window.close()">닫기</button>
-  </div>
-  <div id="captureRoot">${sections}</div>
-  ${scriptOpen} src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js">${scriptClose}
-  ${scriptOpen}>
-    async function saveAsImage(ev){
-      try{
-        if(ev && ev.stopPropagation) ev.stopPropagation();
-        const root = document.getElementById('captureRoot');
-        if(!root) return;
-        const canvas = await html2canvas(root,{scale:2,backgroundColor:'#eef3f8',useCORS:true,logging:false,windowWidth:Math.max(document.documentElement.clientWidth, root.scrollWidth || 0)});
-        const a = document.createElement('a');
-        a.href = canvas.toDataURL('image/png');
-        a.download = 'prelim_sheet.png';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-      }catch(err){
-        alert('이미지 저장 중 오류가 발생했습니다.');
-        console.error(err);
-      }
-    }
-  ${scriptClose}
-
-
-
-
-<!-- v242: PC 화면 중앙 컨테이너 복구 / 모바일은 기존처럼 전체폭 유지 -->
-<style id="pcCenterLayoutFixV242">
-@media (min-width: 769px){
-  main.main-content{
-    width:100% !important;
-    max-width:1140px !important;
-    margin-left:auto !important;
-    margin-right:auto !important;
-    padding-left:16px !important;
-    padding-right:16px !important;
-    overflow-x:visible !important;
-  }
-  body.slider-ready main.main-content{
-    max-width:1140px !important;
-  }
-}
-@media (max-width: 768px){
-  main.main-content{
-    width:100% !important;
-    max-width:100% !important;
-    margin-left:0 !important;
-    margin-right:0 !important;
-  }
-}
-</style>
-
-
-
-
-
-<style id="v286CleanMatchPopupCards">
-#matchListPopup{z-index:2147482600 !important;}
-#matchListPopup .mlp-box{border-radius:18px 18px 0 0 !important;background:#f8fafc !important;}
-#matchListPopup .mlp-head{background:#0f1e3a !important;padding:14px 16px !important;}
-#matchListPopupTitle{font-size:.98rem !important;font-weight:1000 !important;letter-spacing:-.02em !important;}
-#matchListPopup .mlp-body{padding:12px !important;background:#f8fafc !important;}
-#matchListPopup .mlp-card{border:1.5px solid #bfdbfe !important;border-radius:16px !important;background:#fff !important;padding:12px !important;margin-bottom:12px !important;box-shadow:0 8px 18px rgba(15,30,58,.08) !important;}
-#matchListPopup .mlp-meta{display:flex !important;gap:6px !important;flex-wrap:wrap !important;margin-bottom:10px !important;}
-#matchListPopup .mlp-chip{min-height:24px !important;padding:3px 9px !important;border-radius:999px !important;font-size:.72rem !important;font-weight:1000 !important;background:#f8fafc !important;color:#334155 !important;border:1px solid #cbd5e1 !important;}
-#matchListPopup .mlp-chip.done{background:#dcfce7 !important;color:#15803d !important;border-color:#86efac !important;}
-#matchListPopup .mlp-chip.live{background:#fef3c7 !important;color:#92400e !important;border-color:#fcd34d !important;}
-#matchListPopup .mlp-chip.court{background:#eff6ff !important;color:#1d4ed8 !important;border-color:#93c5fd !important;}
-#matchListPopup .mlp-versus-card{display:grid !important;grid-template-columns:minmax(0,1fr) 36px minmax(0,1fr) !important;gap:8px !important;align-items:stretch !important;}
-#matchListPopup .mlp-team-card{min-width:0 !important;border:1.5px solid #dbeafe !important;border-radius:14px !important;background:linear-gradient(180deg,#ffffff,#f8fbff) !important;padding:12px 8px !important;text-align:center !important;display:flex !important;align-items:center !important;justify-content:center !important;min-height:66px !important;}
-#matchListPopup .mlp-team-name{font-size:.94rem !important;font-weight:1000 !important;line-height:1.35 !important;color:#0f172a !important;word-break:keep-all !important;overflow-wrap:anywhere !important;writing-mode:horizontal-tb !important;}
-#matchListPopup .mlp-vs{display:flex !important;align-items:center !important;justify-content:center !important;font-size:.86rem !important;font-weight:1000 !important;color:#64748b !important;}
-#matchListPopup .mlp-score{margin:10px 0 0 !important;text-align:center !important;font-size:1.32rem !important;font-weight:1000 !important;color:#dc2626 !important;line-height:1 !important;}
-#matchListPopup .mlp-actions{display:grid !important;grid-template-columns:repeat(2,minmax(0,1fr)) !important;gap:8px !important;margin-top:12px !important;}
-#matchListPopup .mlp-actions button{min-height:42px !important;border-radius:12px !important;font-size:.86rem !important;font-weight:1000 !important;}
-@media(max-width:680px){
-  #matchListPopup{padding:8px 8px calc(76px + env(safe-area-inset-bottom,0px)) 8px !important;}
-  #matchListPopup .mlp-box{max-height:calc(100vh - 96px - env(safe-area-inset-bottom,0px)) !important;}
-  #matchListPopup .mlp-team-card{min-height:58px !important;padding:10px 7px !important;}
-  #matchListPopup .mlp-team-name{font-size:.88rem !important;}
-}
-</style>
-
-<script id="v286CleanMatchPopupCardsScript">
-(function(){
-  const DROP_RE = /영남권\s*지역신인부|지역신인부|모던클럽배\s*테니스대회|제\s*1\s*회|2026|대회\s*개요/gi;
-  function escHtml(s){
-    return String(s||'').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-  }
-  function cleanName(raw){
-    return String(raw||'')
-      .replace(DROP_RE,'')
-      .replace(/[🏆✅✏️🔔📢🎾📋⚡🚀🔥🔑⏳]/gu,' ')
-      .replace(/\b\d+\s*경기\b/g,' ')
-      .replace(/\b(?:완료|대기중|대기|시합중|진행중)\b/g,' ')
-      .replace(/결과\s*수정하기|결과수정|결과\s*입력하기|결과입력|푸시/g,' ')
-      .replace(/(?:경기코트|배정코트|코트)\s*[:：]?\s*[가-힣A-Za-z0-9_-]*\d+/g,' ')
-      .replace(/승\s*\d+|패\s*\d+|게임득실\s*[+-]?\d+|게임득\s*\d+|게임실\s*\d+|득실\s*[+-]?\d+/g,' ')
-      .replace(/\d+\s*[:：]\s*\d+/g,' ')
-      .replace(/^\s*\d+\s*(?:번|위)?\s*/g,'')
-      .replace(/\s+/g,' ')
-      .trim();
-  }
-  function matchData(matchEl){
-    try{
-      if(typeof G==='undefined') return null;
-      const mid = matchEl.getAttribute('data-match-id') || matchEl.dataset?.matchId || '';
-      if(!mid) return null;
-      for(const [key,list] of Object.entries(G.matches||{})){
-        const m=(list||[]).find(x=>String(x?.id||x?._id||'')===String(mid));
-        if(m) return {key,m};
-      }
-    }catch(e){}
-    return null;
-  }
-  function getTeamNameFromData(key, idx){
-    try{
-      const team=(G.teams?.[key]||[])[idx];
-      if(!team) return '';
-      if(Array.isArray(team.individualPlayers) && team.individualPlayers.length){
-        const names=team.individualPlayers.slice(0,2).map(p=>String(p?.name||'').trim()).filter(Boolean);
-        if(names.length) return names.join(' / ');
-      }
-      if(Array.isArray(team.players) && team.players.length){
-        const names=team.players.slice(0,2).map(v=>String(v||'').trim()).filter(Boolean);
-        if(names.length) return names.join(' / ');
-      }
-      if(typeof tdn==='function') return tdn(team,key,idx)||'';
-      return team.pairLabel||team.entryLabel||team.club||team.name||'';
-    }catch(e){return '';}
-  }
-  function namesFromStandings(groupCard, raw){
-    try{
-      const rows=[...groupCard.querySelectorAll('.gs-row')];
-      const names=rows.map(row=>cleanName((row.querySelector('.gs-nm')||row).textContent)).filter(Boolean);
-      if(names.length<2) return null;
-      const nums=[...String(raw||'').matchAll(/(\d+)\s*번/g)].map(m=>parseInt(m[1],10)).filter(Boolean);
-      const a=nums[0] ? names[nums[0]-1] : names[0];
-      const b=nums[1] ? names[nums[1]-1] : names[1];
-      return (a&&b) ? [a,b] : null;
-    }catch(e){return null;}
-  }
-  function extractTeamNames(matchEl){
-    const raw=(matchEl.innerText||'').replace(/\s+/g,' ');
-    const found=matchData(matchEl);
-    if(found){
-      const a=cleanName(getTeamNameFromData(found.key, found.m.t1) || found.m.label1 || '');
-      const b=cleanName(getTeamNameFromData(found.key, found.m.t2) || found.m.label2 || '');
-      if(a && b) return [a,b];
-    }
-    const teamEls=[...matchEl.querySelectorAll('.m3team,.match-team')];
-    if(teamEls.length>=2){
-      const names=teamEls.slice(0,2).map(team=>cleanName((team.querySelector('.m3tnm,.match-team-name,.match-team-players,b,strong')||team).textContent));
-      if(names[0] && names[1] && !/^팀\s*[AB]?$/.test(names[0]) && !/^팀\s*[AB]?$/.test(names[1])) return names;
-    }
-    const group=matchEl.closest('.grp-card');
-    const standings=group ? namesFromStandings(group, raw) : null;
-    if(standings) return standings;
-    const vs=cleanName(raw).match(/(.+?)\s+VS\s+(.+)/i);
-    if(vs) return [cleanName(vs[1]), cleanName(vs[2])];
-    return ['1번팀','2번팀'];
-  }
-  function extractCourt(raw){
-    const s=String(raw||'').replace(DROP_RE,' ');
-    const m=s.match(/(?:경기코트|배정코트|코트)\s*[:：]?\s*([가-힣A-Za-z0-9_-]*\d+)/);
-    return m ? m[1] : '';
-  }
-  function extractStatus(raw){
-    const s=String(raw||'');
-    if(/완료/.test(s)) return {text:'완료', cls:'done', icon:'✅'};
-    if(/시합중|진행/.test(s)) return {text:'시합중', cls:'live', icon:'🔥'};
-    return {text:'대기', cls:'', icon:'⏳'};
-  }
-  window.v281BuildPopupCardFromMatch = function(matchEl, idx){
-    const raw=(matchEl.innerText||'').replace(/\s+/g,' ');
-    const names=extractTeamNames(matchEl).map(cleanName);
-    const t1=names[0] || '팀 A';
-    const t2=names[1] || '팀 B';
-    const scoreMatch=raw.match(/(\d+)\s*[:：]\s*(\d+)/);
-    const score=scoreMatch ? `${scoreMatch[1]}:${scoreMatch[2]}` : '';
-    const court=extractCourt(raw);
-    const status=extractStatus(raw);
-    const resultBtn=[...matchEl.querySelectorAll('button')].find(b=>/결과|수정/.test((b.textContent||'')));
-    const pushBtn=[...matchEl.querySelectorAll('button')].find(b=>/푸시/.test((b.textContent||'')));
-    const card=document.createElement('div');
-    card.className='mlp-card';
-    card.innerHTML=`
-      <div class="mlp-meta">
-        <span class="mlp-chip">${idx+1}경기</span>
-        <span class="mlp-chip ${status.cls}">${status.icon} ${status.text}</span>
-        ${court?`<span class="mlp-chip court">🎾 ${escHtml(court)}</span>`:''}
-      </div>
-      <div class="mlp-versus-card">
-        <div class="mlp-team-card"><div class="mlp-team-name">${escHtml(t1)}</div></div>
-        <div class="mlp-vs">VS</div>
-        <div class="mlp-team-card"><div class="mlp-team-name">${escHtml(t2)}</div></div>
-      </div>
-      ${score?`<div class="mlp-score">${score}</div>`:''}
-      <div class="mlp-actions">
-        <button type="button" class="btn btn-primary">✏️ 결과입력</button>
-        <button type="button" class="btn btn-outline">🔔 푸시</button>
-      </div>`;
-    const buttons=card.querySelectorAll('.mlp-actions button');
-    if(buttons[0]) buttons[0].onclick=()=>{
-      try{ if(typeof closeMatchListPopup==='function') closeMatchListPopup(); }catch(e){}
-      setTimeout(()=>{ if(resultBtn) resultBtn.click(); }, 30);
-    };
-    if(buttons[1]) buttons[1].onclick=()=>{ if(pushBtn) pushBtn.click(); };
-    if(!pushBtn && buttons[1]) buttons[1].style.opacity='.45';
-    return card;
-  };
-  window.openGroupMatchListPopupFromButton = function(btn){
-    const grpCard=btn.closest('.grp-card');
-    if(!grpCard) return;
-    const pop=(typeof v281EnsurePopupShell==='function') ? v281EnsurePopupShell() : document.getElementById('matchListPopup');
-    const body=document.getElementById('matchListPopupBody');
-    const title=document.getElementById('matchListPopupTitle');
-    let grpName='경기 목록';
-    const hdr=grpCard.querySelector('.grp-hdr');
-    const first=hdr ? hdr.querySelector('span') : null;
-    if(first) grpName=cleanName(first.textContent)||'경기 목록';
-    const gm=String(grpCard.innerText||'').match(/(\d+)\s*조/);
-    if(gm) grpName=`${gm[1]}조`;
-    if(title) title.textContent = `📋 ${grpName} 경기 목록`;
-    if(body){
-      body.innerHTML='';
-      const matches=[...grpCard.querySelectorAll('.grp-matches-section .m3card,.grp-matches-section .match-card')];
-      if(!matches.length){
-        body.innerHTML='<div class="mlp-card" style="text-align:center;font-weight:900;color:#64748b">표시할 경기 목록이 없습니다.</div>';
-      }else{
-        matches.forEach((m,i)=>body.appendChild(window.v281BuildPopupCardFromMatch(m,i)));
-      }
-    }
-    if(pop) pop.classList.add('show');
-  };
-  window.toggleGroupMatchList = function(btn){ window.openGroupMatchListPopupFromButton(btn); };
-  document.addEventListener('DOMContentLoaded',()=>{
-    setTimeout(()=>{try{ if(typeof v281ApplyRecommendedLayout==='function') v281ApplyRecommendedLayout(); }catch(e){}},300);
-  });
-})();
-<\/script>
-
-</body>
-</html>`;
-}
-
-function exportPrelimSheet(){
-  try{
-    const ctx = _prelimPopupContext();
-    if(!ctx) return;
-    const html = _buildPrelimPopupHtml(ctx, 'print');
-    const w = window.open('', '_blank', 'width=1100,height=900');
-    if(!w){
-      toast('팝업이 차단되었습니다. 팝업 허용 후 다시 시도해 주세요.','error');
-      return;
-    }
-    w.document.open();
-    w.document.write(html);
-    w.document.close();
-  }catch(err){
-    console.error(err);
-    toast('예선표 생성 중 오류가 발생했습니다','error');
-  }
-}
-function exportPrelimImage(){
-  try{
-    const ctx = _prelimPopupContext();
-    if(!ctx) return;
-    const html = _buildPrelimPopupHtml(ctx, 'image');
-    const w = window.open('', '_blank', 'width=1100,height=900');
-    if(!w){
-      toast('팝업이 차단되었습니다. 팝업 허용 후 다시 시도해 주세요.','error');
-      return;
-    }
-    w.document.open();
-    w.document.write(html);
-    w.document.close();
-  }catch(err){
-    console.error(err);
-    toast('예선표 이미지 생성 중 오류가 발생했습니다','error');
-  }
-}
-
-(function mobileBackNavigationLayer(){
-  if(window.__mobileBackNavigationLayerInstalled) return;
-  window.__mobileBackNavigationLayerInstalled = true;
-
-  /* ── 핵심 전략 ──────────────────────────────────────────────
-     히스토리 스택을 항상 최소 2단계 이상 유지한다.
-     [ base(replace) | home | home-guard(top) ]
-     popstate 발생 시:
-       1) 팝업 열려있으면 → 팝업 닫고 guard 다시 push
-       2) 홈이 아닌 탭이면 → 홈으로 이동하고 guard 다시 push
-       3) 홈(guard 포함)이면 → 홈 유지하고 guard 다시 push (절대 닫히지 않음)
-  ─────────────────────────────────────────────────────────── */
-
-  const NS = '__appNav2';
-  let busy = false;
-  let syncingModal = false;
-  let seq = 0;
-
-  /* ── 현재 상태 읽기 ── */
-  function curPage(){
-    return document.querySelector('.page.active')?.id?.replace('page-','') ||
-           document.querySelector('.nav-tab.active')?.dataset?.page || 'home';
-  }
-  function curModal(){
-    const list = [...document.querySelectorAll('.modal-overlay.open')]
-                  .map(el=>el.id).filter(Boolean);
-    return list.length ? list[list.length-1] : '';
-  }
-
-  /* ── 히스토리 조작 ── */
-  function mkState(page, modal, isGuard){
-    return { [NS]:true, page:String(page||'home'),
-             modal:String(modal||''), guard:!!isGuard, seq:++seq };
-  }
-  function push(page, modal, isGuard){
-    try{ history.pushState(mkState(page,modal,isGuard),'',
-           '#nav-'+(page||'home')+(isGuard?'-guard':'')+(modal?'-'+modal:'')+'-'+seq);
-    }catch(e){}
-  }
-  function replace(page, modal, isGuard){
-    try{ history.replaceState(mkState(page,modal,isGuard),'',
-           '#nav-'+(page||'home')+(isGuard?'-guard':'')+(modal?'-'+modal:'')+'-'+seq);
-    }catch(e){}
-  }
-
-  /* ── 스택을 안전한 상태로 초기화 ──
-     스택: [base] → [home] → [home-guard]  (top)
-     어떤 상황에서도 뒤로가기 1번으로는 앱 밖으로 못 나감 */
-  function buildSafeStack(){
-    const p = curPage();
-    const m = curModal();
-    replace('home','',false);          // base (가장 아래)
-    if(p !== 'home') push(p, m, false); // 현재 페이지
-    else if(m)       push('home', m, false);
-    push('home','',true);              // guard (top) ← 여기서 뒤로가기 눌러도 home으로 돌아옴
-  }
-
-  /* ── 페이지/모달 실제 적용 ── */
-  function applyPage(page){
-    const fn = window.__appOriginalShowPage || window.showPage;
-    if(typeof fn !== 'function') return;
-    busy = true;
-    try{ fn(String(page||'home')); }finally{ busy = false; }
-    syncTabs();
-  }
-  function closeModal(id){
-    if(!id) return;
-    const el = document.getElementById(id);
-    if(!el) return;
-    try{
-      if(typeof window.__appOriginalCm==='function') window.__appOriginalCm(id);
-      else el.classList.remove('open');
-    }catch(e){ el.classList.remove('open'); }
-  }
-  function openModal(id){
-    if(!id) return;
-    const el = document.getElementById(id);
-    if(!el) return;
-    try{
-      if(typeof window.__appOriginalOm==='function') window.__appOriginalOm(id);
-      else el.classList.add('open');
-    }catch(e){ el.classList.add('open'); }
-  }
-  function applyModal(targetModal){
-    const cur = curModal();
-    if(cur === String(targetModal||'')) return;
-    syncingModal = true;
-    try{
-      document.querySelectorAll('.modal-overlay.open').forEach(el=>{
-        if(el.id !== targetModal) closeModal(el.id);
-      });
-      if(targetModal) openModal(targetModal);
-    }finally{ syncingModal = false; }
-  }
-  function syncTabs(){
-    const page = curPage();
-    document.querySelectorAll('#bottomTabBar button').forEach(btn=>{
-      const t = (btn.dataset.target==='results'?'ranking':btn.dataset.target)||'home';
-      btn.classList.toggle('active', t===page);
-    });
-  }
-
-  /* ── popstate 핸들러 ──
-     어떤 state가 와도 절대 앱 밖으로 안 나가게 한다 */
-  window.addEventListener('popstate', function(ev){
-    const st = ev.state;
-
-    /* 앱 외부 state(null 또는 NS 없음) → 즉시 스택 재건 */
-    if(!st || !st[NS]){
-      busy = true;
-      try{ applyModal(''); applyPage('home'); }finally{ busy=false; }
-      buildSafeStack();
-      syncTabs();
-      return;
-    }
-
-    const modal = curModal();
-    const page  = curPage();
-
-    /* ① 팝업이 열려 있으면 → 팝업만 닫고 guard 재push */
-    if(modal){
-      busy = true;
-      try{ applyModal(''); }finally{ busy=false; }
-      push(curPage(),'',false);
-      push('home','',true);
-      syncTabs();
-      return;
-    }
-
-    /* ② 홈이 아닌 탭 → 홈으로 이동하고 guard 재push */
-    if(page !== 'home'){
-      busy = true;
-      try{ applyPage('home'); }finally{ busy=false; }
-      push('home','',false);
-      push('home','',true);
-      syncTabs();
-      return;
-    }
-
-    /* ③ 이미 홈 (guard든 아니든) → 그냥 guard 재push (절대 닫히지 않음) */
-    push('home','',false);
-    push('home','',true);
-    syncTabs();
-  });
-
-  /* ── showPage 래퍼 ── */
-  const _showPage = window.showPage;
-  if(typeof _showPage==='function'){
-    window.__appOriginalShowPage = _showPage;
-    window.showPage = function(name){
-      const prev = curPage();
-      const res  = _showPage.apply(this, arguments);
-      const next = curPage();
-      syncTabs();
-      if(!busy){
-        const m = curModal();
-        if(next !== prev || !history.state?.[NS]){
-          push(next, m, false);
-          if(next==='home' && !m) push('home','',true);
-        }
-      }
-      return res;
-    };
-  }
-
-  /* ── om(모달열기) 래퍼 ── */
-  const _om = window.om;
-  if(typeof _om==='function'){
-    window.__appOriginalOm = _om;
-    window.om = function(id){
-      const before = curModal();
-      const res    = _om.apply(this, arguments);
-      const after  = curModal();
-      if(!busy && !syncingModal && after && after!==before){
-        push(curPage(), after, false);
-      }
-      return res;
-    };
-  }
-
-  /* ── cm(모달닫기) 래퍼 ── */
-  const _cm = window.cm;
-  if(typeof _cm==='function'){
-    window.__appOriginalCm = _cm;
-    window.cm = function(id){
-      const before = curModal();
-      const target = String(id||before||'');
-      const res    = _cm.apply(this, arguments);
-      const after  = curModal();
-      if(!busy && !syncingModal && target && before===target && after!==target){
-        const p = curPage();
-        push(p, after||'', false);
-        if(p==='home' && !after) push('home','',true);
-      }
-      return res;
-    };
-  }
-
-  /* ── 바텀탭 / nav-tab 클릭 후 동기화 ── */
-  document.addEventListener('click', function(e){
-    const btn = e.target.closest('#bottomTabBar button');
-    if(btn){ setTimeout(()=>{ syncTabs(); }, 50); return; }
-    if(e.target.closest('.nav-tab,[onclick*="showPage("]')){
-      setTimeout(()=>{ syncTabs(); }, 50);
-    }
-  }, true);
-
-  /* ── 초기 스택 구성 ── */
-  function init(){
-    buildSafeStack();
-    syncTabs();
-  }
-  if(document.readyState==='loading'){
-    document.addEventListener('DOMContentLoaded', init);
-  }else{
-    init();
-  }
-
-  /* ── bfcache 복귀 시 재초기화 ── */
-  window.addEventListener('pageshow', function(ev){
-    setTimeout(function(){ buildSafeStack(); syncTabs(); }, 0);
-  });
-
-})();
-</script>
-<!-- ======== 업그레이드 도움말 센터 ======== -->
-<div class="modal-overlay" id="mHelpCenter">
-<div class="modal-box" style="max-width:560px">
-<div class="modal-header" style="background:#0f1e3a">
-<h3>📘 사용자 / 진행자 가이드</h3>
-<button class="modal-close" onclick="cm('mHelpCenter')">✕</button>
-</div>
-<div class="modal-body">
-<div class="guide-hero">
-<h4>처음 쓰는 사람도 바로 이해할 수 있게 정리했습니다</h4>
-<div style="font-size:.82rem;line-height:1.65;opacity:.95">
-          참가자는 <b>대회 찾기 → 신청/확인 → 대진표 보기 → 결과 확인</b> 흐름으로,
-          진행자는 <b>대회 생성 → 접수 관리 → 추첨/배정 → 결과 입력</b> 흐름으로 보면 됩니다.
-        </div>
-<div class="help-chip-row">
-<span class="help-chip">👤 일반 사용자</span>
-<span class="help-chip">🎾 진행자</span>
-<span class="help-chip">❓ FAQ</span>
-<span class="help-chip">🚀 빠른 튜토리얼</span>
-</div>
-</div>
-<div class="help-grid">
-<button class="help-card-btn" onclick="cm('mHelpCenter');openGuideManual('user')">
-<div class="t1">👤 일반 사용자 가이드</div>
-<div class="t2">대회 찾기, 참가 신청, 대진표 확인, 경기 결과 확인까지 기본 흐름을 안내합니다.</div>
-</button>
-<button class="help-card-btn" onclick="cm('mHelpCenter');openGuideManual('operator')">
-<div class="t1">🎾 진행자 가이드</div>
-<div class="t2">대회 생성, 접수 관리, 추첨, 코트 배정, 결과 입력까지 운영 흐름을 안내합니다.</div>
-</button>
-<button class="help-card-btn" onclick="cm('mHelpCenter');openQuickTutorial('user')">
-<div class="t1">🚀 사용자 빠른 튜토리얼</div>
-<div class="t2">실제 사용 순서를 5단계로 짧게 보는 입문용 안내입니다.</div>
-</button>
-<button class="help-card-btn" onclick="cm('mHelpCenter');openQuickTutorial('operator')">
-<div class="t1">🛠 진행자 빠른 튜토리얼</div>
-<div class="t2">진행자가 실제 대회 운영 전에 순서만 빠르게 확인할 수 있습니다.</div>
-</button>
-</div>
-<div style="margin-top:12px">
-<button class="btn btn-outline" onclick="cm('mHelpCenter');om('mFAQ');faqShowTab(1)" style="width:100%;justify-content:flex-start">❓ 자주 묻는 질문 보기</button>
-</div>
-</div>
-<div class="modal-footer">
-<button class="btn btn-gray" onclick="cm('mHelpCenter')">닫기</button>
-</div>
-</div>
-</div>
-<div class="modal-overlay" id="mGuideManual">
-<div class="modal-box" style="max-width:620px">
-<div class="modal-header" style="background:#0f1e3a">
-<h3 id="guideManualTitle">📘 가이드</h3>
-<button class="modal-close" onclick="cm('mGuideManual')">✕</button>
-</div>
-<div class="modal-body" style="padding:0;background:#f7f9fd">
-<div class="guide-tabs">
-<button class="guide-tab active" id="guideTabBtnUser" onclick="showGuideTab('user')">👤 일반 사용자</button>
-<button class="guide-tab" id="guideTabBtnOperator" onclick="showGuideTab('operator')">🎾 진행자</button>
-</div>
-<div class="guide-pane active" id="guidePaneUser">
-<div class="guide-hero">
-<h4>일반 사용자 안내</h4>
-<div style="font-size:.82rem;line-height:1.65;opacity:.95">대회에 참가하거나 진행 상황을 확인하는 사람을 위한 설명입니다. 어려운 운영 용어 없이 실제 화면 기준으로 정리했습니다.</div>
-</div>
-<div class="guide-section">
-<h5>핵심 흐름</h5>
-<div class="guide-step"><div class="guide-step-no">1</div><div class="guide-step-body"><b>홈</b>에서 현재 접수 중인 대회를 확인합니다. 카드에 접수 상태, 참가 클럽 수, 참가 팀 수가 표시됩니다.</div></div>
-<div class="guide-step"><div class="guide-step-no">2</div><div class="guide-step-body"><b>팀등록</b>에서 본인 대회/부서를 선택하고 신청 내용을 입력합니다. 개인전이면 개인 기준, 팀전이면 팀 기준으로 등록하면 됩니다.</div></div>
-<div class="guide-step"><div class="guide-step-no">3</div><div class="guide-step-body">신청이 끝나면 <b>대진표</b>에서 조 편성, 코트 배정, 경기 순서를 확인합니다. 예선과 본선이 함께 보일 수 있습니다.</div></div>
-<div class="guide-step"><div class="guide-step-no">4</div><div class="guide-step-body"><b>참가자기록</b>에서 내 이름 또는 클럽으로 참가 이력을 확인합니다. 최근 참가, 누적 참가, 입상 여부를 확인할 수 있습니다.</div></div>
-<div class="guide-step"><div class="guide-step-no">5</div><div class="guide-step-body"><b>시합결과</b>에서 경기 결과와 최종 순위를 확인합니다. 결과 반영이 늦으면 진행자가 입력 중일 수 있습니다.</div></div>
-</div>
-<div class="guide-section">
-<h5>자주 헷갈리는 점</h5>
-<div class="guide-step"><div class="guide-step-no">Q</div><div class="guide-step-body"><b>신청이 안 되는 경우</b><br/>접수 기간 종료, 대회 미오픈, 자격 제한, 중복 신청 제한 중 하나일 수 있습니다. 먼저 홈의 접수 상태를 확인하세요.</div></div>
-<div class="guide-step"><div class="guide-step-no">Q</div><div class="guide-step-body"><b>이름이 안 보이는 경우</b><br/>등록이 아직 저장되지 않았거나 다른 이름/클럽명으로 등록되었을 수 있습니다. 팀등록 화면과 참가자기록에서 다시 검색해 보세요.</div></div>
-<div class="guide-step"><div class="guide-step-no">Q</div><div class="guide-step-body"><b>대진표가 아직 없는 경우</b><br/>접수 종료 후 추첨/배정 전일 수 있습니다. 이 경우 홈 공지나 진행자 안내를 먼저 확인하는 게 맞습니다.</div></div>
-</div>
-</div>
-<div class="guide-pane" id="guidePaneOperator">
-<div class="guide-hero">
-<h4>진행자 안내</h4>
-<div style="font-size:.82rem;line-height:1.65;opacity:.95">대회 운영을 담당하는 진행자 기준 설명입니다. 실제 운영 순서대로 정리했습니다.</div>
-</div>
-<div class="guide-section">
-<h5>운영 기본 흐름</h5>
-<div class="guide-step"><div class="guide-step-no">1</div><div class="guide-step-body"><b>대회관리</b>에서 대회 생성 또는 기존 대회를 선택합니다. 부서, 접수 기간, 경기 방식, 코트군 등을 먼저 확인합니다.</div></div>
-<div class="guide-step"><div class="guide-step-no">2</div><div class="guide-step-body"><b>팀등록</b>에서 신청 목록을 확인하고 누락/중복 등록이 없는지 점검합니다. 필요한 경우 진행자가 등록 상태를 수정합니다.</div></div>
-<div class="guide-step"><div class="guide-step-no">3</div><div class="guide-step-body"><b>대진표</b>에서 조 추첨, 시드 반영, 본선 배치, 코트 배정을 진행합니다. 추첨 전에는 조건과 참가 수를 먼저 확인하는 것이 안전합니다.</div></div>
-<div class="guide-step"><div class="guide-step-no">4</div><div class="guide-step-body">경기 진행 중에는 <b>코트 배정</b>, <b>대기 현황</b>, <b>지연 여부</b>를 보면서 순서를 조정합니다.</div></div>
-<div class="guide-step"><div class="guide-step-no">5</div><div class="guide-step-body"><b>결과 입력</b> 후에는 본선 반영, 순위 반영, 기록 누적이 정상인지 마지막으로 확인합니다.</div></div>
-</div>
-<div class="guide-section">
-<h5>운영 체크포인트</h5>
-<div class="guide-step"><div class="guide-step-no">✓</div><div class="guide-step-body">추첨 전에는 <b>참가팀 수, 조 수, 본선 진출 수</b>가 맞는지 먼저 확인합니다.</div></div>
-<div class="guide-step"><div class="guide-step-no">✓</div><div class="guide-step-body">결과 입력 후 <b>대진표 자동 승격/순위 반영</b>이 기대한 대로 됐는지 꼭 점검합니다.</div></div>
-<div class="guide-step"><div class="guide-step-no">✓</div><div class="guide-step-body"><b>PC + 휴대폰 동시 운영</b><br/>진행은 보통 <b>PC 화면</b>에서 하고, 같은 계정 또는 진행자 권한으로 <b>휴대폰 앱</b>을 함께 켜두면 현장 대응이 훨씬 빨라집니다. PC는 전체 현황과 입력용, 휴대폰은 알림/문자 발송 보조용으로 쓰는 방식이 가장 현실적입니다.</div></div>
-<div class="guide-step"><div class="guide-step-no">✓</div><div class="guide-step-body"><b>자동 문자 발송 기능</b><br/>경기 시작 안내, 코트 배정, 코트 대기 안내는 운영 정책에 따라 <b>자동 문자 발송</b>을 사용할 수 있습니다. 이 기능은 <b>진행자가 선택적으로 켜거나 끌 수 있는 보조 기능</b>으로 안내하는 것이 맞습니다.</div></div>
-<div class="guide-step"><div class="guide-step-no">✓</div><div class="guide-step-body"><b>코트배정 / 코트대기 알림</b><br/>코트가 배정되거나 대기 순서가 바뀌는 경우, 휴대폰 앱을 켜 둔 진행자가 자동 알림/문자 발송 여부를 선택해 현장 흐름에 맞게 운영할 수 있습니다.</div></div>
-<div class="guide-step"><div class="guide-step-no">✓</div><div class="guide-step-body">사용자 문의가 많을 때는 홈 카드, 대진표, 참가자기록 세 화면만 안내해도 대부분 해결됩니다.</div></div>
-</div>
-</div>
-</div>
-<div class="modal-footer">
-<button class="btn btn-outline" onclick="openQuickTutorial('user')">👤 사용자 튜토리얼</button>
-<button class="btn btn-outline" onclick="openQuickTutorial('operator')">🎾 진행자 튜토리얼</button>
-<button class="btn btn-gray" onclick="cm('mGuideManual')">닫기</button>
-</div>
-</div>
-</div>
-<div class="modal-overlay" id="mQuickTutorial">
-<div class="modal-box" style="max-width:560px">
-<div class="modal-header" style="background:#0f1e3a">
-<h3 id="tourHeaderTitle">🚀 빠른 튜토리얼</h3>
-<button class="modal-close" onclick="closeQuickTutorial()">✕</button>
-</div>
-<div class="modal-body">
-<div class="tour-progress-wrap">
-<div style="display:flex;justify-content:space-between;font-size:.75rem;color:#5d6c85;margin-bottom:6px">
-<span id="tourStepText">1 / 5</span>
-<span id="tourRoleText">일반 사용자</span>
-</div>
-<div class="tour-progress"><div id="tourProgressBar" style="width:20%"></div></div>
-</div>
-<div class="tour-screen">
-<div class="tour-badge" id="tourBadge">🏠 홈</div>
-<div class="tour-title" id="tourTitle">현재 접수 중인 대회 확인</div>
-<div class="tour-desc" id="tourDesc"></div>
-<div class="tour-tip" id="tourTip"></div>
-</div>
-</div>
-<div class="modal-footer">
-<button class="btn btn-outline" onclick="prevQuickTutorial()">이전</button>
-<button class="btn btn-outline" onclick="restartQuickTutorial()">처음부터</button>
-<button class="btn" id="tourNextBtn" onclick="nextQuickTutorial()">다음</button>
-</div>
-</div>
-</div>
-<script>
-window.__helpTourData = {
-  user: [
-    {badge:'🏠 홈', title:'현재 접수 중인 대회 확인', desc:'홈에서 현재 열려 있는 대회와 접수 상태를 먼저 확인합니다. 접수중인지, 마감인지, 이미 진행 중인지부터 보는 것이 맞습니다.', tip:'홈 카드에 보이는 참가 수와 접수 상태만 봐도 현재 상황을 대부분 판단할 수 있습니다.'},
-    {badge:'📋 팀등록', title:'대회 참가 신청 또는 등록 확인', desc:'팀등록 화면에서 참가 신청을 하거나 이미 등록한 내용을 다시 확인합니다. 개인전/팀전 여부에 따라 입력 항목이 다를 수 있습니다.', tip:'중복 신청이나 이름 오기입이 가장 흔한 실수입니다. 제출 전에 한 번 더 확인하세요.'},
-    {badge:'🎲 대진표', title:'조 편성과 경기 순서 확인', desc:'대진표에서 예선 조, 본선 배치, 코트 배정, 경기 순서를 확인합니다. 아직 대진표가 안 보이면 추첨/배정 전일 수 있습니다.', tip:'내 경기를 찾기 어려우면 이름보다 코트/조 정보를 함께 보는 게 빠릅니다.'},
-    {badge:'🧾 참가자기록', title:'내 기록과 참가 이력 확인', desc:'참가자기록에서는 선수별/클럽별 참가 이력과 누적 기록을 볼 수 있습니다. 최근 참가 대회와 입상 기록도 여기서 확인할 수 있습니다.', tip:'이름 검색이 안 되면 다른 표기나 클럽명까지 함께 검색해 보세요.'},
-    {badge:'📋 시합결과', title:'경기 결과와 최종 순위 확인', desc:'시합결과에서 각 경기 결과와 최종 입상 내용을 확인합니다. 반영이 늦으면 진행자가 결과 입력 중일 수 있습니다.', tip:'결과가 안 보일 때는 새로고침보다 잠시 후 다시 확인하는 것이 더 정확할 때가 많습니다.'}
-  ],
-  operator: [
-    {badge:'🏆 대회관리', title:'대회 생성과 기본 설정 확인', desc:'대회명, 부서, 접수 기간, 경기 방식, 코트군 등 기본값을 먼저 점검합니다. 이 단계가 틀리면 뒤 단계가 다 꼬입니다.', tip:'참가팀 수가 바뀔 가능성이 있으면 본선 구조와 조 수를 먼저 여유 있게 검토하세요.'},
-    {badge:'📋 팀등록', title:'신청 목록 점검', desc:'중복 등록, 누락, 잘못된 부서 등록이 없는지 확인합니다. 현장에서 가장 많이 생기는 운영 문제는 여기서 걸러집니다.', tip:'실제 운영 전에는 접수 마감 직후 한 번, 추첨 직전 한 번 더 확인하는 게 안전합니다.'},
-    {badge:'🎲 대진표', title:'추첨, 시드, 본선 배치', desc:'조 추첨과 시드 반영 후 본선 배치가 의도대로 되었는지 확인합니다. 코트 배정까지 이어지는지 같이 점검합니다.', tip:'추첨 후 바로 출력하기보다 먼저 미리보기에서 코트와 대진 흐름을 눈으로 확인하세요.'},
-    {badge:'🎾 코트 운영', title:'코트 배정과 대기 관리', desc:'진행 중에는 코트 사용 현황, 대기 순서, 지연 경기 여부를 보면서 순서를 조정합니다. 운영 속도 차이가 여기서 결정됩니다. PC로 전체 현황을 보고 휴대폰 앱을 함께 열어두면 현장 대응이 더 빨라집니다.', tip:'지연이 생기면 결과 입력보다 먼저 코트 회전과 대기 순서를 정리하는 편이 낫습니다.'},
-    {badge:'📲 문자/알림', title:'자동 문자 발송 보조 운영', desc:'경기 시작, 코트 배정, 코트 대기 알림은 운영 상황에 따라 자동 문자 발송으로 보조할 수 있습니다. 이 기능은 진행자가 현장에서 선택적으로 사용하는 보조 수단으로 이해하면 됩니다.', tip:'휴대폰 앱을 함께 켜 두면 문자 발송 상태 확인과 현장 대응이 더 수월합니다.'},
-    {badge:'✅ 결과 입력', title:'점수 입력 후 반영 확인', desc:'결과 입력 후 본선 승격, 순위 반영, 기록 누적이 자동으로 제대로 처리됐는지 마지막 확인을 합니다.', tip:'특히 예선 종료 직후 본선 자동 배치와 공동순위 처리 여부를 꼭 확인하세요.'}
-  ]
-};
-
-window.__helpTourRole = 'user';
-window.__helpTourIndex = 0;
-
-function openHelpCenter(){
-  try{ cm('mManualChooser'); }catch(e){}
-  om('mHelpCenter');
-}
-function openGuideManual(role){
-  om('mGuideManual');
-  showGuideTab(role || 'user');
-}
-function showGuideTab(role){
-  const isUser = role === 'user';
-  const bu = document.getElementById('guideTabBtnUser');
-  const bo = document.getElementById('guideTabBtnOperator');
-  const pu = document.getElementById('guidePaneUser');
-  const po = document.getElementById('guidePaneOperator');
-  if(!bu || !bo || !pu || !po) return;
-  bu.classList.toggle('active', isUser);
-  bo.classList.toggle('active', !isUser);
-  pu.classList.toggle('active', isUser);
-  po.classList.toggle('active', !isUser);
-  const t = document.getElementById('guideManualTitle');
-  if(t) t.textContent = isUser ? '📘 일반 사용자 가이드' : '📘 진행자 가이드';
-}
-function openQuickTutorial(role){
-  window.__helpTourRole = role || 'user';
-  window.__helpTourIndex = 0;
-  try{ cm('mGuideManual'); }catch(e){}
-  renderQuickTutorial();
-  om('mQuickTutorial');
-}
-function closeQuickTutorial(){ cm('mQuickTutorial'); }
-function restartQuickTutorial(){ window.__helpTourIndex = 0; renderQuickTutorial(); }
-function prevQuickTutorial(){
-  const arr = window.__helpTourData[window.__helpTourRole] || [];
-  window.__helpTourIndex = Math.max(0, window.__helpTourIndex - 1);
-  renderQuickTutorial();
-}
-function nextQuickTutorial(){
-  const arr = window.__helpTourData[window.__helpTourRole] || [];
-  if(window.__helpTourIndex >= arr.length - 1){
-    cm('mQuickTutorial');
-    return;
-  }
-  window.__helpTourIndex += 1;
-  renderQuickTutorial();
-}
-function renderQuickTutorial(){
-  const arr = window.__helpTourData[window.__helpTourRole] || [];
-  const item = arr[window.__helpTourIndex];
-  if(!item) return;
-  const total = arr.length;
-  const n = window.__helpTourIndex + 1;
-  const roleName = window.__helpTourRole === 'user' ? '일반 사용자' : '진행자';
-  const ids = {
-    step:'tourStepText', role:'tourRoleText', bar:'tourProgressBar', badge:'tourBadge',
-    title:'tourTitle', desc:'tourDesc', tip:'tourTip', header:'tourHeaderTitle', next:'tourNextBtn'
-  };
-  document.getElementById(ids.step).textContent = n + ' / ' + total;
-  document.getElementById(ids.role).textContent = roleName;
-  document.getElementById(ids.bar).style.width = ((n/total)*100) + '%';
-  document.getElementById(ids.badge).textContent = item.badge;
-  document.getElementById(ids.title).textContent = item.title;
-  document.getElementById(ids.desc).textContent = item.desc;
-  document.getElementById(ids.tip).textContent = 'TIP. ' + item.tip;
-  document.getElementById(ids.header).textContent = '🚀 ' + roleName + ' 빠른 튜토리얼';
-  document.getElementById(ids.next).textContent = (n >= total) ? '완료' : '다음';
-}
-document.addEventListener('DOMContentLoaded', function(){
-  setTimeout(function(){
-    try{
-      if(!localStorage.getItem('helpTutorialSeen_v1')){
-        localStorage.setItem('helpTutorialSeen_v1', '1');
-        openHelpCenter();
-      }
-    }catch(e){}
-  }, 900);
-});
 </script>
 <div class="bottom-tab-bar" id="bottomTabBar">
 <button type="button" data-target="home"><span class="icon">🏠</span><span>홈</span></button>
@@ -34461,7 +32156,7 @@ document.addEventListener('DOMContentLoaded', function(){
         <div class="pwa-install-icon">📱</div>
         <div class="pwa-install-main">
           <div class="pwa-install-title">230테니스 매치를 설치하면 더 편합니다</div>
-          <div class="pwa-install-desc">내 경기 보기, 코트 배정 확인, 경기 결과 입력, 푸시알림을 앱처럼 사용할 수 있습니다.</div>
+          <div class="pwa-install-desc">내 경기 보기, 코트 배정 확인, 경기 결과 입력, 알림알림을 앱처럼 사용할 수 있습니다.</div>
           <div class="pwa-install-actions">
             <button type="button" class="pwa-install-primary" id="pwaInstallNowBtn">홈화면 설치</button>
             <a class="pwa-install-store" id="pwaPlayStoreBtn" href="${PLAY_STORE_SEARCH}" target="_blank" rel="noopener">플레이스토어 설치</a>
@@ -35124,7 +32819,7 @@ function v283CleanNameText(raw){
     .replace(/게임실\s*[+-]?\d+/g,'')
     .replace(/득실\s*[+-]?\d+/g,'')
     .replace(/\d+\s*[:：]\s*\d+/g,'')
-    .replace(/결과입력|결과수정|푸시|대기|완료|시합중|경기코트|조코트 미배정|공지\(경기\) 입력/g,'')
+    .replace(/결과입력|결과수정|알림|대기|완료|시합중|경기코트|조코트 미배정|공지\(경기\) 입력/g,'')
     .replace(/\s+/g,' ')
     .trim();
 }
@@ -35179,7 +32874,7 @@ function v281BuildPopupCardFromMatch(matchEl,idx){
   const status=/완료/.test(raw)?'완료':(/시합중|진행/.test(raw)?'시합중':'대기');
   const court=(raw.match(/(?:경기코트|코트)\s*[:：]?\s*([가-힣A-Za-z0-9_-]*\d+)/)||[])[1] || '';
   const resultBtn=[...matchEl.querySelectorAll('button')].find(b=>/결과|수정/.test((b.textContent||'')));
-  const pushBtn=[...matchEl.querySelectorAll('button')].find(b=>/푸시/.test((b.textContent||'')));
+  const pushBtn=[...matchEl.querySelectorAll('button')].find(b=>/알림/.test((b.textContent||'')));
   const card=document.createElement('div');
   card.className='mlp-card';
   card.innerHTML=`
@@ -35196,7 +32891,7 @@ function v281BuildPopupCardFromMatch(matchEl,idx){
     ${score?`<div class="mlp-score">${score}</div>`:''}
     <div class="mlp-actions">
       <button type="button" class="btn btn-primary">✏️ 결과입력</button>
-      <button type="button" class="btn btn-outline">🔔 푸시</button>
+      <button type="button" class="btn btn-outline">🔔 알림</button>
     </div>`;
   const buttons=card.querySelectorAll('.mlp-actions button');
   if(buttons[0]) buttons[0].onclick=()=>{ if(resultBtn) resultBtn.click(); };
@@ -35245,7 +32940,7 @@ function v281BuildPopupCardFromMatch(matchEl,idx){
       .replace(/[🏆✅✏️🔔📢🎾📋⚡🚀🔥🔑⏳]/gu,' ')
       .replace(/\b\d+\s*경기\b/g,' ')
       .replace(/\b(?:완료|대기중|대기|시합중|진행중)\b/g,' ')
-      .replace(/결과\s*수정하기|결과수정|결과\s*입력하기|결과입력|푸시/g,' ')
+      .replace(/결과\s*수정하기|결과수정|결과\s*입력하기|결과입력|알림/g,' ')
       .replace(/(?:경기코트|배정코트|코트)\s*[:：]?\s*[가-힣A-Za-z0-9_-]*\d+/g,' ')
       .replace(/승\s*\d+|패\s*\d+|게임득실\s*[+-]?\d+|게임득\s*\d+|게임실\s*\d+|득실\s*[+-]?\d+/g,' ')
       .replace(/\d+\s*[:：]\s*\d+/g,' ')
@@ -35333,7 +33028,7 @@ function v281BuildPopupCardFromMatch(matchEl,idx){
     const court=extractCourt(raw);
     const status=extractStatus(raw);
     const resultBtn=[...matchEl.querySelectorAll('button')].find(b=>/결과|수정/.test((b.textContent||'')));
-    const pushBtn=[...matchEl.querySelectorAll('button')].find(b=>/푸시/.test((b.textContent||'')));
+    const pushBtn=[...matchEl.querySelectorAll('button')].find(b=>/알림/.test((b.textContent||'')));
     const card=document.createElement('div');
     card.className='mlp-card';
     card.innerHTML=`
@@ -35350,7 +33045,7 @@ function v281BuildPopupCardFromMatch(matchEl,idx){
       ${score?`<div class="mlp-score">${score}</div>`:''}
       <div class="mlp-actions">
         <button type="button" class="btn btn-primary">✏️ 결과입력</button>
-        <button type="button" class="btn btn-outline">🔔 푸시</button>
+        <button type="button" class="btn btn-outline">🔔 알림</button>
       </div>`;
     const buttons=card.querySelectorAll('.mlp-actions button');
     if(buttons[0]) buttons[0].onclick=()=>{
@@ -35390,6 +33085,15 @@ function v281BuildPopupCardFromMatch(matchEl,idx){
     setTimeout(()=>{try{ if(typeof v281ApplyRecommendedLayout==='function') v281ApplyRecommendedLayout(); }catch(e){}},300);
   });
 })();
+
+
+// v300: expose module functions used by inline handlers. No DOM polling or post-render button insertion.
+try{
+  window.openM3 = openM3;
+  window.getMatchResultState = getMatchResultState;
+  window.canEditMatchByDirector = canEditMatchByDirector;
+  window.getIndividualResultAuthState = getIndividualResultAuthState;
+}catch(e){}
 </script>
 
 
@@ -35644,6 +33348,27 @@ function v281BuildPopupCardFromMatch(matchEl,idx){
   });
 })();
 </script>
+
+
+
+<script id="v291PushUiGuardScript">
+(function(){
+  'use strict';
+  function hideTemplateLeakNodes(){
+    try{
+      document.querySelectorAll('body > .toolbar').forEach(function(el){
+        if(/\$\{actionBtn\}|닫기/.test(el.textContent||'')) el.style.display='none';
+      });
+      document.querySelectorAll('body > script, body > div').forEach(function(el){
+        if(/\$\{script(Open|Close)\}/.test(el.textContent||'')) el.style.display='none';
+      });
+    }catch(e){}
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', hideTemplateLeakNodes); else hideTemplateLeakNodes();
+})();
+</script>
+
+
 
 </body>
 </html>
