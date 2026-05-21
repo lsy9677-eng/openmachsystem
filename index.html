@@ -4788,7 +4788,7 @@ async function requestMatchPushPermission(){
     const messaging=await getFcmMessagingSafe();
     const permission=await Notification.requestPermission();
     if(permission!=='granted'){
-      toast('알림 허용을 눌러야 경기 알림을 받을 수 있습니다.','info');
+      toast('알림을 허용해야 경기 시작/코트 배정 알림을 받을 수 있습니다.','info');
       const ps=ge('pushStatus'); if(ps) ps.innerHTML='🔕 알림 권한이 허용되지 않았습니다.';
       return;
     }
@@ -4870,7 +4870,52 @@ window.setupFcmForegroundListener=setupFcmForegroundListener;
 window.updatePushStatusLabel=updatePushStatusLabel;
 window.openMatchPushPromptAfterRegistration=openMatchPushPromptAfterRegistration;
 window.renderInlinePushEnableButton=renderInlinePushEnableButton;
-setTimeout(()=>{try{ setupFcmForegroundListener(); updatePushStatusLabel(); }catch(e){}},1800);
+
+// 🔔 앱 진입 시 자동 알림 권한 요청 (1회)
+async function autoRequestPushPermissionOnce(){
+  try{
+    if(location.protocol==='file:') return;
+    if(!('Notification' in window)) return;
+
+    const alreadyAsked = localStorage.getItem('autoPushAskedV2') === '1';
+    const enabled = localStorage.getItem('matchPushEnabled') === '1';
+
+    if(enabled) return;
+
+    // 이미 차단된 경우
+    if(Notification.permission === 'denied'){
+      const ps=ge('pushStatus');
+      if(ps){
+        ps.innerHTML='🔕 브라우저에서 알림이 차단되었습니다. 휴대폰 설정 → Chrome → 알림 허용 후 다시 시도해주세요.';
+      }
+      return;
+    }
+
+    // 최초 1회만 자동 요청
+    if(alreadyAsked) return;
+
+    localStorage.setItem('autoPushAskedV2','1');
+
+    setTimeout(async ()=>{
+      try{
+        await requestMatchPushPermission();
+      }catch(e){
+        console.warn('auto push request failed', e);
+      }
+    }, 1200);
+
+  }catch(e){
+    console.warn('autoRequestPushPermissionOnce error', e);
+  }
+}
+
+setTimeout(()=>{
+  try{
+    setupFcmForegroundListener();
+    updatePushStatusLabel();
+    autoRequestPushPermissionOnce();
+  }catch(e){}
+},1800);
 let AUTH_PERSISTENCE_READY=false;
 const AUTH_PERSISTENCE_PROMISE=setPersistence(auth, browserLocalPersistence)
   .then(()=>{ AUTH_PERSISTENCE_READY=true; })
