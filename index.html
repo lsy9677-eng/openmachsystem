@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-05-21-v315-push-sms-fallback";
+  const APP_VERSION = "2026-05-21-v317-push-stats-dashboard";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -7544,6 +7544,66 @@ function recipientHasPushTokenDoc(recipient, docs=[]){
 function getPushUnavailableSmsRecipients(recipients=[], docs=[]){
   return uniqueSmsRecipientsByPhone(recipients).filter(r=>!recipientHasPushTokenDoc(r,docs));
 }
+function uniqueManualPushRecipientsAll(recipients=[]){
+  const seen=new Set();
+  return (recipients||[]).map(r=>({
+    name:String(r?.name||'').trim()||'대상자',
+    phone:formatPhoneLoose(r?.phone||''),
+    club:String(r?.club||'').trim(),
+    role:String(r?.role||'').trim()
+  })).filter(r=>{
+    const d=String(r.phone||'').replace(/[^0-9]/g,'');
+    const key=d ? ('p:'+d) : ('n:'+normalizePushKey(r.name)+'|c:'+normalizePushKey(r.club));
+    if(seen.has(key)) return false;
+    seen.add(key);
+    return !!(r.name || r.club || d);
+  });
+}
+function classifyManualPushTargets(recipients=[], docs=[]){
+  const all=uniqueManualPushRecipientsAll(recipients);
+  const pushNames=[];
+  const smsFallback=[];
+  const infoMissing=[];
+  all.forEach(r=>{
+    const hasPush=recipientHasPushTokenDoc(r, docs);
+    const hasPhone=String(r.phone||'').replace(/[^0-9]/g,'').length>=9;
+    if(hasPush){ pushNames.push(r); return; }
+    if(hasPhone) smsFallback.push(r);
+    else infoMissing.push(r);
+  });
+  return {all, pushNames, smsFallback, infoMissing};
+}
+function formatRecipientNameList(list=[], limit=5){
+  const arr=(list||[]).slice(0,limit).map(r=>{
+    const name=String(r?.name||'대상자').trim();
+    const phone=String(r?.phone||'').trim();
+    const club=String(r?.club||'').trim();
+    if(phone) return `${name}(${phone})`;
+    if(club) return `${name}/${club}`;
+    return name;
+  });
+  const more=(list||[]).length>limit?` 외 ${(list||[]).length-limit}명`:'';
+  return arr.join(', ')+more;
+}
+function showPushInfoMissingAlert(ctx={}, recipients=[]){
+  try{
+    const list=uniqueManualPushRecipientsAll(recipients);
+    if(!list.length) return false;
+    const names=formatRecipientNameList(list,6);
+    const label=ctx.type==='group' ? '조 참가자' : (ctx.type==='match' ? '경기 대상자' : (ctx.type==='team' ? '명단 대상자' : '전체 대상자'));
+    enqueueStickyAlert({
+      title:'⚠️ 알림 정보 부족',
+      msg:`${label} 중 푸시 토큰도 없고 문자 번호도 없는 ${list.length}명은 알림/문자 발송이 불가합니다.\n${names}`,
+      type:'info',
+      actionType:'info_missing',
+      tid:ctx.key?_k2td(ctx.key).tid:'',
+      div:ctx.key?_k2td(ctx.key).div:'',
+      matchId:ctx.mid||'',
+      dedupeKey:`push_info_missing:${ctx.type||'all'}:${ctx.key||''}:${ctx.mid||''}:${ctx.gi??''}:${Date.now()}`
+    });
+    return true;
+  }catch(e){ console.warn('showPushInfoMissingAlert failed', e); return false; }
+}
 async function getManualPushTargetTokenDocs(ctx={}){
   if(ctx.type==='all') return await getEnabledPushTokenDocs();
   if(ctx.type==='match'){
@@ -7596,11 +7656,14 @@ async function updateManualPushFallbackPreview(){
     const recipients=getManualPushSmsFallbackRecipients(ctx);
     let docs=[];
     try{ docs=await getManualPushTargetTokenDocs(ctx); }catch(e){ docs=[]; }
-    const fallback=getPushUnavailableSmsRecipients(recipients,docs);
+    const cls=classifyManualPushTargets(recipients,docs);
     const pushCount=(docs||[]).length;
-    const smsCount=fallback.length;
-    const names=fallback.slice(0,4).map(r=>`${r.name}${r.phone?`(${r.phone})`:''}`).join(', ');
-    box.innerHTML = `🔔 푸시 가능 기기 ${pushCount}개 · 📨 문자 대체 ${smsCount}명${smsCount?`<br><span style="font-weight:700">대체 대상: ${esc(names)}${smsCount>4?' 외 '+(smsCount-4)+'명':''}</span>`:''}<br><span style="font-weight:700;color:#9a3412">발송 후 푸시 불가 대상은 문자 버튼이 자동 표시됩니다.</span>`;
+    const smsCount=cls.smsFallback.length;
+    const missingCount=cls.infoMissing.length;
+    const pushNames=formatRecipientNameList(cls.pushNames,4);
+    const smsNames=formatRecipientNameList(cls.smsFallback,4);
+    const missingNames=formatRecipientNameList(cls.infoMissing,4);
+    box.innerHTML = `🔔 푸시 가능 기기 ${pushCount}개${pushNames?`<br><span style="font-weight:700;color:#1d4ed8">푸시 대상: ${esc(pushNames)}</span>`:''}<br>📨 문자 대체 ${smsCount}명${smsNames?`<br><span style="font-weight:700">문자 대상: ${esc(smsNames)}</span>`:''}<br>⚠️ 정보 부족 ${missingCount}명${missingNames?`<br><span style="font-weight:700;color:#b91c1c">정보 부족: ${esc(missingNames)}</span>`:''}<br><span style="font-weight:700;color:#9a3412">발송 후 푸시 불가 대상은 문자 버튼이 자동 표시됩니다.</span>`;
   }catch(e){ console.warn('manual push preview failed', e); }
 }
 
@@ -7614,15 +7677,19 @@ async function sendManualPushFromModal(){
     sl(true);
     const docs=await getManualPushTargetTokenDocs(ctx);
     const smsRecipients=getManualPushSmsFallbackRecipients(ctx);
-    const fallbackRecipients=getPushUnavailableSmsRecipients(smsRecipients,docs);
+    const targetClass=classifyManualPushTargets(smsRecipients,docs);
+    const fallbackRecipients=targetClass.smsFallback;
+    const infoMissingRecipients=targetClass.infoMissing;
     if(!docs.length){
       sl(false);
       cm('mManualPush');
       if(fallbackRecipients.length){
-        toast(`푸시 대상 없음 · 문자 대체 ${fallbackRecipients.length}명`,'info');
+        toast(`푸시 대상 없음 · 문자 대체 ${fallbackRecipients.length}명${infoMissingRecipients.length?' · 정보부족 '+infoMissingRecipients.length+'명':''}`,'info');
         showPushSmsFallbackAlert(ctx,fallbackRecipients,body);
+        if(infoMissingRecipients.length) showPushInfoMissingAlert(ctx,infoMissingRecipients);
       }else{
-        toast('발송 대상 알림 토큰과 문자 번호가 없습니다','info');
+        toast(infoMissingRecipients.length?`발송 대상 알림 토큰/문자 번호 없음 · 정보부족 ${infoMissingRecipients.length}명`:'발송 대상 알림 토큰과 문자 번호가 없습니다','info');
+        if(infoMissingRecipients.length) showPushInfoMissingAlert(ctx,infoMissingRecipients);
       }
       return;
     }
@@ -7634,11 +7701,14 @@ async function sendManualPushFromModal(){
       if(res.stale) extra.push(`만료토큰 정리 ${res.stale}`);
       if(res.fail) extra.push(`실패 ${res.fail}`);
       if(fallbackRecipients.length) extra.push(`문자대체 ${fallbackRecipients.length}명`);
+      if(infoMissingRecipients.length) extra.push(`정보부족 ${infoMissingRecipients.length}명`);
       toast(`알림 발송 완료: 성공 ${res.ok}${extra.length?' / '+extra.join(' / '):''}`,'success');
       if(fallbackRecipients.length) showPushSmsFallbackAlert(ctx,fallbackRecipients,body);
+      if(infoMissingRecipients.length) showPushInfoMissingAlert(ctx,infoMissingRecipients);
     }else if((res.stale>0 || res.fail>0) && fallbackRecipients.length){
-      toast(`푸시 성공 0명 · 문자 대체 ${fallbackRecipients.length}명`,'info');
+      toast(`푸시 성공 0명 · 문자 대체 ${fallbackRecipients.length}명${infoMissingRecipients.length?' · 정보부족 '+infoMissingRecipients.length+'명':''}`,'info');
       showPushSmsFallbackAlert(ctx,fallbackRecipients,body);
+      if(infoMissingRecipients.length) showPushInfoMissingAlert(ctx,infoMissingRecipients);
     }else if(res.stale>0 && res.fail===0){
       toast(`유효한 알림 수신자가 없습니다. 만료된 기기 토큰 ${res.stale}개를 정리했습니다.`,'info');
     }else if(res.fail>0){
@@ -7691,6 +7761,246 @@ window.sendManualPushFromModal=sendManualPushFromModal;
 window.updateManualPushFallbackPreview=updateManualPushFallbackPreview;
 window.showPushSmsFallbackAlert=showPushSmsFallbackAlert;
 window.openAdminBroadcastPushModal=openAdminBroadcastPushModal;
+
+
+
+// ── v317: 알림 전체 통계 / 불가·정보부족 명단 대시보드 ─────────────────────────────
+function ensurePushStatsModal(){
+  if(document.getElementById('mPushStats')) return;
+  const wrap=document.createElement('div');
+  wrap.className='modal-overlay';
+  wrap.id='mPushStats';
+  wrap.innerHTML=`<div class="modal-box" style="max-width:980px;width:96vw">
+    <div class="modal-header" style="background:#0f1e3a">
+      <h3>📊 알림 통계 / 불가 명단</h3>
+      <button class="modal-close" onclick="cm('mPushStats')">✕</button>
+    </div>
+    <div class="modal-body" style="max-height:78vh;overflow:auto">
+      <div id="pushStatsToolbar" style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+        <div style="font-size:.78rem;color:var(--text2);line-height:1.6">현재 선택 대회 기준과 전체 회원 기준을 함께 확인합니다.</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-outline" onclick="renderPushStatsDashboard(true)" style="font-size:.78rem;padding:6px 10px">🔄 새로고침</button>
+          <button class="btn btn-outline" onclick="copyPushStatsMissingList()" style="font-size:.78rem;padding:6px 10px">📋 정보부족 복사</button>
+          <button class="btn btn-primary" onclick="sendPushStatsSmsFallback()" style="font-size:.78rem;padding:6px 10px;background:#2563eb;color:#fff">📨 문자대체 명단 문자</button>
+        </div>
+      </div>
+      <div id="pushStatsBody" style="min-height:160px"><div class="empty-state card"><div class="empty-icon">📊</div><p>불러오는 중...</p></div></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-gray" onclick="cm('mPushStats')">닫기</button></div>
+  </div>`;
+  document.body.appendChild(wrap);
+}
+function injectPushStatsAdminButton(){
+  try{
+    ensurePushStatsModal();
+    const body=document.querySelector('#mAdminSettings .modal-body');
+    if(!body || document.getElementById('pushStatsAdminBox')) return;
+    const box=document.createElement('div');
+    box.id='pushStatsAdminBox';
+    box.style.cssText='margin-bottom:16px;padding:14px;background:linear-gradient(135deg,#eef4ff,#fffdf5);border:1.5px solid #93c5fd;border-radius:12px';
+    box.innerHTML=`<div style="font-weight:900;font-size:.9rem;color:#1d4ed8;margin-bottom:7px">📊 알림 통계 / 불가 명단</div>
+      <div style="font-size:.75rem;color:var(--text2);line-height:1.7;margin-bottom:10px">푸시 가능, 문자 대체, 정보 부족 명단을 전체 회원과 현재 대회 기준으로 확인합니다. 대회 전 필수 점검용입니다.</div>
+      <button class="btn btn-primary" onclick="openPushStatsDashboard()" style="width:100%;background:#2563eb;color:#fff">📊 알림 상태판 열기</button>`;
+    body.insertBefore(box, body.firstChild);
+  }catch(e){ console.warn('injectPushStatsAdminButton failed', e); }
+}
+function getSelectedStatsTournamentId(){
+  try{
+    const ids=[ge('brTS')?.value, ge('regTS')?.value, ge('rankTS')?.value].map(v=>String(v||'').trim()).filter(Boolean);
+    if(ids[0]) return ids[0];
+    if(typeof pickDefaultTournamentId==='function') return pickDefaultTournamentId()||'';
+    const live=(G.tournaments||[]).find(t=>String(t.status||'')==='ongoing' || String(t.status||'')==='open');
+    return live?.id || (G.tournaments||[])[0]?.id || '';
+  }catch(e){ return ''; }
+}
+function maskPhoneForStats(phone=''){
+  const d=String(phone||'').replace(/[^0-9]/g,'');
+  if(d.length>=11) return `${d.slice(0,3)}-****-${d.slice(-4)}`;
+  if(d.length>=9) return `${d.slice(0,3)}-***-${d.slice(-4)}`;
+  return phone||'';
+}
+function statsTargetKey(t={}){
+  const phone=String(t.phone||'').replace(/[^0-9]/g,'');
+  if(phone) return 'p:'+phone;
+  return 'n:'+normalizePushKey(t.name||'')+'|c:'+normalizePushKey(t.club||'')+'|d:'+String(t.div||'')+'|r:'+String(t.role||'');
+}
+function uniqueStatsTargets(list=[]){
+  const seen=new Set();
+  const out=[];
+  (list||[]).forEach(x=>{
+    const item={
+      name:String(x?.name||'').trim()||'대상자',
+      phone:formatPhoneLoose(x?.phone||''),
+      club:String(x?.club||'').trim(),
+      div:String(x?.div||'').trim(),
+      role:String(x?.role||'').trim()||'participant',
+      source:String(x?.source||'').trim()
+    };
+    const key=statsTargetKey(item);
+    if(seen.has(key)) return;
+    seen.add(key); out.push(item);
+  });
+  return out;
+}
+function collectTournamentPushStatsTargets(tid=''){
+  const targets=[];
+  try{
+    if(!tid) return [];
+    Object.entries(G.teams||{}).forEach(([key,teams])=>{
+      if(!String(key).startsWith(String(tid)+'_')) return;
+      const div=_k2td(key).div;
+      (teams||[]).forEach((team,idx)=>{
+        const indiv=team?.tournamentType==='individual_pair' || Array.isArray(team?.individualPlayers) || isIndividualByKey(key);
+        if(indiv){
+          getIndividualPlayers(team).slice(0,2).forEach((p,i)=>{
+            targets.push({name:p?.name||`참가자${i+1}`, phone:p?.phone||'', club:p?.clubsRaw||((p?.clubs||[]).join(', ')), div, role:'개인전 선수', source:key});
+          });
+        }else{
+          const club=String(team?.club||'').trim();
+          const phone=team?.phone || (G.meta?.clubContacts||{})[club] || '';
+          targets.push({name:team?.entryLabel||team?.pairLabel||tdn(team,key,idx)||club||'팀', phone, club, div, role:'단체전 팀/경기이사', source:key});
+        }
+      });
+    });
+  }catch(e){ console.warn('collectTournamentPushStatsTargets failed', e); }
+  return uniqueStatsTargets(targets);
+}
+function tokenMatchesStatsTarget(tokenDoc={}, target={}){
+  const tp=String(target?.phone||'').replace(/[^0-9]/g,'');
+  const tc=normalizePushKey(target?.club||'');
+  const xp=String(tokenDoc?.phoneDigits||'').replace(/[^0-9]/g,'');
+  const xc=normalizePushKey(tokenDoc?.clubKey||tokenDoc?.club||'');
+  if(tp && xp && tp===xp) return true;
+  if(target?.role && String(target.role).includes('단체전') && tc && xc && tc===xc) return true;
+  return false;
+}
+function classifyStatsTargets(targets=[], tokenDocs=[]){
+  const pushPossible=[];
+  const smsFallback=[];
+  const infoMissing=[];
+  const profileMissing=[];
+  uniqueStatsTargets(targets).forEach(t=>{
+    const hasPush=(tokenDocs||[]).some(x=>tokenMatchesStatsTarget(x,t));
+    const phoneDigits=String(t.phone||'').replace(/[^0-9]/g,'');
+    const missing=[];
+    if(!String(t.name||'').trim() || String(t.name||'').trim()==='대상자') missing.push('이름');
+    if(phoneDigits.length<9) missing.push('전화번호');
+    if(!String(t.club||'').trim()) missing.push('클럽');
+    if(missing.length) profileMissing.push({...t, missing});
+    if(hasPush) pushPossible.push(t);
+    else if(phoneDigits.length>=9) smsFallback.push(t);
+    else infoMissing.push({...t, missing:missing.length?missing:['푸시/전화번호']});
+  });
+  return {total:uniqueStatsTargets(targets).length, pushPossible, smsFallback, infoMissing, profileMissing};
+}
+function renderPushStatsCountCards(items=[]){
+  return `<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:12px">${items.map(it=>`<div style="padding:12px;border-radius:14px;border:1px solid ${it.border||'#dbeafe'};background:${it.bg||'#f8fbff'}"><div style="font-size:.72rem;font-weight:900;color:${it.color||'#475569'}">${it.label}</div><div style="font-size:1.45rem;font-weight:1000;color:${it.color||'#0f1e3a'};margin-top:4px">${it.value}</div></div>`).join('')}</div>`;
+}
+function renderStatsTargetTable(title, list=[], opts={}){
+  const color=opts.color||'#0f1e3a';
+  const empty=opts.empty||'대상 없음';
+  const rows=(list||[]).slice(0,80).map((r,i)=>`<tr><td>${i+1}</td><td style="text-align:left;font-weight:900">${esc(r.name||'')}</td><td>${esc(maskPhoneForStats(r.phone||''))}</td><td>${esc(r.club||'')}</td><td>${esc(dl(r.div||'')||r.div||'')}</td><td>${esc((r.missing||[]).join(', ')||r.role||'')}</td></tr>`).join('');
+  const more=(list||[]).length>80?`<div style="font-size:.72rem;color:var(--text3);margin-top:6px">80명까지만 표시했습니다. 전체는 복사 기능을 사용하세요.</div>`:'';
+  return `<div style="margin-top:12px"><div style="font-weight:1000;color:${color};font-size:.9rem;margin-bottom:7px">${title} <span style="font-size:.78rem;color:var(--text2)">${(list||[]).length}명</span></div>${rows?`<div class="table-wrap"><table><thead><tr><th>#</th><th>이름/팀</th><th>전화번호</th><th>클럽</th><th>부서</th><th>상태</th></tr></thead><tbody>${rows}</tbody></table></div>${more}`:`<div class="home-empty-note">${empty}</div>`}</div>`;
+}
+async function collectPushStatsData(){
+  if(!(AD||TM||OP)) throw new Error('운영 권한이 필요합니다.');
+  const tid=getSelectedStatsTournamentId();
+  const tournament=(G.tournaments||[]).find(t=>t.id===tid)||null;
+  const tokenSnap=await getDocs(collection(db,'pushTokens'));
+  const allTokenDocs=[];
+  tokenSnap.forEach(d=>allTokenDocs.push({id:d.id,...(d.data()||{})}));
+  const enabledTokens=allTokenDocs.filter(x=>x.enabled && x.token && !x.invalid && !x.disabledByUser);
+  let users=[];
+  try{
+    const userSnap=await getDocs(collection(db,'users'));
+    userSnap.forEach(d=>users.push({id:d.id,...(d.data()||{})}));
+  }catch(e){ users=[]; }
+  const userTargets=uniqueStatsTargets(users.map(u=>({name:u.name||u.displayName||u.email||'회원', phone:u.phone||u.mobile||'', club:u.club||'', role:u.role||'member'})));
+  const currentTargets=collectTournamentPushStatsTargets(tid);
+  return {tid,tournament,allTokenDocs,enabledTokens,users,userTargets,currentTargets,current:classifyStatsTargets(currentTargets,enabledTokens),allUsers:classifyStatsTargets(userTargets,enabledTokens)};
+}
+let PUSH_STATS_CACHE=null;
+async function openPushStatsDashboard(){
+  if(!(AD||TM||OP)){ toast('운영 권한이 필요합니다.','info'); return; }
+  ensurePushStatsModal();
+  om('mPushStats');
+  await renderPushStatsDashboard(true);
+}
+async function renderPushStatsDashboard(force=false){
+  const body=ge('pushStatsBody');
+  if(!body) return;
+  body.innerHTML='<div class="empty-state card"><div class="empty-icon">📊</div><p>알림 통계를 불러오는 중...</p></div>';
+  try{
+    const data=await collectPushStatsData();
+    PUSH_STATS_CACHE=data;
+    const t=data.tournament;
+    const cur=data.current;
+    const all=data.allUsers;
+    const enabledUsers=new Set(data.enabledTokens.map(x=>String(x.uid||'')).filter(Boolean)).size;
+    body.innerHTML=`
+      <div style="padding:12px 14px;border-radius:16px;background:linear-gradient(135deg,#eef4ff,#fffdf5);border:1.5px solid #93c5fd;margin-bottom:12px">
+        <div style="font-weight:1000;color:#1d4ed8;font-size:.96rem">현재 기준: ${esc(t?.name||'선택된 대회 없음')}</div>
+        <div style="font-size:.76rem;color:var(--text2);line-height:1.6;margin-top:4px">푸시 가능은 현재 저장된 FCM 토큰 기준입니다. 문자 대체는 전화번호는 있지만 푸시 토큰이 없는 대상입니다.</div>
+      </div>
+      ${renderPushStatsCountCards([
+        {label:'현재 대회 대상',value:cur.total,bg:'#f8fafc',border:'#cbd5e1',color:'#334155'},
+        {label:'푸시 가능',value:cur.pushPossible.length,bg:'#dcfce7',border:'#86efac',color:'#166534'},
+        {label:'문자 대체',value:cur.smsFallback.length,bg:'#fff7ed',border:'#fdba74',color:'#c2410c'},
+        {label:'정보 부족',value:cur.infoMissing.length,bg:'#fef2f2',border:'#fecaca',color:'#b91c1c'}
+      ])}
+      ${renderPushStatsCountCards([
+        {label:'전체 회원',value:data.users.length,bg:'#f8fafc',border:'#cbd5e1',color:'#334155'},
+        {label:'알림 토큰 보유 회원',value:enabledUsers,bg:'#eff6ff',border:'#93c5fd',color:'#1d4ed8'},
+        {label:'활성 토큰 수',value:data.enabledTokens.length,bg:'#eef2ff',border:'#c4b5fd',color:'#6d28d9'},
+        {label:'비활성/만료 토큰',value:Math.max(0,data.allTokenDocs.length-data.enabledTokens.length),bg:'#f1f5f9',border:'#cbd5e1',color:'#475569'}
+      ])}
+      ${renderStatsTargetTable('✅ 현재 대회 푸시 가능 명단', cur.pushPossible, {color:'#166534', empty:'푸시 가능한 대상이 없습니다.'})}
+      ${renderStatsTargetTable('📨 현재 대회 문자 대체 명단', cur.smsFallback, {color:'#c2410c', empty:'문자 대체 대상이 없습니다.'})}
+      ${renderStatsTargetTable('⚠️ 현재 대회 정보 부족 명단', cur.infoMissing, {color:'#b91c1c', empty:'정보 부족 대상이 없습니다.'})}
+      <details style="margin-top:14px"><summary style="cursor:pointer;font-weight:1000;color:#0f1e3a">전체 회원 기준 보기</summary>
+        ${renderStatsTargetTable('전체 회원 푸시 가능', all.pushPossible, {color:'#166534'})}
+        ${renderStatsTargetTable('전체 회원 문자 대체', all.smsFallback, {color:'#c2410c'})}
+        ${renderStatsTargetTable('전체 회원 정보 부족', all.infoMissing, {color:'#b91c1c'})}
+      </details>`;
+  }catch(e){
+    body.innerHTML=`<div class="home-empty-note" style="border-color:#fecaca;background:#fef2f2;color:#991b1b">알림 통계를 불러오지 못했습니다.<br>${esc(e?.message||e)}</div>`;
+  }
+}
+async function copyPushStatsMissingList(){
+  try{
+    if(!PUSH_STATS_CACHE) PUSH_STATS_CACHE=await collectPushStatsData();
+    const cur=PUSH_STATS_CACHE.current||{};
+    const lines=(cur.infoMissing||[]).map((r,i)=>`${i+1}. ${r.name||''} / ${r.club||''} / ${dl(r.div||'')||r.div||''} / 부족: ${(r.missing||[]).join(', ')||'전화번호·푸시토큰'}`);
+    const text=`[230MATCH 알림 정보 부족 명단]\n대회: ${PUSH_STATS_CACHE.tournament?.name||''}\n총 ${lines.length}명\n\n${lines.join('\n')}`;
+    const ok=await copyTextSafe(text);
+    toast(ok?'정보부족 명단을 복사했습니다 ✅':'복사 실패','info');
+  }catch(e){ toast('복사 실패: '+(e?.message||e),'error'); }
+}
+function sendPushStatsSmsFallback(){
+  try{
+    const data=PUSH_STATS_CACHE;
+    if(!data){ toast('먼저 통계를 불러와 주세요','info'); return; }
+    const list=(data.current?.smsFallback||[]).filter(x=>String(x.phone||'').replace(/[^0-9]/g,'').length>=9);
+    if(!list.length){ toast('문자 대체 대상이 없습니다','info'); return; }
+    const body=`230MATCH 경기 알림 안내입니다. 현재 앱 푸시 알림 설정이 확인되지 않아 문자로 안내드립니다. 앱에 로그인 후 내 정보 설정에서 경기 알림을 켜 주세요.`;
+    const phones=[...new Set(list.map(x=>String(x.phone||'').replace(/[^0-9+]/g,'')).filter(Boolean))];
+    const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||'');
+    if(!isMobile){
+      const copy=`[수신자]\n${list.map(x=>`${x.name} / ${x.club||''} / ${x.phone}`).join('\n')}\n\n[내용]\n${body}`;
+      copyTextSafe(copy).then(ok=>toast(ok?'PC: 문자 대체 명단과 내용이 복사됐습니다. 문자앱에 붙여넣으세요.':'복사 실패','info'));
+      return;
+    }
+    location.href=`sms:${phones.join(',')}?body=${encodeURIComponent(body)}`;
+    toast(`문자창을 열었습니다 ✅ (${phones.length}명)`,'success');
+  }catch(e){ toast('문자 대체 실행 실패: '+(e?.message||e),'error'); }
+}
+window.openPushStatsDashboard=openPushStatsDashboard;
+window.renderPushStatsDashboard=renderPushStatsDashboard;
+window.copyPushStatsMissingList=copyPushStatsMissingList;
+window.sendPushStatsSmsFallback=sendPushStatsSmsFallback;
+setTimeout(injectPushStatsAdminButton,1200);
+document.addEventListener('DOMContentLoaded',()=>setTimeout(injectPushStatsAdminButton,800));
 
 setTimeout(()=>{try{ setupFcmForegroundListener(); updatePushStatusLabel(); }catch(e){}},1800);
 let AUTH_PERSISTENCE_READY=false;
