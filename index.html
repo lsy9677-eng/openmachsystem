@@ -17560,7 +17560,7 @@ function openIndividualEntryInfo(key, idx){
     const body=document.getElementById('mIndividualEntryInfoBody');
     if(body){
       const div=(typeof _k2td==='function'?(_k2td(key).div||''):'');
-      body.innerHTML=`<div class="v334-info-title">${v334IndividualPairTitle(team)}</div><div class="v334-info-meta">${div?`부서: ${esc(div)}`:''}</div><div class="v334-info-list">${v334GetIndividualInfoRows(team)}</div><div class="v334-info-note">목록에서는 이름만 간결하게 표시하고, 소속/구력은 이 상세창에서 확인합니다.</div>`;
+      body.innerHTML=`<div class="v334-info-title">${v334IndividualPairTitle(team)}</div><div class="v334-info-meta">${div?`부서: ${esc(div)}`:''}</div><div class="v334-info-list">${v334GetIndividualInfoRows(team)}</div>`;
     }
     om('mIndividualEntryInfo');
   }catch(e){ console.warn('openIndividualEntryInfo failed',e); toast('상세보기 오류','error'); }
