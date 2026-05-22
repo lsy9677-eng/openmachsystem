@@ -29143,15 +29143,34 @@ function renderAllP(){
       : '<div class="empty-state" style="padding:18px 6px"><p>검색 결과가 없습니다</p></div>';
     if(limited.length===1){ showP(limited[0].name, limited[0].club); }
   } else {
+    const myName=cleanName(CURRENT_APP_PROFILE?.name||CURRENT_APP_PROFILE?.displayName||'').trim();
+    const myClub=normalizeClub(CURRENT_APP_PROFILE?.club||'');
+    const myPhone=normalizePhoneDigits(CURRENT_APP_PROFILE?.phone||'');
+    const isMine=(row)=>{
+      if(!row) return false;
+      const nameHit = myName && (row.name===myName || normName(row.name)===normName(myName));
+      const clubHit = !myClub || normalizeClub(row.club||'')===myClub;
+      const phoneHit = myPhone && (row.summary?.phoneList||[]).some(ph=>normalizePhoneDigits(ph)===myPhone);
+      return !!((nameHit && clubHit) || phoneHit);
+    };
     displayRows.sort((a,b)=>{
+      const am=isMine(a), bm=isMine(b);
+      if(am!==bm) return am ? -1 : 1;
       const ad=String(a.summary?.lastDate||'');
       const bd=String(b.summary?.lastDate||'');
       if(ad!==bd) return bd.localeCompare(ad);
       return Number(b.summary?.totalCount||0)-Number(a.summary?.totalCount||0);
     });
-    const recentRows=displayRows.slice(0,8);
-    container.innerHTML = recentRows.length
-      ? `<div style="font-size:.84rem;font-weight:900;color:var(--primary-dark);margin-bottom:10px">최근 참가자 빠르게 보기</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px">${recentRows.map(row=>buildCard(row)).join('')}</div>`
+    const mineRows=displayRows.filter(isMine);
+    const otherRows=displayRows.filter(row=>!isMine(row));
+    const mineHtml=mineRows.length
+      ? `<div style="font-size:.88rem;font-weight:1000;color:#1d4ed8;margin:0 0 10px">👤 내 기록</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-bottom:16px">${mineRows.map(row=>buildCard(row,true)).join('')}</div>`
+      : '';
+    const allHtml=displayRows.length
+      ? `<div style="font-size:.88rem;font-weight:1000;color:var(--primary-dark);margin:0 0 10px">📋 전체 참가자 기록 <span style="font-size:.76rem;color:var(--text2);font-weight:800">${displayRows.length}명</span></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px">${otherRows.concat(mineRows.length?[]:mineRows).map(row=>buildCard(row)).join('') || mineRows.map(row=>buildCard(row)).join('')}</div>`
+      : '';
+    container.innerHTML = displayRows.length
+      ? mineHtml + allHtml
       : '<div class="empty-state" style="padding:18px 6px"><p>표시할 참가자 기록이 없습니다</p></div>';
   }
 }
@@ -36688,6 +36707,83 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
     var mo=new MutationObserver(function(){
       clearTimeout(window.__v355PlayersRegistryTimer);
       window.__v355PlayersRegistryTimer=setTimeout(reinforce,60);
+    });
+    mo.observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['class','style']});
+  }catch(e){}
+})();
+</script>
+
+
+<!-- v356: 참가자 기록/목록 단일화 + 내 기록 우선 표시 최종 패치 -->
+<style id="v356PlayersUnifiedStyle">
+  /* 김해시 단체전용으로 분리됐던 참가자 기록/목록 탭을 숨기고 하나로 통일 */
+  #page-players .players-tab-bar{display:none !important;}
+  #page-players #ptab-records-content{display:block !important;}
+  #page-players #ptab-registry-content{display:none !important;}
+  #page-players #playerPageTitle::after{content:' · 전체';font-size:.8rem;color:var(--text3);font-weight:800;margin-left:4px;}
+  /* 기존 패치들이 참가자 목록 탭을 다시 보여주는 것을 최종 차단 */
+  html body #ptab-registry,
+  html body #ptab-registry-content{display:none !important;}
+  html body #ptab-records{display:none !important;}
+  #psResults .v354-record-view-btn,
+  #psResults button[onclick*="showP"]{animation:none !important;transform:none !important;filter:none !important;box-shadow:none !important;}
+</style>
+<script id="v356PlayersUnifiedScript">
+(function(){
+  'use strict';
+  if(window.__v356PlayersUnified) return;
+  window.__v356PlayersUnified = true;
+  function $(id){ return document.getElementById(id); }
+  function setUnifiedDom(){
+    try{
+      document.body.classList.remove('players-registry-active');
+      document.body.classList.add('players-records-active');
+      try{ sessionStorage.setItem('playersDesiredTab','records'); }catch(e){}
+      var title=$('playerPageTitle'); if(title) title.textContent='참가자 기록';
+      var bar=document.querySelector('#page-players .players-tab-bar'); if(bar) bar.style.display='none';
+      var rec=$('ptab-records-content'); if(rec) rec.style.display='block';
+      var reg=$('ptab-registry-content'); if(reg) reg.style.display='none';
+      var recBtn=$('ptab-records'); if(recBtn) recBtn.style.display='none';
+      var regBtn=$('ptab-registry'); if(regBtn) regBtn.style.display='none';
+      ['playerPageBtns','registryActionBtns','regTabQuickAdd'].forEach(function(id){var el=$(id); if(el && !document.body.classList.contains('admin-mode')) el.style.display='none';});
+    }catch(e){}
+  }
+  function renderUnified(){
+    setUnifiedDom();
+    try{
+      if(typeof window.loadRegistry==='function') window.loadRegistry(new Date().getFullYear()).catch(function(){});
+      if(typeof window.ensurePlayersLoaded==='function') window.ensurePlayersLoaded().catch(function(){});
+      if(typeof window.ensureAllParticipationDataLoaded==='function') window.ensureAllParticipationDataLoaded().catch(function(){});
+    }catch(e){}
+    setTimeout(function(){ try{ if(typeof window.renderAllP==='function') window.renderAllP(); }catch(e){} setUnifiedDom(); },80);
+    setTimeout(function(){ try{ if(typeof window.renderAllP==='function') window.renderAllP(); }catch(e){} setUnifiedDom(); },650);
+  }
+  window.switchPlayersTab=function(){
+    renderUnified();
+    return false;
+  };
+  var oldShowPage=window.showPage;
+  if(typeof oldShowPage==='function'){
+    window.showPage=function(page){
+      var r=oldShowPage.apply(this, arguments);
+      if(page==='players') renderUnified();
+      return r;
+    };
+  }
+  document.addEventListener('click',function(ev){
+    var t=ev.target&&ev.target.closest?ev.target.closest('#ptab-records,#ptab-registry'):null;
+    if(t){ ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation(); renderUnified(); return false; }
+  },true);
+  document.addEventListener('DOMContentLoaded',function(){
+    setTimeout(function(){ if(document.querySelector('#page-players.active')) renderUnified(); else setUnifiedDom(); },120);
+    setTimeout(function(){ if(document.querySelector('#page-players.active')) renderUnified(); },900);
+  });
+  try{
+    var mo=new MutationObserver(function(){
+      clearTimeout(window.__v356PlayersUnifiedTimer);
+      window.__v356PlayersUnifiedTimer=setTimeout(function(){
+        if(document.querySelector('#page-players.active')) setUnifiedDom();
+      },80);
     });
     mo.observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['class','style']});
   }catch(e){}
