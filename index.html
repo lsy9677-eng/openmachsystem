@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-05-22-v320-push-blocked-sms-fallback";
+  const APP_VERSION = "2026-05-22-v326-push-name-phone-match";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -5887,6 +5887,108 @@ body {
     </div>
   </div>
 </div>
+
+
+<!-- v325: 네이버 로그인 개발모드 안내/구글 우선 로그인 보강 -->
+<style id="v325NaverLoginNoticeStyle">
+#naverLoginHelpModal{
+  position:fixed;inset:0;z-index:2147483200;display:none;align-items:center;justify-content:center;
+  background:rgba(15,23,42,.62);padding:16px;
+}
+#naverLoginHelpModal.show{display:flex;}
+#naverLoginHelpModal .nlh-box{width:min(560px,100%);max-height:88vh;overflow:auto;background:#fff;border-radius:20px;box-shadow:0 24px 70px rgba(15,23,42,.32);}
+#naverLoginHelpModal .nlh-head{background:#03c75a;color:#fff;padding:16px 18px;font-weight:1000;font-size:1.02rem;display:flex;align-items:center;justify-content:space-between;gap:10px;}
+#naverLoginHelpModal .nlh-close{border:0;background:rgba(255,255,255,.18);color:#fff;border-radius:999px;width:32px;height:32px;font-size:1.05rem;font-weight:1000;cursor:pointer;}
+#naverLoginHelpModal .nlh-body{padding:16px 18px;color:#0f172a;}
+#naverLoginHelpModal .nlh-alert{padding:12px 14px;border-radius:14px;border:1.5px solid #fdba74;background:#fff7ed;color:#9a3412;font-size:.86rem;font-weight:900;line-height:1.65;margin-bottom:12px;}
+#naverLoginHelpModal .nlh-note{font-size:.78rem;color:#475569;line-height:1.7;margin:10px 0;padding:10px 12px;border-radius:12px;background:#f8fafc;border:1px solid #e2e8f0;}
+#naverLoginHelpModal .nlh-admin{font-size:.76rem;color:#1e3a8a;line-height:1.7;margin-top:10px;padding:10px 12px;border-radius:12px;background:#eff6ff;border:1px solid #bfdbfe;}
+#naverLoginHelpModal .nlh-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:14px 18px 18px;border-top:1px solid #e2e8f0;}
+#naverLoginHelpModal .nlh-actions button{min-height:44px;border-radius:12px;border:0;font-weight:1000;font-size:.86rem;cursor:pointer;}
+#naverLoginHelpModal .nlh-google{background:#2563eb;color:#fff;}
+#naverLoginHelpModal .nlh-naver{background:#03c75a;color:#fff;}
+#naverLoginHelpModal .nlh-secondary{background:#f1f5f9;color:#334155;border:1px solid #cbd5e1!important;}
+@media(max-width:520px){#naverLoginHelpModal .nlh-actions{grid-template-columns:1fr}#naverLoginHelpModal .nlh-head{font-size:.95rem}}
+</style>
+<div id="naverLoginHelpModal" aria-modal="true" role="dialog">
+  <div class="nlh-box">
+    <div class="nlh-head">
+      <div>🟢 네이버 로그인 안내</div>
+      <button class="nlh-close" onclick="closeNaverLoginHelpModal()">×</button>
+    </div>
+    <div class="nlh-body">
+      <div class="nlh-alert">
+        네이버 화면에서 “입력하신 아이디로 로그인할 수 없습니다”가 나오면, 대부분 앱이 네이버 개발자센터에서 아직 일반 사용자 로그인 가능 상태가 아니기 때문입니다.
+      </div>
+      <div class="nlh-note">
+        지금 바로 참가 접수해야 한다면 <b>Google 로그인</b>을 사용하는 것이 가장 안정적입니다. 네이버 로그인은 관리자 설정이 완료된 뒤 일반 사용자도 정상 이용할 수 있습니다.
+      </div>
+      <div class="nlh-admin">
+        관리자 확인 항목: Naver Developers → 애플리케이션 → API 설정에서 <b>로그인 오픈 API 사용</b>, <b>Callback URL</b>, <b>서비스 상태/검수 또는 테스트 사용자</b> 설정을 확인해야 합니다. 개발중 상태이면 등록된 관리자/테스트 계정만 로그인됩니다.
+      </div>
+    </div>
+    <div class="nlh-actions">
+      <button class="nlh-google" onclick="closeNaverLoginHelpModal();loginWithGoogle();">🔵 Google로 로그인</button>
+      <button class="nlh-naver" onclick="continueNaverLoginAnyway();">🟢 그래도 네이버 로그인</button>
+      <button class="nlh-secondary" onclick="copyNaverAdminChecklist();">📋 관리자 점검 복사</button>
+      <button class="nlh-secondary" onclick="closeNaverLoginHelpModal();">닫기</button>
+    </div>
+  </div>
+</div>
+<script id="v325NaverLoginNoticeScript">
+(function(){
+  const NAVER_CHECK_TEXT = `네이버 로그인 점검 항목\n1. Naver Developers > 내 애플리케이션 > tennis230 접속\n2. API 설정에서 네이버 로그인 사용 여부 확인\n3. Callback URL 확인: https://tennis230.pages.dev/naver/callback 또는 현재 배포 도메인의 /naver/callback\n4. 앱 상태가 개발중이면 일반 사용자는 로그인 불가. 테스트 사용자 등록 또는 서비스 적용/검수 필요\n5. 네이버 로그인 오류가 계속되면 임시로 Google 로그인 안내`;
+  window.openNaverLoginHelpModal=function(){
+    try{ const m=document.getElementById('naverLoginHelpModal'); if(m) m.classList.add('show'); }catch(e){}
+  };
+  window.closeNaverLoginHelpModal=function(){
+    try{ const m=document.getElementById('naverLoginHelpModal'); if(m) m.classList.remove('show'); }catch(e){}
+  };
+  window.copyNaverAdminChecklist=async function(){
+    try{
+      if(window.copyTextSafe){ const ok=await window.copyTextSafe(NAVER_CHECK_TEXT); if(window.toast) toast(ok?'네이버 점검 항목을 복사했습니다 ✅':'복사 실패','info'); return; }
+      await navigator.clipboard.writeText(NAVER_CHECK_TEXT); if(window.toast) toast('네이버 점검 항목을 복사했습니다 ✅','success');
+    }catch(e){ if(window.toast) toast('복사 실패','error'); }
+  };
+  const originalLogin = window.loginWithNaver;
+  window.continueNaverLoginAnyway=function(){
+    try{ closeNaverLoginHelpModal(); localStorage.setItem('NAVER_LOGIN_NOTICE_CONFIRMED','1'); }catch(e){}
+    if(typeof originalLogin==='function') return originalLogin();
+    try{ location.assign('/naver/login?returnUrl='+encodeURIComponent(location.origin+'/')); }catch(e){}
+  };
+  window.loginWithNaver=function(){
+    try{
+      // 네이버 앱이 개발중일 때 일반 사용자는 외부 네이버 화면에서 막히므로, 최초 1회는 안내 후 진행한다.
+      if(localStorage.getItem('NAVER_LOGIN_NOTICE_CONFIRMED')!=='1'){
+        openNaverLoginHelpModal();
+        return;
+      }
+    }catch(e){}
+    return continueNaverLoginAnyway();
+  };
+  function relabelNaverButtons(){
+    try{
+      document.querySelectorAll('#signupNaverLoginBtn,#naverLoginBtn,button[onclick*="loginWithNaver"]').forEach(btn=>{
+        const t=(btn.textContent||'').trim();
+        if(!/안내|확인/.test(t) && /네이버|Naver|NAVER|🟢/.test(t)){
+          btn.title='네이버 개발자센터 설정이 완료되지 않은 경우 일반 사용자는 로그인할 수 없습니다. Google 로그인이 더 안정적입니다.';
+        }
+      });
+      const st=document.getElementById('signupGoogleStatus');
+      if(st && !st.dataset.naverNoticeAdded){
+        st.dataset.naverNoticeAdded='1';
+        const div=document.createElement('div');
+        div.style.cssText='margin-top:6px;padding:7px 9px;border-radius:10px;background:#fff7ed;border:1px solid #fdba74;color:#9a3412;font-size:.72rem;line-height:1.5;font-weight:800';
+        div.innerHTML='네이버 로그인이 막히면 앱 설정 문제일 가능성이 높습니다. 접수는 <b>Google 로그인</b>을 우선 권장합니다.';
+        st.insertAdjacentElement('afterend', div);
+      }
+    }catch(e){}
+  }
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(relabelNaverButtons,900));
+  setTimeout(relabelNaverButtons,1800);
+})();
+</script>
+
 <div class="toast-container" id="TC"></div>
 <div aria-atomic="true" aria-live="polite" class="sticky-alert-wrap" id="stickyAlertWrap"></div>
 <button class="scroll-top" id="stBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
@@ -7575,12 +7677,53 @@ async function markInvalidPushTokenDoc(tokenDoc, reason='UNREGISTERED'){
     },{merge:true});
   }catch(e){ console.warn('invalid push token cleanup skipped', e); }
 }
+async function getPushUserProfileMap(){
+  const map=new Map();
+  try{
+    if(!(AD||TM||OP)) return map;
+    const snap=await getDocs(collection(db,'users'));
+    snap.forEach(d=>{
+      const u={id:d.id, uid:d.id, ...(d.data()||{})};
+      map.set(String(d.id), u);
+    });
+  }catch(e){
+    console.warn('push user profile lookup skipped', e?.message||e);
+  }
+  return map;
+}
+function normalizePushPhone(v=''){
+  return String(v||'').replace(/[^0-9]/g,'');
+}
+function normalizePushName(v=''){
+  return String(v||'').trim().replace(/\s+/g,'');
+}
+function mergePushTokenWithUserProfile(x={}, userMap=new Map()){
+  const uid=String(x?.uid||'');
+  const u=uid ? (userMap.get(uid)||{}) : {};
+  const phone = x.phone || x.phoneNumber || x.mobile || u.phone || u.mobile || u.phoneNumber || '';
+  const name = x.name || x.displayName || u.name || u.displayName || '';
+  const club = x.club || u.club || '';
+  return {
+    ...x,
+    userProfile:u,
+    name,
+    nameKey: normalizePushName(name),
+    phone,
+    phoneDigits: normalizePushPhone(x.phoneDigits || phone),
+    club,
+    clubKey: normalizePushKey(x.clubKey || club),
+    userPhoneDigits: normalizePushPhone(u.phone || u.mobile || u.phoneNumber || ''),
+    userNameKey: normalizePushName(u.name || u.displayName || ''),
+    userClubKey: normalizePushKey(u.club || '')
+  };
+}
 async function getEnabledPushTokenDocs(filterFn=null){
   if(!(AD||TM||OP)) throw new Error('운영 권한이 필요합니다.');
+  const userMap=await getPushUserProfileMap();
   const snap=await getDocs(collection(db,'pushTokens'));
   const out=[];
   snap.forEach(d=>{
-    const x={id:d.id,...(d.data()||{})};
+    const x=mergePushTokenWithUserProfile({id:d.id,...(d.data()||{})}, userMap);
     if(!x.enabled || !x.token) return;
     if(filterFn && !filterFn(x)) return;
     out.push(x);
@@ -7589,6 +7732,39 @@ async function getEnabledPushTokenDocs(filterFn=null){
 }
 function normalizePushKey(v=''){
   return String(v||'').trim().toLowerCase().replace(/\s+/g,'');
+}
+function getTeamPushPeople(team){
+  const people=[];
+  try{
+    if(team?.ownerUid){
+      people.push({uid:String(team.ownerUid), name:team.ownerName||team.name||team.entryLabel||team.pairLabel||'', phone:team.ownerPhone||team.phone||'', club:team.club||'', role:'owner'});
+    }
+    if(Array.isArray(team?.individualPlayers) && team.individualPlayers.length){
+      team.individualPlayers.slice(0,2).forEach((p,idx)=>{
+        people.push({uid:p?.uid||'', name:p?.name||`참가자${idx+1}`, phone:p?.phone||'', club:p?.clubsRaw||((p?.clubs||[])[0])||team?.club||'', role:'player'});
+      });
+    }else if(Array.isArray(team?.players)){
+      team.players.slice(0,2).forEach((name,idx)=>{
+        people.push({uid:'', name, phone:idx===0?(team?.phone||''):'', club:team?.club||'', role:'player'});
+      });
+    }
+  }catch(e){}
+  const seen=new Set();
+  return people.map(p=>({
+    ...p,
+    name:String(p.name||'').trim(),
+    phone:formatPhoneLoose(p.phone||''),
+    phoneDigits:normalizePushPhone(p.phone||''),
+    club:String(p.club||'').trim(),
+    nameKey:normalizePushName(p.name||''),
+    clubKey:normalizePushKey(p.club||'')
+  })).filter(p=>{
+    const key=(p.phoneDigits?('p:'+p.phoneDigits):'') || (p.uid?('u:'+p.uid):'') || ('n:'+p.nameKey+'|c:'+p.clubKey);
+    if(!p.nameKey && !p.phoneDigits && !p.uid) return false;
+    if(seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 function getTeamPushTargetKeys(team){
   const keys=[];
@@ -7605,25 +7781,35 @@ function getTeamPushTargetKeys(team){
   return [...new Set(keys.map(normalizePushKey).filter(Boolean))];
 }
 function getTeamPushPhoneDigits(team){
-  const phones=[];
-  try{
-    if(team?.phone) phones.push(team.phone);
-    if(Array.isArray(team?.individualPlayers)) team.individualPlayers.forEach(p=>{ if(p?.phone) phones.push(p.phone); });
-  }catch(e){}
-  return [...new Set(phones.map(v=>String(v||'').replace(/[^0-9]/g,'')).filter(v=>v.length>=9))];
+  return [...new Set(getTeamPushPeople(team).map(p=>p.phoneDigits).filter(v=>String(v||'').length>=9))];
 }
 
 function isIndividualPushKey(key=''){
   try{ return getTournamentTypeById(String(key||'').split('_')[0]||'')==='individual_pair'; }catch(e){ return false; }
 }
+function pushTokenMatchesPersonTarget(x={}, person={}){
+  const tokenPhones=[x.phoneDigits, x.userPhoneDigits].map(normalizePushPhone).filter(v=>v.length>=9);
+  const targetPhone=normalizePushPhone(person.phoneDigits||person.phone||'');
+  if(targetPhone && tokenPhones.includes(targetPhone)) return true;
+
+  const tokenNames=[x.nameKey, x.userNameKey, normalizePushName(x.name||''), normalizePushName(x.displayName||'')].filter(Boolean);
+  const targetName=normalizePushName(person.name||person.nameKey||'');
+  const tokenClubs=[x.clubKey, x.userClubKey, normalizePushKey(x.club||'')].filter(Boolean);
+  const targetClub=normalizePushKey(person.club||person.clubKey||'');
+  if(targetName && tokenNames.includes(targetName) && targetClub && tokenClubs.includes(targetClub)) return true;
+  return false;
+}
 function pushTokenMatchesTargetsForKey(key,x,targets={}){
-  const pd=String(x?.phoneDigits||'').replace(/[^0-9]/g,'');
+  const pd=normalizePushPhone(x?.phoneDigits||x?.phone||'');
+  const upd=normalizePushPhone(x?.userPhoneDigits||'');
   const uid=String(x?.uid||'');
-  if(isIndividualPushKey(key)){
-    return (pd && (targets.phoneDigits||[]).includes(pd)) || (uid && (targets.uids||[]).includes(uid));
-  }
+  const phones=(targets.phoneDigits||[]).map(normalizePushPhone);
+  if((pd && phones.includes(pd)) || (upd && phones.includes(upd)) || (uid && (targets.uids||[]).includes(uid))) return true;
+  if((targets.people||[]).some(p=>pushTokenMatchesPersonTarget(x,p))) return true;
+  if(isIndividualPushKey(key)) return false;
   const ck=normalizePushKey(x?.clubKey||x?.club||'');
-  return (ck && (targets.clubKeys||[]).includes(ck)) || (pd && (targets.phoneDigits||[]).includes(pd)) || (uid && (targets.uids||[]).includes(uid));
+  const uck=normalizePushKey(x?.userClubKey||'');
+  return (ck && (targets.clubKeys||[]).includes(ck)) || (uck && (targets.clubKeys||[]).includes(uck));
 }
 function formatCourtDisplayName(court=''){
   const raw=String(court||'').trim();
@@ -7656,12 +7842,20 @@ function buildAutoMatchPushMessage(key,m){
 }
 function getMatchPushTargets(key,m){
   const {t1,t2}=getMatchTeamObjects(key,m);
-  const individual=isIndividualPushKey(key) || [t1,t2].some(t=>t?.tournamentType==='individual_pair'||Array.isArray(t?.individualPlayers));
-  const clubKeys=individual ? [] : [...getTeamPushTargetKeys(t1),...getTeamPushTargetKeys(t2)];
-  const phoneDigits=[...getTeamPushPhoneDigits(t1),...getTeamPushPhoneDigits(t2)];
+  const teams=[t1,t2].filter(Boolean);
+  const individual=isIndividualPushKey(key) || teams.some(t=>t?.tournamentType==='individual_pair'||Array.isArray(t?.individualPlayers));
+  const people=teams.flatMap(t=>getTeamPushPeople(t));
+  const clubKeys=individual ? [] : teams.flatMap(t=>getTeamPushTargetKeys(t));
+  const phoneDigits=people.map(p=>p.phoneDigits).filter(v=>String(v||'').length>=9);
   const uids=[];
-  [t1,t2].forEach(t=>{ if(t?.ownerUid) uids.push(String(t.ownerUid)); });
-  return {clubKeys:[...new Set(clubKeys)], phoneDigits:[...new Set(phoneDigits)], uids:[...new Set(uids)]};
+  people.forEach(p=>{ if(p?.uid) uids.push(String(p.uid)); });
+  teams.forEach(t=>{ if(t?.ownerUid) uids.push(String(t.ownerUid)); });
+  return {
+    clubKeys:[...new Set(clubKeys)],
+    phoneDigits:[...new Set(phoneDigits)],
+    uids:[...new Set(uids)],
+    people
+  };
 }
 async function sendPushToTokenDocs(tokenDocs, title, body, data={}){
   const uniq=[];
@@ -7840,39 +8034,39 @@ function getManualPushSmsFallbackRecipients(ctx={}){
   try{
     if(ctx.type==='match'){
       const m=(G.matches[ctx.key]||[]).find(x=>String(x.id)===String(ctx.mid));
-      return uniqueSmsRecipientsByPhone(getMatchNotificationRecipients(ctx.key,m));
+      return uniqueManualPushRecipientsAll(getMatchNotificationRecipients(ctx.key,m));
     }
     if(ctx.type==='team'){
       const team=(G.teams[ctx.key]||[])[Number(ctx.idx)];
       if(!team) return [];
       if(team?.tournamentType==='individual_pair' || Array.isArray(team?.individualPlayers)){
-        return uniqueSmsRecipientsByPhone(getIndividualPlayers(team).slice(0,2).filter(p=>p?.receiveOrderSms!==false).map((p,i)=>({name:p?.name||`참가자${i+1}`, phone:p?.phone||'', club:p?.clubsRaw||''})));
+        return uniqueManualPushRecipientsAll(getIndividualPlayers(team).slice(0,2).filter(p=>p?.receiveOrderSms!==false).map((p,i)=>({name:p?.name||`참가자${i+1}`, phone:p?.phone||'', club:p?.clubsRaw||''})));
       }
       const club=String(team?.club||'').trim();
       const phone=formatPhoneLoose(team?.phone || (G.meta?.clubContacts||{})[club] || '');
-      return uniqueSmsRecipientsByPhone([{name:team?.entryLabel||team?.pairLabel||club||'팀', phone, club}]);
+      return uniqueManualPushRecipientsAll([{name:team?.entryLabel||team?.pairLabel||club||'팀', phone, club}]);
     }
     if(ctx.type==='group'){
       const ms=(G.matches[ctx.key]||[]).filter(m=>m && m.phase==='group' && Number(m.group)===Number(ctx.gi));
-      return uniqueSmsRecipientsByPhone(ms.flatMap(m=>getMatchNotificationRecipients(ctx.key,m)));
+      return uniqueManualPushRecipientsAll(ms.flatMap(m=>getMatchNotificationRecipients(ctx.key,m)));
     }
     if(ctx.type==='all'){
       const contacts=G.meta?.clubContacts||{};
-      return uniqueSmsRecipientsByPhone(Object.entries(contacts).map(([club,phone])=>({name:club, club, phone, role:'captain'})));
+      return uniqueManualPushRecipientsAll(Object.entries(contacts).map(([club,phone])=>({name:club, club, phone, role:'captain'})));
     }
   }catch(e){ console.warn('fallback sms recipients failed', e); }
   return [];
 }
 function recipientHasPushTokenDoc(recipient, docs=[]){
-  const phone=String(recipient?.phone||'').replace(/[^0-9]/g,'');
-  const club=normalizePushKey(recipient?.club||'');
-  return (docs||[]).some(x=>{
-    const xp=String(x?.phoneDigits||'').replace(/[^0-9]/g,'');
-    const xc=normalizePushKey(x?.clubKey||x?.club||'');
-    if(phone && xp && phone===xp) return true;
-    if(club && xc && club===xc) return true;
-    return false;
-  });
+  const person={
+    name:recipient?.name||'',
+    phone:recipient?.phone||'',
+    phoneDigits:normalizePushPhone(recipient?.phone||''),
+    club:recipient?.club||'',
+    nameKey:normalizePushName(recipient?.name||''),
+    clubKey:normalizePushKey(recipient?.club||'')
+  };
+  return (docs||[]).some(x=>pushTokenMatchesPersonTarget(x, person));
 }
 function getPushUnavailableSmsRecipients(recipients=[], docs=[]){
   return uniqueSmsRecipientsByPhone(recipients).filter(r=>!recipientHasPushTokenDoc(r,docs));
@@ -15163,11 +15357,12 @@ function getMatchNotificationRecipients(key,m){
           const wantsOrder = p?.receiveOrderSms !== false;
           if(!wantsOrder) return;
           const phone=formatPhoneLoose(p?.phone||'');
-          if(!phone) return;
-          if(seen.has(phone)) return;
-          seen.add(phone);
           const nm=String(p?.name||'').trim() || `참가자${idx+1}`;
-          out.push({name:nm, phone, role:'player'});
+          const club=String(p?.clubsRaw||((p?.clubs||[])[0])||team?.club||'').trim();
+          const key=(phone?('p:'+phone.replace(/[^0-9]/g,'')):'') || ('n:'+normalizePushName(nm)+'|c:'+normalizePushKey(club));
+          if(seen.has(key)) return;
+          seen.add(key);
+          out.push({name:nm, phone, role:'player', club});
         });
       });
       return out;
@@ -15176,10 +15371,15 @@ function getMatchNotificationRecipients(key,m){
     const seen=new Set();
     return teams.map((team,idx)=>{
       const club=String(team?.club||'').trim();
-      const phone=formatPhoneLoose(contacts[club]||'');
+      const phone=formatPhoneLoose(contacts[club]||team?.phone||'');
       const label=tdn(team,key, idx===0?m?.t1:m?.t2);
       return {name:label||club||`팀${idx+1}`, phone, role:'captain', club};
-    }).filter(r=>r.phone && !seen.has(r.phone) && (seen.add(r.phone), true));
+    }).filter(r=>{
+      const k=(r.phone?('p:'+r.phone.replace(/[^0-9]/g,'')):'') || ('n:'+normalizePushName(r.name)+'|c:'+normalizePushKey(r.club));
+      if(seen.has(k)) return false;
+      seen.add(k);
+      return !!(r.name||r.club||r.phone);
+    });
   }catch(e){ return []; }
 }
 function getMatchResultNotificationRecipients(key,m){
@@ -15195,11 +15395,12 @@ function getMatchResultNotificationRecipients(key,m){
           const wantsResult = p?.receiveResultSms !== false;
           if(!wantsResult) return;
           const phone=formatPhoneLoose(p?.phone||'');
-          if(!phone) return;
-          if(seen.has(phone)) return;
-          seen.add(phone);
           const nm=String(p?.name||'').trim() || `참가자${idx+1}`;
-          out.push({name:nm, phone, role:'player'});
+          const club=String(p?.clubsRaw||((p?.clubs||[])[0])||team?.club||'').trim();
+          const key=(phone?('p:'+phone.replace(/[^0-9]/g,'')):'') || ('n:'+normalizePushName(nm)+'|c:'+normalizePushKey(club));
+          if(seen.has(key)) return;
+          seen.add(key);
+          out.push({name:nm, phone, role:'player', club});
         });
       });
       return out;
@@ -15264,9 +15465,6 @@ function buildCourtNotificationStateMap(matchesObj){
   return out;
 }
 
-function normalizePushPhone(raw=''){
-  return String(raw||'').replace(/[^0-9]/g,'');
-}
 function normalizePushClub(raw=''){
   return String(raw||'').trim().toLowerCase();
 }
