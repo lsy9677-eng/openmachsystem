@@ -8022,7 +8022,18 @@ async function sendPushToTokenDocs(tokenDocs, title, body, data={}){
       }
     }
   }
-  return {ok, fail, stale, total:uniq.length};
+  const result={ok, fail, stale, total:uniq.length};
+  try{
+    recordAdminNotificationSendLog({
+      title, body,
+      kind:(data&&data.type)||'push',
+      target:(data&&data.target)||'',
+      tid:(data&&data.tid)||'',
+      division:(data&&data.division)||'',
+      ok, fail, stale, total:uniq.length
+    });
+  }catch(_e){}
+  return result;
 }
 
 function getAutoNotificationSettings(){
@@ -8755,6 +8766,211 @@ window.openPushStatsDashboard=openPushStatsDashboard;
 window.renderPushStatsDashboard=renderPushStatsDashboard;
 window.copyPushStatsMissingList=copyPushStatsMissingList;
 window.sendPushStatsSmsFallback=sendPushStatsSmsFallback;
+
+
+// ── v331: 대회 당일 운영 점검판 ─────────────────────────────────────────────
+const ADMIN_NOTIFICATION_LOG_KEY='230match_admin_notification_send_logs_v1';
+function getAdminNotificationSendLogs(){
+  try{
+    const arr=JSON.parse(localStorage.getItem(ADMIN_NOTIFICATION_LOG_KEY)||'[]');
+    return Array.isArray(arr)?arr.slice(0,80):[];
+  }catch(e){ return []; }
+}
+function recordAdminNotificationSendLog(row={}){
+  try{
+    const item={
+      at:Date.now(),
+      kind:String(row.kind||'push'),
+      title:String(row.title||''),
+      body:String(row.body||''),
+      target:String(row.target||''),
+      tid:String(row.tid||''),
+      division:String(row.division||''),
+      ok:Number(row.ok||0),
+      fail:Number(row.fail||0),
+      stale:Number(row.stale||0),
+      total:Number(row.total||0)
+    };
+    const arr=[item,...getAdminNotificationSendLogs()].slice(0,80);
+    localStorage.setItem(ADMIN_NOTIFICATION_LOG_KEY, JSON.stringify(arr));
+  }catch(e){}
+}
+function formatAdminCheckTime(ts){
+  try{
+    if(!ts) return '-';
+    const d=new Date(Number(ts));
+    const pad=n=>String(n).padStart(2,'0');
+    return `${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }catch(e){ return '-'; }
+}
+function ensureDayCheckModal(){
+  if(document.getElementById('mDayCheck')) return;
+  const wrap=document.createElement('div');
+  wrap.id='mDayCheck';
+  wrap.className='modal-overlay';
+  wrap.innerHTML=`<div class="modal-box" style="max-width:1040px;width:96vw">
+    <div class="modal-header" style="background:#0f1e3a">
+      <h3>✅ 대회 당일 점검판</h3>
+      <button class="modal-close" onclick="cm('mDayCheck')">✕</button>
+    </div>
+    <div class="modal-body" style="max-height:78vh;overflow:auto">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+        <div style="font-size:.78rem;color:var(--text2);line-height:1.6">현재 선택된 대회를 기준으로 알림·전화번호·파트너 연결·자동 알림·최근 발송 이력을 점검합니다.</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-outline" onclick="renderDayCheckDashboard(true)" style="font-size:.78rem;padding:6px 10px">🔄 새로고침</button>
+          <button class="btn btn-outline" onclick="copyDayCheckReport()" style="font-size:.78rem;padding:6px 10px">📋 점검내용 복사</button>
+          <button class="btn btn-primary" onclick="openPushStatsDashboard()" style="font-size:.78rem;padding:6px 10px;background:#2563eb;color:#fff">📊 알림 상태판</button>
+        </div>
+      </div>
+      <div id="dayCheckBody"><div class="empty-state card"><div class="empty-icon">✅</div><p>점검 데이터를 불러오는 중...</p></div></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-gray" onclick="cm('mDayCheck')">닫기</button></div>
+  </div>`;
+  document.body.appendChild(wrap);
+}
+function injectDayCheckAdminButton(){
+  try{
+    ensureDayCheckModal();
+    const body=document.querySelector('#mAdminSettings .modal-body');
+    if(!body || document.getElementById('dayCheckAdminBox')) return;
+    const box=document.createElement('div');
+    box.id='dayCheckAdminBox';
+    box.style.cssText='margin-bottom:16px;padding:14px;background:linear-gradient(135deg,#ecfdf5,#eff6ff);border:1.5px solid #86efac;border-radius:12px';
+    box.innerHTML=`<div style="font-weight:1000;font-size:.92rem;color:#166534;margin-bottom:7px">✅ 대회 당일 점검판</div>
+      <div style="font-size:.75rem;color:var(--text2);line-height:1.7;margin-bottom:10px">알림 가능/문자 대체/정보 부족, 전화번호 누락, 파트너 미연결, 자동 알림 설정, 최근 발송 로그를 한 화면에서 확인합니다.</div>
+      <button class="btn btn-primary" onclick="openDayCheckDashboard()" style="width:100%;background:#16a34a;color:#fff">✅ 대회 점검 실행</button>`;
+    body.insertBefore(box, body.firstChild);
+  }catch(e){ console.warn('injectDayCheckAdminButton failed', e); }
+}
+function getCurrentTournamentKeysForDayCheck(tid=''){
+  return Object.keys(G.teams||{}).filter(k=>String(k).startsWith(String(tid)+'_'));
+}
+function collectDayCheckMissingPhones(tid=''){
+  const rows=[];
+  getCurrentTournamentKeysForDayCheck(tid).forEach(key=>{
+    const div=_k2td(key).div;
+    (G.teams[key]||[]).forEach((team,idx)=>{
+      const indiv=team?.tournamentType==='individual_pair' || Array.isArray(team?.individualPlayers) || isIndividualByKey(key);
+      if(indiv){
+        getIndividualPlayers(team).slice(0,2).forEach((p,i)=>{
+          const phone=String(p?.phone||'').replace(/[^0-9]/g,'');
+          if(phone.length<9) rows.push({name:p?.name||`참가자${i+1}`, club:p?.clubsRaw||((p?.clubs||[]).join(', ')), div, reason:'전화번호 없음', team:tdn(team,key,idx)||''});
+        });
+      }else{
+        const club=String(team?.club||'').trim();
+        const phone=String(team?.phone || (G.meta?.clubContacts||{})[club] || '').replace(/[^0-9]/g,'');
+        if(phone.length<9) rows.push({name:team?.entryLabel||tdn(team,key,idx)||club||'팀', club, div, reason:'팀/경기이사 전화번호 없음'});
+      }
+    });
+  });
+  return rows;
+}
+function collectDayCheckPartnerUnlinked(tid='', enabledTokens=[]){
+  const rows=[];
+  getCurrentTournamentKeysForDayCheck(tid).forEach(key=>{
+    const div=_k2td(key).div;
+    (G.teams[key]||[]).forEach((team,idx)=>{
+      const indiv=team?.tournamentType==='individual_pair' || Array.isArray(team?.individualPlayers) || isIndividualByKey(key);
+      if(!indiv) return;
+      const players=getIndividualPlayers(team).slice(0,2);
+      players.forEach((p,i)=>{
+        const target={name:p?.name||`참가자${i+1}`, phone:p?.phone||'', club:p?.clubsRaw||((p?.clubs||[]).join(', ')), div, role:'개인전 선수'};
+        const phone=String(target.phone||'').replace(/[^0-9]/g,'');
+        if(phone.length<9) return;
+        const hasToken=(enabledTokens||[]).some(x=>tokenMatchesStatsTarget(x,target));
+        if(!hasToken){
+          rows.push({...target, reason:i===0?'알림 미연결':'파트너 알림 미연결', team:tdn(team,key,idx)||`${players.map(pp=>pp?.name||'').filter(Boolean).join(' / ')}`});
+        }
+      });
+    });
+  });
+  return rows;
+}
+function summarizeAutoNotificationSettingsForDayCheck(){
+  const st=getAutoNotificationSettings();
+  const labels={registration:'접수',courtWaiting:'코트대기',courtChanged:'코트변경',matchStart:'경기시작',orderSubmitted:'오더제출',matchComplete:'경기완료'};
+  return Object.keys(labels).map(k=>({key:k,label:labels[k],on:st[k]!==false}));
+}
+function renderDayCheckMiniCards(items=[]){
+  return `<div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:12px">${items.map(it=>`<div style="padding:12px;border-radius:14px;border:1px solid ${it.border||'#dbeafe'};background:${it.bg||'#f8fbff'}"><div style="font-size:.7rem;font-weight:1000;color:${it.color||'#475569'}">${it.label}</div><div style="font-size:1.45rem;font-weight:1000;color:${it.color||'#0f1e3a'};margin-top:4px">${it.value}</div></div>`).join('')}</div>`;
+}
+function renderDayCheckSimpleList(title, list=[], opts={}){
+  const color=opts.color||'#0f1e3a';
+  const empty=opts.empty||'문제 없음';
+  const rows=(list||[]).slice(0,60).map((r,i)=>`<tr><td>${i+1}</td><td style="text-align:left;font-weight:900">${esc(r.name||'')}</td><td>${esc(maskPhoneForStats(r.phone||''))}</td><td>${esc(r.club||'')}</td><td>${esc(dl(r.div||'')||r.div||'')}</td><td style="text-align:left">${esc(r.reason||r.missing?.join(', ')||'')}</td></tr>`).join('');
+  return `<div style="margin-top:12px"><div style="font-weight:1000;color:${color};font-size:.9rem;margin-bottom:7px">${title} <span style="font-size:.78rem;color:var(--text2)">${(list||[]).length}명</span></div>${rows?`<div class="table-wrap"><table><thead><tr><th>#</th><th>이름/팀</th><th>전화번호</th><th>클럽</th><th>부서</th><th>상태</th></tr></thead><tbody>${rows}</tbody></table></div>`:`<div class="home-empty-note">${empty}</div>`}</div>`;
+}
+function renderAutoSettingsDayCheck(settings=[]){
+  return `<div style="margin-top:12px"><div style="font-weight:1000;color:#1d4ed8;font-size:.9rem;margin-bottom:7px">🤖 자동 알림 설정 상태</div><div style="display:flex;gap:7px;flex-wrap:wrap">${settings.map(x=>`<span style="display:inline-flex;align-items:center;gap:5px;padding:7px 10px;border-radius:999px;border:1px solid ${x.on?'#86efac':'#cbd5e1'};background:${x.on?'#dcfce7':'#f8fafc'};color:${x.on?'#166534':'#475569'};font-size:.78rem;font-weight:1000">${x.on?'ON':'OFF'} · ${x.label}</span>`).join('')}</div></div>`;
+}
+function renderRecentSendLogsDayCheck(logs=[]){
+  const rows=(logs||[]).slice(0,12).map((l,i)=>`<tr><td>${formatAdminCheckTime(l.at)}</td><td>${esc(getAutoNotificationKindLabel(l.kind)||l.kind||'알림')}</td><td style="text-align:left;font-weight:900">${esc(l.title||'')}</td><td>${Number(l.ok||0)}</td><td>${Number(l.fail||0)}</td><td>${Number(l.stale||0)}</td></tr>`).join('');
+  return `<div style="margin-top:12px"><div style="font-weight:1000;color:#0f1e3a;font-size:.9rem;margin-bottom:7px">🧾 최근 발송 로그 <span style="font-size:.78rem;color:var(--text2)">${(logs||[]).length}건</span></div>${rows?`<div class="table-wrap"><table><thead><tr><th>시각</th><th>종류</th><th>제목</th><th>성공</th><th>실패</th><th>만료</th></tr></thead><tbody>${rows}</tbody></table></div>`:`<div class="home-empty-note">이 기기에서 기록된 발송 로그가 없습니다. 앞으로 발송되는 알림부터 기록됩니다.</div>`}</div>`;
+}
+let DAY_CHECK_CACHE=null;
+async function openDayCheckDashboard(){
+  if(!(AD||TM||OP)){ toast('운영 권한이 필요합니다.','info'); return; }
+  ensureDayCheckModal();
+  om('mDayCheck');
+  await renderDayCheckDashboard(true);
+}
+async function renderDayCheckDashboard(force=false){
+  const body=ge('dayCheckBody');
+  if(!body) return;
+  body.innerHTML='<div class="empty-state card"><div class="empty-icon">✅</div><p>대회 점검 중...</p></div>';
+  try{
+    const stats=await collectPushStatsData();
+    const tid=stats.tid;
+    const t=stats.tournament;
+    const cur=stats.current;
+    const phoneMissing=collectDayCheckMissingPhones(tid);
+    const partnerUnlinked=collectDayCheckPartnerUnlinked(tid, stats.enabledTokens||[]);
+    const autoSettings=summarizeAutoNotificationSettingsForDayCheck();
+    const logs=getAdminNotificationSendLogs();
+    DAY_CHECK_CACHE={stats,phoneMissing,partnerUnlinked,autoSettings,logs};
+    const warnCount=cur.infoMissing.length + phoneMissing.length + partnerUnlinked.length;
+    body.innerHTML=`
+      <div style="padding:12px 14px;border-radius:16px;background:${warnCount?'linear-gradient(135deg,#fff7ed,#eff6ff)':'linear-gradient(135deg,#ecfdf5,#eff6ff)'};border:1.5px solid ${warnCount?'#fdba74':'#86efac'};margin-bottom:12px">
+        <div style="font-weight:1000;color:${warnCount?'#c2410c':'#166534'};font-size:.96rem">${warnCount?'점검 필요':'대회 준비 상태 양호'} · ${esc(t?.name||'선택된 대회 없음')}</div>
+        <div style="font-size:.76rem;color:var(--text2);line-height:1.6;margin-top:4px">정보 부족/전화번호 누락/파트너 미연결은 대회 전날까지 정리하는 것을 권장합니다.</div>
+      </div>
+      ${renderDayCheckMiniCards([
+        {label:'푸시 가능',value:cur.pushPossible.length,bg:'#dcfce7',border:'#86efac',color:'#166534'},
+        {label:'문자 대체',value:cur.smsFallback.length,bg:'#fff7ed',border:'#fdba74',color:'#c2410c'},
+        {label:'정보 부족',value:cur.infoMissing.length,bg:'#fef2f2',border:'#fecaca',color:'#b91c1c'},
+        {label:'전화번호 누락',value:phoneMissing.length,bg:'#fef2f2',border:'#fecaca',color:'#b91c1c'},
+        {label:'파트너 미연결',value:partnerUnlinked.length,bg:'#f5f3ff',border:'#c4b5fd',color:'#6d28d9'}
+      ])}
+      ${renderAutoSettingsDayCheck(autoSettings)}
+      ${renderRecentSendLogsDayCheck(logs)}
+      ${renderDayCheckSimpleList('📵 전화번호 누락 명단', phoneMissing, {color:'#b91c1c', empty:'전화번호 누락이 없습니다.'})}
+      ${renderDayCheckSimpleList('🔗 파트너/회원 알림 미연결 명단', partnerUnlinked, {color:'#6d28d9', empty:'파트너 미연결 대상이 없습니다.'})}
+      ${renderStatsTargetTable('⚠️ 알림 정보 부족 명단', cur.infoMissing, {color:'#b91c1c', empty:'알림 정보 부족 대상이 없습니다.'})}`;
+  }catch(e){
+    body.innerHTML=`<div class="home-empty-note" style="border-color:#fecaca;background:#fef2f2;color:#991b1b">대회 점검판을 불러오지 못했습니다.<br>${esc(e?.message||e)}</div>`;
+  }
+}
+async function copyDayCheckReport(){
+  try{
+    if(!DAY_CHECK_CACHE) await renderDayCheckDashboard(true);
+    const c=DAY_CHECK_CACHE;
+    if(!c){ toast('점검 데이터를 먼저 불러와 주세요','info'); return; }
+    const t=c.stats?.tournament?.name||'';
+    const cur=c.stats?.current||{};
+    const line=(arr)=> (arr||[]).map((r,i)=>`${i+1}. ${r.name||''} / ${r.club||''} / ${dl(r.div||'')||r.div||''} / ${r.reason||''}`).join('\n') || '없음';
+    const auto=c.autoSettings.map(x=>`${x.label}:${x.on?'ON':'OFF'}`).join(', ');
+    const text=`[230MATCH 대회 당일 점검]\n대회: ${t}\n\n푸시 가능: ${cur.pushPossible?.length||0}\n문자 대체: ${cur.smsFallback?.length||0}\n정보 부족: ${cur.infoMissing?.length||0}\n전화번호 누락: ${c.phoneMissing.length}\n파트너 미연결: ${c.partnerUnlinked.length}\n자동 알림: ${auto}\n최근 발송 로그: ${c.logs.length}건\n\n[전화번호 누락]\n${line(c.phoneMissing)}\n\n[파트너 미연결]\n${line(c.partnerUnlinked)}\n\n[정보 부족]\n${(cur.infoMissing||[]).map((r,i)=>`${i+1}. ${r.name||''} / ${r.club||''} / ${dl(r.div||'')||r.div||''} / 부족:${(r.missing||[]).join(', ')}`).join('\n')||'없음'}`;
+    const ok=await copyTextSafe(text);
+    toast(ok?'대회 점검 내용을 복사했습니다 ✅':'복사 실패','info');
+  }catch(e){ toast('복사 실패: '+(e?.message||e),'error'); }
+}
+window.openDayCheckDashboard=openDayCheckDashboard;
+window.renderDayCheckDashboard=renderDayCheckDashboard;
+window.copyDayCheckReport=copyDayCheckReport;
+window.getAdminNotificationSendLogs=getAdminNotificationSendLogs;
+window.recordAdminNotificationSendLog=recordAdminNotificationSendLog;
+setTimeout(injectDayCheckAdminButton,1250);
+document.addEventListener('DOMContentLoaded',()=>setTimeout(injectDayCheckAdminButton,850));
 setTimeout(injectPushStatsAdminButton,1200);
 document.addEventListener('DOMContentLoaded',()=>setTimeout(injectPushStatsAdminButton,800));
 
