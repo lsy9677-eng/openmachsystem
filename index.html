@@ -4224,6 +4224,284 @@ body {
 .indiv-prelim-grid .grp-matches-section.force-show{display:block !important;visibility:visible !important;opacity:1 !important;}
 @media(max-width:680px){.v308-main-round-shortcuts{gap:5px;padding:8px}.v308-main-round-shortcuts .v308-round-chip{font-size:.72rem;padding:6px 8px}}
 </style>
+
+<style id="v334RegisterListCleanStyle">
+/* v334: 개인전 접수 리스트 정렬 개선 - 이름은 목록, 소속/구력은 상세 팝업 */
+.rr-team-card.individual-entry-card{
+  border-radius:18px !important;
+  border:1px solid rgba(15,30,58,.10) !important;
+  background:#fff !important;
+  box-shadow:0 8px 18px rgba(15,30,58,.08) !important;
+  overflow:hidden !important;
+}
+.rr-team-card.individual-entry-card .rr-team-header{
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) !important;
+  gap:8px !important;
+  padding:12px 12px !important;
+  background:linear-gradient(135deg,#071026,#0f1e3a) !important;
+}
+.rr-team-card.individual-entry-card .rr-team-info{
+  display:grid !important;
+  grid-template-columns:32px minmax(0,1fr) !important;
+  align-items:center !important;
+  gap:9px !important;
+  min-width:0 !important;
+}
+.rr-team-card.individual-entry-card .rr-team-num{
+  width:28px !important;height:28px !important;
+  border-radius:50% !important;
+  background:rgba(255,255,255,.20) !important;
+  color:#fff !important;
+  font-size:.82rem !important;
+  font-weight:1000 !important;
+}
+.rr-team-card.individual-entry-card .rr-team-name{
+  min-width:0 !important;
+  width:100% !important;
+  font-size:1rem !important;
+  line-height:1.35 !important;
+  color:#fff !important;
+  font-weight:1000 !important;
+}
+.v334-pair-line{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  flex-wrap:wrap;
+  min-width:0;
+}
+.v334-player-pill{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  min-width:0;
+  max-width:100%;
+  padding:3px 0;
+}
+.v334-player-no{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:20px;height:20px;
+  border-radius:999px;
+  background:rgba(255,255,255,.16);
+  color:#fff;
+  font-size:.68rem;
+  font-weight:1000;
+  flex:0 0 auto;
+}
+.v334-player-name{
+  min-width:0;
+  max-width:34vw;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  word-break:keep-all;
+}
+.v334-pair-slash{color:rgba(255,255,255,.55);font-weight:900;}
+.rr-admin-btns.v334-individual-actions{
+  display:grid !important;
+  grid-template-columns:repeat(auto-fit,minmax(70px,1fr)) !important;
+  gap:6px !important;
+  width:100% !important;
+  margin-top:2px !important;
+}
+.rr-admin-btns.v334-individual-actions .btn{
+  width:100% !important;
+  min-height:34px !important;
+  border-radius:10px !important;
+  padding:5px 7px !important;
+  font-size:.76rem !important;
+  font-weight:1000 !important;
+  white-space:nowrap !important;
+}
+.v334-info-title{font-size:1rem;font-weight:1000;color:#0f1e3a;line-height:1.45;margin-bottom:6px;}
+.v334-info-title .v334-player-no{background:#0f1e3a;color:#fff;}
+.v334-info-title .v334-player-name{color:#0f1e3a;max-width:none;}
+.v334-info-title .v334-pair-slash{color:#94a3b8;}
+.v334-info-meta{font-size:.76rem;color:#64748b;margin-bottom:10px;font-weight:800;}
+.v334-info-list{display:flex;flex-direction:column;gap:8px;}
+.v334-info-row{display:grid;grid-template-columns:34px minmax(0,1fr);gap:9px;align-items:start;padding:10px 12px;border:1px solid #dbeafe;background:#f8fbff;border-radius:13px;}
+.v334-info-num{width:28px;height:28px;border-radius:999px;background:#0f1e3a;color:#fff;display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:1000;}
+.v334-info-name{font-size:.95rem;font-weight:1000;color:#0f172a;line-height:1.35;}
+.v334-info-sub{font-size:.78rem;color:#475569;line-height:1.6;margin-top:2px;word-break:keep-all;overflow-wrap:anywhere;}
+.v334-info-note{margin-top:10px;padding:9px 11px;border-radius:12px;background:#fff7ed;border:1px solid #fdba74;color:#92400e;font-size:.76rem;line-height:1.55;font-weight:800;}
+@media(max-width:520px){
+  .rr-team-card.individual-entry-card .rr-team-header{padding:11px 10px !important;}
+  .rr-team-card.individual-entry-card .rr-team-info{grid-template-columns:30px minmax(0,1fr) !important;gap:7px !important;}
+  .v334-pair-line{gap:4px;}
+  .v334-player-name{max-width:calc(100vw - 170px);font-size:.96rem;}
+  .rr-admin-btns.v334-individual-actions{grid-template-columns:repeat(4,minmax(0,1fr)) !important;gap:5px !important;}
+  .rr-admin-btns.v334-individual-actions .btn{min-height:32px !important;font-size:.68rem !important;padding:4px 3px !important;}
+}
+</style>
+
+
+<style id="v335RegisterGridCompactStyle">
+/* v335: 개인전 접수 리스트 2열 컴팩트 정렬 */
+.v335-register-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:10px;
+  align-items:stretch;
+}
+.v335-register-grid .rr-team-card.individual-entry-card{
+  margin-bottom:0 !important;
+  border-radius:15px !important;
+  box-shadow:0 8px 18px rgba(15,30,58,.10) !important;
+}
+.v335-register-grid .rr-team-card.individual-entry-card .rr-team-header{
+  min-height:86px !important;
+  padding:10px 10px 9px !important;
+  gap:7px !important;
+  align-content:space-between !important;
+}
+.v335-register-grid .rr-team-card.individual-entry-card .rr-team-info{
+  grid-template-columns:26px minmax(0,1fr) !important;
+  gap:7px !important;
+}
+.v335-register-grid .rr-team-card.individual-entry-card .rr-team-num{
+  width:24px !important;
+  height:24px !important;
+  font-size:.72rem !important;
+}
+.v335-pair-names{
+  display:block;
+  min-width:0;
+  color:#fff;
+  font-size:.95rem;
+  font-weight:1000;
+  line-height:1.28;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  word-break:keep-all;
+}
+.v335-pair-names .slash{
+  color:rgba(255,255,255,.58);
+  margin:0 4px;
+  font-weight:900;
+}
+.v335-register-grid .rr-admin-btns.v334-individual-actions{
+  display:flex !important;
+  flex-wrap:wrap !important;
+  gap:5px !important;
+  width:100% !important;
+  margin-top:0 !important;
+}
+.v335-register-grid .rr-admin-btns.v334-individual-actions .btn{
+  width:auto !important;
+  min-width:0 !important;
+  min-height:26px !important;
+  height:26px !important;
+  border-radius:8px !important;
+  padding:2px 7px !important;
+  font-size:.62rem !important;
+  line-height:1 !important;
+  box-shadow:none !important;
+}
+.v335-register-grid .rr-admin-btns.v334-individual-actions .v334-detail-btn{
+  flex:0 0 auto !important;
+  padding:2px 9px !important;
+  background:rgba(255,255,255,.95) !important;
+}
+.v335-register-grid .rr-admin-btns.v334-individual-actions .rr-btn-edit:not(.v334-detail-btn),
+.v335-register-grid .rr-admin-btns.v334-individual-actions .rr-btn-del{
+  flex:1 1 calc(33.3% - 4px) !important;
+}
+@media(max-width:380px){
+  .v335-register-grid{grid-template-columns:1fr;}
+  .v335-register-grid .rr-team-card.individual-entry-card .rr-team-header{min-height:auto !important;}
+}
+/* ===== v336 개인전 참가 리스트형 ===== */
+.v336-register-list{
+  display:flex;
+  flex-direction:column;
+  gap:0;
+  border:1.5px solid var(--border);
+  border-radius:14px;
+  overflow:hidden;
+  background:var(--panel);
+}
+.v336-entry-row{
+  display:flex;
+  align-items:center;
+  gap:0;
+  padding:0;
+  border-bottom:1px solid var(--border);
+  transition:background .15s;
+}
+.v336-entry-row:last-child{ border-bottom:none; }
+.v336-entry-row:hover{ background:var(--panel2); }
+.v336-entry-num{
+  flex:0 0 38px;
+  text-align:center;
+  font-size:.75rem;
+  font-weight:900;
+  color:var(--text3);
+  padding:12px 0;
+  border-right:1px solid var(--border);
+  background:var(--panel2);
+  align-self:stretch;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.v336-entry-names{
+  flex:1 1 auto;
+  min-width:0;
+  padding:10px 12px;
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+  justify-content:center;
+}
+.v336-entry-names .slash{
+  color:var(--text3);
+  margin:0 3px;
+  font-weight:400;
+  font-size:.78rem;
+}
+.v336-name-line{
+  font-size:.93rem;
+  font-weight:800;
+  color:var(--text1);
+  line-height:1.3;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.v336-club-line{
+  font-size:.72rem;
+  font-weight:500;
+  color:var(--text3);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.v336-entry-action{
+  flex:0 0 auto;
+  padding:8px 10px;
+  display:flex;
+  align-items:center;
+  gap:5px;
+}
+.v336-entry-action .btn{
+  min-height:28px !important;
+  height:28px !important;
+  padding:3px 9px !important;
+  font-size:.68rem !important;
+  border-radius:8px !important;
+  white-space:nowrap;
+}
+@media(max-width:380px){
+  .v336-entry-names{ font-size:.85rem; padding:9px 10px; }
+  .v336-entry-num{ flex:0 0 32px; font-size:.7rem; }
+}
+/* ===== v336 끝 ===== */
+
+</style>
 </head>
 <body>
 <header class="app-header">
@@ -17208,12 +17486,93 @@ function updateRegisterSlots(){
   if(subWrap) subWrap.style.display=isIndividual?'none':'block';
 }
 
+
+function v334IndividualNameOnly(raw=''){
+  return String(raw||'').replace(/\s*\([^)]*\)\s*$/,'').trim();
+}
+function v334IndividualPairTitle(team){
+  const ps=(typeof getIndividualPlayers==='function'?getIndividualPlayers(team):(team?.individualPlayers||[])).slice(0,2);
+  const safe=(v)=> (typeof esc==='function'?esc(v):String(v||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])));
+  if(ps.length){
+    return `<span class="v334-pair-line">${ps.map((p,idx)=>`<span class="v334-player-pill"><span class="v334-player-no">${idx+1}</span><span class="v334-player-name">${safe(v334IndividualNameOnly(p?.name||''))||'미입력'}</span></span>`).join('<span class="v334-pair-slash">/</span>')}</span>`;
+  }
+  const names=String(team?.pairLabel||team?.entryLabel||team?.club||'참가자').split('/').map(x=>v334IndividualNameOnly(x)).filter(Boolean).slice(0,2);
+  return `<span class="v334-pair-line">${(names.length?names:['참가자']).map((n,idx)=>`<span class="v334-player-pill"><span class="v334-player-no">${idx+1}</span><span class="v334-player-name">${safe(n)}</span></span>`).join('<span class="v334-pair-slash">/</span>')}</span>`;
+}
+
+
+function v336IndividualPairTitle(team){
+  const safe=(v)=>(typeof esc==='function'?esc(v):String(v||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])));
+  const ps=(typeof getIndividualPlayers==='function'?getIndividualPlayers(team):(team?.individualPlayers||[])).slice(0,2);
+  let names=[], clubs=[];
+  if(ps.length){
+    names=ps.map(p=>v334IndividualNameOnly(p?.name||'')).filter(Boolean);
+    clubs=ps.map(p=>safe(String(p?.clubsRaw||p?.club||'').trim())).filter(Boolean);
+  }
+  if(!names.length){
+    names=String(team?.pairLabel||team?.entryLabel||team?.club||'참가자').split('/').map(x=>v334IndividualNameOnly(x)).filter(Boolean).slice(0,2);
+  }
+  if(!names.length) names=['참가자'];
+  const nameHtml=names.map(safe).join('<span class="slash">/</span>');
+  const clubHtml=clubs.length ? clubs.join(' / ') : '';
+  return `<div class="v336-name-line">${nameHtml}</div>${clubHtml?`<div class="v336-club-line">${clubHtml}</div>`:''}`;
+}
+function v335IndividualPairTitleCompact(team){
+  const safe=(v)=> (typeof esc==='function'?esc(v):String(v||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])));
+  let names=[];
+  try{
+    const ps=(typeof getIndividualPlayers==='function'?getIndividualPlayers(team):(team?.individualPlayers||[])).slice(0,2);
+    names=ps.map(p=>v334IndividualNameOnly(p?.name||'')).filter(Boolean);
+  }catch(e){}
+  if(!names.length){
+    names=String(team?.pairLabel||team?.entryLabel||team?.club||'참가자').split('/').map(x=>v334IndividualNameOnly(x)).filter(Boolean).slice(0,2);
+  }
+  if(!names.length) names=['참가자'];
+  return `<span class="v335-pair-names">${names.map(safe).join('<span class="slash">/</span>')}</span>`;
+}
+function v334GetIndividualInfoRows(team){
+  const ps=(typeof getIndividualPlayers==='function'?getIndividualPlayers(team):(team?.individualPlayers||[])).slice(0,2);
+  const safe=(v)=> (typeof esc==='function'?esc(v):String(v||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])));
+  return ps.map((p,idx)=>{
+    const name=safe(v334IndividualNameOnly(p?.name||''));
+    const club=safe(p?.clubsRaw||p?.club||'');
+    const career=safe(p?.career||'');
+    const phone=(typeof formatPhoneLoose==='function'?formatPhoneLoose(p?.phone||''):(p?.phone||''));
+    const canPhone=!!(window.AD || window.TM || window.OP || (typeof isRegistrationOwner==='function' && isRegistrationOwner(team)));
+    return `<div class="v334-info-row"><div class="v334-info-num">${idx+1}</div><div class="v334-info-main"><div class="v334-info-name">${name||'미입력'}</div><div class="v334-info-sub">${club?`소속: ${club}`:'소속 미입력'}${career?` · 구력: ${career}`:''}${canPhone&&phone?` · 전화: ${safe(phone)}`:''}</div></div></div>`;
+  }).join('') || '<div class="v334-info-empty">상세 정보가 없습니다.</div>';
+}
+function ensureIndividualEntryInfoModal(){
+  let m=document.getElementById('mIndividualEntryInfo');
+  if(m) return m;
+  m=document.createElement('div');
+  m.className='modal-overlay';
+  m.id='mIndividualEntryInfo';
+  m.innerHTML=`<div class="modal-box" style="max-width:460px"><div class="modal-header"><h3>👥 참가자 상세</h3><button class="modal-close" onclick="cm('mIndividualEntryInfo')">✕</button></div><div class="modal-body" id="mIndividualEntryInfoBody"></div><div class="modal-footer"><button class="btn btn-gray" onclick="cm('mIndividualEntryInfo')">닫기</button></div></div>`;
+  document.body.appendChild(m);
+  return m;
+}
+function openIndividualEntryInfo(key, idx){
+  try{
+    const team=(G?.teams?.[key]||[])[idx];
+    if(!team){ toast('참가자 정보를 찾을 수 없습니다.','error'); return; }
+    ensureIndividualEntryInfoModal();
+    const body=document.getElementById('mIndividualEntryInfoBody');
+    if(body){
+      const div=(typeof _k2td==='function'?(_k2td(key).div||''):'');
+      body.innerHTML=`<div class="v334-info-title">${v334IndividualPairTitle(team)}</div><div class="v334-info-meta">${div?`부서: ${esc(div)}`:''}</div><div class="v334-info-list">${v334GetIndividualInfoRows(team)}</div><div class="v334-info-note">목록에서는 이름만 간결하게 표시하고, 소속/구력은 이 상세창에서 확인합니다.</div>`;
+    }
+    om('mIndividualEntryInfo');
+  }catch(e){ console.warn('openIndividualEntryInfo failed',e); toast('상세보기 오류','error'); }
+}
+window.openIndividualEntryInfo=openIndividualEntryInfo;
+
 function buildRegisterRosterGrid(tid,div,teams,key){
   if(!teams?.length){
     return `<div style="font-size:.78rem;color:var(--text3);padding:4px 0">아직 등록된 팀이 없습니다.</div>`;
   }
   const isWomen=(div==='여성부');
-  return teams.map((team,i)=>{
+  const __cards = teams.map((team,i)=>{
     const realIdx=(typeof team._origIdx==='number')?team._origIdx:i;
     const isIndividual=isIndividualTournament((G.tournaments||[]).find(x=>x.id===tid));
     const dn=isIndividual
@@ -17234,11 +17593,13 @@ function buildRegisterRosterGrid(tid,div,teams,key){
     const _teamClub = baseClub(team.club||'')||'';
     const _deadlinePassed = !AD && isRegDeadlinePassed();
     const canManageTeam = isIndividual ? (AD || isRegistrationOwner(team)) : (AD || (REG && _myClub && _myClub === _teamClub && !_deadlinePassed));
-    const adminBtns=canManageTeam?`<div class="rr-admin-btns">
+    const detailBtn = isIndividual ? `<button class="btn rr-btn-edit v334-detail-btn" style="background:#f8fafc;color:#0f1e3a;border:1px solid #cbd5e1" onclick="openIndividualEntryInfo('${esc(key)}',${realIdx})">상세</button>` : '';
+    const adminBtns=canManageTeam?`<div class="rr-admin-btns ${isIndividual?'v334-individual-actions':''}">
+      ${detailBtn}
       <button class="btn rr-btn-edit" style="background:#f8fafc;color:#0f1e3a;border:1px solid #cbd5e1" onclick="openETeam('${esc(key)}',${realIdx})">✏️ 수정</button>
       <button class="btn rr-btn-edit" style="background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd" onclick="openManualTeamPush('${esc(key)}',${realIdx})">🔔 알림</button>
       <button class="btn btn-danger rr-btn-del" onclick="delTeam('${esc(key)}',${realIdx})">🗑 삭제</button>
-    </div>`:'';
+    </div>`:(isIndividual?`<div class="rr-admin-btns v334-individual-actions">${detailBtn}</div>`:'');
 
     const womenGroups=[
       {label:'1조 🌸 개나리', players:mainPlayers.slice(0,2), off:0},
@@ -17246,7 +17607,7 @@ function buildRegisterRosterGrid(tid,div,teams,key){
       {label:'3조 🌱 테린이 (구력 4년↓)', players:mainPlayers.slice(4,6), off:4}
     ];
 
-    const individualLine = isIndividual ? getIndividualDisplayLine(team) : '';
+    const individualLine = isIndividual ? v334IndividualPairTitle(team) : '';
 
     const bodyHTML = isIndividual
       ? ``
@@ -17273,10 +17634,29 @@ function buildRegisterRosterGrid(tid,div,teams,key){
           ${subPlayers.length?`<div style="margin-top:6px;padding-top:6px;border-top:1px dashed var(--border);font-size:.86rem;font-weight:600;color:var(--text3)">후보: ${subPlayers.map(n=>rosterPlayerHTML(n,team.club||'',tid)).join(', ')}</div>`:''}
         </div>`;
 
-    const headerName = isIndividual ? `${individualLine||mainPlayers[0]||dn||'참가자'}` : dn;
+    const headerName = isIndividual ? v335IndividualPairTitleCompact(team) : dn;
     const headerCount = isIndividual ? '' : `${p.length}명`;
     const cardClass = isIndividual ? 'rr-team-card individual-entry-card' : 'rr-team-card';
     const titleClass = isIndividual ? 'rr-team-name individual-entry-title' : 'rr-team-name';
+
+    // v336: 개인전은 리스트형 행으로 렌더링
+    if(isIndividual){
+      // 상세 버튼만 오른쪽에 표시, 관리자면 수정/삭제 포함
+      const actionBtns = canManageTeam
+        ? `<div class="v336-entry-action">
+            <button class="btn" style="background:#f8fafc;color:#0f1e3a;border:1px solid #cbd5e1" onclick="openIndividualEntryInfo('${esc(key)}',${realIdx})">상세</button>
+            <button class="btn" style="background:#f8fafc;color:#0f1e3a;border:1px solid #cbd5e1" onclick="openETeam('${esc(key)}',${realIdx})">✏️</button>
+            <button class="btn btn-danger" onclick="delTeam('${esc(key)}',${realIdx})">🗑</button>
+          </div>`
+        : `<div class="v336-entry-action">
+            <button class="btn" style="background:#f8fafc;color:#0f1e3a;border:1px solid #cbd5e1" onclick="openIndividualEntryInfo('${esc(key)}',${realIdx})">상세</button>
+          </div>`;
+      return `<div class="v336-entry-row">
+        <div class="v336-entry-num">${i+1}</div>
+        <div class="v336-entry-names">${v336IndividualPairTitle(team)}</div>
+        ${actionBtns}
+      </div>`;
+    }
 
     return `<div class="${cardClass}">
       <div class="rr-team-header">
@@ -17290,6 +17670,8 @@ function buildRegisterRosterGrid(tid,div,teams,key){
       ${bodyHTML}
     </div>`;
   }).join('');
+  const __t=(G.tournaments||[]).find(x=>x.id===tid);
+  return isIndividualTournament(__t) ? `<div class="v336-register-list">${__cards}</div>` : __cards;
 }
 
 
