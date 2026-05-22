@@ -4510,13 +4510,321 @@ body {
 .v338-fee-copy-body{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .v338-fee-copy-info{font-size:.82rem;line-height:1.65;color:#334155;font-weight:800}
 .v338-fee-copy-info b{color:#0f1e3a}
-.v338-paid-badge{display:inline-flex;align-items:center;justify-content:center;min-height:24px;padding:3px 8px;border-radius:999px;font-size:.68rem;font-weight:1000;white-space:nowrap;border:1px solid #cbd5e1;background:#f8fafc;color:#475569}
-.v338-paid-badge.paid{background:#dcfce7;color:#166534;border-color:#86efac}
-.v338-pay-btn{min-height:26px!important;height:26px!important;border-radius:8px!important;padding:2px 7px!important;font-size:.62rem!important;font-weight:1000!important;white-space:nowrap!important;box-shadow:none!important}
+.v338-paid-badge{display:inline-flex;align-items:center;justify-content:center;min-height:24px;padding:3px 7px;border-radius:999px;font-size:.65rem;font-weight:1000;white-space:nowrap;border:1px solid #cbd5e1;background:#f8fafc;color:#475569;line-height:1.12;gap:2px}
+.v338-paid-badge.paid{background:#dcfce7;color:#166534;border-color:#86efac;flex-direction:row;align-items:center;gap:4px;padding:3px 7px;min-height:26px;border-radius:999px}
+.v338-paid-badge.unpaid{background:#fff7ed;color:#9a3412;border-color:#fdba74}
+.v338-paid-badge .pay-label{font-size:.64rem;font-weight:1000;line-height:1.05;white-space:nowrap}
+.v338-paid-badge .pay-dt{display:inline-flex;font-size:.52rem;font-weight:900;line-height:1;color:#166534;opacity:.92;letter-spacing:-.04em;white-space:nowrap;margin-left:1px}
+.v338-pay-btn{min-height:25px!important;height:25px!important;border-radius:999px!important;padding:2px 6px!important;font-size:.58rem!important;font-weight:1000!important;white-space:nowrap!important;box-shadow:none!important;letter-spacing:-.045em!important;line-height:1!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:3px!important}
 .v338-pay-btn.paid{background:#dcfce7!important;color:#166534!important;border:1px solid #86efac!important}
 .v338-pay-btn.unpaid{background:#fff7ed!important;color:#9a3412!important;border:1px solid #fdba74!important}
+.v338-pay-btn .pay-dt{font-size:.47rem!important;font-weight:1000!important;opacity:.9;line-height:1;letter-spacing:-.05em!important;}
 .v338-pay-status-line{margin-top:4px;font-size:.68rem;color:#64748b;font-weight:700;line-height:1.35}
-@media(max-width:680px){.v338-fee-copy-card{padding:12px 13px;border-radius:16px}.v338-fee-copy-body{align-items:stretch}.v338-fee-copy-body .btn{width:100%}.v338-fee-copy-info{font-size:.78rem}.v338-paid-badge{font-size:.64rem}.v338-pay-btn{font-size:.6rem!important;padding:2px 5px!important}}
+/* v342: 입금 버튼 축소 + 이름 영역 확보 */
+.v336-entry-row{display:grid!important;grid-template-columns:32px minmax(0,1fr) 94px!important;align-items:center!important;}
+.v336-entry-num{width:32px!important;flex:0 0 32px!important;}
+.v336-entry-names{min-width:0!important;padding:8px 8px!important;}
+.v336-name-line{font-size:.9rem!important;letter-spacing:-.03em!important;max-width:100%!important;white-space:normal!important;overflow:visible!important;text-overflow:clip!important;line-height:1.25!important;word-break:keep-all!important;overflow-wrap:anywhere!important;}
+.v336-club-line{font-size:.68rem!important;letter-spacing:-.03em!important;max-width:100%!important;white-space:normal!important;overflow:visible!important;text-overflow:clip!important;line-height:1.2!important;word-break:keep-all!important;overflow-wrap:anywhere!important;}
+.v336-entry-action{padding:5px 5px!important;gap:4px!important;display:flex!important;align-items:center!important;justify-content:flex-end!important;flex-wrap:wrap!important;}
+.v336-entry-action .btn{min-height:24px!important;height:24px!important;padding:2px 6px!important;font-size:.58rem!important;border-radius:8px!important;letter-spacing:-.04em!important;line-height:1!important;}
+.v336-entry-action .btn.btn-danger{width:26px!important;padding:0!important;}
+.v336-entry-action .v338-pay-btn{flex:0 0 92px!important;width:92px!important;max-width:92px!important;}
+@media(max-width:680px){.v338-fee-copy-card{padding:12px 13px;border-radius:16px}.v338-fee-copy-body{align-items:stretch}.v338-fee-copy-body .btn{width:100%}.v338-fee-copy-info{font-size:.78rem}.v338-paid-badge{font-size:.6rem;padding:2px 5px}.v338-paid-badge.paid{padding:3px 5px;min-height:26px;gap:3px}.v338-paid-badge .pay-dt{font-size:.49rem}.v338-pay-btn{font-size:.52rem!important;padding:2px 4px!important;gap:2px!important}.v336-entry-row{grid-template-columns:30px minmax(0,1fr) 94px!important}.v336-entry-num{width:30px!important;flex-basis:30px!important}.v336-entry-action{padding:4px 4px!important;gap:3px!important}.v336-entry-action .btn{font-size:.54rem!important;padding:2px 5px!important}.v336-entry-action .v338-pay-btn{flex-basis:88px!important;width:88px!important;max-width:88px!important}.v336-name-line{font-size:.86rem!important}}
+</style>
+
+<style id="v345PaymentBesideDetailStyle">
+/* v345: 접수 명단에서 입금상태를 상세 버튼 바로 옆에 표시 */
+.v336-entry-row{
+  display:grid!important;
+  grid-template-columns:32px minmax(0,1fr) minmax(132px,auto)!important;
+  align-items:center!important;
+}
+.v336-entry-action{
+  padding:5px 6px!important;
+  display:grid!important;
+  grid-template-columns:auto auto!important;
+  gap:5px!important;
+  align-items:center!important;
+  justify-content:end!important;
+  justify-items:end!important;
+  flex-wrap:nowrap!important;
+}
+.v336-entry-action .btn{
+  width:auto!important;
+  min-width:0!important;
+  min-height:24px!important;
+  height:24px!important;
+  padding:2px 7px!important;
+  font-size:.58rem!important;
+  border-radius:8px!important;
+  line-height:1!important;
+  white-space:nowrap!important;
+}
+.v336-entry-action .v334-detail-btn,
+.v336-entry-action button[onclick*="openIndividualEntryInfo"]{
+  grid-column:1!important;
+  grid-row:1!important;
+}
+.v336-entry-action .v338-pay-btn{
+  grid-column:2!important;
+  grid-row:1!important;
+  width:auto!important;
+  max-width:none!important;
+  min-width:72px!important;
+  flex:0 0 auto!important;
+  padding:2px 7px!important;
+}
+.v336-entry-action .rr-btn-edit:not(.v334-detail-btn),
+.v336-entry-action button[onclick*="edit"],
+.v336-entry-action button[onclick*="Edit"],
+.v336-entry-action button[onclick*="openETeam"]{
+  grid-column:1!important;
+  grid-row:2!important;
+}
+.v336-entry-action .rr-btn-del,
+.v336-entry-action .btn-danger{
+  grid-column:2!important;
+  grid-row:2!important;
+  width:24px!important;
+  min-width:24px!important;
+  padding:0!important;
+}
+.v338-pay-btn .pay-dt,
+.v338-paid-badge .pay-dt{
+  display:inline-flex!important;
+  margin-left:3px!important;
+  font-size:.47rem!important;
+  white-space:nowrap!important;
+}
+@media(max-width:680px){
+  .v336-entry-row{grid-template-columns:30px minmax(0,1fr) minmax(126px,auto)!important;}
+  .v336-entry-action{gap:4px!important;padding:4px 5px!important;}
+  .v336-entry-action .btn{font-size:.54rem!important;padding:2px 6px!important;}
+  .v336-entry-action .v338-pay-btn{min-width:68px!important;padding:2px 6px!important;}
+  .v338-pay-btn .pay-dt,.v338-paid-badge .pay-dt{font-size:.43rem!important;margin-left:2px!important;}
+}
+@media(max-width:390px){
+  .v336-entry-row{grid-template-columns:28px minmax(0,1fr) minmax(116px,auto)!important;}
+  .v336-entry-action .btn{font-size:.5rem!important;padding:2px 5px!important;}
+  .v336-entry-action .v338-pay-btn{min-width:62px!important;padding:2px 5px!important;}
+}
+</style>
+
+<style id="v346AdminRegisterCleanStyle">
+/* v346: 관리자 개인전 접수 목록 단순화 - 목록은 상세 + 입금상태만, 수정/삭제는 상세 팝업에서 처리 */
+.v336-entry-row{
+  grid-template-columns:32px minmax(0,1fr) minmax(124px,auto)!important;
+}
+.v336-entry-action.v346-entry-action-simple{
+  display:flex!important;
+  flex-direction:row!important;
+  flex-wrap:nowrap!important;
+  align-items:center!important;
+  justify-content:flex-end!important;
+  gap:5px!important;
+  padding:5px 6px!important;
+}
+.v336-entry-action.v346-entry-action-simple .btn{
+  height:26px!important;
+  min-height:26px!important;
+  padding:2px 8px!important;
+  font-size:.6rem!important;
+  border-radius:9px!important;
+  white-space:nowrap!important;
+}
+.v336-entry-action.v346-entry-action-simple .v338-pay-btn{
+  min-width:72px!important;
+  max-width:96px!important;
+  width:auto!important;
+  padding:2px 7px!important;
+}
+.v346-detail-admin-actions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin-top:12px;
+  padding-top:12px;
+  border-top:1px dashed #cbd5e1;
+}
+.v346-detail-admin-actions .btn{
+  width:100%;
+  min-height:38px;
+  border-radius:12px;
+  font-size:.82rem;
+  font-weight:900;
+}
+@media(max-width:680px){
+  .v336-entry-row{grid-template-columns:30px minmax(0,1fr) 126px!important;}
+  .v336-entry-action.v346-entry-action-simple{gap:4px!important;padding:4px 5px!important;}
+  .v336-entry-action.v346-entry-action-simple .btn{height:25px!important;min-height:25px!important;font-size:.56rem!important;padding:2px 7px!important;}
+  .v336-entry-action.v346-entry-action-simple .v338-pay-btn{min-width:68px!important;max-width:88px!important;font-size:.52rem!important;padding:2px 6px!important;}
+}
+@media(max-width:380px){
+  .v336-entry-row{grid-template-columns:28px minmax(0,1fr) 118px!important;}
+  .v336-entry-action.v346-entry-action-simple .btn{font-size:.52rem!important;padding:2px 6px!important;}
+  .v336-entry-action.v346-entry-action-simple .v338-pay-btn{min-width:64px!important;max-width:82px!important;}
+}
+</style>
+
+
+
+<style id="v347DetailInlineStyle">
+/* v347: 상세 버튼을 이름 옆으로 이동. 입금상태/일반 회원 화면은 기존 흐름 유지 */
+.v336-entry-row.v347-entry-row-detail-inline{
+  grid-template-columns:32px minmax(0,1fr) minmax(78px,auto)!important;
+}
+.v347-entry-names{
+  position:relative!important;
+  padding-right:46px!important;
+}
+.v347-inline-detail-btn{
+  position:absolute!important;
+  right:7px!important;
+  top:9px!important;
+  height:26px!important;
+  min-height:26px!important;
+  padding:2px 9px!important;
+  border-radius:9px!important;
+  border:1px solid #cbd5e1!important;
+  background:#f8fafc!important;
+  color:#0f1e3a!important;
+  font-size:.6rem!important;
+  font-weight:900!important;
+  line-height:1!important;
+  cursor:pointer!important;
+  white-space:nowrap!important;
+}
+.v347-payment-only-action{
+  justify-content:center!important;
+  padding:5px 5px!important;
+}
+.v347-payment-only-action .v338-pay-btn,
+.v347-payment-only-action .v338-paid-badge{
+  min-width:72px!important;
+  max-width:94px!important;
+}
+@media(max-width:680px){
+  .v336-entry-row.v347-entry-row-detail-inline{grid-template-columns:30px minmax(0,1fr) minmax(74px,auto)!important;}
+  .v347-entry-names{padding-right:42px!important;}
+  .v347-inline-detail-btn{right:5px!important;top:8px!important;height:25px!important;min-height:25px!important;font-size:.56rem!important;padding:2px 8px!important;}
+  .v347-payment-only-action{padding:4px 4px!important;}
+  .v347-payment-only-action .v338-pay-btn,
+  .v347-payment-only-action .v338-paid-badge{min-width:68px!important;max-width:88px!important;}
+}
+@media(max-width:380px){
+  .v336-entry-row.v347-entry-row-detail-inline{grid-template-columns:28px minmax(0,1fr) minmax(68px,auto)!important;}
+  .v347-entry-names{padding-right:38px!important;}
+  .v347-inline-detail-btn{font-size:.52rem!important;padding:2px 7px!important;}
+  .v347-payment-only-action .v338-pay-btn,
+  .v347-payment-only-action .v338-paid-badge{min-width:64px!important;max-width:82px!important;}
+}
+</style>
+
+<style id="v348DetailNextToSecondNameStyle">
+/* v348: 상세 버튼을 두 번째 이름 바로 오른쪽에 붙임 */
+.v347-entry-names{
+  padding-right:0!important;
+  position:static!important;
+}
+.v347-entry-names .v336-name-line{
+  display:block!important;
+  white-space:normal!important;
+  overflow:visible!important;
+  text-overflow:clip!important;
+  line-height:1.35!important;
+}
+.v347-inline-detail-btn{
+  position:static!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  margin-left:7px!important;
+  vertical-align:middle!important;
+  height:24px!important;
+  min-height:24px!important;
+  padding:2px 8px!important;
+  border-radius:8px!important;
+  border:1px solid #cbd5e1!important;
+  background:#f8fafc!important;
+  color:#0f1e3a!important;
+  font-size:.56rem!important;
+  font-weight:900!important;
+  line-height:1!important;
+  cursor:pointer!important;
+  white-space:nowrap!important;
+  transform:translateY(-1px);
+}
+@media(max-width:680px){
+  .v347-entry-names{padding-right:0!important;}
+  .v347-inline-detail-btn{right:auto!important;top:auto!important;font-size:.54rem!important;padding:2px 7px!important;margin-left:6px!important;}
+}
+</style>
+
+
+
+<style id="v349PaymentBadgeFitStyle">
+/* v349: 입금확인 글자/시간이 카드 밖으로 삐져나오지 않도록 초압축 */
+.v347-payment-only-action{
+  min-width:0!important;
+  overflow:hidden!important;
+  justify-content:flex-end!important;
+}
+.v347-payment-only-action .v338-paid-badge,
+.v347-payment-only-action .v338-pay-btn{
+  box-sizing:border-box!important;
+  max-width:100%!important;
+  min-width:0!important;
+  width:auto!important;
+  overflow:hidden!important;
+}
+.v347-payment-only-action .v338-paid-badge.paid,
+.v347-payment-only-action .v338-pay-btn.paid{
+  display:inline-flex!important;
+  flex-direction:row!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:2px!important;
+  padding:2px 5px!important;
+  height:24px!important;
+  min-height:24px!important;
+  border-radius:999px!important;
+  white-space:nowrap!important;
+}
+.v347-payment-only-action .v338-paid-badge .pay-label,
+.v347-payment-only-action .v338-pay-btn span:not(.pay-dt){
+  font-size:.50rem!important;
+  line-height:1!important;
+  letter-spacing:-.075em!important;
+  white-space:nowrap!important;
+}
+.v347-payment-only-action .v338-paid-badge .pay-dt,
+.v347-payment-only-action .v338-pay-btn .pay-dt{
+  display:inline-flex!important;
+  font-size:.36rem!important;
+  line-height:1!important;
+  margin-left:1px!important;
+  letter-spacing:-.09em!important;
+  white-space:nowrap!important;
+  opacity:.92!important;
+}
+@media(max-width:680px){
+  .v336-entry-row.v347-entry-row-detail-inline{grid-template-columns:30px minmax(0,1fr) minmax(76px,82px)!important;}
+  .v347-payment-only-action{padding:4px 3px!important;}
+  .v347-payment-only-action .v338-paid-badge.paid,
+  .v347-payment-only-action .v338-pay-btn.paid{padding:2px 4px!important;}
+  .v347-payment-only-action .v338-paid-badge .pay-label,
+  .v347-payment-only-action .v338-pay-btn span:not(.pay-dt){font-size:.48rem!important;}
+  .v347-payment-only-action .v338-paid-badge .pay-dt,
+  .v347-payment-only-action .v338-pay-btn .pay-dt{font-size:.34rem!important;}
+}
+@media(max-width:380px){
+  .v336-entry-row.v347-entry-row-detail-inline{grid-template-columns:28px minmax(0,1fr) minmax(70px,76px)!important;}
+  .v347-payment-only-action .v338-paid-badge .pay-label,
+  .v347-payment-only-action .v338-pay-btn span:not(.pay-dt){font-size:.45rem!important;}
+  .v347-payment-only-action .v338-paid-badge .pay-dt,
+  .v347-payment-only-action .v338-pay-btn .pay-dt{font-size:.31rem!important;}
+}
 </style>
 </head>
 <body>
@@ -17564,6 +17872,13 @@ function v336IndividualPairTitle(team){
   const clubHtml=clubs.length ? clubs.join(' / ') : '';
   return `<div class="v336-name-line">${nameHtml}</div>${clubHtml?`<div class="v336-club-line">${clubHtml}</div>`:''}`;
 }
+function v348IndividualPairTitleWithDetail(team,key,realIdx){
+  const detailBtn = `<button class="v347-inline-detail-btn" onclick="openIndividualEntryInfo('${esc(key)}',${realIdx})">상세</button>`;
+  const base = (typeof v336IndividualPairTitle === 'function') ? v336IndividualPairTitle(team) : '';
+  if(base && base.includes('</div>')) return base.replace('</div>', detailBtn + '</div>');
+  return `${base}${detailBtn}`;
+}
+
 function v335IndividualPairTitleCompact(team){
   const safe=(v)=> (typeof esc==='function'?esc(v):String(v||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])));
   let names=[];
@@ -17607,7 +17922,9 @@ function openIndividualEntryInfo(key, idx){
     const body=document.getElementById('mIndividualEntryInfoBody');
     if(body){
       const div=(typeof _k2td==='function'?(_k2td(key).div||''):'');
-      body.innerHTML=`<div class="v334-info-title">${v334IndividualPairTitle(team)}</div><div class="v334-info-meta">${div?`부서: ${esc(div)}`:''}</div><div class="v334-info-list">${v334GetIndividualInfoRows(team)}</div>`;
+      const canManage=!!(AD || TM || (typeof isRegistrationOwner==='function' && isRegistrationOwner(team)));
+      const adminActions=canManage?`<div class="v346-detail-admin-actions"><button class="btn btn-outline" onclick="cm('mIndividualEntryInfo');openETeam('${esc(key)}',${Number(idx)})">✏️ 참가팀 수정</button><button class="btn btn-danger" onclick="cm('mIndividualEntryInfo');delTeam('${esc(key)}',${Number(idx)})">🗑 참가팀 삭제</button></div>`:'';
+      body.innerHTML=`<div class="v334-info-title">${v334IndividualPairTitle(team)}</div><div class="v334-info-meta">${div?`부서: ${esc(div)}`:''}</div><div class="v334-info-list">${v334GetIndividualInfoRows(team)}</div>${adminActions}`;
     }
     om('mIndividualEntryInfo');
   }catch(e){ console.warn('openIndividualEntryInfo failed',e); toast('상세보기 오류','error'); }
@@ -17689,21 +18006,17 @@ function buildRegisterRosterGrid(tid,div,teams,key){
 
     // v336: 개인전은 리스트형 행으로 렌더링
     if(isIndividual){
-      // 상세 버튼만 오른쪽에 표시, 관리자면 수정/삭제 포함
+      // 상세 버튼은 두 번째 이름 바로 오른쪽에 붙이고, 입금상태는 기존 위치 유지
       const actionBtns = canManageTeam
-        ? `<div class="v336-entry-action">
-            <button class="btn" style="background:#f8fafc;color:#0f1e3a;border:1px solid #cbd5e1" onclick="openIndividualEntryInfo('${esc(key)}',${realIdx})">상세</button>
+        ? `<div class="v336-entry-action v346-entry-action-simple v347-payment-only-action">
             ${buildPaymentActionHTML(key,realIdx)}
-            <button class="btn" style="background:#f8fafc;color:#0f1e3a;border:1px solid #cbd5e1" onclick="openETeam('${esc(key)}',${realIdx})">✏️</button>
-            <button class="btn btn-danger" onclick="delTeam('${esc(key)}',${realIdx})">🗑</button>
           </div>`
-        : `<div class="v336-entry-action">
-            <button class="btn" style="background:#f8fafc;color:#0f1e3a;border:1px solid #cbd5e1" onclick="openIndividualEntryInfo('${esc(key)}',${realIdx})">상세</button>
+        : `<div class="v336-entry-action v346-entry-action-simple v347-payment-only-action">
             ${buildPaymentStatusHTML(key,realIdx)}
           </div>`;
-      return `<div class="v336-entry-row">
+      return `<div class="v336-entry-row v347-entry-row-detail-inline">
         <div class="v336-entry-num">${i+1}</div>
-        <div class="v336-entry-names">${v336IndividualPairTitle(team)}</div>
+        <div class="v336-entry-names v347-entry-names">${v348IndividualPairTitleWithDetail(team,key,realIdx)}</div>
         ${actionBtns}
       </div>`;
     }
@@ -33307,14 +33620,42 @@ function closeReorderPopup() {
 
 
 
-/* === v339: 참가비 입금 확인 안정화 패치 === */
+/* === v342: 참가비 입금 확인 + 대회별 계좌/알림문구 보강 === */
 function getTeamPaymentPaid(team){
   try{ return !!(team && (team.feePaid === true || team.paymentPaid === true || team.paymentStatus === 'paid')); }catch(e){ return false; }
 }
-function getPaymentFeeText(){ return '팀당 60,000원'; }
-function getPaymentAccountText(){ return '카카오뱅크 3333-07-8834842 (230스포츠미디어)'; }
+function getPaymentTournamentIdFromKey(key=''){
+  try{
+    if(key && typeof _k2td==='function') return _k2td(key).tid || '';
+    return ge('regTS')?.value || ge('brTS')?.value || ge('rankTS')?.value || (typeof pickDefaultTournamentId==='function' ? pickDefaultTournamentId() : '') || (G.tournaments?.[0]?.id||'');
+  }catch(e){ return ''; }
+}
+function getPaymentTournament(key=''){
+  try{ const tid=getPaymentTournamentIdFromKey(key); return (G.tournaments||[]).find(x=>x.id===tid) || null; }catch(e){ return null; }
+}
+function getPaymentTournamentTitle(key=''){
+  const t=getPaymentTournament(key);
+  let name=String(t?.name||'제1회 모던클럽배 테니스대회').trim();
+  name=name.replace(/\([^)]*\)/g,'').replace(/^2026\s*/,'').replace(/\s+/g,' ').trim();
+  return name || '제1회 모던클럽배 테니스대회';
+}
+function getPaymentFeeText(key=''){
+  const t=getPaymentTournament(key);
+  return String(t?.feeAmount||'팀당 60,000원').trim() || '팀당 60,000원';
+}
+function getPaymentFeeAmountOnly(key=''){
+  let v=getPaymentFeeText(key).replace(/^팀당\s*/,'').trim();
+  return v || getPaymentFeeText(key);
+}
+function getPaymentAccountText(key=''){
+  const t=getPaymentTournament(key);
+  const bankHolder=String(t?.feeBankHolder||'카카오뱅크 / 230스포츠미디어').trim();
+  const account=String(t?.feeAccount||'3333-07-8834842').trim();
+  return `${bankHolder} ${account}`.replace(/\s+/g,' ').trim();
+}
 async function copyTournamentFeeAccount(){
-  const text = `2026 제1회 모던클럽배 테니스대회 참가비\n참가비: ${getPaymentFeeText()}\n입금계좌: ${getPaymentAccountText()}\n※ 참가자명으로 입금해 주세요.`;
+  const title=getPaymentTournamentTitle();
+  const text = `${title} 참가비\n참가비: ${getPaymentFeeText()}\n입금계좌: ${getPaymentAccountText()}\n※ 참가자명으로 입금해 주세요.`;
   try{
     if(typeof copyTextSafe === 'function'){
       const ok = await copyTextSafe(text);
@@ -33329,13 +33670,53 @@ async function copyTournamentFeeAccount(){
     return false;
   }
 }
+function getPaymentPlayerNameWithClub(p){
+  try{
+    const rawName=String(p?.name||'').trim();
+    const name=(typeof v334IndividualNameOnly==='function') ? v334IndividualNameOnly(rawName) : rawName.replace(/\s*\([^)]*\)\s*$/,'').trim();
+    const club=String(p?.clubsRaw||p?.club||p?.clubs?.[0]||'').split('/')[0].split(',')[0].trim();
+    if(!name) return '';
+    return club ? `${name}(${club})` : name;
+  }catch(e){ return ''; }
+}
+function getPaymentTeamLabel(team,key='',idx=0){
+  try{
+    if(Array.isArray(team?.individualPlayers) && team.individualPlayers.length){
+      const names=team.individualPlayers.slice(0,2).map(getPaymentPlayerNameWithClub).filter(Boolean);
+      if(names.length) return names.join(' / ');
+    }
+    const ps=(typeof getIndividualPlayers==='function' ? getIndividualPlayers(team) : []).slice(0,2).map(getPaymentPlayerNameWithClub).filter(Boolean);
+    if(ps.length) return ps.join(' / ');
+    if(team?.pairLabel || team?.entryLabel) return String(team.pairLabel||team.entryLabel).trim();
+    if(typeof tdn==='function') return tdn(team,key,idx);
+    return String(team?.club||'참가자').trim() || '참가자';
+  }catch(e){ return '참가자'; }
+}
+function getPaymentConfirmedMessage(key, idx){
+  const team=(G.teams?.[key]||[])[Number(idx)];
+  const label=getPaymentTeamLabel(team,key,idx);
+  const amount=getPaymentFeeAmountOnly(key);
+  const title=getPaymentTournamentTitle(key);
+  return `${label} 참가비 ${amount} 입금이 확인되었습니다. -${title}-`;
+}
+function formatPaymentPaidAtKST(iso){
+  try{
+    if(!iso) return {date:'', time:''};
+    const d=new Date(iso);
+    if(Number.isNaN(d.getTime())) return {date:'', time:''};
+    const parts=new Intl.DateTimeFormat('ko-KR',{
+      timeZone:'Asia/Seoul', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', hour12:false
+    }).formatToParts(d).reduce((a,p)=>{a[p.type]=p.value;return a;},{});
+    return {date:`${parts.month}-${parts.day}`, time:`${parts.hour}:${parts.minute}`};
+  }catch(e){ return {date:'', time:''}; }
+}
 function buildPaymentStatusHTML(key, idx){
   try{
     const team=(G.teams?.[key]||[])[Number(idx)];
     const paid=getTeamPaymentPaid(team);
     const label=paid ? '입금확인' : '입금대기';
-    const time=paid && team?.feePaidAt ? String(team.feePaidAt).slice(5,16).replace('T',' ') : '';
-    return `<span class="v338-paid-badge ${paid?'paid':'unpaid'}" title="${paid?'참가비 입금 확인됨':'참가비 입금 대기'}">${paid?'✅':'⏳'} ${label}${time?` · ${esc(time)}`:''}</span>`;
+    const dt=paid ? formatPaymentPaidAtKST(team?.feePaidAt||'') : {date:'', time:''};
+    return `<span class="v338-paid-badge ${paid?'paid':'unpaid'}" title="${paid?'참가비 입금 확인됨':'참가비 입금 대기'}"><span class="pay-label">${label}</span>${paid&&dt.date?`<span class="pay-dt">${esc(dt.date)} ${esc(dt.time)}</span>`:''}</span>`;
   }catch(e){ return ''; }
 }
 function buildPaymentActionHTML(key, idx){
@@ -33343,7 +33724,8 @@ function buildPaymentActionHTML(key, idx){
     if(!(AD||TM)) return buildPaymentStatusHTML(key,idx);
     const team=(G.teams?.[key]||[])[Number(idx)];
     const paid=getTeamPaymentPaid(team);
-    return `<button type="button" class="btn v338-pay-btn ${paid?'paid':'unpaid'}" onclick="toggleTeamPaymentPaid('${esc(key)}',${Number(idx)})" title="참가비 입금 확인 상태 변경">${paid?'✅ 입금확인':'💳 입금확인'}</button>`;
+    const dt=paid ? formatPaymentPaidAtKST(team?.feePaidAt||'') : {date:'', time:''};
+    return `<button type="button" class="btn v338-pay-btn ${paid?'paid':'unpaid'}" onclick="toggleTeamPaymentPaid('${esc(key)}',${Number(idx)})" title="참가비 입금 확인 상태 변경"><span>${paid?'입금확인':'입금대기'}</span>${paid&&dt.date?`<span class="pay-dt">${esc(dt.date)} ${esc(dt.time)}</span>`:''}</button>`;
   }catch(e){ return ''; }
 }
 async function toggleTeamPaymentPaid(key, idx){
@@ -33382,7 +33764,7 @@ async function toggleTeamPaymentPaid(key, idx){
     try{ upDash(); }catch(e){}
     try{ cacheTournamentBundleFromMemory(_k2td(key).tid); }catch(e){}
     if(next){
-      toast('입금확인 처리 완료 ✅','success');
+      toast('입금 확인 처리 완료 ✅','success');
       setTimeout(()=>sendPaymentConfirmedNotice(key, Number(idx)), 80);
     }else{
       toast('입금확인을 취소했습니다','info');
@@ -33397,16 +33779,15 @@ async function sendPaymentConfirmedNotice(key, idx){
   try{
     const team=(G.teams?.[key]||[])[Number(idx)];
     if(!team) return;
-    const label=team.entryLabel||team.pairLabel||tdn(team,key,idx)||'참가자';
     const title='참가비 입금 확인 ✅';
-    const body=`${label} 참가비 입금이 확인되었습니다.`;
+    const body=getPaymentConfirmedMessage(key,idx);
     if(typeof getManualPushTargetTokenDocs==='function' && typeof sendPushToTokenDocs==='function'){
       const ctx={type:'team', key, idx:Number(idx)};
       const docs=await getManualPushTargetTokenDocs(ctx);
       const recipients=(typeof getManualPushSmsFallbackRecipients==='function') ? getManualPushSmsFallbackRecipients(ctx) : [];
       const cls=(typeof classifyManualPushTargets==='function') ? classifyManualPushTargets(recipients, docs) : {smsFallback:[], infoMissing:[]};
       if(docs && docs.length){
-        const res=await sendPushToTokenDocs(docs,title,body,{type:'payment_confirmed',target:'team'});
+        const res=await sendPushToTokenDocs(docs,title,body,{type:'payment_confirmed',target:'team',key,idx:String(idx)});
         if(res?.ok>0) toast(`입금확인 알림 발송: ${res.ok}명`,'success');
         if(cls?.smsFallback?.length && typeof showPushSmsFallbackAlert==='function') showPushSmsFallbackAlert(ctx,cls.smsFallback,body);
         if(cls?.infoMissing?.length && typeof showPushInfoMissingAlert==='function') showPushInfoMissingAlert(ctx,cls.infoMissing);
