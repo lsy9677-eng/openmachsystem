@@ -18247,10 +18247,13 @@ function renderRL(){
     msg.innerHTML = `⛔ <b>등록 기한이 만료</b>되어 팀 등록·수정·삭제가 불가합니다.<br><span style="font-size:.75rem;color:var(--text3)">${regDeadlineLabel()}</span>`;
     ge('aoReg').style.display='none';
   }else if(!canRegister){
-    msg.style.display='block';
-    msg.innerHTML=isIndividual
-      ? '현재는 참가 접수할 수 없는 상태입니다.'
-      : (!isTeamDirectorLoginEnabled() ? '현재 경기이사 로그인이 꺼져 있어 공개/관리자 등록만 가능합니다.' : (isPublicTeamRegistrationEnabled() ? '현재 팀 등록은 공개 접수 방식입니다. 클럽/팀명을 직접 입력해 접수할 수 있습니다.' : '📋 팀 등록을 하려면 상단의 <b>경기이사 로그인</b>이 필요합니다.'));
+    if(isIndividual){
+      msg.style.display='none';
+      msg.innerHTML='';
+    }else{
+      msg.style.display='block';
+      msg.innerHTML=(!isTeamDirectorLoginEnabled() ? '현재 경기이사 로그인이 꺼져 있어 공개/관리자 등록만 가능합니다.' : (isPublicTeamRegistrationEnabled() ? '현재 팀 등록은 공개 접수 방식입니다. 클럽/팀명을 직접 입력해 접수할 수 있습니다.' : '📋 팀 등록을 하려면 상단의 <b>경기이사 로그인</b>이 필요합니다.'));
+    }
   }else if(lock){
     msg.style.display='block';
     msg.innerHTML = `⛔ 현재 선택한 대회는 <b>${t?.status==='finished'?'종료':t?.status==='closed'?'마감':'접수중 아님'}</b> 상태라 ${isIndividual?'참가 접수':'팀 등록'}이 비활성화 됩니다.<br>상단에서 <b>접수중 대회</b>를 선택해 주세요.`;
@@ -29214,7 +29217,7 @@ async function openPD(name,club){
   const footer=ge('mPDFooter');
   const editKey = k || (useClub ? pKey(dispName, useClub) : dispName);
   if(footer){
-    footer.innerHTML = AD
+    footer.innerHTML = (AD||TM)
       ? `<button class="btn btn-outline" style="font-size:.78rem" onclick="openEditPlayer('${editKey}')">✏️ 수정/삭제</button><div style="flex:1"></div><button class="btn btn-gray" onclick="cm('mPD')">닫기</button>`
       : `<button class="btn btn-gray" onclick="cm('mPD')">닫기</button>`;
   }
@@ -36787,6 +36790,144 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
     });
     mo.observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['class','style']});
   }catch(e){}
+})();
+</script>
+
+
+
+<!-- v357: 관리자/운영자 참가자 기록 수정·삭제 권한 보강 -->
+<style id="v357AdminPlayerRecordEditStyle">
+  .v357-admin-record-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;justify-content:flex-end;}
+  .v357-admin-record-actions .btn{min-height:30px !important;padding:4px 10px !important;font-size:.72rem !important;border-radius:9px !important;}
+</style>
+<script id="v357AdminPlayerRecordEditScript">
+(function(){
+  'use strict';
+  if(window.__v357AdminPlayerRecordEdit) return;
+  window.__v357AdminPlayerRecordEdit=true;
+  function isAdminLike(){
+    try{return !!(window.AD||window.TM||document.body.classList.contains('admin-mode')||document.body.classList.contains('tm-mode'));}catch(e){return false;}
+  }
+  function cleanNameLocal(v){return String(v||'').replace(/\s+/g,' ').trim();}
+  function normPhone(v){return String(v||'').replace(/[^0-9]/g,'');}
+  function safeEsc(s){return String(s||'').replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+  function splitKey(k){
+    var s=String(k||'');
+    if(s.indexOf('__')>=0){var a=s.split('__');return {name:a[0]||'',club:a.slice(1).join('__')||''};}
+    return {name:s,club:''};
+  }
+  function ensurePlayerKey(name,club){
+    name=cleanNameLocal(name); club=cleanNameLocal(club);
+    var G=window.G||{}; var players=G.players||{};
+    var keys=Object.keys(players);
+    var found=keys.find(function(k){var sp=splitKey(k);return cleanNameLocal(sp.name)===name && (!club || cleanNameLocal(sp.club)===club);}) ||
+              keys.find(function(k){var sp=splitKey(k);return cleanNameLocal(sp.name)===name;});
+    return found || (club ? name+'__'+club : name);
+  }
+  async function removeFromRegistryAndHist(name,club){
+    var changed=false;
+    try{
+      if(window.G_REGISTRY){
+        Object.keys(window.G_REGISTRY).forEach(function(y){
+          var arr=Array.isArray(window.G_REGISTRY[y])?window.G_REGISTRY[y]:[];
+          var before=arr.length;
+          window.G_REGISTRY[y]=arr.filter(function(r){
+            var rn=cleanNameLocal(r&&r.name); var rc=cleanNameLocal((r&&r.club)||'');
+            if(rn!==name) return true;
+            if(club && rc && rc!==club) return true;
+            return false;
+          });
+          if(window.G_REGISTRY[y].length!==before) changed=true;
+        });
+      }
+      if(window.HIST_DATA){
+        (window.HIST_DATA||[]).forEach(function(t){
+          (t.teams||[]).forEach(function(tm){
+            var before=(tm.players||[]).length;
+            tm.players=(tm.players||[]).filter(function(pn){return cleanNameLocal(pn)!==name;});
+            if(tm.players.length!==before) changed=true;
+          });
+        });
+      }
+      if(changed){
+        try{ if(typeof window.saveRegistry==='function') await window.saveRegistry(new Date().getFullYear()); }catch(e){}
+        try{ if(typeof window.savePlayersToLocalCache==='function') window.savePlayersToLocalCache(); }catch(e){}
+      }
+    }catch(e){console.warn('v357 registry/hist cleanup failed',e);}
+    return changed;
+  }
+  var originalOpenPD=window.openPD;
+  if(typeof originalOpenPD==='function'){
+    window.openPD=async function(name,club){
+      var r=await originalOpenPD.apply(this,arguments);
+      setTimeout(function(){
+        try{
+          if(!isAdminLike()) return;
+          var footer=document.getElementById('mPDFooter');
+          if(!footer || footer.querySelector('.v357-admin-record-actions')) return;
+          var key=ensurePlayerKey(name,club);
+          footer.innerHTML='<div class="v357-admin-record-actions">'+
+            '<button class="btn btn-outline" onclick="openEditPlayer(\''+safeEsc(key)+'\')">✏️ 기록 수정</button>'+
+            '<button class="btn btn-danger" onclick="deletePlayerRecordDirect(\''+safeEsc(key)+'\')">🗑️ 기록 삭제</button>'+
+            '</div><div style="flex:1"></div><button class="btn btn-gray" onclick="cm(\'mPD\')">닫기</button>';
+        }catch(e){console.warn('v357 openPD footer failed',e);}
+      },80);
+      return r;
+    };
+  }
+  window.deletePlayerRecordDirect=async function(key){
+    if(!isAdminLike()){ if(window.toast) toast('관리자 권한이 필요합니다.','error'); return; }
+    var sp=splitKey(key); var name=cleanNameLocal(sp.name||key), club=cleanNameLocal(sp.club||'');
+    if(!confirm('"'+name+'" 참가자 기록을 삭제하시겠습니까?\n선수 기록/참가자 목록에서 제거됩니다.')) return;
+    try{
+      if(typeof window.sl==='function') window.sl(true);
+      var G=window.G||{}; var players=G.players||{};
+      var realKey=ensurePlayerKey(name,club);
+      if(players[realKey]){
+        try{
+          var docId=realKey.replace(/[\/\.#\$\[\]]/g,'_');
+          if(window.db && window.deleteDoc && window.doc) await window.deleteDoc(window.doc(window.db,'players',docId));
+        }catch(e){console.warn('v357 firestore delete skipped/failed',e);}
+        delete players[realKey];
+      }
+      await removeFromRegistryAndHist(name,club);
+      try{ if(typeof window.cm==='function'){cm('mPD');cm('mEditP');} }catch(e){}
+      try{ if(typeof window.renderAllP==='function') window.renderAllP(); }catch(e){}
+      if(window.toast) toast('기록 삭제 완료 ✅','success');
+    }catch(e){ if(window.toast) toast('기록 삭제 실패: '+(e.message||e),'error'); }
+    finally{ try{ if(typeof window.sl==='function') window.sl(false); }catch(e){} }
+  };
+  // 기존 deletePlayer도 registry/hist 정리까지 보강
+  var originalDeletePlayer=window.deletePlayer;
+  if(typeof originalDeletePlayer==='function'){
+    window.deletePlayer=async function(){
+      var key=window.EP_name || (document.getElementById('epOldName')?document.getElementById('epOldName').value:'');
+      var sp=splitKey(key); var name=cleanNameLocal(sp.name||key), club=cleanNameLocal(sp.club||'');
+      var r=await originalDeletePlayer.apply(this,arguments);
+      try{ await removeFromRegistryAndHist(name,club); if(typeof window.renderAllP==='function') window.renderAllP(); }catch(e){}
+      return r;
+    };
+  }
+  var originalRenderAllP=window.renderAllP;
+  if(typeof originalRenderAllP==='function'){
+    window.renderAllP=function(){
+      var r=originalRenderAllP.apply(this,arguments);
+      setTimeout(function(){
+        try{
+          if(!isAdminLike()) return;
+          // 기록 카드마다 수정/삭제 빠른 버튼을 추가하려고 시도. 구조가 다르면 상세 팝업 버튼만 사용.
+          document.querySelectorAll('#psResults [onclick*="openPD"], #psResults [onclick*="showP"]').forEach(function(btn){
+            var card=btn.closest('.card, .home-panel-row, .ri, div');
+            if(!card || card.querySelector('.v357-admin-record-actions')) return;
+            var text=(card.innerText||'').split('\n')[0]||'';
+            var name=text.replace(/기록 보기|수정|삭제|👤|🏆|📊/g,'').trim().split(/\s{2,}|\|/)[0].trim();
+            if(!name || name.length>20) return;
+          });
+        }catch(e){}
+      },120);
+      return r;
+    };
+  }
 })();
 </script>
 
