@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-05-22-v341-per-tournament-fee-account";
+  const APP_VERSION = "2026-05-22-v361-v359-dev-only-player-record-edit";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -37036,6 +37036,207 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
       return r;
     };
   }
+})();
+</script>
+
+
+
+<!-- v361: v359 기준 개발자 전용 참가자 기록 수정·삭제 + 기록보기 모달 보강 -->
+<style id="v361DeveloperOnlyPlayerRecordEditStyle">
+  .v360-dev-record-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;width:100%;}
+  .v360-dev-record-actions .btn{min-height:34px !important;padding:5px 12px !important;font-size:.78rem !important;border-radius:10px !important;font-weight:900 !important;}
+  @media(max-width:520px){.v360-dev-record-actions{display:grid;grid-template-columns:1fr 1fr;}.v360-dev-record-actions .btn{width:100%;}}
+</style>
+<script id="v361DeveloperOnlyPlayerRecordEditScript">
+(function(){
+  'use strict';
+  if(window.__v361DeveloperOnlyPlayerRecordEdit) return;
+  window.__v361DeveloperOnlyPlayerRecordEdit = true;
+
+  function isDeveloper(){
+    try{
+      return document.body.classList.contains('admin-mode') || window.LOGIN_PORTAL_MODE === 'developer';
+    }catch(e){ return false; }
+  }
+  function clean(v){ return String(v||'').replace(/\s+/g,' ').trim(); }
+  function splitKey(k){
+    var s=String(k||'');
+    if(s.indexOf('__')>=0){ var a=s.split('__'); return {name:a[0]||'', club:a.slice(1).join('__')||''}; }
+    return {name:s, club:''};
+  }
+  function jsArg(s){ return String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,' '); }
+  function ensurePlayerKey(name,club){
+    name=clean(name); club=clean(club);
+    try{
+      var players=(window.G&&window.G.players)||{};
+      var keys=Object.keys(players);
+      var found=keys.find(function(k){ var sp=splitKey(k); return clean(sp.name)===name && (!club || clean(sp.club)===club); }) ||
+                keys.find(function(k){ var sp=splitKey(k); return clean(sp.name)===name; });
+      if(found) return found;
+    }catch(e){}
+    return club ? (name+'__'+club) : name;
+  }
+  function inferKeyFromModalBody(bodyEl, fallback){
+    var text=clean(bodyEl && bodyEl.innerText || '');
+    var first=(text.split('\n').map(clean).filter(Boolean)[0]||'');
+    first=first.replace(/^👤\s*/,'').replace(/기록\s*없음.*$/,'').trim();
+    var sp=splitKey(first || fallback || '');
+    return ensurePlayerKey(sp.name || fallback, sp.club || '');
+  }
+  async function removeFromRegistryAndHist(name,club){
+    var changed=false;
+    try{
+      if(window.G_REGISTRY){
+        Object.keys(window.G_REGISTRY).forEach(function(y){
+          var arr=Array.isArray(window.G_REGISTRY[y])?window.G_REGISTRY[y]:[];
+          var before=arr.length;
+          window.G_REGISTRY[y]=arr.filter(function(r){
+            var rn=clean(r&&r.name), rc=clean((r&&r.club)||'');
+            if(rn!==name) return true;
+            if(club && rc && rc!==club) return true;
+            return false;
+          });
+          if(window.G_REGISTRY[y].length!==before) changed=true;
+        });
+      }
+      if(window.HIST_DATA){
+        (window.HIST_DATA||[]).forEach(function(t){
+          (t.teams||[]).forEach(function(tm){
+            var before=(tm.players||[]).length;
+            tm.players=(tm.players||[]).filter(function(pn){return clean(pn)!==name;});
+            if(tm.players.length!==before) changed=true;
+          });
+        });
+      }
+      if(changed){
+        try{ if(typeof window.saveRegistry==='function') await window.saveRegistry(new Date().getFullYear()); }catch(e){}
+        try{ if(typeof window.savePlayersToLocalCache==='function') window.savePlayersToLocalCache(); }catch(e){}
+      }
+    }catch(e){ console.warn('v361 registry cleanup failed', e); }
+    return changed;
+  }
+  function setPHistFooter(key){
+    try{
+      var footer=document.querySelector('#mPHist .modal-footer');
+      if(!footer) return;
+      if(!isDeveloper()){
+        footer.innerHTML='<button class="btn btn-gray" onclick="cm(\'mPHist\')">닫기</button>';
+        return;
+      }
+      footer.innerHTML='<div class="v360-dev-record-actions">'
+        +'<button class="btn btn-outline" onclick="openEditPlayer(\''+jsArg(key)+'\')">✏️ 기록 수정</button>'
+        +'<button class="btn btn-danger" onclick="deletePlayerRecordDirect(\''+jsArg(key)+'\')">🗑️ 기록 삭제</button>'
+        +'<button class="btn btn-gray" onclick="cm(\'mPHist\')">닫기</button>'
+        +'</div>';
+    }catch(e){ console.warn('v361 mPHist footer failed', e); }
+  }
+  function setPDetailFooter(key){
+    try{
+      var footer=document.getElementById('mPDFooter');
+      if(!footer) return;
+      if(!isDeveloper()){
+        footer.innerHTML='<button class="btn btn-gray" onclick="cm(\'mPD\')">닫기</button>';
+        return;
+      }
+      footer.innerHTML='<div class="v360-dev-record-actions">'
+        +'<button class="btn btn-outline" onclick="openEditPlayer(\''+jsArg(key)+'\')">✏️ 기록 수정</button>'
+        +'<button class="btn btn-danger" onclick="deletePlayerRecordDirect(\''+jsArg(key)+'\')">🗑️ 기록 삭제</button>'
+        +'<button class="btn btn-gray" onclick="cm(\'mPD\')">닫기</button>'
+        +'</div>';
+    }catch(e){ console.warn('v361 mPD footer failed', e); }
+  }
+
+  var installWrappers=function(){
+    if(window.__v361PlayerWrappersInstalled) return;
+    window.__v361PlayerWrappersInstalled=true;
+    var prevOpenPHist = window.openPHist;
+    if(typeof prevOpenPHist === 'function'){
+      window.openPHist = async function(iid){
+        var raw='';
+        try{ raw=(document.getElementById(iid)?.value||'').trim(); }catch(e){}
+        var result = await prevOpenPHist.apply(this, arguments);
+        setTimeout(function(){
+          var sp=splitKey(raw);
+          var key=ensurePlayerKey(sp.name||raw, sp.club||'');
+          if(!key) key=inferKeyFromModalBody(document.getElementById('mPHistBody'), raw);
+          if(key) setPHistFooter(key);
+        }, 140);
+        return result;
+      };
+    }
+
+    var prevOpenPD = window.openPD;
+    if(typeof prevOpenPD === 'function'){
+      window.openPD = async function(name,club){
+        var result = await prevOpenPD.apply(this, arguments);
+        setTimeout(function(){ setPDetailFooter(ensurePlayerKey(name,club)); }, 180);
+        setTimeout(function(){ setPDetailFooter(ensurePlayerKey(name,club)); }, 360);
+        return result;
+      };
+    }
+
+    var prevOpenEditPlayer = window.openEditPlayer;
+    if(typeof prevOpenEditPlayer === 'function'){
+      window.openEditPlayer = function(key){
+        if(!isDeveloper()){
+          if(window.toast) toast('개발자 권한에서만 기록 수정이 가능합니다.','error');
+          return;
+        }
+        return prevOpenEditPlayer.apply(this, arguments);
+      };
+    }
+  };
+
+  window.deletePlayerRecordDirect = async function(key){
+    if(!isDeveloper()){
+      if(window.toast) toast('개발자 권한에서만 기록 삭제가 가능합니다.','error');
+      return;
+    }
+    var sp=splitKey(key);
+    var name=clean(sp.name||key), club=clean(sp.club||'');
+    if(!name){ if(window.toast) toast('삭제할 기록을 찾지 못했습니다.','error'); return; }
+    if(!confirm('"'+name+'" 참가자 기록을 삭제하시겠습니까?\n선수 기록/참가자 목록에서 제거됩니다.')) return;
+    try{
+      if(typeof window.sl==='function') window.sl(true);
+      var G=window.G||{}; var players=G.players||{};
+      var realKey=ensurePlayerKey(name, club);
+      if(players[realKey]){
+        try{
+          var docId=realKey.replace(/[\\/\.#\$\[\]]/g,'_');
+          if(window.db && window.deleteDoc && window.doc) await window.deleteDoc(window.doc(window.db,'players',docId));
+        }catch(e){ console.warn('v361 Firestore player delete skipped/failed', e); }
+        delete players[realKey];
+      }
+      await removeFromRegistryAndHist(name, club);
+      try{ if(typeof window.cm==='function'){ cm('mPD'); cm('mPHist'); cm('mEditP'); } }catch(e){}
+      try{ if(typeof window.renderAllP==='function') window.renderAllP(); }catch(e){}
+      try{ if(typeof window.renderRegistryTab==='function') window.renderRegistryTab(); }catch(e){}
+      if(window.toast) toast('기록 삭제 완료 ✅','success');
+    }catch(e){
+      if(window.toast) toast('기록 삭제 실패: '+(e.message||e),'error');
+    }finally{
+      try{ if(typeof window.sl==='function') window.sl(false); }catch(e){}
+    }
+  };
+
+  try{
+    installWrappers();
+    setTimeout(installWrappers, 500);
+    setTimeout(installWrappers, 1600);
+    var mo=new MutationObserver(function(){
+      clearTimeout(window.__v361RecordFooterTimer);
+      window.__v361RecordFooterTimer=setTimeout(function(){
+        installWrappers();
+        if(!isDeveloper()){
+          var f1=document.getElementById('mPDFooter');
+          if(f1 && f1.querySelector('.v357-admin-record-actions,.v360-dev-record-actions')) f1.innerHTML='<button class="btn btn-gray" onclick="cm(\'mPD\')">닫기</button>';
+          var f2=document.querySelector('#mPHist .modal-footer');
+          if(f2 && f2.querySelector('.v357-admin-record-actions,.v360-dev-record-actions')) f2.innerHTML='<button class="btn btn-gray" onclick="cm(\'mPHist\')">닫기</button>';
+        }
+      }, 60);
+    });
+    mo.observe(document.body,{subtree:true,childList:true});
+  }catch(e){}
 })();
 </script>
 
