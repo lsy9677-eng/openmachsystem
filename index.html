@@ -36312,5 +36312,166 @@ try{
 
 
 
+
+
+<!-- v352: 참가자 목록 권한/백업복구 버튼 안정화 패치 -->
+<style id="v352RegistryBackupFixStyle">
+/* 시합관리자(tm-mode)도 참가자 목록을 볼 수 있게 보정 */
+body.tm-mode #ptab-registry,
+body.tm-mode #ptab-registry-content,
+body.admin-mode #ptab-registry,
+body.admin-mode #ptab-registry-content{
+  display:block !important;
+}
+body.tm-mode .players-tab-bar #ptab-registry,
+body.admin-mode .players-tab-bar #ptab-registry{
+  display:inline-flex !important;
+}
+
+/* 일반회원만 참가자 목록/관리 메뉴 숨김 */
+body:not(.admin-mode):not(.tm-mode) #ptab-registry,
+body:not(.admin-mode):not(.tm-mode) #ptab-registry-content,
+body:not(.admin-mode):not(.tm-mode) #playerPageBtns,
+body:not(.admin-mode):not(.tm-mode) #registryActionBtns,
+body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd,
+body:not(.admin-mode):not(.tm-mode) #mRegistryMgr,
+body:not(.admin-mode):not(.tm-mode) #mQuickAddPlayer{
+  display:none !important;
+}
+
+/* 백업/복구 모달이 cleanup 스크립트 영향으로 숨지 않도록 */
+body.admin-mode #mBackup,
+body.tm-mode #mBackup{
+  visibility:visible !important;
+}
+</style>
+<script id="v352RegistryBackupFixScript">
+(function(){
+  'use strict';
+  if(window.__v352RegistryBackupFix) return;
+  window.__v352RegistryBackupFix = true;
+
+  function $(id){ return document.getElementById(id); }
+  function isManager(){ return document.body.classList.contains('admin-mode') || document.body.classList.contains('tm-mode') || !!window.AD || !!window.TM; }
+
+  window.openBackupModalStable = function(){
+    try{
+      if(!isManager()){
+        if(typeof window.toast==='function') window.toast('관리자 권한이 필요합니다','info');
+        return;
+      }
+      if(typeof window.cm==='function') window.cm('mAdminSettings');
+      setTimeout(function(){
+        var m=$('mBackup');
+        if(!m){ if(typeof window.toast==='function') window.toast('백업/복구 창을 찾을 수 없습니다','error'); return; }
+        m.classList.add('open');
+        m.style.display='flex';
+        m.style.visibility='visible';
+        m.style.opacity='1';
+        var st=$('backupStatus');
+        if(st && !st.textContent.trim()) st.textContent='백업 또는 복구를 선택하세요.';
+      },60);
+    }catch(e){
+      console.error('openBackupModalStable failed', e);
+      if(typeof window.toast==='function') window.toast('백업/복구 창 열기 실패','error');
+    }
+  };
+
+  function wireBackupButtons(){
+    try{
+      document.querySelectorAll('button').forEach(function(btn){
+        var oc=String(btn.getAttribute('onclick')||'');
+        var tx=(btn.textContent||'').replace(/\s+/g,' ');
+        if(/mBackup/.test(oc) && /백업|복구/.test(tx)){
+          btn.setAttribute('onclick','openBackupModalStable()');
+          btn.onclick=function(ev){ ev.preventDefault(); ev.stopPropagation(); window.openBackupModalStable(); return false; };
+          btn.style.display='';
+        }
+      });
+    }catch(e){ console.warn('wireBackupButtons failed', e); }
+  }
+
+  function forceManagerRegistryVisibility(){
+    try{
+      if(!isManager()) return;
+      var regBtn=$('ptab-registry');
+      var recBtn=$('ptab-records');
+      var reg=$('ptab-registry-content');
+      var rec=$('ptab-records-content');
+      if(regBtn) regBtn.style.display='';
+      if(document.querySelector('#ptab-registry.active')){
+        if(reg) reg.style.display='';
+        if(rec) rec.style.display='none';
+      }
+      if(recBtn && recBtn.classList.contains('active')){
+        if(rec) rec.style.display='';
+        if(reg) reg.style.display='none';
+      }
+    }catch(e){}
+  }
+
+  const oldSwitch = window.switchPlayersTab;
+  window.switchPlayersTab = function(tab){
+    var r;
+    try{ if(typeof oldSwitch==='function') r=oldSwitch.apply(this, arguments); }catch(e){ console.warn('old switchPlayersTab failed', e); }
+    try{
+      if(tab==='registry' && isManager()){
+        var recBtn=$('ptab-records'), regBtn=$('ptab-registry');
+        var rec=$('ptab-records-content'), reg=$('ptab-registry-content');
+        if(recBtn) recBtn.classList.remove('active');
+        if(regBtn){ regBtn.style.display=''; regBtn.classList.add('active'); }
+        if(rec) rec.style.display='none';
+        if(reg) reg.style.display='';
+        if(typeof window.renderRegistryTab==='function') window.renderRegistryTab(true).catch(function(err){ console.error(err); if(typeof window.toast==='function') window.toast('참가자 목록 로딩 실패: '+(err.message||err),'error'); });
+      }
+    }catch(e){ console.error('switch registry fix failed', e); }
+    return r;
+  };
+
+  // 백업 함수가 모달 안에서 확실히 동작하도록 보조. 기존 함수가 있으면 우선 사용하고, 실패 시 window.G로 직접 백업.
+  const oldBackup = window.backupJSON;
+  window.backupJSON = function(){
+    try{
+      if(typeof oldBackup==='function') return oldBackup.apply(this, arguments);
+    }catch(e){ console.warn('original backupJSON failed, fallback used', e); }
+    try{
+      var G=window.G||{};
+      var data={
+        version:3,
+        exportDate:new Date().toISOString(),
+        meta:G.meta||{},
+        tournaments:G.tournaments||[],
+        teams:G.teams||{},
+        draws:G.draws||{},
+        matches:G.matches||{},
+        players:G.players||{},
+        clubs:G.clubs||[],
+        log:G.log||[],
+        drawHistories:G.drawHistories||{},
+        registry:window.G_REGISTRY||{}
+      };
+      var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json;charset=utf-8'});
+      var a=document.createElement('a');
+      a.href=URL.createObjectURL(blob);
+      a.download='230MATCH_백업_'+new Date().toISOString().slice(0,10)+'.json';
+      document.body.appendChild(a); a.click(); setTimeout(function(){URL.revokeObjectURL(a.href); a.remove();},300);
+      var st=$('backupStatus'); if(st) st.textContent='✅ 백업 파일 다운로드 완료';
+      if(typeof window.toast==='function') window.toast('백업 완료 💾','success');
+    }catch(e){ console.error(e); if(typeof window.toast==='function') window.toast('백업 실패: '+(e.message||e),'error'); }
+  };
+
+  const oldRestore = window.restoreFromJSON;
+  window.restoreFromJSON = async function(input){
+    try{
+      if(typeof oldRestore==='function') return await oldRestore.apply(this, arguments);
+    }catch(e){ console.error('restoreFromJSON failed', e); if(typeof window.toast==='function') window.toast('복구 실패: '+(e.message||e),'error'); }
+  };
+
+  function apply(){ wireBackupButtons(); forceManagerRegistryVisibility(); }
+  document.addEventListener('DOMContentLoaded', function(){ apply(); setTimeout(apply,300); setTimeout(apply,1000); });
+  setTimeout(apply,1500);
+})();
+</script>
+
 </body>
 </html>
