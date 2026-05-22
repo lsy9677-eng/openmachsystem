@@ -29109,7 +29109,7 @@ function renderAllP(){
   if(!container) return;
   const formatBest=(bestRank)=>bestRank?`${bestRank}위`:'기록없음';
   const formatPhone=(summary)=>summary.displayPhone||'전화번호 없음';
-  const openBtn=(row)=>`<button class="btn btn-outline" style="font-size:.76rem;padding:5px 10px;min-height:34px" onclick="showP('${esc(row.name)}','${esc(row.club)}')">기록 보기</button>`;
+  const openBtn=(row)=>`<button type="button" class="btn btn-outline v354-record-view-btn" data-pname="${esc(row.name)}" data-pclub="${esc(row.club)}" style="font-size:.76rem;padding:5px 10px;min-height:34px" onclick="event.preventDefault();event.stopPropagation();showP('${esc(row.name)}','${esc(row.club)}');return false;">기록 보기</button>`;
   const buildCard=(row, highlight=false)=>{
     const summary=row.summary||{};
     const recent=formatRecentLabel(summary.lastDate)||'-';
@@ -35614,139 +35614,7 @@ body:not(.admin-mode):not(.tm-mode) #bottomTabBar button[data-target="players"]{
   }
 }
 </style>
-<script id="v261RecordsMenuStableScript">
-(function(){
-  'use strict';
-  if(window.__v261RecordsMenuStable) return;
-  window.__v261RecordsMenuStable = true;
-
-  function isManager(){
-    return document.body.classList.contains('admin-mode') || document.body.classList.contains('tm-mode');
-  }
-  function currentPage(){
-    var p=document.querySelector('.page.active');
-    return p && p.id ? p.id.replace(/^page-/,'') : 'home';
-  }
-  function qs(sel){ return Array.prototype.slice.call(document.querySelectorAll(sel)); }
-
-  function ensureRecordsTabDefault(){
-    try{
-      var recBtn=document.getElementById('ptab-records');
-      var regBtn=document.getElementById('ptab-registry');
-      var rec=document.getElementById('ptab-records-content');
-      var reg=document.getElementById('ptab-registry-content');
-      if(!isManager()){
-        if(recBtn){ recBtn.style.display=''; recBtn.classList.add('active'); }
-        if(regBtn){ regBtn.classList.remove('active'); regBtn.style.display='none'; }
-        if(rec) rec.style.display='';
-        if(reg) reg.style.display='none';
-      }
-      if(typeof window.switchPlayersTab==='function'){
-        try{ window.switchPlayersTab('records'); }catch(e){}
-      }
-    }catch(e){}
-  }
-
-  function syncMenu(){
-    var manager=isManager();
-    qs('.nav-tab[data-page="tournament"], #bottomTabBar button[data-target="tournament"]').forEach(function(el){
-      el.style.display = manager ? '' : 'none';
-    });
-    qs('.nav-tab[data-page="players"], #bottomTabBar button[data-target="players"]').forEach(function(el){
-      el.style.display = '';
-    });
-    var navPlayers=document.querySelector('.nav-tab[data-page="players"]');
-    if(navPlayers) navPlayers.textContent='🧾 참가자기록';
-    var bottomPlayers=document.querySelector('#bottomTabBar button[data-target="players"] span:last-child');
-    if(bottomPlayers) bottomPlayers.textContent='기록';
-    if(!manager && currentPage()==='tournament' && typeof window.showPage==='function'){
-      setTimeout(function(){ try{ window.showPage('home'); }catch(e){} },0);
-    }
-    var page=currentPage();
-    var activeTarget=(page==='ranking')?'results':page;
-    qs('#bottomTabBar button').forEach(function(btn){ btn.classList.toggle('active', btn.dataset.target===activeTarget); });
-    if(page==='players') ensureRecordsTabDefault();
-  }
-
-  function forceActivatePage(page){
-    try{
-      qs('.page').forEach(function(p){ p.classList.remove('active'); });
-      qs('.nav-tab').forEach(function(t){ t.classList.remove('active'); });
-      var target=document.getElementById('page-'+page);
-      var tab=document.querySelector('.nav-tab[data-page="'+page+'"]');
-      if(target) target.classList.add('active');
-      if(tab){ tab.classList.add('active'); tab.style.display=''; }
-      qs('.swipe-dot').forEach(function(d){ d.classList.toggle('active', d.dataset.page===page); });
-      if(page==='players') ensureRecordsTabDefault();
-      window.scrollTo({top:0,behavior:'auto'});
-    }catch(e){}
-  }
-
-  function wrapShowPage(){
-    var old=window.showPage;
-    if(typeof old!=='function' || old.__v261Wrapped) return;
-    var fn=function(page){
-      var requested=String(page||'home');
-      if(requested==='tournament' && !isManager()){
-        try{ if(typeof window.toast==='function') window.toast('대회관리는 운영자 전용 메뉴입니다','info'); }catch(e){}
-        requested='home';
-      }
-      var r=old.apply(this, [requested]);
-      if(requested==='players'){
-        setTimeout(function(){ forceActivatePage('players'); syncMenu(); },0);
-        setTimeout(function(){ forceActivatePage('players'); syncMenu(); },120);
-      }else{
-        setTimeout(syncMenu,0); setTimeout(syncMenu,120);
-      }
-      return r;
-    };
-    fn.__v261Wrapped=true;
-    window.showPage=fn;
-  }
-
-  function bindMenuGuards(){
-    qs('#bottomTabBar button[data-target="tournament"], .nav-tab[data-page="tournament"]').forEach(function(el){
-      if(el.__v261TournamentGuard) return;
-      el.__v261TournamentGuard=true;
-      ['click','pointerup'].forEach(function(type){
-        el.addEventListener(type, function(e){
-          if(!isManager()){
-            e.preventDefault(); e.stopImmediatePropagation();
-            if(typeof window.showPage==='function') window.showPage('home');
-          }
-        }, true);
-      });
-    });
-    qs('#bottomTabBar button[data-target="players"], .nav-tab[data-page="players"]').forEach(function(el){
-      if(el.__v261PlayersGuard) return;
-      el.__v261PlayersGuard=true;
-      ['click','pointerup'].forEach(function(type){
-        el.addEventListener(type, function(e){
-          e.preventDefault(); e.stopImmediatePropagation();
-          if(typeof window.showPage==='function') window.showPage('players');
-          else forceActivatePage('players');
-        }, true);
-      });
-    });
-  }
-
-  function init(){
-    wrapShowPage();
-    bindMenuGuards();
-    syncMenu();
-    setTimeout(syncMenu,200);
-    setTimeout(syncMenu,900);
-    setTimeout(syncMenu,1800);
-  }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', init); else init();
-  try{
-    new MutationObserver(function(){
-      clearTimeout(window.__v261MenuTimer);
-      window.__v261MenuTimer=setTimeout(function(){ bindMenuGuards(); syncMenu(); },60);
-    }).observe(document.body,{attributes:true,attributeFilter:['class'],childList:true,subtree:true});
-  }catch(e){}
-})();
-</script>
+<!-- v261RecordsMenuStableScript removed by v354: it forced 참가자목록 back to 참가자기록 -->
 
 <script id="v283FinalPopupTeamNameFixScript">
 function v283CleanNameText(raw){
@@ -36470,6 +36338,359 @@ body.tm-mode #mBackup{
   function apply(){ wireBackupButtons(); forceManagerRegistryVisibility(); }
   document.addEventListener('DOMContentLoaded', function(){ apply(); setTimeout(apply,300); setTimeout(apply,1000); });
   setTimeout(apply,1500);
+})();
+</script>
+
+
+
+<!-- v353 players registry click fix replaced by v354 -->
+
+
+<!-- v354: 참가자 기록/목록 탭 튕김 방지 + 기록보기 버튼 실제 클릭 안정화 -->
+<style id="v354PlayersTabsRealFixStyle">
+/* 일반회원도 참가자 목록 탭/내용은 볼 수 있게 유지 */
+html body:not(.admin-mode):not(.tm-mode) #ptab-registry{
+  display:inline-flex !important;
+}
+html body:not(.admin-mode):not(.tm-mode) #ptab-registry-content{
+  display:block;
+}
+html body:not(.admin-mode):not(.tm-mode) #playerPageBtns,
+html body:not(.admin-mode):not(.tm-mode) #registryActionBtns,
+html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
+  display:none !important;
+}
+/* 기록 보기 버튼 번쩍임/흔들림 완전 차단 */
+#psResults .v354-record-view-btn,
+#psResults button[onclick*="showP"],
+#psResults .btn.btn-outline[onclick*="showP"]{
+  animation:none !important;
+  transform:none !important;
+  transition:background-color .12s ease,border-color .12s ease,color .12s ease !important;
+  will-change:auto !important;
+  filter:none !important;
+  box-shadow:none !important;
+  opacity:1 !important;
+}
+#psResults .v354-record-view-btn:hover,
+#psResults button[onclick*="showP"]:hover,
+#psResults .btn.btn-outline[onclick*="showP"]:hover{
+  animation:none !important;
+  transform:none !important;
+  filter:none !important;
+  box-shadow:none !important;
+  opacity:1 !important;
+}
+</style>
+<script id="v354PlayersTabsRealFixScript">
+(function(){
+  'use strict';
+  if(window.__v354PlayersTabsRealFix) return;
+  window.__v354PlayersTabsRealFix = true;
+
+  var lockedTab = null;
+  var lockUntil = 0;
+  function $(id){ return document.getElementById(id); }
+  function isManager(){ return document.body.classList.contains('admin-mode') || document.body.classList.contains('tm-mode') || !!window.AD || !!window.TM; }
+  function inRecordsClickEvent(){
+    try{ var ev=window.event; return !!(ev && ev.target && ev.target.closest && ev.target.closest('#ptab-records')); }catch(e){ return false; }
+  }
+  function setPlayersTabDom(tab){
+    tab = tab === 'registry' ? 'registry' : 'records';
+    var recBtn=$('ptab-records'), regBtn=$('ptab-registry');
+    var rec=$('ptab-records-content'), reg=$('ptab-registry-content');
+    if(recBtn) recBtn.classList.toggle('active', tab==='records');
+    if(regBtn){ regBtn.style.display=''; regBtn.classList.toggle('active', tab==='registry'); }
+    if(rec) rec.style.display = tab==='records' ? '' : 'none';
+    if(reg) reg.style.display = tab==='registry' ? '' : 'none';
+    if(!isManager()){
+      ['playerPageBtns','registryActionBtns','regTabQuickAdd'].forEach(function(id){ var el=$(id); if(el) el.style.display='none'; });
+    }
+  }
+  function markRecordButtons(){
+    try{
+      document.querySelectorAll('#psResults button').forEach(function(btn){
+        var oc=String(btn.getAttribute('onclick')||'');
+        var tx=(btn.textContent||'').replace(/\s+/g,'').trim();
+        if(oc.indexOf('showP')>=0 || tx.indexOf('기록보기')>=0){
+          btn.type='button';
+          btn.classList.add('v354-record-view-btn');
+          btn.style.animation='none';
+          btn.style.transform='none';
+          btn.style.transition='background-color .12s ease,border-color .12s ease,color .12s ease';
+        }
+      });
+    }catch(e){}
+  }
+  function decodeHtml(s){ try{ var t=document.createElement('textarea'); t.innerHTML=String(s||''); return t.value; }catch(e){ return String(s||''); } }
+  function loadRecords(){
+    try{
+      var jobs=[];
+      if(typeof window.loadRegistry==='function') jobs.push(Promise.resolve(window.loadRegistry(new Date().getFullYear())));
+      if(typeof window.ensurePlayersLoaded==='function') jobs.push(Promise.resolve(window.ensurePlayersLoaded()));
+      if(typeof window.ensureAllParticipationDataLoaded==='function') jobs.push(Promise.resolve(window.ensureAllParticipationDataLoaded()));
+      Promise.allSettled(jobs).then(function(){
+        try{ if(typeof window.renderAllP==='function') window.renderAllP(); }catch(e){}
+        try{ if(typeof window.popCF==='function') window.popCF(); }catch(e){}
+        try{ if(typeof window.updatePlayersAdminControls==='function') window.updatePlayersAdminControls(); }catch(e){}
+        setTimeout(markRecordButtons,0); setTimeout(markRecordButtons,120);
+      });
+    }catch(e){ try{ if(typeof window.renderAllP==='function') window.renderAllP(); }catch(_e){} setTimeout(markRecordButtons,0); }
+  }
+  function loadRegistry(force){
+    try{
+      var body=$('regTabBody');
+      if(body && !body.dataset.ready){
+        body.innerHTML='<div class="card" style="padding:22px;text-align:center;font-size:.9rem;color:var(--text2)">참가자 목록을 불러오는 중입니다…</div>';
+      }
+      var p;
+      if(typeof window.initRegistryTab==='function') p=Promise.resolve(window.initRegistryTab(!!force));
+      else if(typeof window.renderRegistryTab==='function') p=Promise.resolve(window.renderRegistryTab(true));
+      if(p) p.catch(function(err){ console.error('registry load failed',err); if(window.toast) toast('참가자 목록 로딩 실패','error'); });
+    }catch(e){ console.error('registry load failed',e); }
+  }
+
+  var originalSwitch = window.switchPlayersTab;
+  window.switchPlayersTab = function(tab){
+    tab = tab === 'registry' ? 'registry' : 'records';
+    if(tab === 'registry'){
+      lockedTab = 'registry';
+      lockUntil = Date.now() + 3500;
+      setPlayersTabDom('registry');
+      loadRegistry(true);
+      setTimeout(function(){ setPlayersTabDom('registry'); },80);
+      setTimeout(function(){ setPlayersTabDom('registry'); },300);
+      return false;
+    }
+    // 이전 스크립트가 자동으로 records로 돌려놓는 호출은 일정 시간 무시한다.
+    if(tab === 'records' && lockedTab === 'registry' && Date.now() < lockUntil && !inRecordsClickEvent()){
+      setPlayersTabDom('registry');
+      return false;
+    }
+    lockedTab = 'records';
+    lockUntil = 0;
+    setPlayersTabDom('records');
+    loadRecords();
+    return false;
+  };
+
+  // 탭 버튼 클릭은 캡처 단계에서 직접 처리해서 기존 강제 전환 스크립트를 우회한다.
+  document.addEventListener('click', function(ev){
+    var regBtn = ev.target && ev.target.closest ? ev.target.closest('#ptab-registry') : null;
+    if(regBtn){
+      ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation();
+      window.switchPlayersTab('registry');
+      return false;
+    }
+    var recBtn = ev.target && ev.target.closest ? ev.target.closest('#ptab-records') : null;
+    if(recBtn){
+      ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation();
+      lockedTab='records'; lockUntil=0;
+      window.switchPlayersTab('records');
+      return false;
+    }
+  }, true);
+
+  // 기록 보기 버튼은 카드/hover 이벤트와 분리해서 직접 실행한다.
+  document.addEventListener('click', function(ev){
+    var btn = ev.target && ev.target.closest ? ev.target.closest('#psResults button') : null;
+    if(!btn) return;
+    var oc=String(btn.getAttribute('onclick')||'');
+    var tx=(btn.textContent||'').replace(/\s+/g,'').trim();
+    if(oc.indexOf('showP')<0 && tx.indexOf('기록보기')<0) return;
+    ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation();
+    try{
+      var name=btn.getAttribute('data-pname')||'';
+      var club=btn.getAttribute('data-pclub')||'';
+      if(!name){
+        var m=oc.match(/showP\('([^']*)'\s*,\s*'([^']*)'\)/);
+        if(m){ name=decodeHtml(m[1]); club=decodeHtml(m[2]); }
+      }else{ name=decodeHtml(name); club=decodeHtml(club); }
+      if(typeof window.showP==='function') window.showP(name, club);
+      else if(window.toast) toast('선수 기록 함수가 아직 준비되지 않았습니다. 잠시 후 다시 눌러주세요.','info');
+    }catch(e){ console.error('record view failed',e); if(window.toast) toast('기록 보기 실행 실패','error'); }
+    return false;
+  }, true);
+
+  function reinforce(){
+    try{
+      var regBtn=$('ptab-registry'); if(regBtn) regBtn.style.display='';
+      if(lockedTab==='registry' && Date.now()<lockUntil) setPlayersTabDom('registry');
+      markRecordButtons();
+    }catch(e){}
+  }
+  document.addEventListener('DOMContentLoaded', function(){
+    setTimeout(reinforce,100); setTimeout(reinforce,600); setTimeout(reinforce,1500);
+  });
+  try{
+    var mo=new MutationObserver(function(){ clearTimeout(window.__v354PlayersTimer); window.__v354PlayersTimer=setTimeout(reinforce,80); });
+    mo.observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['class','style']});
+  }catch(e){}
+})();
+</script>
+
+
+
+<!-- v355: 일반회원 참가자 목록 탭 고정 + 전체 목록 표시 강제 보정 -->
+<style id="v355PublicRegistryStickyFixStyle">
+  /* 참가자 목록 탭에서 기록 화면이 같이 보이지 않도록 최종 우선순위 보정 */
+  body.players-registry-active #ptab-records-content{display:none !important;}
+  body.players-registry-active #ptab-registry-content{display:block !important;}
+  body.players-registry-active #ptab-registry{display:inline-flex !important;}
+  body.players-registry-active #ptab-registry.active{color:var(--primary) !important;border-bottom-color:var(--primary) !important;font-weight:900 !important;}
+  body.players-registry-active #ptab-records{color:var(--text2) !important;border-bottom-color:transparent !important;font-weight:600 !important;}
+  body.players-registry-active #regTabBody{display:block !important;visibility:visible !important;opacity:1 !important;}
+  body.players-registry-active #playerPageBtns,
+  body.players-registry-active:not(.admin-mode):not(.tm-mode) #registryActionBtns,
+  body.players-registry-active:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{display:none !important;}
+</style>
+<script id="v355PublicRegistryStickyFixScript">
+(function(){
+  'use strict';
+  if(window.__v355PublicRegistryStickyFix) return;
+  window.__v355PublicRegistryStickyFix = true;
+
+  var desiredTab = 'records';
+  var lastRegistryClickAt = 0;
+  function $(id){ return document.getElementById(id); }
+  function currentPageIsPlayers(){
+    try{ return !!document.querySelector('#page-players.active'); }catch(e){ return false; }
+  }
+  function isManager(){
+    return document.body.classList.contains('admin-mode') || document.body.classList.contains('tm-mode') || !!window.AD || !!window.TM;
+  }
+  function setDom(tab){
+    tab = tab === 'registry' ? 'registry' : 'records';
+    var recBtn=$('ptab-records'), regBtn=$('ptab-registry');
+    var rec=$('ptab-records-content'), reg=$('ptab-registry-content');
+    if(recBtn) recBtn.classList.toggle('active', tab==='records');
+    if(regBtn){ regBtn.style.display=''; regBtn.classList.toggle('active', tab==='registry'); }
+    if(rec) rec.style.display = tab==='records' ? '' : 'none';
+    if(reg) reg.style.display = tab==='registry' ? '' : 'none';
+    document.body.classList.toggle('players-registry-active', currentPageIsPlayers() && tab==='registry');
+    document.body.classList.toggle('players-records-active', currentPageIsPlayers() && tab==='records');
+    if(!isManager()){
+      ['playerPageBtns','registryActionBtns','regTabQuickAdd'].forEach(function(id){ var el=$(id); if(el) el.style.display='none'; });
+    }
+  }
+  function renderRegistry(force){
+    try{
+      var body=$('regTabBody');
+      if(body && !body.dataset.ready){
+        body.innerHTML='<div class="card" style="padding:22px;text-align:center;font-size:.9rem;color:var(--text2)">참가자 목록을 불러오는 중입니다…</div>';
+      }
+      var p=null;
+      if(typeof window.initRegistryTab==='function') p=Promise.resolve(window.initRegistryTab(!!force));
+      else if(typeof window.renderRegistryTab==='function') p=Promise.resolve(window.renderRegistryTab(true));
+      if(p){
+        p.then(function(){ setDom('registry'); }).catch(function(err){
+          console.error('registry load failed',err);
+          if(typeof window.toast==='function') window.toast('참가자 목록 로딩 실패: '+(err.message||err),'error');
+        });
+      }
+    }catch(e){ console.error('registry load failed',e); }
+  }
+  function renderRecords(){
+    try{
+      var jobs=[];
+      if(typeof window.loadRegistry==='function') jobs.push(Promise.resolve(window.loadRegistry(new Date().getFullYear())));
+      if(typeof window.ensurePlayersLoaded==='function') jobs.push(Promise.resolve(window.ensurePlayersLoaded()));
+      if(typeof window.ensureAllParticipationDataLoaded==='function') jobs.push(Promise.resolve(window.ensureAllParticipationDataLoaded()));
+      Promise.allSettled(jobs).then(function(){
+        try{ if(typeof window.renderAllP==='function') window.renderAllP(); }catch(e){}
+        try{ if(typeof window.popCF==='function') window.popCF(); }catch(e){}
+        try{ if(typeof window.updatePlayersAdminControls==='function') window.updatePlayersAdminControls(); }catch(e){}
+      });
+    }catch(e){ try{ if(typeof window.renderAllP==='function') window.renderAllP(); }catch(_e){} }
+  }
+
+  var prevSwitch = window.switchPlayersTab;
+  window.switchPlayersTab = function(tab, opts){
+    tab = tab === 'registry' ? 'registry' : 'records';
+    opts = opts || {};
+    // 참가자 목록을 사용자가 선택한 직후에는 다른 스크립트의 자동 records 전환을 막는다.
+    if(tab==='records' && desiredTab==='registry' && !opts.explicit){
+      setDom('registry');
+      renderRegistry(false);
+      return false;
+    }
+    desiredTab = tab;
+    try{ sessionStorage.setItem('playersDesiredTab', desiredTab); }catch(e){}
+    if(tab==='registry'){
+      lastRegistryClickAt = Date.now();
+      setDom('registry');
+      renderRegistry(true);
+      setTimeout(function(){ setDom('registry'); },80);
+      setTimeout(function(){ setDom('registry'); },350);
+      setTimeout(function(){ setDom('registry'); },1200);
+      return false;
+    }
+    setDom('records');
+    renderRecords();
+    return false;
+  };
+
+  // 탭 클릭을 캡처 단계에서 직접 처리하여 기존 onclick/이전 패치의 자동 전환을 차단한다.
+  document.addEventListener('click', function(ev){
+    var t = ev.target && ev.target.closest ? ev.target.closest('#ptab-registry,#ptab-records') : null;
+    if(!t) return;
+    if(t.id==='ptab-registry'){
+      ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation();
+      desiredTab='registry';
+      try{ sessionStorage.setItem('playersDesiredTab','registry'); }catch(e){}
+      window.switchPlayersTab('registry');
+      return false;
+    }
+    if(t.id==='ptab-records'){
+      ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation();
+      desiredTab='records';
+      try{ sessionStorage.setItem('playersDesiredTab','records'); }catch(e){}
+      window.switchPlayersTab('records',{explicit:true});
+      return false;
+    }
+  }, true);
+
+  // showPage('players') 이후에도 사용자가 마지막으로 참가자 목록을 보던 상태면 목록을 유지한다.
+  var prevShowPage = window.showPage;
+  if(typeof prevShowPage==='function'){
+    window.showPage = function(page){
+      var r = prevShowPage.apply(this, arguments);
+      try{
+        if(page==='players'){
+          var saved=sessionStorage.getItem('playersDesiredTab')||desiredTab;
+          if(saved==='registry') setTimeout(function(){ window.switchPlayersTab('registry'); },30);
+        }else{
+          document.body.classList.remove('players-registry-active','players-records-active');
+        }
+      }catch(e){}
+      return r;
+    };
+  }
+
+  function reinforce(){
+    try{
+      var saved=sessionStorage.getItem('playersDesiredTab');
+      if(saved==='registry') desiredTab='registry';
+      if(currentPageIsPlayers() && desiredTab==='registry'){
+        setDom('registry');
+        var body=$('regTabBody');
+        if(body && (!body.dataset.ready || /최근\s*참가자\s*빠르게\s*보기/.test(body.textContent||''))){
+          renderRegistry(false);
+        }
+      }
+    }catch(e){}
+  }
+  document.addEventListener('DOMContentLoaded', function(){
+    try{ desiredTab=sessionStorage.getItem('playersDesiredTab')||desiredTab; }catch(e){}
+    setTimeout(reinforce,100); setTimeout(reinforce,700); setTimeout(reinforce,1600);
+  });
+  try{
+    var mo=new MutationObserver(function(){
+      clearTimeout(window.__v355PlayersRegistryTimer);
+      window.__v355PlayersRegistryTimer=setTimeout(reinforce,60);
+    });
+    mo.observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['class','style']});
+  }catch(e){}
 })();
 </script>
 
