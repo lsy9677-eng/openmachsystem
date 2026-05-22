@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-05-22-v330-guide-notification-inbox";
+  const APP_VERSION = "2026-05-22-v341-per-tournament-fee-account";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -4502,6 +4502,22 @@ body {
 /* ===== v336 끝 ===== */
 
 </style>
+
+<style id="v338PaymentConfirmStyle">
+/* v338: 참가비 계좌 복사 + 입금 확인 */
+.v338-fee-copy-card{margin:0 0 14px 0;padding:14px 16px;border-radius:18px;background:linear-gradient(135deg,#fff7dd,#eef4ff);border:1.5px solid #d4a017;box-shadow:0 10px 24px rgba(15,30,58,.08)}
+.v338-fee-copy-title{font-size:.94rem;font-weight:1000;color:#0f1e3a;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.v338-fee-copy-body{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.v338-fee-copy-info{font-size:.82rem;line-height:1.65;color:#334155;font-weight:800}
+.v338-fee-copy-info b{color:#0f1e3a}
+.v338-paid-badge{display:inline-flex;align-items:center;justify-content:center;min-height:24px;padding:3px 8px;border-radius:999px;font-size:.68rem;font-weight:1000;white-space:nowrap;border:1px solid #cbd5e1;background:#f8fafc;color:#475569}
+.v338-paid-badge.paid{background:#dcfce7;color:#166534;border-color:#86efac}
+.v338-pay-btn{min-height:26px!important;height:26px!important;border-radius:8px!important;padding:2px 7px!important;font-size:.62rem!important;font-weight:1000!important;white-space:nowrap!important;box-shadow:none!important}
+.v338-pay-btn.paid{background:#dcfce7!important;color:#166534!important;border:1px solid #86efac!important}
+.v338-pay-btn.unpaid{background:#fff7ed!important;color:#9a3412!important;border:1px solid #fdba74!important}
+.v338-pay-status-line{margin-top:4px;font-size:.68rem;color:#64748b;font-weight:700;line-height:1.35}
+@media(max-width:680px){.v338-fee-copy-card{padding:12px 13px;border-radius:16px}.v338-fee-copy-body{align-items:stretch}.v338-fee-copy-body .btn{width:100%}.v338-fee-copy-info{font-size:.78rem}.v338-paid-badge{font-size:.64rem}.v338-pay-btn{font-size:.6rem!important;padding:2px 5px!important}}
+</style>
 </head>
 <body>
 <header class="app-header">
@@ -4598,6 +4614,15 @@ body {
 <input class="form-input" id="tRegDl" type="datetime-local"/>
 <div style="font-size:.71rem;color:var(--text3);margin-top:3px">비워두면 제한 없음. 관리자는 항상 등록 가능.</div>
 </div>
+</div>
+<div class="card" style="padding:14px 16px;margin-bottom:14px;background:linear-gradient(135deg,#fff7dd,#eef4ff);border:1.5px solid #d4a017">
+<div style="font-weight:800;font-size:.9rem;color:#92400e;margin-bottom:8px">💳 참가비 / 입금계좌 설정</div>
+<div style="font-size:.75rem;color:var(--text2);line-height:1.6;margin-bottom:10px">이 항목은 <b>대회별로 저장</b>됩니다. 홈화면 계좌 복사와 참가비 입금확인 안내에 사용됩니다.</div>
+<div class="frow">
+<div class="form-group"><label class="form-label">참가비</label><input class="form-input" id="tFeeAmount" placeholder="예: 팀당 60,000원" value="팀당 60,000원"/></div>
+<div class="form-group"><label class="form-label">은행 / 예금주</label><input class="form-input" id="tFeeBankHolder" placeholder="예: 카카오뱅크 / 230스포츠미디어" value="카카오뱅크 / 230스포츠미디어"/></div>
+</div>
+<div class="form-group"><label class="form-label">입금계좌</label><input class="form-input" id="tFeeAccount" placeholder="예: 3333-07-8834842" value="3333-07-8834842"/></div>
 </div>
 <div class="card" style="padding:14px 16px;margin-bottom:14px;background:linear-gradient(135deg,#f8fbff,#fffdf5)">
 <div style="font-weight:800;font-size:.9rem;color:var(--primary-dark);margin-bottom:8px">🎾 대회 운영 코트 설정</div>
@@ -16484,6 +16509,9 @@ async function createTournament(){
       ds[name]={format:fmt,grpSize:gs,advance:adv,doublesCount:type==='individual_pair'?1:rub,maxTeams:parseInt(maxTeams||0)||0,thirdPlaceMode:'shared',allowedCourts:Array.isArray(d.courts)?d.courts.map(String).filter(Boolean):[]};
     });
     const _tRegDl=ge('tRegDl')?.value;
+    const feeAmount=(ge('tFeeAmount')?.value||'').trim() || '팀당 60,000원';
+    const feeBankHolder=(ge('tFeeBankHolder')?.value||'').trim() || '카카오뱅크 / 230스포츠미디어';
+    const feeAccount=(ge('tFeeAccount')?.value||'').trim() || '3333-07-8834842';
     const ownerUid = user?.uid || '';
     const ownerEmail = user?.email || '';
     const tRef=await addDoc(collection(db,'tournaments'),{
@@ -16493,6 +16521,7 @@ async function createTournament(){
       staffUids:[],
       createdByRole:isAdmin ? 'super_admin' : 'tournament_admin',
       name:nm,date:dt,venue:ge('tVenue').value.trim(),deadline:ge('tDeadline').value,
+      feeAmount,feeBankHolder,feeAccount,
       courtGroups:getDraftCourtGroups('create'),
       regDeadlineDt:_tRegDl?new Date(_tRegDl).toISOString():'',
       type,
@@ -16506,6 +16535,9 @@ async function createTournament(){
     if(assets.length>0){await setDoc(doc(db,'tourGuides',tRef.id),{assets,updatedAt:serverTimestamp()});}
     await fbLog('대회 생성: '+nm+' ['+(type==='individual_pair'?'개인전':'단체전')+']','🏆');
     ['tName','tDate','tVenue','tDeadline','tRegDl','tNotice','tGuideText','tGuideUrl','newDivMaxTeams','newCourtGroupName','newCourtGroupCount'].forEach(id=>{const el=ge(id);if(el)el.value='';});
+    if(ge('tFeeAmount')) ge('tFeeAmount').value='팀당 60,000원';
+    if(ge('tFeeBankHolder')) ge('tFeeBankHolder').value='카카오뱅크 / 230스포츠미디어';
+    if(ge('tFeeAccount')) ge('tFeeAccount').value='3333-07-8834842';
     if(ge('tType')) ge('tType').value='team';
     updateTournamentTypeUI();
     GUIDE_FILES_CREATE=[];GUIDE_FILES_CREATE_PENDING=[];renderGuidePreview('create');
@@ -16744,6 +16776,15 @@ function openET(tid){
       <div id="etRegDlStatus" style="font-size:.75rem;margin-top:6px;color:#166534">${regDeadlineLabel(t.id)}</div>
       <div style="font-size:.7rem;color:var(--text3);margin-top:3px">비워두면 제한 없음. 관리자는 항상 등록 가능.</div>
     </div>
+    <div class="form-group" style="background:linear-gradient(135deg,#fff7dd,#eef4ff);border:1.5px solid #d4a017;border-radius:10px;padding:10px 12px">
+      <label class="form-label" style="color:#92400e">💳 참가비 / 입금계좌 설정</label>
+      <div style="font-size:.72rem;color:var(--text2);line-height:1.6;margin-bottom:9px">이 대회 홈화면의 계좌 복사와 입금확인 안내에 사용됩니다.</div>
+      <div class="frow">
+        <div class="form-group"><label class="form-label">참가비</label><input class="form-input" id="etFeeAmount" value="${t.feeAmount||'팀당 60,000원'}" placeholder="예: 팀당 60,000원"></div>
+        <div class="form-group"><label class="form-label">은행 / 예금주</label><input class="form-input" id="etFeeBankHolder" value="${t.feeBankHolder||'카카오뱅크 / 230스포츠미디어'}" placeholder="예: 카카오뱅크 / 230스포츠미디어"></div>
+      </div>
+      <div class="form-group" style="margin-bottom:0"><label class="form-label">입금계좌</label><input class="form-input" id="etFeeAccount" value="${t.feeAccount||'3333-07-8834842'}" placeholder="예: 3333-07-8834842"></div>
+    </div>
     <div class="form-group" style="background:linear-gradient(135deg,#f8fbff,#fffdf5);border:1.5px solid #dbe7ff;border-radius:10px;padding:10px 12px">
       <label class="form-label" style="color:var(--primary-dark)">🎾 대회 운영 코트 설정</label>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
@@ -16842,6 +16883,9 @@ async function saveET(){
     const guideUrl  = ge('etGuideUrl')?.value.trim() || '';
     const notice    = ge('etNt').value.trim();
     const venue     = ge('etVn').value.trim();
+    const feeAmount = (ge('etFeeAmount')?.value||'').trim() || '팀당 60,000원';
+    const feeBankHolder = (ge('etFeeBankHolder')?.value||'').trim() || '카카오뱅크 / 230스포츠미디어';
+    const feeAccount = (ge('etFeeAccount')?.value||'').trim() || '3333-07-8834842';
     const hasGuideAssets = assets.length > 0;
 
     const _etRegDlVal = ge('etRegDl')?.value||'';
@@ -16850,6 +16894,9 @@ async function saveET(){
       date: ge('etDt').value,
       venue,
       deadline: ge('etDl').value,
+      feeAmount,
+      feeBankHolder,
+      feeAccount,
       regDeadlineDt: _etRegDlVal ? new Date(_etRegDlVal).toISOString() : '',
       status: ge('etSt').value,
       divisions: newD,
@@ -17596,6 +17643,7 @@ function buildRegisterRosterGrid(tid,div,teams,key){
     const detailBtn = isIndividual ? `<button class="btn rr-btn-edit v334-detail-btn" style="background:#f8fafc;color:#0f1e3a;border:1px solid #cbd5e1" onclick="openIndividualEntryInfo('${esc(key)}',${realIdx})">상세</button>` : '';
     const adminBtns=canManageTeam?`<div class="rr-admin-btns ${isIndividual?'v334-individual-actions':''}">
       ${detailBtn}
+      ${buildPaymentActionHTML(key,realIdx)}
       <button class="btn rr-btn-edit" style="background:#f8fafc;color:#0f1e3a;border:1px solid #cbd5e1" onclick="openETeam('${esc(key)}',${realIdx})">✏️ 수정</button>
       <button class="btn rr-btn-edit" style="background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd" onclick="openManualTeamPush('${esc(key)}',${realIdx})">🔔 알림</button>
       <button class="btn btn-danger rr-btn-del" onclick="delTeam('${esc(key)}',${realIdx})">🗑 삭제</button>
@@ -17645,11 +17693,13 @@ function buildRegisterRosterGrid(tid,div,teams,key){
       const actionBtns = canManageTeam
         ? `<div class="v336-entry-action">
             <button class="btn" style="background:#f8fafc;color:#0f1e3a;border:1px solid #cbd5e1" onclick="openIndividualEntryInfo('${esc(key)}',${realIdx})">상세</button>
+            ${buildPaymentActionHTML(key,realIdx)}
             <button class="btn" style="background:#f8fafc;color:#0f1e3a;border:1px solid #cbd5e1" onclick="openETeam('${esc(key)}',${realIdx})">✏️</button>
             <button class="btn btn-danger" onclick="delTeam('${esc(key)}',${realIdx})">🗑</button>
           </div>`
         : `<div class="v336-entry-action">
             <button class="btn" style="background:#f8fafc;color:#0f1e3a;border:1px solid #cbd5e1" onclick="openIndividualEntryInfo('${esc(key)}',${realIdx})">상세</button>
+            ${buildPaymentStatusHTML(key,realIdx)}
           </div>`;
       return `<div class="v336-entry-row">
         <div class="v336-entry-num">${i+1}</div>
@@ -17664,6 +17714,7 @@ function buildRegisterRosterGrid(tid,div,teams,key){
           <span class="rr-team-num">${i+1}</span>
           <span class="${titleClass}">${headerName}</span>
           ${headerCount?`<span class="rr-team-count">${headerCount}</span>`:''}
+          ${buildPaymentStatusHTML(key,realIdx)}
         </div>
         ${adminBtns}
       </div>
@@ -27838,6 +27889,17 @@ function upDash(){
     const liveHtml = liveRows.length ? liveRows.slice(0,4).map((row,idx)=>`<div class="home-panel-row" onclick="${rowClick(row)}"><div class="home-panel-row-main"><div class="home-panel-row-title">${esc(row.title)}</div><div class="home-panel-row-sub">${esc(row.sub)}</div></div><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end">${mineChip(row)}<span class="home-panel-badge">진행 ${idx+1}</span></div></div>`).join('') : '<div class="home-empty-note">지금 표시할 진행중 경기가 없어요. 대진표에서 배정 상태를 확인해 주세요.</div>';
     const waitHtml = waitRows.length ? waitRows.slice(0,4).map((row,idx)=>`<div class="home-panel-row" onclick="${rowClick(row)}"><div class="home-panel-row-main"><div class="home-panel-row-title">${esc(row.title)}</div><div class="home-panel-row-sub">${esc(row.sub)}</div></div><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end">${mineChip(row)}<span class="home-panel-badge" style="background:#fff7ed;color:#9a3412">대기 ${idx+1}</span></div></div>`).join('') : '<div class="home-empty-note">대기중 경기가 없어요. 코트 현황 또는 대진표에서 다음 순서를 확인해 주세요.</div>';
     const personalHomeBanner = renderHomePersonalMatchBanner(at.id, at.divisions||[]);
+    const feeCopyHtml = `<div class="v338-fee-copy-card" id="homeFeeCopyCard">
+      <div class="v338-fee-copy-title">💳 참가비 입금 계좌 <span style="font-size:.72rem;color:#64748b;font-weight:800">대회별 설정</span></div>
+      <div class="v338-fee-copy-body">
+        <div class="v338-fee-copy-info">
+          <div>참가비: <b>${esc(getPaymentFeeText())}</b></div>
+          <div>입금계좌: <b>${esc(getPaymentAccountText())}</b></div>
+          <div style="font-size:.74rem;color:#92400e;margin-top:3px">※ 참가자명으로 입금해 주세요. 관리자가 입금 확인 후 상태가 표시됩니다.</div>
+        </div>
+        <button type="button" class="btn btn-primary" onclick="copyTournamentFeeAccount()" style="background:#d4a017;color:#111827;font-weight:1000;min-width:126px">📋 계좌 복사</button>
+      </div>
+    </div>`;
 
     ge('homeTournInfo').innerHTML=`<div class="home-panel">
       <div class="home-panel-box">
@@ -27854,6 +27916,7 @@ function upDash(){
         <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn btn-outline" style="font-size:.78rem;padding:5px 11px" onclick="openHomeGuideAction()">📌 요강 보기</button><button class="btn btn-outline" style="font-size:.78rem;padding:5px 11px" onclick="openHomeBracket()">🎲 대진표 바로가기</button></div>
         ${at.notice?`<div style="margin-top:10px;font-size:.78rem;background:var(--panel2);padding:8px;border-radius:var(--radius);border:1px solid var(--border);white-space:pre-line">${at.notice}</div>`:''}
       </div>
+      ${feeCopyHtml}
       ${personalHomeBanner||''}
       <div class="home-panel-box">
         <div class="home-panel-title">🎾 지금 진행중 경기</div>
@@ -33242,7 +33305,124 @@ function closeReorderPopup() {
   ge('reorderOverlay')?.remove();
 }
 
-Object.assign(window,{ openAdminBroadcastPushModal, openManualMatchPush, openManualTeamPush, sendManualPushFromModal, closeStickyAlert, goToStickyAlertMatch, toggleModalFullscreen, setModalFullscreenState, openQuickAddPlayer, quickAddPlayer, fillAdminPlayerClub, adminAddPlayer, openSupportModal, sendSupportSMS, saveAdminPhone, 
+
+
+/* === v339: 참가비 입금 확인 안정화 패치 === */
+function getTeamPaymentPaid(team){
+  try{ return !!(team && (team.feePaid === true || team.paymentPaid === true || team.paymentStatus === 'paid')); }catch(e){ return false; }
+}
+function getPaymentFeeText(){ return '팀당 60,000원'; }
+function getPaymentAccountText(){ return '카카오뱅크 3333-07-8834842 (230스포츠미디어)'; }
+async function copyTournamentFeeAccount(){
+  const text = `2026 제1회 모던클럽배 테니스대회 참가비\n참가비: ${getPaymentFeeText()}\n입금계좌: ${getPaymentAccountText()}\n※ 참가자명으로 입금해 주세요.`;
+  try{
+    if(typeof copyTextSafe === 'function'){
+      const ok = await copyTextSafe(text);
+      toast(ok ? '참가비 계좌를 복사했습니다 ✅' : '복사 실패', ok ? 'success' : 'error');
+      return ok;
+    }
+    await navigator.clipboard.writeText(text);
+    toast('참가비 계좌를 복사했습니다 ✅','success');
+    return true;
+  }catch(e){
+    try{ window.prompt('아래 내용을 복사하세요', text); }catch(_e){}
+    return false;
+  }
+}
+function buildPaymentStatusHTML(key, idx){
+  try{
+    const team=(G.teams?.[key]||[])[Number(idx)];
+    const paid=getTeamPaymentPaid(team);
+    const label=paid ? '입금확인' : '입금대기';
+    const time=paid && team?.feePaidAt ? String(team.feePaidAt).slice(5,16).replace('T',' ') : '';
+    return `<span class="v338-paid-badge ${paid?'paid':'unpaid'}" title="${paid?'참가비 입금 확인됨':'참가비 입금 대기'}">${paid?'✅':'⏳'} ${label}${time?` · ${esc(time)}`:''}</span>`;
+  }catch(e){ return ''; }
+}
+function buildPaymentActionHTML(key, idx){
+  try{
+    if(!(AD||TM)) return buildPaymentStatusHTML(key,idx);
+    const team=(G.teams?.[key]||[])[Number(idx)];
+    const paid=getTeamPaymentPaid(team);
+    return `<button type="button" class="btn v338-pay-btn ${paid?'paid':'unpaid'}" onclick="toggleTeamPaymentPaid('${esc(key)}',${Number(idx)})" title="참가비 입금 확인 상태 변경">${paid?'✅ 입금확인':'💳 입금확인'}</button>`;
+  }catch(e){ return ''; }
+}
+async function toggleTeamPaymentPaid(key, idx){
+  try{
+    if(!(AD||TM)){ toast('관리자/운영자만 입금확인 처리할 수 있습니다','error'); return; }
+    const list=G.teams?.[key]||[];
+    const team=list[Number(idx)];
+    if(!team){ toast('참가 명단을 찾을 수 없습니다','error'); return; }
+    const next=!getTeamPaymentPaid(team);
+    team.feePaid=next;
+    team.paymentStatus=next?'paid':'unpaid';
+    team.feePaidAt=next?new Date().toISOString():'';
+    team.feePaidBy=next?(auth?.currentUser?.uid||'admin'):'';
+    team.feePaidByName=next?(auth?.currentUser?.email||'관리자'):'';
+    sl(true);
+    try{
+      if(team._id){
+        await updateDoc(doc(db,'registrations',team._id),{
+          feePaid:team.feePaid,
+          paymentStatus:team.paymentStatus,
+          feePaidAt:team.feePaidAt,
+          feePaidBy:team.feePaidBy,
+          feePaidByName:team.feePaidByName,
+          updatedAt:new Date().toISOString()
+        });
+      }else{
+        await stT(key);
+      }
+    }catch(e){
+      sl(false);
+      toast('입금확인 저장 실패: '+(e?.message||e),'error');
+      return;
+    }
+    sl(false);
+    try{ renderRL(); }catch(e){}
+    try{ upDash(); }catch(e){}
+    try{ cacheTournamentBundleFromMemory(_k2td(key).tid); }catch(e){}
+    if(next){
+      toast('입금확인 처리 완료 ✅','success');
+      setTimeout(()=>sendPaymentConfirmedNotice(key, Number(idx)), 80);
+    }else{
+      toast('입금확인을 취소했습니다','info');
+    }
+  }catch(e){
+    sl(false);
+    console.error(e);
+    toast('입금확인 처리 실패: '+(e?.message||e),'error');
+  }
+}
+async function sendPaymentConfirmedNotice(key, idx){
+  try{
+    const team=(G.teams?.[key]||[])[Number(idx)];
+    if(!team) return;
+    const label=team.entryLabel||team.pairLabel||tdn(team,key,idx)||'참가자';
+    const title='참가비 입금 확인 ✅';
+    const body=`${label} 참가비 입금이 확인되었습니다.`;
+    if(typeof getManualPushTargetTokenDocs==='function' && typeof sendPushToTokenDocs==='function'){
+      const ctx={type:'team', key, idx:Number(idx)};
+      const docs=await getManualPushTargetTokenDocs(ctx);
+      const recipients=(typeof getManualPushSmsFallbackRecipients==='function') ? getManualPushSmsFallbackRecipients(ctx) : [];
+      const cls=(typeof classifyManualPushTargets==='function') ? classifyManualPushTargets(recipients, docs) : {smsFallback:[], infoMissing:[]};
+      if(docs && docs.length){
+        const res=await sendPushToTokenDocs(docs,title,body,{type:'payment_confirmed',target:'team'});
+        if(res?.ok>0) toast(`입금확인 알림 발송: ${res.ok}명`,'success');
+        if(cls?.smsFallback?.length && typeof showPushSmsFallbackAlert==='function') showPushSmsFallbackAlert(ctx,cls.smsFallback,body);
+        if(cls?.infoMissing?.length && typeof showPushInfoMissingAlert==='function') showPushInfoMissingAlert(ctx,cls.infoMissing);
+      }else if(cls?.smsFallback?.length && typeof showPushSmsFallbackAlert==='function'){
+        toast(`푸시 대상 없음 · 문자 대체 ${cls.smsFallback.length}명`,'info');
+        showPushSmsFallbackAlert(ctx,cls.smsFallback,body);
+      }
+    }else if(typeof openManualTeamPush==='function'){
+      await openManualTeamPush(key,idx);
+      if(ge('manualPushTitle')) ge('manualPushTitle').value=title;
+      if(ge('manualPushBody')) ge('manualPushBody').value=body;
+    }
+  }catch(e){ console.warn('payment confirm notice skipped', e); }
+}
+
+Object.assign(window,{ copyTournamentFeeAccount, toggleTeamPaymentPaid, sendPaymentConfirmedNotice, buildPaymentActionHTML, buildPaymentStatusHTML, openAdminBroadcastPushModal, openManualMatchPush, openManualTeamPush, sendManualPushFromModal, closeStickyAlert, goToStickyAlertMatch, toggleModalFullscreen, setModalFullscreenState, openQuickAddPlayer, quickAddPlayer, fillAdminPlayerClub, adminAddPlayer, openSupportModal, sendSupportSMS, saveAdminPhone, 
   showPage,toggleAdmin,doLogin,openAdminSettings,saveAdminPassword,goBracket,onGuideFilesSelected,removeGuideFile,openGuide,loadHistFromDB,uploadHistFromExcel,previewHistExcel,renderGuidePreview,onHistGuideFilesSelected,uploadHistGuideFiles,manageHistGuide,deleteHistGuideFile,removeHistGuidePending,
   createTournament,renderTL,chgTS,delT,openET,saveET,openTD,applyRec,saveDivS,
   onRegTC,renderRL,renderRegisterDivisionOverview,selectRegDivision,registerTeam,delTeam,phint,openPHist,openETeam,saveETeam,etUpdateSlots,updateRegisterSlots,
