@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-05-22-v329-inapp-notification-history";
+  const APP_VERSION = "2026-05-22-v330-guide-notification-inbox";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -4233,7 +4233,7 @@ body {
 <div class="logo-icon" style="display:none">🎾</div>
 <div class="logo-text"><h1>시합관리 시스템</h1><p>230MATCH TOURNAMENT</p></div>
 </div>
-<div class="header-actions"><span class="admin-badge" id="regLoginBadge" style="display:none;background:var(--success);color:#fff;font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:999px">클럽</span><span class="admin-badge" id="opLoginBadge" style="display:none;background:#1565c0;color:#fff;font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:999px">진행자</span><span class="admin-badge" id="adminBadge">관리자</span><button class="btn-sm admin-only" id="adminSettingsBtn" onclick="openAdminSettings()">⚙️</button><button class="btn-sm" id="manualToggleBtn" onclick="openHelpCenter()" style="background:#fff;color:#0f1e3a;border:1.5px solid rgba(255,255,255,.42);font-weight:900">📘 가이드</button><div class="login-menu-wrap" id="loginMenuWrap"><button class="btn-sm login-menu-btn" id="loginMenuBtn" onclick="toggleLoginMenu(event)" style="background:#fff;color:#0f1e3a;border:1.5px solid rgba(255,255,255,.42);font-weight:900">🔐 로그인</button><div class="login-menu-panel login-menu-panel-clean" id="loginMenuPanel"><span id="regClubNameBadge" style="display:none;background:var(--success);color:#fff;font-size:.75rem;font-weight:900;padding:7px 10px;border-radius:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span><button class="btn-sm login-menu-item login-menu-main-item" id="roleLoginMenuBtn" onclick="toggleRoleLoginPanel(event)" style="background:linear-gradient(135deg,#0f1e3a,#1b2f5a);color:#fff;border:1px solid rgba(255,255,255,.14)">🔑 권한별 로그인 <span class="login-menu-arrow" id="roleLoginArrow">▾</span></button><div class="role-login-panel" id="roleLoginPanel"><button class="btn-sm login-menu-item" id="regToggleBtn" onclick="closeLoginMenu();toggleReg()" style="background:var(--success);color:#fff;border:none">🏆 경기이사 로그인</button><button class="btn-sm login-menu-item" id="opToggleBtn" onclick="closeLoginMenu();toggleOperator()" style="background:#1565c0;color:#fff;border:none">🎾 진행자 로그인</button><button class="btn-sm login-menu-item" id="adminToggleBtn" onclick="closeLoginMenu();toggleTournamentManagerLogin()" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">🧑‍💼 운영자 로그인</button><button class="btn-sm login-menu-item" id="developerToggleBtn" onclick="closeLoginMenu();toggleDeveloperLogin()" style="background:#0f1e3a;color:#fff;border:1px solid rgba(255,255,255,.12)">🛠️ 개발자 로그인</button></div><div class="login-menu-sep"></div><button class="btn-sm login-menu-item login-menu-main-item" id="adminSignupBtn" onclick="closeLoginMenu();toggleAdminSignup()" style="background:#eef4ff;color:#12306b;border:1px solid rgba(18,48,107,.12)">👤 회원가입 / 간편 로그인</button><button class="btn-sm login-menu-item" id="myProfileBtn" onclick="closeLoginMenu();openMyProfileModal()" style="display:none;background:#eef4ff;color:#12306b;border:1px solid rgba(18,48,107,.12)">👤 내 정보 설정</button><button class="btn-sm login-menu-item" id="googleLogoutBtn" onclick="closeLoginMenu();logoutGoogleUser()" style="display:none;background:#f8fafc;color:#475569;border:1px solid rgba(15,30,58,.12)">🚪 로그아웃</button><button class="btn-sm login-menu-item" id="googleLoginBtn" onclick="loginWithGoogle()" style="display:none;background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">🔵 구글 로그인</button><button class="btn-sm login-menu-item" id="naverLoginBtn" onclick="loginWithNaver()" style="display:none;background:#03c75a;color:#fff;border:1px solid rgba(3,199,90,.35)">🟢 네이버 로그인</button></div></div></div>
+<div class="header-actions"><span class="admin-badge" id="regLoginBadge" style="display:none;background:var(--success);color:#fff;font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:999px">클럽</span><span class="admin-badge" id="opLoginBadge" style="display:none;background:#1565c0;color:#fff;font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:999px">진행자</span><span class="admin-badge" id="adminBadge">관리자</span><button class="btn-sm admin-only" id="adminSettingsBtn" onclick="openAdminSettings()">⚙️</button><button class="btn-sm" id="manualToggleBtn" onclick="openHelpCenter()" style="background:#fff;color:#0f1e3a;border:1.5px solid rgba(255,255,255,.42);font-weight:900">📘 가이드</button><button class="btn-sm" id="topNotificationInboxBtn" onclick="openNotificationInbox()" style="background:#fff;color:#0f1e3a;border:1.5px solid rgba(255,255,255,.42);font-weight:900">🔔 알림 <span data-notification-unread-badge style="display:none;margin-left:4px;min-width:17px;height:17px;border-radius:999px;background:#ef4444;color:#fff;align-items:center;justify-content:center;font-size:.66rem;font-weight:900"></span></button><div class="login-menu-wrap" id="loginMenuWrap"><button class="btn-sm login-menu-btn" id="loginMenuBtn" onclick="toggleLoginMenu(event)" style="background:#fff;color:#0f1e3a;border:1.5px solid rgba(255,255,255,.42);font-weight:900">🔐 로그인</button><div class="login-menu-panel login-menu-panel-clean" id="loginMenuPanel"><span id="regClubNameBadge" style="display:none;background:var(--success);color:#fff;font-size:.75rem;font-weight:900;padding:7px 10px;border-radius:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span><button class="btn-sm login-menu-item login-menu-main-item" id="roleLoginMenuBtn" onclick="toggleRoleLoginPanel(event)" style="background:linear-gradient(135deg,#0f1e3a,#1b2f5a);color:#fff;border:1px solid rgba(255,255,255,.14)">🔑 권한별 로그인 <span class="login-menu-arrow" id="roleLoginArrow">▾</span></button><div class="role-login-panel" id="roleLoginPanel"><button class="btn-sm login-menu-item" id="regToggleBtn" onclick="closeLoginMenu();toggleReg()" style="background:var(--success);color:#fff;border:none">🏆 경기이사 로그인</button><button class="btn-sm login-menu-item" id="opToggleBtn" onclick="closeLoginMenu();toggleOperator()" style="background:#1565c0;color:#fff;border:none">🎾 진행자 로그인</button><button class="btn-sm login-menu-item" id="adminToggleBtn" onclick="closeLoginMenu();toggleTournamentManagerLogin()" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">🧑‍💼 운영자 로그인</button><button class="btn-sm login-menu-item" id="developerToggleBtn" onclick="closeLoginMenu();toggleDeveloperLogin()" style="background:#0f1e3a;color:#fff;border:1px solid rgba(255,255,255,.12)">🛠️ 개발자 로그인</button></div><div class="login-menu-sep"></div><button class="btn-sm login-menu-item login-menu-main-item" id="adminSignupBtn" onclick="closeLoginMenu();toggleAdminSignup()" style="background:#eef4ff;color:#12306b;border:1px solid rgba(18,48,107,.12)">👤 회원가입 / 간편 로그인</button><button class="btn-sm login-menu-item" id="myProfileBtn" onclick="closeLoginMenu();openMyProfileModal()" style="display:none;background:#eef4ff;color:#12306b;border:1px solid rgba(18,48,107,.12)">👤 내 정보 설정</button><button class="btn-sm login-menu-item" id="googleLogoutBtn" onclick="closeLoginMenu();logoutGoogleUser()" style="display:none;background:#f8fafc;color:#475569;border:1px solid rgba(15,30,58,.12)">🚪 로그아웃</button><button class="btn-sm login-menu-item" id="googleLoginBtn" onclick="loginWithGoogle()" style="display:none;background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">🔵 구글 로그인</button><button class="btn-sm login-menu-item" id="naverLoginBtn" onclick="loginWithNaver()" style="display:none;background:#03c75a;color:#fff;border:1px solid rgba(3,199,90,.35)">🟢 네이버 로그인</button></div></div></div>
 </div>
 <nav class="nav-tabs">
 <div class="nav-tab active" data-page="home" onclick="showPage('home')">🏠 홈</div>
@@ -33579,6 +33579,128 @@ body {
   window.nextQuickTutorial = function(){};
 })();
 </script>
+
+<!-- v330: 통합 가이드 + 상단 알림함 바로가기 -->
+<style id="v330GuideNotificationStyle">
+#helpCenterV330{position:fixed;inset:0;z-index:2147483100;display:none;align-items:flex-end;justify-content:center;background:rgba(15,23,42,.62);padding:16px;}
+#helpCenterV330.show{display:flex;}
+#helpCenterV330 .hc-box{width:min(920px,100%);max-height:88vh;background:#fff;border-radius:22px 22px 0 0;box-shadow:0 -24px 70px rgba(15,23,42,.32);overflow:hidden;display:flex;flex-direction:column;}
+#helpCenterV330 .hc-head{background:linear-gradient(135deg,#0f1e3a,#1d4ed8);color:#fff;padding:16px 18px;display:flex;align-items:center;justify-content:space-between;gap:10px;}
+#helpCenterV330 .hc-title{font-size:1.02rem;font-weight:1000;line-height:1.35;}
+#helpCenterV330 .hc-close{border:0;background:rgba(255,255,255,.16);color:#fff;border-radius:999px;width:34px;height:34px;font-size:1.1rem;font-weight:1000;cursor:pointer;}
+#helpCenterV330 .hc-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;padding:10px;background:#f8fafc;border-bottom:1px solid #e2e8f0;}
+#helpCenterV330 .hc-tab{border:1px solid #cbd5e1;background:#fff;color:#334155;border-radius:12px;min-height:40px;font-size:.82rem;font-weight:900;cursor:pointer;}
+#helpCenterV330 .hc-tab.active{background:#0f1e3a;color:#fff;border-color:#0f1e3a;}
+#helpCenterV330 .hc-body{padding:14px;overflow:auto;-webkit-overflow-scrolling:touch;}
+#helpCenterV330 .hc-pane{display:none;}
+#helpCenterV330 .hc-pane.active{display:block;}
+#helpCenterV330 .hc-hero{padding:14px 15px;border-radius:16px;background:linear-gradient(135deg,#eef4ff,#fff8df);border:1px solid #dbe7ff;margin-bottom:12px;}
+#helpCenterV330 .hc-hero b{color:#0f1e3a;}
+#helpCenterV330 .hc-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+#helpCenterV330 .hc-card{border:1px solid #e2e8f0;background:#fff;border-radius:16px;padding:13px 14px;box-shadow:0 8px 18px rgba(15,30,58,.05);}
+#helpCenterV330 .hc-card h4{font-size:.92rem;color:#10213f;margin-bottom:8px;font-weight:1000;}
+#helpCenterV330 .hc-card p,#helpCenterV330 .hc-card li{font-size:.79rem;color:#475569;line-height:1.7;word-break:keep-all;}
+#helpCenterV330 .hc-card ul{padding-left:18px;margin:0;}
+#helpCenterV330 .hc-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+#helpCenterV330 .hc-actions button{border:1px solid #cbd5e1;background:#f8fafc;color:#0f1e3a;border-radius:999px;padding:8px 12px;font-size:.76rem;font-weight:900;cursor:pointer;}
+#helpCenterV330 .hc-actions button.primary{background:#2563eb;color:#fff;border-color:#2563eb;}
+#helpCenterV330 .hc-warn{padding:10px 12px;border-radius:13px;background:#fff7ed;border:1px solid #fdba74;color:#9a3412;font-size:.78rem;line-height:1.65;font-weight:800;margin-top:10px;}
+#helpCenterV330 .hc-step{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-top:1px dashed #e2e8f0;}
+#helpCenterV330 .hc-step:first-child{border-top:0;padding-top:0;}
+#helpCenterV330 .hc-no{flex:0 0 26px;height:26px;border-radius:999px;background:#d4a017;color:#fff;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:1000;}
+#helpCenterV330 .hc-foot{padding:10px 14px;border-top:1px solid #e2e8f0;background:#fff;display:flex;justify-content:flex-end;gap:8px;}
+#helpCenterV330 .hc-foot button{border:0;border-radius:12px;padding:9px 14px;font-weight:900;cursor:pointer;}
+#helpCenterV330 .hc-foot .close{background:#e2e8f0;color:#334155;}
+@media(max-width:720px){#helpCenterV330{padding:8px 8px calc(76px + env(safe-area-inset-bottom,0px)) 8px;}#helpCenterV330 .hc-box{max-height:calc(100vh - 96px - env(safe-area-inset-bottom,0px));}#helpCenterV330 .hc-tabs{grid-template-columns:repeat(2,minmax(0,1fr));}#helpCenterV330 .hc-grid{grid-template-columns:1fr;}#helpCenterV330 .hc-tab{font-size:.78rem;min-height:38px;}#topNotificationInboxBtn{padding-left:8px!important;padding-right:8px!important;}}
+</style>
+<div id="helpCenterV330" role="dialog" aria-modal="true" aria-label="230MATCH 사용 가이드">
+  <div class="hc-box">
+    <div class="hc-head"><div class="hc-title">📘 230MATCH 사용 가이드</div><button class="hc-close" onclick="closeHelpCenterV330()">×</button></div>
+    <div class="hc-tabs">
+      <button class="hc-tab active" data-hc-tab="basic" onclick="showHelpCenterTabV330('basic')">기본 사용</button>
+      <button class="hc-tab" data-hc-tab="individual" onclick="showHelpCenterTabV330('individual')">개인전/내경기</button>
+      <button class="hc-tab" data-hc-tab="notification" onclick="showHelpCenterTabV330('notification')">알림/문자</button>
+      <button class="hc-tab" data-hc-tab="team" onclick="showHelpCenterTabV330('team')">단체전/운영</button>
+    </div>
+    <div class="hc-body">
+      <div class="hc-pane active" data-hc-pane="basic">
+        <div class="hc-hero"><b>처음 사용하는 분은</b> 로그인 → 내 정보 완료 → 참가접수/대진표 확인 순서로 진행하면 됩니다.</div>
+        <div class="hc-grid">
+          <div class="hc-card"><h4>1. 로그인</h4><p>상단 <b>로그인</b> 버튼에서 Google, Naver, Kakao 또는 이메일 로그인을 선택합니다. 네이버가 막히면 Google 또는 Kakao 로그인을 먼저 사용하세요.</p><div class="hc-actions"><button class="primary" onclick="try{cm('helpCenterV330');toggleAdminSignup();}catch(e){}">회원가입/로그인</button></div></div>
+          <div class="hc-card"><h4>2. 내 정보 설정</h4><p>이름, 휴대폰 번호, 소속 클럽을 입력해야 내 경기 확인과 알림 대상 매칭이 정확해집니다. 개인 참가자는 클럽에 <b>개인</b>을 입력해도 됩니다.</p><div class="hc-actions"><button onclick="try{cm('helpCenterV330');openMyProfileModal();}catch(e){}">내 정보 설정</button></div></div>
+          <div class="hc-card"><h4>3. 참가접수</h4><p>개인전은 로그인한 회원 정보가 1번 선수에 자동 입력됩니다. 파트너인 2번 선수 정보만 직접 입력하면 됩니다.</p><div class="hc-actions"><button onclick="try{cm('helpCenterV330');showPage('register');}catch(e){}">참가접수로 이동</button></div></div>
+          <div class="hc-card"><h4>4. 대진표 확인</h4><p>대진표 화면에서 예선 조, 코트 배정, 대기 순서, 경기 결과를 확인합니다. 휴대폰은 하단 메뉴의 <b>대진표</b>를 누르면 됩니다.</p><div class="hc-actions"><button onclick="try{cm('helpCenterV330');showPage('bracket');}catch(e){}">대진표 보기</button></div></div>
+        </div>
+      </div>
+      <div class="hc-pane" data-hc-pane="individual">
+        <div class="hc-hero"><b>개인전 핵심은 휴대폰 번호입니다.</b> 참가 명단 전화번호와 내 정보 전화번호가 일치하면 내 경기와 알림이 정확히 연결됩니다.</div>
+        <div class="hc-grid">
+          <div class="hc-card"><h4>내 경기 보기</h4><ul><li>내 정보의 전화번호와 참가자 전화번호가 일치하면 자동으로 내 경기가 표시됩니다.</li><li>대진표에서 <b>내 경기 보기</b> 또는 상단/홈 안내를 이용합니다.</li><li>파트너가 대신 접수했어도 본인이 로그인하고 번호를 등록하면 알림 대상에 포함됩니다.</li></ul><div class="hc-actions"><button class="primary" onclick="try{cm('helpCenterV330');focusPersonalMatchPanel();}catch(e){}">내 경기 보기</button></div></div>
+          <div class="hc-card"><h4>개인전 접수 방법</h4><div class="hc-step"><span class="hc-no">1</span><p>참가접수 화면에서 대회를 선택합니다.</p></div><div class="hc-step"><span class="hc-no">2</span><p>로그인한 회원은 1번 선수 정보가 자동 입력됩니다.</p></div><div class="hc-step"><span class="hc-no">3</span><p>2번 선수 이름, 전화번호, 클럽, 구력을 입력하고 접수합니다.</p></div></div>
+          <div class="hc-card"><h4>파트너 알림</h4><p>알림은 신청자만 받는 구조가 아니라, <b>선수별 이름/전화번호</b>를 기준으로 찾습니다. 파트너가 로그인 후 본인 전화번호를 저장하면 파트너도 푸시 또는 문자 대체 대상이 됩니다.</p></div>
+          <div class="hc-card"><h4>전화번호가 다르면?</h4><p>010-1234-5678과 01012345678은 자동 정리되지만, 번호 자체가 다르면 내 경기와 알림이 연결되지 않습니다. 관리자에게 명단 번호 수정을 요청하세요.</p></div>
+        </div>
+      </div>
+      <div class="hc-pane" data-hc-pane="notification">
+        <div class="hc-hero"><b>알림은 푸시 + 문자 대체</b> 방식입니다. 푸시가 안 되는 사람은 관리자 화면에서 문자 대체 대상으로 표시됩니다.</div>
+        <div class="hc-grid">
+          <div class="hc-card"><h4>알림 설정 방법</h4><div class="hc-step"><span class="hc-no">1</span><p>로그인 후 내 정보 설정에서 이름/전화번호/클럽을 저장합니다.</p></div><div class="hc-step"><span class="hc-no">2</span><p><b>알림 켜기</b>를 누르고 휴대폰 권한 요청에서 허용을 선택합니다.</p></div><div class="hc-step"><span class="hc-no">3</span><p>알림이 오지 않으면 <b>알림 다시 연결</b>을 누릅니다.</p></div><div class="hc-actions"><button onclick="try{cm('helpCenterV330');openMyProfileModal();}catch(e){}">알림 설정</button></div></div>
+          <div class="hc-card"><h4>알림이 안 될 때</h4><ul><li>휴대폰에서 알림 권한을 차단한 경우 앱에서 강제로 켤 수 없습니다.</li><li>이 경우 앱은 해당 회원을 <b>문자 대체 대상</b>으로 저장합니다.</li><li>관리자는 경기 알림 발송 후 문자 보내기 버튼으로 안내할 수 있습니다.</li></ul><div class="hc-warn">푸시가 안 떠도 접수/대진표 사용은 가능합니다. 중요한 경기 안내는 문자 대체로 보완합니다.</div></div>
+          <div class="hc-card"><h4>지난 알림 확인</h4><p>앱을 보고 있는 중 받은 알림은 화면에 뜨고, 확인을 눌러야 닫힙니다. 지난 알림은 상단 <b>🔔 알림</b> 버튼에서 바로 볼 수 있습니다.</p><div class="hc-actions"><button class="primary" onclick="try{cm('helpCenterV330');openNotificationInbox();}catch(e){}">지난 알림 보기</button></div></div>
+          <div class="hc-card"><h4>알림 대상 기준</h4><p>알림은 팀 신청자만이 아니라 참가팀 안의 선수 전화번호와 회원 정보 전화번호를 비교해서 찾습니다. 전화번호 일치가 가장 안전한 기준입니다.</p></div>
+        </div>
+      </div>
+      <div class="hc-pane" data-hc-pane="team">
+        <div class="hc-hero"><b>단체전은 경기이사/진행자 권한</b>이 중요합니다. 오더 제출, 대리제출, 결과 입력 권한이 구분됩니다.</div>
+        <div class="hc-grid">
+          <div class="hc-card"><h4>경기이사</h4><ul><li>클럽 전용 로그인 후 자기 클럽 팀을 관리합니다.</li><li>오더 제출은 상대팀 제출 전까지 수정 가능합니다.</li><li>양팀 제출 후 오더가 공개됩니다.</li></ul></div>
+          <div class="hc-card"><h4>진행자</h4><ul><li>오더 제출 현황 확인</li><li>미제출팀 대리제출</li><li>예선/본선 진행 및 결과 확인</li></ul></div>
+          <div class="hc-card"><h4>관리자</h4><ul><li>대회 생성, 참가자 관리, 대진표 추첨</li><li>알림 발송 및 문자 대체 확인</li><li>알림 통계/정보 부족 명단 확인</li></ul></div>
+          <div class="hc-card"><h4>자동 알림</h4><p>관리자 설정에서 접수 알림, 코트 배정 알림, 경기 시작 알림 등을 켜고 끌 수 있습니다. 수동 알림 버튼은 별도로 계속 사용 가능합니다.</p></div>
+        </div>
+      </div>
+    </div>
+    <div class="hc-foot"><button class="close" onclick="closeHelpCenterV330()">닫기</button></div>
+  </div>
+</div>
+<script id="v330GuideNotificationScript">
+(function(){
+  function byId(id){return document.getElementById(id)}
+  window.showHelpCenterTabV330=function(tab){
+    try{
+      document.querySelectorAll('#helpCenterV330 .hc-tab').forEach(b=>b.classList.toggle('active', b.dataset.hcTab===tab));
+      document.querySelectorAll('#helpCenterV330 .hc-pane').forEach(p=>p.classList.toggle('active', p.dataset.hcPane===tab));
+    }catch(e){}
+  };
+  window.openHelpCenter=function(tab){
+    try{
+      const el=byId('helpCenterV330');
+      if(el){ el.classList.add('show'); window.showHelpCenterTabV330(tab||'basic'); return; }
+    }catch(e){}
+    try{ if(document.getElementById('mManualChooser') && window.om) return window.om('mManualChooser'); }catch(e){}
+  };
+  window.closeHelpCenterV330=function(){ try{ const el=byId('helpCenterV330'); if(el) el.classList.remove('show'); }catch(e){} };
+  function addInboxShortcut(){
+    try{
+      const actions=document.querySelector('.header-actions');
+      if(actions && !document.getElementById('topNotificationInboxBtn')){
+        const guide=document.getElementById('manualToggleBtn');
+        const btn=document.createElement('button');
+        btn.className='btn-sm';
+        btn.id='topNotificationInboxBtn';
+        btn.type='button';
+        btn.onclick=function(){ if(window.openNotificationInbox) window.openNotificationInbox(); };
+        btn.style.cssText='background:#fff;color:#0f1e3a;border:1.5px solid rgba(255,255,255,.42);font-weight:900';
+        btn.innerHTML='🔔 알림 <span data-notification-unread-badge style="display:none;margin-left:4px;min-width:17px;height:17px;border-radius:999px;background:#ef4444;color:#fff;align-items:center;justify-content:center;font-size:.66rem;font-weight:900"></span>';
+        if(guide && guide.parentNode) guide.insertAdjacentElement('afterend', btn); else actions.insertBefore(btn, actions.firstChild);
+      }
+    }catch(e){}
+  }
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(addInboxShortcut,300));
+  setTimeout(addInboxShortcut,1200);
+})();
+</script>
+
 <div class="bottom-tab-bar" id="bottomTabBar">
 <button type="button" data-target="home"><span class="icon">🏠</span><span>홈</span></button>
 <button type="button" data-target="tournament"><span class="icon">🏆</span><span>대회관리</span></button>
