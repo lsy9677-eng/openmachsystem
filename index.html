@@ -8581,10 +8581,20 @@ function getSelectedStatsTournamentId(){
   }catch(e){ return ''; }
 }
 function maskPhoneForStats(phone=''){
+  // v332: 관리자/운영 점검 화면에서는 실제 연락 조치가 필요하므로 전체 번호를 표시합니다.
   const d=String(phone||'').replace(/[^0-9]/g,'');
-  if(d.length>=11) return `${d.slice(0,3)}-****-${d.slice(-4)}`;
-  if(d.length>=9) return `${d.slice(0,3)}-***-${d.slice(-4)}`;
+  if(d.length===11) return `${d.slice(0,3)}-${d.slice(3,7)}-${d.slice(7)}`;
+  if(d.length===10) return `${d.slice(0,3)}-${d.slice(3,6)}-${d.slice(6)}`;
   return phone||'';
+}
+function getDayCheckActionText(row={}){
+  const reason=String(row.reason || (Array.isArray(row.missing)?row.missing.join(', '):'') || row.role || '');
+  const phone=String(row.phone||'').replace(/[^0-9]/g,'');
+  if(/전화번호/.test(reason) && phone.length<9) return '전화번호 확인/수정 필요';
+  if(/파트너|미연결|알림/.test(reason)) return '앱 로그인 + 알림 켜기 안내 문자';
+  if(/클럽/.test(reason)) return '소속 클럽 입력 확인';
+  if(/이름/.test(reason)) return '이름 정보 확인';
+  return phone.length>=9 ? '문자 안내 가능' : '관리자 확인 필요';
 }
 function statsTargetKey(t={}){
   const phone=String(t.phone||'').replace(/[^0-9]/g,'');
@@ -8666,9 +8676,9 @@ function renderPushStatsCountCards(items=[]){
 function renderStatsTargetTable(title, list=[], opts={}){
   const color=opts.color||'#0f1e3a';
   const empty=opts.empty||'대상 없음';
-  const rows=(list||[]).slice(0,80).map((r,i)=>`<tr><td>${i+1}</td><td style="text-align:left;font-weight:900">${esc(r.name||'')}</td><td>${esc(maskPhoneForStats(r.phone||''))}</td><td>${esc(r.club||'')}</td><td>${esc(dl(r.div||'')||r.div||'')}</td><td>${esc((r.missing||[]).join(', ')||r.role||'')}</td></tr>`).join('');
+  const rows=(list||[]).slice(0,80).map((r,i)=>`<tr><td>${i+1}</td><td style="text-align:left;font-weight:900">${esc(r.name||'')}</td><td style="font-weight:900;color:#0f1e3a">${esc(maskPhoneForStats(r.phone||''))}</td><td>${esc(r.club||'')}</td><td>${esc(dl(r.div||'')||r.div||'')}</td><td style="text-align:left">${esc((r.missing||[]).join(', ')||r.role||'')}</td><td style="text-align:left;color:#1d4ed8;font-weight:900">${esc(getDayCheckActionText(r))}</td></tr>`).join('');
   const more=(list||[]).length>80?`<div style="font-size:.72rem;color:var(--text3);margin-top:6px">80명까지만 표시했습니다. 전체는 복사 기능을 사용하세요.</div>`:'';
-  return `<div style="margin-top:12px"><div style="font-weight:1000;color:${color};font-size:.9rem;margin-bottom:7px">${title} <span style="font-size:.78rem;color:var(--text2)">${(list||[]).length}명</span></div>${rows?`<div class="table-wrap"><table><thead><tr><th>#</th><th>이름/팀</th><th>전화번호</th><th>클럽</th><th>부서</th><th>상태</th></tr></thead><tbody>${rows}</tbody></table></div>${more}`:`<div class="home-empty-note">${empty}</div>`}</div>`;
+  return `<div style="margin-top:12px"><div style="font-weight:1000;color:${color};font-size:.9rem;margin-bottom:7px">${title} <span style="font-size:.78rem;color:var(--text2)">${(list||[]).length}명</span></div>${rows?`<div class="table-wrap"><table><thead><tr><th>#</th><th>이름/팀</th><th>전화번호</th><th>클럽</th><th>부서</th><th>상태</th><th>조치</th></tr></thead><tbody>${rows}</tbody></table></div>${more}`:`<div class="home-empty-note">${empty}</div>`}</div>`;
 }
 async function collectPushStatsData(){
   if(!(AD||TM||OP)) throw new Error('운영 권한이 필요합니다.');
@@ -8891,14 +8901,86 @@ function summarizeAutoNotificationSettingsForDayCheck(){
   const labels={registration:'접수',courtWaiting:'코트대기',courtChanged:'코트변경',matchStart:'경기시작',orderSubmitted:'오더제출',matchComplete:'경기완료'};
   return Object.keys(labels).map(k=>({key:k,label:labels[k],on:st[k]!==false}));
 }
+function renderDayCheckActionGuide(data={}){
+  const smsCount=(data.current?.smsFallback||[]).length;
+  const unlinkCount=(data.partnerUnlinked||[]).length;
+  const phoneMissing=(data.phoneMissing||[]).length;
+  return `<div style="padding:12px 14px;border-radius:16px;background:linear-gradient(135deg,#eff6ff,#fff7ed);border:1.5px solid #93c5fd;margin-bottom:12px">
+    <div style="font-weight:1000;color:#1d4ed8;font-size:.92rem;margin-bottom:6px">📌 어떻게 조치하면 되는지</div>
+    <div style="font-size:.78rem;color:#334155;line-height:1.75">
+      <b>알림 미설정/파트너 미연결</b>은 관리자가 강제로 켤 수 없습니다. 회원이 앱에 로그인해서 <b>알림 켜기</b> 또는 <b>알림 다시 연결</b>을 눌러야 합니다.<br>
+      알림이 계속 막힌 회원은 <b>문자 대체</b>로 처리하면 됩니다. 전화번호 누락자는 먼저 전화번호를 보정해야 문자도 보낼 수 있습니다.
+    </div>
+    <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:10px">
+      <button class="btn btn-primary" onclick="sendDayCheckReconnectSms()" style="background:#2563eb;color:#fff;font-size:.78rem;padding:7px 10px">🔔 알림 연결 안내 문자</button>
+      <button class="btn btn-outline" onclick="copyDayCheckPhoneMissingList()" style="font-size:.78rem;padding:7px 10px">📵 전화번호 누락 복사</button>
+      <button class="btn btn-outline" onclick="copyDayCheckUnlinkedList()" style="font-size:.78rem;padding:7px 10px">🔗 미연결 명단 복사</button>
+      <span style="align-self:center;font-size:.73rem;color:#64748b">문자대체 ${smsCount}명 · 미연결 ${unlinkCount}명 · 번호누락 ${phoneMissing}명</span>
+    </div>
+  </div>`;
+}
+function collectDayCheckReconnectSmsTargets(){
+  const c=DAY_CHECK_CACHE;
+  if(!c) return [];
+  const list=[...(c.stats?.current?.smsFallback||[]), ...(c.partnerUnlinked||[])];
+  const seen=new Set();
+  return list.filter(x=>{
+    const p=String(x.phone||'').replace(/[^0-9+]/g,'');
+    if(p.length<9 || seen.has(p)) return false;
+    seen.add(p); return true;
+  });
+}
+function buildDayCheckReconnectSmsBody(){
+  return `230MATCH 경기 알림 안내입니다.
+경기 시작/코트 배정/대기 알림을 받으려면 앱에 로그인 후 [🔔 알림] 또는 [내 정보 설정 > 알림 켜기/알림 다시 연결]을 눌러 주세요.
+알림이 차단된 기기는 문자로 대체 안내됩니다.`;
+}
+function sendDayCheckReconnectSms(){
+  try{
+    const list=collectDayCheckReconnectSmsTargets();
+    if(!list.length){ toast('문자 안내 대상이 없습니다.','info'); return; }
+    const phones=[...new Set(list.map(x=>String(x.phone||'').replace(/[^0-9+]/g,'')).filter(Boolean))];
+    const body=buildDayCheckReconnectSmsBody();
+    const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||'');
+    if(!isMobile){
+      const copy=`[230MATCH 알림 연결 안내 대상]
+${list.map((x,i)=>`${i+1}. ${x.name||''} / ${maskPhoneForStats(x.phone||'')} / ${x.club||''} / ${dl(x.div||'')||x.div||''} / ${x.reason||'알림 미설정'}`).join('\n')}
+
+[문자 내용]
+${body}`;
+      copyTextSafe(copy).then(ok=>toast(ok?'PC: 알림 연결 안내 명단과 문자내용을 복사했습니다 ✅':'복사 실패','info'));
+      return;
+    }
+    location.href=`sms:${phones.join(',')}?body=${encodeURIComponent(body)}`;
+    toast(`알림 연결 안내 문자창을 열었습니다 ✅ (${phones.length}명)`,'success');
+  }catch(e){ toast('문자 안내 실패: '+(e?.message||e),'error'); }
+}
+async function copyDayCheckPhoneMissingList(){
+  try{
+    if(!DAY_CHECK_CACHE) await renderDayCheckDashboard(true);
+    const list=DAY_CHECK_CACHE?.phoneMissing||[];
+    const text=`[230MATCH 전화번호 누락 명단]
+${list.map((x,i)=>`${i+1}. ${x.name||''} / ${x.club||''} / ${dl(x.div||'')||x.div||''} / ${x.team||''}`).join('\n')||'없음'}`;
+    const ok=await copyTextSafe(text); toast(ok?'전화번호 누락 명단 복사 완료 ✅':'복사 실패','info');
+  }catch(e){ toast('복사 실패','error'); }
+}
+async function copyDayCheckUnlinkedList(){
+  try{
+    if(!DAY_CHECK_CACHE) await renderDayCheckDashboard(true);
+    const list=DAY_CHECK_CACHE?.partnerUnlinked||[];
+    const text=`[230MATCH 알림 미연결 명단]
+${list.map((x,i)=>`${i+1}. ${x.name||''} / ${maskPhoneForStats(x.phone||'')} / ${x.club||''} / ${dl(x.div||'')||x.div||''} / ${x.reason||''}`).join('\n')||'없음'}`;
+    const ok=await copyTextSafe(text); toast(ok?'알림 미연결 명단 복사 완료 ✅':'복사 실패','info');
+  }catch(e){ toast('복사 실패','error'); }
+}
 function renderDayCheckMiniCards(items=[]){
   return `<div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:12px">${items.map(it=>`<div style="padding:12px;border-radius:14px;border:1px solid ${it.border||'#dbeafe'};background:${it.bg||'#f8fbff'}"><div style="font-size:.7rem;font-weight:1000;color:${it.color||'#475569'}">${it.label}</div><div style="font-size:1.45rem;font-weight:1000;color:${it.color||'#0f1e3a'};margin-top:4px">${it.value}</div></div>`).join('')}</div>`;
 }
 function renderDayCheckSimpleList(title, list=[], opts={}){
   const color=opts.color||'#0f1e3a';
   const empty=opts.empty||'문제 없음';
-  const rows=(list||[]).slice(0,60).map((r,i)=>`<tr><td>${i+1}</td><td style="text-align:left;font-weight:900">${esc(r.name||'')}</td><td>${esc(maskPhoneForStats(r.phone||''))}</td><td>${esc(r.club||'')}</td><td>${esc(dl(r.div||'')||r.div||'')}</td><td style="text-align:left">${esc(r.reason||r.missing?.join(', ')||'')}</td></tr>`).join('');
-  return `<div style="margin-top:12px"><div style="font-weight:1000;color:${color};font-size:.9rem;margin-bottom:7px">${title} <span style="font-size:.78rem;color:var(--text2)">${(list||[]).length}명</span></div>${rows?`<div class="table-wrap"><table><thead><tr><th>#</th><th>이름/팀</th><th>전화번호</th><th>클럽</th><th>부서</th><th>상태</th></tr></thead><tbody>${rows}</tbody></table></div>`:`<div class="home-empty-note">${empty}</div>`}</div>`;
+  const rows=(list||[]).slice(0,80).map((r,i)=>`<tr><td>${i+1}</td><td style="text-align:left;font-weight:900">${esc(r.name||'')}</td><td style="font-weight:900;color:#0f1e3a">${esc(maskPhoneForStats(r.phone||''))}</td><td>${esc(r.club||'')}</td><td>${esc(dl(r.div||'')||r.div||'')}</td><td style="text-align:left">${esc(r.team||'')}</td><td style="text-align:left;color:#991b1b;font-weight:800">${esc(r.reason||r.missing?.join(', ')||'')}</td><td style="text-align:left;color:#1d4ed8;font-weight:900">${esc(getDayCheckActionText(r))}</td></tr>`).join('');
+  return `<div style="margin-top:12px"><div style="font-weight:1000;color:${color};font-size:.9rem;margin-bottom:7px">${title} <span style="font-size:.78rem;color:var(--text2)">${(list||[]).length}명</span></div>${rows?`<div class="table-wrap"><table><thead><tr><th>#</th><th>이름/팀</th><th>전화번호</th><th>클럽</th><th>부서</th><th>소속 팀</th><th>상태</th><th>조치</th></tr></thead><tbody>${rows}</tbody></table></div>`:`<div class="home-empty-note">${empty}</div>`}</div>`;
 }
 function renderAutoSettingsDayCheck(settings=[]){
   return `<div style="margin-top:12px"><div style="font-weight:1000;color:#1d4ed8;font-size:.9rem;margin-bottom:7px">🤖 자동 알림 설정 상태</div><div style="display:flex;gap:7px;flex-wrap:wrap">${settings.map(x=>`<span style="display:inline-flex;align-items:center;gap:5px;padding:7px 10px;border-radius:999px;border:1px solid ${x.on?'#86efac':'#cbd5e1'};background:${x.on?'#dcfce7':'#f8fafc'};color:${x.on?'#166534':'#475569'};font-size:.78rem;font-weight:1000">${x.on?'ON':'OFF'} · ${x.label}</span>`).join('')}</div></div>`;
@@ -8941,6 +9023,7 @@ async function renderDayCheckDashboard(force=false){
         {label:'전화번호 누락',value:phoneMissing.length,bg:'#fef2f2',border:'#fecaca',color:'#b91c1c'},
         {label:'파트너 미연결',value:partnerUnlinked.length,bg:'#f5f3ff',border:'#c4b5fd',color:'#6d28d9'}
       ])}
+      ${renderDayCheckActionGuide({current:cur, phoneMissing, partnerUnlinked})}
       ${renderAutoSettingsDayCheck(autoSettings)}
       ${renderRecentSendLogsDayCheck(logs)}
       ${renderDayCheckSimpleList('📵 전화번호 누락 명단', phoneMissing, {color:'#b91c1c', empty:'전화번호 누락이 없습니다.'})}
@@ -8967,6 +9050,9 @@ async function copyDayCheckReport(){
 window.openDayCheckDashboard=openDayCheckDashboard;
 window.renderDayCheckDashboard=renderDayCheckDashboard;
 window.copyDayCheckReport=copyDayCheckReport;
+window.sendDayCheckReconnectSms=sendDayCheckReconnectSms;
+window.copyDayCheckPhoneMissingList=copyDayCheckPhoneMissingList;
+window.copyDayCheckUnlinkedList=copyDayCheckUnlinkedList;
 window.getAdminNotificationSendLogs=getAdminNotificationSendLogs;
 window.recordAdminNotificationSendLog=recordAdminNotificationSendLog;
 setTimeout(injectDayCheckAdminButton,1250);
