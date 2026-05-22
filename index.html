@@ -8682,6 +8682,113 @@ function getAutoNotificationKindLabel(kind=''){
 window.getAutoNotificationSettings=getAutoNotificationSettings;
 window.isAutoNotificationEnabled=isAutoNotificationEnabled;
 
+
+
+// v359: 참가 접수 시 개발자/운영자 알림
+const ADMIN_REG_ALERT_SEEN_PREFIX='230match_admin_registration_alert_seen_v1_';
+function isManagerUserProfileForPush(x={}){
+  const u=x.userProfile||{};
+  const role=String(u.role||u.userRole||'').toLowerCase();
+  const approved=(u.approved===true || u.isApproved===true || u.status==='approved');
+  return role==='admin' || role==='developer' || role==='manager' || role==='tournament_admin' || (role==='operator' && approved) || (role==='tournament_manager' && approved);
+}
+async function getDeveloperAndManagerPushTokenDocs(){
+  if(!(AD||TM)) return [];
+  const adminUids=new Set();
+  try{
+    if(AD){
+      const snap=await getDocs(collection(db,'admins'));
+      snap.forEach(d=>adminUids.add(String(d.id)));
+    }
+  }catch(e){ console.warn('admin uid lookup skipped', e?.message||e); }
+  return await getEnabledPushTokenDocs(x=>{
+    const uid=String(x.uid||'');
+    return (uid && adminUids.has(uid)) || isManagerUserProfileForPush(x);
+  });
+}
+function getAdminRegistrationTeamLabel(reg={}){
+  try{
+    if(Array.isArray(reg.individualPlayers) && reg.individualPlayers.length){
+      return reg.individualPlayers.slice(0,2).map(p=>`${String(p?.name||'').trim()}${String(p?.clubsRaw||p?.club||'').trim()?`(${String(p?.clubsRaw||p?.club||'').trim()})`:''}`).filter(Boolean).join(' / ');
+    }
+    if(Array.isArray(reg.players) && reg.players.length){
+      const c=String(reg.club||'').trim();
+      return `${c?c+' ':''}${reg.players.slice(0,2).join(' / ')}${reg.players.length>2?` 외 ${reg.players.length-2}명`:''}`;
+    }
+    return String(reg.entryLabel||reg.pairLabel||reg.club||'참가자');
+  }catch(e){ return String(reg.entryLabel||reg.pairLabel||reg.club||'참가자'); }
+}
+function getAdminRegistrationAlertMessage(reg={}){
+  const t=(G.tournaments||[]).find(x=>String(x.id)===String(reg.tournamentId));
+  const div=String(reg.division||'');
+  const teamLabel=getAdminRegistrationTeamLabel(reg);
+  const tName=String(t?.name||'대회');
+  return {
+    title:'📋 새 참가 접수',
+    body:`${teamLabel}\n${tName}${div?` · ${dl(div)}`:''} 참가 접수가 등록되었습니다.`
+  };
+}
+function getAdminRegSeenSet(tid=''){
+  try{
+    const raw=localStorage.getItem(ADMIN_REG_ALERT_SEEN_PREFIX+String(tid||'all'))||'[]';
+    return new Set(JSON.parse(raw).map(String));
+  }catch(e){ return new Set(); }
+}
+function saveAdminRegSeenSet(tid='', set=new Set()){
+  try{ localStorage.setItem(ADMIN_REG_ALERT_SEEN_PREFIX+String(tid||'all'), JSON.stringify([...set].slice(-500))); }catch(e){}
+}
+async function handleAdminRegistrationAdded(reg={}, docId=''){
+  if(!(AD||TM)) return;
+  if(!docId || reg.deleted) return;
+  const msg=getAdminRegistrationAlertMessage(reg);
+  try{ saveMatchNotificationHistory({title:msg.title, body:msg.body, data:{type:'admin_registration_created', registrationId:docId, tid:reg.tournamentId||'', division:reg.division||''}, type:'admin_registration_created'}); }catch(e){}
+  try{
+    enqueueStickyAlert({
+      title:msg.title,
+      msg:msg.body,
+      type:'info',
+      tid:reg.tournamentId||'',
+      div:reg.division||'',
+      actionType:'admin_registration_created',
+      dedupeKey:`admin_registration_created:${docId}`,
+      autoCloseMs:0
+    });
+  }catch(e){ try{ toast(msg.body,'info'); }catch(_e){} }
+  try{
+    if(('Notification' in window) && Notification.permission==='granted'){
+      new Notification(msg.title,{body:msg.body, tag:`reg-${docId}`, requireInteraction:false});
+    }
+  }catch(e){}
+  try{
+    // 관리자/운영자 중 한 명이라도 앱을 켜 둔 상태라면, 그 기기가 관리자 토큰으로 푸시를 중계합니다.
+    const docs=await getDeveloperAndManagerPushTokenDocs();
+    if(docs.length) await sendPushToTokenDocs(docs,msg.title,msg.body,{type:'admin_registration_created',target:'managers',tid:reg.tournamentId||'',division:reg.division||'',registrationId:docId});
+  }catch(e){ console.warn('admin registration push skipped', e?.message||e); }
+}
+function processAdminRegistrationSnapshotChanges(snapshot, tid=''){
+  if(!(AD||TM) || !snapshot) return;
+  const initKey='adminRegAlertInit:'+String(tid||'all');
+  const seen=getAdminRegSeenSet(tid);
+  if(sessionStorage.getItem(initKey)!=='1'){
+    snapshot.docs.forEach(d=>seen.add(String(d.id)));
+    saveAdminRegSeenSet(tid,seen);
+    sessionStorage.setItem(initKey,'1');
+    return;
+  }
+  snapshot.docChanges().forEach(ch=>{
+    if(ch.type!=='added') return;
+    const id=String(ch.doc.id);
+    if(seen.has(id)) return;
+    seen.add(id);
+    const reg={_id:id,...(ch.doc.data()||{})};
+    handleAdminRegistrationAdded(reg,id);
+  });
+  saveAdminRegSeenSet(tid,seen);
+}
+window.getDeveloperAndManagerPushTokenDocs=getDeveloperAndManagerPushTokenDocs;
+window.handleAdminRegistrationAdded=handleAdminRegistrationAdded;
+window.processAdminRegistrationSnapshotChanges=processAdminRegistrationSnapshotChanges;
+
 async function sendRegistrationCompletePush(team,t,div){
   try{
     if(!isAutoNotificationEnabled('registration')) return;
@@ -10527,6 +10634,7 @@ function startRealtimeTournamentSync(tid){
   stopRealtimeTournamentSync();
   CURRENT_LIVE_TID=tid;
   _realtimeRegsUnsub = onSnapshot(query(collection(db,'registrations'), where('tournamentId','==',tid)), s=>{
+    try{ processAdminRegistrationSnapshotChanges(s, tid); }catch(err){ console.warn('admin registration alert process failed', err); }
     const bundle={regs:s.docs.map(d=>({_id:d.id,...(d.data()||{})})), matches:(getTournamentBundleCache(tid)?.matches)||[], draws:(getTournamentBundleCache(tid)?.draws)||[]};
     saveTournamentBundleCache(tid,{...(getTournamentBundleCache(tid)||{}), regs:bundle.regs, matches:bundle.matches, draws:bundle.draws});
     applyTournamentBundle(tid, getTournamentBundleCache(tid)||bundle);
