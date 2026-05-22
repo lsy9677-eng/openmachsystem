@@ -3,7 +3,7 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" name="viewport"/>
 <meta content="no-store, no-cache, must-revalidate, max-age=0" http-equiv="Cache-Control"/>
 <meta content="no-cache" http-equiv="Pragma"/>
 <meta content="0" http-equiv="Expires"/>
@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-05-22-v361-v359-dev-only-player-record-edit";
+  const APP_VERSION = "2026-05-22-v370-payment-confirm-blue";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -4826,6 +4826,146 @@ body {
   .v347-payment-only-action .v338-pay-btn .pay-dt{font-size:.31rem!important;}
 }
 </style>
+
+<style id="v368NativeRecordDeleteStyle">
+#psResults .btn-danger{background:#c0392b!important;color:#fff!important;border:none!important;}
+#mPHist .modal-footer{gap:8px!important;}
+#mPHist .modal-footer .btn-danger{background:#c0392b!important;color:#fff!important;border:none!important;}
+@media(max-width:520px){#mPHist .modal-footer{display:grid!important;grid-template-columns:1fr 1fr!important;}#mPHist .modal-footer>div{display:none!important;}#mPHist .modal-footer .btn{width:100%!important;}}
+</style>
+
+
+<style id="v370PaymentBadgeBlueConfirmStyle">
+/* v370: 참가명단 입금확인 상태를 파랑 계통으로 구분 */
+.v336-entry-row.v347-entry-row-detail-inline,
+.v336-entry-row{
+  grid-template-columns:34px minmax(0,1fr) minmax(104px,112px) !important;
+}
+.v336-entry-action.v346-entry-action-simple.v347-payment-only-action,
+.v347-payment-only-action{
+  justify-content:center !important;
+  padding:6px 6px !important;
+  overflow:visible !important;
+}
+.v347-payment-only-action .v338-pay-btn,
+.v347-payment-only-action .v338-paid-badge,
+.v336-entry-action .v338-pay-btn,
+.v336-entry-action .v338-paid-badge{
+  min-width:92px !important;
+  max-width:108px !important;
+  width:100% !important;
+  min-height:34px !important;
+  height:34px !important;
+  padding:5px 8px !important;
+  border-radius:12px !important;
+  border-width:2px !important;
+  box-shadow:0 3px 9px rgba(15,30,58,.10) !important;
+  letter-spacing:-.02em !important;
+}
+.v338-pay-btn.unpaid,
+.v338-paid-badge.unpaid,
+.v347-payment-only-action .v338-pay-btn.unpaid,
+.v347-payment-only-action .v338-paid-badge.unpaid{
+  background:#fff1e6 !important;
+  color:#b45309 !important;
+  border-color:#f59e0b !important;
+}
+.v338-pay-btn.paid,
+.v338-paid-badge.paid,
+.v347-payment-only-action .v338-pay-btn.paid,
+.v347-payment-only-action .v338-paid-badge.paid{
+  background:#dbeafe !important;
+  color:#1d4ed8 !important;
+  border-color:#3b82f6 !important;
+}
+
+.v338-pay-btn.paid .pay-dt,
+.v338-paid-badge.paid .pay-dt,
+.v347-payment-only-action .v338-pay-btn.paid .pay-dt,
+.v347-payment-only-action .v338-paid-badge.paid .pay-dt{
+  color:#1e40af !important;
+  opacity:.95 !important;
+}
+.v338-pay-btn span:not(.pay-dt),
+.v338-paid-badge .pay-label,
+.v347-payment-only-action .v338-pay-btn span:not(.pay-dt),
+.v347-payment-only-action .v338-paid-badge .pay-label{
+  font-size:.72rem !important;
+  font-weight:1000 !important;
+  line-height:1.05 !important;
+  letter-spacing:-.035em !important;
+  white-space:nowrap !important;
+}
+.v338-pay-btn .pay-dt,
+.v338-paid-badge .pay-dt,
+.v347-payment-only-action .v338-pay-btn .pay-dt,
+.v347-payment-only-action .v338-paid-badge .pay-dt{
+  display:block !important;
+  flex-basis:100% !important;
+  width:100% !important;
+  margin:2px 0 0 0 !important;
+  font-size:.48rem !important;
+  font-weight:900 !important;
+  line-height:1 !important;
+  letter-spacing:-.06em !important;
+  opacity:.88 !important;
+  text-align:center !important;
+  white-space:nowrap !important;
+}
+.v338-pay-btn.paid,
+.v338-paid-badge.paid{
+  flex-direction:column !important;
+  gap:0 !important;
+}
+@media(max-width:680px){
+  .v336-entry-row.v347-entry-row-detail-inline,
+  .v336-entry-row{
+    grid-template-columns:30px minmax(0,1fr) minmax(98px,104px) !important;
+  }
+  .v347-payment-only-action .v338-pay-btn,
+  .v347-payment-only-action .v338-paid-badge,
+  .v336-entry-action .v338-pay-btn,
+  .v336-entry-action .v338-paid-badge{
+    min-width:90px !important;
+    max-width:102px !important;
+    min-height:33px !important;
+    height:33px !important;
+    padding:5px 6px !important;
+  }
+  .v338-pay-btn span:not(.pay-dt),
+  .v338-paid-badge .pay-label,
+  .v347-payment-only-action .v338-pay-btn span:not(.pay-dt),
+  .v347-payment-only-action .v338-paid-badge .pay-label{
+    font-size:.68rem !important;
+  }
+  .v338-pay-btn .pay-dt,
+  .v338-paid-badge .pay-dt,
+  .v347-payment-only-action .v338-pay-btn .pay-dt,
+  .v347-payment-only-action .v338-paid-badge .pay-dt{
+    font-size:.44rem !important;
+  }
+}
+@media(max-width:380px){
+  .v336-entry-row.v347-entry-row-detail-inline,
+  .v336-entry-row{
+    grid-template-columns:28px minmax(0,1fr) minmax(90px,96px) !important;
+  }
+  .v347-payment-only-action .v338-pay-btn,
+  .v347-payment-only-action .v338-paid-badge,
+  .v336-entry-action .v338-pay-btn,
+  .v336-entry-action .v338-paid-badge{
+    min-width:84px !important;
+    max-width:94px !important;
+  }
+  .v338-pay-btn span:not(.pay-dt),
+  .v338-paid-badge .pay-label,
+  .v347-payment-only-action .v338-pay-btn span:not(.pay-dt),
+  .v347-payment-only-action .v338-paid-badge .pay-label{
+    font-size:.64rem !important;
+  }
+}
+</style>
+
 </head>
 <body>
 <header class="app-header">
@@ -29074,6 +29214,110 @@ function formatRecentLabel(lastDate){
   const dd=String(d.getDate()).padStart(2,'0');
   return `${yy}.${mm}.${dd}`;
 }
+
+
+// v368: 참가자 기록 화면 네이티브 삭제 함수 — 기록보기/목록 버튼에서 직접 사용
+function isRecordDeleteAdminAllowed(){
+  try{
+    return !!(AD || TM || document.body.classList.contains('admin-mode') || document.body.classList.contains('tm-mode'));
+  }catch(e){ return false; }
+}
+async function deletePlayerRecordFromList(name, club=''){
+  const targetName=cleanName(name||'').trim();
+  const targetClub=normalizeClub(club||'');
+  if(!targetName){ toast('삭제할 이름을 찾지 못했습니다.','error'); return; }
+  if(!isRecordDeleteAdminAllowed()){ toast('관리자 로그인 후 삭제할 수 있습니다.','error'); return; }
+  if(!confirm(`"${targetName}" 명단/기록을 삭제하시겠습니까?\n\n외1명, 테스트 이름처럼 잘못 남은 명단 정리용입니다.\n삭제 후 복구가 어려우니 확인 후 진행하세요.`)) return;
+  sl(true);
+  try{
+    let changedPlayers=false, changedRegistry=false, changedTeams=false, changedHist=false;
+
+    // 1) 선수 기록 문서 삭제
+    const playerKeys=Object.keys(G.players||{}).filter(k=>{
+      const pk=pKeyParse(k);
+      const nm=cleanName(pk.name||k);
+      const cl=normalizeClub(pk.club||G.players[k]?.club||'');
+      if(nm!==targetName) return false;
+      if(targetClub && cl && cl!==targetClub) return false;
+      return true;
+    });
+    for(const pk of playerKeys){
+      try{ await deleteDoc(doc(db,'players', pk.replace(/[\/\.#\$\[\]]/g,'_'))); }catch(e){ console.warn('v368 player delete skipped', e); }
+      delete G.players[pk];
+      changedPlayers=true;
+    }
+
+    // 2) 등록선수 명단 삭제
+    const changedYears=[];
+    Object.keys(G_REGISTRY||{}).forEach(y=>{
+      const arr=Array.isArray(G_REGISTRY[y])?G_REGISTRY[y]:[];
+      const before=arr.length;
+      G_REGISTRY[y]=arr.filter(r=>{
+        const rn=cleanName(r?.name||'');
+        const rc=normalizeClub(r?.club||'');
+        if(rn!==targetName) return true;
+        if(targetClub && rc && rc!==targetClub) return true;
+        return false;
+      });
+      if(G_REGISTRY[y].length!==before){ changedRegistry=true; changedYears.push(y); }
+    });
+
+    // 3) 현재 참가 팀/개인전 참가자 안에 남은 이름 삭제
+    const changedTeamKeys=[];
+    Object.entries(G.teams||{}).forEach(([key,teams])=>{
+      let keyChanged=false;
+      (teams||[]).forEach(team=>{
+        if(Array.isArray(team.players)){
+          const before=team.players.length;
+          team.players=team.players.filter(v=>cleanName(v||'')!==targetName);
+          if(team.players.length!==before) keyChanged=true;
+        }
+        if(Array.isArray(team.individualPlayers)){
+          const before=team.individualPlayers.length;
+          team.individualPlayers=team.individualPlayers.filter(p=>cleanName(p?.name||p||'')!==targetName);
+          if(team.individualPlayers.length!==before) keyChanged=true;
+        }
+      });
+      if(keyChanged){ changedTeams=true; changedTeamKeys.push(key); }
+    });
+    for(const key of changedTeamKeys){
+      try{ await stT(key); }catch(e){ console.warn('v368 team save skipped', key, e); }
+    }
+
+    // 4) 내장/과거 데이터 표시 찌꺼기 삭제
+    try{
+      (HIST_DATA||[]).forEach(t=>{
+        (t.teams||[]).forEach(tm=>{
+          if(Array.isArray(tm.players)){
+            const before=tm.players.length;
+            tm.players=tm.players.filter(pn=>cleanName(pn||'')!==targetName);
+            if(tm.players.length!==before) changedHist=true;
+          }
+        });
+      });
+    }catch(e){}
+
+    if(changedPlayers) savePlayersToLocalCache();
+    if(changedRegistry){
+      for(const y of changedYears){ try{ await saveRegistry(y); }catch(e){ console.warn('v368 registry save skipped', y, e); } }
+    }
+
+    try{ cm('mPHist'); cm('mPD'); cm('mEditP'); }catch(e){}
+    try{ renderAllP(); }catch(e){}
+    try{ if(typeof renderRegistryTab==='function') renderRegistryTab(); }catch(e){}
+    try{ if(typeof renderRL==='function') renderRL(); }catch(e){}
+
+    const touched=[changedPlayers&&'선수기록', changedRegistry&&'등록명단', changedTeams&&'참가팀', changedHist&&'과거표시'].filter(Boolean).join(' · ');
+    toast(touched ? `삭제 완료 ✅ (${touched})` : '삭제할 항목을 찾지 못했습니다.','success');
+  }catch(e){
+    console.error(e);
+    toast('삭제 실패: '+(e.message||e),'error');
+  }finally{
+    sl(false);
+  }
+}
+window.deletePlayerRecordFromList=deletePlayerRecordFromList;
+
 function filterP(){PF.club='';PF.div='';PF.recent='';PF.count='';PF.search=ge('psInput')?.value||'';renderAllP();}
 async function showP(name,club){
   try{ if(!Object.keys(G.players||{}).length) await ensurePlayersLoaded(); }catch(e){}
@@ -29122,6 +29366,16 @@ async function showP(name,club){
   const body=ge('mPHistBody');
   if(body) body.innerHTML = buildPH(dispName,p);
   om('mPHist');
+  try{
+    const footer=document.querySelector('#mPHist .modal-footer');
+    if(footer){
+      if(isRecordDeleteAdminAllowed()){
+        footer.innerHTML=`<button class="btn btn-danger" onclick="deletePlayerRecordFromList('${esc(dispName)}','${esc(useClub)}')">🗑️ 명단 삭제</button><div style="flex:1"></div><button class="btn btn-gray" onclick="cm('mPHist')">닫기</button>`;
+      }else{
+        footer.innerHTML=`<button class="btn btn-gray" onclick="cm('mPHist')">닫기</button>`;
+      }
+    }
+  }catch(e){}
 }
 
 function renderAllP(){
@@ -29220,7 +29474,11 @@ function renderAllP(){
   if(!container) return;
   const formatBest=(bestRank)=>bestRank?`${bestRank}위`:'기록없음';
   const formatPhone=(summary)=>summary.displayPhone||'전화번호 없음';
-  const openBtn=(row)=>`<button type="button" class="btn btn-outline v354-record-view-btn" data-pname="${esc(row.name)}" data-pclub="${esc(row.club)}" style="font-size:.76rem;padding:5px 10px;min-height:34px" onclick="event.preventDefault();event.stopPropagation();showP('${esc(row.name)}','${esc(row.club)}');return false;">기록 보기</button>`;
+  const openBtn=(row)=>{
+    const view=`<button type="button" class="btn btn-outline v354-record-view-btn" data-pname="${esc(row.name)}" data-pclub="${esc(row.club)}" style="font-size:.76rem;padding:5px 10px;min-height:34px" onclick="event.preventDefault();event.stopPropagation();showP('${esc(row.name)}','${esc(row.club)}');return false;">기록 보기</button>`;
+    const del=isRecordDeleteAdminAllowed()?`<button type="button" class="btn btn-danger" style="font-size:.76rem;padding:5px 10px;min-height:34px" onclick="event.preventDefault();event.stopPropagation();deletePlayerRecordFromList('${esc(row.name)}','${esc(row.club)}');return false;">삭제</button>`:'';
+    return view+del;
+  };
   const buildCard=(row, highlight=false)=>{
     const summary=row.summary||{};
     const recent=formatRecentLabel(summary.lastDate)||'-';
@@ -30144,7 +30402,7 @@ function backupJSON(){
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
   const d=new Date().toISOString().substring(0,10);
-  a.download=`김해테니스협회_백업_${d}.json`;
+  a.download=`230테니스매치_백업_${d}.json`;
   a.click();
   ge('backupStatus').textContent='✅ 백업 파일 다운로드 완료!';
   toast('백업 완료 💾','success');
@@ -33803,20 +34061,25 @@ function getPaymentAccountText(key=''){
   const account=String(t?.feeAccount||'3333-07-8834842').trim();
   return `${bankHolder} ${account}`.replace(/\s+/g,' ').trim();
 }
+function getPaymentAccountNumberOnly(key=''){
+  const t=getPaymentTournament(key);
+  const raw=String(t?.feeAccount||'3333-07-8834842').trim();
+  const accountLike=(raw.match(/[0-9][0-9\-\s]{5,}[0-9]/g)||[]).pop();
+  return (accountLike||raw).replace(/\s+/g,'').trim();
+}
 async function copyTournamentFeeAccount(){
-  const title=getPaymentTournamentTitle();
-  const text = `${title} 참가비\n참가비: ${getPaymentFeeText()}\n입금계좌: ${getPaymentAccountText()}\n※ 참가자명으로 입금해 주세요.`;
+  const text = getPaymentAccountNumberOnly();
   try{
     if(typeof copyTextSafe === 'function'){
       const ok = await copyTextSafe(text);
-      toast(ok ? '참가비 계좌를 복사했습니다 ✅' : '복사 실패', ok ? 'success' : 'error');
+      toast(ok ? '계좌번호만 복사했습니다 ✅' : '복사 실패', ok ? 'success' : 'error');
       return ok;
     }
     await navigator.clipboard.writeText(text);
-    toast('참가비 계좌를 복사했습니다 ✅','success');
+    toast('계좌번호만 복사했습니다 ✅','success');
     return true;
   }catch(e){
-    try{ window.prompt('아래 내용을 복사하세요', text); }catch(_e){}
+    try{ window.prompt('아래 계좌번호를 복사하세요', text); }catch(_e){}
     return false;
   }
 }
@@ -33966,7 +34229,7 @@ Object.assign(window,{ copyTournamentFeeAccount, toggleTeamPaymentPaid, sendPaym
   backupJSON,restoreFromJSON,backupPlayersExcel,exportPlayersCSV,exportPlayersExcel,
   bracketToImage,bracketToPDF,openBracketView,switchBVTab,renderBracketView,saveBracketViewImage,
   onRankTC,renderRanking,
-  filterP,showP,renderAllP,openPD,openRoster,openIndividualExcelModal,previewIndividualExcelFile,importIndividualExcelTeams,openPlayerContact,
+  filterP,showP,renderAllP,deletePlayerRecordFromList,openPD,openRoster,openIndividualExcelModal,previewIndividualExcelFile,importIndividualExcelTeams,openPlayerContact,
   switchPlayersTab,initRegistryTab,renderRegistryTab,openRegistryMgr,renderRegistryMgr,
   registryTabQuickAdd,quickEditRegistryMember,quickDeleteRegistryMember,addRegistryRow,saveRegistryRow,deleteRegistryRow,clearRegistryYear,
   importRegistryFromFile,exportRegistryExcel,exportRegistryExcelMgr,exportRegistryFiltered,normalizeClub,bulkChangeRegion,
@@ -37236,6 +37499,578 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
       }, 60);
     });
     mo.observe(document.body,{subtree:true,childList:true});
+  }catch(e){}
+})();
+</script>
+
+
+<!-- v362: 핀치줌 오작동 방지 + Android/PWA 뒤로가기 흐름 복구 -->
+<style id="v362GestureBackFixStyle">
+  /* 브라우저 핀치줌은 허용하되, 앱 화면 전환 스와이프가 확대 제스처를 가로채지 않게 보조 */
+  .page-viewport,
+  main.main-content{
+    touch-action: pan-x pan-y pinch-zoom !important;
+  }
+  .bottom-tab-bar,
+  .nav-tabs,
+  button,
+  input,
+  textarea,
+  select,
+  a,
+  label{
+    touch-action: manipulation !important;
+  }
+</style>
+<script id="v362GestureBackFixScript">
+(function(){
+  'use strict';
+  if(window.__v362GestureBackFixInstalled) return;
+  window.__v362GestureBackFixInstalled = true;
+
+  var PAGE_NAMES = ['home','tournament','register','bracket','players','ranking'];
+  var suppressHistoryPush = false;
+  var closingByHistory = false;
+  var pinchActive = false;
+  var lastMultiTouchAt = 0;
+
+  function currentPage(){
+    var active = document.querySelector('.page.active');
+    var id = active && active.id ? active.id.replace(/^page-/,'') : '';
+    if(PAGE_NAMES.indexOf(id) >= 0) return id;
+    var tab = document.querySelector('.nav-tab.active');
+    return (tab && tab.dataset && tab.dataset.page) || 'home';
+  }
+
+  function pageState(extra){
+    var st = Object.assign({app:'230match', v:362, page:currentPage()}, extra || {});
+    return st;
+  }
+
+  function safeReplaceState(extra){
+    try{
+      history.replaceState(pageState(extra), '', location.href);
+    }catch(e){}
+  }
+
+  function safePushState(extra){
+    try{
+      history.pushState(pageState(extra), '', location.href);
+    }catch(e){}
+  }
+
+  function getOpenModals(){
+    return Array.from(document.querySelectorAll('.modal-overlay.open, #matchListPopup.show, #naverLoginHelpModal.show'))
+      .filter(function(el){ return el && el.offsetParent !== null || (el && (el.classList.contains('open') || el.classList.contains('show'))); });
+  }
+
+  function closeTopModal(){
+    var list = getOpenModals();
+    if(!list.length) return false;
+    var el = list[list.length - 1];
+    var id = el.id || '';
+    try{
+      closingByHistory = true;
+      if(id === 'matchListPopup' && typeof window.closeMatchListPopup === 'function') window.closeMatchListPopup();
+      else if(id === 'naverLoginHelpModal' && typeof window.closeNaverLoginHelpModal === 'function') window.closeNaverLoginHelpModal();
+      else if(id && typeof window.cm === 'function') window.cm(id);
+      else {
+        el.classList.remove('open');
+        el.classList.remove('show');
+      }
+    }catch(e){
+      try{ el.classList.remove('open'); el.classList.remove('show'); }catch(_e){}
+    }finally{
+      setTimeout(function(){ closingByHistory = false; }, 0);
+    }
+    return true;
+  }
+
+  function installHistoryBridge(){
+    safeReplaceState();
+
+    var prevShowPage = window.showPage;
+    if(typeof prevShowPage === 'function' && !prevShowPage.__v362BackWrapped){
+      var wrappedShowPage = function(page){
+        var before = currentPage();
+        var result = prevShowPage.apply(this, arguments);
+        var after = currentPage();
+        if(!suppressHistoryPush && after && after !== before){
+          safePushState({page:after});
+        }
+        return result;
+      };
+      wrappedShowPage.__v362BackWrapped = true;
+      window.showPage = wrappedShowPage;
+    }
+
+    var prevOm = window.om;
+    if(typeof prevOm === 'function' && !prevOm.__v362BackWrapped){
+      var wrappedOm = function(id){
+        var result = prevOm.apply(this, arguments);
+        setTimeout(function(){
+          var el = id ? document.getElementById(id) : null;
+          if(el && (el.classList.contains('open') || el.classList.contains('show'))){
+            safePushState({page:currentPage(), modal:id});
+          }
+        }, 0);
+        return result;
+      };
+      wrappedOm.__v362BackWrapped = true;
+      window.om = wrappedOm;
+    }
+
+    var prevCm = window.cm;
+    if(typeof prevCm === 'function' && !prevCm.__v362BackWrapped){
+      var wrappedCm = function(id){
+        var result = prevCm.apply(this, arguments);
+        if(!closingByHistory){
+          // X/닫기 버튼으로 닫은 경우 현재 히스토리 엔트리를 페이지 상태로 바꿔
+          // 다음 Android 뒤로가기가 이미 닫힌 팝업을 다시 처리하지 않게 한다.
+          safeReplaceState({page:currentPage()});
+        }
+        return result;
+      };
+      wrappedCm.__v362BackWrapped = true;
+      window.cm = wrappedCm;
+    }
+
+    window.addEventListener('popstate', function(e){
+      if(closeTopModal()) return;
+
+      var targetPage = e && e.state && e.state.app === '230match' ? e.state.page : '';
+      var now = currentPage();
+
+      if(targetPage && PAGE_NAMES.indexOf(targetPage) >= 0 && targetPage !== now){
+        suppressHistoryPush = true;
+        try{ if(typeof window.showPage === 'function') window.showPage(targetPage); }
+        finally{ setTimeout(function(){ suppressHistoryPush = false; }, 0); }
+        return;
+      }
+
+      // 앱 내부 상태가 없는 상태에서 뒤로가기가 들어오면, 비홈 화면은 홈으로 먼저 보낸다.
+      // 홈에서 한 번 더 누르는 경우는 브라우저/PWA 기본 종료 흐름에 맡긴다.
+      if(now !== 'home'){
+        suppressHistoryPush = true;
+        try{ if(typeof window.showPage === 'function') window.showPage('home'); }
+        finally{
+          setTimeout(function(){
+            suppressHistoryPush = false;
+            safeReplaceState({page:'home'});
+          }, 0);
+        }
+      }
+    });
+  }
+
+  function isActuallyZooming(){
+    try{
+      if(window.visualViewport && window.visualViewport.scale && window.visualViewport.scale !== 1) return true;
+    }catch(e){}
+    return false;
+  }
+
+  function installPinchGuard(){
+    // 기존에 남아 있는 document/pageViewport 스와이프 리스너들이 핀치줌을 화면 전환으로 오인하지 못하게
+    // 멀티터치 구간의 이벤트 전파만 차단한다. preventDefault는 사용하지 않아 브라우저 확대 자체는 살린다.
+    ['touchstart','touchmove','touchend','touchcancel'].forEach(function(type){
+      document.addEventListener(type, function(e){
+        try{
+          var touchCount = e.touches ? e.touches.length : 0;
+          if(type === 'touchstart' && touchCount > 1){
+            pinchActive = true;
+            lastMultiTouchAt = Date.now();
+            e.stopImmediatePropagation();
+            return;
+          }
+          if(type === 'touchmove' && (pinchActive || touchCount > 1 || isActuallyZooming())){
+            if(touchCount > 1) lastMultiTouchAt = Date.now();
+            e.stopImmediatePropagation();
+            return;
+          }
+          if((type === 'touchend' || type === 'touchcancel') && pinchActive){
+            e.stopImmediatePropagation();
+            if(!touchCount){
+              setTimeout(function(){ pinchActive = false; }, 180);
+            }
+            return;
+          }
+          // 핀치 직후 남는 마지막 touchend/click성 이벤트가 스와이프 전환으로 이어지는 것 방지
+          if(Date.now() - lastMultiTouchAt < 260){
+            e.stopImmediatePropagation();
+          }
+        }catch(_e){}
+      }, {capture:true, passive:true});
+    });
+  }
+
+  function installModalDirectBackStates(){
+    // om()을 거치지 않고 classList로 직접 여는 팝업도 일부 있어, 열린 상태가 감지되면 히스토리 보호를 1회 추가한다.
+    var lastModalId = '';
+    var timer = null;
+    function check(){
+      var list = getOpenModals();
+      var top = list.length ? (list[list.length-1].id || '') : '';
+      if(top && top !== lastModalId){
+        lastModalId = top;
+        safePushState({page:currentPage(), modal:top});
+      }
+      if(!top) lastModalId = '';
+    }
+    try{
+      var mo = new MutationObserver(function(){
+        clearTimeout(timer);
+        timer = setTimeout(check, 30);
+      });
+      mo.observe(document.body, {subtree:true, attributes:true, attributeFilter:['class','style']});
+    }catch(e){}
+  }
+
+  function init(){
+    installPinchGuard();
+    installHistoryBridge();
+    installModalDirectBackStates();
+  }
+
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+</script>
+
+
+
+<!-- v365: 관리자 기록보기 삭제 권한 단순화 + 테스트/외1명 찌꺼기 정리 -->
+<style id="v365AdminRecordDeleteCleanupStyle">
+  .v365-record-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;width:100%;}
+  .v365-record-actions .btn{min-height:34px !important;padding:5px 12px !important;font-size:.78rem !important;border-radius:10px !important;font-weight:900 !important;}
+  .v365-record-note{margin:10px 0 0;padding:8px 10px;border-radius:12px;background:#fff7ed;border:1px solid #fdba74;color:#92400e;font-size:.74rem;line-height:1.55;font-weight:800;}
+  @media(max-width:520px){.v365-record-actions{display:grid;grid-template-columns:1fr 1fr;}.v365-record-actions .btn{width:100%;}}
+</style>
+<script id="v365AdminRecordDeleteCleanupScript">
+(function(){
+  'use strict';
+  if(window.__v365AdminRecordDeleteCleanup) return;
+  window.__v365AdminRecordDeleteCleanup=true;
+
+  function isAdminLike(){
+    try{return !!(window.AD||window.TM||document.body.classList.contains('admin-mode')||document.body.classList.contains('tm-mode')||window.LOGIN_PORTAL_MODE==='developer'||window.LOGIN_PORTAL_MODE==='tournament_admin');}catch(e){return false;}
+  }
+  function clean(v){return String(v||'').replace(/\s+/g,' ').trim();}
+  function normClub(v){try{return typeof window.normalizeClub==='function'?window.normalizeClub(v):clean(v);}catch(e){return clean(v);}}
+  function splitKey(k){var s=String(k||''); if(s.indexOf('__')>=0){var a=s.split('__');return {name:a[0]||'',club:a.slice(1).join('__')||''};} return {name:s,club:''};}
+  function jsArg(s){return String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,' ');}
+  function makeKey(name,club){try{if(typeof window.pKey==='function')return window.pKey(name,club);}catch(e){} return club?name+'__'+club:name;}
+  function selectedClub(){try{var v=(document.getElementById('regClub')&&document.getElementById('regClub').value)||'';if(!v||v==='__custom__')v=(document.getElementById('regClubText')&&document.getElementById('regClubText').value)||'';return normClub(v);}catch(e){return '';}}
+  function ensureKey(name,club){
+    name=clean(name); club=normClub(club||'');
+    try{var players=(window.G&&window.G.players)||{};var keys=Object.keys(players);var found=keys.find(function(k){var sp=splitKey(k);return clean(sp.name)===name&&(!club||normClub(sp.club)===club);})||keys.find(function(k){var sp=splitKey(k);return clean(sp.name)===name;});if(found)return found;}catch(e){}
+    return makeKey(name,club);
+  }
+  function inferKeyFromBody(body,fallback,club){
+    var text=clean((body&&body.innerText)||'');
+    var first=(text.split('\n').map(clean).filter(Boolean)[0]||fallback||'');
+    first=first.replace(/^👤\s*/,'').replace(/기록\s*없음.*$/,'').trim();
+    var sp=splitKey(first||fallback||'');
+    return ensureKey(sp.name||fallback,sp.club||club||'');
+  }
+  function footerHtml(key){
+    return '<div class="v365-record-actions">'
+      +'<button class="btn btn-danger" onclick="deletePlayerRecordDirect(\''+jsArg(key)+'\')">🗑️ 명단 삭제</button>'
+      +'<button class="btn btn-gray" onclick="cm(\'mPD\');cm(\'mPHist\')">닫기</button>'
+      +'</div>';
+  }
+  function setPHistFooter(key){
+    try{var footer=document.querySelector('#mPHist .modal-footer'); if(!footer)return; if(!isAdminLike()){footer.innerHTML='<button class="btn btn-gray" onclick="cm(\'mPHist\')">닫기</button>';return;} footer.innerHTML=footerHtml(key); var body=document.getElementById('mPHistBody'); if(body&&!body.querySelector('.v365-record-note')){var n=document.createElement('div');n.className='v365-record-note';n.textContent='관리자 모드: 테스트 이름, 외1명처럼 잘못 남은 명단은 아래 삭제 버튼으로 기록보기/참가자 목록에서 정리할 수 있습니다.';body.appendChild(n);}}catch(e){console.warn('v365 PHist footer failed',e);}
+  }
+  function setPDFooter(key){
+    try{var footer=document.getElementById('mPDFooter'); if(!footer)return; if(!isAdminLike()){footer.innerHTML='<button class="btn btn-gray" onclick="cm(\'mPD\')">닫기</button>';return;} footer.innerHTML=footerHtml(key);}catch(e){console.warn('v365 PD footer failed',e);}
+  }
+  function removeNameFromTeam(team,name){
+    var changed=false, nm=clean(name);
+    if(Array.isArray(team.players)){
+      var before=team.players.length;
+      team.players=team.players.filter(function(p){return clean(p)!==nm;});
+      if(team.players.length!==before) changed=true;
+    }
+    if(Array.isArray(team.individualPlayers)){
+      var before2=team.individualPlayers.length;
+      team.individualPlayers=team.individualPlayers.filter(function(p){return clean((p&&p.name)||p)!==nm;});
+      if(team.individualPlayers.length!==before2) changed=true;
+    }
+    if(changed){
+      var names=[];
+      if(Array.isArray(team.individualPlayers)&&team.individualPlayers.length) names=team.individualPlayers.map(function(p){return clean((p&&p.name)||p);}).filter(Boolean);
+      else if(Array.isArray(team.players)) names=team.players.map(clean).filter(Boolean);
+      if(team.tournamentType==='individual_pair'||team.individualPlayers||team.pairLabel||team.entryLabel){
+        team.pairLabel=names.join(' / ');
+        team.entryLabel=team.pairLabel;
+      }
+      team.updatedAt=new Date().toISOString();
+    }
+    return changed;
+  }
+  async function cleanupEverywhere(name,club){
+    var changedKeys=[];
+    try{
+      var G=window.G||{};
+      if(G.players){
+        var keys=Object.keys(G.players);
+        keys.forEach(function(k){var sp=splitKey(k);var n=clean(sp.name), c=normClub(sp.club||G.players[k]?.club||''); if(n===name&&(!club||!c||c===club)){delete G.players[k];}});
+      }
+      if(G.teams){
+        Object.keys(G.teams).forEach(function(key){
+          var arr=Array.isArray(G.teams[key])?G.teams[key]:[];
+          var changed=false;
+          arr.forEach(function(team){
+            var teamClub=normClub(team&&team.club||'');
+            if(!club||!teamClub||teamClub===club) changed=removeNameFromTeam(team,name)||changed;
+            else changed=removeNameFromTeam(team,name)||changed; // 이름 찌꺼기는 클럽 정보가 부정확한 경우가 많아 동일 이름 기준으로도 제거
+          });
+          if(changed) changedKeys.push(key);
+        });
+      }
+      if(window.G_REGISTRY){
+        Object.keys(window.G_REGISTRY).forEach(function(y){
+          var arr=Array.isArray(window.G_REGISTRY[y])?window.G_REGISTRY[y]:[];
+          window.G_REGISTRY[y]=arr.filter(function(r){var rn=clean(r&&r.name), rc=normClub((r&&r.club)||''); if(rn!==name)return true; if(club&&rc&&rc!==club)return true; return false;});
+        });
+      }
+      if(window.HIST_DATA){
+        (window.HIST_DATA||[]).forEach(function(t){(t.teams||[]).forEach(function(tm){tm.players=(tm.players||[]).filter(function(pn){return clean(pn)!==name;});});});
+      }
+      try{var docId=ensureKey(name,club).replace(/[\\/\.#\$\[\]]/g,'_'); if(window.db&&window.deleteDoc&&window.doc) await window.deleteDoc(window.doc(window.db,'players',docId));}catch(e){console.warn('v365 player doc delete skipped',e);}
+      for(var i=0;i<changedKeys.length;i++){try{if(typeof window.stT==='function') await window.stT(changedKeys[i]);}catch(e){console.warn('v365 team save skipped',changedKeys[i],e);}}
+      try{if(typeof window.saveRegistry==='function') await window.saveRegistry(window.REG_YEAR||new Date().getFullYear());}catch(e){}
+      try{if(typeof window.savePlayersToLocalCache==='function') window.savePlayersToLocalCache();}catch(e){}
+    }catch(e){console.warn('v365 cleanup failed',e);throw e;}
+  }
+  window.deletePlayerRecordDirect=async function(key){
+    if(!isAdminLike()){if(window.toast)toast('관리자 권한이 필요합니다.','error');return;}
+    var sp=splitKey(key); var name=clean(sp.name||key), club=normClub(sp.club||'');
+    if(!name){if(window.toast)toast('삭제할 이름을 찾지 못했습니다.','error');return;}
+    if(!confirm('"'+name+'" 명단을 삭제하시겠습니까?\n기록보기/참가자 목록/등록 명단에 남은 동일 이름을 정리합니다.')) return;
+    try{if(typeof window.sl==='function')window.sl(true); await cleanupEverywhere(name,club); try{if(typeof window.cm==='function'){cm('mPD');cm('mPHist');cm('mEditP');}}catch(e){} try{if(typeof window.renderAllP==='function')window.renderAllP();}catch(e){} try{if(typeof window.renderRegistryTab==='function')window.renderRegistryTab();}catch(e){} try{if(typeof window.renderRL==='function')window.renderRL();}catch(e){} try{if(typeof window.renderBracket==='function')window.renderBracket();}catch(e){} if(window.toast)toast('명단 삭제 완료 ✅','success');}
+    catch(e){if(window.toast)toast('삭제 실패: '+(e.message||e),'error');}
+    finally{try{if(typeof window.sl==='function')window.sl(false);}catch(e){}}
+  };
+  var prevOpenPHist=window.openPHist;
+  if(typeof prevOpenPHist==='function'){
+    window.openPHist=async function(iid){var raw='',club='';try{raw=(document.getElementById(iid)?.value||'').trim();club=selectedClub();}catch(e){} var r=await prevOpenPHist.apply(this,arguments); setTimeout(function(){var sp=splitKey(raw);var key=ensureKey(sp.name||raw,sp.club||club); if(!key)key=inferKeyFromBody(document.getElementById('mPHistBody'),raw,club); if(key)setPHistFooter(key);},220); return r;};
+  }
+  var prevOpenPD=window.openPD;
+  if(typeof prevOpenPD==='function'){
+    window.openPD=async function(name,club){var r=await prevOpenPD.apply(this,arguments); setTimeout(function(){setPDFooter(ensureKey(name,club));},240); setTimeout(function(){setPDFooter(ensureKey(name,club));},520); return r;};
+  }
+  try{
+    var mo=new MutationObserver(function(){clearTimeout(window.__v365RecordTimer);window.__v365RecordTimer=setTimeout(function(){try{if(!isAdminLike())return;var pd=document.getElementById('mPD');if(pd&&pd.classList.contains('open')){var title=(document.getElementById('mPDT')?.textContent||'').replace(/^👤\s*/,'').trim();if(title)setPDFooter(ensureKey(title,''));}var ph=document.getElementById('mPHist');if(ph&&ph.classList.contains('open')){var key=inferKeyFromBody(document.getElementById('mPHistBody'),'','');if(key)setPHistFooter(key);}}catch(e){}},90);});
+    mo.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['class','style']});
+  }catch(e){}
+})();
+</script>
+
+
+<!-- v366: 기록 보기(showP) 모달에도 관리자 명단 삭제 버튼 강제 표시 -->
+<style id="v366RecordViewDeleteVisibleStyle">
+  .v366-record-delete-row{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;width:100%;}
+  .v366-record-delete-row .btn{min-height:36px!important;padding:6px 12px!important;font-size:.8rem!important;border-radius:10px!important;font-weight:900!important;}
+  .v366-record-delete-inline{margin-top:10px;display:flex;justify-content:flex-end;gap:6px;}
+  @media(max-width:520px){.v366-record-delete-row{display:grid;grid-template-columns:1fr 1fr}.v366-record-delete-row .btn{width:100%;}}
+</style>
+<script id="v366RecordViewDeleteVisibleScript">
+(function(){
+  'use strict';
+  if(window.__v366RecordViewDeleteVisible) return;
+  window.__v366RecordViewDeleteVisible=true;
+
+  function clean(v){return String(v||'').replace(/\s+/g,' ').trim();}
+  function splitKey(k){var s=String(k||''); if(s.indexOf('__')>=0){var a=s.split('__');return {name:a[0]||'',club:a.slice(1).join('__')||''};} return {name:s,club:''};}
+  function jsArg(s){return String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,' ');}
+  function isAdminLike(){
+    try{
+      var badge=document.getElementById('adminBadge');
+      var badgeText=clean(badge&&badge.textContent||'');
+      var badgeShown=!!(badge && (badge.classList.contains('show') || badge.style.display!=='none') && /관리자|운영자|개발자/.test(badgeText));
+      return !!(
+        document.body.classList.contains('admin-mode') ||
+        document.body.classList.contains('tm-mode') ||
+        window.AD || window.TM ||
+        window.LOGIN_PORTAL_MODE==='developer' ||
+        window.LOGIN_PORTAL_MODE==='tournament_admin' ||
+        badgeShown
+      );
+    }catch(e){return false;}
+  }
+  function makeKey(name,club){
+    name=clean(name); club=clean(club);
+    try{ if(typeof window.pKey==='function' && club) return window.pKey(name,club); }catch(e){}
+    try{
+      var players=(window.G&&window.G.players)||{};
+      var keys=Object.keys(players);
+      var found=keys.find(function(k){var sp=splitKey(k);return clean(sp.name)===name && (!club || clean(sp.club)===club);}) ||
+                keys.find(function(k){var sp=splitKey(k);return clean(sp.name)===name;});
+      if(found) return found;
+    }catch(e){}
+    return club ? name+'__'+club : name;
+  }
+  function inferKeyFromRecordBody(fallbackName,fallbackClub){
+    try{
+      var body=document.getElementById('mPHistBody');
+      var txt=clean(body&&body.innerText||'');
+      var first=(txt.split('\n').map(clean).filter(Boolean)[0]||'');
+      first=first.replace(/^👤\s*/,'').replace(/기록\s*없음.*$/,'').trim();
+      var sp=splitKey(first||fallbackName||'');
+      return makeKey(sp.name||fallbackName, sp.club||fallbackClub||'');
+    }catch(e){return makeKey(fallbackName,fallbackClub);}
+  }
+  function setRecordViewFooter(key){
+    try{
+      var footer=document.querySelector('#mPHist .modal-footer');
+      if(!footer) return;
+      if(!isAdminLike()){
+        footer.innerHTML='<button class="btn btn-gray" onclick="cm(\'mPHist\')">닫기</button>';
+        return;
+      }
+      footer.innerHTML='<div class="v366-record-delete-row">'
+        +'<button class="btn btn-danger" onclick="deletePlayerRecordDirect(\''+jsArg(key)+'\')">🗑️ 명단 삭제</button>'
+        +'<button class="btn btn-gray" onclick="cm(\'mPHist\')">닫기</button>'
+        +'</div>';
+      var body=document.getElementById('mPHistBody');
+      if(body && !body.querySelector('.v365-record-note') && !body.querySelector('.v366-record-note')){
+        var note=document.createElement('div');
+        note.className='v366-record-note v365-record-note';
+        note.textContent='관리자 모드: 외1명, 테스트 이름처럼 잘못 남은 명단은 아래 명단 삭제로 정리할 수 있습니다.';
+        body.appendChild(note);
+      }
+    }catch(e){console.warn('v366 record footer failed',e);}
+  }
+  function setPlayerDetailFooter(key){
+    try{
+      var footer=document.getElementById('mPDFooter');
+      if(!footer) return;
+      if(!isAdminLike()){
+        footer.innerHTML='<button class="btn btn-gray" onclick="cm(\'mPD\')">닫기</button>';
+        return;
+      }
+      footer.innerHTML='<div class="v366-record-delete-row">'
+        +'<button class="btn btn-danger" onclick="deletePlayerRecordDirect(\''+jsArg(key)+'\')">🗑️ 명단 삭제</button>'
+        +'<button class="btn btn-gray" onclick="cm(\'mPD\')">닫기</button>'
+        +'</div>';
+    }catch(e){console.warn('v366 detail footer failed',e);}
+  }
+
+  var prevShowP=window.showP;
+  if(typeof prevShowP==='function'){
+    window.showP=async function(name,club){
+      var r=await prevShowP.apply(this,arguments);
+      var key=makeKey(name,club);
+      setTimeout(function(){setRecordViewFooter(key||inferKeyFromRecordBody(name,club));},80);
+      setTimeout(function(){setRecordViewFooter(key||inferKeyFromRecordBody(name,club));},260);
+      setTimeout(function(){setRecordViewFooter(key||inferKeyFromRecordBody(name,club));},620);
+      return r;
+    };
+  }
+
+  var prevOpenPD=window.openPD;
+  if(typeof prevOpenPD==='function'){
+    window.openPD=async function(name,club){
+      var r=await prevOpenPD.apply(this,arguments);
+      var key=makeKey(name,club);
+      setTimeout(function(){setPlayerDetailFooter(key);},120);
+      setTimeout(function(){setPlayerDetailFooter(key);},360);
+      return r;
+    };
+  }
+
+  // 이미 열린 상태에서 관리자 로그인/렌더링 타이밍이 뒤바뀌어도 버튼을 다시 붙인다.
+  try{
+    var mo=new MutationObserver(function(){
+      clearTimeout(window.__v366RecordViewTimer);
+      window.__v366RecordViewTimer=setTimeout(function(){
+        try{
+          if(!isAdminLike()) return;
+          var ph=document.getElementById('mPHist');
+          if(ph && ph.classList.contains('open')) setRecordViewFooter(inferKeyFromRecordBody('',''));
+          var pd=document.getElementById('mPD');
+          if(pd && pd.classList.contains('open')){
+            var t=clean((document.getElementById('mPDT')&&document.getElementById('mPDT').textContent)||'').replace(/^👤\s*/,'');
+            if(t) setPlayerDetailFooter(makeKey(t,''));
+          }
+        }catch(e){}
+      },120);
+    });
+    mo.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['class','style']});
+  }catch(e){}
+})();
+</script>
+
+
+<!-- v367: 참가자 기록 목록 카드에도 관리자 삭제 버튼 표시 -->
+<style id="v367InlineRecordDeleteButtonStyle">
+  #psResults .v367-inline-delete-btn{min-height:34px!important;padding:5px 10px!important;font-size:.76rem!important;border-radius:10px!important;font-weight:900!important;}
+</style>
+<script id="v367InlineRecordDeleteButtonScript">
+(function(){
+  'use strict';
+  if(window.__v367InlineRecordDeleteButton) return;
+  window.__v367InlineRecordDeleteButton=true;
+  function clean(v){return String(v||'').replace(/\s+/g,' ').trim();}
+  function isAdminLike(){
+    try{
+      var badge=document.getElementById('adminBadge');
+      var badgeText=clean(badge&&badge.textContent||'');
+      return !!(document.body.classList.contains('admin-mode')||document.body.classList.contains('tm-mode')||window.AD||window.TM||/관리자|운영자|개발자/.test(badgeText));
+    }catch(e){return false;}
+  }
+  function jsArg(s){return String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,' ');}
+  function makeKey(name,club){
+    name=clean(name); club=clean(club);
+    try{if(typeof window.pKey==='function' && club)return window.pKey(name,club);}catch(e){}
+    return club?name+'__'+club:name;
+  }
+  function addInlineDeleteButtons(){
+    try{
+      if(!isAdminLike()) return;
+      document.querySelectorAll('#psResults .v354-record-view-btn[data-pname]').forEach(function(viewBtn){
+        var wrap=viewBtn.parentElement;
+        if(!wrap || wrap.querySelector('.v367-inline-delete-btn')) return;
+        var name=viewBtn.getAttribute('data-pname')||'';
+        var club=viewBtn.getAttribute('data-pclub')||'';
+        if(!name) return;
+        var btn=document.createElement('button');
+        btn.type='button';
+        btn.className='btn btn-danger v367-inline-delete-btn';
+        btn.textContent='명단 삭제';
+        btn.onclick=function(ev){
+          ev.preventDefault(); ev.stopPropagation();
+          if(typeof window.deletePlayerRecordDirect==='function') window.deletePlayerRecordDirect(makeKey(name,club));
+          else alert('삭제 기능을 찾지 못했습니다. 새로고침 후 다시 시도해 주세요.');
+          return false;
+        };
+        wrap.appendChild(btn);
+      });
+    }catch(e){console.warn('v367 inline delete failed',e);}
+  }
+  var prevRenderAllP=window.renderAllP;
+  if(typeof prevRenderAllP==='function'){
+    window.renderAllP=function(){
+      var r=prevRenderAllP.apply(this,arguments);
+      setTimeout(addInlineDeleteButtons,80);
+      setTimeout(addInlineDeleteButtons,300);
+      return r;
+    };
+  }
+  var prevFilterP=window.filterP;
+  if(typeof prevFilterP==='function'){
+    window.filterP=function(){
+      var r=prevFilterP.apply(this,arguments);
+      setTimeout(addInlineDeleteButtons,120);
+      return r;
+    };
+  }
+  document.addEventListener('DOMContentLoaded',function(){setTimeout(addInlineDeleteButtons,600);setTimeout(addInlineDeleteButtons,1400);});
+  try{
+    var mo=new MutationObserver(function(){clearTimeout(window.__v367InlineDeleteTimer);window.__v367InlineDeleteTimer=setTimeout(addInlineDeleteButtons,160);});
+    mo.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['class','style']});
   }catch(e){}
 })();
 </script>
