@@ -17923,13 +17923,33 @@ function openIndividualEntryInfo(key, idx){
     if(body){
       const div=(typeof _k2td==='function'?(_k2td(key).div||''):'');
       const canManage=!!(AD || TM || (typeof isRegistrationOwner==='function' && isRegistrationOwner(team)));
-      const adminActions=canManage?`<div class="v346-detail-admin-actions"><button class="btn btn-outline" onclick="cm('mIndividualEntryInfo');openETeam('${esc(key)}',${Number(idx)})">✏️ 참가팀 수정</button><button class="btn btn-danger" onclick="cm('mIndividualEntryInfo');delTeam('${esc(key)}',${Number(idx)})">🗑 참가팀 삭제</button></div>`:'';
+      const adminActions=canManage?`<div class="v346-detail-admin-actions"><button type="button" class="btn btn-outline" onclick="window.__editEntryFromDetail && window.__editEntryFromDetail('${esc(key)}',${Number(idx)})">✏️ 참가팀 수정</button><button type="button" class="btn btn-danger" onclick="window.__deleteEntryFromDetail && window.__deleteEntryFromDetail('${esc(key)}',${Number(idx)})">🗑 참가팀 삭제</button></div>`:'';
       body.innerHTML=`<div class="v334-info-title">${v334IndividualPairTitle(team)}</div><div class="v334-info-meta">${div?`부서: ${esc(div)}`:''}</div><div class="v334-info-list">${v334GetIndividualInfoRows(team)}</div>${adminActions}`;
     }
     om('mIndividualEntryInfo');
   }catch(e){ console.warn('openIndividualEntryInfo failed',e); toast('상세보기 오류','error'); }
 }
 window.openIndividualEntryInfo=openIndividualEntryInfo;
+// v351: 상세 팝업 안의 수정/삭제 버튼은 인라인 핸들러가 모듈 스코프 함수에 직접 접근하지 못하는 경우가 있어
+// 전역 래퍼로 한 번 감싸 안정적으로 실행한다.
+window.__editEntryFromDetail = function(key, idx){
+  try{
+    cm('mIndividualEntryInfo');
+    setTimeout(()=>{
+      if(typeof openETeam === 'function') openETeam(String(key), Number(idx));
+      else toast('수정 기능을 찾을 수 없습니다. 새로고침 후 다시 시도해 주세요.','error');
+    }, 30);
+  }catch(e){ console.warn('__editEntryFromDetail failed', e); toast('수정창 열기 실패','error'); }
+};
+window.__deleteEntryFromDetail = function(key, idx){
+  try{
+    cm('mIndividualEntryInfo');
+    setTimeout(()=>{
+      if(typeof delTeam === 'function') delTeam(String(key), Number(idx));
+      else toast('삭제 기능을 찾을 수 없습니다. 새로고침 후 다시 시도해 주세요.','error');
+    }, 30);
+  }catch(e){ console.warn('__deleteEntryFromDetail failed', e); toast('삭제 처리 실패','error'); }
+};
 
 function buildRegisterRosterGrid(tid,div,teams,key){
   if(!teams?.length){
@@ -17956,7 +17976,7 @@ function buildRegisterRosterGrid(tid,div,teams,key){
     const _myClub = REG_CLUB ? baseClub(REG_CLUB) : '';
     const _teamClub = baseClub(team.club||'')||'';
     const _deadlinePassed = !AD && isRegDeadlinePassed();
-    const canManageTeam = isIndividual ? (AD || isRegistrationOwner(team)) : (AD || (REG && _myClub && _myClub === _teamClub && !_deadlinePassed));
+    const canManageTeam = isIndividual ? (AD || TM || isRegistrationOwner(team)) : (AD || TM || (REG && _myClub && _myClub === _teamClub && !_deadlinePassed));
     const detailBtn = isIndividual ? `<button class="btn rr-btn-edit v334-detail-btn" style="background:#f8fafc;color:#0f1e3a;border:1px solid #cbd5e1" onclick="openIndividualEntryInfo('${esc(key)}',${realIdx})">상세</button>` : '';
     const adminBtns=canManageTeam?`<div class="rr-admin-btns ${isIndividual?'v334-individual-actions':''}">
       ${detailBtn}
@@ -18471,23 +18491,23 @@ async function delTeam(key,idx){
   const isIndividual = getTournamentTypeById(tid0)==='individual_pair' || team.tournamentType==='individual_pair' || Array.isArray(team.individualPlayers);
 
   if(isIndividual){
-    if(!AD && !verifyIndividualEditPin(team,'삭제')) return;
-    if(!AD && !isRegistrationOwner(team)){
+    if(!(AD || TM) && !verifyIndividualEditPin(team,'삭제')) return;
+    if(!(AD || TM) && !isRegistrationOwner(team)){
       toast('구글 로그인 전환 후에는 최초 등록한 계정으로만 삭제할 수 있습니다','error');
       return;
     }
   }else{
-    if(!(AD || REG)){
-      toast('경기이사 로그인 후 삭제할 수 있습니다','error');
+    if(!(AD || TM || REG)){
+      toast('경기이사 또는 운영자 로그인 후 삭제할 수 있습니다','error');
       return;
     }
-    if(!AD && REG){
+    if(!(AD || TM) && REG){
       const _t=(G.teams[key]||[])[idx];
       if(!_t||baseClub(_t.club||'')!==baseClub(REG_CLUB||'')){
         toast('내 클럽 팀만 삭제할 수 있습니다','error'); return;
       }
     }
-    if(!AD && isRegDeadlinePassed()){
+    if(!(AD || TM) && isRegDeadlinePassed()){
       toast(`등록 기한이 만료되어 삭제할 수 없습니다.\n${regDeadlineLabel()}`,'error');
       return;
     }
@@ -18503,7 +18523,7 @@ async function delTeam(key,idx){
   sl(true);
   try{
     G.teams[key].splice(idx,1);
-    if(isIndividual && !AD) await stTPublicDeleteOne(key, team);
+    if(isIndividual && !(AD || TM)) await stTPublicDeleteOne(key, team);
     else await stT(key);
   }catch(e){
     G.teams[key] = backupTeams;
@@ -18565,16 +18585,16 @@ function openETeam(key,idx){
   window.__IND_TEAM_EDIT_VERIFIED = false;
 
   if(!isIndividual){
-    const canManage = AD || REG;
+    const canManage = AD || TM || REG;
     if(!canManage){
       toast('경기이사 로그인 후 수정할 수 있습니다','error');
       return;
     }
-    if(!AD && REG && baseClub(team.club||'')!==baseClub(REG_CLUB||'')){
+    if(!(AD || TM) && REG && baseClub(team.club||'')!==baseClub(REG_CLUB||'')){
       toast('내 클럽 팀만 수정할 수 있습니다','error'); return;
     }
   }else{
-    if(!AD && !verifyIndividualEditPin(team,'수정')) return;
+    if(!(AD || TM) && !verifyIndividualEditPin(team,'수정')) return;
     window.__IND_TEAM_EDIT_VERIFIED = true;
   }
 
@@ -18662,10 +18682,10 @@ async function saveETeam(){
   const isIndividual = getTournamentTypeById(tid0)==='individual_pair' || team.tournamentType==='individual_pair' || Array.isArray(team.individualPlayers);
 
   if(isIndividual){
-    if(!AD && !window.__IND_TEAM_EDIT_VERIFIED){
+    if(!(AD || TM) && !window.__IND_TEAM_EDIT_VERIFIED){
       if(!verifyIndividualEditPin(team,'수정')) return;
     }
-    if(!AD && !isRegistrationOwner(team)){
+    if(!(AD || TM) && !isRegistrationOwner(team)){
       toast('구글 로그인 전환 후에는 최초 등록한 계정으로만 수정할 수 있습니다','error');
       return;
     }
@@ -18722,7 +18742,7 @@ async function saveETeam(){
 
     sl(true);
     try{
-      if(!AD) await stTPublicUpdateOne(CE_key, team);
+      if(!(AD || TM)) await stTPublicUpdateOne(CE_key, team);
       else await stT(CE_key);
     }catch(e){
       teams[CE_idx] = backupTeam;
@@ -18744,7 +18764,7 @@ async function saveETeam(){
     toast('경기이사 로그인 후 수정할 수 있습니다','error');
     return;
   }
-  if(!AD && isRegDeadlinePassed()){
+  if(!(AD || TM) && isRegDeadlinePassed()){
     toast(`등록 기한이 만료되어 수정할 수 없습니다.\n${regDeadlineLabel()}`,'error');
     return;
   }
