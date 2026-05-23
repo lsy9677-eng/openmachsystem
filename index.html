@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-05-23-v375-detail-notify-records-history-fix";
+  const APP_VERSION = "2026-05-23-v378-push-popup-button-visible";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -6166,11 +6166,7 @@ body {
 <button class="btn btn-outline" onclick="exportPlayersCSV()" style="padding:12px 8px;font-size:.82rem">📄 CSV 저장</button>
 </div>
 </div>
-<div class="form-group" style="border-top:1px solid var(--border);padding-top:14px;margin-bottom:16px">
-<div style="font-weight:700;font-size:.88rem;margin-bottom:6px;color:var(--primary-dark)">🟢 네이버 로그인 설정</div>
-<div style="font-size:.72rem;color:var(--text3);margin-bottom:10px;line-height:1.6">이 버전은 <b>Cloudflare Pages Functions</b> 방식입니다. GitHub 루트의 <b>/functions/naver/login.js</b>, <b>/functions/naver/callback.js</b>가 배포되면 자동으로 <b>/naver/login</b> 경로를 사용합니다. 별도 Worker 주소 저장은 필요 없습니다.</div>
-<button class="btn btn-outline" onclick="loginWithNaver()" style="white-space:nowrap">🟢 네이버 로그인 테스트</button>
-</div>
+
 <!-- 팀등록 비밀번호 관리 -->
 <div class="form-group" style="border-top:1px solid var(--border);padding-top:14px;margin-bottom:16px">
 <div style="font-weight:700;font-size:.88rem;margin-bottom:4px;color:var(--primary-dark)">🔑 팀등록 비밀번호 관리</div>
@@ -7904,18 +7900,25 @@ async function disableCurrentUserPushTokens(reason='user_disabled'){
 function getPushAutoReconnectDue(){
   try{
     const last=Date.parse(localStorage.getItem('matchPushAutoReconnectAt')||'0')||0;
-    return !last || (Date.now()-last) > 24*60*60*1000;
+    return !last || (Date.now()-last) > 6*60*60*1000;
   }catch(e){ return true; }
 }
-
+function isPushUserExplicitlyOptedOut(){
+  try{
+    const p=CURRENT_APP_PROFILE||{};
+    const choice=String(p.pushSetupChoice||'');
+    return localStorage.getItem('matchPushOptOut')==='1' || choice==='denied' || choice==='sms_fallback' || p.pushDenied===true;
+  }catch(e){ return false; }
+}
 async function autoReconnectPushIfNeeded(reason='auto'){
   try{
     const u=auth.currentUser || CURRENT_APP_USER;
     if(!u || u.isAnonymous) return false;
     if(!('Notification' in window) || Notification.permission!=='granted') return false;
-    const p=CURRENT_APP_PROFILE||{};
-    const wantsPush = p.pushEnabled===true || p.pushSetupChoice==='enabled' || localStorage.getItem('matchPushEnabled')==='1';
-    if(!wantsPush) return false;
+    // 사용자가 명시적으로 꺼두거나 문자대체를 선택한 경우는 존중한다.
+    if(isPushUserExplicitlyOptedOut()) return false;
+    // 예전 버전에서 pushEnabled가 저장되지 않았더라도, 브라우저 권한이 이미 granted이면
+    // 앱 실행 시 현재 기기 토큰을 자동 재등록해 복구한다.
     if(!getPushAutoReconnectDue() && sessionStorage.getItem('pushTokenAutoRefreshedThisSession')) return false;
     sessionStorage.setItem('pushTokenAutoRefreshedThisSession','1');
     const ok=await refreshCurrentFcmToken(reason);
@@ -7924,6 +7927,12 @@ async function autoReconnectPushIfNeeded(reason='auto'){
   }catch(e){ console.warn('autoReconnectPushIfNeeded failed', e?.message||e); return false; }
 }
 window.autoReconnectPushIfNeeded=autoReconnectPushIfNeeded;
+try{
+  document.addEventListener('visibilitychange',()=>{
+    if(document.visibilityState==='visible') setTimeout(()=>autoReconnectPushIfNeeded('visibility_auto').catch(()=>{}),900);
+  });
+  window.addEventListener('focus',()=>setTimeout(()=>autoReconnectPushIfNeeded('focus_auto').catch(()=>{}),1200));
+}catch(e){}
 
 async function refreshCurrentFcmToken(reason='manual') {
   const user = auth.currentUser || CURRENT_APP_USER;
@@ -7931,13 +7940,15 @@ async function refreshCurrentFcmToken(reason='manual') {
   try{
     if(!('Notification' in window) || Notification.permission !== 'granted') return false;
     const messaging = await getFcmMessagingSafe();
-    await ensureFcmServiceWorker();
-
-    // 기존 브라우저 캐시 토큰이 FCM에서 UNREGISTERED 된 경우가 많아서
-    // 현재 기기 토큰을 한 번 삭제한 뒤 새 토큰을 다시 발급받는다.
-    try{ await deleteToken(messaging); }catch(e){ console.warn('deleteToken skipped', e?.message || e); }
-
     const swReg = await ensureFcmServiceWorker();
+
+    // 자동 복구는 기존 토큰을 지우지 않고 현재 브라우저 토큰을 재저장한다.
+    // 수동 '알림 다시 연결'일 때만 토큰을 재발급해 죽은 토큰을 교체한다.
+    const forceReissue=/manual|reconnect|force|repair/i.test(String(reason||''));
+    if(forceReissue){
+      try{ await deleteToken(messaging); }catch(e){ console.warn('deleteToken skipped', e?.message || e); }
+    }
+
     const token = await getToken(messaging,{vapidKey:FCM_VAPID_KEY,serviceWorkerRegistration:swReg});
     if(!token) return false;
     const saved = await saveCurrentFcmToken(token);
@@ -9548,6 +9559,7 @@ function ensurePushStatsModal(){
         <div style="font-size:.78rem;color:var(--text2);line-height:1.6">현재 선택 대회 기준과 전체 회원 기준을 함께 확인합니다.</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           <button class="btn btn-outline" onclick="renderPushStatsDashboard(true)" style="font-size:.78rem;padding:6px 10px">🔄 새로고침</button>
+          <button class="btn btn-primary" onclick="publishPushReconnectPrompt()" style="font-size:.78rem;padding:6px 10px;background:#7c3aed;color:#fff;border-color:#7c3aed">🔔 전체 알림 확인 팝업</button>
           <button class="btn btn-outline" onclick="copyPushStatsMissingList()" style="font-size:.78rem;padding:6px 10px">📋 정보부족 복사</button>
           <button class="btn btn-primary" onclick="sendPushStatsSmsFallback()" style="font-size:.78rem;padding:6px 10px;background:#2563eb;color:#fff">📨 문자대체 명단 문자</button>
         </div>
@@ -9568,7 +9580,7 @@ function injectPushStatsAdminButton(){
     box.style.cssText='margin-bottom:16px;padding:14px;background:linear-gradient(135deg,#eef4ff,#fffdf5);border:1.5px solid #93c5fd;border-radius:12px';
     box.innerHTML=`<div style="font-weight:900;font-size:.9rem;color:#1d4ed8;margin-bottom:7px">📊 알림 통계 / 불가 명단</div>
       <div style="font-size:.75rem;color:var(--text2);line-height:1.7;margin-bottom:10px">푸시 가능, 문자 대체, 정보 부족 명단을 전체 회원과 현재 대회 기준으로 확인합니다. 대회 전 필수 점검용입니다.</div>
-      <button class="btn btn-primary" onclick="openPushStatsDashboard()" style="width:100%;background:#2563eb;color:#fff">📊 알림 상태판 열기</button>`;
+      <div style="display:grid;grid-template-columns:1fr;gap:8px"><button class="btn btn-primary" onclick="openPushStatsDashboard()" style="width:100%;background:#2563eb;color:#fff">📊 알림 상태판 열기</button><button class="btn btn-primary" onclick="publishPushReconnectPrompt()" style="width:100%;background:#7c3aed;color:#fff">🔔 전체 알림 확인 팝업 띄우기</button></div>`;
     body.insertBefore(box, body.firstChild);
   }catch(e){ console.warn('injectPushStatsAdminButton failed', e); }
 }
@@ -9778,6 +9790,257 @@ window.renderPushStatsDashboard=renderPushStatsDashboard;
 window.copyPushStatsMissingList=copyPushStatsMissingList;
 window.sendPushStatsSmsFallback=sendPushStatsSmsFallback;
 
+
+
+
+// ── v377: 대회 전 전체 알림 확인 팝업 / 자동 재연결 유도 ─────────────────────
+const PUSH_RECONNECT_PROMPT_DOC = 'pushReconnectPrompt';
+const PUSH_RECONNECT_RESPONSES = 'pushReconnectResponses';
+function getPushReconnectLocalKey(id='', suffix='ack'){
+  return '230match_push_reconnect_'+suffix+'_'+String(id||'latest').replace(/[^A-Za-z0-9_-]/g,'_');
+}
+function getCurrentPushReconnectPromptId(){
+  try{
+    const p=window.__pushReconnectPrompt||{};
+    return String(p.id||p.promptId||'');
+  }catch(e){ return ''; }
+}
+async function publishPushReconnectPrompt(){
+  if(!(AD||TM||OP)){ toast('관리자/운영자 권한이 필요합니다.','info'); return; }
+  const tid=getSelectedStatsTournamentId();
+  const t=(G.tournaments||[]).find(x=>x.id===tid)||{};
+  const name=t?.name || '현재 대회';
+  const ok=confirm('전체 사용자에게 대회 알림 확인 팝업을 띄울까요?\n\n사용자가 앱을 열면 알림 다시 연결 / 문자 대체 / 나중에 중 하나를 선택하게 됩니다.');
+  if(!ok) return;
+  const promptId='push_reconnect_'+Date.now();
+  const payload={
+    enabled:true,
+    id:promptId,
+    promptId,
+    tid:tid||'',
+    tournamentName:name,
+    title:'대회 알림 수신 확인',
+    message:`${name} 경기 시작·코트 배정 알림을 받으려면 알림 연결 확인이 필요합니다. 아래 버튼을 눌러 알림을 다시 연결해 주세요. 알림이 어려운 경우 문자 안내 대상으로 저장됩니다.`,
+    createdAt:serverTimestamp(),
+    createdAtText:new Date().toISOString(),
+    createdBy:(auth.currentUser||CURRENT_APP_USER)?.uid||'',
+    appVersion:APP_VERSION
+  };
+  try{
+    await setDoc(doc(db,'meta',PUSH_RECONNECT_PROMPT_DOC), payload, {merge:true});
+    window.__pushReconnectPrompt=payload;
+    toast('전체 알림 확인 팝업 요청을 저장했습니다 ✅','success');
+    try{ await renderPushStatsDashboard(true); }catch(e){}
+  }catch(e){
+    console.warn('publishPushReconnectPrompt failed', e);
+    toast('팝업 요청 저장 실패: '+(e?.message||e),'error');
+  }
+}
+async function recordPushReconnectResponse(action='later', detail={}){
+  try{
+    const p=window.__pushReconnectPrompt||{};
+    const id=String(p.id||p.promptId||'');
+    if(!id) return;
+    const u=auth.currentUser || CURRENT_APP_USER;
+    const uid=(u && !u.isAnonymous && u.uid) ? String(u.uid) : ('guest_'+safeNotificationDocPart(localStorage.getItem('anonymousClientId')||navigator.userAgent||'guest'));
+    const payload={
+      promptId:id,
+      uid,
+      action:String(action||'later'),
+      name:(CURRENT_APP_PROFILE||{}).name || u?.displayName || '',
+      phone:(CURRENT_APP_PROFILE||{}).phone || '',
+      club:(CURRENT_APP_PROFILE||{}).club || '',
+      tid:String(p.tid||''),
+      tournamentName:String(p.tournamentName||''),
+      userAgent:navigator.userAgent||'',
+      updatedAt:serverTimestamp(),
+      updatedAtText:new Date().toISOString(),
+      detail:detail||{}
+    };
+    await setDoc(doc(db,PUSH_RECONNECT_RESPONSES,safeNotificationDocPart(id+'_'+uid)), payload, {merge:true});
+  }catch(e){ console.warn('recordPushReconnectResponse skipped', e?.message||e); }
+}
+function ensurePushReconnectPromptModal(){
+  let m=document.getElementById('mPushReconnectPrompt');
+  if(m) return m;
+  m=document.createElement('div');
+  m.className='modal-overlay';
+  m.id='mPushReconnectPrompt';
+  m.innerHTML=`<div class="modal-box" style="max-width:560px">
+    <div class="modal-header" style="background:#1d4ed8"><h3>🔔 대회 알림 확인</h3><button class="modal-close" onclick="closePushReconnectPrompt('x')">✕</button></div>
+    <div class="modal-body">
+      <div id="pushReconnectPromptTitle" style="font-size:1rem;font-weight:1000;color:#0f1e3a;margin-bottom:8px;line-height:1.4">대회 알림 수신 확인</div>
+      <div id="pushReconnectPromptMsg" style="padding:12px 14px;border:1.5px solid #93c5fd;background:#eff6ff;border-radius:14px;font-size:.84rem;line-height:1.75;color:#1e40af;font-weight:800;word-break:keep-all"></div>
+      <div id="pushReconnectPromptState" style="margin-top:10px;padding:9px 11px;border-radius:12px;background:#f8fafc;border:1px solid #e2e8f0;font-size:.76rem;color:#475569;line-height:1.6">알림 권한과 앱 로그인 상태를 확인합니다.</div>
+      <div style="margin-top:12px;font-size:.74rem;color:#64748b;line-height:1.65">※ 휴대폰 알림 권한이 차단된 경우 앱에서 강제로 켤 수 없습니다. 이때는 문자 안내 대상으로 저장됩니다.</div>
+    </div>
+    <div class="modal-footer" style="display:grid;grid-template-columns:1.25fr 1fr .75fr;gap:8px">
+      <button class="btn btn-primary" onclick="handlePushReconnectConfirm()" style="background:#2563eb;color:#fff">🔔 알림 다시 연결</button>
+      <button class="btn btn-outline" onclick="handlePushReconnectSmsFallback()" style="background:#fff7ed;color:#9a3412;border-color:#fdba74">📩 문자로 받을게요</button>
+      <button class="btn btn-gray" onclick="closePushReconnectPrompt('later')">나중에</button>
+    </div>
+  </div>`;
+  document.body.appendChild(m);
+  return m;
+}
+function renderPushReconnectPromptModal(p={}){
+  ensurePushReconnectPromptModal();
+  const title=ge('pushReconnectPromptTitle');
+  const msg=ge('pushReconnectPromptMsg');
+  const state=ge('pushReconnectPromptState');
+  if(title) title.textContent=String(p.title||'대회 알림 수신 확인');
+  if(msg) msg.textContent=String(p.message||'경기 알림을 받으려면 알림 연결 확인이 필요합니다.');
+  if(state){
+    const u=auth.currentUser || CURRENT_APP_USER;
+    const perm=('Notification' in window)?Notification.permission:'unsupported';
+    const parts=[];
+    parts.push(u && !u.isAnonymous ? '로그인 확인됨' : '로그인 필요');
+    parts.push(perm==='granted'?'휴대폰 알림 허용됨':(perm==='denied'?'휴대폰 알림 차단됨':'알림 권한 확인 필요'));
+    state.textContent=parts.join(' · ');
+  }
+  try{ om('mPushReconnectPrompt'); }catch(e){ ge('mPushReconnectPrompt')?.classList.add('open'); }
+}
+function isPushReconnectPromptSnoozed(id=''){
+  try{
+    const until=Number(localStorage.getItem(getPushReconnectLocalKey(id,'snooze'))||0);
+    return until && Date.now()<until;
+  }catch(e){ return false; }
+}
+async function closePushReconnectPrompt(mode='later'){
+  const id=getCurrentPushReconnectPromptId();
+  try{ cm('mPushReconnectPrompt'); }catch(e){ ge('mPushReconnectPrompt')?.classList.remove('open'); }
+  if(mode==='later' || mode==='x'){
+    try{ localStorage.setItem(getPushReconnectLocalKey(id,'snooze'), String(Date.now()+24*60*60*1000)); }catch(e){}
+    await recordPushReconnectResponse('later', {mode});
+  }
+}
+async function handlePushReconnectConfirm(){
+  const id=getCurrentPushReconnectPromptId();
+  const u=auth.currentUser || CURRENT_APP_USER;
+  if(!u || u.isAnonymous){
+    toast('먼저 회원가입/로그인 후 알림을 다시 연결해 주세요.','info');
+    await recordPushReconnectResponse('login_needed',{});
+    try{ cm('mPushReconnectPrompt'); toggleAdminSignup(); }catch(e){}
+    return;
+  }
+  const p=CURRENT_APP_PROFILE||{};
+  if(!isRequiredProfileComplete(p)){
+    toast('이름·전화번호·클럽 정보를 먼저 확인해 주세요.','info');
+    await recordPushReconnectResponse('profile_needed',{});
+    try{ cm('mPushReconnectPrompt'); showRequiredProfileSetupPrompt('global_push_reconnect'); }catch(e){}
+    return;
+  }
+  if(!('Notification' in window) || Notification.permission==='denied'){
+    await markPushSmsFallback('global_prompt_blocked','global reconnect prompt: notification blocked');
+    try{ localStorage.setItem(getPushReconnectLocalKey(id,'ack'),'sms_fallback'); }catch(e){}
+    await recordPushReconnectResponse('sms_fallback',{reason:'blocked'});
+    toast('알림이 차단되어 문자 안내 대상으로 저장했습니다.','info');
+    try{ cm('mPushReconnectPrompt'); }catch(e){}
+    return;
+  }
+  const ok=await requestMatchPushPermission();
+  if(ok){
+    try{ localStorage.setItem(getPushReconnectLocalKey(id,'ack'),'enabled'); localStorage.removeItem(getPushReconnectLocalKey(id,'snooze')); }catch(e){}
+    await recordPushReconnectResponse('enabled',{});
+    toast('알림 연결이 확인되었습니다 ✅','success');
+    try{ cm('mPushReconnectPrompt'); }catch(e){}
+  }else{
+    await recordPushReconnectResponse('failed',{});
+    toast('알림 연결이 되지 않았습니다. 문자 대체를 선택해도 됩니다.','info');
+  }
+}
+async function handlePushReconnectSmsFallback(){
+  const id=getCurrentPushReconnectPromptId();
+  await markPushSmsFallback('global_prompt_sms','user selected SMS fallback from global prompt');
+  try{ localStorage.setItem(getPushReconnectLocalKey(id,'ack'),'sms_fallback'); localStorage.removeItem(getPushReconnectLocalKey(id,'snooze')); }catch(e){}
+  await recordPushReconnectResponse('sms_fallback',{reason:'user_selected'});
+  toast('문자 안내 대상으로 저장했습니다 ✅','success');
+  try{ cm('mPushReconnectPrompt'); }catch(e){}
+}
+async function checkPushReconnectPrompt(force=false){
+  try{
+    if(location.protocol==='file:') return;
+    const snap=await getDoc(doc(db,'meta',PUSH_RECONNECT_PROMPT_DOC));
+    if(!snap.exists()) return;
+    const p=snap.data()||{};
+    if(p.enabled===false) return;
+    const id=String(p.id||p.promptId||'');
+    if(!id) return;
+    window.__pushReconnectPrompt=p;
+    const ack=localStorage.getItem(getPushReconnectLocalKey(id,'ack'))||'';
+    if(!force && ack) return;
+    if(!force && isPushReconnectPromptSnoozed(id)) return;
+    renderPushReconnectPromptModal(p);
+  }catch(e){ console.warn('checkPushReconnectPrompt skipped', e?.message||e); }
+}
+window.publishPushReconnectPrompt=publishPushReconnectPrompt;
+window.ensurePushReconnectPromptModal=ensurePushReconnectPromptModal;
+window.checkPushReconnectPrompt=checkPushReconnectPrompt;
+window.handlePushReconnectConfirm=handlePushReconnectConfirm;
+window.handlePushReconnectSmsFallback=handlePushReconnectSmsFallback;
+window.closePushReconnectPrompt=closePushReconnectPrompt;
+try{
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>checkPushReconnectPrompt(false),2600));
+  window.addEventListener('focus',()=>setTimeout(()=>checkPushReconnectPrompt(false),2200));
+  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') setTimeout(()=>checkPushReconnectPrompt(false),2200); });
+}catch(e){}
+
+
+
+// ── v378: 알림 상태판 버튼 강제 표시 보강 ─────────────────────────────
+function ensureGlobalPushPromptButtonVisible(){
+  try{
+    // 1) 알림 상태판 툴바 안에 버튼이 없으면 즉시 삽입
+    const toolbar=document.getElementById('pushStatsToolbar');
+    if(toolbar){
+      const actions=[...toolbar.querySelectorAll('div')].find(d=>d.querySelector('button')) || toolbar;
+      const has=[...toolbar.querySelectorAll('button')].some(b=>/전체\s*알림\s*확인|알림\s*확인\s*팝업|재연결/.test(b.textContent||''));
+      if(!has){
+        const btn=document.createElement('button');
+        btn.type='button';
+        btn.className='btn btn-primary';
+        btn.textContent='🔔 전체 알림 확인 팝업';
+        btn.style.cssText='font-size:.78rem;padding:6px 10px;background:#7c3aed;color:#fff;border-color:#7c3aed;box-shadow:0 4px 12px rgba(124,58,237,.22)';
+        btn.onclick=function(ev){ ev.preventDefault(); ev.stopPropagation(); publishPushReconnectPrompt(); };
+        const copyBtn=[...actions.querySelectorAll('button')].find(b=>/정보부족/.test(b.textContent||''));
+        if(copyBtn) actions.insertBefore(btn, copyBtn);
+        else actions.appendChild(btn);
+      }
+    }
+
+    // 2) 관리자 설정 상단은 기존 pushStatsAdminBox 한 곳만 사용합니다.
+    //    중복 카드(pushReconnectAdminShortcutBox)는 운영 혼선을 막기 위해 만들지 않습니다.
+    const dup=document.getElementById('pushReconnectAdminShortcutBox');
+    if(dup) dup.remove();
+  }catch(e){ console.warn('ensureGlobalPushPromptButtonVisible failed', e); }
+}
+
+try{
+  const _origOpenPushStatsDashboard = window.openPushStatsDashboard || openPushStatsDashboard;
+  window.openPushStatsDashboard = async function(){
+    const r = await _origOpenPushStatsDashboard.apply(this, arguments);
+    setTimeout(ensureGlobalPushPromptButtonVisible, 0);
+    setTimeout(ensureGlobalPushPromptButtonVisible, 250);
+    return r;
+  };
+}catch(e){}
+try{
+  const _origOpenAdminSettings = window.openAdminSettings;
+  if(typeof _origOpenAdminSettings==='function'){
+    window.openAdminSettings=function(){
+      const r=_origOpenAdminSettings.apply(this, arguments);
+      setTimeout(ensureGlobalPushPromptButtonVisible, 0);
+      setTimeout(ensureGlobalPushPromptButtonVisible, 300);
+      return r;
+    };
+  }
+  document.addEventListener('DOMContentLoaded',()=>{
+    setTimeout(ensureGlobalPushPromptButtonVisible, 1200);
+    const mo=new MutationObserver(()=>ensureGlobalPushPromptButtonVisible());
+    mo.observe(document.body,{childList:true,subtree:true});
+  });
+}catch(e){}
+window.ensureGlobalPushPromptButtonVisible=ensureGlobalPushPromptButtonVisible;
 
 // ── v331: 대회 당일 운영 점검판 ─────────────────────────────────────────────
 const ADMIN_NOTIFICATION_LOG_KEY='230match_admin_notification_send_logs_v1';
@@ -14197,6 +14460,11 @@ async function saveMyProfile(){
     CURRENT_APP_PROFILE={...(CURRENT_APP_PROFILE||{}), ...prevProfile, ...profilePayload};
     refreshGoogleLoginUI(user);
     try{ syncProfilePhoneToPersonalMatch(profilePayload, {render:true, force:true}); }catch(e){}
+    try{
+      if(('Notification' in window) && Notification.permission==='granted' && !isPushUserExplicitlyOptedOut()){
+        setTimeout(()=>refreshCurrentFcmToken('profile_saved_auto').catch(()=>{}),350);
+      }
+    }catch(_e){}
     sl(false);
     cm('mMyProfile');
     toast('내 정보 저장 완료 ✅ · 내 경기 보기 번호도 자동 적용됐습니다','success');
