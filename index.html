@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-05-23-v374-detail-notify-compact-records";
+  const APP_VERSION = "2026-05-23-v371-notification-inbox-save";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -7995,6 +7995,7 @@ function saveMatchNotificationHistory(item={}){
       court:String(item.court||item.data?.court||''),
       createdAt:item.createdAt||now.toISOString(),
       read:item.read===true?true:false,
+      firestoreId:String(item.firestoreId||item.id||id),
       data:item.data||{}
     };
     const list=getMatchNotificationHistory().filter(x=>String(x.id)!==id);
@@ -8004,14 +8005,129 @@ function saveMatchNotificationHistory(item={}){
     return id;
   }catch(e){ console.warn('save notification history failed', e); return ''; }
 }
+
+function safeNotificationDocPart(v=''){
+  return String(v||'').replace(/[^A-Za-z0-9_-]/g,'_').slice(0,140) || 'x';
+}
+function getCurrentNotificationUid(){
+  try{
+    const u=auth?.currentUser || CURRENT_APP_USER;
+    if(u && !u.isAnonymous && u.uid) return String(u.uid);
+  }catch(e){}
+  return '';
+}
+function makeClientNotificationId(data={}){
+  const base=[data.type||'push', data.target||'', data.tid||'', data.division||data.div||'', data.key||'', data.matchId||data.mid||'', data.court||'', data.queuePos||'']
+    .map(v=>String(v||'')).join('_').replace(/[^A-Za-z0-9_-]/g,'_').slice(0,170);
+  return (base && base!=='push______') ? (base+'_'+Date.now()) : ('ntf_'+Date.now()+'_'+Math.random().toString(36).slice(2,8));
+}
+function notificationInboxDocId(uid='', notificationId=''){
+  return 'inbox_'+safeNotificationDocPart(uid)+'_'+safeNotificationDocPart(notificationId);
+}
+async function saveNotificationInboxDocsForTokenDocs(tokenDocs=[], title='230MATCH 알림', body='', data={}, sendResult={}){
+  try{
+    const notificationId=String(data.notificationId||data.id||makeClientNotificationId(data));
+    const nowText=new Date().toISOString();
+    const byUid=new Map();
+    (tokenDocs||[]).forEach(x=>{
+      const uid=String(x?.uid||'').trim();
+      if(!uid) return;
+      if(!byUid.has(uid)) byUid.set(uid,{uid, tokenDocIds:[], names:new Set(), phones:new Set(), clubs:new Set()});
+      const row=byUid.get(uid);
+      if(x?.id) row.tokenDocIds.push(String(x.id));
+      if(x?.name) row.names.add(String(x.name));
+      if(x?.phone) row.phones.add(String(x.phone));
+      if(x?.club) row.clubs.add(String(x.club));
+    });
+    const rows=[...byUid.values()];
+    if(!rows.length) return 0;
+    let batch=writeBatch(db), n=0, committed=0;
+    for(const r of rows){
+      const fid=notificationInboxDocId(r.uid, notificationId);
+      batch.set(doc(db,'notificationInbox',fid),{
+        uid:r.uid,
+        notificationId,
+        title:String(title||'230MATCH 알림'),
+        body:String(body||''),
+        type:String(data.type||''),
+        target:String(data.target||''),
+        tid:String(data.tid||''),
+        division:String(data.division||data.div||''),
+        key:String(data.key||''),
+        matchId:String(data.matchId||data.mid||''),
+        court:String(data.court||''),
+        queuePos:Number(data.queuePos||0)||0,
+        read:false,
+        app:'230MATCH',
+        createdAt:serverTimestamp(),
+        createdAtText:nowText,
+        tokenDocIds:[...new Set(r.tokenDocIds)].slice(0,20),
+        targetNames:[...r.names].slice(0,6),
+        targetPhones:[...r.phones].slice(0,6),
+        targetClubs:[...r.clubs].slice(0,6),
+        sendOk:Number(sendResult.ok||0),
+        sendFail:Number(sendResult.fail||0),
+        sendStale:Number(sendResult.stale||0),
+        total:Number(sendResult.total||rows.length),
+        data:Object.fromEntries(Object.entries(data||{}).map(([k,v])=>[k, typeof v==='object'?JSON.stringify(v).slice(0,500):String(v||'').slice(0,500)]))
+      },{merge:true});
+      n++; committed++;
+      if(n>=430){ await batch.commit(); batch=writeBatch(db); n=0; }
+    }
+    if(n) await batch.commit();
+    return committed;
+  }catch(e){ console.warn('saveNotificationInboxDocsForTokenDocs failed', e?.message||e); return 0; }
+}
+function normalizeFirestoreNotificationItem(docSnap){
+  const x={id:docSnap.id, ...(docSnap.data?docSnap.data():{})};
+  return {
+    id:String(x.notificationId||x.id||docSnap.id),
+    firestoreId:String(docSnap.id),
+    title:String(x.title||'230MATCH 알림'),
+    body:String(x.body||''),
+    type:String(x.type||''),
+    matchId:String(x.matchId||x.mid||''),
+    court:String(x.court||''),
+    createdAt:String(x.createdAtText||x.createdAt?.toDate?.()?.toISOString?.()||new Date().toISOString()),
+    read:x.read===true,
+    data:x.data||{}
+  };
+}
+async function syncFirestoreNotificationInboxToLocal(){
+  try{
+    const uid=getCurrentNotificationUid();
+    if(!uid) return 0;
+    const snap=await getDocs(query(collection(db,'notificationInbox'), where('uid','==',uid), limit(120)));
+    const remote=[];
+    snap.forEach(d=>remote.push(normalizeFirestoreNotificationItem(d)));
+    if(!remote.length){ updateNotificationInboxBadges(); return 0; }
+    remote.sort((a,b)=>(Date.parse(b.createdAt||0)||0)-(Date.parse(a.createdAt||0)||0));
+    const local=getMatchNotificationHistory();
+    const map=new Map();
+    [...remote,...local].forEach(x=>{
+      const id=String(x.id||x.firestoreId||'');
+      if(!id) return;
+      const prev=map.get(id)||{};
+      map.set(id,{...x, read:(prev.read===true || x.read===true), firestoreId:x.firestoreId||prev.firestoreId||''});
+    });
+    const merged=[...map.values()].sort((a,b)=>(Date.parse(b.createdAt||0)||0)-(Date.parse(a.createdAt||0)||0)).slice(0,120);
+    localStorage.setItem(getMatchNotificationHistoryKey(), JSON.stringify(merged));
+    updateNotificationInboxBadges();
+    return remote.length;
+  }catch(e){ console.warn('syncFirestoreNotificationInboxToLocal failed', e?.message||e); updateNotificationInboxBadges(); return 0; }
+}
+window.saveNotificationInboxDocsForTokenDocs=saveNotificationInboxDocsForTokenDocs;
+window.syncFirestoreNotificationInboxToLocal=syncFirestoreNotificationInboxToLocal;
+
 function markMatchNotificationRead(id){
   try{
     if(!id) return;
     const list=getMatchNotificationHistory();
-    let changed=false;
-    list.forEach(x=>{ if(String(x.id)===String(id) && x.read!==true){ x.read=true; changed=true; }});
+    let changed=false, firestoreId='';
+    list.forEach(x=>{ if(String(x.id)===String(id) && x.read!==true){ x.read=true; changed=true; firestoreId=x.firestoreId||x.id||''; }});
     if(changed) localStorage.setItem(getMatchNotificationHistoryKey(), JSON.stringify(list));
     updateNotificationInboxBadges();
+    if(firestoreId){ setDoc(doc(db,'notificationInbox',firestoreId),{read:true,readAt:serverTimestamp(),readAtText:new Date().toISOString()},{merge:true}).catch(()=>{}); }
   }catch(e){}
 }
 function updateNotificationInboxBadges(){
@@ -8066,23 +8182,43 @@ function renderNotificationInbox(){
     </div>`;
   }).join('');
 }
-function openNotificationInbox(){
-  renderNotificationInbox();
+async function openNotificationInbox(){
+  ensureNotificationInboxModal();
+  const body=ge('notificationInboxBody');
+  if(body) body.innerHTML='<div class="empty-state" style="padding:30px 12px"><div class="empty-icon">🔔</div><p>지난 알림을 불러오는 중...</p></div>';
   try{ om('mNotificationInbox'); }catch(e){ ensureNotificationInboxModal().classList.add('open'); }
+  await syncFirestoreNotificationInboxToLocal();
+  renderNotificationInbox();
 }
-function markAllMatchNotificationsRead(){
+async function markAllMatchNotificationsRead(){
   try{
     const list=getMatchNotificationHistory().map(x=>({...x, read:true}));
     localStorage.setItem(getMatchNotificationHistoryKey(), JSON.stringify(list));
     updateNotificationInboxBadges();
     renderNotificationInbox();
+    const uid=getCurrentNotificationUid();
+    if(uid){
+      const snap=await getDocs(query(collection(db,'notificationInbox'), where('uid','==',uid), limit(120)));
+      let batch=writeBatch(db), n=0;
+      snap.forEach(d=>{ batch.set(d.ref,{read:true,readAt:serverTimestamp(),readAtText:new Date().toISOString()},{merge:true}); n++; });
+      if(n) await batch.commit();
+    }
   }catch(e){}
 }
-function clearMatchNotificationHistory(){
+async function clearMatchNotificationHistory(){
   if(!confirm('지난 알림 기록을 삭제할까요?')) return;
   try{ localStorage.removeItem(getMatchNotificationHistoryKey()); }catch(e){}
   updateNotificationInboxBadges();
   renderNotificationInbox();
+  try{
+    const uid=getCurrentNotificationUid();
+    if(uid){
+      const snap=await getDocs(query(collection(db,'notificationInbox'), where('uid','==',uid), limit(120)));
+      let batch=writeBatch(db), n=0;
+      snap.forEach(d=>{ batch.delete(d.ref); n++; });
+      if(n) await batch.commit();
+    }
+  }catch(e){ console.warn('remote notification clear skipped', e?.message||e); }
 }
 function showReceivedPushConfirmAlert(title='230MATCH 알림', body='', data={}){
   try{
@@ -8122,6 +8258,7 @@ window.clearMatchNotificationHistory=clearMatchNotificationHistory;
 window.showReceivedPushConfirmAlert=showReceivedPushConfirmAlert;
 window.closeReceivedPushConfirmAlert=closeReceivedPushConfirmAlert;
 setTimeout(updateNotificationInboxBadges,1200);
+setTimeout(()=>{try{ syncFirestoreNotificationInboxToLocal(); }catch(e){}},3200);
 
 
 function closeRequiredProfileModal(){
@@ -8757,11 +8894,15 @@ async function sendPushToTokenDocs(tokenDocs, title, body, data={}){
     const token=String(x?.token||'').trim();
     if(token && !seen.has(token)){ seen.add(token); uniq.push(x); }
   });
+  const notificationId=String(data.notificationId||data.id||makeClientNotificationId(data));
+  const sendData={...(data||{}), notificationId, requireInteraction:'true'};
   let ok=0, fail=0, stale=0;
+  const successDocs=[];
   for(const x of uniq){
     try{
-      await sendFcmPushToken(x.token,title,body,{...(data||{}),requireInteraction:'true'});
+      await sendFcmPushToken(x.token,title,body,sendData);
       ok++;
+      successDocs.push(x);
     }catch(e){
       if(e?.isUnregistered){
         stale++;
@@ -8773,7 +8914,10 @@ async function sendPushToTokenDocs(tokenDocs, title, body, data={}){
       }
     }
   }
-  const result={ok, fail, stale, total:uniq.length};
+  const result={ok, fail, stale, total:uniq.length, notificationId};
+  try{
+    if(successDocs.length) await saveNotificationInboxDocsForTokenDocs(successDocs,title,body,sendData,result);
+  }catch(_e){ console.warn('recipient inbox save skipped', _e?.message||_e); }
   try{
     recordAdminNotificationSendLog({
       title, body,
@@ -16854,7 +16998,12 @@ async function enqueueMatchPushNotification(kind,key,m,meta={}){
       createdAtText:new Date().toISOString()
     };
     const docId=makePushNotificationDocId(payload);
+    payload.notificationId=docId;
     await setDoc(doc(db,'pushNotifications',docId), payload, {merge:true});
+    try{
+      const inboxDocs=await getEnabledPushTokenDocs(x=>pushTokenMatchesTargetsForKey(key,x,{clubKeys:targets.clubs, phoneDigits:targets.phones, uids:targets.uids}));
+      if(inboxDocs.length) await saveNotificationInboxDocsForTokenDocs(inboxDocs,title,body,{...payload,type:'match_event',target:'match_event',notificationId:docId},{ok:inboxDocs.length,total:inboxDocs.length});
+    }catch(_inboxErr){ console.warn('match push inbox save skipped', _inboxErr?.message||_inboxErr); }
     console.log('push notification queued', docId, payload);
     try{
       const triggerBody=JSON.stringify({ source:'client', docId, limit:20, t:Date.now() });
@@ -18171,7 +18320,7 @@ function openIndividualEntryInfo(key, idx){
     if(body){
       const div=(typeof _k2td==='function'?(_k2td(key).div||''):'');
       const canManage=!!(AD || TM || (typeof isRegistrationOwner==='function' && isRegistrationOwner(team)));
-      const adminActions=canManage?`<div class="v346-detail-admin-actions"><button type="button" class="btn btn-primary" style="background:#2563eb;color:#fff" onclick="openParticipantTeamNotifySms('${esc(key)}',${Number(idx)})">🔔 알림/문자</button><button type="button" class="btn btn-outline" onclick="window.__editEntryFromDetail && window.__editEntryFromDetail('${esc(key)}',${Number(idx)})">✏️ 참가팀 수정</button><button type="button" class="btn btn-danger" onclick="window.__deleteEntryFromDetail && window.__deleteEntryFromDetail('${esc(key)}',${Number(idx)})">🗑 참가팀 삭제</button></div>`:'';
+      const adminActions=canManage?`<div class="v346-detail-admin-actions"><button type="button" class="btn btn-outline" onclick="window.__editEntryFromDetail && window.__editEntryFromDetail('${esc(key)}',${Number(idx)})">✏️ 참가팀 수정</button><button type="button" class="btn btn-danger" onclick="window.__deleteEntryFromDetail && window.__deleteEntryFromDetail('${esc(key)}',${Number(idx)})">🗑 참가팀 삭제</button></div>`:'';
       body.innerHTML=`<div class="v334-info-title">${v334IndividualPairTitle(team)}</div><div class="v334-info-meta">${div?`부서: ${esc(div)}`:''}</div><div class="v334-info-list">${v334GetIndividualInfoRows(team)}</div>${adminActions}`;
     }
     om('mIndividualEntryInfo');
@@ -18230,7 +18379,7 @@ function buildRegisterRosterGrid(tid,div,teams,key){
       ${detailBtn}
       ${buildPaymentActionHTML(key,realIdx)}
       <button class="btn rr-btn-edit" style="background:#f8fafc;color:#0f1e3a;border:1px solid #cbd5e1" onclick="openETeam('${esc(key)}',${realIdx})">✏️ 수정</button>
-      <button class="btn rr-btn-edit" style="background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd" onclick="openParticipantTeamNotifySms('${esc(key)}',${realIdx})">🔔 알림/문자</button>
+      <button class="btn rr-btn-edit" style="background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd" onclick="openManualTeamPush('${esc(key)}',${realIdx})">🔔 알림</button>
       <button class="btn btn-danger rr-btn-del" onclick="delTeam('${esc(key)}',${realIdx})">🗑 삭제</button>
     </div>`:(isIndividual?`<div class="rr-admin-btns v334-individual-actions">${detailBtn}</div>`:'');
 
@@ -34216,194 +34365,6 @@ async function sendPaymentConfirmedNotice(key, idx){
   }catch(e){ console.warn('payment confirm notice skipped', e); }
 }
 
-
-
-/* === v374: 참가자 상세 알림/문자 + 참가자 기록 compact list === */
-function v374Esc(v){return String(v==null?'':v).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
-function v374Js(v){return String(v==null?'':v).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,' ');}
-function v374Digits(v){return String(v||'').replace(/[^0-9]/g,'');}
-function v374FormatPhone(v){
-  const d=v374Digits(v); if(!d) return '';
-  if(d.length===11) return d.replace(/(\d{3})(\d{4})(\d{4})/,'$1-$2-$3');
-  if(d.length===10) return d.replace(/(\d{3})(\d{3})(\d{4})/,'$1-$2-$3');
-  return String(v||'').trim();
-}
-function v374IsManagerLike(){
-  try{return !!(AD||TM||OP||document.body.classList.contains('admin-mode')||document.body.classList.contains('tm-mode')||document.body.classList.contains('operator-mode'));}catch(e){return false;}
-}
-function v374ShortClub(v){
-  const s=String(v||'').trim(); if(!s) return '미상';
-  return s.length>4 ? s.slice(0,4)+'…' : s;
-}
-function v374GetTeamNotifyRecipients(team){
-  try{
-    if(!team) return [];
-    if(Array.isArray(team.individualPlayers) && team.individualPlayers.length){
-      return team.individualPlayers.slice(0,2).map((p,i)=>({
-        name: cleanName(String(p?.name||`참가자${i+1}`)),
-        phone: v374FormatPhone(p?.phone||''),
-        club: String(p?.clubsRaw||((Array.isArray(p?.clubs)&&p.clubs[0])||team?.club||'')).trim(),
-        checked:true
-      })).filter(r=>r.name);
-    }
-    const phone=v374FormatPhone(team?.phone || (G.meta?.clubContacts||{})[String(team?.club||'').trim()] || '');
-    const club=String(team?.club||'').trim();
-    const names=(Array.isArray(team?.players)?team.players:[]).filter(Boolean).map(n=>cleanName(String(n))).filter(Boolean);
-    if(names.length) return names.slice(0,14).map(n=>({name:n, phone, club, checked:true}));
-    const label=String(team?.entryLabel||team?.pairLabel||club||'참가자').trim();
-    return [{name:label, phone, club, checked:true}];
-  }catch(e){return [];}
-}
-function v374UniqueRecipients(list=[]){
-  const seen=new Set();
-  return (list||[]).map(r=>({name:cleanName(String(r?.name||'대상자')),phone:v374FormatPhone(r?.phone||''),club:String(r?.club||'').trim(),checked:r?.checked!==false})).filter(r=>{
-    const d=v374Digits(r.phone); const key=d?('p:'+d):('n:'+normName(r.name)+'|c:'+normalizeClub(r.club));
-    if(seen.has(key)) return false; seen.add(key); return !!(r.name||r.phone||r.club);
-  });
-}
-function v374EnsureNotifyModal(){
-  let m=document.getElementById('mParticipantNotifySms');
-  if(m) return m;
-  m=document.createElement('div');
-  m.className='modal-overlay';
-  m.id='mParticipantNotifySms';
-  m.innerHTML=`<div class="modal-box" style="max-width:560px">
-    <div class="modal-header" style="background:#2563eb"><h3>🔔 알림 / 문자 보내기</h3><button class="modal-close" onclick="cm('mParticipantNotifySms')">✕</button></div>
-    <div class="modal-body" id="mParticipantNotifySmsBody"></div>
-    <div class="modal-footer" id="mParticipantNotifySmsFooter"></div>
-  </div>`;
-  document.body.appendChild(m);
-  return m;
-}
-function v374SelectedNotifyRecipients(){
-  try{
-    const rows=[...document.querySelectorAll('#mParticipantNotifySmsBody .v374-rec-check')];
-    const src=window.__v374NotifyRecipients||[];
-    return rows.map((el,i)=>el.checked?src[i]:null).filter(Boolean);
-  }catch(e){return [];}
-}
-function v374SyncAllCheckbox(){
-  try{
-    const all=document.getElementById('v374NotifyAll');
-    const boxes=[...document.querySelectorAll('#mParticipantNotifySmsBody .v374-rec-check')];
-    if(!all||!boxes.length) return;
-    all.checked=boxes.every(b=>b.checked);
-  }catch(e){}
-}
-function v374RenderNotifyModal(opts={}){
-  v374EnsureNotifyModal();
-  const recs=v374UniqueRecipients(opts.recipients||[]);
-  window.__v374NotifyRecipients=recs;
-  window.__v374NotifyContext=opts.context||{};
-  const body=ge('mParticipantNotifySmsBody');
-  const footer=ge('mParticipantNotifySmsFooter');
-  const defaultTitle=opts.title||'230MATCH 안내';
-  const defaultBody=opts.body||'230MATCH 안내입니다.';
-  if(body){
-    body.innerHTML=`<div class="v374-notify-wrap">
-      <div class="v374-notify-target">${v374Esc(opts.targetText||'대상자')}</div>
-      <div class="v374-notify-guide">팀 전체를 선택하거나, 필요한 참가자만 체크해서 알림/문자를 보낼 수 있습니다.</div>
-      <label class="v374-all-row"><input type="checkbox" id="v374NotifyAll" checked onchange="document.querySelectorAll('#mParticipantNotifySmsBody .v374-rec-check').forEach(b=>b.checked=this.checked)"> <b>팀 전체 선택</b></label>
-      <div class="v374-rec-list">${recs.map((r,i)=>`<label class="v374-rec-row"><input type="checkbox" class="v374-rec-check" ${r.checked?'checked':''} onchange="v374SyncAllCheckbox()"><span class="v374-rec-main"><b>${v374Esc(r.name)}</b><small>${v374Esc(v374ShortClub(r.club))}${r.phone?' · '+v374Esc(r.phone):' · 전화번호 없음'}</small></span>${r.phone?`<button type="button" class="btn btn-outline" onclick="event.preventDefault();v374SendOneSms(${i})" style="min-height:30px;font-size:.72rem;padding:4px 8px">문자</button>`:''}</label>`).join('')}</div>
-      <div class="form-group" style="margin-top:12px"><label class="form-label">알림 제목</label><input class="form-input" id="v374NotifyTitle" value="${v374Esc(defaultTitle)}"></div>
-      <div class="form-group"><label class="form-label">알림/문자 내용</label><textarea class="form-textarea" id="v374NotifyBody" rows="4">${v374Esc(defaultBody)}</textarea></div>
-    </div>`;
-  }
-  if(footer){
-    footer.innerHTML=`<button class="btn btn-primary" onclick="v374SendSelectedPush()" style="background:#2563eb;color:#fff">🔔 선택 알림</button><button class="btn btn-outline" onclick="v374SendSelectedSms()">📨 선택 문자</button><button class="btn btn-gray" onclick="cm('mParticipantNotifySms')">닫기</button>`;
-  }
-  om('mParticipantNotifySms');
-}
-function openParticipantTeamNotifySms(key,idx){
-  try{
-    if(!v374IsManagerLike()){toast('관리자/진행자만 사용할 수 있습니다','info');return;}
-    const team=(G.teams?.[key]||[])[Number(idx)];
-    if(!team){toast('참가 명단을 찾을 수 없습니다','error');return;}
-    const label=team.entryLabel||team.pairLabel||(Array.isArray(team.individualPlayers)?getIndividualPlayers(team).map(p=>p.name).join(' / '):tdn(team,key,idx))||'참가자';
-    v374RenderNotifyModal({
-      targetText:`참가 명단: ${label}`,
-      recipients:v374GetTeamNotifyRecipients(team),
-      title:'참가자 안내',
-      body:`${label} 참가자 안내입니다.`,
-      context:{type:'team',key,idx:Number(idx)}
-    });
-  }catch(e){console.warn(e);toast('알림/문자 창 열기 실패','error');}
-}
-function openParticipantPersonNotifySms(name,club='',phone=''){
-  try{
-    if(!v374IsManagerLike()){toast('관리자/진행자만 사용할 수 있습니다','info');return;}
-    const rec={name:cleanName(name||'대상자'), club:String(club||'').trim(), phone:v374FormatPhone(phone||'')};
-    v374RenderNotifyModal({targetText:`참가자 기록: ${rec.name}${rec.club?' / '+rec.club:''}`, recipients:[rec], title:'참가자 안내', body:`${rec.name}님, 230MATCH 안내입니다.`, context:{type:'person'}});
-  }catch(e){console.warn(e);toast('알림/문자 창 열기 실패','error');}
-}
-async function v374SendSelectedPush(){
-  try{
-    if(!v374IsManagerLike()){toast('운영 권한 필요','error');return;}
-    const recs=v374SelectedNotifyRecipients();
-    if(!recs.length){toast('대상자를 선택해 주세요','info');return;}
-    const title=(ge('v374NotifyTitle')?.value||'230MATCH 안내').trim();
-    const body=(ge('v374NotifyBody')?.value||'').trim();
-    if(!body){toast('알림 내용을 입력해 주세요','error');return;}
-    sl(true);
-    const docs=await getEnabledPushTokenDocs(x=>recs.some(r=>pushTokenMatchesPersonTarget(x,{name:r.name, phone:r.phone, phoneDigits:v374Digits(r.phone), club:r.club})));
-    if(!docs.length){sl(false);toast('선택 대상 중 앱 알림 가능 기기가 없습니다. 문자로 보내세요.','info');return;}
-    const res=await sendPushToTokenDocs(docs,title,body,{type:'manual_participant',target:'selected_participants'});
-    sl(false);
-    toast(`알림 발송 완료: ${res.ok||0}명`,'success');
-  }catch(e){sl(false);console.warn(e);toast('알림 발송 실패: '+(e?.message||e),'error');}
-}
-function v374SmsUrl(phones,body){
-  const list=(phones||[]).map(v374Digits).filter(v=>v.length>=9);
-  if(!list.length) return '';
-  return 'sms:'+list.join(',')+'?body='+encodeURIComponent(body||'');
-}
-function v374SendSelectedSms(){
-  const recs=v374SelectedNotifyRecipients().filter(r=>v374Digits(r.phone).length>=9);
-  if(!recs.length){toast('문자 보낼 전화번호가 없습니다','info');return;}
-  const body=(ge('v374NotifyBody')?.value||'').trim()||'230MATCH 안내입니다.';
-  location.href=v374SmsUrl(recs.map(r=>r.phone),body);
-}
-function v374SendOneSms(i){
-  const r=(window.__v374NotifyRecipients||[])[Number(i)];
-  if(!r||!v374Digits(r.phone)){toast('전화번호가 없습니다','info');return;}
-  const body=(ge('v374NotifyBody')?.value||'').trim()||'230MATCH 안내입니다.';
-  location.href=v374SmsUrl([r.phone],body);
-}
-function v374ExtractPhoneFromText(txt){
-  const m=String(txt||'').match(/0\d{1,2}[-\s]?\d{3,4}[-\s]?\d{4}/);
-  return m?v374FormatPhone(m[0]):'';
-}
-function v374CompactRecordCards(){
-  try{
-    const container=ge('psResults'); if(!container || container.dataset.v374Compacting==='1') return;
-    const buttons=[...container.querySelectorAll('.v354-record-view-btn[data-pname]')];
-    if(!buttons.length) return;
-    const seen=new Set();
-    const rows=[];
-    buttons.forEach(btn=>{
-      const name=cleanName(btn.getAttribute('data-pname')||'');
-      const club=String(btn.getAttribute('data-pclub')||'').trim();
-      const card=btn.closest('[style*="border"]') || btn.closest('div') || btn.parentElement;
-      const phone=v374ExtractPhoneFromText(card?.innerText||'');
-      const key=normName(name)+'|'+normalizeClub(club)+'|'+v374Digits(phone);
-      if(!name||seen.has(key)) return; seen.add(key);
-      rows.push({name,club,phone});
-    });
-    rows.sort((a,b)=>a.name.localeCompare(b.name,'ko') || String(a.club||'').localeCompare(String(b.club||''),'ko'));
-    const isMgr=v374IsManagerLike();
-    container.dataset.v374Compacting='1';
-    container.innerHTML=`<div class="v374-record-summary">📋 전체 참가자 기록 <b>${rows.length}</b>명</div><div class="v374-record-grid">${rows.map(r=>`<div class="v374-record-card" onclick="showP('${v374Js(r.name)}','${v374Js(r.club)}')"><div class="v374-record-name">${v374Esc(r.name)}</div><div class="v374-record-club" title="${v374Esc(r.club||'')}">${v374Esc(v374ShortClub(r.club))}</div><div class="v374-record-actions" onclick="event.stopPropagation()"><button type="button" class="btn btn-outline" onclick="showP('${v374Js(r.name)}','${v374Js(r.club)}')">상세</button>${isMgr?`<button type="button" class="btn btn-outline" onclick="openParticipantPersonNotifySms('${v374Js(r.name)}','${v374Js(r.club)}','${v374Js(r.phone)}')">알림/문자</button>`:''}${isRecordDeleteAdminAllowed()?`<button type="button" class="btn btn-danger" onclick="deletePlayerRecordFromList('${v374Js(r.name)}','${v374Js(r.club)}')">삭제</button>`:''}</div></div>`).join('')}</div>`;
-    delete container.dataset.v374Compacting;
-  }catch(e){console.warn('v374 compact records failed',e); try{delete ge('psResults').dataset.v374Compacting;}catch(_e){}}
-}
-const __v374RenderAllP=renderAllP;
-renderAllP=function(){
-  const r=__v374RenderAllP.apply(this,arguments);
-  setTimeout(v374CompactRecordCards,0);
-  return r;
-};
-Object.assign(window,{openParticipantTeamNotifySms,openParticipantPersonNotifySms,v374SendSelectedPush,v374SendSelectedSms,v374SendOneSms,v374SyncAllCheckbox,v374CompactRecordCards});
-
 Object.assign(window,{ copyTournamentFeeAccount, toggleTeamPaymentPaid, sendPaymentConfirmedNotice, buildPaymentActionHTML, buildPaymentStatusHTML, openAdminBroadcastPushModal, openManualMatchPush, openManualTeamPush, sendManualPushFromModal, closeStickyAlert, goToStickyAlertMatch, toggleModalFullscreen, setModalFullscreenState, openQuickAddPlayer, quickAddPlayer, fillAdminPlayerClub, adminAddPlayer, openSupportModal, sendSupportSMS, saveAdminPhone, 
   showPage,toggleAdmin,doLogin,openAdminSettings,saveAdminPassword,goBracket,onGuideFilesSelected,removeGuideFile,openGuide,loadHistFromDB,uploadHistFromExcel,previewHistExcel,renderGuidePreview,onHistGuideFilesSelected,uploadHistGuideFiles,manageHistGuide,deleteHistGuideFile,removeHistGuidePending,
   createTournament,renderTL,chgTS,delT,openET,saveET,openTD,applyRec,saveDivS,
@@ -38261,32 +38222,6 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
     mo.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['class','style']});
   }catch(e){}
 })();
-</script>
-
-
-
-<!-- v371: 참가 명단/기록 이름카드에서 관리자·진행자 수동 알림/문자 발송 -->
-<style id="v374ParticipantNotifySmsStyle">
-  .v374-notify-wrap{display:flex;flex-direction:column;gap:10px;}
-  .v374-notify-target{padding:11px 13px;border:1.5px solid #bfdbfe;background:#eff6ff;border-radius:13px;color:#1d4ed8;font-size:.86rem;font-weight:1000;line-height:1.55;word-break:keep-all;}
-  .v374-notify-guide{padding:9px 11px;border:1px solid #e2e8f0;background:#f8fafc;border-radius:12px;color:#475569;font-size:.76rem;font-weight:800;line-height:1.6;}
-  .v374-all-row{display:flex;align-items:center;gap:8px;padding:9px 11px;border:1.5px solid #dbeafe;background:#f8fbff;border-radius:12px;font-size:.84rem;color:#0f1e3a;}
-  .v374-rec-list{display:flex;flex-direction:column;gap:7px;max-height:220px;overflow:auto;padding-right:2px;}
-  .v374-rec-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;align-items:center;padding:8px 10px;border:1px solid #e2e8f0;border-radius:12px;background:#fff;}
-  .v374-rec-main{min-width:0;display:flex;flex-direction:column;gap:2px;}
-  .v374-rec-main b{font-size:.84rem;color:#0f172a;line-height:1.25;}
-  .v374-rec-main small{font-size:.72rem;color:#64748b;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .v374-record-summary{font-size:.88rem;font-weight:1000;color:var(--primary-dark);margin:0 0 10px;}
-  .v374-record-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
-  .v374-record-card{border:1.5px solid #dbeafe;background:linear-gradient(180deg,#fff,#f8fbff);border-radius:13px;padding:10px;cursor:pointer;min-width:0;box-shadow:0 6px 14px rgba(15,30,58,.05);}
-  .v374-record-name{font-size:.95rem;font-weight:1000;color:#0f172a;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .v374-record-club{display:inline-flex;margin-top:4px;padding:2px 7px;border-radius:999px;background:#eef2ff;color:#1d4ed8;font-size:.72rem;font-weight:900;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .v374-record-actions{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px;}
-  .v374-record-actions .btn{min-height:28px!important;height:28px!important;padding:3px 8px!important;font-size:.66rem!important;border-radius:8px!important;font-weight:900!important;}
-  @media(max-width:420px){.v374-record-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.v374-record-card{padding:9px 8px}.v374-record-name{font-size:.9rem}.v374-record-actions .btn{font-size:.6rem!important;padding:3px 6px!important}.v374-rec-list{max-height:260px}}
-</style>
-<script id="v374ParticipantNotifySmsScript">
-// v374: 기능 본체는 module 스크립트 안에서 직접 등록합니다. 로딩 방해 방지를 위해 DOM 전체 감시는 사용하지 않습니다.
 </script>
 
 </body>
