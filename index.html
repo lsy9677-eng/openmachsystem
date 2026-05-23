@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-05-23-v378-push-popup-button-visible";
+  const APP_VERSION = "2026-05-23-v383-participant-club-sort-fast";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -4963,6 +4963,156 @@ body {
   .v347-payment-only-action .v338-paid-badge .pay-label{
     font-size:.64rem !important;
   }
+}
+</style>
+
+
+
+<style id="v381CompactParticipantRecordListStyle">
+/* v381: 참가자 기록 목록 압축 정렬 - 모바일/PC에서 더 많은 명단 표시 */
+#ptab-records-content > .card:first-child{
+  padding:14px 14px 12px !important;
+  margin-bottom:10px !important;
+}
+#ptab-records-content > .card:first-child > div:first-child{
+  padding:8px 10px !important;
+  margin-bottom:8px !important;
+  font-size:.74rem !important;
+  line-height:1.5 !important;
+}
+#ptab-records-content .form-input#psInput{
+  min-height:38px !important;
+  height:38px !important;
+  padding:7px 10px !important;
+  font-size:.88rem !important;
+  border-radius:10px !important;
+}
+#ptab-records-content button[onclick*="filterP"]{
+  min-height:38px !important;
+  height:38px !important;
+  padding:6px 12px !important;
+  border-radius:10px !important;
+  font-size:.82rem !important;
+}
+#pFInfo{
+  margin-bottom:7px !important;
+  font-size:.74rem !important;
+}
+.v374-record-summary{
+  display:flex !important;
+  align-items:center !important;
+  justify-content:space-between !important;
+  gap:8px !important;
+  margin:0 0 8px !important;
+  font-size:.82rem !important;
+}
+.v374-record-summary b{font-size:.9rem !important;color:#1d4ed8 !important;}
+.v374-record-grid{
+  display:grid !important;
+  grid-template-columns:repeat(auto-fill,minmax(150px,1fr)) !important;
+  gap:7px !important;
+  align-items:stretch !important;
+}
+.v374-record-card{
+  position:relative !important;
+  min-width:0 !important;
+  min-height:58px !important;
+  padding:8px 46px 8px 9px !important;
+  border-radius:11px !important;
+  border:1px solid #dbeafe !important;
+  background:linear-gradient(180deg,#ffffff,#f8fbff) !important;
+  box-shadow:none !important;
+}
+.v374-record-card:hover{
+  border-color:#93c5fd !important;
+  background:#f8fbff !important;
+}
+.v374-record-name{
+  font-size:.9rem !important;
+  font-weight:1000 !important;
+  line-height:1.2 !important;
+  margin-bottom:3px !important;
+  white-space:nowrap !important;
+  overflow:hidden !important;
+  text-overflow:ellipsis !important;
+}
+.v374-record-club{
+  display:inline-flex !important;
+  max-width:100% !important;
+  margin-top:0 !important;
+  padding:1px 6px !important;
+  border-radius:999px !important;
+  background:#eef2ff !important;
+  color:#1d4ed8 !important;
+  font-size:.66rem !important;
+  font-weight:900 !important;
+  line-height:1.25 !important;
+  white-space:nowrap !important;
+  overflow:hidden !important;
+  text-overflow:ellipsis !important;
+}
+.v374-record-actions{
+  position:absolute !important;
+  right:6px !important;
+  top:50% !important;
+  transform:translateY(-50%) !important;
+  display:flex !important;
+  flex-direction:column !important;
+  align-items:stretch !important;
+  gap:3px !important;
+  margin:0 !important;
+  width:36px !important;
+}
+.v374-record-actions .btn{
+  width:100% !important;
+  min-height:24px !important;
+  height:24px !important;
+  padding:2px 4px !important;
+  font-size:.58rem !important;
+  border-radius:7px !important;
+  font-weight:1000 !important;
+  line-height:1 !important;
+  white-space:nowrap !important;
+}
+.v374-record-actions .btn.btn-danger{font-size:.54rem !important;}
+.v374-record-card:has(.v374-record-actions .btn:nth-child(2)){
+  min-height:82px !important;
+  padding-right:74px !important;
+}
+.v374-record-card:has(.v374-record-actions .btn:nth-child(2)) .v374-record-actions{
+  width:64px !important;
+}
+.v374-record-card:has(.v374-record-actions .btn:nth-child(2)) .v374-record-actions .btn{
+  font-size:.54rem !important;
+}
+@media(min-width:1100px){
+  .v374-record-grid{grid-template-columns:repeat(4,minmax(0,1fr)) !important;}
+  .v374-record-card{min-height:54px !important;}
+}
+@media(min-width:1500px){
+  .v374-record-grid{grid-template-columns:repeat(5,minmax(0,1fr)) !important;}
+}
+@media(max-width:680px){
+  #ptab-records-content > .card:first-child{padding:12px 10px 10px !important;}
+  #ptab-records-content > .card:first-child > div:first-child{display:none !important;}
+  #ptab-records-content .form-input#psInput{min-height:36px !important;height:36px !important;font-size:.82rem !important;}
+  #ptab-records-content button[onclick*="filterP"]{min-height:36px !important;height:36px !important;padding:5px 10px !important;font-size:.78rem !important;}
+  .v374-record-grid{grid-template-columns:repeat(3,minmax(0,1fr)) !important;gap:6px !important;}
+  .v374-record-card{min-height:56px !important;padding:7px 40px 7px 8px !important;border-radius:10px !important;}
+  .v374-record-name{font-size:.84rem !important;}
+  .v374-record-club{font-size:.6rem !important;padding:1px 5px !important;}
+  .v374-record-actions{width:32px !important;right:5px !important;}
+  .v374-record-actions .btn{height:23px !important;min-height:23px !important;font-size:.54rem !important;padding:2px 3px !important;}
+}
+@media(max-width:430px){
+  .v374-record-grid{grid-template-columns:repeat(2,minmax(0,1fr)) !important;gap:7px !important;}
+  .v374-record-card{min-height:58px !important;padding-right:44px !important;}
+  .v374-record-name{font-size:.88rem !important;}
+  .v374-record-club{font-size:.62rem !important;}
+  .v374-record-actions{width:34px !important;}
+}
+@media(max-width:340px){
+  .v374-record-grid{grid-template-columns:1fr !important;}
 }
 </style>
 
@@ -38703,6 +38853,88 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
 </style>
 <script id="v374ParticipantNotifySmsScript">
 // v374: 기능 본체는 module 스크립트 안에서 직접 등록합니다. 로딩 방해 방지를 위해 DOM 전체 감시는 사용하지 않습니다.
+</script>
+
+
+<!-- v383: 참가자 기록 목록 클럽별 정리 토글 최적화 (3열 복구 + 빠른 전환) -->
+<style id="v383ParticipantClubSortFastStyle">
+  .v382-record-toolbar{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin:0 0 7px;padding:6px 8px;border:1px solid #dbeafe;background:linear-gradient(135deg,#f8fbff,#fff);border-radius:12px;}
+  .v382-record-toolbar-title{font-size:.74rem;font-weight:1000;color:#0f1e3a;display:flex;align-items:center;gap:5px;white-space:nowrap;}
+  .v382-record-toolbar-actions{display:flex;align-items:center;gap:5px;flex-wrap:nowrap;}
+  .v382-record-mode-btn{border:1.5px solid #cbd5e1;background:#fff;color:#334155;border-radius:999px;min-height:28px;padding:4px 9px;font-size:.7rem;font-weight:1000;cursor:pointer;line-height:1;}
+  .v382-record-mode-btn.active{background:#1d4ed8;color:#fff;border-color:#1d4ed8;box-shadow:0 4px 10px rgba(29,78,216,.15);}
+  .v382-club-section{margin:0 0 8px;}
+  .v382-club-head{position:sticky;top:0;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 8px;margin:0 0 5px;border:1px solid #bfdbfe;background:linear-gradient(135deg,#eff6ff,#ffffff);border-radius:10px;color:#1e3a8a;font-size:.74rem;font-weight:1000;}
+  .v382-club-count{display:inline-flex;align-items:center;justify-content:center;min-width:22px;padding:2px 7px;border-radius:999px;background:#1d4ed8;color:#fff;font-size:.66rem;font-weight:1000;}
+  .v382-record-grid.v382-compact{display:grid!important;grid-template-columns:repeat(auto-fill,minmax(145px,1fr))!important;gap:7px!important;align-items:stretch!important;}
+  @media(min-width:900px){.v382-record-grid.v382-compact{grid-template-columns:repeat(auto-fill,minmax(170px,1fr))!important;}}
+  @media(min-width:1280px){.v382-record-grid.v382-compact{grid-template-columns:repeat(5,minmax(0,1fr))!important;}}
+  @media(max-width:680px){.v382-record-toolbar{padding:6px 7px;margin-bottom:6px}.v382-record-toolbar-title{font-size:.68rem}.v382-record-mode-btn{min-height:26px;padding:4px 8px;font-size:.66rem}.v382-club-head{font-size:.7rem;padding:5px 8px}.v382-record-grid.v382-compact{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:6px!important}.v382-record-grid.v382-compact .v374-record-card{min-height:52px!important;padding:6px 34px 6px 7px!important}.v382-record-grid.v382-compact .v374-record-name{font-size:.78rem!important}.v382-record-grid.v382-compact .v374-record-club{font-size:.56rem!important;padding:1px 4px!important}.v382-record-grid.v382-compact .v374-record-actions{width:29px!important;right:4px!important}.v382-record-grid.v382-compact .v374-record-actions .btn{height:22px!important;min-height:22px!important;font-size:.5rem!important;padding:1px 2px!important;border-radius:7px!important}}
+  @media(max-width:360px){.v382-record-grid.v382-compact{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:6px!important}.v382-record-grid.v382-compact .v374-record-name{font-size:.84rem!important}.v382-record-grid.v382-compact .v374-record-club{font-size:.6rem!important}}
+</style>
+<script id="v383ParticipantClubSortFastScript">
+(function(){
+  const MODE_KEY='participant_record_view_mode_v382';
+  let timer=null;
+  let organizing=false;
+  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+  function clubText(card){try{const el=card.querySelector('.v374-record-club');const t=(el?.getAttribute('title')||el?.textContent||'').trim();return t&&t!=='미상'?t:'소속 미상';}catch(e){return '소속 미상';}}
+  function nameText(card){try{return (card.querySelector('.v374-record-name')?.textContent||'').trim();}catch(e){return '';}}
+  function getMode(){try{return localStorage.getItem(MODE_KEY)||'name';}catch(e){return 'name';}}
+  function toolbarHTML(mode,total){return `<div class="v382-record-toolbar" data-v382-toolbar="1" data-v382-mode="${esc(mode)}"><div class="v382-record-toolbar-title">🧾 참가자 정리 <span style="color:#64748b;font-weight:900">${Number(total||0)}명</span></div><div class="v382-record-toolbar-actions"><button type="button" class="v382-record-mode-btn ${mode==='name'?'active':''}" onclick="setParticipantRecordViewMode('name')">가나다순</button><button type="button" class="v382-record-mode-btn ${mode==='club'?'active':''}" onclick="setParticipantRecordViewMode('club')">클럽별</button></div></div>`;}
+  function makeSummary(total){return `<div class="v374-record-summary">📋 전체 참가자 기록 <b>${Number(total||0)}</b>명</div>`;}
+  function organize(force=false){
+    const container=document.getElementById('psResults');
+    if(!container||organizing) return;
+    const mode=getMode();
+    const existingToolbar=container.querySelector('[data-v382-toolbar="1"]');
+    if(existingToolbar && existingToolbar.dataset.v382Mode===mode && !force) return;
+    const allCards=[...container.querySelectorAll('.v374-record-card')];
+    if(!allCards.length) return;
+    organizing=true;
+    try{
+      const cards=allCards;
+      cards.forEach(c=>c.classList.add('v382-record-card'));
+      cards.sort((a,b)=>{const ca=clubText(a),cb=clubText(b); if(mode==='club'&&ca!==cb)return ca.localeCompare(cb,'ko'); return nameText(a).localeCompare(nameText(b),'ko')||ca.localeCompare(cb,'ko');});
+      const frag=document.createDocumentFragment();
+      const tmp=document.createElement('div');
+      tmp.innerHTML=toolbarHTML(mode,cards.length)+makeSummary(cards.length);
+      while(tmp.firstChild) frag.appendChild(tmp.firstChild);
+      if(mode==='club'){
+        const list=document.createElement('div'); list.className='v382-club-list';
+        const groups=new Map();
+        cards.forEach(c=>{const cl=clubText(c); if(!groups.has(cl))groups.set(cl,[]); groups.get(cl).push(c);});
+        [...groups.entries()].forEach(([club,items])=>{
+          const sec=document.createElement('div'); sec.className='v382-club-section';
+          const head=document.createElement('div'); head.className='v382-club-head'; head.innerHTML=`<span>🏷 ${esc(club)}</span><span class="v382-club-count">${items.length}</span>`;
+          const grid=document.createElement('div'); grid.className='v374-record-grid v382-record-grid v382-compact';
+          items.forEach(c=>grid.appendChild(c));
+          sec.appendChild(head); sec.appendChild(grid); list.appendChild(sec);
+        });
+        frag.appendChild(list);
+      }else{
+        const grid=document.createElement('div'); grid.className='v374-record-grid v382-record-grid v382-compact';
+        cards.forEach(c=>grid.appendChild(c));
+        frag.appendChild(grid);
+      }
+      container.replaceChildren(frag);
+    }catch(e){console.warn('v383 participant club organizer failed',e);}finally{organizing=false;}
+  }
+  function schedule(force=false,delay=40){clearTimeout(timer);timer=setTimeout(()=>organize(force),delay);}
+  window.v382OrganizeParticipantRecords=organize;
+  window.setParticipantRecordViewMode=function(m){try{localStorage.setItem(MODE_KEY,m);}catch(e){} organize(true);};
+  document.addEventListener('DOMContentLoaded',()=>schedule(false,120));
+  try{
+    const mo=new MutationObserver(()=>{
+      if(organizing) return;
+      const c=document.getElementById('psResults');
+      if(!c) return;
+      if(c.querySelector('[data-v382-toolbar="1"]')) return;
+      schedule(false,70);
+    });
+    mo.observe(document.body,{childList:true,subtree:true});
+  }catch(e){}
+})();
 </script>
 
 </body>
