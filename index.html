@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-05-23-v385-waitlist-registration";
+  const APP_VERSION = "2026-05-23-v386-startup-image-popup";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -5319,6 +5319,50 @@ body {
 .rr-team-card.v385-waitlist-row{border:1.5px solid #fdba74!important;box-shadow:0 8px 18px rgba(251,146,60,.12)!important}
 @media(max-width:680px){.v385-waitlist-badge{font-size:.62rem;padding:3px 6px}}
 </style>
+
+<style id="v386StartupImagePopupStyle">
+.startup-image-popup{
+  position:fixed;inset:0;z-index:2147483500;display:none;align-items:center;justify-content:center;
+  padding:18px;background:rgba(7,15,31,.72);backdrop-filter:blur(10px) saturate(130%);
+}
+.startup-image-popup.show{display:flex;animation:startupPopupFadeIn .18s ease-out;}
+@keyframes startupPopupFadeIn{from{opacity:0}to{opacity:1}}
+.startup-image-popup-box{
+  width:min(720px,100%);max-height:min(92vh,900px);display:flex;flex-direction:column;overflow:hidden;
+  border-radius:22px;background:#fff;box-shadow:0 24px 70px rgba(0,0,0,.38);border:1px solid rgba(255,255,255,.18);
+}
+.startup-image-popup-head{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;
+  background:linear-gradient(135deg,#071026,#0f1e3a);color:#fff;
+}
+.startup-image-popup-title{font-size:.95rem;font-weight:1000;line-height:1.35;word-break:keep-all;}
+.startup-image-popup-close{
+  width:34px;height:34px;border-radius:999px;border:0;background:rgba(255,255,255,.14);color:#fff;
+  font-size:1.1rem;font-weight:1000;cursor:pointer;flex:0 0 auto;
+}
+.startup-image-popup-body{background:#0b1224;overflow:auto;-webkit-overflow-scrolling:touch;}
+.startup-image-popup-img{display:block;width:100%;height:auto;max-height:calc(92vh - 118px);object-fit:contain;background:#0b1224;}
+.startup-image-popup-error{display:none;padding:28px 18px;text-align:center;color:#fff;font-size:.86rem;line-height:1.7;font-weight:800;}
+.startup-image-popup-foot{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 14px;background:#fff;border-top:1px solid #e5e7eb;
+}
+.startup-image-popup-check{display:flex;align-items:center;gap:8px;font-size:.82rem;font-weight:900;color:#334155;cursor:pointer;user-select:none;}
+.startup-image-popup-check input{width:17px;height:17px;accent-color:#0f1e3a;}
+.startup-image-popup-btn{
+  border:0;border-radius:999px;background:#0f1e3a;color:#fff;font-size:.82rem;font-weight:1000;
+  min-height:36px;padding:8px 15px;cursor:pointer;white-space:nowrap;
+}
+@media(max-width:680px){
+  .startup-image-popup{padding:8px 8px calc(78px + env(safe-area-inset-bottom,0px)) 8px;align-items:flex-end;}
+  .startup-image-popup-box{border-radius:18px 18px 0 0;max-height:calc(100vh - 92px - env(safe-area-inset-bottom,0px));}
+  .startup-image-popup-head{padding:10px 12px;}
+  .startup-image-popup-title{font-size:.88rem;}
+  .startup-image-popup-img{max-height:calc(100vh - 196px - env(safe-area-inset-bottom,0px));}
+  .startup-image-popup-foot{padding:10px 12px;}
+  .startup-image-popup-check{font-size:.78rem;}
+}
+</style>
+
 </head>
 <body>
 <header class="app-header">
@@ -6594,6 +6638,34 @@ body {
 <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px;flex-wrap:wrap">
 <button class="btn btn-gray" onclick="clearFloatingNotice()">지우기</button>
 <button class="btn btn-primary" onclick="saveFloatingNoticeSettings()">💾 공지 저장</button>
+</div>
+</div>
+<div class="form-group" style="border-top:1px solid var(--border);padding-top:14px;margin-bottom:16px">
+<div style="font-weight:700;font-size:.88rem;margin-bottom:6px;color:var(--primary-dark)">🖼️ 첫 화면 이미지 팝업</div>
+<div style="font-size:.72rem;color:var(--text3);margin-bottom:10px;line-height:1.5">
+  GitHub <b>guide</b> 폴더에 이미지를 올린 뒤 <b>/guide/plus.png</b>처럼 주소만 넣으면 첫 화면에 팝업으로 표시됩니다.<br/>
+  사용자가 <b>오늘 이후 보지 않기</b>를 체크하고 닫으면 같은 팝업 ID는 다시 뜨지 않습니다.
+</div>
+<label style="display:flex;align-items:center;gap:8px;font-size:.82rem;font-weight:700;margin-bottom:8px;cursor:pointer">
+  <input id="adminStartupPopupEnabled" type="checkbox"/> 이미지 팝업 표시 켜기
+</label>
+<div class="form-group" style="margin-bottom:8px">
+  <label class="form-label">팝업 제목</label>
+  <input class="form-input" id="adminStartupPopupTitle" placeholder="예: 추가(후보) 접수 안내"/>
+</div>
+<div class="form-group" style="margin-bottom:8px">
+  <label class="form-label">이미지 주소</label>
+  <input class="form-input" id="adminStartupPopupUrl" placeholder="/guide/plus.png 또는 https://..."/>
+  <div style="font-size:.7rem;color:var(--text3);margin-top:4px;line-height:1.5">같은 파일명을 덮어쓸 때는 아래 팝업 ID를 바꾸면 캐시가 갱신되고, 숨김 처리한 사용자에게도 새 팝업으로 다시 표시됩니다.</div>
+</div>
+<div class="form-group" style="margin-bottom:8px">
+  <label class="form-label">팝업 ID / 버전</label>
+  <input class="form-input" id="adminStartupPopupId" placeholder="예: modern2026_candidate_v1"/>
+</div>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px;flex-wrap:wrap">
+  <button class="btn btn-gray" onclick="clearStartupImagePopupSettings()">지우기</button>
+  <button class="btn btn-outline" onclick="previewStartupImagePopup()">미리보기</button>
+  <button class="btn btn-primary" onclick="saveStartupImagePopupSettings()">💾 팝업 저장</button>
 </div>
 </div>
 <div class="form-group" style="border-top:1px solid var(--border);padding-top:14px;margin-bottom:16px">
@@ -12696,6 +12768,7 @@ async function initFB(){
     sl(false);toast('🔥 연결 완료','success');
     if(window.renderHomeReg) window.renderHomeReg();
     refreshAppBranding();
+    setTimeout(()=>{ try{ showStartupImagePopup(false); }catch(e){} }, 650);
     if(!window.__directorSessionPoller){
       window.__directorSessionPoller=setInterval(()=>{ try{ pollDirectorSessionVersion(); }catch(e){} }, 20000);
     }
@@ -12710,7 +12783,7 @@ async function loadMeta(){
       const d=s.data();
       // memberRegistry2026은 meta/config에서 제외 → memberRegistries/2026 에서만 관리
       const {memberRegistry2026:_mr, ...dClean}=d;
-      G.meta={pw:'kimhae1234',regPw:'202601',memberRegistry2026:[],clubContacts:{},clubEmails:{},clubPasswords:{},clubPasswordCustom:{},adminFloatingNotice:'',adminFloatingNoticeEnabled:false,onlineOrderEnabled:false,operatorPw:'2026court',allowTeamDirectorLogin:true,individualAutoCourtAssignEnabled:false,regSessionVersion:1,usePlayerRegistry:false,showAssociationDashboard:false,useFixedClubs:false,allowPublicTeamRegistration:false,allowPublicResultEntry:false,appTitle:'시합관리 시스템',autoNotificationSettings:{registration:true,courtWaiting:true,courtChanged:true,matchStart:true,orderSubmitted:true,matchComplete:false},...dClean};
+      G.meta={pw:'kimhae1234',regPw:'202601',memberRegistry2026:[],clubContacts:{},clubEmails:{},clubPasswords:{},clubPasswordCustom:{},adminFloatingNotice:'',adminFloatingNoticeEnabled:false,startupImagePopupEnabled:false,startupImagePopupUrl:'/guide/plus.png',startupImagePopupId:'startup-popup-v1',startupImagePopupTitle:'공지 안내',onlineOrderEnabled:false,operatorPw:'2026court',allowTeamDirectorLogin:true,individualAutoCourtAssignEnabled:false,regSessionVersion:1,usePlayerRegistry:false,showAssociationDashboard:false,useFixedClubs:false,allowPublicTeamRegistration:false,allowPublicResultEntry:false,appTitle:'시합관리 시스템',autoNotificationSettings:{registration:true,courtWaiting:true,courtChanged:true,matchStart:true,orderSubmitted:true,matchComplete:false},...dClean};
       if(Array.isArray(d.clubs)){
         G.clubs=d.clubs.map(x=>String(x||'').trim()).filter(Boolean);
       }
@@ -12724,6 +12797,10 @@ async function loadMeta(){
       if(!G.meta.regDeadlineDt) G.meta.regDeadlineDt='';
       if(typeof G.meta.adminFloatingNotice!=='string') G.meta.adminFloatingNotice='';
       if(typeof G.meta.adminFloatingNoticeEnabled!=='boolean') G.meta.adminFloatingNoticeEnabled=!!G.meta.adminFloatingNoticeEnabled;
+      if(typeof G.meta.startupImagePopupEnabled!=='boolean') G.meta.startupImagePopupEnabled=!!G.meta.startupImagePopupEnabled;
+      if(typeof G.meta.startupImagePopupUrl!=='string' || !G.meta.startupImagePopupUrl.trim()) G.meta.startupImagePopupUrl='/guide/plus.png';
+      if(typeof G.meta.startupImagePopupId!=='string' || !G.meta.startupImagePopupId.trim()) G.meta.startupImagePopupId='startup-popup-v1';
+      if(typeof G.meta.startupImagePopupTitle!=='string') G.meta.startupImagePopupTitle='공지 안내';
       if(typeof G.meta.onlineOrderEnabled!=='boolean') G.meta.onlineOrderEnabled=!!G.meta.onlineOrderEnabled;
       if(!G.meta.operatorPw) G.meta.operatorPw='2026court';
       if(typeof G.meta.individualAutoCourtAssignEnabled!=='boolean') G.meta.individualAutoCourtAssignEnabled=!!G.meta.individualAutoCourtAssignEnabled;
@@ -12743,9 +12820,9 @@ async function loadMeta(){
       if(!G.meta.indivLockEnabled) G.meta.indivLockEnabled=false;
       if(!G.meta.indivLockStart) G.meta.indivLockStart='';
       if(!G.meta.indivLockEnd) G.meta.indivLockEnd='';
-      markFbWriteCache('meta','config',{pw:G.meta.pw,regPw:(G.meta.regPw||'202601'),clubs:G.clubs,adminPhone:(G.meta.adminPhone||''),clubContacts:(G.meta.clubContacts||{}),clubEmails:(G.meta.clubEmails||{}),clubPasswords:(G.meta.clubPasswords||{}),clubPasswordCustom:(G.meta.clubPasswordCustom||{}),regDeadlineDt:(G.meta.regDeadlineDt||''),adminFloatingNotice:(G.meta.adminFloatingNotice||''),adminFloatingNoticeEnabled:!!G.meta.adminFloatingNoticeEnabled,onlineOrderEnabled:!!G.meta.onlineOrderEnabled,operatorPw:(G.meta.operatorPw||'2026court'),individualAutoCourtAssignEnabled:!!G.meta.individualAutoCourtAssignEnabled,usePlayerRegistry:!!G.meta.usePlayerRegistry,showAssociationDashboard:!!G.meta.showAssociationDashboard,useFixedClubs:!!G.meta.useFixedClubs,allowTeamDirectorLogin:!!G.meta.allowTeamDirectorLogin,allowPublicTeamRegistration:!!G.meta.allowPublicTeamRegistration,allowPublicResultEntry:!!G.meta.allowPublicResultEntry,appTitle:(G.meta.appTitle||'시합관리 시스템'),regSessionVersion:Number(G.meta.regSessionVersion||1),drawHistoryPolicyVersion:Number(G.meta.drawHistoryPolicyVersion||0),indivLockEnabled:!!G.meta.indivLockEnabled,indivLockStart:(G.meta.indivLockStart||''),indivLockEnd:(G.meta.indivLockEnd||''),autoNotificationSettings:getAutoNotificationSettings()});
+      markFbWriteCache('meta','config',{pw:G.meta.pw,regPw:(G.meta.regPw||'202601'),clubs:G.clubs,adminPhone:(G.meta.adminPhone||''),clubContacts:(G.meta.clubContacts||{}),clubEmails:(G.meta.clubEmails||{}),clubPasswords:(G.meta.clubPasswords||{}),clubPasswordCustom:(G.meta.clubPasswordCustom||{}),regDeadlineDt:(G.meta.regDeadlineDt||''),adminFloatingNotice:(G.meta.adminFloatingNotice||''),adminFloatingNoticeEnabled:!!G.meta.adminFloatingNoticeEnabled,startupImagePopupEnabled:!!G.meta.startupImagePopupEnabled,startupImagePopupUrl:(G.meta.startupImagePopupUrl||'/guide/plus.png'),startupImagePopupId:(G.meta.startupImagePopupId||'startup-popup-v1'),startupImagePopupTitle:(G.meta.startupImagePopupTitle||'공지 안내'),onlineOrderEnabled:!!G.meta.onlineOrderEnabled,operatorPw:(G.meta.operatorPw||'2026court'),individualAutoCourtAssignEnabled:!!G.meta.individualAutoCourtAssignEnabled,usePlayerRegistry:!!G.meta.usePlayerRegistry,showAssociationDashboard:!!G.meta.showAssociationDashboard,useFixedClubs:!!G.meta.useFixedClubs,allowTeamDirectorLogin:!!G.meta.allowTeamDirectorLogin,allowPublicTeamRegistration:!!G.meta.allowPublicTeamRegistration,allowPublicResultEntry:!!G.meta.allowPublicResultEntry,appTitle:(G.meta.appTitle||'시합관리 시스템'),regSessionVersion:Number(G.meta.regSessionVersion||1),drawHistoryPolicyVersion:Number(G.meta.drawHistoryPolicyVersion||0),indivLockEnabled:!!G.meta.indivLockEnabled,indivLockStart:(G.meta.indivLockStart||''),indivLockEnd:(G.meta.indivLockEnd||''),autoNotificationSettings:getAutoNotificationSettings()});
     }else{
-      await setDoc(doc(db,'meta','config'),{pw:'kimhae1234',regPw:'202601',clubs:G.clubs,adminPhone:'',clubContacts:{},clubPasswords:{},clubPasswordCustom:{},adminFloatingNotice:'',adminFloatingNoticeEnabled:false,onlineOrderEnabled:false,operatorPw:'2026court',allowTeamDirectorLogin:true,individualAutoCourtAssignEnabled:false,regSessionVersion:1,drawHistoryPolicyVersion:0,usePlayerRegistry:false,showAssociationDashboard:false,useFixedClubs:false,allowPublicTeamRegistration:false,allowPublicResultEntry:false,appTitle:'시합관리 시스템',courtGroupCatalog:DEFAULT_COURT_GROUPS.map(g=>({name:g.title,count:(g.courts||[]).length})),autoNotificationSettings:{registration:true,courtWaiting:true,courtChanged:true,matchStart:true,orderSubmitted:true,matchComplete:false}});
+      await setDoc(doc(db,'meta','config'),{pw:'kimhae1234',regPw:'202601',clubs:G.clubs,adminPhone:'',clubContacts:{},clubPasswords:{},clubPasswordCustom:{},adminFloatingNotice:'',adminFloatingNoticeEnabled:false,startupImagePopupEnabled:false,startupImagePopupUrl:'/guide/plus.png',startupImagePopupId:'startup-popup-v1',startupImagePopupTitle:'공지 안내',onlineOrderEnabled:false,operatorPw:'2026court',allowTeamDirectorLogin:true,individualAutoCourtAssignEnabled:false,regSessionVersion:1,drawHistoryPolicyVersion:0,usePlayerRegistry:false,showAssociationDashboard:false,useFixedClubs:false,allowPublicTeamRegistration:false,allowPublicResultEntry:false,appTitle:'시합관리 시스템',courtGroupCatalog:DEFAULT_COURT_GROUPS.map(g=>({name:g.title,count:(g.courts||[]).length})),autoNotificationSettings:{registration:true,courtWaiting:true,courtChanged:true,matchStart:true,orderSubmitted:true,matchComplete:false}});
     }
   }catch(e){}
 
@@ -12779,6 +12856,10 @@ async function saveMeta(){
     regDeadlineDt:(G.meta.regDeadlineDt||''),
     adminFloatingNotice:(G.meta.adminFloatingNotice||''),
     adminFloatingNoticeEnabled:!!G.meta.adminFloatingNoticeEnabled,
+    startupImagePopupEnabled:!!G.meta.startupImagePopupEnabled,
+    startupImagePopupUrl:(G.meta.startupImagePopupUrl||'/guide/plus.png'),
+    startupImagePopupId:(G.meta.startupImagePopupId||'startup-popup-v1'),
+    startupImagePopupTitle:(G.meta.startupImagePopupTitle||'공지 안내'),
     onlineOrderEnabled:!!G.meta.onlineOrderEnabled,
     autoNotificationSettings:getAutoNotificationSettings(),
     operatorPw:(G.meta.operatorPw||'2026court'),
@@ -15822,6 +15903,10 @@ function openAdminSettings(){
   const ap=ge('adminPhoneInput'); if(ap) ap.value=(G.meta.adminPhone||'');
   const fn=ge('adminFloatingNoticeInput'); if(fn) fn.value=(G.meta.adminFloatingNotice||'');
   const fne=ge('adminFloatingNoticeEnabled'); if(fne) fne.checked=!!G.meta.adminFloatingNoticeEnabled;
+  const spn=ge('adminStartupPopupEnabled'); if(spn) spn.checked=!!G.meta.startupImagePopupEnabled;
+  const spu=ge('adminStartupPopupUrl'); if(spu) spu.value=(G.meta.startupImagePopupUrl||'/guide/plus.png');
+  const spi=ge('adminStartupPopupId'); if(spi) spi.value=(G.meta.startupImagePopupId||'startup-popup-v1');
+  const spt=ge('adminStartupPopupTitle'); if(spt) spt.value=(G.meta.startupImagePopupTitle||'공지 안내');
   const ooe=ge('onlineOrderEnabled'); if(ooe) ooe.checked=!!G.meta.onlineOrderEnabled;
   const upr=ge('metaUsePlayerRegistry'); if(upr) upr.checked=!!G.meta.usePlayerRegistry;
   const sad=ge('metaShowAssociationDashboard'); if(sad) sad.checked=!!G.meta.showAssociationDashboard;
@@ -17170,6 +17255,137 @@ function renderFloatingNotice(){
     });
   }
 }
+
+/* === v386 첫 화면 이미지 팝업 === */
+function getStartupImagePopupId(){
+  return String(G.meta?.startupImagePopupId||'startup-popup-v1').trim() || 'startup-popup-v1';
+}
+function getStartupImagePopupStorageKey(){
+  return 'startupImagePopupHidden:' + getStartupImagePopupId();
+}
+function normalizeStartupImageUrl(url){
+  let u=String(url||'').trim();
+  if(!u) return '';
+  if(/^data:|^blob:/i.test(u)) return u;
+  if(/^https?:\/\//i.test(u)) return u;
+  if(u.startsWith('//')) return location.protocol + u;
+  if(u.startsWith('/')) return location.origin + u;
+  if(u.startsWith('./') || u.startsWith('../')) return u;
+  return './' + u.replace(/^\/+/, '');
+}
+function addStartupPopupCacheBust(url){
+  if(!url || /^data:|^blob:/i.test(url)) return url;
+  const id=encodeURIComponent(getStartupImagePopupId());
+  const sep=url.includes('?') ? '&' : '?';
+  return url + sep + 'popup_v=' + id;
+}
+function hasHiddenStartupImagePopup(){
+  try{ return localStorage.getItem(getStartupImagePopupStorageKey())==='1'; }catch(e){ return false; }
+}
+function markStartupImagePopupHidden(){
+  try{ localStorage.setItem(getStartupImagePopupStorageKey(),'1'); }catch(e){}
+}
+function ensureStartupImagePopupEl(){
+  let el=ge('startupImagePopup');
+  if(el) return el;
+  el=document.createElement('div');
+  el.id='startupImagePopup';
+  el.className='startup-image-popup';
+  el.innerHTML=`<div class="startup-image-popup-box" role="dialog" aria-modal="true" aria-label="이미지 공지 팝업">
+    <div class="startup-image-popup-head">
+      <div class="startup-image-popup-title" id="startupImagePopupTitle">공지 안내</div>
+      <button type="button" class="startup-image-popup-close" onclick="closeStartupImagePopup()" aria-label="닫기">×</button>
+    </div>
+    <div class="startup-image-popup-body">
+      <img class="startup-image-popup-img" id="startupImagePopupImg" alt="공지 이미지"/>
+      <div class="startup-image-popup-error" id="startupImagePopupError">이미지를 불러오지 못했습니다.<br/>관리자 설정의 이미지 주소를 확인해 주세요.</div>
+    </div>
+    <div class="startup-image-popup-foot">
+      <label class="startup-image-popup-check"><input type="checkbox" id="startupImagePopupDontShow"/> 오늘 이후 보지 않기</label>
+      <button type="button" class="startup-image-popup-btn" onclick="closeStartupImagePopup()">닫기</button>
+    </div>
+  </div>`;
+  el.addEventListener('click', e=>{ if(e.target===el) closeStartupImagePopup(); });
+  document.body.appendChild(el);
+  return el;
+}
+function showStartupImagePopup(force=false){
+  try{
+    const enabled=!!G.meta?.startupImagePopupEnabled;
+    const rawUrl=String(G.meta?.startupImagePopupUrl||'').trim();
+    if(!force && (!enabled || !rawUrl || hasHiddenStartupImagePopup())) return false;
+    const el=ensureStartupImagePopupEl();
+    const title=ge('startupImagePopupTitle');
+    const img=ge('startupImagePopupImg');
+    const err=ge('startupImagePopupError');
+    const chk=ge('startupImagePopupDontShow');
+    if(title) title.textContent=(G.meta?.startupImagePopupTitle||'공지 안내').trim() || '공지 안내';
+    if(chk) chk.checked=false;
+    if(err) err.style.display='none';
+    if(img){
+      img.style.display='block';
+      img.onerror=function(){ this.style.display='none'; if(err) err.style.display='block'; };
+      img.onload=function(){ if(err) err.style.display='none'; this.style.display='block'; };
+      img.src=addStartupPopupCacheBust(normalizeStartupImageUrl(rawUrl));
+    }
+    el.classList.add('show');
+    el.style.display='flex';
+    document.body.style.overflow='hidden';
+    return true;
+  }catch(e){ console.warn('showStartupImagePopup failed', e); return false; }
+}
+function closeStartupImagePopup(){
+  const chk=ge('startupImagePopupDontShow');
+  if(chk && chk.checked) markStartupImagePopupHidden();
+  const el=ge('startupImagePopup');
+  if(el){ el.classList.remove('show'); el.style.display='none'; }
+  document.body.style.overflow='';
+}
+async function saveStartupImagePopupSettings(){
+  if(!(AD||TM)){ toast('개발자 또는 운영자 로그인 필요','info'); return; }
+  const enabled=!!ge('adminStartupPopupEnabled')?.checked;
+  const url=(ge('adminStartupPopupUrl')?.value||'').trim();
+  const id=(ge('adminStartupPopupId')?.value||'').trim();
+  const title=(ge('adminStartupPopupTitle')?.value||'').trim();
+  if(enabled && !url){ toast('이미지 주소를 입력해 주세요','info'); return; }
+  if(enabled && !id){ toast('팝업 ID/버전을 입력해 주세요','info'); return; }
+  G.meta.startupImagePopupEnabled=enabled;
+  G.meta.startupImagePopupUrl=url || '/guide/plus.png';
+  G.meta.startupImagePopupId=id || 'startup-popup-v1';
+  G.meta.startupImagePopupTitle=title || '공지 안내';
+  try{
+    await saveMeta();
+    toast('이미지 팝업 저장 완료 ✅','success');
+    if(enabled) showStartupImagePopup(true);
+  }catch(e){ console.error(e); toast('저장 실패: '+e.message,'error'); }
+}
+async function clearStartupImagePopupSettings(){
+  if(!(AD||TM)){ toast('개발자 또는 운영자 로그인 필요','info'); return; }
+  G.meta.startupImagePopupEnabled=false;
+  G.meta.startupImagePopupUrl='/guide/plus.png';
+  G.meta.startupImagePopupId='startup-popup-v1';
+  G.meta.startupImagePopupTitle='공지 안내';
+  const en=ge('adminStartupPopupEnabled'); if(en) en.checked=false;
+  const url=ge('adminStartupPopupUrl'); if(url) url.value='/guide/plus.png';
+  const id=ge('adminStartupPopupId'); if(id) id.value='startup-popup-v1';
+  const title=ge('adminStartupPopupTitle'); if(title) title.value='공지 안내';
+  closeStartupImagePopup();
+  try{ await saveMeta(); toast('이미지 팝업 지움 완료','success'); }
+  catch(e){ console.error(e); toast('저장 실패: '+e.message,'error'); }
+}
+function previewStartupImagePopup(){
+  if(ge('adminStartupPopupEnabled')) G.meta.startupImagePopupEnabled=!!ge('adminStartupPopupEnabled').checked;
+  if(ge('adminStartupPopupUrl')) G.meta.startupImagePopupUrl=(ge('adminStartupPopupUrl').value||'/guide/plus.png').trim();
+  if(ge('adminStartupPopupId')) G.meta.startupImagePopupId=(ge('adminStartupPopupId').value||'preview').trim();
+  if(ge('adminStartupPopupTitle')) G.meta.startupImagePopupTitle=(ge('adminStartupPopupTitle').value||'공지 안내').trim();
+  showStartupImagePopup(true);
+}
+window.showStartupImagePopup=showStartupImagePopup;
+window.closeStartupImagePopup=closeStartupImagePopup;
+window.saveStartupImagePopupSettings=saveStartupImagePopupSettings;
+window.clearStartupImagePopupSettings=clearStartupImagePopupSettings;
+window.previewStartupImagePopup=previewStartupImagePopup;
+
 async function saveFloatingNoticeSettings(){
   if(!(AD||TM)){ toast('개발자 또는 운영자 로그인 필요','info'); return; }
   const input=ge('adminFloatingNoticeInput');
