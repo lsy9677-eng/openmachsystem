@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-05-23-v383-participant-club-sort-fast";
+  const APP_VERSION = "2026-05-23-v385-waitlist-registration";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -5116,6 +5116,209 @@ body {
 }
 </style>
 
+
+
+<style id="v384PushStatsMobileLayoutFix">
+/* v384: 알림 상태판 모바일/좁은 화면 정렬 개선 - 기능 변경 없음 */
+#mPushStats .modal-box{
+  overflow:hidden !important;
+}
+#mPushStats .modal-body{
+  -webkit-overflow-scrolling:touch;
+}
+#mPushStats .table-wrap{
+  border-radius:14px !important;
+  border:1px solid #dbe7ff !important;
+  overflow:auto !important;
+  background:#fff !important;
+}
+#mPushStats table{
+  table-layout:auto !important;
+  min-width:760px;
+}
+#mPushStats table th,
+#mPushStats table td{
+  white-space:nowrap !important;
+  word-break:keep-all !important;
+  vertical-align:middle !important;
+}
+#mPushStats table td{
+  line-height:1.35 !important;
+}
+#mPushStats table td:nth-child(2){min-width:92px;}
+#mPushStats table td:nth-child(3){min-width:112px;}
+#mPushStats table td:nth-child(4){min-width:86px;}
+#mPushStats table td:nth-child(5){min-width:110px;}
+#mPushStats table td:nth-child(6){min-width:92px;}
+#mPushStats table td:nth-child(7){min-width:130px;}
+
+@media(max-width:680px){
+  #mPushStats .modal-box{
+    width:calc(100vw - 10px) !important;
+    max-width:none !important;
+    max-height:calc(100vh - 82px - env(safe-area-inset-bottom,0px)) !important;
+    border-radius:18px 18px 0 0 !important;
+  }
+  #mPushStats .modal-header{
+    padding:12px 14px !important;
+  }
+  #mPushStats .modal-header h3{
+    font-size:.98rem !important;
+  }
+  #mPushStats .modal-body{
+    padding:12px 10px !important;
+    max-height:calc(100vh - 176px - env(safe-area-inset-bottom,0px)) !important;
+    overflow-y:auto !important;
+  }
+  #mPushStats #pushStatsToolbar{
+    display:grid !important;
+    grid-template-columns:1fr !important;
+    gap:8px !important;
+    margin-bottom:10px !important;
+  }
+  #mPushStats #pushStatsToolbar > div:last-child{
+    display:grid !important;
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+    gap:6px !important;
+    width:100% !important;
+  }
+  #mPushStats #pushStatsToolbar .btn{
+    width:100% !important;
+    min-height:38px !important;
+    padding:7px 6px !important;
+    font-size:.72rem !important;
+    border-radius:11px !important;
+  }
+  #mPushStats .modal-body div[style*="grid-template-columns:repeat(4"]{
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+    gap:8px !important;
+  }
+  #mPushStats .modal-body div[style*="grid-template-columns:repeat(4"] > div{
+    padding:10px 12px !important;
+    min-height:72px !important;
+  }
+  #mPushStats .modal-body div[style*="grid-template-columns:repeat(4"] > div > div:first-child{
+    font-size:.72rem !important;
+    line-height:1.2 !important;
+    word-break:keep-all !important;
+  }
+  #mPushStats .modal-body div[style*="grid-template-columns:repeat(4"] > div > div:nth-child(2){
+    font-size:1.35rem !important;
+  }
+
+  /* 좁은 화면에서는 표를 카드형 목록으로 전환 */
+  #mPushStats .table-wrap{
+    overflow:visible !important;
+    border:0 !important;
+    background:transparent !important;
+  }
+  #mPushStats table,
+  #mPushStats thead,
+  #mPushStats tbody{
+    display:block !important;
+    width:100% !important;
+    min-width:0 !important;
+  }
+  #mPushStats thead{display:none !important;}
+  #mPushStats tbody{
+    display:flex !important;
+    flex-direction:column !important;
+    gap:8px !important;
+  }
+  #mPushStats tbody tr{
+    display:grid !important;
+    grid-template-columns:34px minmax(0,1fr) !important;
+    gap:2px 9px !important;
+    padding:10px 11px !important;
+    border:1.5px solid #dbe7ff !important;
+    border-radius:14px !important;
+    background:#fff !important;
+    box-shadow:0 5px 14px rgba(15,30,58,.06) !important;
+  }
+  #mPushStats tbody td{
+    display:block !important;
+    border:0 !important;
+    padding:0 !important;
+    text-align:left !important;
+    white-space:normal !important;
+    word-break:keep-all !important;
+    overflow-wrap:anywhere !important;
+    line-height:1.35 !important;
+    background:transparent !important;
+  }
+  #mPushStats tbody td:nth-child(1){
+    grid-column:1 !important;
+    grid-row:1 / span 5 !important;
+    display:flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    width:28px !important;
+    height:28px !important;
+    border-radius:999px !important;
+    background:#eef4ff !important;
+    color:#1d4ed8 !important;
+    font-size:.72rem !important;
+    font-weight:1000 !important;
+    align-self:start !important;
+    margin-top:2px !important;
+  }
+  #mPushStats tbody td:nth-child(n+2){
+    grid-column:2 !important;
+    min-width:0 !important;
+  }
+  #mPushStats tbody td:nth-child(2){
+    font-size:.95rem !important;
+    font-weight:1000 !important;
+    color:#0f172a !important;
+  }
+  #mPushStats tbody td:nth-child(3){
+    font-size:.88rem !important;
+    font-weight:1000 !important;
+    color:#0f1e3a !important;
+  }
+  #mPushStats tbody td:nth-child(4),
+  #mPushStats tbody td:nth-child(5),
+  #mPushStats tbody td:nth-child(6),
+  #mPushStats tbody td:nth-child(7){
+    font-size:.76rem !important;
+    color:#475569 !important;
+  }
+  #mPushStats tbody td:nth-child(4)::before{content:'클럽 ';font-weight:1000;color:#64748b;}
+  #mPushStats tbody td:nth-child(5)::before{content:'부서 ';font-weight:1000;color:#64748b;}
+  #mPushStats tbody td:nth-child(6)::before{content:'상태 ';font-weight:1000;color:#64748b;}
+  #mPushStats tbody td:nth-child(7){
+    color:#1d4ed8 !important;
+    font-weight:1000 !important;
+    margin-top:2px !important;
+  }
+  #mPushStats tbody td:nth-child(7)::before{content:'조치 ';font-weight:1000;color:#64748b;}
+  #mPushStats .modal-footer{
+    padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px)) 12px !important;
+  }
+  #mPushStats .modal-footer .btn{
+    width:100% !important;
+    min-height:42px !important;
+  }
+}
+
+@media(max-width:380px){
+  #mPushStats .modal-body div[style*="grid-template-columns:repeat(4"]{
+    grid-template-columns:1fr 1fr !important;
+  }
+  #mPushStats #pushStatsToolbar > div:last-child{
+    grid-template-columns:1fr !important;
+  }
+}
+</style>
+
+
+<style id="v385WaitlistRegistrationStyle">
+.v385-waitlist-badge{display:inline-flex;align-items:center;justify-content:center;padding:3px 8px;border-radius:999px;background:#fff7ed;color:#c2410c;border:1.5px solid #fb923c;font-size:.68rem;font-weight:1000;line-height:1;white-space:nowrap}
+.v385-waitlist-row{background:linear-gradient(135deg,#fffaf5,#ffffff)!important;border-color:#fdba74!important}
+.v336-entry-row.v385-waitlist-row{border-left:4px solid #fb923c!important}
+.rr-team-card.v385-waitlist-row{border:1.5px solid #fdba74!important;box-shadow:0 8px 18px rgba(251,146,60,.12)!important}
+@media(max-width:680px){.v385-waitlist-badge{font-size:.62rem;padding:3px 6px}}
+</style>
 </head>
 <body>
 <header class="app-header">
@@ -7290,6 +7493,45 @@ function getDivisionMaxTeams(tid, div){
   const t=(G.tournaments||[]).find(x=>x.id===tid);
   const v=Number(t?.divSettings?.[div]?.maxTeams||0);
   return Number.isFinite(v)&&v>0?v:0;
+}
+
+// v385: 정원 초과 접수는 추가(대기)로 받되, 대진표는 현재 정원 안의 팀만 기본 포함한다.
+function isTeamWaitlistedForKey(key, idx){
+  try{
+    const {tid, div}= _k2td(key);
+    const max=getDivisionMaxTeams(tid, div);
+    if(!max) return false;
+    return Number(idx) >= max;
+  }catch(e){ return false; }
+}
+function getWaitlistNoForKey(key, idx){
+  try{
+    const {tid, div}= _k2td(key);
+    const max=getDivisionMaxTeams(tid, div);
+    return max ? Math.max(1, Number(idx)-max+1) : 0;
+  }catch(e){ return 0; }
+}
+function getConfirmedTeamCountForKey(key){
+  const arr=(G.teams?.[key]||[]);
+  const {tid, div}= _k2td(key);
+  const max=getDivisionMaxTeams(tid, div);
+  return max ? Math.min(arr.length, max) : arr.length;
+}
+function getWaitlistedTeamCountForKey(key){
+  const arr=(G.teams?.[key]||[]);
+  const {tid, div}= _k2td(key);
+  const max=getDivisionMaxTeams(tid, div);
+  return max ? Math.max(0, arr.length-max) : 0;
+}
+function getDrawTeamsForKey(key){
+  const arr=(G.teams?.[key]||[]);
+  const confirmed=getConfirmedTeamCountForKey(key);
+  return arr.slice(0, confirmed);
+}
+function waitlistBadgeHTML(key, idx){
+  if(!isTeamWaitlistedForKey(key, idx)) return '';
+  const no=getWaitlistNoForKey(key, idx);
+  return `<span class="v385-waitlist-badge">추가대기 ${no}</span>`;
 }
 function getDivisionLabelForRegister(div, t){
   const type=t?.type||'team';
@@ -18772,6 +19014,8 @@ function buildRegisterRosterGrid(tid,div,teams,key){
   const isWomen=(div==='여성부');
   const __cards = teams.map((team,i)=>{
     const realIdx=(typeof team._origIdx==='number')?team._origIdx:i;
+    const isWaitlisted=isTeamWaitlistedForKey(key, realIdx);
+    const waitBadge=waitlistBadgeHTML(key, realIdx);
     const isIndividual=isIndividualTournament((G.tournaments||[]).find(x=>x.id===tid));
     const dn=isIndividual
       ? getIndividualDisplayLine(team)
@@ -18848,19 +19092,20 @@ function buildRegisterRosterGrid(tid,div,teams,key){
         : `<div class="v336-entry-action v346-entry-action-simple v347-payment-only-action">
             ${buildPaymentStatusHTML(key,realIdx)}
           </div>`;
-      return `<div class="v336-entry-row v347-entry-row-detail-inline">
+      return `<div class="v336-entry-row v347-entry-row-detail-inline ${isWaitlisted?'v385-waitlist-row':''}">
         <div class="v336-entry-num">${i+1}</div>
-        <div class="v336-entry-names v347-entry-names">${v348IndividualPairTitleWithDetail(team,key,realIdx)}</div>
+        <div class="v336-entry-names v347-entry-names">${v348IndividualPairTitleWithDetail(team,key,realIdx)}${waitBadge?`<div style="margin-top:3px">${waitBadge}</div>`:''}</div>
         ${actionBtns}
       </div>`;
     }
 
-    return `<div class="${cardClass}">
+    return `<div class="${cardClass} ${isWaitlisted?'v385-waitlist-row':''}">
       <div class="rr-team-header">
         <div class="rr-team-info">
           <span class="rr-team-num">${i+1}</span>
           <span class="${titleClass}">${headerName}</span>
           ${headerCount?`<span class="rr-team-count">${headerCount}</span>`:''}
+          ${waitBadge}
           ${buildPaymentStatusHTML(key,realIdx)}
         </div>
         ${adminBtns}
@@ -18940,6 +19185,9 @@ function renderRegisterDivisionOverview(){
           .filter(tm=>baseClub(tm.club||'')===bc || tm.club===_ctxClub)
       : allTeams.map((tm,origIdx)=>({...tm,_origIdx:origIdx}));
     const totalPlayers=teams.reduce((s,tm)=>s+((tm.players||[]).length),0);
+    const confirmedCnt=getConfirmedTeamCountForKey(key);
+    const waitCnt=getWaitlistedTeamCountForKey(key);
+    const maxCnt=getDivisionMaxTeams(tid,div);
     const isSel=selected===div;
     const canRegister=isIndividualTournament(t) ? isOpen : ((AD||REG||isPublicTeamRegistrationEnabled()||!isTeamDirectorLoginEnabled()) && (AD||isOpen) && (AD||!isRegDeadlinePassed()));
     // 내 클럽 필터 ON 시 내 클럽이 있는 부서만 강조
@@ -18949,8 +19197,9 @@ function renderRegisterDivisionOverview(){
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <span class="dpill ${dc(div)}">${dl(div)}</span>
-          <span class="badge bg-green">${teams.length}${isIndividualTournament(t)?'조':'팀'}</span>
-          <span class="badge bg-blue">${totalPlayers}명</span>${getDivisionMaxTeams(tid,div)?`<span class="badge bg-gold">정원 ${getDivisionMaxTeams(tid,div)}</span>`:''}
+          <span class="badge bg-green">확정 ${confirmedCnt}${isIndividualTournament(t)?'조':'팀'}</span>
+          ${waitCnt?`<span class="v385-waitlist-badge">추가대기 ${waitCnt}</span>`:''}
+          <span class="badge bg-blue">${totalPlayers}명</span>${maxCnt?`<span class="badge bg-gold">정원 ${maxCnt}</span>`:''}
           ${isSel?'<span class="badge" style="background:var(--accent);color:#fff">등록 입력중</span>':''}
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -19108,9 +19357,7 @@ async function registerTeam(){
 
   const key=tid+'_'+div,ex=G.teams[key]||[];
   const maxTeams=getDivisionMaxTeams(tid,div);
-  if(maxTeams>0 && ex.length>=maxTeams){
-    toast(`이 부서는 정원(${maxTeams}${isIndividual?'조':'팀'})이 마감되었습니다`,'error'); return;
-  }
+  const willBeWaitlist = maxTeams>0 && ex.length>=maxTeams;
 
   let names=[];
   let dbl=1;
@@ -19186,6 +19433,8 @@ async function registerTeam(){
     ownerUid:isIndividual?(individualOwner?.uid||''):'',
     ownerEmail:isIndividual?(individualOwner?.email||''):'',
     ownerName:isIndividual?(individualOwner?.displayName||''):'',
+    registrationStatus: willBeWaitlist ? 'waitlist' : 'confirmed',
+    waitlistNo: willBeWaitlist ? (ex.length - maxTeams + 1) : 0,
     registeredAt:new Date().toISOString()
   };
   G.teams[key].push(newTeam);
@@ -19249,7 +19498,7 @@ async function registerTeam(){
   sl(false);
   renderRL();
   renderRegisterDivisionOverview();
-  toast(isIndividual?'참가 접수 완료 ✅':'팀 등록 완료 ✅','success');
+  toast(willBeWaitlist ? `정원 마감으로 추가(대기) 접수되었습니다 ✅ 대기 ${newTeam.waitlistNo}번` : (isIndividual?'참가 접수 완료 ✅':'팀 등록 완료 ✅'),'success');
   try{ await sendRegistrationCompletePush(newTeam,t,div); }catch(e){ console.warn('registration complete push failed', e); }
   if(isIndividual){
     try{ openMatchPushPromptAfterRegistration(); }catch(e){}
@@ -23377,13 +23626,14 @@ let DW={key:null,tid:null,div:null,teams:[],cfg:{},isRunning:false,seed:1,seedMe
 function openDraw(tid,div){
   if(!canManageBracket()){ toast('예선 추첨은 관리자 또는 경기진행자만 실행할 수 있습니다','error'); return; }
   const key=tid+'_'+div;
-  const teams=G.teams[key]||[];
+  const teams=getDrawTeamsForKey(key);
   const t=G.tournaments.find(t=>t.id===tid);
+  const waitCnt=getWaitlistedTeamCountForKey(key);
   // 개인전은 전용 추첨 UI로 분기
   if(isIndividualTournament(t)){ openIndividualDraw(tid,div); return; }
   DW={key,tid,div,teams,cfg:{},isRunning:false};
   const hasSameClub=checkSameClub(teams);
-  ge('drawTeamList').innerHTML=`<div style="padding:10px 12px;background:var(--panel2);border-radius:var(--radius-lg);border:1px solid var(--border)"><div style="font-weight:700;font-size:.85rem;margin-bottom:8px">${dl(div)} — 등록 팀 (${teams.length}팀)</div><div style="display:flex;flex-wrap:wrap;gap:4px">${teams.map((tm,i)=>`<span class="badge bg-green" style="font-size:.78rem">${tdn(tm,key,i)}</span>`).join('')}</div></div>`;
+  ge('drawTeamList').innerHTML=`<div style="padding:10px 12px;background:var(--panel2);border-radius:var(--radius-lg);border:1px solid var(--border)"><div style="font-weight:700;font-size:.85rem;margin-bottom:8px">${dl(div)} — 대진 포함 ${teams.length}팀${waitCnt?` · 추가대기 ${waitCnt}팀 제외`:``}</div><div style="display:flex;flex-wrap:wrap;gap:4px">${teams.map((tm,i)=>`<span class="badge bg-green" style="font-size:.78rem">${tdn(tm,key,i)}</span>`).join('')}</div></div>`;
   buildDrawPresets(teams.length,t,div);
   ge('sameClubWarn').classList.toggle('show',hasSameClub);
   DW.candidates=[];
@@ -24809,8 +25059,9 @@ function calcIndivGroups(n, grpSize){
 // 개인전 추첨 모달 열기
 function openIndividualDraw(tid,div){
   const key=tid+'_'+div;
-  const teams=G.teams[key]||[];
+  const teams=getDrawTeamsForKey(key);
   const t=G.tournaments.find(t=>t.id===tid);
+  const waitCnt=getWaitlistedTeamCountForKey(key);
   if(teams.length<2){ toast('최소 2팀 필요','error'); return; }
 
   IDW={key,tid,div,teams,grpSize:2,isRunning:false,drawMode:'instant'};
@@ -24834,7 +25085,7 @@ function openIndividualDraw(tid,div){
 
   const modalHTML=`
     <div style="margin-bottom:14px;padding:10px 14px;background:var(--panel2);border-radius:var(--radius-lg);border:1px solid var(--border)">
-      <div style="font-weight:700;font-size:.85rem;margin-bottom:8px">${tl(div)} — 등록 (${teams.length}조)</div>
+      <div style="font-weight:700;font-size:.85rem;margin-bottom:8px">${tl(div)} — 대진 포함 ${teams.length}조${waitCnt?` · 추가대기 ${waitCnt}조 제외`:``}</div>
       <div style="display:flex;flex-wrap:wrap;gap:4px">${listHTML}</div>
     </div>
     <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:12px">
