@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-05-25-v397-my-record-auth-fix";
+  const APP_VERSION = "2026-05-26-v398-read-cost-guard";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -11521,7 +11521,7 @@ let _realtimeRegsUnsub=null,_realtimeMatchesUnsub=null,_realtimeDrawsUnsub=null;
 let _registerRegsUnsub=null,_registerLiveTid='';
 let _viewerBracketPoller=null;
 let _viewerBracketPollTid='';
-const VIEWER_BRACKET_POLL_MS=20000;
+const VIEWER_BRACKET_POLL_MS=180000; // v398: 일반 관람자 자동 새로고침은 비용 보호를 위해 3분 이상
 let _bundleFetchSeq=0;
 let PLAYERS_LOADED=false;
 let PLAYERS_LOADING_PROMISE=null;
@@ -11612,6 +11612,15 @@ async function runViewerBracketPoll(force=false){
   }
 }
 function ensureViewerBracketPolling(page, tid){
+  // v398 비용 보호:
+  // 일반 관람자 200명이 접속한 상태에서 20초 폴링을 돌리면
+  // registrations/matches/draws 전체 재조회가 누적되어 읽기 요금이 급증합니다.
+  // 기본값은 자동 폴링 OFF. 관리/진행/경기이사 화면은 기존 onSnapshot 실시간 동기화를 사용합니다.
+  const AUTO_VIEWER_POLL = false;
+  if(!AUTO_VIEWER_POLL){
+    stopViewerBracketPolling();
+    return;
+  }
   const pg=page||getCurrentPageName();
   const targetTid=String(tid || getSelectedTournamentIdForPage(pg) || getRealtimeTargetTournamentId() || '').trim();
   if(!isViewerReadOnlyMode() || pg!=='bracket' || !targetTid){
@@ -11876,7 +11885,14 @@ async function syncTournamentDataForPage(page, tid, force=false){
   if(pg==='register'){
     stopViewerBracketPolling();
     stopRealtimeTournamentSync();
-    await fetchTournamentBundle(targetTid, {force:true, acceptStale:true});
+    // v398 비용 보호:
+    // 참가접수 화면 진입 때마다 registrations/matches/draws 3종을 강제 재조회하지 않습니다.
+    // 캐시가 없을 때만 1회 읽고, 이후 참가자 목록은 registrations 리스너가 담당합니다.
+    if(!getTournamentBundleCache(targetTid)){
+      await fetchTournamentBundle(targetTid, {force:false, acceptStale:true});
+    }else{
+      applyTournamentBundle(targetTid, getTournamentBundleCache(targetTid));
+    }
     startRegisterRegistrationSync(targetTid);
     return;
   }
@@ -40277,97 +40293,7 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
   #mPHist .modal-footer.v394-force-footer .v394-spacer{display:none !important;}
 }
 </style>
-<script id="v394ForceNotifyButtonScript">
-(function(){
-  'use strict';
-  if(window.__v394ForceNotifyButton) return;
-  window.__v394ForceNotifyButton = true;
-
-  function clean(v){ return String(v||'').replace(/\s+/g,' ').trim(); }
-  function js(v){ return String(v==null?'':v).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,' '); }
-
-  function isOpen(id){
-    var el=document.getElementById(id);
-    return !!(el && el.classList.contains('open'));
-  }
-
-  function getInfo(id){
-    var body=document.querySelector('#'+id+' .modal-body');
-    var name='';
-    var club='';
-    try{
-      var b=body && body.querySelector('b');
-      if(b) name=clean(b.innerText||b.textContent||'');
-      var txt=body?String(body.innerText||''):'';
-      var m=txt.match(/주클럽\s*[:：]\s*([^\n]+)/);
-      if(m) club=clean(m[1]).replace(/부클럽.*/,'').trim();
-      if(!name){
-        var title=clean(document.querySelector('#'+id+' .modal-header h3')?.innerText||'');
-        title=title.replace(/^👤\s*/,'').replace(/^참가자\s*기록$/,'').replace(/^선수\s*기록$/,'').trim();
-        if(title && title.length<20) name=title;
-      }
-    }catch(e){}
-    return {name:name, club:club};
-  }
-
-  function notifyBtn(name,club){
-    return '<button type="button" class="btn btn-outline v394-notify-btn" style="background:#eff6ff;color:#1d4ed8;border:1.5px solid #93c5fd" onclick="event.preventDefault();event.stopPropagation(); if(typeof openParticipantPersonNotifySms===\'function\'){openParticipantPersonNotifySms(\''+js(name)+'\',\''+js(club)+'\',\'\')}else if(window.toast){toast(\'알림/문자 기능을 찾지 못했습니다.\',\'error\')}">🔔 알림/문자</button>';
-  }
-  function closeBtn(id){
-    return '<button type="button" class="btn btn-gray" onclick="cm(\''+id+'\')">닫기</button>';
-  }
-
-  function hasManageAuthority(){
-    try{
-      return !!(window.AD || window.TM || window.OP ||
-        document.body.classList.contains('admin-mode') ||
-        document.body.classList.contains('tm-mode') ||
-        document.body.classList.contains('operator-mode'));
-    }catch(e){ return false; }
-  }
-
-  function fixFooter(id){
-    try{
-      if(!isOpen(id)) return;
-      var footer=document.querySelector('#'+id+' .modal-footer');
-      if(!footer) return;
-      var text=footer.innerText||'';
-      var canShow = hasManageAuthority() || /삭제|명단\s*삭제|기록\s*삭제/.test(text);
-      if(!canShow) return;
-      if(/알림\/문자/.test(text) && footer.querySelector('.v394-notify-btn')) return;
-      var info=getInfo(id);
-      if(!info.name) return;
-      var deleteButton='';
-      var oldDelete=[].slice.call(footer.querySelectorAll('button')).find(function(b){return /삭제/.test(b.innerText||'');});
-      if(oldDelete){
-        deleteButton=oldDelete.outerHTML;
-      }else if(typeof window.deletePlayerRecordFromList==='function'){
-        deleteButton='<button type="button" class="btn btn-danger" onclick="deletePlayerRecordFromList(\''+js(info.name)+'\',\''+js(info.club)+'\')">🗑️ 명단 삭제</button>';
-      }
-      footer.classList.add('v394-force-footer');
-      footer.innerHTML = notifyBtn(info.name,info.club) + deleteButton + '<div class="v394-spacer" style="flex:1"></div>' + closeBtn(id);
-    }catch(e){ console.warn('v394 footer fix failed', e); }
-  }
-
-  function fixAll(){ fixFooter('mPHist'); fixFooter('mPD'); }
-
-  // 기존 스크립트가 footer를 다시 덮어써도 즉시 복구
-  try{
-    var mo=new MutationObserver(function(){
-      clearTimeout(window.__v394NotifyTimer);
-      window.__v394NotifyTimer=setTimeout(fixAll,40);
-    });
-    mo.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['class','style']});
-  }catch(e){}
-
-  // 모달이 열린 직후/조금 뒤 모두 보정
-  setInterval(fixAll, 600);
-  document.addEventListener('click', function(){ setTimeout(fixAll,80); setTimeout(fixAll,250); setTimeout(fixAll,700); }, true);
-  document.addEventListener('DOMContentLoaded', function(){ setTimeout(fixAll,300); });
-})();
-</script>
-
-
+<!-- v398: removed v394 0.6s DOM polling script -->
 <script id="v395NotifyButtonObserverPatch">
 (function(){
   const V395_NOTIFY_BTN_ID = 'v395DetailNotifyBtn';
@@ -40843,6 +40769,19 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
   }
   document.addEventListener('DOMContentLoaded',()=>setTimeout(v396RefreshMyRecordButton,300));
   setTimeout(v396RefreshMyRecordButton,800);
+})();
+</script>
+
+
+<script id="v398ReadCostGuardPatch">
+(function(){
+  // v398: 비용 보호 점검용. Firebase 읽기/쓰기는 하지 않습니다.
+  window.__READ_COST_GUARD_V398__ = {
+    spectatorPolling: 'off',
+    removedPolling: 'v394 0.6s DOM polling removed',
+    registerFetch: 'no forced 3-collection fetch on every register page entry',
+    viewerPollMsIfEnabled: 180000
+  };
 })();
 </script>
 
