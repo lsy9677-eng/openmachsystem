@@ -20350,7 +20350,11 @@ function renderBracket(){
     return;
   }
 
-  targetDivs.forEach(d=>{ ensureAutoTeamMainBracketIfReady(tid,d).then(changed=>{ if(changed) try{ renderBracket(); }catch(e){}; }).catch(()=>{}); });
+  targetDivs.forEach(d=>{
+    const _key=tid+'_'+d;
+    syncMainBracketFromPrelimAndPersist(_key).then(changed=>{ if(changed) try{ renderBracket(); }catch(e){}; }).catch(()=>{});
+    ensureAutoTeamMainBracketIfReady(tid,d).then(changed=>{ if(changed) try{ renderBracket(); }catch(e){}; }).catch(()=>{});
+  });
   const parts = targetDivs.map(d=>renderBracketHTMLForDiv(tid,d,isAll)).filter(Boolean);
   cont.innerHTML = parts.length ? parts.join('<div style="height:14px"></div>') : '<div class="empty-state card"><div class="empty-icon">🎲</div><p>표시할 부서가 없습니다</p></div>';
   const _eb=ge('bracketExportBar');
@@ -23384,41 +23388,53 @@ function getPreviewAdvSlots(draw,cfg){
   (draw?.groups||[]).forEach((grp,gi)=>{
     const grpSize=(grp?.teams||[]).length||0;
     const advCount=grpSize<=2 ? grpSize : Math.max(1, Number(draw?.advance||cfg?.advance||2));
-    for(let rk=1; rk<=advCount; rk++) res.push({nm:`${grpLabel(gi)} ${rk}위`, gn:gi+1, rk, placeholder:true, grpSize});
+    for(let rk=1; rk<=advCount; rk++){
+      const label=`${grpLabel(gi)} ${rk}위`;
+      // 자리 기준 본선 추첨용 가상 ti. 실제 팀 index와 절대 충돌하지 않도록 음수로 둔다.
+      res.push({ti:-((gi+1)*100+rk), nm:label, gn:gi+1, rk, placeholder:true, grpSize});
+    }
   });
   return res;
 }
 
 const AUTO_MAIN_BUILDING = {};
+function isPrelimAllGroupMatchesDone(key){
+  try{
+    const gMs=(G.matches?.[key]||[]).filter(m=>m && m.phase==='group');
+    if(!gMs.length) return false;
+    return gMs.every(m=>getMatchResultState(key,m).done);
+  }catch(e){ return false; }
+}
+function hasAnyMainBracketMatches(key){
+  return (G.matches?.[key]||[]).some(m=>m && (m.phase==='main' || m.phase==='playin'));
+}
 async function ensureAutoTeamMainBracketIfReady(tid,div){
+  // v389: 본선은 예선 완료 후 자동생성보다, 운영자가 누른 "자리 기준 본선 추첨"을 우선한다.
+  // 기존 자동생성은 기존 대회 호환용으로만 유지한다. 이미 본선이 있으면 결과 확정 시 syncMainBracketFromPrelim()이 채운다.
   const key=tid+'_'+div;
   const t=G.tournaments.find(x=>x.id===tid);
   const draw=G.draws[key];
   if(!t || !draw || isIndividualTournament(t)) return false;
   const cfg=gDS(t,div);
-  const isGroupKO = (cfg.format==='group_knockout');
-  if(!isGroupKO) return false;
-  const allMs=G.matches[key]||[];
-  if(allMs.some(m=>m && (m.phase==='main' || m.phase==='playin'))) return false;
-  const gMs=allMs.filter(m=>m && m.phase==='group');
-  if(!gMs.length) return false;
-  const allDone=gMs.every(m=>getMatchResultState(key,m).done);
-  if(!allDone) return false;
+  if(cfg.format!=='group_knockout') return false;
+  if(hasAnyMainBracketMatches(key)) return false;
+  if(!isPrelimAllGroupMatchesDone(key)) return false;
   if(AUTO_MAIN_BUILDING[key]) return false;
 
   const teams=G.teams[key]||[];
   const advT=getAdvT(key,draw,teams,cfg);
   if((advT||[]).length < 2) return false;
-  const pv=buildPreviewMainSlots(draw, cfg);
-  if(!(pv && Number(pv.n||0) >= 2 && Array.isArray(pv.matchSlots) && pv.matchSlots.length)) return false;
+  const spec=computeMainBracketSpec(advT.length);
+  const plan=buildSeededMainSlots(advT, spec.mainSize, 1, tid, div);
+  if(!(plan && Number(plan.n||0)>=2 && Array.isArray(plan.matchSlots) && plan.matchSlots.length)) return false;
 
   AUTO_MAIN_BUILDING[key]=true;
   try{
-    const nonMain=allMs.filter(m=>m && m.phase!=='main' && m.phase!=='playin');
-    const built=buildMainMatches(pv.matchSlots||[], pv.n||0, pv.playInMatches||[]);
+    const nonMain=(G.matches[key]||[]).filter(m=>m && m.phase!=='main' && m.phase!=='playin');
+    const built=buildMainMatches(plan.matchSlots||[], plan.n||0, plan.playInMatches||[]);
     if(!built.length) return false;
     G.matches[key]=[...nonMain, ...built];
-    G.draws[key]={...(G.draws[key]||{}), autoMainBuiltAt:new Date().toISOString()};
+    G.draws[key]={...(G.draws[key]||{}), autoMainBuiltAt:new Date().toISOString(), mainPlan:getMainDrawPlanStorageValue(plan,false), mainUpdatedAt:new Date().toISOString()};
     try{ setMainSectionCollapsed(key,false); }catch(e){}
     await stD(key);
     await stM(key);
@@ -23452,14 +23468,20 @@ function getPrelimResolvedLabelMap(key){
       const advCount=grpSize<=2 ? grpSize : advDefault;
       const topStats=stats.slice(0,advCount);
       if(!topStats.length) return;
+      // 동률 미확정이면 그 조의 본선 자리만 아직 비워둔다.
       const resolved=topStats.every(row=>row && row.ti!=null && row.rank!=null && !row.tiePending);
       if(!resolved) return;
       topStats.forEach((row,idx)=>{
-        const entry={ti:row.ti,nm:tdn(teams[row.ti],key,row.ti),gn:gi+1,rk:idx+1,grpSize};
-        const label=getMainEntryBracketLabel(entry);
-        if(label){
-          map[String(label).trim()]={ti:row.ti,name:tdn(teams[row.ti],key,row.ti)};
-        }
+        const team=teams[row.ti];
+        if(!team) return;
+        const name=tdn(team,key,row.ti);
+        const labels=new Set([
+          `${grpLabel(gi)} ${idx+1}위`,
+          `${grpLabel(gi)} ${row.rank||idx+1}위`,
+          `${gi+1}조 ${idx+1}위`,
+          `${gi+1}조 ${row.rank||idx+1}위`
+        ].map(v=>String(v||'').replace(/\s+/g,' ').trim()).filter(Boolean));
+        labels.forEach(label=>{ map[label]={ti:row.ti,name,gn:gi+1,rk:idx+1,grpSize}; });
       });
     });
     return map;
@@ -23510,41 +23532,49 @@ function propagateResolvedMainAdvancements(key){
   });
   return changed;
 }
-function syncIndividualMainBracketFromPrelim(key){
-  if(!isIndividualByKey(key)) return false;
+function syncMainBracketFromPrelim(key){
   const labelMap=getPrelimResolvedLabelMap(key);
   if(!Object.keys(labelMap).length) return false;
   const list=G.matches[key]||[];
   let changed=false;
+  const norm=(v)=>String(v||'').replace(/\s+/g,' ').trim();
+  const resolveLabel=(label)=>labelMap[norm(label)] || null;
   const applySide=(m,side,label)=>{
-    const resolved=labelMap[String(label||'').trim()];
+    const resolved=resolveLabel(label);
     if(!resolved) return;
     if(side==='t1'){
       if(m.t1!==resolved.ti){ m.t1=resolved.ti; changed=true; }
-      if(m.phase==='playin'){
-        if(String(m.source1Label||'')!==resolved.name){ m.source1Label=resolved.name; changed=true; }
-      }else if(String(m.source1Label||'')){
-        m.source1Label=''; changed=true;
-      }
+      // source label은 지우지 않는다. 자리 기준 연결성을 유지하면서 화면에서는 실제 팀명으로 resolve된다.
     }else{
       if(m.t2!==resolved.ti){ m.t2=resolved.ti; changed=true; }
-      if(m.phase==='playin'){
-        if(String(m.source2Label||'')!==resolved.name){ m.source2Label=resolved.name; changed=true; }
-      }else if(String(m.source2Label||'').trim()!=='부전승' && String(m.source2Label||'')){
-        m.source2Label=''; changed=true;
-      }
     }
   };
   list.forEach(m=>{
     if(!m) return;
     if(m.phase==='playin' || (m.phase==='main' && Number(m.round||0)===0)){
       applySide(m,'t1',m.source1Label);
-      applySide(m,'t2',m.source2Label);
+      if(norm(m.source2Label)!=='부전승') applySide(m,'t2',m.source2Label);
     }
   });
   if(propagateResolvedMainAdvancements(key)) changed=true;
   return changed;
 }
+async function syncMainBracketFromPrelimAndPersist(key){
+  try{
+    if(!hasAnyMainBracketMatches(key)) return false;
+    const changed=syncMainBracketFromPrelim(key);
+    if(!changed) return false;
+    G.draws[key]={...(G.draws[key]||{}), mainSyncedAt:new Date().toISOString()};
+    await stD(key);
+    await stM(key);
+    return true;
+  }catch(e){ console.warn('syncMainBracketFromPrelimAndPersist failed', e); return false; }
+}
+function syncIndividualMainBracketFromPrelim(key){
+  return syncMainBracketFromPrelim(key);
+}
+window.syncMainBracketFromPrelim = syncMainBracketFromPrelim;
+window.syncMainBracketFromPrelimAndPersist = syncMainBracketFromPrelimAndPersist;
 window.syncIndividualMainBracketFromPrelim = syncIndividualMainBracketFromPrelim;
 function hybridSpreadOrder(count){
   const arr=[];
@@ -26622,8 +26652,10 @@ function openMainDraw(tid,div){
   const key=tid+'_'+div, t=G.tournaments.find(t=>t.id===tid),
         draw=G.draws[key], teams=G.teams[key]||[], cfg=gDS(t,div);
 
-  let advT=getAdvT(key,draw,teams,cfg);
-  let previewOnly=false;
+  if(!draw || !Array.isArray(draw.groups) || !draw.groups.length){ toast('먼저 예선 추첨을 진행하세요','info'); return; }
+  const prelimDone=isPrelimAllGroupMatchesDone(key);
+  let advT=prelimDone ? getAdvT(key,draw,teams,cfg) : getPreviewAdvSlots(draw,cfg);
+  let previewOnly=!prelimDone;
   if(advT.length<2){
     advT=getPreviewAdvSlots(draw,cfg);
     previewOnly=true;
@@ -26645,7 +26677,7 @@ function openMainDraw(tid,div){
       <div style="font-weight:700;font-size:.88rem;margin-bottom:8px">🏆 본선 진출팀 (${advT.length}팀)</div>
       ${spec.playInMatches>0?`<div style="font-size:.76rem;color:var(--text2);line-height:1.6;margin-bottom:8px"><b>직행 ${spec.directCount}팀</b>은 바로 ${spec.mainSize}강, <b>진출전 ${spec.playInTeams}팀</b>은 ${spec.playInMatches}경기 후 <b>승자 ${spec.winnersNeeded}팀</b>이 ${spec.mainSize}강 합류</div>`:''}
       <div style="display:flex;flex-wrap:wrap;gap:5px">
-        ${advT.map(a=>`<span class="badge" style="background:${a.rk===1?'linear-gradient(135deg,#fff7dd,#f6d365)':'linear-gradient(135deg,#eef2f7,#d8e0ea)'};color:${a.rk===1?'#7a5600':'#425466'};border:1px solid ${a.rk===1?'#d4a017':'#b8c3d1'};font-size:.78rem">#${Number(a.ti)+1} ${a.rk===1?'👑':'🥈'} ${a.nm} <small style="opacity:.8">(${(a.gn!=null?grpLabel(a.gn):'?')} ${a.rk}위)</small></span>`).join('')}
+        ${advT.map(a=>`<span class="badge" style="background:${a.rk===1?'linear-gradient(135deg,#fff7dd,#f6d365)':'linear-gradient(135deg,#eef2f7,#d8e0ea)'};color:${a.rk===1?'#7a5600':'#425466'};border:1px solid ${a.rk===1?'#d4a017':'#b8c3d1'};font-size:.78rem">#${Number(a.ti)+1} ${a.rk===1?'👑':'🥈'} ${a.nm} <small style="opacity:.8">(${(a.gn!=null?grpLabel((a.gn||1)-1):'?')} ${a.rk}위)</small></span>`).join('')}
       </div>
     </div>`;
 
@@ -28009,11 +28041,15 @@ async function saveM3(){
         await persistSingleMatchDocPublic(key, m);
         wroteMatches=true;
       }else{
-        if(isIndividualByKey(key)){
+        {
           let syncedMain=false;
-          if(m.phase==='group') syncedMain = syncIndividualMainBracketFromPrelim(key);
-          const autoChanged = isIndividualAutoCourtAssignEnabled() ? ensureIndividualAutoCourtAssignmentsForKey(key) : false;
+          if(m.phase==='group') syncedMain = syncMainBracketFromPrelim(key);
+          const autoChanged = isIndividualByKey(key) && isIndividualAutoCourtAssignEnabled() ? ensureIndividualAutoCourtAssignmentsForKey(key) : false;
           if(syncedMain || autoChanged || promotedAfterFinish){
+            if(syncedMain){
+              G.draws[key]={...(G.draws[key]||{}), mainSyncedAt:new Date().toISOString()};
+              await stD(key);
+            }
             await stM(key);
             wroteMatches=true;
           }
