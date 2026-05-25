@@ -9943,6 +9943,115 @@ async function resetAutoNotificationSettingsToDefault(){
   refreshAutoNotificationSettingsForm();
   await saveAutoNotificationSettings();
 }
+
+/* === v391: 자동 문자 안내 설정 ===
+   브라우저/휴대폰 보안 정책상 웹앱이 사용자의 문자앱에서 '전송' 버튼까지 자동으로 누를 수는 없습니다.
+   ON 상태에서는 코트 상태 변경을 감지해 운영자 화면에 문자 작성 팝업을 자동으로 띄우고,
+   진행자가 문자 보내기 버튼을 누르면 수신자와 본문이 채워진 문자앱을 엽니다. */
+function getAutoSmsSettings(){
+  const defaults={
+    enabled:false,
+    waitingRegistered:true,
+    courtChanged:true,
+    matchStart:true
+  };
+  const raw=(G&&G.meta&&G.meta.autoSmsSettings&&typeof G.meta.autoSmsSettings==='object') ? G.meta.autoSmsSettings : {};
+  return {...defaults, ...raw};
+}
+function isAutoSmsEnabled(kind=''){
+  const st=getAutoSmsSettings();
+  if(st.enabled!==true) return false;
+  if(kind==='waiting_registered' || kind==='court_waiting' || kind==='queue_registered') return st.waitingRegistered!==false;
+  if(kind==='court_changed' || kind==='court_assigned' || kind==='queue_changed') return st.courtChanged!==false;
+  if(kind==='match_started' || kind==='matchStart' || kind==='start') return st.matchStart!==false;
+  return false;
+}
+function buildAutoSmsSettingsPanelHTML(){
+  const st=getAutoSmsSettings();
+  const row=(id,label,desc,checked,disabled=false)=>`
+    <label style="display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-top:1px dashed rgba(15,30,58,.12);cursor:pointer;${disabled?'opacity:.55':''}">
+      <input type="checkbox" id="${id}" ${checked?'checked':''} ${disabled?'disabled':''} style="margin-top:3px;accent-color:#d97706">
+      <span style="display:block;flex:1;min-width:0">
+        <span style="display:block;font-size:.82rem;font-weight:900;color:#0f1e3a">${label}</span>
+        <span style="display:block;font-size:.72rem;color:var(--text2);line-height:1.5;margin-top:2px">${desc}</span>
+      </span>
+    </label>`;
+  return `<div id="autoSmsSettingsBox" class="form-group" style="margin-bottom:16px;padding:14px;background:linear-gradient(135deg,#fff7ed,#fffdf5);border:1.5px solid #fdba74;border-radius:12px">
+    <div style="font-weight:900;font-size:.9rem;color:#c2410c;margin-bottom:7px">📨 자동 문자 안내 설정</div>
+    <div style="font-size:.75rem;color:var(--text2);line-height:1.7;margin-bottom:8px">
+      푸시 알림이 안 되는 회원이 많을 때 쓰는 <b>문자앱 자동 작성</b> 기능입니다. 켜두면 코트 상태가 바뀔 때 운영자/진행자 화면에 문자 보내기 팝업이 자동으로 뜹니다.<br>
+      <b>주의:</b> 휴대폰 보안상 실제 전송은 문자앱에서 진행자가 한 번 눌러야 합니다.
+    </div>
+    <label style="display:flex;align-items:center;gap:9px;padding:10px 0;cursor:pointer">
+      <input type="checkbox" id="autoSmsEnabled" ${st.enabled===true?'checked':''} style="accent-color:#d97706">
+      <span style="font-size:.86rem;font-weight:1000;color:#9a3412">자동 문자 안내 기능 사용</span>
+    </label>
+    ${row('autoSmsMatchStart','각 코트 시합 시작 문자','대기 1번이 현재 경기로 올라오거나 코트의 현재 경기가 바뀌면 문자 안내를 띄웁니다.',st.matchStart!==false)}
+    ${row('autoSmsWaitingRegistered','코트 대기 진입 문자','공용대기 또는 미배정 경기에서 특정 코트 대기열에 새로 들어오면 문자 안내를 띄웁니다.',st.waitingRegistered!==false)}
+    ${row('autoSmsCourtChanged','코트 대기 순서/코트 변경 문자','대기 코트가 바뀌거나 대기 순번이 바뀌면 문자 안내를 띄웁니다.',st.courtChanged!==false)}
+    <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:10px">
+      <button class="btn btn-gray" onclick="resetAutoSmsSettingsToDefault()" style="font-size:.78rem;padding:6px 10px">기본값 OFF</button>
+      <button class="btn btn-primary" onclick="saveAutoSmsSettings()" style="font-size:.78rem;padding:6px 12px;background:#d97706;color:#fff">💾 자동 문자 설정 저장</button>
+    </div>
+    <div id="autoSmsSettingsStatus" style="font-size:.72rem;color:var(--text3);line-height:1.5;margin-top:8px">현재 상태: ${st.enabled===true?'자동 문자 안내 ON':'자동 문자 안내 OFF'}</div>
+  </div>`;
+}
+function readAutoSmsSettingsFromForm(){
+  return {
+    enabled:!!ge('autoSmsEnabled')?.checked,
+    matchStart:!!ge('autoSmsMatchStart')?.checked,
+    waitingRegistered:!!ge('autoSmsWaitingRegistered')?.checked,
+    courtChanged:!!ge('autoSmsCourtChanged')?.checked
+  };
+}
+function refreshAutoSmsSettingsForm(){
+  const st=getAutoSmsSettings();
+  const set=(id,val)=>{ const el=ge(id); if(el) el.checked=!!val; };
+  set('autoSmsEnabled', st.enabled===true);
+  set('autoSmsMatchStart', st.matchStart!==false);
+  set('autoSmsWaitingRegistered', st.waitingRegistered!==false);
+  set('autoSmsCourtChanged', st.courtChanged!==false);
+  const status=ge('autoSmsSettingsStatus');
+  if(status) status.textContent=`현재 상태: ${st.enabled===true?'자동 문자 안내 ON':'자동 문자 안내 OFF'}`;
+}
+async function saveAutoSmsSettings(){
+  if(!(AD||TM)){ toast('개발자 또는 운영자 로그인 필요','info'); return; }
+  G.meta.autoSmsSettings=readAutoSmsSettingsFromForm();
+  sl(true);
+  try{
+    await saveMeta();
+    sl(false);
+    refreshAutoSmsSettingsForm();
+    toast(G.meta.autoSmsSettings.enabled?'자동 문자 안내 기능을 켰습니다 ✅':'자동 문자 안내 기능을 껐습니다','success');
+  }catch(e){
+    sl(false); toast('저장 실패: '+(e?.message||e),'error');
+  }
+}
+async function resetAutoSmsSettingsToDefault(){
+  if(!(AD||TM)){ toast('개발자 또는 운영자 로그인 필요','info'); return; }
+  G.meta.autoSmsSettings={enabled:false,matchStart:true,waitingRegistered:true,courtChanged:true};
+  refreshAutoSmsSettingsForm();
+  await saveAutoSmsSettings();
+}
+function injectAutoSmsSettingsBox(){
+  try{
+    const body=document.querySelector('#mAdminSettings .modal-body');
+    if(!body || ge('autoSmsSettingsBox')) return;
+    const box=document.createElement('div');
+    box.innerHTML=buildAutoSmsSettingsPanelHTML();
+    const target=ge('adminSettingsSection_common') || ge('adminSettingsSection_team') || body;
+    const ref=target.querySelector('#autoNotificationSettingsBox') || target.querySelector('#adminPushControlBox') || target.firstChild;
+    if(ref && ref.parentNode===target) target.insertBefore(box.firstElementChild, ref.nextSibling);
+    else target.prepend(box.firstElementChild);
+    refreshAutoSmsSettingsForm();
+  }catch(e){ console.warn('injectAutoSmsSettingsBox failed', e); }
+}
+window.getAutoSmsSettings=getAutoSmsSettings;
+window.isAutoSmsEnabled=isAutoSmsEnabled;
+window.saveAutoSmsSettings=saveAutoSmsSettings;
+window.resetAutoSmsSettingsToDefault=resetAutoSmsSettingsToDefault;
+window.refreshAutoSmsSettingsForm=refreshAutoSmsSettingsForm;
+
 function injectAutoNotificationSettingsBox(){
   try{
     const body=document.querySelector('#mAdminSettings .modal-body');
@@ -9958,11 +10067,19 @@ function injectAutoNotificationSettingsBox(){
 window.saveAutoNotificationSettings=saveAutoNotificationSettings;
 window.resetAutoNotificationSettingsToDefault=resetAutoNotificationSettingsToDefault;
 window.refreshAutoNotificationSettingsForm=refreshAutoNotificationSettingsForm;
+window.injectAutoSmsSettingsBox=injectAutoSmsSettingsBox;
 
 function ensureAdminPushControls(){
   try{
     const body=document.querySelector('#mAdminSettings .modal-body');
-    if(!body || ge('adminPushControlBox')) return;
+    if(!body) return;
+    if(ge('adminPushControlBox')){
+      injectAutoNotificationSettingsBox();
+      injectAutoSmsSettingsBox();
+      refreshAutoNotificationSettingsForm();
+      refreshAutoSmsSettingsForm();
+      return;
+    }
     const box=document.createElement('div');
     box.id='adminPushControlBox';
     box.className='form-group';
@@ -9970,7 +10087,9 @@ function ensureAdminPushControls(){
     box.innerHTML=`<div style="font-weight:800;font-size:.9rem;color:#1d4ed8;margin-bottom:8px">🔔 관리자 알림 발송</div><div style="font-size:.75rem;color:var(--text2);line-height:1.7;margin-bottom:10px">알림을 켠 전체 사용자에게 공지를 발송합니다. 경기 카드/명단 카드에서는 해당 대상에게만 보낼 수 있습니다.</div><button class="btn btn-primary" onclick="openAdminBroadcastPushModal()" style="width:100%;background:#2563eb">📢 전체 알림 공지 보내기</button>`;
     body.prepend(box);
     injectAutoNotificationSettingsBox();
+    injectAutoSmsSettingsBox();
     refreshAutoNotificationSettingsForm();
+    refreshAutoSmsSettingsForm();
   }catch(e){}
 }
 function openMatchPushPromptAfterRegistration(){
@@ -11342,7 +11461,7 @@ Object.defineProperty(window,'REG_CLUB',{get:()=>REG_CLUB,set:(v)=>{REG_CLUB=v;}
 // ── 과거 대회 내장 데이터 ─────────────────────────────────
 let HIST_DATA = []; // 과거 대회 데이터는 엑셀/Firestore로 관리
 
-let G={meta:{pw:'kimhae1234',regPw:'202601',memberRegistry2026:[],clubContacts:{},clubEmails:{},clubPasswords:{},clubPasswordCustom:{},regDeadlineDt:'',onlineOrderEnabled:false,operatorPw:'2026court',individualAutoCourtAssignEnabled:false,regSessionVersion:1,drawHistoryPolicyVersion:0,usePlayerRegistry:false,showAssociationDashboard:false,useFixedClubs:false,allowTeamDirectorLogin:true,allowPublicTeamRegistration:false,allowPublicResultEntry:false,appTitle:'시합관리 시스템',autoNotificationSettings:{registration:true,courtWaiting:true,courtChanged:true,matchStart:true,orderSubmitted:true,matchComplete:false}},clubs:[],tournaments:[],teams:{},draws:{},matches:{},players:{},log:[],drawHistories:{}};
+let G={meta:{pw:'kimhae1234',regPw:'202601',memberRegistry2026:[],clubContacts:{},clubEmails:{},clubPasswords:{},clubPasswordCustom:{},regDeadlineDt:'',onlineOrderEnabled:false,operatorPw:'2026court',individualAutoCourtAssignEnabled:false,regSessionVersion:1,drawHistoryPolicyVersion:0,usePlayerRegistry:false,showAssociationDashboard:false,useFixedClubs:false,allowTeamDirectorLogin:true,allowPublicTeamRegistration:false,allowPublicResultEntry:false,appTitle:'시합관리 시스템',autoNotificationSettings:{registration:true,courtWaiting:true,courtChanged:true,matchStart:true,orderSubmitted:true,matchComplete:false},autoSmsSettings:{enabled:false,matchStart:true,waitingRegistered:true,courtChanged:true}},clubs:[],tournaments:[],teams:{},draws:{},matches:{},players:{},log:[],drawHistories:{}};
 const PLAYER_CACHE_KEY='OAI_PLAYER_CACHE_V1';
 const PLAYER_CACHE_TTL=1000*60*60*12;
 const TOURNAMENT_BUNDLE_CACHE_KEY='OAI_TOURNAMENT_BUNDLE_CACHE_V3';
@@ -12805,7 +12924,7 @@ async function loadMeta(){
       const d=s.data();
       // memberRegistry2026은 meta/config에서 제외 → memberRegistries/2026 에서만 관리
       const {memberRegistry2026:_mr, ...dClean}=d;
-      G.meta={pw:'kimhae1234',regPw:'202601',memberRegistry2026:[],clubContacts:{},clubEmails:{},clubPasswords:{},clubPasswordCustom:{},adminFloatingNotice:'',adminFloatingNoticeEnabled:false,startupImagePopupEnabled:false,startupImagePopupUrl:'/guide/plus.png',startupImagePopupId:'startup-popup-v1',startupImagePopupTitle:'공지 안내',onlineOrderEnabled:false,operatorPw:'2026court',allowTeamDirectorLogin:true,individualAutoCourtAssignEnabled:false,regSessionVersion:1,usePlayerRegistry:false,showAssociationDashboard:false,useFixedClubs:false,allowPublicTeamRegistration:false,allowPublicResultEntry:false,appTitle:'시합관리 시스템',autoNotificationSettings:{registration:true,courtWaiting:true,courtChanged:true,matchStart:true,orderSubmitted:true,matchComplete:false},...dClean};
+      G.meta={pw:'kimhae1234',regPw:'202601',memberRegistry2026:[],clubContacts:{},clubEmails:{},clubPasswords:{},clubPasswordCustom:{},adminFloatingNotice:'',adminFloatingNoticeEnabled:false,startupImagePopupEnabled:false,startupImagePopupUrl:'/guide/plus.png',startupImagePopupId:'startup-popup-v1',startupImagePopupTitle:'공지 안내',onlineOrderEnabled:false,operatorPw:'2026court',allowTeamDirectorLogin:true,individualAutoCourtAssignEnabled:false,regSessionVersion:1,usePlayerRegistry:false,showAssociationDashboard:false,useFixedClubs:false,allowPublicTeamRegistration:false,allowPublicResultEntry:false,appTitle:'시합관리 시스템',autoNotificationSettings:{registration:true,courtWaiting:true,courtChanged:true,matchStart:true,orderSubmitted:true,matchComplete:false},autoSmsSettings:{enabled:false,matchStart:true,waitingRegistered:true,courtChanged:true},...dClean};
       if(Array.isArray(d.clubs)){
         G.clubs=d.clubs.map(x=>String(x||'').trim()).filter(Boolean);
       }
@@ -12835,6 +12954,8 @@ async function loadMeta(){
       if(!G.meta.appTitle) G.meta.appTitle='시합관리 시스템';
       if(!G.meta.autoNotificationSettings || typeof G.meta.autoNotificationSettings!=='object') G.meta.autoNotificationSettings={registration:true,courtWaiting:true,courtChanged:true,matchStart:true,orderSubmitted:true,matchComplete:false};
       G.meta.autoNotificationSettings={registration:G.meta.autoNotificationSettings.registration!==false,courtWaiting:G.meta.autoNotificationSettings.courtWaiting!==false,courtChanged:G.meta.autoNotificationSettings.courtChanged!==false,matchStart:G.meta.autoNotificationSettings.matchStart!==false,orderSubmitted:G.meta.autoNotificationSettings.orderSubmitted!==false,matchComplete:G.meta.autoNotificationSettings.matchComplete===true};
+      if(!G.meta.autoSmsSettings || typeof G.meta.autoSmsSettings!=='object') G.meta.autoSmsSettings={enabled:false,matchStart:true,waitingRegistered:true,courtChanged:true};
+      G.meta.autoSmsSettings={enabled:G.meta.autoSmsSettings.enabled===true,matchStart:G.meta.autoSmsSettings.matchStart!==false,waitingRegistered:G.meta.autoSmsSettings.waitingRegistered!==false,courtChanged:G.meta.autoSmsSettings.courtChanged!==false};
       G.meta.courtGroupCatalog = normalizeCourtGroups(G.meta.courtGroupCatalog||[]);
       if(!G.meta.courtGroupCatalog.length) G.meta.courtGroupCatalog = DEFAULT_COURT_GROUPS.map(g=>({name:g.title,count:(g.courts||[]).length}));
       if(!Number.isFinite(Number(G.meta.regSessionVersion))) G.meta.regSessionVersion=1;
@@ -12842,9 +12963,9 @@ async function loadMeta(){
       if(!G.meta.indivLockEnabled) G.meta.indivLockEnabled=false;
       if(!G.meta.indivLockStart) G.meta.indivLockStart='';
       if(!G.meta.indivLockEnd) G.meta.indivLockEnd='';
-      markFbWriteCache('meta','config',{pw:G.meta.pw,regPw:(G.meta.regPw||'202601'),clubs:G.clubs,adminPhone:(G.meta.adminPhone||''),clubContacts:(G.meta.clubContacts||{}),clubEmails:(G.meta.clubEmails||{}),clubPasswords:(G.meta.clubPasswords||{}),clubPasswordCustom:(G.meta.clubPasswordCustom||{}),regDeadlineDt:(G.meta.regDeadlineDt||''),adminFloatingNotice:(G.meta.adminFloatingNotice||''),adminFloatingNoticeEnabled:!!G.meta.adminFloatingNoticeEnabled,startupImagePopupEnabled:!!G.meta.startupImagePopupEnabled,startupImagePopupUrl:(G.meta.startupImagePopupUrl||'/guide/plus.png'),startupImagePopupId:(G.meta.startupImagePopupId||'startup-popup-v1'),startupImagePopupTitle:(G.meta.startupImagePopupTitle||'공지 안내'),onlineOrderEnabled:!!G.meta.onlineOrderEnabled,operatorPw:(G.meta.operatorPw||'2026court'),individualAutoCourtAssignEnabled:!!G.meta.individualAutoCourtAssignEnabled,usePlayerRegistry:!!G.meta.usePlayerRegistry,showAssociationDashboard:!!G.meta.showAssociationDashboard,useFixedClubs:!!G.meta.useFixedClubs,allowTeamDirectorLogin:!!G.meta.allowTeamDirectorLogin,allowPublicTeamRegistration:!!G.meta.allowPublicTeamRegistration,allowPublicResultEntry:!!G.meta.allowPublicResultEntry,appTitle:(G.meta.appTitle||'시합관리 시스템'),regSessionVersion:Number(G.meta.regSessionVersion||1),drawHistoryPolicyVersion:Number(G.meta.drawHistoryPolicyVersion||0),indivLockEnabled:!!G.meta.indivLockEnabled,indivLockStart:(G.meta.indivLockStart||''),indivLockEnd:(G.meta.indivLockEnd||''),autoNotificationSettings:getAutoNotificationSettings()});
+      markFbWriteCache('meta','config',{pw:G.meta.pw,regPw:(G.meta.regPw||'202601'),clubs:G.clubs,adminPhone:(G.meta.adminPhone||''),clubContacts:(G.meta.clubContacts||{}),clubEmails:(G.meta.clubEmails||{}),clubPasswords:(G.meta.clubPasswords||{}),clubPasswordCustom:(G.meta.clubPasswordCustom||{}),regDeadlineDt:(G.meta.regDeadlineDt||''),adminFloatingNotice:(G.meta.adminFloatingNotice||''),adminFloatingNoticeEnabled:!!G.meta.adminFloatingNoticeEnabled,startupImagePopupEnabled:!!G.meta.startupImagePopupEnabled,startupImagePopupUrl:(G.meta.startupImagePopupUrl||'/guide/plus.png'),startupImagePopupId:(G.meta.startupImagePopupId||'startup-popup-v1'),startupImagePopupTitle:(G.meta.startupImagePopupTitle||'공지 안내'),onlineOrderEnabled:!!G.meta.onlineOrderEnabled,operatorPw:(G.meta.operatorPw||'2026court'),individualAutoCourtAssignEnabled:!!G.meta.individualAutoCourtAssignEnabled,usePlayerRegistry:!!G.meta.usePlayerRegistry,showAssociationDashboard:!!G.meta.showAssociationDashboard,useFixedClubs:!!G.meta.useFixedClubs,allowTeamDirectorLogin:!!G.meta.allowTeamDirectorLogin,allowPublicTeamRegistration:!!G.meta.allowPublicTeamRegistration,allowPublicResultEntry:!!G.meta.allowPublicResultEntry,appTitle:(G.meta.appTitle||'시합관리 시스템'),regSessionVersion:Number(G.meta.regSessionVersion||1),drawHistoryPolicyVersion:Number(G.meta.drawHistoryPolicyVersion||0),indivLockEnabled:!!G.meta.indivLockEnabled,indivLockStart:(G.meta.indivLockStart||''),indivLockEnd:(G.meta.indivLockEnd||''),autoNotificationSettings:getAutoNotificationSettings(),autoSmsSettings:getAutoSmsSettings()});
     }else{
-      await setDoc(doc(db,'meta','config'),{pw:'kimhae1234',regPw:'202601',clubs:G.clubs,adminPhone:'',clubContacts:{},clubPasswords:{},clubPasswordCustom:{},adminFloatingNotice:'',adminFloatingNoticeEnabled:false,startupImagePopupEnabled:false,startupImagePopupUrl:'/guide/plus.png',startupImagePopupId:'startup-popup-v1',startupImagePopupTitle:'공지 안내',onlineOrderEnabled:false,operatorPw:'2026court',allowTeamDirectorLogin:true,individualAutoCourtAssignEnabled:false,regSessionVersion:1,drawHistoryPolicyVersion:0,usePlayerRegistry:false,showAssociationDashboard:false,useFixedClubs:false,allowPublicTeamRegistration:false,allowPublicResultEntry:false,appTitle:'시합관리 시스템',courtGroupCatalog:DEFAULT_COURT_GROUPS.map(g=>({name:g.title,count:(g.courts||[]).length})),autoNotificationSettings:{registration:true,courtWaiting:true,courtChanged:true,matchStart:true,orderSubmitted:true,matchComplete:false}});
+      await setDoc(doc(db,'meta','config'),{pw:'kimhae1234',regPw:'202601',clubs:G.clubs,adminPhone:'',clubContacts:{},clubPasswords:{},clubPasswordCustom:{},adminFloatingNotice:'',adminFloatingNoticeEnabled:false,startupImagePopupEnabled:false,startupImagePopupUrl:'/guide/plus.png',startupImagePopupId:'startup-popup-v1',startupImagePopupTitle:'공지 안내',onlineOrderEnabled:false,operatorPw:'2026court',allowTeamDirectorLogin:true,individualAutoCourtAssignEnabled:false,regSessionVersion:1,drawHistoryPolicyVersion:0,usePlayerRegistry:false,showAssociationDashboard:false,useFixedClubs:false,allowPublicTeamRegistration:false,allowPublicResultEntry:false,appTitle:'시합관리 시스템',courtGroupCatalog:DEFAULT_COURT_GROUPS.map(g=>({name:g.title,count:(g.courts||[]).length})),autoNotificationSettings:{registration:true,courtWaiting:true,courtChanged:true,matchStart:true,orderSubmitted:true,matchComplete:false},autoSmsSettings:{enabled:false,matchStart:true,waitingRegistered:true,courtChanged:true}});
     }
   }catch(e){}
 
@@ -12884,6 +13005,7 @@ async function saveMeta(){
     startupImagePopupTitle:(G.meta.startupImagePopupTitle||'공지 안내'),
     onlineOrderEnabled:!!G.meta.onlineOrderEnabled,
     autoNotificationSettings:getAutoNotificationSettings(),
+    autoSmsSettings:getAutoSmsSettings(),
     operatorPw:(G.meta.operatorPw||'2026court'),
     individualAutoCourtAssignEnabled:!!G.meta.individualAutoCourtAssignEnabled,
     usePlayerRegistry:!!G.meta.usePlayerRegistry,
@@ -17787,7 +17909,8 @@ function buildCourtNotificationApprovalPayload(kind,key,m,meta={}){
 ${meta.court?meta.court+' 코트':''}${queueText}
 받는 사람: ${recipientLabel}`.trim(),
     title,
-    kind:'court_sms',
+    kind,
+    smsKind:kind,
     actionType:'sms_approval',
     smsRecipients:recipients,
     smsBody:body,
@@ -17931,6 +18054,8 @@ function buildCourtSmsAlertPayloads(prevMap,nextMap){
     else if(next.status==='waiting' && prev && (prev.court!==next.court || prev.queuePos!==next.queuePos)) kind='court_changed';
     if(!kind) return;
     const payload=buildCourtNotificationApprovalPayload(kind,next.key,next.match,{court:next.court,queuePos:next.queuePos,tid:next.tid,div:next.div});
+    payload.smsKind=kind;
+    payload.eventKind=kind;
     if(kind==='match_started'){
       payload.title='🎾 경기 시작 알림';
       payload.side='left';
@@ -17941,13 +18066,31 @@ function buildCourtSmsAlertPayloads(prevMap,nextMap){
   return payloads;
 }
 function enqueueCourtSmsAlertsFromState(prevMap,nextMap){
-  // v310: 자동 문자 팝업은 중단. 상태 변경 시 자동 푸시 대기열만 유지하고, 문자는 카드의 📨 버튼으로 수동 발송한다.
-  buildCourtSmsAlertPayloads(prevMap,nextMap);
+  const payloads=buildCourtSmsAlertPayloads(prevMap,nextMap);
+  // v391: 관리자 설정에서 자동 문자 안내를 켠 경우에만 문자 작성 팝업을 자동으로 띄운다.
+  // 실제 SMS 전송은 휴대폰 문자앱에서 진행자가 최종 전송 버튼을 누르는 방식이다.
+  try{
+    if(!(AD||OP||TM)) return;
+    (payloads||[]).forEach(payload=>{
+      const kind=String(payload?.smsKind||payload?.eventKind||payload?.kind||'');
+      if(!isAutoSmsEnabled(kind)) return;
+      const recipients=(payload.smsRecipients||[]).filter(r=>String(r?.phone||'').replace(/[^0-9]/g,'').length>=9);
+      if(!recipients.length) return;
+      enqueueStickyAlert({
+        ...payload,
+        smsRecipients:recipients,
+        title:payload.title || '📨 자동 문자 안내',
+        actionType:'sms_approval',
+        dedupeKey:payload.dedupeKey || `auto_sms:${kind}:${payload.tid||''}:${payload.div||''}:${payload.matchId||''}`,
+        autoCloseMs:0
+      },'info');
+    });
+  }catch(e){ console.warn('auto sms enqueue failed', e); }
 }
 
 function sendCourtCardSms(key, mid, statusKind='queue_registered', court='', queuePos=0){
   try{
-    if(!canManageBracket()){ toast('관리자 또는 경기진행자만 문자 발송 가능','info'); return false; }
+    if(!(AD||OP||TM)){ toast('관리자/운영자 또는 경기진행자만 문자 발송 가능','info'); return false; }
     const list=G.matches?.[key]||[];
     const m=list.find(x=>String(x?.id||'')===String(mid||''));
     if(!m){ toast('경기를 찾을 수 없습니다','error'); return false; }
@@ -31403,7 +31546,7 @@ function renderNextStickyAlert(){
   STICKY_ALERT_OPEN=true;
   const alertTitle = item.title || (item.kind==='court_complete' ? '🎾 코트 완료 알림' : '🔔 오더 제출 알림');
   const hasSmsRecipients = Array.isArray(item.smsRecipients) && item.smsRecipients.length>0;
-  const canApproveSms = item.actionType==='sms_approval' && (AD||OP);
+  const canApproveSms = item.actionType==='sms_approval' && (AD||OP||TM);
   const actions = canApproveSms
     ? `${hasSmsRecipients?`<button type="button" class="sticky-alert-btn primary" onclick="window.sendStickyAlertSMS()">문자 보내기</button>`:`<button type="button" class="sticky-alert-btn secondary" onclick="window.closeStickyAlert()">번호 없음</button>`}<button type="button" class="sticky-alert-btn secondary" onclick="window.closeStickyAlert()">닫기</button>`
     : `<button type="button" class="sticky-alert-btn secondary" onclick="window.closeStickyAlert()">${item.actionType==='sms_approval'?'확인':'확인'}</button>`;
