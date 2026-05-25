@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-05-25-v395-notify-button-observer";
+  const APP_VERSION = "2026-05-25-v396-my-record-page";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -5434,7 +5434,7 @@ body {
 <div class="logo-icon" style="display:none">🎾</div>
 <div class="logo-text"><h1>시합관리 시스템</h1><p>230MATCH TOURNAMENT</p></div>
 </div>
-<div class="header-actions"><span class="admin-badge" id="regLoginBadge" style="display:none;background:var(--success);color:#fff;font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:999px">클럽</span><span class="admin-badge" id="opLoginBadge" style="display:none;background:#1565c0;color:#fff;font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:999px">진행자</span><span class="admin-badge" id="adminBadge">관리자</span><button class="btn-sm admin-only" id="adminSettingsBtn" onclick="openAdminSettings()">⚙️</button><button class="btn-sm" id="manualToggleBtn" onclick="openHelpCenter()" style="background:#fff;color:#0f1e3a;border:1.5px solid rgba(255,255,255,.42);font-weight:900">📘 가이드</button><button class="btn-sm" id="topNotificationInboxBtn" onclick="openNotificationInbox()" style="background:#fff;color:#0f1e3a;border:1.5px solid rgba(255,255,255,.42);font-weight:900">🔔 알림 <span data-notification-unread-badge style="display:none;margin-left:4px;min-width:17px;height:17px;border-radius:999px;background:#ef4444;color:#fff;align-items:center;justify-content:center;font-size:.66rem;font-weight:900"></span></button><div class="login-menu-wrap" id="loginMenuWrap"><button class="btn-sm login-menu-btn" id="loginMenuBtn" onclick="toggleLoginMenu(event)" style="background:#fff;color:#0f1e3a;border:1.5px solid rgba(255,255,255,.42);font-weight:900">🔐 로그인</button><div class="login-menu-panel login-menu-panel-clean" id="loginMenuPanel"><span id="regClubNameBadge" style="display:none;background:var(--success);color:#fff;font-size:.75rem;font-weight:900;padding:7px 10px;border-radius:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span><button class="btn-sm login-menu-item login-menu-main-item" id="roleLoginMenuBtn" onclick="toggleRoleLoginPanel(event)" style="background:linear-gradient(135deg,#0f1e3a,#1b2f5a);color:#fff;border:1px solid rgba(255,255,255,.14)">🔑 권한별 로그인 <span class="login-menu-arrow" id="roleLoginArrow">▾</span></button><div class="role-login-panel" id="roleLoginPanel"><button class="btn-sm login-menu-item" id="regToggleBtn" onclick="closeLoginMenu();toggleReg()" style="background:var(--success);color:#fff;border:none">🏆 경기이사 로그인</button><button class="btn-sm login-menu-item" id="opToggleBtn" onclick="closeLoginMenu();toggleOperator()" style="background:#1565c0;color:#fff;border:none">🎾 진행자 로그인</button><button class="btn-sm login-menu-item" id="adminToggleBtn" onclick="closeLoginMenu();toggleTournamentManagerLogin()" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">🧑‍💼 운영자 로그인</button><button class="btn-sm login-menu-item" id="developerToggleBtn" onclick="closeLoginMenu();toggleDeveloperLogin()" style="background:#0f1e3a;color:#fff;border:1px solid rgba(255,255,255,.12)">🛠️ 개발자 로그인</button></div><div class="login-menu-sep"></div><button class="btn-sm login-menu-item login-menu-main-item" id="adminSignupBtn" onclick="closeLoginMenu();toggleAdminSignup()" style="background:#eef4ff;color:#12306b;border:1px solid rgba(18,48,107,.12)">👤 회원가입 / 간편 로그인</button><button class="btn-sm login-menu-item" id="myProfileBtn" onclick="closeLoginMenu();openMyProfileModal()" style="display:none;background:#eef4ff;color:#12306b;border:1px solid rgba(18,48,107,.12)">👤 내 정보 설정</button><button class="btn-sm login-menu-item" id="googleLogoutBtn" onclick="closeLoginMenu();logoutGoogleUser()" style="display:none;background:#f8fafc;color:#475569;border:1px solid rgba(15,30,58,.12)">🚪 로그아웃</button><button class="btn-sm login-menu-item" id="googleLoginBtn" onclick="loginWithGoogle()" style="display:none;background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">🔵 구글 로그인</button><button class="btn-sm login-menu-item" id="naverLoginBtn" onclick="loginWithNaver()" style="display:none;background:#03c75a;color:#fff;border:1px solid rgba(3,199,90,.35)">🟢 네이버 로그인</button></div></div></div>
+<div class="header-actions"><span class="admin-badge" id="regLoginBadge" style="display:none;background:var(--success);color:#fff;font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:999px">클럽</span><span class="admin-badge" id="opLoginBadge" style="display:none;background:#1565c0;color:#fff;font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:999px">진행자</span><span class="admin-badge" id="adminBadge">관리자</span><button class="btn-sm admin-only" id="adminSettingsBtn" onclick="openAdminSettings()">⚙️</button><button class="btn-sm" id="manualToggleBtn" onclick="openHelpCenter()" style="background:#fff;color:#0f1e3a;border:1.5px solid rgba(255,255,255,.42);font-weight:900">📘 가이드</button><button class="btn-sm" id="topNotificationInboxBtn" onclick="openNotificationInbox()" style="background:#fff;color:#0f1e3a;border:1.5px solid rgba(255,255,255,.42);font-weight:900">🔔 알림 <span data-notification-unread-badge style="display:none;margin-left:4px;min-width:17px;height:17px;border-radius:999px;background:#ef4444;color:#fff;align-items:center;justify-content:center;font-size:.66rem;font-weight:900"></span></button><div class="login-menu-wrap" id="loginMenuWrap"><button class="btn-sm login-menu-btn" id="loginMenuBtn" onclick="toggleLoginMenu(event)" style="background:#fff;color:#0f1e3a;border:1.5px solid rgba(255,255,255,.42);font-weight:900">🔐 로그인</button><div class="login-menu-panel login-menu-panel-clean" id="loginMenuPanel"><span id="regClubNameBadge" style="display:none;background:var(--success);color:#fff;font-size:.75rem;font-weight:900;padding:7px 10px;border-radius:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span><button class="btn-sm login-menu-item login-menu-main-item" id="roleLoginMenuBtn" onclick="toggleRoleLoginPanel(event)" style="background:linear-gradient(135deg,#0f1e3a,#1b2f5a);color:#fff;border:1px solid rgba(255,255,255,.14)">🔑 권한별 로그인 <span class="login-menu-arrow" id="roleLoginArrow">▾</span></button><div class="role-login-panel" id="roleLoginPanel"><button class="btn-sm login-menu-item" id="regToggleBtn" onclick="closeLoginMenu();toggleReg()" style="background:var(--success);color:#fff;border:none">🏆 경기이사 로그인</button><button class="btn-sm login-menu-item" id="opToggleBtn" onclick="closeLoginMenu();toggleOperator()" style="background:#1565c0;color:#fff;border:none">🎾 진행자 로그인</button><button class="btn-sm login-menu-item" id="adminToggleBtn" onclick="closeLoginMenu();toggleTournamentManagerLogin()" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">🧑‍💼 운영자 로그인</button><button class="btn-sm login-menu-item" id="developerToggleBtn" onclick="closeLoginMenu();toggleDeveloperLogin()" style="background:#0f1e3a;color:#fff;border:1px solid rgba(255,255,255,.12)">🛠️ 개발자 로그인</button></div><div class="login-menu-sep"></div><button class="btn-sm login-menu-item login-menu-main-item" id="adminSignupBtn" onclick="closeLoginMenu();toggleAdminSignup()" style="background:#eef4ff;color:#12306b;border:1px solid rgba(18,48,107,.12)">👤 회원가입 / 간편 로그인</button><button class="btn-sm login-menu-item" id="myProfileBtn" onclick="closeLoginMenu();openMyProfileModal()" style="display:none;background:#eef4ff;color:#12306b;border:1px solid rgba(18,48,107,.12)">👤 내 정보 설정</button><button class="btn-sm login-menu-item" id="myRecordBtn" onclick="closeLoginMenu();openMyRecordModal()" style="display:none;background:#fff7dd;color:#7a5600;border:1px solid rgba(212,160,23,.32);font-weight:900">📊 내 경기/기록</button><button class="btn-sm login-menu-item" id="googleLogoutBtn" onclick="closeLoginMenu();logoutGoogleUser()" style="display:none;background:#f8fafc;color:#475569;border:1px solid rgba(15,30,58,.12)">🚪 로그아웃</button><button class="btn-sm login-menu-item" id="googleLoginBtn" onclick="loginWithGoogle()" style="display:none;background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">🔵 구글 로그인</button><button class="btn-sm login-menu-item" id="naverLoginBtn" onclick="loginWithNaver()" style="display:none;background:#03c75a;color:#fff;border:1px solid rgba(3,199,90,.35)">🟢 네이버 로그인</button></div></div></div>
 </div>
 <nav class="nav-tabs">
 <div class="nav-tab active" data-page="home" onclick="showPage('home')">🏠 홈</div>
@@ -5476,6 +5476,7 @@ body {
 <div class="card-title">⚡ 빠른 메뉴</div>
 <div class="home-quick-grid">
 <button class="home-quick-btn" onclick="openHomeRegister()">📋<span>팀 등록</span></button>
+<button class="home-quick-btn" onclick="openMyRecordModal()">📊<span>내 기록</span></button>
 <button class="home-quick-btn" onclick="openHomeBracket()">🎲<span>대진표 보기</span></button>
 <button class="home-quick-btn" onclick="openHomeCourtInfo()">🎾<span>코트 현황</span></button>
 <button class="home-quick-btn" onclick="openHomeGuideAction()">📌<span>대회 요강</span></button>
@@ -40255,6 +40256,351 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
   }
 }
 </style>
+
+
+<!-- v396: 일반회원 내 경기/기록 화면 -->
+<div class="modal-overlay" id="mMyRecord">
+  <div class="modal-box" style="max-width:760px;width:96vw">
+    <div class="modal-header" style="background:#0f1e3a">
+      <h3>📊 내 경기/기록</h3>
+      <button class="modal-close" onclick="cm('mMyRecord')">✕</button>
+    </div>
+    <div class="modal-body" id="mMyRecordBody" style="max-height:76vh;overflow-y:auto">
+      <div style="padding:18px;text-align:center;color:var(--text2)">내 기록을 불러오는 중입니다…</div>
+    </div>
+    <div class="modal-footer" style="gap:8px;flex-wrap:wrap">
+      <button class="btn btn-outline" onclick="openMyProfileModal()">👤 내 정보 설정</button>
+      <button class="btn btn-gray" onclick="cm('mMyRecord')">닫기</button>
+    </div>
+  </div>
+</div>
+
+<style id="v396MyRecordStyle">
+.my-record-summary{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:10px;
+  margin-bottom:14px;
+}
+.my-record-stat{
+  border:1px solid #dbe7ff;
+  border-radius:16px;
+  background:linear-gradient(180deg,#ffffff,#f8fbff);
+  padding:14px 12px;
+  text-align:center;
+}
+.my-record-stat b{
+  display:block;
+  font-size:1.55rem;
+  color:#0f1e3a;
+  line-height:1;
+  margin-bottom:5px;
+}
+.my-record-stat span{
+  font-size:.76rem;
+  color:#64748b;
+  font-weight:900;
+}
+.my-record-card{
+  border:1.5px solid #dbe7ff;
+  border-radius:16px;
+  background:#fff;
+  padding:12px 13px;
+  margin-bottom:10px;
+  box-shadow:0 6px 16px rgba(15,30,58,.05);
+}
+.my-record-card-title{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  margin-bottom:6px;
+}
+.my-record-card-title b{
+  font-size:.94rem;
+  color:#0f172a;
+  line-height:1.35;
+  word-break:keep-all;
+}
+.my-record-chip{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:3px 8px;
+  border-radius:999px;
+  background:#eef4ff;
+  color:#1d4ed8;
+  font-size:.68rem;
+  font-weight:1000;
+  white-space:nowrap;
+}
+.my-record-muted{
+  font-size:.76rem;
+  color:#64748b;
+  line-height:1.55;
+  word-break:keep-all;
+}
+.my-record-section-title{
+  font-size:.9rem;
+  font-weight:1000;
+  color:#0f1e3a;
+  margin:14px 0 8px;
+}
+@media(max-width:680px){
+  .my-record-summary{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;}
+  .my-record-stat{padding:11px 7px;border-radius:13px;}
+  .my-record-stat b{font-size:1.25rem;}
+  .my-record-stat span{font-size:.68rem;}
+  #mMyRecord .modal-box{max-height:calc(100vh - 90px - env(safe-area-inset-bottom,0px));border-radius:18px 18px 0 0;}
+  #mMyRecord .modal-body{max-height:calc(100vh - 196px - env(safe-area-inset-bottom,0px))!important;}
+}
+</style>
+
+<script id="v396MyRecordScript">
+(function(){
+  function E(s){
+    try{ return (typeof esc==='function') ? esc(String(s||'')) : String(s||'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+    catch(e){ return String(s||''); }
+  }
+  function CN(s){
+    try{ return (typeof cleanName==='function') ? cleanName(String(s||'')) : String(s||'').replace(/\s+/g,'').trim(); }
+    catch(e){ return String(s||'').trim(); }
+  }
+  function NN(s){
+    try{ return (typeof normName==='function') ? normName(String(s||'')) : CN(s).replace(/\s+/g,'').toLowerCase(); }
+    catch(e){ return String(s||'').replace(/\s+/g,'').toLowerCase(); }
+  }
+  function NC(s){
+    try{ return (typeof normalizeClub==='function') ? normalizeClub(String(s||'')) : String(s||'').trim(); }
+    catch(e){ return String(s||'').trim(); }
+  }
+  function Phone(s){
+    try{ return (typeof normalizePhoneDigits==='function') ? normalizePhoneDigits(s||'') : String(s||'').replace(/[^0-9]/g,''); }
+    catch(e){ return String(s||'').replace(/[^0-9]/g,''); }
+  }
+  function fmtDate(s){
+    const d=new Date(s||'');
+    if(!s || Number.isNaN(d.getTime())) return s||'-';
+    return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
+  }
+  function divLabel(d){
+    try{ return (typeof dl==='function') ? dl(d) : d; }catch(e){ return d||''; }
+  }
+  function getIdentity(profile,user){
+    const names=new Set();
+    [profile?.name, profile?.displayName, profile?.socialName, user?.displayName].forEach(v=>{
+      const n=CN(v||'');
+      if(n && !/@/.test(n)) names.add(n);
+    });
+    const phone=Phone(profile?.phone||'');
+    const club=NC(profile?.club||'');
+    return {names:[...names], normNames:[...names].map(NN), phone, club, uid:user?.uid||'', email:user?.email||''};
+  }
+  function playerNameFromKey(k,p){
+    try{
+      const pk=(typeof pKeyParse==='function') ? pKeyParse(k) : {};
+      return CN(p?.name || pk.name || k);
+    }catch(e){ return CN(p?.name || k); }
+  }
+  function playerClubFromKey(k,p){
+    try{
+      const pk=(typeof pKeyParse==='function') ? pKeyParse(k) : {};
+      return NC(p?.club || pk.club || ((p?.clubs||[])[0]) || '');
+    }catch(e){ return NC(p?.club || ((p?.clubs||[])[0]) || ''); }
+  }
+  function isMineByIdentity(name, club, phone, id){
+    const n=CN(name||'');
+    const nn=NN(n);
+    const c=NC(club||'');
+    const p=Phone(phone||'');
+    if(id.phone && p && id.phone===p) return true;
+    if(id.normNames.length && id.normNames.includes(nn)){
+      if(!id.club || !c || id.club===c) return true;
+    }
+    return false;
+  }
+  function collectMyCandidates(id){
+    const map=new Map();
+    Object.entries(window.G?.players||{}).forEach(([k,p])=>{
+      const nm=playerNameFromKey(k,p);
+      const cl=playerClubFromKey(k,p);
+      const ph=Phone(p?.phone||'');
+      if(isMineByIdentity(nm,cl,ph,id)){
+        const key=`${nm}|${cl}`;
+        map.set(key,{name:nm,club:cl,p:p||{name:nm,club:cl,clubs:cl?[cl]:[],history:[],wins:0,losses:0}});
+      }
+    });
+
+    Object.values(window.G?.teams||{}).forEach(arr=>{
+      (arr||[]).forEach(team=>{
+        const teamClub=NC((typeof baseClub==='function' ? baseClub(team?.club||'') : team?.club) || team?.club || '');
+        const ownerHit=id.uid && String(team?.ownerUid||'')===String(id.uid);
+        const addCandidate=(nm, ph='')=>{
+          if(!nm) return;
+          if(ownerHit || isMineByIdentity(nm,teamClub,ph,id)){
+            const key=`${CN(nm)}|${teamClub}`;
+            if(!map.has(key)) map.set(key,{name:CN(nm),club:teamClub,p:{name:CN(nm),club:teamClub,clubs:teamClub?[teamClub]:[],history:[],wins:0,losses:0,phone:ph||''}});
+          }
+        };
+        (team?.players||[]).forEach(nm=>addCandidate(nm,''));
+        (team?.individualPlayers||[]).forEach(p=>addCandidate(p?.name||'',p?.phone||''));
+      });
+    });
+    return [...map.values()];
+  }
+  function collectMyTeamRows(id){
+    const rows=[];
+    const seen=new Set();
+    (window.G?.tournaments||[]).forEach(t=>{
+      const tid=t?.id||'';
+      (t?.divisions||[]).forEach(div=>{
+        const key=`${tid}_${div}`;
+        (window.G?.teams?.[key]||[]).forEach((team,idx)=>{
+          const teamClubRaw=String(team?.club||'').trim();
+          const teamClub=NC((typeof baseClub==='function' ? baseClub(teamClubRaw) : teamClubRaw) || teamClubRaw);
+          const ownerHit=id.uid && String(team?.ownerUid||'')===String(id.uid);
+          let hit=!!ownerHit;
+          const playerNames=[];
+          (team?.players||[]).forEach(nm=>{ const cn=CN(nm||''); if(cn) playerNames.push(cn); if(isMineByIdentity(cn,teamClub,'',id)) hit=true; });
+          (team?.individualPlayers||[]).forEach(p=>{ const cn=CN(p?.name||''); if(cn) playerNames.push(cn); if(isMineByIdentity(cn,teamClub,p?.phone||'',id)) hit=true; });
+          if(!hit) return;
+          const dk=`${tid}|${div}|${idx}|${playerNames.join('/')}`;
+          if(seen.has(dk)) return;
+          seen.add(dk);
+          let result='참가';
+          try{
+            const ach=(typeof getLiveTeamAchievementForHistory==='function') ? getLiveTeamAchievementForHistory(key,idx,team,tid,div) : null;
+            result=ach?.result || (team?.rank?`${team.rank}위`:'참가');
+          }catch(e){}
+          rows.push({
+            date:t?.date||'',
+            tname:t?.name||'',
+            div,
+            club:teamClubRaw||teamClub,
+            players:playerNames,
+            result,
+            status:t?.status||''
+          });
+        });
+      });
+    });
+    rows.sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+    return rows;
+  }
+  function collectHistoryRows(candidates){
+    const rows=[];
+    const seen=new Set();
+    candidates.forEach(c=>{
+      let live=[];
+      try{ live=(typeof collectLivePlayerHistory==='function') ? collectLivePlayerHistory(c.name,c.club) : []; }catch(e){}
+      let fb=(c.p?.history||[]).map(h=>({date:h.date||'',tname:h.tname||'',club:h.club||c.club||'',div:h.div||'',rank:h.rank||null,result:h.result||'참가'}));
+      [...fb,...live].forEach(h=>{
+        const dk=`${h.date}|${h.tname}|${h.club}|${h.div}|${h.result}`;
+        if(seen.has(dk)) return;
+        seen.add(dk);
+        rows.push(h);
+      });
+    });
+    rows.sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+    return rows;
+  }
+  function renderCandidateDetails(candidates){
+    if(!candidates.length) return '';
+    return candidates.map(c=>{
+      let html='';
+      try{
+        html=(typeof buildPH==='function') ? buildPH(c.name,c.p) : '';
+      }catch(e){ html=''; }
+      return `<div class="my-record-card" style="padding:14px;margin-top:10px">${html || `<b>${E(c.name)}</b><div class="my-record-muted">${E(c.club||'')}</div>`}</div>`;
+    }).join('');
+  }
+  async function openMyRecordModal(){
+    const user=window.auth?.currentUser || window.CURRENT_APP_USER;
+    if(!user || user.isAnonymous){
+      if(typeof toast==='function') toast('먼저 개인 로그인 후 이용할 수 있습니다.','info');
+      if(typeof toggleAdminSignup==='function') toggleAdminSignup();
+      return;
+    }
+    const body=document.getElementById('mMyRecordBody');
+    if(body) body.innerHTML='<div style="padding:22px;text-align:center;color:var(--text2)">내 경기 기록을 불러오는 중입니다…</div>';
+    if(typeof om==='function') om('mMyRecord');
+    try{
+      if(typeof getMyProfileDoc==='function') window.CURRENT_APP_PROFILE=await getMyProfileDoc();
+      if(typeof ensurePlayersLoaded==='function') await ensurePlayersLoaded();
+      if(typeof ensureAllParticipationDataLoaded==='function') await ensureAllParticipationDataLoaded();
+      if(typeof loadRegistry==='function') await loadRegistry(2026).catch(()=>{});
+    }catch(e){ console.warn('v396 load my record data failed', e); }
+
+    const profile=window.CURRENT_APP_PROFILE||{};
+    const id=getIdentity(profile,user);
+    const candidates=collectMyCandidates(id);
+    const teamRows=collectMyTeamRows(id);
+    const histRows=collectHistoryRows(candidates);
+    const best=histRows.find(h=>Number(h.rank||0)>0 || /우승|준우승|위|강|본선|통과/.test(String(h.result||'')))?.result || '-';
+
+    const profileWarn=(!id.names.length && !id.phone)
+      ? `<div class="my-record-card" style="border-color:#f59e0b;background:#fff7ed"><b>본인 확인 정보가 부족합니다</b><div class="my-record-muted" style="margin-top:5px">내 정보 설정에서 이름과 전화번호를 저장하면 참가 기록을 더 정확하게 찾을 수 있습니다.</div><div style="margin-top:10px"><button class="btn btn-primary" onclick="openMyProfileModal()">👤 내 정보 설정</button></div></div>`
+      : '';
+
+    const currentHtml=teamRows.length
+      ? teamRows.map(r=>`<div class="my-record-card">
+          <div class="my-record-card-title"><b>${E(r.tname||'대회')}</b><span class="my-record-chip">${E(r.result||'참가')}</span></div>
+          <div class="my-record-muted">📅 ${E(fmtDate(r.date))} · 🏷 ${E(divLabel(r.div))} · 👥 ${E(r.club||'-')}</div>
+          <div class="my-record-muted" style="margin-top:3px">선수: ${E((r.players||[]).join(' / ')||'-')}</div>
+        </div>`).join('')
+      : '<div class="my-record-card"><div class="my-record-muted">현재 선택된 데이터에서 내 참가 시합을 찾지 못했습니다. 이름/전화번호를 내 정보에 저장했는지 확인하세요.</div></div>';
+
+    const histHtml=histRows.length
+      ? histRows.slice(0,30).map(h=>`<div class="my-record-card">
+          <div class="my-record-card-title"><b>${E(h.tname||'대회')}</b><span class="my-record-chip">${E(h.result||'참가')}</span></div>
+          <div class="my-record-muted">📅 ${E(fmtDate(h.date))} · 🏷 ${E(divLabel(h.div))} · 👥 ${E(h.club||'-')}</div>
+        </div>`).join('')
+      : '<div class="my-record-card"><div class="my-record-muted">누적 경기 이력이 아직 없습니다.</div></div>';
+
+    if(body){
+      body.innerHTML=`
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+          <div>
+            <div style="font-size:1.05rem;font-weight:1000;color:#0f1e3a">${E(id.names[0] || profile.displayName || user.displayName || user.email || '회원')}님의 기록</div>
+            <div class="my-record-muted">${id.club?`소속: ${E(id.club)}`:'소속 클럽 미설정'}${id.phone?' · 전화번호 연결됨':' · 전화번호 미등록'}</div>
+          </div>
+          <button class="btn btn-outline" onclick="openMyProfileModal()">👤 정보 수정</button>
+        </div>
+        ${profileWarn}
+        <div class="my-record-summary">
+          <div class="my-record-stat"><b>${teamRows.length}</b><span>참가 시합</span></div>
+          <div class="my-record-stat"><b>${histRows.length}</b><span>기록 이력</span></div>
+          <div class="my-record-stat"><b style="font-size:1.05rem;line-height:1.2">${E(best)}</b><span>주요 성적</span></div>
+        </div>
+        <div class="my-record-section-title">🎾 참가했던 시합 목록</div>
+        ${currentHtml}
+        <div class="my-record-section-title">📋 본인 경기 기록</div>
+        ${histHtml}
+        ${candidates.length?`<div class="my-record-section-title">👤 상세 기록</div>${renderCandidateDetails(candidates)}`:''}
+      `;
+    }
+  }
+
+  window.openMyRecordModal=openMyRecordModal;
+
+  function v396RefreshMyRecordButton(){
+    const user=window.auth?.currentUser || window.CURRENT_APP_USER;
+    const logged=!!(user && !user.isAnonymous);
+    const btn=document.getElementById('myRecordBtn');
+    if(btn) btn.style.display=logged?'':'none';
+  }
+  const oldRefresh=window.refreshGoogleLoginUI;
+  if(typeof oldRefresh==='function'){
+    window.refreshGoogleLoginUI=function(user){
+      const r=oldRefresh.apply(this,arguments);
+      setTimeout(v396RefreshMyRecordButton,0);
+      return r;
+    };
+  }
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(v396RefreshMyRecordButton,300));
+  setTimeout(v396RefreshMyRecordButton,800);
+})();
+</script>
 
 </body>
 </html>
