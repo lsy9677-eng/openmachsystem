@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-05-23-v386-startup-image-popup";
+  const APP_VERSION = "2026-05-25-v387-fast-registration-sync";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -5465,7 +5465,7 @@ body {
 <div style="font-size:.75rem;color:var(--text2);line-height:1.6;margin-bottom:10px">이 항목은 <b>대회별로 저장</b>됩니다. 홈화면 계좌 복사와 참가비 입금확인 안내에 사용됩니다.</div>
 <div class="frow">
 <div class="form-group"><label class="form-label">참가비</label><input class="form-input" id="tFeeAmount" placeholder="예: 팀당 60,000원" value="팀당 60,000원"/></div>
-<div class="form-group"><label class="form-label">은행 / 예금주</label><input class="form-input" id="tFeeBankHolder" placeholder="예: 카카오뱅크 / 230스포츠미디어" value="카카오뱅크 / 230스포츠미디어"/></div>
+<div class="form-group"><label class="form-label">은행 / 예금주</label><input class="form-input" id="tFeeBankHolder" placeholder="예: 카카오뱅크 / (김성희)230스포츠미디어" value="카카오뱅크 / (김성희)230스포츠미디어"/></div>
 </div>
 <div class="form-group"><label class="form-label">입금계좌</label><input class="form-input" id="tFeeAccount" placeholder="예: 3333-07-8834842" value="3333-07-8834842"/></div>
 </div>
@@ -11415,6 +11415,9 @@ function shouldUseRealtimeForTournament(page, tid){
   const pg=page||getCurrentPageName();
   const targetTid=String(tid||'').trim();
   if(!targetTid) return false;
+  // v387: 참가 등록/명단 화면은 저장 직후 반영 속도가 중요하므로 선택된 대회만 실시간 구독합니다.
+  // 전체 대회가 아니라 현재 선택 대회 1개만 구독해서 Firestore 읽기 폭증은 피합니다.
+  if(pg==='register') return true;
   if(pg!=='bracket') return false;
   if(AD || OP || REG) return true;
   return false;
@@ -11687,6 +11690,25 @@ async function syncTournamentDataForPage(page, tid, force=false){
     ensureViewerBracketPolling(page, targetTid);
   }
 }
+
+async function refreshRegistrationViewAfterWrite(tid, div){
+  try{
+    const targetTid=String(tid||'').trim();
+    if(!targetTid) return;
+    // 저장 직후에는 로컬 배열만 믿지 않고 서버에서 한 번 강제 재조회합니다.
+    await fetchTournamentBundle(targetTid, {force:true, acceptStale:true});
+    if(ge('regTS') && ge('regTS').value===targetTid){
+      if(div && ge('regDS')) ge('regDS').value=div;
+      try{ renderRegisterDivisionOverview(); }catch(e){}
+      try{ renderRL(); }catch(e){}
+    }
+    try{ upDash(); }catch(e){}
+  }catch(e){
+    console.warn('refreshRegistrationViewAfterWrite failed', e);
+  }
+}
+window.refreshRegistrationViewAfterWrite = refreshRegistrationViewAfterWrite;
+
 async function ensureDrawHistoryLoaded(force=false){
   if(DRAW_HISTORY_LOADED && !force) return G.drawHistories||{};
   try{
@@ -18090,7 +18112,7 @@ async function createTournament(){
     });
     const _tRegDl=ge('tRegDl')?.value;
     const feeAmount=(ge('tFeeAmount')?.value||'').trim() || '팀당 60,000원';
-    const feeBankHolder=(ge('tFeeBankHolder')?.value||'').trim() || '카카오뱅크 / 230스포츠미디어';
+    const feeBankHolder=normalizeFeeBankHolderText((ge('tFeeBankHolder')?.value||'').trim());
     const feeAccount=(ge('tFeeAccount')?.value||'').trim() || '3333-07-8834842';
     const ownerUid = user?.uid || '';
     const ownerEmail = user?.email || '';
@@ -18116,7 +18138,7 @@ async function createTournament(){
     await fbLog('대회 생성: '+nm+' ['+(type==='individual_pair'?'개인전':'단체전')+']','🏆');
     ['tName','tDate','tVenue','tDeadline','tRegDl','tNotice','tGuideText','tGuideUrl','newDivMaxTeams','newCourtGroupName','newCourtGroupCount'].forEach(id=>{const el=ge(id);if(el)el.value='';});
     if(ge('tFeeAmount')) ge('tFeeAmount').value='팀당 60,000원';
-    if(ge('tFeeBankHolder')) ge('tFeeBankHolder').value='카카오뱅크 / 230스포츠미디어';
+    if(ge('tFeeBankHolder')) ge('tFeeBankHolder').value='카카오뱅크 / (김성희)230스포츠미디어';
     if(ge('tFeeAccount')) ge('tFeeAccount').value='3333-07-8834842';
     if(ge('tType')) ge('tType').value='team';
     updateTournamentTypeUI();
@@ -18361,7 +18383,7 @@ function openET(tid){
       <div style="font-size:.72rem;color:var(--text2);line-height:1.6;margin-bottom:9px">이 대회 홈화면의 계좌 복사와 입금확인 안내에 사용됩니다.</div>
       <div class="frow">
         <div class="form-group"><label class="form-label">참가비</label><input class="form-input" id="etFeeAmount" value="${t.feeAmount||'팀당 60,000원'}" placeholder="예: 팀당 60,000원"></div>
-        <div class="form-group"><label class="form-label">은행 / 예금주</label><input class="form-input" id="etFeeBankHolder" value="${t.feeBankHolder||'카카오뱅크 / 230스포츠미디어'}" placeholder="예: 카카오뱅크 / 230스포츠미디어"></div>
+        <div class="form-group"><label class="form-label">은행 / 예금주</label><input class="form-input" id="etFeeBankHolder" value="${normalizeFeeBankHolderText(t.feeBankHolder)}" placeholder="예: 카카오뱅크 / (김성희)230스포츠미디어"></div>
       </div>
       <div class="form-group" style="margin-bottom:0"><label class="form-label">입금계좌</label><input class="form-input" id="etFeeAccount" value="${t.feeAccount||'3333-07-8834842'}" placeholder="예: 3333-07-8834842"></div>
     </div>
@@ -18464,7 +18486,7 @@ async function saveET(){
     const notice    = ge('etNt').value.trim();
     const venue     = ge('etVn').value.trim();
     const feeAmount = (ge('etFeeAmount')?.value||'').trim() || '팀당 60,000원';
-    const feeBankHolder = (ge('etFeeBankHolder')?.value||'').trim() || '카카오뱅크 / 230스포츠미디어';
+    const feeBankHolder = normalizeFeeBankHolderText((ge('etFeeBankHolder')?.value||'').trim());
     const feeAccount = (ge('etFeeAccount')?.value||'').trim() || '3333-07-8834842';
     const hasGuideAssets = assets.length > 0;
 
@@ -18992,7 +19014,12 @@ function rosterPlayerHTML(name, club, tid){
 
 function onRegTC(){
   const tid=ge('regTS').value,ds=ge('regDS');
-  try{ syncTournamentDataForPage('register', tid || getRealtimeTargetTournamentId() || null, false).catch(e=>console.warn('register sync failed', e)); }catch(e){}
+  try{
+    // v387: 대회 선택 시 캐시가 아닌 서버 최신 등록명단을 우선 확인하고, 도착 즉시 화면을 다시 그립니다.
+    syncTournamentDataForPage('register', tid || getRealtimeTargetTournamentId() || null, true)
+      .then(()=>{ try{ renderRegisterDivisionOverview(); renderRL(); }catch(_e){} })
+      .catch(e=>console.warn('register sync failed', e));
+  }catch(e){}
   setRegClubInputMode(currentRegIsIndividual());
   applyRegLoginUI();
   ge('regSection').style.display='none';
@@ -19660,6 +19687,8 @@ async function registerTeam(){
     const usePublicAppendOnly = isIndividual && !AD && !OP;
     if(usePublicAppendOnly) await stTPublicAppendOne(key, newTeam);
     else await stT(key);
+    // v387: 저장 성공 직후 서버 최신 등록명단을 강제 재조회해 설치앱/PWA 캐시 지연을 줄입니다.
+    try{ await refreshRegistrationViewAfterWrite(tid, div); }catch(_e){ console.warn('post registration refresh skipped', _e); }
   }catch(e){
     G.teams[key].splice(newIdx,1);
     if(!G.teams[key].length) delete G.teams[key];
@@ -35074,6 +35103,12 @@ function getPaymentTournamentIdFromKey(key=''){
 function getPaymentTournament(key=''){
   try{ const tid=getPaymentTournamentIdFromKey(key); return (G.tournaments||[]).find(x=>x.id===tid) || null; }catch(e){ return null; }
 }
+function normalizeFeeBankHolderText(v=''){
+  const raw=String(v||'').trim();
+  if(!raw) return '카카오뱅크 / (김성희)230스포츠미디어';
+  if(raw==='카카오뱅크 / 230스포츠미디어') return '카카오뱅크 / (김성희)230스포츠미디어';
+  return raw;
+}
 function getPaymentTournamentTitle(key=''){
   const t=getPaymentTournament(key);
   let name=String(t?.name||'제1회 모던클럽배 테니스대회').trim();
@@ -35090,7 +35125,7 @@ function getPaymentFeeAmountOnly(key=''){
 }
 function getPaymentAccountText(key=''){
   const t=getPaymentTournament(key);
-  const bankHolder=String(t?.feeBankHolder||'카카오뱅크 / 230스포츠미디어').trim();
+  const bankHolder=normalizeFeeBankHolderText(t?.feeBankHolder);
   const account=String(t?.feeAccount||'3333-07-8834842').trim();
   return `${bankHolder} ${account}`.replace(/\s+/g,' ').trim();
 }
