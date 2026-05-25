@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-05-25-v390-auto-sms-toggle";
+  const APP_VERSION = "2026-05-25-v395-notify-button-observer";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -5369,6 +5369,62 @@ body {
 #page-register .btn, #page-register input, #page-register select, #page-register textarea{animation:none!important;}
 #page-register #aoReg{scroll-margin-top:92px;}
 </style>
+
+<style id="v391RecordCardNameFixStyle">
+/* v391: 관리자 화면에서도 참가자 이름이 잘리지 않도록 목록 버튼을 '상세' 1개로 축소 */
+.v374-record-card.v391-record-card,
+.v374-record-card{
+  padding:9px 50px 9px 10px !important;
+  min-height:62px !important;
+}
+.v374-record-name{
+  display:block !important;
+  max-width:100% !important;
+  font-size:.92rem !important;
+  line-height:1.25 !important;
+  white-space:normal !important;
+  overflow:visible !important;
+  text-overflow:clip !important;
+  word-break:keep-all !important;
+  overflow-wrap:anywhere !important;
+}
+.v374-record-actions.v391-record-actions,
+.v374-record-actions{
+  width:38px !important;
+  right:6px !important;
+  gap:0 !important;
+}
+.v374-record-actions.v391-record-actions .btn,
+.v374-record-actions .btn{
+  min-height:30px !important;
+  height:30px !important;
+  padding:2px 4px !important;
+  font-size:.58rem !important;
+  border-radius:8px !important;
+}
+.v374-record-card:has(.v374-record-actions .btn:nth-child(2)){
+  padding-right:50px !important;
+  min-height:62px !important;
+}
+.v374-record-card:has(.v374-record-actions .btn:nth-child(2)) .v374-record-actions{
+  width:38px !important;
+}
+@media(max-width:680px){
+  .v374-record-grid{grid-template-columns:repeat(3,minmax(0,1fr)) !important;gap:7px !important;}
+  .v374-record-card.v391-record-card,
+  .v374-record-card{padding:8px 44px 8px 8px !important;min-height:60px !important;}
+  .v374-record-name{font-size:.86rem !important;line-height:1.24 !important;}
+  .v374-record-actions.v391-record-actions,
+  .v374-record-actions{width:34px !important;right:5px !important;}
+  .v374-record-actions.v391-record-actions .btn,
+  .v374-record-actions .btn{height:28px !important;min-height:28px !important;font-size:.54rem !important;}
+}
+@media(max-width:430px){
+  .v374-record-grid{grid-template-columns:repeat(2,minmax(0,1fr)) !important;}
+  .v374-record-name{font-size:.9rem !important;}
+}
+</style>
+
 </head>
 <body>
 <header class="app-header">
@@ -35678,9 +35734,9 @@ function v374CompactRecordCards(){
       rows.push({name,club,phone});
     });
     rows.sort((a,b)=>a.name.localeCompare(b.name,'ko') || String(a.club||'').localeCompare(String(b.club||''),'ko'));
-    const isMgr=v374IsManagerLike();
     container.dataset.v374Compacting='1';
-    container.innerHTML=`<div class="v374-record-summary">📋 전체 참가자 기록 <b>${rows.length}</b>명</div><div class="v374-record-grid">${rows.map(r=>`<div class="v374-record-card" onclick="showP('${v374Js(r.name)}','${v374Js(r.club)}')"><div class="v374-record-name">${v374Esc(r.name)}</div><div class="v374-record-club" title="${v374Esc(r.club||'')}">${v374Esc(v374ShortClub(r.club))}</div><div class="v374-record-actions" onclick="event.stopPropagation()"><button type="button" class="btn btn-outline" onclick="showP('${v374Js(r.name)}','${v374Js(r.club)}')">상세</button>${isMgr?`<button type="button" class="btn btn-outline" onclick="openParticipantPersonNotifySms('${v374Js(r.name)}','${v374Js(r.club)}','${v374Js(r.phone)}')">알림/문자</button>`:''}${isRecordDeleteAdminAllowed()?`<button type="button" class="btn btn-danger" onclick="deletePlayerRecordFromList('${v374Js(r.name)}','${v374Js(r.club)}')">삭제</button>`:''}</div></div>`).join('')}</div>`;
+    // v391: 목록에서는 이름 가독성을 우선한다. 관리자용 알림/삭제는 상세 팝업 안으로 이동.
+    container.innerHTML=`<div class="v374-record-summary">📋 전체 참가자 기록 <b>${rows.length}</b>명</div><div class="v374-record-grid">${rows.map(r=>`<div class="v374-record-card v391-record-card" onclick="showP('${v374Js(r.name)}','${v374Js(r.club)}')"><div class="v374-record-name" title="${v374Esc(r.name)}">${v374Esc(r.name)}</div><div class="v374-record-club" title="${v374Esc(r.club||'')}">${v374Esc(v374ShortClub(r.club))}</div><div class="v374-record-actions v391-record-actions" onclick="event.stopPropagation()"><button type="button" class="btn btn-outline" onclick="showP('${v374Js(r.name)}','${v374Js(r.club)}')">상세</button></div></div>`).join('')}</div>`;
     delete container.dataset.v374Compacting;
   }catch(e){console.warn('v374 compact records failed',e); try{delete ge('psResults').dataset.v374Compacting;}catch(_e){}}
 }
@@ -39658,6 +39714,547 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
   }catch(e){}
 })();
 </script>
+
+
+<script id="v391RecordDetailAdminActionsScript">
+(function(){
+  function v391AddRecordDetailActions(name,club){
+    try{
+      if(!(typeof v374IsManagerLike==='function' && v374IsManagerLike())) return;
+      const footer=document.querySelector('#mPHist .modal-footer');
+      if(!footer) return;
+      const safeName=(typeof v374Js==='function')?v374Js(name):String(name||'').replace(/'/g,"\\'");
+      const safeClub=(typeof v374Js==='function')?v374Js(club):String(club||'').replace(/'/g,"\\'");
+      const notifyBtn=`<button class="btn btn-outline" onclick="openParticipantPersonNotifySms('${safeName}','${safeClub}','')">🔔 알림/문자</button>`;
+      const delBtn=(typeof isRecordDeleteAdminAllowed==='function' && isRecordDeleteAdminAllowed())
+        ? `<button class="btn btn-danger" onclick="deletePlayerRecordFromList('${safeName}','${safeClub}')">🗑️ 삭제</button>` : '';
+      footer.innerHTML=`${notifyBtn}${delBtn}<div style="flex:1"></div><button class="btn btn-gray" onclick="cm('mPHist')">닫기</button>`;
+      footer.style.gap='8px';
+      footer.style.flexWrap='wrap';
+    }catch(e){console.warn('v391 detail actions failed',e);}
+  }
+  const prevShowP=window.showP;
+  if(typeof prevShowP==='function' && !window.__v391ShowPWrapped){
+    window.__v391ShowPWrapped=true;
+    window.showP=function(name,club){
+      const r=prevShowP.apply(this,arguments);
+      setTimeout(()=>v391AddRecordDetailActions(name,club),120);
+      return r;
+    };
+  }
+})();
+</script>
+
+
+
+<style id="v392RecordDetailNotifyFixStyle">
+/* v392: 참가자 기록 상세 팝업 하단에 알림/문자 버튼을 항상 복구 */
+#mPHist .modal-footer.v392-record-footer{
+  display:flex !important;
+  align-items:center !important;
+  justify-content:flex-end !important;
+  gap:8px !important;
+  flex-wrap:wrap !important;
+}
+#mPHist .modal-footer.v392-record-footer .btn{
+  min-height:38px !important;
+  padding:7px 12px !important;
+  border-radius:11px !important;
+  font-size:.82rem !important;
+  font-weight:900 !important;
+}
+@media(max-width:520px){
+  #mPHist .modal-footer.v392-record-footer{
+    display:grid !important;
+    grid-template-columns:1fr 1fr !important;
+  }
+  #mPHist .modal-footer.v392-record-footer .btn{width:100% !important;}
+  #mPHist .modal-footer.v392-record-footer .v392-spacer{display:none !important;}
+}
+</style>
+<script id="v392RecordDetailNotifyFixScript">
+(function(){
+  'use strict';
+  if(window.__v392RecordDetailNotifyFix) return;
+  window.__v392RecordDetailNotifyFix=true;
+
+  var lastName='';
+  var lastClub='';
+
+  function isManagerLike(){
+    try{
+      return !!(window.AD || window.TM || window.OP ||
+        document.body.classList.contains('admin-mode') ||
+        document.body.classList.contains('tm-mode') ||
+        document.body.classList.contains('operator-mode'));
+    }catch(e){ return false; }
+  }
+  function canDeleteRecord(){
+    try{
+      if(typeof window.isRecordDeleteAdminAllowed==='function') return !!window.isRecordDeleteAdminAllowed();
+      return !!(window.AD || window.TM || document.body.classList.contains('admin-mode') || document.body.classList.contains('tm-mode'));
+    }catch(e){ return false; }
+  }
+  function jsArg(v){
+    return String(v==null?'':v).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,' ');
+  }
+  function clean(v){ return String(v||'').replace(/\s+/g,' ').trim(); }
+  function inferFromBody(){
+    try{
+      var body=document.getElementById('mPHistBody');
+      var text=clean(body && body.innerText || '');
+      var first=(text.split('\n').map(clean).filter(Boolean)[0]||'');
+      first=first.replace(/^👤\s*/,'').replace(/기록\s*없음.*$/,'').trim();
+      if(first && first.length<30 && !/승률|전체|출전|우승|준우승|상세/.test(first)) return first;
+    }catch(e){}
+    return '';
+  }
+  function applyFooter(name,club){
+    try{
+      if(name) lastName=clean(name);
+      if(club) lastClub=clean(club);
+      var n=lastName || inferFromBody();
+      var c=lastClub || '';
+      var footer=document.querySelector('#mPHist .modal-footer');
+      if(!footer) return;
+      if(!isManagerLike()){
+        footer.classList.remove('v392-record-footer');
+        footer.innerHTML='<button class="btn btn-gray" onclick="cm(\'mPHist\')">닫기</button>';
+        return;
+      }
+      var notify='';
+      if(typeof window.openParticipantPersonNotifySms==='function'){
+        notify='<button type="button" class="btn btn-outline" onclick="openParticipantPersonNotifySms(\''+jsArg(n)+'\',\''+jsArg(c)+'\',\'\')">🔔 알림/문자</button>';
+      }
+      var del='';
+      if(canDeleteRecord() && typeof window.deletePlayerRecordFromList==='function'){
+        del='<button type="button" class="btn btn-danger" onclick="deletePlayerRecordFromList(\''+jsArg(n)+'\',\''+jsArg(c)+'\')">🗑️ 삭제</button>';
+      }
+      footer.classList.add('v392-record-footer');
+      footer.innerHTML= notify + del + '<div class="v392-spacer" style="flex:1"></div><button type="button" class="btn btn-gray" onclick="cm(\'mPHist\')">닫기</button>';
+    }catch(e){ console.warn('v392 record detail footer failed', e); }
+  }
+
+  var prevShowP=window.showP;
+  if(typeof prevShowP==='function'){
+    window.showP=function(name,club){
+      lastName=clean(name); lastClub=clean(club);
+      var r=prevShowP.apply(this,arguments);
+      setTimeout(function(){applyFooter(lastName,lastClub);},80);
+      setTimeout(function(){applyFooter(lastName,lastClub);},260);
+      setTimeout(function(){applyFooter(lastName,lastClub);},700);
+      return r;
+    };
+  }
+
+  try{
+    var mo=new MutationObserver(function(){
+      var m=document.getElementById('mPHist');
+      if(!m || !m.classList.contains('open')) return;
+      clearTimeout(window.__v392RecordFooterTimer);
+      window.__v392RecordFooterTimer=setTimeout(function(){applyFooter(lastName,lastClub);},90);
+    });
+    mo.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['class','style']});
+  }catch(e){}
+})();
+</script>
+
+
+<style id="v393PDetailNotifyFixStyle">
+/* v393: 참가자 상세(mPD)·기록(mPHist) 하단 알림/문자 버튼 강제 복구 */
+#mPD .modal-footer.v393-detail-footer,
+#mPHist .modal-footer.v393-detail-footer{
+  display:flex !important;
+  align-items:center !important;
+  justify-content:flex-end !important;
+  gap:8px !important;
+  flex-wrap:wrap !important;
+}
+#mPD .modal-footer.v393-detail-footer .btn,
+#mPHist .modal-footer.v393-detail-footer .btn{
+  min-height:38px !important;
+  padding:7px 12px !important;
+  border-radius:11px !important;
+  font-size:.82rem !important;
+  font-weight:900 !important;
+}
+@media(max-width:520px){
+  #mPD .modal-footer.v393-detail-footer,
+  #mPHist .modal-footer.v393-detail-footer{
+    display:grid !important;
+    grid-template-columns:1fr 1fr !important;
+  }
+  #mPD .modal-footer.v393-detail-footer .btn,
+  #mPHist .modal-footer.v393-detail-footer .btn{width:100% !important;}
+  #mPD .modal-footer.v393-detail-footer .v393-spacer,
+  #mPHist .modal-footer.v393-detail-footer .v393-spacer{display:none !important;}
+}
+</style>
+<script id="v393PDetailNotifyFixScript">
+(function(){
+  'use strict';
+  if(window.__v393PDetailNotifyFix) return;
+  window.__v393PDetailNotifyFix=true;
+
+  var lastName='';
+  var lastClub='';
+
+  function clean(v){ return String(v||'').replace(/\s+/g,' ').trim(); }
+  function jsArg(v){ return String(v==null?'':v).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,' '); }
+  function splitKey(v){
+    var s=clean(v);
+    if(s.indexOf('__')>=0){ var a=s.split('__'); return {name:clean(a[0]), club:clean(a.slice(1).join('__'))}; }
+    return {name:s, club:''};
+  }
+  function isManagerLike(modalId){
+    try{
+      var footer = modalId ? document.querySelector('#'+modalId+' .modal-footer') : null;
+      var hasDelete = footer && /삭제|명단 삭제|기록 삭제/.test(footer.innerText||'');
+      return !!(hasDelete || window.AD || window.TM || window.OP ||
+        document.body.classList.contains('admin-mode') ||
+        document.body.classList.contains('tm-mode') ||
+        document.body.classList.contains('operator-mode'));
+    }catch(e){ return false; }
+  }
+  function inferFromModal(modalId){
+    try{
+      var title = clean(document.querySelector('#'+modalId+' .modal-header h3')?.innerText||'');
+      title = title.replace(/^👤\s*/,'').replace(/^참가자\s*기록$/,'').replace(/^선수\s*기록$/,'').trim();
+      var body = clean(document.querySelector('#'+modalId+' .modal-body')?.innerText||'');
+      var lines = body.split('\n').map(clean).filter(Boolean);
+      var candidates = [title].concat(lines);
+      for(var i=0;i<candidates.length;i++){
+        var v = clean(candidates[i]).replace(/^👤\s*/,'');
+        if(!v) continue;
+        if(/참가자 기록|선수 기록|총참가|대회 이력|순위|참가|닫기|삭제|수정/.test(v)) continue;
+        if(v.length>20) continue;
+        return v;
+      }
+    }catch(e){}
+    return '';
+  }
+  function makeNotifyButton(n,c){
+    return '<button type="button" class="btn btn-outline v393-notify-btn" style="background:#eff6ff;color:#1d4ed8;border:1.5px solid #93c5fd" onclick="if(typeof openParticipantPersonNotifySms===\'function\'){openParticipantPersonNotifySms(\''+jsArg(n)+'\',\''+jsArg(c)+'\',\'\')}else if(window.toast){toast(\'알림/문자 기능을 찾지 못했습니다.\',\'error\')}">🔔 알림/문자</button>';
+  }
+  function makeDeleteButton(n,c){
+    if(typeof window.deletePlayerRecordFromList==='function'){
+      return '<button type="button" class="btn btn-danger" onclick="deletePlayerRecordFromList(\''+jsArg(n)+'\',\''+jsArg(c)+'\')">🗑️ 명단 삭제</button>';
+    }
+    return '';
+  }
+  function applyFooter(modalId,name,club){
+    try{
+      var footer = document.querySelector('#'+modalId+' .modal-footer');
+      if(!footer) return;
+      if(name){ var sp=splitKey(name); lastName=sp.name||clean(name); if(sp.club) lastClub=sp.club; }
+      if(club) lastClub=clean(club);
+      var n = lastName || inferFromModal(modalId);
+      var c = lastClub || '';
+      if(!n) return;
+      if(!isManagerLike(modalId)) return;
+      var existingText = footer.innerText || '';
+      var closeBtn = '<button type="button" class="btn btn-gray" onclick="cm(\''+modalId+'\')">닫기</button>';
+      var del = /삭제|명단 삭제|기록 삭제/.test(existingText) ? makeDeleteButton(n,c) : '';
+      if(!del && modalId==='mPD' && (window.AD || window.TM || document.body.classList.contains('admin-mode') || document.body.classList.contains('tm-mode'))){
+        del = makeDeleteButton(n,c);
+      }
+      footer.classList.add('v393-detail-footer');
+      footer.innerHTML = makeNotifyButton(n,c) + del + '<div class="v393-spacer" style="flex:1"></div>' + closeBtn;
+    }catch(e){ console.warn('v393 detail footer failed', e); }
+  }
+
+  var prevShowP=window.showP;
+  if(typeof prevShowP==='function'){
+    window.showP=function(name,club){
+      var sp=splitKey(name); lastName=sp.name||clean(name); lastClub=clean(club)||sp.club||'';
+      var r=prevShowP.apply(this,arguments);
+      [80,240,700,1300].forEach(function(ms){setTimeout(function(){applyFooter('mPHist',lastName,lastClub);},ms);});
+      return r;
+    };
+  }
+
+  var prevOpenPD=window.openPD;
+  if(typeof prevOpenPD==='function'){
+    window.openPD=function(name,club){
+      var sp=splitKey(name); lastName=sp.name||clean(name); lastClub=clean(club)||sp.club||'';
+      var r=prevOpenPD.apply(this,arguments);
+      Promise.resolve(r).finally(function(){
+        [80,240,700,1300].forEach(function(ms){setTimeout(function(){applyFooter('mPD',lastName,lastClub);},ms);});
+      });
+      return r;
+    };
+  }
+
+  function refreshOpenModals(){
+    var pd=document.getElementById('mPD');
+    var ph=document.getElementById('mPHist');
+    if(pd && pd.classList.contains('open')) applyFooter('mPD',lastName,lastClub);
+    if(ph && ph.classList.contains('open')) applyFooter('mPHist',lastName,lastClub);
+  }
+  try{
+    var mo=new MutationObserver(function(){
+      clearTimeout(window.__v393FooterTimer);
+      window.__v393FooterTimer=setTimeout(refreshOpenModals,60);
+    });
+    mo.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['class','style']});
+  }catch(e){}
+  document.addEventListener('DOMContentLoaded',function(){setTimeout(refreshOpenModals,300);});
+})();
+</script>
+
+
+<style id="v394ForceNotifyButtonStyle">
+/* v394: 참가자 상세/기록 팝업에 알림·문자 버튼 강제 표시 */
+#mPD .modal-footer.v394-force-footer,
+#mPHist .modal-footer.v394-force-footer{
+  display:flex !important;
+  align-items:center !important;
+  justify-content:flex-end !important;
+  gap:8px !important;
+  flex-wrap:wrap !important;
+}
+#mPD .modal-footer.v394-force-footer .btn,
+#mPHist .modal-footer.v394-force-footer .btn{
+  min-height:38px !important;
+  border-radius:11px !important;
+  font-size:.82rem !important;
+  font-weight:900 !important;
+}
+@media(max-width:520px){
+  #mPD .modal-footer.v394-force-footer,
+  #mPHist .modal-footer.v394-force-footer{
+    display:grid !important;
+    grid-template-columns:1fr 1fr !important;
+  }
+  #mPD .modal-footer.v394-force-footer .btn,
+  #mPHist .modal-footer.v394-force-footer .btn{width:100% !important;}
+  #mPD .modal-footer.v394-force-footer .v394-spacer,
+  #mPHist .modal-footer.v394-force-footer .v394-spacer{display:none !important;}
+}
+</style>
+<script id="v394ForceNotifyButtonScript">
+(function(){
+  'use strict';
+  if(window.__v394ForceNotifyButton) return;
+  window.__v394ForceNotifyButton = true;
+
+  function clean(v){ return String(v||'').replace(/\s+/g,' ').trim(); }
+  function js(v){ return String(v==null?'':v).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,' '); }
+
+  function isOpen(id){
+    var el=document.getElementById(id);
+    return !!(el && el.classList.contains('open'));
+  }
+
+  function getInfo(id){
+    var body=document.querySelector('#'+id+' .modal-body');
+    var name='';
+    var club='';
+    try{
+      var b=body && body.querySelector('b');
+      if(b) name=clean(b.innerText||b.textContent||'');
+      var txt=body?String(body.innerText||''):'';
+      var m=txt.match(/주클럽\s*[:：]\s*([^\n]+)/);
+      if(m) club=clean(m[1]).replace(/부클럽.*/,'').trim();
+      if(!name){
+        var title=clean(document.querySelector('#'+id+' .modal-header h3')?.innerText||'');
+        title=title.replace(/^👤\s*/,'').replace(/^참가자\s*기록$/,'').replace(/^선수\s*기록$/,'').trim();
+        if(title && title.length<20) name=title;
+      }
+    }catch(e){}
+    return {name:name, club:club};
+  }
+
+  function notifyBtn(name,club){
+    return '<button type="button" class="btn btn-outline v394-notify-btn" style="background:#eff6ff;color:#1d4ed8;border:1.5px solid #93c5fd" onclick="event.preventDefault();event.stopPropagation(); if(typeof openParticipantPersonNotifySms===\'function\'){openParticipantPersonNotifySms(\''+js(name)+'\',\''+js(club)+'\',\'\')}else if(window.toast){toast(\'알림/문자 기능을 찾지 못했습니다.\',\'error\')}">🔔 알림/문자</button>';
+  }
+  function closeBtn(id){
+    return '<button type="button" class="btn btn-gray" onclick="cm(\''+id+'\')">닫기</button>';
+  }
+
+  function hasManageAuthority(){
+    try{
+      return !!(window.AD || window.TM || window.OP ||
+        document.body.classList.contains('admin-mode') ||
+        document.body.classList.contains('tm-mode') ||
+        document.body.classList.contains('operator-mode'));
+    }catch(e){ return false; }
+  }
+
+  function fixFooter(id){
+    try{
+      if(!isOpen(id)) return;
+      var footer=document.querySelector('#'+id+' .modal-footer');
+      if(!footer) return;
+      var text=footer.innerText||'';
+      var canShow = hasManageAuthority() || /삭제|명단\s*삭제|기록\s*삭제/.test(text);
+      if(!canShow) return;
+      if(/알림\/문자/.test(text) && footer.querySelector('.v394-notify-btn')) return;
+      var info=getInfo(id);
+      if(!info.name) return;
+      var deleteButton='';
+      var oldDelete=[].slice.call(footer.querySelectorAll('button')).find(function(b){return /삭제/.test(b.innerText||'');});
+      if(oldDelete){
+        deleteButton=oldDelete.outerHTML;
+      }else if(typeof window.deletePlayerRecordFromList==='function'){
+        deleteButton='<button type="button" class="btn btn-danger" onclick="deletePlayerRecordFromList(\''+js(info.name)+'\',\''+js(info.club)+'\')">🗑️ 명단 삭제</button>';
+      }
+      footer.classList.add('v394-force-footer');
+      footer.innerHTML = notifyBtn(info.name,info.club) + deleteButton + '<div class="v394-spacer" style="flex:1"></div>' + closeBtn(id);
+    }catch(e){ console.warn('v394 footer fix failed', e); }
+  }
+
+  function fixAll(){ fixFooter('mPHist'); fixFooter('mPD'); }
+
+  // 기존 스크립트가 footer를 다시 덮어써도 즉시 복구
+  try{
+    var mo=new MutationObserver(function(){
+      clearTimeout(window.__v394NotifyTimer);
+      window.__v394NotifyTimer=setTimeout(fixAll,40);
+    });
+    mo.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['class','style']});
+  }catch(e){}
+
+  // 모달이 열린 직후/조금 뒤 모두 보정
+  setInterval(fixAll, 600);
+  document.addEventListener('click', function(){ setTimeout(fixAll,80); setTimeout(fixAll,250); setTimeout(fixAll,700); }, true);
+  document.addEventListener('DOMContentLoaded', function(){ setTimeout(fixAll,300); });
+})();
+</script>
+
+
+<script id="v395NotifyButtonObserverPatch">
+(function(){
+  const V395_NOTIFY_BTN_ID = 'v395DetailNotifyBtn';
+
+  function v395IsAdminLike(){
+    try{
+      if (document.body.classList.contains('admin-mode')) return true;
+      if (document.body.classList.contains('operator-mode')) return true;
+      if (document.body.classList.contains('tm-mode')) return true;
+      if (window.isAdmin || window.isOperator || window.isTournamentManager || window.isDeveloper) return true;
+      const adminBadge = document.getElementById('adminBadge');
+      if (adminBadge && getComputedStyle(adminBadge).display !== 'none') return true;
+    }catch(e){}
+    return false;
+  }
+
+  function v395FindCurrentPlayerName(){
+    try{
+      const modal = document.getElementById('mPD');
+      if(!modal) return '';
+      const title = modal.querySelector('#mPDT, .modal-body h3, .modal-body h2, .modal-body b, .modal-body strong');
+      const body = modal.querySelector('#mPDB') || modal.querySelector('.modal-body');
+      let txt = '';
+      if(title) txt = (title.textContent || '').trim();
+      if(!txt && body){
+        const lines = (body.innerText || '').split('\n').map(s=>s.trim()).filter(Boolean);
+        txt = lines.find(s => s.length >= 2 && s.length <= 12 && !/참가자|기록|대회|순위|총참가|참가/.test(s)) || '';
+      }
+      return txt;
+    }catch(e){ return ''; }
+  }
+
+  function v395OpenNotifyForCurrentPlayer(){
+    try{
+      const name = v395FindCurrentPlayerName();
+      if (typeof openManualPlayerNotify === 'function') return openManualPlayerNotify(name);
+      if (typeof openPlayerNotifySms === 'function') return openPlayerNotifySms(name);
+      if (typeof openPlayerQuickContact === 'function') return openPlayerQuickContact(name);
+      if (typeof sendPlayerNotificationSms === 'function') return sendPlayerNotificationSms(name);
+      if (typeof openManualPushForPlayer === 'function') return openManualPushForPlayer(name);
+      if (typeof toast === 'function') toast('알림/문자 기능을 찾을 수 없습니다. 참가자 목록의 알림/문자 버튼을 사용해 주세요.', 'error');
+      else alert('알림/문자 기능을 찾을 수 없습니다.');
+    }catch(e){
+      console.warn('v395 notify open failed', e);
+      try{ alert('알림/문자 실행 중 오류가 발생했습니다.'); }catch(_){}
+    }
+  }
+
+  function v395EnsureNotifyButton(){
+    try{
+      if(!v395IsAdminLike()) return;
+      const modal = document.getElementById('mPD');
+      const footer = document.getElementById('mPDFooter');
+      if(!modal || !footer) return;
+      const isOpen = modal.classList.contains('open') || getComputedStyle(modal).display !== 'none';
+      if(!isOpen) return;
+
+      if(footer.querySelector('#' + V395_NOTIFY_BTN_ID)) return;
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.id = V395_NOTIFY_BTN_ID;
+      btn.className = 'btn btn-outline';
+      btn.textContent = '🔔 알림/문자';
+      btn.style.fontWeight = '900';
+      btn.style.minHeight = '38px';
+      btn.onclick = function(ev){
+        ev.preventDefault();
+        ev.stopPropagation();
+        v395OpenNotifyForCurrentPlayer();
+      };
+
+      const delBtn = [...footer.querySelectorAll('button')].find(b => /삭제/.test(b.textContent || ''));
+      if(delBtn && delBtn.parentNode === footer){
+        footer.insertBefore(btn, delBtn.nextSibling);
+      }else{
+        footer.insertBefore(btn, footer.firstChild);
+      }
+    }catch(e){
+      console.warn('v395EnsureNotifyButton failed', e);
+    }
+  }
+
+  // 상세창이 열리는 이벤트 흐름에서만 1회 보정
+  document.addEventListener('click', function(e){
+    const target = e.target && e.target.closest && e.target.closest('button,[onclick]');
+    if(!target) return;
+    const txt = (target.textContent || '') + ' ' + (target.getAttribute('onclick') || '');
+    if(/상세|openPD|openPHist|참가자/.test(txt)){
+      setTimeout(v395EnsureNotifyButton, 0);
+      setTimeout(v395EnsureNotifyButton, 120);
+    }
+  }, true);
+
+  // footer가 실제 변경될 때만 보정: Firebase 읽기/쓰기 없음
+  document.addEventListener('DOMContentLoaded', function(){
+    const footer = document.getElementById('mPDFooter');
+    if(footer && window.MutationObserver){
+      const mo = new MutationObserver(function(){ v395EnsureNotifyButton(); });
+      mo.observe(footer, { childList:true, subtree:false });
+    }
+    const modal = document.getElementById('mPD');
+    if(modal && window.MutationObserver){
+      const mo2 = new MutationObserver(function(){ v395EnsureNotifyButton(); });
+      mo2.observe(modal, { attributes:true, attributeFilter:['class','style'] });
+    }
+  });
+
+  window.v395EnsureNotifyButton = v395EnsureNotifyButton;
+})();
+</script>
+<style id="v395NotifyButtonObserverStyle">
+#mPDFooter #v395DetailNotifyBtn{
+  background:#eff6ff !important;
+  color:#1d4ed8 !important;
+  border:1.5px solid #93c5fd !important;
+  border-radius:12px !important;
+}
+@media(max-width:680px){
+  #mPDFooter{
+    display:grid !important;
+    grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+    gap:8px !important;
+  }
+  #mPDFooter .btn{
+    width:100% !important;
+    min-width:0 !important;
+    font-size:.8rem !important;
+    padding:8px 6px !important;
+  }
+}
+</style>
 
 </body>
 </html>
