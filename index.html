@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-05-25-v396-my-record-page";
+  const APP_VERSION = "2026-05-25-v397-my-record-auth-fix";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -35791,6 +35791,250 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.querySelectorAll('.reg-year-label').forEach(el=>{
     el.textContent = yr+'년 등록선수';
   });
+
+// v397: 일반회원 내 경기/기록 - 실제 Firebase 로그인 상태와 연결 보정
+(function(){
+  function v397E(s){
+    try{ return (typeof esc==='function') ? esc(String(s||'')) : String(s||'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+    catch(e){ return String(s||''); }
+  }
+  function v397CN(s){
+    try{ return (typeof cleanName==='function') ? cleanName(String(s||'')) : String(s||'').replace(/\s+/g,'').trim(); }
+    catch(e){ return String(s||'').trim(); }
+  }
+  function v397NN(s){ return v397CN(s).toLowerCase(); }
+  function v397NC(s){
+    try{ return (typeof normalizeClub==='function') ? normalizeClub(String(s||'')) : String(s||'').trim(); }
+    catch(e){ return String(s||'').trim(); }
+  }
+  function v397Phone(s){
+    try{ return (typeof normalizePhoneDigits==='function') ? normalizePhoneDigits(s||'') : String(s||'').replace(/[^0-9]/g,''); }
+    catch(e){ return String(s||'').replace(/[^0-9]/g,''); }
+  }
+  function v397FmtDate(s){
+    const d=new Date(s||'');
+    if(!s || Number.isNaN(d.getTime())) return s||'-';
+    return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
+  }
+  function v397DivLabel(d){
+    try{ return (typeof dl==='function') ? dl(d) : d; }catch(e){ return d||''; }
+  }
+  function v397GetRealUser(){
+    try{
+      const u = (typeof auth!=='undefined' && auth?.currentUser && !auth.currentUser.isAnonymous) ? auth.currentUser : null;
+      return u || CURRENT_APP_USER || null;
+    }catch(e){ return CURRENT_APP_USER || null; }
+  }
+  function v397Identity(user){
+    const p = CURRENT_APP_PROFILE || {};
+    const names = new Set();
+    [p.name, p.displayName, p.socialName, user?.displayName].forEach(v=>{
+      const n=v397CN(v||'');
+      if(n && !/@/.test(n)) names.add(n);
+    });
+    return {
+      names:[...names],
+      normNames:[...names].map(v397NN),
+      phone:v397Phone(p.phone || p.mobile || p.phoneNumber || ''),
+      club:v397NC(p.club || p.verifiedClub || ''),
+      uid:user?.uid||'',
+      email:user?.email||''
+    };
+  }
+  function v397PlayerNameFromKey(k,p){
+    try{
+      const pk=(typeof pKeyParse==='function') ? pKeyParse(k) : {};
+      return v397CN(p?.name || pk.name || k);
+    }catch(e){ return v397CN(p?.name || k); }
+  }
+  function v397PlayerClubFromKey(k,p){
+    try{
+      const pk=(typeof pKeyParse==='function') ? pKeyParse(k) : {};
+      return v397NC(p?.club || pk.club || ((p?.clubs||[])[0]) || '');
+    }catch(e){ return v397NC(p?.club || ((p?.clubs||[])[0]) || ''); }
+  }
+  function v397IsMine(name, club, phone, id){
+    const n=v397CN(name||'');
+    const nn=v397NN(n);
+    const c=v397NC(club||'');
+    const p=v397Phone(phone||'');
+    if(id.phone && p && id.phone===p) return true;
+    if(id.normNames.length && id.normNames.includes(nn)){
+      if(!id.club || !c || id.club===c) return true;
+    }
+    return false;
+  }
+  function v397CollectCandidates(id){
+    const map=new Map();
+    Object.entries(G?.players||{}).forEach(([k,p])=>{
+      const nm=v397PlayerNameFromKey(k,p);
+      const cl=v397PlayerClubFromKey(k,p);
+      const ph=v397Phone(p?.phone||'');
+      if(v397IsMine(nm,cl,ph,id)){
+        map.set(`${nm}|${cl}`, {name:nm, club:cl, p:p||{name:nm,club:cl,clubs:cl?[cl]:[],history:[]}});
+      }
+    });
+    Object.values(G?.teams||{}).forEach(arr=>{
+      (arr||[]).forEach(team=>{
+        const rawClub=String(team?.club||'').trim();
+        const teamClub=v397NC((typeof baseClub==='function' ? baseClub(rawClub) : rawClub) || rawClub);
+        const ownerHit=id.uid && String(team?.ownerUid||'')===String(id.uid);
+        const add=(nm,ph='')=>{
+          const cn=v397CN(nm||'');
+          if(!cn) return;
+          if(ownerHit || v397IsMine(cn,teamClub,ph,id)){
+            const key=`${cn}|${teamClub}`;
+            if(!map.has(key)) map.set(key,{name:cn,club:teamClub,p:{name:cn,club:teamClub,clubs:teamClub?[teamClub]:[],history:[],phone:ph||''}});
+          }
+        };
+        (team?.players||[]).forEach(nm=>add(nm,''));
+        (team?.individualPlayers||[]).forEach(p=>add(p?.name||'',p?.phone||''));
+      });
+    });
+    return [...map.values()];
+  }
+  function v397CollectTeamRows(id){
+    const rows=[], seen=new Set();
+    (G?.tournaments||[]).forEach(t=>{
+      const tid=t?.id||'';
+      (t?.divisions||[]).forEach(div=>{
+        const key=`${tid}_${div}`;
+        (G?.teams?.[key]||[]).forEach((team,idx)=>{
+          const rawClub=String(team?.club||'').trim();
+          const teamClub=v397NC((typeof baseClub==='function' ? baseClub(rawClub) : rawClub) || rawClub);
+          const ownerHit=id.uid && String(team?.ownerUid||'')===String(id.uid);
+          let hit=!!ownerHit;
+          const playerNames=[];
+          (team?.players||[]).forEach(nm=>{ const cn=v397CN(nm||''); if(cn) playerNames.push(cn); if(v397IsMine(cn,teamClub,'',id)) hit=true; });
+          (team?.individualPlayers||[]).forEach(p=>{ const cn=v397CN(p?.name||''); if(cn) playerNames.push(cn); if(v397IsMine(cn,teamClub,p?.phone||'',id)) hit=true; });
+          if(!hit) return;
+          const dk=`${tid}|${div}|${idx}|${playerNames.join('/')}`;
+          if(seen.has(dk)) return;
+          seen.add(dk);
+          let result='참가';
+          try{
+            const ach=(typeof getLiveTeamAchievementForHistory==='function') ? getLiveTeamAchievementForHistory(key,idx,team,tid,div) : null;
+            result=ach?.result || (team?.rank?`${team.rank}위`:'참가');
+          }catch(e){}
+          rows.push({date:t?.date||'',tname:t?.name||'',div,club:rawClub||teamClub,players:playerNames,result,status:t?.status||''});
+        });
+      });
+    });
+    rows.sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+    return rows;
+  }
+  function v397CollectHistoryRows(candidates){
+    const rows=[], seen=new Set();
+    candidates.forEach(c=>{
+      let live=[];
+      try{ live=(typeof collectLivePlayerHistory==='function') ? collectLivePlayerHistory(c.name,c.club) : []; }catch(e){}
+      const fb=(c.p?.history||[]).map(h=>({date:h.date||'',tname:h.tname||'',club:h.club||c.club||'',div:h.div||'',rank:h.rank||null,result:h.result||'참가'}));
+      [...fb,...live].forEach(h=>{
+        const dk=`${h.date}|${h.tname}|${h.club}|${h.div}|${h.result}`;
+        if(seen.has(dk)) return;
+        seen.add(dk);
+        rows.push(h);
+      });
+    });
+    rows.sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+    return rows;
+  }
+  function v397RenderCandidateDetails(candidates){
+    if(!candidates.length) return '';
+    return candidates.map(c=>{
+      let html='';
+      try{ html=(typeof buildPH==='function') ? buildPH(c.name,c.p) : ''; }catch(e){}
+      return `<div class="my-record-card" style="padding:14px;margin-top:10px">${html || `<b>${v397E(c.name)}</b><div class="my-record-muted">${v397E(c.club||'')}</div>`}</div>`;
+    }).join('');
+  }
+
+  window.openMyRecordModal = async function(){
+    const user=v397GetRealUser();
+    if(!user || user.isAnonymous){
+      try{ toast('먼저 개인 로그인 후 이용할 수 있습니다.','info'); }catch(e){}
+      try{ toggleAdminSignup(); }catch(e){}
+      return;
+    }
+    const body=ge('mMyRecordBody');
+    if(body) body.innerHTML='<div style="padding:22px;text-align:center;color:var(--text2)">내 경기 기록을 불러오는 중입니다…</div>';
+    try{ om('mMyRecord'); }catch(e){}
+
+    try{
+      try{ CURRENT_APP_PROFILE=await ensureUserProfileDoc(user); }catch(e){}
+      if(typeof ensurePlayersLoaded==='function') await ensurePlayersLoaded();
+      if(typeof ensureAllParticipationDataLoaded==='function') await ensureAllParticipationDataLoaded();
+      if(typeof loadRegistry==='function') await loadRegistry(2026).catch(()=>{});
+    }catch(e){ console.warn('v397 load my record data failed', e); }
+
+    const id=v397Identity(user);
+    const candidates=v397CollectCandidates(id);
+    const teamRows=v397CollectTeamRows(id);
+    const histRows=v397CollectHistoryRows(candidates);
+    const best=histRows.find(h=>Number(h.rank||0)>0 || /우승|준우승|위|강|본선|통과/.test(String(h.result||'')))?.result || '-';
+
+    const profileWarn=(!id.names.length && !id.phone)
+      ? `<div class="my-record-card" style="border-color:#f59e0b;background:#fff7ed"><b>본인 확인 정보가 부족합니다</b><div class="my-record-muted" style="margin-top:5px">내 정보 설정에서 이름과 전화번호를 저장하면 참가 기록을 더 정확하게 찾을 수 있습니다.</div><div style="margin-top:10px"><button class="btn btn-primary" onclick="openMyProfileModal()">👤 내 정보 설정</button></div></div>`
+      : '';
+
+    const currentHtml=teamRows.length
+      ? teamRows.map(r=>`<div class="my-record-card">
+          <div class="my-record-card-title"><b>${v397E(r.tname||'대회')}</b><span class="my-record-chip">${v397E(r.result||'참가')}</span></div>
+          <div class="my-record-muted">📅 ${v397E(v397FmtDate(r.date))} · 🏷 ${v397E(v397DivLabel(r.div))} · 👥 ${v397E(r.club||'-')}</div>
+          <div class="my-record-muted" style="margin-top:3px">선수: ${v397E((r.players||[]).join(' / ')||'-')}</div>
+        </div>`).join('')
+      : '<div class="my-record-card"><div class="my-record-muted">현재 선택된 데이터에서 내 참가 시합을 찾지 못했습니다. 이름/전화번호를 내 정보에 저장했는지 확인하세요.</div></div>';
+
+    const histHtml=histRows.length
+      ? histRows.slice(0,30).map(h=>`<div class="my-record-card">
+          <div class="my-record-card-title"><b>${v397E(h.tname||'대회')}</b><span class="my-record-chip">${v397E(h.result||'참가')}</span></div>
+          <div class="my-record-muted">📅 ${v397E(v397FmtDate(h.date))} · 🏷 ${v397E(v397DivLabel(h.div))} · 👥 ${v397E(h.club||'-')}</div>
+        </div>`).join('')
+      : '<div class="my-record-card"><div class="my-record-muted">누적 경기 이력이 아직 없습니다.</div></div>';
+
+    if(body){
+      body.innerHTML=`
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+          <div>
+            <div style="font-size:1.05rem;font-weight:1000;color:#0f1e3a">${v397E(id.names[0] || CURRENT_APP_PROFILE?.displayName || user.displayName || user.email || '회원')}님의 기록</div>
+            <div class="my-record-muted">${id.club?`소속: ${v397E(id.club)}`:'소속 클럽 미설정'}${id.phone?' · 전화번호 연결됨':' · 전화번호 미등록'}</div>
+          </div>
+          <button class="btn btn-outline" onclick="openMyProfileModal()">👤 정보 수정</button>
+        </div>
+        ${profileWarn}
+        <div class="my-record-summary">
+          <div class="my-record-stat"><b>${teamRows.length}</b><span>참가 시합</span></div>
+          <div class="my-record-stat"><b>${histRows.length}</b><span>기록 이력</span></div>
+          <div class="my-record-stat"><b style="font-size:1.05rem;line-height:1.2">${v397E(best)}</b><span>주요 성적</span></div>
+        </div>
+        <div class="my-record-section-title">🎾 참가했던 시합 목록</div>
+        ${currentHtml}
+        <div class="my-record-section-title">📋 본인 경기 기록</div>
+        ${histHtml}
+        ${candidates.length?`<div class="my-record-section-title">👤 상세 기록</div>${v397RenderCandidateDetails(candidates)}`:''}
+      `;
+    }
+  };
+
+  function v397RefreshMyRecordButton(user=CURRENT_APP_USER){
+    try{
+      const u=user || v397GetRealUser();
+      const logged=!!(u && !u.isAnonymous);
+      const btn=ge('myRecordBtn');
+      if(btn){
+        btn.style.display=logged?'':'none';
+        btn.textContent='📊 내 경기/기록';
+      }
+    }catch(e){}
+  }
+  const __v397RefreshGoogleLoginUI = refreshGoogleLoginUI;
+  refreshGoogleLoginUI = function(user=CURRENT_APP_USER){
+    const r=__v397RefreshGoogleLoginUI.apply(this, arguments);
+    v397RefreshMyRecordButton(user);
+    return r;
+  };
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>v397RefreshMyRecordButton(CURRENT_APP_USER),300));
+})();
+
   initFB();
   refreshRoleUI();
 });
