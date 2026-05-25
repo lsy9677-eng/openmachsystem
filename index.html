@@ -5912,7 +5912,7 @@ body {
 <div id="faqTabC2" style="padding:14px 16px;display:none;flex-direction:column;gap:0">
 <div style="border-left:3px solid #1565c0;padding:10px 12px;margin-bottom:10px;background:#eff6ff;border-radius:0 8px 8px 0">
 <div style="font-weight:700;font-size:.84rem;color:#1e40af;margin-bottom:5px">Q. 본선 추첨 버튼이 활성화가 안 돼요</div>
-<div style="font-size:.78rem;color:#374151;line-height:1.6">예선 <b>전 경기의 결과가 모두 입력</b>되어야 본선 추첨 버튼이 활성화됩니다. 대진표에서 결과가 입력되지 않은 경기가 없는지 확인하세요. 미입력 경기가 하나라도 있으면 추첨이 시작되지 않습니다.</div>
+<div style="font-size:.78rem;color:#374151;line-height:1.6">예선 조 추첨만 완료되어 있으면 본선 추첨이 가능합니다. 예선이 진행 중이면 A조 1위·B조 2위 같은 자리 기준으로 먼저 본선표를 만들고, 결과가 확정되는 조부터 실제 팀명으로 자동 반영됩니다.</div>
 </div>
 <div style="border-left:3px solid #1565c0;padding:10px 12px;margin-bottom:10px;background:#eff6ff;border-radius:0 8px 8px 0">
 <div style="font-weight:700;font-size:.84rem;color:#1e40af;margin-bottom:5px">Q. 오더 초기화 후 어떻게 해야 하나요</div>
@@ -6194,21 +6194,21 @@ body {
 <!-- 탭2: 본선 추첨 -->
 <div id="opTabC2" style="padding:16px;display:none">
 <div style="background:#fce4ec;border-radius:10px;padding:11px 13px;margin-bottom:14px;font-size:.80rem;color:#880e4f;line-height:1.6;font-weight:700">
-    🏆 예선 전 경기 결과가 모두 입력되어야 본선 추첨이 가능합니다
+    🏆 예선 조 추첨 후에는 예선 진행 중에도 본선 추첨이 가능합니다
   </div>
 <div style="display:flex;flex-direction:column;gap:14px">
 <div style="display:flex;gap:11px;align-items:flex-start">
 <div style="flex-shrink:0;width:24px;height:24px;border-radius:50%;background:#880e4f;color:#fff;font-size:.76rem;font-weight:800;display:flex;align-items:center;justify-content:center">1</div>
 <div>
 <div style="font-weight:700;font-size:.86rem;margin-bottom:3px">예선 완료 확인</div>
-<div style="font-size:.79rem;color:#555;line-height:1.55">대진표에서 예선 조별 경기의 결과가 모두 입력됐는지 확인합니다. 결과 미입력 경기가 남아 있으면 본선 추첨 버튼이 활성화되지 않습니다.</div>
+<div style="font-size:.79rem;color:#555;line-height:1.55">대진표에서 예선 조 추첨이 완료됐는지 확인합니다. 예선 결과가 아직 없어도 본선 추첨을 먼저 실행할 수 있습니다.</div>
 </div>
 </div>
 <div style="display:flex;gap:11px;align-items:flex-start">
 <div style="flex-shrink:0;width:24px;height:24px;border-radius:50%;background:#880e4f;color:#fff;font-size:.76rem;font-weight:800;display:flex;align-items:center;justify-content:center">2</div>
 <div>
 <div style="font-weight:700;font-size:.86rem;margin-bottom:3px">본선 추첨 실행</div>
-<div style="font-size:.79rem;color:#555;line-height:1.55">예선 결과를 바탕으로 본선 진출팀이 자동 결정됩니다. 대진표 상단 또는 해당 부 섹션의 <span style="background:#880e4f;color:#fff;padding:1px 7px;border-radius:5px;font-size:.73rem;font-weight:700">🎲 본선 추첨</span> 버튼을 클릭하면 본선 대진이 생성됩니다.</div>
+<div style="font-size:.79rem;color:#555;line-height:1.55">예선 진행 중에는 A조 1위·B조 2위 같은 자리 기준으로 본선 대진이 생성됩니다. 이후 예선 결과가 저장되면 확정된 자리부터 실제 팀명으로 자동 치환됩니다.</div>
 </div>
 </div>
 <div style="display:flex;gap:11px;align-items:flex-start">
@@ -21664,7 +21664,7 @@ function renderBracketHTMLForDiv(tid,div,isAll){
           </div>
         </div>` : ``}
         ${isGroupKO && showMainDrawManageMenus ? `<div class="login-menu-wrap js-mini-menu" id="${mainMenuWrapId}">
-          <button class="btn btn-outline" style="padding:4px 10px;font-size:.72rem;min-height:34px;white-space:nowrap;font-weight:800;${canMainRedraw?'':'opacity:.5;cursor:not-allowed;'}" onclick="${canMainRedraw?`toggleMiniMenu(event,'${mainMenuWrapId}')`:`toast('예선을 먼저 완료하세요','info')`}">🏆 본선 추첨 관리</button>
+          <button class="btn btn-outline" style="padding:4px 10px;font-size:.72rem;min-height:34px;white-space:nowrap;font-weight:800;${canMainRedraw?'':'opacity:.5;cursor:not-allowed;'}" onclick="${canMainRedraw?`toggleMiniMenu(event,'${mainMenuWrapId}')`:`toast('예선 조 추첨을 먼저 진행하세요','info')`}">🏆 본선 추첨 관리</button>
           <div class="login-menu-panel" style="min-width:210px">
             ${canManageBracket()?`<button class="btn-sm login-menu-item" onclick="closeMiniMenu('${mainMenuWrapId}');buildMain('${tid}','${div}')" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12);${canMainRedraw?'':'opacity:.5;cursor:not-allowed;'}" ${canMainRedraw?'':'disabled'}>${latestMainSavedDraw || mMs.length ? '🎲 본선 재추첨' : '🎲 본선 추첨 시작'}</button>`:''}
             <button class="btn-sm login-menu-item" onclick="closeMiniMenu('${mainMenuWrapId}');openLatestSavedDraw('${tid}','${div}','main')" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12);${latestMainSavedDraw?'':'opacity:.5;cursor:not-allowed;'}" ${latestMainSavedDraw?'':'disabled'}>📋 본선 결과 보기</button>
@@ -21979,7 +21979,7 @@ function renderBracketHTMLForDiv(tid,div,isAll){
             <div style="font-weight:800;color:var(--primary-dark);margin-bottom:6px">${isFixedPreview?'📌 본선은 지금부터 계속 보입니다':'📌 본선은 예선 후 재추첨됩니다'}</div>
             <div style="font-size:.78rem;color:var(--text2);margin-bottom:10px;line-height:1.7">
               ${isFixedPreview
-                ? '예선이 끝나기 전에는 <b>본선 구조 미리보기</b>로 표시되고, 예선 종료 후 본선 추첨을 하면 실제 팀으로 자동 배정됩니다. 진출전이 있으면 직행팀 수와 진출전 팀 수가 함께 표시됩니다.'
+                ? '예선이 끝나기 전에도 <b>본선 추첨</b>을 실행할 수 있습니다. 이때는 A조 1위·B조 2위 같은 자리 기준으로 저장되고, 예선 결과가 확정되는 대로 실제 팀명으로 자동 반영됩니다. 진출전이 있으면 직행팀 수와 진출전 팀 수가 함께 표시됩니다.'
                 : '본선을 <b>재추첨</b>으로 설정한 경우에는 예선 단계에서 실제 본선 배정 위치를 미리 보여주지 않습니다. 아래에는 구조와 진출전 자리만 표시됩니다. 예: 66팀이면 직행 62팀, 진출전 4팀(2경기), 승자 2팀이 64강 합류.'}
             </div>
             ${isFixedPreview ? renderMainPreviewHTML(pv.matchSlots,pv.n,true,pv.playInMatches||[]) : renderMainPreviewHTML(redrawPreview.matchSlots,redrawPreview.spec.mainSize||pv.n,true,redrawPreview.playInMatches||[])}
