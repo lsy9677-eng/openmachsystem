@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-05-25-v387-fast-registration-sync";
+  const APP_VERSION = "2026-05-25-v390-auto-sms-toggle";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -5363,6 +5363,12 @@ body {
 }
 </style>
 
+
+<style id="v389RegisterFocusStableStyle">
+/* v389: 참가접수 버튼/폼 안정화 */
+#page-register .btn, #page-register input, #page-register select, #page-register textarea{animation:none!important;}
+#page-register #aoReg{scroll-margin-top:92px;}
+</style>
 </head>
 <body>
 <header class="app-header">
@@ -5911,8 +5917,8 @@ body {
 <!-- 진행자 FAQ -->
 <div id="faqTabC2" style="padding:14px 16px;display:none;flex-direction:column;gap:0">
 <div style="border-left:3px solid #1565c0;padding:10px 12px;margin-bottom:10px;background:#eff6ff;border-radius:0 8px 8px 0">
-<div style="font-weight:700;font-size:.84rem;color:#1e40af;margin-bottom:5px">Q. 본선 추첨 버튼이 활성화가 안 돼요</div>
-<div style="font-size:.78rem;color:#374151;line-height:1.6">예선 조 추첨만 완료되어 있으면 본선 추첨이 가능합니다. 예선이 진행 중이면 A조 1위·B조 2위 같은 자리 기준으로 먼저 본선표를 만들고, 결과가 확정되는 조부터 실제 팀명으로 자동 반영됩니다.</div>
+<div style="font-weight:700;font-size:.84rem;color:#1e40af;margin-bottom:5px">Q. 예선 진행 중에도 본선 추첨이 되나요?</div>
+<div style="font-size:.78rem;color:#374151;line-height:1.6">예선이 진행 중이어도 <b>자리 기준 본선 추첨</b>이 가능합니다. 먼저 A조 1위·B조 2위 같은 자리로 대진을 확정하고, 각 조 예선 결과가 확정되는 즉시 실제 팀명으로 자동 치환됩니다.</div>
 </div>
 <div style="border-left:3px solid #1565c0;padding:10px 12px;margin-bottom:10px;background:#eff6ff;border-radius:0 8px 8px 0">
 <div style="font-weight:700;font-size:.84rem;color:#1e40af;margin-bottom:5px">Q. 오더 초기화 후 어떻게 해야 하나요</div>
@@ -6194,37 +6200,37 @@ body {
 <!-- 탭2: 본선 추첨 -->
 <div id="opTabC2" style="padding:16px;display:none">
 <div style="background:#fce4ec;border-radius:10px;padding:11px 13px;margin-bottom:14px;font-size:.80rem;color:#880e4f;line-height:1.6;font-weight:700">
-    🏆 예선 조 추첨 후에는 예선 진행 중에도 본선 추첨이 가능합니다
+    🏆 예선 진행 중에도 자리 기준으로 본선 추첨이 가능합니다
   </div>
 <div style="display:flex;flex-direction:column;gap:14px">
 <div style="display:flex;gap:11px;align-items:flex-start">
 <div style="flex-shrink:0;width:24px;height:24px;border-radius:50%;background:#880e4f;color:#fff;font-size:.76rem;font-weight:800;display:flex;align-items:center;justify-content:center">1</div>
 <div>
-<div style="font-weight:700;font-size:.86rem;margin-bottom:3px">예선 완료 확인</div>
-<div style="font-size:.79rem;color:#555;line-height:1.55">대진표에서 예선 조 추첨이 완료됐는지 확인합니다. 예선 결과가 아직 없어도 본선 추첨을 먼저 실행할 수 있습니다.</div>
+<div style="font-weight:700;font-size:.86rem;margin-bottom:3px">자리 기준 본선 추첨</div>
+<div style="font-size:.79rem;color:#555;line-height:1.55">예선 조별 경기 결과가 아직 모두 입력되지 않아도 본선 추첨을 먼저 진행할 수 있습니다. 이때 본선 대진은 A조 1위, B조 2위 같은 <b>자리 기준</b>으로 생성됩니다.</div>
 </div>
 </div>
 <div style="display:flex;gap:11px;align-items:flex-start">
 <div style="flex-shrink:0;width:24px;height:24px;border-radius:50%;background:#880e4f;color:#fff;font-size:.76rem;font-weight:800;display:flex;align-items:center;justify-content:center">2</div>
 <div>
 <div style="font-weight:700;font-size:.86rem;margin-bottom:3px">본선 추첨 실행</div>
-<div style="font-size:.79rem;color:#555;line-height:1.55">예선 진행 중에는 A조 1위·B조 2위 같은 자리 기준으로 본선 대진이 생성됩니다. 이후 예선 결과가 저장되면 확정된 자리부터 실제 팀명으로 자동 치환됩니다.</div>
+<div style="font-size:.79rem;color:#555;line-height:1.55">예선 완료 전에는 자리 기준으로 본선 대진을 먼저 확정하고, 예선 결과가 확정되는 즉시 해당 자리가 실제 팀명으로 자동 치환됩니다. 대진표 상단 또는 해당 부 섹션의 <span style="background:#880e4f;color:#fff;padding:1px 7px;border-radius:5px;font-size:.73rem;font-weight:700">🎲 본선 추첨</span> 버튼을 클릭하면 본선 대진이 생성됩니다.</div>
 </div>
 </div>
 <div style="display:flex;gap:11px;align-items:flex-start">
 <div style="flex-shrink:0;width:24px;height:24px;border-radius:50%;background:#880e4f;color:#fff;font-size:.76rem;font-weight:800;display:flex;align-items:center;justify-content:center">3</div>
 <div>
 <div style="font-weight:700;font-size:.86rem;margin-bottom:3px">본선 추첨 후 확인</div>
-<div style="font-size:.79rem;color:#555;line-height:1.55">추첨 결과를 확인하고 이상이 없으면 본선 경기를 진행합니다. 추첨 결과는 추첨 로그에 자동 저장됩니다.</div>
+<div style="font-size:.79rem;color:#555;line-height:1.55">추첨 결과를 확인하고 이상이 없으면 본선 경기를 진행합니다. 예선 미확정 자리는 자리명으로 남아 있다가 확정 즉시 자동 치환되며, 추첨 결과는 추첨 로그에 자동 저장됩니다.</div>
 </div>
 </div>
 </div>
 <div style="margin-top:14px;background:#fce4ec;border-radius:10px;padding:11px">
 <div style="font-size:.76rem;font-weight:700;color:#880e4f;margin-bottom:7px">🏆 예선 → 본선 흐름</div>
 <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
-<div style="padding:5px 9px;background:#fce4ec;color:#880e4f;border-radius:7px;font-size:.74rem;font-weight:700">예선 결과 전부 입력</div>
+<div style="padding:5px 9px;background:#fce4ec;color:#880e4f;border-radius:7px;font-size:.74rem;font-weight:700">자리 기준 본선 추첨</div>
 <div style="color:#bbb">→</div>
-<div style="padding:5px 9px;background:#f3e5f5;color:#6a1b9a;border-radius:7px;font-size:.74rem;font-weight:700">본선 추첨 실행</div>
+<div style="padding:5px 9px;background:#f3e5f5;color:#6a1b9a;border-radius:7px;font-size:.74rem;font-weight:700">예선결과 자동 치환</div>
 <div style="color:#bbb">→</div>
 <div style="padding:5px 9px;background:#e8f5e9;color:#1b5e20;border-radius:7px;font-size:.74rem;font-weight:700">본선 경기 시작</div>
 </div>
@@ -9440,6 +9446,110 @@ function getAutoNotificationKindLabel(kind=''){
 window.getAutoNotificationSettings=getAutoNotificationSettings;
 window.isAutoNotificationEnabled=isAutoNotificationEnabled;
 
+function getAutoSmsSettings(){
+  const defaults={
+    enabled:false,
+    courtWaiting:true,
+    courtChanged:true,
+    matchStart:true,
+    matchComplete:false
+  };
+  const raw=(G&&G.meta&&G.meta.autoSmsSettings&&typeof G.meta.autoSmsSettings==='object') ? G.meta.autoSmsSettings : {};
+  return {...defaults, ...raw};
+}
+function isAutoSmsEnabled(type){
+  const st=getAutoSmsSettings();
+  if(st.enabled!==true) return false;
+  if(type==='waiting_registered' || type==='court_waiting' || type==='courtWaiting' || type==='queue_registered') return st.courtWaiting!==false;
+  if(type==='court_changed' || type==='court_assigned' || type==='courtChanged') return st.courtChanged!==false;
+  if(type==='match_started' || type==='matchStart' || type==='start') return st.matchStart!==false;
+  if(type==='match_completed' || type==='matchComplete' || type==='complete') return st.matchComplete===true;
+  return false;
+}
+function buildAutoSmsSettingsPanelHTML(){
+  const st=getAutoSmsSettings();
+  const row=(id,label,desc,checked)=>`
+    <label style="display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-top:1px dashed rgba(15,30,58,.12);cursor:pointer">
+      <input type="checkbox" id="${id}" ${checked?'checked':''} style="margin-top:3px;accent-color:#d97706">
+      <span style="display:block;flex:1;min-width:0">
+        <span style="display:block;font-size:.82rem;font-weight:900;color:#0f1e3a">${label}</span>
+        <span style="display:block;font-size:.72rem;color:var(--text2);line-height:1.5;margin-top:2px">${desc}</span>
+      </span>
+    </label>`;
+  return `<div id="autoSmsSettingsBox" class="form-group" style="margin-bottom:16px;padding:14px;background:linear-gradient(135deg,#fff7ed,#fffdf5);border:1.5px solid #fb923c;border-radius:12px">
+    <div style="font-weight:900;font-size:.9rem;color:#c2410c;margin-bottom:7px">📨 자동 문자 설정</div>
+    <div style="font-size:.75rem;color:var(--text2);line-height:1.7;margin-bottom:8px">푸시 알림을 못 받는 회원을 위해 코트 이벤트가 발생하면 운영자 화면에 <b>문자 보내기</b> 승인창을 자동으로 띄웁니다. 휴대폰 보안 정책상 실제 전송은 문자앱에서 한 번 확인해야 합니다.</div>
+    <label style="display:flex;align-items:center;gap:9px;padding:10px 0;cursor:pointer;font-size:.84rem;font-weight:1000;color:#9a3412">
+      <input type="checkbox" id="autoSmsEnabled" ${st.enabled===true?'checked':''} style="accent-color:#d97706"> 자동 문자 승인창 사용
+    </label>
+    ${row('autoSmsCourtWaiting','코트 대기 진입 문자','경기가 특정 코트 대기열에 새로 들어가면 문자 승인창을 띄웁니다.',st.courtWaiting!==false)}
+    ${row('autoSmsCourtChanged','코트 대기 순서/코트 변경 문자','대기 코트 또는 대기 순번이 바뀌면 문자 승인창을 띄웁니다.',st.courtChanged!==false)}
+    ${row('autoSmsMatchStart','각 코트 시합 시작 문자','경기가 현재 경기로 올라오면 문자 승인창을 띄웁니다.',st.matchStart!==false)}
+    ${row('autoSmsMatchComplete','경기 완료 문자','결과 저장 후 완료 문자를 띄우는 항목입니다. 기본 OFF 권장.',st.matchComplete===true)}
+    <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:10px">
+      <button class="btn btn-gray" onclick="resetAutoSmsSettingsToDefault()" style="font-size:.78rem;padding:6px 10px">기본값</button>
+      <button class="btn btn-primary" onclick="saveAutoSmsSettings()" style="font-size:.78rem;padding:6px 12px;background:#d97706;color:#fff">💾 자동 문자 설정 저장</button>
+    </div>
+    <div id="autoSmsSettingsStatus" style="font-size:.72rem;color:var(--text3);line-height:1.5;margin-top:8px">권장: 필요할 때만 전체 ON. 문자앱 확인 후 전송됩니다.</div>
+  </div>`;
+}
+function readAutoSmsSettingsFromForm(){
+  return {
+    enabled:!!ge('autoSmsEnabled')?.checked,
+    courtWaiting:!!ge('autoSmsCourtWaiting')?.checked,
+    courtChanged:!!ge('autoSmsCourtChanged')?.checked,
+    matchStart:!!ge('autoSmsMatchStart')?.checked,
+    matchComplete:!!ge('autoSmsMatchComplete')?.checked
+  };
+}
+function refreshAutoSmsSettingsForm(){
+  const st=getAutoSmsSettings();
+  const set=(id,val)=>{ const el=ge(id); if(el) el.checked=!!val; };
+  set('autoSmsEnabled', st.enabled===true);
+  set('autoSmsCourtWaiting', st.courtWaiting!==false);
+  set('autoSmsCourtChanged', st.courtChanged!==false);
+  set('autoSmsMatchStart', st.matchStart!==false);
+  set('autoSmsMatchComplete', st.matchComplete===true);
+}
+async function saveAutoSmsSettings(){
+  if(!(AD||TM)){ toast('개발자 또는 운영자 로그인 필요','info'); return; }
+  G.meta.autoSmsSettings=readAutoSmsSettingsFromForm();
+  sl(true);
+  try{
+    await saveMeta();
+    sl(false);
+    const st=getAutoSmsSettings();
+    const status=ge('autoSmsSettingsStatus');
+    if(status) status.textContent=st.enabled ? '저장됨 · 자동 문자 승인창 사용 중' : '저장됨 · 자동 문자 승인창 꺼짐';
+    toast('자동 문자 설정 저장 완료 ✅','success');
+  }catch(e){
+    sl(false); toast('저장 실패: '+(e?.message||e),'error');
+  }
+}
+async function resetAutoSmsSettingsToDefault(){
+  if(!(AD||TM)){ toast('개발자 또는 운영자 로그인 필요','info'); return; }
+  G.meta.autoSmsSettings={enabled:false,courtWaiting:true,courtChanged:true,matchStart:true,matchComplete:false};
+  refreshAutoSmsSettingsForm();
+  await saveAutoSmsSettings();
+}
+function injectAutoSmsSettingsBox(){
+  try{
+    const body=document.querySelector('#mAdminSettings .modal-body');
+    if(!body || ge('autoSmsSettingsBox')) return;
+    const box=document.createElement('div');
+    box.innerHTML=buildAutoSmsSettingsPanelHTML();
+    const target=ge('adminSettingsSection_common') || body;
+    const ref=ge('autoNotificationSettingsBox') || target.querySelector('#adminPushControlBox') || target.firstChild;
+    if(ref && ref.parentNode===target) target.insertBefore(box.firstElementChild, ref.nextSibling);
+    else target.prepend(box.firstElementChild);
+  }catch(e){ console.warn('injectAutoSmsSettingsBox failed', e); }
+}
+window.getAutoSmsSettings=getAutoSmsSettings;
+window.isAutoSmsEnabled=isAutoSmsEnabled;
+window.saveAutoSmsSettings=saveAutoSmsSettings;
+window.resetAutoSmsSettingsToDefault=resetAutoSmsSettingsToDefault;
+window.refreshAutoSmsSettingsForm=refreshAutoSmsSettingsForm;
+
 
 
 // v359: 참가 접수 시 개발자/운영자 알림
@@ -9943,115 +10053,6 @@ async function resetAutoNotificationSettingsToDefault(){
   refreshAutoNotificationSettingsForm();
   await saveAutoNotificationSettings();
 }
-
-/* === v391: 자동 문자 안내 설정 ===
-   브라우저/휴대폰 보안 정책상 웹앱이 사용자의 문자앱에서 '전송' 버튼까지 자동으로 누를 수는 없습니다.
-   ON 상태에서는 코트 상태 변경을 감지해 운영자 화면에 문자 작성 팝업을 자동으로 띄우고,
-   진행자가 문자 보내기 버튼을 누르면 수신자와 본문이 채워진 문자앱을 엽니다. */
-function getAutoSmsSettings(){
-  const defaults={
-    enabled:false,
-    waitingRegistered:true,
-    courtChanged:true,
-    matchStart:true
-  };
-  const raw=(G&&G.meta&&G.meta.autoSmsSettings&&typeof G.meta.autoSmsSettings==='object') ? G.meta.autoSmsSettings : {};
-  return {...defaults, ...raw};
-}
-function isAutoSmsEnabled(kind=''){
-  const st=getAutoSmsSettings();
-  if(st.enabled!==true) return false;
-  if(kind==='waiting_registered' || kind==='court_waiting' || kind==='queue_registered') return st.waitingRegistered!==false;
-  if(kind==='court_changed' || kind==='court_assigned' || kind==='queue_changed') return st.courtChanged!==false;
-  if(kind==='match_started' || kind==='matchStart' || kind==='start') return st.matchStart!==false;
-  return false;
-}
-function buildAutoSmsSettingsPanelHTML(){
-  const st=getAutoSmsSettings();
-  const row=(id,label,desc,checked,disabled=false)=>`
-    <label style="display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-top:1px dashed rgba(15,30,58,.12);cursor:pointer;${disabled?'opacity:.55':''}">
-      <input type="checkbox" id="${id}" ${checked?'checked':''} ${disabled?'disabled':''} style="margin-top:3px;accent-color:#d97706">
-      <span style="display:block;flex:1;min-width:0">
-        <span style="display:block;font-size:.82rem;font-weight:900;color:#0f1e3a">${label}</span>
-        <span style="display:block;font-size:.72rem;color:var(--text2);line-height:1.5;margin-top:2px">${desc}</span>
-      </span>
-    </label>`;
-  return `<div id="autoSmsSettingsBox" class="form-group" style="margin-bottom:16px;padding:14px;background:linear-gradient(135deg,#fff7ed,#fffdf5);border:1.5px solid #fdba74;border-radius:12px">
-    <div style="font-weight:900;font-size:.9rem;color:#c2410c;margin-bottom:7px">📨 자동 문자 안내 설정</div>
-    <div style="font-size:.75rem;color:var(--text2);line-height:1.7;margin-bottom:8px">
-      푸시 알림이 안 되는 회원이 많을 때 쓰는 <b>문자앱 자동 작성</b> 기능입니다. 켜두면 코트 상태가 바뀔 때 운영자/진행자 화면에 문자 보내기 팝업이 자동으로 뜹니다.<br>
-      <b>주의:</b> 휴대폰 보안상 실제 전송은 문자앱에서 진행자가 한 번 눌러야 합니다.
-    </div>
-    <label style="display:flex;align-items:center;gap:9px;padding:10px 0;cursor:pointer">
-      <input type="checkbox" id="autoSmsEnabled" ${st.enabled===true?'checked':''} style="accent-color:#d97706">
-      <span style="font-size:.86rem;font-weight:1000;color:#9a3412">자동 문자 안내 기능 사용</span>
-    </label>
-    ${row('autoSmsMatchStart','각 코트 시합 시작 문자','대기 1번이 현재 경기로 올라오거나 코트의 현재 경기가 바뀌면 문자 안내를 띄웁니다.',st.matchStart!==false)}
-    ${row('autoSmsWaitingRegistered','코트 대기 진입 문자','공용대기 또는 미배정 경기에서 특정 코트 대기열에 새로 들어오면 문자 안내를 띄웁니다.',st.waitingRegistered!==false)}
-    ${row('autoSmsCourtChanged','코트 대기 순서/코트 변경 문자','대기 코트가 바뀌거나 대기 순번이 바뀌면 문자 안내를 띄웁니다.',st.courtChanged!==false)}
-    <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:10px">
-      <button class="btn btn-gray" onclick="resetAutoSmsSettingsToDefault()" style="font-size:.78rem;padding:6px 10px">기본값 OFF</button>
-      <button class="btn btn-primary" onclick="saveAutoSmsSettings()" style="font-size:.78rem;padding:6px 12px;background:#d97706;color:#fff">💾 자동 문자 설정 저장</button>
-    </div>
-    <div id="autoSmsSettingsStatus" style="font-size:.72rem;color:var(--text3);line-height:1.5;margin-top:8px">현재 상태: ${st.enabled===true?'자동 문자 안내 ON':'자동 문자 안내 OFF'}</div>
-  </div>`;
-}
-function readAutoSmsSettingsFromForm(){
-  return {
-    enabled:!!ge('autoSmsEnabled')?.checked,
-    matchStart:!!ge('autoSmsMatchStart')?.checked,
-    waitingRegistered:!!ge('autoSmsWaitingRegistered')?.checked,
-    courtChanged:!!ge('autoSmsCourtChanged')?.checked
-  };
-}
-function refreshAutoSmsSettingsForm(){
-  const st=getAutoSmsSettings();
-  const set=(id,val)=>{ const el=ge(id); if(el) el.checked=!!val; };
-  set('autoSmsEnabled', st.enabled===true);
-  set('autoSmsMatchStart', st.matchStart!==false);
-  set('autoSmsWaitingRegistered', st.waitingRegistered!==false);
-  set('autoSmsCourtChanged', st.courtChanged!==false);
-  const status=ge('autoSmsSettingsStatus');
-  if(status) status.textContent=`현재 상태: ${st.enabled===true?'자동 문자 안내 ON':'자동 문자 안내 OFF'}`;
-}
-async function saveAutoSmsSettings(){
-  if(!(AD||TM)){ toast('개발자 또는 운영자 로그인 필요','info'); return; }
-  G.meta.autoSmsSettings=readAutoSmsSettingsFromForm();
-  sl(true);
-  try{
-    await saveMeta();
-    sl(false);
-    refreshAutoSmsSettingsForm();
-    toast(G.meta.autoSmsSettings.enabled?'자동 문자 안내 기능을 켰습니다 ✅':'자동 문자 안내 기능을 껐습니다','success');
-  }catch(e){
-    sl(false); toast('저장 실패: '+(e?.message||e),'error');
-  }
-}
-async function resetAutoSmsSettingsToDefault(){
-  if(!(AD||TM)){ toast('개발자 또는 운영자 로그인 필요','info'); return; }
-  G.meta.autoSmsSettings={enabled:false,matchStart:true,waitingRegistered:true,courtChanged:true};
-  refreshAutoSmsSettingsForm();
-  await saveAutoSmsSettings();
-}
-function injectAutoSmsSettingsBox(){
-  try{
-    const body=document.querySelector('#mAdminSettings .modal-body');
-    if(!body || ge('autoSmsSettingsBox')) return;
-    const box=document.createElement('div');
-    box.innerHTML=buildAutoSmsSettingsPanelHTML();
-    const target=ge('adminSettingsSection_common') || ge('adminSettingsSection_team') || body;
-    const ref=target.querySelector('#autoNotificationSettingsBox') || target.querySelector('#adminPushControlBox') || target.firstChild;
-    if(ref && ref.parentNode===target) target.insertBefore(box.firstElementChild, ref.nextSibling);
-    else target.prepend(box.firstElementChild);
-    refreshAutoSmsSettingsForm();
-  }catch(e){ console.warn('injectAutoSmsSettingsBox failed', e); }
-}
-window.getAutoSmsSettings=getAutoSmsSettings;
-window.isAutoSmsEnabled=isAutoSmsEnabled;
-window.saveAutoSmsSettings=saveAutoSmsSettings;
-window.resetAutoSmsSettingsToDefault=resetAutoSmsSettingsToDefault;
-window.refreshAutoSmsSettingsForm=refreshAutoSmsSettingsForm;
-
 function injectAutoNotificationSettingsBox(){
   try{
     const body=document.querySelector('#mAdminSettings .modal-body');
@@ -10067,19 +10068,11 @@ function injectAutoNotificationSettingsBox(){
 window.saveAutoNotificationSettings=saveAutoNotificationSettings;
 window.resetAutoNotificationSettingsToDefault=resetAutoNotificationSettingsToDefault;
 window.refreshAutoNotificationSettingsForm=refreshAutoNotificationSettingsForm;
-window.injectAutoSmsSettingsBox=injectAutoSmsSettingsBox;
 
 function ensureAdminPushControls(){
   try{
     const body=document.querySelector('#mAdminSettings .modal-body');
-    if(!body) return;
-    if(ge('adminPushControlBox')){
-      injectAutoNotificationSettingsBox();
-      injectAutoSmsSettingsBox();
-      refreshAutoNotificationSettingsForm();
-      refreshAutoSmsSettingsForm();
-      return;
-    }
+    if(!body || ge('adminPushControlBox')) return;
     const box=document.createElement('div');
     box.id='adminPushControlBox';
     box.className='form-group';
@@ -10087,9 +10080,7 @@ function ensureAdminPushControls(){
     box.innerHTML=`<div style="font-weight:800;font-size:.9rem;color:#1d4ed8;margin-bottom:8px">🔔 관리자 알림 발송</div><div style="font-size:.75rem;color:var(--text2);line-height:1.7;margin-bottom:10px">알림을 켠 전체 사용자에게 공지를 발송합니다. 경기 카드/명단 카드에서는 해당 대상에게만 보낼 수 있습니다.</div><button class="btn btn-primary" onclick="openAdminBroadcastPushModal()" style="width:100%;background:#2563eb">📢 전체 알림 공지 보내기</button>`;
     body.prepend(box);
     injectAutoNotificationSettingsBox();
-    injectAutoSmsSettingsBox();
     refreshAutoNotificationSettingsForm();
-    refreshAutoSmsSettingsForm();
   }catch(e){}
 }
 function openMatchPushPromptAfterRegistration(){
@@ -11461,7 +11452,7 @@ Object.defineProperty(window,'REG_CLUB',{get:()=>REG_CLUB,set:(v)=>{REG_CLUB=v;}
 // ── 과거 대회 내장 데이터 ─────────────────────────────────
 let HIST_DATA = []; // 과거 대회 데이터는 엑셀/Firestore로 관리
 
-let G={meta:{pw:'kimhae1234',regPw:'202601',memberRegistry2026:[],clubContacts:{},clubEmails:{},clubPasswords:{},clubPasswordCustom:{},regDeadlineDt:'',onlineOrderEnabled:false,operatorPw:'2026court',individualAutoCourtAssignEnabled:false,regSessionVersion:1,drawHistoryPolicyVersion:0,usePlayerRegistry:false,showAssociationDashboard:false,useFixedClubs:false,allowTeamDirectorLogin:true,allowPublicTeamRegistration:false,allowPublicResultEntry:false,appTitle:'시합관리 시스템',autoNotificationSettings:{registration:true,courtWaiting:true,courtChanged:true,matchStart:true,orderSubmitted:true,matchComplete:false},autoSmsSettings:{enabled:false,matchStart:true,waitingRegistered:true,courtChanged:true}},clubs:[],tournaments:[],teams:{},draws:{},matches:{},players:{},log:[],drawHistories:{}};
+let G={meta:{pw:'kimhae1234',regPw:'202601',memberRegistry2026:[],clubContacts:{},clubEmails:{},clubPasswords:{},clubPasswordCustom:{},regDeadlineDt:'',onlineOrderEnabled:false,operatorPw:'2026court',individualAutoCourtAssignEnabled:false,regSessionVersion:1,drawHistoryPolicyVersion:0,usePlayerRegistry:false,showAssociationDashboard:false,useFixedClubs:false,allowTeamDirectorLogin:true,allowPublicTeamRegistration:false,allowPublicResultEntry:false,appTitle:'시합관리 시스템',autoNotificationSettings:{registration:true,courtWaiting:true,courtChanged:true,matchStart:true,orderSubmitted:true,matchComplete:false},autoSmsSettings:{enabled:false,courtWaiting:true,courtChanged:true,matchStart:true,matchComplete:false}},clubs:[],tournaments:[],teams:{},draws:{},matches:{},players:{},log:[],drawHistories:{}};
 const PLAYER_CACHE_KEY='OAI_PLAYER_CACHE_V1';
 const PLAYER_CACHE_TTL=1000*60*60*12;
 const TOURNAMENT_BUNDLE_CACHE_KEY='OAI_TOURNAMENT_BUNDLE_CACHE_V3';
@@ -11470,6 +11461,7 @@ const TOURNAMENT_BUNDLE_MEM={};
 let DRAW_HISTORY_LOADED=false;
 let CURRENT_LIVE_TID=null;
 let _realtimeRegsUnsub=null,_realtimeMatchesUnsub=null,_realtimeDrawsUnsub=null;
+let _registerRegsUnsub=null,_registerLiveTid='';
 let _viewerBracketPoller=null;
 let _viewerBracketPollTid='';
 const VIEWER_BRACKET_POLL_MS=20000;
@@ -11534,9 +11526,6 @@ function shouldUseRealtimeForTournament(page, tid){
   const pg=page||getCurrentPageName();
   const targetTid=String(tid||'').trim();
   if(!targetTid) return false;
-  // v387: 참가 등록/명단 화면은 저장 직후 반영 속도가 중요하므로 선택된 대회만 실시간 구독합니다.
-  // 전체 대회가 아니라 현재 선택 대회 1개만 구독해서 Firestore 읽기 폭증은 피합니다.
-  if(pg==='register') return true;
   if(pg!=='bracket') return false;
   if(AD || OP || REG) return true;
   return false;
@@ -11760,6 +11749,34 @@ function stopRealtimeTournamentSync(){
   if(_realtimeDrawsUnsub){ try{_realtimeDrawsUnsub();}catch(e){} _realtimeDrawsUnsub=null; }
   CURRENT_LIVE_TID=null;
 }
+function applyRegistrationSnapshotForTournament(tid, snapshot){
+  const cache=getTournamentBundleCache(tid)||{};
+  const next={
+    ...(cache||{}),
+    regs:snapshot.docs.map(d=>({_id:d.id,...(d.data()||{})})).filter(x=>!x.deleted),
+    matches:Array.isArray(cache.matches)?cache.matches:[],
+    draws:Array.isArray(cache.draws)?cache.draws:[]
+  };
+  saveTournamentBundleCache(tid, next);
+  applyTournamentBundle(tid, next);
+  return next;
+}
+function stopRegisterRegistrationSync(){
+  if(_registerRegsUnsub){ try{_registerRegsUnsub();}catch(e){} _registerRegsUnsub=null; }
+  _registerLiveTid='';
+}
+function startRegisterRegistrationSync(tid){
+  if(!tid) return stopRegisterRegistrationSync();
+  if(_registerLiveTid===tid && _registerRegsUnsub) return;
+  stopRegisterRegistrationSync();
+  _registerLiveTid=tid;
+  _registerRegsUnsub=onSnapshot(query(collection(db,'registrations'), where('tournamentId','==',tid)), s=>{
+    try{ processAdminRegistrationSnapshotChanges(s, tid); }catch(err){ console.warn('register registration alert process failed', err); }
+    applyRegistrationSnapshotForTournament(tid, s);
+    if(!isRegisterUserActive()) onDU();
+    else { try{ upDash(); }catch(_e){} }
+  }, e=>console.error('register regs snap err', e));
+}
 function startRealtimeTournamentSync(tid){
   if(!tid) return stopRealtimeTournamentSync();
   if(CURRENT_LIVE_TID===tid && _realtimeRegsUnsub && _realtimeMatchesUnsub && _realtimeDrawsUnsub) return;
@@ -11767,10 +11784,9 @@ function startRealtimeTournamentSync(tid){
   CURRENT_LIVE_TID=tid;
   _realtimeRegsUnsub = onSnapshot(query(collection(db,'registrations'), where('tournamentId','==',tid)), s=>{
     try{ processAdminRegistrationSnapshotChanges(s, tid); }catch(err){ console.warn('admin registration alert process failed', err); }
-    const bundle={regs:s.docs.map(d=>({_id:d.id,...(d.data()||{})})), matches:(getTournamentBundleCache(tid)?.matches)||[], draws:(getTournamentBundleCache(tid)?.draws)||[]};
-    saveTournamentBundleCache(tid,{...(getTournamentBundleCache(tid)||{}), regs:bundle.regs, matches:bundle.matches, draws:bundle.draws});
-    applyTournamentBundle(tid, getTournamentBundleCache(tid)||bundle);
-    onDU();
+    applyRegistrationSnapshotForTournament(tid, s);
+    if(!isRegisterUserActive()) onDU();
+    else { try{ upDash(); }catch(_e){} }
   }, e=>console.error('regs snap err', e));
   _realtimeDrawsUnsub = onSnapshot(query(collection(db,'draws'), where(documentId(), '>=', tid + '_'), where(documentId(), '<=', tid + '_\uf8ff')), s=>{
     const bundle=getTournamentBundleCache(tid)||{};
@@ -11792,13 +11808,23 @@ function startRealtimeTournamentSync(tid){
   }, e=>console.error('matches snap err', e));
 }
 async function syncTournamentDataForPage(page, tid, force=false){
-  const targetTid=String(tid || getSelectedTournamentIdForPage(page) || getRealtimeTargetTournamentId() || '').trim();
+  const pg=page||getCurrentPageName();
+  const targetTid=String(tid || getSelectedTournamentIdForPage(pg) || getRealtimeTargetTournamentId() || '').trim();
   if(!targetTid){
-    if(!shouldUseRealtimeForTournament(page,'')) stopRealtimeTournamentSync();
+    if(!shouldUseRealtimeForTournament(pg,'')) stopRealtimeTournamentSync();
+    stopRegisterRegistrationSync();
     stopViewerBracketPolling();
     return;
   }
-  if(shouldUseRealtimeForTournament(page, targetTid)){
+  if(pg==='register'){
+    stopViewerBracketPolling();
+    stopRealtimeTournamentSync();
+    await fetchTournamentBundle(targetTid, {force:true, acceptStale:true});
+    startRegisterRegistrationSync(targetTid);
+    return;
+  }
+  stopRegisterRegistrationSync();
+  if(shouldUseRealtimeForTournament(pg, targetTid)){
     stopViewerBracketPolling();
     const hasCache=!!getTournamentBundleCache(targetTid);
     if(force || !hasCache) await fetchTournamentBundle(targetTid, {force:!!force, acceptStale:true});
@@ -11806,28 +11832,9 @@ async function syncTournamentDataForPage(page, tid, force=false){
   }else{
     stopRealtimeTournamentSync();
     await fetchTournamentBundle(targetTid, {force:!!force, acceptStale:true});
-    ensureViewerBracketPolling(page, targetTid);
+    ensureViewerBracketPolling(pg, targetTid);
   }
 }
-
-async function refreshRegistrationViewAfterWrite(tid, div){
-  try{
-    const targetTid=String(tid||'').trim();
-    if(!targetTid) return;
-    // 저장 직후에는 로컬 배열만 믿지 않고 서버에서 한 번 강제 재조회합니다.
-    await fetchTournamentBundle(targetTid, {force:true, acceptStale:true});
-    if(ge('regTS') && ge('regTS').value===targetTid){
-      if(div && ge('regDS')) ge('regDS').value=div;
-      try{ renderRegisterDivisionOverview(); }catch(e){}
-      try{ renderRL(); }catch(e){}
-    }
-    try{ upDash(); }catch(e){}
-  }catch(e){
-    console.warn('refreshRegistrationViewAfterWrite failed', e);
-  }
-}
-window.refreshRegistrationViewAfterWrite = refreshRegistrationViewAfterWrite;
-
 async function ensureDrawHistoryLoaded(force=false){
   if(DRAW_HISTORY_LOADED && !force) return G.drawHistories||{};
   try{
@@ -12924,7 +12931,7 @@ async function loadMeta(){
       const d=s.data();
       // memberRegistry2026은 meta/config에서 제외 → memberRegistries/2026 에서만 관리
       const {memberRegistry2026:_mr, ...dClean}=d;
-      G.meta={pw:'kimhae1234',regPw:'202601',memberRegistry2026:[],clubContacts:{},clubEmails:{},clubPasswords:{},clubPasswordCustom:{},adminFloatingNotice:'',adminFloatingNoticeEnabled:false,startupImagePopupEnabled:false,startupImagePopupUrl:'/guide/plus.png',startupImagePopupId:'startup-popup-v1',startupImagePopupTitle:'공지 안내',onlineOrderEnabled:false,operatorPw:'2026court',allowTeamDirectorLogin:true,individualAutoCourtAssignEnabled:false,regSessionVersion:1,usePlayerRegistry:false,showAssociationDashboard:false,useFixedClubs:false,allowPublicTeamRegistration:false,allowPublicResultEntry:false,appTitle:'시합관리 시스템',autoNotificationSettings:{registration:true,courtWaiting:true,courtChanged:true,matchStart:true,orderSubmitted:true,matchComplete:false},autoSmsSettings:{enabled:false,matchStart:true,waitingRegistered:true,courtChanged:true},...dClean};
+      G.meta={pw:'kimhae1234',regPw:'202601',memberRegistry2026:[],clubContacts:{},clubEmails:{},clubPasswords:{},clubPasswordCustom:{},adminFloatingNotice:'',adminFloatingNoticeEnabled:false,startupImagePopupEnabled:false,startupImagePopupUrl:'/guide/plus.png',startupImagePopupId:'startup-popup-v1',startupImagePopupTitle:'공지 안내',onlineOrderEnabled:false,operatorPw:'2026court',allowTeamDirectorLogin:true,individualAutoCourtAssignEnabled:false,regSessionVersion:1,usePlayerRegistry:false,showAssociationDashboard:false,useFixedClubs:false,allowPublicTeamRegistration:false,allowPublicResultEntry:false,appTitle:'시합관리 시스템',autoNotificationSettings:{registration:true,courtWaiting:true,courtChanged:true,matchStart:true,orderSubmitted:true,matchComplete:false},autoSmsSettings:{enabled:false,courtWaiting:true,courtChanged:true,matchStart:true,matchComplete:false},...dClean};
       if(Array.isArray(d.clubs)){
         G.clubs=d.clubs.map(x=>String(x||'').trim()).filter(Boolean);
       }
@@ -12954,8 +12961,8 @@ async function loadMeta(){
       if(!G.meta.appTitle) G.meta.appTitle='시합관리 시스템';
       if(!G.meta.autoNotificationSettings || typeof G.meta.autoNotificationSettings!=='object') G.meta.autoNotificationSettings={registration:true,courtWaiting:true,courtChanged:true,matchStart:true,orderSubmitted:true,matchComplete:false};
       G.meta.autoNotificationSettings={registration:G.meta.autoNotificationSettings.registration!==false,courtWaiting:G.meta.autoNotificationSettings.courtWaiting!==false,courtChanged:G.meta.autoNotificationSettings.courtChanged!==false,matchStart:G.meta.autoNotificationSettings.matchStart!==false,orderSubmitted:G.meta.autoNotificationSettings.orderSubmitted!==false,matchComplete:G.meta.autoNotificationSettings.matchComplete===true};
-      if(!G.meta.autoSmsSettings || typeof G.meta.autoSmsSettings!=='object') G.meta.autoSmsSettings={enabled:false,matchStart:true,waitingRegistered:true,courtChanged:true};
-      G.meta.autoSmsSettings={enabled:G.meta.autoSmsSettings.enabled===true,matchStart:G.meta.autoSmsSettings.matchStart!==false,waitingRegistered:G.meta.autoSmsSettings.waitingRegistered!==false,courtChanged:G.meta.autoSmsSettings.courtChanged!==false};
+      if(!G.meta.autoSmsSettings || typeof G.meta.autoSmsSettings!=='object') G.meta.autoSmsSettings={enabled:false,courtWaiting:true,courtChanged:true,matchStart:true,matchComplete:false};
+      G.meta.autoSmsSettings={enabled:G.meta.autoSmsSettings.enabled===true,courtWaiting:G.meta.autoSmsSettings.courtWaiting!==false,courtChanged:G.meta.autoSmsSettings.courtChanged!==false,matchStart:G.meta.autoSmsSettings.matchStart!==false,matchComplete:G.meta.autoSmsSettings.matchComplete===true};
       G.meta.courtGroupCatalog = normalizeCourtGroups(G.meta.courtGroupCatalog||[]);
       if(!G.meta.courtGroupCatalog.length) G.meta.courtGroupCatalog = DEFAULT_COURT_GROUPS.map(g=>({name:g.title,count:(g.courts||[]).length}));
       if(!Number.isFinite(Number(G.meta.regSessionVersion))) G.meta.regSessionVersion=1;
@@ -12965,7 +12972,7 @@ async function loadMeta(){
       if(!G.meta.indivLockEnd) G.meta.indivLockEnd='';
       markFbWriteCache('meta','config',{pw:G.meta.pw,regPw:(G.meta.regPw||'202601'),clubs:G.clubs,adminPhone:(G.meta.adminPhone||''),clubContacts:(G.meta.clubContacts||{}),clubEmails:(G.meta.clubEmails||{}),clubPasswords:(G.meta.clubPasswords||{}),clubPasswordCustom:(G.meta.clubPasswordCustom||{}),regDeadlineDt:(G.meta.regDeadlineDt||''),adminFloatingNotice:(G.meta.adminFloatingNotice||''),adminFloatingNoticeEnabled:!!G.meta.adminFloatingNoticeEnabled,startupImagePopupEnabled:!!G.meta.startupImagePopupEnabled,startupImagePopupUrl:(G.meta.startupImagePopupUrl||'/guide/plus.png'),startupImagePopupId:(G.meta.startupImagePopupId||'startup-popup-v1'),startupImagePopupTitle:(G.meta.startupImagePopupTitle||'공지 안내'),onlineOrderEnabled:!!G.meta.onlineOrderEnabled,operatorPw:(G.meta.operatorPw||'2026court'),individualAutoCourtAssignEnabled:!!G.meta.individualAutoCourtAssignEnabled,usePlayerRegistry:!!G.meta.usePlayerRegistry,showAssociationDashboard:!!G.meta.showAssociationDashboard,useFixedClubs:!!G.meta.useFixedClubs,allowTeamDirectorLogin:!!G.meta.allowTeamDirectorLogin,allowPublicTeamRegistration:!!G.meta.allowPublicTeamRegistration,allowPublicResultEntry:!!G.meta.allowPublicResultEntry,appTitle:(G.meta.appTitle||'시합관리 시스템'),regSessionVersion:Number(G.meta.regSessionVersion||1),drawHistoryPolicyVersion:Number(G.meta.drawHistoryPolicyVersion||0),indivLockEnabled:!!G.meta.indivLockEnabled,indivLockStart:(G.meta.indivLockStart||''),indivLockEnd:(G.meta.indivLockEnd||''),autoNotificationSettings:getAutoNotificationSettings(),autoSmsSettings:getAutoSmsSettings()});
     }else{
-      await setDoc(doc(db,'meta','config'),{pw:'kimhae1234',regPw:'202601',clubs:G.clubs,adminPhone:'',clubContacts:{},clubPasswords:{},clubPasswordCustom:{},adminFloatingNotice:'',adminFloatingNoticeEnabled:false,startupImagePopupEnabled:false,startupImagePopupUrl:'/guide/plus.png',startupImagePopupId:'startup-popup-v1',startupImagePopupTitle:'공지 안내',onlineOrderEnabled:false,operatorPw:'2026court',allowTeamDirectorLogin:true,individualAutoCourtAssignEnabled:false,regSessionVersion:1,drawHistoryPolicyVersion:0,usePlayerRegistry:false,showAssociationDashboard:false,useFixedClubs:false,allowPublicTeamRegistration:false,allowPublicResultEntry:false,appTitle:'시합관리 시스템',courtGroupCatalog:DEFAULT_COURT_GROUPS.map(g=>({name:g.title,count:(g.courts||[]).length})),autoNotificationSettings:{registration:true,courtWaiting:true,courtChanged:true,matchStart:true,orderSubmitted:true,matchComplete:false},autoSmsSettings:{enabled:false,matchStart:true,waitingRegistered:true,courtChanged:true}});
+      await setDoc(doc(db,'meta','config'),{pw:'kimhae1234',regPw:'202601',clubs:G.clubs,adminPhone:'',clubContacts:{},clubPasswords:{},clubPasswordCustom:{},adminFloatingNotice:'',adminFloatingNoticeEnabled:false,startupImagePopupEnabled:false,startupImagePopupUrl:'/guide/plus.png',startupImagePopupId:'startup-popup-v1',startupImagePopupTitle:'공지 안내',onlineOrderEnabled:false,operatorPw:'2026court',allowTeamDirectorLogin:true,individualAutoCourtAssignEnabled:false,regSessionVersion:1,drawHistoryPolicyVersion:0,usePlayerRegistry:false,showAssociationDashboard:false,useFixedClubs:false,allowPublicTeamRegistration:false,allowPublicResultEntry:false,appTitle:'시합관리 시스템',courtGroupCatalog:DEFAULT_COURT_GROUPS.map(g=>({name:g.title,count:(g.courts||[]).length})),autoNotificationSettings:{registration:true,courtWaiting:true,courtChanged:true,matchStart:true,orderSubmitted:true,matchComplete:false},autoSmsSettings:{enabled:false,courtWaiting:true,courtChanged:true,matchStart:true,matchComplete:false}});
     }
   }catch(e){}
 
@@ -13438,6 +13445,31 @@ function pKeyParse(key){ const i=(key||'').lastIndexOf('__'); return i>0?{name:k
 async function stP(k){try{const pk=pKeyParse(k);const pureName=cleanName(pk.name||k);await setDoc(doc(db,'players',k.replace(/[\\/\\.#\\$\\[\\]]/g,'_')),{...G.players[k],key:k,name:pureName,club:pk.club||''});}catch(e){}}
 async function fbLog(t,i='📌'){ return; }
 
+
+// v389: 참가접수 화면 입력 중 실시간 갱신이 폼을 다시 렌더링해 포커스/자판이 닫히는 문제 방지
+let __regUserActiveUntil = 0;
+function markRegisterUserActive(){
+  __regUserActiveUntil = Date.now() + 3500;
+}
+function isRegisterUserActive(){
+  try{
+    const activePage=document.querySelector('.nav-tab.active')?.dataset.page || document.querySelector('.page.active')?.id?.replace('page-','') || '';
+    if(activePage !== 'register') return false;
+    const ae=document.activeElement;
+    const inReg=!!(ae && ae.closest && ae.closest('#page-register'));
+    const tag=String(ae?.tagName||'').toUpperCase();
+    const editable=inReg && (/^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(tag) || ae?.isContentEditable);
+    return !!(editable || Date.now() < __regUserActiveUntil);
+  }catch(e){ return false; }
+}
+try{
+  ['focusin','pointerdown','touchstart','input','keydown','change'].forEach(evt=>{
+    document.addEventListener(evt, ev=>{
+      try{ if(ev.target && ev.target.closest && ev.target.closest('#page-register')) markRegisterUserActive(); }catch(e){}
+    }, true);
+  });
+}catch(e){}
+
 function onDU(){
   // 관리자 세션은 Firebase Auth 상태로만 복원
   if(!AD && localStorage.getItem('adm')==='1' && auth.currentUser){
@@ -13471,12 +13503,19 @@ function onDU(){
   const p=document.querySelector('.nav-tab.active')?.dataset.page;
   if(p==='tournament'){ try{ renderTL(); }catch(e){ console.warn('onDU renderTL failed', e); } }
   if(p==='register'){
-    try{ popSel(); }catch(e){ console.warn('onDU popSel(register) failed', e); }
-    try{ renderRL(); }catch(e){ console.warn('onDU renderRL failed', e); }
+    if(!isRegisterUserActive()){
+      try{ popSel(); }catch(e){ console.warn('onDU popSel(register) failed', e); }
+      try{ renderRL(); }catch(e){ console.warn('onDU renderRL failed', e); }
+    }else{
+      // 입력 중에는 폼 재렌더링 금지: 커서/모바일 자판 유지
+      try{ updateFilterBtnUI('register', MY_CLUB_FILTER); }catch(e){}
+    }
   }
   if(p==='bracket'){ try{ renderBracket(); }catch(e){ console.warn('onDU renderBracket failed', e); } }
   if(p==='ranking'){ try{ renderRanking(); }catch(e){ console.warn('onDU renderRanking failed', e); } }
-  try{ popSel(); }catch(e){ console.warn('onDU popSel failed', e); }
+  if(!(p==='register' && isRegisterUserActive())){
+    try{ popSel(); }catch(e){ console.warn('onDU popSel failed', e); }
+  }
   renderFloatingNotice();
   refreshAppBranding();
   updateOperationSticky();
@@ -14621,11 +14660,6 @@ function showPage(n){
     const el=ge('rankTS');
     if(el && !el.value){ el.value = pickDefaultTournamentId(); onRankTC(); }
   }
-
-  try{
-    const activeTid = getSelectedTournamentIdForPage(n) || getRealtimeTargetTournamentId();
-    syncTournamentDataForPage(n, activeTid, false).catch(e=>console.warn('page tournament sync failed', e));
-  }catch(e){}
 
   window.scrollTo({top:0,behavior:'auto'});
   renderFloatingNotice();
@@ -16042,6 +16076,8 @@ function openAdminSettings(){
   ensureAdminPushControls();
   injectAutoNotificationSettingsBox();
   refreshAutoNotificationSettingsForm();
+  injectAutoSmsSettingsBox();
+  refreshAutoSmsSettingsForm();
   // 입력 초기화
   ['aspCur','aspNew','aspNew2'].forEach(id=>{const el=ge(id);if(el)el.value='';});
   const ap=ge('adminPhoneInput'); if(ap) ap.value=(G.meta.adminPhone||'');
@@ -17710,11 +17746,19 @@ function pickDefaultTournamentId(){
 
 
 function openHomeRegister(){
-  const currentTid = pickDefaultTournamentId();
+  openHomeRegisterWithTournament(pickDefaultTournamentId());
+}
+function openHomeRegisterWithTournament(tid){
+  try{ markRegisterUserActive(); }catch(e){}
   showPage('register');
-  const el=ge('regTS');
-  if(el && currentTid){ el.value=currentTid; onRegTC(); }
-  window.scrollTo({top:0,behavior:'smooth'});
+  setTimeout(()=>{
+    try{
+      const el=ge('regTS');
+      const target=tid || pickDefaultTournamentId();
+      if(el && target){ el.value=target; onRegTC(); }
+      window.scrollTo({top:0,behavior:'smooth'});
+    }catch(e){ console.warn('openHomeRegisterWithTournament failed', e); }
+  }, 0);
 }
 function openHomeBracket(){
   const currentTid = pickDefaultTournamentId();
@@ -17909,7 +17953,7 @@ function buildCourtNotificationApprovalPayload(kind,key,m,meta={}){
 ${meta.court?meta.court+' 코트':''}${queueText}
 받는 사람: ${recipientLabel}`.trim(),
     title,
-    kind,
+    kind:'court_sms',
     smsKind:kind,
     actionType:'sms_approval',
     smsRecipients:recipients,
@@ -18054,8 +18098,6 @@ function buildCourtSmsAlertPayloads(prevMap,nextMap){
     else if(next.status==='waiting' && prev && (prev.court!==next.court || prev.queuePos!==next.queuePos)) kind='court_changed';
     if(!kind) return;
     const payload=buildCourtNotificationApprovalPayload(kind,next.key,next.match,{court:next.court,queuePos:next.queuePos,tid:next.tid,div:next.div});
-    payload.smsKind=kind;
-    payload.eventKind=kind;
     if(kind==='match_started'){
       payload.title='🎾 경기 시작 알림';
       payload.side='left';
@@ -18067,30 +18109,19 @@ function buildCourtSmsAlertPayloads(prevMap,nextMap){
 }
 function enqueueCourtSmsAlertsFromState(prevMap,nextMap){
   const payloads=buildCourtSmsAlertPayloads(prevMap,nextMap);
-  // v391: 관리자 설정에서 자동 문자 안내를 켠 경우에만 문자 작성 팝업을 자동으로 띄운다.
-  // 실제 SMS 전송은 휴대폰 문자앱에서 진행자가 최종 전송 버튼을 누르는 방식이다.
-  try{
-    if(!(AD||OP||TM)) return;
-    (payloads||[]).forEach(payload=>{
-      const kind=String(payload?.smsKind||payload?.eventKind||payload?.kind||'');
-      if(!isAutoSmsEnabled(kind)) return;
-      const recipients=(payload.smsRecipients||[]).filter(r=>String(r?.phone||'').replace(/[^0-9]/g,'').length>=9);
-      if(!recipients.length) return;
-      enqueueStickyAlert({
-        ...payload,
-        smsRecipients:recipients,
-        title:payload.title || '📨 자동 문자 안내',
-        actionType:'sms_approval',
-        dedupeKey:payload.dedupeKey || `auto_sms:${kind}:${payload.tid||''}:${payload.div||''}:${payload.matchId||''}`,
-        autoCloseMs:0
-      },'info');
-    });
-  }catch(e){ console.warn('auto sms enqueue failed', e); }
+  if(!payloads.length) return;
+  if(!(AD||TM||OP)) return;
+  if(!getAutoSmsSettings().enabled) return;
+  payloads.forEach(payload=>{
+    const smsKind=String(payload.smsKind||'');
+    if(!isAutoSmsEnabled(smsKind)) return;
+    enqueueStickyAlert(payload,'info');
+  });
 }
 
 function sendCourtCardSms(key, mid, statusKind='queue_registered', court='', queuePos=0){
   try{
-    if(!(AD||OP||TM)){ toast('관리자/운영자 또는 경기진행자만 문자 발송 가능','info'); return false; }
+    if(!canManageBracket()){ toast('관리자 또는 경기진행자만 문자 발송 가능','info'); return false; }
     const list=G.matches?.[key]||[];
     const m=list.find(x=>String(x?.id||'')===String(mid||''));
     if(!m){ toast('경기를 찾을 수 없습니다','error'); return false; }
@@ -18255,7 +18286,7 @@ async function createTournament(){
     });
     const _tRegDl=ge('tRegDl')?.value;
     const feeAmount=(ge('tFeeAmount')?.value||'').trim() || '팀당 60,000원';
-    const feeBankHolder=normalizeFeeBankHolderText((ge('tFeeBankHolder')?.value||'').trim());
+    const feeBankHolder=(ge('tFeeBankHolder')?.value||'').trim() || '카카오뱅크 / (김성희)230스포츠미디어';
     const feeAccount=(ge('tFeeAccount')?.value||'').trim() || '3333-07-8834842';
     const ownerUid = user?.uid || '';
     const ownerEmail = user?.email || '';
@@ -18526,7 +18557,7 @@ function openET(tid){
       <div style="font-size:.72rem;color:var(--text2);line-height:1.6;margin-bottom:9px">이 대회 홈화면의 계좌 복사와 입금확인 안내에 사용됩니다.</div>
       <div class="frow">
         <div class="form-group"><label class="form-label">참가비</label><input class="form-input" id="etFeeAmount" value="${t.feeAmount||'팀당 60,000원'}" placeholder="예: 팀당 60,000원"></div>
-        <div class="form-group"><label class="form-label">은행 / 예금주</label><input class="form-input" id="etFeeBankHolder" value="${normalizeFeeBankHolderText(t.feeBankHolder)}" placeholder="예: 카카오뱅크 / (김성희)230스포츠미디어"></div>
+        <div class="form-group"><label class="form-label">은행 / 예금주</label><input class="form-input" id="etFeeBankHolder" value="${normalizeFeeBankHolderText(t.feeBankHolder||'카카오뱅크 / (김성희)230스포츠미디어')}" placeholder="예: 카카오뱅크 / (김성희)230스포츠미디어"></div>
       </div>
       <div class="form-group" style="margin-bottom:0"><label class="form-label">입금계좌</label><input class="form-input" id="etFeeAccount" value="${t.feeAccount||'3333-07-8834842'}" placeholder="예: 3333-07-8834842"></div>
     </div>
@@ -18629,7 +18660,7 @@ async function saveET(){
     const notice    = ge('etNt').value.trim();
     const venue     = ge('etVn').value.trim();
     const feeAmount = (ge('etFeeAmount')?.value||'').trim() || '팀당 60,000원';
-    const feeBankHolder = normalizeFeeBankHolderText((ge('etFeeBankHolder')?.value||'').trim());
+    const feeBankHolder = (ge('etFeeBankHolder')?.value||'').trim() || '카카오뱅크 / (김성희)230스포츠미디어';
     const feeAccount = (ge('etFeeAccount')?.value||'').trim() || '3333-07-8834842';
     const hasGuideAssets = assets.length > 0;
 
@@ -19157,12 +19188,7 @@ function rosterPlayerHTML(name, club, tid){
 
 function onRegTC(){
   const tid=ge('regTS').value,ds=ge('regDS');
-  try{
-    // v387: 대회 선택 시 캐시가 아닌 서버 최신 등록명단을 우선 확인하고, 도착 즉시 화면을 다시 그립니다.
-    syncTournamentDataForPage('register', tid || getRealtimeTargetTournamentId() || null, true)
-      .then(()=>{ try{ renderRegisterDivisionOverview(); renderRL(); }catch(_e){} })
-      .catch(e=>console.warn('register sync failed', e));
-  }catch(e){}
+  try{ syncTournamentDataForPage('register', tid || getRealtimeTargetTournamentId() || null, true).catch(e=>console.warn('register sync failed', e)); }catch(e){}
   setRegClubInputMode(currentRegIsIndividual());
   applyRegLoginUI();
   ge('regSection').style.display='none';
@@ -19830,8 +19856,6 @@ async function registerTeam(){
     const usePublicAppendOnly = isIndividual && !AD && !OP;
     if(usePublicAppendOnly) await stTPublicAppendOne(key, newTeam);
     else await stT(key);
-    // v387: 저장 성공 직후 서버 최신 등록명단을 강제 재조회해 설치앱/PWA 캐시 지연을 줄입니다.
-    try{ await refreshRegistrationViewAfterWrite(tid, div); }catch(_e){ console.warn('post registration refresh skipped', _e); }
   }catch(e){
     G.teams[key].splice(newIdx,1);
     if(!G.teams[key].length) delete G.teams[key];
@@ -20493,11 +20517,7 @@ function renderBracket(){
     return;
   }
 
-  targetDivs.forEach(d=>{
-    const _key=tid+'_'+d;
-    syncMainBracketFromPrelimAndPersist(_key).then(changed=>{ if(changed) try{ renderBracket(); }catch(e){}; }).catch(()=>{});
-    ensureAutoTeamMainBracketIfReady(tid,d).then(changed=>{ if(changed) try{ renderBracket(); }catch(e){}; }).catch(()=>{});
-  });
+  targetDivs.forEach(d=>{ ensureAutoTeamMainBracketIfReady(tid,d).then(changed=>{ if(changed) try{ renderBracket(); }catch(e){}; }).catch(()=>{}); });
   const parts = targetDivs.map(d=>renderBracketHTMLForDiv(tid,d,isAll)).filter(Boolean);
   cont.innerHTML = parts.length ? parts.join('<div style="height:14px"></div>') : '<div class="empty-state card"><div class="empty-icon">🎲</div><p>표시할 부서가 없습니다</p></div>';
   const _eb=ge('bracketExportBar');
@@ -21751,6 +21771,7 @@ function filterIndividualPrelimCards(key,q){
 window.filterIndividualPrelimCards=filterIndividualPrelimCards;
 function renderBracketHTMLForDiv(tid,div,isAll){
   const key=tid+'_'+div;
+  try{ if(typeof syncMainBracketFromPrelim==='function') syncMainBracketFromPrelim(key); }catch(e){}
   const showPrelimSection = shouldShowPrelimByOperationMode(key);
   const showMainSection = shouldShowMainByOperationMode(key);
   if(isIndividualByKey(key) && isIndividualAutoCourtAssignEnabled()){
@@ -21807,7 +21828,7 @@ function renderBracketHTMLForDiv(tid,div,isAll){
           </div>
         </div>` : ``}
         ${isGroupKO && showMainDrawManageMenus ? `<div class="login-menu-wrap js-mini-menu" id="${mainMenuWrapId}">
-          <button class="btn btn-outline" style="padding:4px 10px;font-size:.72rem;min-height:34px;white-space:nowrap;font-weight:800;${canMainRedraw?'':'opacity:.5;cursor:not-allowed;'}" onclick="${canMainRedraw?`toggleMiniMenu(event,'${mainMenuWrapId}')`:`toast('예선 조 추첨을 먼저 진행하세요','info')`}">🏆 본선 추첨 관리</button>
+          <button class="btn btn-outline" style="padding:4px 10px;font-size:.72rem;min-height:34px;white-space:nowrap;font-weight:800;${canMainRedraw?'':'opacity:.5;cursor:not-allowed;'}" onclick="${canMainRedraw?`toggleMiniMenu(event,'${mainMenuWrapId}')`:`toast('예선을 먼저 완료하세요','info')`}">🏆 본선 추첨 관리</button>
           <div class="login-menu-panel" style="min-width:210px">
             ${canManageBracket()?`<button class="btn-sm login-menu-item" onclick="closeMiniMenu('${mainMenuWrapId}');buildMain('${tid}','${div}')" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12);${canMainRedraw?'':'opacity:.5;cursor:not-allowed;'}" ${canMainRedraw?'':'disabled'}>${latestMainSavedDraw || mMs.length ? '🎲 본선 재추첨' : '🎲 본선 추첨 시작'}</button>`:''}
             <button class="btn-sm login-menu-item" onclick="closeMiniMenu('${mainMenuWrapId}');openLatestSavedDraw('${tid}','${div}','main')" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12);${latestMainSavedDraw?'':'opacity:.5;cursor:not-allowed;'}" ${latestMainSavedDraw?'':'disabled'}>📋 본선 결과 보기</button>
@@ -22122,7 +22143,7 @@ function renderBracketHTMLForDiv(tid,div,isAll){
             <div style="font-weight:800;color:var(--primary-dark);margin-bottom:6px">${isFixedPreview?'📌 본선은 지금부터 계속 보입니다':'📌 본선은 예선 후 재추첨됩니다'}</div>
             <div style="font-size:.78rem;color:var(--text2);margin-bottom:10px;line-height:1.7">
               ${isFixedPreview
-                ? '예선이 끝나기 전에도 <b>본선 추첨</b>을 실행할 수 있습니다. 이때는 A조 1위·B조 2위 같은 자리 기준으로 저장되고, 예선 결과가 확정되는 대로 실제 팀명으로 자동 반영됩니다. 진출전이 있으면 직행팀 수와 진출전 팀 수가 함께 표시됩니다.'
+                ? '예선이 끝나기 전에는 <b>본선 구조 미리보기</b>로 표시되고, 예선 종료 후 본선 추첨을 하면 실제 팀으로 자동 배정됩니다. 진출전이 있으면 직행팀 수와 진출전 팀 수가 함께 표시됩니다.'
                 : '본선을 <b>재추첨</b>으로 설정한 경우에는 예선 단계에서 실제 본선 배정 위치를 미리 보여주지 않습니다. 아래에는 구조와 진출전 자리만 표시됩니다. 예: 66팀이면 직행 62팀, 진출전 4팀(2경기), 승자 2팀이 64강 합류.'}
             </div>
             ${isFixedPreview ? renderMainPreviewHTML(pv.matchSlots,pv.n,true,pv.playInMatches||[]) : renderMainPreviewHTML(redrawPreview.matchSlots,redrawPreview.spec.mainSize||pv.n,true,redrawPreview.playInMatches||[])}
@@ -23531,53 +23552,41 @@ function getPreviewAdvSlots(draw,cfg){
   (draw?.groups||[]).forEach((grp,gi)=>{
     const grpSize=(grp?.teams||[]).length||0;
     const advCount=grpSize<=2 ? grpSize : Math.max(1, Number(draw?.advance||cfg?.advance||2));
-    for(let rk=1; rk<=advCount; rk++){
-      const label=`${grpLabel(gi)} ${rk}위`;
-      // 자리 기준 본선 추첨용 가상 ti. 실제 팀 index와 절대 충돌하지 않도록 음수로 둔다.
-      res.push({ti:-((gi+1)*100+rk), nm:label, gn:gi+1, rk, placeholder:true, grpSize});
-    }
+    for(let rk=1; rk<=advCount; rk++) res.push({nm:`${grpLabel(gi)} ${rk}위`, gn:gi+1, rk, placeholder:true, grpSize});
   });
   return res;
 }
 
 const AUTO_MAIN_BUILDING = {};
-function isPrelimAllGroupMatchesDone(key){
-  try{
-    const gMs=(G.matches?.[key]||[]).filter(m=>m && m.phase==='group');
-    if(!gMs.length) return false;
-    return gMs.every(m=>getMatchResultState(key,m).done);
-  }catch(e){ return false; }
-}
-function hasAnyMainBracketMatches(key){
-  return (G.matches?.[key]||[]).some(m=>m && (m.phase==='main' || m.phase==='playin'));
-}
 async function ensureAutoTeamMainBracketIfReady(tid,div){
-  // v389: 본선은 예선 완료 후 자동생성보다, 운영자가 누른 "자리 기준 본선 추첨"을 우선한다.
-  // 기존 자동생성은 기존 대회 호환용으로만 유지한다. 이미 본선이 있으면 결과 확정 시 syncMainBracketFromPrelim()이 채운다.
   const key=tid+'_'+div;
   const t=G.tournaments.find(x=>x.id===tid);
   const draw=G.draws[key];
   if(!t || !draw || isIndividualTournament(t)) return false;
   const cfg=gDS(t,div);
-  if(cfg.format!=='group_knockout') return false;
-  if(hasAnyMainBracketMatches(key)) return false;
-  if(!isPrelimAllGroupMatchesDone(key)) return false;
+  const isGroupKO = (cfg.format==='group_knockout');
+  if(!isGroupKO) return false;
+  const allMs=G.matches[key]||[];
+  if(allMs.some(m=>m && (m.phase==='main' || m.phase==='playin'))) return false;
+  const gMs=allMs.filter(m=>m && m.phase==='group');
+  if(!gMs.length) return false;
+  const allDone=gMs.every(m=>getMatchResultState(key,m).done);
+  if(!allDone) return false;
   if(AUTO_MAIN_BUILDING[key]) return false;
 
   const teams=G.teams[key]||[];
   const advT=getAdvT(key,draw,teams,cfg);
   if((advT||[]).length < 2) return false;
-  const spec=computeMainBracketSpec(advT.length);
-  const plan=buildSeededMainSlots(advT, spec.mainSize, 1, tid, div);
-  if(!(plan && Number(plan.n||0)>=2 && Array.isArray(plan.matchSlots) && plan.matchSlots.length)) return false;
+  const pv=buildPreviewMainSlots(draw, cfg);
+  if(!(pv && Number(pv.n||0) >= 2 && Array.isArray(pv.matchSlots) && pv.matchSlots.length)) return false;
 
   AUTO_MAIN_BUILDING[key]=true;
   try{
-    const nonMain=(G.matches[key]||[]).filter(m=>m && m.phase!=='main' && m.phase!=='playin');
-    const built=buildMainMatches(plan.matchSlots||[], plan.n||0, plan.playInMatches||[]);
+    const nonMain=allMs.filter(m=>m && m.phase!=='main' && m.phase!=='playin');
+    const built=buildMainMatches(pv.matchSlots||[], pv.n||0, pv.playInMatches||[]);
     if(!built.length) return false;
     G.matches[key]=[...nonMain, ...built];
-    G.draws[key]={...(G.draws[key]||{}), autoMainBuiltAt:new Date().toISOString(), mainPlan:getMainDrawPlanStorageValue(plan,false), mainUpdatedAt:new Date().toISOString()};
+    G.draws[key]={...(G.draws[key]||{}), autoMainBuiltAt:new Date().toISOString()};
     try{ setMainSectionCollapsed(key,false); }catch(e){}
     await stD(key);
     await stM(key);
@@ -23608,23 +23617,19 @@ function getPrelimResolvedLabelMap(key){
       const stats=calcGS(key,gi,tids,teams)||[];
       if(!stats.length) return;
       const grpSize=tids.length;
+      const groupMatches=(G.matches[key]||[]).filter(m=>m && m.phase==='group' && Number(m.group)===Number(gi));
+      if(groupMatches.length && !groupMatches.every(m=>getMatchResultState(key,m).done)) return;
       const advCount=grpSize<=2 ? grpSize : advDefault;
       const topStats=stats.slice(0,advCount);
       if(!topStats.length) return;
-      // 동률 미확정이면 그 조의 본선 자리만 아직 비워둔다.
       const resolved=topStats.every(row=>row && row.ti!=null && row.rank!=null && !row.tiePending);
       if(!resolved) return;
       topStats.forEach((row,idx)=>{
-        const team=teams[row.ti];
-        if(!team) return;
-        const name=tdn(team,key,row.ti);
-        const labels=new Set([
-          `${grpLabel(gi)} ${idx+1}위`,
-          `${grpLabel(gi)} ${row.rank||idx+1}위`,
-          `${gi+1}조 ${idx+1}위`,
-          `${gi+1}조 ${row.rank||idx+1}위`
-        ].map(v=>String(v||'').replace(/\s+/g,' ').trim()).filter(Boolean));
-        labels.forEach(label=>{ map[label]={ti:row.ti,name,gn:gi+1,rk:idx+1,grpSize}; });
+        const entry={ti:row.ti,nm:tdn(teams[row.ti],key,row.ti),gn:gi+1,rk:idx+1,grpSize};
+        const label=getMainEntryBracketLabel(entry);
+        if(label){
+          map[String(label).trim()]={ti:row.ti,name:tdn(teams[row.ti],key,row.ti)};
+        }
       });
     });
     return map;
@@ -23675,50 +23680,87 @@ function propagateResolvedMainAdvancements(key){
   });
   return changed;
 }
-function syncMainBracketFromPrelim(key){
+function syncIndividualMainBracketFromPrelim(key){
+  if(!isIndividualByKey(key)) return false;
   const labelMap=getPrelimResolvedLabelMap(key);
   if(!Object.keys(labelMap).length) return false;
   const list=G.matches[key]||[];
   let changed=false;
-  const norm=(v)=>String(v||'').replace(/\s+/g,' ').trim();
-  const resolveLabel=(label)=>labelMap[norm(label)] || null;
   const applySide=(m,side,label)=>{
-    const resolved=resolveLabel(label);
+    const resolved=labelMap[String(label||'').trim()];
     if(!resolved) return;
     if(side==='t1'){
       if(m.t1!==resolved.ti){ m.t1=resolved.ti; changed=true; }
-      // source label은 지우지 않는다. 자리 기준 연결성을 유지하면서 화면에서는 실제 팀명으로 resolve된다.
+      if(m.phase==='playin'){
+        if(String(m.source1Label||'')!==resolved.name){ m.source1Label=resolved.name; changed=true; }
+      }else if(String(m.source1Label||'')){
+        m.source1Label=''; changed=true;
+      }
     }else{
       if(m.t2!==resolved.ti){ m.t2=resolved.ti; changed=true; }
+      if(m.phase==='playin'){
+        if(String(m.source2Label||'')!==resolved.name){ m.source2Label=resolved.name; changed=true; }
+      }else if(String(m.source2Label||'').trim()!=='부전승' && String(m.source2Label||'')){
+        m.source2Label=''; changed=true;
+      }
     }
   };
   list.forEach(m=>{
     if(!m) return;
     if(m.phase==='playin' || (m.phase==='main' && Number(m.round||0)===0)){
       applySide(m,'t1',m.source1Label);
-      if(norm(m.source2Label)!=='부전승') applySide(m,'t2',m.source2Label);
+      applySide(m,'t2',m.source2Label);
     }
   });
   if(propagateResolvedMainAdvancements(key)) changed=true;
   return changed;
 }
-async function syncMainBracketFromPrelimAndPersist(key){
-  try{
-    if(!hasAnyMainBracketMatches(key)) return false;
-    const changed=syncMainBracketFromPrelim(key);
-    if(!changed) return false;
-    G.draws[key]={...(G.draws[key]||{}), mainSyncedAt:new Date().toISOString()};
-    await stD(key);
-    await stM(key);
-    return true;
-  }catch(e){ console.warn('syncMainBracketFromPrelimAndPersist failed', e); return false; }
-}
-function syncIndividualMainBracketFromPrelim(key){
-  return syncMainBracketFromPrelim(key);
+window.syncIndividualMainBracketFromPrelim = syncIndividualMainBracketFromPrelim;
+
+function syncMainBracketFromPrelim(key){
+  const labelMap=getPrelimResolvedLabelMap(key)||{};
+  if(!Object.keys(labelMap).length) return false;
+  const list=G.matches[key]||[];
+  let changed=false;
+  const resolveSide=(m, side, label)=>{
+    const labelKey=String(label||'').trim();
+    if(!labelKey || labelKey==='부전승') return;
+    const resolved=labelMap[labelKey];
+    if(!resolved) return;
+    if(side==='t1'){
+      if(m.t1!==resolved.ti){ m.t1=resolved.ti; changed=true; }
+      if(m.phase==='playin'){
+        if(String(m.source1Label||'')!==resolved.name){ m.source1Label=resolved.name; changed=true; }
+      }else if(String(m.source1Label||'')){
+        m.source1Label=''; changed=true;
+      }
+    }else{
+      if(m.t2!==resolved.ti){ m.t2=resolved.ti; changed=true; }
+      if(m.phase==='playin'){
+        if(String(m.source2Label||'')!==resolved.name){ m.source2Label=resolved.name; changed=true; }
+      }else if(String(m.source2Label||'').trim()!=='부전승' && String(m.source2Label||'')){
+        m.source2Label=''; changed=true;
+      }
+    }
+  };
+  list.forEach(m=>{
+    if(!m) return;
+    if(m.phase==='playin' || (m.phase==='main' && Number(m.round||0)===0)){
+      resolveSide(m,'t1',m.source1Label);
+      resolveSide(m,'t2',m.source2Label);
+    }
+  });
+  if(propagateResolvedMainAdvancements(key)) changed=true;
+  if(changed){
+    const info=_k2td(key);
+    if(info && info.tid && G.draws && G.draws[key]){
+      G.draws[key]={...(G.draws[key]||{}), mainAutoResolvedAt:new Date().toISOString()};
+    }
+  }
+  return changed;
 }
 window.syncMainBracketFromPrelim = syncMainBracketFromPrelim;
-window.syncMainBracketFromPrelimAndPersist = syncMainBracketFromPrelimAndPersist;
-window.syncIndividualMainBracketFromPrelim = syncIndividualMainBracketFromPrelim;
+
 function hybridSpreadOrder(count){
   const arr=[];
   let left=0,right=count-1;
@@ -26121,8 +26163,8 @@ function openIndividualMainDraw(tid,div){
   const gDone=gMs.filter(m=>getMatchResultState(key,m).done).length;
   const isPrelimDone = gMs.length>0 && gDone===gMs.length;
 
-  const advT=getAdvT(key,draw,teams,cfg);
-  if(!advT.length){ toast('예선 진출팀이 없습니다','error'); return; }
+  const advT=isPrelimDone ? getAdvT(key,draw,teams,cfg) : getPreviewAdvSlots(draw,cfg);
+  if(!advT.length){ toast('예선 진출 자리가 없습니다','error'); return; }
 
   const spec=computeMainBracketSpec(advT.length);
   const bracketN=spec.playInTeams>0 ? spec.mainSize : nextPow2(advT.length);
@@ -26795,10 +26837,10 @@ function openMainDraw(tid,div){
   const key=tid+'_'+div, t=G.tournaments.find(t=>t.id===tid),
         draw=G.draws[key], teams=G.teams[key]||[], cfg=gDS(t,div);
 
-  if(!draw || !Array.isArray(draw.groups) || !draw.groups.length){ toast('먼저 예선 추첨을 진행하세요','info'); return; }
-  const prelimDone=isPrelimAllGroupMatchesDone(key);
-  let advT=prelimDone ? getAdvT(key,draw,teams,cfg) : getPreviewAdvSlots(draw,cfg);
-  let previewOnly=!prelimDone;
+  const gMs=(G.matches[key]||[]).filter(m=>m&&m.phase==='group');
+  const prelimDone = gMs.length>0 && gMs.every(m=>getMatchResultState(key,m).done);
+  let advT = prelimDone ? getAdvT(key,draw,teams,cfg) : getPreviewAdvSlots(draw,cfg);
+  let previewOnly = !prelimDone;
   if(advT.length<2){
     advT=getPreviewAdvSlots(draw,cfg);
     previewOnly=true;
@@ -26820,7 +26862,7 @@ function openMainDraw(tid,div){
       <div style="font-weight:700;font-size:.88rem;margin-bottom:8px">🏆 본선 진출팀 (${advT.length}팀)</div>
       ${spec.playInMatches>0?`<div style="font-size:.76rem;color:var(--text2);line-height:1.6;margin-bottom:8px"><b>직행 ${spec.directCount}팀</b>은 바로 ${spec.mainSize}강, <b>진출전 ${spec.playInTeams}팀</b>은 ${spec.playInMatches}경기 후 <b>승자 ${spec.winnersNeeded}팀</b>이 ${spec.mainSize}강 합류</div>`:''}
       <div style="display:flex;flex-wrap:wrap;gap:5px">
-        ${advT.map(a=>`<span class="badge" style="background:${a.rk===1?'linear-gradient(135deg,#fff7dd,#f6d365)':'linear-gradient(135deg,#eef2f7,#d8e0ea)'};color:${a.rk===1?'#7a5600':'#425466'};border:1px solid ${a.rk===1?'#d4a017':'#b8c3d1'};font-size:.78rem">#${Number(a.ti)+1} ${a.rk===1?'👑':'🥈'} ${a.nm} <small style="opacity:.8">(${(a.gn!=null?grpLabel((a.gn||1)-1):'?')} ${a.rk}위)</small></span>`).join('')}
+        ${advT.map((a,i)=>{ const slotOnly=!!a.placeholder || a.ti==null; const label=slotOnly ? (getMainEntryBracketLabel(a)||a.nm||`본선 자리 ${i+1}`) : `#${Number(a.ti)+1} ${a.nm}`; return `<span class="badge" style="background:${a.rk===1?'linear-gradient(135deg,#fff7dd,#f6d365)':'linear-gradient(135deg,#eef2f7,#d8e0ea)'};color:${a.rk===1?'#7a5600':'#425466'};border:1px solid ${a.rk===1?'#d4a017':'#b8c3d1'};font-size:.78rem">${a.rk===1?'👑':'🥈'} ${label} <small style="opacity:.8">(${(a.gn!=null?grpLabel(a.gn):'?')} ${a.rk}위)</small></span>`; }).join('')}
       </div>
     </div>`;
 
@@ -27072,12 +27114,12 @@ async function startMainDraw(){
 
     ge('mainStageMeta').innerHTML = meta.isTest
       ? '테스트용 본선 추첨 완료 — 기록만 저장했습니다.'
-      : '본선 추첨 완료 — 실제 대진표와 본선 시합 생성이 완료되었습니다.';
+      : (MD?.previewOnly ? '자리 기준 본선 추첨 완료 — 예선 결과 확정 시 자동으로 실제 팀명으로 치환됩니다.' : '본선 추첨 완료 — 실제 대진표와 본선 시합 생성이 완료되었습니다.');
     ge('mainProgressBar').style.width='100%';
     ge('mainDrawBtn').disabled=false;
     ge('mainDrawBtn').textContent='🎲 다시 추첨';
     ge('mainDrawBtn').onclick=startMainDraw;
-    toast(meta.isTest ? '테스트 본선 추첨 저장 완료 ✅' : '본선 추첨 저장 및 본선 시합 생성 완료 ✅','success');
+    toast(meta.isTest ? '테스트 본선 추첨 저장 완료 ✅' : (MD?.previewOnly ? '자리 기준 본선 추첨 저장 완료 ✅' : '본선 추첨 저장 및 본선 시합 생성 완료 ✅'),'success');
     try{ openDrawHistory(tid, div); }catch(e){}
   }catch(e){
     console.error(e);
@@ -28186,13 +28228,9 @@ async function saveM3(){
       }else{
         {
           let syncedMain=false;
-          if(m.phase==='group') syncedMain = syncMainBracketFromPrelim(key);
+          if(m.phase==='group') syncedMain = (typeof syncMainBracketFromPrelim==='function') ? syncMainBracketFromPrelim(key) : (isIndividualByKey(key) ? syncIndividualMainBracketFromPrelim(key) : false);
           const autoChanged = isIndividualByKey(key) && isIndividualAutoCourtAssignEnabled() ? ensureIndividualAutoCourtAssignmentsForKey(key) : false;
           if(syncedMain || autoChanged || promotedAfterFinish){
-            if(syncedMain){
-              G.draws[key]={...(G.draws[key]||{}), mainSyncedAt:new Date().toISOString()};
-              await stD(key);
-            }
             await stM(key);
             wroteMatches=true;
           }
@@ -29751,7 +29789,7 @@ function upDash(){
         <div class="home-panel-title">⏳ 다음 순서 / 대기 경기</div>
         <div class="home-panel-list">${waitHtml}</div>
       </div>
-      ${homeTours.length ? `<div class="home-panel-box home-current-tournaments-box"><div class="home-panel-title">📋 현재 접수중 / 진행중 대회</div><div class="home-panel-list">${homeTours.map(t=>`<div class="home-panel-row home-current-tournament-row" onclick="showPage('register');const el=ge('regTS');if(el){el.value='${t.id}';onRegTC();}window.scrollTo({top:0,behavior:'smooth'});"><div class="home-panel-row-main"><div class="home-panel-row-title">${esc(t.name||'')}</div><div class="home-panel-row-sub">📅 ${esc(t.date||'-')} · ${String(t.status||'')==='ongoing'?'진행중':'접수중'}</div></div><span class="home-panel-badge">바로가기</span></div>`).join('')}</div></div>` : ''}
+      ${homeTours.length ? `<div class="home-panel-box home-current-tournaments-box"><div class="home-panel-title">📋 현재 접수중 / 진행중 대회</div><div class="home-panel-list">${homeTours.map(t=>`<div class="home-panel-row home-current-tournament-row" onclick="openHomeRegisterWithTournament('${t.id}')"><div class="home-panel-row-main"><div class="home-panel-row-title">${esc(t.name||'')}</div><div class="home-panel-row-sub">📅 ${esc(t.date||'-')} · ${String(t.status||'')==='ongoing'?'진행중':'접수중'}</div></div><span class="home-panel-badge">바로가기</span></div>`).join('')}</div></div>` : ''}
     </div>`;
     ge('homeDivStatus').innerHTML=at.divisions.map(d=>{
       const k=`${at.id}_${d}`;
@@ -31546,7 +31584,7 @@ function renderNextStickyAlert(){
   STICKY_ALERT_OPEN=true;
   const alertTitle = item.title || (item.kind==='court_complete' ? '🎾 코트 완료 알림' : '🔔 오더 제출 알림');
   const hasSmsRecipients = Array.isArray(item.smsRecipients) && item.smsRecipients.length>0;
-  const canApproveSms = item.actionType==='sms_approval' && (AD||OP||TM);
+  const canApproveSms = item.actionType==='sms_approval' && (AD||OP);
   const actions = canApproveSms
     ? `${hasSmsRecipients?`<button type="button" class="sticky-alert-btn primary" onclick="window.sendStickyAlertSMS()">문자 보내기</button>`:`<button type="button" class="sticky-alert-btn secondary" onclick="window.closeStickyAlert()">번호 없음</button>`}<button type="button" class="sticky-alert-btn secondary" onclick="window.closeStickyAlert()">닫기</button>`
     : `<button type="button" class="sticky-alert-btn secondary" onclick="window.closeStickyAlert()">${item.actionType==='sms_approval'?'확인':'확인'}</button>`;
@@ -31592,7 +31630,7 @@ window.startIndividualMainDraw = startIndividualMainDraw;
 
 function enqueueStickyAlert(payload,type='info'){
   const item=(payload && typeof payload==='object' && !Array.isArray(payload))
-    ? {msg:String(payload.msg||'').trim(), type:payload.type||type, tid:payload.tid||'', div:payload.div||'', matchId:payload.matchId||payload.mid||'', title:String(payload.title||''), kind:String(payload.kind||''), actionType:String(payload.actionType||''), smsRecipients:Array.isArray(payload.smsRecipients)?payload.smsRecipients:[], smsBody:String(payload.smsBody||''), dedupeKey:String(payload.dedupeKey||''), side:String(payload.side||''), autoCloseMs:Number(payload.autoCloseMs||0)||0}
+    ? {msg:String(payload.msg||'').trim(), type:payload.type||type, tid:payload.tid||'', div:payload.div||'', matchId:payload.matchId||payload.mid||'', title:String(payload.title||''), kind:String(payload.kind||''), actionType:String(payload.actionType||''), smsRecipients:Array.isArray(payload.smsRecipients)?payload.smsRecipients:[], smsBody:String(payload.smsBody||''), smsKind:String(payload.smsKind||payload.kind||''), dedupeKey:String(payload.dedupeKey||''), side:String(payload.side||''), autoCloseMs:Number(payload.autoCloseMs||0)||0}
     : {msg:String(payload||'').trim(), type, tid:'', div:'', matchId:'', title:'', kind:'', actionType:'', smsRecipients:[], smsBody:'', dedupeKey:'', side:'', autoCloseMs:0};
   const key=item.dedupeKey || item.msg;
   if(!key) return;
@@ -35269,6 +35307,15 @@ function closeReorderPopup() {
 
 
 
+
+function normalizeFeeBankHolderText(v){
+  const s=String(v||'').trim();
+  if(!s) return '카카오뱅크 / (김성희)230스포츠미디어';
+  if(s==='230스포츠미디어' || s==='카카오뱅크 / 230스포츠미디어') return '카카오뱅크 / (김성희)230스포츠미디어';
+  return s.replace(/카카오뱅크\s*\/\s*230스포츠미디어/g,'카카오뱅크 / (김성희)230스포츠미디어')
+          .replace(/\(김성희\)\s*230스포츠미디어/g,'(김성희)230스포츠미디어');
+}
+
 /* === v342: 참가비 입금 확인 + 대회별 계좌/알림문구 보강 === */
 function getTeamPaymentPaid(team){
   try{ return !!(team && (team.feePaid === true || team.paymentPaid === true || team.paymentStatus === 'paid')); }catch(e){ return false; }
@@ -35281,12 +35328,6 @@ function getPaymentTournamentIdFromKey(key=''){
 }
 function getPaymentTournament(key=''){
   try{ const tid=getPaymentTournamentIdFromKey(key); return (G.tournaments||[]).find(x=>x.id===tid) || null; }catch(e){ return null; }
-}
-function normalizeFeeBankHolderText(v=''){
-  const raw=String(v||'').trim();
-  if(!raw) return '카카오뱅크 / (김성희)230스포츠미디어';
-  if(raw==='카카오뱅크 / 230스포츠미디어') return '카카오뱅크 / (김성희)230스포츠미디어';
-  return raw;
 }
 function getPaymentTournamentTitle(key=''){
   const t=getPaymentTournament(key);
@@ -35304,7 +35345,7 @@ function getPaymentFeeAmountOnly(key=''){
 }
 function getPaymentAccountText(key=''){
   const t=getPaymentTournament(key);
-  const bankHolder=normalizeFeeBankHolderText(t?.feeBankHolder);
+  const bankHolder=normalizeFeeBankHolderText(String(t?.feeBankHolder||'카카오뱅크 / (김성희)230스포츠미디어').trim());
   const account=String(t?.feeAccount||'3333-07-8834842').trim();
   return `${bankHolder} ${account}`.replace(/\s+/g,' ').trim();
 }
@@ -35651,7 +35692,7 @@ renderAllP=function(){
 };
 Object.assign(window,{openParticipantTeamNotifySms,openParticipantPersonNotifySms,v374SendSelectedPush,v374SendSelectedSms,v374SendOneSms,v374SyncAllCheckbox,v374CompactRecordCards});
 
-Object.assign(window,{ copyTournamentFeeAccount, toggleTeamPaymentPaid, sendPaymentConfirmedNotice, buildPaymentActionHTML, buildPaymentStatusHTML, openAdminBroadcastPushModal, openManualMatchPush, openManualTeamPush, sendManualPushFromModal, closeStickyAlert, goToStickyAlertMatch, toggleModalFullscreen, setModalFullscreenState, openQuickAddPlayer, quickAddPlayer, fillAdminPlayerClub, adminAddPlayer, openSupportModal, sendSupportSMS, saveAdminPhone, 
+Object.assign(window,{ openHomeRegisterWithTournament, openHomeRegister, copyTournamentFeeAccount, toggleTeamPaymentPaid, sendPaymentConfirmedNotice, buildPaymentActionHTML, buildPaymentStatusHTML, openAdminBroadcastPushModal, openManualMatchPush, openManualTeamPush, sendManualPushFromModal, closeStickyAlert, goToStickyAlertMatch, toggleModalFullscreen, setModalFullscreenState, openQuickAddPlayer, quickAddPlayer, fillAdminPlayerClub, adminAddPlayer, openSupportModal, sendSupportSMS, saveAdminPhone, 
   showPage,toggleAdmin,doLogin,openAdminSettings,saveAdminPassword,goBracket,onGuideFilesSelected,removeGuideFile,openGuide,loadHistFromDB,uploadHistFromExcel,previewHistExcel,renderGuidePreview,onHistGuideFilesSelected,uploadHistGuideFiles,manageHistGuide,deleteHistGuideFile,removeHistGuidePending,
   createTournament,renderTL,chgTS,delT,openET,saveET,openTD,applyRec,saveDivS,
   onRegTC,renderRL,renderRegisterDivisionOverview,selectRegDivision,registerTeam,delTeam,phint,openPHist,openETeam,saveETeam,etUpdateSlots,updateRegisterSlots,
