@@ -8525,19 +8525,22 @@ function saveMatchNotificationHistory(item={}){
   try{
     const now=new Date();
     const id=String(item.id||item.notificationId||('ntf_'+now.getTime()+'_'+Math.random().toString(36).slice(2,8)));
+    const currentList=getMatchNotificationHistory();
+    const existing=currentList.find(x=>String(x.id||x.notificationId||x.firestoreId||'')===id) || null;
     const data={
       id,
-      title:String(item.title||'230MATCH 알림'),
-      body:String(item.body||''),
-      type:String(item.type||item.data?.type||''),
-      matchId:String(item.matchId||item.mid||item.data?.matchId||item.data?.mid||''),
-      court:String(item.court||item.data?.court||''),
-      createdAt:item.createdAt||now.toISOString(),
-      read:item.read===true?true:false,
-      firestoreId:String(item.firestoreId||item.id||id),
-      data:item.data||{}
+      title:String(item.title||existing?.title||'230MATCH 알림'),
+      body:String(item.body||existing?.body||''),
+      type:String(item.type||item.data?.type||existing?.type||''),
+      matchId:String(item.matchId||item.mid||item.data?.matchId||item.data?.mid||existing?.matchId||''),
+      court:String(item.court||item.data?.court||existing?.court||''),
+      createdAt:item.createdAt||existing?.createdAt||now.toISOString(),
+      // 같은 알림을 Firestore/허브 동기화가 다시 저장하더라도 이미 확인한 상태는 절대 되돌리지 않는다.
+      read:(item.read===true || existing?.read===true) ? true : false,
+      firestoreId:String(item.firestoreId||existing?.firestoreId||item.id||id),
+      data:item.data||existing?.data||{}
     };
-    const list=getMatchNotificationHistory().filter(x=>String(x.id)!==id);
+    const list=currentList.filter(x=>String(x.id||x.notificationId||x.firestoreId||'')!==id);
     list.unshift(data);
     localStorage.setItem(getMatchNotificationHistoryKey(), JSON.stringify(list.slice(0,120)));
     if(!item.silent) updateNotificationInboxBadges();
@@ -9769,7 +9772,7 @@ function saveAdminRegistrationNotificationLocalItem(reg={}, docId='', opt={}){
       body:built.body,
       type:'admin_registration_created',
       createdAt:createdAtText,
-      read:false,
+      read:opt.read===true,
       data:built.data,
       silent:!!opt.silent
     });
@@ -9783,7 +9786,19 @@ async function saveAdminRegistrationInboxForCurrentManager(reg={}, docId='', opt
     const nowText=new Date().toISOString();
     const createdAtText=String(reg.adminNotificationCreatedAt||reg.registeredAt||nowText);
     const firestoreId=uid ? notificationInboxDocId(uid,built.notificationId) : '';
-    try{ saveAdminRegistrationNotificationLocalItem({...reg, firestoreId}, docId, {silent:!!opt.silent}); }catch(e){}
+    let existingRead=false;
+    let existingCreatedAtText=createdAtText;
+    if(uid && firestoreId){
+      try{
+        const oldSnap=await getDoc(doc(db,'notificationInbox',firestoreId));
+        if(oldSnap.exists()){
+          const old=oldSnap.data()||{};
+          existingRead=old.read===true;
+          existingCreatedAtText=String(old.createdAtText||createdAtText);
+        }
+      }catch(_e){}
+    }
+    try{ saveAdminRegistrationNotificationLocalItem({...reg, firestoreId}, docId, {silent:!!opt.silent, read:existingRead}); }catch(e){}
     if(!uid){
       if(!opt.silent) updateNotificationInboxBadges();
       return true;
@@ -9798,10 +9813,11 @@ async function saveAdminRegistrationInboxForCurrentManager(reg={}, docId='', opt
       tid:String(reg.tournamentId||''),
       division:String(reg.division||''),
       registrationId:String(docId||reg._id||''),
-      read:false,
+      // 허브/접수 동기화가 반복되어도 사용자가 이미 확인한 상태는 보존한다.
+      read:existingRead,
       app:'230MATCH',
       createdAt:serverTimestamp(),
-      createdAtText,
+      createdAtText:existingCreatedAtText,
       sourceCollection:'registrations',
       data:Object.fromEntries(Object.entries(built.data).map(([k,v])=>[k,String(v||'').slice(0,500)]))
     },{merge:true});
