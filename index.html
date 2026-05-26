@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-05-26-v398-read-cost-guard";
+  const APP_VERSION = "2026-05-26-v400-hide-record-cost-notice";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -5424,6 +5424,7 @@ body {
   .v374-record-name{font-size:.9rem !important;}
 }
 </style>
+
 
 </head>
 <body>
@@ -30671,6 +30672,33 @@ async function deletePlayerRecordFromList(name, club=''){
 window.deletePlayerRecordFromList=deletePlayerRecordFromList;
 
 function filterP(){PF.club='';PF.div='';PF.recent='';PF.count='';PF.search=ge('psInput')?.value||'';renderAllP();}
+
+function renderPlayerRecordCostGuardNotice(){
+  // v400: 사용자에게 과금 방지 안내문은 노출하지 않음.
+  // 필요 시 콘솔 또는 관리자 내부에서 refreshPlayerRecordsOnDemand() 호출 가능.
+  return;
+}
+async function refreshPlayerRecordsOnDemand(){
+  try{
+    sl(true);
+    await Promise.all([
+      loadRegistry(2026).catch(()=>null),
+      ensurePlayersLoaded(true).catch(()=>null),
+      ensureAllParticipationDataLoaded(true).catch(()=>null)
+    ]);
+    renderAllP();
+    popCF();
+    updatePlayersAdminControls();
+    renderPlayerRecordCostGuardNotice();
+    toast('참가자 기록을 최신화했습니다','success');
+  }catch(e){
+    toast('기록 최신화 실패: '+(e?.message||e),'error');
+  }finally{
+    sl(false);
+  }
+}
+window.refreshPlayerRecordsOnDemand=refreshPlayerRecordsOnDemand;
+
 async function showP(name,club){
   try{ if(!Object.keys(G.players||{}).length) await ensurePlayersLoaded(); }catch(e){}
   const sec=ge('ppSection');
@@ -34172,15 +34200,28 @@ function switchPlayersTab(tab){
     const c=ge('ptab-'+t+'-content'); if(c) c.style.display=(t===tab)?'':'none';
   });
   updatePlayersAdminControls();
+
   if(tab==='registry'){
     const b=ge('regTabBody');
     if(b && !b.dataset.ready){
-      b.innerHTML='<div class="card" style="padding:22px;text-align:center;font-size:.9rem;color:var(--text2)">선수 명단을 불러오는 중입니다…</div>';
+      b.innerHTML='<div class="card" style="padding:22px;text-align:center;font-size:.9rem;color:var(--text2)">참가자 목록을 불러오는 중입니다…</div>';
     }
+    // 등록선수 목록은 1개 문서(memberRegistries) 중심이라 부담이 작음
     setTimeout(()=>initRegistryTab(),0);
   }
+
   if(tab==='records'){
-    Promise.all([loadRegistry(2026), ensurePlayersLoaded(), ensureAllParticipationDataLoaded()]).then(()=>{ renderAllP(); popCF(); updatePlayersAdminControls(); }).catch(()=>{ renderAllP(); popCF(); updatePlayersAdminControls(); });
+    // v399 비용 보호:
+    // 참가자 기록 화면은 실시간성이 낮으므로 진입 때 players/registrations/matches/draws 전체를 강제 읽지 않음.
+    // 1) 로컬 캐시 선수기록
+    // 2) 이미 로드된 현재 대회 참가/경기 데이터
+    // 3) 2026 등록명단 1문서
+    // 만 사용해 먼저 표시. 필요할 때만 수동 최신화.
+    try{ loadPlayersFromLocalCache(); }catch(e){}
+    Promise.resolve()
+      .then(()=>loadRegistry(2026).catch(()=>null))
+      .then(()=>{ renderAllP(); popCF(); updatePlayersAdminControls(); renderPlayerRecordCostGuardNotice(); })
+      .catch(()=>{ renderAllP(); popCF(); updatePlayersAdminControls(); renderPlayerRecordCostGuardNotice(); });
   }
 }
 
@@ -35977,8 +36018,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 
     try{
       try{ CURRENT_APP_PROFILE=await ensureUserProfileDoc(user); }catch(e){}
-      if(typeof ensurePlayersLoaded==='function') await ensurePlayersLoaded();
-      if(typeof ensureAllParticipationDataLoaded==='function') await ensureAllParticipationDataLoaded();
+      // v399 비용 보호: 내 기록도 기본은 로컬/현재 로드 데이터 중심.
+      // 전체 players/registrations/matches/draws 강제 읽기는 하지 않음.
+      try{ loadPlayersFromLocalCache(); }catch(e){}
       if(typeof loadRegistry==='function') await loadRegistry(2026).catch(()=>{});
     }catch(e){ console.warn('v397 load my record data failed', e); }
 
@@ -40696,8 +40738,7 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
     if(typeof om==='function') om('mMyRecord');
     try{
       if(typeof getMyProfileDoc==='function') window.CURRENT_APP_PROFILE=await getMyProfileDoc();
-      if(typeof ensurePlayersLoaded==='function') await ensurePlayersLoaded();
-      if(typeof ensureAllParticipationDataLoaded==='function') await ensureAllParticipationDataLoaded();
+      try{ if(typeof loadPlayersFromLocalCache==='function') loadPlayersFromLocalCache(); }catch(e){}
       if(typeof loadRegistry==='function') await loadRegistry(2026).catch(()=>{});
     }catch(e){ console.warn('v396 load my record data failed', e); }
 
