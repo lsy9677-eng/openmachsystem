@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-05-26-v401-mobile-resume-refresh";
+  const APP_VERSION = "2026-05-26-v404-admin-registration-hub-sync";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -8726,6 +8726,7 @@ async function openNotificationInbox(){
   const body=ge('notificationInboxBody');
   if(body) body.innerHTML='<div class="empty-state" style="padding:30px 12px"><div class="empty-icon">🔔</div><p>지난 알림을 불러오는 중...</p></div>';
   try{ om('mNotificationInbox'); }catch(e){ ensureNotificationInboxModal().classList.add('open'); }
+  try{ await syncAdminRegistrationNotificationHubToLocal({limit:120}); }catch(_e){}
   await syncFirestoreNotificationInboxToLocal();
   renderNotificationInbox();
 }
@@ -9634,6 +9635,7 @@ async function getDeveloperAndManagerPushTokenDocs(){
 }
 function getAdminRegistrationTeamLabel(reg={}){
   try{
+    if(reg.teamLabel) return String(reg.teamLabel);
     if(Array.isArray(reg.individualPlayers) && reg.individualPlayers.length){
       return reg.individualPlayers.slice(0,2).map(p=>`${String(p?.name||'').trim()}${String(p?.clubsRaw||p?.club||'').trim()?`(${String(p?.clubsRaw||p?.club||'').trim()})`:''}`).filter(Boolean).join(' / ');
     }
@@ -9645,6 +9647,9 @@ function getAdminRegistrationTeamLabel(reg={}){
   }catch(e){ return String(reg.entryLabel||reg.pairLabel||reg.club||'참가자'); }
 }
 function getAdminRegistrationAlertMessage(reg={}){
+  if(String(reg.type||reg.adminNotificationType||'')==='admin_registration_created' && reg.title && reg.body){
+    return {title:String(reg.title), body:String(reg.body)};
+  }
   const t=(G.tournaments||[]).find(x=>String(x.id)===String(reg.tournamentId));
   const div=String(reg.division||'');
   const teamLabel=getAdminRegistrationTeamLabel(reg);
@@ -9654,6 +9659,134 @@ function getAdminRegistrationAlertMessage(reg={}){
     body:`${teamLabel}\n${tName}${div?` · ${dl(div)}`:''} 참가 접수가 등록되었습니다.`
   };
 }
+
+function buildAdminRegistrationNotificationPayload(reg={}, docId=''){
+  const msg=getAdminRegistrationAlertMessage(reg);
+  const notificationId=String(reg.adminNotificationId||`admin_registration_created_${docId}`);
+  return {
+    notificationId,
+    title:msg.title,
+    body:msg.body,
+    data:{
+      type:'admin_registration_created',
+      target:'managers',
+      tid:String(reg.tournamentId||''),
+      division:String(reg.division||''),
+      registrationId:String(docId||reg._id||''),
+      notificationId
+    }
+  };
+}
+async function saveAdminRegistrationInboxForCurrentManager(reg={}, docId='', opt={}){
+  try{
+    if(!(AD||TM)) return false;
+    const uid=getCurrentNotificationUid();
+    if(!uid) return false;
+    const built=buildAdminRegistrationNotificationPayload(reg, docId);
+    const nowText=new Date().toISOString();
+    const createdAtText=String(reg.adminNotificationCreatedAt||reg.registeredAt||nowText);
+    const firestoreId=notificationInboxDocId(uid,built.notificationId);
+    const item={
+      id:built.notificationId,
+      firestoreId,
+      title:built.title,
+      body:built.body,
+      type:'admin_registration_created',
+      createdAt:createdAtText,
+      read:false,
+      data:built.data
+    };
+    try{ saveMatchNotificationHistory(item); }catch(e){}
+    await setDoc(doc(db,'notificationInbox',firestoreId),{
+      uid,
+      notificationId:built.notificationId,
+      title:built.title,
+      body:built.body,
+      type:'admin_registration_created',
+      target:'managers',
+      tid:String(reg.tournamentId||''),
+      division:String(reg.division||''),
+      registrationId:String(docId||reg._id||''),
+      read:false,
+      app:'230MATCH',
+      createdAt:serverTimestamp(),
+      createdAtText,
+      sourceCollection:'registrations',
+      data:Object.fromEntries(Object.entries(built.data).map(([k,v])=>[k,String(v||'').slice(0,500)]))
+    },{merge:true});
+    updateNotificationInboxBadges();
+    return true;
+  }catch(e){
+    console.warn('admin registration inbox save skipped', e?.message||e);
+    return false;
+  }
+}
+async function writeAdminRegistrationNotificationHub(reg={}, docId=''){
+  try{
+    if(!docId || !reg?.adminNotificationId) return false;
+    const built=buildAdminRegistrationNotificationPayload(reg, docId);
+    await setDoc(doc(db,'adminRegistrationNotifications',String(docId)),{
+      notificationId:built.notificationId,
+      title:built.title,
+      body:built.body,
+      type:'admin_registration_created',
+      target:'managers',
+      tid:String(reg.tournamentId||''),
+      division:String(reg.division||''),
+      registrationId:String(docId),
+      teamLabel:getAdminRegistrationTeamLabel(reg),
+      createdAt:serverTimestamp(),
+      createdAtText:String(reg.adminNotificationCreatedAt||reg.registeredAt||new Date().toISOString()),
+      sourceCollection:'registrations'
+    },{merge:true});
+    return true;
+  }catch(e){
+    // 권한 규칙이 허용하지 않아도 접수 자체는 절대 막지 않는다. registrations 문서의 adminNotificationId로 보완한다.
+    console.warn('admin registration notification hub write skipped', e?.message||e);
+    return false;
+  }
+}
+function shouldCreateAdminRegistrationInboxFromReg(reg={}){
+  if(!reg || reg.deleted) return false;
+  return String(reg.adminNotificationType||'')==='admin_registration_created' || !!reg.adminNotificationId;
+}
+async function syncAdminRegistrationNotificationHubToLocal(opts={}){
+  try{
+    if(!(AD||TM)) return 0;
+    const uid=getCurrentNotificationUid();
+    if(!uid) return 0;
+    const snap=await getDocs(query(collection(db,'adminRegistrationNotifications'), orderBy('createdAt','desc'), limit(Number(opts.limit||120)||120)));
+    let count=0;
+    for(const d of snap.docs){
+      const h={_hubId:String(d.id), ...(d.data()||{})};
+      if(String(h.type||'') && String(h.type)!=='admin_registration_created') continue;
+      const notificationId=String(h.notificationId||`admin_registration_created_${h.registrationId||d.id}`);
+      const reg={
+        _id:String(h.registrationId||d.id),
+        tournamentId:String(h.tid||h.tournamentId||''),
+        division:String(h.division||''),
+        type:'admin_registration_created',
+        title:String(h.title||'📋 새 참가 접수'),
+        body:String(h.body||''),
+        teamLabel:String(h.teamLabel||''),
+        adminNotificationType:'admin_registration_created',
+        adminNotificationId:notificationId,
+        adminNotificationCreatedAt:String(h.createdAtText||new Date().toISOString())
+      };
+      await saveAdminRegistrationInboxForCurrentManager(reg, reg._id, {silent:true});
+      count++;
+    }
+    if(count) updateNotificationInboxBadges();
+    return count;
+  }catch(e){
+    // 읽기 권한이 아직 없거나 과거 배포본과 규칙이 맞지 않아도 기존 registrations 기반 복원은 유지한다.
+    console.warn('admin registration hub sync skipped', e?.message||e);
+    return 0;
+  }
+}
+window.saveAdminRegistrationInboxForCurrentManager=saveAdminRegistrationInboxForCurrentManager;
+window.writeAdminRegistrationNotificationHub=writeAdminRegistrationNotificationHub;
+window.syncAdminRegistrationNotificationHubToLocal=syncAdminRegistrationNotificationHubToLocal;
 function getAdminRegSeenSet(tid=''){
   try{
     const raw=localStorage.getItem(ADMIN_REG_ALERT_SEEN_PREFIX+String(tid||'all'))||'[]';
@@ -9667,7 +9800,7 @@ async function handleAdminRegistrationAdded(reg={}, docId=''){
   if(!(AD||TM)) return;
   if(!docId || reg.deleted) return;
   const msg=getAdminRegistrationAlertMessage(reg);
-  try{ saveMatchNotificationHistory({title:msg.title, body:msg.body, data:{type:'admin_registration_created', registrationId:docId, tid:reg.tournamentId||'', division:reg.division||''}, type:'admin_registration_created'}); }catch(e){}
+  try{ await saveAdminRegistrationInboxForCurrentManager(reg, docId); }catch(e){}
   try{
     enqueueStickyAlert({
       title:msg.title,
@@ -9696,7 +9829,16 @@ function processAdminRegistrationSnapshotChanges(snapshot, tid=''){
   const initKey='adminRegAlertInit:'+String(tid||'all');
   const seen=getAdminRegSeenSet(tid);
   if(sessionStorage.getItem(initKey)!=='1'){
-    snapshot.docs.forEach(d=>seen.add(String(d.id)));
+    snapshot.docs.forEach(d=>{
+      const id=String(d.id);
+      const reg={_id:id,...(d.data()||{})};
+      if(!seen.has(id) && shouldCreateAdminRegistrationInboxFromReg(reg)){
+        seen.add(id);
+        saveAdminRegistrationInboxForCurrentManager(reg,id,{silent:true}).catch(()=>{});
+      }else{
+        seen.add(id);
+      }
+    });
     saveAdminRegSeenSet(tid,seen);
     sessionStorage.setItem(initKey,'1');
     return;
@@ -11844,14 +11986,32 @@ function startRegisterRegistrationSync(tid){
     else { try{ upDash(); }catch(_e){} }
   }, e=>console.error('register regs snap err', e));
 }
-// ── v401: 앱 포그라운드 복귀 시 데이터 새로고침 ──────────────────────────────
-// 모바일 앱에서 백→포그라운드로 돌아올 때 캐시가 살아있으면 Firebase를 재조회
-// 하지 않아 참가내역·입금내역·대진표가 갱신되지 않는 문제 해결.
-// ▸ 최소 재조회 간격: 일반 뷰어 120초 / 관리자 30초 (요금 폭탄 방지)
-// ▸ register 페이지: onSnapshot 리스너가 끊겼으면 재시작
-// ▸ bracket 페이지 (일반 회원): 강제 1회 재조회 후 renderBracket()
-// ▸ bracket 페이지 (관리자/운영자): 기존 onSnapshot 재시작
+// ── v404: 앱 포그라운드 복귀 시 데이터 새로고침 ──────────────────────────────
+// 모바일 앱에서 백→포그라운드로 돌아올 때 PWA/Firestore 캐시가 살아있으면
+// 참가내역·입금내역이 늦게 보일 수 있어 register 화면은 registrations만
+// 서버에서 1회 강제조회한다. matches/draws는 읽지 않아 요금 폭탄을 막는다.
+// ▸ 최소 재조회 간격: 일반 뷰어 120초 / 관리자 30초
+// ▸ register 페이지: registrations만 1회 서버조회 + 화면 재렌더
+// ▸ bracket 페이지: 기존 v401 방식 유지
 let __lastAppResumeRefresh = 0;
+async function refreshRegisterRegistrationsOnly(tid, opts={}){
+  tid=String(tid||'').trim();
+  if(!tid) return null;
+  const snap = await getDocs(query(collection(db,'registrations'), where('tournamentId','==',tid)));
+  const next = applyRegistrationSnapshotForTournament(tid, snap);
+
+  // register 전용 리스너는 끊겨 있으면 다시 연결만 한다. 이미 살아 있으면 중복 연결하지 않는다.
+  try{ startRegisterRegistrationSync(tid); }catch(_e){}
+
+  if(opts.render !== false && getCurrentPageName()==='register' && String(ge('regTS')?.value||'')===tid){
+    try{ renderRegisterDivisionOverview(); }catch(_e){}
+    try{ renderRL(); }catch(_e){}
+    try{ upDash(); }catch(_e){}
+  }
+  return next;
+}
+window.refreshRegisterRegistrationsOnly = refreshRegisterRegistrationsOnly;
+
 (function setupAppResumeRefresh(){
   document.addEventListener('visibilitychange', async ()=>{
     if(document.visibilityState !== 'visible') return;
@@ -11860,24 +12020,16 @@ let __lastAppResumeRefresh = 0;
     if(now - __lastAppResumeRefresh < minGap) return;
     __lastAppResumeRefresh = now;
 
+    try{ if(AD || TM) syncAdminRegistrationNotificationHubToLocal({limit:120}).catch(()=>{}); }catch(_e){}
     const pg = getCurrentPageName();
     const tid = String(getSelectedTournamentIdForPage(pg) || getRealtimeTargetTournamentId() || '').trim();
     if(!tid) return;
 
     try{
       if(pg === 'register'){
-        // register 페이지: 리스너가 살아있으면 그대로, 끊어졌으면 재시작
-        // 캐시 TTL을 0으로 만들어 다음 진입 때 강제 재조회되게도 함
-        if(!_registerRegsUnsub || _registerLiveTid !== tid){
-          // 번들 캐시 무효화 후 재시작
-          try{ if(TOURNAMENT_BUNDLE_MEM[tid]) delete TOURNAMENT_BUNDLE_MEM[tid]; }catch(_e){}
-          await fetchTournamentBundle(tid, {force:true, acceptStale:true});
-          startRegisterRegistrationSync(tid);
-          if(!isRegisterUserActive()){ try{ onDU(); }catch(_e){} }
-        } else {
-          // 리스너는 살아있지만 메모리 캐시 무효화 → 다음 onSnapshot 발화 때 최신 데이터 적용
-          try{ if(TOURNAMENT_BUNDLE_MEM[tid]) TOURNAMENT_BUNDLE_MEM[tid].ts = 0; }catch(_e){}
-        }
+        // 참가/입금 목록은 registrations만 최신이면 된다.
+        // 기존 fetchTournamentBundle(force:true)는 matches/draws까지 읽어서 비용이 커지므로 사용하지 않는다.
+        await refreshRegisterRegistrationsOnly(tid, {render:true});
       } else if(pg === 'bracket'){
         if(AD || OP || REG){
           // 관리자: 기존 realtime 재시작
@@ -11895,7 +12047,7 @@ let __lastAppResumeRefresh = 0;
           }
         }
       }
-    }catch(e){ console.warn('v401 app resume refresh failed', e); }
+    }catch(e){ console.warn('v404 app resume refresh failed', e); }
   });
 })();
 // ─────────────────────────────────────────────────────────────────────────────
@@ -13310,7 +13462,10 @@ async function stT(key){
     ...(t.note !== undefined ? {note: t.note} : {}),
     ...(t.doublesCount !== undefined ? {doublesCount: t.doublesCount} : {}),
     ...(t.mainPlayerCount !== undefined ? {mainPlayerCount: t.mainPlayerCount} : {}),
-    ...(t.tiebreakAge !== undefined ? {tiebreakAge: Number(t.tiebreakAge||0)||0} : {})
+    ...(t.tiebreakAge !== undefined ? {tiebreakAge: Number(t.tiebreakAge||0)||0} : {}),
+    ...(t.adminNotificationType ? {adminNotificationType: t.adminNotificationType} : {}),
+    ...(t.adminNotificationId ? {adminNotificationId: t.adminNotificationId} : {}),
+    ...(t.adminNotificationCreatedAt ? {adminNotificationCreatedAt: t.adminNotificationCreatedAt} : {})
   }));
   const hashPayload={ docs: docsForHash, ids:[...curIds].sort(), deleted:[...toDel].sort() };
   if(isSameFbWrite('teams', key, hashPayload)) return;
@@ -13334,7 +13489,10 @@ async function stT(key){
       ...(t.note !== undefined ? {note: t.note} : {}),
       ...(t.doublesCount !== undefined ? {doublesCount: t.doublesCount} : {}),
       ...(t.mainPlayerCount !== undefined ? {mainPlayerCount: t.mainPlayerCount} : {}),
-      ...(t.tiebreakAge !== undefined ? {tiebreakAge: Number(t.tiebreakAge||0)||0} : {})
+      ...(t.tiebreakAge !== undefined ? {tiebreakAge: Number(t.tiebreakAge||0)||0} : {}),
+      ...(t.adminNotificationType ? {adminNotificationType: t.adminNotificationType} : {}),
+      ...(t.adminNotificationId ? {adminNotificationId: t.adminNotificationId} : {}),
+      ...(t.adminNotificationCreatedAt ? {adminNotificationCreatedAt: t.adminNotificationCreatedAt} : {})
     };
     batch.set(doc(db,'registrations',docId), payload, {merge:true});
   });
@@ -13366,7 +13524,10 @@ function _buildRegistrationDocPayload(key, team){
     ...(team.note !== undefined ? {note: team.note} : {}),
     ...(team.doublesCount !== undefined ? {doublesCount: team.doublesCount} : {}),
     ...(team.mainPlayerCount !== undefined ? {mainPlayerCount: team.mainPlayerCount} : {}),
-    ...(team.tiebreakAge !== undefined ? {tiebreakAge: Number(team.tiebreakAge||0)||0} : {})
+    ...(team.tiebreakAge !== undefined ? {tiebreakAge: Number(team.tiebreakAge||0)||0} : {}),
+    ...(team.adminNotificationType ? {adminNotificationType: team.adminNotificationType} : {}),
+    ...(team.adminNotificationId ? {adminNotificationId: team.adminNotificationId} : {}),
+    ...(team.adminNotificationCreatedAt ? {adminNotificationCreatedAt: team.adminNotificationCreatedAt} : {})
   };
 }
 
@@ -14850,6 +15011,7 @@ function applyTournamentManagerUI(profile={}){
   const createCard=ge('aoTCreate'); if(createCard) createCard.style.display='block';
   const qaHide=ge('regTabQuickAdd'); if(qaHide) qaHide.style.display='none';
   refreshRoleUI();
+  try{ setTimeout(()=>syncAdminRegistrationNotificationHubToLocal({limit:120}).catch(()=>{}), 900); }catch(e){}
 }
 
 
@@ -15474,6 +15636,7 @@ function applyAdminUI(){
   }
   updatePlayersAdminControls();
   refreshRoleUI();
+  try{ setTimeout(()=>syncAdminRegistrationNotificationHubToLocal({limit:120}).catch(()=>{}), 900); }catch(e){}
   try{ applyIndivLock(); }catch(e){}
 }
 async function doLogin(){
@@ -19961,7 +20124,9 @@ async function registerTeam(){
 
   sl(true);
   if(!G.teams[key])G.teams[key]=[];
+  const newRegId=(typeof _rid==='function') ? _rid() : ('r_'+Math.random().toString(36).slice(2,10));
   const newTeam={
+    _id:newRegId,
     club:isIndividual?(individualPlayers[0]?.clubsRaw||individualPlayers[1]?.clubsRaw||''):club,
     players:names,
     individualPlayers:isIndividual?individualPlayers:undefined,
@@ -19977,7 +20142,10 @@ async function registerTeam(){
     ownerName:isIndividual?(individualOwner?.displayName||''):'',
     registrationStatus: willBeWaitlist ? 'waitlist' : 'confirmed',
     waitlistNo: willBeWaitlist ? (ex.length - maxTeams + 1) : 0,
-    registeredAt:new Date().toISOString()
+    registeredAt:new Date().toISOString(),
+    adminNotificationType:'admin_registration_created',
+    adminNotificationId:`admin_registration_created_${newRegId}`,
+    adminNotificationCreatedAt:new Date().toISOString()
   };
   G.teams[key].push(newTeam);
   const newIdx=G.teams[key].length-1;
@@ -19993,6 +20161,10 @@ async function registerTeam(){
     toast('등록 실패: '+(e?.message||e),'error');
     return;
   }
+
+  try{
+    await writeAdminRegistrationNotificationHub({tournamentId:tid, division:div, ...newTeam}, newTeam._id);
+  }catch(e){ console.warn('admin registration notification record failed', e?.message||e); }
 
   const postErrors=[];
   if(!isIndividual){
