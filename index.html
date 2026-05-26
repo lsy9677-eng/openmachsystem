@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-05-26-v407-mobile-auth-ready-inbox";
+  const APP_VERSION = "2026-05-26-v408-firebase-only-inbox";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -8712,47 +8712,65 @@ function normalizeFirestoreNotificationItem(docSnap){
 async function syncFirestoreNotificationInboxToLocal(){
   try{
     const uid=getCurrentNotificationUid();
-    if(!uid) return 0;
+    if(!uid){
+      // Firebase 기준 통일: 로그인 UID가 없으면 게스트 localStorage 알림은 표시하지 않는다.
+      try{ localStorage.setItem(getMatchNotificationHistoryKey(), '[]'); }catch(_e){}
+      updateNotificationInboxBadgesFromCache();
+      return 0;
+    }
     const snap=await getDocs(query(collection(db,'notificationInbox'), where('uid','==',uid), limit(120)));
     const remote=[];
     snap.forEach(d=>remote.push(normalizeFirestoreNotificationItem(d)));
-    if(!remote.length){ updateNotificationInboxBadges(); return 0; }
     remote.sort((a,b)=>(Date.parse(b.createdAt||0)||0)-(Date.parse(a.createdAt||0)||0));
-    const local=getMatchNotificationHistory();
-    const map=new Map();
-    [...remote,...local].forEach(x=>{
-      const id=String(x.id||x.firestoreId||'');
-      if(!id) return;
-      const prev=map.get(id)||{};
-      map.set(id,{...x, read:(prev.read===true || x.read===true), firestoreId:x.firestoreId||prev.firestoreId||''});
-    });
-    const merged=[...map.values()].sort((a,b)=>(Date.parse(b.createdAt||0)||0)-(Date.parse(a.createdAt||0)||0)).slice(0,120);
-    localStorage.setItem(getMatchNotificationHistoryKey(), JSON.stringify(merged));
-    updateNotificationInboxBadges();
+    // Firebase 기준 통일: localStorage는 서버 알림의 화면 캐시일 뿐, 로컬 단독 알림은 병합하지 않는다.
+    localStorage.setItem(getMatchNotificationHistoryKey(), JSON.stringify(remote.slice(0,120)));
+    updateNotificationInboxBadgesFromCache();
     return remote.length;
-  }catch(e){ console.warn('syncFirestoreNotificationInboxToLocal failed', e?.message||e); updateNotificationInboxBadges(); return 0; }
+  }catch(e){ console.warn('syncFirestoreNotificationInboxToLocal failed', e?.message||e); updateNotificationInboxBadgesFromCache(); return 0; }
 }
 window.saveNotificationInboxDocsForTokenDocs=saveNotificationInboxDocsForTokenDocs;
 window.syncFirestoreNotificationInboxToLocal=syncFirestoreNotificationInboxToLocal;
+window.updateNotificationInboxBadgesFromCache=updateNotificationInboxBadgesFromCache;
 
-function markMatchNotificationRead(id){
+async function markMatchNotificationRead(id){
   try{
     if(!id) return;
     const list=getMatchNotificationHistory();
     let changed=false, firestoreId='';
-    list.forEach(x=>{ if(String(x.id)===String(id) && x.read!==true){ x.read=true; changed=true; firestoreId=x.firestoreId||x.id||''; }});
+    list.forEach(x=>{
+      if(String(x.id)===String(id) || String(x.firestoreId||'')===String(id)){
+        if(x.read!==true){ x.read=true; changed=true; }
+        firestoreId=x.firestoreId||notificationInboxDocId(getCurrentNotificationUid(), x.id||id);
+      }
+    });
     if(changed) localStorage.setItem(getMatchNotificationHistoryKey(), JSON.stringify(list));
-    updateNotificationInboxBadges();
-    if(firestoreId){ setDoc(doc(db,'notificationInbox',firestoreId),{read:true,readAt:serverTimestamp(),readAtText:new Date().toISOString()},{merge:true}).catch(()=>{}); }
-  }catch(e){}
+    updateNotificationInboxBadgesFromCache();
+    const uid=getCurrentNotificationUid();
+    if(uid && firestoreId){
+      await setDoc(doc(db,'notificationInbox',firestoreId),{read:true,readAt:serverTimestamp(),readAtText:new Date().toISOString()},{merge:true});
+      await syncFirestoreNotificationInboxToLocal();
+    }
+  }catch(e){ console.warn('mark notification read failed', e?.message||e); }
 }
-function updateNotificationInboxBadges(){
+function updateNotificationInboxBadgesFromCache(){
   try{
     const unread=getMatchNotificationHistory().filter(x=>x.read!==true).length;
     document.querySelectorAll('[data-notification-unread-badge]').forEach(el=>{
       el.textContent=unread?String(unread):'';
       el.style.display=unread?'inline-flex':'none';
     });
+  }catch(e){}
+}
+let __notificationBadgeRefreshTimer=null;
+function updateNotificationInboxBadges(){
+  updateNotificationInboxBadgesFromCache();
+  try{
+    const uid=getCurrentNotificationUid();
+    if(!uid) return;
+    if(__notificationBadgeRefreshTimer) clearTimeout(__notificationBadgeRefreshTimer);
+    __notificationBadgeRefreshTimer=setTimeout(()=>{
+      syncFirestoreNotificationInboxToLocal().catch(()=>updateNotificationInboxBadgesFromCache());
+    }, 350);
   }catch(e){}
 }
 function ensureNotificationInboxModal(){
@@ -8793,7 +8811,7 @@ function renderNotificationInbox(){
       </div>
       <div style="font-size:.84rem;color:#334155;line-height:1.6;white-space:pre-wrap;word-break:keep-all">${esc(x.body||'')}</div>
       <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:10px">
-        ${unread?`<button class="btn btn-outline" style="min-height:32px;padding:4px 10px;font-size:.75rem" onclick="markMatchNotificationRead('${esc(String(x.id))}');renderNotificationInbox()">확인</button>`:''}
+        ${unread?`<button class="btn btn-outline" style="min-height:32px;padding:4px 10px;font-size:.75rem" onclick="markMatchNotificationRead('${esc(String(x.id))}').then(renderNotificationInbox)">확인</button>`:''}
       </div>
     </div>`;
   }).join('');
@@ -8810,24 +8828,22 @@ async function openNotificationInbox(){
 }
 async function markAllMatchNotificationsRead(){
   try{
-    const list=getMatchNotificationHistory().map(x=>({...x, read:true}));
-    localStorage.setItem(getMatchNotificationHistoryKey(), JSON.stringify(list));
-    updateNotificationInboxBadges();
-    renderNotificationInbox();
     const uid=getCurrentNotificationUid();
     if(uid){
       const snap=await getDocs(query(collection(db,'notificationInbox'), where('uid','==',uid), limit(120)));
       let batch=writeBatch(db), n=0;
       snap.forEach(d=>{ batch.set(d.ref,{read:true,readAt:serverTimestamp(),readAtText:new Date().toISOString()},{merge:true}); n++; });
       if(n) await batch.commit();
+      await syncFirestoreNotificationInboxToLocal();
+    }else{
+      localStorage.setItem(getMatchNotificationHistoryKey(), '[]');
+      updateNotificationInboxBadgesFromCache();
     }
-  }catch(e){}
+    renderNotificationInbox();
+  }catch(e){ console.warn('mark all notifications read failed', e?.message||e); }
 }
 async function clearMatchNotificationHistory(){
   if(!confirm('지난 알림 기록을 삭제할까요?')) return;
-  try{ localStorage.removeItem(getMatchNotificationHistoryKey()); }catch(e){}
-  updateNotificationInboxBadges();
-  renderNotificationInbox();
   try{
     const uid=getCurrentNotificationUid();
     if(uid){
@@ -8836,7 +8852,10 @@ async function clearMatchNotificationHistory(){
       snap.forEach(d=>{ batch.delete(d.ref); n++; });
       if(n) await batch.commit();
     }
-  }catch(e){ console.warn('remote notification clear skipped', e?.message||e); }
+    localStorage.setItem(getMatchNotificationHistoryKey(), '[]');
+    updateNotificationInboxBadgesFromCache();
+    renderNotificationInbox();
+  }catch(e){ console.warn('remote notification clear failed', e?.message||e); toast('알림 삭제 중 오류가 발생했습니다','error'); }
 }
 function showReceivedPushConfirmAlert(title='230MATCH 알림', body='', data={}){
   try{
@@ -8858,7 +8877,7 @@ function closeReceivedPushConfirmAlert(){
     const wrap=ge('stickyAlertWrap');
     if(wrap && String(wrap.getAttribute('data-action-type')||'')==='received_push'){
       const id=wrap.getAttribute('data-notification-id')||'';
-      if(id) markMatchNotificationRead(id);
+      if(id) markMatchNotificationRead(id).catch(()=>{});
       wrap.classList.remove('show');
       wrap.innerHTML='';
       wrap.removeAttribute('data-action-type');
