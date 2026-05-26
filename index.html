@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-05-26-v404-admin-registration-hub-sync";
+  const APP_VERSION = "2026-05-26-v406-mobile-auth-ready-inbox";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -8539,8 +8539,8 @@ function saveMatchNotificationHistory(item={}){
     };
     const list=getMatchNotificationHistory().filter(x=>String(x.id)!==id);
     list.unshift(data);
-    localStorage.setItem(getMatchNotificationHistoryKey(), JSON.stringify(list.slice(0,100)));
-    updateNotificationInboxBadges();
+    localStorage.setItem(getMatchNotificationHistoryKey(), JSON.stringify(list.slice(0,120)));
+    if(!item.silent) updateNotificationInboxBadges();
     return id;
   }catch(e){ console.warn('save notification history failed', e); return ''; }
 }
@@ -8555,6 +8555,80 @@ function getCurrentNotificationUid(){
   }catch(e){}
   return '';
 }
+
+window.__notificationAuthStateResolved = !!(auth && auth.currentUser);
+function migrateGuestNotificationHistoryToCurrentUid(){
+  try{
+    const uid=getCurrentNotificationUid();
+    if(!uid) return 0;
+    const guestKey='matchNotificationHistory_guest';
+    const uidKey='matchNotificationHistory_'+String(uid);
+    if(guestKey===uidKey) return 0;
+    const guest=JSON.parse(localStorage.getItem(guestKey)||'[]');
+    if(!Array.isArray(guest) || !guest.length) return 0;
+    const mine=JSON.parse(localStorage.getItem(uidKey)||'[]');
+    const merged=[];
+    const seen=new Set();
+    [...guest, ...(Array.isArray(mine)?mine:[])].forEach(x=>{
+      const id=String(x?.id||x?.notificationId||x?.firestoreId||'');
+      if(!id || seen.has(id)) return;
+      seen.add(id);
+      merged.push(x);
+    });
+    merged.sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+    localStorage.setItem(uidKey, JSON.stringify(merged.slice(0,120)));
+    localStorage.removeItem(guestKey);
+    return guest.length;
+  }catch(e){ return 0; }
+}
+async function waitForNotificationAuthReady(opts={}){
+  try{
+    const direct=getCurrentNotificationUid();
+    if(direct){ migrateGuestNotificationHistoryToCurrentUid(); return direct; }
+    if(window.__notificationAuthStateResolved) return '';
+    const timeoutMs=Number(opts.timeoutMs||5000)||5000;
+    const started=Date.now();
+    return await new Promise(resolve=>{
+      let done=false, unsub=null, timer=null;
+      const finish=(uid='')=>{
+        if(done) return;
+        done=true;
+        try{ if(unsub) unsub(); }catch(_e){}
+        try{ if(timer) clearInterval(timer); }catch(_e){}
+        if(uid) migrateGuestNotificationHistoryToCurrentUid();
+        resolve(String(uid||''));
+      };
+      try{
+        unsub=onAuthStateChanged(auth,(user)=>{
+          window.__notificationAuthStateResolved=true;
+          CURRENT_APP_USER = (user && !user.isAnonymous) ? user : CURRENT_APP_USER;
+          const uid=getCurrentNotificationUid();
+          finish(uid);
+        });
+      }catch(_e){ finish(''); return; }
+      timer=setInterval(()=>{
+        const uid=getCurrentNotificationUid();
+        if(uid) return finish(uid);
+        if(window.__notificationAuthStateResolved || Date.now()-started>=timeoutMs) return finish('');
+      },180);
+    });
+  }catch(e){ return ''; }
+}
+async function syncAdminRegistrationNotificationHubToLocalAfterAuth(opts={}){
+  try{ await waitForNotificationAuthReady({timeoutMs:Number(opts.timeoutMs||5000)||5000}); }catch(_e){}
+  return syncAdminRegistrationNotificationHubToLocal(opts);
+}
+function scheduleAdminRegistrationHubSyncAfterAuth(reason=''){
+  try{
+    [900, 2400, 5200].forEach((ms)=>{
+      setTimeout(()=>syncAdminRegistrationNotificationHubToLocalAfterAuth({limit:200, timeoutMs:5200, reason}).catch(()=>{}), ms);
+    });
+  }catch(e){}
+}
+window.migrateGuestNotificationHistoryToCurrentUid=migrateGuestNotificationHistoryToCurrentUid;
+window.waitForNotificationAuthReady=waitForNotificationAuthReady;
+window.syncAdminRegistrationNotificationHubToLocalAfterAuth=syncAdminRegistrationNotificationHubToLocalAfterAuth;
+window.scheduleAdminRegistrationHubSyncAfterAuth=scheduleAdminRegistrationHubSyncAfterAuth;
 function makeClientNotificationId(data={}){
   const base=[data.type||'push', data.target||'', data.tid||'', data.division||data.div||'', data.key||'', data.matchId||data.mid||'', data.court||'', data.queuePos||'']
     .map(v=>String(v||'')).join('_').replace(/[^A-Za-z0-9_-]/g,'_').slice(0,170);
@@ -8726,7 +8800,8 @@ async function openNotificationInbox(){
   const body=ge('notificationInboxBody');
   if(body) body.innerHTML='<div class="empty-state" style="padding:30px 12px"><div class="empty-icon">🔔</div><p>지난 알림을 불러오는 중...</p></div>';
   try{ om('mNotificationInbox'); }catch(e){ ensureNotificationInboxModal().classList.add('open'); }
-  try{ await syncAdminRegistrationNotificationHubToLocal({limit:120}); }catch(_e){}
+  try{ await syncAdminRegistrationNotificationHubToLocalAfterAuth({limit:200, timeoutMs:6500, force:true}); }catch(_e){}
+  try{ migrateGuestNotificationHistoryToCurrentUid(); }catch(_e){}
   await syncFirestoreNotificationInboxToLocal();
   renderNotificationInbox();
 }
@@ -9677,26 +9752,42 @@ function buildAdminRegistrationNotificationPayload(reg={}, docId=''){
     }
   };
 }
-async function saveAdminRegistrationInboxForCurrentManager(reg={}, docId='', opt={}){
+function isAdminNotificationViewer(){
   try{
-    if(!(AD||TM)) return false;
-    const uid=getCurrentNotificationUid();
-    if(!uid) return false;
+    return !!(AD || TM || document.body.classList.contains('admin-mode') || document.body.classList.contains('tm-mode'));
+  }catch(e){ return !!(AD||TM); }
+}
+function saveAdminRegistrationNotificationLocalItem(reg={}, docId='', opt={}){
+  try{
+    if(!isAdminNotificationViewer()) return '';
     const built=buildAdminRegistrationNotificationPayload(reg, docId);
-    const nowText=new Date().toISOString();
-    const createdAtText=String(reg.adminNotificationCreatedAt||reg.registeredAt||nowText);
-    const firestoreId=notificationInboxDocId(uid,built.notificationId);
-    const item={
+    const createdAtText=String(reg.adminNotificationCreatedAt||reg.registeredAt||new Date().toISOString());
+    return saveMatchNotificationHistory({
       id:built.notificationId,
-      firestoreId,
+      firestoreId:String(reg.firestoreId||''),
       title:built.title,
       body:built.body,
       type:'admin_registration_created',
       createdAt:createdAtText,
       read:false,
-      data:built.data
-    };
-    try{ saveMatchNotificationHistory(item); }catch(e){}
+      data:built.data,
+      silent:!!opt.silent
+    });
+  }catch(e){ console.warn('save admin registration local item skipped', e?.message||e); return ''; }
+}
+async function saveAdminRegistrationInboxForCurrentManager(reg={}, docId='', opt={}){
+  try{
+    if(!isAdminNotificationViewer()) return false;
+    const uid=getCurrentNotificationUid();
+    const built=buildAdminRegistrationNotificationPayload(reg, docId);
+    const nowText=new Date().toISOString();
+    const createdAtText=String(reg.adminNotificationCreatedAt||reg.registeredAt||nowText);
+    const firestoreId=uid ? notificationInboxDocId(uid,built.notificationId) : '';
+    try{ saveAdminRegistrationNotificationLocalItem({...reg, firestoreId}, docId, {silent:!!opt.silent}); }catch(e){}
+    if(!uid){
+      if(!opt.silent) updateNotificationInboxBadges();
+      return true;
+    }
     await setDoc(doc(db,'notificationInbox',firestoreId),{
       uid,
       notificationId:built.notificationId,
@@ -9714,7 +9805,7 @@ async function saveAdminRegistrationInboxForCurrentManager(reg={}, docId='', opt
       sourceCollection:'registrations',
       data:Object.fromEntries(Object.entries(built.data).map(([k,v])=>[k,String(v||'').slice(0,500)]))
     },{merge:true});
-    updateNotificationInboxBadges();
+    if(!opt.silent) updateNotificationInboxBadges();
     return true;
   }catch(e){
     console.warn('admin registration inbox save skipped', e?.message||e);
@@ -9752,10 +9843,8 @@ function shouldCreateAdminRegistrationInboxFromReg(reg={}){
 }
 async function syncAdminRegistrationNotificationHubToLocal(opts={}){
   try{
-    if(!(AD||TM)) return 0;
-    const uid=getCurrentNotificationUid();
-    if(!uid) return 0;
-    const snap=await getDocs(query(collection(db,'adminRegistrationNotifications'), orderBy('createdAt','desc'), limit(Number(opts.limit||120)||120)));
+    if(!isAdminNotificationViewer()) return 0;
+    const snap=await getDocs(query(collection(db,'adminRegistrationNotifications'), orderBy('createdAt','desc'), limit(Number(opts.limit||200)||200)));
     let count=0;
     for(const d of snap.docs){
       const h={_hubId:String(d.id), ...(d.data()||{})};
@@ -9771,7 +9860,8 @@ async function syncAdminRegistrationNotificationHubToLocal(opts={}){
         teamLabel:String(h.teamLabel||''),
         adminNotificationType:'admin_registration_created',
         adminNotificationId:notificationId,
-        adminNotificationCreatedAt:String(h.createdAtText||new Date().toISOString())
+        adminNotificationCreatedAt:String(h.createdAtText||new Date().toISOString()),
+        firestoreId:String(d.id)
       };
       await saveAdminRegistrationInboxForCurrentManager(reg, reg._id, {silent:true});
       count++;
@@ -9785,6 +9875,7 @@ async function syncAdminRegistrationNotificationHubToLocal(opts={}){
   }
 }
 window.saveAdminRegistrationInboxForCurrentManager=saveAdminRegistrationInboxForCurrentManager;
+window.saveAdminRegistrationNotificationLocalItem=saveAdminRegistrationNotificationLocalItem;
 window.writeAdminRegistrationNotificationHub=writeAdminRegistrationNotificationHub;
 window.syncAdminRegistrationNotificationHubToLocal=syncAdminRegistrationNotificationHubToLocal;
 function getAdminRegSeenSet(tid=''){
@@ -11561,7 +11652,9 @@ async function ensureParticipantAnonymousAuth(meta={}){
 window.ensureParticipantAnonymousAuth = ensureParticipantAnonymousAuth;
 onAuthStateChanged(auth, async (user)=>{
   try{
+    window.__notificationAuthStateResolved = true;
     CURRENT_APP_USER = (user && !user.isAnonymous) ? user : null;
+    try{ if(CURRENT_APP_USER) migrateGuestNotificationHistoryToCurrentUid(); }catch(_e){}
     if(CURRENT_APP_USER){
       try{ CURRENT_APP_PROFILE=await ensureUserProfileDoc(CURRENT_APP_USER); }catch(_e){}
       try{
@@ -12020,7 +12113,7 @@ window.refreshRegisterRegistrationsOnly = refreshRegisterRegistrationsOnly;
     if(now - __lastAppResumeRefresh < minGap) return;
     __lastAppResumeRefresh = now;
 
-    try{ if(AD || TM) syncAdminRegistrationNotificationHubToLocal({limit:120}).catch(()=>{}); }catch(_e){}
+    try{ if(AD || TM) syncAdminRegistrationNotificationHubToLocalAfterAuth({limit:200, timeoutMs:5200}).catch(()=>{}); }catch(_e){}
     const pg = getCurrentPageName();
     const tid = String(getSelectedTournamentIdForPage(pg) || getRealtimeTargetTournamentId() || '').trim();
     if(!tid) return;
@@ -15011,7 +15104,7 @@ function applyTournamentManagerUI(profile={}){
   const createCard=ge('aoTCreate'); if(createCard) createCard.style.display='block';
   const qaHide=ge('regTabQuickAdd'); if(qaHide) qaHide.style.display='none';
   refreshRoleUI();
-  try{ setTimeout(()=>syncAdminRegistrationNotificationHubToLocal({limit:120}).catch(()=>{}), 900); }catch(e){}
+  try{ scheduleAdminRegistrationHubSyncAfterAuth('tm_ui'); }catch(e){}
 }
 
 
@@ -15636,7 +15729,7 @@ function applyAdminUI(){
   }
   updatePlayersAdminControls();
   refreshRoleUI();
-  try{ setTimeout(()=>syncAdminRegistrationNotificationHubToLocal({limit:120}).catch(()=>{}), 900); }catch(e){}
+  try{ scheduleAdminRegistrationHubSyncAfterAuth('admin_ui'); }catch(e){}
   try{ applyIndivLock(); }catch(e){}
 }
 async function doLogin(){
