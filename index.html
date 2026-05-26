@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-05-26-v400-hide-record-cost-notice";
+  const APP_VERSION = "2026-05-26-v401-mobile-resume-refresh";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -11844,6 +11844,62 @@ function startRegisterRegistrationSync(tid){
     else { try{ upDash(); }catch(_e){} }
   }, e=>console.error('register regs snap err', e));
 }
+// ── v401: 앱 포그라운드 복귀 시 데이터 새로고침 ──────────────────────────────
+// 모바일 앱에서 백→포그라운드로 돌아올 때 캐시가 살아있으면 Firebase를 재조회
+// 하지 않아 참가내역·입금내역·대진표가 갱신되지 않는 문제 해결.
+// ▸ 최소 재조회 간격: 일반 뷰어 120초 / 관리자 30초 (요금 폭탄 방지)
+// ▸ register 페이지: onSnapshot 리스너가 끊겼으면 재시작
+// ▸ bracket 페이지 (일반 회원): 강제 1회 재조회 후 renderBracket()
+// ▸ bracket 페이지 (관리자/운영자): 기존 onSnapshot 재시작
+let __lastAppResumeRefresh = 0;
+(function setupAppResumeRefresh(){
+  document.addEventListener('visibilitychange', async ()=>{
+    if(document.visibilityState !== 'visible') return;
+    const now = Date.now();
+    const minGap = (AD || OP || REG) ? 30000 : 120000; // 관리자 30초, 일반 2분
+    if(now - __lastAppResumeRefresh < minGap) return;
+    __lastAppResumeRefresh = now;
+
+    const pg = getCurrentPageName();
+    const tid = String(getSelectedTournamentIdForPage(pg) || getRealtimeTargetTournamentId() || '').trim();
+    if(!tid) return;
+
+    try{
+      if(pg === 'register'){
+        // register 페이지: 리스너가 살아있으면 그대로, 끊어졌으면 재시작
+        // 캐시 TTL을 0으로 만들어 다음 진입 때 강제 재조회되게도 함
+        if(!_registerRegsUnsub || _registerLiveTid !== tid){
+          // 번들 캐시 무효화 후 재시작
+          try{ if(TOURNAMENT_BUNDLE_MEM[tid]) delete TOURNAMENT_BUNDLE_MEM[tid]; }catch(_e){}
+          await fetchTournamentBundle(tid, {force:true, acceptStale:true});
+          startRegisterRegistrationSync(tid);
+          if(!isRegisterUserActive()){ try{ onDU(); }catch(_e){} }
+        } else {
+          // 리스너는 살아있지만 메모리 캐시 무효화 → 다음 onSnapshot 발화 때 최신 데이터 적용
+          try{ if(TOURNAMENT_BUNDLE_MEM[tid]) TOURNAMENT_BUNDLE_MEM[tid].ts = 0; }catch(_e){}
+        }
+      } else if(pg === 'bracket'){
+        if(AD || OP || REG){
+          // 관리자: 기존 realtime 재시작
+          if(!_realtimeRegsUnsub || CURRENT_LIVE_TID !== tid){
+            await fetchTournamentBundle(tid, {force:true, acceptStale:true});
+            startRealtimeTournamentSync(tid);
+          }
+        } else {
+          // 일반 회원 뷰어: 강제 1회 재조회 + 렌더
+          try{ if(TOURNAMENT_BUNDLE_MEM[tid]) delete TOURNAMENT_BUNDLE_MEM[tid]; }catch(_e){}
+          await fetchTournamentBundle(tid, {force:true, acceptStale:true});
+          if(getCurrentPageName()==='bracket' && String(ge('brTS')?.value||'')===tid){
+            try{ renderBracket(); }catch(_e){}
+            try{ initBracketNotice(); }catch(_e){}
+          }
+        }
+      }
+    }catch(e){ console.warn('v401 app resume refresh failed', e); }
+  });
+})();
+// ─────────────────────────────────────────────────────────────────────────────
+
 function startRealtimeTournamentSync(tid){
   if(!tid) return stopRealtimeTournamentSync();
   if(CURRENT_LIVE_TID===tid && _realtimeRegsUnsub && _realtimeMatchesUnsub && _realtimeDrawsUnsub) return;
