@@ -18389,6 +18389,26 @@ function openHomeRegisterWithTournament(tid){
     }catch(e){ console.warn('openHomeRegisterWithTournament failed', e); }
   }, 0);
 }
+
+function openHomeRegisterWithTournamentDivision(tid, div){
+  try{ markRegisterUserActive(); }catch(e){}
+  showPage('register');
+  setTimeout(()=>{
+    try{
+      const target = tid || pickDefaultTournamentId();
+      const ts = ge('regTS');
+      if(ts && target){ ts.value = target; onRegTC(); }
+      setTimeout(()=>{
+        try{
+          const ds = ge('regDS');
+          if(ds && div){ ds.value = div; renderRL(); }
+          const targetCard = ge(`regInlineForm_${div}`)?.closest('.card') || ge('regDivisionOverview') || ge('page-register');
+          targetCard?.scrollIntoView({behavior:'smooth', block:'start'});
+        }catch(e){ console.warn('openHomeRegisterWithTournamentDivision inner failed', e); }
+      }, 60);
+    }catch(e){ console.warn('openHomeRegisterWithTournamentDivision failed', e); }
+  }, 0);
+}
 function openHomeBracket(){
   const currentTid = pickDefaultTournamentId();
   showPage('bracket');
@@ -30493,7 +30513,7 @@ function upDash(){
           <div style="font-size:.74rem;color:${color};margin-top:2px;font-weight:700">양팀 제출 완료 경기 ${bothCnt}/${allMatchMs.length}</div>
         </div>`;
       }
-      return`<div class="stat-card" style="cursor:pointer;padding:20px 18px;min-height:158px;border-width:2px" onclick="${onClickFn}"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span class="dpill ${dc(d)}" style="font-size:.9rem;padding:6px 14px">${dl(d)}</span>${isOngoing&&mt>0?'<span class="badge bg-green" style="animation:pulse 2s infinite;font-size:.78rem;padding:5px 10px">진행중</span>':hd?'<span class="badge bg-green" style="font-size:.78rem;padding:5px 10px">추첨완료</span>':'<span class="badge bg-gray" style="font-size:.78rem;padding:5px 10px">대기</span>'}</div><div class="stat-val" style="margin-top:12px;font-size:2.25rem">${tc}<span style="font-size:1.08rem;font-weight:500"> 팀</span></div><div class="stat-label" style="font-size:.9rem;margin-top:2px">${mt>0?`경기 ${md}/${mt} 완료`:'미시작'}</div>${summary}${orderHtml}${isOngoing?'<div style="margin-top:10px;font-size:.82rem;color:var(--primary);font-weight:700">👆 탭하면 대진표 실시간 보기</div>':''}</div>`;
+      return`<div class="stat-card" style="cursor:pointer;padding:20px 18px;min-height:158px;border-width:2px" onclick="${onClickFn}"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span class="dpill ${dc(d)}" style="font-size:.9rem;padding:6px 14px">${dl(d)}</span>${isOngoing&&mt>0?'<span class="badge bg-green" style="animation:pulse 2s infinite;font-size:.78rem;padding:5px 10px">진행중</span>':hd?'<span class="badge bg-green" style="font-size:.78rem;padding:5px 10px">추첨완료</span>':'<span class="badge bg-gray" style="font-size:.78rem;padding:5px 10px">대기</span>'}</div><div class="stat-val" title="참가접수 명단으로 이동" onclick="event.stopPropagation();openHomeRegisterWithTournamentDivision('${at.id}','${d}')" style="margin-top:12px;font-size:2.25rem;cursor:pointer">${tc}<span style="font-size:1.08rem;font-weight:500"> 팀</span></div><div class="stat-label" style="font-size:.9rem;margin-top:2px">${mt>0?`경기 ${md}/${mt} 완료`:'미시작'}</div>${summary}${orderHtml}${isOngoing?'<div style="margin-top:10px;font-size:.82rem;color:var(--primary);font-weight:700">👆 탭하면 대진표 실시간 보기</div>':''}</div>`;
     }).join('');
   } else {
     ge('heroTitle').textContent=getAppTitle();
@@ -36370,7 +36390,7 @@ renderAllP=function(){
 };
 Object.assign(window,{openParticipantTeamNotifySms,openParticipantPersonNotifySms,v374SendSelectedPush,v374SendSelectedSms,v374SendOneSms,v374SyncAllCheckbox,v374CompactRecordCards});
 
-Object.assign(window,{ openHomeRegisterWithTournament, openHomeRegister, copyTournamentFeeAccount, toggleTeamPaymentPaid, sendPaymentConfirmedNotice, buildPaymentActionHTML, buildPaymentStatusHTML, openAdminBroadcastPushModal, openManualMatchPush, openManualTeamPush, sendManualPushFromModal, closeStickyAlert, goToStickyAlertMatch, toggleModalFullscreen, setModalFullscreenState, openQuickAddPlayer, quickAddPlayer, fillAdminPlayerClub, adminAddPlayer, openSupportModal, sendSupportSMS, saveAdminPhone, 
+Object.assign(window,{ openHomeRegisterWithTournament, openHomeRegisterWithTournamentDivision, openHomeRegister, copyTournamentFeeAccount, toggleTeamPaymentPaid, sendPaymentConfirmedNotice, buildPaymentActionHTML, buildPaymentStatusHTML, openAdminBroadcastPushModal, openManualMatchPush, openManualTeamPush, sendManualPushFromModal, closeStickyAlert, goToStickyAlertMatch, toggleModalFullscreen, setModalFullscreenState, openQuickAddPlayer, quickAddPlayer, fillAdminPlayerClub, adminAddPlayer, openSupportModal, sendSupportSMS, saveAdminPhone, 
   showPage,toggleAdmin,doLogin,openAdminSettings,saveAdminPassword,goBracket,onGuideFilesSelected,removeGuideFile,openGuide,loadHistFromDB,uploadHistFromExcel,previewHistExcel,renderGuidePreview,onHistGuideFilesSelected,uploadHistGuideFiles,manageHistGuide,deleteHistGuideFile,removeHistGuidePending,
   createTournament,renderTL,chgTS,delT,openET,saveET,openTD,applyRec,saveDivS,
   onRegTC,renderRL,renderRegisterDivisionOverview,selectRegDivision,registerTeam,delTeam,phint,openPHist,openETeam,saveETeam,etUpdateSlots,updateRegisterSlots,
