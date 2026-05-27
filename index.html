@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-05-26-v408-firebase-only-inbox";
+  const APP_VERSION = "2026-05-27-v419-stable-select-sms";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -41407,6 +41407,380 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
     registerFetch: 'no forced 3-collection fetch on every register page entry',
     viewerPollMsIfEnabled: 180000
   };
+})();
+</script>
+
+
+
+<!-- v419: stable selectable SMS targets only (team/person + paid/unpaid) -->
+<style id="v419StableSmsStyle">
+.v419-smsbar{margin:0 0 12px 0;padding:12px 14px;border:1.5px solid #99f6e4;border-radius:16px;background:linear-gradient(135deg,#ecfdf5,#eef4ff);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;box-shadow:0 8px 18px rgba(15,30,58,.06)}
+.v419-sms-title{font-size:.9rem;font-weight:1000;color:#0f766e;line-height:1.35}.v419-sms-sub{font-size:.72rem;color:#475569;line-height:1.45;margin-top:3px}.v419-sms-actions{display:flex;gap:7px;flex-wrap:wrap;align-items:center}.v419-sms-actions .btn{font-size:.74rem!important;padding:7px 10px!important;min-height:34px!important;border-radius:11px!important;white-space:nowrap!important}
+.v419-topstat{padding:10px 12px;border:1.5px solid #99f6e4;background:#f0fdfa;border-radius:12px;margin-bottom:10px;font-size:.82rem;line-height:1.65;color:#0f766e}.v419-controls{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 10px}.v419-controls .btn{font-size:.72rem!important;padding:6px 9px!important;min-height:32px!important;border-radius:10px!important}
+.v419-list{display:flex;flex-direction:column;gap:7px;max-height:420px;overflow:auto;-webkit-overflow-scrolling:touch}.v419-row{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:8px;align-items:center;padding:10px 11px;border:1px solid #dbeafe;border-radius:13px;background:#fff;cursor:pointer;user-select:none}.v419-row:hover{background:#f8fbff;border-color:#93c5fd}.v419-row.paid{border-left:4px solid #2563eb}.v419-row.unpaid{border-left:4px solid #f97316}.v419-row.selected{box-shadow:0 0 0 2px rgba(15,118,110,.20);background:#f0fdfa}.v419-row input{width:19px;height:19px;accent-color:#0f766e}.v419-name{font-size:.88rem;font-weight:1000;color:#0f172a;line-height:1.32;word-break:keep-all;overflow-wrap:anywhere}.v419-meta{font-size:.72rem;color:#64748b;line-height:1.45;margin-top:3px;word-break:keep-all;overflow-wrap:anywhere}.v419-phone{font-size:.72rem;font-weight:900;color:#0f766e;white-space:nowrap}.v419-chip{display:inline-flex;align-items:center;justify-content:center;margin-left:5px;padding:2px 7px;border-radius:999px;font-size:.65rem;font-weight:1000;white-space:nowrap}.v419-chip.paid{background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd}.v419-chip.unpaid{background:#fff7ed;color:#c2410c;border:1px solid #fdba74}
+@media(max-width:680px){.v419-smsbar{align-items:stretch}.v419-sms-actions{width:100%;display:grid;grid-template-columns:1fr 1fr;gap:6px}.v419-sms-actions .btn{width:100%}.v419-row{grid-template-columns:26px minmax(0,1fr);gap:7px}.v419-phone{grid-column:2;white-space:normal}.v419-controls{display:grid;grid-template-columns:1fr 1fr}.v419-controls .btn{width:100%}}
+</style>
+<script id="v419StableSmsScript">
+(function(){
+  'use strict';
+  const OLD_IDS=['v412RegisterSmsQuickBar','v412RegisterSmsBar','v415RegisterSmsBar','v416RegisterSmsBar','v417RegisterSmsBar','v418RegisterSmsBar','v412AdminIndividualSmsBox','v416AdminIndividualSmsBox','v417SettingsSmsBox','v418SettingsSmsBox','mIndividualSms','sms418Modal'];
+  const state={selected:new Set()};
+  function ge(id){return document.getElementById(id);} 
+  function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];});}
+  function toastMsg(msg,type){try{if(typeof toast==='function')return toast(msg,type||'info');}catch(e){} alert(msg);} 
+  function cleanOldSms(){OLD_IDS.forEach(function(id){var x=ge(id); if(x)x.remove();});}
+  function adminLike(){
+    try{if(typeof AD!=='undefined'&&AD)return true;}catch(e){}
+    try{if(typeof TM!=='undefined'&&TM)return true;}catch(e){}
+    try{if(window.AD||window.TM)return true;}catch(e){}
+    try{if(document.body.classList.contains('admin-mode')||document.body.classList.contains('tm-mode'))return true;}catch(e){}
+    try{var b=ge('adminSettingsBtn'); if(b&&getComputedStyle(b).display!=='none'&&getComputedStyle(b).visibility!=='hidden') return true;}catch(e){}
+    try{if(document.querySelector('.v338-pay-btn,button[onclick*="toggleTeamPaymentPaid"],button[onclick*="markTeamPaid"]'))return true;}catch(e){}
+    return false;
+  }
+  function isIndividual(t){
+    try{if(typeof isIndividualTournament==='function'&&isIndividualTournament(t))return true;}catch(e){}
+    var type=String((t&&(t.tournamentType||t.type||t.mode))||'');
+    if(type==='individual_pair')return true;
+    try{var ds=(t&&t.divisions)||[]; for(var i=0;i<ds.length;i++){var arr=((window.G&&G.teams&&G.teams[t.id+'_'+ds[i]])||[]); if(arr.some(function(x){return Array.isArray(x.individualPlayers)||x.tournamentType==='individual_pair';}))return true;}}catch(e){}
+    return false;
+  }
+  function tournaments(){return ((window.G&&G.tournaments)||[]).filter(isIndividual);} 
+  function divName(d){try{return typeof dl==='function'?dl(d):String(d||'');}catch(e){return String(d||'');}}
+  function normalizePhone(v){return String(v||'').replace(/[^0-9+]/g,'');}
+  function phoneKey(v){return String(v||'').replace(/[^0-9]/g,'');}
+  function formatPhone(v){try{if(typeof formatPhoneLoose==='function')return formatPhoneLoose(v);}catch(e){} return String(v||'');}
+  function phoneOf(o){return o&&(o.phone||o.phoneNumber||o.mobile||o.tel||o.contact||o.contactPhone)||'';}
+  function playersOf(team){
+    try{if(typeof getIndividualPlayers==='function')return getIndividualPlayers(team)||[];}catch(e){}
+    if(Array.isArray(team&&team.individualPlayers))return team.individualPlayers;
+    if(Array.isArray(team&&team.players))return team.players.slice(0,2).map(function(v){return typeof v==='string'?{name:v}:v;});
+    return [];
+  }
+  function paidOf(team){
+    try{if(typeof getTeamPaymentPaid==='function')return !!getTeamPaymentPaid(team);}catch(e){}
+    var s=String((team&&(team.paymentStatus||team.payStatus||team.feeStatus))||'').toLowerCase();
+    return !!(team&&(team.feePaid===true||team.paymentPaid===true||team.paid===true||s==='paid'||s==='입금완료'||s==='입금확인'));
+  }
+  function deleted(team){return !team||team.deleted===true||String(team.status||'')==='deleted';}
+  function currentTid(){var vals=[ge('regTS')&&ge('regTS').value,ge('sms419Tournament')&&ge('sms419Tournament').value,ge('brTS')&&ge('brTS').value].filter(Boolean),list=tournaments(); for(var i=0;i<vals.length;i++){if(list.some(function(t){return String(t.id)===String(vals[i]);}))return vals[i];} return ((list.find(function(t){return ['open','ongoing'].indexOf(String(t.status||''))>=0;})||list[0]||{}).id)||'';}
+  function teamLabel(team,idx){var ps=playersOf(team).slice(0,2).map(function(p){return String((p&&p.name)||'').trim();}).filter(Boolean); return ps.join(' / ')||String(team&&(team.pairLabel||team.entryLabel||team.club)||('참가팀 '+(idx+1)));}
+  function teamPhones(team){var out=[],seen={}; function add(raw){var p=normalizePhone(raw),k=phoneKey(p); if(k.length<9||seen[k])return; seen[k]=1; out.push({phone:p,text:formatPhone(p)});} playersOf(team).slice(0,2).forEach(function(p){add(phoneOf(p));}); add(team&&(team.ownerPhone||team.phone||team.contactPhone||team.managerPhone)); return out;}
+  function collect(tid,divFilter,scope){
+    var t=tournaments().find(function(x){return String(x.id)===String(tid);}); if(!t)return {t:null,rows:[],teams:0,missing:0};
+    var divs=divFilter?[divFilter]:(t.divisions||[]),rows=[],missing=0,teams=0,seenPerson={};
+    divs.forEach(function(div){var key=t.id+'_'+div,arr=((window.G&&G.teams&&G.teams[key])||[]); arr.forEach(function(team,idx){
+      if(deleted(team))return; teams++; var paid=paidOf(team),label=teamLabel(team,idx),club=String(team.club||'').trim();
+      if(scope==='person'){
+        var fallback=team.ownerPhone||team.phone||team.contactPhone||team.managerPhone||'';
+        playersOf(team).slice(0,2).forEach(function(p,pi){var name=String((p&&p.name)||('참가자'+(pi+1))).trim(),club2=String((p&&(p.club||p.clubsRaw))||club||'').trim(),raw=phoneOf(p)||(pi===0?fallback:''),ph=normalizePhone(raw),pk=phoneKey(ph); if(pk.length<9){missing++; return;} if(seenPerson[pk])return; seenPerson[pk]=1; rows.push({id:'p|'+key+'|'+idx+'|'+pi+'|'+pk,paid:paid,name:name,club:club2,meta:divName(div)+' · '+(idx+1)+'번 참가팀 · '+label,phones:[{phone:ph,text:formatPhone(ph)}],phoneText:formatPhone(ph)});});
+      }else{
+        var phones=teamPhones(team); if(!phones.length){missing++; return;} rows.push({id:'t|'+key+'|'+idx,paid:paid,name:label,club:club,meta:divName(div)+' · '+(idx+1)+'번 참가팀',phones:phones,phoneText:phones.map(function(p){return p.text;}).join(', ')});
+      }
+    });});
+    return {t:t,rows:rows,teams:teams,missing:missing};
+  }
+  function ensureModal(){
+    var old=ge('sms419Modal'); if(old)return old;
+    var wrap=document.createElement('div'); wrap.className='modal-overlay'; wrap.id='sms419Modal';
+    wrap.innerHTML='<div class="modal-box" style="max-width:760px"><div class="modal-header" style="background:#0f766e"><h3 id="sms419Title">📨 선택 문자 보내기</h3><button class="modal-close" onclick="cm(\'sms419Modal\')">✕</button></div><div class="modal-body" style="max-height:78vh;overflow:auto"><div style="padding:10px 12px;background:linear-gradient(135deg,#f0fdfa,#eef4ff);border:1px solid #99f6e4;border-radius:12px;font-size:.78rem;color:#0f766e;line-height:1.6;margin-bottom:12px">팀 또는 개인을 직접 체크해서 문자 대상을 선택합니다. 입금대기/입금완료 필터도 선택할 수 있습니다.</div><div class="frow"><div class="form-group"><label class="form-label">대회</label><select class="form-select" id="sms419Tournament" onchange="sms419FillDivisions();sms419Render(true)"></select></div><div class="form-group"><label class="form-label">부서</label><select class="form-select" id="sms419Division" onchange="sms419Render(true)"></select></div></div><div class="frow"><div class="form-group"><label class="form-label">발송 기준</label><select class="form-select" id="sms419Scope" onchange="sms419Render(true)"><option value="team">참가팀별 선택</option><option value="person">개인별 선택</option></select></div><div class="form-group"><label class="form-label">입금상태</label><select class="form-select" id="sms419Filter" onchange="sms419Render(true)"><option value="all">전체</option><option value="unpaid">입금대기</option><option value="paid">입금완료</option></select></div></div><div class="form-group"><label class="form-label">문자 내용</label><textarea class="form-textarea" id="sms419Body" rows="5" placeholder="문자 내용을 입력하세요"></textarea></div><div id="sms419Preview"></div></div><div class="modal-footer" style="gap:8px;flex-wrap:wrap"><button class="btn btn-outline" onclick="sms419Copy()">📋 선택명단 복사</button><button class="btn btn-gray" onclick="cm(\'sms419Modal\')">닫기</button><button class="btn btn-primary" onclick="sms419Send()" style="background:#0f766e;color:#fff">📨 선택 문자 열기</button></div></div>';
+    document.body.appendChild(wrap);
+    wrap.addEventListener('change',function(ev){var ch=ev.target&&ev.target.closest&&ev.target.closest('.sms419-check'); if(ch){if(ch.checked)state.selected.add(ch.value); else state.selected.delete(ch.value); updateCount();}});
+    wrap.addEventListener('click',function(ev){var row=ev.target&&ev.target.closest&&ev.target.closest('.v419-row'); if(!row||ev.target.closest('input'))return; var ch=row.querySelector('.sms419-check'); if(ch){ch.checked=!ch.checked; ch.dispatchEvent(new Event('change',{bubbles:true}));}});
+    return wrap;
+  }
+  function fillTournaments(selected){var sel=ge('sms419Tournament'); if(!sel)return; var list=tournaments(); sel.innerHTML=list.map(function(t){return '<option value="'+esc(t.id)+'">'+esc(t.name||'개인전 대회')+'</option>';}).join(''); if(selected&&list.some(function(t){return String(t.id)===String(selected);}))sel.value=selected; else if(list[0])sel.value=list[0].id; fillDivisions();}
+  function fillDivisions(){var tid=ge('sms419Tournament')&&ge('sms419Tournament').value,t=tournaments().find(function(x){return String(x.id)===String(tid);}),sel=ge('sms419Division'); if(!sel)return; var cur=sel.value; sel.innerHTML='<option value="">전체 부서</option>'+((t&&t.divisions)||[]).map(function(d){return '<option value="'+esc(d)+'">'+esc(divName(d))+'</option>';}).join(''); if(cur&&[].slice.call(sel.options).some(function(o){return o.value===cur;}))sel.value=cur;}
+  function visible(){var tid=ge('sms419Tournament')&&ge('sms419Tournament').value,div=ge('sms419Division')&&ge('sms419Division').value,scope=ge('sms419Scope')&&ge('sms419Scope').value||'team',filter=ge('sms419Filter')&&ge('sms419Filter').value||'all'; var data=collect(tid,div,scope); var rows=data.rows.filter(function(r){return filter==='paid'?r.paid:(filter==='unpaid'?!r.paid:true);}); return {data:data,rows:rows,scope:scope,filter:filter};}
+  function defaultMsg(t,filter){var name=(t&&t.name)||'개인전 대회'; if(filter==='unpaid')return '[230MATCH 공지]\n'+name+'\n참가비 입금 대기 안내드립니다.'; if(filter==='paid')return '[230MATCH 공지]\n'+name+'\n입금 확인된 참가자 대상 공지입니다.'; return '[230MATCH 공지]\n'+name+'\n공지 내용을 입력해 주세요.';}
+  function render(keepSelected){var box=ge('sms419Preview'); if(!box)return; if(!keepSelected)state.selected.clear(); var v=visible(),rows=v.rows,paid=rows.filter(function(r){return r.paid;}).length,unpaid=rows.length-paid,title=ge('sms419Title'); if(title)title.textContent=(v.scope==='team'?'📨 참가팀별 선택 문자':'📨 개인별 선택 문자'); box.innerHTML='<div class="v419-topstat"><div id="sms419Count">선택 0건</div><div style="font-size:.73rem;color:#64748b;margin-top:3px">표시 '+rows.length+'건 · 입금대기 '+unpaid+'건 · 입금완료 '+paid+'건 · 번호 없음 '+v.data.missing+'건</div></div><div class="v419-controls"><button type="button" class="btn btn-outline" onclick="sms419Select(\'all\')">표시 전체 선택</button><button type="button" class="btn btn-outline" onclick="sms419Select(\'unpaid\')" style="background:#fff7ed;color:#c2410c;border-color:#fdba74">입금대기 선택</button><button type="button" class="btn btn-outline" onclick="sms419Select(\'paid\')" style="background:#eff6ff;color:#1d4ed8;border-color:#93c5fd">입금완료 선택</button><button type="button" class="btn btn-gray" onclick="sms419Select(\'none\')">선택 해제</button></div>'+(rows.length?'<div class="v419-list">'+rows.map(function(r){var ch=state.selected.has(r.id); return '<div class="v419-row '+(r.paid?'paid':'unpaid')+(ch?' selected':'')+'" data-id="'+esc(r.id)+'"><input type="checkbox" class="sms419-check" value="'+esc(r.id)+'" data-paid="'+(r.paid?'1':'0')+'" onchange="sms419UpdateCount()" '+(ch?'checked':'')+'><span><span class="v419-name">'+esc(r.name)+' '+(r.club?'<span style="color:#64748b;font-weight:800">'+esc(r.club)+'</span>':'')+'<span class="v419-chip '+(r.paid?'paid':'unpaid')+'">'+(r.paid?'입금완료':'입금대기')+'</span></span><div class="v419-meta">'+esc(r.meta||'')+'</div></span><span class="v419-phone">'+esc(r.phoneText)+'</span></div>';}).join('')+'</div>':'<div style="padding:10px 12px;background:#fff1f2;border:1px solid #fecaca;border-radius:10px;color:#dc2626;font-size:.8rem">표시할 발송 대상이 없습니다.</div>'); updateCount();}
+  function updateCount(){var boxes=[].slice.call(document.querySelectorAll('#sms419Preview .sms419-check')),selected=boxes.filter(function(x){return x.checked;}),p=selected.filter(function(x){return x.dataset.paid==='1';}).length; boxes.forEach(function(x){if(x.checked)state.selected.add(x.value);else state.selected.delete(x.value);var row=x.closest('.v419-row'); if(row)row.classList.toggle('selected',x.checked);}); var el=ge('sms419Count'); if(el)el.textContent='선택 '+selected.length+'건 · 입금대기 '+(selected.length-p)+'건 · 입금완료 '+p+'건';}
+  function selectMode(mode){var v=visible(); if(mode==='none'){state.selected.clear();} else {v.rows.forEach(function(r){var ok=mode==='all'||(mode==='paid'&&r.paid)||(mode==='unpaid'&&!r.paid); if(ok)state.selected.add(r.id);});} render(true);}
+  function selectedRows(){var v=visible(); return v.rows.filter(function(r){return state.selected.has(r.id);});}
+  function open(filter,scope){if(!adminLike()){toastMsg('관리자 또는 운영자 로그인 필요','info');return;} cleanOldSms(); ensureModal(); var tid=currentTid(); fillTournaments(tid); var d=ge('sms419Division'),cur=ge('regDS')&&ge('regDS').value; if(d&&cur&&[].slice.call(d.options).some(function(o){return o.value===cur;}))d.value=cur; ge('sms419Scope').value=scope||'team'; ge('sms419Filter').value=filter||'all'; var t=tournaments().find(function(x){return String(x.id)===String(ge('sms419Tournament').value);}); ge('sms419Body').value=defaultMsg(t,filter||'all'); state.selected.clear(); render(false); if(filter==='unpaid'||filter==='paid')selectMode(filter); try{om('sms419Modal');}catch(e){ge('sms419Modal').classList.add('open');}}
+  function copy(){var body=String((ge('sms419Body')||{}).value||'').trim(); if(!body){toastMsg('문자 내용을 입력하세요','error');return;} var rows=selectedRows(); if(!rows.length){toastMsg('선택된 대상이 없습니다','error');return;} var txt='[수신자 '+rows.length+'건]\n'+rows.map(function(r){return r.name+' ('+(r.paid?'입금완료':'입금대기')+') '+r.phoneText;}).join('\n')+'\n\n[내용]\n'+body; try{navigator.clipboard.writeText(txt).then(function(){toastMsg('선택 명단과 내용이 복사됐습니다','success');});}catch(e){alert(txt);}}
+  function send(){var body=String((ge('sms419Body')||{}).value||'').trim(); if(!body){toastMsg('문자 내용을 입력하세요','error');return;} var rows=selectedRows(); if(!rows.length){toastMsg('선택된 대상이 없습니다','error');return;} var seen={},phones=[]; rows.forEach(function(r){(r.phones||[]).forEach(function(p){var k=phoneKey(p.phone); if(k.length>=9&&!seen[k]){seen[k]=1; phones.push(p.phone);}});}); if(!phones.length){toastMsg('발송 가능한 전화번호가 없습니다','error');return;} if(!confirm('선택한 대상 '+phones.length+'명에게 문자앱을 엽니다.\n\n계속하시겠습니까?'))return; var mobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent); if(!mobile){copy(); toastMsg('PC에서는 복사만 가능합니다. 휴대폰 문자앱에 붙여넣으세요.','info');return;} window.location.href='sms:'+phones.join(',')+'?body='+encodeURIComponent(body);}
+  function injectRegister(){try{cleanOldSms(); var page=ge('page-register'); if(!page)return; var tid=ge('regTS')&&ge('regTS').value,t=tournaments().find(function(x){return String(x.id)===String(tid);}),old=ge('v419RegisterSmsBar'); if(!adminLike()||!t){if(old)old.remove();return;} var div=ge('regDS')&&ge('regDS').value||'',data=collect(tid,div,'team'),paid=data.rows.filter(function(r){return r.paid;}).length,unpaid=data.rows.length-paid,bar=old||document.createElement('div'); bar.id='v419RegisterSmsBar'; bar.className='v419-smsbar'; bar.innerHTML='<div><div class="v419-sms-title">📨 참가팀별 문자 보내기</div><div class="v419-sms-sub">현재 '+(div?divName(div):'전체 부서')+' · 발송 가능 '+data.rows.length+'팀 · 입금대기 '+unpaid+'팀 · 입금완료 '+paid+'팀</div></div><div class="v419-sms-actions"><button type="button" class="btn btn-outline" onclick="sms419Open(\'all\',\'team\')">참가팀 선택 문자</button><button type="button" class="btn btn-primary" onclick="sms419Open(\'unpaid\',\'team\')" style="background:#c2410c;color:#fff">입금대기팀 문자</button><button type="button" class="btn btn-primary" onclick="sms419Open(\'paid\',\'team\')" style="background:#2563eb;color:#fff">입금완료팀 문자</button></div>'; var anchor=ge('regDivisionOverview')||ge('regSection')||page.querySelector('.card'); if(anchor&&anchor.parentNode&&(!old||bar.nextSibling!==anchor))anchor.parentNode.insertBefore(bar,anchor); else if(!old)page.insertBefore(bar,page.firstChild);}catch(e){console.warn('v419 register sms failed',e);}}
+  function injectSettings(){try{cleanOldSms(); if(!adminLike())return; if(ge('v419SettingsSmsBox'))return; var body=document.querySelector('#mAdminSettings .modal-body'); if(!body)return; var ref=ge('noticeContactBtns'),fg=ref&&ref.closest?ref.closest('.form-group'):null,box=document.createElement('div'); box.id='v419SettingsSmsBox'; box.className='v419-smsbar'; box.innerHTML='<div><div class="v419-sms-title">📨 개인전 참가자 문자 보내기</div><div class="v419-sms-sub">개인별로 한 명씩 선택하고 입금대기/입금완료 필터로 문자 발송합니다.</div></div><div class="v419-sms-actions"><button type="button" class="btn btn-primary" onclick="sms419Open(\'all\',\'person\')" style="background:#0f766e;color:#fff">개인별 선택 문자 보내기</button></div>'; if(fg&&fg.parentNode)fg.parentNode.insertBefore(box,fg.nextSibling); else body.appendChild(box);}catch(e){console.warn('v419 settings sms failed',e);}}
+  window.sms419Open=open; window.sms419Render=render; window.sms419FillDivisions=fillDivisions; window.sms419UpdateCount=updateCount; window.sms419Select=selectMode; window.sms419Copy=copy; window.sms419Send=send; window.v419InjectRegisterSmsBar=injectRegister; window.v419InjectSettingsSmsBox=injectSettings;
+  var oldShow=window.showPage; if(typeof oldShow==='function'){window.showPage=function(){var r=oldShow.apply(this,arguments); setTimeout(injectRegister,80); setTimeout(injectSettings,120); return r;};}
+  var oldReg=window.onRegTC; if(typeof oldReg==='function'){window.onRegTC=function(){var r=oldReg.apply(this,arguments); setTimeout(injectRegister,120); return r;};}
+  var oldOverview=window.renderRegisterDivisionOverview; if(typeof oldOverview==='function'){window.renderRegisterDivisionOverview=function(){var r=oldOverview.apply(this,arguments); setTimeout(injectRegister,120); return r;};}
+  var oldRender=window.renderRL; if(typeof oldRender==='function'){window.renderRL=function(){var r=oldRender.apply(this,arguments); setTimeout(injectRegister,120); return r;};}
+  var oldAdmin=window.openAdminSettings; if(typeof oldAdmin==='function'){window.openAdminSettings=function(){var r=oldAdmin.apply(this,arguments); [120,300,700,1200,2000].forEach(function(ms){setTimeout(injectSettings,ms);}); return r;};}
+  document.addEventListener('DOMContentLoaded',function(){
+    setTimeout(function(){cleanOldSms();injectRegister();injectSettings();},700);
+    setInterval(function(){if(document.querySelector('#page-register.active'))injectRegister(); if(document.querySelector('#mAdminSettings.open'))injectSettings();},900);
+    document.addEventListener('change',function(ev){ if(ev.target&&ev.target.classList&&ev.target.classList.contains('sms419-check')){ try{updateCount();}catch(e){} } }, true);
+  });
+})();
+</script>
+
+
+
+
+<!-- v421: settings-only individual participant SMS fix (does not touch register SMS) -->
+<style id="v421SettingsPersonSmsStyle">
+#sms421SettingsBox{margin:12px 0 16px;padding:12px 14px;border:1.5px solid #99f6e4;border-radius:16px;background:linear-gradient(135deg,#ecfdf5,#eef4ff);box-shadow:0 8px 18px rgba(15,30,58,.06)}
+#sms421SettingsBox .sms421-title{font-size:.9rem;font-weight:1000;color:#0f766e;line-height:1.35}
+#sms421SettingsBox .sms421-sub{font-size:.72rem;color:#475569;line-height:1.5;margin:4px 0 10px}
+#sms421SettingsBox .sms421-actions{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+#sms421SettingsBox .sms421-actions .btn{font-size:.74rem!important;padding:7px 10px!important;min-height:34px!important;border-radius:11px!important;white-space:nowrap!important}
+#sms421Modal .sms421-topstat{padding:10px 12px;border:1.5px solid #99f6e4;background:#f0fdfa;border-radius:12px;margin-bottom:10px;font-size:.82rem;line-height:1.65;color:#0f766e}
+#sms421Modal .sms421-controls{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 10px}
+#sms421Modal .sms421-controls .btn{font-size:.72rem!important;padding:6px 9px!important;min-height:32px!important;border-radius:10px!important}
+#sms421Modal .sms421-list{display:flex;flex-direction:column;gap:7px;max-height:420px;overflow:auto;-webkit-overflow-scrolling:touch}
+#sms421Modal .sms421-row{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:8px;align-items:center;padding:10px 11px;border:1px solid #dbeafe;border-radius:13px;background:#fff;cursor:pointer;user-select:none}
+#sms421Modal .sms421-row:hover{background:#f8fbff;border-color:#93c5fd}
+#sms421Modal .sms421-row.paid{border-left:4px solid #2563eb}
+#sms421Modal .sms421-row.unpaid{border-left:4px solid #f97316}
+#sms421Modal .sms421-row.selected{box-shadow:0 0 0 2px rgba(15,118,110,.20);background:#f0fdfa}
+#sms421Modal .sms421-row input{width:19px;height:19px;accent-color:#0f766e}
+#sms421Modal .sms421-name{font-size:.88rem;font-weight:1000;color:#0f172a;line-height:1.32;word-break:keep-all;overflow-wrap:anywhere}
+#sms421Modal .sms421-meta{font-size:.72rem;color:#64748b;line-height:1.45;margin-top:3px;word-break:keep-all;overflow-wrap:anywhere}
+#sms421Modal .sms421-phone{font-size:.72rem;font-weight:900;color:#0f766e;white-space:nowrap}
+#sms421Modal .sms421-chip{display:inline-flex;align-items:center;justify-content:center;margin-left:5px;padding:2px 7px;border-radius:999px;font-size:.65rem;font-weight:1000;white-space:nowrap}
+#sms421Modal .sms421-chip.paid{background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd}
+#sms421Modal .sms421-chip.unpaid{background:#fff7ed;color:#c2410c;border:1px solid #fdba74}
+@media(max-width:680px){#sms421SettingsBox .sms421-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px}#sms421SettingsBox .sms421-actions .btn{width:100%}#sms421Modal .sms421-row{grid-template-columns:26px minmax(0,1fr);gap:7px}#sms421Modal .sms421-phone{grid-column:2;white-space:normal}#sms421Modal .sms421-controls{display:grid;grid-template-columns:1fr 1fr}#sms421Modal .sms421-controls .btn{width:100%}}
+</style>
+<script id="v421SettingsPersonSmsScript">
+(function(){
+  'use strict';
+  const S={selected:new Set()};
+  function ge(id){return document.getElementById(id);}
+  function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];});}
+  function toastMsg(msg,type){try{if(typeof toast==='function')return toast(msg,type||'info');}catch(e){} alert(msg);}
+  function phoneKey(v){return String(v||'').replace(/[^0-9]/g,'');}
+  function normPhone(v){return String(v||'').replace(/[^0-9+]/g,'');}
+  function fmtPhone(v){try{if(typeof formatPhoneLoose==='function')return formatPhoneLoose(v);}catch(e){} return String(v||'');}
+  function divLabel(d){try{return typeof dl==='function'?dl(d):String(d||'');}catch(e){return String(d||'');}}
+  function adminLike(){
+    try{if(typeof AD!=='undefined'&&AD)return true;}catch(e){}
+    try{if(typeof TM!=='undefined'&&TM)return true;}catch(e){}
+    try{if(window.AD||window.TM)return true;}catch(e){}
+    try{if(document.body.classList.contains('admin-mode')||document.body.classList.contains('tm-mode'))return true;}catch(e){}
+    try{if(ge('mAdminSettings')&&ge('mAdminSettings').classList.contains('open'))return true;}catch(e){}
+    return false;
+  }
+  function isIndividual(t){
+    try{if(typeof isIndividualTournament==='function'&&isIndividualTournament(t))return true;}catch(e){}
+    const type=String((t&&(t.tournamentType||t.type||t.mode))||'');
+    if(type==='individual_pair')return true;
+    try{const ds=(t&&t.divisions)||[];return ds.some(d=>((window.G&&G.teams&&G.teams[t.id+'_'+d])||[]).some(x=>Array.isArray(x.individualPlayers)||x.tournamentType==='individual_pair'));}catch(e){}
+    return false;
+  }
+  function tournaments(){return ((window.G&&G.tournaments)||[]).filter(isIndividual);}
+  function currentTid(){
+    const opts=[ge('sms421Tournament')&&ge('sms421Tournament').value,ge('regTS')&&ge('regTS').value,ge('brTS')&&ge('brTS').value].filter(Boolean);
+    const list=tournaments();
+    for(const v of opts){if(list.some(t=>String(t.id)===String(v)))return v;}
+    return ((list.find(t=>['open','ongoing'].includes(String(t.status||'')))||list[0]||{}).id)||'';
+  }
+  function playersOf(team){
+    try{if(typeof getIndividualPlayers==='function')return getIndividualPlayers(team)||[];}catch(e){}
+    if(Array.isArray(team&&team.individualPlayers))return team.individualPlayers;
+    if(Array.isArray(team&&team.players))return team.players.slice(0,2).map(v=>typeof v==='string'?{name:v}:v);
+    return [];
+  }
+  function phoneOf(o){return o&&(o.phone||o.phoneNumber||o.mobile||o.tel||o.contact||o.contactPhone)||'';}
+  function paidOf(team){
+    try{if(typeof getTeamPaymentPaid==='function')return !!getTeamPaymentPaid(team);}catch(e){}
+    const s=String((team&&(team.paymentStatus||team.payStatus||team.feeStatus))||'').toLowerCase();
+    return !!(team&&(team.feePaid===true||team.paymentPaid===true||team.paid===true||s==='paid'||s==='입금완료'||s==='입금확인'));
+  }
+  function deleted(team){return !team||team.deleted===true||String(team.status||'')==='deleted';}
+  function teamName(team,idx){const ps=playersOf(team).slice(0,2).map(p=>String((p&&p.name)||'').trim()).filter(Boolean);return ps.join(' / ')||String(team&&(team.pairLabel||team.entryLabel||team.club)||('참가팀 '+(idx+1)));}
+  function collect(tid,divFilter){
+    const t=tournaments().find(x=>String(x.id)===String(tid)); if(!t)return {t:null,rows:[],missing:0,teams:0};
+    const divs=divFilter?[divFilter]:(t.divisions||[]),rows=[],seen={},stats={missing:0,teams:0};
+    divs.forEach(div=>{const arr=((window.G&&G.teams&&G.teams[t.id+'_'+div])||[]); arr.forEach((team,idx)=>{
+      if(deleted(team))return; stats.teams++; const paid=paidOf(team),label=teamName(team,idx),fallback=team.ownerPhone||team.phone||team.contactPhone||team.managerPhone||'',baseClub=String(team.club||'').trim();
+      playersOf(team).slice(0,2).forEach((p,pi)=>{
+        const name=String((p&&p.name)||('참가자'+(pi+1))).trim();
+        const club=String((p&&(p.club||p.clubsRaw))||baseClub||'').trim();
+        const raw=phoneOf(p)||(pi===0?fallback:'');
+        const ph=normPhone(raw), pk=phoneKey(ph);
+        if(pk.length<9){stats.missing++; return;}
+        const id='p421|'+t.id+'|'+div+'|'+idx+'|'+pi+'|'+pk;
+        if(seen[id])return; seen[id]=1;
+        rows.push({id,paid,name,club,meta:divLabel(div)+' · '+(idx+1)+'번 참가팀 · '+label,phone:ph,phoneText:fmtPhone(ph)});
+      });
+    });});
+    return {t,rows,missing:stats.missing,teams:stats.teams};
+  }
+  function ensureModal(){
+    let m=ge('sms421Modal'); if(m)return m;
+    m=document.createElement('div'); m.className='modal-overlay'; m.id='sms421Modal';
+    m.innerHTML='<div class="modal-box" style="max-width:760px;width:96vw"><div class="modal-header"><h3 id="sms421Title">📨 개인별 선택 문자</h3><button class="modal-close" onclick="cm(\'sms421Modal\')">✕</button></div><div class="modal-body" style="max-height:76vh;overflow:auto"><div class="frow" style="margin-bottom:10px"><div class="form-group"><label class="form-label">대회</label><select class="form-select" id="sms421Tournament" onchange="sms421FillDivisions();sms421Render(false)"></select></div><div class="form-group"><label class="form-label">부서</label><select class="form-select" id="sms421Division" onchange="sms421Render(false)"></select></div></div><div class="form-group" style="margin-bottom:10px"><label class="form-label">보기 필터</label><select class="form-select" id="sms421Filter" onchange="sms421Render(false)"><option value="all">전체 참가자</option><option value="unpaid">입금대기자만</option><option value="paid">입금완료자만</option></select></div><div id="sms421Preview"></div><div class="form-group" style="margin-top:12px"><label class="form-label">문자 내용</label><textarea class="form-textarea" id="sms421Body" rows="5" placeholder="문자 내용을 입력하세요"></textarea></div></div><div class="modal-footer" style="gap:8px;flex-wrap:wrap"><button class="btn btn-outline" onclick="sms421Copy()">📋 명단/내용 복사</button><button class="btn btn-primary" onclick="sms421Send()" style="background:#0f766e;color:#fff">📨 선택 문자 열기</button></div></div>';
+    document.body.appendChild(m);
+    m.addEventListener('change',ev=>{const cb=ev.target&&ev.target.closest&&ev.target.closest('.sms421-check'); if(cb){if(cb.checked)S.selected.add(cb.value); else S.selected.delete(cb.value); updateCount();}});
+    m.addEventListener('click',ev=>{const row=ev.target&&ev.target.closest&&ev.target.closest('.sms421-row'); if(!row||ev.target.closest('input,button,select,textarea'))return; const cb=row.querySelector('.sms421-check'); if(cb){cb.checked=!cb.checked; cb.dispatchEvent(new Event('change',{bubbles:true}));}});
+    return m;
+  }
+  function fillTournaments(selected){const sel=ge('sms421Tournament'); if(!sel)return; const list=tournaments(); sel.innerHTML=list.map(t=>'<option value="'+esc(t.id)+'">'+esc(t.name||'개인전 대회')+'</option>').join(''); if(selected&&list.some(t=>String(t.id)===String(selected)))sel.value=selected; else if(list[0])sel.value=list[0].id; fillDivisions();}
+  function fillDivisions(){const tid=ge('sms421Tournament')&&ge('sms421Tournament').value,t=tournaments().find(x=>String(x.id)===String(tid)),sel=ge('sms421Division'); if(!sel)return; const cur=sel.value; sel.innerHTML='<option value="">전체 부서</option>'+((t&&t.divisions)||[]).map(d=>'<option value="'+esc(d)+'">'+esc(divLabel(d))+'</option>').join(''); if(cur&&[].slice.call(sel.options).some(o=>o.value===cur))sel.value=cur;}
+  function visibleRows(){const tid=ge('sms421Tournament')&&ge('sms421Tournament').value, div=ge('sms421Division')&&ge('sms421Division').value, filter=ge('sms421Filter')&&ge('sms421Filter').value||'all'; const data=collect(tid,div); const rows=data.rows.filter(r=>filter==='paid'?r.paid:(filter==='unpaid'?!r.paid:true)); return {data,rows,filter};}
+  function render(keep){const box=ge('sms421Preview'); if(!box)return; if(!keep)S.selected.clear(); const v=visibleRows(),rows=v.rows,paid=rows.filter(r=>r.paid).length,unpaid=rows.length-paid; box.innerHTML='<div class="sms421-topstat"><div id="sms421Count">선택 0명</div><div style="font-size:.73rem;color:#64748b;margin-top:3px">표시 '+rows.length+'명 · 입금대기 '+unpaid+'명 · 입금완료 '+paid+'명 · 번호 없음 '+v.data.missing+'명</div></div><div class="sms421-controls"><button type="button" class="btn btn-outline" onclick="sms421Select(\'all\')">표시 전체 선택</button><button type="button" class="btn btn-outline" onclick="sms421Select(\'unpaid\')" style="background:#fff7ed;color:#c2410c;border-color:#fdba74">입금대기 선택</button><button type="button" class="btn btn-outline" onclick="sms421Select(\'paid\')" style="background:#eff6ff;color:#1d4ed8;border-color:#93c5fd">입금완료 선택</button><button type="button" class="btn btn-gray" onclick="sms421Select(\'none\')">선택 해제</button></div>'+(rows.length?'<div class="sms421-list">'+rows.map(r=>{const ch=S.selected.has(r.id); return '<div class="sms421-row '+(r.paid?'paid':'unpaid')+(ch?' selected':'')+'" data-id="'+esc(r.id)+'"><input type="checkbox" class="sms421-check" value="'+esc(r.id)+'" data-paid="'+(r.paid?'1':'0')+'" '+(ch?'checked':'')+'><span><span class="sms421-name">'+esc(r.name)+' '+(r.club?'<span style="color:#64748b;font-weight:800">'+esc(r.club)+'</span>':'')+'<span class="sms421-chip '+(r.paid?'paid':'unpaid')+'">'+(r.paid?'입금완료':'입금대기')+'</span></span><div class="sms421-meta">'+esc(r.meta||'')+'</div></span><span class="sms421-phone">'+esc(r.phoneText)+'</span></div>';}).join('')+'</div>':'<div style="padding:10px 12px;background:#fff1f2;border:1px solid #fecaca;border-radius:10px;color:#dc2626;font-size:.8rem">표시할 발송 대상이 없습니다.</div>'); updateCount();}
+  function updateCount(){const boxes=[].slice.call(document.querySelectorAll('#sms421Preview .sms421-check')),selected=boxes.filter(x=>x.checked),paid=selected.filter(x=>x.dataset.paid==='1').length; boxes.forEach(x=>{if(x.checked)S.selected.add(x.value); else S.selected.delete(x.value); const row=x.closest('.sms421-row'); if(row)row.classList.toggle('selected',x.checked);}); const el=ge('sms421Count'); if(el)el.textContent='선택 '+selected.length+'명 · 입금대기 '+(selected.length-paid)+'명 · 입금완료 '+paid+'명';}
+  function select(mode){const v=visibleRows(); if(mode==='none')S.selected.clear(); else v.rows.forEach(r=>{if(mode==='all'||(mode==='paid'&&r.paid)||(mode==='unpaid'&&!r.paid))S.selected.add(r.id);}); render(true);}
+  function selectedRows(){const v=visibleRows(); return v.rows.filter(r=>S.selected.has(r.id));}
+  function defaultMsg(t,filter){const name=(t&&t.name)||'개인전 대회'; if(filter==='unpaid')return '[230MATCH 공지]\n'+name+'\n참가비 입금 대기 안내드립니다.'; if(filter==='paid')return '[230MATCH 공지]\n'+name+'\n입금 확인된 참가자 대상 공지입니다.'; return '[230MATCH 공지]\n'+name+'\n공지 내용을 입력해 주세요.';}
+  function open(filter){if(!adminLike()){toastMsg('관리자 또는 운영자 로그인 필요','info');return;} ensureModal(); fillTournaments(currentTid()); const curDiv=ge('regDS')&&ge('regDS').value, d=ge('sms421Division'); if(d&&curDiv&&[].slice.call(d.options).some(o=>o.value===curDiv))d.value=curDiv; ge('sms421Filter').value=filter||'all'; const t=tournaments().find(x=>String(x.id)===String(ge('sms421Tournament').value)); ge('sms421Body').value=defaultMsg(t,filter||'all'); S.selected.clear(); render(false); if(filter==='paid'||filter==='unpaid')select(filter); try{om('sms421Modal');}catch(e){ge('sms421Modal').classList.add('open');}}
+  function copy(){const body=String((ge('sms421Body')||{}).value||'').trim(); if(!body){toastMsg('문자 내용을 입력하세요','error');return;} const rows=selectedRows(); if(!rows.length){toastMsg('선택된 대상이 없습니다','error');return;} const txt='[수신자 '+rows.length+'명]\n'+rows.map(r=>r.name+' ('+(r.paid?'입금완료':'입금대기')+') '+r.phoneText).join('\n')+'\n\n[내용]\n'+body; try{navigator.clipboard.writeText(txt).then(()=>toastMsg('선택 명단과 내용이 복사됐습니다','success'));}catch(e){alert(txt);}}
+  function send(){const body=String((ge('sms421Body')||{}).value||'').trim(); if(!body){toastMsg('문자 내용을 입력하세요','error');return;} const rows=selectedRows(); if(!rows.length){toastMsg('선택된 대상이 없습니다','error');return;} const seen={},phones=[]; rows.forEach(r=>{const k=phoneKey(r.phone); if(k.length>=9&&!seen[k]){seen[k]=1; phones.push(r.phone);}}); if(!phones.length){toastMsg('발송 가능한 전화번호가 없습니다','error');return;} if(!confirm('선택한 대상 '+phones.length+'명에게 문자앱을 엽니다.\n\n계속하시겠습니까?'))return; const mobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent); if(!mobile){copy(); toastMsg('PC에서는 복사만 가능합니다. 휴대폰 문자앱에 붙여넣으세요.','info'); return;} window.location.href='sms:'+phones.join(',')+'?body='+encodeURIComponent(body);}
+  function inject(){try{if(!adminLike())return; const old=ge('v419SettingsSmsBox'); if(old)old.remove(); if(ge('sms421SettingsBox'))return; const body=document.querySelector('#mAdminSettings .modal-body'); if(!body)return; const ref=ge('noticeContactBtns'), fg=ref&&ref.closest?ref.closest('.form-group'):null; const box=document.createElement('div'); box.id='sms421SettingsBox'; box.innerHTML='<div class="sms421-title">📨 개인전 참가자 문자 보내기</div><div class="sms421-sub">설정 전용 기능입니다. 개인별로 한 명씩 선택하고, 입금대기자/입금완료자만 골라 문자 발송할 수 있습니다.</div><div class="sms421-actions"><button type="button" class="btn btn-primary" onclick="sms421Open(\'all\')" style="background:#0f766e;color:#fff">개인별 선택 문자</button><button type="button" class="btn btn-primary" onclick="sms421Open(\'unpaid\')" style="background:#c2410c;color:#fff">입금대기자 문자</button><button type="button" class="btn btn-primary" onclick="sms421Open(\'paid\')" style="background:#2563eb;color:#fff">입금완료자 문자</button></div>'; if(fg&&fg.parentNode)fg.parentNode.insertBefore(box,fg.nextSibling); else body.appendChild(box);}catch(e){console.warn('v421 settings sms inject failed',e);}}
+  window.sms421Open=open; window.sms421Render=render; window.sms421FillDivisions=fillDivisions; window.sms421Select=select; window.sms421Copy=copy; window.sms421Send=send; window.v421InjectSettingsPersonSms=inject;
+  const oldAdmin=window.openAdminSettings; if(typeof oldAdmin==='function'){window.openAdminSettings=function(){const r=oldAdmin.apply(this,arguments); [80,200,500,900,1500,2500].forEach(ms=>setTimeout(inject,ms)); return r;};}
+  document.addEventListener('DOMContentLoaded',()=>{setTimeout(inject,900); setInterval(()=>{if(document.querySelector('#mAdminSettings.open'))inject();},700);});
+})();
+</script>
+
+
+<!-- v422: settings top individual SMS bridge fix - keep register SMS untouched -->
+<style id="v422SettingsSmsBridgeStyle">
+#sms421SettingsBox{display:none !important;}
+</style>
+<script id="v422SettingsSmsBridgeScript">
+(function(){
+  'use strict';
+  function ge(id){return document.getElementById(id);}
+  function toastMsg(msg,type){try{if(typeof toast==='function')return toast(msg,type||'info');}catch(e){} alert(msg);}
+  function bridgeOpen(mode){
+    mode = mode || 'all';
+    if(typeof window.sms421Open !== 'function'){
+      toastMsg('문자 기능을 준비 중입니다. 잠시 후 다시 눌러주세요.','info');
+      return;
+    }
+    window.sms421Open(mode);
+    // 상단 버튼은 "전체 참가자 문자" 의미가 강하므로 전체 모드에서는 표시 명단 전체를 자동 선택한다.
+    if(mode === 'all'){
+      [120,260,520].forEach(function(ms){
+        setTimeout(function(){ try{ if(typeof window.sms421Select === 'function') window.sms421Select('all'); }catch(e){} }, ms);
+      });
+    }
+  }
+  function fixTopAdminSmsBox(){
+    try{
+      var root=document.querySelector('#mAdminSettings .modal-body');
+      if(!root) return;
+      var btns=[].slice.call(root.querySelectorAll('button'));
+      btns.forEach(function(btn){
+        var txt=(btn.textContent||'').replace(/\s+/g,' ').trim();
+        var oc=String(btn.getAttribute('onclick')||'');
+        if(/개인전\s*참가자.*문자/.test(txt) || /openIndividualParticipantSmsModal/.test(oc)){
+          btn.textContent='📨 개인전 참가자 전체 문자 보내기';
+          btn.setAttribute('onclick',"openIndividualParticipantSmsModal('all')");
+          btn.style.background='#0f766e';
+          btn.style.color='#fff';
+        }
+      });
+      // v421이 아래쪽에 중복 삽입한 설정 전용 박스는 혼동을 막기 위해 숨긴다.
+      var dup=ge('sms421SettingsBox');
+      if(dup) dup.style.display='none';
+    }catch(e){console.warn('v422 fixTopAdminSmsBox failed',e);}
+  }
+  window.openIndividualParticipantSmsModal = function(mode){ bridgeOpen(mode || 'all'); };
+  window.openSettingsIndividualParticipantSms = window.openIndividualParticipantSmsModal;
+  var old=window.openAdminSettings;
+  if(typeof old==='function'){
+    window.openAdminSettings=function(){
+      var r=old.apply(this,arguments);
+      [80,180,350,700,1200,2000].forEach(function(ms){setTimeout(fixTopAdminSmsBox,ms);});
+      return r;
+    };
+  }
+  document.addEventListener('DOMContentLoaded',function(){
+    [600,1200,2200].forEach(function(ms){setTimeout(fixTopAdminSmsBox,ms);});
+    setInterval(function(){ if(document.querySelector('#mAdminSettings.open')) fixTopAdminSmsBox(); }, 900);
+  });
+})();
+</script>
+
+
+
+<!-- v423: settings top individual SMS inline panel fix - avoids disappearing modal, does not touch register SMS -->
+<style id="v423SettingsInlineSmsStyle">
+#sms423Panel{margin:12px 0 16px;padding:12px 14px;border:1.5px solid #99f6e4;border-radius:16px;background:linear-gradient(135deg,#ecfdf5,#eef4ff);box-shadow:0 8px 18px rgba(15,30,58,.06)}
+#sms423Panel .sms423-title{font-size:.9rem;font-weight:1000;color:#0f766e;line-height:1.35;margin-bottom:4px}
+#sms423Panel .sms423-sub{font-size:.72rem;color:#475569;line-height:1.5;margin-bottom:10px}
+#sms423Panel .sms423-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px}
+#sms423Panel .sms423-actions{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 10px}
+#sms423Panel .sms423-actions .btn{font-size:.72rem!important;padding:6px 9px!important;min-height:32px!important;border-radius:10px!important;white-space:nowrap!important}
+#sms423Panel .sms423-stat{padding:9px 11px;border:1px solid #99f6e4;background:#f0fdfa;border-radius:12px;margin-bottom:8px;font-size:.78rem;line-height:1.55;color:#0f766e;font-weight:800}
+#sms423Panel .sms423-list{display:flex;flex-direction:column;gap:7px;max-height:360px;overflow:auto;-webkit-overflow-scrolling:touch;margin-top:8px}
+#sms423Panel .sms423-row{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:8px;align-items:center;padding:10px 11px;border:1px solid #dbeafe;border-radius:13px;background:#fff;cursor:pointer;user-select:none}
+#sms423Panel .sms423-row:hover{background:#f8fbff;border-color:#93c5fd}
+#sms423Panel .sms423-row.paid{border-left:4px solid #2563eb}
+#sms423Panel .sms423-row.unpaid{border-left:4px solid #f97316}
+#sms423Panel .sms423-row.selected{box-shadow:0 0 0 2px rgba(15,118,110,.20);background:#f0fdfa}
+#sms423Panel .sms423-row input{width:19px;height:19px;accent-color:#0f766e}
+#sms423Panel .sms423-name{font-size:.88rem;font-weight:1000;color:#0f172a;line-height:1.32;word-break:keep-all;overflow-wrap:anywhere}
+#sms423Panel .sms423-meta{font-size:.72rem;color:#64748b;line-height:1.45;margin-top:3px;word-break:keep-all;overflow-wrap:anywhere}
+#sms423Panel .sms423-phone{font-size:.72rem;font-weight:900;color:#0f766e;white-space:nowrap}
+#sms423Panel .sms423-chip{display:inline-flex;align-items:center;justify-content:center;margin-left:5px;padding:2px 7px;border-radius:999px;font-size:.65rem;font-weight:1000;white-space:nowrap}
+#sms423Panel .sms423-chip.paid{background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd}
+#sms423Panel .sms423-chip.unpaid{background:#fff7ed;color:#c2410c;border:1px solid #fdba74}
+#sms423Panel textarea{margin-top:8px}
+@media(max-width:680px){#sms423Panel .sms423-grid{grid-template-columns:1fr}#sms423Panel .sms423-actions{display:grid;grid-template-columns:1fr 1fr}#sms423Panel .sms423-actions .btn{width:100%}#sms423Panel .sms423-row{grid-template-columns:26px minmax(0,1fr);gap:7px}#sms423Panel .sms423-phone{grid-column:2;white-space:normal}}
+</style>
+<script id="v423SettingsInlineSmsScript">
+(function(){
+  'use strict';
+  const S={selected:new Set(), mode:'all'};
+  function ge(id){return document.getElementById(id);}
+  function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];});}
+  function toastMsg(msg,type){try{if(typeof toast==='function')return toast(msg,type||'info');}catch(e){} alert(msg);}
+  function phoneKey(v){return String(v||'').replace(/[^0-9]/g,'');}
+  function normPhone(v){return String(v||'').replace(/[^0-9+]/g,'');}
+  function fmtPhone(v){try{if(typeof formatPhoneLoose==='function')return formatPhoneLoose(v);}catch(e){} return String(v||'');}
+  function divLabel(d){try{return typeof dl==='function'?dl(d):String(d||'');}catch(e){return String(d||'');}}
+  function isOpenSettings(){const m=ge('mAdminSettings');return !!(m&&m.classList.contains('open'));}
+  function adminLike(){try{if(typeof AD!=='undefined'&&AD)return true;}catch(e){} try{if(typeof TM!=='undefined'&&TM)return true;}catch(e){} try{if(window.AD||window.TM)return true;}catch(e){} try{if(document.body.classList.contains('admin-mode')||document.body.classList.contains('tm-mode'))return true;}catch(e){} return isOpenSettings();}
+  function isIndividual(t){try{if(typeof isIndividualTournament==='function'&&isIndividualTournament(t))return true;}catch(e){} const type=String((t&&(t.tournamentType||t.type||t.mode))||''); if(type==='individual_pair')return true; try{const ds=(t&&t.divisions)||[];return ds.some(d=>((window.G&&G.teams&&G.teams[t.id+'_'+d])||[]).some(x=>Array.isArray(x.individualPlayers)||x.tournamentType==='individual_pair'));}catch(e){} return false;}
+  function tournaments(){return ((window.G&&G.tournaments)||[]).filter(isIndividual);}
+  function currentTid(){const opts=[ge('sms423Tournament')&&ge('sms423Tournament').value,ge('regTS')&&ge('regTS').value,ge('brTS')&&ge('brTS').value].filter(Boolean); const list=tournaments(); for(const v of opts){if(list.some(t=>String(t.id)===String(v)))return v;} return ((list.find(t=>['open','ongoing'].includes(String(t.status||'')))||list[0]||{}).id)||'';}
+  function playersOf(team){try{if(typeof getIndividualPlayers==='function')return getIndividualPlayers(team)||[];}catch(e){} if(Array.isArray(team&&team.individualPlayers))return team.individualPlayers; if(Array.isArray(team&&team.players))return team.players.slice(0,2).map(v=>typeof v==='string'?{name:v}:v); return [];}
+  function phoneOf(o){return o&&(o.phone||o.phoneNumber||o.mobile||o.tel||o.contact||o.contactPhone)||'';}
+  function paidOf(team){try{if(typeof getTeamPaymentPaid==='function')return !!getTeamPaymentPaid(team);}catch(e){} const s=String((team&&(team.paymentStatus||team.payStatus||team.feeStatus))||'').toLowerCase(); return !!(team&&(team.feePaid===true||team.paymentPaid===true||team.paid===true||s==='paid'||s==='입금완료'||s==='입금확인'));}
+  function deleted(team){return !team||team.deleted===true||String(team.status||'')==='deleted';}
+  function teamName(team,idx){const ps=playersOf(team).slice(0,2).map(p=>String((p&&p.name)||'').trim()).filter(Boolean);return ps.join(' / ')||String(team&&(team.pairLabel||team.entryLabel||team.club)||('참가팀 '+(idx+1)));}
+  function collect(tid,divFilter){
+    const t=tournaments().find(x=>String(x.id)===String(tid)); if(!t)return {t:null,rows:[],missing:0,teams:0};
+    const divs=divFilter?[divFilter]:(t.divisions||[]),rows=[],seen={},stats={missing:0,teams:0};
+    divs.forEach(div=>{const arr=((window.G&&G.teams&&G.teams[t.id+'_'+div])||[]); arr.forEach((team,idx)=>{ if(deleted(team))return; stats.teams++; const paid=paidOf(team),label=teamName(team,idx),fallback=team.ownerPhone||team.phone||team.contactPhone||team.managerPhone||'',baseClub=String(team.club||'').trim();
+      playersOf(team).slice(0,2).forEach((p,pi)=>{ const name=String((p&&p.name)||('참가자'+(pi+1))).trim(); const club=String((p&&(p.club||p.clubsRaw))||baseClub||'').trim(); const raw=phoneOf(p)||(pi===0?fallback:''); const ph=normPhone(raw), pk=phoneKey(ph); if(pk.length<9){stats.missing++; return;} const id='p423|'+t.id+'|'+div+'|'+idx+'|'+pi+'|'+pk; if(seen[id])return; seen[id]=1; rows.push({id,paid,name,club,meta:divLabel(div)+' · '+(idx+1)+'번 참가팀 · '+label,phone:ph,phoneText:fmtPhone(ph)}); });
+    });});
+    return {t,rows,missing:stats.missing,teams:stats.teams};
+  }
+  function ensurePanel(){
+    let p=ge('sms423Panel'); if(p)return p;
+    const body=document.querySelector('#mAdminSettings .modal-body'); if(!body)return null;
+    p=document.createElement('div'); p.id='sms423Panel';
+    p.innerHTML='<div class="sms423-title">📨 개인전 참가자 문자 보내기</div><div class="sms423-sub">설정 화면 안에서 바로 선택합니다. 개인별 체크, 입금대기/입금완료 선택 후 문자앱을 열 수 있습니다.</div><div class="sms423-grid"><div class="form-group"><label class="form-label">대회</label><select class="form-select" id="sms423Tournament" onchange="sms423FillDivisions();sms423Render(false)"></select></div><div class="form-group"><label class="form-label">부서</label><select class="form-select" id="sms423Division" onchange="sms423Render(false)"></select></div><div class="form-group"><label class="form-label">보기 필터</label><select class="form-select" id="sms423Filter" onchange="sms423Render(false)"><option value="all">전체 참가자</option><option value="unpaid">입금대기자만</option><option value="paid">입금완료자만</option></select></div></div><div id="sms423Preview"></div><div class="form-group"><label class="form-label">문자 내용</label><textarea class="form-textarea" id="sms423Body" rows="5" placeholder="문자 내용을 입력하세요"></textarea></div><div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap"><button type="button" class="btn btn-outline" onclick="sms423Copy()">📋 명단/내용 복사</button><button type="button" class="btn btn-primary" onclick="sms423Send()" style="background:#0f766e;color:#fff">📨 선택 문자 열기</button></div>';
+    const top=body.querySelector('.form-group, #managerApprovalSection');
+    if(top&&top.parentNode) top.parentNode.insertBefore(p, top); else body.prepend(p);
+    p.addEventListener('change',function(ev){const cb=ev.target&&ev.target.closest&&ev.target.closest('.sms423-check'); if(cb){if(cb.checked)S.selected.add(cb.value); else S.selected.delete(cb.value); updateCount();}});
+    p.addEventListener('click',function(ev){const row=ev.target&&ev.target.closest&&ev.target.closest('.sms423-row'); if(!row||ev.target.closest('input,button,select,textarea'))return; const cb=row.querySelector('.sms423-check'); if(cb){cb.checked=!cb.checked; cb.dispatchEvent(new Event('change',{bubbles:true}));}});
+    return p;
+  }
+  function fillTournaments(selected){const sel=ge('sms423Tournament'); if(!sel)return; const list=tournaments(); sel.innerHTML=list.map(t=>'<option value="'+esc(t.id)+'">'+esc(t.name||'개인전 대회')+'</option>').join(''); if(selected&&list.some(t=>String(t.id)===String(selected)))sel.value=selected; else if(list[0])sel.value=list[0].id; fillDivisions();}
+  function fillDivisions(){const tid=ge('sms423Tournament')&&ge('sms423Tournament').value,t=tournaments().find(x=>String(x.id)===String(tid)),sel=ge('sms423Division'); if(!sel)return; const cur=sel.value; sel.innerHTML='<option value="">전체 부서</option>'+((t&&t.divisions)||[]).map(d=>'<option value="'+esc(d)+'">'+esc(divLabel(d))+'</option>').join(''); if(cur&&[].slice.call(sel.options).some(o=>o.value===cur))sel.value=cur;}
+  function visibleRows(){const tid=ge('sms423Tournament')&&ge('sms423Tournament').value, div=ge('sms423Division')&&ge('sms423Division').value, filter=ge('sms423Filter')&&ge('sms423Filter').value||'all'; const data=collect(tid,div); const rows=data.rows.filter(r=>filter==='paid'?r.paid:(filter==='unpaid'?!r.paid:true)); return {data,rows,filter};}
+  function render(keep){const box=ge('sms423Preview'); if(!box)return; if(!keep)S.selected.clear(); const v=visibleRows(),rows=v.rows,paid=rows.filter(r=>r.paid).length,unpaid=rows.length-paid; box.innerHTML='<div class="sms423-stat"><div id="sms423Count">선택 0명</div><div style="font-size:.73rem;color:#64748b;margin-top:3px">표시 '+rows.length+'명 · 입금대기 '+unpaid+'명 · 입금완료 '+paid+'명 · 번호 없음 '+v.data.missing+'명</div></div><div class="sms423-actions"><button type="button" class="btn btn-outline" onclick="sms423Select(\'all\')">표시 전체 선택</button><button type="button" class="btn btn-outline" onclick="sms423Select(\'unpaid\')" style="background:#fff7ed;color:#c2410c;border-color:#fdba74">입금대기 선택</button><button type="button" class="btn btn-outline" onclick="sms423Select(\'paid\')" style="background:#eff6ff;color:#1d4ed8;border-color:#93c5fd">입금완료 선택</button><button type="button" class="btn btn-gray" onclick="sms423Select(\'none\')">선택 해제</button></div>'+(rows.length?'<div class="sms423-list">'+rows.map(r=>{const ch=S.selected.has(r.id); return '<div class="sms423-row '+(r.paid?'paid':'unpaid')+(ch?' selected':'')+'" data-id="'+esc(r.id)+'"><input type="checkbox" class="sms423-check" value="'+esc(r.id)+'" data-paid="'+(r.paid?'1':'0')+'" '+(ch?'checked':'')+'><span><span class="sms423-name">'+esc(r.name)+' '+(r.club?'<span style="color:#64748b;font-weight:800">'+esc(r.club)+'</span>':'')+'<span class="sms423-chip '+(r.paid?'paid':'unpaid')+'">'+(r.paid?'입금완료':'입금대기')+'</span></span><div class="sms423-meta">'+esc(r.meta||'')+'</div></span><span class="sms423-phone">'+esc(r.phoneText)+'</span></div>';}).join('')+'</div>':'<div style="padding:10px 12px;background:#fff1f2;border:1px solid #fecaca;border-radius:10px;color:#dc2626;font-size:.8rem">표시할 발송 대상이 없습니다.</div>'); updateCount();}
+  function updateCount(){const boxes=[].slice.call(document.querySelectorAll('#sms423Preview .sms423-check')),selected=boxes.filter(x=>x.checked),paid=selected.filter(x=>x.dataset.paid==='1').length; boxes.forEach(x=>{if(x.checked)S.selected.add(x.value); else S.selected.delete(x.value); const row=x.closest('.sms423-row'); if(row)row.classList.toggle('selected',x.checked);}); const el=ge('sms423Count'); if(el)el.textContent='선택 '+selected.length+'명 · 입금대기 '+(selected.length-paid)+'명 · 입금완료 '+paid+'명';}
+  function select(mode){const v=visibleRows(); if(mode==='none')S.selected.clear(); else v.rows.forEach(r=>{if(mode==='all'||(mode==='paid'&&r.paid)||(mode==='unpaid'&&!r.paid))S.selected.add(r.id);}); render(true);}
+  function selectedRows(){const v=visibleRows(); return v.rows.filter(r=>S.selected.has(r.id));}
+  function defaultMsg(t,filter){const name=(t&&t.name)||'개인전 대회'; if(filter==='unpaid')return '[230MATCH 공지]\n'+name+'\n참가비 입금 대기 안내드립니다.'; if(filter==='paid')return '[230MATCH 공지]\n'+name+'\n입금 확인된 참가자 대상 공지입니다.'; return '[230MATCH 공지]\n'+name+'\n공지 내용을 입력해 주세요.';}
+  function openSettings(mode){if(!adminLike()){toastMsg('관리자 또는 운영자 로그인 필요','info');return;} const p=ensurePanel(); if(!p){toastMsg('설정 화면을 먼저 열어주세요','info');return;} fillTournaments(currentTid()); const curDiv=ge('regDS')&&ge('regDS').value, d=ge('sms423Division'); if(d&&curDiv&&[].slice.call(d.options).some(o=>o.value===curDiv))d.value=curDiv; ge('sms423Filter').value=mode||'all'; const t=tournaments().find(x=>String(x.id)===String(ge('sms423Tournament').value)); ge('sms423Body').value=defaultMsg(t,mode||'all'); S.selected.clear(); render(false); if(mode==='paid'||mode==='unpaid')select(mode); else select('all'); try{p.scrollIntoView({behavior:'smooth',block:'start'});}catch(e){} }
+  function copy(){const body=String((ge('sms423Body')||{}).value||'').trim(); if(!body){toastMsg('문자 내용을 입력하세요','error');return;} const rows=selectedRows(); if(!rows.length){toastMsg('선택된 대상이 없습니다','error');return;} const txt='[수신자 '+rows.length+'명]\n'+rows.map(r=>r.name+' ('+(r.paid?'입금완료':'입금대기')+') '+r.phoneText).join('\n')+'\n\n[내용]\n'+body; try{navigator.clipboard.writeText(txt).then(()=>toastMsg('선택 명단과 내용이 복사됐습니다','success'));}catch(e){alert(txt);}}
+  function send(){const body=String((ge('sms423Body')||{}).value||'').trim(); if(!body){toastMsg('문자 내용을 입력하세요','error');return;} const rows=selectedRows(); if(!rows.length){toastMsg('선택된 대상이 없습니다','error');return;} const seen={},phones=[]; rows.forEach(r=>{const k=phoneKey(r.phone); if(k.length>=9&&!seen[k]){seen[k]=1; phones.push(r.phone);}}); if(!phones.length){toastMsg('발송 가능한 전화번호가 없습니다','error');return;} if(!confirm('선택한 대상 '+phones.length+'명에게 문자앱을 엽니다.\n\n계속하시겠습니까?'))return; const mobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent); if(!mobile){copy(); toastMsg('PC에서는 복사만 가능합니다. 휴대폰 문자앱에 붙여넣으세요.','info'); return;} window.location.href='sms:'+phones.join(',')+'?body='+encodeURIComponent(body);}
+  function wireTopButtons(){try{const root=document.querySelector('#mAdminSettings .modal-body'); if(!root)return; root.querySelectorAll('button').forEach(btn=>{const txt=(btn.textContent||'').replace(/\s+/g,' ').trim(); const oc=String(btn.getAttribute('onclick')||''); if(/개인전\s*참가자.*문자/.test(txt)||/openIndividualParticipantSmsModal/.test(oc)){btn.textContent='📨 개인전 참가자 전체 문자 보내기'; btn.setAttribute('onclick','sms423OpenSettings(\'all\')'); btn.style.background='#0f766e'; btn.style.color='#fff';}});}catch(e){console.warn('v423 wireTopButtons failed',e);}}
+  const prevOpen=window.openIndividualParticipantSmsModal;
+  window.sms423OpenSettings=openSettings; window.sms423Render=render; window.sms423FillDivisions=fillDivisions; window.sms423Select=select; window.sms423Copy=copy; window.sms423Send=send;
+  window.openIndividualParticipantSmsModal=function(mode){ if(isOpenSettings()) return openSettings(mode||'all'); if(typeof prevOpen==='function') return prevOpen.apply(this,arguments); return openSettings(mode||'all'); };
+  const oldAdmin=window.openAdminSettings; if(typeof oldAdmin==='function'){window.openAdminSettings=function(){const r=oldAdmin.apply(this,arguments); [80,180,350,700,1200,2000].forEach(ms=>setTimeout(wireTopButtons,ms)); return r;};}
+  document.addEventListener('DOMContentLoaded',function(){[600,1200,2200].forEach(ms=>setTimeout(wireTopButtons,ms)); setInterval(function(){if(isOpenSettings())wireTopButtons();},700);});
 })();
 </script>
 
