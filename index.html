@@ -8298,7 +8298,7 @@ function etAddCustomDiv(){
 function grpLabel(gi){ return `${Number(gi)+1}조`; }
 
 import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import{getFirestore,collection,doc,getDoc,getDocs,setDoc,addDoc,updateDoc,deleteDoc,onSnapshot,query,orderBy,limit,serverTimestamp,writeBatch,where,documentId}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import{getFirestore,collection,doc,getDoc,getDocs,getDocsFromServer,setDoc,addDoc,updateDoc,deleteDoc,onSnapshot,query,orderBy,limit,serverTimestamp,writeBatch,where,documentId}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import{getStorage,ref,uploadBytes,getDownloadURL,deleteObject,listAll}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 import{getAuth,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut,onAuthStateChanged,signInAnonymously,GoogleAuthProvider,signInWithPopup,signInWithRedirect,getRedirectResult,signInWithCustomToken,setPersistence,browserLocalPersistence}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import{getMessaging,getToken,deleteToken,onMessage,isSupported}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
@@ -12069,7 +12069,8 @@ async function fetchTournamentBundle(tid, opts={}){
   const regsQ=query(collection(db,'registrations'), where('tournamentId','==',tid));
   const matchesQ=query(collection(db,'matches'), where('tournamentId','==',tid));
   const drawsQ=query(collection(db,'draws'), where(documentId(), '>=', tid + '_'), where(documentId(), '<=', tid + '_\uf8ff'));
-  const [regsSnap, matchesSnap, drawsSnap]=await Promise.all([getDocs(regsQ), getDocs(matchesQ), getDocs(drawsQ)]);
+  const readDocs = (force && typeof getDocsFromServer==='function') ? getDocsFromServer : getDocs;
+  const [regsSnap, matchesSnap, drawsSnap]=await Promise.all([readDocs(regsQ), readDocs(matchesQ), readDocs(drawsQ)]);
   if(seq!==_bundleFetchSeq && !options.acceptStale) return null;
   const payload={
     regs: regsSnap.docs.map(d=>({_id:d.id,...(d.data()||{})})).filter(x=>!x.deleted),
@@ -12098,6 +12099,27 @@ function applyRegistrationSnapshotForTournament(tid, snapshot){
   applyTournamentBundle(tid, next);
   return next;
 }
+function scheduleRegisterListRender(reason='snapshot'){
+  try{
+    const tid=String(getSelectedTournamentIdForPage('register')||'').trim();
+    if(getCurrentPageName()!=='register' || !tid) return;
+    clearTimeout(window.__regListRenderTimer);
+    window.__regListRenderTimer=setTimeout(()=>{
+      try{
+        if(isRegisterUserActive()){
+          window.__regListRenderPending=true;
+          return;
+        }
+        window.__regListRenderPending=false;
+        renderRegisterDivisionOverview();
+        renderRL();
+        upDash();
+      }catch(e){ console.warn('scheduleRegisterListRender failed', reason, e); }
+    }, 80);
+  }catch(e){}
+}
+window.scheduleRegisterListRender=scheduleRegisterListRender;
+
 function stopRegisterRegistrationSync(){
   if(_registerRegsUnsub){ try{_registerRegsUnsub();}catch(e){} _registerRegsUnsub=null; }
   _registerLiveTid='';
@@ -12110,8 +12132,8 @@ function startRegisterRegistrationSync(tid){
   _registerRegsUnsub=onSnapshot(query(collection(db,'registrations'), where('tournamentId','==',tid)), s=>{
     try{ processAdminRegistrationSnapshotChanges(s, tid); }catch(err){ console.warn('register registration alert process failed', err); }
     applyRegistrationSnapshotForTournament(tid, s);
-    if(!isRegisterUserActive()) onDU();
-    else { try{ upDash(); }catch(_e){} }
+    if(getCurrentPageName()==='register' && String(ge('regTS')?.value||'')===String(tid)) scheduleRegisterListRender('register-snapshot');
+    else onDU();
   }, e=>console.error('register regs snap err', e));
 }
 // ── v404: 앱 포그라운드 복귀 시 데이터 새로고침 ──────────────────────────────
@@ -12125,7 +12147,10 @@ let __lastAppResumeRefresh = 0;
 async function refreshRegisterRegistrationsOnly(tid, opts={}){
   tid=String(tid||'').trim();
   if(!tid) return null;
-  const snap = await getDocs(query(collection(db,'registrations'), where('tournamentId','==',tid)));
+  const q = query(collection(db,'registrations'), where('tournamentId','==',tid));
+  let snap;
+  try{ snap = (typeof getDocsFromServer==='function') ? await getDocsFromServer(q) : await getDocs(q); }
+  catch(_e){ snap = await getDocs(q); }
   const next = applyRegistrationSnapshotForTournament(tid, snap);
 
   // register 전용 리스너는 끊겨 있으면 다시 연결만 한다. 이미 살아 있으면 중복 연결하지 않는다.
@@ -12188,8 +12213,8 @@ function startRealtimeTournamentSync(tid){
   _realtimeRegsUnsub = onSnapshot(query(collection(db,'registrations'), where('tournamentId','==',tid)), s=>{
     try{ processAdminRegistrationSnapshotChanges(s, tid); }catch(err){ console.warn('admin registration alert process failed', err); }
     applyRegistrationSnapshotForTournament(tid, s);
-    if(!isRegisterUserActive()) onDU();
-    else { try{ upDash(); }catch(_e){} }
+    if(getCurrentPageName()==='register' && String(ge('regTS')?.value||'')===String(tid)) scheduleRegisterListRender('realtime-regs-snapshot');
+    else onDU();
   }, e=>console.error('regs snap err', e));
   _realtimeDrawsUnsub = onSnapshot(query(collection(db,'draws'), where(documentId(), '>=', tid + '_'), where(documentId(), '<=', tid + '_\uf8ff')), s=>{
     const bundle=getTournamentBundleCache(tid)||{};
@@ -13865,28 +13890,46 @@ async function stP(k){try{const pk=pKeyParse(k);const pureName=cleanName(pk.name
 async function fbLog(t,i='📌'){ return; }
 
 
-// v389: 참가접수 화면 입력 중 실시간 갱신이 폼을 다시 렌더링해 포커스/자판이 닫히는 문제 방지
+// v409: 참가접수 목록 실시간 반영 안정화
+// 기존 v389는 page-register 안에서 터치/버튼 클릭만 해도 "사용자 입력 중"으로 보고
+// onSnapshot 렌더링을 막았다. 그래서 알림은 왔는데 참가자 목록은 한참 뒤에 바뀌는 현상이 생겼다.
+// 이제 실제 입력칸에 입력 중일 때만 폼 재렌더링을 잠시 보류하고, 목록 갱신은 즉시 반영한다.
 let __regUserActiveUntil = 0;
 function markRegisterUserActive(){
-  __regUserActiveUntil = Date.now() + 3500;
+  __regUserActiveUntil = Date.now() + 1800;
 }
 function isRegisterUserActive(){
   try{
-    const activePage=document.querySelector('.nav-tab.active')?.dataset.page || document.querySelector('.page.active')?.id?.replace('page-','') || '';
+    const activePage=getCurrentPageName ? getCurrentPageName() : (document.querySelector('.nav-tab.active')?.dataset.page || '');
     if(activePage !== 'register') return false;
     const ae=document.activeElement;
     const inReg=!!(ae && ae.closest && ae.closest('#page-register'));
     const tag=String(ae?.tagName||'').toUpperCase();
-    const editable=inReg && (/^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(tag) || ae?.isContentEditable);
-    return !!(editable || Date.now() < __regUserActiveUntil);
+    const editable=inReg && (/^(INPUT|TEXTAREA|SELECT)$/.test(tag) || ae?.isContentEditable);
+    return !!(editable && Date.now() < __regUserActiveUntil);
   }catch(e){ return false; }
 }
 try{
-  ['focusin','pointerdown','touchstart','input','keydown','change'].forEach(evt=>{
+  ['input','keydown','change'].forEach(evt=>{
     document.addEventListener(evt, ev=>{
-      try{ if(ev.target && ev.target.closest && ev.target.closest('#page-register')) markRegisterUserActive(); }catch(e){}
+      try{
+        const t=ev.target;
+        if(t && t.closest && t.closest('#page-register') && /^(INPUT|TEXTAREA|SELECT)$/i.test(String(t.tagName||''))) markRegisterUserActive();
+      }catch(e){}
     }, true);
   });
+  document.addEventListener('focusout', ev=>{
+    try{
+      if(ev.target && ev.target.closest && ev.target.closest('#page-register')){
+        setTimeout(()=>{
+          if(window.__regListRenderPending && !isRegisterUserActive()){
+            window.__regListRenderPending=false;
+            try{ renderRegisterDivisionOverview(); renderRL(); upDash(); }catch(_e){}
+          }
+        }, 120);
+      }
+    }catch(e){}
+  }, true);
 }catch(e){}
 
 function onDU(){
