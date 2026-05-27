@@ -10403,7 +10403,7 @@ function ensureAdminPushControls(){
     box.id='adminPushControlBox';
     box.className='form-group';
     box.style.cssText='margin-bottom:16px;padding:14px;background:linear-gradient(135deg,#eef4ff,#fffdf5);border:1.5px solid #93c5fd;border-radius:12px';
-    box.innerHTML=`<div style="font-weight:800;font-size:.9rem;color:#1d4ed8;margin-bottom:8px">🔔 관리자 알림 발송</div><div style="font-size:.75rem;color:var(--text2);line-height:1.7;margin-bottom:10px">알림을 켠 전체 사용자에게 공지를 발송합니다. 경기 카드/명단 카드에서는 해당 대상에게만 보낼 수 있습니다.</div><button class="btn btn-primary" onclick="openAdminBroadcastPushModal()" style="width:100%;background:#2563eb">📢 전체 알림 공지 보내기</button>`;
+    box.innerHTML=`<div style="font-weight:800;font-size:.9rem;color:#1d4ed8;margin-bottom:8px">🔔 관리자 알림 발송</div><div style="font-size:.75rem;color:var(--text2);line-height:1.7;margin-bottom:10px">알림을 켠 전체 사용자에게 공지를 발송합니다. 개인전 참가자에게는 휴대폰 문자 공지를 한 번에 보낼 수 있습니다.</div><div style="display:grid;grid-template-columns:1fr;gap:8px"><button class="btn btn-primary" onclick="openAdminBroadcastPushModal()" style="width:100%;background:#2563eb">📢 전체 알림 공지 보내기</button><button class="btn btn-primary" onclick="openIndividualParticipantSmsModal()" style="width:100%;background:#0f766e;color:#fff">📨 개인전 참가자 전체 문자 보내기</button></div>`;
     body.prepend(box);
     injectAutoNotificationSettingsBox();
     refreshAutoNotificationSettingsForm();
@@ -17507,6 +17507,171 @@ ${body}`;
   window.location.href = smsUrl;
   toast(`✅ ${modeLabel} 문자창을 한 번에 열었습니다 (${phones.length}개 번호)`,'success');
 }
+
+
+// ── 개인전 참가자 전체 문자 발송 ──────────────────────────────────────────
+function ensureIndividualParticipantSmsModal(){
+  if(document.getElementById('mIndividualSms')) return;
+  const wrap=document.createElement('div');
+  wrap.className='modal-overlay';
+  wrap.id='mIndividualSms';
+  wrap.innerHTML=`<div class="modal-box" style="max-width:680px;width:96vw">
+    <div class="modal-header" style="background:#0f766e">
+      <h3>📨 개인전 참가자 전체 문자</h3>
+      <button class="modal-close" onclick="cm('mIndividualSms')">✕</button>
+    </div>
+    <div class="modal-body" style="max-height:76vh;overflow:auto">
+      <div style="padding:10px 12px;background:linear-gradient(135deg,#ecfdf5,#eef4ff);border:1.5px solid #99f6e4;border-radius:12px;font-size:.78rem;color:#0f766e;line-height:1.65;margin-bottom:12px">
+        현재 접수된 <b>개인전 참가자 휴대폰 번호</b>를 모아 문자앱으로 넘깁니다. 삭제된 접수는 제외하고, 같은 번호는 1번만 발송합니다.
+      </div>
+      <div class="frow">
+        <div class="form-group"><label class="form-label">대회</label><select class="form-select" id="individualSmsTournament" onchange="renderIndividualParticipantSmsPanel()"></select></div>
+        <div class="form-group"><label class="form-label">부서</label><select class="form-select" id="individualSmsDivision" onchange="renderIndividualParticipantSmsPanel()"></select></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">공지 문자 내용</label>
+        <textarea class="form-textarea" id="individualSmsBody" rows="6" placeholder="개인전 참가자에게 보낼 공지 내용을 입력하세요"></textarea>
+      </div>
+      <div id="individualSmsPreview" style="margin-top:10px"></div>
+    </div>
+    <div class="modal-footer" style="gap:8px;flex-wrap:wrap">
+      <button class="btn btn-gray" onclick="cm('mIndividualSms')">닫기</button>
+      <button class="btn btn-outline" onclick="copyIndividualParticipantSmsTargets()">📋 번호/내용 복사</button>
+      <button class="btn btn-primary" onclick="sendIndividualParticipantSmsAll()" style="background:#0f766e;color:#fff">📨 전체 문자 열기</button>
+    </div>
+  </div>`;
+  document.body.appendChild(wrap);
+}
+function getIndividualSmsTournamentList(){
+  return (G.tournaments||[]).filter(t=>isIndividualTournament(t));
+}
+function getDefaultIndividualSmsTournamentId(){
+  const ids=[ge('regTS')?.value, ge('brTS')?.value, ge('rankTS')?.value].map(v=>String(v||'').trim()).filter(Boolean);
+  const list=getIndividualSmsTournamentList();
+  for(const id of ids){ if(list.some(t=>String(t.id)===String(id))) return id; }
+  const open=list.find(t=>String(t.status||'')==='open' || String(t.status||'')==='ongoing');
+  return open?.id || list[0]?.id || '';
+}
+function buildDefaultIndividualSmsMessage(t){
+  const name=String(t?.name||'개인전 대회').trim();
+  const date=String(t?.date||'').trim();
+  const venue=String(t?.venue||'').trim();
+  return `[230MATCH 공지]\n${name}${date?` (${date})`:''}\n${venue?`장소: ${venue}\n`:''}\n공지 내용을 입력해 주세요.`;
+}
+function collectIndividualParticipantSmsTargets(tid='', divFilter=''){
+  const t=(G.tournaments||[]).find(x=>String(x.id)===String(tid));
+  if(!t || !isIndividualTournament(t)) return [];
+  const divs=divFilter ? [divFilter] : (t.divisions||[]);
+  const seen=new Set();
+  const out=[];
+  divs.forEach(div=>{
+    const key=t.id+'_'+div;
+    (G.teams?.[key]||[]).forEach((team, teamIdx)=>{
+      if(!team || team.deleted || String(team.status||'')==='deleted') return;
+      const players=getIndividualPlayers(team).slice(0,2);
+      players.forEach((p, playerIdx)=>{
+        if(p?.receiveSms===false) return;
+        const raw=p?.phone || (playerIdx===0 ? (team.ownerPhone||team.phone||'') : '');
+        const digits=String(raw||'').replace(/[^0-9+]/g,'');
+        const numeric=digits.replace(/[^0-9]/g,'');
+        if(numeric.length<9) return;
+        if(seen.has(numeric)) return;
+        seen.add(numeric);
+        out.push({
+          phone:digits,
+          phoneText:formatPhoneLoose(digits),
+          name:String(p?.name||`참가자${playerIdx+1}`).trim(),
+          club:String(p?.clubsRaw||p?.club||team.club||'').trim(),
+          div:String(div||''),
+          teamLabel:String(team.pairLabel||team.entryLabel||team.club||'').trim(),
+          teamNo:teamIdx+1
+        });
+      });
+    });
+  });
+  return out.sort((a,b)=>String(a.div).localeCompare(String(b.div),'ko') || a.teamNo-b.teamNo || String(a.name).localeCompare(String(b.name),'ko'));
+}
+function renderIndividualParticipantSmsPanel(){
+  ensureIndividualParticipantSmsModal();
+  const tSel=ge('individualSmsTournament');
+  const dSel=ge('individualSmsDivision');
+  const prevTid=tSel?.value || getDefaultIndividualSmsTournamentId();
+  const list=getIndividualSmsTournamentList();
+  if(tSel){
+    tSel.innerHTML=list.length
+      ? list.map(t=>`<option value="${esc(t.id)}">${esc(t.name||'개인전 대회')} ${t.date?`(${esc(t.date)})`:''}</option>`).join('')
+      : '<option value="">개인전 대회 없음</option>';
+    if(list.some(t=>String(t.id)===String(prevTid))) tSel.value=prevTid;
+  }
+  const tid=tSel?.value||'';
+  const t=list.find(x=>String(x.id)===String(tid));
+  const prevDiv=dSel?.value||'';
+  if(dSel){
+    dSel.innerHTML='<option value="">전체 부서</option>'+(t?.divisions||[]).map(d=>`<option value="${esc(d)}">${esc(dl(d))}</option>`).join('');
+    if(prevDiv && (t?.divisions||[]).includes(prevDiv)) dSel.value=prevDiv;
+  }
+  const body=ge('individualSmsBody');
+  if(body && !String(body.value||'').trim()) body.value=buildDefaultIndividualSmsMessage(t);
+  const targets=collectIndividualParticipantSmsTargets(tid, dSel?.value||'');
+  const allTeamCount=t ? (dSel?.value ? (G.teams?.[t.id+'_'+dSel.value]||[]).length : (t.divisions||[]).reduce((sum,d)=>sum+(G.teams?.[t.id+'_'+d]||[]).length,0)) : 0;
+  const preview=ge('individualSmsPreview');
+  if(!preview) return;
+  if(!t){
+    preview.innerHTML='<div style="font-size:.8rem;color:var(--text3);padding:10px 12px;background:var(--panel2);border-radius:10px">개인전 대회가 없습니다.</div>';
+    return;
+  }
+  const missingCount=Math.max(0, allTeamCount*2-targets.length);
+  preview.innerHTML=`<div style="padding:10px 12px;border:1.5px solid #99f6e4;background:#f0fdfa;border-radius:12px;margin-bottom:10px;font-size:.82rem;line-height:1.65;color:#0f766e">
+      <b>발송 대상 ${targets.length}명</b> · 접수팀 ${allTeamCount}팀${missingCount?` · 번호 없음/수신거부 추정 ${missingCount}명`:''}
+    </div>
+    ${targets.length?`<div style="max-height:220px;overflow:auto;border:1px solid var(--border);border-radius:12px;background:#fff">
+      ${targets.map((x,i)=>`<div style="display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:8px;align-items:center;padding:8px 10px;border-bottom:1px dashed var(--border);font-size:.78rem">
+        <span style="width:26px;height:26px;border-radius:999px;background:#ccfbf1;color:#0f766e;display:flex;align-items:center;justify-content:center;font-weight:900">${i+1}</span>
+        <span style="min-width:0"><b>${esc(x.name)}</b> <span style="color:var(--text3)">${esc(x.club||'-')}</span><br><span style="font-size:.7rem;color:var(--text3)">${esc(dl(x.div))} · ${esc(x.teamLabel||'')}</span></span>
+        <span style="font-weight:900;color:#1d4ed8;white-space:nowrap">${esc(x.phoneText)}</span>
+      </div>`).join('')}
+    </div>`:'<div style="font-size:.8rem;color:#dc2626;padding:10px 12px;background:#fff1f2;border:1px solid #fecaca;border-radius:10px">발송 가능한 전화번호가 없습니다. 참가자 전화번호를 확인하세요.</div>'}`;
+}
+function openIndividualParticipantSmsModal(){
+  if(!(AD||TM)){ toast('관리자 또는 운영자 로그인 필요','info'); return; }
+  ensureIndividualParticipantSmsModal();
+  renderIndividualParticipantSmsPanel();
+  om('mIndividualSms');
+}
+async function copyIndividualParticipantSmsTargets(){
+  const tid=ge('individualSmsTournament')?.value||'';
+  const div=ge('individualSmsDivision')?.value||'';
+  const body=String(ge('individualSmsBody')?.value||'').trim();
+  if(!body){ toast('공지 내용을 입력하세요','error'); return; }
+  const targets=collectIndividualParticipantSmsTargets(tid, div);
+  if(!targets.length){ toast('복사할 번호가 없습니다','error'); return; }
+  const copyText=`[수신자 ${targets.length}명]\n${targets.map(x=>`${x.name}(${x.div}) ${x.phoneText}`).join('\n')}\n\n[내용]\n${body}`;
+  const ok=await copyTextSafe(copyText);
+  toast(ok?'참가자 번호와 문자 내용이 복사됐습니다 ✅':'복사 실패','info');
+}
+function sendIndividualParticipantSmsAll(){
+  const tid=ge('individualSmsTournament')?.value||'';
+  const div=ge('individualSmsDivision')?.value||'';
+  const body=String(ge('individualSmsBody')?.value||'').trim();
+  if(!body){ toast('공지 내용을 입력하세요','error'); return; }
+  const targets=collectIndividualParticipantSmsTargets(tid, div);
+  if(!targets.length){ toast('보낼 번호가 없습니다','error'); return; }
+  const phones=[...new Set(targets.map(x=>x.phone).filter(Boolean))];
+  const t=(G.tournaments||[]).find(x=>String(x.id)===String(tid));
+  if(!confirm(`${t?.name||'개인전'} ${div?dl(div):'전체 부서'} 참가자 ${phones.length}명에게 문자앱을 엽니다.\n\n계속하시겠습니까?`)) return;
+  const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  if(!isMobile){
+    const copyText=`[수신자 ${targets.length}명]\n${targets.map(x=>`${x.name}(${x.div}) ${x.phoneText}`).join('\n')}\n\n[내용]\n${body}`;
+    copyTextSafe(copyText).then(ok=>toast(ok?'PC: 번호/내용이 복사됐습니다. 문자앱에 붙여넣으세요.':'복사 실패','info'));
+    return;
+  }
+  window.location.href=`sms:${phones.join(',')}?body=${encodeURIComponent(body)}`;
+  toast(`개인전 참가자 전체 문자창을 열었습니다 (${phones.length}명)`,'success');
+}
+window.openIndividualParticipantSmsModal=openIndividualParticipantSmsModal;
+window.renderIndividualParticipantSmsPanel=renderIndividualParticipantSmsPanel;
+window.copyIndividualParticipantSmsTargets=copyIndividualParticipantSmsTargets;
+window.sendIndividualParticipantSmsAll=sendIndividualParticipantSmsAll;
 
 // ── 카카오톡 발송 ───────────────────────────────────────────────────────────
 const KAKAO_JS_KEY = '9dee117ad9f0ea8f08467597240f5f86';
