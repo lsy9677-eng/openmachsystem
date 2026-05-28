@@ -20133,6 +20133,66 @@ window.__deleteEntryFromDetail = function(key, idx){
   }catch(e){ console.warn('__deleteEntryFromDetail failed', e); toast('삭제 처리 실패','error'); }
 };
 
+
+function registerUnpaidFilterAdminLike(){
+  try{ if(typeof AD !== 'undefined' && AD) return true; }catch(e){}
+  try{ if(typeof TM !== 'undefined' && TM) return true; }catch(e){}
+  try{ if(typeof OP !== 'undefined' && OP) return true; }catch(e){}
+  try{ if(window.AD || window.TM || window.OP) return true; }catch(e){}
+  try{
+    return !!(document.body && (
+      document.body.classList.contains('admin-mode') ||
+      document.body.classList.contains('tm-mode') ||
+      document.body.classList.contains('operator-mode')
+    ));
+  }catch(e){}
+  return false;
+}
+function isRegisterUnpaidOnlyActive(){
+  try{ return !!window.REG_UNPAID_ONLY && registerUnpaidFilterAdminLike(); }catch(e){ return false; }
+}
+function toggleRegisterUnpaidOnly(v){
+  try{
+    window.REG_UNPAID_ONLY = !!v;
+    if(typeof renderRegisterDivisionOverview==='function') renderRegisterDivisionOverview();
+  }catch(e){ console.warn('toggleRegisterUnpaidOnly failed', e); }
+}
+// v430: inline onchange handler can only resolve global properties reliably after bundling/browser scope changes.
+// Keep the filter functions explicitly attached to window and also support delegated clicks.
+try{
+  window.registerUnpaidFilterAdminLike = registerUnpaidFilterAdminLike;
+  window.isRegisterUnpaidOnlyActive = isRegisterUnpaidOnlyActive;
+  window.toggleRegisterUnpaidOnly = toggleRegisterUnpaidOnly;
+  window.buildRegisterUnpaidFilterBar = buildRegisterUnpaidFilterBar;
+}catch(e){}
+try{
+  document.addEventListener('change', function(e){
+    const el = e && e.target;
+    if(el && el.id === 'regUnpaidOnlyChk'){
+      try{ window.toggleRegisterUnpaidOnly(!!el.checked); }catch(err){ console.warn('regUnpaidOnlyChk delegated handler failed', err); }
+    }
+  });
+}catch(e){}
+function buildRegisterUnpaidFilterBar(tid){
+  try{
+    if(!registerUnpaidFilterAdminLike()) return '';
+    const divs=((G.tournaments||[]).find(x=>String(x.id)===String(tid))?.divisions||[]);
+    let total=0, unpaid=0, paid=0;
+    divs.forEach(d=>{
+      const arr=(G.teams?.[tid+'_'+d]||[]).filter(tm=>!tm?.deleted);
+      arr.forEach(tm=>{ total++; if(typeof getTeamPaymentPaid==='function' && getTeamPaymentPaid(tm)) paid++; else unpaid++; });
+    });
+    const checked=isRegisterUnpaidOnlyActive()?'checked':'';
+    return `<div id="registerUnpaidFilterBar" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:0 0 10px;padding:10px 12px;border-radius:14px;background:linear-gradient(135deg,#fff7ed,#f8fbff);border:1.5px solid #fdba74">
+      <label style="display:flex;align-items:center;gap:8px;font-size:.84rem;font-weight:1000;color:#9a3412;cursor:pointer;user-select:none">
+        <input id="regUnpaidOnlyChk" type="checkbox" ${checked} onchange="window.toggleRegisterUnpaidOnly && window.toggleRegisterUnpaidOnly(this.checked)" style="width:18px;height:18px;accent-color:#f97316"/>
+        입금대기팀만 보기
+      </label>
+      <div style="font-size:.74rem;color:#64748b;font-weight:800">전체 ${total}팀 · 입금대기 ${unpaid}팀 · 입금완료 ${paid}팀</div>
+    </div>`;
+  }catch(e){ return ''; }
+}
+
 function buildRegisterRosterGrid(tid,div,teams,key){
   if(!teams?.length){
     return `<div style="font-size:.78rem;color:var(--text3);padding:4px 0">아직 등록된 팀이 없습니다.</div>`;
@@ -20300,17 +20360,21 @@ function renderRegisterDivisionOverview(){
     ? `<div style="padding:8px 12px;background:#dcfce7;border:1.5px solid #16a34a;border-radius:10px;font-size:.8rem;color:#166534;font-weight:600;margin-bottom:10px">
         🏆 ${getMyClubContextClub()} 팀만 표시 중 (같은 클럽 다른 팀은 숨김) &nbsp;<button onclick="toggleMyClubFilter('register')" style="font-size:.74rem;padding:2px 8px;border:1px solid #16a34a;border-radius:999px;background:white;color:#166534;cursor:pointer">전체 보기</button>
       </div>` : '';
-  box.innerHTML=_filterBanner+divisions.map(div=>{
+  const _unpaidFilterBar = buildRegisterUnpaidFilterBar(tid);
+  box.innerHTML=_filterBanner+_unpaidFilterBar+divisions.map(div=>{
     const key=tid+'_'+div;
     const allTeams=G.teams[key]||[];
     // 내 클럽 필터 ON 시 내 클럽 팀만 표시
     const _ctxClub=getMyClubContextClub();
     const bc = _ctxClub ? baseClub(_ctxClub) : '';
-    const teams = (MY_CLUB_FILTER && bc)
+    let teams = (MY_CLUB_FILTER && bc)
       ? allTeams
           .map((tm,origIdx)=>({...tm,_origIdx:origIdx}))
           .filter(tm=>baseClub(tm.club||'')===bc || tm.club===_ctxClub)
       : allTeams.map((tm,origIdx)=>({...tm,_origIdx:origIdx}));
+    if(isRegisterUnpaidOnlyActive()){
+      teams = teams.filter(tm=>!(typeof getTeamPaymentPaid==='function' && getTeamPaymentPaid(tm)));
+    }
     const totalPlayers=teams.reduce((s,tm)=>s+((tm.players||[]).length),0);
     const confirmedCnt=getConfirmedTeamCountForKey(key);
     const waitCnt=getWaitlistedTeamCountForKey(key);
@@ -20327,6 +20391,7 @@ function renderRegisterDivisionOverview(){
           <span class="badge bg-green">확정 ${confirmedCnt}${isIndividualTournament(t)?'조':'팀'}</span>
           ${waitCnt?`<span class="v385-waitlist-badge">추가대기 ${waitCnt}</span>`:''}
           <span class="badge bg-blue">${totalPlayers}명</span>${maxCnt?`<span class="badge bg-gold">정원 ${maxCnt}</span>`:''}
+          ${isRegisterUnpaidOnlyActive()?'<span class="badge" style="background:#fff7ed;color:#c2410c;border:1px solid #fdba74">미입금만 표시중</span>':''}
           ${isSel?'<span class="badge" style="background:var(--accent);color:#fff">등록 입력중</span>':''}
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
