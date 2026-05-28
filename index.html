@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-05-27-v419-stable-select-sms";
+  const APP_VERSION = "2026-05-28-v426-sms-chunk-syntax-fix";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -10685,7 +10685,7 @@ function sendPushStatsSmsFallback(){
       copyTextSafe(copy).then(ok=>toast(ok?'PC: 문자 대체 명단과 내용이 복사됐습니다. 문자앱에 붙여넣으세요.':'복사 실패','info'));
       return;
     }
-    location.href=`sms:${phones.join(',')}?body=${encodeURIComponent(body)}`;
+    if(window.openBulkSmsInChunks){window.openBulkSmsInChunks(phones,body,'선택 대상 문자');}else{location.href=`sms:${phones.join(',')}?body=${encodeURIComponent(body)}`;}
     toast(`문자창을 열었습니다 ✅ (${phones.length}명)`,'success');
   }catch(e){ toast('문자 대체 실행 실패: '+(e?.message||e),'error'); }
 }
@@ -11119,7 +11119,7 @@ ${body}`;
       copyTextSafe(copy).then(ok=>toast(ok?'PC: 알림 연결 안내 명단과 문자내용을 복사했습니다 ✅':'복사 실패','info'));
       return;
     }
-    location.href=`sms:${phones.join(',')}?body=${encodeURIComponent(body)}`;
+    if(window.openBulkSmsInChunks){window.openBulkSmsInChunks(phones,body,'선택 대상 문자');}else{location.href=`sms:${phones.join(',')}?body=${encodeURIComponent(body)}`;}
     toast(`알림 연결 안내 문자창을 열었습니다 ✅ (${phones.length}명)`,'success');
   }catch(e){ toast('문자 안내 실패: '+(e?.message||e),'error'); }
 }
@@ -17509,10 +17509,14 @@ ${body}`;
     return;
   }
 
-  const recipients = phones.join(',');
-  const smsUrl = `sms:${recipients}?body=${encodeURIComponent(body)}`;
-  window.location.href = smsUrl;
-  toast(`✅ ${modeLabel} 문자창을 한 번에 열었습니다 (${phones.length}개 번호)`,'success');
+  if(window.openBulkSmsInChunks){
+    window.openBulkSmsInChunks(phones, body, `${modeLabel} 문자`);
+  }else{
+    const recipients = phones.join(',');
+    const smsUrl = `sms:${recipients}?body=${encodeURIComponent(body)}`;
+    window.location.href = smsUrl;
+    toast(`✅ ${modeLabel} 문자창을 열었습니다 (${phones.length}개 번호)`,'success');
+  }
 }
 
 
@@ -17672,7 +17676,7 @@ function sendIndividualParticipantSmsAll(){
     copyTextSafe(copyText).then(ok=>toast(ok?'PC: 번호/내용이 복사됐습니다. 문자앱에 붙여넣으세요.':'복사 실패','info'));
     return;
   }
-  window.location.href=`sms:${phones.join(',')}?body=${encodeURIComponent(body)}`;
+  if(window.openBulkSmsInChunks){ window.openBulkSmsInChunks(phones, body, '개인전 참가자 문자'); } else { location.href=`sms:${phones.join(',')}?body=${encodeURIComponent(body)}`; }
   toast(`개인전 참가자 전체 문자창을 열었습니다 (${phones.length}명)`,'success');
 }
 window.openIndividualParticipantSmsModal=openIndividualParticipantSmsModal;
@@ -18518,7 +18522,11 @@ function _openSMSForRecipients(recipients=[], body=''){
     });
     return false;
   }
-  _openSMS(phones.join(','), body);
+  if(window.openBulkSmsInChunks){
+    window.openBulkSmsInChunks(phones, body, '문자 대체 발송');
+  }else{
+    _openSMS(phones.join(','), body);
+  }
   return true;
 }
 function getMatchNotificationRecipients(key,m){
@@ -36357,7 +36365,7 @@ function v374SendSelectedSms(){
   const recs=v374SelectedNotifyRecipients().filter(r=>v374Digits(r.phone).length>=9);
   if(!recs.length){toast('문자 보낼 전화번호가 없습니다','info');return;}
   const body=(ge('v374NotifyBody')?.value||'').trim()||'230MATCH 안내입니다.';
-  location.href=v374SmsUrl(recs.map(r=>r.phone),body);
+  if(window.openBulkSmsInChunks){window.openBulkSmsInChunks(recs.map(r=>r.phone),body,'선택 참가자 문자');}else{location.href=v374SmsUrl(recs.map(r=>r.phone),body);}
 }
 function v374SendOneSms(i){
   const r=(window.__v374NotifyRecipients||[])[Number(i)];
@@ -41509,7 +41517,7 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
   function selectedRows(){var v=visible(); return v.rows.filter(function(r){return state.selected.has(r.id);});}
   function open(filter,scope){if(!adminLike()){toastMsg('관리자 또는 운영자 로그인 필요','info');return;} cleanOldSms(); ensureModal(); var tid=currentTid(); fillTournaments(tid); var d=ge('sms419Division'),cur=ge('regDS')&&ge('regDS').value; if(d&&cur&&[].slice.call(d.options).some(function(o){return o.value===cur;}))d.value=cur; ge('sms419Scope').value=scope||'team'; ge('sms419Filter').value=filter||'all'; var t=tournaments().find(function(x){return String(x.id)===String(ge('sms419Tournament').value);}); ge('sms419Body').value=defaultMsg(t,filter||'all'); state.selected.clear(); render(false); if(filter==='unpaid'||filter==='paid')selectMode(filter); try{om('sms419Modal');}catch(e){ge('sms419Modal').classList.add('open');}}
   function copy(){var body=String((ge('sms419Body')||{}).value||'').trim(); if(!body){toastMsg('문자 내용을 입력하세요','error');return;} var rows=selectedRows(); if(!rows.length){toastMsg('선택된 대상이 없습니다','error');return;} var txt='[수신자 '+rows.length+'건]\n'+rows.map(function(r){return r.name+' ('+(r.paid?'입금완료':'입금대기')+') '+r.phoneText;}).join('\n')+'\n\n[내용]\n'+body; try{navigator.clipboard.writeText(txt).then(function(){toastMsg('선택 명단과 내용이 복사됐습니다','success');});}catch(e){alert(txt);}}
-  function send(){var body=String((ge('sms419Body')||{}).value||'').trim(); if(!body){toastMsg('문자 내용을 입력하세요','error');return;} var rows=selectedRows(); if(!rows.length){toastMsg('선택된 대상이 없습니다','error');return;} var seen={},phones=[]; rows.forEach(function(r){(r.phones||[]).forEach(function(p){var k=phoneKey(p.phone); if(k.length>=9&&!seen[k]){seen[k]=1; phones.push(p.phone);}});}); if(!phones.length){toastMsg('발송 가능한 전화번호가 없습니다','error');return;} if(!confirm('선택한 대상 '+phones.length+'명에게 문자앱을 엽니다.\n\n계속하시겠습니까?'))return; var mobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent); if(!mobile){copy(); toastMsg('PC에서는 복사만 가능합니다. 휴대폰 문자앱에 붙여넣으세요.','info');return;} window.location.href='sms:'+phones.join(',')+'?body='+encodeURIComponent(body);}
+  function send(){var body=String((ge('sms419Body')||{}).value||'').trim(); if(!body){toastMsg('문자 내용을 입력하세요','error');return;} var rows=selectedRows(); if(!rows.length){toastMsg('선택된 대상이 없습니다','error');return;} var seen={},phones=[]; rows.forEach(function(r){(r.phones||[]).forEach(function(p){var k=phoneKey(p.phone); if(k.length>=9&&!seen[k]){seen[k]=1; phones.push(p.phone);}});}); if(!phones.length){toastMsg('발송 가능한 전화번호가 없습니다','error');return;} if(!confirm('선택한 대상 '+phones.length+'명에게 문자앱을 엽니다.\n\n계속하시겠습니까?'))return; var mobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent); if(!mobile){copy(); toastMsg('PC에서는 복사만 가능합니다. 휴대폰 문자앱에 붙여넣으세요.','info');return;} if(window.openBulkSmsInChunks){window.openBulkSmsInChunks(phones,body,'선택 대상 문자');}else{window.location.href='sms:'+phones.join(',')+'?body='+encodeURIComponent(body);}}
   function injectRegister(){try{cleanOldSms(); var page=ge('page-register'); if(!page)return; var tid=ge('regTS')&&ge('regTS').value,t=tournaments().find(function(x){return String(x.id)===String(tid);}),old=ge('v419RegisterSmsBar'); if(!adminLike()||!t){if(old)old.remove();return;} var div=ge('regDS')&&ge('regDS').value||'',data=collect(tid,div,'team'),paid=data.rows.filter(function(r){return r.paid;}).length,unpaid=data.rows.length-paid,bar=old||document.createElement('div'); bar.id='v419RegisterSmsBar'; bar.className='v419-smsbar'; bar.innerHTML='<div><div class="v419-sms-title">📨 참가팀별 문자 보내기</div><div class="v419-sms-sub">현재 '+(div?divName(div):'전체 부서')+' · 발송 가능 '+data.rows.length+'팀 · 입금대기 '+unpaid+'팀 · 입금완료 '+paid+'팀</div></div><div class="v419-sms-actions"><button type="button" class="btn btn-outline" onclick="sms419Open(\'all\',\'team\')">참가팀 선택 문자</button><button type="button" class="btn btn-primary" onclick="sms419Open(\'unpaid\',\'team\')" style="background:#c2410c;color:#fff">입금대기팀 문자</button><button type="button" class="btn btn-primary" onclick="sms419Open(\'paid\',\'team\')" style="background:#2563eb;color:#fff">입금완료팀 문자</button></div>'; var anchor=ge('regDivisionOverview')||ge('regSection')||page.querySelector('.card'); if(anchor&&anchor.parentNode&&(!old||bar.nextSibling!==anchor))anchor.parentNode.insertBefore(bar,anchor); else if(!old)page.insertBefore(bar,page.firstChild);}catch(e){console.warn('v419 register sms failed',e);}}
   function injectSettings(){try{cleanOldSms(); if(!adminLike())return; if(ge('v419SettingsSmsBox'))return; var body=document.querySelector('#mAdminSettings .modal-body'); if(!body)return; var ref=ge('noticeContactBtns'),fg=ref&&ref.closest?ref.closest('.form-group'):null,box=document.createElement('div'); box.id='v419SettingsSmsBox'; box.className='v419-smsbar'; box.innerHTML='<div><div class="v419-sms-title">📨 개인전 참가자 문자 보내기</div><div class="v419-sms-sub">개인별로 한 명씩 선택하고 입금대기/입금완료 필터로 문자 발송합니다.</div></div><div class="v419-sms-actions"><button type="button" class="btn btn-primary" onclick="sms419Open(\'all\',\'person\')" style="background:#0f766e;color:#fff">개인별 선택 문자 보내기</button></div>'; if(fg&&fg.parentNode)fg.parentNode.insertBefore(box,fg.nextSibling); else body.appendChild(box);}catch(e){console.warn('v419 settings sms failed',e);}}
   window.sms419Open=open; window.sms419Render=render; window.sms419FillDivisions=fillDivisions; window.sms419UpdateCount=updateCount; window.sms419Select=selectMode; window.sms419Copy=copy; window.sms419Send=send; window.v419InjectRegisterSmsBar=injectRegister; window.v419InjectSettingsSmsBox=injectSettings;
@@ -41638,7 +41646,7 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
   function defaultMsg(t,filter){const name=(t&&t.name)||'개인전 대회'; if(filter==='unpaid')return '[230MATCH 공지]\n'+name+'\n참가비 입금 대기 안내드립니다.'; if(filter==='paid')return '[230MATCH 공지]\n'+name+'\n입금 확인된 참가자 대상 공지입니다.'; return '[230MATCH 공지]\n'+name+'\n공지 내용을 입력해 주세요.';}
   function open(filter){if(!adminLike()){toastMsg('관리자 또는 운영자 로그인 필요','info');return;} ensureModal(); fillTournaments(currentTid()); const curDiv=ge('regDS')&&ge('regDS').value, d=ge('sms421Division'); if(d&&curDiv&&[].slice.call(d.options).some(o=>o.value===curDiv))d.value=curDiv; ge('sms421Filter').value=filter||'all'; const t=tournaments().find(x=>String(x.id)===String(ge('sms421Tournament').value)); ge('sms421Body').value=defaultMsg(t,filter||'all'); S.selected.clear(); render(false); if(filter==='paid'||filter==='unpaid')select(filter); try{om('sms421Modal');}catch(e){ge('sms421Modal').classList.add('open');}}
   function copy(){const body=String((ge('sms421Body')||{}).value||'').trim(); if(!body){toastMsg('문자 내용을 입력하세요','error');return;} const rows=selectedRows(); if(!rows.length){toastMsg('선택된 대상이 없습니다','error');return;} const txt='[수신자 '+rows.length+'명]\n'+rows.map(r=>r.name+' ('+(r.paid?'입금완료':'입금대기')+') '+r.phoneText).join('\n')+'\n\n[내용]\n'+body; try{navigator.clipboard.writeText(txt).then(()=>toastMsg('선택 명단과 내용이 복사됐습니다','success'));}catch(e){alert(txt);}}
-  function send(){const body=String((ge('sms421Body')||{}).value||'').trim(); if(!body){toastMsg('문자 내용을 입력하세요','error');return;} const rows=selectedRows(); if(!rows.length){toastMsg('선택된 대상이 없습니다','error');return;} const seen={},phones=[]; rows.forEach(r=>{const k=phoneKey(r.phone); if(k.length>=9&&!seen[k]){seen[k]=1; phones.push(r.phone);}}); if(!phones.length){toastMsg('발송 가능한 전화번호가 없습니다','error');return;} if(!confirm('선택한 대상 '+phones.length+'명에게 문자앱을 엽니다.\n\n계속하시겠습니까?'))return; const mobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent); if(!mobile){copy(); toastMsg('PC에서는 복사만 가능합니다. 휴대폰 문자앱에 붙여넣으세요.','info'); return;} window.location.href='sms:'+phones.join(',')+'?body='+encodeURIComponent(body);}
+  function send(){const body=String((ge('sms421Body')||{}).value||'').trim(); if(!body){toastMsg('문자 내용을 입력하세요','error');return;} const rows=selectedRows(); if(!rows.length){toastMsg('선택된 대상이 없습니다','error');return;} const seen={},phones=[]; rows.forEach(r=>{const k=phoneKey(r.phone); if(k.length>=9&&!seen[k]){seen[k]=1; phones.push(r.phone);}}); if(!phones.length){toastMsg('발송 가능한 전화번호가 없습니다','error');return;} if(!confirm('선택한 대상 '+phones.length+'명에게 문자앱을 엽니다.\n\n계속하시겠습니까?'))return; const mobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent); if(!mobile){copy(); toastMsg('PC에서는 복사만 가능합니다. 휴대폰 문자앱에 붙여넣으세요.','info'); return;} if(window.openBulkSmsInChunks){window.openBulkSmsInChunks(phones,body,'선택 대상 문자');}else{window.location.href='sms:'+phones.join(',')+'?body='+encodeURIComponent(body);}}
   function inject(){try{if(!adminLike())return; const old=ge('v419SettingsSmsBox'); if(old)old.remove(); if(ge('sms421SettingsBox'))return; const body=document.querySelector('#mAdminSettings .modal-body'); if(!body)return; const ref=ge('noticeContactBtns'), fg=ref&&ref.closest?ref.closest('.form-group'):null; const box=document.createElement('div'); box.id='sms421SettingsBox'; box.innerHTML='<div class="sms421-title">📨 개인전 참가자 문자 보내기</div><div class="sms421-sub">설정 전용 기능입니다. 개인별로 한 명씩 선택하고, 입금대기자/입금완료자만 골라 문자 발송할 수 있습니다.</div><div class="sms421-actions"><button type="button" class="btn btn-primary" onclick="sms421Open(\'all\')" style="background:#0f766e;color:#fff">개인별 선택 문자</button><button type="button" class="btn btn-primary" onclick="sms421Open(\'unpaid\')" style="background:#c2410c;color:#fff">입금대기자 문자</button><button type="button" class="btn btn-primary" onclick="sms421Open(\'paid\')" style="background:#2563eb;color:#fff">입금완료자 문자</button></div>'; if(fg&&fg.parentNode)fg.parentNode.insertBefore(box,fg.nextSibling); else body.appendChild(box);}catch(e){console.warn('v421 settings sms inject failed',e);}}
   window.sms421Open=open; window.sms421Render=render; window.sms421FillDivisions=fillDivisions; window.sms421Select=select; window.sms421Copy=copy; window.sms421Send=send; window.v421InjectSettingsPersonSms=inject;
   const oldAdmin=window.openAdminSettings; if(typeof oldAdmin==='function'){window.openAdminSettings=function(){const r=oldAdmin.apply(this,arguments); [80,200,500,900,1500,2500].forEach(ms=>setTimeout(inject,ms)); return r;};}
@@ -41784,7 +41792,7 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
   function defaultMsg(t,filter){const name=(t&&t.name)||'개인전 대회'; if(filter==='unpaid')return '[230MATCH 공지]\n'+name+'\n참가비 입금 대기 안내드립니다.'; if(filter==='paid')return '[230MATCH 공지]\n'+name+'\n입금 확인된 참가자 대상 공지입니다.'; return '[230MATCH 공지]\n'+name+'\n공지 내용을 입력해 주세요.';}
   function openSettings(mode){if(!adminLike()){toastMsg('관리자 또는 운영자 로그인 필요','info');return;} const p=ensurePanel(); if(!p){toastMsg('설정 화면을 먼저 열어주세요','info');return;} fillTournaments(currentTid()); const curDiv=ge('regDS')&&ge('regDS').value, d=ge('sms423Division'); if(d&&curDiv&&[].slice.call(d.options).some(o=>o.value===curDiv))d.value=curDiv; ge('sms423Filter').value=mode||'all'; const t=tournaments().find(x=>String(x.id)===String(ge('sms423Tournament').value)); ge('sms423Body').value=defaultMsg(t,mode||'all'); S.selected.clear(); render(false); if(mode==='paid'||mode==='unpaid')select(mode); else select('all'); try{p.scrollIntoView({behavior:'smooth',block:'start'});}catch(e){} }
   function copy(){const body=String((ge('sms423Body')||{}).value||'').trim(); if(!body){toastMsg('문자 내용을 입력하세요','error');return;} const rows=selectedRows(); if(!rows.length){toastMsg('선택된 대상이 없습니다','error');return;} const txt='[수신자 '+rows.length+'명]\n'+rows.map(r=>r.name+' ('+(r.paid?'입금완료':'입금대기')+') '+r.phoneText).join('\n')+'\n\n[내용]\n'+body; try{navigator.clipboard.writeText(txt).then(()=>toastMsg('선택 명단과 내용이 복사됐습니다','success'));}catch(e){alert(txt);}}
-  function send(){const body=String((ge('sms423Body')||{}).value||'').trim(); if(!body){toastMsg('문자 내용을 입력하세요','error');return;} const rows=selectedRows(); if(!rows.length){toastMsg('선택된 대상이 없습니다','error');return;} const seen={},phones=[]; rows.forEach(r=>{const k=phoneKey(r.phone); if(k.length>=9&&!seen[k]){seen[k]=1; phones.push(r.phone);}}); if(!phones.length){toastMsg('발송 가능한 전화번호가 없습니다','error');return;} if(!confirm('선택한 대상 '+phones.length+'명에게 문자앱을 엽니다.\n\n계속하시겠습니까?'))return; const mobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent); if(!mobile){copy(); toastMsg('PC에서는 복사만 가능합니다. 휴대폰 문자앱에 붙여넣으세요.','info'); return;} window.location.href='sms:'+phones.join(',')+'?body='+encodeURIComponent(body);}
+  function send(){const body=String((ge('sms423Body')||{}).value||'').trim(); if(!body){toastMsg('문자 내용을 입력하세요','error');return;} const rows=selectedRows(); if(!rows.length){toastMsg('선택된 대상이 없습니다','error');return;} const seen={},phones=[]; rows.forEach(r=>{const k=phoneKey(r.phone); if(k.length>=9&&!seen[k]){seen[k]=1; phones.push(r.phone);}}); if(!phones.length){toastMsg('발송 가능한 전화번호가 없습니다','error');return;} if(!confirm('선택한 대상 '+phones.length+'명에게 문자앱을 엽니다.\n\n계속하시겠습니까?'))return; const mobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent); if(!mobile){copy(); toastMsg('PC에서는 복사만 가능합니다. 휴대폰 문자앱에 붙여넣으세요.','info'); return;} if(window.openBulkSmsInChunks){window.openBulkSmsInChunks(phones,body,'선택 대상 문자');}else{window.location.href='sms:'+phones.join(',')+'?body='+encodeURIComponent(body);}}
   function wireTopButtons(){try{const root=document.querySelector('#mAdminSettings .modal-body'); if(!root)return; root.querySelectorAll('button').forEach(btn=>{const txt=(btn.textContent||'').replace(/\s+/g,' ').trim(); const oc=String(btn.getAttribute('onclick')||''); if(/개인전\s*참가자.*문자/.test(txt)||/openIndividualParticipantSmsModal/.test(oc)){btn.textContent='📨 개인전 참가자 전체 문자 보내기'; btn.setAttribute('onclick','sms423OpenSettings(\'all\')'); btn.style.background='#0f766e'; btn.style.color='#fff';}});}catch(e){console.warn('v423 wireTopButtons failed',e);}}
   const prevOpen=window.openIndividualParticipantSmsModal;
   window.sms423OpenSettings=openSettings; window.sms423Render=render; window.sms423FillDivisions=fillDivisions; window.sms423Select=select; window.sms423Copy=copy; window.sms423Send=send;
@@ -41856,6 +41864,97 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
       return r;
     };
   }
+})();
+</script>
+
+
+
+<script id="v425SmsChunk30Helper">
+(function(){
+  const CHUNK_SIZE = 30;
+  function ge(id){return document.getElementById(id);}
+  function toastMsg(msg,type){try{ if(typeof toast==='function') toast(msg,type||'info'); else alert(msg); }catch(e){ alert(msg); }}
+  function normalizePhone(v){
+    return String(v||'').split(/[;,\n\s]+/).map(x=>x.trim()).filter(Boolean).map(x=>x.replace(/[^0-9+]/g,''));
+  }
+  function uniquePhones(values){
+    const seen=new Set(), out=[];
+    (Array.isArray(values)?values:[values]).forEach(v=>{
+      normalizePhone(v).forEach(p=>{
+        const k=p.replace(/[^0-9]/g,'');
+        if(k.length>=9 && !seen.has(k)){ seen.add(k); out.push(p); }
+      });
+    });
+    return out;
+  }
+  function makeSmsUrl(phones, body){
+    return 'sms:'+phones.join(',')+'?body='+encodeURIComponent(body||'');
+  }
+  function copyText(text){
+    try{
+      if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(()=>toastMsg('복사되었습니다.','success')).catch(()=>fallbackCopy(text));}
+      else fallbackCopy(text);
+    }catch(e){fallbackCopy(text);}
+  }
+  function fallbackCopy(text){
+    try{const ta=document.createElement('textarea');ta.value=text;ta.style.cssText='position:fixed;left:-9999px;top:-9999px';document.body.appendChild(ta);ta.focus();ta.select();document.execCommand('copy');ta.remove();toastMsg('복사되었습니다.','success');}
+    catch(e){alert(text);}
+  }
+  function ensureModal(){
+    let m=ge('smsChunk30Modal');
+    if(m) return m;
+    m=document.createElement('div');
+    m.id='smsChunk30Modal';
+    m.className='modal-overlay';
+    m.innerHTML=`<div class="modal-box" style="max-width:720px;width:96vw">
+      <div class="modal-header" style="background:#0f1e3a"><h3 id="smsChunk30Title">📨 단체 문자 분할 발송</h3><button class="modal-close" onclick="document.getElementById('smsChunk30Modal').classList.remove('open')">✕</button></div>
+      <div class="modal-body" style="max-height:74vh;overflow:auto">
+        <div id="smsChunk30Summary" style="font-size:.82rem;line-height:1.7;color:#334155;background:#f8fbff;border:1px solid #dbeafe;border-radius:12px;padding:10px 12px;margin-bottom:10px"></div>
+        <div id="smsChunk30List" style="display:flex;flex-direction:column;gap:8px"></div>
+        <div style="margin-top:10px;font-size:.72rem;color:#64748b;line-height:1.6">※ LG U+ 등 일부 문자앱은 단체 수신자 수 제한이 있어 30명씩 나누어 문자앱을 엽니다. 각 차수 버튼을 눌러 문자앱에서 전송 후, 앱으로 돌아와 다음 차수를 누르세요.</div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-outline" id="smsChunk30CopyAll">📋 전체 번호/내용 복사</button><button class="btn btn-gray" onclick="document.getElementById('smsChunk30Modal').classList.remove('open')">닫기</button></div>
+    </div>`;
+    document.body.appendChild(m);
+    return m;
+  }
+  window.openBulkSmsInChunks=function(phonesInput, body, title){
+    const phones=uniquePhones(phonesInput);
+    if(!phones.length){toastMsg('보낼 번호가 없습니다.','error');return false;}
+    const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if(!isMobile){
+      copyText('[수신번호]\n'+phones.join('\n')+'\n\n[내용]\n'+(body||''));
+      toastMsg('PC에서는 문자앱을 열 수 없어 번호와 내용을 복사했습니다.','info');
+      return false;
+    }
+    if(phones.length<=CHUNK_SIZE){
+      window.location.href=makeSmsUrl(phones,body);
+      toastMsg(`문자창을 열었습니다 (${phones.length}명).`,'success');
+      return true;
+    }
+    const chunks=[];
+    for(let i=0;i<phones.length;i+=CHUNK_SIZE) chunks.push(phones.slice(i,i+CHUNK_SIZE));
+    const m=ensureModal();
+    ge('smsChunk30Title').textContent=`📨 단체 문자 분할 발송 · ${title||'문자'}`;
+    ge('smsChunk30Summary').innerHTML=`총 <b style="color:#1d4ed8">${phones.length}</b>명 · <b style="color:#c2410c">${CHUNK_SIZE}명씩 ${chunks.length}회</b>로 나누어 발송합니다.`;
+    ge('smsChunk30List').innerHTML=chunks.map((c,i)=>`<div style="border:1px solid #dbeafe;border-radius:12px;background:#fff;padding:10px 12px;display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center">
+      <div style="min-width:0"><div style="font-weight:900;color:#0f1e3a;font-size:.86rem">${i+1}차 발송</div><div style="font-size:.74rem;color:#64748b;margin-top:3px">${c.length}명 · ${c[0]} ~ ${c[c.length-1]}</div></div>
+      <button type="button" class="btn btn-primary" data-sms-chunk="${i}" style="background:#2563eb;color:#fff;font-size:.78rem;white-space:nowrap">${i+1}차 문자 열기</button>
+    </div>`).join('');
+    ge('smsChunk30List').querySelectorAll('button[data-sms-chunk]').forEach(btn=>{
+      btn.onclick=function(){
+        const idx=Number(this.getAttribute('data-sms-chunk'))||0;
+        const c=chunks[idx]||[];
+        this.textContent=`${idx+1}차 열림`;
+        this.style.background='#16a34a';
+        window.location.href=makeSmsUrl(c,body);
+      };
+    });
+    const cp=ge('smsChunk30CopyAll');
+    if(cp) cp.onclick=()=>copyText('[수신번호]\n'+phones.join('\n')+'\n\n[내용]\n'+(body||''));
+    m.classList.add('open');
+    return true;
+  };
 })();
 </script>
 
