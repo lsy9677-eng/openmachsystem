@@ -8267,6 +8267,8 @@ function _renderEtDivList(){
           <option value="2" ${d.rub===2?'selected':''}>2복식</option>
           <option value="1" ${d.rub===1?'selected':''}>1복식</option>
         </select>
+        <input class="form-input" type="number" min="0" value="${d.maxTeams||''}" placeholder="정원" title="참가팀 정원" style="width:78px;font-size:.76rem;padding:4px 8px" onchange="window._etDivList[${i}].maxTeams=parseInt(this.value||'0')||0">
+        ${(()=>{ const key=(window.CE_tid||'')+'_'+d.name; const cnt=(G.teams?.[key]||[]).length; const max=Number(d.maxTeams||0)||0; return max?`<span style="font-size:.7rem;color:var(--text2);font-weight:800">확정 ${Math.min(cnt,max)} / 대기 ${Math.max(0,cnt-max)}</span>`:`<span style="font-size:.7rem;color:var(--text3)">정원 없음</span>`; })()}
         ${d.locked?`<span style="font-size:.7rem;color:var(--text3)">삭제불가</span>`:`<button class="btn btn-danger" style="padding:3px 8px;font-size:.72rem" onclick="_etRemoveDiv(${i})">✕</button>`}
       </div>
       ${renderDivisionCourtInlineSelector(d.courts||[],'edit',i)}
@@ -8286,11 +8288,13 @@ function etAddPreset(name,rub){
 function etAddCustomDiv(){
   const name=(ge('etNewDivName')?.value||'').trim();
   const rub=parseInt(ge('etNewDivRub')?.value||'5');
+  const maxTeams=parseInt(ge('etNewDivMaxTeams')?.value||'0')||0;
   if(!name){toast('부서명을 입력해 주세요','error');return;}
   if(!window._etDivList)window._etDivList=[];
   if(window._etDivList.find(d=>d.name===name)){toast(`"${name}" 이미 추가됨`,'info');return;}
-  window._etDivList.push({name,rub,maxTeams:0,courts:[],locked:false});
+  window._etDivList.push({name,rub,maxTeams,courts:[],locked:false});
   if(ge('etNewDivName'))ge('etNewDivName').value='';
+  if(ge('etNewDivMaxTeams'))ge('etNewDivMaxTeams').value='';
   _renderEtDivList();
 }
 
@@ -11958,7 +11962,7 @@ function applyTournamentBundle(tid, bundle){
     if(x._id||x.id) G._regIdsByKey[key].push(x._id||x.id);
   });
   Object.keys(G.teams).filter(k=>_k2td(k).tid===tid).forEach(k=>{
-    G.teams[k].sort((a,b)=>(a.registeredAt||'').localeCompare(b.registeredAt||''));
+    G.teams[k].sort((a,b)=>{ const aq=Number(a.queueOrder), bq=Number(b.queueOrder); if(Number.isFinite(aq)&&Number.isFinite(bq)&&aq!==bq) return aq-bq; return (a.registeredAt||'').localeCompare(b.registeredAt||''); });
     const docs=(G.teams[k]||[]).map(t=>normalizeRegistrationPayloadForHash({tournamentId:tid,division:_k2td(k).div,club:t.club,players:t.players||[],registeredAt:t.registeredAt||'',...(t.tournamentType?{tournamentType:t.tournamentType}:{}),...(t.editPin?{editPin:t.editPin}:{}),...(Array.isArray(t.individualPlayers)?{individualPlayers:t.individualPlayers}:{}),...(t.clubTokens?{clubTokens:t.clubTokens}:{}),...(t.pairLabel!==undefined?{pairLabel:t.pairLabel}:{}),...(t.entryLabel!==undefined?{entryLabel:t.entryLabel}:{}),...(t.note!==undefined?{note:t.note}:{}),...(t.doublesCount!==undefined?{doublesCount:t.doublesCount}:{}),...(t.mainPlayerCount!==undefined?{mainPlayerCount:t.mainPlayerCount}:{}),...(t.tiebreakAge!==undefined?{tiebreakAge:Number(t.tiebreakAge||0)||0}:{})}));
     markFbWriteCache('teams',k,{docs,ids:(G._regIdsByKey[k]||[]).slice().sort(),deleted:[]});
   });
@@ -12024,7 +12028,7 @@ async function ensureAllParticipationDataLoaded(force=false){
     nextRegIds[key].push(d.id);
   });
   Object.keys(nextTeams).forEach(k=>{
-    nextTeams[k].sort((a,b)=>String(a.registeredAt||'').localeCompare(String(b.registeredAt||'')));
+    nextTeams[k].sort((a,b)=>{ const aq=Number(a.queueOrder), bq=Number(b.queueOrder); if(Number.isFinite(aq)&&Number.isFinite(bq)&&aq!==bq) return aq-bq; return String(a.registeredAt||'').localeCompare(String(b.registeredAt||'')); });
   });
 
   matchesSnap.forEach(d=>{
@@ -13603,6 +13607,7 @@ async function stT(key){
     club: t.club,
     players: t.players||[],
     registeredAt: t.registeredAt || '',
+    ...(t.queueOrder !== undefined ? {queueOrder: Number(t.queueOrder)||0} : {}),
     ...(t.tournamentType ? {tournamentType: t.tournamentType} : {}),
     ...(t.editPin ? {editPin: t.editPin} : {}),
     ...(t.ownerUid ? {ownerUid: t.ownerUid} : {}),
@@ -13633,6 +13638,7 @@ async function stT(key){
       players: t.players||[],
       registeredAt: t.registeredAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      ...(t.queueOrder !== undefined ? {queueOrder: Number(t.queueOrder)||0} : {}),
       ...(t.tournamentType ? {tournamentType: t.tournamentType} : {}),
       ...(t.editPin ? {editPin: t.editPin} : {}),
       ...(Array.isArray(t.individualPlayers) ? {individualPlayers: t.individualPlayers} : {}),
@@ -13666,6 +13672,7 @@ function _buildRegistrationDocPayload(key, team){
     players: team.players||[],
     registeredAt: team.registeredAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    ...(team.queueOrder !== undefined ? {queueOrder: Number(team.queueOrder)||0} : {}),
     ...(team.tournamentType ? {tournamentType: team.tournamentType} : {}),
     ...(team.ownerUid ? {ownerUid: team.ownerUid} : {}),
     ...(team.ownerEmail ? {ownerEmail: team.ownerEmail} : {}),
@@ -19244,6 +19251,7 @@ function openET(tid){
         <select class="form-select" id="etNewDivRub" style="width:85px;font-size:.8rem">
           <option value="5">5복식</option><option value="3">3복식</option><option value="4">4복식</option><option value="2">2복식</option><option value="1">1복식</option>
         </select>
+        <input class="form-input" id="etNewDivMaxTeams" type="number" min="0" placeholder="정원" style="width:86px;font-size:.8rem">
         <button type="button" class="btn btn-primary" style="font-size:.78rem;padding:5px 10px;white-space:nowrap" onclick="etAddCustomDiv()">➕ 추가</button>
       </div>
       <div id="etDivList" style="display:flex;flex-direction:column;gap:6px"></div>
@@ -19293,10 +19301,10 @@ async function saveET(){
   sl(true);
   try{
     const ds = { ...(t.divSettings || {}) };
-    etDivs.forEach(({name, rub, courts}) => {
+    etDivs.forEach(({name, rub, courts, maxTeams}) => {
       if(!ds[name]) ds[name] = { format:'group_knockout', grpSize:4, advance:2, thirdPlaceMode:'shared' };
       ds[name].doublesCount = rub;
-      ds[name].maxTeams = parseInt((window._etDivList||[]).find(x=>x.name===name)?.maxTeams||ds[name].maxTeams||0)||0;
+      ds[name].maxTeams = parseInt(maxTeams||0)||0;
       ds[name].thirdPlaceMode = ds[name].thirdPlaceMode || 'shared';
       ds[name].allowedCourts = Array.isArray(courts)?courts.map(String).filter(Boolean):[];
     });
@@ -20155,7 +20163,7 @@ function buildRegisterRosterGrid(tid,div,teams,key){
           </div>`;
       return `<div class="v336-entry-row v347-entry-row-detail-inline ${isWaitlisted?'v385-waitlist-row':''}">
         <div class="v336-entry-num">${i+1}</div>
-        <div class="v336-entry-names v347-entry-names">${v348IndividualPairTitleWithDetail(team,key,realIdx)}${waitBadge?`<div style="margin-top:3px">${waitBadge}</div>`:''}</div>
+        <div class="v336-entry-names v347-entry-names">${v348IndividualPairTitleWithDetail(team,key,realIdx)}${waitBadge?`<div style="margin-top:3px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">${waitBadge}${(isWaitlisted&&(AD||TM))?`<button class="btn btn-outline" style="min-height:24px;height:24px;padding:2px 8px;font-size:.62rem;border-radius:999px" onclick="promoteWaitlistedTeam('${esc(key)}',${realIdx})">일반전환</button>`:''}</div>`:''}</div>
         ${actionBtns}
       </div>`;
     }
@@ -20168,6 +20176,7 @@ function buildRegisterRosterGrid(tid,div,teams,key){
           ${headerCount?`<span class="rr-team-count">${headerCount}</span>`:''}
           ${waitBadge}
           ${buildPaymentStatusHTML(key,realIdx)}
+          ${isWaitlisted&&(AD||TM)?`<button class="btn btn-outline" style="min-height:28px;height:28px;padding:3px 9px;font-size:.66rem;border-radius:999px;background:#fff" onclick="promoteWaitlistedTeam('${esc(key)}',${realIdx})">일반전환</button>`:''}
         </div>
         ${adminBtns}
       </div>
@@ -20499,6 +20508,7 @@ async function registerTeam(){
     registrationStatus: willBeWaitlist ? 'waitlist' : 'confirmed',
     waitlistNo: willBeWaitlist ? (ex.length - maxTeams + 1) : 0,
     registeredAt:new Date().toISOString(),
+    queueOrder: ex.length,
     adminNotificationType:'admin_registration_created',
     adminNotificationId:`admin_registration_created_${newRegId}`,
     adminNotificationCreatedAt:new Date().toISOString()
@@ -41781,6 +41791,71 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
   window.openIndividualParticipantSmsModal=function(mode){ if(isOpenSettings()) return openSettings(mode||'all'); if(typeof prevOpen==='function') return prevOpen.apply(this,arguments); return openSettings(mode||'all'); };
   const oldAdmin=window.openAdminSettings; if(typeof oldAdmin==='function'){window.openAdminSettings=function(){const r=oldAdmin.apply(this,arguments); [80,180,350,700,1200,2000].forEach(ms=>setTimeout(wireTopButtons,ms)); return r;};}
   document.addEventListener('DOMContentLoaded',function(){[600,1200,2200].forEach(ms=>setTimeout(wireTopButtons,ms)); setInterval(function(){if(isOpenSettings())wireTopButtons();},700);});
+})();
+</script>
+
+
+
+<style id="v424CapacityEditPromoteStyle">
+.v424-capacity-note{margin-top:6px;padding:8px 10px;border-radius:10px;background:#fff7ed;border:1px solid #fdba74;color:#9a3412;font-size:.72rem;line-height:1.55;font-weight:800}
+#mET #etDivList input[placeholder="정원"], #mET #etNewDivMaxTeams{border-color:#d4a017;background:#fffdf5;font-weight:900;color:#0f1e3a;}
+</style>
+<script id="v424CapacityEditPromoteScript">
+(function(){
+  function toastSafe(msg,type){ try{ if(typeof toast==='function') toast(msg,type||'info'); else alert(msg); }catch(e){ alert(msg); } }
+  function renumberQueueOrder(key){
+    try{ (G.teams?.[key]||[]).forEach((t,i)=>{ t.queueOrder=i; }); }catch(e){}
+  }
+  window.promoteWaitlistedTeam = async function(key, idx){
+    try{
+      if(!(window.AD||window.TM)){ toastSafe('관리자만 전환할 수 있습니다.','error'); return; }
+      key=String(key||''); idx=Number(idx);
+      const arr=G.teams?.[key]||[];
+      if(!arr.length || !arr[idx]){ toastSafe('대상 참가팀을 찾을 수 없습니다.','error'); return; }
+      const td=(typeof _k2td==='function')?_k2td(key):{tid:key.split('_')[0],div:key.split('_').slice(1).join('_')};
+      const max=(typeof getDivisionMaxTeams==='function')?Number(getDivisionMaxTeams(td.tid,td.div)||0):0;
+      if(!max){ toastSafe('이 부서는 정원이 없어 대기 전환 대상이 없습니다.','info'); return; }
+      if(idx<max){ toastSafe('이미 일반 참가 상태입니다.','info'); return; }
+      const name=(typeof getIndividualDisplayLine==='function')?getIndividualDisplayLine(arr[idx]):(arr[idx].entryLabel||arr[idx].pairLabel||arr[idx].club||'선택팀');
+      const msg=`${name}\n\n대기팀을 일반 참가로 전환합니다.\n현재 정원(${max}팀)이 이미 꽉 찬 상태라면 마지막 일반 참가팀은 대기 순번으로 밀립니다. 진행할까요?`;
+      if(!confirm(msg)) return;
+      const item=arr.splice(idx,1)[0];
+      const insertAt=Math.max(0, Math.min(max-1, arr.length));
+      arr.splice(insertAt,0,item);
+      renumberQueueOrder(key);
+      if(typeof sl==='function') sl(true);
+      if(typeof stT==='function') await stT(key);
+      try{ if(typeof fbLog==='function') await fbLog(`대기팀 일반전환: ${name} (${td.div})`,'📋'); }catch(_e){}
+      if(typeof sl==='function') sl(false);
+      try{ renderRegisterDivisionOverview(); renderRL(); upDash(); }catch(_e){}
+      toastSafe('일반 참가로 전환했습니다 ✅','success');
+    }catch(e){
+      console.error(e);
+      try{ if(typeof sl==='function') sl(false); }catch(_e){}
+      toastSafe('일반 전환 실패: '+(e?.message||e),'error');
+    }
+  };
+
+  // 대회 편집창이 열릴 때 정원 설명을 보강한다.
+  const oldOpenET=window.openET;
+  if(typeof oldOpenET==='function'){
+    window.openET=function(){
+      const r=oldOpenET.apply(this,arguments);
+      setTimeout(()=>{
+        try{
+          const list=document.getElementById('etDivList');
+          if(list && !document.getElementById('v424CapacityNote')){
+            const note=document.createElement('div');
+            note.id='v424CapacityNote';
+            note.className='v424-capacity-note';
+            note.innerHTML='정원을 64→80처럼 늘리면 현재 접수 순서 기준으로 80팀까지 일반 참가가 되고, 그 이후부터 추가대기로 표시됩니다. 특정 대기팀만 올릴 때는 참가접수 명단의 <b>일반전환</b> 버튼을 사용하세요.';
+            list.insertAdjacentElement('afterend',note);
+          }
+        }catch(e){}
+      },80);
+      return r;
+    };
+  }
 })();
 </script>
 
