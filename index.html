@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-01-v444d-name-clip-fix";
+  const APP_VERSION = "2026-06-01-v444e-waitlist-sort-fix";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -12006,7 +12006,21 @@ function applyTournamentBundle(tid, bundle){
     if(x._id||x.id) G._regIdsByKey[key].push(x._id||x.id);
   });
   Object.keys(G.teams).filter(k=>_k2td(k).tid===tid).forEach(k=>{
-    G.teams[k].sort((a,b)=>{ const aq=Number(a.queueOrder), bq=Number(b.queueOrder); if(Number.isFinite(aq)&&Number.isFinite(bq)&&aq!==bq) return aq-bq; return (a.registeredAt||'').localeCompare(b.registeredAt||''); });
+    G.teams[k].sort((a,b)=>{
+      const {tid:_t, div:_d}= _k2td(k);
+      const max=getDivisionMaxTeams(_t, _d)||Infinity;
+      const aq=Number(a.queueOrder), bq=Number(b.queueOrder);
+      const aWait=(Number.isFinite(aq)&&aq>=max)||(a.registrationStatus==='waitlist');
+      const bWait=(Number.isFinite(bq)&&bq>=max)||(b.registrationStatus==='waitlist');
+      // 확정 vs 대기: 확정이 항상 앞
+      if(!aWait && bWait) return -1;
+      if(aWait && !bWait) return 1;
+      // 대기자끼리는 registeredAt(접수 시각) 오름차순으로만 정렬 — queueOrder 무시
+      if(aWait && bWait) return String(a.registeredAt||'').localeCompare(String(b.registeredAt||''));
+      // 확정자끼리는 기존 queueOrder → registeredAt
+      if(Number.isFinite(aq)&&Number.isFinite(bq)&&aq!==bq) return aq-bq;
+      return (a.registeredAt||'').localeCompare(b.registeredAt||'');
+    });
     const docs=(G.teams[k]||[]).map(t=>normalizeRegistrationPayloadForHash({tournamentId:tid,division:_k2td(k).div,club:t.club,players:t.players||[],registeredAt:t.registeredAt||'',...(t.tournamentType?{tournamentType:t.tournamentType}:{}),...(t.editPin?{editPin:t.editPin}:{}),...(Array.isArray(t.individualPlayers)?{individualPlayers:t.individualPlayers}:{}),...(t.clubTokens?{clubTokens:t.clubTokens}:{}),...(t.pairLabel!==undefined?{pairLabel:t.pairLabel}:{}),...(t.entryLabel!==undefined?{entryLabel:t.entryLabel}:{}),...(t.note!==undefined?{note:t.note}:{}),...(t.doublesCount!==undefined?{doublesCount:t.doublesCount}:{}),...(t.mainPlayerCount!==undefined?{mainPlayerCount:t.mainPlayerCount}:{}),...(t.tiebreakAge!==undefined?{tiebreakAge:Number(t.tiebreakAge||0)||0}:{})}));
     markFbWriteCache('teams',k,{docs,ids:(G._regIdsByKey[k]||[]).slice().sort(),deleted:[]});
   });
@@ -12072,7 +12086,18 @@ async function ensureAllParticipationDataLoaded(force=false){
     nextRegIds[key].push(d.id);
   });
   Object.keys(nextTeams).forEach(k=>{
-    nextTeams[k].sort((a,b)=>{ const aq=Number(a.queueOrder), bq=Number(b.queueOrder); if(Number.isFinite(aq)&&Number.isFinite(bq)&&aq!==bq) return aq-bq; return String(a.registeredAt||'').localeCompare(String(b.registeredAt||'')); });
+    nextTeams[k].sort((a,b)=>{
+      const {tid:_t2, div:_d2}= _k2td(k);
+      const max2=getDivisionMaxTeams(_t2, _d2)||Infinity;
+      const aq=Number(a.queueOrder), bq=Number(b.queueOrder);
+      const aWait=(Number.isFinite(aq)&&aq>=max2)||(a.registrationStatus==='waitlist');
+      const bWait=(Number.isFinite(bq)&&bq>=max2)||(b.registrationStatus==='waitlist');
+      if(!aWait && bWait) return -1;
+      if(aWait && !bWait) return 1;
+      if(aWait && bWait) return String(a.registeredAt||'').localeCompare(String(b.registeredAt||''));
+      if(Number.isFinite(aq)&&Number.isFinite(bq)&&aq!==bq) return aq-bq;
+      return String(a.registeredAt||'').localeCompare(String(b.registeredAt||''));
+    });
   });
 
   matchesSnap.forEach(d=>{
