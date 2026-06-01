@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-01-v430-template-button-visible";
+  const APP_VERSION = "2026-06-01-v439-court-result-stable";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -5757,8 +5757,7 @@ body {
 <div class="login-menu-wrap js-mini-menu" id="bracketSaveMenuWrap">
 <button class="btn btn-outline" onclick="toggleBracketSaveMenu(event)" style="font-size:.78rem;padding:5px 12px">💾 저장하기</button>
 <div class="login-menu-panel" id="bracketSaveMenuPanel" style="min-width:210px">
-<button class="btn-sm login-menu-item" onclick="event.stopPropagation();closeBracketSaveMenu();bracketToImage()" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">🖼️ 이미지 저장</button>
-<button class="btn-sm login-menu-item" onclick="event.stopPropagation();closeBracketSaveMenu();bracketToPDF()" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">📄 PDF 저장</button>
+<button class="btn-sm login-menu-item" onclick="event.stopPropagation();closeBracketSaveMenu();exportPrelimPDF()" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">📄 PDF 저장</button>
 <button class="btn-sm login-menu-item" onclick="event.stopPropagation();closeBracketSaveMenu();exportPrelimSheet()" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">📄 예선표(A4) 출력</button>
 <button class="btn-sm login-menu-item" onclick="event.stopPropagation();closeBracketSaveMenu();exportPrelimImage()" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">🖼️ 예선표 저장</button>
 </div>
@@ -22765,8 +22764,8 @@ function renderBracketHTMLForDiv(tid,div,isAll){
         const qTeams = G.teams[key] || [];
         const qT1 = qTeams[qm.t1] ?? qTeams.find(t=>t&&((t.id!=null&&t.id===qm.t1)||(t.name&&t.name===qm.t1)));
         const qT2 = qTeams[qm.t2] ?? qTeams.find(t=>t&&((t.id!=null&&t.id===qm.t2)||(t.name&&t.name===qm.t2)));
-        const qName1 = qT1 ? tdn(qT1,key,qm.t1) : 'TBD';
-        const qName2 = qT2 ? tdn(qT2,key,qm.t2) : 'TBD';
+        const qName1 = qT1 ? String(tdn(qT1,key,qm.t1)).replace(/\s*\([^)]*\)/g,'').replace(/\s+\/\s+/g,' / ').trim() : 'TBD';
+        const qName2 = qT2 ? String(tdn(qT2,key,qm.t2)).replace(/\s*\([^)]*\)/g,'').replace(/\s+\/\s+/g,' / ').trim() : 'TBD';
         const qCourts = getMatchCourtsForStatusBoard(key,qm)||[];
         const qGrpCourts = getGroupDisplayCourts(key, gi)||[];
         const qCanEdit = !!(AD||TM||canEditMatchByDirector(key,qm)||getIndividualResultAuthState(key,qm).allowed||isPublicResultEntryEnabled());
@@ -42153,6 +42152,1329 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
     m.classList.add('open');
     return true;
   };
+})();
+</script>
+
+
+
+<!-- v431: 대진표/A4 저장 안정화 패치 -->
+<style id="v431BracketExportFixStyle">
+.v431-export-sheet{position:fixed;left:-12000px;top:0;width:794px;background:#fff;color:#0f172a;font-family:'Noto Sans KR',sans-serif;z-index:-1;}
+.v431-a4-page{width:794px;min-height:1123px;box-sizing:border-box;padding:28px 28px 24px;background:#fff;page-break-after:always;overflow:hidden;}
+.v431-a4-title{text-align:center;font-size:20px;font-weight:1000;color:#0f1e3a;margin-bottom:6px;line-height:1.35;}
+.v431-a4-sub{text-align:center;font-size:12px;font-weight:800;color:#475569;margin-bottom:14px;}
+.v431-a4-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start;}
+.v431-group-card{border:1.4px solid #cbd5e1;border-radius:10px;overflow:hidden;background:#fff;break-inside:avoid;}
+.v431-group-head{display:flex;justify-content:space-between;align-items:center;gap:8px;background:#0f1e3a;color:#fff;padding:7px 9px;font-size:12px;font-weight:1000;}
+.v431-group-body{padding:7px 8px;display:flex;flex-direction:column;gap:5px;}
+.v431-team-row{display:grid;grid-template-columns:24px minmax(0,1fr);gap:6px;align-items:start;border:1px solid #e2e8f0;border-radius:8px;padding:5px 6px;background:#f8fafc;min-height:30px;}
+.v431-team-no{width:20px;height:20px;border-radius:999px;background:#0f1e3a;color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:1000;}
+.v431-team-name{font-size:11px;font-weight:900;line-height:1.35;word-break:keep-all;overflow-wrap:anywhere;}
+.v431-team-sub{font-size:9px;color:#64748b;font-weight:700;line-height:1.25;margin-top:1px;}
+.v431-page-foot{position:absolute;left:28px;right:28px;bottom:14px;border-top:1px solid #e5e7eb;padding-top:6px;text-align:right;font-size:9px;color:#94a3b8;}
+@media print{body>*:not(.v431-print-root){display:none!important}.v431-print-root{display:block!important}.v431-a4-page{page-break-after:always}.v431-page-foot{position:absolute}}
+</style>
+<script id="v431BracketExportFixScript">
+(function(){
+  'use strict';
+  const A4W = 794;
+  const A4H = 1123;
+
+  function safeToast(msg,type){try{typeof window.toast==='function'?window.toast(msg,type||'info'):console.log(msg);}catch(e){}}
+  function today(){return new Date().toISOString().slice(0,10);}
+  function safeName(s){return String(s||'').replace(/[\\/:*?"<>|\s]+/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'').slice(0,80)||'대진표';}
+  function loadScriptOnce(src, test){
+    return new Promise((resolve,reject)=>{
+      try{ if(test && test()) return resolve(); }catch(e){}
+      const existing=[...document.scripts].find(s=>s.src===src);
+      if(existing){ existing.addEventListener('load',()=>resolve(),{once:true}); existing.addEventListener('error',()=>reject(new Error('라이브러리 로드 실패')),{once:true}); return; }
+      const s=document.createElement('script'); s.src=src; s.onload=()=>resolve(); s.onerror=()=>reject(new Error('라이브러리 로드 실패: '+src)); document.head.appendChild(s);
+    });
+  }
+  async function ensureCanvasLib(){ await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',()=>!!window.html2canvas); }
+  async function ensurePdfLib(){ await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',()=>!!window.jspdf); }
+
+  function getCurrentTid(){ return document.getElementById('brTS')?.value || document.getElementById('regTS')?.value || ''; }
+  function getCurrentDivs(tid){
+    const t=(window.G?.tournaments||[]).find(x=>x.id===tid);
+    if(!t) return [];
+    try{
+      if(typeof window.getBracketSelectedDivs==='function'){
+        const ds=window.getBracketSelectedDivs(tid)||[];
+        if(ds.includes('__ALL__') || !ds.length) return t.divisions||[];
+        return ds.filter(d=>(t.divisions||[]).includes(d));
+      }
+    }catch(e){}
+    const ds=document.getElementById('brDS')?.value;
+    if(ds && ds!=='__ALL__') return [ds];
+    return t.divisions||[];
+  }
+  function getTeamName(key, team, idx){
+    try{ if(typeof window.tdn==='function') return window.tdn(team,key,idx); }catch(e){}
+    if(team?.individualPlayers?.length){
+      return team.individualPlayers.slice(0,2).map(p=>String(p?.name||'').trim()).filter(Boolean).join(' / ');
+    }
+    return team?.pairLabel || team?.entryLabel || team?.club || ('팀 '+(idx+1));
+  }
+  function getPlayerSub(team){
+    if(team?.individualPlayers?.length){
+      return team.individualPlayers.slice(0,2).map(p=>[p.club,p.career].filter(Boolean).join(' · ')).filter(Boolean).join(' / ');
+    }
+    const ps=(team?.players||[]).filter(Boolean).slice(0,4);
+    return ps.length?ps.join(' / '):'';
+  }
+  function divLabel(d){ try{return typeof window.dl==='function'?window.dl(d):d;}catch(e){return d;} }
+
+  function buildPrelimSheetElement(tid, divs){
+    const t=(window.G?.tournaments||[]).find(x=>x.id===tid);
+    if(!t) return null;
+    const root=document.createElement('div');
+    root.className='v431-export-sheet v431-print-root';
+    const pages=[];
+    const groupItems=[];
+    divs.forEach(div=>{
+      const key=tid+'_'+div;
+      const teams=window.G?.teams?.[key]||[];
+      const draw=window.G?.draws?.[key];
+      if(!draw || !Array.isArray(draw.groups) || !draw.groups.length) return;
+      draw.groups.forEach((grp,gi)=>{
+        const rows=(grp.teams||[]).map((ti,slot)=>{
+          const team=teams[ti];
+          return {slot:slot+1, name:getTeamName(key,team,ti), sub:getPlayerSub(team)};
+        });
+        groupItems.push({div, groupName:grp.name || (gi+1)+'조', rows});
+      });
+    });
+    const perPage=8; // A4 세로 기준: 2열 × 4행. 3팀조/2팀조 모두 안정적으로 들어감
+    for(let i=0;i<Math.max(1,groupItems.length);i+=perPage){
+      const chunk=groupItems.slice(i,i+perPage);
+      const page=document.createElement('div');
+      page.className='v431-a4-page';
+      page.style.position='relative';
+      const pageNo=pages.length+1;
+      page.innerHTML=`
+        <div class="v431-a4-title">${t.name||'대회'} 예선 대진표</div>
+        <div class="v431-a4-sub">${divs.length===1?divLabel(divs[0]):'전체 부서'} · ${t.date||''} · ${pageNo}페이지</div>
+        <div class="v431-a4-grid">
+          ${chunk.map(item=>`
+            <div class="v431-group-card">
+              <div class="v431-group-head"><span>${divLabel(item.div)}</span><span>${item.groupName}</span></div>
+              <div class="v431-group-body">
+                ${item.rows.map(r=>`
+                  <div class="v431-team-row">
+                    <div class="v431-team-no">${r.slot}</div>
+                    <div><div class="v431-team-name">${r.name||'-'}</div>${r.sub?`<div class="v431-team-sub">${r.sub}</div>`:''}</div>
+                  </div>`).join('')}
+              </div>
+            </div>`).join('') || '<div style="padding:40px;text-align:center;color:#64748b;font-weight:900">예선 추첨 데이터가 없습니다.</div>'}
+        </div>
+        <div class="v431-page-foot">출력일시 ${new Date().toLocaleString('ko-KR')} · 230MATCH</div>`;
+      pages.push(page);
+      root.appendChild(page);
+    }
+    return root;
+  }
+
+  function openPrintWindowWithSheet(sheet){
+    const html=`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>예선 대진표 A4 출력</title>
+      <style>${document.getElementById('v431BracketExportFixStyle')?.innerHTML||''}
+      @page{size:A4 portrait;margin:0} body{margin:0;background:#fff;font-family:'Noto Sans KR',Arial,sans-serif}.v431-export-sheet{position:static!important;left:auto!important;top:auto!important;width:794px!important;margin:0 auto;z-index:auto!important}.v431-a4-page{page-break-after:always;break-after:page}.v431-a4-page:last-child{page-break-after:auto}</style>
+      </head><body>${sheet.outerHTML}<script>window.onload=function(){setTimeout(function(){window.focus();window.print();},250)}<\/script>
+
+<!-- v434: A4 예선표 출력 전 미리보기 + 코트/클럽 표시 보강 -->
+<style id="v434A4PreviewCourtClubStyle">
+.v432-group-head .v434-head-left{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.v432-group-head .v434-head-right{display:flex;align-items:center;gap:3px;flex:0 0 auto;max-width:58%;overflow:hidden;}
+.v434-court-badge{display:inline-flex;align-items:center;justify-content:center;padding:1px 4px;border-radius:999px;background:#facc15;color:#0f172a;font-size:7.6px;font-weight:1000;line-height:1.2;max-width:72px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.v432-team-sub{font-size:7.3px!important;color:#334155!important;font-weight:900!important;line-height:1.12!important;margin-top:1px!important;white-space:normal!important;overflow:visible!important;text-overflow:clip!important;word-break:keep-all!important;overflow-wrap:anywhere!important;}
+.v432-team-name{letter-spacing:-.035em!important;}
+.v434-preview-overlay{position:fixed;inset:0;z-index:2147483200;display:none;background:rgba(7,15,31,.72);backdrop-filter:blur(8px) saturate(130%);align-items:center;justify-content:center;padding:14px;}
+.v434-preview-overlay.show{display:flex;}
+.v434-preview-box{width:min(1040px,100%);height:min(94vh,980px);background:#f8fafc;border-radius:18px;box-shadow:0 24px 80px rgba(0,0,0,.36);overflow:hidden;display:flex;flex-direction:column;border:1px solid rgba(255,255,255,.25);}
+.v434-preview-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 14px;background:#0f1e3a;color:#fff;}
+.v434-preview-title{font-size:.92rem;font-weight:1000;line-height:1.35;word-break:keep-all;}
+.v434-preview-meta{font-size:.74rem;color:rgba(255,255,255,.78);margin-top:2px;font-weight:700;}
+.v434-preview-actions{display:flex;gap:7px;align-items:center;flex-wrap:wrap;justify-content:flex-end;}
+.v434-preview-btn{border:0;border-radius:999px;min-height:34px;padding:7px 12px;font-size:.76rem;font-weight:1000;cursor:pointer;white-space:nowrap;}
+.v434-preview-btn.primary{background:#facc15;color:#111827;}
+.v434-preview-btn.secondary{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.18);}
+.v434-preview-btn.close{width:34px;height:34px;padding:0;border-radius:999px;background:rgba(255,255,255,.14);color:#fff;font-size:1.1rem;}
+.v434-preview-body{flex:1;overflow:auto;padding:14px;background:#e5eaf3;display:flex;flex-direction:column;align-items:center;gap:14px;}
+.v434-preview-body .v432-export-sheet{position:static!important;left:auto!important;top:auto!important;z-index:auto!important;width:794px!important;background:#fff!important;transform-origin:top center;box-shadow:0 8px 24px rgba(15,30,58,.18);}
+.v434-preview-body .v432-a4-page{margin:0 auto 14px auto!important;border:1px solid #cbd5e1;box-shadow:0 3px 10px rgba(15,30,58,.12);}
+.v434-print-sheet{position:fixed!important;left:-14000px!important;top:0!important;}
+@media(max-width:680px){.v434-preview-overlay{padding:8px 8px calc(76px + env(safe-area-inset-bottom,0px)) 8px;align-items:flex-end}.v434-preview-box{height:calc(100vh - 92px - env(safe-area-inset-bottom,0px));border-radius:18px 18px 0 0}.v434-preview-head{padding:10px 11px;align-items:flex-start}.v434-preview-title{font-size:.84rem}.v434-preview-meta{font-size:.68rem}.v434-preview-actions{gap:5px}.v434-preview-btn{font-size:.68rem;padding:6px 9px;min-height:31px}.v434-preview-btn.close{width:31px;height:31px}.v434-preview-body{padding:10px}}
+</style>
+<script id="v434A4PreviewCourtClubScript">
+(function(){
+  'use strict';
+  const A4W=794, A4H=1123, CONTENT_W=766, CONTENT_H=1051;
+  const MIN_ONE_PAGE_SCALE=0.42;
+  const MIN_MULTI_PAGE_SCALE=0.54;
+  let currentPreviewSheet=null;
+  function ge(id){return document.getElementById(id);}
+  function safeToast(msg,type){try{typeof window.toast==='function'?window.toast(msg,type||'info'):console.log(msg);}catch(e){}}
+  function today(){return new Date().toISOString().slice(0,10);}
+  function safeName(s){return String(s||'').replace(/[\\/:*?"<>|\s]+/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'').slice(0,80)||'대진표';}
+  function esc(s){return String(s??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
+  function loadScriptOnce(src,test){return new Promise((resolve,reject)=>{try{if(test&&test())return resolve();}catch(e){}const ex=[...document.scripts].find(x=>x.src===src);if(ex){if(test&&test())return resolve();ex.addEventListener('load',()=>resolve(),{once:true});ex.addEventListener('error',()=>reject(new Error('라이브러리 로드 실패')),{once:true});return;}const s=document.createElement('script');s.src=src;s.onload=()=>resolve();s.onerror=()=>reject(new Error('라이브러리 로드 실패: '+src));document.head.appendChild(s);});}
+  async function ensureCanvasLib(){await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',()=>!!window.html2canvas);}
+  function getCurrentTid(){return ge('brTS')?.value || ge('regTS')?.value || '';}
+  function getCurrentDivs(tid){
+    const t=(window.G?.tournaments||[]).find(x=>x.id===tid); if(!t) return [];
+    try{if(typeof window.getBracketSelectedDivs==='function'){const ds=window.getBracketSelectedDivs(tid)||[]; if(ds.includes('__ALL__')||!ds.length) return t.divisions||[]; return ds.filter(d=>(t.divisions||[]).includes(d));}}catch(e){}
+    const d=ge('brDS')?.value; if(d&&d!=='__ALL__') return [d]; return t.divisions||[];
+  }
+  function divLabel(d){try{return typeof window.dl==='function'?window.dl(d):d;}catch(e){return d;}}
+  function parseClubAliasesLocal(raw=''){try{return typeof window.parseClubAliases==='function'?window.parseClubAliases(raw):String(raw||'').split(',').map(s=>s.trim()).filter(Boolean);}catch(e){return String(raw||'').split(',').map(s=>s.trim()).filter(Boolean);}}
+  function getIndividualPlayersLocal(team){
+    try{if(typeof window.getIndividualPlayers==='function') return window.getIndividualPlayers(team)||[];}catch(e){}
+    if(Array.isArray(team?.individualPlayers)) return team.individualPlayers;
+    const ps=(team?.players||[]).slice(0,2);
+    return ps.map(name=>({name,clubsRaw:String(team?.club||'').trim(),clubs:parseClubAliasesLocal(team?.club||''),career:''}));
+  }
+  function playerName(p){return String(p?.name||p||'').trim();}
+  function playerClub(p){
+    const raw=String(p?.clubsRaw||p?.club||'').trim();
+    if(raw) return raw;
+    if(Array.isArray(p?.clubs)&&p.clubs.length) return p.clubs.join(',');
+    return '';
+  }
+  function playerCareer(p){return String(p?.career||p?.grade||'').trim();}
+  function getTeamName(key,team,idx){
+    if(team?.tournamentType==='individual_pair'||Array.isArray(team?.individualPlayers)){
+      const names=getIndividualPlayersLocal(team).slice(0,2).map(playerName).filter(Boolean);
+      return names.length?names.join(' / '):(team?.pairLabel||team?.entryLabel||('팀 '+(idx+1)));
+    }
+    try{if(typeof window.tdn==='function') return window.tdn(team,key,idx);}catch(e){}
+    return team?.club||team?.pairLabel||team?.entryLabel||('팀 '+(idx+1));
+  }
+  function getClubLine(team){
+    if(team?.tournamentType==='individual_pair'||Array.isArray(team?.individualPlayers)){
+      const parts=getIndividualPlayersLocal(team).slice(0,2).map(p=>{
+        const club=playerClub(p);
+        const career=playerCareer(p);
+        return [club,career].filter(Boolean).join(' · ');
+      }).filter(Boolean);
+      return parts.join(' / ');
+    }
+    const players=(team?.players||[]).filter(Boolean).slice(0,10);
+    return players.length?players.join(' / '):'';
+  }
+  function groupCourtLabel(key,grp,gi){
+    const direct=[...(Array.isArray(grp?.courts)?grp.courts:[]), grp?.court, grp?.courtLabel, grp?.assignedCourt].map(v=>String(v||'').trim()).filter(Boolean);
+    if(direct.length) return [...new Set(direct)].join('/');
+    const matches=(window.G?.matches?.[key]||[]).filter(m=>String(m?.phase||'')==='group' && Number(m?.group)===Number(gi));
+    const courts=[...new Set(matches.flatMap(m=>Array.isArray(m?.courts)&&m.courts.length?m.courts:(m?.court?[m.court]:[])).map(v=>String(v||'').trim()).filter(Boolean))];
+    return courts.join('/');
+  }
+  function collectPrelimItems(tid,divs){
+    const items=[];
+    divs.forEach(div=>{
+      const key=tid+'_'+div; const teams=window.G?.teams?.[key]||[]; const draw=window.G?.draws?.[key];
+      if(!draw||!Array.isArray(draw.groups)||!draw.groups.length)return;
+      draw.groups.forEach((grp,gi)=>{
+        const rows=(grp.teams||[]).map((ti,slot)=>{const team=teams[ti]; return {slot:slot+1,name:getTeamName(key,team,ti),sub:getClubLine(team)};});
+        items.push({div, groupName:grp.name||(gi+1)+'조', court:groupCourtLabel(key,grp,gi), rows});
+      });
+    });
+    return items;
+  }
+  function groupCardHTML(item){
+    return `<div class="v432-group-card"><div class="v432-group-head"><span class="v434-head-left">${esc(divLabel(item.div))}</span><span class="v434-head-right"><span>${esc(item.groupName)}</span>${item.court?`<span class="v434-court-badge">🎾 ${esc(item.court)}</span>`:''}</span></div><div class="v432-group-body">${item.rows.map(r=>`<div class="v432-team-row"><div class="v432-team-no">${r.slot}</div><div><div class="v432-team-name">${esc(r.name||'-')}</div>${r.sub?`<div class="v432-team-sub">${esc(r.sub)}</div>`:''}</div></div>`).join('')}</div></div>`;
+  }
+  function pageHTML(t,divs,chunk,pageNo,totalPages,cols,scale){
+    return `<div class="v432-a4-page"><div class="v432-title">${esc(t?.name||'대회')} 예선 대진표</div><div class="v432-sub">${esc(divs.length===1?divLabel(divs[0]):'전체 부서')} · ${esc(t?.date||'')} · ${pageNo}/${totalPages}페이지 · ${chunk.length}개 조 · 코트/클럽 표시</div><div class="v432-fitbox" style="--v432-cols:${cols};transform:scale(${scale});"><div class="v432-grid">${chunk.map(groupCardHTML).join('')||'<div style="padding:36px;text-align:center;color:#64748b;font-weight:900">예선 추첨 데이터가 없습니다.</div>'}</div></div><div class="v432-page-foot">출력일시 ${new Date().toLocaleString('ko-KR')} · 230MATCH</div></div>`;
+  }
+  function measureChunk(chunk,cols){
+    const probe=document.createElement('div'); probe.className='v432-export-sheet'; probe.style.visibility='hidden'; probe.style.zIndex='-1';
+    probe.innerHTML=`<div class="v432-a4-page"><div class="v432-title">측정</div><div class="v432-sub">측정</div><div class="v432-fitbox" style="--v432-cols:${cols};transform:none"><div class="v432-grid">${chunk.map(groupCardHTML).join('')}</div></div></div>`;
+    document.body.appendChild(probe);
+    const fit=probe.querySelector('.v432-fitbox');
+    const h=Math.max(fit.scrollHeight, fit.getBoundingClientRect().height); const w=Math.max(fit.scrollWidth, fit.getBoundingClientRect().width);
+    probe.remove();
+    return {w,h,scale:Math.min(1,CONTENT_W/w,CONTENT_H/h)};
+  }
+  function chooseLayout(items){
+    if(!items.length) return {pageCount:1,cols:4,scale:1,chunks:[[]]};
+    const oneCols=[4,5,3,6,2]; let bestOne=null;
+    for(const cols of oneCols){const m=measureChunk(items,cols); if(!bestOne||m.scale>bestOne.scale) bestOne={cols,scale:m.scale};}
+    if(bestOne.scale>=MIN_ONE_PAGE_SCALE || items.length<=18) return {pageCount:1,cols:bestOne.cols,scale:Math.max(0.34,Math.min(1,bestOne.scale)),chunks:[items]};
+    for(let pc=2;pc<=4;pc++){
+      const chunkSize=Math.ceil(items.length/pc); const chunks=[]; for(let i=0;i<items.length;i+=chunkSize) chunks.push(items.slice(i,i+chunkSize));
+      let best=null;
+      for(const cols of [4,3,5,2,6]){const scales=chunks.map(c=>measureChunk(c,cols).scale); const minScale=Math.min(...scales); if(!best||minScale>best.scale) best={cols,scale:minScale};}
+      if(best.scale>=MIN_MULTI_PAGE_SCALE || pc===4) return {pageCount:chunks.length,cols:best.cols,scale:Math.max(0.42,Math.min(1,best.scale)),chunks};
+    }
+    return {pageCount:1,cols:bestOne.cols,scale:Math.max(0.34,Math.min(1,bestOne.scale)),chunks:[items]};
+  }
+  function buildDenseSheet(tid,divs){
+    const t=(window.G?.tournaments||[]).find(x=>x.id===tid); if(!t) return null;
+    const items=collectPrelimItems(tid,divs); const layout=chooseLayout(items);
+    const root=document.createElement('div'); root.className='v432-export-sheet v432-print-root';
+    root.setAttribute('data-v432-pages',String(layout.pageCount)); root.setAttribute('data-v432-scale',String(layout.scale.toFixed(2))); root.setAttribute('data-v432-groups',String(items.length));
+    layout.chunks.forEach((chunk,i)=>{root.insertAdjacentHTML('beforeend',pageHTML(t,divs,chunk,i+1,layout.chunks.length,layout.cols,layout.scale));});
+    return root;
+  }
+  function ensurePreviewShell(){
+    let ov=ge('v434A4PreviewOverlay');
+    if(ov) return ov;
+    ov=document.createElement('div'); ov.id='v434A4PreviewOverlay'; ov.className='v434-preview-overlay';
+    ov.innerHTML=`<div class="v434-preview-box"><div class="v434-preview-head"><div style="min-width:0"><div class="v434-preview-title">A4 출력 미리보기</div><div class="v434-preview-meta" id="v434PreviewMeta"></div></div><div class="v434-preview-actions"><button class="v434-preview-btn primary" id="v434PrintBtn" type="button">🖨️ 인쇄 미리보기 열기</button><button class="v434-preview-btn secondary" id="v434SaveImgBtn" type="button">🖼️ 이미지 저장</button><button class="v434-preview-btn close" id="v434CloseBtn" type="button">×</button></div></div><div class="v434-preview-body" id="v434PreviewBody"></div></div>`;
+    document.body.appendChild(ov);
+    ge('v434CloseBtn').onclick=closePreview;
+    ge('v434PrintBtn').onclick=printCurrentPreview;
+    ge('v434SaveImgBtn').onclick=()=>window.exportPrelimImage();
+    ov.addEventListener('click',e=>{if(e.target===ov) closePreview();});
+    return ov;
+  }
+  function resizePreviewSheet(){
+    const body=ge('v434PreviewBody'); const sheet=body?.querySelector('.v432-export-sheet'); if(!body||!sheet) return;
+    const maxW=Math.max(280,body.clientWidth-16); const scale=Math.min(1,maxW/A4W);
+    sheet.style.transform=`scale(${scale})`;
+    sheet.style.marginBottom=`${Math.max(0,(A4H*(scale-1)))}px`;
+  }
+  function showPreview(sheet){
+    currentPreviewSheet=sheet;
+    const ov=ensurePreviewShell(); const body=ge('v434PreviewBody'); body.innerHTML='';
+    const display=sheet.cloneNode(true); display.classList.remove('v432-print-root');
+    body.appendChild(display);
+    const pages=sheet.getAttribute('data-v432-pages')||'1'; const groups=sheet.getAttribute('data-v432-groups')||'0'; const scale=sheet.getAttribute('data-v432-scale')||'';
+    ge('v434PreviewMeta').textContent=`${groups}개 조 · A4 ${pages}장 구성 · 자동 압축률 ${scale}`;
+    ov.classList.add('show');
+    setTimeout(resizePreviewSheet,50);
+  }
+  function closePreview(){const ov=ge('v434A4PreviewOverlay'); if(ov) ov.classList.remove('show');}
+  function printCurrentPreview(){
+    if(!currentPreviewSheet){safeToast('출력할 예선표가 없습니다','error');return;}
+    document.querySelectorAll('.v434-print-sheet').forEach(x=>x.remove());
+    const printSheet=currentPreviewSheet.cloneNode(true); printSheet.classList.add('v434-print-sheet','v432-print-root');
+    document.body.appendChild(printSheet);
+    const cleanup=()=>{setTimeout(()=>{printSheet.remove(); window.removeEventListener('afterprint',cleanup);},300);};
+    window.addEventListener('afterprint',cleanup);
+    setTimeout(()=>{window.focus(); window.print(); setTimeout(cleanup,1200);},150);
+  }
+  window.addEventListener('resize',resizePreviewSheet);
+  window.exportPrelimSheet=function(){
+    try{const tid=getCurrentTid(); if(!tid){safeToast('대회를 먼저 선택하세요','info');return;} const divs=getCurrentDivs(tid); const sheet=buildDenseSheet(tid,divs); if(!sheet){safeToast('예선 추첨 데이터가 없습니다','info');return;} showPreview(sheet); const pages=sheet.getAttribute('data-v432-pages'); const groups=sheet.getAttribute('data-v432-groups'); safeToast(`출력 전 미리보기 표시 · A4 ${pages}장 · ${groups}개 조`,'success');}
+    catch(e){console.error(e);safeToast('A4 미리보기 준비 실패: '+e.message,'error');}
+  };
+  window.exportPrelimImage=async function(){
+    let sheet=null;
+    try{const tid=getCurrentTid(); if(!tid){safeToast('대회를 먼저 선택하세요','info');return;} const t=(window.G?.tournaments||[]).find(x=>x.id===tid); const divs=getCurrentDivs(tid); sheet=buildDenseSheet(tid,divs); if(!sheet){safeToast('예선 추첨 데이터가 없습니다','info');return;} document.body.appendChild(sheet); await ensureCanvasLib(); const pages=[...sheet.querySelectorAll('.v432-a4-page')]; for(let i=0;i<pages.length;i++){const canvas=await window.html2canvas(pages[i],{backgroundColor:'#ffffff',scale:2,useCORS:true,logging:false,width:A4W,height:A4H,windowWidth:A4W,windowHeight:A4H}); const a=document.createElement('a'); a.href=canvas.toDataURL('image/png'); a.download=`예선대진표_A4_코트클럽_${safeName(t?.name)}_${String(i+1).padStart(2,'0')}_${today()}.png`; document.body.appendChild(a); a.click(); a.remove();} const count=pages.length; safeToast(`코트/클럽 포함 A4 이미지 ${count}장 저장 완료`,'success');}
+    catch(e){console.error(e);safeToast('예선표 이미지 저장 실패: '+e.message,'error');}
+    finally{try{sheet&&sheet.remove();}catch(e){}}
+  };
+})();
+</script>
+
+</body></html>`;
+    const w=window.open('','_blank');
+    if(!w){ safeToast('팝업이 차단되었습니다. 브라우저 팝업 허용 후 다시 눌러주세요.','error'); return; }
+    w.document.open(); w.document.write(html); w.document.close();
+  }
+
+  function sliceCanvasToPngs(canvas, baseName, pageRatio){
+    const ratio=pageRatio || (A4H/A4W);
+    const pageH=Math.floor(canvas.width*ratio);
+    const total=Math.max(1, Math.ceil(canvas.height/pageH));
+    for(let i=0;i<total;i++){
+      const sy=i*pageH;
+      const sh=Math.min(pageH, canvas.height-sy);
+      const c=document.createElement('canvas');
+      c.width=canvas.width; c.height=sh;
+      c.getContext('2d').drawImage(canvas,0,sy,canvas.width,sh,0,0,canvas.width,sh);
+      const a=document.createElement('a');
+      a.href=c.toDataURL('image/png');
+      a.download= total===1 ? `${baseName}.png` : `${baseName}_${String(i+1).padStart(2,'0')}.png`;
+      document.body.appendChild(a); a.click(); a.remove();
+    }
+    return total;
+  }
+
+  async function elementToCanvas(el, scale){
+    await ensureCanvasLib();
+    const oldTransform=el.style.transform;
+    const oldTransition=el.style.transition;
+    el.style.transform='none'; el.style.transition='none';
+    await new Promise(r=>setTimeout(r,80));
+    try{
+      return await window.html2canvas(el,{backgroundColor:'#f0f4fa',scale:scale||2,useCORS:true,allowTaint:true,logging:false,windowWidth:Math.max(document.documentElement.clientWidth,el.scrollWidth||0),windowHeight:Math.max(document.documentElement.clientHeight,el.scrollHeight||0),scrollX:0,scrollY:0});
+    }finally{
+      el.style.transform=oldTransform; el.style.transition=oldTransition;
+    }
+  }
+
+  async function saveElementAsPagedPdf(el, filename, orientation){
+    await ensureCanvasLib(); await ensurePdfLib();
+    const canvas=await elementToCanvas(el,2);
+    const {jsPDF}=window.jspdf;
+    const isLandscape=orientation ? orientation==='landscape' : canvas.width>canvas.height;
+    const pdf=new jsPDF({orientation:isLandscape?'landscape':'portrait',unit:'mm',format:'a4'});
+    const pageW=pdf.internal.pageSize.getWidth();
+    const pageH=pdf.internal.pageSize.getHeight();
+    const margin=6;
+    const imgW=pageW-margin*2;
+    const pxPageH=Math.floor((pageH-margin*2) * canvas.width / imgW);
+    const total=Math.ceil(canvas.height/pxPageH);
+    for(let i=0;i<total;i++){
+      if(i>0) pdf.addPage();
+      const sy=i*pxPageH;
+      const sh=Math.min(pxPageH, canvas.height-sy);
+      const c=document.createElement('canvas');
+      c.width=canvas.width; c.height=sh;
+      c.getContext('2d').drawImage(canvas,0,sy,canvas.width,sh,0,0,canvas.width,sh);
+      const imgH=sh*imgW/canvas.width;
+      pdf.addImage(c.toDataURL('image/png'),'PNG',margin,margin,imgW,imgH,undefined,'FAST');
+    }
+    pdf.save(filename.endsWith('.pdf')?filename:filename+'.pdf');
+    return total;
+  }
+
+  window.exportPrelimSheet=function(){
+    try{
+      const tid=getCurrentTid();
+      if(!tid){safeToast('대회를 먼저 선택하세요','info');return;}
+      const divs=getCurrentDivs(tid);
+      const sheet=buildPrelimSheetElement(tid,divs);
+      if(!sheet){safeToast('예선 추첨 데이터가 없습니다','info');return;}
+      openPrintWindowWithSheet(sheet);
+    }catch(e){console.error(e);safeToast('A4 출력 준비 실패: '+e.message,'error');}
+  };
+
+  window.exportPrelimImage=async function(){
+    try{
+      const tid=getCurrentTid(); if(!tid){safeToast('대회를 먼저 선택하세요','info');return;}
+      const t=(window.G?.tournaments||[]).find(x=>x.id===tid);
+      const divs=getCurrentDivs(tid);
+      const sheet=buildPrelimSheetElement(tid,divs);
+      if(!sheet){safeToast('예선 추첨 데이터가 없습니다','info');return;}
+      document.body.appendChild(sheet);
+      await ensureCanvasLib();
+      const pages=[...sheet.querySelectorAll('.v431-a4-page')];
+      for(let i=0;i<pages.length;i++){
+        const canvas=await window.html2canvas(pages[i],{backgroundColor:'#ffffff',scale:2,useCORS:true,logging:false,width:A4W,height:A4H,windowWidth:A4W,windowHeight:A4H});
+        const a=document.createElement('a');
+        a.href=canvas.toDataURL('image/png');
+        a.download=`예선대진표_A4_${safeName(t?.name)}_${String(i+1).padStart(2,'0')}_${today()}.png`;
+        document.body.appendChild(a); a.click(); a.remove();
+      }
+      sheet.remove();
+      safeToast(`A4 이미지 ${pages.length}장 저장 완료`,'success');
+    }catch(e){console.error(e);safeToast('예선표 이미지 저장 실패: '+e.message,'error');}
+  };
+
+  window.bracketToImage=async function(){
+    const el=document.getElementById('bracketContent');
+    if(!el||!el.querySelector('.t-bracket,.grp-card,.indiv-prelim-grid')){safeToast('대진표를 먼저 불러오세요','info');return;}
+    try{
+      safeToast('대진표 이미지 생성 중...','info');
+      const canvas=await elementToCanvas(el,2);
+      const pages=sliceCanvasToPngs(canvas,`대진표_${today()}`,A4H/A4W);
+      safeToast(pages>1?`이미지 ${pages}장으로 나누어 저장했습니다`:'이미지 저장 완료','success');
+    }catch(e){console.error(e);safeToast('이미지 저장 실패: '+e.message,'error');}
+  };
+
+  window.bracketToPDF=async function(){
+    const el=document.getElementById('bracketContent');
+    if(!el||!el.querySelector('.t-bracket,.grp-card,.indiv-prelim-grid')){safeToast('대진표를 먼저 불러오세요','info');return;}
+    try{
+      safeToast('대진표 PDF 생성 중...','info');
+      const pages=await saveElementAsPagedPdf(el,`대진표_${today()}.pdf`);
+      safeToast(pages>1?`PDF ${pages}페이지 저장 완료`:'PDF 저장 완료','success');
+    }catch(e){console.error(e);safeToast('PDF 저장 실패: '+e.message,'error');}
+  };
+
+  window.saveBracketViewImage=async function(){
+    const el=document.getElementById('bvContent');
+    if(!el){safeToast('전체 대진표를 먼저 열어주세요','info');return;}
+    try{
+      safeToast('전체 대진표 이미지 생성 중...','info');
+      const sections=[...el.children].filter(x=>x instanceof HTMLElement);
+      if(sections.length>1){
+        let total=0;
+        for(let i=0;i<sections.length;i++){
+          const canvas=await elementToCanvas(sections[i],2);
+          total+=sliceCanvasToPngs(canvas,`전체대진표_${safeName(BV?.div||'ALL')}_${String(i+1).padStart(2,'0')}_${today()}`,A4H/A4W);
+        }
+        safeToast(`전체 대진표를 보기 좋게 ${total}장으로 나누어 저장했습니다`,'success');
+      }else{
+        const canvas=await elementToCanvas(el,2);
+        const pages=sliceCanvasToPngs(canvas,`전체대진표_${safeName(BV?.div||'ALL')}_${today()}`,A4H/A4W);
+        safeToast(pages>1?`전체 대진표를 ${pages}장으로 나누어 저장했습니다`:'전체 대진표 이미지 저장 완료','success');
+      }
+    }catch(e){console.error(e);safeToast('전체 대진표 이미지 저장 실패: '+e.message,'error');}
+  };
+})();
+</script>
+
+
+
+<!-- v432: A4 예선표 최대 압축/1장 우선 출력 패치 -->
+<style id="v432DenseA4PrelimStyle">
+.v432-export-sheet{position:fixed;left:-14000px;top:0;width:794px;background:#fff;color:#0f172a;font-family:'Noto Sans KR',Arial,sans-serif;z-index:-1;}
+.v432-a4-page{width:794px;height:1123px;box-sizing:border-box;padding:14px 14px 18px;background:#fff;page-break-after:always;break-after:page;overflow:hidden;position:relative;}
+.v432-a4-page:last-child{page-break-after:auto;break-after:auto;}
+.v432-title{height:34px;text-align:center;font-size:17px;font-weight:1000;color:#0f1e3a;line-height:1.2;letter-spacing:-.02em;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+.v432-sub{height:20px;text-align:center;font-size:10px;font-weight:900;color:#475569;line-height:1.2;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin-bottom:4px;}
+.v432-fitbox{transform-origin:top left;width:766px;}
+.v432-grid{display:grid;grid-template-columns:repeat(var(--v432-cols,4),minmax(0,1fr));gap:5px;align-items:start;}
+.v432-group-card{border:1px solid #b8c5d8;border-radius:6px;overflow:hidden;background:#fff;break-inside:avoid;box-sizing:border-box;}
+.v432-group-head{display:flex;justify-content:space-between;align-items:center;gap:4px;background:#0f1e3a;color:#fff;padding:4px 6px;font-size:9px;font-weight:1000;line-height:1.2;white-space:nowrap;overflow:hidden;}
+.v432-group-head span{overflow:hidden;text-overflow:ellipsis;}
+.v432-group-body{padding:4px;display:flex;flex-direction:column;gap:3px;}
+.v432-team-row{display:grid;grid-template-columns:18px minmax(0,1fr);gap:4px;align-items:start;border:1px solid #e2e8f0;border-radius:5px;padding:3px 4px;background:#f8fafc;min-height:21px;box-sizing:border-box;}
+.v432-team-no{width:15px;height:15px;border-radius:999px;background:#0f1e3a;color:#fff;display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:1000;line-height:1;}
+.v432-team-name{font-size:8.7px;font-weight:1000;line-height:1.16;word-break:keep-all;overflow-wrap:anywhere;color:#0f172a;}
+.v432-team-sub{font-size:6.8px;color:#64748b;font-weight:800;line-height:1.05;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.v432-page-foot{position:absolute;left:14px;right:14px;bottom:6px;border-top:1px solid #e5e7eb;padding-top:3px;text-align:right;font-size:7px;color:#94a3b8;}
+@media print{body>*:not(.v432-print-root){display:none!important}.v432-print-root{display:block!important}.v432-export-sheet{position:static!important;left:auto!important;top:auto!important;width:794px!important;margin:0 auto!important;z-index:auto!important}.v432-a4-page{page-break-after:always;break-after:page}.v432-a4-page:last-child{page-break-after:auto;break-after:auto}}
+</style>
+<script id="v432DenseA4PrelimScript">
+(function(){
+  'use strict';
+  const A4W=794, A4H=1123, CONTENT_W=766, CONTENT_H=1051;
+  const MIN_ONE_PAGE_SCALE=0.42;   // 이 이상이면 무조건 1장 우선
+  const MIN_MULTI_PAGE_SCALE=0.54; // 2장 이상일 때 최소 가독성 기준
+  function ge(id){return document.getElementById(id);}
+  function safeToast(msg,type){try{typeof window.toast==='function'?window.toast(msg,type||'info'):console.log(msg);}catch(e){}}
+  function today(){return new Date().toISOString().slice(0,10);}
+  function safeName(s){return String(s||'').replace(/[\\/:*?"<>|\s]+/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'').slice(0,80)||'대진표';}
+  function esc(s){return String(s??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
+  function loadScriptOnce(src,test){return new Promise((resolve,reject)=>{try{if(test&&test())return resolve();}catch(e){}const ex=[...document.scripts].find(x=>x.src===src);if(ex){ex.addEventListener('load',()=>resolve(),{once:true});ex.addEventListener('error',()=>reject(new Error('라이브러리 로드 실패')),{once:true});return;}const s=document.createElement('script');s.src=src;s.onload=()=>resolve();s.onerror=()=>reject(new Error('라이브러리 로드 실패: '+src));document.head.appendChild(s);});}
+  async function ensureCanvasLib(){await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',()=>!!window.html2canvas);}
+  function getCurrentTid(){return ge('brTS')?.value || ge('regTS')?.value || '';}
+  function getCurrentDivs(tid){
+    const t=(window.G?.tournaments||[]).find(x=>x.id===tid); if(!t) return [];
+    try{if(typeof window.getBracketSelectedDivs==='function'){const ds=window.getBracketSelectedDivs(tid)||[]; if(ds.includes('__ALL__')||!ds.length) return t.divisions||[]; return ds.filter(d=>(t.divisions||[]).includes(d));}}catch(e){}
+    const d=ge('brDS')?.value; if(d&&d!=='__ALL__') return [d]; return t.divisions||[];
+  }
+  function divLabel(d){try{return typeof window.dl==='function'?window.dl(d):d;}catch(e){return d;}}
+  function getTeamName(key,team,idx){try{if(typeof window.tdn==='function') return window.tdn(team,key,idx);}catch(e){} if(team?.individualPlayers?.length){return team.individualPlayers.slice(0,2).map(p=>String(p?.name||'').trim()).filter(Boolean).join(' / ');} return team?.pairLabel||team?.entryLabel||team?.club||('팀 '+(idx+1));}
+  function getPlayerSub(team){if(team?.individualPlayers?.length){return team.individualPlayers.slice(0,2).map(p=>[p.club,p.career].filter(Boolean).join(' · ')).filter(Boolean).join(' / ');} const ps=(team?.players||[]).filter(Boolean).slice(0,2); return ps.length?ps.join(' / '):'';}
+  function collectPrelimItems(tid,divs){
+    const items=[];
+    divs.forEach(div=>{const key=tid+'_'+div; const teams=window.G?.teams?.[key]||[]; const draw=window.G?.draws?.[key]; if(!draw||!Array.isArray(draw.groups)||!draw.groups.length)return; draw.groups.forEach((grp,gi)=>{const rows=(grp.teams||[]).map((ti,slot)=>{const team=teams[ti]; return {slot:slot+1,name:getTeamName(key,team,ti),sub:getPlayerSub(team)};}); items.push({div,groupName:grp.name||(gi+1)+'조',rows});});});
+    return items;
+  }
+  function pageHTML(t,divs,chunk,pageNo,totalPages,cols,scale){
+    return `<div class="v432-a4-page"><div class="v432-title">${esc(t?.name||'대회')} 예선 대진표</div><div class="v432-sub">${esc(divs.length===1?divLabel(divs[0]):'전체 부서')} · ${esc(t?.date||'')} · ${pageNo}/${totalPages}페이지 · ${chunk.length}개 조</div><div class="v432-fitbox" style="--v432-cols:${cols};transform:scale(${scale});"><div class="v432-grid">${chunk.map(item=>`<div class="v432-group-card"><div class="v432-group-head"><span>${esc(divLabel(item.div))}</span><span>${esc(item.groupName)}</span></div><div class="v432-group-body">${item.rows.map(r=>`<div class="v432-team-row"><div class="v432-team-no">${r.slot}</div><div><div class="v432-team-name">${esc(r.name||'-')}</div>${r.sub?`<div class="v432-team-sub">${esc(r.sub)}</div>`:''}</div></div>`).join('')}</div></div>`).join('')||'<div style="padding:36px;text-align:center;color:#64748b;font-weight:900">예선 추첨 데이터가 없습니다.</div>'}</div></div><div class="v432-page-foot">출력일시 ${new Date().toLocaleString('ko-KR')} · 230MATCH</div></div>`;
+  }
+  function measureChunk(chunk,cols){
+    const probe=document.createElement('div'); probe.className='v432-export-sheet'; probe.style.visibility='hidden'; probe.style.zIndex='-1';
+    probe.innerHTML=`<div class="v432-a4-page"><div class="v432-title">측정</div><div class="v432-sub">측정</div><div class="v432-fitbox" style="--v432-cols:${cols};transform:none"><div class="v432-grid">${chunk.map(item=>`<div class="v432-group-card"><div class="v432-group-head"><span>${esc(divLabel(item.div))}</span><span>${esc(item.groupName)}</span></div><div class="v432-group-body">${item.rows.map(r=>`<div class="v432-team-row"><div class="v432-team-no">${r.slot}</div><div><div class="v432-team-name">${esc(r.name||'-')}</div>${r.sub?`<div class="v432-team-sub">${esc(r.sub)}</div>`:''}</div></div>`).join('')}</div></div>`).join('')}</div></div></div>`;
+    document.body.appendChild(probe);
+    const fit=probe.querySelector('.v432-fitbox');
+    const h=Math.max(fit.scrollHeight, fit.getBoundingClientRect().height); const w=Math.max(fit.scrollWidth, fit.getBoundingClientRect().width);
+    probe.remove();
+    return {w,h,scale:Math.min(1,CONTENT_W/w,CONTENT_H/h)};
+  }
+  function chooseLayout(items){
+    if(!items.length) return {pageCount:1,cols:4,scale:1,chunks:[[]]};
+    const oneCols=[4,5,3,6,2];
+    let bestOne=null;
+    for(const cols of oneCols){const m=measureChunk(items,cols); if(!bestOne||m.scale>bestOne.scale) bestOne={cols,scale:m.scale};}
+    if(bestOne.scale>=MIN_ONE_PAGE_SCALE || items.length<=18) return {pageCount:1,cols:bestOne.cols,scale:Math.max(0.34,Math.min(1,bestOne.scale)),chunks:[items]};
+    for(let pc=2;pc<=4;pc++){
+      const chunkSize=Math.ceil(items.length/pc); const chunks=[]; for(let i=0;i<items.length;i+=chunkSize) chunks.push(items.slice(i,i+chunkSize));
+      let best=null;
+      for(const cols of [4,3,5,2]){const scales=chunks.map(c=>measureChunk(c,cols).scale); const minScale=Math.min(...scales); if(!best||minScale>best.scale) best={cols,scale:minScale};}
+      if(best.scale>=MIN_MULTI_PAGE_SCALE || pc===4) return {pageCount:chunks.length,cols:best.cols,scale:Math.max(0.42,Math.min(1,best.scale)),chunks};
+    }
+    return {pageCount:1,cols:bestOne.cols,scale:Math.max(0.34,Math.min(1,bestOne.scale)),chunks:[items]};
+  }
+  function buildDenseSheet(tid,divs){
+    const t=(window.G?.tournaments||[]).find(x=>x.id===tid); if(!t) return null;
+    const items=collectPrelimItems(tid,divs); const layout=chooseLayout(items);
+    const root=document.createElement('div'); root.className='v432-export-sheet v432-print-root';
+    root.setAttribute('data-v432-pages',String(layout.pageCount)); root.setAttribute('data-v432-scale',String(layout.scale.toFixed(2))); root.setAttribute('data-v432-groups',String(items.length));
+    layout.chunks.forEach((chunk,i)=>{root.insertAdjacentHTML('beforeend',pageHTML(t,divs,chunk,i+1,layout.chunks.length,layout.cols,layout.scale));});
+    return root;
+  }
+  function openPrintWindowWithSheet(sheet){
+    const html=`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>예선 대진표 A4 출력</title><style>${ge('v432DenseA4PrelimStyle')?.innerHTML||''}@page{size:A4 portrait;margin:0}body{margin:0;background:#fff;font-family:'Noto Sans KR',Arial,sans-serif}.v432-export-sheet{position:static!important;left:auto!important;top:auto!important;width:794px!important;margin:0 auto!important;z-index:auto!important}</style></head><body>${sheet.outerHTML}<script>window.onload=function(){setTimeout(function(){window.focus();window.print();},250)}<\/script></body></html>`;
+    const w=window.open('','_blank'); if(!w){safeToast('팝업이 차단되었습니다. 브라우저 팝업 허용 후 다시 눌러주세요.','error');return;} w.document.open(); w.document.write(html); w.document.close();
+  }
+  window.exportPrelimSheet=function(){
+    try{const tid=getCurrentTid(); if(!tid){safeToast('대회를 먼저 선택하세요','info');return;} const divs=getCurrentDivs(tid); const sheet=buildDenseSheet(tid,divs); if(!sheet){safeToast('예선 추첨 데이터가 없습니다','info');return;} openPrintWindowWithSheet(sheet); const pages=sheet.getAttribute('data-v432-pages'); const groups=sheet.getAttribute('data-v432-groups'); safeToast(`A4 ${pages}장 구성 · ${groups}개 조 최대 압축`,'success');}
+    catch(e){console.error(e);safeToast('A4 출력 준비 실패: '+e.message,'error');}
+  };
+  window.exportPrelimImage=async function(){
+    try{const tid=getCurrentTid(); if(!tid){safeToast('대회를 먼저 선택하세요','info');return;} const t=(window.G?.tournaments||[]).find(x=>x.id===tid); const divs=getCurrentDivs(tid); const sheet=buildDenseSheet(tid,divs); if(!sheet){safeToast('예선 추첨 데이터가 없습니다','info');return;} document.body.appendChild(sheet); await ensureCanvasLib(); const pages=[...sheet.querySelectorAll('.v432-a4-page')]; for(let i=0;i<pages.length;i++){const canvas=await window.html2canvas(pages[i],{backgroundColor:'#ffffff',scale:2,useCORS:true,logging:false,width:A4W,height:A4H,windowWidth:A4W,windowHeight:A4H}); const a=document.createElement('a'); a.href=canvas.toDataURL('image/png'); a.download=`예선대진표_A4압축_${safeName(t?.name)}_${String(i+1).padStart(2,'0')}_${today()}.png`; document.body.appendChild(a); a.click(); a.remove();} const count=pages.length; sheet.remove(); safeToast(`A4 압축 이미지 ${count}장 저장 완료`,'success');}
+    catch(e){console.error(e);safeToast('예선표 이미지 저장 실패: '+e.message,'error');}
+  };
+})();
+</script>
+
+
+
+<!-- v435: A4 예선표 미리보기/출력 최종 보강 - 실제 화면에서 코트/클럽명 누락 방지 -->
+<style id="v435A4PreviewFinalStyle">
+.v435-preview-overlay{position:fixed;inset:0;z-index:2147483600;display:none;align-items:center;justify-content:center;background:rgba(7,15,31,.74);backdrop-filter:blur(8px) saturate(130%);padding:14px;}
+.v435-preview-overlay.show{display:flex;}
+.v435-preview-box{width:min(1060px,100%);height:min(94vh,980px);background:#f1f5f9;border-radius:18px;box-shadow:0 24px 80px rgba(0,0,0,.36);overflow:hidden;display:flex;flex-direction:column;border:1px solid rgba(255,255,255,.25);}
+.v435-preview-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 14px;background:#0f1e3a;color:#fff;}
+.v435-preview-title{font-size:.94rem;font-weight:1000;line-height:1.35;word-break:keep-all;}
+.v435-preview-meta{font-size:.74rem;color:rgba(255,255,255,.80);margin-top:2px;font-weight:800;}
+.v435-preview-actions{display:flex;gap:7px;align-items:center;flex-wrap:wrap;justify-content:flex-end;}
+.v435-preview-btn{border:0;border-radius:999px;min-height:34px;padding:7px 12px;font-size:.76rem;font-weight:1000;cursor:pointer;white-space:nowrap;}
+.v435-preview-btn.primary{background:#facc15;color:#111827;}
+.v435-preview-btn.secondary{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.20);}
+.v435-preview-btn.close{width:34px;height:34px;padding:0;border-radius:999px;background:rgba(255,255,255,.14);color:#fff;font-size:1.1rem;}
+.v435-preview-body{flex:1;overflow:auto;padding:14px;background:#e5eaf3;display:flex;flex-direction:column;align-items:center;gap:14px;}
+.v435-export-sheet{position:fixed;left:-14000px;top:0;width:794px;background:#fff;color:#0f172a;font-family:'Noto Sans KR',Arial,sans-serif;z-index:-1;}
+.v435-preview-body .v435-export-sheet{position:static!important;left:auto!important;top:auto!important;z-index:auto!important;width:794px!important;background:#fff!important;transform-origin:top center;box-shadow:0 8px 24px rgba(15,30,58,.18);}
+.v435-a4-page{position:relative;width:794px;height:1123px;box-sizing:border-box;padding:18px 14px 22px;background:#fff;page-break-after:always;break-after:page;overflow:hidden;}
+.v435-a4-page:last-child{page-break-after:auto;break-after:auto;}
+.v435-title{text-align:center;font-size:17px;font-weight:1000;color:#0f1e3a;line-height:1.25;margin-bottom:4px;letter-spacing:-.03em;}
+.v435-sub{text-align:center;font-size:9.5px;font-weight:900;color:#475569;line-height:1.25;margin-bottom:7px;}
+.v435-fitbox{width:766px;height:1051px;transform-origin:top left;}
+.v435-grid{display:grid;grid-template-columns:repeat(var(--v435-cols,4),minmax(0,1fr));gap:5px;align-items:start;}
+.v435-group-card{border:1px solid #94a3b8;border-radius:6px;overflow:hidden;background:#fff;break-inside:avoid;}
+.v435-group-head{display:flex;align-items:center;justify-content:space-between;gap:4px;background:#0f1e3a;color:#fff;padding:4px 5px;font-size:8.5px;font-weight:1000;line-height:1.15;}
+.v435-head-left{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.v435-head-right{display:flex;align-items:center;gap:3px;flex:0 0 auto;max-width:62%;overflow:hidden;}
+.v435-court-badge{display:inline-flex;align-items:center;justify-content:center;padding:1px 4px;border-radius:999px;background:#facc15;color:#0f172a;font-size:7.5px;font-weight:1000;line-height:1.15;max-width:92px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.v435-group-body{display:flex;flex-direction:column;gap:3px;padding:4px;background:#f8fafc;}
+.v435-team-row{display:grid;grid-template-columns:17px minmax(0,1fr);gap:3px;align-items:start;background:#fff;border:1px solid #e2e8f0;border-radius:5px;padding:3px;min-height:27px;}
+.v435-team-no{width:15px;height:15px;border-radius:999px;background:#0f1e3a;color:#fff;display:flex;align-items:center;justify-content:center;font-size:7.2px;font-weight:1000;line-height:1;}
+.v435-team-name{font-size:8.7px;font-weight:1000;line-height:1.16;color:#0f172a;word-break:keep-all;overflow-wrap:anywhere;letter-spacing:-.045em;}
+.v435-team-sub{font-size:7.1px;color:#334155;font-weight:900;line-height:1.10;margin-top:1px;word-break:keep-all;overflow-wrap:anywhere;letter-spacing:-.035em;}
+.v435-page-foot{position:absolute;left:14px;right:14px;bottom:8px;border-top:1px solid #e5e7eb;padding-top:3px;text-align:right;font-size:7px;color:#94a3b8;}
+@media print{
+  @page{size:A4 portrait;margin:0;}
+  body>*:not(.v435-print-root){display:none!important;}
+  .v435-print-root{display:block!important;position:static!important;left:auto!important;top:auto!important;width:794px!important;margin:0 auto!important;z-index:auto!important;}
+  .v435-a4-page{page-break-after:always;break-after:page;box-shadow:none!important;border:0!important;}
+  .v435-a4-page:last-child{page-break-after:auto;break-after:auto;}
+}
+@media(max-width:680px){.v435-preview-overlay{padding:8px 8px calc(76px + env(safe-area-inset-bottom,0px)) 8px;align-items:flex-end}.v435-preview-box{height:calc(100vh - 92px - env(safe-area-inset-bottom,0px));border-radius:18px 18px 0 0}.v435-preview-head{padding:10px 11px;align-items:flex-start}.v435-preview-title{font-size:.84rem}.v435-preview-meta{font-size:.68rem}.v435-preview-actions{gap:5px}.v435-preview-btn{font-size:.68rem;padding:6px 9px;min-height:31px}.v435-preview-btn.close{width:31px;height:31px}.v435-preview-body{padding:10px}}
+</style>
+<script id="v435A4PreviewFinalScript">
+(function(){
+  'use strict';
+  const A4W=794,A4H=1123,CONTENT_W=766,CONTENT_H=1051;
+  const MIN_ONE_PAGE_SCALE=0.40, MIN_MULTI_PAGE_SCALE=0.52;
+  let currentSheet=null;
+  const $=id=>document.getElementById(id);
+  function safeToast(msg,type){try{typeof window.toast==='function'?window.toast(msg,type||'info'):console.log(msg);}catch(e){}}
+  function today(){return new Date().toISOString().slice(0,10);}
+  function safeName(s){return String(s||'').replace(/[\\/:*?"<>|\s]+/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'').slice(0,80)||'대진표';}
+  function esc(s){return String(s??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
+  function divLabel(d){try{return typeof window.dl==='function'?window.dl(d):String(d||'');}catch(e){return String(d||'');}}
+  function loadScriptOnce(src,test){return new Promise((resolve,reject)=>{try{if(test&&test())return resolve();}catch(e){}const ex=[...document.scripts].find(x=>x.src===src);if(ex){if(test&&test())return resolve();ex.addEventListener('load',()=>resolve(),{once:true});ex.addEventListener('error',()=>reject(new Error('라이브러리 로드 실패')),{once:true});return;}const s=document.createElement('script');s.src=src;s.onload=()=>resolve();s.onerror=()=>reject(new Error('라이브러리 로드 실패: '+src));document.head.appendChild(s);});}
+  async function ensureCanvasLib(){await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',()=>!!window.html2canvas);}
+  function getCurrentTid(){return $('brTS')?.value || $('regTS')?.value || '';}
+  function getCurrentDivs(tid){
+    const t=(window.G?.tournaments||[]).find(x=>x.id===tid); if(!t) return [];
+    try{if(typeof window.getBracketSelectedDivs==='function'){const ds=window.getBracketSelectedDivs(tid)||[]; if(ds.includes('__ALL__')||!ds.length) return t.divisions||[]; return ds.filter(d=>(t.divisions||[]).includes(d));}}catch(e){}
+    const d=$('brDS')?.value; if(d&&d!=='__ALL__') return [d]; return t.divisions||[];
+  }
+  function parseClubs(raw){try{return typeof window.parseClubAliases==='function'?window.parseClubAliases(raw):String(raw||'').split(/[,\/]/).map(s=>s.trim()).filter(Boolean);}catch(e){return String(raw||'').split(/[,\/]/).map(s=>s.trim()).filter(Boolean);}}
+  function getIndivPlayers(team){
+    try{if(typeof window.getIndividualPlayers==='function'){const a=window.getIndividualPlayers(team)||[]; if(a.length)return a;}}catch(e){}
+    if(Array.isArray(team?.individualPlayers)&&team.individualPlayers.length) return team.individualPlayers;
+    const names=(team?.players||[]).slice(0,2).filter(Boolean);
+    const clubs=parseClubs(team?.club||'');
+    return names.map((name,i)=>({name,club:clubs[i]||clubs[0]||'',clubsRaw:clubs[i]||clubs[0]||'',clubs:clubs[i]?[clubs[i]]:clubs,career:''}));
+  }
+  function isIndividualTeam(team,key){return team?.tournamentType==='individual_pair'||Array.isArray(team?.individualPlayers)||(typeof window.isIndividualByKey==='function'&&window.isIndividualByKey(key));}
+  function pName(p){return String(p?.name||p||'').trim();}
+  function pClub(p,team){
+    const raw=String(p?.clubsRaw||p?.club||p?.mainClub||'').trim(); if(raw) return raw;
+    if(Array.isArray(p?.clubs)&&p.clubs.length) return p.clubs.join(',');
+    return String(team?.club||'').trim();
+  }
+  function pCareer(p){return String(p?.career||p?.tennisCareer||p?.grade||'').trim();}
+  function teamName(key,team,idx){
+    if(isIndividualTeam(team,key)){const names=getIndivPlayers(team).slice(0,2).map(pName).filter(Boolean); if(names.length) return names.join(' / ');}
+    try{if(typeof window.tdn==='function') return window.tdn(team,key,idx);}catch(e){}
+    return team?.pairLabel||team?.entryLabel||team?.club||('팀 '+(idx+1));
+  }
+  function teamSubLine(key,team){
+    if(isIndividualTeam(team,key)){
+      const parts=getIndivPlayers(team).slice(0,2).map(p=>{
+        const club=pClub(p,team), career=pCareer(p);
+        return [club,career].filter(Boolean).join(' · ');
+      }).filter(Boolean);
+      if(parts.length) return parts.join(' / ');
+      return String(team?.club||'').trim();
+    }
+    const ps=(team?.players||[]).filter(Boolean).slice(0,10);
+    return ps.length?ps.join(' / '):'';
+  }
+  function groupCourtLabel(key,grp,gi){
+    const vals=[];
+    try{ if(typeof window.getGroupAssignedCourts==='function') vals.push(...(window.getGroupAssignedCourts(key,Number(gi))||[])); }catch(e){}
+    try{ if(typeof window.getGroupDisplayCourts==='function') vals.push(...(window.getGroupDisplayCourts(key,Number(gi))||[])); }catch(e){}
+    if(Array.isArray(grp?.courts)) vals.push(...grp.courts);
+    ['court','courtLabel','assignedCourt','courtName'].forEach(k=>{if(grp&&grp[k]) vals.push(grp[k]);});
+    try{
+      (window.G?.matches?.[key]||[]).filter(m=>String(m?.phase||'')==='group'&&Number(m?.group)===Number(gi)).forEach(m=>{
+        if(Array.isArray(m?.courts)) vals.push(...m.courts);
+        ['court','courtLabel','assignedCourt','courtName'].forEach(k=>{if(m&&m[k]) vals.push(m[k]);});
+        try{if(typeof window.getMatchCourtsForStatusBoard==='function') vals.push(...(window.getMatchCourtsForStatusBoard(key,m)||[]));}catch(e){}
+      });
+    }catch(e){}
+    return [...new Set(vals.map(v=>String(v||'').trim()).filter(Boolean))].join('/');
+  }
+  function collectItems(tid,divs){
+    const out=[];
+    divs.forEach(div=>{
+      const key=tid+'_'+div, teams=window.G?.teams?.[key]||[], draw=window.G?.draws?.[key];
+      if(!draw||!Array.isArray(draw.groups)||!draw.groups.length) return;
+      draw.groups.forEach((grp,gi)=>{
+        const rows=(grp.teams||[]).map((ti,slot)=>{const tm=teams[ti]||{};return {slot:slot+1,name:teamName(key,tm,ti),sub:teamSubLine(key,tm)};});
+        out.push({div,groupName:grp.name||((gi+1)+'조'),court:groupCourtLabel(key,grp,gi),rows});
+      });
+    });
+    return out;
+  }
+  function cardHTML(item){
+    return `<div class="v435-group-card"><div class="v435-group-head"><span class="v435-head-left">${esc(divLabel(item.div))}</span><span class="v435-head-right"><span>${esc(item.groupName)}</span>${item.court?`<span class="v435-court-badge">🎾 ${esc(item.court)}</span>`:`<span class="v435-court-badge">코트미정</span>`}</span></div><div class="v435-group-body">${item.rows.map(r=>`<div class="v435-team-row"><div class="v435-team-no">${r.slot}</div><div><div class="v435-team-name">${esc(r.name||'-')}</div>${r.sub?`<div class="v435-team-sub">${esc(r.sub)}</div>`:''}</div></div>`).join('')}</div></div>`;
+  }
+  function pageHTML(t,divs,chunk,pageNo,total,cols,scale){
+    return `<div class="v435-a4-page"><div class="v435-title">${esc(t?.name||'대회')} 예선 대진표</div><div class="v435-sub">${esc(divs.length===1?divLabel(divs[0]):'전체 부서')} · ${esc(t?.date||'')} · ${pageNo}/${total}페이지 · ${chunk.length}개 조 · 코트/클럽명 표시</div><div class="v435-fitbox" style="--v435-cols:${cols};transform:scale(${scale});"><div class="v435-grid">${chunk.map(cardHTML).join('')||'<div style="padding:36px;text-align:center;color:#64748b;font-weight:900">예선 추첨 데이터가 없습니다.</div>'}</div></div><div class="v435-page-foot">출력일시 ${new Date().toLocaleString('ko-KR')} · 230MATCH</div></div>`;
+  }
+  function measure(chunk,cols){
+    const p=document.createElement('div');p.className='v435-export-sheet';p.style.visibility='hidden';p.style.zIndex='-1';
+    p.innerHTML=`<div class="v435-a4-page"><div class="v435-title">측정</div><div class="v435-sub">측정</div><div class="v435-fitbox" style="--v435-cols:${cols};transform:none"><div class="v435-grid">${chunk.map(cardHTML).join('')}</div></div></div>`;
+    document.body.appendChild(p);const fit=p.querySelector('.v435-fitbox');const h=Math.max(fit.scrollHeight,fit.getBoundingClientRect().height),w=Math.max(fit.scrollWidth,fit.getBoundingClientRect().width);p.remove();return {w,h,scale:Math.min(1,CONTENT_W/w,CONTENT_H/h)};
+  }
+  function chooseLayout(items){
+    if(!items.length) return {chunks:[[]],cols:4,scale:1};
+    let best=null; for(const cols of [4,5,3,6,2]){const m=measure(items,cols); if(!best||m.scale>best.scale) best={cols,scale:m.scale};}
+    if(best.scale>=MIN_ONE_PAGE_SCALE||items.length<=18) return {chunks:[items],cols:best.cols,scale:Math.max(0.34,Math.min(1,best.scale))};
+    for(let pc=2;pc<=4;pc++){const size=Math.ceil(items.length/pc),chunks=[];for(let i=0;i<items.length;i+=size)chunks.push(items.slice(i,i+size));let b=null;for(const cols of [4,3,5,2,6]){const s=Math.min(...chunks.map(c=>measure(c,cols).scale)); if(!b||s>b.scale)b={cols,scale:s};} if(b.scale>=MIN_MULTI_PAGE_SCALE||pc===4)return {chunks,cols:b.cols,scale:Math.max(0.40,Math.min(1,b.scale))};}
+    return {chunks:[items],cols:best.cols,scale:Math.max(0.34,Math.min(1,best.scale))};
+  }
+  function buildSheet(tid,divs){
+    const t=(window.G?.tournaments||[]).find(x=>x.id===tid); if(!t) return null;
+    const items=collectItems(tid,divs); if(!items.length) return null;
+    const layout=chooseLayout(items), root=document.createElement('div'); root.className='v435-export-sheet v435-print-root';
+    root.setAttribute('data-pages',String(layout.chunks.length)); root.setAttribute('data-groups',String(items.length)); root.setAttribute('data-scale',String(layout.scale.toFixed(2)));
+    layout.chunks.forEach((chunk,i)=>root.insertAdjacentHTML('beforeend',pageHTML(t,divs,chunk,i+1,layout.chunks.length,layout.cols,layout.scale)));
+    return root;
+  }
+  function ensureShell(){
+    let ov=$('v435A4PreviewOverlay'); if(ov) return ov;
+    ov=document.createElement('div'); ov.id='v435A4PreviewOverlay'; ov.className='v435-preview-overlay';
+    ov.innerHTML=`<div class="v435-preview-box"><div class="v435-preview-head"><div style="min-width:0"><div class="v435-preview-title">A4 출력 미리보기</div><div class="v435-preview-meta" id="v435PreviewMeta"></div></div><div class="v435-preview-actions"><button class="v435-preview-btn primary" id="v435PrintBtn" type="button">🖨️ 인쇄 미리보기 열기</button><button class="v435-preview-btn secondary" id="v435SaveImgBtn" type="button">🖼️ 이미지 저장</button><button class="v435-preview-btn close" id="v435CloseBtn" type="button">×</button></div></div><div class="v435-preview-body" id="v435PreviewBody"></div></div>`;
+    document.body.appendChild(ov);$('v435CloseBtn').onclick=closePreview;$('v435PrintBtn').onclick=printPreview;$('v435SaveImgBtn').onclick=()=>window.exportPrelimImage();ov.addEventListener('click',e=>{if(e.target===ov)closePreview();});return ov;
+  }
+  function resizePreview(){const body=$('v435PreviewBody'), sheet=body?.querySelector('.v435-export-sheet'); if(!body||!sheet)return; const scale=Math.min(1,Math.max(280,body.clientWidth-16)/A4W); sheet.style.transform=`scale(${scale})`; sheet.style.marginBottom=`${Math.max(0,A4H*(scale-1))}px`;}
+  function showPreview(sheet){currentSheet=sheet;const ov=ensureShell(),body=$('v435PreviewBody');body.innerHTML='';const d=sheet.cloneNode(true);d.classList.remove('v435-print-root');body.appendChild(d);$('v435PreviewMeta').textContent=`${sheet.getAttribute('data-groups')}개 조 · A4 ${sheet.getAttribute('data-pages')}장 · 압축률 ${sheet.getAttribute('data-scale')} · 코트/클럽명 포함`;ov.classList.add('show');setTimeout(resizePreview,40);}
+  function closePreview(){const ov=$('v435A4PreviewOverlay'); if(ov)ov.classList.remove('show');}
+  function printPreview(){
+    if(!currentSheet){safeToast('출력할 예선표가 없습니다','error');return;}
+    document.querySelectorAll('.v435-temp-print').forEach(x=>x.remove());const p=currentSheet.cloneNode(true);p.classList.add('v435-temp-print','v435-print-root');document.body.appendChild(p);
+    const cleanup=()=>setTimeout(()=>{try{p.remove();}catch(e){} window.removeEventListener('afterprint',cleanup);},350);
+    window.addEventListener('afterprint',cleanup);setTimeout(()=>{window.focus();window.print();setTimeout(cleanup,1600);},120);
+  }
+  window.v435A4Tools={buildSheet,getCurrentTid,getCurrentDivs,safeName,today,A4W,A4H,ensureCanvasLib};
+  window.addEventListener('resize',resizePreview);
+  window.exportPrelimSheet=function(){try{const tid=getCurrentTid();if(!tid){safeToast('대회를 먼저 선택하세요','info');return;}const divs=getCurrentDivs(tid);const sheet=buildSheet(tid,divs);if(!sheet){safeToast('예선 추첨 데이터가 없습니다','info');return;}showPreview(sheet);safeToast(`출력 전 미리보기 표시 · A4 ${sheet.getAttribute('data-pages')}장 · 코트/클럽명 포함`,'success');}catch(e){console.error(e);safeToast('A4 미리보기 준비 실패: '+e.message,'error');}};
+  window.exportPrelimImage=async function(){let sheet=null;try{const tid=getCurrentTid();if(!tid){safeToast('대회를 먼저 선택하세요','info');return;}const t=(window.G?.tournaments||[]).find(x=>x.id===tid);const divs=getCurrentDivs(tid);sheet=buildSheet(tid,divs);if(!sheet){safeToast('예선 추첨 데이터가 없습니다','info');return;}document.body.appendChild(sheet);await ensureCanvasLib();const pages=[...sheet.querySelectorAll('.v435-a4-page')];for(let i=0;i<pages.length;i++){const canvas=await window.html2canvas(pages[i],{backgroundColor:'#ffffff',scale:2,useCORS:true,logging:false,width:A4W,height:A4H,windowWidth:A4W,windowHeight:A4H});const a=document.createElement('a');a.href=canvas.toDataURL('image/png');a.download=`예선대진표_A4_코트클럽_${safeName(t?.name)}_${String(i+1).padStart(2,'0')}_${today()}.png`;document.body.appendChild(a);a.click();a.remove();}safeToast(`코트/클럽명 포함 A4 이미지 ${pages.length}장 저장 완료`,'success');}catch(e){console.error(e);safeToast('예선표 이미지 저장 실패: '+e.message,'error');}finally{try{sheet&&sheet.remove();}catch(e){}}};
+})();
+</script>
+
+
+<!-- v436: 저장 메뉴 정리 / PDF 저장 안정화 / 모바일 예선 경기카드 클럽명 제거 -->
+<style id="v436MobilePrelimCardCleanStyle">
+/* 예선 조 카드의 빠른 경기표는 선수명만 깔끔하게 표시 */
+.indiv-prelim-grid .indiv-group-action-card{padding:10px 10px 11px!important;}
+.indiv-prelim-grid .indiv-group-action-card > div[style*="grid-template-columns:1fr auto 1fr"]{grid-template-columns:minmax(0,1fr) 46px minmax(0,1fr)!important;gap:6px!important;align-items:center!important;}
+.indiv-prelim-grid .indiv-group-action-card > div[style*="grid-template-columns:1fr auto 1fr"] > div:nth-child(1),
+.indiv-prelim-grid .indiv-group-action-card > div[style*="grid-template-columns:1fr auto 1fr"] > div:nth-child(3){font-size:.88rem!important;line-height:1.22!important;white-space:normal!important;word-break:keep-all!important;overflow-wrap:anywhere!important;letter-spacing:-.045em!important;}
+.indiv-prelim-grid .indiv-group-action-card > div[style*="grid-template-columns:1fr auto 1fr"] > div:nth-child(2){min-width:46px!important;font-size:1rem!important;background:#f8fafc!important;border-radius:10px!important;padding:5px 0!important;}
+.indiv-prelim-grid .indiv-group-action-card button{min-height:32px!important;font-size:.72rem!important;}
+@media(max-width:680px){
+  .indiv-prelim-grid .indiv-group-action-card{padding:9px 8px 10px!important;}
+  .indiv-prelim-grid .indiv-group-action-card > div:first-child{margin-bottom:7px!important;}
+  .indiv-prelim-grid .indiv-group-action-card > div[style*="grid-template-columns:1fr auto 1fr"]{grid-template-columns:minmax(0,1fr) 40px minmax(0,1fr)!important;gap:5px!important;}
+  .indiv-prelim-grid .indiv-group-action-card > div[style*="grid-template-columns:1fr auto 1fr"] > div:nth-child(1),
+  .indiv-prelim-grid .indiv-group-action-card > div[style*="grid-template-columns:1fr auto 1fr"] > div:nth-child(3){font-size:.82rem!important;line-height:1.22!important;}
+  .indiv-prelim-grid .indiv-group-action-card > div[style*="grid-template-columns:1fr auto 1fr"] > div:nth-child(2){min-width:40px!important;font-size:.92rem!important;}
+}
+</style>
+<script id="v436ExportAndMobileCleanScript">
+(function(){
+  'use strict';
+  const $=id=>document.getElementById(id);
+  function toastSafe(msg,type){try{typeof toast==='function'?toast(msg,type||'info'):console.log(msg);}catch(e){}}
+  function today(){return new Date().toISOString().slice(0,10);}
+  function safeName(s){return String(s||'').replace(/[\\/:*?"<>|\s]+/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'').slice(0,80)||'대진표';}
+  function loadScript(src,test){return new Promise((resolve,reject)=>{try{if(test&&test())return resolve();}catch(e){}const found=[...document.scripts].find(x=>x.src===src);if(found){found.addEventListener('load',()=>resolve(),{once:true});found.addEventListener('error',()=>reject(new Error('라이브러리 로드 실패')),{once:true});setTimeout(()=>{try{if(!test||test())resolve();}catch(e){}},120);return;}const s=document.createElement('script');s.src=src;s.onload=()=>resolve();s.onerror=()=>reject(new Error('라이브러리 로드 실패: '+src));document.head.appendChild(s);});}
+  async function ensureLibs(){
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',()=>!!window.html2canvas);
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',()=>!!window.jspdf?.jsPDF);
+  }
+  function removeTopImageSaveButton(){
+    try{
+      const panel=$('bracketSaveMenuPanel'); if(!panel) return;
+      [...panel.querySelectorAll('button')].forEach(b=>{ if(/이미지\s*저장/.test((b.textContent||'').trim()) && /bracketToImage/.test(String(b.getAttribute('onclick')||''))) b.remove(); });
+    }catch(e){}
+  }
+  function cleanName(s){
+    return String(s||'')
+      .replace(/\s*\([^)]*\)/g,'')
+      .replace(/\s+\/\s+/g,' / ')
+      .replace(/\s{2,}/g,' ')
+      .trim();
+  }
+  function cleanMobilePrelimMatchCards(){
+    try{
+      document.querySelectorAll('.indiv-prelim-grid .indiv-group-action-card').forEach(card=>{
+        const grid=[...card.children].find(el=>String(el.getAttribute('style')||'').includes('grid-template-columns:1fr auto 1fr'));
+        if(!grid || grid.children.length<3) return;
+        [grid.children[0], grid.children[2]].forEach(el=>{
+          const before=el.textContent||'';
+          const after=cleanName(before);
+          if(after && after!==before.trim()) el.textContent=after;
+        });
+      });
+    }catch(e){}
+  }
+  document.addEventListener('DOMContentLoaded',()=>{removeTopImageSaveButton(); setTimeout(cleanMobilePrelimMatchCards,300); setTimeout(cleanMobilePrelimMatchCards,1000);});
+  const mo=new MutationObserver(()=>{removeTopImageSaveButton(); cleanMobilePrelimMatchCards();});
+  try{mo.observe(document.body,{childList:true,subtree:true});}catch(e){}
+
+  window.bracketToPDF=async function(){
+    let sheet=null;
+    try{
+      removeTopImageSaveButton();
+      const tools=window.v435A4Tools;
+      const tid=(tools&&tools.getCurrentTid?tools.getCurrentTid():($('brTS')?.value||''));
+      if(!tid){toastSafe('대회를 먼저 선택하세요','info');return;}
+      const t=(window.G?.tournaments||[]).find(x=>x.id===tid);
+      if(!t){toastSafe('대회 정보를 찾을 수 없습니다','error');return;}
+      toastSafe('A4 PDF 생성 중...','info');
+      await ensureLibs();
+      if(tools&&tools.buildSheet){
+        const divs=tools.getCurrentDivs?tools.getCurrentDivs(tid):(t.divisions||[]);
+        sheet=tools.buildSheet(tid,divs);
+      }
+      if(sheet){
+        document.body.appendChild(sheet);
+        const pages=[...sheet.querySelectorAll('.v435-a4-page')];
+        const {jsPDF}=window.jspdf;
+        const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4',compress:true});
+        for(let i=0;i<pages.length;i++){
+          const canvas=await window.html2canvas(pages[i],{backgroundColor:'#ffffff',scale:2,useCORS:true,logging:false,width:794,height:1123,windowWidth:794,windowHeight:1123});
+          if(i>0) pdf.addPage('a4','portrait');
+          pdf.addImage(canvas.toDataURL('image/jpeg',0.92),'JPEG',0,0,210,297);
+        }
+        pdf.save(`예선대진표_A4_${safeName(t.name)}_${today()}.pdf`);
+        toastSafe(`PDF 저장 완료 · A4 ${pages.length}장`,'success');
+        return;
+      }
+      // fallback: 현재 대진표를 A4 단위로 분할 저장
+      const el=$('bracketContent');
+      if(!el||!el.querySelector('.t-bracket,.grp-card,.grp-block,.m3card')){toastSafe('대진표를 먼저 불러오세요','info');return;}
+      const canvas=await window.html2canvas(el,{scale:1.6,backgroundColor:'#ffffff',useCORS:true,logging:false,windowWidth:Math.max(document.documentElement.clientWidth,el.scrollWidth||0)});
+      const {jsPDF}=window.jspdf;
+      const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4',compress:true});
+      const pageW=210,pageH=297,margin=4,imgW=pageW-margin*2,imgH=canvas.height*imgW/canvas.width;
+      let y=margin, remaining=imgH;
+      pdf.addImage(canvas.toDataURL('image/jpeg',0.9),'JPEG',margin,y,imgW,imgH);
+      remaining-=pageH-margin*2;
+      while(remaining>0){pdf.addPage(); y-=pageH-margin*2; pdf.addImage(canvas.toDataURL('image/jpeg',0.9),'JPEG',margin,y,imgW,imgH); remaining-=pageH-margin*2;}
+      pdf.save(`대진표_${safeName(t.name)}_${today()}.pdf`);
+      toastSafe('PDF 저장 완료','success');
+    }catch(e){console.error(e);toastSafe('PDF 저장 실패: '+(e?.message||e),'error');}
+    finally{try{sheet&&sheet.remove();}catch(e){}}
+  };
+})();
+</script>
+
+
+<!-- v437: 예선표/대진표 코트별 경기순번 + 예상시간 표시 -->
+<style id="v437PrelimScheduleStyle">
+.v437-schedule-badge{display:inline-flex;align-items:center;gap:3px;padding:1px 4px;border-radius:999px;background:#dcfce7;color:#166534;border:1px solid #86efac;font-size:7.5px;font-weight:1000;line-height:1.15;white-space:nowrap;}
+.v437-match-row{display:grid;grid-template-columns:40px minmax(0,1fr);gap:4px;align-items:center;margin-top:3px;padding:3px 4px;border-radius:5px;background:#fff7ed;border:1px solid #fed7aa;}
+.v437-match-no{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;background:#0f1e3a;color:#fff;font-size:7px;font-weight:1000;min-height:14px;padding:1px 4px;line-height:1;}
+.v437-match-teams{font-size:7.4px;font-weight:900;color:#7c2d12;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.v437-group-match-list{padding:0 4px 4px;background:#f8fafc;}
+.v437-court-seq-chip{display:inline-flex!important;align-items:center;justify-content:center;gap:3px;margin-left:4px;padding:2px 7px;border-radius:999px;background:#dcfce7;color:#166534;border:1px solid #86efac;font-size:.66rem;font-weight:1000;line-height:1.15;white-space:nowrap;vertical-align:middle;}
+.indiv-prelim-grid .grp-hdr .v437-court-seq-chip{margin-left:5px!important;}
+@media(max-width:680px){
+  .indiv-prelim-grid .grp-hdr{align-items:flex-start!important;}
+  .v437-court-seq-chip{font-size:.58rem!important;padding:2px 5px!important;margin-left:2px!important;margin-top:2px!important;}
+}
+</style>
+<script id="v437PrelimScheduleScript">
+(function(){
+  'use strict';
+  const A4W=794,A4H=1123,CONTENT_W=766,CONTENT_H=1051;
+  const MIN_ONE_PAGE_SCALE=0.38, MIN_MULTI_PAGE_SCALE=0.50;
+  let currentSheet=null;
+  const $=id=>document.getElementById(id);
+  function safeToast(msg,type){try{typeof window.toast==='function'?window.toast(msg,type||'info'):console.log(msg);}catch(e){}}
+  function today(){return new Date().toISOString().slice(0,10);}
+  function safeName(s){return String(s||'').replace(/[\\/:*?"<>|\s]+/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'').slice(0,80)||'대진표';}
+  function esc(s){return String(s??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
+  function divLabel(d){try{return typeof window.dl==='function'?window.dl(d):String(d||'');}catch(e){return String(d||'');}}
+  function loadScriptOnce(src,test){return new Promise((resolve,reject)=>{try{if(test&&test())return resolve();}catch(e){}const ex=[...document.scripts].find(x=>x.src===src);if(ex){if(test&&test())return resolve();ex.addEventListener('load',()=>resolve(),{once:true});ex.addEventListener('error',()=>reject(new Error('라이브러리 로드 실패')),{once:true});return;}const s=document.createElement('script');s.src=src;s.onload=()=>resolve();s.onerror=()=>reject(new Error('라이브러리 로드 실패: '+src));document.head.appendChild(s);});}
+  async function ensureCanvasLib(){await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',()=>!!window.html2canvas);}
+  async function ensurePdfLib(){await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',()=>!!window.jspdf?.jsPDF);}
+  function getCurrentTid(){return $('brTS')?.value || $('regTS')?.value || '';}
+  function getCurrentDivs(tid){
+    const t=(window.G?.tournaments||[]).find(x=>x.id===tid); if(!t) return [];
+    try{if(typeof window.getBracketSelectedDivs==='function'){const ds=window.getBracketSelectedDivs(tid)||[]; if(ds.includes('__ALL__')||!ds.length) return t.divisions||[]; return ds.filter(d=>(t.divisions||[]).includes(d));}}catch(e){}
+    const d=$('brDS')?.value; if(d&&d!=='__ALL__') return [d]; return t.divisions||[];
+  }
+  function parseClubs(raw){try{return typeof window.parseClubAliases==='function'?window.parseClubAliases(raw):String(raw||'').split(/[,\/]/).map(s=>s.trim()).filter(Boolean);}catch(e){return String(raw||'').split(/[,\/]/).map(s=>s.trim()).filter(Boolean);}}
+  function getIndivPlayers(team){
+    try{if(typeof window.getIndividualPlayers==='function'){const a=window.getIndividualPlayers(team)||[]; if(a.length)return a;}}catch(e){}
+    if(Array.isArray(team?.individualPlayers)&&team.individualPlayers.length) return team.individualPlayers;
+    const names=(team?.players||[]).slice(0,2).filter(Boolean);
+    const clubs=parseClubs(team?.club||'');
+    return names.map((name,i)=>({name,club:clubs[i]||clubs[0]||'',clubsRaw:clubs[i]||clubs[0]||'',clubs:clubs[i]?[clubs[i]]:clubs,career:''}));
+  }
+  function isIndividualTeam(team,key){return team?.tournamentType==='individual_pair'||Array.isArray(team?.individualPlayers)||(typeof window.isIndividualByKey==='function'&&window.isIndividualByKey(key));}
+  function pName(p){return String(p?.name||p||'').replace(/\s*\([^)]*\)\s*/g,'').trim();}
+  function pClub(p,team){const raw=String(p?.clubsRaw||p?.club||p?.mainClub||'').trim(); if(raw)return raw; if(Array.isArray(p?.clubs)&&p.clubs.length)return p.clubs.join(','); return String(team?.club||'').trim();}
+  function pCareer(p){return String(p?.career||p?.tennisCareer||p?.grade||'').trim();}
+  function teamName(key,team,idx){
+    if(isIndividualTeam(team,key)){const names=getIndivPlayers(team).slice(0,2).map(pName).filter(Boolean); if(names.length) return names.join(' / ');}
+    try{if(typeof window.tdn==='function') return window.tdn(team,key,idx);}catch(e){}
+    return team?.pairLabel||team?.entryLabel||team?.club||('팀 '+(idx+1));
+  }
+  function teamSubLine(key,team){
+    if(isIndividualTeam(team,key)){
+      const parts=getIndivPlayers(team).slice(0,2).map(p=>{const club=pClub(p,team), career=pCareer(p); return [club,career].filter(Boolean).join(' · ');}).filter(Boolean);
+      if(parts.length) return parts.join(' / ');
+      return String(team?.club||'').trim();
+    }
+    const ps=(team?.players||[]).filter(Boolean).slice(0,10);
+    return ps.length?ps.join(' / '):'';
+  }
+  function cleanCourt(v){
+    let s=String(v||'').replace(/경기코트|조코트|배정코트|코트/g,'').replace(/[:：]/g,'').trim();
+    s=s.replace(/\s+/g,'');
+    return s;
+  }
+  function groupCourtLabel(key,grp,gi){
+    const vals=[];
+    try{ if(typeof window.getGroupAssignedCourts==='function') vals.push(...(window.getGroupAssignedCourts(key,Number(gi))||[])); }catch(e){}
+    try{ if(typeof window.getGroupDisplayCourts==='function') vals.push(...(window.getGroupDisplayCourts(key,Number(gi))||[])); }catch(e){}
+    if(Array.isArray(grp?.courts)) vals.push(...grp.courts);
+    ['court','courtLabel','assignedCourt','courtName'].forEach(k=>{if(grp&&grp[k]) vals.push(grp[k]);});
+    try{
+      (window.G?.matches?.[key]||[]).filter(m=>String(m?.phase||'')==='group'&&Number(m?.group)===Number(gi)).forEach(m=>{
+        if(Array.isArray(m?.courts)) vals.push(...m.courts);
+        ['court','courtLabel','assignedCourt','courtName'].forEach(k=>{if(m&&m[k]) vals.push(m[k]);});
+        try{if(typeof window.getMatchCourtsForStatusBoard==='function') vals.push(...(window.getMatchCourtsForStatusBoard(key,m)||[]));}catch(e){}
+      });
+    }catch(e){}
+    return [...new Set(vals.map(cleanCourt).filter(Boolean))].join('/');
+  }
+  function baseTime(t){
+    const raw=[t?.startTime,t?.start,t?.matchTime,t?.time,t?.startAt,t?.dateTime].map(v=>String(v||'')).find(v=>/\d{1,2}:\d{2}/.test(v));
+    const m=(raw||'09:00').match(/(\d{1,2}):(\d{2})/);
+    return {h:Number(m?.[1]||9),m:Number(m?.[2]||0)};
+  }
+  function timeLabel(t,order){
+    if(!order) return '';
+    const b=baseTime(t); const total=b.h*60+b.m+(Number(order)-1)*30;
+    const hh=String(Math.floor(total/60)%24).padStart(2,'0'), mm=String(total%60).padStart(2,'0');
+    return `${hh}:${mm}`;
+  }
+  function matchLabelForGroup(order,t){
+    if(!order) return '';
+    return `${order}경기 · 예상 ${timeLabel(t,order)}`;
+  }
+  function matchPairs(key,grp,teams){
+    const idxs=Array.isArray(grp?.teams)?grp.teams:[];
+    const existing=(window.G?.matches?.[key]||[]).filter(m=>String(m?.phase||'')==='group'&&Number(m?.group)===Number(grp?.__gi));
+    const arr=existing.length?existing.map((m,i)=>({no:i+1,t1:m.t1,t2:m.t2})):idxs.flatMap((a,ai)=>idxs.slice(ai+1).map((b,bi)=>({no:0,t1:a,t2:b}))).map((x,i)=>({...x,no:i+1}));
+    return arr.map(m=>({no:m.no,a:teamName(key,teams[m.t1]||{},m.t1),b:teamName(key,teams[m.t2]||{},m.t2)})).slice(0,6);
+  }
+  function assignCourtOrders(items,t){
+    const counts={};
+    items.forEach(it=>{
+      const key=(String(it.court||'').split('/')[0]||'').trim();
+      if(!key){it.courtOrder=0;it.estimate='';return;}
+      counts[key]=(counts[key]||0)+1;
+      it.courtOrder=counts[key];
+      it.estimate=timeLabel(t,it.courtOrder);
+      it.schedule=matchLabelForGroup(it.courtOrder,t);
+    });
+    return items;
+  }
+  function collectItems(tid,divs){
+    const t=(window.G?.tournaments||[]).find(x=>x.id===tid);
+    const out=[];
+    divs.forEach(div=>{
+      const key=tid+'_'+div, teams=window.G?.teams?.[key]||[], draw=window.G?.draws?.[key];
+      if(!draw||!Array.isArray(draw.groups)||!draw.groups.length) return;
+      draw.groups.forEach((grp,gi)=>{
+        grp.__gi=gi;
+        const rows=(grp.teams||[]).map((ti,slot)=>{const tm=teams[ti]||{};return {slot:slot+1,name:teamName(key,tm,ti),sub:teamSubLine(key,tm)};});
+        const matches=matchPairs(key,grp,teams);
+        out.push({div,key,groupIndex:gi,groupName:grp.name||((gi+1)+'조'),court:groupCourtLabel(key,grp,gi),rows,matches});
+      });
+    });
+    return assignCourtOrders(out,t);
+  }
+  function cardHTML(item){
+    const order = item.courtOrder ? `<span class="v438-order-badge">${esc(item.courtOrder)}경기</span>` : '';
+    const time = item.estimate ? `<span class="v438-time-badge">예상 ${esc(item.estimate)}</span>` : '';
+    const court = item.court ? `<span class="v435-court-badge">🎾 ${esc(item.court)}</span>` : `<span class="v435-court-badge">코트미정</span>`;
+    const matchList=item.matches&&item.matches.length?`<div class="v437-group-match-list">${item.matches.map(m=>`<div class="v437-match-row"><span class="v437-match-no">${m.no}경기</span><span class="v437-match-teams">${esc(m.a)} vs ${esc(m.b)}</span></div>`).join('')}</div>`:'';
+    return `<div class="v435-group-card"><div class="v435-group-head v438-group-head"><span class="v435-head-left v438-group-name">${esc(item.groupName)}</span><span class="v435-head-right v438-head-badges">${court}${order}${time}</span></div><div class="v435-group-body">${item.rows.map(r=>`<div class="v435-team-row"><div class="v435-team-no">${r.slot}</div><div><div class="v435-team-name">${esc(r.name||'-')}</div>${r.sub?`<div class="v435-team-sub">${esc(r.sub)}</div>`:''}</div></div>`).join('')}</div>${matchList}</div>`;
+  }
+  function pageHTML(t,divs,chunk,pageNo,total,cols,scale){
+    return `<div class="v435-a4-page"><div class="v435-title">${esc(t?.name||'대회')} 예선 대진표</div><div class="v435-sub">${esc(divs.length===1?divLabel(divs[0]):'전체 부서')} · ${esc(t?.date||'')} · ${pageNo}/${total}페이지 · ${chunk.length}개 조 · 코트/경기순번/예상시간 표시 · 1경기당 30분 기준</div><div class="v435-fitbox" style="--v435-cols:${cols};transform:scale(${scale});"><div class="v435-grid">${chunk.map(cardHTML).join('')||'<div style="padding:36px;text-align:center;color:#64748b;font-weight:900">예선 추첨 데이터가 없습니다.</div>'}</div></div><div class="v435-page-foot">출력일시 ${new Date().toLocaleString('ko-KR')} · 230MATCH</div></div>`;
+  }
+  function measure(chunk,cols){
+    const p=document.createElement('div');p.className='v435-export-sheet';p.style.visibility='hidden';p.style.zIndex='-1';
+    p.innerHTML=`<div class="v435-a4-page"><div class="v435-title">측정</div><div class="v435-sub">측정</div><div class="v435-fitbox" style="--v435-cols:${cols};transform:none"><div class="v435-grid">${chunk.map(cardHTML).join('')}</div></div></div>`;
+    document.body.appendChild(p);const fit=p.querySelector('.v435-fitbox');const h=Math.max(fit.scrollHeight,fit.getBoundingClientRect().height),w=Math.max(fit.scrollWidth,fit.getBoundingClientRect().width);p.remove();return {w,h,scale:Math.min(1,CONTENT_W/w,CONTENT_H/h)};
+  }
+  function chooseLayout(items){
+    if(!items.length) return {chunks:[[]],cols:4,scale:1};
+    let best=null; for(const cols of [4,5,3,6,2]){const m=measure(items,cols); if(!best||m.scale>best.scale) best={cols,scale:m.scale};}
+    if(best.scale>=MIN_ONE_PAGE_SCALE||items.length<=18) return {chunks:[items],cols:best.cols,scale:Math.max(0.32,Math.min(1,best.scale))};
+    for(let pc=2;pc<=4;pc++){const size=Math.ceil(items.length/pc),chunks=[];for(let i=0;i<items.length;i+=size)chunks.push(items.slice(i,i+size));let b=null;for(const cols of [4,3,5,2,6]){const s=Math.min(...chunks.map(c=>measure(c,cols).scale)); if(!b||s>b.scale)b={cols,scale:s};} if(b.scale>=MIN_MULTI_PAGE_SCALE||pc===4)return {chunks,cols:b.cols,scale:Math.max(0.38,Math.min(1,b.scale))};}
+    return {chunks:[items],cols:best.cols,scale:Math.max(0.32,Math.min(1,best.scale))};
+  }
+  function buildSheet(tid,divs){
+    const t=(window.G?.tournaments||[]).find(x=>x.id===tid); if(!t) return null;
+    const items=collectItems(tid,divs); if(!items.length) return null;
+    const layout=chooseLayout(items), root=document.createElement('div'); root.className='v435-export-sheet v435-print-root';
+    root.setAttribute('data-pages',String(layout.chunks.length)); root.setAttribute('data-groups',String(items.length)); root.setAttribute('data-scale',String(layout.scale.toFixed(2)));
+    layout.chunks.forEach((chunk,i)=>root.insertAdjacentHTML('beforeend',pageHTML(t,divs,chunk,i+1,layout.chunks.length,layout.cols,layout.scale)));
+    return root;
+  }
+  function ensureShell(){
+    let ov=$('v435A4PreviewOverlay'); if(ov) return ov;
+    ov=document.createElement('div'); ov.id='v435A4PreviewOverlay'; ov.className='v435-preview-overlay';
+    ov.innerHTML=`<div class="v435-preview-box"><div class="v435-preview-head"><div style="min-width:0"><div class="v435-preview-title">A4 출력 미리보기</div><div class="v435-preview-meta" id="v435PreviewMeta"></div></div><div class="v435-preview-actions"><button class="v435-preview-btn primary" id="v435PrintBtn" type="button">🖨️ 인쇄 미리보기 열기</button><button class="v435-preview-btn secondary" id="v435SaveImgBtn" type="button">🖼️ 이미지 저장</button><button class="v435-preview-btn close" id="v435CloseBtn" type="button">×</button></div></div><div class="v435-preview-body" id="v435PreviewBody"></div></div>`;
+    document.body.appendChild(ov);$('v435CloseBtn').onclick=closePreview;$('v435PrintBtn').onclick=printPreview;$('v435SaveImgBtn').onclick=()=>window.exportPrelimImage();ov.addEventListener('click',e=>{if(e.target===ov)closePreview();});return ov;
+  }
+  function resizePreview(){const body=$('v435PreviewBody'), sheet=body?.querySelector('.v435-export-sheet'); if(!body||!sheet)return; const scale=Math.min(1,Math.max(280,body.clientWidth-16)/A4W); sheet.style.transform=`scale(${scale})`; sheet.style.marginBottom=`${Math.max(0,A4H*(scale-1))}px`;}
+  function showPreview(sheet){currentSheet=sheet;const ov=ensureShell(),body=$('v435PreviewBody');body.innerHTML='';const d=sheet.cloneNode(true);d.classList.remove('v435-print-root');body.appendChild(d);$('v435PreviewMeta').textContent=`${sheet.getAttribute('data-groups')}개 조 · A4 ${sheet.getAttribute('data-pages')}장 · 압축률 ${sheet.getAttribute('data-scale')} · 코트별 경기순번/예상시간 포함`;ov.classList.add('show');setTimeout(resizePreview,40);}
+  function closePreview(){const ov=$('v435A4PreviewOverlay'); if(ov)ov.classList.remove('show');}
+  function printPreview(){
+    if(!currentSheet){safeToast('출력할 예선표가 없습니다','error');return;}
+    document.querySelectorAll('.v435-temp-print').forEach(x=>x.remove());const p=currentSheet.cloneNode(true);p.classList.add('v435-temp-print','v435-print-root');document.body.appendChild(p);
+    const cleanup=()=>setTimeout(()=>{try{p.remove();}catch(e){} window.removeEventListener('afterprint',cleanup);},350);
+    window.addEventListener('afterprint',cleanup);setTimeout(()=>{window.focus();window.print();setTimeout(cleanup,1600);},120);
+  }
+  function addScheduleToLiveCards(){
+    try{
+      const tid=getCurrentTid(); const t=(window.G?.tournaments||[]).find(x=>x.id===tid)||{};
+      const cards=[...document.querySelectorAll('.indiv-prelim-grid .grp-card')].filter(c=>c.offsetParent!==null);
+      const courtCounts={};
+      cards.forEach(card=>{
+        if(card.querySelector('.v437-court-seq-chip')) return;
+        const raw=(card.innerText||'').replace(/\s+/g,' ');
+        let court='';
+        const m=raw.match(/(?:경기코트|조코트|코트)\s*[:：]?\s*([가-힣A-Za-z]*\d+)/);
+        if(m) court=cleanCourt(m[1]);
+        if(!court) return;
+        courtCounts[court]=(courtCounts[court]||0)+1;
+        const order=courtCounts[court], time=timeLabel(t,order);
+        const chip=document.createElement('span');
+        chip.className='v437-court-seq-chip';
+        chip.textContent=`⏱ ${order}경기 ${time}`;
+        const hdr=card.querySelector('.grp-hdr');
+        if(hdr){
+          const left=hdr.querySelector('div:first-child')||hdr;
+          left.appendChild(chip);
+        }
+      });
+    }catch(e){}
+  }
+  document.addEventListener('DOMContentLoaded',()=>{setTimeout(addScheduleToLiveCards,600);setTimeout(addScheduleToLiveCards,1400);});
+  try{new MutationObserver(()=>addScheduleToLiveCards()).observe(document.body,{childList:true,subtree:true});}catch(e){}
+  window.addEventListener('resize',resizePreview);
+
+  window.v435A4Tools={buildSheet,getCurrentTid,getCurrentDivs,safeName,today,A4W,A4H,ensureCanvasLib};
+  window.v437A4Tools={buildSheet,collectItems,timeLabel,addScheduleToLiveCards};
+  window.exportPrelimSheet=function(){try{const tid=getCurrentTid();if(!tid){safeToast('대회를 먼저 선택하세요','info');return;}const divs=getCurrentDivs(tid);const sheet=buildSheet(tid,divs);if(!sheet){safeToast('예선 추첨 데이터가 없습니다','info');return;}showPreview(sheet);safeToast(`출력 전 미리보기 표시 · A4 ${sheet.getAttribute('data-pages')}장 · 경기순번/예상시간 포함`,'success');}catch(e){console.error(e);safeToast('A4 미리보기 준비 실패: '+e.message,'error');}};
+  window.exportPrelimImage=async function(){let sheet=null;try{const tid=getCurrentTid();if(!tid){safeToast('대회를 먼저 선택하세요','info');return;}const t=(window.G?.tournaments||[]).find(x=>x.id===tid);const divs=getCurrentDivs(tid);sheet=buildSheet(tid,divs);if(!sheet){safeToast('예선 추첨 데이터가 없습니다','info');return;}document.body.appendChild(sheet);await ensureCanvasLib();const pages=[...sheet.querySelectorAll('.v435-a4-page')];for(let i=0;i<pages.length;i++){const canvas=await window.html2canvas(pages[i],{backgroundColor:'#ffffff',scale:2,useCORS:true,logging:false,width:A4W,height:A4H,windowWidth:A4W,windowHeight:A4H});const a=document.createElement('a');a.href=canvas.toDataURL('image/png');a.download=`예선대진표_A4_경기순번_${safeName(t?.name)}_${String(i+1).padStart(2,'0')}_${today()}.png`;document.body.appendChild(a);a.click();a.remove();}safeToast(`경기순번/예상시간 포함 A4 이미지 ${pages.length}장 저장 완료`,'success');}catch(e){console.error(e);safeToast('예선표 이미지 저장 실패: '+e.message,'error');}finally{try{sheet&&sheet.remove();}catch(e){}}};
+  window.bracketToPDF=async function(){let sheet=null;try{const tid=getCurrentTid();if(!tid){safeToast('대회를 먼저 선택하세요','info');return;}const t=(window.G?.tournaments||[]).find(x=>x.id===tid);const divs=getCurrentDivs(tid);sheet=buildSheet(tid,divs);if(!sheet){safeToast('예선 추첨 데이터가 없습니다','info');return;}safeToast('A4 PDF 생성 중...','info');document.body.appendChild(sheet);await ensureCanvasLib();await ensurePdfLib();const {jsPDF}=window.jspdf;const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4',compress:true});const pages=[...sheet.querySelectorAll('.v435-a4-page')];for(let i=0;i<pages.length;i++){const canvas=await window.html2canvas(pages[i],{backgroundColor:'#ffffff',scale:2,useCORS:true,logging:false,width:A4W,height:A4H,windowWidth:A4W,windowHeight:A4H});if(i>0)pdf.addPage('a4','portrait');pdf.addImage(canvas.toDataURL('image/jpeg',0.92),'JPEG',0,0,210,297);}pdf.save(`예선대진표_A4_경기순번_${safeName(t?.name)}_${today()}.pdf`);safeToast(`PDF 저장 완료 · A4 ${pages.length}장`,'success');}catch(e){console.error(e);safeToast('PDF 저장 실패: '+(e?.message||e),'error');}finally{try{sheet&&sheet.remove();}catch(e){}}};
+})();
+</script>
+
+<!-- v438: A4 group header cleanup, court-board estimated times, PDF uses A4 sheet -->
+<style id="v438CourtTimePdfStyle">
+.v438-group-head{align-items:center!important;gap:4px!important;}
+.v438-group-name{font-size:11px!important;font-weight:1000!important;color:#0f172a!important;white-space:nowrap!important;}
+.v438-head-badges{display:flex!important;align-items:center!important;gap:3px!important;flex-wrap:wrap!important;justify-content:flex-end!important;}
+.v438-order-badge,.v438-time-badge{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;font-size:7.5px;font-weight:1000;line-height:1.15;white-space:nowrap;border:1px solid #bfdbfe;padding:1px 4px;background:#eff6ff;color:#1d4ed8;}
+.v438-time-badge{background:#dcfce7;color:#166534;border-color:#86efac;}
+.v438-court-estimate{display:inline-flex!important;align-items:center;gap:3px;margin-top:5px;padding:4px 7px;border-radius:999px;background:#ecfdf5;color:#166534;border:1px solid #86efac;font-size:.68rem;font-weight:1000;line-height:1.15;white-space:nowrap;}
+.v438-court-estimate.current{background:#dbeafe;color:#1d4ed8;border-color:#93c5fd;}
+.v438-court-estimate.waiting{background:#fff7ed;color:#9a3412;border-color:#fdba74;}
+@media(max-width:680px){.v438-court-estimate{font-size:.62rem;padding:3px 6px}.v438-order-badge,.v438-time-badge{font-size:7px;padding:1px 3px}}
+</style>
+<script id="v438CourtTimePdfScript">
+(function(){
+  'use strict';
+  const A4W=794,A4H=1123;
+  function toast2(msg,type){try{typeof window.toast==='function'?window.toast(msg,type||'info'):console.log(msg);}catch(e){}}
+  function safeName(s){return String(s||'').replace(/[\\/:*?"<>|\s]+/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'').slice(0,80)||'대진표';}
+  function today(){return new Date().toISOString().slice(0,10);}
+  function getTid(){return document.getElementById('brTS')?.value || document.getElementById('regTS')?.value || '';}
+  function getDivs(tid){
+    try{ if(window.v435A4Tools&&typeof window.v435A4Tools.getCurrentDivs==='function') return window.v435A4Tools.getCurrentDivs(tid); }catch(e){}
+    const t=(window.G?.tournaments||[]).find(x=>x.id===tid); return t?.divisions||[];
+  }
+  async function ensureCanvas(){
+    if(window.v435A4Tools&&typeof window.v435A4Tools.ensureCanvasLib==='function') return window.v435A4Tools.ensureCanvasLib();
+    if(window.html2canvas) return;
+    await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});
+  }
+  async function ensurePdf(){
+    if(window.jspdf?.jsPDF) return;
+    await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});
+  }
+  async function exportPrelimPDF(){
+    let sheet=null;
+    try{
+      const tid=getTid();
+      if(!tid){toast2('대회를 먼저 선택하세요','info');return;}
+      const t=(window.G?.tournaments||[]).find(x=>x.id===tid);
+      const builder=window.v437A4Tools?.buildSheet || window.v435A4Tools?.buildSheet;
+      if(!builder){toast2('A4 예선표 생성 기능을 찾을 수 없습니다','error');return;}
+      sheet=builder(tid,getDivs(tid));
+      if(!sheet){toast2('예선 추첨 데이터가 없습니다','info');return;}
+      document.body.appendChild(sheet);
+      await ensureCanvas(); await ensurePdf();
+      const {jsPDF}=window.jspdf;
+      const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4',compress:true});
+      const pages=[...sheet.querySelectorAll('.v435-a4-page')];
+      if(!pages.length) throw new Error('A4 페이지가 생성되지 않았습니다');
+      for(let i=0;i<pages.length;i++){
+        const canvas=await window.html2canvas(pages[i],{backgroundColor:'#ffffff',scale:2,useCORS:true,logging:false,width:A4W,height:A4H,windowWidth:A4W,windowHeight:A4H});
+        if(i>0) pdf.addPage('a4','portrait');
+        pdf.addImage(canvas.toDataURL('image/jpeg',0.92),'JPEG',0,0,210,297);
+      }
+      pdf.save(`예선대진표_A4_${safeName(t?.name)}_${today()}.pdf`);
+      toast2(`A4 예선표 PDF 저장 완료 · ${pages.length}장`,'success');
+    }catch(e){console.error(e);toast2('PDF 저장 실패: '+(e?.message||e),'error');}
+    finally{try{sheet&&sheet.remove();}catch(e){}}
+  }
+  window.exportPrelimPDF=exportPrelimPDF;
+  window.bracketToPDF=exportPrelimPDF;
+
+  function esc(s){return String(s??'').replace(/[&<>\"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
+  function toDate(v){
+    if(!v) return null;
+    const d=new Date(v); if(!isNaN(d)) return d;
+    const m=String(v).match(/(\d{1,2}):(\d{2})/); if(m){const n=new Date();n.setHours(+m[1],+m[2],0,0);return n;}
+    return null;
+  }
+  function fmt(d){if(!d||isNaN(d))return '';return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+  function addMin(d,n){const x=new Date(d.getTime());x.setMinutes(x.getMinutes()+n);return x;}
+  function findMatchFromCard(card){
+    const btn=[...card.querySelectorAll('button[onclick*="openM3"]')][0];
+    const oc=btn?.getAttribute('onclick')||'';
+    const m=oc.match(/openM3\('([^']+)'\s*,\s*'([^']+)'\)/);
+    if(!m) return null;
+    const key=m[1], mid=m[2];
+    const match=(window.G?.matches?.[key]||[]).find(x=>String(x.id)===String(mid));
+    return match?{key,mid,match}:null;
+  }
+  function baseForCourt(zone){
+    const cur=findMatchFromCard(zone);
+    const d=toDate(cur?.match?.courtAssignedAt||cur?.match?.startedAt||cur?.match?.startTime||'');
+    if(d) return d;
+    const firstWait=[...zone.querySelectorAll('.court-wait-card')].map(findMatchFromCard).find(Boolean);
+    return toDate(firstWait?.match?.waitingFirstAt||firstWait?.match?.courtAssignedAt||'') || new Date();
+  }
+  function addBadge(container,text,kind){
+    if(!container||container.querySelector('.v438-court-estimate')) return;
+    const div=document.createElement('div');
+    div.className='v438-court-estimate '+(kind||'');
+    div.textContent=text;
+    const target=container.querySelector('div[style*="font-size:.84rem"], div[style*="font-size:.78rem"]') || container.firstElementChild || container;
+    if(target && target.parentElement) target.parentElement.insertBefore(div,target.nextSibling);
+    else container.appendChild(div);
+  }
+  function addCourtEstimatedTimes(){
+    try{
+      document.querySelectorAll('.court-drop-zone').forEach(zone=>{
+        const courtTitle=(zone.querySelector('div[style*="font-size:.92rem"]')?.textContent||'').trim();
+        if(!/^🎾/.test(courtTitle)) return;
+        const base=baseForCourt(zone);
+        const currentPart=zone.querySelector(':scope > div:nth-child(3)');
+        if(currentPart && findMatchFromCard(currentPart)) addBadge(currentPart,'예상 종료 '+fmt(addMin(base,30)),'current');
+        const waitCards=[...zone.querySelectorAll('.court-wait-card')];
+        waitCards.forEach((card,idx)=>{
+          const start=addMin(base,30*(idx+1));
+          addBadge(card,`예상 시작 ${fmt(start)} · 예상 종료 ${fmt(addMin(start,30))}`,'waiting');
+        });
+      });
+    }catch(e){}
+  }
+  window.addCourtEstimatedTimes=addCourtEstimatedTimes;
+  document.addEventListener('DOMContentLoaded',()=>{setTimeout(addCourtEstimatedTimes,600);setTimeout(addCourtEstimatedTimes,1500);});
+  try{new MutationObserver(()=>addCourtEstimatedTimes()).observe(document.body,{childList:true,subtree:true});}catch(e){}
+})();
+</script>
+
+
+<!-- v439: court board result button stability fix -->
+<style id="v439CourtBoardResultStableStyle">
+.court-drop-zone .btn.btn-accent,
+.court-wait-card .btn.btn-accent,
+.v439-court-result-btn{
+  display:inline-flex !important;
+  visibility:visible !important;
+  opacity:1 !important;
+  pointer-events:auto !important;
+  position:relative !important;
+  z-index:20 !important;
+}
+.court-drop-zone .v439-action-row,
+.court-wait-card .v439-action-row{
+  display:flex !important;
+  gap:5px !important;
+  flex-wrap:wrap !important;
+  margin-top:6px !important;
+  min-height:30px !important;
+}
+</style>
+<script id="v439CourtBoardResultStableScript">
+(function(){
+  'use strict';
+
+  const nativeCanShow = window.canShowMatchActionButtons;
+  let lastAllowed = false;
+
+  function hasCourtResultPermission(){
+    try{
+      const allowed = !!(window.AD || window.TM || window.OP || window.REG || (typeof window.canManageBracket === 'function' && window.canManageBracket()));
+      if(allowed) lastAllowed = true;
+      return allowed || lastAllowed;
+    }catch(e){
+      return lastAllowed;
+    }
+  }
+
+  // 기존 함수가 렌더 시점마다 true/false로 흔들리면 코트 현황판 결과 버튼이 사라지므로
+  // 코트 현황판에서는 마지막 권한 상태를 유지한다.
+  window.canShowMatchActionButtons = function(){
+    try{
+      const nativeValue = (typeof nativeCanShow === 'function') ? !!nativeCanShow() : false;
+      if(nativeValue) lastAllowed = true;
+      return nativeValue || hasCourtResultPermission();
+    }catch(e){
+      return hasCourtResultPermission();
+    }
+  };
+
+  function escAttr(s){
+    return String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,' ');
+  }
+
+  function findMatchInfoFromCard(card){
+    if(!card) return null;
+    const btn = card.querySelector('button[onclick*="openM3"]');
+    const oc = btn ? (btn.getAttribute('onclick')||'') : '';
+    let m = oc.match(/openM3\('([^']+)'\s*,\s*'([^']+)'\)/);
+    if(m) return {key:m[1], mid:m[2]};
+    const text = card.innerHTML || '';
+    m = text.match(/openManualMatchPush\('([^']+)'\s*,\s*'([^']+)'\)/) || text.match(/sendCourtCardSms\('([^']+)'\s*,\s*'([^']+)'/);
+    if(m) return {key:m[1], mid:m[2]};
+    return null;
+  }
+
+  function ensureActionRow(card){
+    let row = [...card.querySelectorAll('div')].find(el=>{
+      const s = el.getAttribute('style') || '';
+      return /display\s*:\s*flex/.test(s) && /gap\s*:\s*5px/.test(s) && /margin-top\s*:\s*6px/.test(s);
+    });
+    if(!row){
+      row = document.createElement('div');
+      row.className = 'v439-action-row';
+      const anchor = card.querySelector('.v438-court-estimate') || card.querySelector('div[style*="font-size:.72rem"]') || card.firstElementChild;
+      if(anchor && anchor.parentElement) anchor.parentElement.appendChild(row);
+      else card.appendChild(row);
+    }
+    row.classList.add('v439-action-row');
+    return row;
+  }
+
+  function addResultButton(card){
+    if(!hasCourtResultPermission()) return;
+    if(!card || card.querySelector('button[onclick*="openM3"]')) return;
+    const info = findMatchInfoFromCard(card);
+    if(!info || !info.key || !info.mid) return;
+    const row = ensureActionRow(card);
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'btn btn-accent v439-court-result-btn';
+    b.setAttribute('style','font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap;display:inline-flex!important;visibility:visible!important;opacity:1!important');
+    b.setAttribute('onclick', "openM3('"+escAttr(info.key)+"','"+escAttr(info.mid)+"')");
+    b.textContent = '⚡ 결과';
+    row.insertBefore(b, row.firstChild);
+  }
+
+  function stabilizeCourtBoardResultButtons(){
+    try{
+      if(!hasCourtResultPermission()) return;
+      document.querySelectorAll('.court-drop-zone').forEach(zone=>{
+        // 현재 경기 영역
+        const currentInfo = findMatchInfoFromCard(zone);
+        if(currentInfo && !zone.querySelector(':scope > div button[onclick*="openM3"]')){
+          // zone 전체에 매치가 잡히지만 버튼이 없는 경우를 대비
+          addResultButton(zone);
+        }
+
+        // 대기 카드 영역
+        zone.querySelectorAll('.court-wait-card').forEach(card=>addResultButton(card));
+
+        // 이미 존재하는 결과 버튼은 렌더 보정 스크립트가 숨기지 못하게 고정
+        zone.querySelectorAll('button[onclick*="openM3"]').forEach(btn=>{
+          btn.classList.add('v439-court-result-btn');
+          btn.style.display='inline-flex';
+          btn.style.visibility='visible';
+          btn.style.opacity='1';
+          btn.style.pointerEvents='auto';
+          btn.style.position='relative';
+          btn.style.zIndex='20';
+          if(!/결과/.test(btn.textContent||'')) btn.textContent='⚡ 결과';
+        });
+      });
+    }catch(e){}
+  }
+
+  window.stabilizeCourtBoardResultButtons = stabilizeCourtBoardResultButtons;
+
+  function hookRender(){
+    try{
+      if(typeof window.renderCourtStatusBoard === 'function' && !window.renderCourtStatusBoard.__v439Hooked){
+        const orig = window.renderCourtStatusBoard;
+        const wrapped = function(){
+          const html = orig.apply(this, arguments);
+          setTimeout(stabilizeCourtBoardResultButtons, 0);
+          setTimeout(stabilizeCourtBoardResultButtons, 80);
+          setTimeout(stabilizeCourtBoardResultButtons, 250);
+          return html;
+        };
+        wrapped.__v439Hooked = true;
+        window.renderCourtStatusBoard = wrapped;
+      }
+    }catch(e){}
+  }
+
+  document.addEventListener('DOMContentLoaded', ()=>{
+    hookRender();
+    setTimeout(stabilizeCourtBoardResultButtons, 400);
+    setTimeout(stabilizeCourtBoardResultButtons, 1200);
+  });
+
+  try{
+    new MutationObserver(()=>{
+      hookRender();
+      stabilizeCourtBoardResultButtons();
+    }).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['style','class']});
+  }catch(e){}
 })();
 </script>
 
