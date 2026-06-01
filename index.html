@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-01-v439-court-result-stable";
+  const APP_VERSION = "2026-06-01-v444c-print-color-fix";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -42468,148 +42468,6 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
 })();
 </script>
 
-</body></html>`;
-    const w=window.open('','_blank');
-    if(!w){ safeToast('팝업이 차단되었습니다. 브라우저 팝업 허용 후 다시 눌러주세요.','error'); return; }
-    w.document.open(); w.document.write(html); w.document.close();
-  }
-
-  function sliceCanvasToPngs(canvas, baseName, pageRatio){
-    const ratio=pageRatio || (A4H/A4W);
-    const pageH=Math.floor(canvas.width*ratio);
-    const total=Math.max(1, Math.ceil(canvas.height/pageH));
-    for(let i=0;i<total;i++){
-      const sy=i*pageH;
-      const sh=Math.min(pageH, canvas.height-sy);
-      const c=document.createElement('canvas');
-      c.width=canvas.width; c.height=sh;
-      c.getContext('2d').drawImage(canvas,0,sy,canvas.width,sh,0,0,canvas.width,sh);
-      const a=document.createElement('a');
-      a.href=c.toDataURL('image/png');
-      a.download= total===1 ? `${baseName}.png` : `${baseName}_${String(i+1).padStart(2,'0')}.png`;
-      document.body.appendChild(a); a.click(); a.remove();
-    }
-    return total;
-  }
-
-  async function elementToCanvas(el, scale){
-    await ensureCanvasLib();
-    const oldTransform=el.style.transform;
-    const oldTransition=el.style.transition;
-    el.style.transform='none'; el.style.transition='none';
-    await new Promise(r=>setTimeout(r,80));
-    try{
-      return await window.html2canvas(el,{backgroundColor:'#f0f4fa',scale:scale||2,useCORS:true,allowTaint:true,logging:false,windowWidth:Math.max(document.documentElement.clientWidth,el.scrollWidth||0),windowHeight:Math.max(document.documentElement.clientHeight,el.scrollHeight||0),scrollX:0,scrollY:0});
-    }finally{
-      el.style.transform=oldTransform; el.style.transition=oldTransition;
-    }
-  }
-
-  async function saveElementAsPagedPdf(el, filename, orientation){
-    await ensureCanvasLib(); await ensurePdfLib();
-    const canvas=await elementToCanvas(el,2);
-    const {jsPDF}=window.jspdf;
-    const isLandscape=orientation ? orientation==='landscape' : canvas.width>canvas.height;
-    const pdf=new jsPDF({orientation:isLandscape?'landscape':'portrait',unit:'mm',format:'a4'});
-    const pageW=pdf.internal.pageSize.getWidth();
-    const pageH=pdf.internal.pageSize.getHeight();
-    const margin=6;
-    const imgW=pageW-margin*2;
-    const pxPageH=Math.floor((pageH-margin*2) * canvas.width / imgW);
-    const total=Math.ceil(canvas.height/pxPageH);
-    for(let i=0;i<total;i++){
-      if(i>0) pdf.addPage();
-      const sy=i*pxPageH;
-      const sh=Math.min(pxPageH, canvas.height-sy);
-      const c=document.createElement('canvas');
-      c.width=canvas.width; c.height=sh;
-      c.getContext('2d').drawImage(canvas,0,sy,canvas.width,sh,0,0,canvas.width,sh);
-      const imgH=sh*imgW/canvas.width;
-      pdf.addImage(c.toDataURL('image/png'),'PNG',margin,margin,imgW,imgH,undefined,'FAST');
-    }
-    pdf.save(filename.endsWith('.pdf')?filename:filename+'.pdf');
-    return total;
-  }
-
-  window.exportPrelimSheet=function(){
-    try{
-      const tid=getCurrentTid();
-      if(!tid){safeToast('대회를 먼저 선택하세요','info');return;}
-      const divs=getCurrentDivs(tid);
-      const sheet=buildPrelimSheetElement(tid,divs);
-      if(!sheet){safeToast('예선 추첨 데이터가 없습니다','info');return;}
-      openPrintWindowWithSheet(sheet);
-    }catch(e){console.error(e);safeToast('A4 출력 준비 실패: '+e.message,'error');}
-  };
-
-  window.exportPrelimImage=async function(){
-    try{
-      const tid=getCurrentTid(); if(!tid){safeToast('대회를 먼저 선택하세요','info');return;}
-      const t=(window.G?.tournaments||[]).find(x=>x.id===tid);
-      const divs=getCurrentDivs(tid);
-      const sheet=buildPrelimSheetElement(tid,divs);
-      if(!sheet){safeToast('예선 추첨 데이터가 없습니다','info');return;}
-      document.body.appendChild(sheet);
-      await ensureCanvasLib();
-      const pages=[...sheet.querySelectorAll('.v431-a4-page')];
-      for(let i=0;i<pages.length;i++){
-        const canvas=await window.html2canvas(pages[i],{backgroundColor:'#ffffff',scale:2,useCORS:true,logging:false,width:A4W,height:A4H,windowWidth:A4W,windowHeight:A4H});
-        const a=document.createElement('a');
-        a.href=canvas.toDataURL('image/png');
-        a.download=`예선대진표_A4_${safeName(t?.name)}_${String(i+1).padStart(2,'0')}_${today()}.png`;
-        document.body.appendChild(a); a.click(); a.remove();
-      }
-      sheet.remove();
-      safeToast(`A4 이미지 ${pages.length}장 저장 완료`,'success');
-    }catch(e){console.error(e);safeToast('예선표 이미지 저장 실패: '+e.message,'error');}
-  };
-
-  window.bracketToImage=async function(){
-    const el=document.getElementById('bracketContent');
-    if(!el||!el.querySelector('.t-bracket,.grp-card,.indiv-prelim-grid')){safeToast('대진표를 먼저 불러오세요','info');return;}
-    try{
-      safeToast('대진표 이미지 생성 중...','info');
-      const canvas=await elementToCanvas(el,2);
-      const pages=sliceCanvasToPngs(canvas,`대진표_${today()}`,A4H/A4W);
-      safeToast(pages>1?`이미지 ${pages}장으로 나누어 저장했습니다`:'이미지 저장 완료','success');
-    }catch(e){console.error(e);safeToast('이미지 저장 실패: '+e.message,'error');}
-  };
-
-  window.bracketToPDF=async function(){
-    const el=document.getElementById('bracketContent');
-    if(!el||!el.querySelector('.t-bracket,.grp-card,.indiv-prelim-grid')){safeToast('대진표를 먼저 불러오세요','info');return;}
-    try{
-      safeToast('대진표 PDF 생성 중...','info');
-      const pages=await saveElementAsPagedPdf(el,`대진표_${today()}.pdf`);
-      safeToast(pages>1?`PDF ${pages}페이지 저장 완료`:'PDF 저장 완료','success');
-    }catch(e){console.error(e);safeToast('PDF 저장 실패: '+e.message,'error');}
-  };
-
-  window.saveBracketViewImage=async function(){
-    const el=document.getElementById('bvContent');
-    if(!el){safeToast('전체 대진표를 먼저 열어주세요','info');return;}
-    try{
-      safeToast('전체 대진표 이미지 생성 중...','info');
-      const sections=[...el.children].filter(x=>x instanceof HTMLElement);
-      if(sections.length>1){
-        let total=0;
-        for(let i=0;i<sections.length;i++){
-          const canvas=await elementToCanvas(sections[i],2);
-          total+=sliceCanvasToPngs(canvas,`전체대진표_${safeName(BV?.div||'ALL')}_${String(i+1).padStart(2,'0')}_${today()}`,A4H/A4W);
-        }
-        safeToast(`전체 대진표를 보기 좋게 ${total}장으로 나누어 저장했습니다`,'success');
-      }else{
-        const canvas=await elementToCanvas(el,2);
-        const pages=sliceCanvasToPngs(canvas,`전체대진표_${safeName(BV?.div||'ALL')}_${today()}`,A4H/A4W);
-        safeToast(pages>1?`전체 대진표를 ${pages}장으로 나누어 저장했습니다`:'전체 대진표 이미지 저장 완료','success');
-      }
-    }catch(e){console.error(e);safeToast('전체 대진표 이미지 저장 실패: '+e.message,'error');}
-  };
-})();
-</script>
-
-
-
 <!-- v432: A4 예선표 최대 압축/1장 우선 출력 패치 -->
 <style id="v432DenseA4PrelimStyle">
 .v432-export-sheet{position:fixed;left:-14000px;top:0;width:794px;background:#fff;color:#0f172a;font-family:'Noto Sans KR',Arial,sans-serif;z-index:-1;}
@@ -42843,9 +42701,9 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
   }
   function chooseLayout(items){
     if(!items.length) return {chunks:[[]],cols:4,scale:1};
-    let best=null; for(const cols of [4,5,3,6,2]){const m=measure(items,cols); if(!best||m.scale>best.scale) best={cols,scale:m.scale};}
+    let best=null; for(const cols of [4,3,2]){const m=measure(items,cols); if(!best||m.scale>best.scale) best={cols,scale:m.scale};}
     if(best.scale>=MIN_ONE_PAGE_SCALE||items.length<=18) return {chunks:[items],cols:best.cols,scale:Math.max(0.34,Math.min(1,best.scale))};
-    for(let pc=2;pc<=4;pc++){const size=Math.ceil(items.length/pc),chunks=[];for(let i=0;i<items.length;i+=size)chunks.push(items.slice(i,i+size));let b=null;for(const cols of [4,3,5,2,6]){const s=Math.min(...chunks.map(c=>measure(c,cols).scale)); if(!b||s>b.scale)b={cols,scale:s};} if(b.scale>=MIN_MULTI_PAGE_SCALE||pc===4)return {chunks,cols:b.cols,scale:Math.max(0.40,Math.min(1,b.scale))};}
+    for(let pc=2;pc<=4;pc++){const size=Math.ceil(items.length/pc),chunks=[];for(let i=0;i<items.length;i+=size)chunks.push(items.slice(i,i+size));let b=null;for(const cols of [4,3,2]){const s=Math.min(...chunks.map(c=>measure(c,cols).scale)); if(!b||s>b.scale)b={cols,scale:s};} if(b.scale>=MIN_MULTI_PAGE_SCALE||pc===4)return {chunks,cols:b.cols,scale:Math.max(0.40,Math.min(1,b.scale))};}
     return {chunks:[items],cols:best.cols,scale:Math.max(0.34,Math.min(1,best.scale))};
   }
   function buildSheet(tid,divs){
@@ -43134,9 +42992,9 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
   }
   function chooseLayout(items){
     if(!items.length) return {chunks:[[]],cols:4,scale:1};
-    let best=null; for(const cols of [4,5,3,6,2]){const m=measure(items,cols); if(!best||m.scale>best.scale) best={cols,scale:m.scale};}
+    let best=null; for(const cols of [4,3,2]){const m=measure(items,cols); if(!best||m.scale>best.scale) best={cols,scale:m.scale};}
     if(best.scale>=MIN_ONE_PAGE_SCALE||items.length<=18) return {chunks:[items],cols:best.cols,scale:Math.max(0.32,Math.min(1,best.scale))};
-    for(let pc=2;pc<=4;pc++){const size=Math.ceil(items.length/pc),chunks=[];for(let i=0;i<items.length;i+=size)chunks.push(items.slice(i,i+size));let b=null;for(const cols of [4,3,5,2,6]){const s=Math.min(...chunks.map(c=>measure(c,cols).scale)); if(!b||s>b.scale)b={cols,scale:s};} if(b.scale>=MIN_MULTI_PAGE_SCALE||pc===4)return {chunks,cols:b.cols,scale:Math.max(0.38,Math.min(1,b.scale))};}
+    for(let pc=2;pc<=4;pc++){const size=Math.ceil(items.length/pc),chunks=[];for(let i=0;i<items.length;i+=size)chunks.push(items.slice(i,i+size));let b=null;for(const cols of [4,3,2]){const s=Math.min(...chunks.map(c=>measure(c,cols).scale)); if(!b||s>b.scale)b={cols,scale:s};} if(b.scale>=MIN_MULTI_PAGE_SCALE||pc===4)return {chunks,cols:b.cols,scale:Math.max(0.38,Math.min(1,b.scale))};}
     return {chunks:[items],cols:best.cols,scale:Math.max(0.32,Math.min(1,best.scale))};
   }
   function buildSheet(tid,divs){
@@ -43475,6 +43333,725 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
       stabilizeCourtBoardResultButtons();
     }).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['style','class']});
   }catch(e){}
+})();
+</script>
+
+
+
+<!-- v440: A4 출력/저장 안정화 + 조 카드 헤더 한줄화 + 하단 경기목록 제거 -->
+<style id="v440A4PrintCleanStyle">
+.v440-a4-sheet{background:#fff!important;color:#0f172a!important;font-family:'Noto Sans KR',Arial,sans-serif!important;}
+.v440-a4-sheet .v437-group-match-list{display:none!important;}
+.v440-a4-sheet .v435-group-head,
+.v440-a4-sheet .v438-group-head{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:3px!important;flex-wrap:nowrap!important;padding:3px 5px!important;min-height:24px!important;box-sizing:border-box!important;overflow:hidden!important;}
+.v440-a4-sheet .v435-head-left,
+.v440-a4-sheet .v438-group-name{flex:0 0 auto!important;max-width:38px!important;font-size:10px!important;font-weight:1000!important;line-height:1!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;color:#0f172a!important;}
+.v440-a4-sheet .v435-head-right,
+.v440-a4-sheet .v438-head-badges{flex:1 1 auto!important;min-width:0!important;display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:2px!important;flex-wrap:nowrap!important;white-space:nowrap!important;overflow:hidden!important;}
+.v440-a4-sheet .v435-court-badge,
+.v440-a4-sheet .v438-order-badge,
+.v440-a4-sheet .v438-time-badge{display:inline-flex!important;align-items:center!important;justify-content:center!important;flex:0 1 auto!important;min-width:0!important;max-width:none!important;border-radius:999px!important;font-size:6.8px!important;font-weight:1000!important;line-height:1!important;padding:2px 3px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:clip!important;border:1px solid #bfdbfe!important;background:#eff6ff!important;color:#1d4ed8!important;}
+.v440-a4-sheet .v438-time-badge{background:#dcfce7!important;color:#166534!important;border-color:#86efac!important;}
+.v440-a4-sheet .v435-group-body{padding:4px!important;gap:3px!important;}
+.v440-a4-sheet .v435-team-row{min-height:23px!important;padding:3px 4px!important;}
+.v440-a4-sheet .v435-team-name{font-size:8.3px!important;line-height:1.12!important;}
+.v440-a4-sheet .v435-team-sub{font-size:6.4px!important;line-height:1.05!important;}
+#v440A4PreviewOverlay{position:fixed;inset:0;z-index:2147482000;display:none;background:rgba(15,23,42,.70);padding:14px;align-items:center;justify-content:center;}
+#v440A4PreviewOverlay.show{display:flex;}
+.v440-preview-box{width:min(980px,100%);height:min(94vh,980px);background:#f8fafc;border-radius:18px;box-shadow:0 24px 80px rgba(0,0,0,.38);overflow:hidden;display:flex;flex-direction:column;border:1px solid rgba(255,255,255,.25);}
+.v440-preview-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 14px;background:#0f1e3a;color:#fff;}
+.v440-preview-title{font-weight:1000;font-size:.94rem;line-height:1.3;}
+.v440-preview-actions{display:flex;gap:7px;align-items:center;flex-wrap:wrap;}
+.v440-preview-actions button{border:0;border-radius:10px;min-height:34px;padding:7px 11px;font-size:.78rem;font-weight:1000;cursor:pointer;}
+.v440-print-btn{background:#facc15;color:#111827;}
+.v440-save-btn{background:#eff6ff;color:#1d4ed8;}
+.v440-close-btn{background:rgba(255,255,255,.14);color:#fff;}
+.v440-preview-body{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;background:#d1d5db;padding:18px;display:flex;justify-content:center;align-items:flex-start;}
+.v440-preview-body .v435-export-sheet{position:static!important;left:auto!important;top:auto!important;z-index:auto!important;transform-origin:top center!important;box-shadow:0 8px 30px rgba(15,23,42,.22);}
+.v440-temp-print{position:fixed!important;left:0!important;top:0!important;width:794px!important;z-index:2147483000!important;background:#fff!important;}
+@media print{
+  html,body{background:#fff!important;margin:0!important;padding:0!important;}
+  body>*:not(.v440-temp-print){display:none!important;visibility:hidden!important;}
+  .v440-temp-print{display:block!important;visibility:visible!important;position:static!important;left:auto!important;top:auto!important;width:794px!important;margin:0 auto!important;z-index:auto!important;background:#fff!important;}
+  .v440-temp-print *{visibility:visible!important;}
+  .v435-a4-page{page-break-after:always!important;break-after:page!important;box-shadow:none!important;margin:0!important;}
+  .v435-a4-page:last-child{page-break-after:auto!important;break-after:auto!important;}
+  @page{size:A4 portrait;margin:0;}
+}
+@media(max-width:680px){#v440A4PreviewOverlay{padding:8px}.v440-preview-box{height:calc(100vh - 18px);border-radius:14px}.v440-preview-head{padding:9px 10px}.v440-preview-title{font-size:.86rem}.v440-preview-actions button{font-size:.7rem;min-height:32px;padding:6px 8px}.v440-preview-body{padding:10px}}
+</style>
+<script id="v440A4PrintCleanScript">
+(function(){
+  'use strict';
+  const A4W=794, A4H=1123;
+  let currentSheet=null;
+  function toast(msg,type){try{typeof window.safeToast==='function'?safeToast(msg,type||'info'):(typeof window.toast==='function'?toast(msg,type||'info'):console.log(msg));}catch(e){}}
+  function safeName(s){return String(s||'').replace(/[\\/:*?"<>|\s]+/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'').slice(0,80)||'대진표';}
+  function today(){return new Date().toISOString().slice(0,10);}
+  function tid(){return document.getElementById('brTS')?.value || document.getElementById('regTS')?.value || '';}
+  function divs(id){try{return window.v435A4Tools?.getCurrentDivs?.(id)||[]}catch(e){return [];}}
+  async function ensureCanvas(){
+    if(window.html2canvas) return;
+    if(window.v435A4Tools?.ensureCanvasLib) return window.v435A4Tools.ensureCanvasLib();
+    await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});
+  }
+  async function ensurePdf(){
+    if(window.jspdf?.jsPDF) return;
+    await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});
+  }
+  function buildRawSheet(){
+    const id=tid();
+    if(!id){toast('대회를 먼저 선택하세요','info');return null;}
+    const builder=window.v437A4Tools?.buildSheet || window.v435A4Tools?.buildSheet;
+    if(!builder){toast('A4 예선표 생성 기능을 찾을 수 없습니다','error');return null;}
+    const sheet=builder(id,divs(id));
+    if(!sheet){toast('예선 추첨 데이터가 없습니다','info');return null;}
+    return cleanSheet(sheet);
+  }
+  function cleanBadgeText(s){return String(s||'').replace(/^🎾\s*/,'').replace(/\s+/g,' ').trim();}
+  function cleanSheet(sheet){
+    try{
+      sheet.classList.add('v440-a4-sheet');
+      sheet.querySelectorAll('.v437-group-match-list').forEach(x=>x.remove());
+      sheet.querySelectorAll('.v435-court-badge').forEach(x=>{x.textContent=cleanBadgeText(x.textContent).replace(/^코트\s*/,'코트');});
+      sheet.querySelectorAll('.v438-order-badge').forEach(x=>{x.textContent=cleanBadgeText(x.textContent).replace(/\s+/g,'');});
+      sheet.querySelectorAll('.v438-time-badge').forEach(x=>{let t=cleanBadgeText(x.textContent); if(!/^예상/.test(t)) t='예상 '+t; x.textContent=t;});
+      sheet.querySelectorAll('.v438-head-badges,.v435-head-right').forEach(x=>{x.style.flexWrap='nowrap';x.style.whiteSpace='nowrap';});
+      sheet.querySelectorAll('.v435-group-card').forEach(card=>card.classList.add('v440-group-card'));
+    }catch(e){}
+    return sheet;
+  }
+  function ensureOverlay(){
+    let ov=document.getElementById('v440A4PreviewOverlay');
+    if(ov) return ov;
+    ov=document.createElement('div');
+    ov.id='v440A4PreviewOverlay';
+    ov.innerHTML=`<div class="v440-preview-box"><div class="v440-preview-head"><div><div class="v440-preview-title">📄 예선표 A4 출력 미리보기</div><div id="v440PreviewMeta" style="font-size:.72rem;opacity:.82;margin-top:2px">코트 · 경기순번 · 예상시간 한줄 표시</div></div><div class="v440-preview-actions"><button class="v440-print-btn" id="v440PrintBtn">🖨️ 출력/저장</button><button class="v440-save-btn" id="v440PdfBtn">📄 PDF 저장</button><button class="v440-save-btn" id="v440ImgBtn">🖼️ 이미지</button><button class="v440-close-btn" id="v440CloseBtn">닫기</button></div></div><div class="v440-preview-body" id="v440PreviewBody"></div></div>`;
+    document.body.appendChild(ov);
+    ov.querySelector('#v440CloseBtn').onclick=()=>ov.classList.remove('show');
+    ov.querySelector('#v440PrintBtn').onclick=printCurrent;
+    ov.querySelector('#v440PdfBtn').onclick=()=>window.exportPrelimPDF();
+    ov.querySelector('#v440ImgBtn').onclick=()=>window.exportPrelimImage();
+    ov.addEventListener('click',e=>{if(e.target===ov)ov.classList.remove('show');});
+    return ov;
+  }
+  function showPreview(sheet){
+    currentSheet=sheet;
+    const ov=ensureOverlay(), body=ov.querySelector('#v440PreviewBody');
+    body.innerHTML='';
+    const display=cleanSheet(sheet.cloneNode(true));
+    display.classList.remove('v435-print-root','v432-print-root','v440-temp-print');
+    body.appendChild(display);
+    const pages=sheet.querySelectorAll('.v435-a4-page,.v432-a4-page').length || sheet.getAttribute('data-pages') || 1;
+    const groups=sheet.getAttribute('data-groups')||sheet.getAttribute('data-v432-groups')||'';
+    const meta=ov.querySelector('#v440PreviewMeta');
+    if(meta) meta.textContent=`A4 ${pages}장${groups?` · ${groups}개 조`:''} · 코트/경기순번/예상시간 한줄 표시 · 하단 경기목록 숨김`;
+    ov.classList.add('show');
+  }
+  function printCurrent(){
+    try{
+      if(!currentSheet){toast('출력할 예선표가 없습니다','error');return;}
+      document.querySelectorAll('.v440-temp-print').forEach(x=>x.remove());
+      const p=cleanSheet(currentSheet.cloneNode(true));
+      p.classList.add('v440-temp-print','v435-print-root');
+      p.classList.remove('v432-print-root');
+      document.body.appendChild(p);
+      const cleanup=()=>setTimeout(()=>{try{p.remove();}catch(e){} window.removeEventListener('afterprint',cleanup);},450);
+      window.addEventListener('afterprint',cleanup);
+      setTimeout(()=>{window.focus(); window.print(); setTimeout(cleanup,2500);},160);
+    }catch(e){console.error(e);toast('출력 실패: '+(e.message||e),'error');}
+  }
+  window.exportPrelimSheet=function(){
+    try{const sheet=buildRawSheet(); if(!sheet) return; showPreview(sheet); toast('출력 전 미리보기를 열었습니다','success');}
+    catch(e){console.error(e);toast('A4 미리보기 준비 실패: '+(e.message||e),'error');}
+  };
+  window.exportPrelimImage=async function(){
+    let sheet=null;
+    try{
+      sheet=buildRawSheet(); if(!sheet) return;
+      const id=tid(), t=(window.G?.tournaments||[]).find(x=>x.id===id);
+      document.body.appendChild(sheet); sheet.style.position='fixed'; sheet.style.left='-14000px'; sheet.style.top='0';
+      await ensureCanvas();
+      const pages=[...sheet.querySelectorAll('.v435-a4-page,.v432-a4-page')];
+      if(!pages.length) throw new Error('A4 페이지가 없습니다');
+      for(let i=0;i<pages.length;i++){
+        const canvas=await window.html2canvas(pages[i],{backgroundColor:'#ffffff',scale:2,useCORS:true,logging:false,width:A4W,height:A4H,windowWidth:A4W,windowHeight:A4H});
+        const a=document.createElement('a'); a.href=canvas.toDataURL('image/png');
+        a.download=`예선대진표_A4_${safeName(t?.name)}_${String(i+1).padStart(2,'0')}_${today()}.png`;
+        document.body.appendChild(a); a.click(); a.remove();
+      }
+      toast(`A4 예선표 이미지 ${pages.length}장 저장 완료`,'success');
+    }catch(e){console.error(e);toast('예선표 이미지 저장 실패: '+(e.message||e),'error');}
+    finally{try{sheet&&sheet.remove();}catch(e){}}
+  };
+  window.exportPrelimPDF=async function(){
+    let sheet=null;
+    try{
+      sheet=buildRawSheet(); if(!sheet) return;
+      const id=tid(), t=(window.G?.tournaments||[]).find(x=>x.id===id);
+      document.body.appendChild(sheet); sheet.style.position='fixed'; sheet.style.left='-14000px'; sheet.style.top='0';
+      await ensureCanvas(); await ensurePdf();
+      const {jsPDF}=window.jspdf; const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4',compress:true});
+      const pages=[...sheet.querySelectorAll('.v435-a4-page,.v432-a4-page')];
+      if(!pages.length) throw new Error('A4 페이지가 없습니다');
+      for(let i=0;i<pages.length;i++){
+        const canvas=await window.html2canvas(pages[i],{backgroundColor:'#ffffff',scale:2,useCORS:true,logging:false,width:A4W,height:A4H,windowWidth:A4W,windowHeight:A4H});
+        if(i>0) pdf.addPage('a4','portrait');
+        pdf.addImage(canvas.toDataURL('image/jpeg',0.92),'JPEG',0,0,210,297);
+      }
+      pdf.save(`예선대진표_A4_${safeName(t?.name)}_${today()}.pdf`);
+      toast(`A4 예선표 PDF 저장 완료 · ${pages.length}장`,'success');
+    }catch(e){console.error(e);toast('PDF 저장 실패: '+(e.message||e),'error');}
+    finally{try{sheet&&sheet.remove();}catch(e){}}
+  };
+  window.bracketToPDF=window.exportPrelimPDF;
+})();
+</script>
+
+
+<!-- v441: A4 4열 고정 + 출력 백지 수정 + 헤더 한줄 가독성 보강 -->
+<style id="v441A4FourColumnPrintFixStyle">
+/* A4 예선표: 한 줄 최대 4개 카드 고정 */
+.v441-a4-sheet .v435-fitbox{width:766px!important;height:1051px!important;transform-origin:top left!important;}
+.v441-a4-sheet .v435-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:7px!important;}
+.v441-a4-sheet .v435-group-card{border-radius:7px!important;min-height:0!important;}
+.v441-a4-sheet .v435-group-head,
+.v441-a4-sheet .v438-group-head{display:grid!important;grid-template-columns:32px minmax(0,1fr)!important;align-items:center!important;gap:3px!important;padding:4px 5px!important;min-height:25px!important;overflow:hidden!important;background:#0f1e3a!important;}
+.v441-a4-sheet .v435-head-left,
+.v441-a4-sheet .v438-group-name{font-size:9.5px!important;color:#fff!important;max-width:32px!important;min-width:0!important;overflow:hidden!important;white-space:nowrap!important;text-overflow:clip!important;line-height:1!important;}
+.v441-a4-sheet .v435-head-right,
+.v441-a4-sheet .v438-head-badges{display:grid!important;grid-template-columns:auto auto minmax(44px,1fr)!important;align-items:center!important;justify-content:end!important;gap:2px!important;min-width:0!important;overflow:hidden!important;white-space:nowrap!important;}
+.v441-a4-sheet .v435-court-badge,
+.v441-a4-sheet .v438-order-badge,
+.v441-a4-sheet .v438-time-badge{display:inline-flex!important;align-items:center!important;justify-content:center!important;min-width:0!important;max-width:none!important;padding:2px 4px!important;border-radius:999px!important;font-size:7.4px!important;font-weight:1000!important;line-height:1!important;white-space:nowrap!important;overflow:visible!important;text-overflow:clip!important;letter-spacing:-.04em!important;}
+.v441-a4-sheet .v438-time-badge{font-size:7.1px!important;padding:2px 3px!important;}
+.v441-a4-sheet .v435-group-body{padding:5px!important;gap:4px!important;}
+.v441-a4-sheet .v435-team-row{min-height:29px!important;padding:4px!important;grid-template-columns:18px minmax(0,1fr)!important;gap:4px!important;}
+.v441-a4-sheet .v435-team-name{font-size:9px!important;line-height:1.12!important;letter-spacing:-.045em!important;}
+.v441-a4-sheet .v435-team-sub{font-size:6.8px!important;line-height:1.08!important;letter-spacing:-.04em!important;}
+/* 조 하단 경기목록은 출력/저장용에서 숨김 */
+.v441-a4-sheet .v437-group-match-list{display:none!important;}
+@media print{
+  html,body{background:#fff!important;margin:0!important;padding:0!important;}
+  body>*:not(.v440-temp-print){display:none!important;visibility:hidden!important;}
+  .v440-temp-print,.v440-temp-print.v435-print-root{display:block!important;visibility:visible!important;position:static!important;left:auto!important;top:auto!important;width:794px!important;margin:0 auto!important;z-index:999999!important;background:#fff!important;}
+  .v440-temp-print *{visibility:visible!important;}
+  .v440-temp-print .v435-a4-page{display:block!important;visibility:visible!important;page-break-after:always!important;break-after:page!important;box-shadow:none!important;margin:0!important;}
+  .v440-temp-print .v435-a4-page:last-child{page-break-after:auto!important;break-after:auto!important;}
+  @page{size:A4 portrait;margin:0;}
+}
+</style>
+<script id="v441A4FourColumnPrintFixScript">
+(function(){
+  'use strict';
+  const A4W=794,A4H=1123;
+  function toast(msg,type){try{typeof window.toast==='function'?window.toast(msg,type||'info'):console.log(msg);}catch(e){}}
+  function forceFourColumns(sheet){
+    try{
+      if(!sheet) return sheet;
+      sheet.classList.add('v441-a4-sheet','v440-a4-sheet');
+      sheet.querySelectorAll('.v435-fitbox').forEach(f=>{
+        f.style.setProperty('--v435-cols','4');
+        const t=f.style.transform||'';
+        const m=t.match(/scale\(([^)]+)\)/);
+        let sc=m?parseFloat(m[1]):1;
+        if(!Number.isFinite(sc)) sc=1;
+        // 4열로 바꾸면 폭은 충분하지만 높이가 늘 수 있어, 한 페이지 우선 유지용으로 살짝 압축
+        sc=Math.max(0.34, Math.min(sc, 0.92));
+        f.style.transform=`scale(${sc})`;
+      });
+      sheet.querySelectorAll('.v437-group-match-list').forEach(x=>x.remove());
+      sheet.querySelectorAll('.v435-court-badge').forEach(x=>{x.textContent=String(x.textContent||'').replace(/^🎾\s*/,'').replace(/\s+/g,'').trim();});
+      sheet.querySelectorAll('.v438-order-badge').forEach(x=>{x.textContent=String(x.textContent||'').replace(/\s+/g,'').trim();});
+      sheet.querySelectorAll('.v438-time-badge').forEach(x=>{let t=String(x.textContent||'').replace(/\s+/g,'').trim();t=t.replace(/^상/,'예상'); if(!/^예상/.test(t)) t='예상'+t.replace(/^예상?/,''); x.textContent=t;});
+    }catch(e){console.warn('forceFourColumns failed',e);}
+    return sheet;
+  }
+  window.v441ForceA4FourColumns=forceFourColumns;
+
+  // 기존 v440 함수들을 감싸서 4열/출력 수정 확실히 적용
+  const oldSheet=window.exportPrelimSheet;
+  window.exportPrelimSheet=function(){
+    try{
+      if(typeof oldSheet==='function') return oldSheet.apply(this,arguments);
+    }catch(e){console.error(e);toast('A4 미리보기 준비 실패: '+(e.message||e),'error');}
+  };
+
+  // buildRawSheet 내부 접근은 불가하므로, v435/v437 builder 결과를 강제 보정하도록 buildSheet 자체를 래핑
+  ['v437A4Tools','v435A4Tools'].forEach(ns=>{
+    try{
+      if(window[ns] && typeof window[ns].buildSheet==='function' && !window[ns].__v441Wrapped){
+        const orig=window[ns].buildSheet;
+        window[ns].buildSheet=function(){return forceFourColumns(orig.apply(this,arguments));};
+        window[ns].__v441Wrapped=true;
+      }
+    }catch(e){}
+  });
+
+  // 인쇄는 기존 CSS 충돌을 피하기 위해 iframe 방식으로 고정
+  window.v441PrintSheet=function(sheet){
+    try{
+      if(!sheet){toast('출력할 예선표가 없습니다','error');return;}
+      const clone=forceFourColumns(sheet.cloneNode(true));
+      const css=[...document.querySelectorAll('style')].map(s=>s.outerHTML).join('\n');
+      const html=`<!doctype html><html><head><meta charset="utf-8"><title>예선 대진표 출력</title>${css}<style>@page{size:A4 portrait;margin:0}html,body{margin:0!important;padding:0!important;background:#fff!important}.v435-export-sheet{position:static!important;left:auto!important;top:auto!important;width:794px!important;z-index:auto!important}.v435-a4-page{page-break-after:always!important;break-after:page!important;box-shadow:none!important;margin:0 auto!important}.v435-a4-page:last-child{page-break-after:auto!important;break-after:auto!important}</style></head><body>${clone.outerHTML}</body></html>`;
+      const iframe=document.createElement('iframe');
+      iframe.style.position='fixed'; iframe.style.right='0'; iframe.style.bottom='0'; iframe.style.width='0'; iframe.style.height='0'; iframe.style.border='0';
+      document.body.appendChild(iframe);
+      const doc=iframe.contentWindow.document;
+      doc.open(); doc.write(html); doc.close();
+      setTimeout(()=>{try{iframe.contentWindow.focus(); iframe.contentWindow.print();}catch(e){console.error(e);toast('출력창 열기 실패: '+(e.message||e),'error');}},450);
+      setTimeout(()=>{try{iframe.remove();}catch(e){}},10000);
+    }catch(e){console.error(e);toast('출력 실패: '+(e.message||e),'error');}
+  };
+
+  // v440 미리보기 버튼이 iframe 인쇄를 쓰도록 다시 연결
+  const hook=()=>{
+    try{
+      const btn=document.getElementById('v440PrintBtn');
+      if(btn && !btn.__v441Hooked){
+        btn.__v441Hooked=true;
+        btn.onclick=function(){
+          const preview=document.querySelector('#v440PreviewBody .v435-export-sheet');
+          window.v441PrintSheet(preview);
+        };
+      }
+    }catch(e){}
+  };
+  document.addEventListener('click',()=>setTimeout(hook,50),true);
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(hook,500));
+})();
+</script>
+
+
+
+<!-- v442: A4 꽉찬 4열 예선표 + 인쇄 백지 최종 수정 -->
+<style id="v442A4FullPrintFixStyle">
+.v442-a4-sheet{background:#fff!important;color:#0f172a!important;font-family:'Noto Sans KR',Arial,sans-serif!important;}
+.v442-a4-sheet .v435-a4-page{width:794px!important;height:1123px!important;padding:16px 18px 18px!important;background:#fff!important;box-sizing:border-box!important;overflow:hidden!important;}
+.v442-a4-sheet .v435-title{font-size:18px!important;line-height:1.15!important;margin:0 0 3px!important;letter-spacing:-.055em!important;}
+.v442-a4-sheet .v435-sub{font-size:9.4px!important;line-height:1.15!important;margin:0 0 6px!important;}
+.v442-a4-sheet .v435-page-foot{display:none!important;}
+.v442-a4-sheet .v435-fitbox{width:758px!important;height:1052px!important;transform:none!important;transform-origin:top left!important;overflow:hidden!important;}
+.v442-a4-sheet .v435-grid{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:6px!important;align-items:stretch!important;width:100%!important;height:auto!important;}
+.v442-a4-sheet .v435-group-card{height:var(--v442-row-h,96px)!important;min-height:0!important;border-radius:7px!important;border:1.2px solid #cbd5e1!important;overflow:hidden!important;background:#fff!important;box-shadow:none!important;break-inside:avoid!important;}
+.v442-a4-sheet .v435-group-head,.v442-a4-sheet .v438-group-head{display:grid!important;grid-template-columns:30px minmax(0,1fr)!important;align-items:center!important;gap:4px!important;height:24px!important;min-height:24px!important;padding:3px 5px!important;box-sizing:border-box!important;background:#0f1e3a!important;color:#fff!important;overflow:hidden!important;}
+.v442-a4-sheet .v435-head-left,.v442-a4-sheet .v438-group-name{font-size:10px!important;font-weight:1000!important;color:#fff!important;line-height:1!important;white-space:nowrap!important;overflow:hidden!important;letter-spacing:-.04em!important;}
+.v442-a4-sheet .v435-head-right,.v442-a4-sheet .v438-head-badges{display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:2px!important;min-width:0!important;overflow:visible!important;white-space:nowrap!important;flex-wrap:nowrap!important;}
+.v442-a4-sheet .v435-court-badge,.v442-a4-sheet .v438-order-badge,.v442-a4-sheet .v438-time-badge{display:inline-flex!important;align-items:center!important;justify-content:center!important;flex:0 0 auto!important;border-radius:999px!important;font-size:7.6px!important;font-weight:1000!important;line-height:1!important;padding:2px 4px!important;white-space:nowrap!important;overflow:visible!important;text-overflow:clip!important;letter-spacing:-.055em!important;border:1px solid #bfdbfe!important;background:#eff6ff!important;color:#1d4ed8!important;}
+.v442-a4-sheet .v438-time-badge{min-width:48px!important;background:#dcfce7!important;color:#166534!important;border-color:#86efac!important;font-size:7.4px!important;padding:2px 4px!important;}
+.v442-a4-sheet .v435-court-badge{max-width:42px!important;}
+.v442-a4-sheet .v438-order-badge{max-width:34px!important;}
+.v442-a4-sheet .v435-group-body{display:flex!important;flex-direction:column!important;gap:4px!important;padding:5px!important;height:calc(var(--v442-row-h,96px) - 24px)!important;box-sizing:border-box!important;background:#f8fafc!important;overflow:hidden!important;}
+.v442-a4-sheet .v435-team-row{display:grid!important;grid-template-columns:18px minmax(0,1fr)!important;gap:4px!important;align-items:start!important;min-height:0!important;height:calc((var(--v442-row-h,96px) - 39px) / 2)!important;padding:4px!important;border-radius:5px!important;border:1px solid #e2e8f0!important;background:#fff!important;box-sizing:border-box!important;overflow:hidden!important;}
+.v442-a4-sheet .v435-team-no{width:16px!important;height:16px!important;font-size:7.5px!important;line-height:1!important;}
+.v442-a4-sheet .v435-team-name{font-size:9.3px!important;line-height:1.08!important;font-weight:1000!important;letter-spacing:-.055em!important;color:#0f172a!important;white-space:normal!important;overflow:hidden!important;display:-webkit-box!important;-webkit-line-clamp:1!important;-webkit-box-orient:vertical!important;}
+.v442-a4-sheet .v435-team-sub{font-size:6.7px!important;line-height:1.05!important;font-weight:900!important;letter-spacing:-.055em!important;color:#334155!important;white-space:normal!important;overflow:hidden!important;display:-webkit-box!important;-webkit-line-clamp:2!important;-webkit-box-orient:vertical!important;margin-top:1px!important;}
+.v442-a4-sheet .v437-group-match-list{display:none!important;}
+.v440-preview-body .v442-a4-sheet{transform:none!important;transform-origin:top center!important;}
+@media print{
+  @page{size:A4 portrait;margin:0;}
+  html,body{margin:0!important;padding:0!important;background:#fff!important;}
+  body>*{display:none!important;visibility:hidden!important;}
+  .v442-print-root{display:block!important;visibility:visible!important;position:static!important;left:auto!important;top:auto!important;width:794px!important;margin:0 auto!important;background:#fff!important;z-index:999999!important;}
+  .v442-print-root *{visibility:visible!important;}
+  .v442-print-root .v435-a4-page{display:block!important;visibility:visible!important;page-break-after:always!important;break-after:page!important;box-shadow:none!important;margin:0 auto!important;border:0!important;}
+  .v442-print-root .v435-a4-page:last-child{page-break-after:auto!important;break-after:auto!important;}
+}
+</style>
+<script id="v442A4FullPrintFixScript">
+(function(){
+  'use strict';
+  const A4W=794,A4H=1123;
+  let currentSheet=null;
+  function toast(msg,type){try{(window.safeToast||window.toast||console.log)(msg,type||'info');}catch(e){}}
+  function safeName(s){return String(s||'').replace(/[\\/:*?"<>|\s]+/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'').slice(0,80)||'대진표';}
+  function today(){return new Date().toISOString().slice(0,10);}
+  function getTid(){return document.getElementById('brTS')?.value || document.getElementById('regTS')?.value || '';}
+  function getDivs(tid){try{return window.v435A4Tools?.getCurrentDivs?.(tid)||[]}catch(e){return [];}}
+  async function ensureCanvas(){if(window.html2canvas)return;if(window.v435A4Tools?.ensureCanvasLib)return window.v435A4Tools.ensureCanvasLib();await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});}
+  async function ensurePdf(){if(window.jspdf?.jsPDF)return;await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});}
+  function cleanText(s){return String(s||'').replace(/^🎾\s*/,'').replace(/\s+/g,'').trim();}
+  function prepareSheet(sheet){
+    if(!sheet)return null;
+    try{
+      sheet.classList.add('v442-a4-sheet','v441-a4-sheet','v440-a4-sheet');
+      sheet.classList.remove('v435-print-root','v432-print-root','v440-temp-print','v442-print-root');
+      sheet.querySelectorAll('.v437-group-match-list').forEach(x=>x.remove());
+      sheet.querySelectorAll('.v435-court-badge').forEach(x=>{let t=cleanText(x.textContent).replace(/^코트/,'');x.textContent=t;});
+      sheet.querySelectorAll('.v438-order-badge').forEach(x=>{let t=cleanText(x.textContent);x.textContent=t;});
+      sheet.querySelectorAll('.v438-time-badge').forEach(x=>{let t=cleanText(x.textContent).replace(/^상/,'예상'); if(!/^예상/.test(t)) t='예상'+t.replace(/^예상?/,''); x.textContent=t;});
+      sheet.querySelectorAll('.v435-a4-page,.v432-a4-page').forEach(page=>{
+        const fit=page.querySelector('.v435-fitbox');
+        const grid=page.querySelector('.v435-grid');
+        if(!fit||!grid)return;
+        fit.style.transform='none';
+        fit.style.width='758px';
+        fit.style.height='1052px';
+        const cards=[...grid.querySelectorAll('.v435-group-card')];
+        const rows=Math.max(1,Math.ceil(cards.length/4));
+        const gap=6;
+        const rowH=Math.floor((1052-(rows-1)*gap)/rows);
+        const clamped=Math.max(72,Math.min(118,rowH));
+        fit.style.setProperty('--v442-row-h',clamped+'px');
+        grid.style.gridTemplateColumns='repeat(4,minmax(0,1fr))';
+        grid.style.gap=gap+'px';
+        cards.forEach(c=>{c.style.setProperty('--v442-row-h',clamped+'px'); c.style.height=clamped+'px';});
+      });
+    }catch(e){console.warn('v442 prepareSheet failed',e);}
+    return sheet;
+  }
+  function buildSheet(){
+    const id=getTid();
+    if(!id){toast('대회를 먼저 선택하세요','info');return null;}
+    const builder=window.v437A4Tools?.buildSheet || window.v435A4Tools?.buildSheet;
+    if(!builder){toast('A4 예선표 생성 기능을 찾을 수 없습니다','error');return null;}
+    const sheet=builder(id,getDivs(id));
+    if(!sheet){toast('예선 추첨 데이터가 없습니다','info');return null;}
+    return prepareSheet(sheet);
+  }
+  function ensureOverlay(){
+    let ov=document.getElementById('v440A4PreviewOverlay');
+    if(!ov){
+      ov=document.createElement('div');
+      ov.id='v440A4PreviewOverlay';
+      ov.innerHTML='<div class="v440-preview-box"><div class="v440-preview-head"><div><div class="v440-preview-title">📄 예선표 A4 출력 미리보기</div><div id="v440PreviewMeta" style="font-size:.72rem;opacity:.82;margin-top:2px"></div></div><div class="v440-preview-actions"><button class="v440-print-btn" id="v440PrintBtn">🖨️ 출력/저장</button><button class="v440-save-btn" id="v440PdfBtn">📄 PDF 저장</button><button class="v440-save-btn" id="v440ImgBtn">🖼️ 이미지</button><button class="v440-close-btn" id="v440CloseBtn">닫기</button></div></div><div class="v440-preview-body" id="v440PreviewBody"></div></div>';
+      document.body.appendChild(ov);
+      ov.addEventListener('click',e=>{if(e.target===ov)ov.classList.remove('show');});
+    }
+    const close=ov.querySelector('#v440CloseBtn'); if(close) close.onclick=()=>ov.classList.remove('show');
+    const print=ov.querySelector('#v440PrintBtn'); if(print) print.onclick=()=>printSheet(currentSheet);
+    const pdf=ov.querySelector('#v440PdfBtn'); if(pdf) pdf.onclick=()=>window.exportPrelimPDF();
+    const img=ov.querySelector('#v440ImgBtn'); if(img) img.onclick=()=>window.exportPrelimImage();
+    return ov;
+  }
+  function showPreview(sheet){
+    currentSheet=prepareSheet(sheet);
+    const ov=ensureOverlay();
+    const body=ov.querySelector('#v440PreviewBody');
+    body.innerHTML='';
+    const d=prepareSheet(currentSheet.cloneNode(true));
+    d.classList.remove('v442-print-root','v440-temp-print','v435-print-root');
+    body.appendChild(d);
+    const pages=currentSheet.querySelectorAll('.v435-a4-page,.v432-a4-page').length||1;
+    const groups=currentSheet.getAttribute('data-groups')||currentSheet.getAttribute('data-v432-groups')||'';
+    const meta=ov.querySelector('#v440PreviewMeta');
+    if(meta)meta.textContent=`A4 ${pages}장${groups?` · ${groups}개 조`:''} · 4열 고정 · 화면 꽉참 · 예상시간 표시`;
+    ov.classList.add('show');
+  }
+  function printSheet(sheet){
+    try{
+      if(!sheet){toast('출력할 예선표가 없습니다','error');return;}
+      const clone=prepareSheet(sheet.cloneNode(true));
+      clone.classList.add('v442-print-root','v440-temp-print','v435-print-root');
+      const css=[...document.querySelectorAll('style')].map(s=>s.outerHTML).join('\n');
+      const html='<!doctype html><html><head><meta charset="utf-8"><title>예선 대진표 출력</title>'+css+'<style>@page{size:A4 portrait;margin:0}html,body{margin:0!important;padding:0!important;background:#fff!important;}body>*{display:none!important;visibility:hidden!important}.v442-print-root{display:block!important;visibility:visible!important;position:static!important;width:794px!important;margin:0 auto!important;background:#fff!important}.v442-print-root *{visibility:visible!important}.v442-print-root .v435-a4-page{display:block!important;page-break-after:always!important;break-after:page!important;margin:0 auto!important;box-shadow:none!important;border:0!important}.v442-print-root .v435-a4-page:last-child{page-break-after:auto!important;break-after:auto!important}</style></head><body>'+clone.outerHTML+'</body></html>';
+      const iframe=document.createElement('iframe');
+      iframe.style.position='fixed'; iframe.style.left='-10000px'; iframe.style.top='0'; iframe.style.width='794px'; iframe.style.height='1123px'; iframe.style.border='0';
+      document.body.appendChild(iframe);
+      const w=iframe.contentWindow, doc=w.document;
+      doc.open(); doc.write(html); doc.close();
+      const doPrint=()=>{try{w.focus();w.print();}catch(e){console.error(e);toast('출력창 열기 실패: '+(e.message||e),'error');}};
+      iframe.onload=()=>setTimeout(doPrint,250);
+      setTimeout(doPrint,700);
+      setTimeout(()=>{try{iframe.remove();}catch(e){}},15000);
+    }catch(e){console.error(e);toast('출력 실패: '+(e.message||e),'error');}
+  }
+  window.exportPrelimSheet=function(){try{const sheet=buildSheet(); if(!sheet)return; showPreview(sheet); toast('A4 출력 미리보기를 열었습니다','success');}catch(e){console.error(e);toast('A4 미리보기 실패: '+(e.message||e),'error');}};
+  window.exportPrelimImage=async function(){let sheet=null;try{sheet=buildSheet(); if(!sheet)return; const id=getTid(),t=(window.G?.tournaments||[]).find(x=>x.id===id); document.body.appendChild(sheet); sheet.style.position='fixed';sheet.style.left='-14000px';sheet.style.top='0'; await ensureCanvas(); const pages=[...sheet.querySelectorAll('.v435-a4-page,.v432-a4-page')]; for(let i=0;i<pages.length;i++){const canvas=await window.html2canvas(pages[i],{backgroundColor:'#ffffff',scale:2,useCORS:true,logging:false,width:A4W,height:A4H,windowWidth:A4W,windowHeight:A4H}); const a=document.createElement('a'); a.href=canvas.toDataURL('image/png'); a.download=`예선대진표_A4_${safeName(t?.name)}_${String(i+1).padStart(2,'0')}_${today()}.png`; document.body.appendChild(a); a.click(); a.remove();} toast(`A4 예선표 이미지 ${pages.length}장 저장 완료`,'success');}catch(e){console.error(e);toast('이미지 저장 실패: '+(e.message||e),'error');}finally{try{sheet&&sheet.remove();}catch(e){}}};
+  window.exportPrelimPDF=async function(){let sheet=null;try{sheet=buildSheet(); if(!sheet)return; const id=getTid(),t=(window.G?.tournaments||[]).find(x=>x.id===id); document.body.appendChild(sheet); sheet.style.position='fixed';sheet.style.left='-14000px';sheet.style.top='0'; await ensureCanvas(); await ensurePdf(); const {jsPDF}=window.jspdf; const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4',compress:true}); const pages=[...sheet.querySelectorAll('.v435-a4-page,.v432-a4-page')]; for(let i=0;i<pages.length;i++){const canvas=await window.html2canvas(pages[i],{backgroundColor:'#ffffff',scale:2,useCORS:true,logging:false,width:A4W,height:A4H,windowWidth:A4W,windowHeight:A4H}); if(i>0)pdf.addPage('a4','portrait'); pdf.addImage(canvas.toDataURL('image/jpeg',0.92),'JPEG',0,0,210,297);} pdf.save(`예선대진표_A4_${safeName(t?.name)}_${today()}.pdf`); toast(`A4 예선표 PDF 저장 완료 · ${pages.length}장`,'success');}catch(e){console.error(e);toast('PDF 저장 실패: '+(e.message||e),'error');}finally{try{sheet&&sheet.remove();}catch(e){}}};
+  window.bracketToPDF=window.exportPrelimPDF;
+})();
+</script>
+
+
+<!-- v443: A4 print preview blank fix + group number clipping fix -->
+<style id="v443PrintAndGroupFixStyle">
+/* 조 번호가 29조/30조처럼 두 자리일 때 잘리지 않도록 헤더 첫 칸 확장 */
+.v443-a4-sheet .v435-group-head,
+.v443-a4-sheet .v438-group-head,
+.v442-a4-sheet .v435-group-head,
+.v442-a4-sheet .v438-group-head{
+  grid-template-columns:42px minmax(0,1fr)!important;
+  column-gap:4px!important;
+}
+.v443-a4-sheet .v435-head-left,
+.v443-a4-sheet .v438-group-name,
+.v442-a4-sheet .v435-head-left,
+.v442-a4-sheet .v438-group-name{
+  font-size:9.6px!important;
+  min-width:42px!important;
+  max-width:42px!important;
+  width:42px!important;
+  overflow:visible!important;
+  text-overflow:clip!important;
+  white-space:nowrap!important;
+  letter-spacing:-.075em!important;
+}
+.v443-a4-sheet .v435-head-right,
+.v443-a4-sheet .v438-head-badges,
+.v442-a4-sheet .v435-head-right,
+.v442-a4-sheet .v438-head-badges{
+  min-width:0!important;
+  flex-wrap:nowrap!important;
+  overflow:visible!important;
+}
+/* 예상시간이 잘리지 않도록 배지는 조금 더 압축 */
+.v443-a4-sheet .v435-court-badge,
+.v443-a4-sheet .v438-order-badge,
+.v443-a4-sheet .v438-time-badge,
+.v442-a4-sheet .v435-court-badge,
+.v442-a4-sheet .v438-order-badge,
+.v442-a4-sheet .v438-time-badge{
+  font-size:7.1px!important;
+  padding:2px 3px!important;
+  letter-spacing:-.085em!important;
+}
+.v443-a4-sheet .v438-time-badge,
+.v442-a4-sheet .v438-time-badge{
+  min-width:46px!important;
+}
+/* 현재 페이지에서 인쇄할 때 오직 임시 출력 루트만 보이게 강제 */
+/* ── 배경색 보존: 브라우저 인쇄 시 background 제거 방지 ── */
+#v443PrintRoot,
+#v443PrintRoot *{
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+  color-adjust: exact !important;
+}
+@media print{
+  @page{size:A4 portrait;margin:0}
+  html,body{margin:0!important;padding:0!important;background:#fff!important;width:794px!important;}
+  /* 배경색 보존 (브라우저 인쇄 기본값이 배경 제거하므로 명시 필요) */
+  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;}
+  /* v431~v442 모든 hide 규칙보다 나중에 선언 → 덮어씀 */
+  body > *:not(#v443PrintRoot){display:none!important;visibility:hidden!important;}
+  #v443PrintRoot{display:block!important;visibility:visible!important;position:absolute!important;left:0!important;top:0!important;width:794px!important;margin:0!important;padding:0!important;background:#fff!important;z-index:2147483647!important;}
+  #v443PrintRoot *{visibility:visible!important;}
+  /* v440-temp-print, v432-print-root 등 다중 클래스가 #v443PrintRoot 자식에 있으므로
+     그 규칙들의 display:none이 자식에 영향 안 주도록 자식도 명시 */
+  #v443PrintRoot .v435-export-sheet,
+  #v443PrintRoot .v432-export-sheet,
+  #v443PrintRoot .v440-a4-sheet,
+  #v443PrintRoot .v442-a4-sheet{display:block!important;visibility:visible!important;position:static!important;width:794px!important;margin:0 auto!important;}
+  #v443PrintRoot .v435-a4-page,#v443PrintRoot .v432-a4-page{display:block!important;visibility:visible!important;page-break-after:always!important;break-after:page!important;margin:0!important;box-shadow:none!important;border:0!important;}
+  #v443PrintRoot .v435-a4-page:last-child,#v443PrintRoot .v432-a4-page:last-child{page-break-after:auto!important;break-after:auto!important;}
+  /* 조 헤더 배경색 명시 강제 (브라우저가 background 날리는 것 방지) */
+  #v443PrintRoot .v435-group-head,
+  #v443PrintRoot .v438-group-head{background:#0f1e3a!important;color:#fff!important;}
+  #v443PrintRoot .v435-head-left,
+  #v443PrintRoot .v438-group-name{color:#fff!important;}
+  #v443PrintRoot .v435-court-badge,
+  #v443PrintRoot .v438-order-badge{background:#eff6ff!important;color:#1d4ed8!important;border-color:#bfdbfe!important;}
+  #v443PrintRoot .v438-time-badge{background:#dcfce7!important;color:#166534!important;border-color:#86efac!important;}
+  #v443PrintRoot .v435-group-body{background:#f8fafc!important;}
+  #v443PrintRoot .v435-team-row{background:#fff!important;border-color:#e2e8f0!important;}
+  #v443PrintRoot .v435-team-no{background:#0f1e3a!important;color:#fff!important;}
+}
+</style>
+<script id="v443PrintAndGroupFixScript">
+(function(){
+  /* ── v444 출력 백지 수정 ──────────────────────────────────────────
+     문제: v440 ensureOverlay()가 미리보기 열릴 때마다 #v440PrintBtn.onclick을
+           자체 printCurrent(팝업창)로 재바인딩 → v443 hookPreviewButtons 무효화
+           → 팝업창 방식은 CSP/팝업 차단으로 백지
+     해결: MutationObserver로 #v440PrintBtn을 항상 감시, 바인딩될 때마다 즉시 교체.
+           getPreviewSheet 셀렉터 확장(v440-a4-sheet 포함).
+           #v443PrintRoot에 v440-temp-print 클래스 추가 → 기존 @media print과 호환.
+  ─────────────────────────────────────────────────────────────────── */
+  function applyGroupFix(sheet){
+    try{
+      if(!sheet) return sheet;
+      sheet.classList.add('v443-a4-sheet','v442-a4-sheet','v441-a4-sheet','v440-a4-sheet');
+      sheet.querySelectorAll('.v435-group-head,.v438-group-head').forEach(head=>{
+        head.style.gridTemplateColumns='42px minmax(0,1fr)';
+      });
+      sheet.querySelectorAll('.v435-head-left,.v438-group-name').forEach(el=>{
+        el.style.minWidth='42px';
+        el.style.width='42px';
+        el.style.maxWidth='42px';
+        el.style.overflow='visible';
+        el.style.textOverflow='clip';
+        el.style.whiteSpace='nowrap';
+      });
+      return sheet;
+    }catch(e){return sheet;}
+  }
+  window.v443ApplyGroupFix=applyGroupFix;
+
+  const oldExportPrelimSheet = window.exportPrelimSheet;
+
+  // v440PreviewBody 안의 시트를 확실하게 찾는 셀렉터 (클래스 확장)
+  function getPreviewSheet(){
+    return document.querySelector(
+      '#v440PreviewBody .v435-export-sheet,' +
+      '#v440PreviewBody .v432-export-sheet,' +
+      '#v440PreviewBody .v440-a4-sheet,' +
+      '#v440PreviewBody .v442-a4-sheet,' +
+      '#v440PreviewBody [data-pages]'
+    );
+  }
+
+  function getCurrentSheetClone(){
+    let sheet=getPreviewSheet();
+    if(sheet) return applyGroupFix(sheet.cloneNode(true));
+    try{
+      if(typeof oldExportPrelimSheet==='function') oldExportPrelimSheet();
+      // 미리보기가 비동기로 열리므로 잠시 대기 후 재시도
+      sheet=getPreviewSheet();
+      if(sheet) return applyGroupFix(sheet.cloneNode(true));
+    }catch(e){}
+    return null;
+  }
+
+  function cleanupPrintRoot(){
+    try{document.getElementById('v443PrintRoot')?.remove();}catch(e){}
+  }
+
+  function printCurrentA4(){
+    try{
+      const clone=getCurrentSheetClone();
+      if(!clone){
+        // 미리보기가 아직 안 열린 경우: 먼저 열고 잠시 후 재시도
+        try{ if(typeof oldExportPrelimSheet==='function') oldExportPrelimSheet(); }catch(e){}
+        setTimeout(function(){
+          const clone2=getPreviewSheet();
+          if(!clone2){try{toast('출력할 예선표가 없습니다. 먼저 미리보기를 열어주세요.','error');}catch(e){}return;}
+          doActualPrint(applyGroupFix(clone2.cloneNode(true)));
+        },400);
+        return;
+      }
+      doActualPrint(clone);
+    }catch(e){console.error('[v444]',e);try{toast('출력 실패: '+(e.message||e),'error');}catch(e2){} cleanupPrintRoot();}
+  }
+
+  function doActualPrint(clone){
+    try{
+      cleanupPrintRoot();
+      // ── 모든 기존 @media print 룰이 이 요소를 보이게 인식하도록
+      //    v431~v442 각 버전의 print-root 클래스를 모두 부여
+      clone.classList.add(
+        'v431-print-root','v432-print-root','v435-print-root',
+        'v440-temp-print','v442-print-root',
+        'v440-a4-sheet','v442-a4-sheet','v443-a4-sheet'
+      );
+      // ── 브라우저 인쇄 시 배경색 제거 방지 (인라인으로도 강제)
+      clone.style.webkitPrintColorAdjust='exact';
+      clone.style.printColorAdjust='exact';
+      clone.style.colorAdjust='exact';
+      // 조 헤더 배경색 인라인 강제 (CSS 변수가 인쇄 컨텍스트에서 날아가는 경우 대비)
+      clone.querySelectorAll('.v435-group-head,.v438-group-head').forEach(function(h){
+        h.style.setProperty('background','#0f1e3a','important');
+        h.style.setProperty('color','#ffffff','important');
+        h.style.setProperty('-webkit-print-color-adjust','exact','important');
+        h.style.setProperty('print-color-adjust','exact','important');
+      });
+      clone.querySelectorAll('.v435-head-left,.v438-group-name').forEach(function(el){
+        el.style.setProperty('color','#ffffff','important');
+      });
+      clone.querySelectorAll('.v435-team-no').forEach(function(el){
+        el.style.setProperty('background','#0f1e3a','important');
+        el.style.setProperty('color','#ffffff','important');
+        el.style.setProperty('-webkit-print-color-adjust','exact','important');
+        el.style.setProperty('print-color-adjust','exact','important');
+      });
+      clone.querySelectorAll('.v435-group-body').forEach(function(el){
+        el.style.setProperty('background','#f8fafc','important');
+        el.style.setProperty('-webkit-print-color-adjust','exact','important');
+        el.style.setProperty('print-color-adjust','exact','important');
+      });
+      clone.querySelectorAll('.v435-team-row').forEach(function(el){
+        el.style.setProperty('background','#ffffff','important');
+        el.style.setProperty('-webkit-print-color-adjust','exact','important');
+        el.style.setProperty('print-color-adjust','exact','important');
+      });
+      clone.querySelectorAll('.v435-court-badge,.v438-order-badge').forEach(function(el){
+        el.style.setProperty('background','#eff6ff','important');
+        el.style.setProperty('color','#1d4ed8','important');
+        el.style.setProperty('border-color','#bfdbfe','important');
+        el.style.setProperty('-webkit-print-color-adjust','exact','important');
+        el.style.setProperty('print-color-adjust','exact','important');
+      });
+      clone.querySelectorAll('.v438-time-badge').forEach(function(el){
+        el.style.setProperty('background','#dcfce7','important');
+        el.style.setProperty('color','#166534','important');
+        el.style.setProperty('border-color','#86efac','important');
+        el.style.setProperty('-webkit-print-color-adjust','exact','important');
+        el.style.setProperty('print-color-adjust','exact','important');
+      });
+      // 내부 페이지도 명시적으로 보이게
+      clone.querySelectorAll('.v435-a4-page,.v432-a4-page').forEach(function(p){
+        p.style.cssText+='display:block!important;visibility:visible!important;page-break-after:always!important;break-after:page!important;box-shadow:none!important;margin:0 auto!important;border:0!important;';
+      });
+      const root=document.createElement('div');
+      root.id='v443PrintRoot';
+      // body의 직접 자식인 root 자체에도 모든 버전 print-root 클래스 추가
+      // → body>*:not(.v432-print-root), body>*:not(.v440-temp-print) 등 모든 hide 규칙 우회
+      root.className='v431-print-root v432-print-root v435-print-root v440-temp-print v442-print-root';
+      root.appendChild(clone);
+      document.body.appendChild(root);
+      const finish=()=>setTimeout(cleanupPrintRoot,600);
+      window.addEventListener('afterprint',finish,{once:true});
+      setTimeout(function(){
+        try{window.focus(); window.print();}
+        catch(e){console.error(e);try{toast('출력 실패: '+(e.message||e),'error');}catch(e2){} cleanupPrintRoot();}
+      },200);
+      setTimeout(cleanupPrintRoot,20000);
+    }catch(e){console.error('[v444]',e);cleanupPrintRoot();}
+  }
+  window.v443PrintCurrentA4=printCurrentA4;
+
+  // ── MutationObserver로 #v440PrintBtn 클릭 핸들러를 항상 교체 ──────
+  function forcePrintBtn(){
+    try{
+      const btn=document.getElementById('v440PrintBtn');
+      if(btn && btn.__v444hooked!==true){
+        btn.__v444hooked=true;
+        btn.onclick=function(ev){
+          if(ev){ev.preventDefault();ev.stopPropagation();}
+          printCurrentA4();
+        };
+      }
+    }catch(e){}
+  }
+
+  // body 하위 DOM 변화 감시 → #v440PrintBtn이 새로 나타날 때마다 즉시 교체
+  const _mo=new MutationObserver(function(mutations){
+    for(const m of mutations){
+      for(const n of m.addedNodes){
+        if(n.nodeType!==1) continue;
+        if(n.id==='v440A4PreviewOverlay'||n.querySelector&&n.querySelector('#v440PrintBtn')){
+          setTimeout(forcePrintBtn,10);
+          setTimeout(forcePrintBtn,100);
+        }
+      }
+      // onclick이 바뀔 때(attributeOldValue 지원 안 함이라 addedNodes로 감지)
+    }
+  });
+  document.addEventListener('DOMContentLoaded',function(){
+    _mo.observe(document.body,{childList:true,subtree:true});
+    setTimeout(forcePrintBtn,300);
+  });
+
+  // exportPrelimSheet 래핑 → 미리보기 열릴 때마다 버튼 재훅
+  const origSheet=window.exportPrelimSheet;
+  window.exportPrelimSheet=function(){
+    try{
+      const r=origSheet?origSheet():undefined;
+      setTimeout(forcePrintBtn,60);
+      setTimeout(forcePrintBtn,300);
+      return r;
+    }catch(e){console.error(e);try{toast('A4 미리보기 실패: '+(e.message||e),'error');}catch(e2){}}
+  };
+
+  // 미리보기 오버레이 내 시트에 조번호 fix 적용
+  function applyGroupFixToPreview(){
+    try{const s=getPreviewSheet(); if(s) applyGroupFix(s);}catch(e){}
+  }
+  document.addEventListener('DOMContentLoaded',function(){
+    setTimeout(forcePrintBtn,500);
+    setTimeout(applyGroupFixToPreview,600);
+  });
 })();
 </script>
 
