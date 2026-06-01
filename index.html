@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-01-v444e-waitlist-sort-fix";
+  const APP_VERSION = "2026-06-01-v445-live-match-sync-fix";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -11903,8 +11903,11 @@ function shouldUseRealtimeForTournament(page, tid){
   const targetTid=String(tid||'').trim();
   if(!targetTid) return false;
   if(pg!=='bracket') return false;
-  if(AD || OP || REG) return true;
-  return false;
+  // v445: 예선/본선 결과는 관람자 화면도 즉시 갱신되어야 한다.
+  // 기존에는 관리자·진행자·경기이사만 matches onSnapshot을 켜고,
+  // 일반 관람자는 10분짜리 tournament bundle 캐시를 우선 사용해서
+  // PC↔모바일 간 결과가 새로고침 후에도 늦게 보일 수 있었다.
+  return true;
 }
 function isViewerReadOnlyMode(){
   return !(AD || OP || REG);
@@ -15206,7 +15209,11 @@ function showPage(n){
   renderFloatingNotice();
   setTimeout(updateOperationSticky,0);
   setTimeout(()=>window.updatePageSliderHeight && window.updatePageSliderHeight(), 0);
-  try{ syncTournamentDataForPage(n, getSelectedTournamentIdForPage(n) || getRealtimeTargetTournamentId() || null, false).catch(e=>console.warn('page sync failed', e)); }catch(e){}
+  try{
+    const _syncTid = getSelectedTournamentIdForPage(n) || getRealtimeTargetTournamentId() || null;
+    // v445: 대진표 화면은 결과 동기화가 핵심이므로 화면 진입 시 서버 기준 1회 확인한다.
+    syncTournamentDataForPage(n, _syncTid, n==='bracket').catch(e=>console.warn('page sync failed', e));
+  }catch(e){}
   ensureViewerBracketPolling(n, getSelectedTournamentIdForPage(n) || getRealtimeTargetTournamentId() || null);
   refreshRoleUI();
   // refreshRoleUI가 탭 display를 덮어쓰므로 잠금 재적용
@@ -21224,7 +21231,11 @@ function initBracketNotice(){
 
 function onBrTC(){
   const tid=ge('brTS').value, ds=ge('brDS');
-  try{ syncTournamentDataForPage('bracket', tid || getRealtimeTargetTournamentId() || null, false).catch(e=>console.warn('bracket sync failed', e)); }catch(e){}
+  try{
+    // v445: 대진표 진입/대회 변경 시 기존 10분 캐시를 그대로 쓰지 말고
+    // 서버 기준 1회 동기화 후 실시간 리스너를 연결한다.
+    syncTournamentDataForPage('bracket', tid || getRealtimeTargetTournamentId() || null, true).catch(e=>console.warn('bracket sync failed', e));
+  }catch(e){}
   if(!tid){
     if(ds) ds.innerHTML='<option value="__ALL__">전체</option>';
     BR_MULTI_DIVS=['__ALL__'];
