@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-01-v444c-print-color-fix";
+  const APP_VERSION = "2026-06-01-v444d-name-clip-fix";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -43645,8 +43645,8 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
 .v442-a4-sheet .v435-group-body{display:flex!important;flex-direction:column!important;gap:4px!important;padding:5px!important;height:calc(var(--v442-row-h,96px) - 24px)!important;box-sizing:border-box!important;background:#f8fafc!important;overflow:hidden!important;}
 .v442-a4-sheet .v435-team-row{display:grid!important;grid-template-columns:18px minmax(0,1fr)!important;gap:4px!important;align-items:start!important;min-height:0!important;height:calc((var(--v442-row-h,96px) - 39px) / 2)!important;padding:4px!important;border-radius:5px!important;border:1px solid #e2e8f0!important;background:#fff!important;box-sizing:border-box!important;overflow:hidden!important;}
 .v442-a4-sheet .v435-team-no{width:16px!important;height:16px!important;font-size:7.5px!important;line-height:1!important;}
-.v442-a4-sheet .v435-team-name{font-size:9.3px!important;line-height:1.08!important;font-weight:1000!important;letter-spacing:-.055em!important;color:#0f172a!important;white-space:normal!important;overflow:hidden!important;display:-webkit-box!important;-webkit-line-clamp:1!important;-webkit-box-orient:vertical!important;}
-.v442-a4-sheet .v435-team-sub{font-size:6.7px!important;line-height:1.05!important;font-weight:900!important;letter-spacing:-.055em!important;color:#334155!important;white-space:normal!important;overflow:hidden!important;display:-webkit-box!important;-webkit-line-clamp:2!important;-webkit-box-orient:vertical!important;margin-top:1px!important;}
+.v442-a4-sheet .v435-team-name{font-size:9.3px!important;line-height:1.08!important;font-weight:1000!important;letter-spacing:-.055em!important;color:#0f172a!important;white-space:normal!important;overflow:visible!important;display:block!important;-webkit-line-clamp:unset!important;word-break:keep-all!important;overflow-wrap:anywhere!important;}
+.v442-a4-sheet .v435-team-sub{font-size:6.7px!important;line-height:1.05!important;font-weight:900!important;letter-spacing:-.055em!important;color:#334155!important;white-space:normal!important;overflow:visible!important;display:block!important;-webkit-line-clamp:unset!important;word-break:keep-all!important;overflow-wrap:anywhere!important;margin-top:1px!important;}
 .v442-a4-sheet .v437-group-match-list{display:none!important;}
 .v440-preview-body .v442-a4-sheet{transform:none!important;transform-origin:top center!important;}
 @media print{
@@ -43811,6 +43811,31 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
 .v442-a4-sheet .v438-time-badge{
   min-width:46px!important;
 }
+/* 팀 이름/소속 잘림 방지 - line-clamp 해제, 전체 표시 */
+.v443-a4-sheet .v435-team-name,
+.v442-a4-sheet .v435-team-name,
+.v441-a4-sheet .v435-team-name,
+.v440-a4-sheet .v435-team-name{
+  overflow:visible!important;
+  display:block!important;
+  -webkit-line-clamp:unset!important;
+  -webkit-box-orient:unset!important;
+  white-space:normal!important;
+  word-break:keep-all!important;
+  overflow-wrap:anywhere!important;
+}
+.v443-a4-sheet .v435-team-sub,
+.v442-a4-sheet .v435-team-sub,
+.v441-a4-sheet .v435-team-sub,
+.v440-a4-sheet .v435-team-sub{
+  overflow:visible!important;
+  display:block!important;
+  -webkit-line-clamp:unset!important;
+  -webkit-box-orient:unset!important;
+  white-space:normal!important;
+  word-break:keep-all!important;
+  overflow-wrap:anywhere!important;
+}
 /* 현재 페이지에서 인쇄할 때 오직 임시 출력 루트만 보이게 강제 */
 /* ── 배경색 보존: 브라우저 인쇄 시 background 제거 방지 ── */
 #v443PrintRoot,
@@ -43964,6 +43989,15 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
         el.style.setProperty('background','#ffffff','important');
         el.style.setProperty('-webkit-print-color-adjust','exact','important');
         el.style.setProperty('print-color-adjust','exact','important');
+      });
+      // 팀 이름/소속 잘림 방지 (line-clamp 인라인 해제)
+      clone.querySelectorAll('.v435-team-name,.v435-team-sub').forEach(function(el){
+        el.style.setProperty('overflow','visible','important');
+        el.style.setProperty('display','block','important');
+        el.style.setProperty('-webkit-line-clamp','unset','important');
+        el.style.setProperty('white-space','normal','important');
+        el.style.setProperty('word-break','keep-all','important');
+        el.style.setProperty('overflow-wrap','anywhere','important');
       });
       clone.querySelectorAll('.v435-court-badge,.v438-order-badge').forEach(function(el){
         el.style.setProperty('background','#eff6ff','important');
