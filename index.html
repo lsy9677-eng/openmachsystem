@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-01-v445-live-match-sync-fix";
+  const APP_VERSION = "2026-06-01-v448-court-scoped-start-time-fix";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -5426,6 +5426,33 @@ body {
 </style>
 
 
+
+<style id="v446MobileIndividualScoreFixStyle">
+/* v446: 모바일 개인전 결과 입력 간결화 + 오입력 방지 */
+.indiv-score-compact{display:grid;grid-template-columns:minmax(0,1fr) 22px minmax(0,1fr);gap:8px;align-items:stretch;width:100%;}
+.indiv-score-side{min-width:0;border:1.5px solid #dbeafe;border-radius:14px;background:linear-gradient(180deg,#fff,#f8fbff);padding:10px 8px;text-align:center;}
+.indiv-score-label{font-size:.78rem;font-weight:900;color:#475569;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.indiv-score-display{display:flex;align-items:center;justify-content:center;width:46px;height:42px;margin:0 auto 7px;border-radius:13px;background:#0f1e3a;color:#fff;font-size:1.4rem;font-weight:1000;line-height:1;}
+.indiv-score-help{font-size:.64rem;font-weight:800;color:#64748b;margin-bottom:6px;letter-spacing:-.02em;}
+.indiv-score-btns{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;}
+.indiv-score-btn{height:34px;min-height:34px;border-radius:10px;border:1.5px solid var(--border);background:#fff;color:var(--text);font-weight:1000;font-size:.86rem;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
+.indiv-score-btn.active{background:var(--primary)!important;color:#fff!important;border-color:var(--primary)!important;}
+.indiv-score-colon{display:flex;align-items:center;justify-content:center;font-size:1.25rem;font-weight:1000;color:#64748b;}
+.indiv-score-guide{margin-top:10px;padding:8px 10px;border-radius:12px;background:#fff7ed;border:1px solid #fdba74;color:#9a3412;font-size:.74rem;line-height:1.55;font-weight:800;}
+#mM3SaveResultBtn{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
+@media(max-width:680px){
+  #mM3 .v300-result-summary{padding:10px!important;margin-bottom:10px!important;}
+  #mM3 .v300-result-summary > div[style*="grid-template-columns"]{gap:6px!important;}
+  #mM3 .v300-result-summary > div[style*="grid-template-columns"] > div{min-height:44px!important;padding:8px 6px!important;font-size:.82rem!important;}
+  .indiv-score-compact{grid-template-columns:minmax(0,1fr) 16px minmax(0,1fr);gap:6px;}
+  .indiv-score-side{padding:8px 6px;border-radius:12px;}
+  .indiv-score-display{width:40px;height:36px;font-size:1.22rem;border-radius:11px;margin-bottom:6px;}
+  .indiv-score-btn{height:32px;min-height:32px;font-size:.82rem;border-radius:9px;}
+  .indiv-score-help{font-size:.59rem;}
+  .indiv-score-guide{font-size:.68rem;padding:7px 9px;}
+}
+</style>
+
 </head>
 <body>
 <header class="app-header">
@@ -8346,7 +8373,7 @@ function etAddCustomDiv(){
 function grpLabel(gi){ return `${Number(gi)+1}조`; }
 
 import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import{getFirestore,collection,doc,getDoc,getDocs,getDocsFromServer,setDoc,addDoc,updateDoc,deleteDoc,onSnapshot,query,orderBy,limit,serverTimestamp,writeBatch,where,documentId}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import{getFirestore,collection,doc,getDoc,getDocs,getDocsFromServer,setDoc,addDoc,updateDoc,deleteDoc,onSnapshot,query,orderBy,limit,serverTimestamp,writeBatch,where,documentId,waitForPendingWrites}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import{getStorage,ref,uploadBytes,getDownloadURL,deleteObject,listAll}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 import{getAuth,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut,onAuthStateChanged,signInAnonymously,GoogleAuthProvider,signInWithPopup,signInWithRedirect,getRedirectResult,signInWithCustomToken,setPersistence,browserLocalPersistence}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import{getMessaging,getToken,deleteToken,onMessage,isSupported}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
@@ -13857,6 +13884,7 @@ async function persistSingleMatchDoc(key, matchObj){
   payload.updatedAt=new Date().toISOString();
   if(!payload.createdAt) payload.createdAt=payload.updatedAt;
   await setDoc(doc(db,'matches',matchObj._id), payload, {merge:true});
+  try{ await waitForPendingWrites(db); }catch(_e){}
   const cur=G.matches[key]||[];
   const docsForHash=cur.map(x=>{
     const cloned={...x};
@@ -13890,6 +13918,7 @@ async function persistSingleMatchDocPublic(key, matchObj){
   if(matchObj.t2OwnerUid) publicPayload.t2OwnerUid=matchObj.t2OwnerUid;
   if(matchObj._id){
     await updateDoc(doc(db,'matches',matchObj._id), publicPayload);
+    try{ await waitForPendingWrites(db); }catch(_e){}
   }else{
     throw new Error('기존 경기 문서 ID가 없어 참가자 결과 저장을 할 수 없습니다. 관리자 저장은 가능하지만, 참가자 저장 규칙은 기존 경기 문서 update만 허용하도록 맞춰야 합니다.');
   }
@@ -22182,8 +22211,10 @@ function rebuildIndividualAutoCourtAssignmentsForKey(key){
     m.courtQueueOrder=queueOrder;
     if(item.autoLabel) m.autoCourtLabel=item.autoLabel; else delete m.autoCourtLabel;
     m.manualSharedHold=false;
-    // [BUG FIX] rebuild 시 prevState에 저장된 waitingFirstAt/lastWaitingFirstAt 복원
-    if(prev.waitingFirstAt) m.waitingFirstAt=prev.waitingFirstAt; else delete m.waitingFirstAt;
+    // v448: assign 단계에서는 waitingFirstAt을 복원하지 않는다.
+    // 현재 경기인지, 대기 1번/2번인지가 아직 확정되지 않은 상태에서 복원하면
+    // 이미 시합중인 다른 코트까지 '대기에서 승격'으로 오판되어 시작시간이 0분으로 리셋될 수 있다.
+    delete m.waitingFirstAt;
     if(prev.lastWaitingFirstAt) m.lastWaitingFirstAt=prev.lastWaitingFirstAt; else delete m.lastWaitingFirstAt;
     assignedIds.add(String(m.id));
   };
@@ -22370,12 +22401,12 @@ function rebuildIndividualAutoCourtAssignmentsForKey(key){
       const prevCurrent=prevState.get(String(current.id)) || {assignedAt:'', waitingFirstAt:'', lastWaitingFirstAt:'', courts:'[]'};
       const currentCourts=JSON.stringify(Array.isArray(current.courts)?current.courts:(current.court?[current.court]:[]));
       const sameCourtQueue = prevCurrent.courts===currentCourts;
-      const wasActuallyWaiting = !!(prevCurrent.waitingFirstAt && sameCourtQueue);
-      if(wasActuallyWaiting){
+
+      // v448: 자동 재배정/렌더링 단계에서는 절대 현재 경기의 시작시각을 새로 찍지 않는다.
+      // 실제 승격 시각은 결과 저장 직후 promoteNextWaitingAfterFinishedCourts(key, finishedCourts)에서
+      // '결과가 입력된 해당 코트'에 대해서만 부여한다.
+      if(prevCurrent.waitingFirstAt && sameCourtQueue){
         current.lastWaitingFirstAt=prevCurrent.waitingFirstAt;
-        const promotedAt = new Date().toISOString();
-        current.courtAssignedAt = promotedAt;
-        changed = true;
       }else if(prevCurrent.lastWaitingFirstAt && sameCourtQueue){
         current.lastWaitingFirstAt=prevCurrent.lastWaitingFirstAt;
       }else{
@@ -28521,6 +28552,7 @@ function openM3(key,mid){
   const exRb=Array.isArray(m.rubbers)?m.rubbers:[];
   const existingMatchMemo=getMatchMemoByObj(m);
   const scBtns=(id,cur)=>[0,1,2,3,4,5,6].map(n=>`<button type="button" onclick="setRbSc('${id}',${n})" style="width:32px;height:32px;border-radius:6px;border:1.5px solid ${cur===n?'var(--primary)':'var(--border)'};background:${cur===n?'var(--primary)':'white'};color:${cur===n?'white':'var(--text)'};font-weight:700;font-size:.85rem;cursor:pointer;transition:.15s" id="${id}_btn${n}">${n}</button>`).join('');
+  const indivScBtns=(id,cur)=>[0,1,2,3,4,5].map(n=>`<button type="button" class="indiv-score-btn ${cur===n?'active':''}" onclick="setIndividualQuickScore('${id}',${n})" id="${id}_btn${n}">${n}</button>`).join('');
   let html='';
 
   if(isIndividualMode){
@@ -28550,19 +28582,24 @@ function openM3(key,mid){
         <div id="rp2_0" style="display:none" data-selected="${encodeURIComponent(JSON.stringify(p2v))}"></div>
         <div style="padding:12px;border-radius:14px;background:#fff;border:1.5px solid var(--border)">
           <div style="font-size:.92rem;font-weight:900;color:var(--primary-dark);margin-bottom:10px">${roundLabel}</div>
-          <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center">
-            <div>
-              <div style="font-size:.78rem;font-weight:800;color:var(--text2);margin-bottom:6px;text-align:center">${sideLabel1}</div>
-              <div style="display:flex;flex-wrap:wrap;gap:4px;justify-content:center">${scBtns('rs1_0', s1v===''?null:Number(s1v))}</div>
+          <div class="indiv-score-compact">
+            <div class="indiv-score-side">
+              <div class="indiv-score-label">${sideLabel1}</div>
+              <div class="indiv-score-display" id="scoreView_rs1_0">${s1v===''?'-':s1v}</div>
+              <div class="indiv-score-help">이 팀이 진 경우 점수 선택</div>
+              <div class="indiv-score-btns">${indivScBtns('rs1_0', s1v===''?null:Number(s1v))}</div>
               <input type="hidden" id="rs1_0" value="${s1v}">
             </div>
-            <div style="font-size:1.3rem;font-weight:900;color:var(--text3);text-align:center">:</div>
-            <div>
-              <div style="font-size:.78rem;font-weight:800;color:var(--text2);margin-bottom:6px;text-align:center">${sideLabel2}</div>
-              <div style="display:flex;flex-wrap:wrap;gap:4px;justify-content:center">${scBtns('rs2_0', s2v===''?null:Number(s2v))}</div>
+            <div class="indiv-score-colon">:</div>
+            <div class="indiv-score-side">
+              <div class="indiv-score-label">${sideLabel2}</div>
+              <div class="indiv-score-display" id="scoreView_rs2_0">${s2v===''?'-':s2v}</div>
+              <div class="indiv-score-help">이 팀이 진 경우 점수 선택</div>
+              <div class="indiv-score-btns">${indivScBtns('rs2_0', s2v===''?null:Number(s2v))}</div>
               <input type="hidden" id="rs2_0" value="${s2v}">
             </div>
           </div>
+          <div class="indiv-score-guide">패자 점수만 누르면 상대팀은 자동으로 6점 입력됩니다. 예: 6:2이면 2점을 받은 팀의 2를 누르세요.</div>
         </div>
       </div>
     </div>`;
@@ -28700,17 +28737,38 @@ function openM3(key,mid){
 
 function esc(s){return(s||'').replace(/'/g,"\\'").replace(/"/g,'&quot;');}
 // 스코어 버튼 클릭 핸들러
-function setRbSc(inputId, val){
+function setScoreValueAndButtons(inputId, val){
   const inp = ge(inputId);
   if(!inp) return;
-  inp.value = val;
+  inp.value = (val===null||val===undefined) ? '' : String(val);
+  const view = ge('scoreView_'+inputId);
+  if(view) view.textContent = (inp.value==='' ? '-' : inp.value);
   for(let n=0;n<=6;n++){
     const btn = ge(inputId+'_btn'+n);
     if(!btn) continue;
-    const active = n===val;
+    const active = Number(inp.value)===n;
+    btn.classList.toggle('active', active);
     btn.style.background = active?'var(--primary)':'white';
     btn.style.color = active?'white':'var(--text)';
     btn.style.borderColor = active?'var(--primary)':'var(--border)';
+  }
+}
+function getOppositeScoreInputId(inputId){
+  const m=String(inputId||'').match(/^rs([12])_(\d+)$/);
+  if(!m) return '';
+  return `rs${m[1]==='1'?'2':'1'}_${m[2]}`;
+}
+function setIndividualQuickScore(inputId, val){
+  setScoreValueAndButtons(inputId, val);
+  const otherId=getOppositeScoreInputId(inputId);
+  if(otherId) setScoreValueAndButtons(otherId, 6);
+}
+function setRbSc(inputId, val){
+  setScoreValueAndButtons(inputId, val);
+  const otherId=getOppositeScoreInputId(inputId);
+  // 개인전 결과 입력 화면에서는 패자 점수(0~5)를 누르면 상대 6점을 자동 입력한다.
+  if(otherId && ge('mM3')?.classList.contains('open') && ge('scoreView_'+inputId) && Number(val)<6){
+    setScoreValueAndButtons(otherId, 6);
   }
 }
 
@@ -28869,7 +28927,7 @@ function closeResultModalAfterSave(){
   }
 }
 
-async function saveM3(){
+async function saveM3Core(){
   const prevCourtState=captureCourtNotificationState();
   const key=CM_key,mid=CM_id;if(!key||!mid)return;
   const list=G.matches[key]||[];const idx=list.findIndex(m=>m.id===mid);if(idx<0)return;
@@ -29013,6 +29071,9 @@ async function saveM3(){
   m.rubbers=newRb;
   if(G.meta.onlineOrderEnabled && orderState.bothSubmitted) syncRevealedOrderIntoMatchRubbers(key,m);
   m.winner=hasFinalWinner ? (sc1>sc2?m.t1:m.t2) : null;
+  m.sc1=sc1;
+  m.sc2=sc2;
+  m.scoreText=`${sc1}:${sc2}`;
   attachMatchAudit(m, hasFinalWinner?'result_save':'score_save');
   if(hasFinalWinner){
     if(!m.completedAt) m.completedAt=new Date().toISOString();
@@ -29112,6 +29173,34 @@ async function saveM3(){
     dispatchLocalCourtNotificationAlerts(prevCourtState);
     sl(false);closeResultModalAfterSave();toast(hasFinalWinner ? '결과 저장 ✅' : (isTieState ? '동점 상태로 실시간 스코어 저장 ✅' : '실시간 스코어 저장 ✅'),'success');renderBracket();
   }catch(e){sl(false);toast('저장 실패: '+e.message,'error');}
+}
+
+let __m3Saving=false;
+function setM3SavingState(on){
+  try{
+    ['mM3SaveResultBtn','mM3SaveBtn','mM3SubmitBtn','mM3SubmitHomeBtn','mM3SubmitAwayBtn','mM3SubmitOperatorHomeBtn','mM3SubmitOperatorAwayBtn'].forEach(id=>{
+      const b=ge(id); if(!b) return;
+      b.disabled=!!on;
+      b.style.opacity=on?'.62':'';
+      b.style.pointerEvents=on?'none':'';
+    });
+    const save=ge('mM3SaveResultBtn');
+    if(save){
+      if(on){ save.dataset.prevText=save.textContent||''; save.textContent='저장 중...'; }
+      else if(save.dataset.prevText){ save.textContent=save.dataset.prevText; delete save.dataset.prevText; }
+    }
+  }catch(e){}
+}
+async function saveM3(){
+  if(__m3Saving){ toast('저장 중입니다. 잠시만 기다려주세요','info'); return; }
+  __m3Saving=true;
+  setM3SavingState(true);
+  try{
+    await saveM3Core();
+  }finally{
+    __m3Saving=false;
+    setM3SavingState(false);
+  }
 }
 
 // ═══════════════════════════════════════════════════
@@ -42315,7 +42404,11 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
     const html=`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>예선 대진표 A4 출력</title>
       <style>${document.getElementById('v431BracketExportFixStyle')?.innerHTML||''}
       @page{size:A4 portrait;margin:0} body{margin:0;background:#fff;font-family:'Noto Sans KR',Arial,sans-serif}.v431-export-sheet{position:static!important;left:auto!important;top:auto!important;width:794px!important;margin:0 auto;z-index:auto!important}.v431-a4-page{page-break-after:always;break-after:page}.v431-a4-page:last-child{page-break-after:auto}</style>
-      </head><body>${sheet.outerHTML}<script>window.onload=function(){setTimeout(function(){window.focus();window.print();},250)}<\/script>
+      </head><body>${sheet.outerHTML}<script>window.onload=function(){setTimeout(function(){window.focus();window.print();},250)}<\/script></body></html>`;
+    const w=window.open('','_blank');
+    if(!w){safeToast('팝업이 차단되었습니다. 브라우저 팝업 허용 후 다시 눌러주세요.','error');return;}
+    w.document.open(); w.document.write(html); w.document.close();
+  }
 
 <!-- v434: A4 예선표 출력 전 미리보기 + 코트/클럽 표시 보강 -->
 <style id="v434A4PreviewCourtClubStyle">
@@ -44122,6 +44215,66 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
     setTimeout(forcePrintBtn,500);
     setTimeout(applyGroupFixToPreview,600);
   });
+})();
+</script>
+
+
+<script id="v447MobileResultScoreClickFix">
+(function(){
+  'use strict';
+  function ge(id){ return document.getElementById(id); }
+  function updateScoreValue(inputId, val){
+    const inp = ge(inputId);
+    if(!inp) return;
+    inp.value = (val === null || val === undefined || val === '') ? '' : String(val);
+    const view = ge('scoreView_' + inputId);
+    if(view) view.textContent = inp.value === '' ? '-' : inp.value;
+    for(let n=0;n<=6;n++){
+      const btn = ge(inputId + '_btn' + n);
+      if(!btn) continue;
+      const active = String(inp.value) === String(n);
+      btn.classList.toggle('active', active);
+      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+      if(btn.classList.contains('indiv-score-btn')){
+        // CSS active class handles the compact individual-result buttons.
+      }else{
+        btn.style.background = active ? 'var(--primary)' : 'white';
+        btn.style.color = active ? 'white' : 'var(--text)';
+        btn.style.borderColor = active ? 'var(--primary)' : 'var(--border)';
+      }
+    }
+  }
+  function oppositeScoreId(inputId){
+    const m = String(inputId||'').match(/^rs([12])_(\d+)$/);
+    if(!m) return '';
+    return 'rs' + (m[1] === '1' ? '2' : '1') + '_' + m[2];
+  }
+  window.setScoreValueAndButtons = updateScoreValue;
+  window.getOppositeScoreInputId = oppositeScoreId;
+  window.setIndividualQuickScore = function(inputId, val){
+    val = Number(val);
+    if(!Number.isFinite(val)) return;
+    updateScoreValue(inputId, val);
+    const otherId = oppositeScoreId(inputId);
+    if(otherId) updateScoreValue(otherId, 6);
+  };
+  window.setRbSc = function(inputId, val){
+    val = Number(val);
+    if(!Number.isFinite(val)) return;
+    updateScoreValue(inputId, val);
+    const otherId = oppositeScoreId(inputId);
+    const isCompactIndividual = !!ge('scoreView_' + inputId);
+    if(isCompactIndividual && otherId && val < 6) updateScoreValue(otherId, 6);
+  };
+  document.addEventListener('click', function(ev){
+    const btn = ev.target && ev.target.closest ? ev.target.closest('.indiv-score-btn') : null;
+    if(!btn || !btn.id) return;
+    const m = btn.id.match(/^(rs[12]_\d+)_btn(\d)$/);
+    if(!m) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    window.setIndividualQuickScore(m[1], Number(m[2]));
+  }, true);
 })();
 </script>
 
