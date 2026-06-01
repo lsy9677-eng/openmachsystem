@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-05-28-v427-phase-court-settings";
+  const APP_VERSION = "2026-06-01-v430-template-button-visible";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -30637,7 +30637,7 @@ function upDash(){
           summary=`<div style="margin-top:6px;padding:5px 8px;background:var(--panel2);border-radius:var(--radius);font-size:.75rem;color:var(--text2)">📋 예선 진행중<br><span style="font-weight:600">${grpSummary}</span></div>`;
         }
       }
-      const onClickFn=isOngoing?`goBracket('${at.id}','${d}')`:`openRoster('${at.id}','${d}')`;
+      const onClickFn=isOngoing?`goBracket('${at.id}','${d}')`:`openHomeRegisterWithTournamentDivision('${at.id}','${d}')`;
       // 홈 현재 부서 진행 현황에는 상세 오더 목록 대신 요약만 표시
       let orderHtml='';
       if(G.meta.onlineOrderEnabled && !isIndividualTournament(at) && isOngoing && allMs.length>0){
@@ -30663,7 +30663,15 @@ function upDash(){
           <div style="font-size:.74rem;color:${color};margin-top:2px;font-weight:700">양팀 제출 완료 경기 ${bothCnt}/${allMatchMs.length}</div>
         </div>`;
       }
-      return`<div class="stat-card" style="cursor:pointer;padding:20px 18px;min-height:158px;border-width:2px" onclick="${onClickFn}"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span class="dpill ${dc(d)}" style="font-size:.9rem;padding:6px 14px">${dl(d)}</span>${isOngoing&&mt>0?'<span class="badge bg-green" style="animation:pulse 2s infinite;font-size:.78rem;padding:5px 10px">진행중</span>':hd?'<span class="badge bg-green" style="font-size:.78rem;padding:5px 10px">추첨완료</span>':'<span class="badge bg-gray" style="font-size:.78rem;padding:5px 10px">대기</span>'}</div><div class="stat-val" title="참가접수 명단으로 이동" onclick="event.stopPropagation();openHomeRegisterWithTournamentDivision('${at.id}','${d}')" style="margin-top:12px;font-size:2.25rem;cursor:pointer">${tc}<span style="font-size:1.08rem;font-weight:500"> 팀</span></div><div class="stat-label" style="font-size:.9rem;margin-top:2px">${mt>0?`경기 ${md}/${mt} 완료`:'미시작'}</div>${summary}${orderHtml}${isOngoing?'<div style="margin-top:10px;font-size:.82rem;color:var(--primary);font-weight:700">👆 탭하면 대진표 실시간 보기</div>':''}</div>`;
+      const drawCompleted = hd && mt>0;
+      const statusBadge = (isOngoing&&mt>0)
+        ? '<span class="badge bg-green" style="animation:pulse 2s infinite;font-size:.78rem;padding:5px 10px">진행중</span>'
+        : drawCompleted
+          ? '<span class="badge bg-green" style="font-size:.78rem;padding:5px 10px">추첨완료</span>'
+          : (String(at.status||'')==='open'
+              ? '<span class="badge bg-blue" style="font-size:.78rem;padding:5px 10px">접수중</span>'
+              : '<span class="badge bg-gray" style="font-size:.78rem;padding:5px 10px">추첨전</span>');
+      return`<div class="stat-card" style="cursor:pointer;padding:20px 18px;min-height:158px;border-width:2px" onclick="${onClickFn}"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span class="dpill ${dc(d)}" style="font-size:.9rem;padding:6px 14px">${dl(d)}</span>${statusBadge}</div><div class="stat-val" title="참가접수 명단으로 이동" onclick="event.stopPropagation();openHomeRegisterWithTournamentDivision('${at.id}','${d}')" style="margin-top:12px;font-size:2.25rem;cursor:pointer">${tc}<span style="font-size:1.08rem;font-weight:500"> 팀</span></div><div class="stat-label" style="font-size:.9rem;margin-top:2px">${mt>0?`경기 ${md}/${mt} 완료`:'미시작'}</div>${summary}${orderHtml}${isOngoing?'<div style="margin-top:10px;font-size:.82rem;color:var(--primary);font-weight:700">👆 탭하면 대진표 실시간 보기</div>':'<div style="margin-top:10px;font-size:.82rem;color:var(--primary);font-weight:700">👆 탭하면 참가접수 명단으로 이동</div>'}</div>`;
     }).join('');
   } else {
     ge('heroTitle').textContent=getAppTitle();
@@ -36441,6 +36449,7 @@ function v374RenderNotifyModal(opts={}){
       <div class="v374-notify-guide">팀 전체를 선택하거나, 필요한 참가자만 체크해서 알림/문자를 보낼 수 있습니다.</div>
       <label class="v374-all-row"><input type="checkbox" id="v374NotifyAll" checked onchange="document.querySelectorAll('#mParticipantNotifySmsBody .v374-rec-check').forEach(b=>b.checked=this.checked)"> <b>팀 전체 선택</b></label>
       <div class="v374-rec-list">${recs.map((r,i)=>`<label class="v374-rec-row"><input type="checkbox" class="v374-rec-check" ${r.checked?'checked':''} onchange="v374SyncAllCheckbox()"><span class="v374-rec-main"><b>${v374Esc(r.name)}</b><small>${v374Esc(v374ShortClub(r.club))}${r.phone?' · '+v374Esc(r.phone):' · 전화번호 없음'}</small></span>${r.phone?`<button type="button" class="btn btn-outline" onclick="event.preventDefault();v374SendOneSms(${i})" style="min-height:30px;font-size:.72rem;padding:4px 8px">문자</button>`:''}</label>`).join('')}</div>
+      ${(opts.context&&opts.context.type==='team')?`<div id="v428NotifyTemplateBar" style="display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 8px;padding:9px 10px;border-radius:12px;background:#fff7ed;border:1.5px solid #fdba74"><button type="button" class="btn btn-outline" style="font-size:.78rem;padding:6px 10px;background:#fff;color:#9a3412;border-color:#fdba74;font-weight:900" onclick="applyParticipantSmsTemplate('waitlist_promoted')">⚡ 대기→정식등록 문구</button><button type="button" class="btn btn-outline" style="font-size:.78rem;padding:6px 10px;font-weight:900" onclick="applyParticipantSmsTemplate('payment_confirmed')">💳 입금확인 문구</button></div>`:''}
       <div class="form-group" style="margin-top:12px"><label class="form-label">알림 제목</label><input class="form-input" id="v374NotifyTitle" value="${v374Esc(defaultTitle)}"></div>
       <div class="form-group"><label class="form-label">알림/문자 내용</label><textarea class="form-textarea" id="v374NotifyBody" rows="4">${v374Esc(defaultBody)}</textarea></div>
     </div>`;
@@ -36450,19 +36459,75 @@ function v374RenderNotifyModal(opts={}){
   }
   om('mParticipantNotifySms');
 }
-function openParticipantTeamNotifySms(key,idx){
+function getWaitlistPromotedSmsMessage(key, idx){
+  try{
+    const team=(G.teams?.[key]||[])[Number(idx)];
+    const label=getPaymentTeamLabel(team,key,idx).replace(/\s+/g,' ').trim() || '참가자';
+    const regNo=Number(idx)+1;
+    const account=getPaymentAccountNumberOnly(key) || '3333-07-8834842';
+    const title=getPaymentTournamentTitle(key) || '모던클럽배';
+    return `${label}
+참가자 안내입니다. 참가비
+지금 바로 입금하시면
+${regNo}번으로 정식등록 됩니다.
+카카오뱅크${account}
+
+${title} 입금확인 후
+등록해드리겠습니다. 입금
+안되시면 다음 순번대기자로
+넘어오니 확인 부탁드립니다. ^^`;
+  }catch(e){
+    return `참가자 안내입니다. 참가비 지금 바로 입금하시면 정식등록 됩니다.
+카카오뱅크3333-07-8834842
+입금확인 후 등록해드리겠습니다. 입금 안되시면 다음 순번대기자로 넘어오니 확인 부탁드립니다. ^^`;
+  }
+}
+function applyParticipantSmsTemplate(mode){
+  try{
+    const ctx=window.__v374NotifyContext||{};
+    if(ctx.type!=='team') return;
+    const idx=Number(ctx.idx||0);
+    if(mode==='waitlist_promoted'){
+      const title=ge('v374NotifyTitle');
+      const body=ge('v374NotifyBody');
+      if(title) title.value='추가대기 정식등록 안내';
+      if(body) body.value=getWaitlistPromotedSmsMessage(ctx.key, idx);
+    }else if(mode==='payment_confirmed'){
+      const title=ge('v374NotifyTitle');
+      const body=ge('v374NotifyBody');
+      if(title) title.value='참가비 입금 확인 ✅';
+      if(body) body.value=getPaymentConfirmedMessage(ctx.key, idx);
+    }
+  }catch(e){console.warn('template apply failed', e);}
+}
+function openParticipantTeamNotifySms(key,idx,templateMode){
   try{
     if(!v374IsManagerLike()){toast('관리자/진행자만 사용할 수 있습니다','info');return;}
     const team=(G.teams?.[key]||[])[Number(idx)];
     if(!team){toast('참가 명단을 찾을 수 없습니다','error');return;}
     const label=team.entryLabel||team.pairLabel||(Array.isArray(team.individualPlayers)?getIndividualPlayers(team).map(p=>p.name).join(' / '):tdn(team,key,idx))||'참가자';
+    const title = templateMode==='waitlist_promoted' ? '추가대기 정식등록 안내' : '참가자 안내';
+    const body = templateMode==='waitlist_promoted' ? getWaitlistPromotedSmsMessage(key,idx) : `${label} 참가자 안내입니다.`;
     v374RenderNotifyModal({
       targetText:`참가 명단: ${label}`,
       recipients:v374GetTeamNotifyRecipients(team),
-      title:'참가자 안내',
-      body:`${label} 참가자 안내입니다.`,
+      title,
+      body,
       context:{type:'team',key,idx:Number(idx)}
     });
+    setTimeout(()=>{
+      try{
+        const box=ge('mParticipantNotifySmsBody');
+        if(box && !ge('v428NotifyTemplateBar')){
+          const bar=document.createElement('div');
+          bar.id='v428NotifyTemplateBar';
+          bar.style.cssText='display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 2px;padding:8px 10px;border-radius:12px;background:#fff7ed;border:1px solid #fdba74';
+          bar.innerHTML=`<button type="button" class="btn btn-outline" style="font-size:.74rem;padding:5px 10px;background:#fff;color:#9a3412;border-color:#fdba74" onclick="applyParticipantSmsTemplate('waitlist_promoted')">⚡ 대기→정식등록 문구</button><button type="button" class="btn btn-outline" style="font-size:.74rem;padding:5px 10px" onclick="applyParticipantSmsTemplate('payment_confirmed')">💳 입금확인 문구</button>`;
+          const first=box.querySelector('.form-group');
+          if(first) box.insertBefore(bar, first); else box.appendChild(bar);
+        }
+      }catch(_e){}
+    },0);
   }catch(e){console.warn(e);toast('알림/문자 창 열기 실패','error');}
 }
 function openParticipantPersonNotifySms(name,club='',phone=''){
@@ -36538,7 +36603,7 @@ renderAllP=function(){
   setTimeout(v374CompactRecordCards,0);
   return r;
 };
-Object.assign(window,{openParticipantTeamNotifySms,openParticipantPersonNotifySms,v374SendSelectedPush,v374SendSelectedSms,v374SendOneSms,v374SyncAllCheckbox,v374CompactRecordCards});
+Object.assign(window,{openParticipantTeamNotifySms,openParticipantPersonNotifySms,getWaitlistPromotedSmsMessage,applyParticipantSmsTemplate,v374SendSelectedPush,v374SendSelectedSms,v374SendOneSms,v374SyncAllCheckbox,v374CompactRecordCards});
 
 Object.assign(window,{ openHomeRegisterWithTournament, openHomeRegisterWithTournamentDivision, openHomeRegister, copyTournamentFeeAccount, toggleTeamPaymentPaid, sendPaymentConfirmedNotice, buildPaymentActionHTML, buildPaymentStatusHTML, openAdminBroadcastPushModal, openManualMatchPush, openManualTeamPush, sendManualPushFromModal, closeStickyAlert, goToStickyAlertMatch, toggleModalFullscreen, setModalFullscreenState, openQuickAddPlayer, quickAddPlayer, fillAdminPlayerClub, adminAddPlayer, openSupportModal, sendSupportSMS, saveAdminPhone, 
   showPage,toggleAdmin,doLogin,openAdminSettings,saveAdminPassword,goBracket,onGuideFilesSelected,removeGuideFile,openGuide,loadHistFromDB,uploadHistFromExcel,previewHistExcel,renderGuidePreview,onHistGuideFilesSelected,uploadHistGuideFiles,manageHistGuide,deleteHistGuideFile,removeHistGuidePending,
@@ -41969,6 +42034,7 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
       if(typeof sl==='function') sl(false);
       try{ renderRegisterDivisionOverview(); renderRL(); upDash(); }catch(_e){}
       toastSafe('일반 참가로 전환했습니다 ✅','success');
+      try{ setTimeout(()=>{ if(typeof openParticipantTeamNotifySms==='function') openParticipantTeamNotifySms(key, insertAt, 'waitlist_promoted'); }, 180); }catch(_e){}
     }catch(e){
       console.error(e);
       try{ if(typeof sl==='function') sl(false); }catch(_e){}
