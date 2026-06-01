@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-01-v456-mo-syntax-observer-fix";
+  const APP_VERSION = "2026-06-01-v462-main-card-compact-fix";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -5458,6 +5458,129 @@ body {
 .court-drop-zone .btn.btn-accent{display:inline-flex!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;}
 .court-drop-zone .court-wait-card{contain:layout paint;}
 </style>
+
+<style id="v460SharedToggleStableStyle">
+.court-shared-toggle-btn{transition:none!important;transform:none!important;touch-action:manipulation!important;}
+.court-shared-toggle-btn:hover{transform:none!important;}
+</style>
+
+
+<style id="v462MainCardCompactStyle">
+/* v462: 개인전 본선 경기현황 카드 세로 압축 */
+#bracketContent .m3card:has(.v302-main-result-body-action){
+  border-radius:14px !important;
+  margin-bottom:8px !important;
+  overflow:hidden !important;
+}
+#bracketContent .m3card:has(.v302-main-result-body-action) .m3body{
+  padding:8px 10px 10px !important;
+}
+#bracketContent .m3card:has(.v302-main-result-body-action) .m3body > div:first-child{
+  margin-bottom:5px !important;
+  gap:5px !important;
+}
+#bracketContent .m3card:has(.v302-main-result-body-action) .m3badge,
+#bracketContent .m3card:has(.v302-main-result-body-action) .badge{
+  font-size:.66rem !important;
+  padding:2px 7px !important;
+  min-height:22px !important;
+  line-height:1.15 !important;
+}
+#bracketContent .m3card:has(.v302-main-result-body-action) button:not(.v302-main-result-btn){
+  min-height:30px !important;
+  padding:4px 9px !important;
+  font-size:.68rem !important;
+  border-radius:999px !important;
+  line-height:1.1 !important;
+}
+#bracketContent .m3card:has(.v302-main-result-body-action) .m3body > div:nth-child(2){
+  margin-bottom:6px !important;
+  gap:5px !important;
+}
+#bracketContent .m3card:has(.v302-main-result-body-action) .m3body > div[style*="grid-template-columns"]{
+  grid-template-columns:minmax(0,1fr) 20px minmax(0,1fr) !important;
+  gap:6px !important;
+  margin-bottom:5px !important;
+}
+#bracketContent .m3card:has(.v302-main-result-body-action) .m3body > div[style*="grid-template-columns"] > div:not(:nth-child(2)){
+  padding:6px !important;
+  border-radius:10px !important;
+}
+#bracketContent .m3card:has(.v302-main-result-body-action) .m3body > div[style*="grid-template-columns"] > div:not(:nth-child(2)) > div:first-child{
+  font-size:.66rem !important;
+  margin-bottom:4px !important;
+}
+#bracketContent .m3card:has(.v302-main-result-body-action) .m3body > div[style*="grid-template-columns"] > div:not(:nth-child(2)) > div:nth-child(2){
+  padding:7px 6px !important;
+  border-radius:9px !important;
+  min-height:50px !important;
+  display:flex !important;
+  flex-direction:column !important;
+  justify-content:center !important;
+}
+#bracketContent .m3card:has(.v302-main-result-body-action) .m3body > div[style*="grid-template-columns"] > div:not(:nth-child(2)) > div:nth-child(2) > div:first-child{
+  font-size:.86rem !important;
+  line-height:1.24 !important;
+}
+#bracketContent .m3card:has(.v302-main-result-body-action) .m3body > div[style*="grid-template-columns"] > div:not(:nth-child(2)) > div:nth-child(2) > div:nth-child(2){
+  font-size:.56rem !important;
+  margin-top:2px !important;
+  line-height:1.15 !important;
+  max-height:1.25em !important;
+  overflow:hidden !important;
+}
+#bracketContent .m3card:has(.v302-main-result-body-action) .m3body > div[style*="grid-template-columns"] > div:nth-child(2){
+  font-size:.92rem !important;
+}
+#bracketContent .m3card:has(.v302-main-result-body-action) .v302-main-result-body-action{
+  margin:6px 0 0 !important;
+}
+#bracketContent .m3card:has(.v302-main-result-body-action) .v302-main-result-btn{
+  min-height:38px !important;
+  height:38px !important;
+  border-radius:11px !important;
+  font-size:.82rem !important;
+  padding:6px 10px !important;
+}
+@media(max-width:680px){
+  #bracketContent .m3card:has(.v302-main-result-body-action){
+    margin-bottom:7px !important;
+  }
+  #bracketContent .m3card:has(.v302-main-result-body-action) .m3body{
+    padding:7px 8px 8px !important;
+  }
+  #bracketContent .m3card:has(.v302-main-result-body-action) .m3badge,
+  #bracketContent .m3card:has(.v302-main-result-body-action) .badge{
+    font-size:.61rem !important;
+    padding:2px 6px !important;
+  }
+  #bracketContent .m3card:has(.v302-main-result-body-action) button:not(.v302-main-result-btn){
+    min-height:28px !important;
+    padding:3px 7px !important;
+    font-size:.62rem !important;
+  }
+  #bracketContent .m3card:has(.v302-main-result-body-action) .m3body > div[style*="grid-template-columns"]{
+    grid-template-columns:minmax(0,1fr) 18px minmax(0,1fr) !important;
+    gap:5px !important;
+  }
+  #bracketContent .m3card:has(.v302-main-result-body-action) .m3body > div[style*="grid-template-columns"] > div:not(:nth-child(2)){
+    padding:5px !important;
+  }
+  #bracketContent .m3card:has(.v302-main-result-body-action) .m3body > div[style*="grid-template-columns"] > div:not(:nth-child(2)) > div:nth-child(2){
+    padding:6px 5px !important;
+    min-height:46px !important;
+  }
+  #bracketContent .m3card:has(.v302-main-result-body-action) .m3body > div[style*="grid-template-columns"] > div:not(:nth-child(2)) > div:nth-child(2) > div:first-child{
+    font-size:.78rem !important;
+  }
+  #bracketContent .m3card:has(.v302-main-result-body-action) .v302-main-result-btn{
+    min-height:36px !important;
+    height:36px !important;
+    font-size:.78rem !important;
+  }
+}
+</style>
+
 </head>
 <body>
 <header class="app-header">
@@ -12653,10 +12776,21 @@ function toggleCourtBoardHidden(key){
   st.hidden=!st.hidden;
   renderBracket();
 }
-function toggleCourtBoardSharedExpanded(key){
+function toggleCourtBoardSharedExpanded(evOrKey, maybeKey, desiredState){
+  let key = evOrKey;
+  try{
+    if(evOrKey && typeof evOrKey==='object' && typeof evOrKey.stopPropagation==='function'){
+      evOrKey.preventDefault && evOrKey.preventDefault();
+      evOrKey.stopPropagation && evOrKey.stopPropagation();
+      evOrKey.stopImmediatePropagation && evOrKey.stopImmediatePropagation();
+      key = maybeKey;
+    }
+  }catch(e){}
   const st=getCourtBoardUIState(key);
-  st.sharedExpanded=!st.sharedExpanded;
+  if(typeof desiredState==='boolean') st.sharedExpanded=desiredState;
+  else st.sharedExpanded=!st.sharedExpanded;
   renderBracket();
+  return false;
 }
 window.toggleCourtBoardCollapsed = toggleCourtBoardCollapsed;
 window.toggleCourtBoardHidden = toggleCourtBoardHidden;
@@ -13186,7 +13320,7 @@ function renderCourtStatusBoard(key, div){
         <div style="font-size:.84rem;font-weight:900;color:#9a6400">⏳ 공용대기 ${sharedWaiting.length}경기</div>
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
           <div style="font-size:.7rem;color:#9a6400">위 카드가 우선순위 1번</div>
-          ${sharedWaiting.length>sharedWaitingDefaultVisibleCount?`<button class="btn btn-outline" type="button" style="font-size:.68rem;padding:4px 9px;min-height:28px;border-color:#e8b353;color:#9a6400;background:#fff7df" onclick="toggleCourtBoardSharedExpanded('${key}')">${sharedWaitingExpanded?`접기 (${sharedWaiting.length})`:`더보기 +${sharedWaitingHiddenCount}`}</button>`:''}
+          ${sharedWaiting.length>sharedWaitingDefaultVisibleCount?`<button class="btn btn-outline court-shared-toggle-btn" type="button" style="font-size:.68rem;padding:4px 9px;min-height:28px;border-color:#e8b353;color:#9a6400;background:#fff7df" onclick="return toggleCourtBoardSharedExpanded(event,'${key}',${sharedWaitingExpanded?'false':'true'})">${sharedWaitingExpanded?`접기 (${sharedWaiting.length})`:`더보기 +${sharedWaitingHiddenCount}`}</button>`:''}
         </div>
       </div>
       ${sharedWaitingVisible.length?`<div class="shared-wait-stack">${sharedWaitingVisible.map((w,idx)=>{ const wi=describeCourtBoardMatch(key,w); const priority=idx+1; const headline=((wi.title&&wi.title!=='TBD vs TBD')?wi.title:((wi.rawTitle&&wi.rawTitle!=='TBD vs TBD')?wi.rawTitle:(wi.autoTitle||'경기 대기'))); const targetCourt=String(w.__sharedCourtLabel||'').trim(); const detailParts=[wi.label, targetCourt?`${targetCourt} 배정예정`:'공용 대기']; const isManual=!!w.manualSharedHold || !!String(w.manualCourtTarget||'').trim(); const assignedElapsed = buildElapsedMetaLine(w.courtAssignedAt||'', 'wait_placed'); const metaEntries=[]; if(assignedElapsed.clock) metaEntries.push({...assignedElapsed, prefix:'대기배치'}); return `<div class="court-wait-card" draggable="${canManageBracket()?'true':'false'}" ondragstart="onCourtCardDragStart(event,'${key}','${String(w.id)}')" ondragend="onCourtCardDragEnd(event)" style="padding:8px 10px;border-radius:10px;background:${getCourtBoardPhaseColor(wi,w).bg};border:2px solid ${getCourtBoardPhaseColor(wi,w).bd}"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px"><div style="min-width:0;flex:1"><div style="font-size:.78rem;font-weight:900;color:${getCourtBoardPhaseColor(wi,w).fg};line-height:1.35;word-break:keep-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(headline)}</div><div style="font-size:.72rem;color:${getCourtBoardPhaseColor(wi,w).fg};margin-top:3px">${esc(detailParts.join(' · '))}</div>${renderElapsedMetaBlocks(metaEntries, getCourtBoardPhaseColor(wi,w).fg)}<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px">${courtBoardStableResultButtonsHtml(key,w)}${canManageBracket()?`<button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="sendCourtCardSms('${key}','${String(w.id)}','${targetCourt?'court_changed':'queue_registered'}','${targetCourt}',${priority})">📨 문자</button>`:''}<button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="showCourtMovePicker('${key}','${String(w.id)}')">코트 선택</button></div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px"><span class="court-wait-priority">${priority}</span>${assignedElapsed.badge?`<span class="badge" style="font-size:.66rem;padding:3px 7px;background:${assignedElapsed.badge.bg};color:${assignedElapsed.badge.color};border:1px solid ${assignedElapsed.badge.bd}">${assignedElapsed.badge.text}</span>`:''}${isManual?'<span class="badge bg-blue" style="font-size:.66rem;padding:3px 7px">수동</span>':''}</div></div></div>`; }).join('')}</div>${sharedWaitingHiddenCount?`<div style="margin-top:8px;font-size:.74rem;color:#9a6400;font-weight:700">아래 더보기로 나머지 ${sharedWaitingHiddenCount}경기 확인</div>`:''}`:`<div style="padding:10px 12px;border:1px dashed #f6d28b;border-radius:10px;background:#fff;font-size:.78rem;color:#9a6400">여기로 카드를 옮기면 공용 대기 상태로 유지됩니다.</div>`}
@@ -27979,6 +28113,16 @@ async function startMainDraw(){
         mainAudit:audit,
         mainUpdatedAt:new Date().toISOString()
       };
+      try{
+        if(isIndividualByKey(key) && isIndividualAutoCourtAssignEnabled() && typeof rebuildIndividualAutoCourtAssignmentsForKey==='function'){
+          const autoCourtChanged = rebuildIndividualAutoCourtAssignmentsForKey(key);
+          if(autoCourtChanged){
+            audit.autoCourtAssignedAt = new Date().toISOString();
+          }
+        }
+      }catch(autoCourtErr){
+        console.warn('main draw auto court assignment failed', key, autoCourtErr);
+      }
       await stD(key);
       await stM(key);
       try{
@@ -29129,7 +29273,7 @@ async function saveM3Core(){
   }
 
   const finishedCourts = hasFinalWinner ? (Array.isArray(m.courts) ? m.courts : (m.court ? [m.court] : [])) : [];
-  const promotedAfterFinish = hasFinalWinner ? promoteNextWaitingAfterFinishedCourts(key, finishedCourts) : false;
+  let promotedAfterFinish = false;
 
   sl(true);
   try{
@@ -29147,28 +29291,22 @@ async function saveM3Core(){
         await persistSingleMatchDocPublic(key, m);
         wroteMatches=true;
       }else{
-        {
-          let syncedMain=false;
-          if(m.phase==='group') syncedMain = (typeof syncMainBracketFromPrelim==='function') ? syncMainBracketFromPrelim(key) : (isIndividualByKey(key) ? syncIndividualMainBracketFromPrelim(key) : false);
-          const autoChanged = isIndividualByKey(key) && isIndividualAutoCourtAssignEnabled() ? ensureIndividualAutoCourtAssignmentsForKey(key) : false;
-          if(syncedMain || autoChanged || promotedAfterFinish){
-            await stM(key);
-            wroteMatches=true;
-          }
+        // v461: 본선 결과 저장은 반드시 한 번의 메모리 갱신 후 전체 matches를 저장한다.
+        // 기존 흐름은 ① 코트 재배정 저장 → ② 본선 진출 저장 → ③ 예약된 자동저장 순서가 섞이면서
+        // 공용대기 1번 카드가 잠깐 코트 대기 1번으로 붙었다가 이전 스냅샷/저장값으로 되돌아갈 수 있었다.
+        // 이제 결과, 본선 진출, 다음 대기 승격, 자동 코트배정을 모두 메모리에서 끝낸 뒤 stM(key)를 1회 실행한다.
+        let syncedMain=false;
+        let advancedMain=false;
+        if(m.phase==='group'){
+          syncedMain = (typeof syncMainBracketFromPrelim==='function') ? syncMainBracketFromPrelim(key) : (isIndividualByKey(key) ? syncIndividualMainBracketFromPrelim(key) : false);
+        }else if(m.phase==='main' || m.phase==='playin'){
+          advancedMain = applyAutoAdvanceInMemory(key,m.id);
         }
-        if(!wroteMatches && promotedAfterFinish){
-          await stM(key);
-          wroteMatches=true;
-        }
-        if(!wroteMatches && m.phase!=='main'){
-          await persistSingleMatchDoc(key, m);
-          wroteMatches=true;
-        }
+        promotedAfterFinish = promoteNextWaitingAfterFinishedCourts(key, finishedCourts);
+        const autoChanged = isIndividualByKey(key) && isIndividualAutoCourtAssignEnabled() ? rebuildIndividualAutoCourtAssignmentsForKey(key) : false;
+        await stM(key);
+        wroteMatches=true;
         try{ await fbLog(`결과: ${dn1} ${alertScoreText} ${dn2}`,'⚡'); }catch(_e){ console.warn('fbLog skipped', _e); }
-        if(m.phase==='main'){
-          await autoAdv(key,m.id);
-          wroteMatches=true;
-        }
       }
     }else if(isTieState){
       if(!wroteMatches){
@@ -29294,30 +29432,45 @@ async function updPS(key,m,prevW){
   enqueuePlayerPersist(allKeys, 15000);
 }
 
-async function autoAdv(key,mid){
+function applyAutoAdvanceInMemory(key,mid){
   const list=G.matches[key]||[];
   const m=list.find(m=>m.id===mid);
-  if(!m) return;
+  if(!m) return false;
+  let changed=false;
 
   if(m.phase==='playin'){
     const target=list.find(x=>x.phase==='main' && x.round===0 && x.slot===Number(m.targetSlot));
     if(target && m.winner!=null){
-      if(String(m.targetSide||'t1')==='t2') target.t2=m.winner;
-      else target.t1=m.winner;
-      target.winner=null;
-      target.bye=false;
+      const nextSide=String(m.targetSide||'t1')==='t2' ? 't2' : 't1';
+      if(String(target[nextSide])!==String(m.winner)) changed=true;
+      target[nextSide]=m.winner;
+      if(target.winner!=null){ target.winner=null; changed=true; }
+      if(target.bye){ target.bye=false; changed=true; }
     }
-    await stM(key);
-    return;
+    return changed;
   }
 
-  if(m.phase!=='main') return;
+  if(m.phase!=='main') return false;
   const nm=list.find(m2=>m2.phase==='main'&&m2.round===m.round+1&&m2.slot===Math.floor(m.slot/2));
-  if(nm){
-    if(m.slot%2===0)nm.t1=m.winner;else nm.t2=m.winner;
-    nm.winner=null;nm.bye=false;
+  if(nm && m.winner!=null){
+    const side=(m.slot%2===0)?'t1':'t2';
+    if(String(nm[side])!==String(m.winner)){ nm[side]=m.winner; changed=true; }
+    if(nm.winner!=null){ nm.winner=null; changed=true; }
+    if(nm.bye){ nm.bye=false; changed=true; }
   }
-  ensureBronzeMatchForKey(key,false);
+  try{
+    const before=(G.matches[key]||[]).length;
+    ensureBronzeMatchForKey(key,false);
+    if((G.matches[key]||[]).length!==before) changed=true;
+  }catch(e){}
+  return changed;
+}
+
+async function autoAdv(key,mid){
+  applyAutoAdvanceInMemory(key,mid);
+  if(isIndividualByKey(key) && isIndividualAutoCourtAssignEnabled()){
+    rebuildIndividualAutoCourtAssignmentsForKey(key);
+  }
   await stM(key);
 }
 
@@ -44278,6 +44431,206 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
       window.addScheduleToLiveCards = function(){ return false; };
     }, 2000);
   });
+})();
+</script>
+
+
+
+
+<!-- v459: 추첨 관리 메뉴 hover/click 깜빡임 제거 - 단일 floating menu 엔진 -->
+<style id="v459DrawMenuNoHoverFlickerStyle">
+.js-mini-menu > button,
+.js-mini-menu > .btn,
+.js-mini-menu > .btn-sm{
+  transform:none!important;
+  transition:none!important;
+  animation:none!important;
+}
+.js-mini-menu > button:hover,
+.js-mini-menu > .btn:hover,
+.js-mini-menu > .btn-sm:hover{
+  transform:none!important;
+}
+.v459-floating-mini-panel{
+  position:fixed!important;
+  display:flex!important;
+  flex-direction:column!important;
+  gap:8px!important;
+  min-width:214px!important;
+  max-width:min(270px,calc(100vw - 20px))!important;
+  padding:10px!important;
+  background:rgba(9,18,37,.99)!important;
+  border:1px solid rgba(255,255,255,.14)!important;
+  border-radius:14px!important;
+  box-shadow:0 18px 40px rgba(0,0,0,.30)!important;
+  z-index:2147483001!important;
+  max-height:min(78vh,520px)!important;
+  overflow-y:auto!important;
+  overscroll-behavior:contain!important;
+  pointer-events:auto!important;
+  transition:none!important;
+  animation:none!important;
+  transform:none!important;
+}
+.v459-floating-mini-panel .login-menu-item,
+.v459-floating-mini-panel .btn-sm{
+  width:100%!important;
+  justify-content:flex-start!important;
+  min-height:36px!important;
+  transition:none!important;
+  transform:none!important;
+}
+.v459-floating-mini-panel .login-menu-item:hover,
+.v459-floating-mini-panel .btn-sm:hover{
+  transform:none!important;
+}
+@media(max-width:680px){
+  .v459-floating-mini-panel{min-width:196px!important;max-width:calc(100vw - 16px)!important;padding:9px!important;border-radius:12px!important;}
+  .v459-floating-mini-panel .login-menu-item,.v459-floating-mini-panel .btn-sm{font-size:.72rem!important;min-height:34px!important;padding:7px 10px!important;}
+}
+</style>
+<script id="v459DrawMenuNoHoverFlickerScript">
+(function(){
+  'use strict';
+
+  let activePanel=null;
+  let activeWrapId='';
+  let openedAt=0;
+
+  function cleanup(){
+    try{ if(activePanel && activePanel.parentNode) activePanel.parentNode.removeChild(activePanel); }catch(e){}
+    activePanel=null;
+    activeWrapId='';
+    try{ document.querySelectorAll('.js-mini-menu.open').forEach(function(n){ n.classList.remove('open'); }); }catch(e){}
+  }
+
+  function getButtonFromTarget(target){
+    try{ return target && target.closest ? target.closest('button') : null; }catch(e){ return null; }
+  }
+
+  function getWrapFromButton(btn){
+    try{
+      if(!btn) return null;
+      const direct=btn.closest('.js-mini-menu');
+      const inline=String(btn.getAttribute('onclick')||'');
+      if(direct && (/toggleMiniMenu|toggleBracketSaveMenu/.test(inline) || direct.querySelector('.login-menu-panel'))) return direct;
+      const m=inline.match(/toggleMiniMenu\s*\(\s*event\s*,\s*['"]([^'"]+)['"]/);
+      if(m && m[1]) return document.getElementById(m[1]);
+      if(/toggleBracketSaveMenu/.test(inline)) return document.getElementById('bracketSaveMenuWrap');
+    }catch(e){}
+    return null;
+  }
+
+  function clamp(n,min,max){ return Math.max(min, Math.min(n,max)); }
+
+  function positionPanel(panel, btn){
+    const r=btn.getBoundingClientRect();
+    const margin=8;
+    panel.style.visibility='hidden';
+    panel.style.left='0px';
+    panel.style.top='0px';
+    document.body.appendChild(panel);
+    const pw=panel.offsetWidth || 220;
+    const ph=panel.offsetHeight || 220;
+    let left=r.right - pw;
+    left=clamp(left, margin, Math.max(margin, window.innerWidth - pw - margin));
+    let top=r.bottom + 6;
+    if(top + ph > window.innerHeight - margin){
+      top=Math.max(margin, r.top - ph - 6);
+    }
+    panel.style.left=left+'px';
+    panel.style.top=top+'px';
+    panel.style.visibility='visible';
+  }
+
+  function openFromWrap(wrap, btn){
+    if(!wrap || !btn) return false;
+    const srcPanel=wrap.querySelector('.login-menu-panel');
+    if(!srcPanel) return false;
+    const wrapId=wrap.id || ('mini_'+Date.now());
+    if(!wrap.id) wrap.id=wrapId;
+
+    if(activePanel && activeWrapId===wrapId){
+      cleanup();
+      return true;
+    }
+
+    cleanup();
+    const clone=srcPanel.cloneNode(true);
+    clone.id='v459FloatingMiniPanel_'+String(wrapId).replace(/[^a-zA-Z0-9_-]/g,'_');
+    clone.classList.remove('login-menu-panel');
+    clone.classList.add('v459-floating-mini-panel');
+    clone.style.display='flex';
+    clone.dataset.sourceWrapId=wrapId;
+
+    clone.addEventListener('click', function(ev){
+      // 메뉴 내부 버튼의 inline onclick은 실행되게 두고, 외부 닫힘 이벤트로만 전파되지 않게 막는다.
+      ev.stopPropagation();
+    }, false);
+    clone.addEventListener('pointerdown', function(ev){ ev.stopPropagation(); }, false);
+    clone.addEventListener('touchstart', function(ev){ ev.stopPropagation(); }, false);
+
+    activePanel=clone;
+    activeWrapId=wrapId;
+    openedAt=Date.now();
+    positionPanel(clone, btn);
+    return true;
+  }
+
+  function handleTrigger(ev){
+    const btn=getButtonFromTarget(ev.target);
+    const wrap=getWrapFromButton(btn);
+    if(!wrap) return false;
+    try{ ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation(); }catch(e){}
+    openFromWrap(wrap, btn);
+    return true;
+  }
+
+  // 기존 inline onclick보다 먼저 실행되도록 캡처 단계에서 처리한다.
+  document.addEventListener('click', function(ev){
+    if(handleTrigger(ev)) return false;
+    if(!activePanel) return;
+    const target=ev.target;
+    if(activePanel.contains(target)) return;
+    const source=activeWrapId ? document.getElementById(activeWrapId) : null;
+    if(source && source.contains(target)) return;
+    if(Date.now()-openedAt < 250) return;
+    cleanup();
+  }, true);
+
+  ['pointerdown','touchstart'].forEach(function(type){
+    document.addEventListener(type, function(ev){
+      const btn=getButtonFromTarget(ev.target);
+      const wrap=getWrapFromButton(btn);
+      if(wrap){
+        try{ ev.stopPropagation(); }catch(e){}
+        return;
+      }
+      if(activePanel && !activePanel.contains(ev.target)){
+        const source=activeWrapId ? document.getElementById(activeWrapId) : null;
+        if(!(source && source.contains(ev.target)) && Date.now()-openedAt >= 250) cleanup();
+      }
+    }, true);
+  });
+
+  document.addEventListener('keydown', function(ev){
+    if(ev.key==='Escape') cleanup();
+  });
+
+  // hover, mousemove, scroll 때문에 닫지 않는다. 크기 변경 때만 닫는다.
+  window.addEventListener('resize', cleanup);
+
+  window.toggleMiniMenu=function(ev, wrapId){
+    try{ ev && ev.preventDefault && ev.preventDefault(); ev && ev.stopPropagation && ev.stopPropagation(); ev && ev.stopImmediatePropagation && ev.stopImmediatePropagation(); }catch(e){}
+    const wrap=document.getElementById(wrapId) || (ev && ev.currentTarget && ev.currentTarget.closest && ev.currentTarget.closest('.js-mini-menu'));
+    const btn=(ev && ev.currentTarget) || (wrap && wrap.querySelector('button'));
+    openFromWrap(wrap, btn);
+    return false;
+  };
+  window.toggleBracketSaveMenu=function(ev){ return window.toggleMiniMenu(ev,'bracketSaveMenuWrap'); };
+  window.closeMiniMenu=function(wrapId){ if(!wrapId || wrapId===activeWrapId) cleanup(); };
+  window.closeAllMiniMenus=cleanup;
+  window.closeBracketSaveMenu=function(){ window.closeMiniMenu('bracketSaveMenuWrap'); };
 })();
 </script>
 
