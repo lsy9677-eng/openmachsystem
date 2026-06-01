@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-01-v448-court-scoped-start-time-fix";
+  const APP_VERSION = "2026-06-01-v453b-mo-block-fix";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -5453,6 +5453,11 @@ body {
 }
 </style>
 
+
+<style id="v450CourtBoardStableStyle">
+.court-drop-zone .btn.btn-accent{display:inline-flex!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;}
+.court-drop-zone .court-wait-card{contain:layout paint;}
+</style>
 </head>
 <body>
 <header class="app-header">
@@ -12890,60 +12895,58 @@ async function moveCourtQueueCard(key, mid, targetCourt){
       return;
     }
   }
+
+  const prevCourt=String(m.court||((Array.isArray(m.courts)&&m.courts[0])||'')).trim();
+  const sameCourt=!!court && prevCourt===court;
+  const nowIso=new Date().toISOString();
+
   if(court){
+    // v450: 수동 이동은 이동한 카드 1개만 시간 변경한다. 전체 자동 재배정 함수 호출 금지.
     m.manualCourtTarget=court;
     m.manualSharedHold=false;
-    m.manualCourtPinnedAt=new Date().toISOString();
-  }else{
-    m.manualCourtTarget='';
-    m.manualSharedHold=true;
-    m.manualCourtPinnedAt=new Date().toISOString();
-  }
-  const nowIso = new Date().toISOString();
-  if(isIndividualByKey(key) && isIndividualAutoCourtAssignEnabled()){
-    if(court){
-      // [BUG FIX] rebuild 전에 m.courts/m.court를 즉시 설정해두어야
-      // renderBracket() 시점에 snapshot에서 카드가 사라지지 않는다.
-      m.courts=[court];
-      m.court=court;
+    if(!sameCourt || !m.manualCourtPinnedAt) m.manualCourtPinnedAt=nowIso;
+    m.courts=[court];
+    m.court=court;
+
+    const relatedBefore=(G.matches[key]||[]).filter(x=>
+      x && x.winner==null && String(x.id)!==String(mid) &&
+      (Array.isArray(x.courts)?x.courts:[x.court||'']).map(String).includes(court)
+    ).sort((a,b)=>{
+      const aa=String(a.courtQueueOrder||a.courtAssignedAt||'');
+      const bb=String(b.courtQueueOrder||b.courtAssignedAt||'');
+      if(aa!==bb) return aa.localeCompare(bb);
+      return String(a.id||'').localeCompare(String(b.id||''),'ko');
+    });
+    const hasOther=relatedBefore.length>0;
+
+    if(sameCourt){
+      // 같은 코트 내 이동/재저장은 기존 시작/대기 시간을 보존한다.
       if(!m.courtAssignedAt) m.courtAssignedAt=nowIso;
-      // rebuild: 전체 재계산 (수동 pinned를 우선 배치)
-      ensureIndividualAutoCourtAssignmentsForKey(key);
-      // rebuild 후에도 m.courts가 올바르게 설정됐는지 보장
-      if(!Array.isArray(m.courts)||!m.courts.length){ m.courts=[court]; m.court=court; }
+      if(!m.courtQueueOrder) m.courtQueueOrder=m.courtAssignedAt||nowIso;
     }else{
-      m.courts=[];
-      m.court='';
-      delete m.courtAssignedAt;
-      delete m.autoCourtLabel;
-      // 공용대기로 이동 시 waitingFirstAt 초기화
-      delete m.waitingFirstAt;
-    }
-  }else{
-    if(court){
-      const prevCourt=String(m.court||'').trim();
-      const isNewCourt = prevCourt!==court;
-      m.courts=[court];
-      m.court=court;
-      if(!m.courtAssignedAt || isNewCourt) m.courtAssignedAt=nowIso;
-      // [BUG FIX] 코트 대기열(2번째 이후)로 이동할 때 waitingFirstAt 기록
-      // getCourtStatusSnapshot에서 related[0]=current, 나머지=waiting이므로
-      // 현재 그 코트에 이미 진행중 경기가 있으면 대기 상태임
-      const currentOnCourt=(G.matches[key]||[]).find(x=>
-        x.winner==null && String(x.id)!==String(mid) &&
-        (Array.isArray(x.courts)?x.courts:[x.court||'']).includes(court) &&
-        String(x.courtQueueOrder||x.courtAssignedAt||'') < String(m.courtAssignedAt||nowIso)
-      );
-      if(currentOnCourt){
-        if(!m.waitingFirstAt) m.waitingFirstAt=nowIso;
+      // 다른 코트로 이동한 카드만 새 대기/시작 시각을 부여한다.
+      m.courtAssignedAt=nowIso;
+      m.courtQueueOrder=nowIso;
+      if(hasOther){
+        m.waitingFirstAt=nowIso;
       }else{
-        // 현재 경기로 직접 배정되는 경우 waitingFirstAt 불필요
+        if(m.waitingFirstAt && !m.lastWaitingFirstAt) m.lastWaitingFirstAt=m.waitingFirstAt;
         delete m.waitingFirstAt;
       }
-    }else{
-      m.courts=[]; m.court=''; delete m.courtAssignedAt; delete m.waitingFirstAt;
     }
+  }else{
+    // 공용대기로 이동한 카드만 코트/대기 시간 제거. 다른 코트는 건드리지 않는다.
+    m.manualCourtTarget='';
+    m.manualSharedHold=true;
+    m.manualCourtPinnedAt=nowIso;
+    m.courts=[];
+    m.court='';
+    delete m.courtAssignedAt;
+    delete m.courtQueueOrder;
+    delete m.waitingFirstAt;
+    delete m.autoCourtLabel;
   }
+
   sl(true);
   try{
     await persistSingleMatchDoc(key, m);
@@ -13141,6 +13144,15 @@ function getVisibleSharedWaitingOrderForAssign(key){
   }
 }
 
+
+function courtBoardStableResultButtonsHtml(key, match){
+  try{
+    const mid = String(match?.id || '');
+    if(!mid) return '';
+    return `<button class="btn btn-accent v451-court-result-btn" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="openM3('${key}','${mid}')">⚡ 결과</button><button class="btn btn-outline v451-court-push-btn" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap;background:#eff6ff;color:#1d4ed8;border-color:#93c5fd" onclick="openManualMatchPush('${key}','${mid}')">🔔 알림</button>`;
+  }catch(e){ return ''; }
+}
+
 function renderCourtStatusBoard(key, div){
   const selectedCourts=getSelectedCourtFilters(key);
   const usedCourts=getUsedCourtsForKey(key);
@@ -13177,7 +13189,7 @@ function renderCourtStatusBoard(key, div){
           ${sharedWaiting.length>sharedWaitingDefaultVisibleCount?`<button class="btn btn-outline" type="button" style="font-size:.68rem;padding:4px 9px;min-height:28px;border-color:#e8b353;color:#9a6400;background:#fff7df" onclick="toggleCourtBoardSharedExpanded('${key}')">${sharedWaitingExpanded?`접기 (${sharedWaiting.length})`:`더보기 +${sharedWaitingHiddenCount}`}</button>`:''}
         </div>
       </div>
-      ${sharedWaitingVisible.length?`<div class="shared-wait-stack">${sharedWaitingVisible.map((w,idx)=>{ const wi=describeCourtBoardMatch(key,w); const priority=idx+1; const headline=((wi.title&&wi.title!=='TBD vs TBD')?wi.title:((wi.rawTitle&&wi.rawTitle!=='TBD vs TBD')?wi.rawTitle:(wi.autoTitle||'경기 대기'))); const targetCourt=String(w.__sharedCourtLabel||'').trim(); const detailParts=[wi.label, targetCourt?`${targetCourt} 배정예정`:'공용 대기']; const isManual=!!w.manualSharedHold || !!String(w.manualCourtTarget||'').trim(); const assignedElapsed = buildElapsedMetaLine(w.courtAssignedAt||'', 'wait_placed'); const metaEntries=[]; if(assignedElapsed.clock) metaEntries.push({...assignedElapsed, prefix:'대기배치'}); return `<div class="court-wait-card" draggable="${canManageBracket()?'true':'false'}" ondragstart="onCourtCardDragStart(event,'${key}','${String(w.id)}')" ondragend="onCourtCardDragEnd(event)" style="padding:8px 10px;border-radius:10px;background:${getCourtBoardPhaseColor(wi,w).bg};border:2px solid ${getCourtBoardPhaseColor(wi,w).bd}"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px"><div style="min-width:0;flex:1"><div style="font-size:.78rem;font-weight:900;color:${getCourtBoardPhaseColor(wi,w).fg};line-height:1.35;word-break:keep-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(headline)}</div><div style="font-size:.72rem;color:${getCourtBoardPhaseColor(wi,w).fg};margin-top:3px">${esc(detailParts.join(' · '))}</div>${renderElapsedMetaBlocks(metaEntries, getCourtBoardPhaseColor(wi,w).fg)}<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px">${canShowMatchActionButtons()?`<button class="btn btn-accent" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="openM3('${key}','${String(w.id)}')">⚡ 결과</button><button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap;background:#eff6ff;color:#1d4ed8;border-color:#93c5fd" onclick="openManualMatchPush('${key}','${String(w.id)}')">🔔 알림</button>`:''}${canManageBracket()?`<button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="sendCourtCardSms('${key}','${String(w.id)}','${targetCourt?'court_changed':'queue_registered'}','${targetCourt}',${priority})">📨 문자</button>`:''}<button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="showCourtMovePicker('${key}','${String(w.id)}')">코트 선택</button></div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px"><span class="court-wait-priority">${priority}</span>${assignedElapsed.badge?`<span class="badge" style="font-size:.66rem;padding:3px 7px;background:${assignedElapsed.badge.bg};color:${assignedElapsed.badge.color};border:1px solid ${assignedElapsed.badge.bd}">${assignedElapsed.badge.text}</span>`:''}${isManual?'<span class="badge bg-blue" style="font-size:.66rem;padding:3px 7px">수동</span>':''}</div></div></div>`; }).join('')}</div>${sharedWaitingHiddenCount?`<div style="margin-top:8px;font-size:.74rem;color:#9a6400;font-weight:700">아래 더보기로 나머지 ${sharedWaitingHiddenCount}경기 확인</div>`:''}`:`<div style="padding:10px 12px;border:1px dashed #f6d28b;border-radius:10px;background:#fff;font-size:.78rem;color:#9a6400">여기로 카드를 옮기면 공용 대기 상태로 유지됩니다.</div>`}
+      ${sharedWaitingVisible.length?`<div class="shared-wait-stack">${sharedWaitingVisible.map((w,idx)=>{ const wi=describeCourtBoardMatch(key,w); const priority=idx+1; const headline=((wi.title&&wi.title!=='TBD vs TBD')?wi.title:((wi.rawTitle&&wi.rawTitle!=='TBD vs TBD')?wi.rawTitle:(wi.autoTitle||'경기 대기'))); const targetCourt=String(w.__sharedCourtLabel||'').trim(); const detailParts=[wi.label, targetCourt?`${targetCourt} 배정예정`:'공용 대기']; const isManual=!!w.manualSharedHold || !!String(w.manualCourtTarget||'').trim(); const assignedElapsed = buildElapsedMetaLine(w.courtAssignedAt||'', 'wait_placed'); const metaEntries=[]; if(assignedElapsed.clock) metaEntries.push({...assignedElapsed, prefix:'대기배치'}); return `<div class="court-wait-card" draggable="${canManageBracket()?'true':'false'}" ondragstart="onCourtCardDragStart(event,'${key}','${String(w.id)}')" ondragend="onCourtCardDragEnd(event)" style="padding:8px 10px;border-radius:10px;background:${getCourtBoardPhaseColor(wi,w).bg};border:2px solid ${getCourtBoardPhaseColor(wi,w).bd}"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px"><div style="min-width:0;flex:1"><div style="font-size:.78rem;font-weight:900;color:${getCourtBoardPhaseColor(wi,w).fg};line-height:1.35;word-break:keep-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(headline)}</div><div style="font-size:.72rem;color:${getCourtBoardPhaseColor(wi,w).fg};margin-top:3px">${esc(detailParts.join(' · '))}</div>${renderElapsedMetaBlocks(metaEntries, getCourtBoardPhaseColor(wi,w).fg)}<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px">${courtBoardStableResultButtonsHtml(key,w)}${canManageBracket()?`<button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="sendCourtCardSms('${key}','${String(w.id)}','${targetCourt?'court_changed':'queue_registered'}','${targetCourt}',${priority})">📨 문자</button>`:''}<button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="showCourtMovePicker('${key}','${String(w.id)}')">코트 선택</button></div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px"><span class="court-wait-priority">${priority}</span>${assignedElapsed.badge?`<span class="badge" style="font-size:.66rem;padding:3px 7px;background:${assignedElapsed.badge.bg};color:${assignedElapsed.badge.color};border:1px solid ${assignedElapsed.badge.bd}">${assignedElapsed.badge.text}</span>`:''}${isManual?'<span class="badge bg-blue" style="font-size:.66rem;padding:3px 7px">수동</span>':''}</div></div></div>`; }).join('')}</div>${sharedWaitingHiddenCount?`<div style="margin-top:8px;font-size:.74rem;color:#9a6400;font-weight:700">아래 더보기로 나머지 ${sharedWaitingHiddenCount}경기 확인</div>`:''}`:`<div style="padding:10px 12px;border:1px dashed #f6d28b;border-radius:10px;background:#fff;font-size:.78rem;color:#9a6400">여기로 카드를 옮기면 공용 대기 상태로 유지됩니다.</div>`}
       <div class="court-drop-hint">카드를 각 코트로 드래그하거나, 코트 선택 버튼으로 수동 배정할 수 있습니다. 코트에서 다시 이 영역으로 드래그하거나 공용 대기를 선택하면 복귀합니다.</div>
     </div>`;
   const cards=hasCourts ? processedItems.map(item=>{
@@ -13196,7 +13208,7 @@ function renderCourtStatusBoard(key, div){
     // 현재경기: 시합시작 시각 1개만 표시
     if(currentElapsed.clock) currentMetaEntries.push({...currentElapsed, prefix:'시합시작'});
     const line = info
-      ? `<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px"><div style="font-size:.84rem;font-weight:900;color:var(--primary-dark);line-height:1.35;flex:1;word-break:keep-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(info.title)}</div><div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;justify-content:flex-end">${isCurrentManual?'<span class="badge bg-blue" style="font-size:.66rem;padding:3px 7px">수동</span>':''}${currentElapsed.badge?`<span class="badge" style="font-size:.66rem;padding:3px 7px;background:${currentElapsed.badge.bg};color:${currentElapsed.badge.color};border:1px solid ${currentElapsed.badge.bd}">${currentElapsed.badge.text}</span>`:''}</div></div>${phaseChip}${renderElapsedMetaBlocks(currentMetaEntries, currentElapsed.badge?currentElapsed.badge.color:'var(--text2)')}<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px">${canShowMatchActionButtons()?`<button class="btn btn-accent" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="openM3('${key}','${String(item.current?.id||'')}')">⚡ 결과</button><button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap;background:#eff6ff;color:#1d4ed8;border-color:#93c5fd" onclick="openManualMatchPush('${key}','${String(item.current?.id||'')}')">🔔 알림</button>`:''}${canManageBracket()?`<button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="sendCourtCardSms('${key}','${String(item.current?.id||'')}','match_started','${String(item.court||'')}',0)">📨 문자</button>`:''}</div>`
+      ? `<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px"><div style="font-size:.84rem;font-weight:900;color:var(--primary-dark);line-height:1.35;flex:1;word-break:keep-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(info.title)}</div><div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;justify-content:flex-end">${isCurrentManual?'<span class="badge bg-blue" style="font-size:.66rem;padding:3px 7px">수동</span>':''}${currentElapsed.badge?`<span class="badge" style="font-size:.66rem;padding:3px 7px;background:${currentElapsed.badge.bg};color:${currentElapsed.badge.color};border:1px solid ${currentElapsed.badge.bd}">${currentElapsed.badge.text}</span>`:''}</div></div>${phaseChip}${renderElapsedMetaBlocks(currentMetaEntries, currentElapsed.badge?currentElapsed.badge.color:'var(--text2)')}<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px">${courtBoardStableResultButtonsHtml(key,item.current)}${canManageBracket()?`<button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="sendCourtCardSms('${key}','${String(item.current?.id||'')}','match_started','${String(item.court||'')}',0)">📨 문자</button>`:''}</div>`
       : `<div style="font-size:.84rem;font-weight:800;color:#64748b;line-height:1.45">배정된 진행 경기 없음</div>
          <div style="font-size:.74rem;color:var(--text3);margin-top:4px">경기 코트 배정을 하면 이 코트에 표시됩니다.</div>`;
     const waitingList=[...(item.__visibleWaiting||[])];
@@ -13213,7 +13225,7 @@ function renderCourtStatusBoard(key, div){
               if(waitElapsed.clock) metaEntries.push({...waitElapsed, prefix:'대기시작'});
               return `<div class="court-wait-card" draggable="${canManageBracket()?'true':'false'}" ondragstart="onCourtCardDragStart(event,'${key}','${String(w.id)}')" ondragend="onCourtCardDragEnd(event)" style="padding:8px 10px;border-radius:10px;background:${getCourtBoardPhaseColor(wi,w).bg};border:2px solid ${getCourtBoardPhaseColor(wi,w).bd}">
                 <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
-                  <div style="min-width:0;flex:1"><div style="font-size:.78rem;font-weight:900;color:${getCourtBoardPhaseColor(wi,w).fg};line-height:1.35;word-break:keep-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(wi.title)}</div><div style="font-size:.72rem;color:${getCourtBoardPhaseColor(wi,w).fg};margin-top:3px">${esc([wi.label, '대기중'].filter(Boolean).join(' · '))}</div>${renderElapsedMetaBlocks(metaEntries, getCourtBoardPhaseColor(wi,w).fg)}<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px">${canShowMatchActionButtons()?`<button class="btn btn-accent" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="openM3('${key}','${String(w.id)}')">⚡ 결과</button><button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap;background:#eff6ff;color:#1d4ed8;border-color:#93c5fd" onclick="openManualMatchPush('${key}','${String(w.id)}')">🔔 알림</button>`:''}${canManageBracket()?`<button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="sendCourtCardSms('${key}','${String(w.id)}','court_changed','${String(item.court||'')}',${priority})">📨 문자</button>`:''}<button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="showCourtMovePicker('${key}','${String(w.id)}')">코트 선택</button></div></div>
+                  <div style="min-width:0;flex:1"><div style="font-size:.78rem;font-weight:900;color:${getCourtBoardPhaseColor(wi,w).fg};line-height:1.35;word-break:keep-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(wi.title)}</div><div style="font-size:.72rem;color:${getCourtBoardPhaseColor(wi,w).fg};margin-top:3px">${esc([wi.label, '대기중'].filter(Boolean).join(' · '))}</div>${renderElapsedMetaBlocks(metaEntries, getCourtBoardPhaseColor(wi,w).fg)}<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px">${courtBoardStableResultButtonsHtml(key,w)}${canManageBracket()?`<button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="sendCourtCardSms('${key}','${String(w.id)}','court_changed','${String(item.court||'')}',${priority})">📨 문자</button>`:''}<button class="btn btn-outline" type="button" style="font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap" onclick="showCourtMovePicker('${key}','${String(w.id)}')">코트 선택</button></div></div>
                   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px"><span class="court-wait-priority">${priority}</span>${waitElapsed.badge?`<span class="badge" style="font-size:.66rem;padding:3px 7px;background:${waitElapsed.badge.bg};color:${waitElapsed.badge.color};border:1px solid ${waitElapsed.badge.bd}">${waitElapsed.badge.text}</span>`:''}${isManual?'<span class="badge bg-blue" style="font-size:.66rem;padding:3px 7px">수동</span>':''}</div>
                 </div>
               </div>`;
@@ -22162,6 +22174,8 @@ function rebuildIndividualAutoCourtAssignmentsForKey(key){
       manualCourtPinnedAt: String(m.manualCourtPinnedAt||''),
       manualSharedHold: !!m.manualSharedHold
     });
+    // courtAssignedAt을 rebuild assign() 전에 보존: 다른 코트 시간이 리셋되는 버그 방지
+    m.__origCourtAssignedAt = m.courtAssignedAt || '';
     m.courts=[]; m.court=''; delete m.courtAssignedAt; delete m.courtQueueOrder; delete m.waitingFirstAt; delete m.lastWaitingFirstAt; delete m.autoCourtLabel;
   });
   const assignedIds=new Set();
@@ -22199,10 +22213,12 @@ function rebuildIndividualAutoCourtAssignmentsForKey(key){
     const prev=prevState.get(String(m.id)) || {courts:'[]', assignedAt:'', queueOrder:'', waitingFirstAt:'', lastWaitingFirstAt:'', autoLabel:'', manualCourtTarget:'', manualCourtPinnedAt:'', manualSharedHold:false};
     const sameCourt = prev.courts===nextCourts;
     const hadPrevCourt = !!(prev.courts && prev.courts!=='[]');
-    // 경과시간이 렌더 때마다 0으로 리셋되지 않도록
-    // 기존에 한 번이라도 코트에 올라간 경기면 assignedAt/queueOrder를 최대한 유지한다.
-    // 실제 새 경기(이전 코트 없음)일 때만 현재 시각을 새로 넣는다.
-    const realAssignedAt = (hadPrevCourt && isRuntimeTimestampUsable(prev.assignedAt)) ? prev.assignedAt : new Date().toISOString();
+    // ── 시간 버그 수정: rebuild 시 다른 코트 시간이 바뀌는 문제 ──
+    // prevState에 assignedAt이 있으면 무조건 보존.
+    // 없더라도 m에 courtAssignedAt이 이미 있으면 그걸 사용 (코트 변경과 무관한 경기들 보호).
+    // 정말 새로 배정되는 경기(둘 다 없음)만 현재 시각을 새로 찍는다.
+    const existingAt = prev.assignedAt || String(m.__origCourtAssignedAt||'');
+    const realAssignedAt = (existingAt && isRuntimeTimestampUsable(existingAt)) ? existingAt : new Date().toISOString();
     const queueOrder = (sameCourt && prev.queueOrder) ? prev.queueOrder : (prev.queueOrder || seqTs);
     if(prev.courts!==nextCourts || prev.assignedAt!==realAssignedAt || prev.queueOrder!==queueOrder || prev.autoLabel!==String(item.autoLabel||'')) changed=true;
     m.courts=[String(court)];
@@ -22211,10 +22227,8 @@ function rebuildIndividualAutoCourtAssignmentsForKey(key){
     m.courtQueueOrder=queueOrder;
     if(item.autoLabel) m.autoCourtLabel=item.autoLabel; else delete m.autoCourtLabel;
     m.manualSharedHold=false;
-    // v448: assign 단계에서는 waitingFirstAt을 복원하지 않는다.
-    // 현재 경기인지, 대기 1번/2번인지가 아직 확정되지 않은 상태에서 복원하면
-    // 이미 시합중인 다른 코트까지 '대기에서 승격'으로 오판되어 시작시간이 0분으로 리셋될 수 있다.
-    delete m.waitingFirstAt;
+    // [BUG FIX] rebuild 시 prevState에 저장된 waitingFirstAt/lastWaitingFirstAt 복원
+    if(prev.waitingFirstAt) m.waitingFirstAt=prev.waitingFirstAt; else delete m.waitingFirstAt;
     if(prev.lastWaitingFirstAt) m.lastWaitingFirstAt=prev.lastWaitingFirstAt; else delete m.lastWaitingFirstAt;
     assignedIds.add(String(m.id));
   };
@@ -22401,14 +22415,17 @@ function rebuildIndividualAutoCourtAssignmentsForKey(key){
       const prevCurrent=prevState.get(String(current.id)) || {assignedAt:'', waitingFirstAt:'', lastWaitingFirstAt:'', courts:'[]'};
       const currentCourts=JSON.stringify(Array.isArray(current.courts)?current.courts:(current.court?[current.court]:[]));
       const sameCourtQueue = prevCurrent.courts===currentCourts;
-
-      // v448: 자동 재배정/렌더링 단계에서는 절대 현재 경기의 시작시각을 새로 찍지 않는다.
-      // 실제 승격 시각은 결과 저장 직후 promoteNextWaitingAfterFinishedCourts(key, finishedCourts)에서
-      // '결과가 입력된 해당 코트'에 대해서만 부여한다.
-      if(prevCurrent.waitingFirstAt && sameCourtQueue){
-        current.lastWaitingFirstAt=prevCurrent.waitingFirstAt;
-      }else if(prevCurrent.lastWaitingFirstAt && sameCourtQueue){
+      // v452: 자동 재배정/rebuild 단계에서는 현재경기의 시작시간을 절대 새로 찍지 않는다.
+      // 실제 승격 시각은 promoteNextWaitingAfterFinishedCourts() 또는 수동 이동 저장 함수에서만 설정한다.
+      // 여기서 new Date()를 찍으면 한 코트 변경 때 모든 코트 현재경기가 같은 시작시간으로 리셋된다.
+      if(sameCourtQueue && prevCurrent.assignedAt && isRuntimeTimestampUsable(prevCurrent.assignedAt)){
+        current.courtAssignedAt = prevCurrent.assignedAt;
+      }
+      if(prevCurrent.lastWaitingFirstAt && sameCourtQueue){
         current.lastWaitingFirstAt=prevCurrent.lastWaitingFirstAt;
+      }else if(prevCurrent.waitingFirstAt && sameCourtQueue){
+        // 과거 버전에서 현재경기에 waitingFirstAt이 남아 있던 경우에도 시작시간은 건드리지 않고 기록만 보존한다.
+        current.lastWaitingFirstAt=prevCurrent.waitingFirstAt;
       }else{
         delete current.lastWaitingFirstAt;
       }
@@ -22550,6 +22567,8 @@ function rebuildIndividualAutoCourtAssignmentsForKey(key){
   Object.entries(deferredManualByCourt).forEach(([court, manualItems])=>{
     (manualItems||[]).forEach(item=>assign(court,item,true));
   });
+  // __origCourtAssignedAt 임시 필드 정리
+  list.forEach(m=>{ if(m) delete m.__origCourtAssignedAt; });
   prevState.forEach((prev, mid)=>{
     if(assignedIds.has(mid)) return;
     const cur=list.find(x=>String(x.id)===String(mid));
@@ -22648,11 +22667,9 @@ function renderBracketHTMLForDiv(tid,div,isAll){
   try{ if(typeof syncMainBracketFromPrelim==='function') syncMainBracketFromPrelim(key); }catch(e){}
   const showPrelimSection = shouldShowPrelimByOperationMode(key);
   const showMainSection = shouldShowMainByOperationMode(key);
-  if(isIndividualByKey(key) && isIndividualAutoCourtAssignEnabled()){
-    // 공용대기/코트대기 승격은 결과 저장 직후뿐 아니라 화면 렌더 때도 항상 재계산해야
-    // 빈 대기칸이 생겼을 때 즉시 공용대기에서 다시 채워진다.
-    ensureIndividualAutoCourtAssignmentsForKey(key);
-  }
+  // v450: 화면 렌더링 중에는 자동 코트 배정을 저장/재계산하지 않는다.
+  // 렌더 때 matches를 건드리면 코트 대기/시작 시간이 전체 코트에서 같은 시각으로 리셋될 수 있다.
+  // 자동 코트 배정은 결과 저장, 코트 수동 이동 등 명시적 액션에서만 처리한다.
   const teams=G.teams[key]||[];
   const draw=G.draws[key];
   const t=G.tournaments.find(t=>t.id===tid);
@@ -42404,7 +42421,12 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
     const html=`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>예선 대진표 A4 출력</title>
       <style>${document.getElementById('v431BracketExportFixStyle')?.innerHTML||''}
       @page{size:A4 portrait;margin:0} body{margin:0;background:#fff;font-family:'Noto Sans KR',Arial,sans-serif}.v431-export-sheet{position:static!important;left:auto!important;top:auto!important;width:794px!important;margin:0 auto;z-index:auto!important}.v431-a4-page{page-break-after:always;break-after:page}.v431-a4-page:last-child{page-break-after:auto}</style>
-      </head><body>${sheet.outerHTML}<script>window.onload=function(){setTimeout(function(){window.focus();window.print();},250)}<\/script></body></html>`;
+      </head><body>${sheet.outerHTML}<script>window.onload=function(){setTimeout(function(){window.focus();window.print();},250)}<\/script>
+
+
+
+
+</body></html>`;
     const w=window.open('','_blank');
     if(!w){safeToast('팝업이 차단되었습니다. 브라우저 팝업 허용 후 다시 눌러주세요.','error');return;}
     w.document.open(); w.document.write(html); w.document.close();
@@ -42679,7 +42701,12 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
     return root;
   }
   function openPrintWindowWithSheet(sheet){
-    const html=`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>예선 대진표 A4 출력</title><style>${ge('v432DenseA4PrelimStyle')?.innerHTML||''}@page{size:A4 portrait;margin:0}body{margin:0;background:#fff;font-family:'Noto Sans KR',Arial,sans-serif}.v432-export-sheet{position:static!important;left:auto!important;top:auto!important;width:794px!important;margin:0 auto!important;z-index:auto!important}</style></head><body>${sheet.outerHTML}<script>window.onload=function(){setTimeout(function(){window.focus();window.print();},250)}<\/script></body></html>`;
+    const html=`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>예선 대진표 A4 출력</title><style>${ge('v432DenseA4PrelimStyle')?.innerHTML||''}@page{size:A4 portrait;margin:0}body{margin:0;background:#fff;font-family:'Noto Sans KR',Arial,sans-serif}.v432-export-sheet{position:static!important;left:auto!important;top:auto!important;width:794px!important;margin:0 auto!important;z-index:auto!important}</style></head><body>${sheet.outerHTML}<script>window.onload=function(){setTimeout(function(){window.focus();window.print();},250)}<\/script>
+
+
+
+
+</body></html>`;
     const w=window.open('','_blank'); if(!w){safeToast('팝업이 차단되었습니다. 브라우저 팝업 허용 후 다시 눌러주세요.','error');return;} w.document.open(); w.document.write(html); w.document.close();
   }
   window.exportPrelimSheet=function(){
@@ -43305,6 +43332,23 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
 </script>
 
 
+
+<style id="v451CourtButtonNoFlickerStyle">
+.court-drop-zone .btn.btn-accent,
+.court-wait-card .btn.btn-accent,
+.v451-court-result-btn,
+.v451-court-push-btn{
+  display:inline-flex !important;
+  visibility:visible !important;
+  opacity:1 !important;
+  pointer-events:auto !important;
+}
+.court-drop-zone div[style*="margin-top:6px"],
+.court-wait-card div[style*="margin-top:6px"]{
+  min-height:30px !important;
+}
+</style>
+
 <!-- v439: court board result button stability fix -->
 <style id="v439CourtBoardResultStableStyle">
 .court-drop-zone .btn.btn-accent,
@@ -43326,14 +43370,12 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
   min-height:30px !important;
 }
 </style>
-<script id="v439CourtBoardResultStableScript">
+<script id="v450CourtBoardResultStableScript">
 (function(){
   'use strict';
-
   const nativeCanShow = window.canShowMatchActionButtons;
   let lastAllowed = false;
-
-  function hasCourtResultPermission(){
+  function stableCourtResultPermission(){
     try{
       const allowed = !!(window.AD || window.TM || window.OP || window.REG || (typeof window.canManageBracket === 'function' && window.canManageBracket()));
       if(allowed) lastAllowed = true;
@@ -43342,126 +43384,19 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
       return lastAllowed;
     }
   }
-
-  // 기존 함수가 렌더 시점마다 true/false로 흔들리면 코트 현황판 결과 버튼이 사라지므로
-  // 코트 현황판에서는 마지막 권한 상태를 유지한다.
+  window.hasStableCourtResultPermission = stableCourtResultPermission;
   window.canShowMatchActionButtons = function(){
     try{
       const nativeValue = (typeof nativeCanShow === 'function') ? !!nativeCanShow() : false;
       if(nativeValue) lastAllowed = true;
-      return nativeValue || hasCourtResultPermission();
+      return nativeValue || stableCourtResultPermission();
     }catch(e){
-      return hasCourtResultPermission();
+      return stableCourtResultPermission();
     }
   };
-
-  function escAttr(s){
-    return String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,' ');
-  }
-
-  function findMatchInfoFromCard(card){
-    if(!card) return null;
-    const btn = card.querySelector('button[onclick*="openM3"]');
-    const oc = btn ? (btn.getAttribute('onclick')||'') : '';
-    let m = oc.match(/openM3\('([^']+)'\s*,\s*'([^']+)'\)/);
-    if(m) return {key:m[1], mid:m[2]};
-    const text = card.innerHTML || '';
-    m = text.match(/openManualMatchPush\('([^']+)'\s*,\s*'([^']+)'\)/) || text.match(/sendCourtCardSms\('([^']+)'\s*,\s*'([^']+)'/);
-    if(m) return {key:m[1], mid:m[2]};
-    return null;
-  }
-
-  function ensureActionRow(card){
-    let row = [...card.querySelectorAll('div')].find(el=>{
-      const s = el.getAttribute('style') || '';
-      return /display\s*:\s*flex/.test(s) && /gap\s*:\s*5px/.test(s) && /margin-top\s*:\s*6px/.test(s);
-    });
-    if(!row){
-      row = document.createElement('div');
-      row.className = 'v439-action-row';
-      const anchor = card.querySelector('.v438-court-estimate') || card.querySelector('div[style*="font-size:.72rem"]') || card.firstElementChild;
-      if(anchor && anchor.parentElement) anchor.parentElement.appendChild(row);
-      else card.appendChild(row);
-    }
-    row.classList.add('v439-action-row');
-    return row;
-  }
-
-  function addResultButton(card){
-    if(!hasCourtResultPermission()) return;
-    if(!card || card.querySelector('button[onclick*="openM3"]')) return;
-    const info = findMatchInfoFromCard(card);
-    if(!info || !info.key || !info.mid) return;
-    const row = ensureActionRow(card);
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'btn btn-accent v439-court-result-btn';
-    b.setAttribute('style','font-size:.66rem;padding:4px 8px;min-height:28px;white-space:nowrap;display:inline-flex!important;visibility:visible!important;opacity:1!important');
-    b.setAttribute('onclick', "openM3('"+escAttr(info.key)+"','"+escAttr(info.mid)+"')");
-    b.textContent = '⚡ 결과';
-    row.insertBefore(b, row.firstChild);
-  }
-
-  function stabilizeCourtBoardResultButtons(){
-    try{
-      if(!hasCourtResultPermission()) return;
-      document.querySelectorAll('.court-drop-zone').forEach(zone=>{
-        // 현재 경기 영역
-        const currentInfo = findMatchInfoFromCard(zone);
-        if(currentInfo && !zone.querySelector(':scope > div button[onclick*="openM3"]')){
-          // zone 전체에 매치가 잡히지만 버튼이 없는 경우를 대비
-          addResultButton(zone);
-        }
-
-        // 대기 카드 영역
-        zone.querySelectorAll('.court-wait-card').forEach(card=>addResultButton(card));
-
-        // 이미 존재하는 결과 버튼은 렌더 보정 스크립트가 숨기지 못하게 고정
-        zone.querySelectorAll('button[onclick*="openM3"]').forEach(btn=>{
-          btn.classList.add('v439-court-result-btn');
-          btn.style.display='inline-flex';
-          btn.style.visibility='visible';
-          btn.style.opacity='1';
-          btn.style.pointerEvents='auto';
-          btn.style.position='relative';
-          btn.style.zIndex='20';
-          if(!/결과/.test(btn.textContent||'')) btn.textContent='⚡ 결과';
-        });
-      });
-    }catch(e){}
-  }
-
-  window.stabilizeCourtBoardResultButtons = stabilizeCourtBoardResultButtons;
-
-  function hookRender(){
-    try{
-      if(typeof window.renderCourtStatusBoard === 'function' && !window.renderCourtStatusBoard.__v439Hooked){
-        const orig = window.renderCourtStatusBoard;
-        const wrapped = function(){
-          const html = orig.apply(this, arguments);
-          setTimeout(stabilizeCourtBoardResultButtons, 0);
-          setTimeout(stabilizeCourtBoardResultButtons, 80);
-          setTimeout(stabilizeCourtBoardResultButtons, 250);
-          return html;
-        };
-        wrapped.__v439Hooked = true;
-        window.renderCourtStatusBoard = wrapped;
-      }
-    }catch(e){}
-  }
-
-  document.addEventListener('DOMContentLoaded', ()=>{
-    hookRender();
-    setTimeout(stabilizeCourtBoardResultButtons, 400);
-    setTimeout(stabilizeCourtBoardResultButtons, 1200);
-  });
-
-  try{
-    new MutationObserver(()=>{
-      hookRender();
-      stabilizeCourtBoardResultButtons();
-    }).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['style','class']});
-  }catch(e){}
+  // v450: 결과 버튼을 MutationObserver로 사후 삽입하지 않는다.
+  // 사후 삽입은 버튼이 사라졌다 생기는 깜빡임과 카드 높이 변동의 직접 원인이었다.
+  // 버튼은 renderCourtStatusBoard의 HTML 생성 단계에서만 출력되도록 고정한다.
 })();
 </script>
 
@@ -43723,7 +43658,12 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
       if(!sheet){toast('출력할 예선표가 없습니다','error');return;}
       const clone=forceFourColumns(sheet.cloneNode(true));
       const css=[...document.querySelectorAll('style')].map(s=>s.outerHTML).join('\n');
-      const html=`<!doctype html><html><head><meta charset="utf-8"><title>예선 대진표 출력</title>${css}<style>@page{size:A4 portrait;margin:0}html,body{margin:0!important;padding:0!important;background:#fff!important}.v435-export-sheet{position:static!important;left:auto!important;top:auto!important;width:794px!important;z-index:auto!important}.v435-a4-page{page-break-after:always!important;break-after:page!important;box-shadow:none!important;margin:0 auto!important}.v435-a4-page:last-child{page-break-after:auto!important;break-after:auto!important}</style></head><body>${clone.outerHTML}</body></html>`;
+      const html=`<!doctype html><html><head><meta charset="utf-8"><title>예선 대진표 출력</title>${css}<style>@page{size:A4 portrait;margin:0}html,body{margin:0!important;padding:0!important;background:#fff!important}.v435-export-sheet{position:static!important;left:auto!important;top:auto!important;width:794px!important;z-index:auto!important}.v435-a4-page{page-break-after:always!important;break-after:page!important;box-shadow:none!important;margin:0 auto!important}.v435-a4-page:last-child{page-break-after:auto!important;break-after:auto!important}</style></head><body>${clone.outerHTML}
+
+
+
+
+</body></html>`;
       const iframe=document.createElement('iframe');
       iframe.style.position='fixed'; iframe.style.right='0'; iframe.style.bottom='0'; iframe.style.width='0'; iframe.style.height='0'; iframe.style.border='0';
       document.body.appendChild(iframe);
@@ -43874,7 +43814,12 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
       const clone=prepareSheet(sheet.cloneNode(true));
       clone.classList.add('v442-print-root','v440-temp-print','v435-print-root');
       const css=[...document.querySelectorAll('style')].map(s=>s.outerHTML).join('\n');
-      const html='<!doctype html><html><head><meta charset="utf-8"><title>예선 대진표 출력</title>'+css+'<style>@page{size:A4 portrait;margin:0}html,body{margin:0!important;padding:0!important;background:#fff!important;}body>*{display:none!important;visibility:hidden!important}.v442-print-root{display:block!important;visibility:visible!important;position:static!important;width:794px!important;margin:0 auto!important;background:#fff!important}.v442-print-root *{visibility:visible!important}.v442-print-root .v435-a4-page{display:block!important;page-break-after:always!important;break-after:page!important;margin:0 auto!important;box-shadow:none!important;border:0!important}.v442-print-root .v435-a4-page:last-child{page-break-after:auto!important;break-after:auto!important}</style></head><body>'+clone.outerHTML+'</body></html>';
+      const html='<!doctype html><html><head><meta charset="utf-8"><title>예선 대진표 출력</title>'+css+'<style>@page{size:A4 portrait;margin:0}html,body{margin:0!important;padding:0!important;background:#fff!important;}body>*{display:none!important;visibility:hidden!important}.v442-print-root{display:block!important;visibility:visible!important;position:static!important;width:794px!important;margin:0 auto!important;background:#fff!important}.v442-print-root *{visibility:visible!important}.v442-print-root .v435-a4-page{display:block!important;page-break-after:always!important;break-after:page!important;margin:0 auto!important;box-shadow:none!important;border:0!important}.v442-print-root .v435-a4-page:last-child{page-break-after:auto!important;break-after:auto!important}</style></head><body>'+clone.outerHTML+'
+
+
+
+
+</body></html>';
       const iframe=document.createElement('iframe');
       iframe.style.position='fixed'; iframe.style.left='-10000px'; iframe.style.top='0'; iframe.style.width='794px'; iframe.style.height='1123px'; iframe.style.border='0';
       document.body.appendChild(iframe);
@@ -44275,6 +44220,67 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
     ev.stopPropagation();
     window.setIndividualQuickScore(m[1], Number(m[2]));
   }, true);
+})();
+</script>
+
+
+
+<style id="v452NoFlickerTimeLockStyle">
+/* v452: 코트 현황판 움직임 차단 - 사후 예상시간 배지는 숨겨 레이아웃 변동 제거 */
+.v438-court-estimate{display:none!important;height:0!important;min-height:0!important;margin:0!important;padding:0!important;overflow:hidden!important;}
+.court-drop-zone .v452-action-row,
+.court-drop-zone div:has(> .v451-court-result-btn),
+.court-wait-card div:has(> .v451-court-result-btn){
+  min-height:32px!important;display:flex!important;align-items:center!important;gap:5px!important;flex-wrap:wrap!important;
+}
+.v451-court-result-btn,.v451-court-push-btn{display:inline-flex!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;}
+.court-drop-zone,.court-wait-card{contain:layout style!important;}
+</style>
+<script id="v452NoFlickerTimeLockScript">
+(function(){
+  'use strict';
+  // ── v453 깜빡임 근본 수정 ────────────────────────────────────────────
+  // 원인: addCourtEstimatedTimes, addScheduleToLiveCards 두 함수가
+  //       body 전체를 감시하는 MutationObserver를 각각 달고 있어서
+  //       DOM이 바뀔 때마다 실행 → 버튼/카드 DOM 재조작 → 또 DOM 변경 → 반복
+  //
+  // 해결: 두 함수를 no-op으로 교체하고 MutationObserver가 더 이상 body를
+  //       감시하지 못하도록 MutationObserver 생성자를 일시 차단한 뒤 복원.
+  // ─────────────────────────────────────────────────────────────────────
+
+  // 1) 두 원인 함수를 no-op으로 선점 (실제 함수 정의 전에 미리 등록)
+  window.addCourtEstimatedTimes = function(){ return false; };
+  window.addScheduleToLiveCards = function(){ return false; };
+
+  // 2) MutationObserver 생성자를 감싸서 body subtree 감시 등록을 차단
+  //    (이 두 함수가 observe(document.body,{subtree:true})를 호출하는 타이밍을 막음)
+  const _OrigMO = window.MutationObserver;
+  let _blockBodyObservers = true;
+  window.MutationObserver = function(cb){
+    const instance = new _OrigMO(cb);
+    const _origObserve = instance.observe.bind(instance);
+    instance.observe = function(target, opts){
+      if(_blockBodyObservers && target === document.body && opts && opts.subtree){
+        // body 전체 subtree 감시 등록 차단 — no-op
+        return;
+      }
+      return _origObserve(target, opts);
+    };
+    return instance;
+  };
+  window.MutationObserver.prototype = _OrigMO.prototype;
+
+  // 3) DOMContentLoaded 후 일반 MutationObserver 복원 (다른 기능에 영향 없게)
+  //    단, addCourtEstimatedTimes / addScheduleToLiveCards는 계속 no-op 유지
+  document.addEventListener('DOMContentLoaded', function(){
+    setTimeout(function(){
+      _blockBodyObservers = false;
+      window.MutationObserver = _OrigMO;
+      // no-op 재등록 (DOMContentLoaded 이후 원본 함수가 덮어쓸 수 있으므로)
+      window.addCourtEstimatedTimes = function(){ return false; };
+      window.addScheduleToLiveCards = function(){ return false; };
+    }, 2000);
+  });
 })();
 </script>
 
