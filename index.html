@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-03-v520-cost-guard";
+  const APP_VERSION = "2026-06-03-v523-final-low-read-fixed";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -5913,6 +5913,7 @@ button:disabled{opacity:.55!important;cursor:not-allowed!important;filter:graysc
 </button>
 </div>
 <div id="bracketExportBar" style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+<button class="btn btn-outline" onclick="manualRefreshCurrentTournament()" style="font-size:.78rem;padding:5px 10px">↻ 새로고침</button>
 <button class="btn btn-outline" onclick="openBracketView()" style="font-size:.78rem;padding:5px 10px">📊 전체 대진표 보기</button>
 <div class="login-menu-wrap js-mini-menu" id="bracketSaveMenuWrap">
 <button class="btn btn-outline" onclick="toggleBracketSaveMenu(event)" style="font-size:.78rem;padding:5px 12px">💾 저장하기</button>
@@ -5923,7 +5924,7 @@ button:disabled{opacity:.55!important;cursor:not-allowed!important;filter:graysc
 </div>
 </div>
 </div>
-<div class="sec-title">대진표 · 경기 현황 <span style="font-size:.72rem;font-weight:400;color:var(--text2)">— 실시간 업데이트 🔥</span></div>
+<div class="sec-title">대진표 · 경기 현황 <span style="font-size:.72rem;font-weight:400;color:var(--text2)">— 저읽기 운영모드 · 경기상태 45초 갱신</span></div>
 <div class="card">
 <div class="frow">
 <div class="form-group"><label class="form-label">대회</label><select class="form-select" id="brTS" onchange="onBrTC()"><option value="">-- 대회 선택 --</option></select></div>
@@ -12386,7 +12387,13 @@ async function fetchTournamentBundle(tid, opts={}){
 }
 function stopRealtimeTournamentSync(){
   if(_realtimeRegsUnsub){ try{_realtimeRegsUnsub();}catch(e){} _realtimeRegsUnsub=null; }
-  if(_realtimeMatchesUnsub){ try{_realtimeMatchesUnsub();}catch(e){} _realtimeMatchesUnsub=null; }
+  if(_realtimeMatchesUnsub){
+    try{
+      if(typeof _realtimeMatchesUnsub==='function') _realtimeMatchesUnsub();
+      else clearInterval(_realtimeMatchesUnsub);
+    }catch(e){}
+    _realtimeMatchesUnsub=null;
+  }
   if(_realtimeDrawsUnsub){ try{_realtimeDrawsUnsub();}catch(e){} _realtimeDrawsUnsub=null; }
   CURRENT_LIVE_TID=null;
 }
@@ -12424,20 +12431,33 @@ function scheduleRegisterListRender(reason='snapshot'){
 window.scheduleRegisterListRender=scheduleRegisterListRender;
 
 function stopRegisterRegistrationSync(){
-  if(_registerRegsUnsub){ try{_registerRegsUnsub();}catch(e){} _registerRegsUnsub=null; }
+  if(_registerRegsUnsub){
+    try{
+      if(typeof _registerRegsUnsub==='function') _registerRegsUnsub();
+      else clearInterval(_registerRegsUnsub);
+    }catch(e){}
+    _registerRegsUnsub=null;
+  }
   _registerLiveTid='';
 }
 function startRegisterRegistrationSync(tid){
+  // v523: 접수 화면은 실시간 리스너를 쓰지 않고 120초 저읽기 갱신만 사용합니다.
+  tid=String(tid||'').trim();
   if(!tid) return stopRegisterRegistrationSync();
   if(_registerLiveTid===tid && _registerRegsUnsub) return;
   stopRegisterRegistrationSync();
   _registerLiveTid=tid;
-  _registerRegsUnsub=onSnapshot(query(collection(db,'registrations'), where('tournamentId','==',tid)), s=>{
-    try{ processAdminRegistrationSnapshotChanges(s, tid); }catch(err){ console.warn('register registration alert process failed', err); }
-    applyRegistrationSnapshotForTournament(tid, s);
-    if(getCurrentPageName()==='register' && String(ge('regTS')?.value||'')===String(tid)) scheduleRegisterListRender('register-snapshot');
-    else onDU();
-  }, e=>console.error('register regs snap err', e));
+
+  const run=async()=>{
+    try{
+      if(getCurrentPageName()!=='register') return;
+      if(String(ge('regTS')?.value||'')!==tid) return;
+      await refreshRegisterRegistrationsOnly(tid,{render:true,noRestart:true});
+    }catch(e){ console.warn('[cost-guard v523] register low-read refresh failed', e); }
+  };
+  setTimeout(run, 1200);
+  const timer=setInterval(run, 120000);
+  _registerRegsUnsub=function(){ clearInterval(timer); };
 }
 // ── v404: 앱 포그라운드 복귀 시 데이터 새로고침 ──────────────────────────────
 // 모바일 앱에서 백→포그라운드로 돌아올 때 PWA/Firestore 캐시가 살아있으면
@@ -12456,8 +12476,7 @@ async function refreshRegisterRegistrationsOnly(tid, opts={}){
   catch(_e){ snap = await getDocs(q); }
   const next = applyRegistrationSnapshotForTournament(tid, snap);
 
-  // register 전용 리스너는 끊겨 있으면 다시 연결만 한다. 이미 살아 있으면 중복 연결하지 않는다.
-  try{ startRegisterRegistrationSync(tid); }catch(_e){}
+  // v523: 여기서는 리스너/폴링을 재시작하지 않는다. 호출자가 필요할 때만 시작한다.
 
   if(opts.render !== false && getCurrentPageName()==='register' && String(ge('regTS')?.value||'')===tid){
     try{ renderRegisterDivisionOverview(); }catch(_e){}
@@ -12488,10 +12507,12 @@ window.refreshRegisterRegistrationsOnly = refreshRegisterRegistrationsOnly;
         await refreshRegisterRegistrationsOnly(tid, {render:true});
       } else if(pg === 'bracket'){
         if(AD || OP || REG){
-          // 관리자: 기존 realtime 재시작
-          if(!_realtimeRegsUnsub || CURRENT_LIVE_TID !== tid){
+          // v523 관리자: 전체 리스너 재시작 금지, 경기 상태만 저읽기 갱신
+          if(CURRENT_LIVE_TID !== tid){
             await fetchTournamentBundle(tid, {force:true, acceptStale:true});
             startRealtimeTournamentSync(tid);
+          }else{
+            await refreshMatchesOnlyForTournament(tid,'visibilitychange');
           }
         } else {
           // 일반 회원 뷰어: 강제 1회 재조회 + 렌더
@@ -12508,35 +12529,51 @@ window.refreshRegisterRegistrationsOnly = refreshRegisterRegistrationsOnly;
 })();
 // ─────────────────────────────────────────────────────────────────────────────
 
+async function refreshMatchesOnlyForTournament(tid, reason='manual'){
+  tid=String(tid||'').trim();
+  if(!tid) return null;
+  console.log('[cost-guard v523] matches-only refresh:', reason, tid);
+  const prevMatchMap=buildMatchAlertStateMap(G.matches||{});
+  const prevCourtMap=buildCourtNotificationStateMap(G.matches||{});
+  const q=query(collection(db,'matches'), where('tournamentId','==',tid));
+  let snap;
+  try{ snap=(typeof getDocsFromServer==='function') ? await getDocsFromServer(q) : await getDocs(q); }
+  catch(_e){ snap=await getDocs(q); }
+  const bundle=getTournamentBundleCache(tid)||{};
+  const next={...(bundle||{}), matches:snap.docs.map(d=>({_id:d.id,...(d.data()||{})}))};
+  saveTournamentBundleCache(tid,next);
+  applyTournamentBundle(tid,next);
+  try{ processOnlineOrderAlerts(prevMatchMap, G.matches||{}); }catch(err){ console.warn('order alert process failed', err); }
+  try{ processCourtSmsAlerts(prevCourtMap, buildCourtNotificationStateMap(G.matches||{})); }catch(err){ console.warn('court sms alert process failed', err); }
+  if(getCurrentPageName()==='bracket' && String(ge('brTS')?.value||'')===tid){
+    try{ renderBracket(); }catch(_e){ onDU(); }
+    try{ initBracketNotice(); }catch(_e){}
+  }else{
+    onDU();
+  }
+  return next;
+}
+window.refreshMatchesOnlyForTournament=refreshMatchesOnlyForTournament;
+
 function startRealtimeTournamentSync(tid){
+  // v523: 이름은 유지하지만 실제 onSnapshot 리스너는 사용하지 않습니다.
+  // 관리자/진행자도 경기 상태(matches)만 45초 간격으로 갱신합니다.
+  tid=String(tid||'').trim();
   if(!tid) return stopRealtimeTournamentSync();
-  if(CURRENT_LIVE_TID===tid && _realtimeRegsUnsub && _realtimeMatchesUnsub && _realtimeDrawsUnsub) return;
+  if(CURRENT_LIVE_TID===tid && _realtimeMatchesUnsub) return;
   stopRealtimeTournamentSync();
   CURRENT_LIVE_TID=tid;
-  _realtimeRegsUnsub = onSnapshot(query(collection(db,'registrations'), where('tournamentId','==',tid)), s=>{
-    try{ processAdminRegistrationSnapshotChanges(s, tid); }catch(err){ console.warn('admin registration alert process failed', err); }
-    applyRegistrationSnapshotForTournament(tid, s);
-    if(getCurrentPageName()==='register' && String(ge('regTS')?.value||'')===String(tid)) scheduleRegisterListRender('realtime-regs-snapshot');
-    else onDU();
-  }, e=>console.error('regs snap err', e));
-  _realtimeDrawsUnsub = onSnapshot(query(collection(db,'draws'), where(documentId(), '>=', tid + '_'), where(documentId(), '<=', tid + '_\uf8ff')), s=>{
-    const bundle=getTournamentBundleCache(tid)||{};
-    const next={...(bundle||{}), draws:s.docs.map(d=>({id:d.id,...(d.data()||{})}))};
-    saveTournamentBundleCache(tid, next);
-    applyTournamentBundle(tid, next);
-    onDU();
-  }, e=>console.error('draws snap err', e));
-  _realtimeMatchesUnsub = onSnapshot(query(collection(db,'matches'), where('tournamentId','==',tid)), s=>{
-    const prevMatchMap=buildMatchAlertStateMap(G.matches||{});
-    const prevCourtMap=buildCourtNotificationStateMap(G.matches||{});
-    const bundle=getTournamentBundleCache(tid)||{};
-    const next={...(bundle||{}), matches:s.docs.map(d=>({_id:d.id,...(d.data()||{})}))};
-    saveTournamentBundleCache(tid, next);
-    applyTournamentBundle(tid, next);
-    try{ processOnlineOrderAlerts(prevMatchMap, G.matches||{}); }catch(err){ console.warn('order alert process failed', err); }
-    try{ processCourtSmsAlerts(prevCourtMap, buildCourtNotificationStateMap(G.matches||{})); }catch(err){ console.warn('court sms alert process failed', err); }
-    onDU();
-  }, e=>console.error('matches snap err', e));
+  setTimeout(()=>refreshMatchesOnlyForTournament(tid,'admin-bracket-initial').catch(e=>console.warn(e)), 1200);
+  const timer=setInterval(()=>{
+    try{
+      if(getCurrentPageName()==='bracket' && String(ge('brTS')?.value||'')===tid){
+        refreshMatchesOnlyForTournament(tid,'admin-bracket-45s').catch(e=>console.warn(e));
+      }
+    }catch(e){}
+  },45000);
+  _realtimeMatchesUnsub=function(){ clearInterval(timer); };
+  _realtimeRegsUnsub=null;
+  _realtimeDrawsUnsub=null;
 }
 async function syncTournamentDataForPage(page, tid, force=false){
   const pg=page||getCurrentPageName();
@@ -33556,7 +33593,13 @@ async function _buildRegListEl44(){
   targetDivs.forEach(div=>{
     const key=tid+'_'+div;
     const teams=(G.teams[key]||[]).slice();
-    const sorted=teams.map((team,i)=>({team,i})).sort((x,y)=>(x.team.club||'').localeCompare(y.team.club||'','ko'));
+    // v520: 접수순(queueOrder → registeredAt) 정렬
+    const sorted=teams.map((team,i)=>({team,i})).sort((x,y)=>{
+      const aq=Number.isFinite(Number(x.team.queueOrder))?Number(x.team.queueOrder):Infinity;
+      const bq=Number.isFinite(Number(y.team.queueOrder))?Number(y.team.queueOrder):Infinity;
+      if(aq!==bq) return aq-bq;
+      return String(x.team.registeredAt||'').localeCompare(String(y.team.registeredAt||''));
+    });
     const sec=document.createElement('div');
     sec.style.cssText='margin-bottom:14px';
     let html=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding:6px 10px;background:#3b6fd8;border-radius:8px">
@@ -33691,7 +33734,13 @@ async function saveRegListExcel44(){
     targetDivs.forEach(div=>{
       const key=tid+'_'+div;
       const teams=(G.teams[key]||[]).slice();
-      const sorted=teams.map((team,i)=>({team,sortIdx:i})).sort((x,y)=>(x.team.club||'').localeCompare(y.team.club||'','ko'));
+      // v520: 접수순(queueOrder → registeredAt) 정렬
+      const sorted=teams.map((team,i)=>({team,sortIdx:i})).sort((x,y)=>{
+        const aq=Number.isFinite(Number(x.team.queueOrder))?Number(x.team.queueOrder):Infinity;
+        const bq=Number.isFinite(Number(y.team.queueOrder))?Number(y.team.queueOrder):Infinity;
+        if(aq!==bq) return aq-bq;
+        return String(x.team.registeredAt||'').localeCompare(String(y.team.registeredAt||''));
+      });
       if(!sorted.length){
         rows.push([dl(div),'','','등록팀없음','','']);
         return;
@@ -48689,5 +48738,31 @@ body:not(.reg-popup-open) div[id^="regInlineForm_"] > #aoReg{display:none!import
 })();
 </script>
 
+
+<script id="v523ManualRefreshFunction">
+async function manualRefreshCurrentTournament(){
+  try{
+    const pg=(typeof getCurrentPageName==='function')?getCurrentPageName():'';
+    const tid=String(
+      (pg==='register' ? (ge('regTS')?.value||'') : '') ||
+      (pg==='bracket' ? (ge('brTS')?.value||'') : '') ||
+      (typeof getSelectedTournamentIdForPage==='function' ? getSelectedTournamentIdForPage(pg) : '') ||
+      (typeof getRealtimeTargetTournamentId==='function' ? getRealtimeTargetTournamentId() : '') ||
+      ''
+    ).trim();
+    if(!tid){ toast('선택된 대회가 없습니다','error'); return; }
+    if(pg==='register'){
+      await refreshRegisterRegistrationsOnly(tid,{render:true,noRestart:true});
+    }else if(pg==='bracket'){
+      await refreshMatchesOnlyForTournament(tid,'manual-refresh');
+    }else{
+      await fetchTournamentBundle(tid,{force:true,acceptStale:true});
+      onDU();
+    }
+    toast('새로고침 완료','success');
+  }catch(e){ console.error(e); toast('새로고침 실패','error'); }
+}
+window.manualRefreshCurrentTournament=manualRefreshCurrentTournament;
+</script>
 </body>
 </html>
