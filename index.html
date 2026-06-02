@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-02-v497c-promote-fee-fix";
+  const APP_VERSION = "2026-06-02-v497-delete-request-approval";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -5581,6 +5581,11 @@ body {
 }
 </style>
 
+
+<style id="v497DeleteRequestStyle">
+.v497-delete-request-badge{display:inline-flex;align-items:center;justify-content:center;padding:3px 8px;border-radius:999px;background:#fee2e2;color:#b91c1c;border:1.5px solid #fca5a5;font-size:.66rem;font-weight:1000;line-height:1;white-space:nowrap}
+button:disabled{opacity:.55!important;cursor:not-allowed!important;filter:grayscale(.15)}
+</style>
 </head>
 <body>
 <header class="app-header">
@@ -13936,7 +13941,13 @@ async function stT(key){
     ...(t.tiebreakAge !== undefined ? {tiebreakAge: Number(t.tiebreakAge||0)||0} : {}),
     ...(t.adminNotificationType ? {adminNotificationType: t.adminNotificationType} : {}),
     ...(t.adminNotificationId ? {adminNotificationId: t.adminNotificationId} : {}),
-    ...(t.adminNotificationCreatedAt ? {adminNotificationCreatedAt: t.adminNotificationCreatedAt} : {})
+    ...(t.adminNotificationCreatedAt ? {adminNotificationCreatedAt: t.adminNotificationCreatedAt} : {}),
+    ...(t.deleteRequested ? {deleteRequested: true} : {}),
+    ...(t.deleteRequestAt ? {deleteRequestAt: t.deleteRequestAt} : {}),
+    ...(t.deleteRequestBy ? {deleteRequestBy: t.deleteRequestBy} : {}),
+    ...(t.deleteRequestByEmail ? {deleteRequestByEmail: t.deleteRequestByEmail} : {}),
+    ...(t.deleteRequestByName ? {deleteRequestByName: t.deleteRequestByName} : {}),
+    ...(t.deleteRequestStatus ? {deleteRequestStatus: t.deleteRequestStatus} : {})
   }));
   const hashPayload={ docs: docsForHash, ids:[...curIds].sort(), deleted:[...toDel].sort() };
   if(isSameFbWrite('teams', key, hashPayload)) return;
@@ -13965,15 +13976,12 @@ async function stT(key){
       ...(t.adminNotificationType ? {adminNotificationType: t.adminNotificationType} : {}),
       ...(t.adminNotificationId ? {adminNotificationId: t.adminNotificationId} : {}),
       ...(t.adminNotificationCreatedAt ? {adminNotificationCreatedAt: t.adminNotificationCreatedAt} : {}),
-      ...(t.feePaid !== undefined ? {feePaid: t.feePaid} : {}),
-      ...(t.feePaidAt ? {feePaidAt: t.feePaidAt} : {}),
-      ...(t.feePaidBy ? {feePaidBy: t.feePaidBy} : {}),
-      ...(t.feePaidByName ? {feePaidByName: t.feePaidByName} : {}),
-      ...(t.paymentStatus ? {paymentStatus: t.paymentStatus} : {}),
-      ...(t.ownerUid ? {ownerUid: t.ownerUid} : {}),
-      ...(t.ownerEmail ? {ownerEmail: t.ownerEmail} : {}),
-      ...(t.ownerName ? {ownerName: t.ownerName} : {}),
-      ...(t.deleted !== undefined ? {deleted: !!t.deleted} : {})
+      ...(t.deleteRequested ? {deleteRequested: true} : {}),
+      ...(t.deleteRequestAt ? {deleteRequestAt: t.deleteRequestAt} : {}),
+      ...(t.deleteRequestBy ? {deleteRequestBy: t.deleteRequestBy} : {}),
+      ...(t.deleteRequestByEmail ? {deleteRequestByEmail: t.deleteRequestByEmail} : {}),
+      ...(t.deleteRequestByName ? {deleteRequestByName: t.deleteRequestByName} : {}),
+      ...(t.deleteRequestStatus ? {deleteRequestStatus: t.deleteRequestStatus} : {})
     };
     batch.set(doc(db,'registrations',docId), payload, {merge:true});
   });
@@ -14009,7 +14017,13 @@ function _buildRegistrationDocPayload(key, team){
     ...(team.tiebreakAge !== undefined ? {tiebreakAge: Number(team.tiebreakAge||0)||0} : {}),
     ...(team.adminNotificationType ? {adminNotificationType: team.adminNotificationType} : {}),
     ...(team.adminNotificationId ? {adminNotificationId: team.adminNotificationId} : {}),
-    ...(team.adminNotificationCreatedAt ? {adminNotificationCreatedAt: team.adminNotificationCreatedAt} : {})
+    ...(team.adminNotificationCreatedAt ? {adminNotificationCreatedAt: team.adminNotificationCreatedAt} : {}),
+    ...(team.deleteRequested ? {deleteRequested: true} : {}),
+    ...(team.deleteRequestAt ? {deleteRequestAt: team.deleteRequestAt} : {}),
+    ...(team.deleteRequestBy ? {deleteRequestBy: team.deleteRequestBy} : {}),
+    ...(team.deleteRequestByEmail ? {deleteRequestByEmail: team.deleteRequestByEmail} : {}),
+    ...(team.deleteRequestByName ? {deleteRequestByName: team.deleteRequestByName} : {}),
+    ...(team.deleteRequestStatus ? {deleteRequestStatus: team.deleteRequestStatus} : {})
   };
 }
 
@@ -14053,6 +14067,25 @@ async function stTPublicDeleteOne(key, team){
   if(!G._regIdsByKey) G._regIdsByKey={};
   const prev = Array.isArray(G._regIdsByKey[key]) ? G._regIdsByKey[key] : [];
   G._regIdsByKey[key]=prev.filter(id=>id!==team._id);
+  try{ markFbWriteCache('teams', key, null); }catch(e){}
+  try{ cacheTournamentBundleFromMemory(tid); }catch(e){}
+}
+
+async function stTPublicRequestDeleteOne(key, team){
+  const {tid}=_k2td(key);
+  if(!team || !team._id) throw new Error('삭제 요청할 등록 문서가 없습니다');
+  const now = new Date().toISOString();
+  const req = {
+    deleteRequested: true,
+    deleteRequestAt: now,
+    deleteRequestBy: auth.currentUser?.uid || '',
+    deleteRequestByEmail: auth.currentUser?.email || '',
+    deleteRequestByName: auth.currentUser?.displayName || '',
+    deleteRequestStatus: 'pending',
+    updatedAt: now
+  };
+  await updateDoc(doc(db,'registrations', team._id), req);
+  Object.assign(team, req);
   try{ markFbWriteCache('teams', key, null); }catch(e){}
   try{ cacheTournamentBundleFromMemory(tid); }catch(e){}
 }
@@ -20455,8 +20488,11 @@ function openIndividualEntryInfo(key, idx){
     if(body){
       const div=(typeof _k2td==='function'?(_k2td(key).div||''):'');
       const canManage=!!(AD || TM || (typeof isRegistrationOwner==='function' && isRegistrationOwner(team)));
-      const adminActions=canManage?`<div class="v346-detail-admin-actions"><button type="button" class="btn btn-primary" style="background:#2563eb;color:#fff" onclick="openParticipantTeamNotifySms('${esc(key)}',${Number(idx)})">🔔 알림/문자</button><button type="button" class="btn btn-outline" onclick="window.__editEntryFromDetail && window.__editEntryFromDetail('${esc(key)}',${Number(idx)})">✏️ 참가팀 수정</button><button type="button" class="btn btn-danger" onclick="window.__deleteEntryFromDetail && window.__deleteEntryFromDetail('${esc(key)}',${Number(idx)})">🗑 참가팀 삭제</button></div>`:'';
-      body.innerHTML=`<div class="v334-info-title">${v334IndividualPairTitle(team)}</div><div class="v334-info-meta">${div?`부서: ${esc(div)}`:''}</div><div class="v334-info-list">${v334GetIndividualInfoRows(team)}</div>${adminActions}`;
+      const delLabel=(AD||TM)?'🗑 참가팀 최종삭제':(team.deleteRequested?'⏳ 삭제요청 접수됨':'🗑 삭제 요청');
+      const delDisabled=(!(AD||TM) && team.deleteRequested)?'disabled':'';
+      const requestInfo=team.deleteRequested?`<div style="margin:10px 0;padding:9px 11px;border-radius:12px;background:#fff7ed;border:1.5px solid #fb923c;color:#9a3412;font-size:.78rem;font-weight:900;line-height:1.55">${deleteRequestBadgeHTML(team)}<br>관리자가 환불 여부와 입금 내역 확인 후 최종 삭제합니다.</div>`:'';
+      const adminActions=canManage?`<div class="v346-detail-admin-actions"><button type="button" class="btn btn-primary" style="background:#2563eb;color:#fff" onclick="openParticipantTeamNotifySms('${esc(key)}',${Number(idx)})">🔔 알림/문자</button><button type="button" class="btn btn-outline" onclick="window.__editEntryFromDetail && window.__editEntryFromDetail('${esc(key)}',${Number(idx)})">✏️ 참가팀 수정</button><button type="button" class="btn btn-danger" ${delDisabled} onclick="window.__deleteEntryFromDetail && window.__deleteEntryFromDetail('${esc(key)}',${Number(idx)})">${delLabel}</button></div>`:'';
+      body.innerHTML=`<div class="v334-info-title">${v334IndividualPairTitle(team)}</div><div class="v334-info-meta">${div?`부서: ${esc(div)}`:''}</div>${requestInfo}<div class="v334-info-list">${v334GetIndividualInfoRows(team)}</div>${adminActions}`;
     }
     om('mIndividualEntryInfo');
   }catch(e){ console.warn('openIndividualEntryInfo failed',e); toast('상세보기 오류','error'); }
@@ -20552,6 +20588,7 @@ function buildRegisterRosterGrid(tid,div,teams,key){
     const realIdx=(typeof team._origIdx==='number')?team._origIdx:i;
     const isWaitlisted=isTeamWaitlistedForKey(key, realIdx);
     const waitBadge=waitlistBadgeHTML(key, realIdx);
+    const deleteReqBadge=deleteRequestBadgeHTML(team);
     const isIndividual=isIndividualTournament((G.tournaments||[]).find(x=>x.id===tid));
     const dn=isIndividual
       ? getIndividualDisplayLine(team)
@@ -20630,7 +20667,7 @@ function buildRegisterRosterGrid(tid,div,teams,key){
           </div>`;
       return `<div class="v336-entry-row v347-entry-row-detail-inline ${isWaitlisted?'v385-waitlist-row':''}">
         <div class="v336-entry-num">${i+1}</div>
-        <div class="v336-entry-names v347-entry-names">${v348IndividualPairTitleWithDetail(team,key,realIdx)}${waitBadge?`<div style="margin-top:3px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">${waitBadge}${(isWaitlisted&&(AD||TM))?`<button class="btn btn-outline" style="min-height:24px;height:24px;padding:2px 8px;font-size:.62rem;border-radius:999px" onclick="promoteWaitlistedTeam('${esc(key)}',${realIdx})">일반전환</button>`:''}</div>`:''}</div>
+        <div class="v336-entry-names v347-entry-names">${v348IndividualPairTitleWithDetail(team,key,realIdx)}${(waitBadge||deleteReqBadge)?`<div style="margin-top:3px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">${waitBadge||''}${deleteReqBadge||''}${(isWaitlisted&&(AD||TM))?`<button class="btn btn-outline" style="min-height:24px;height:24px;padding:2px 8px;font-size:.62rem;border-radius:999px" onclick="promoteWaitlistedTeam('${esc(key)}',${realIdx})">일반전환</button>`:''}</div>`:''}</div>
         ${actionBtns}
       </div>`;
     }
@@ -20642,6 +20679,7 @@ function buildRegisterRosterGrid(tid,div,teams,key){
           <span class="${titleClass}">${headerName}</span>
           ${headerCount?`<span class="rr-team-count">${headerCount}</span>`:''}
           ${waitBadge}
+          ${deleteReqBadge}
           ${buildPaymentStatusHTML(key,realIdx)}
           ${isWaitlisted&&(AD||TM)?`<button class="btn btn-outline" style="min-height:28px;height:28px;padding:3px 9px;font-size:.66rem;border-radius:999px;background:#fff" onclick="promoteWaitlistedTeam('${esc(key)}',${realIdx})">일반전환</button>`:''}
         </div>
@@ -21083,6 +21121,57 @@ async function _removePlayerHistory(names, club, tid, div){
   }
 }
 
+
+function deleteRequestBadgeHTML(team){
+  if(!team || !team.deleteRequested) return '';
+  let dt='';
+  try{
+    if(team.deleteRequestAt){
+      const d=new Date(team.deleteRequestAt);
+      if(!Number.isNaN(d.getTime())) dt=` ${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    }
+  }catch(e){}
+  return `<span class="v497-delete-request-badge">삭제요청${dt}</span>`;
+}
+async function requestDeleteTeamOnly(key, idx, team){
+  if(!team) return;
+  if(team.deleteRequested){
+    toast('이미 삭제 요청이 접수되어 관리자 확인 대기 중입니다','info');
+    return;
+  }
+  const msg='바로 삭제되지 않고 관리자에게 삭제 요청만 접수됩니다.\n환불 여부와 입금 확인 후 관리자가 최종 삭제합니다.\n삭제 요청을 접수할까요?';
+  if(!confirm(msg)) return;
+  const now=new Date().toISOString();
+  const req={
+    deleteRequested:true,
+    deleteRequestAt:now,
+    deleteRequestBy:auth.currentUser?.uid||'',
+    deleteRequestByEmail:auth.currentUser?.email||'',
+    deleteRequestByName:auth.currentUser?.displayName||'',
+    deleteRequestStatus:'pending'
+  };
+  const backup={...team};
+  Object.assign(team, req);
+  sl(true);
+  try{
+    const tid0=String(key||'').split('_')[0]||'';
+    const isIndividual=getTournamentTypeById(tid0)==='individual_pair'||team.tournamentType==='individual_pair'||Array.isArray(team.individualPlayers);
+    if(isIndividual && typeof stTPublicRequestDeleteOne==='function'){
+      await stTPublicRequestDeleteOne(key, team);
+    }else{
+      await stT(key);
+    }
+    sl(false);
+    try{ renderRL(); }catch(e){}
+    toast('삭제 요청이 접수되었습니다. 관리자가 확인 후 삭제합니다 ✅','success');
+  }catch(e){
+    Object.keys(team).forEach(k=>delete team[k]);
+    Object.assign(team, backup);
+    sl(false);
+    toast('삭제 요청 실패: '+(e?.message||e),'error');
+  }
+}
+
 function verifyIndividualEditPin(team, actionLabel='수정/삭제'){
   const isIndividual = !!team && (
     team.tournamentType==='individual_pair' ||
@@ -21251,32 +21340,6 @@ function openETeam(key,idx){
           <div class="form-group" style="margin-bottom:0"><label class="form-label">비고</label><input class="form-input" id="etPNote" value="${esc(team.note||'')}"></div>
           <div class="form-group" style="margin-bottom:0;display:none"><label class="form-label">수정/삭제 비밀번호</label><input class="form-input" id="etEditPin" inputmode="numeric" maxlength="4" value=""></div>
         </div>
-        ${(AD||TM)?`<div style="padding:10px 12px;background:#fff8e8;border:1.5px solid #f6d28b;border-radius:12px;margin-top:4px">
-          <div style="font-size:.78rem;font-weight:900;color:#92400e;margin-bottom:8px">🔧 관리자 전용 필드</div>
-          <div class="frow">
-            <div class="form-group" style="margin-bottom:0">
-              <label class="form-label">입금확인 일시 <span style="font-size:.7rem;color:var(--text3)">(YYYY-MM-DDTHH:MM:SS)</span></label>
-              <input class="form-input" id="etFeePaidAt" value="${esc(team.feePaidAt||team.registeredAt||'')}" placeholder="예: 2026-05-26T07:01:03">
-            </div>
-            <div class="form-group" style="margin-bottom:0">
-              <label class="form-label">등록 일시 <span style="font-size:.7rem;color:var(--text3)">(순번 기준)</span></label>
-              <input class="form-input" id="etRegisteredAt" value="${esc(team.registeredAt||'')}" placeholder="예: 2026-05-26T06:52:27">
-            </div>
-          </div>
-          <div class="frow" style="margin-top:6px">
-            <div class="form-group" style="margin-bottom:0">
-              <label class="form-label">등록순번 (queueOrder)</label>
-              <input class="form-input" id="etQueueOrder" type="number" min="0" value="${team.queueOrder!=null?team.queueOrder:''}" placeholder="숫자 (낮을수록 앞)">
-            </div>
-            <div class="form-group" style="margin-bottom:0">
-              <label class="form-label">입금확인 여부</label>
-              <select class="form-select" id="etFeePaid">
-                <option value="true" ${team.feePaid!==false?'selected':''}>✅ 입금확인</option>
-                <option value="false" ${team.feePaid===false?'selected':''}>⏳ 미확인</option>
-              </select>
-            </div>
-          </div>
-        </div>`:''}
       </div>`;
     om('mETeam');
     return;
@@ -21383,18 +21446,6 @@ async function saveETeam(){
     team.tournamentType = 'individual_pair';
     team.doublesCount = 1;
     team.mainPlayerCount = 2;
-    // 관리자 전용 필드 저장
-    if(AD||TM){
-      const feePaidAtVal=(ge('etFeePaidAt')?.value||'').trim();
-      const registeredAtVal=(ge('etRegisteredAt')?.value||'').trim();
-      const queueOrderVal=ge('etQueueOrder')?.value;
-      const feePaidVal=ge('etFeePaid')?.value;
-      if(feePaidAtVal) team.feePaidAt=feePaidAtVal.includes('T')?feePaidAtVal:feePaidAtVal+'T00:00:00';
-      if(registeredAtVal) team.registeredAt=registeredAtVal.includes('T')?registeredAtVal:registeredAtVal+'T00:00:00';
-      if(queueOrderVal!==''&&queueOrderVal!=null&&!isNaN(Number(queueOrderVal))) team.queueOrder=Number(queueOrderVal);
-      if(feePaidVal==='true'){team.feePaid=true;team.paymentStatus='paid';}
-      else if(feePaidVal==='false'){team.feePaid=false;team.paymentStatus='pending';}
-    }
 
     sl(true);
     try{
@@ -37093,21 +37144,40 @@ function getWaitlistPromotedSmsMessage(key, idx){
     const label=getPaymentTeamLabel(team,key,idx).replace(/\s+/g,' ').trim() || '참가자';
     const regNo=Number(idx)+1;
     const account=getPaymentAccountNumberOnly(key) || '3333-07-8834842';
-    const title=getPaymentTournamentTitle(key) || '모던클럽배';
-    return `${label}
-참가자 안내입니다. 참가비
-지금 바로 입금하시면
-${regNo}번으로 정식등록 됩니다.
-카카오뱅크${account}
+    const tournamentTitle=getPaymentTournamentTitle(key) || '제1회 모던클럽배 테니스대회';
+    const t=getPaymentTournament(key);
+    const bankHolder=normalizeFeeBankHolderText(String(t?.feeBankHolder||'카카오뱅크 / 김성희(230스포츠미디어)').trim());
+    return `[${tournamentTitle} 참가 안내]
 
-${title} 입금확인 후
-등록해드리겠습니다. 입금
-안되시면 다음 순번대기자로
-넘어오니 확인 부탁드립니다. ^^`;
+${label} 팀은 현재 정식 등록 가능 순번입니다.
+
+참가비 입금 후 문자 주시면
+${regNo}번으로 정식 등록 처리해드리겠습니다.
+
+입금계좌
+${bankHolder}
+${account}
+
+입금 확인 또는 연락이 없을 경우,
+다음 대기 순번 팀에게 등록 기회가 넘어갈 수 있습니다.
+
+확인 부탁드립니다. 감사합니다.`;
   }catch(e){
-    return `참가자 안내입니다. 참가비 지금 바로 입금하시면 정식등록 됩니다.
-카카오뱅크3333-07-8834842
-입금확인 후 등록해드리겠습니다. 입금 안되시면 다음 순번대기자로 넘어오니 확인 부탁드립니다. ^^`;
+    return `[제1회 모던클럽배 테니스대회 참가 안내]
+
+참가팀은 현재 정식 등록 가능 순번입니다.
+
+참가비 입금 후 문자 주시면
+정식 등록 처리해드리겠습니다.
+
+입금계좌
+카카오뱅크 / 김성희(230스포츠미디어)
+3333-07-8834842
+
+입금 확인 또는 연락이 없을 경우,
+다음 대기 순번 팀에게 등록 기회가 넘어갈 수 있습니다.
+
+확인 부탁드립니다. 감사합니다.`;
   }
 }
 function applyParticipantSmsTemplate(mode){
@@ -37118,7 +37188,7 @@ function applyParticipantSmsTemplate(mode){
     if(mode==='waitlist_promoted'){
       const title=ge('v374NotifyTitle');
       const body=ge('v374NotifyBody');
-      if(title) title.value='추가대기 정식등록 안내';
+      if(title) title.value='대기팀 정식 등록 안내';
       if(body) body.value=getWaitlistPromotedSmsMessage(ctx.key, idx);
     }else if(mode==='payment_confirmed'){
       const title=ge('v374NotifyTitle');
@@ -37134,7 +37204,7 @@ function openParticipantTeamNotifySms(key,idx,templateMode){
     const team=(G.teams?.[key]||[])[Number(idx)];
     if(!team){toast('참가 명단을 찾을 수 없습니다','error');return;}
     const label=team.entryLabel||team.pairLabel||(Array.isArray(team.individualPlayers)?getIndividualPlayers(team).map(p=>p.name).join(' / '):tdn(team,key,idx))||'참가자';
-    const title = templateMode==='waitlist_promoted' ? '추가대기 정식등록 안내' : '참가자 안내';
+    const title = templateMode==='waitlist_promoted' ? '대기팀 정식 등록 안내' : '참가자 안내';
     const body = templateMode==='waitlist_promoted' ? getWaitlistPromotedSmsMessage(key,idx) : `${label} 참가자 안내입니다.`;
     v374RenderNotifyModal({
       targetText:`참가 명단: ${label}`,
@@ -42641,9 +42711,7 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
   }
   window.promoteWaitlistedTeam = async function(key, idx){
     try{
-      // 호출 시점에 전역 변수 재확인 (IIFE 클로저 캡처 문제 방지)
-      const _AD=!!(window.AD), _TM=!!(window.TM), _OP=!!(window.OP);
-      if(!(_AD||_TM||_OP)){ toastSafe('관리자(또는 진행자)만 전환할 수 있습니다.','error'); return; }
+      if(!(window.AD||window.TM)){ toastSafe('관리자만 전환할 수 있습니다.','error'); return; }
       key=String(key||''); idx=Number(idx);
       const arr=G.teams?.[key]||[];
       if(!arr.length || !arr[idx]){ toastSafe('대상 참가팀을 찾을 수 없습니다.','error'); return; }
@@ -42659,20 +42727,7 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
       arr.splice(insertAt,0,item);
       renumberQueueOrder(key);
       if(typeof sl==='function') sl(true);
-      try{
-        if(typeof stT==='function') await stT(key);
-      }catch(stErr){
-        // stT 권한 오류 시 queueOrder만 개별 doc 업데이트로 fallback
-        console.warn('stT failed, trying individual doc update:', stErr);
-        try{
-          const {writeBatch:wb2, doc:doc2}=await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js').catch(()=>({}));
-          if(wb2 && doc2){
-            const b2=wb2(db);
-            arr.forEach(t=>{ if(t._id) b2.update(doc2(db,'registrations',t._id),{queueOrder:Number(t.queueOrder||0),updatedAt:new Date().toISOString()}); });
-            await b2.commit();
-          }
-        }catch(fbErr){ throw stErr; } // fallback도 실패하면 원래 오류 던지기
-      }
+      if(typeof stT==='function') await stT(key);
       try{ if(typeof fbLog==='function') await fbLog(`대기팀 일반전환: ${name} (${td.div})`,'📋'); }catch(_e){}
       if(typeof sl==='function') sl(false);
       try{ renderRegisterDivisionOverview(); renderRL(); upDash(); }catch(_e){}
@@ -47255,6 +47310,44 @@ button:hover,.btn:hover,.btn-sm:hover,
     }catch(e){return false;}
   }
 
+  function rememberValues(){
+    const data={activeId:'',start:null,end:null,values:{}};
+    try{
+      const ae=document.activeElement;
+      if(isTextInput(ae) && ae.id){
+        data.activeId=ae.id;
+        data.start=ae.selectionStart;
+        data.end=ae.selectionEnd;
+      }
+      document.querySelectorAll('#page-register input,#page-register textarea').forEach(el=>{
+        if(el.id && !['checkbox','radio','file','hidden'].includes(String(el.type||'').toLowerCase())) data.values[el.id]=el.value;
+      });
+    }catch(e){}
+    return data;
+  }
+
+  function restoreValues(data){
+    try{
+      if(!data) return;
+      Object.entries(data.values||{}).forEach(([id,val])=>{
+        const el=document.getElementById(id);
+        if(el && !el.disabled && !el.readOnly && el.value!==val) el.value=val;
+      });
+      if(data.activeId){
+        const el=document.getElementById(data.activeId);
+        if(el && !el.disabled && !el.readOnly){
+          el.focus({preventScroll:true});
+          if(typeof el.setSelectionRange==='function'){
+            const len=String(el.value||'').length;
+            const s=Math.min(typeof data.start==='number'?data.start:len,len);
+            const e=Math.min(typeof data.end==='number'?data.end:s,len);
+            el.setSelectionRange(s,e);
+          }
+        }
+      }
+    }catch(e){}
+  }
+
   function markPending(){
     window.__v496PendingRegisterRender=true;
     window.__regListRenderPending=true;
@@ -47294,10 +47387,10 @@ button:hover,.btn:hover,.btn-sm:hover,
           markPending();
           return undefined;
         }
-        // [BUG FIX] rememberValues/restoreValues 제거:
-        // restoreValues에서 el.focus()를 호출하면 모바일에서 키보드가 닫혔다 열리며 커서 튕김 발생.
-        // 렌더링 자체를 editing 중에 차단하므로 값 복원 불필요.
-        return old.apply(this,arguments);
+        const st=rememberValues();
+        const r=old.apply(this,arguments);
+        setTimeout(()=>restoreValues(st),0);
+        return r;
       };
       wrapped.__v496CursorWrapped=true;
       window[name]=wrapped;
@@ -47322,12 +47415,23 @@ button:hover,.btn:hover,.btn-sm:hover,
     }catch(e){}
   }
 
+  function clearButtonBlink(root){
+    try{
+      (root||document).querySelectorAll('button,.btn,.btn-sm,.home-quick-btn,.nav-tab,.players-tab-btn').forEach(el=>{
+        el.classList.remove('live-blink','match-focus-pulse');
+        el.style.setProperty('animation','none','important');
+        el.style.setProperty('transition','none','important');
+      });
+    }catch(e){}
+  }
+
   function boot(){
     wrapBlock('renderRL');
     wrapBlock('renderRegisterDivisionOverview');
     wrapSchedule();
-    setTimeout(()=>{wrapBlock('renderRL');wrapBlock('renderRegisterDivisionOverview');wrapSchedule();},500);
-    setTimeout(()=>{wrapBlock('renderRL');wrapBlock('renderRegisterDivisionOverview');wrapSchedule();},1500);
+    clearButtonBlink(document);
+    setTimeout(()=>{wrapBlock('renderRL');wrapBlock('renderRegisterDivisionOverview');wrapSchedule();clearButtonBlink(document);},500);
+    setTimeout(()=>{wrapBlock('renderRL');wrapBlock('renderRegisterDivisionOverview');wrapSchedule();clearButtonBlink(document);},1500);
   }
 
   document.addEventListener('focusin',function(ev){
@@ -47357,10 +47461,21 @@ button:hover,.btn:hover,.btn-sm:hover,
   document.addEventListener('focusout',function(ev){
     if(ev.target && ev.target.closest && ev.target.closest('#page-register')){
       clearTimeout(window.__v496PendingTimer);
-      // [BUG FIX] focusout 후 다른 입력창으로 이동할 수 있으므로 지연 시간 충분히 확보
-      window.__v496PendingTimer=setTimeout(runPending,600);
+      window.__v496PendingTimer=setTimeout(runPending,350);
     }
   },true);
+
+  try{
+    const mo=new MutationObserver(function(muts){
+      let changed=false;
+      for(const m of muts){ if(m.addedNodes && m.addedNodes.length){ changed=true; break; } }
+      if(changed){
+        clearTimeout(window.__v496BlinkTimer);
+        window.__v496BlinkTimer=setTimeout(()=>clearButtonBlink(document),80);
+      }
+    });
+    if(document.body) mo.observe(document.body,{childList:true,subtree:true});
+  }catch(e){}
 
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot);
   else boot();
