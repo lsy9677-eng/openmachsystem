@@ -42980,7 +42980,194 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
     // <script> 태그를 인라인에 두면 HTML 파서가 스크립트를 중간에 끊는 버그 발생.
     // Blob URL 방식으로 교체하여 파서 혼란 방지.
     const autoprint='window.onload=function(){setTimeout(function(){window.focus();window.print();},250)};';
-    const html='<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>예선 대진표 A4 출력</title><style>'+style+printCss+'</style><'+'script>'+autoprint+'<'+'/script></head><body>'+sheet.outerHTML+'</body></html>';
+    const html='<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>예선 대진표 A4 출력</title><style>'+style+printCss+'</style><'+'script>'+autoprint+'<'+'/script></head><body>'+sheet.outerHTML+'
+
+<style id="v499GlobalFlickerStabilizeStyle">
+/* v499: 전체 화면 깜빡임/버튼 흔들림 안정화 */
+html, body{scroll-behavior:auto !important;}
+.page, .card, .tc, .m3card, .match-card, .grp-card,
+.court-drop-zone, .court-wait-card, .bottom-tab-bar,
+.modal-box, .modal-overlay, .toast, .sticky-alert-wrap,
+button, .btn, .btn-sm, .nav-tab, .players-tab-btn,
+.home-quick-btn, .home-click-card, .home-click-chip,
+.badge, .hero-chip, .stat-card, input, select, textarea{
+  animation:none !important;
+  transition:none !important;
+  transform:none !important;
+}
+button:hover, .btn:hover, .btn-sm:hover, .nav-tab:hover,
+.home-quick-btn:hover, .home-click-card:hover, .home-click-chip:hover,
+.players-tab-btn:hover{
+  animation:none !important;
+  transition:none !important;
+  transform:none !important;
+}
+.fade-in, .live-blink, .match-focus-pulse, .draw-team-slot.slot-active,
+.draw-team-slot.slot-filled, .leaf-card-stage.floating, .leaf-card-stage.landing,
+.roulette-strip.spinning, .confetti-piece{
+  animation:none !important;
+  transition:none !important;
+  transform:none !important;
+}
+#gLd{
+  animation:none !important;
+  transform:none !important;
+  opacity:.55 !important;
+  height:2px !important;
+}
+#bracketContent, #regSection, #regDivisionOverview, #homeDivStatus, #tournList{
+  overflow-anchor:none !important;
+}
+#page-register input, #page-register textarea, #page-register select{
+  animation:none !important;
+  transition:none !important;
+  caret-color:#0f1e3a !important;
+}
+</style>
+<script id="v499GlobalFlickerStabilizeScript">
+(function(){
+  'use strict';
+
+  function isTypingInRegister(){
+    try{
+      const el=document.activeElement;
+      if(!el || !el.closest || !el.closest('#page-register')) return false;
+      if(el.disabled || el.readOnly) return false;
+      const tag=String(el.tagName||'').toUpperCase();
+      if(tag==='TEXTAREA') return true;
+      if(tag!=='INPUT') return false;
+      const type=String(el.type||'text').toLowerCase();
+      return !['button','submit','reset','checkbox','radio','file','hidden','range','color'].includes(type);
+    }catch(e){return false;}
+  }
+
+  function normalizeStatic(root){
+    try{
+      (root||document).querySelectorAll('.live-blink,.match-focus-pulse,.fade-in,button,.btn,.btn-sm,.nav-tab,.players-tab-btn,.home-quick-btn,.court-wait-card,.court-drop-zone').forEach(function(el){
+        el.classList.remove('live-blink','match-focus-pulse');
+        el.style.setProperty('animation','none','important');
+        el.style.setProperty('transition','none','important');
+        if(/button|btn|nav-tab|players-tab-btn|home-quick-btn/i.test(el.className||'') || String(el.tagName||'').toLowerCase()==='button'){
+          el.style.setProperty('transform','none','important');
+        }
+      });
+      const bar=document.getElementById('gLd');
+      if(bar){
+        bar.style.setProperty('animation','none','important');
+        bar.style.setProperty('transform','none','important');
+        bar.style.setProperty('opacity','.55','important');
+      }
+    }catch(e){}
+  }
+
+  function coalesceVoidRender(name, wait){
+    try{
+      const old=window[name];
+      if(typeof old!=='function' || old.__v499Coalesced) return;
+      let last=0, timer=0, queuedArgs=null, queuedThis=null, running=false;
+      const wrapped=function(){
+        if(running) return old.apply(this, arguments);
+        if((name==='renderRL' || name==='renderRegisterDivisionOverview') && isTypingInRegister()){
+          window.__v499PendingRegister=true;
+          clearTimeout(timer);
+          queuedArgs=arguments; queuedThis=this;
+          timer=setTimeout(function(){
+            if(isTypingInRegister()) return;
+            window.__v499PendingRegister=false;
+            running=true;
+            try{ old.apply(queuedThis||window, queuedArgs||[]); normalizeStatic(document); }
+            finally{ running=false; queuedArgs=null; queuedThis=null; }
+          }, 450);
+          return undefined;
+        }
+        const now=Date.now();
+        if(now-last < wait){
+          queuedArgs=arguments; queuedThis=this;
+          clearTimeout(timer);
+          timer=setTimeout(function(){
+            last=Date.now();
+            running=true;
+            try{ old.apply(queuedThis||window, queuedArgs||[]); normalizeStatic(document); }
+            finally{ running=false; queuedArgs=null; queuedThis=null; }
+          }, wait);
+          return undefined;
+        }
+        last=now;
+        running=true;
+        try{
+          const r=old.apply(this, arguments);
+          setTimeout(function(){normalizeStatic(document);}, 0);
+          return r;
+        }finally{ running=false; }
+      };
+      wrapped.__v499Coalesced=true;
+      window[name]=wrapped;
+    }catch(e){}
+  }
+
+  function stabilizeLoadingBar(){
+    try{
+      const old=window.sl;
+      if(typeof old!=='function' || old.__v499Stable) return;
+      let showTimer=0;
+      const wrapped=function(show){
+        if(show){
+          clearTimeout(showTimer);
+          showTimer=setTimeout(function(){
+            try{ old(true); normalizeStatic(document); }catch(e){}
+          }, 220);
+          return;
+        }
+        clearTimeout(showTimer);
+        return old(false);
+      };
+      wrapped.__v499Stable=true;
+      window.sl=wrapped;
+    }catch(e){}
+  }
+
+  function boot(){
+    ['renderBracket','renderRL','renderRegisterDivisionOverview','renderRanking','upDash','renderTL','renderHome','renderTournaments'].forEach(function(n){coalesceVoidRender(n, 120);});
+    stabilizeLoadingBar();
+    normalizeStatic(document);
+    setTimeout(function(){
+      ['renderBracket','renderRL','renderRegisterDivisionOverview','renderRanking','upDash','renderTL','renderHome','renderTournaments'].forEach(function(n){coalesceVoidRender(n, 120);});
+      stabilizeLoadingBar();
+      normalizeStatic(document);
+    }, 900);
+  }
+
+  document.addEventListener('focusout', function(){
+    if(window.__v499PendingRegister){
+      setTimeout(function(){
+        try{
+          if(!isTypingInRegister()){
+            window.__v499PendingRegister=false;
+            if(typeof window.renderRegisterDivisionOverview==='function') window.renderRegisterDivisionOverview();
+            if(typeof window.renderRL==='function') window.renderRL();
+          }
+        }catch(e){}
+      }, 350);
+    }
+  }, true);
+
+  try{
+    const mo=new MutationObserver(function(muts){
+      let added=false;
+      for(const m of muts){ if(m.addedNodes && m.addedNodes.length){ added=true; break; } }
+      if(!added) return;
+      clearTimeout(window.__v499StaticTimer);
+      window.__v499StaticTimer=setTimeout(function(){normalizeStatic(document);}, 140);
+    });
+    if(document.body) mo.observe(document.body,{childList:true,subtree:true});
+  }catch(e){}
+
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
+</script>
+
+</body></html>';
     try{
       const blob=new Blob([html],{type:'text/html;charset=utf-8'});
       const url=URL.createObjectURL(blob);
@@ -43651,7 +43838,194 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
     const printCss='@page{size:A4 portrait;margin:0}body{margin:0;background:#fff;font-family:\'Noto Sans KR\',Arial,sans-serif}.v432-export-sheet{position:static!important;left:auto!important;top:auto!important;width:794px!important;margin:0 auto!important;z-index:auto!important}';
     const autoprint='window.onload=function(){setTimeout(function(){window.focus();window.print();},250)};';
     // <script> 태그를 분리해 HTML 파서가 끊지 못하도록 함
-    const html='<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>예선 대진표 A4 출력</title><style>'+style+printCss+'</style><'+'script>'+autoprint+'<'+'/script></head><body>'+sheet.outerHTML+'</body></html>';
+    const html='<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>예선 대진표 A4 출력</title><style>'+style+printCss+'</style><'+'script>'+autoprint+'<'+'/script></head><body>'+sheet.outerHTML+'
+
+<style id="v499GlobalFlickerStabilizeStyle">
+/* v499: 전체 화면 깜빡임/버튼 흔들림 안정화 */
+html, body{scroll-behavior:auto !important;}
+.page, .card, .tc, .m3card, .match-card, .grp-card,
+.court-drop-zone, .court-wait-card, .bottom-tab-bar,
+.modal-box, .modal-overlay, .toast, .sticky-alert-wrap,
+button, .btn, .btn-sm, .nav-tab, .players-tab-btn,
+.home-quick-btn, .home-click-card, .home-click-chip,
+.badge, .hero-chip, .stat-card, input, select, textarea{
+  animation:none !important;
+  transition:none !important;
+  transform:none !important;
+}
+button:hover, .btn:hover, .btn-sm:hover, .nav-tab:hover,
+.home-quick-btn:hover, .home-click-card:hover, .home-click-chip:hover,
+.players-tab-btn:hover{
+  animation:none !important;
+  transition:none !important;
+  transform:none !important;
+}
+.fade-in, .live-blink, .match-focus-pulse, .draw-team-slot.slot-active,
+.draw-team-slot.slot-filled, .leaf-card-stage.floating, .leaf-card-stage.landing,
+.roulette-strip.spinning, .confetti-piece{
+  animation:none !important;
+  transition:none !important;
+  transform:none !important;
+}
+#gLd{
+  animation:none !important;
+  transform:none !important;
+  opacity:.55 !important;
+  height:2px !important;
+}
+#bracketContent, #regSection, #regDivisionOverview, #homeDivStatus, #tournList{
+  overflow-anchor:none !important;
+}
+#page-register input, #page-register textarea, #page-register select{
+  animation:none !important;
+  transition:none !important;
+  caret-color:#0f1e3a !important;
+}
+</style>
+<script id="v499GlobalFlickerStabilizeScript">
+(function(){
+  'use strict';
+
+  function isTypingInRegister(){
+    try{
+      const el=document.activeElement;
+      if(!el || !el.closest || !el.closest('#page-register')) return false;
+      if(el.disabled || el.readOnly) return false;
+      const tag=String(el.tagName||'').toUpperCase();
+      if(tag==='TEXTAREA') return true;
+      if(tag!=='INPUT') return false;
+      const type=String(el.type||'text').toLowerCase();
+      return !['button','submit','reset','checkbox','radio','file','hidden','range','color'].includes(type);
+    }catch(e){return false;}
+  }
+
+  function normalizeStatic(root){
+    try{
+      (root||document).querySelectorAll('.live-blink,.match-focus-pulse,.fade-in,button,.btn,.btn-sm,.nav-tab,.players-tab-btn,.home-quick-btn,.court-wait-card,.court-drop-zone').forEach(function(el){
+        el.classList.remove('live-blink','match-focus-pulse');
+        el.style.setProperty('animation','none','important');
+        el.style.setProperty('transition','none','important');
+        if(/button|btn|nav-tab|players-tab-btn|home-quick-btn/i.test(el.className||'') || String(el.tagName||'').toLowerCase()==='button'){
+          el.style.setProperty('transform','none','important');
+        }
+      });
+      const bar=document.getElementById('gLd');
+      if(bar){
+        bar.style.setProperty('animation','none','important');
+        bar.style.setProperty('transform','none','important');
+        bar.style.setProperty('opacity','.55','important');
+      }
+    }catch(e){}
+  }
+
+  function coalesceVoidRender(name, wait){
+    try{
+      const old=window[name];
+      if(typeof old!=='function' || old.__v499Coalesced) return;
+      let last=0, timer=0, queuedArgs=null, queuedThis=null, running=false;
+      const wrapped=function(){
+        if(running) return old.apply(this, arguments);
+        if((name==='renderRL' || name==='renderRegisterDivisionOverview') && isTypingInRegister()){
+          window.__v499PendingRegister=true;
+          clearTimeout(timer);
+          queuedArgs=arguments; queuedThis=this;
+          timer=setTimeout(function(){
+            if(isTypingInRegister()) return;
+            window.__v499PendingRegister=false;
+            running=true;
+            try{ old.apply(queuedThis||window, queuedArgs||[]); normalizeStatic(document); }
+            finally{ running=false; queuedArgs=null; queuedThis=null; }
+          }, 450);
+          return undefined;
+        }
+        const now=Date.now();
+        if(now-last < wait){
+          queuedArgs=arguments; queuedThis=this;
+          clearTimeout(timer);
+          timer=setTimeout(function(){
+            last=Date.now();
+            running=true;
+            try{ old.apply(queuedThis||window, queuedArgs||[]); normalizeStatic(document); }
+            finally{ running=false; queuedArgs=null; queuedThis=null; }
+          }, wait);
+          return undefined;
+        }
+        last=now;
+        running=true;
+        try{
+          const r=old.apply(this, arguments);
+          setTimeout(function(){normalizeStatic(document);}, 0);
+          return r;
+        }finally{ running=false; }
+      };
+      wrapped.__v499Coalesced=true;
+      window[name]=wrapped;
+    }catch(e){}
+  }
+
+  function stabilizeLoadingBar(){
+    try{
+      const old=window.sl;
+      if(typeof old!=='function' || old.__v499Stable) return;
+      let showTimer=0;
+      const wrapped=function(show){
+        if(show){
+          clearTimeout(showTimer);
+          showTimer=setTimeout(function(){
+            try{ old(true); normalizeStatic(document); }catch(e){}
+          }, 220);
+          return;
+        }
+        clearTimeout(showTimer);
+        return old(false);
+      };
+      wrapped.__v499Stable=true;
+      window.sl=wrapped;
+    }catch(e){}
+  }
+
+  function boot(){
+    ['renderBracket','renderRL','renderRegisterDivisionOverview','renderRanking','upDash','renderTL','renderHome','renderTournaments'].forEach(function(n){coalesceVoidRender(n, 120);});
+    stabilizeLoadingBar();
+    normalizeStatic(document);
+    setTimeout(function(){
+      ['renderBracket','renderRL','renderRegisterDivisionOverview','renderRanking','upDash','renderTL','renderHome','renderTournaments'].forEach(function(n){coalesceVoidRender(n, 120);});
+      stabilizeLoadingBar();
+      normalizeStatic(document);
+    }, 900);
+  }
+
+  document.addEventListener('focusout', function(){
+    if(window.__v499PendingRegister){
+      setTimeout(function(){
+        try{
+          if(!isTypingInRegister()){
+            window.__v499PendingRegister=false;
+            if(typeof window.renderRegisterDivisionOverview==='function') window.renderRegisterDivisionOverview();
+            if(typeof window.renderRL==='function') window.renderRL();
+          }
+        }catch(e){}
+      }, 350);
+    }
+  }, true);
+
+  try{
+    const mo=new MutationObserver(function(muts){
+      let added=false;
+      for(const m of muts){ if(m.addedNodes && m.addedNodes.length){ added=true; break; } }
+      if(!added) return;
+      clearTimeout(window.__v499StaticTimer);
+      window.__v499StaticTimer=setTimeout(function(){normalizeStatic(document);}, 140);
+    });
+    if(document.body) mo.observe(document.body,{childList:true,subtree:true});
+  }catch(e){}
+
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
+</script>
+
+</body></html>';
     try{
       const blob=new Blob([html],{type:'text/html;charset=utf-8'});
       const url=URL.createObjectURL(blob);
@@ -44612,7 +44986,194 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
       if(!sheet){toast('출력할 예선표가 없습니다','error');return;}
       const clone=forceFourColumns(sheet.cloneNode(true));
       const css=[...document.querySelectorAll('style')].map(s=>s.outerHTML).join('\n');
-      const html=`<!doctype html><html><head><meta charset="utf-8"><title>예선 대진표 출력</title>${css}<style>@page{size:A4 portrait;margin:0}html,body{margin:0!important;padding:0!important;background:#fff!important}.v435-export-sheet{position:static!important;left:auto!important;top:auto!important;width:794px!important;z-index:auto!important}.v435-a4-page{page-break-after:always!important;break-after:page!important;box-shadow:none!important;margin:0 auto!important}.v435-a4-page:last-child{page-break-after:auto!important;break-after:auto!important}</style></head><body>${clone.outerHTML}</body></html>`;
+      const html=`<!doctype html><html><head><meta charset="utf-8"><title>예선 대진표 출력</title>${css}<style>@page{size:A4 portrait;margin:0}html,body{margin:0!important;padding:0!important;background:#fff!important}.v435-export-sheet{position:static!important;left:auto!important;top:auto!important;width:794px!important;z-index:auto!important}.v435-a4-page{page-break-after:always!important;break-after:page!important;box-shadow:none!important;margin:0 auto!important}.v435-a4-page:last-child{page-break-after:auto!important;break-after:auto!important}</style></head><body>${clone.outerHTML}
+
+<style id="v499GlobalFlickerStabilizeStyle">
+/* v499: 전체 화면 깜빡임/버튼 흔들림 안정화 */
+html, body{scroll-behavior:auto !important;}
+.page, .card, .tc, .m3card, .match-card, .grp-card,
+.court-drop-zone, .court-wait-card, .bottom-tab-bar,
+.modal-box, .modal-overlay, .toast, .sticky-alert-wrap,
+button, .btn, .btn-sm, .nav-tab, .players-tab-btn,
+.home-quick-btn, .home-click-card, .home-click-chip,
+.badge, .hero-chip, .stat-card, input, select, textarea{
+  animation:none !important;
+  transition:none !important;
+  transform:none !important;
+}
+button:hover, .btn:hover, .btn-sm:hover, .nav-tab:hover,
+.home-quick-btn:hover, .home-click-card:hover, .home-click-chip:hover,
+.players-tab-btn:hover{
+  animation:none !important;
+  transition:none !important;
+  transform:none !important;
+}
+.fade-in, .live-blink, .match-focus-pulse, .draw-team-slot.slot-active,
+.draw-team-slot.slot-filled, .leaf-card-stage.floating, .leaf-card-stage.landing,
+.roulette-strip.spinning, .confetti-piece{
+  animation:none !important;
+  transition:none !important;
+  transform:none !important;
+}
+#gLd{
+  animation:none !important;
+  transform:none !important;
+  opacity:.55 !important;
+  height:2px !important;
+}
+#bracketContent, #regSection, #regDivisionOverview, #homeDivStatus, #tournList{
+  overflow-anchor:none !important;
+}
+#page-register input, #page-register textarea, #page-register select{
+  animation:none !important;
+  transition:none !important;
+  caret-color:#0f1e3a !important;
+}
+</style>
+<script id="v499GlobalFlickerStabilizeScript">
+(function(){
+  'use strict';
+
+  function isTypingInRegister(){
+    try{
+      const el=document.activeElement;
+      if(!el || !el.closest || !el.closest('#page-register')) return false;
+      if(el.disabled || el.readOnly) return false;
+      const tag=String(el.tagName||'').toUpperCase();
+      if(tag==='TEXTAREA') return true;
+      if(tag!=='INPUT') return false;
+      const type=String(el.type||'text').toLowerCase();
+      return !['button','submit','reset','checkbox','radio','file','hidden','range','color'].includes(type);
+    }catch(e){return false;}
+  }
+
+  function normalizeStatic(root){
+    try{
+      (root||document).querySelectorAll('.live-blink,.match-focus-pulse,.fade-in,button,.btn,.btn-sm,.nav-tab,.players-tab-btn,.home-quick-btn,.court-wait-card,.court-drop-zone').forEach(function(el){
+        el.classList.remove('live-blink','match-focus-pulse');
+        el.style.setProperty('animation','none','important');
+        el.style.setProperty('transition','none','important');
+        if(/button|btn|nav-tab|players-tab-btn|home-quick-btn/i.test(el.className||'') || String(el.tagName||'').toLowerCase()==='button'){
+          el.style.setProperty('transform','none','important');
+        }
+      });
+      const bar=document.getElementById('gLd');
+      if(bar){
+        bar.style.setProperty('animation','none','important');
+        bar.style.setProperty('transform','none','important');
+        bar.style.setProperty('opacity','.55','important');
+      }
+    }catch(e){}
+  }
+
+  function coalesceVoidRender(name, wait){
+    try{
+      const old=window[name];
+      if(typeof old!=='function' || old.__v499Coalesced) return;
+      let last=0, timer=0, queuedArgs=null, queuedThis=null, running=false;
+      const wrapped=function(){
+        if(running) return old.apply(this, arguments);
+        if((name==='renderRL' || name==='renderRegisterDivisionOverview') && isTypingInRegister()){
+          window.__v499PendingRegister=true;
+          clearTimeout(timer);
+          queuedArgs=arguments; queuedThis=this;
+          timer=setTimeout(function(){
+            if(isTypingInRegister()) return;
+            window.__v499PendingRegister=false;
+            running=true;
+            try{ old.apply(queuedThis||window, queuedArgs||[]); normalizeStatic(document); }
+            finally{ running=false; queuedArgs=null; queuedThis=null; }
+          }, 450);
+          return undefined;
+        }
+        const now=Date.now();
+        if(now-last < wait){
+          queuedArgs=arguments; queuedThis=this;
+          clearTimeout(timer);
+          timer=setTimeout(function(){
+            last=Date.now();
+            running=true;
+            try{ old.apply(queuedThis||window, queuedArgs||[]); normalizeStatic(document); }
+            finally{ running=false; queuedArgs=null; queuedThis=null; }
+          }, wait);
+          return undefined;
+        }
+        last=now;
+        running=true;
+        try{
+          const r=old.apply(this, arguments);
+          setTimeout(function(){normalizeStatic(document);}, 0);
+          return r;
+        }finally{ running=false; }
+      };
+      wrapped.__v499Coalesced=true;
+      window[name]=wrapped;
+    }catch(e){}
+  }
+
+  function stabilizeLoadingBar(){
+    try{
+      const old=window.sl;
+      if(typeof old!=='function' || old.__v499Stable) return;
+      let showTimer=0;
+      const wrapped=function(show){
+        if(show){
+          clearTimeout(showTimer);
+          showTimer=setTimeout(function(){
+            try{ old(true); normalizeStatic(document); }catch(e){}
+          }, 220);
+          return;
+        }
+        clearTimeout(showTimer);
+        return old(false);
+      };
+      wrapped.__v499Stable=true;
+      window.sl=wrapped;
+    }catch(e){}
+  }
+
+  function boot(){
+    ['renderBracket','renderRL','renderRegisterDivisionOverview','renderRanking','upDash','renderTL','renderHome','renderTournaments'].forEach(function(n){coalesceVoidRender(n, 120);});
+    stabilizeLoadingBar();
+    normalizeStatic(document);
+    setTimeout(function(){
+      ['renderBracket','renderRL','renderRegisterDivisionOverview','renderRanking','upDash','renderTL','renderHome','renderTournaments'].forEach(function(n){coalesceVoidRender(n, 120);});
+      stabilizeLoadingBar();
+      normalizeStatic(document);
+    }, 900);
+  }
+
+  document.addEventListener('focusout', function(){
+    if(window.__v499PendingRegister){
+      setTimeout(function(){
+        try{
+          if(!isTypingInRegister()){
+            window.__v499PendingRegister=false;
+            if(typeof window.renderRegisterDivisionOverview==='function') window.renderRegisterDivisionOverview();
+            if(typeof window.renderRL==='function') window.renderRL();
+          }
+        }catch(e){}
+      }, 350);
+    }
+  }, true);
+
+  try{
+    const mo=new MutationObserver(function(muts){
+      let added=false;
+      for(const m of muts){ if(m.addedNodes && m.addedNodes.length){ added=true; break; } }
+      if(!added) return;
+      clearTimeout(window.__v499StaticTimer);
+      window.__v499StaticTimer=setTimeout(function(){normalizeStatic(document);}, 140);
+    });
+    if(document.body) mo.observe(document.body,{childList:true,subtree:true});
+  }catch(e){}
+
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
+</script>
+
+</body></html>`;
       const iframe=document.createElement('iframe');
       iframe.style.position='fixed'; iframe.style.right='0'; iframe.style.bottom='0'; iframe.style.width='0'; iframe.style.height='0'; iframe.style.border='0';
       document.body.appendChild(iframe);
@@ -47481,5 +48042,192 @@ button:hover,.btn:hover,.btn-sm:hover,
   else boot();
 })();
 </script>
+
+
+<style id="v499GlobalFlickerStabilizeStyle">
+/* v499: 전체 화면 깜빡임/버튼 흔들림 안정화 */
+html, body{scroll-behavior:auto !important;}
+.page, .card, .tc, .m3card, .match-card, .grp-card,
+.court-drop-zone, .court-wait-card, .bottom-tab-bar,
+.modal-box, .modal-overlay, .toast, .sticky-alert-wrap,
+button, .btn, .btn-sm, .nav-tab, .players-tab-btn,
+.home-quick-btn, .home-click-card, .home-click-chip,
+.badge, .hero-chip, .stat-card, input, select, textarea{
+  animation:none !important;
+  transition:none !important;
+  transform:none !important;
+}
+button:hover, .btn:hover, .btn-sm:hover, .nav-tab:hover,
+.home-quick-btn:hover, .home-click-card:hover, .home-click-chip:hover,
+.players-tab-btn:hover{
+  animation:none !important;
+  transition:none !important;
+  transform:none !important;
+}
+.fade-in, .live-blink, .match-focus-pulse, .draw-team-slot.slot-active,
+.draw-team-slot.slot-filled, .leaf-card-stage.floating, .leaf-card-stage.landing,
+.roulette-strip.spinning, .confetti-piece{
+  animation:none !important;
+  transition:none !important;
+  transform:none !important;
+}
+#gLd{
+  animation:none !important;
+  transform:none !important;
+  opacity:.55 !important;
+  height:2px !important;
+}
+#bracketContent, #regSection, #regDivisionOverview, #homeDivStatus, #tournList{
+  overflow-anchor:none !important;
+}
+#page-register input, #page-register textarea, #page-register select{
+  animation:none !important;
+  transition:none !important;
+  caret-color:#0f1e3a !important;
+}
+</style>
+<script id="v499GlobalFlickerStabilizeScript">
+(function(){
+  'use strict';
+
+  function isTypingInRegister(){
+    try{
+      const el=document.activeElement;
+      if(!el || !el.closest || !el.closest('#page-register')) return false;
+      if(el.disabled || el.readOnly) return false;
+      const tag=String(el.tagName||'').toUpperCase();
+      if(tag==='TEXTAREA') return true;
+      if(tag!=='INPUT') return false;
+      const type=String(el.type||'text').toLowerCase();
+      return !['button','submit','reset','checkbox','radio','file','hidden','range','color'].includes(type);
+    }catch(e){return false;}
+  }
+
+  function normalizeStatic(root){
+    try{
+      (root||document).querySelectorAll('.live-blink,.match-focus-pulse,.fade-in,button,.btn,.btn-sm,.nav-tab,.players-tab-btn,.home-quick-btn,.court-wait-card,.court-drop-zone').forEach(function(el){
+        el.classList.remove('live-blink','match-focus-pulse');
+        el.style.setProperty('animation','none','important');
+        el.style.setProperty('transition','none','important');
+        if(/button|btn|nav-tab|players-tab-btn|home-quick-btn/i.test(el.className||'') || String(el.tagName||'').toLowerCase()==='button'){
+          el.style.setProperty('transform','none','important');
+        }
+      });
+      const bar=document.getElementById('gLd');
+      if(bar){
+        bar.style.setProperty('animation','none','important');
+        bar.style.setProperty('transform','none','important');
+        bar.style.setProperty('opacity','.55','important');
+      }
+    }catch(e){}
+  }
+
+  function coalesceVoidRender(name, wait){
+    try{
+      const old=window[name];
+      if(typeof old!=='function' || old.__v499Coalesced) return;
+      let last=0, timer=0, queuedArgs=null, queuedThis=null, running=false;
+      const wrapped=function(){
+        if(running) return old.apply(this, arguments);
+        if((name==='renderRL' || name==='renderRegisterDivisionOverview') && isTypingInRegister()){
+          window.__v499PendingRegister=true;
+          clearTimeout(timer);
+          queuedArgs=arguments; queuedThis=this;
+          timer=setTimeout(function(){
+            if(isTypingInRegister()) return;
+            window.__v499PendingRegister=false;
+            running=true;
+            try{ old.apply(queuedThis||window, queuedArgs||[]); normalizeStatic(document); }
+            finally{ running=false; queuedArgs=null; queuedThis=null; }
+          }, 450);
+          return undefined;
+        }
+        const now=Date.now();
+        if(now-last < wait){
+          queuedArgs=arguments; queuedThis=this;
+          clearTimeout(timer);
+          timer=setTimeout(function(){
+            last=Date.now();
+            running=true;
+            try{ old.apply(queuedThis||window, queuedArgs||[]); normalizeStatic(document); }
+            finally{ running=false; queuedArgs=null; queuedThis=null; }
+          }, wait);
+          return undefined;
+        }
+        last=now;
+        running=true;
+        try{
+          const r=old.apply(this, arguments);
+          setTimeout(function(){normalizeStatic(document);}, 0);
+          return r;
+        }finally{ running=false; }
+      };
+      wrapped.__v499Coalesced=true;
+      window[name]=wrapped;
+    }catch(e){}
+  }
+
+  function stabilizeLoadingBar(){
+    try{
+      const old=window.sl;
+      if(typeof old!=='function' || old.__v499Stable) return;
+      let showTimer=0;
+      const wrapped=function(show){
+        if(show){
+          clearTimeout(showTimer);
+          showTimer=setTimeout(function(){
+            try{ old(true); normalizeStatic(document); }catch(e){}
+          }, 220);
+          return;
+        }
+        clearTimeout(showTimer);
+        return old(false);
+      };
+      wrapped.__v499Stable=true;
+      window.sl=wrapped;
+    }catch(e){}
+  }
+
+  function boot(){
+    ['renderBracket','renderRL','renderRegisterDivisionOverview','renderRanking','upDash','renderTL','renderHome','renderTournaments'].forEach(function(n){coalesceVoidRender(n, 120);});
+    stabilizeLoadingBar();
+    normalizeStatic(document);
+    setTimeout(function(){
+      ['renderBracket','renderRL','renderRegisterDivisionOverview','renderRanking','upDash','renderTL','renderHome','renderTournaments'].forEach(function(n){coalesceVoidRender(n, 120);});
+      stabilizeLoadingBar();
+      normalizeStatic(document);
+    }, 900);
+  }
+
+  document.addEventListener('focusout', function(){
+    if(window.__v499PendingRegister){
+      setTimeout(function(){
+        try{
+          if(!isTypingInRegister()){
+            window.__v499PendingRegister=false;
+            if(typeof window.renderRegisterDivisionOverview==='function') window.renderRegisterDivisionOverview();
+            if(typeof window.renderRL==='function') window.renderRL();
+          }
+        }catch(e){}
+      }, 350);
+    }
+  }, true);
+
+  try{
+    const mo=new MutationObserver(function(muts){
+      let added=false;
+      for(const m of muts){ if(m.addedNodes && m.addedNodes.length){ added=true; break; } }
+      if(!added) return;
+      clearTimeout(window.__v499StaticTimer);
+      window.__v499StaticTimer=setTimeout(function(){normalizeStatic(document);}, 140);
+    });
+    if(document.body) mo.observe(document.body,{childList:true,subtree:true});
+  }catch(e){}
+
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
+</script>
+
 </body>
 </html>
