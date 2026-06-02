@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-02-v497-cursor-nofocus-fix";
+  const APP_VERSION = "2026-06-02-v497c-promote-fee-fix";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -13964,7 +13964,16 @@ async function stT(key){
       ...(t.tiebreakAge !== undefined ? {tiebreakAge: Number(t.tiebreakAge||0)||0} : {}),
       ...(t.adminNotificationType ? {adminNotificationType: t.adminNotificationType} : {}),
       ...(t.adminNotificationId ? {adminNotificationId: t.adminNotificationId} : {}),
-      ...(t.adminNotificationCreatedAt ? {adminNotificationCreatedAt: t.adminNotificationCreatedAt} : {})
+      ...(t.adminNotificationCreatedAt ? {adminNotificationCreatedAt: t.adminNotificationCreatedAt} : {}),
+      ...(t.feePaid !== undefined ? {feePaid: t.feePaid} : {}),
+      ...(t.feePaidAt ? {feePaidAt: t.feePaidAt} : {}),
+      ...(t.feePaidBy ? {feePaidBy: t.feePaidBy} : {}),
+      ...(t.feePaidByName ? {feePaidByName: t.feePaidByName} : {}),
+      ...(t.paymentStatus ? {paymentStatus: t.paymentStatus} : {}),
+      ...(t.ownerUid ? {ownerUid: t.ownerUid} : {}),
+      ...(t.ownerEmail ? {ownerEmail: t.ownerEmail} : {}),
+      ...(t.ownerName ? {ownerName: t.ownerName} : {}),
+      ...(t.deleted !== undefined ? {deleted: !!t.deleted} : {})
     };
     batch.set(doc(db,'registrations',docId), payload, {merge:true});
   });
@@ -21242,6 +21251,32 @@ function openETeam(key,idx){
           <div class="form-group" style="margin-bottom:0"><label class="form-label">비고</label><input class="form-input" id="etPNote" value="${esc(team.note||'')}"></div>
           <div class="form-group" style="margin-bottom:0;display:none"><label class="form-label">수정/삭제 비밀번호</label><input class="form-input" id="etEditPin" inputmode="numeric" maxlength="4" value=""></div>
         </div>
+        ${(AD||TM)?`<div style="padding:10px 12px;background:#fff8e8;border:1.5px solid #f6d28b;border-radius:12px;margin-top:4px">
+          <div style="font-size:.78rem;font-weight:900;color:#92400e;margin-bottom:8px">🔧 관리자 전용 필드</div>
+          <div class="frow">
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label">입금확인 일시 <span style="font-size:.7rem;color:var(--text3)">(YYYY-MM-DDTHH:MM:SS)</span></label>
+              <input class="form-input" id="etFeePaidAt" value="${esc(team.feePaidAt||team.registeredAt||'')}" placeholder="예: 2026-05-26T07:01:03">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label">등록 일시 <span style="font-size:.7rem;color:var(--text3)">(순번 기준)</span></label>
+              <input class="form-input" id="etRegisteredAt" value="${esc(team.registeredAt||'')}" placeholder="예: 2026-05-26T06:52:27">
+            </div>
+          </div>
+          <div class="frow" style="margin-top:6px">
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label">등록순번 (queueOrder)</label>
+              <input class="form-input" id="etQueueOrder" type="number" min="0" value="${team.queueOrder!=null?team.queueOrder:''}" placeholder="숫자 (낮을수록 앞)">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label">입금확인 여부</label>
+              <select class="form-select" id="etFeePaid">
+                <option value="true" ${team.feePaid!==false?'selected':''}>✅ 입금확인</option>
+                <option value="false" ${team.feePaid===false?'selected':''}>⏳ 미확인</option>
+              </select>
+            </div>
+          </div>
+        </div>`:''}
       </div>`;
     om('mETeam');
     return;
@@ -21348,6 +21383,18 @@ async function saveETeam(){
     team.tournamentType = 'individual_pair';
     team.doublesCount = 1;
     team.mainPlayerCount = 2;
+    // 관리자 전용 필드 저장
+    if(AD||TM){
+      const feePaidAtVal=(ge('etFeePaidAt')?.value||'').trim();
+      const registeredAtVal=(ge('etRegisteredAt')?.value||'').trim();
+      const queueOrderVal=ge('etQueueOrder')?.value;
+      const feePaidVal=ge('etFeePaid')?.value;
+      if(feePaidAtVal) team.feePaidAt=feePaidAtVal.includes('T')?feePaidAtVal:feePaidAtVal+'T00:00:00';
+      if(registeredAtVal) team.registeredAt=registeredAtVal.includes('T')?registeredAtVal:registeredAtVal+'T00:00:00';
+      if(queueOrderVal!==''&&queueOrderVal!=null&&!isNaN(Number(queueOrderVal))) team.queueOrder=Number(queueOrderVal);
+      if(feePaidVal==='true'){team.feePaid=true;team.paymentStatus='paid';}
+      else if(feePaidVal==='false'){team.feePaid=false;team.paymentStatus='pending';}
+    }
 
     sl(true);
     try{
@@ -42594,7 +42641,9 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
   }
   window.promoteWaitlistedTeam = async function(key, idx){
     try{
-      if(!(window.AD||window.TM)){ toastSafe('관리자만 전환할 수 있습니다.','error'); return; }
+      // 호출 시점에 전역 변수 재확인 (IIFE 클로저 캡처 문제 방지)
+      const _AD=!!(window.AD), _TM=!!(window.TM), _OP=!!(window.OP);
+      if(!(_AD||_TM||_OP)){ toastSafe('관리자(또는 진행자)만 전환할 수 있습니다.','error'); return; }
       key=String(key||''); idx=Number(idx);
       const arr=G.teams?.[key]||[];
       if(!arr.length || !arr[idx]){ toastSafe('대상 참가팀을 찾을 수 없습니다.','error'); return; }
@@ -42610,7 +42659,20 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
       arr.splice(insertAt,0,item);
       renumberQueueOrder(key);
       if(typeof sl==='function') sl(true);
-      if(typeof stT==='function') await stT(key);
+      try{
+        if(typeof stT==='function') await stT(key);
+      }catch(stErr){
+        // stT 권한 오류 시 queueOrder만 개별 doc 업데이트로 fallback
+        console.warn('stT failed, trying individual doc update:', stErr);
+        try{
+          const {writeBatch:wb2, doc:doc2}=await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js').catch(()=>({}));
+          if(wb2 && doc2){
+            const b2=wb2(db);
+            arr.forEach(t=>{ if(t._id) b2.update(doc2(db,'registrations',t._id),{queueOrder:Number(t.queueOrder||0),updatedAt:new Date().toISOString()}); });
+            await b2.commit();
+          }
+        }catch(fbErr){ throw stErr; } // fallback도 실패하면 원래 오류 던지기
+      }
       try{ if(typeof fbLog==='function') await fbLog(`대기팀 일반전환: ${name} (${td.div})`,'📋'); }catch(_e){}
       if(typeof sl==='function') sl(false);
       try{ renderRegisterDivisionOverview(); renderRL(); upDash(); }catch(_e){}
