@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-02-v513-register-save-fix";
+  const APP_VERSION = "2026-06-03-v520-cost-guard";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -12247,16 +12247,35 @@ function applyTournamentBundle(tid, bundle){
 }
 
 let ALL_PARTICIPATION_CACHE_TS = 0;
-const ALL_PARTICIPATION_CACHE_TTL = 1000 * 60 * 3;
+// v520 비용 보호:
+//   - registrations/matches/draws 전체 조회 완전 금지
+//   - 반드시 현재 선택된 tournamentId(tid) 기준으로만 읽음
+//   - tid 없으면 즉시 반환, 관리자 여부 무관
+//   - TTL 30분: 같은 tid 재진입 시 Firestore 읽기 없음
+const ALL_PARTICIPATION_CACHE_TTL = 1000 * 60 * 30;
 async function ensureAllParticipationDataLoaded(force=false){
-  const now=Date.now();
-  if(!force && ALL_PARTICIPATION_CACHE_TS && (now-ALL_PARTICIPATION_CACHE_TS)<ALL_PARTICIPATION_CACHE_TTL){
+  // v520: 현재 선택된 tid로만 읽음. 전체 컬렉션 조회 완전 금지.
+  const tid = String(
+    (typeof getRealtimeTargetTournamentId==='function' && getRealtimeTargetTournamentId()) ||
+    (typeof getSelectedTournamentIdForPage==='function' && getSelectedTournamentIdForPage(typeof getCurrentPageName==='function'?getCurrentPageName():'')) ||
+    ''
+  ).trim();
+  if(!tid){
+    console.log('[cost-guard] ensureAllParticipationDataLoaded: tid 없음 — 전체 조회 생략');
     return;
   }
+  const now=Date.now();
+  const cacheKey='_allPartic_'+tid;
+  const lastTs=ALL_PARTICIPATION_CACHE_TS[cacheKey]||0;
+  if(!force && lastTs && (now-lastTs)<ALL_PARTICIPATION_CACHE_TTL){
+    return;
+  }
+  console.log('[cost-guard] ensureAllParticipationDataLoaded: tid='+tid+' 기준 읽기');
+  const regsQ   = query(collection(db,'registrations'), where('tournamentId','==',tid));
+  const matchesQ= query(collection(db,'matches'),       where('tournamentId','==',tid));
+  const drawsQ  = query(collection(db,'draws'), where(documentId(),'>=',tid+'_'), where(documentId(),'<=',tid+'_'));
   const [regsSnap, matchesSnap, drawsSnap] = await Promise.all([
-    getDocs(collection(db,'registrations')),
-    getDocs(collection(db,'matches')),
-    getDocs(collection(db,'draws'))
+    getDocs(regsQ), getDocs(matchesQ), getDocs(drawsQ)
   ]);
 
   const nextTeams={...(G.teams||{})};
@@ -12321,13 +12340,26 @@ async function ensureAllParticipationDataLoaded(force=false){
   G.draws=nextDraws;
   G._regIdsByKey=nextRegIds;
   G._matchIdsByKey=nextMatchIds;
-  ALL_PARTICIPATION_CACHE_TS = now;
+  if(!ALL_PARTICIPATION_CACHE_TS||typeof ALL_PARTICIPATION_CACHE_TS!=='object') ALL_PARTICIPATION_CACHE_TS={};
+  ALL_PARTICIPATION_CACHE_TS[cacheKey] = now;
 }
 
+// v520 비용 보호: force=true라도 30초 쿨다운 — 연속 클릭/루프로 인한 읽기 폭증 방지
+const _bundleFetchCooldown = {};
+const BUNDLE_FETCH_COOLDOWN_MS = 30 * 1000; // 30초
 async function fetchTournamentBundle(tid, opts={}){
   const options=opts||{};
   const force=!!options.force;
   if(!tid) return null;
+  const now=Date.now();
+  if(force){
+    const lastFetch=_bundleFetchCooldown[tid]||0;
+    if(now-lastFetch < BUNDLE_FETCH_COOLDOWN_MS){
+      console.log('[cost-guard] fetchTournamentBundle: '+tid+' 쿨다운 중 ('+Math.ceil((BUNDLE_FETCH_COOLDOWN_MS-(now-lastFetch))/1000)+'초 남음) — 캐시 반환');
+      const cached=getTournamentBundleCache(tid);
+      if(cached){ applyTournamentBundle(tid, cached); return cached; }
+    }
+  }
   if(!force){
     const cached=getTournamentBundleCache(tid);
     if(cached){
@@ -12335,6 +12367,7 @@ async function fetchTournamentBundle(tid, opts={}){
       return cached;
     }
   }
+  _bundleFetchCooldown[tid]=now;
   const seq=++_bundleFetchSeq;
   const regsQ=query(collection(db,'registrations'), where('tournamentId','==',tid));
   const matchesQ=query(collection(db,'matches'), where('tournamentId','==',tid));
@@ -12540,10 +12573,30 @@ async function syncTournamentDataForPage(page, tid, force=false){
     ensureViewerBracketPolling(pg, targetTid);
   }
 }
-async function ensureDrawHistoryLoaded(force=false){
-  if(DRAW_HISTORY_LOADED && !force) return G.drawHistories||{};
+async function ensureDrawHistoryLoaded(force=false, tid=''){
+  // v520 비용 보호: tid 지정 시 해당 대회만, 없으면 limit(50) 적용. 전체 무제한 조회 금지.
+  const targetTid=String(tid||
+    (typeof getRealtimeTargetTournamentId==='function'?getRealtimeTargetTournamentId():'')||
+    (typeof getSelectedTournamentIdForPage==='function'?getSelectedTournamentIdForPage(typeof getCurrentPageName==='function'?getCurrentPageName():''):'')||
+    '').trim();
+  const cacheKey='drawHistory'+(targetTid?'_'+targetTid:'_global');
+  if(DRAW_HISTORY_LOADED && !force && G.drawHistories && Object.keys(G.drawHistories).length>0){
+    if(!targetTid || Object.keys(G.drawHistories).some(k=>k.startsWith(targetTid+'_'))){
+      return G.drawHistories||{};
+    }
+  }
   try{
-    const dhSnap = await getDocs(collection(db,'drawHistory'));
+    let dhSnap;
+    if(targetTid){
+      const dhQ=query(collection(db,'drawHistory'), where('tournamentId','==',targetTid), orderBy('createdAt','desc'), limit(100));
+      dhSnap=await getDocs(dhQ);
+      console.log('[cost-guard] ensureDrawHistoryLoaded: tid='+targetTid+' limit=100');
+    } else {
+      // tid 없을 경우 최근 50개만 (전체 무제한 조회 금지)
+      const dhQ=query(collection(db,'drawHistory'), orderBy('createdAt','desc'), limit(50));
+      dhSnap=await getDocs(dhQ);
+      console.log('[cost-guard] ensureDrawHistoryLoaded: tid 없음 — 최근 50개만');
+    }
     G.drawHistories = {};
     dhSnap.forEach(d=>{
       const x={id:d.id,...(d.data()||{})};
@@ -13716,15 +13769,12 @@ async function initFB(){
     await loadRegistry(2026);
 
     // 대회 목록만 실시간 유지
-    onSnapshot(query(collection(db,'tournaments'),orderBy('createdAt','desc')), async s=>{
+    // v520 비용 보호: tournaments onSnapshot은 G.tournaments 갱신과 UI 갱신(onDU)만 담당.
+    //   bundle fetch(registrations/matches/draws 읽기) 완전 차단.
+    //   사용자가 화면에서 직접 대회를 선택하거나 새로고침 버튼을 눌렀을 때만 bundle을 읽음.
+    onSnapshot(query(collection(db,'tournaments'),orderBy('createdAt','desc')), s=>{
       G.tournaments=s.docs.map(d=>({id:d.id,...d.data()})).filter(t=>!t.deleted);
-      try{
-        const activeTid = getRealtimeTargetTournamentId() || null;
-        await syncTournamentDataForPage(getCurrentPageName(), activeTid, false);
-      }catch(syncErr){
-        console.warn('initial tournament sync failed', syncErr);
-      }
-      onDU();
+      onDU(); // UI 갱신만. Firestore 추가 읽기 없음.
     },e=>console.error(e));
 
     // 선수기록은 로컬 캐시 우선
@@ -20870,6 +20920,15 @@ function renderRegisterDivisionOverview(){
     if(isRegisterUnpaidOnlyActive()){
       teams = teams.filter(tm=>!(typeof getTeamPaymentPaid==='function' && getTeamPaymentPaid(tm)));
     }
+    // 참가 접수 목록의 표시 순번은 접수 시간(registeredAt) 오름차순이 기준입니다.
+    // 기존 배열 위치는 수정/삭제 버튼의 원본 인덱스로만 사용합니다.
+    teams = teams.slice().sort((a,b)=>{
+      const ta=Date.parse(String(a.registeredAt||a.createdAt||a.createdAtText||a.adminNotificationCreatedAt||a.updatedAt||''));
+      const tb=Date.parse(String(b.registeredAt||b.createdAt||b.createdAtText||b.adminNotificationCreatedAt||b.updatedAt||''));
+      const aa=Number.isFinite(ta)?ta:(9000000000000000+Number(a._origIdx||0));
+      const bb=Number.isFinite(tb)?tb:(9000000000000000+Number(b._origIdx||0));
+      return (aa-bb) || (Number(a._origIdx||0)-Number(b._origIdx||0));
+    });
     const totalPlayers=teams.reduce((s,tm)=>s+((tm.players||[]).length),0);
     const confirmedCnt=getConfirmedTeamCountForKey(key);
     const waitCnt=getWaitlistedTeamCountForKey(key);
@@ -21141,8 +21200,10 @@ async function registerTeam(){
   const newIdx=G.teams[key].length-1;
 
   try{
-    const usePublicAppendOnly = isIndividual && !AD && !OP;
-    if(usePublicAppendOnly) await stTPublicAppendOne(key, newTeam);
+    // 개인전 신규 접수는 관리자/개발자 로그인 상태에서도 registrations 단일 문서로 저장합니다.
+    // 전체 팀목록(stT) 저장은 기존 접수 문서 삭제/권한 충돌을 만들 수 있어 신규 접수에는 쓰지 않습니다.
+    const useSingleRegistrationDoc = isIndividual && typeof stTPublicAppendOne === 'function';
+    if(useSingleRegistrationDoc) await stTPublicAppendOne(key, newTeam);
     else await stT(key);
   }catch(e){
     G.teams[key].splice(newIdx,1);
@@ -21314,7 +21375,12 @@ async function delTeam(key,idx){
   if(isIndividual){
     if(!(AD || TM) && !verifyIndividualEditPin(team,'삭제')) return;
     if(!(AD || TM) && !isRegistrationOwner(team)){
-      toast('구글 로그인 전환 후에는 최초 등록한 계정으로만 삭제할 수 있습니다','error');
+      toast('구글 로그인 전환 후에는 최초 등록한 계정으로만 삭제 요청할 수 있습니다','error');
+      return;
+    }
+    // 일반회원의 개인전 취소는 즉시 삭제하지 않고 관리자 삭제요청으로만 접수합니다.
+    if(!(AD || TM)){
+      await requestDeleteTeamOnly(key, idx, team);
       return;
     }
   }else{
@@ -26688,7 +26754,7 @@ function openSavedDrawHistory(id, key){
   renderSavedDrawView(entry);
 }
 async function openDrawHistory(tid,div,mode='prelim'){
-  await ensureDrawHistoryLoaded();
+  await ensureDrawHistoryLoaded(false, tid);
   const key=tid+'_'+div;
   DRAW_HISTORY_CTX_KEY=key;
   const wantMain = String(mode||'prelim')==='main';
@@ -26741,7 +26807,7 @@ async function openDrawHistory(tid,div,mode='prelim'){
 }
 
 async function openLatestSavedDraw(tid,div,mode='prelim'){
-  await ensureDrawHistoryLoaded();
+  await ensureDrawHistoryLoaded(false, tid);
   const key=tid+'_'+div;
   const wantMain = String(mode||'prelim')==='main';
   const entry=(G.drawHistories[key]||[])
@@ -40278,7 +40344,8 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
       var jobs=[];
       if(typeof window.loadRegistry==='function') jobs.push(Promise.resolve(window.loadRegistry(new Date().getFullYear())));
       if(typeof window.ensurePlayersLoaded==='function') jobs.push(Promise.resolve(window.ensurePlayersLoaded()));
-      if(typeof window.ensureAllParticipationDataLoaded==='function') jobs.push(Promise.resolve(window.ensureAllParticipationDataLoaded()));
+      // v519 비용 보호: 관리자(AD)일 때만 전체 participation 조회
+      if(typeof window.ensureAllParticipationDataLoaded==='function' && window.AD) jobs.push(Promise.resolve(window.ensureAllParticipationDataLoaded()));
       Promise.allSettled(jobs).then(function(){
         try{ if(typeof window.renderAllP==='function') window.renderAllP(); }catch(e){}
         try{ if(typeof window.popCF==='function') window.popCF(); }catch(e){}
@@ -40445,7 +40512,8 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
       var jobs=[];
       if(typeof window.loadRegistry==='function') jobs.push(Promise.resolve(window.loadRegistry(new Date().getFullYear())));
       if(typeof window.ensurePlayersLoaded==='function') jobs.push(Promise.resolve(window.ensurePlayersLoaded()));
-      if(typeof window.ensureAllParticipationDataLoaded==='function') jobs.push(Promise.resolve(window.ensureAllParticipationDataLoaded()));
+      // v519 비용 보호: 관리자(AD)일 때만 전체 participation 조회
+      if(typeof window.ensureAllParticipationDataLoaded==='function' && window.AD) jobs.push(Promise.resolve(window.ensureAllParticipationDataLoaded()));
       Promise.allSettled(jobs).then(function(){
         try{ if(typeof window.renderAllP==='function') window.renderAllP(); }catch(e){}
         try{ if(typeof window.popCF==='function') window.popCF(); }catch(e){}
@@ -40584,7 +40652,8 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
     try{
       if(typeof window.loadRegistry==='function') window.loadRegistry(new Date().getFullYear()).catch(function(){});
       if(typeof window.ensurePlayersLoaded==='function') window.ensurePlayersLoaded().catch(function(){});
-      if(typeof window.ensureAllParticipationDataLoaded==='function') window.ensureAllParticipationDataLoaded().catch(function(){});
+      // v519 비용 보호: 관리자(AD)일 때만
+      if(typeof window.ensureAllParticipationDataLoaded==='function' && window.AD) window.ensureAllParticipationDataLoaded().catch(function(){});
     }catch(e){}
     setTimeout(function(){ try{ if(typeof window.renderAllP==='function') window.renderAllP(); }catch(e){} setUnifiedDom(); },80);
     setTimeout(function(){ try{ if(typeof window.renderAllP==='function') window.renderAllP(); }catch(e){} setUnifiedDom(); },650);
@@ -48234,6 +48303,389 @@ body:not(.reg-popup-open) div[id^="regInlineForm_"] > #aoReg{display:none!import
   document.addEventListener('compositionend',function(e){var m=ge2('regPopupModal'); if(m&&m.contains(e.target)) inputActiveUntil=Date.now()+2000;},true);
   document.addEventListener('DOMContentLoaded',function(){setTimeout(install,0);setTimeout(install,500);setTimeout(parkIfClosed,900);});
   setTimeout(install,0); setTimeout(install,1200);
+})();
+</script>
+
+<script id="v514DeveloperRegisterAndDeleteRequestFix">
+(function(){
+  try{
+    if(!Object.getOwnPropertyDescriptor(window,'AD')) Object.defineProperty(window,'AD',{get:function(){try{return AD;}catch(e){return false;}}, configurable:true});
+    if(!Object.getOwnPropertyDescriptor(window,'TM')) Object.defineProperty(window,'TM',{get:function(){try{return TM;}catch(e){return false;}}, configurable:true});
+    if(!Object.getOwnPropertyDescriptor(window,'OP')) Object.defineProperty(window,'OP',{get:function(){try{return OP;}catch(e){return false;}}, configurable:true});
+    if(!Object.getOwnPropertyDescriptor(window,'REG')) Object.defineProperty(window,'REG',{get:function(){try{return REG;}catch(e){return false;}}, configurable:true});
+  }catch(e){}
+})();
+</script>
+
+<script id="v515RegisterExportCurrentViewFix">
+(function(){
+  function $id(id){return document.getElementById(id);} 
+  function safe(v){
+    try{ if(typeof esc==='function') return esc(v); }catch(e){}
+    return String(v==null?'':v).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];});
+  }
+  function textOnlyName(v){
+    var s=String(v||'').trim();
+    try{ if(typeof v334IndividualNameOnly==='function') return v334IndividualNameOnly(s); }catch(e){}
+    return s.replace(/\s*\([^)]*\)\s*$/,'').trim();
+  }
+  function divName(v){
+    try{ if(typeof dl==='function') return dl(v); }catch(e){}
+    return String(v||'');
+  }
+  function isDeletedTeam(t){
+    return !t || t.deleted===true || String(t.status||'').toLowerCase()==='deleted';
+  }
+  function isPaidTeam(t){
+    try{ if(typeof getTeamPaymentPaid==='function') return !!getTeamPaymentPaid(t); }catch(e){}
+    var s=String((t&&(t.paymentStatus||t.payStatus||t.feeStatus))||'').toLowerCase();
+    return !!(t&&(t.feePaid===true||t.paymentPaid===true||t.paid===true||s==='paid'||s==='입금완료'||s==='입금확인'));
+  }
+  function paidDateText(t){
+    try{
+      if(!isPaidTeam(t)) return '';
+      var dt=(typeof formatPaymentPaidAtKST==='function') ? formatPaymentPaidAtKST(t.feePaidAt||'') : {date:'',time:''};
+      return ((dt.date||'')+' '+(dt.time||'')).trim();
+    }catch(e){return '';}
+  }
+  function playersOf(team){
+    try{ if(typeof getIndividualPlayers==='function') return (getIndividualPlayers(team)||[]).slice(0,2); }catch(e){}
+    if(Array.isArray(team&&team.individualPlayers)) return team.individualPlayers.slice(0,2);
+    var ps=(team&&team.players)||[];
+    return ps.slice(0,2).map(function(x){return typeof x==='string'?{name:x}:x;});
+  }
+  function playerName(p){ return textOnlyName((p&&p.name)||p||''); }
+  function playerClub(p){
+    return String((p&&(p.clubsRaw||p.club||(Array.isArray(p.clubs)?p.clubs.join('/'):'') ))||'').trim();
+  }
+  function teamLabel(team,key,idx,t){
+    try{ if(t && (typeof isIndividualTournament==='function') && isIndividualTournament(t)){
+      var ps=playersOf(team), names=ps.map(playerName).filter(Boolean);
+      if(names.length) return names.join(' / ');
+    }}catch(e){}
+    try{ if(typeof tdn==='function') return tdn(team,key,idx); }catch(e){}
+    return String(team&& (team.pairLabel||team.entryLabel||team.club) || '참가팀');
+  }
+  function teamSubLine(team,t){
+    try{ if(t && (typeof isIndividualTournament==='function') && isIndividualTournament(t)){
+      var clubs=playersOf(team).map(playerClub).filter(Boolean);
+      return clubs.length?clubs.join(' / '):'';
+    }}catch(e){}
+    var p=(team&&team.players||[]).filter(Boolean);
+    if(p.length) return p.join(' / ');
+    return String(team&&team.club||'');
+  }
+  function displayRows(tid,div){
+    var t=((window.G&&G.tournaments)||[]).find(function(x){return String(x.id)===String(tid);});
+    if(!t) return {t:null, rows:[]};
+    var key=tid+'_'+div;
+    var all=((G.teams&&G.teams[key])||[]);
+    var bc='';
+    try{ if(window.MY_CLUB_FILTER && typeof getMyClubContextClub==='function' && typeof baseClub==='function') bc=baseClub(getMyClubContextClub()||''); }catch(e){}
+    var rows=[];
+    all.forEach(function(team,idx){
+      if(isDeletedTeam(team)) return;
+      if(bc){
+        try{ if(baseClub(team.club||'')!==bc) return; }catch(e){}
+      }
+      try{ if(typeof isRegisterUnpaidOnlyActive==='function' && isRegisterUnpaidOnlyActive() && isPaidTeam(team)) return; }catch(e){}
+      rows.push({team:team, idx:idx, no:rows.length+1, key:key});
+    });
+    return {t:t, rows:rows};
+  }
+  function selectedDivs(t){
+    var sel=($id('regDS')&&$id('regDS').value)||'';
+    var divs=(t&&t.divisions?t.divisions.slice():[]);
+    if(sel && divs.indexOf(sel)>=0) return [sel];
+    return divs;
+  }
+  function statusHTML(team){
+    var paid=isPaidTeam(team), dt=paidDateText(team);
+    var del=team&&team.deleteRequested;
+    var wait=false;
+    try{ wait = typeof isTeamWaitlistedForKey==='function' && isTeamWaitlistedForKey('',0) && false; }catch(e){}
+    var html='<span class="ex-pay '+(paid?'paid':'unpaid')+'">'+(paid?'입금확인':'입금대기')+(dt?'<small>'+safe(dt)+'</small>':'')+'</span>';
+    if(del) html+='<span class="ex-del">삭제요청</span>';
+    return html;
+  }
+  function buildExportElement(){
+    var tid=($id('regTS')&&$id('regTS').value)||'';
+    var t=((window.G&&G.tournaments)||[]).find(function(x){return String(x.id)===String(tid);});
+    if(!tid||!t){try{toast('대회를 먼저 선택해 주세요','info');}catch(e){} return null;}
+    var wrap=document.createElement('div');
+    wrap.className='v515-export-wrap';
+    wrap.style.cssText='position:fixed;left:-20000px;top:0;width:1120px;background:#eef3fb;padding:22px;font-family:Noto Sans KR,Arial,sans-serif;z-index:-1;color:#0f172a';
+    var ds=selectedDivs(t);
+    var total=0, paid=0;
+    ds.forEach(function(d){ var r=displayRows(tid,d).rows; total+=r.length; r.forEach(function(x){if(isPaidTeam(x.team)) paid++;}); });
+    var title=safe(t.name||'대회');
+    wrap.innerHTML='<div style="background:#fff;border:1px solid #dbe4f0;border-top:4px solid #d4a017;border-radius:18px;padding:20px 22px;margin-bottom:14px;box-shadow:0 8px 20px rgba(15,30,58,.08)">'+
+      '<div style="font-size:24px;font-weight:1000;line-height:1.35;margin-bottom:8px">'+title+'</div>'+
+      '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:14px;font-weight:900">'+
+        '<span style="background:#f3e8ff;color:#7e22ce;border:1px solid #c084fc;border-radius:999px;padding:6px 12px">참가 접수 명단</span>'+
+        '<span style="background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd;border-radius:999px;padding:6px 12px">표시 '+total+'팀</span>'+
+        '<span style="background:#dbeafe;color:#1d4ed8;border:1px solid #3b82f6;border-radius:999px;padding:6px 12px">입금확인 '+paid+'팀</span>'+
+        '<span style="background:#fff7ed;color:#c2410c;border:1px solid #fdba74;border-radius:999px;padding:6px 12px">입금대기 '+(total-paid)+'팀</span>'+
+        (t.date?'<span style="margin-left:auto;color:#64748b;font-size:13px">대회일 '+safe(t.date)+'</span>':'')+
+      '</div></div>';
+    ds.forEach(function(div){
+      var data=displayRows(tid,div), rows=data.rows;
+      var section=document.createElement('div');
+      section.style.cssText='background:#fff;border:1px solid #dbe4f0;border-top:3px solid #d4a017;border-radius:18px;padding:16px 18px;margin-bottom:16px;box-shadow:0 8px 20px rgba(15,30,58,.08);overflow:hidden';
+      var paidCount=rows.filter(function(r){return isPaidTeam(r.team);}).length;
+      var maxCnt=''; try{ if(typeof getDivisionMaxTeams==='function') maxCnt=getDivisionMaxTeams(tid,div)||''; }catch(e){}
+      var head='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px">'+
+        '<span style="display:inline-flex;align-items:center;border:2px solid #c084fc;background:#f8f0ff;color:#7e22ce;border-radius:999px;padding:7px 13px;font-size:15px;font-weight:1000">'+safe(divName(div))+'</span>'+
+        '<span style="background:#e0f2fe;color:#0369a1;border:1px solid #7dd3fc;border-radius:999px;padding:5px 10px;font-size:13px;font-weight:900">확정 '+rows.length+'조</span>'+
+        (maxCnt?'<span style="background:#fef3c7;color:#92400e;border:1px solid #f59e0b;border-radius:999px;padding:5px 10px;font-size:13px;font-weight:900">정원 '+safe(maxCnt)+'</span>':'')+
+        '<span style="background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:999px;padding:5px 10px;font-size:13px;font-weight:900">입금 '+paidCount+'/'+rows.length+'</span>'+
+      '</div>';
+      var body='<table style="width:100%;border-collapse:separate;border-spacing:0;border:1px solid #dbe4f0;border-radius:14px;overflow:hidden;font-size:15px;background:#fff">'+
+        '<thead><tr style="background:#f8fafc;color:#475569"><th style="width:58px;padding:12px 8px;border-bottom:1px solid #dbe4f0;text-align:center">순번</th><th style="padding:12px 12px;border-bottom:1px solid #dbe4f0;text-align:left">참가자</th><th style="padding:12px 12px;border-bottom:1px solid #dbe4f0;text-align:left">소속/메모</th><th style="width:150px;padding:12px 8px;border-bottom:1px solid #dbe4f0;text-align:center">입금상태</th></tr></thead><tbody>';
+      if(!rows.length){
+        body+='<tr><td colspan="4" style="padding:20px;text-align:center;color:#94a3b8;font-weight:800">표시할 참가자가 없습니다.</td></tr>';
+      }else{
+        rows.forEach(function(r){
+          body+='<tr>'+
+            '<td style="padding:13px 8px;border-bottom:1px solid #dbe4f0;text-align:center;background:#f8fafc;color:#64748b;font-weight:1000">'+r.no+'</td>'+
+            '<td style="padding:13px 12px;border-bottom:1px solid #dbe4f0;text-align:left;font-size:16px;font-weight:1000;line-height:1.35">'+safe(teamLabel(r.team,r.key,r.idx,t))+'</td>'+
+            '<td style="padding:13px 12px;border-bottom:1px solid #dbe4f0;text-align:left;color:#64748b;font-size:13px;font-weight:800;line-height:1.35">'+safe(teamSubLine(r.team,t)||'-')+'</td>'+
+            '<td style="padding:13px 8px;border-bottom:1px solid #dbe4f0;text-align:center">'+statusHTML(r.team)+'</td>'+
+          '</tr>';
+        });
+      }
+      body+='</tbody></table>';
+      section.innerHTML=head+body;
+      wrap.appendChild(section);
+    });
+    var style=document.createElement('style');
+    style.textContent='.v515-export-wrap .ex-pay{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;min-width:96px;min-height:34px;border-radius:999px;padding:5px 9px;font-size:13px;font-weight:1000;line-height:1.05}.v515-export-wrap .ex-pay.paid{background:#dbeafe;color:#1d4ed8;border:2px solid #3b82f6}.v515-export-wrap .ex-pay.unpaid{background:#fff7ed;color:#c2410c;border:2px solid #f59e0b}.v515-export-wrap .ex-pay small{display:block;margin-top:3px;font-size:10px;font-weight:900;letter-spacing:-.02em}.v515-export-wrap .ex-del{display:inline-flex;margin-top:4px;background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;border-radius:999px;padding:3px 8px;font-size:11px;font-weight:1000}';
+    wrap.appendChild(style);
+    var foot=document.createElement('div');
+    foot.style.cssText='text-align:right;color:#94a3b8;font-size:12px;font-weight:800;margin-top:8px';
+    foot.textContent='저장일시: '+new Date().toLocaleString('ko-KR');
+    wrap.appendChild(foot);
+    document.body.appendChild(wrap);
+    return wrap;
+  }
+  async function loadH2c(){
+    if(window.html2canvas) return;
+    await new Promise(function(res,rej){var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});
+  }
+  function fileBase(t,divLabel,ext){
+    var name=String((t&&t.name)||'대회').replace(/[\\/:*?"<>|]/g,'').replace(/\s+/g,'');
+    return '참가접수명단_'+name+'_'+divLabel+'_'+new Date().toISOString().substring(0,10)+'.'+ext;
+  }
+  window.saveRegListImage44=async function(){
+    var tid=($id('regTS')&&$id('regTS').value)||'', t=((G&&G.tournaments)||[]).find(function(x){return String(x.id)===String(tid);});
+    if(!t){try{toast('대회를 먼저 선택해 주세요','info');}catch(e){} return;}
+    try{ await loadH2c(); var wrap=buildExportElement(); if(!wrap)return; await new Promise(function(r){setTimeout(r,80);}); var canvas=await html2canvas(wrap,{backgroundColor:'#eef3fb',scale:2.6,useCORS:true,logging:false}); wrap.remove(); var sel=($id('regDS')&&$id('regDS').value)||''; var a=document.createElement('a'); a.href=canvas.toDataURL('image/png'); a.download=fileBase(t,sel?divName(sel):'전체','png'); a.click(); try{toast('현재 화면 순서대로 이미지 저장 완료','success');}catch(e){} }catch(e){try{toast('이미지 저장 실패: '+(e.message||e),'error');}catch(_){}}
+  };
+  window.saveRegListPDF44=async function(){
+    var tid=($id('regTS')&&$id('regTS').value)||'', t=((G&&G.tournaments)||[]).find(function(x){return String(x.id)===String(tid);});
+    if(!t){try{toast('대회를 먼저 선택해 주세요','info');}catch(e){} return;}
+    try{ await loadH2c(); if(!window.jspdf) await new Promise(function(res,rej){var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);}); var wrap=buildExportElement(); if(!wrap)return; await new Promise(function(r){setTimeout(r,80);}); var canvas=await html2canvas(wrap,{backgroundColor:'#eef3fb',scale:2.2,useCORS:true,logging:false}); wrap.remove(); var jsPDF=window.jspdf.jsPDF; var pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'}); var pageW=pdf.internal.pageSize.getWidth(),pageH=pdf.internal.pageSize.getHeight(),margin=6; var imgW=pageW-margin*2,imgH=canvas.height*imgW/canvas.width,img=canvas.toDataURL('image/png'); var y=margin, remaining=imgH, pos=0; pdf.addImage(img,'PNG',margin,y,imgW,imgH); remaining-=pageH-margin*2; while(remaining>0){pos-=pageH-margin*2; pdf.addPage(); pdf.addImage(img,'PNG',margin,margin+pos,imgW,imgH); remaining-=pageH-margin*2;} var sel=($id('regDS')&&$id('regDS').value)||''; pdf.save(fileBase(t,sel?divName(sel):'전체','pdf')); try{toast('현재 화면 순서대로 PDF 저장 완료','success');}catch(e){} }catch(e){try{toast('PDF 저장 실패: '+(e.message||e),'error');}catch(_){}}
+  };
+  window.saveRegListExcel44=async function(){
+    var tid=($id('regTS')&&$id('regTS').value)||'', t=((G&&G.tournaments)||[]).find(function(x){return String(x.id)===String(tid);});
+    if(!t){try{toast('대회를 먼저 선택해 주세요','info');}catch(e){} return;}
+    try{ if(typeof ensureXLSX==='function') await ensureXLSX(); var rows=[['부서','화면순번','참가자1','소속1','참가자2','소속2','참가자 표시','소속/메모 표시','입금상태','입금확인일시','삭제요청','원본순번']]; selectedDivs(t).forEach(function(div){ var data=displayRows(tid,div); data.rows.forEach(function(r){ var ps=playersOf(r.team), p1=ps[0]||{}, p2=ps[1]||{}; rows.push([divName(div),r.no,playerName(p1),playerClub(p1),playerName(p2),playerClub(p2),teamLabel(r.team,r.key,r.idx,t),teamSubLine(r.team,t),isPaidTeam(r.team)?'입금확인':'입금대기',paidDateText(r.team),r.team&&r.team.deleteRequested?'삭제요청':'',r.idx+1]); }); rows.push(['','','','','','','','','','','','']); }); var ws=XLSX.utils.aoa_to_sheet(rows); ws['!cols']=[{wch:16},{wch:8},{wch:14},{wch:20},{wch:14},{wch:20},{wch:28},{wch:34},{wch:12},{wch:16},{wch:10},{wch:8}]; var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'참가접수명단'); var sel=($id('regDS')&&$id('regDS').value)||''; XLSX.writeFile(wb,fileBase(t,sel?divName(sel):'전체','xlsx')); try{toast('현재 화면 순서대로 엑셀 저장 완료','success');}catch(e){} }catch(e){try{toast('엑셀 저장 실패: '+(e.message||e),'error');}catch(_){}}
+  };
+  window.saveRegListKakao44=window.saveRegListImage44;
+})();
+</script>
+<script id="v517RegisterExportOrderDownloadFix">
+(function(){
+  function el(id){return document.getElementById(id);} 
+  function safe(v){
+    try{ if(typeof esc==='function') return esc(v); }catch(e){}
+    return String(v==null?'':v).replace(/[&<>\"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[m];});
+  }
+  function divLabel(v){ try{ if(typeof dl==='function') return dl(v); }catch(e){} return String(v||''); }
+  function cleanFileName(s){ return String(s||'대회').replace(/[\\/:*?"<>|]/g,'').replace(/\s+/g,'').slice(0,80); }
+  function currentTid(){ return (el('regTS')&&el('regTS').value)||''; }
+  function currentTournament(){ var tid=currentTid(); return ((window.G&&G.tournaments)||[]).find(function(x){return String(x.id)===String(tid);}); }
+  function selectedDivisions(t){
+    var sel=(el('regDS')&&el('regDS').value)||'';
+    var divs=(t&&Array.isArray(t.divisions))?t.divisions.slice():[];
+    try{ divs.sort(function(a,b){ var order={'금':1,'은':2,'동':3,'테린이':4}; return (order[a]||99)-(order[b]||99); }); }catch(e){}
+    if(sel && divs.indexOf(sel)>=0) return [sel];
+    return divs;
+  }
+  function isDeleted(team){ return !team || team.deleted===true || String(team.status||'').toLowerCase()==='deleted'; }
+  function isPaid(team){
+    try{ if(typeof getTeamPaymentPaid==='function') return !!getTeamPaymentPaid(team); }catch(e){}
+    var s=String((team&&(team.paymentStatus||team.payStatus||team.feeStatus))||'').toLowerCase();
+    return !!(team&&(team.feePaid===true||team.paymentPaid===true||team.paid===true||s==='paid'||s==='입금완료'||s==='입금확인'));
+  }
+  function payTime(team){
+    if(!isPaid(team)) return '';
+    try{ if(typeof formatPaymentPaidAtKST==='function'){ var dt=formatPaymentPaidAtKST(team.feePaidAt||team.paymentPaidAt||team.paidAt||''); return ((dt.date||'')+' '+(dt.time||'')).trim(); } }catch(e){}
+    return String(team.feePaidAt||team.paymentPaidAt||team.paidAt||'').trim();
+  }
+  function waitlisted(key, idx){ try{ return typeof isTeamWaitlistedForKey==='function' && !!isTeamWaitlistedForKey(key,idx); }catch(e){ return false; } }
+  function playersOf(team){
+    try{ if(typeof getIndividualPlayers==='function') return (getIndividualPlayers(team)||[]).slice(0,2); }catch(e){}
+    if(Array.isArray(team&&team.individualPlayers)) return team.individualPlayers.slice(0,2);
+    var ps=(team&&team.players)||[];
+    return ps.slice(0,2).map(function(x){ return typeof x==='string'?{name:x}:x; });
+  }
+  function playerName(p){
+    var s=String((p&&p.name)||p||'').trim();
+    try{ if(typeof v334IndividualNameOnly==='function') return v334IndividualNameOnly(s); }catch(e){}
+    return s.replace(/\s*\([^)]*\)\s*$/,'').trim();
+  }
+  function playerClub(p){ return String((p&&(p.clubsRaw||p.club||(Array.isArray(p.clubs)?p.clubs.join('/'):'') ))||'').trim(); }
+  function teamName(team,key,idx,t){
+    try{ if(t && typeof isIndividualTournament==='function' && isIndividualTournament(t)){
+      var ps=playersOf(team).map(playerName).filter(Boolean);
+      if(ps.length) return ps.join(' / ');
+    }}catch(e){}
+    try{ if(typeof tdn==='function') return tdn(team,key,idx); }catch(e){}
+    return team&&((team.pairLabel||team.entryLabel)||team.club)||'';
+  }
+  function teamSub(team,t){
+    try{ if(t && typeof isIndividualTournament==='function' && isIndividualTournament(t)){
+      var ps=playersOf(team);
+      return ps.map(function(p){ return playerClub(p)||'-'; }).join(' / ');
+    }}catch(e){}
+    var ps=(team&&team.players)||[];
+    return (team&&team.club?team.club:'') + (ps.length?' · '+ps.filter(Boolean).join(', '):'');
+  }
+  function regTimeValue(team, fallbackIdx){
+    var raw = team && (team.registeredAt || team.createdAt || team.createdAtText || team.adminNotificationCreatedAt || team.updatedAt || '');
+    var ms = Date.parse(String(raw||''));
+    if(!Number.isFinite(ms)) ms = 9000000000000000 + Number(fallbackIdx||0);
+    return ms;
+  }
+  function getVisibleRows(tid, div){
+    var key=tid+'_'+div;
+    var teams=((G&&G.teams&&G.teams[key])||[]);
+    var rows=[];
+    var bc='';
+    try{ if(window.MY_CLUB_FILTER && typeof getMyClubContextClub==='function' && typeof baseClub==='function') bc=baseClub(getMyClubContextClub()||''); }catch(e){}
+    teams.forEach(function(team,origIdx){
+      if(isDeleted(team)) return;
+      if(bc){ try{ if(baseClub(team.club||'')!==bc && team.club!==getMyClubContextClub()) return; }catch(e){} }
+      try{ if(typeof isRegisterUnpaidOnlyActive==='function' && isRegisterUnpaidOnlyActive() && isPaid(team)) return; }catch(e){}
+      rows.push({team:team, idx:origIdx, key:key, _regTime:regTimeValue(team,origIdx)});
+    });
+    rows.sort(function(a,b){ return (a._regTime-b._regTime) || (a.idx-b.idx); });
+    rows.forEach(function(r,i){ r.no=i+1; });
+    return rows;
+  }
+  function statusText(r){
+    if(waitlisted(r.key,r.idx)) return '대기';
+    if(r.team&&r.team.deleteRequested) return '삭제요청';
+    return '확정';
+  }
+  function payHTML(r){
+    var paid=isPaid(r.team), tm=payTime(r.team);
+    var html='<span class="ex-pay '+(paid?'paid':'unpaid')+'">'+(paid?'입금확인':'입금대기')+(tm?'<small>'+safe(tm)+'</small>':'')+'</span>';
+    var st=statusText(r);
+    if(st==='대기') html+='<span class="ex-badge wait">대기</span>';
+    if(st==='삭제요청') html+='<span class="ex-badge del">삭제요청</span>';
+    return html;
+  }
+  function fileBase(t, divName, ext){ return '참가접수명단_'+cleanFileName(t&&t.name)+'_'+cleanFileName(divName||'전체')+'_'+new Date().toISOString().slice(0,10)+'.'+ext; }
+  function buildExportElement(){
+    var tid=currentTid(), t=currentTournament();
+    if(!tid||!t){ try{toast('대회를 먼저 선택해 주세요','info');}catch(e){} return null; }
+    var divs=selectedDivisions(t), all=[];
+    divs.forEach(function(d){ getVisibleRows(tid,d).forEach(function(r){ all.push({div:d,row:r}); }); });
+    var paid=all.filter(function(x){return isPaid(x.row.team);}).length;
+    var wrap=document.createElement('div');
+    wrap.className='v517-export-wrap';
+    wrap.style.cssText='position:fixed;left:-20000px;top:0;width:1280px;background:#eef3fb;padding:22px;font-family:Noto Sans KR,Arial,sans-serif;z-index:-1;color:#0f172a';
+    var head='<div class="ex-head"><div class="ex-title">'+safe(t.name||'대회')+'</div><div class="ex-sub">참가 접수 명단</div><div class="ex-chips"><span>'+all.length+'팀</span><span>입금확인 '+paid+'팀</span><span>입금대기 '+(all.length-paid)+'팀</span>'+(t.date?'<span>대회일 '+safe(t.date)+'</span>':'')+'</div></div>';
+    wrap.innerHTML=head;
+    divs.forEach(function(div){
+      var rows=getVisibleRows(tid,div);
+      var maxCnt=''; try{ if(typeof getDivisionMaxTeams==='function') maxCnt=getDivisionMaxTeams(tid,div)||''; }catch(e){}
+      var sec=document.createElement('div'); sec.className='ex-sec';
+      var paidCnt=rows.filter(function(r){return isPaid(r.team);}).length;
+      var html='<div class="ex-sec-head"><span class="ex-div">'+safe(divLabel(div))+'</span><span>표시 '+rows.length+'팀</span><span>입금 '+paidCnt+'/'+rows.length+'</span>'+(maxCnt?'<span>정원 '+safe(maxCnt)+'</span>':'')+'</div>';
+      html+='<table><thead><tr><th class="c-no">순번</th><th class="c-team">참가자</th><th class="c-club">소속/메모</th><th class="c-state">상태</th><th class="c-pay">입금</th></tr></thead><tbody>';
+      if(!rows.length){ html+='<tr><td colspan="5" class="empty">표시할 참가자가 없습니다.</td></tr>'; }
+      rows.forEach(function(r){
+        html+='<tr><td class="c-no">'+r.no+'</td><td class="c-team">'+safe(teamName(r.team,r.key,r.idx,t))+'</td><td class="c-club">'+safe(teamSub(r.team,t)||'-')+'</td><td class="c-state">'+safe(statusText(r))+'</td><td class="c-pay">'+payHTML(r)+'</td></tr>';
+      });
+      html+='</tbody></table>';
+      sec.innerHTML=html; wrap.appendChild(sec);
+    });
+    var style=document.createElement('style');
+    style.textContent='.v517-export-wrap .ex-head{background:#fff;border:1px solid #dbe4f0;border-top:4px solid #d4a017;border-radius:18px;padding:18px 22px;margin-bottom:14px;box-shadow:0 8px 20px rgba(15,30,58,.08)}.v517-export-wrap .ex-title{font-size:25px;font-weight:1000;line-height:1.3}.v517-export-wrap .ex-sub{font-size:15px;font-weight:900;color:#1d4ed8;margin-top:4px}.v517-export-wrap .ex-chips,.v517-export-wrap .ex-sec-head{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}.v517-export-wrap .ex-chips span,.v517-export-wrap .ex-sec-head span{border-radius:999px;padding:5px 10px;font-size:13px;font-weight:900;background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd}.v517-export-wrap .ex-sec{background:#fff;border:1px solid #dbe4f0;border-top:3px solid #d4a017;border-radius:16px;padding:14px 16px;margin-bottom:14px;box-shadow:0 8px 20px rgba(15,30,58,.07);overflow:hidden}.v517-export-wrap .ex-div{background:#f8f0ff!important;color:#7e22ce!important;border-color:#c084fc!important}.v517-export-wrap table{width:100%;border-collapse:separate;border-spacing:0;border:1px solid #dbe4f0;border-radius:12px;overflow:hidden;background:#fff}.v517-export-wrap th{background:#f8fafc;color:#475569;font-size:13px;font-weight:1000;padding:10px 8px;border-bottom:1px solid #dbe4f0;text-align:left}.v517-export-wrap td{padding:11px 10px;border-bottom:1px solid #dbe4f0;font-size:14px;line-height:1.35;vertical-align:middle}.v517-export-wrap tr:last-child td{border-bottom:0}.v517-export-wrap .c-no{width:58px;text-align:center;color:#64748b;font-weight:1000;background:#f8fafc}.v517-export-wrap td.c-team{font-size:16px;font-weight:1000;color:#0f172a}.v517-export-wrap .c-club{color:#64748b;font-size:13px;font-weight:800}.v517-export-wrap .c-state{width:86px;text-align:center;font-weight:1000}.v517-export-wrap .c-pay{width:150px;text-align:center}.v517-export-wrap .empty{text-align:center;color:#94a3b8;font-weight:900;padding:24px}.v517-export-wrap .ex-pay{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;min-width:92px;min-height:32px;border-radius:999px;padding:4px 8px;font-size:12px;font-weight:1000;line-height:1.05}.v517-export-wrap .ex-pay.paid{background:#dbeafe;color:#1d4ed8;border:2px solid #3b82f6}.v517-export-wrap .ex-pay.unpaid{background:#fff7ed;color:#c2410c;border:2px solid #f59e0b}.v517-export-wrap .ex-pay small{font-size:10px;margin-top:2px}.v517-export-wrap .ex-badge{display:inline-flex;margin-top:3px;border-radius:999px;padding:3px 8px;font-size:11px;font-weight:1000}.v517-export-wrap .ex-badge.wait{background:#fff7ed;color:#c2410c;border:1px solid #fdba74}.v517-export-wrap .ex-badge.del{background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5}';
+    wrap.appendChild(style);
+    var foot=document.createElement('div'); foot.style.cssText='text-align:right;color:#94a3b8;font-size:12px;font-weight:800;margin-top:8px'; foot.textContent='저장일시: '+new Date().toLocaleString('ko-KR'); wrap.appendChild(foot);
+    document.body.appendChild(wrap);
+    return wrap;
+  }
+  async function ensureHtml2Canvas(){
+    if(window.html2canvas) return;
+    await new Promise(function(res,rej){ var s=document.createElement('script'); s.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'; s.onload=res; s.onerror=rej; document.head.appendChild(s); });
+  }
+  function downloadBlob(blob, filename){
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');
+    a.href=url; a.download=filename; a.style.display='none'; document.body.appendChild(a); a.click();
+    setTimeout(function(){ try{URL.revokeObjectURL(url);}catch(e){} try{a.remove();}catch(e){} },30000);
+  }
+  window.saveRegListImage44=async function(){
+    var t=currentTournament(); if(!t){try{toast('대회를 먼저 선택해 주세요','info');}catch(e){} return;}
+    try{
+      await ensureHtml2Canvas();
+      try{toast('PNG 이미지 생성 중...','info');}catch(e){}
+      var wrap=buildExportElement(); if(!wrap) return;
+      await new Promise(function(r){setTimeout(r,100);});
+      var canvas=await html2canvas(wrap,{backgroundColor:'#eef3fb',scale:2,useCORS:true,logging:false});
+      wrap.remove();
+      var sel=(el('regDS')&&el('regDS').value)||'';
+      var filename=fileBase(t,sel?divLabel(sel):'전체','png');
+      canvas.toBlob(function(blob){ if(!blob){ try{toast('PNG 변환 실패','error');}catch(e){} return; } downloadBlob(blob,filename); try{toast('PNG 이미지 저장 완료','success');}catch(e){} },'image/png');
+    }catch(e){ try{toast('이미지 저장 실패: '+(e.message||e),'error');}catch(_){} }
+  };
+  window.saveRegListKakao44=window.saveRegListImage44;
+  window.saveRegListPDF44=async function(){
+    var t=currentTournament(); if(!t){try{toast('대회를 먼저 선택해 주세요','info');}catch(e){} return;}
+    try{
+      await ensureHtml2Canvas();
+      if(!window.jspdf) await new Promise(function(res,rej){var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});
+      try{toast('PDF 생성 중...','info');}catch(e){}
+      var wrap=buildExportElement(); if(!wrap) return;
+      await new Promise(function(r){setTimeout(r,100);});
+      var canvas=await html2canvas(wrap,{backgroundColor:'#eef3fb',scale:1.8,useCORS:true,logging:false});
+      wrap.remove();
+      var pdf=new window.jspdf.jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+      var pageW=pdf.internal.pageSize.getWidth(), pageH=pdf.internal.pageSize.getHeight(), margin=6;
+      var imgW=pageW-margin*2, imgH=canvas.height*imgW/canvas.width, img=canvas.toDataURL('image/png');
+      var pos=0, remaining=imgH;
+      pdf.addImage(img,'PNG',margin,margin,imgW,imgH); remaining-=pageH-margin*2;
+      while(remaining>0){ pos-=pageH-margin*2; pdf.addPage(); pdf.addImage(img,'PNG',margin,margin+pos,imgW,imgH); remaining-=pageH-margin*2; }
+      var sel=(el('regDS')&&el('regDS').value)||'';
+      pdf.save(fileBase(t,sel?divLabel(sel):'전체','pdf'));
+      try{toast('PDF 저장 완료','success');}catch(e){}
+    }catch(e){ try{toast('PDF 저장 실패: '+(e.message||e),'error');}catch(_){} }
+  };
+  window.saveRegListExcel44=async function(){
+    var tid=currentTid(), t=currentTournament(); if(!t){try{toast('대회를 먼저 선택해 주세요','info');}catch(e){} return;}
+    try{
+      if(typeof ensureXLSX==='function') await ensureXLSX();
+      var rows=[['부서','화면순번','참가자1','소속1','참가자2','소속2','참가자 표시','소속/메모 표시','상태','입금상태','입금확인일시','원본순번']];
+      selectedDivisions(t).forEach(function(div){
+        getVisibleRows(tid,div).forEach(function(r){
+          var ps=playersOf(r.team), p1=ps[0]||{}, p2=ps[1]||{};
+          rows.push([divLabel(div),r.no,playerName(p1),playerClub(p1),playerName(p2),playerClub(p2),teamName(r.team,r.key,r.idx,t),teamSub(r.team,t),statusText(r),isPaid(r.team)?'입금확인':'입금대기',payTime(r.team),r.idx+1]);
+        });
+        rows.push(['','','','','','','','','','','','']);
+      });
+      var ws=XLSX.utils.aoa_to_sheet(rows);
+      ws['!cols']=[{wch:16},{wch:8},{wch:14},{wch:22},{wch:14},{wch:22},{wch:30},{wch:38},{wch:10},{wch:12},{wch:18},{wch:8}];
+      var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'참가접수명단');
+      var sel=(el('regDS')&&el('regDS').value)||'';
+      XLSX.writeFile(wb,fileBase(t,sel?divLabel(sel):'전체','xlsx'));
+      try{toast('엑셀 저장 완료','success');}catch(e){}
+    }catch(e){ try{toast('엑셀 저장 실패: '+(e.message||e),'error');}catch(_){} }
+  };
 })();
 </script>
 
