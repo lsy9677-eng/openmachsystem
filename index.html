@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-02-v497-delete-request-approval";
+  const APP_VERSION = "2026-06-02-v503-read-stable-no-infinite-loading";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -12077,11 +12077,12 @@ function shouldUseRealtimeForTournament(page, tid){
   const targetTid=String(tid||'').trim();
   if(!targetTid) return false;
   if(pg!=='bracket') return false;
-  // v445: 예선/본선 결과는 관람자 화면도 즉시 갱신되어야 한다.
-  // 기존에는 관리자·진행자·경기이사만 matches onSnapshot을 켜고,
-  // 일반 관람자는 10분짜리 tournament bundle 캐시를 우선 사용해서
-  // PC↔모바일 간 결과가 새로고침 후에도 늦게 보일 수 있었다.
-  return true;
+  // v503 비용/깜빡임 보호:
+  // 일반 관람자까지 matches/draws/registrations onSnapshot을 켜면
+  // 화면 깜빡임과 Firestore 읽기 폭증이 동시에 발생할 수 있다.
+  // 실시간 리스너는 관리자/진행자/경기이사만 사용하고,
+  // 일반 사용자는 캐시/수동 새로고침 흐름을 사용한다.
+  return !!(AD || OP || REG);
 }
 function isViewerReadOnlyMode(){
   return !(AD || OP || REG);
@@ -47671,6 +47672,84 @@ button:hover,.btn:hover,.btn-sm:hover,
     if(document.body) mo.observe(document.body,{childList:true,subtree:true});
   }catch(e){}
 
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
+})();
+</script>
+
+
+<style id="v503ReadStableNoFlickerStyle">
+/* v503: 무한로딩/깜빡임 방지 - 기능 변경 최소화 */
+*{scroll-behavior:auto!important;}
+button,.btn,.btn-sm,.nav-tab,.card,.badge,.hero-chip,.home-click-card,.home-quick-btn,.court-wait-card,.m3card,.match-card{
+  animation:none!important;
+  transition:none!important;
+  transform:none!important;
+}
+.live-blink,.match-focus-pulse,.slot-active,.floating,.landing,.spinning,.fade-in{
+  animation:none!important;
+  transform:none!important;
+}
+#page-register input,#page-register textarea,#page-register select{
+  animation:none!important;
+  transition:border-color .05s linear, box-shadow .05s linear!important;
+}
+#page-register input:focus,#page-register textarea:focus{
+  outline:2px solid rgba(37,99,235,.22)!important;
+  outline-offset:1px!important;
+}
+</style>
+<script id="v503ReadStableNoFlickerScript">
+(function(){
+  if(window.__v503ReadStableInstalled) return;
+  window.__v503ReadStableInstalled=true;
+  const S={editingUntil:0,pending:false,timers:{},lastRun:{},blockedNames:new Set(['renderRL','renderRegisterDivisionOverview','upDash','renderBracket','renderTL','renderRanking'])};
+  const now=()=>Date.now();
+  function editable(el){return !!(el && el.closest && el.closest('#page-register') && (el.matches('input,textarea,select') || el.closest('input,textarea,select')));}
+  function isEditing(){return now()<S.editingUntil || !!(document.activeElement && editable(document.activeElement));}
+  window.isRegisterUserActive=function(){return isEditing();};
+  function activate(ms){S.editingUntil=Math.max(S.editingUntil,now()+(ms||12000));}
+  function markPending(){S.pending=true; window.__regListRenderPending=true;}
+  function flush(delay){clearTimeout(S.timers.flush); S.timers.flush=setTimeout(()=>{
+    if(isEditing()){flush(1500);return;}
+    if(!S.pending&&!window.__regListRenderPending) return;
+    S.pending=false; window.__regListRenderPending=false;
+    try{
+      if(typeof window.renderRegisterDivisionOverview==='function') window.renderRegisterDivisionOverview.__v503Original ? window.renderRegisterDivisionOverview.__v503Original() : window.renderRegisterDivisionOverview();
+      if(typeof window.renderRL==='function') window.renderRL.__v503Original ? window.renderRL.__v503Original() : window.renderRL();
+      if(typeof window.upDash==='function') window.upDash.__v503Original ? window.upDash.__v503Original() : window.upDash();
+    }catch(e){console.warn('v503 pending refresh failed',e);}
+  },delay||800);}
+  function wrapRender(name, minGap){
+    const old=window[name];
+    if(typeof old!=='function'||old.__v503Wrapped) return;
+    function wrapped(){
+      if((name==='renderRL'||name==='renderRegisterDivisionOverview'||name==='upDash') && isEditing()){
+        markPending(); flush(1500); return;
+      }
+      const t=now();
+      const gap=minGap||250;
+      if(S.lastRun[name] && t-S.lastRun[name]<gap){
+        clearTimeout(S.timers[name]);
+        S.timers[name]=setTimeout(()=>{S.lastRun[name]=now(); try{old.apply(this,arguments);}catch(e){console.error(e);}}, gap);
+        return;
+      }
+      S.lastRun[name]=t;
+      return old.apply(this,arguments);
+    }
+    wrapped.__v503Wrapped=true; wrapped.__v503Original=old; window[name]=wrapped;
+  }
+  function boot(){
+    ['renderRL','renderRegisterDivisionOverview','upDash'].forEach(n=>wrapRender(n,450));
+    ['renderBracket','renderTL','renderRanking'].forEach(n=>wrapRender(n,700));
+    document.addEventListener('pointerdown',e=>{if(editable(e.target))activate(16000);},true);
+    document.addEventListener('mousedown',e=>{if(editable(e.target))activate(16000);},true);
+    document.addEventListener('touchstart',e=>{if(editable(e.target))activate(16000);},true);
+    document.addEventListener('focusin',e=>{if(editable(e.target))activate(20000);},true);
+    document.addEventListener('input',e=>{if(editable(e.target))activate(20000);},true);
+    document.addEventListener('compositionstart',e=>{if(editable(e.target))activate(20000);},true);
+    document.addEventListener('compositionend',e=>{if(editable(e.target))activate(12000);},true);
+    document.addEventListener('focusout',e=>{if(editable(e.target)){activate(1000);flush(1200);}},true);
+  }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
 })();
 </script>
