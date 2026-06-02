@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-02-v506e-input-focus-fix";
+  const APP_VERSION = "2026-06-02-v510-register-popup-text-fix";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -44730,7 +44730,9 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
       if(!sheet){toast('출력할 예선표가 없습니다','error');return;}
       const clone=forceFourColumns(sheet.cloneNode(true));
       const css=[...document.querySelectorAll('style')].map(s=>s.outerHTML).join('\n');
-      const html=`<!doctype html><html><head><meta charset="utf-8"><title>예선 대진표 출력</title>${css}<style>@page{size:A4 portrait;margin:0}html,body{margin:0!important;padding:0!important;background:#fff!important}.v435-export-sheet{position:static!important;left:auto!important;top:auto!important;width:794px!important;z-index:auto!important}.v435-a4-page{page-break-after:always!important;break-after:page!important;box-shadow:none!important;margin:0 auto!important}.v435-a4-page:last-child{page-break-after:auto!important;break-after:auto!important}</style></head><body>${clone.outerHTML}</body></html>`;
+      const html=`<!doctype html><html><head><meta charset="utf-8"><title>예선 대진표 출력</title>${css}<style>@page{size:A4 portrait;margin:0}html,body{margin:0!important;padding:0!important;background:#fff!important}.v435-export-sheet{position:static!important;left:auto!important;top:auto!important;width:794px!important;z-index:auto!important}.v435-a4-page{page-break-after:always!important;break-after:page!important;box-shadow:none!important;margin:0 auto!important}.v435-a4-page:last-child{page-break-after:auto!important;break-after:auto!important}</style></head><body>${clone.outerHTML}
+
+</body></html>`;
       const iframe=document.createElement('iframe');
       iframe.style.position='fixed'; iframe.style.right='0'; iframe.style.bottom='0'; iframe.style.width='0'; iframe.style.height='0'; iframe.style.border='0';
       document.body.appendChild(iframe);
@@ -48066,5 +48068,144 @@ button,.btn,.btn-sm,.nav-tab,.card,.badge,.hero-chip,.home-click-card,.home-quic
   document.addEventListener('DOMContentLoaded',()=>setTimeout(sanitizeFilters,300));
 })();
 </script>
+
+
+<style id="v509RegisterPopupStableStyle">
+/* v509: 참가 접수 입력창을 실제 팝업으로 분리 - 인라인 폼 숨김 */
+#regPopupLauncherCard{
+  display:none;margin:10px 0 14px;padding:14px 16px;border-radius:18px;
+  background:linear-gradient(135deg,#fff7dd,#eef4ff);border:1.5px solid #d4a017;
+  box-shadow:0 10px 24px rgba(15,30,58,.08)
+}
+#regPopupLauncherCard .reg-popup-title{font-size:.94rem;font-weight:1000;color:#0f1e3a;margin-bottom:6px}
+#regPopupLauncherCard .reg-popup-desc{font-size:.76rem;line-height:1.55;color:#475569;margin-bottom:10px;word-break:keep-all}
+#regPopupLauncherCard .reg-popup-open-btn{width:100%;min-height:44px!important;border-radius:14px!important;font-size:.9rem!important;font-weight:1000!important}
+#regPopupModal{position:fixed;inset:0;z-index:2147483400;display:none;align-items:flex-end;justify-content:center;background:rgba(7,15,31,.58);padding:12px;-webkit-overflow-scrolling:touch}
+#regPopupModal.open{display:flex!important}
+#regPopupModal .reg-popup-box{width:min(720px,100%);max-height:calc(100vh - 28px);display:flex;flex-direction:column;background:#fff;border-radius:22px 22px 0 0;overflow:hidden;box-shadow:0 -20px 60px rgba(15,23,42,.28)}
+#regPopupModal .reg-popup-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 15px;background:linear-gradient(135deg,#071026,#0f1e3a);color:#fff}
+#regPopupModal .reg-popup-head-title{font-size:.96rem;font-weight:1000;line-height:1.35}
+#regPopupModal .reg-popup-close{width:34px;height:34px;border:0;border-radius:999px;background:rgba(255,255,255,.14);color:#fff;font-size:1.1rem;font-weight:1000;cursor:pointer}
+#regPopupModal .reg-popup-body{padding:12px;overflow-y:auto;-webkit-overflow-scrolling:touch;background:#f6f8fd}
+#regPopupModal #aoReg{display:block!important;margin:0!important;box-shadow:none!important;border-radius:16px!important}
+#regFormParking{display:none!important}
+body:not(.reg-popup-open) #regSection > #aoReg{display:none!important}
+body:not(.reg-popup-open) div[id^="regInlineForm_"] > #aoReg{display:none!important}
+@media(max-width:680px){
+  #regPopupModal{padding:6px 6px calc(76px + env(safe-area-inset-bottom,0px)) 6px}
+  #regPopupModal .reg-popup-box{max-height:calc(100vh - 88px - env(safe-area-inset-bottom,0px));border-radius:18px 18px 0 0}
+  #regPopupModal .reg-popup-body{padding:10px}
+  #regPopupModal #aoReg input,#regPopupModal #aoReg textarea,#regPopupModal #aoReg select{font-size:16px!important}
+}
+</style>
+<script id="v509RegisterPopupStableScript">
+(function(){
+  var oldSelect=null, oldRender=null, oldRegister=null;
+  var inputActiveUntil=0;
+  function ge2(id){return document.getElementById(id)}
+  function popupOpen(){var m=ge2('regPopupModal'); return !!(m&&m.classList.contains('open'));}
+  function inInputProtect(){return Date.now()<inputActiveUntil;}
+  function ensurePopup(){
+    var form=ge2('aoReg'); if(!form) return false;
+    var parking=ge2('regFormParking');
+    if(!parking){parking=document.createElement('div');parking.id='regFormParking';parking.style.display='none';document.body.appendChild(parking);}
+    var modal=ge2('regPopupModal');
+    if(!modal){
+      modal=document.createElement('div'); modal.id='regPopupModal';
+      modal.innerHTML='<div class="reg-popup-box" role="dialog" aria-modal="true"><div class="reg-popup-head"><div class="reg-popup-head-title">📝 참가 접수</div><button type="button" class="reg-popup-close" onclick="closeRegisterPopup()">×</button></div><div class="reg-popup-body" id="regPopupBody"></div></div>';
+      document.body.appendChild(modal);
+      modal.addEventListener('click',function(e){if(e.target===modal) window.closeRegisterPopup();});
+    }
+    var launcher=ge2('regPopupLauncherCard');
+    if(!launcher){
+      launcher=document.createElement('div'); launcher.id='regPopupLauncherCard';
+      launcher.innerHTML='<div class="reg-popup-title">📝 참가 접수 입력</div><div class="reg-popup-desc">휴대폰 자판/커서가 튕기지 않도록 참가 접수는 팝업에서 입력합니다.</div><button type="button" class="btn btn-primary reg-popup-open-btn" onclick="openRegisterPopup()">✅ 참가 접수 입력하기</button>';
+      var rs=ge2('regSection'), page=ge2('page-register');
+      if(rs&&rs.parentNode) rs.parentNode.insertBefore(launcher,rs); else if(page) page.appendChild(launcher);
+    }
+    return true;
+  }
+  function canShowLauncher(){
+    try{
+      var tid=ge2('regTS')&&ge2('regTS').value||'';
+      var div=ge2('regDS')&&ge2('regDS').value||'';
+      if(!tid||!div) return false;
+      var t=(window.G&&window.G.tournaments||[]).find(function(x){return String(x.id)===String(tid)});
+      if(!t) return false;
+      var isInd=(typeof window.isIndividualTournament==='function')?window.isIndividualTournament(t):false;
+      var open=(t.status==='open');
+      var deadline=(typeof window.isRegDeadlinePassed==='function')?window.isRegDeadlinePassed():false;
+      return !!(isInd ? (open&&(window.AD||(typeof window.isGoogleSignedIn==='function'&&window.isGoogleSignedIn()))) : (window.AD||window.REG||((typeof window.isTeamDirectorLoginEnabled!=='function'||!window.isTeamDirectorLoginEnabled())&&!deadline)||((typeof window.isPublicTeamRegistrationEnabled==='function'&&window.isPublicTeamRegistrationEnabled())&&!deadline)));
+    }catch(e){return false;}
+  }
+  function parkIfClosed(){
+    if(!ensurePopup()) return;
+    var form=ge2('aoReg'), parking=ge2('regFormParking'), launcher=ge2('regPopupLauncherCard');
+    if(launcher) launcher.style.display=canShowLauncher()?'block':'none';
+    if(form && parking && !popupOpen()){
+      if(form.parentNode!==parking) parking.appendChild(form);
+      form.style.display='none';
+    }
+  }
+  window.openRegisterPopup=function(){
+    if(!ensurePopup()) return;
+    var form=ge2('aoReg'), body=ge2('regPopupBody'), modal=ge2('regPopupModal');
+    if(!form||!body||!modal) return;
+    body.appendChild(form); form.style.display='block';
+    modal.classList.add('open'); document.body.classList.add('reg-popup-open');
+    try{ if(typeof window.updateRegisterSlots==='function') window.updateRegisterSlots(); }catch(e){}
+    try{
+      var no=ge2('regNo'), tid=ge2('regTS')&&ge2('regTS').value||'', div=ge2('regDS')&&ge2('regDS').value||'';
+      if(no&&tid&&div){var teams=(window.G&&window.G.teams||{})[tid+'_'+div]||[]; no.value=teams.length+1;}
+    }catch(e){}
+    setTimeout(function(){
+      var target=form.querySelector('input:not([type=hidden]):not([disabled]):not([readonly]), textarea:not([disabled])');
+      if(target){try{target.focus({preventScroll:true});}catch(e){try{target.focus();}catch(_e){}}}
+    },120);
+  };
+  window.closeRegisterPopup=function(){
+    var modal=ge2('regPopupModal'); if(modal) modal.classList.remove('open');
+    document.body.classList.remove('reg-popup-open'); inputActiveUntil=0; setTimeout(parkIfClosed,0);
+  };
+  window.mountRegisterFormInline=function(){ parkIfClosed(); };
+  function install(){
+    ensurePopup(); parkIfClosed();
+    if(!oldSelect && typeof window.selectRegDivision==='function'){
+      oldSelect=window.selectRegDivision;
+      window.selectRegDivision=function(div){
+        var r=oldSelect.apply(this,arguments);
+        setTimeout(function(){ if(canShowLauncher()) window.openRegisterPopup(); else parkIfClosed();},120);
+        return r;
+      };
+    }
+    if(!oldRender && typeof window.renderRL==='function'){
+      oldRender=window.renderRL;
+      window.renderRL=function(){
+        if(popupOpen() && inInputProtect()) return;
+        var r=oldRender.apply(this,arguments);
+        setTimeout(parkIfClosed,0); setTimeout(parkIfClosed,120);
+        return r;
+      };
+    }
+    if(!oldRegister && typeof window.registerTeam==='function'){
+      oldRegister=window.registerTeam;
+      window.registerTeam=async function(){
+        var key=(ge2('regTS')&&ge2('regTS').value||'')+'_'+(ge2('regDS')&&ge2('regDS').value||'');
+        var before=((window.G&&window.G.teams||{})[key]||[]).length;
+        var res=await oldRegister.apply(this,arguments);
+        setTimeout(function(){var after=((window.G&&window.G.teams||{})[key]||[]).length;if(after>before) window.closeRegisterPopup();},200);
+        return res;
+      };
+    }
+  }
+  ['focusin','pointerdown','touchstart','input','compositionstart'].forEach(function(ev){
+    document.addEventListener(ev,function(e){var m=ge2('regPopupModal'); if(m&&m.contains(e.target)) inputActiveUntil=Date.now()+8000;},true);
+  });
+  document.addEventListener('compositionend',function(e){var m=ge2('regPopupModal'); if(m&&m.contains(e.target)) inputActiveUntil=Date.now()+2000;},true);
+  document.addEventListener('DOMContentLoaded',function(){setTimeout(install,0);setTimeout(install,500);setTimeout(parkIfClosed,900);});
+  setTimeout(install,0); setTimeout(install,1200);
+})();
+</script>
+
 </body>
 </html>
