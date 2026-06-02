@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-02-v504-court-prune-edit-timeout";
+  const APP_VERSION = "2026-06-02-v506e-input-focus-fix";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -12862,6 +12862,28 @@ function getUsedCourtsForKey(key){
     return String(a).localeCompare(String(b),'ko');
   });
 }
+function getCourtBoardConfiguredCourtsV505(key){
+  try{
+    const {tid,div}=_k2td(key);
+    const t=(G.tournaments||[]).find(x=>String(x.id)===String(tid));
+    const ds=t?.divSettings?.[div]||null;
+    if(!ds) return {explicit:false,list:[]};
+    const hasPrelim=Object.prototype.hasOwnProperty.call(ds,'allowedCourts');
+    const hasMain=Object.prototype.hasOwnProperty.call(ds,'mainAllowedCourts');
+    if(!hasPrelim && !hasMain) return {explicit:false,list:[]};
+    const prelim=hasPrelim && Array.isArray(ds.allowedCourts) ? ds.allowedCourts.map(String).filter(Boolean) : [];
+    const main=hasMain && Array.isArray(ds.mainAllowedCourts) ? ds.mainAllowedCourts.map(String).filter(Boolean) : [];
+    const list=[...new Set([...(hasPrelim?prelim:[]), ...(hasMain?main:[])])];
+    return {explicit:true,list};
+  }catch(e){ return {explicit:false,list:[]}; }
+}
+function filterCourtsByConfiguredV505(key, courts){
+  const cfg=getCourtBoardConfiguredCourtsV505(key);
+  const input=(courts||[]).map(String).filter(Boolean);
+  if(!cfg.explicit) return input;
+  const set=new Set(cfg.list.map(String));
+  return input.filter(c=>set.has(String(c)));
+}
 function getCourtBoardSafeTeamName(key, teamIdx){
   const teams=G.teams[key]||[];
   const team=teams[teamIdx] ?? teams.find(t=>t&&((t.id!=null&&t.id===teamIdx)||(t.name&&t.name===teamIdx)));
@@ -12983,12 +13005,18 @@ function getAutoAssignedGroupsForCourt(key, court){
   }catch(e){ return []; }
 }
 function getCourtStatusSnapshot(key){
-  const selectedCourts=getDisplayCourtFilters(key)||[];
-  const usedCourts=getUsedCourtsForKey(key);
-  const targetCourts=(selectedCourts.length && isIndividualByKey(key))
-    ? [...new Set([...selectedCourts, ...usedCourts])]
-    : usedCourts;
-  const list=G.matches[key]||[];
+  const selectedCourts=filterCourtsByConfiguredV505(key, getDisplayCourtFilters(key)||[]);
+  const usedCourts=filterCourtsByConfiguredV505(key, getUsedCourtsForKey(key));
+  const cfg=getCourtBoardConfiguredCourtsV505(key);
+  const targetCourts=cfg.explicit
+    ? (selectedCourts.length ? selectedCourts : cfg.list)
+    : ((selectedCourts.length && isIndividualByKey(key)) ? [...new Set([...selectedCourts, ...usedCourts])] : usedCourts);
+  const allowedSet=cfg.explicit ? new Set(cfg.list.map(String)) : null;
+  const list=(G.matches[key]||[]).filter(m=>{
+    if(!allowedSet) return true;
+    const courts=getMatchCourtsForStatusBoard(key,m).map(String).filter(Boolean);
+    return !courts.length || courts.some(c=>allowedSet.has(c));
+  });
   return targetCourts.map(court=>{
     const related=list.filter(m=>getMatchCourtsForStatusBoard(key,m).includes(court) && m.winner==null).sort((a,b)=>{
       const aa=String(a.courtQueueOrder||a.courtAssignedAt||'');
@@ -13313,9 +13341,10 @@ function getCourtBoardSharedOverflowItems(key, items, selectedCourts, usedCourts
 
 function getVisibleSharedWaitingOrderForAssign(key){
   try{
-    const usedCourts=getUsedCourtsForKey(key)||[];
-    const autoPool=(isIndividualByKey(key) && isIndividualAutoCourtAssignEnabled()) ? (getIndividualAutoAssignmentPlan(key)?.pool||[]) : [];
-    const boardCourts=[...new Set([...(usedCourts||[]), ...(autoPool||[])])].map(String).filter(Boolean);
+    const cfg=getCourtBoardConfiguredCourtsV505(key);
+    const usedCourts=filterCourtsByConfiguredV505(key, getUsedCourtsForKey(key)||[]);
+    const autoPool=filterCourtsByConfiguredV505(key, (isIndividualByKey(key) && isIndividualAutoCourtAssignEnabled()) ? (getIndividualAutoAssignmentPlan(key)?.pool||[]) : []);
+    const boardCourts=(cfg.explicit ? cfg.list : [...new Set([...(usedCourts||[]), ...(autoPool||[])])]).map(String).filter(Boolean);
     if(!boardCourts.length) return getIndividualAutoSharedWaitingItems(key)||[];
     const snapshots=getCourtStatusSnapshot(key)||[];
     const snapshotMap=new Map((snapshots||[]).map(item=>[String(item.court||''), item]));
@@ -13362,16 +13391,20 @@ function getCourtEstimatedTimeText(key, waitIdx, hasCurrentMatch){
   }catch(e){ return ''; }
 }
 function renderCourtStatusBoard(key, div){
-  const selectedCourts=getSelectedCourtFilters(key);
-  const usedCourts=getUsedCourtsForKey(key);
+  const courtCfgV505=getCourtBoardConfiguredCourtsV505(key);
+  const selectedCourts=filterCourtsByConfiguredV505(key, getSelectedCourtFilters(key));
+  const usedCourts=filterCourtsByConfiguredV505(key, getUsedCourtsForKey(key));
   const st=getCourtBoardUIState(key);
   if(st.hidden){
     return `<div style="margin:10px 0 12px;display:flex;justify-content:flex-end">
       <button class="btn btn-outline" style="font-size:.78rem;padding:6px 12px" onclick="toggleCourtBoardHidden('${key}')">🎾 코트 현황판 열기</button>
     </div>`;
   }
-  const autoPool=(isIndividualByKey(key) && isIndividualAutoCourtAssignEnabled()) ? (getIndividualAutoAssignmentPlan(key)?.pool||[]) : [];
-  const boardCourts=(selectedCourts.length ? selectedCourts : [...new Set([...(usedCourts||[]), ...(autoPool||[])])]).map(String).filter(Boolean);
+  const autoPool=filterCourtsByConfiguredV505(key, (isIndividualByKey(key) && isIndividualAutoCourtAssignEnabled()) ? (getIndividualAutoAssignmentPlan(key)?.pool||[]) : []);
+  const boardCourts=(courtCfgV505.explicit
+    ? (selectedCourts.length ? selectedCourts : courtCfgV505.list)
+    : (selectedCourts.length ? selectedCourts : [...new Set([...(usedCourts||[]), ...(autoPool||[])])])
+  ).map(String).filter(Boolean);
   const allSnapshots=getCourtStatusSnapshot(key);
   const snapshotMap=new Map((allSnapshots||[]).map(item=>[String(item.court), item]));
   const items=boardCourts.map(court=>snapshotMap.get(String(court)) || {court:String(court),status:'empty',current:null,waiting:[],related:[]});
@@ -19770,13 +19803,18 @@ async function saveET(){
   sl(true);
   try{
     const ds = { ...(t.divSettings || {}) };
+    // 현재 편집 코트군에 있는 코트만 허용 (코트군에서 빠진 코트는 자동 제거)
+    const validCourts=new Set(getDraftCourtList('edit').map(String).filter(Boolean));
     etDivs.forEach(({name, rub, courts, mainCourts, maxTeams}) => {
       if(!ds[name]) ds[name] = { format:'group_knockout', grpSize:4, advance:2, thirdPlaceMode:'shared' };
       ds[name].doublesCount = rub;
       ds[name].maxTeams = parseInt(maxTeams||0)||0;
       ds[name].thirdPlaceMode = ds[name].thirdPlaceMode || 'shared';
-      ds[name].allowedCourts = Array.isArray(courts)?courts.map(String).filter(Boolean):[];
-      ds[name].mainAllowedCourts = Array.isArray(mainCourts)?mainCourts.map(String).filter(Boolean):(Array.isArray(courts)?courts.map(String).filter(Boolean):[]);
+      // 코트군에 없는 코트(예: 장유중)는 allowedCourts에서 자동 제거
+      const filteredCourts=Array.isArray(courts)?courts.map(String).filter(c=>c && validCourts.has(c)):[];
+      const filteredMain=Array.isArray(mainCourts)?mainCourts.map(String).filter(c=>c && validCourts.has(c)):filteredCourts.slice();
+      ds[name].allowedCourts = filteredCourts;
+      ds[name].mainAllowedCourts = filteredMain;
     });
 
     await flushGuideUploads(CE_tid, 'edit');
@@ -19825,6 +19863,45 @@ async function saveET(){
     if(_ti >= 0){
       Object.assign(G.tournaments[_ti], updFields);
     }
+
+    // 코트 설정 변경 후 G.draws의 allowedCourts도 즉시 갱신 + 강제 저장
+    // (pruneKey가 isSameFbWrite로 저장을 스킵할 수 있으므로 직접 처리)
+    try{
+      const affectedDivs=etDivs.map(d=>d.name);
+      for(const divName of affectedDivs){
+        const dkey=CE_tid+'_'+divName;
+        const divDraw=G.draws&&G.draws[dkey];
+        if(!divDraw) continue;
+        const divDs=updFields.divSettings?.[divName];
+        if(!divDs) continue;
+        const newGroupCourts=Array.isArray(divDs.allowedCourts)?divDs.allowedCourts.map(String).filter(Boolean):[];
+        const newMainCourts=Array.isArray(divDs.mainAllowedCourts)?divDs.mainAllowedCourts.map(String).filter(Boolean):newGroupCourts;
+        const allAllowed=new Set([...newGroupCourts,...newMainCourts]);
+        // G.draws allowedCourts 갱신
+        divDraw.allowedCourts=newGroupCourts;
+        // G.draws groups 내 courts도 정리
+        if(Array.isArray(divDraw.groups)){
+          divDraw.groups.forEach(g=>{
+            if(g&&Array.isArray(g.courts)) g.courts=g.courts.filter(c=>allAllowed.has(String(c)));
+          });
+        }
+        // G.matches의 허용 안 된 코트 배정 제거
+        (G.matches[dkey]||[]).forEach(m=>{
+          if(!m) return;
+          const mc=String(m.court||'').trim();
+          if(mc && !allAllowed.has(mc)){
+            m.court=''; m.courts=[];
+            delete m.manualCourtTarget; delete m.initialPrelimAutoCourt;
+            delete m.courtAssignedAt; delete m.courtQueueOrder;
+            delete m.autoCourtLabel; delete m.waitingFirstAt;
+          }
+        });
+        // Firestore 강제 저장 (isSameFbWrite 캐시 무효화 후)
+        try{ if(window.markFbWriteCache) window.markFbWriteCache('draws',dkey,null); }catch(e){}
+        if(typeof stD==='function') stD(dkey).catch(e=>console.warn('stD after court change failed',e));
+        if(typeof stM==='function') stM(dkey).catch(e=>console.warn('stM after court change failed',e));
+      }
+    }catch(courtPruneErr){ console.warn('court prune in saveET failed', courtPruneErr); }
 
     await fbLog('대회 편집: ' + nm, '✏️');
 
@@ -47763,55 +47840,53 @@ button,.btn,.btn-sm,.nav-tab,.card,.badge,.hero-chip,.home-click-card,.home-quic
 (function(){
   if(window.__v503ReadStableInstalled) return;
   window.__v503ReadStableInstalled=true;
-  const S={editingUntil:0,pending:false,timers:{},lastRun:{},blockedNames:new Set(['renderRL','renderRegisterDivisionOverview','upDash','renderBracket','renderTL','renderRanking'])};
+  const S={editingUntil:0,pending:false,timers:{},lastRun:{}};
   const now=()=>Date.now();
-  function editable(el){return !!(el && el.closest && el.closest('#page-register') && (el.matches('input,textarea,select') || el.closest('input,textarea,select')));}
-  function isEditing(){return now()<S.editingUntil || !!(document.activeElement && editable(document.activeElement));}
+  function editable(el){
+    if(!el||!el.closest) return false;
+    const tag=String(el.tagName||'').toUpperCase();
+    if(tag!=='INPUT'&&tag!=='TEXTAREA') return false;
+    if(el.readOnly||el.disabled) return false;
+    if(tag==='INPUT'){const t=String(el.type||'text').toLowerCase();if(['button','submit','reset','checkbox','radio','file','hidden','range','color'].includes(t))return false;}
+    return !!(el.closest('#page-register')||el.closest('.modal-box')||el.closest('.modal-overlay'));
+  }
+  // 실제 입력 중(키 입력)일 때만 차단, 단순 클릭/포커스는 차단 안 함
+  function isEditing(){return now()<S.editingUntil||(document.activeElement&&editable(document.activeElement)&&now()<S.editingUntil+200);}
   window.isRegisterUserActive=function(){return isEditing();};
-  function activate(ms){S.editingUntil=Math.max(S.editingUntil,now()+(ms||12000));}
-  function markPending(){S.pending=true; window.__regListRenderPending=true;}
-  function flush(delay){clearTimeout(S.timers.flush); S.timers.flush=setTimeout(()=>{
-    if(isEditing()){flush(1500);return;}
-    if(!S.pending&&!window.__regListRenderPending) return;
-    S.pending=false; window.__regListRenderPending=false;
+  function activate(ms){S.editingUntil=Math.max(S.editingUntil,now()+(ms||2000));}
+  function markPending(){S.pending=true;window.__regListRenderPending=true;}
+  function flush(delay){clearTimeout(S.timers.flush);S.timers.flush=setTimeout(()=>{
+    if(isEditing()){flush(800);return;}
+    if(!S.pending&&!window.__regListRenderPending)return;
+    S.pending=false;window.__regListRenderPending=false;
     try{
-      if(typeof window.renderRegisterDivisionOverview==='function') window.renderRegisterDivisionOverview.__v503Original ? window.renderRegisterDivisionOverview.__v503Original() : window.renderRegisterDivisionOverview();
-      if(typeof window.renderRL==='function') window.renderRL.__v503Original ? window.renderRL.__v503Original() : window.renderRL();
-      if(typeof window.upDash==='function') window.upDash.__v503Original ? window.upDash.__v503Original() : window.upDash();
-    }catch(e){console.warn('v503 pending refresh failed',e);}
-  },delay||800);}
-  function wrapRender(name, minGap){
+      if(typeof window.renderRegisterDivisionOverview==='function')window.renderRegisterDivisionOverview.__v503Original?window.renderRegisterDivisionOverview.__v503Original():window.renderRegisterDivisionOverview();
+      if(typeof window.renderRL==='function')window.renderRL.__v503Original?window.renderRL.__v503Original():window.renderRL();
+      if(typeof window.upDash==='function')window.upDash.__v503Original?window.upDash.__v503Original():window.upDash();
+    }catch(e){console.warn('v503 flush failed',e);}
+  },delay||500);}
+  function wrapRender(name,minGap){
     const old=window[name];
-    if(typeof old!=='function'||old.__v503Wrapped) return;
+    if(typeof old!=='function'||old.__v503Wrapped)return;
     function wrapped(){
-      if((name==='renderRL'||name==='renderRegisterDivisionOverview'||name==='upDash') && isEditing()){
-        markPending(); flush(1500); return;
-      }
-      const t=now();
-      const gap=minGap||250;
-      if(S.lastRun[name] && t-S.lastRun[name]<gap){
-        clearTimeout(S.timers[name]);
-        S.timers[name]=setTimeout(()=>{S.lastRun[name]=now(); try{old.apply(this,arguments);}catch(e){console.error(e);}}, gap);
-        return;
-      }
-      S.lastRun[name]=t;
-      return old.apply(this,arguments);
+      if((name==='renderRL'||name==='renderRegisterDivisionOverview'||name==='upDash')&&isEditing()){markPending();flush(600);return;}
+      const t=now(),gap=minGap||250;
+      if(S.lastRun[name]&&t-S.lastRun[name]<gap){clearTimeout(S.timers[name]);S.timers[name]=setTimeout(()=>{S.lastRun[name]=now();try{old.apply(this,arguments);}catch(e){console.error(e);}},gap);return;}
+      S.lastRun[name]=t;return old.apply(this,arguments);
     }
-    wrapped.__v503Wrapped=true; wrapped.__v503Original=old; window[name]=wrapped;
+    wrapped.__v503Wrapped=true;wrapped.__v503Original=old;window[name]=wrapped;
   }
   function boot(){
     ['renderRL','renderRegisterDivisionOverview','upDash'].forEach(n=>wrapRender(n,450));
     ['renderBracket','renderTL','renderRanking'].forEach(n=>wrapRender(n,700));
-    document.addEventListener('pointerdown',e=>{if(editable(e.target))activate(8000);},true);
-    document.addEventListener('mousedown',e=>{if(editable(e.target))activate(8000);},true);
-    document.addEventListener('touchstart',e=>{if(editable(e.target))activate(8000);},true);
-    document.addEventListener('focusin',e=>{if(editable(e.target))activate(8000);},true);
-    document.addEventListener('input',e=>{if(editable(e.target))activate(6000);},true);
-    document.addEventListener('compositionstart',e=>{if(editable(e.target))activate(6000);},true);
-    document.addEventListener('compositionend',e=>{if(editable(e.target))activate(4000);},true);
-    document.addEventListener('focusout',e=>{if(editable(e.target)){activate(800);flush(1000);}},true);
+    // input/composition 중에만 차단 — pointerdown/focusin은 제거하여 첫 탭 즉시 포커스
+    document.addEventListener('input',e=>{if(editable(e.target))activate(3000);},true);
+    document.addEventListener('keydown',e=>{if(editable(e.target))activate(3000);},true);
+    document.addEventListener('compositionstart',e=>{if(editable(e.target))activate(3000);},true);
+    document.addEventListener('compositionend',e=>{if(editable(e.target))activate(1500);},true);
+    document.addEventListener('focusout',e=>{if(editable(e.target)){S.editingUntil=0;flush(400);}},true);
   }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();
 </script>
 
@@ -47936,24 +48011,25 @@ button,.btn,.btn-sm,.nav-tab,.card,.badge,.hero-chip,.home-click-card,.home-quic
     const old=window[name];
     if(typeof old!=='function' || old.__v504CourtWrapped) return;
     const fn=function(){
+      // CE_tid를 최우선으로 사용 (saveET는 CE_tid가 항상 설정됨)
       let tid='';
-      try{ tid=document.getElementById('brTS')?.value || document.getElementById('regTS')?.value || document.getElementById('rankTS')?.value || window.CE_tid || ''; }catch(e){}
+      try{ tid=window.CE_tid || document.getElementById('brTS')?.value || document.getElementById('regTS')?.value || document.getElementById('rankTS')?.value || ''; }catch(e){}
       const r=old.apply(this,arguments);
       try{
         if(r && typeof r.then==='function'){
           return r.then(v=>{
-            setTimeout(()=>{ try{ if(pruneTournament(tid||window.CE_tid||'', {save:name==='saveET'})){ if(typeof renderBracket==='function') renderBracket(); } }catch(e){} }, after||120);
+            setTimeout(()=>{ try{ const curTid=window.CE_tid||tid; if(pruneTournament(curTid, {save:name==='saveET'})){ if(typeof renderBracket==='function') renderBracket(); } }catch(e){} }, after||120);
             return v;
           });
         }
       }catch(e){}
-      setTimeout(()=>{ try{ if(pruneTournament(tid||window.CE_tid||'', {save:name==='saveET'})){ if(typeof renderBracket==='function') renderBracket(); } }catch(e){} }, after||120);
+      setTimeout(()=>{ try{ const curTid=window.CE_tid||tid; if(pruneTournament(curTid, {save:name==='saveET'})){ if(typeof renderBracket==='function') renderBracket(); } }catch(e){} }, after||120);
       return r;
     };
     fn.__v504CourtWrapped=true;
     window[name]=fn;
   }
-  wrap('saveET',200);
+  wrap('saveET',800); // saveET는 async+await updateDoc 완료 후 G.tournaments 업데이트 → 충분한 지연 필요
   wrap('renderBracket',0);
   wrap('onBrTC',120);
   wrap('startDraw',300);
@@ -47964,5 +48040,31 @@ button,.btn,.btn-sm,.nav-tab,.card,.badge,.hero-chip,.home-click-card,.home-quic
 })();
 </script>
 
+
+<script id="v505CourtBoardAllowedFixScript">
+(function(){
+  'use strict';
+  function sanitizeFilters(){
+    try{
+      const store=window.INDIV_OPERATOR_FILTERS || null;
+      if(!store || typeof getCourtBoardConfiguredCourtsV505!=='function') return;
+      Object.keys(store).forEach(key=>{
+        const cfg=getCourtBoardConfiguredCourtsV505(key);
+        if(!cfg.explicit) return;
+        const set=new Set((cfg.list||[]).map(String));
+        const f=store[key]||{};
+        if(Array.isArray(f.courts)) f.courts=f.courts.map(String).filter(c=>set.has(c));
+      });
+    }catch(e){}
+  }
+  const oldRender=window.renderBracket;
+  if(typeof oldRender==='function' && !oldRender.__v505CourtBoardWrapped){
+    const wrapped=function(){ sanitizeFilters(); return oldRender.apply(this,arguments); };
+    wrapped.__v505CourtBoardWrapped=true;
+    window.renderBracket=wrapped;
+  }
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(sanitizeFilters,300));
+})();
+</script>
 </body>
 </html>
