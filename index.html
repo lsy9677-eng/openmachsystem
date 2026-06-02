@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-02-v503-read-stable-no-infinite-loading";
+  const APP_VERSION = "2026-06-02-v504-court-prune-edit-timeout";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -7712,6 +7712,25 @@ function getDivisionMainConfiguredCourts(tid, div){
 }
 function getDivisionPhaseConfiguredCourts(tid, div, phase='group'){
   const p=String(phase||'group');
+  // v504: 설정 필드가 존재하면 빈 배열도 유효한 설정으로 처리
+  try{
+    const t=(G.tournaments||[]).find(x=>String(x.id)===String(tid));
+    const ds=t?.divSettings?.[div]||null;
+    if(ds){
+      if(p==='group' || p==='prelim'){
+        if(Object.prototype.hasOwnProperty.call(ds,'allowedCourts')){
+          return Array.isArray(ds.allowedCourts)?ds.allowedCourts.map(String).filter(Boolean):[];
+        }
+      }else{
+        if(Object.prototype.hasOwnProperty.call(ds,'mainAllowedCourts')){
+          return Array.isArray(ds.mainAllowedCourts)?ds.mainAllowedCourts.map(String).filter(Boolean):[];
+        }
+        if(Object.prototype.hasOwnProperty.call(ds,'allowedCourts')){
+          return Array.isArray(ds.allowedCourts)?ds.allowedCourts.map(String).filter(Boolean):[];
+        }
+      }
+    }
+  }catch(e){}
   if(p==='group' || p==='prelim') return getDivisionConfiguredCourts(tid, div);
   return getDivisionMainConfiguredCourts(tid, div);
 }
@@ -12569,6 +12588,16 @@ function getDrawAllowedCourts(key){
 }
 function getBracketAllowedCourts(key){
   const {tid,div}=_k2td(key);
+  // v504: 부서별 코트 설정이 명시되어 있으면 빈 배열도 그대로 존중한다.
+  // 기존 코드는 []를 "설정 없음"으로 보고 draw/전체 코트로 fallback해서,
+  // 편집에서 코트를 뺐는데도 대진표에 코트가 계속 남는 문제가 있었다.
+  try{
+    const t=(G.tournaments||[]).find(x=>String(x.id)===String(tid));
+    const ds=t?.divSettings?.[div]||null;
+    if(ds && Object.prototype.hasOwnProperty.call(ds,'allowedCourts')){
+      return Array.isArray(ds.allowedCourts)?ds.allowedCourts.map(String).filter(Boolean):[];
+    }
+  }catch(e){}
   const fromTournament=getDivisionConfiguredCourts(tid, div);
   if(fromTournament.length) return fromTournament;
   const fromDraw=getDrawAllowedCourts(key);
@@ -22372,7 +22401,18 @@ function isIndividualAutoCourtAssignEnabled(){
 function getIndividualAutoCourtPool(key, phase='group'){
   const {tid,div}=_k2td(key);
   const safePhase=String(phase||'group');
+  // v504: 부서 코트 설정이 명시되어 있으면 기존 조/추첨 코트나 전체 코트로 되살리지 않는다.
+  let explicit=false;
+  try{
+    const t=(G.tournaments||[]).find(x=>String(x.id)===String(tid));
+    const ds=t?.divSettings?.[div]||null;
+    if(ds){
+      if(safePhase==='group') explicit=Object.prototype.hasOwnProperty.call(ds,'allowedCourts');
+      else explicit=Object.prototype.hasOwnProperty.call(ds,'mainAllowedCourts')||Object.prototype.hasOwnProperty.call(ds,'allowedCourts');
+    }
+  }catch(e){}
   const phaseCourts=getDivisionPhaseConfiguredCourts(tid, div, safePhase==='group'?'group':'main').map(String).filter(Boolean);
+  if(explicit) return [...new Set(phaseCourts)];
   const base=[...new Set((phaseCourts.length?phaseCourts:getBracketAllowedCourts(key)).map(String).filter(Boolean))];
   const grpCourts=[...new Set((((G.draws[key]?.groups)||[]).flatMap(g=>Array.isArray(g?.courts)?g.courts:[]).filter(Boolean).map(String)))];
   // 본선 자동 배정은 예선에서 실제 사용된 코트 수가 아니라, 본선 허용 코트 기준으로 돈다.
@@ -46286,6 +46326,17 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
   function courtPool(key){
     const {tid,div}=keyInfo(key);
     const draw=G.draws?.[key]||{};
+    let explicit=false;
+    let configured=[];
+    try{
+      const t=(G.tournaments||[]).find(x=>String(x.id)===String(tid));
+      const ds=t?.divSettings?.[div]||null;
+      if(ds && Object.prototype.hasOwnProperty.call(ds,'allowedCourts')){
+        explicit=true;
+        configured=safeArr(ds.allowedCourts).map(String).map(s=>s.trim()).filter(Boolean);
+      }
+    }catch(e){}
+    if(explicit) return [...new Set(configured)];
     let pool=[];
     try{ if(typeof getDivisionPhaseConfiguredCourts==='function') pool=pool.concat(safeArr(getDivisionPhaseConfiguredCourts(tid,div,'group'))); }catch(e){}
     try{ pool=pool.concat(safeArr(draw.allowedCourts)); }catch(e){}
@@ -46476,6 +46527,16 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
     const {tid,div}=keyInfo(key);
     const draw=(G.draws&&G.draws[key])||{};
     const t=arr(G.tournaments).find(x=>String(x.id)===String(tid))||{};
+    let explicit=false;
+    let configured=[];
+    try{
+      const ds=t?.divSettings?.[div]||null;
+      if(ds && Object.prototype.hasOwnProperty.call(ds,'allowedCourts')){
+        explicit=true;
+        configured=arr(ds.allowedCourts).map(String).map(x=>x.trim()).filter(Boolean);
+      }
+    }catch(e){}
+    if(explicit) return [...new Set(configured)];
     let pool=[];
     function add(v){ pool=pool.concat(arr(v).map(String).map(x=>x.trim()).filter(Boolean)); }
     try{ if(typeof getDivisionPhaseConfiguredCourts==='function') add(getDivisionPhaseConfiguredCourts(tid,div,'group')); }catch(e){}
@@ -47741,16 +47802,165 @@ button,.btn,.btn-sm,.nav-tab,.card,.badge,.hero-chip,.home-click-card,.home-quic
   function boot(){
     ['renderRL','renderRegisterDivisionOverview','upDash'].forEach(n=>wrapRender(n,450));
     ['renderBracket','renderTL','renderRanking'].forEach(n=>wrapRender(n,700));
-    document.addEventListener('pointerdown',e=>{if(editable(e.target))activate(16000);},true);
-    document.addEventListener('mousedown',e=>{if(editable(e.target))activate(16000);},true);
-    document.addEventListener('touchstart',e=>{if(editable(e.target))activate(16000);},true);
-    document.addEventListener('focusin',e=>{if(editable(e.target))activate(20000);},true);
-    document.addEventListener('input',e=>{if(editable(e.target))activate(20000);},true);
-    document.addEventListener('compositionstart',e=>{if(editable(e.target))activate(20000);},true);
-    document.addEventListener('compositionend',e=>{if(editable(e.target))activate(12000);},true);
-    document.addEventListener('focusout',e=>{if(editable(e.target)){activate(1000);flush(1200);}},true);
+    document.addEventListener('pointerdown',e=>{if(editable(e.target))activate(8000);},true);
+    document.addEventListener('mousedown',e=>{if(editable(e.target))activate(8000);},true);
+    document.addEventListener('touchstart',e=>{if(editable(e.target))activate(8000);},true);
+    document.addEventListener('focusin',e=>{if(editable(e.target))activate(8000);},true);
+    document.addEventListener('input',e=>{if(editable(e.target))activate(6000);},true);
+    document.addEventListener('compositionstart',e=>{if(editable(e.target))activate(6000);},true);
+    document.addEventListener('compositionend',e=>{if(editable(e.target))activate(4000);},true);
+    document.addEventListener('focusout',e=>{if(editable(e.target)){activate(800);flush(1000);}},true);
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
+})();
+</script>
+
+
+<script id="v504CourtSettingPruneScript">
+(function(){
+  'use strict';
+  if(window.__v504CourtSettingPruneInstalled) return;
+  window.__v504CourtSettingPruneInstalled=true;
+  const arr=v=>Array.isArray(v)?v:[];
+  const clean=v=>String(v==null?'':v).trim();
+  function keyInfo(key){
+    try{ return typeof _k2td==='function' ? _k2td(key) : {tid:String(key).split('_')[0], div:String(key).split('_').slice(1).join('_')}; }
+    catch(e){ return {tid:'', div:''}; }
+  }
+  function getTournament(tid){
+    return arr(window.G&&G.tournaments).find(t=>String(t.id)===String(tid))||null;
+  }
+  function courtConfig(tid,div,phase){
+    const t=getTournament(tid);
+    const ds=t&&t.divSettings&&t.divSettings[div];
+    if(!ds) return {configured:false,courts:[]};
+    const isMain=String(phase||'group')!=='group' && String(phase||'group')!=='prelim';
+    if(isMain){
+      if(Object.prototype.hasOwnProperty.call(ds,'mainAllowedCourts')){
+        return {configured:true,courts:arr(ds.mainAllowedCourts).map(clean).filter(Boolean)};
+      }
+      if(Object.prototype.hasOwnProperty.call(ds,'allowedCourts')){
+        return {configured:true,courts:arr(ds.allowedCourts).map(clean).filter(Boolean)};
+      }
+      return {configured:false,courts:[]};
+    }
+    if(Object.prototype.hasOwnProperty.call(ds,'allowedCourts')){
+      return {configured:true,courts:arr(ds.allowedCourts).map(clean).filter(Boolean)};
+    }
+    return {configured:false,courts:[]};
+  }
+  function allowedForKeyPhase(key,phase){
+    const {tid,div}=keyInfo(key);
+    const cfg=courtConfig(tid,div,phase);
+    if(cfg.configured) return {explicit:true,set:new Set(cfg.courts),list:cfg.courts};
+    let list=[];
+    try{ if(typeof getBracketAllowedCourts==='function') list=arr(getBracketAllowedCourts(key)).map(clean).filter(Boolean); }catch(e){}
+    return {explicit:false,set:new Set(list),list};
+  }
+  function clearMatchCourt(m){
+    let changed=false;
+    if(clean(m.court)){ m.court=''; changed=true; }
+    if(arr(m.courts).length){ m.courts=[]; changed=true; }
+    ['manualCourtTarget','manualSharedHold','manualCourt','manualCourtMode','initialPrelimAutoCourt','autoCourtLabel','courtAssignedAt','courtQueueOrder'].forEach(k=>{
+      if(Object.prototype.hasOwnProperty.call(m,k)){ try{ delete m[k]; changed=true; }catch(e){ m[k]=undefined; changed=true; } }
+    });
+    return changed;
+  }
+  function pruneKey(key, opts){
+    opts=opts||{};
+    if(!window.G) return {changed:false,matchChanged:false,drawChanged:false};
+    const {tid,div}=keyInfo(key);
+    if(!tid || !div) return {changed:false,matchChanged:false,drawChanged:false};
+    let matchChanged=false, drawChanged=false;
+    const draw=G.draws&&G.draws[key];
+    const groupAllowed=allowedForKeyPhase(key,'group');
+    const mainAllowed=allowedForKeyPhase(key,'main');
+    const gset=groupAllowed.set, mset=mainAllowed.set;
+    if(draw && groupAllowed.explicit){
+      const nextAllowed=arr(draw.allowedCourts).map(clean).filter(c=>gset.has(c));
+      if(JSON.stringify(nextAllowed)!==JSON.stringify(arr(draw.allowedCourts).map(clean).filter(Boolean))){
+        draw.allowedCourts=nextAllowed; drawChanged=true;
+      }
+      arr(draw.groups).forEach(g=>{
+        if(!g) return;
+        const before=arr(g.courts).map(clean).filter(Boolean);
+        const after=before.filter(c=>gset.has(c));
+        if(JSON.stringify(before)!==JSON.stringify(after)){ g.courts=after; drawChanged=true; }
+      });
+    }
+    arr(G.matches&&G.matches[key]).forEach(m=>{
+      if(!m) return;
+      const phase=String(m.phase||'group');
+      const allowed=(phase==='group'||phase==='prelim')?groupAllowed:mainAllowed;
+      if(!allowed.explicit) return;
+      const set=allowed.set;
+      const cur=clean(m.court||arr(m.courts)[0]||'');
+      const courts=arr(m.courts).map(clean).filter(Boolean);
+      if(cur && !set.has(cur)){
+        if(clearMatchCourt(m)) matchChanged=true;
+        return;
+      }
+      const after=courts.filter(c=>set.has(c));
+      if(JSON.stringify(courts)!==JSON.stringify(after)){ m.courts=after; matchChanged=true; }
+      if(clean(m.court) && !set.has(clean(m.court))){ m.court=''; matchChanged=true; }
+      if(!clean(m.court) && after.length){ m.court=after[0]; matchChanged=true; }
+    });
+    if(opts.save){
+      try{ if(drawChanged && typeof stD==='function') stD(key); }catch(e){ console.warn('v504 stD failed',e); }
+      try{ if(matchChanged && typeof stM==='function') stM(key); }catch(e){ console.warn('v504 stM failed',e); }
+    }
+    return {changed:matchChanged||drawChanged,matchChanged,drawChanged};
+  }
+  function pruneTournament(tid, opts){
+    opts=opts||{};
+    let changed=false;
+    try{
+      Object.keys((window.G&&G.draws)||{}).forEach(key=>{
+        if(!tid || keyInfo(key).tid===String(tid)){
+          const r=pruneKey(key,opts);
+          changed=changed||r.changed;
+        }
+      });
+      Object.keys((window.G&&G.matches)||{}).forEach(key=>{
+        if(!tid || keyInfo(key).tid===String(tid)){
+          const r=pruneKey(key,opts);
+          changed=changed||r.changed;
+        }
+      });
+    }catch(e){ console.warn('v504 pruneTournament failed',e); }
+    return changed;
+  }
+  window.pruneRemovedCourtAssignmentsV504=pruneTournament;
+
+  function wrap(name, after){
+    const old=window[name];
+    if(typeof old!=='function' || old.__v504CourtWrapped) return;
+    const fn=function(){
+      let tid='';
+      try{ tid=document.getElementById('brTS')?.value || document.getElementById('regTS')?.value || document.getElementById('rankTS')?.value || window.CE_tid || ''; }catch(e){}
+      const r=old.apply(this,arguments);
+      try{
+        if(r && typeof r.then==='function'){
+          return r.then(v=>{
+            setTimeout(()=>{ try{ if(pruneTournament(tid||window.CE_tid||'', {save:name==='saveET'})){ if(typeof renderBracket==='function') renderBracket(); } }catch(e){} }, after||120);
+            return v;
+          });
+        }
+      }catch(e){}
+      setTimeout(()=>{ try{ if(pruneTournament(tid||window.CE_tid||'', {save:name==='saveET'})){ if(typeof renderBracket==='function') renderBracket(); } }catch(e){} }, after||120);
+      return r;
+    };
+    fn.__v504CourtWrapped=true;
+    window[name]=fn;
+  }
+  wrap('saveET',200);
+  wrap('renderBracket',0);
+  wrap('onBrTC',120);
+  wrap('startDraw',300);
+  wrap('startIndividualDraw',300);
+  document.addEventListener('DOMContentLoaded',function(){
+    setTimeout(()=>{ try{ pruneTournament('',{save:false}); }catch(e){} },700);
+  });
 })();
 </script>
 
