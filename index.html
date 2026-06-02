@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-02-v494-court-current-wait-buttons-one-row-fix";
+  const APP_VERSION = "2026-06-02-v497-cursor-nofocus-fix";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -47131,5 +47131,178 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
 })();
 </script>
 
+
+
+<style id="v496RegisterCursorStableStyle">
+/* v496: 참가 접수 입력 중 커서 튕김/버튼 반짝임 방지 */
+#page-register input,
+#page-register textarea,
+#page-register select{
+  caret-color:#0f1e3a !important;
+}
+#page-register input:focus,
+#page-register textarea:focus{
+  outline:none !important;
+  border-color:#0f1e3a !important;
+  box-shadow:0 0 0 3px rgba(15,30,58,.10) !important;
+}
+button,.btn,.btn-sm,
+.home-quick-btn,.home-click-card,.home-click-chip,
+.nav-tab,.players-tab-btn,
+.court-wait-card button,.court-drop-zone button{
+  animation:none !important;
+  transition:none !important;
+}
+button:hover,.btn:hover,.btn-sm:hover,
+.home-quick-btn:hover,.home-click-card:hover,.home-click-chip:hover,
+.nav-tab:hover,.players-tab-btn:hover,
+.court-wait-card button:hover,.court-drop-zone button:hover{
+  transform:none !important;
+}
+.live-blink,.match-focus-pulse{
+  animation:none !important;
+}
+</style>
+<script id="v496RegisterCursorStableScript">
+(function(){
+  'use strict';
+
+  function regPageActive(){
+    try{
+      if(typeof getCurrentPageName === 'function') return getCurrentPageName() === 'register';
+    }catch(e){}
+    try{return !!document.querySelector('#page-register.page.active');}catch(e){return false;}
+  }
+
+  function isTextInput(el){
+    try{
+      if(!el || !el.closest || !el.closest('#page-register')) return false;
+      if(el.readOnly || el.disabled) return false;
+      const tag=String(el.tagName||'').toUpperCase();
+      if(tag==='TEXTAREA') return true;
+      if(tag!=='INPUT') return false;
+      const type=String(el.type||'text').toLowerCase();
+      return !['button','submit','reset','checkbox','radio','file','hidden','range','color'].includes(type);
+    }catch(e){return false;}
+  }
+
+  function isRegisterEditing(){
+    try{
+      if(!regPageActive()) return false;
+      return isTextInput(document.activeElement) || !!window.__v496Composing;
+    }catch(e){return false;}
+  }
+
+  function markPending(){
+    window.__v496PendingRegisterRender=true;
+    window.__regListRenderPending=true;
+  }
+
+  function runPending(){
+    try{
+      if(isRegisterEditing()) return;
+      if(!window.__v496PendingRegisterRender && !window.__regListRenderPending) return;
+      window.__v496PendingRegisterRender=false;
+      window.__regListRenderPending=false;
+      window.__v496AllowRegisterRender=true;
+      try{
+        if(typeof renderRegisterDivisionOverview==='function') renderRegisterDivisionOverview();
+        if(typeof renderRL==='function') renderRL();
+        if(typeof upDash==='function') upDash();
+      }finally{
+        window.__v496AllowRegisterRender=false;
+      }
+    }catch(e){}
+  }
+
+  function shouldBlockRegisterRender(){
+    return isRegisterEditing() && !window.__v496AllowRegisterRender;
+  }
+
+  try{
+    window.isRegisterUserActive=function(){ return isRegisterEditing(); };
+  }catch(e){}
+
+  function wrapBlock(name){
+    try{
+      const old=window[name];
+      if(typeof old!=='function' || old.__v496CursorWrapped) return;
+      const wrapped=function(){
+        if(shouldBlockRegisterRender()){
+          markPending();
+          return undefined;
+        }
+        // [BUG FIX] rememberValues/restoreValues 제거:
+        // restoreValues에서 el.focus()를 호출하면 모바일에서 키보드가 닫혔다 열리며 커서 튕김 발생.
+        // 렌더링 자체를 editing 중에 차단하므로 값 복원 불필요.
+        return old.apply(this,arguments);
+      };
+      wrapped.__v496CursorWrapped=true;
+      window[name]=wrapped;
+    }catch(e){}
+  }
+
+  function wrapSchedule(){
+    try{
+      const old=window.scheduleRegisterListRender;
+      if(typeof old!=='function' || old.__v496CursorWrapped) return;
+      const wrapped=function(){
+        if(shouldBlockRegisterRender()){
+          markPending();
+          clearTimeout(window.__v496PendingTimer);
+          window.__v496PendingTimer=setTimeout(runPending,500);
+          return undefined;
+        }
+        return old.apply(this,arguments);
+      };
+      wrapped.__v496CursorWrapped=true;
+      window.scheduleRegisterListRender=wrapped;
+    }catch(e){}
+  }
+
+  function boot(){
+    wrapBlock('renderRL');
+    wrapBlock('renderRegisterDivisionOverview');
+    wrapSchedule();
+    setTimeout(()=>{wrapBlock('renderRL');wrapBlock('renderRegisterDivisionOverview');wrapSchedule();},500);
+    setTimeout(()=>{wrapBlock('renderRL');wrapBlock('renderRegisterDivisionOverview');wrapSchedule();},1500);
+  }
+
+  document.addEventListener('focusin',function(ev){
+    if(isTextInput(ev.target)){
+      window.__v496RegisterFocused=true;
+      clearTimeout(window.__v496PendingTimer);
+    }
+  },true);
+
+  document.addEventListener('compositionstart',function(ev){ if(isTextInput(ev.target)) window.__v496Composing=true; },true);
+  document.addEventListener('compositionend',function(ev){
+    if(isTextInput(ev.target)){
+      window.__v496Composing=false;
+      clearTimeout(window.__v496PendingTimer);
+    }
+  },true);
+
+  ['keydown','input','beforeinput'].forEach(evt=>{
+    document.addEventListener(evt,function(ev){
+      if(isTextInput(ev.target)){
+        window.__v496RegisterFocused=true;
+        clearTimeout(window.__v496PendingTimer);
+      }
+    },true);
+  });
+
+  document.addEventListener('focusout',function(ev){
+    if(ev.target && ev.target.closest && ev.target.closest('#page-register')){
+      clearTimeout(window.__v496PendingTimer);
+      // [BUG FIX] focusout 후 다른 입력창으로 이동할 수 있으므로 지연 시간 충분히 확보
+      window.__v496PendingTimer=setTimeout(runPending,600);
+    }
+  },true);
+
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot);
+  else boot();
+})();
+</script>
 </body>
 </html>
