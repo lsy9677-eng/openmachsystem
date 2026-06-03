@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-03-v523-final-low-read-fixed";
+  const APP_VERSION = "2026-06-03-v525-manual-refresh";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -5775,6 +5775,7 @@ button:disabled{opacity:.55!important;cursor:not-allowed!important;filter:graysc
 <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:nowrap;gap:8px;margin-bottom:4px;overflow-x:auto">
 <div class="sec-title" style="margin-bottom:0;flex:0 0 auto">팀 등록</div>
 <div style="display:flex;gap:4px;flex-wrap:nowrap;align-items:center;justify-content:flex-end;flex:0 0 auto;white-space:nowrap">
+<button class="btn btn-outline" onclick="manualRefreshRegister()" style="font-size:.68rem;padding:4px 8px;min-height:32px;white-space:nowrap">↻ 새로고침</button>
 <button class="btn btn-outline" onclick="saveRegListImage44()" style="font-size:.68rem;padding:4px 8px;min-height:32px;white-space:nowrap">🖼️ 이미지 저장</button>
 <button class="btn btn-outline" onclick="saveRegListExcel44()" style="font-size:.68rem;padding:4px 8px;min-height:32px;white-space:nowrap">📊 엑셀 저장</button>
 <button class="btn btn-outline" onclick="saveRegListPDF44()" style="font-size:.68rem;padding:4px 8px;min-height:32px;white-space:nowrap">📄 PDF 저장</button>
@@ -5938,6 +5939,7 @@ button:disabled{opacity:.55!important;cursor:not-allowed!important;filter:graysc
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;flex-wrap:wrap;gap:8px">
 <div class="sec-title" id="playerPageTitle" style="margin-bottom:0">선수 현황</div>
 <div id="playerPageBtns" style="display:none">
+<button class="btn btn-outline" onclick="manualRefreshPlayers()" style="font-size:.78rem;padding:5px 10px">↻ 새로고침</button>
 <button class="btn btn-outline" onclick="exportPlayersExcel()" style="font-size:.78rem;padding:5px 10px">📊 엑셀 저장</button>
 <button class="btn btn-outline" onclick="exportPlayersCSV()" style="font-size:.78rem;padding:5px 10px">📄 CSV 저장</button>
 </div>
@@ -12347,7 +12349,7 @@ async function ensureAllParticipationDataLoaded(force=false){
 
 // v520 비용 보호: force=true라도 30초 쿨다운 — 연속 클릭/루프로 인한 읽기 폭증 방지
 const _bundleFetchCooldown = {};
-const BUNDLE_FETCH_COOLDOWN_MS = 30 * 1000; // 30초
+const BUNDLE_FETCH_COOLDOWN_MS = 5 * 60 * 1000; // v524: 5분 쿨다운
 async function fetchTournamentBundle(tid, opts={}){
   const options=opts||{};
   const force=!!options.force;
@@ -12356,7 +12358,7 @@ async function fetchTournamentBundle(tid, opts={}){
   if(force){
     const lastFetch=_bundleFetchCooldown[tid]||0;
     if(now-lastFetch < BUNDLE_FETCH_COOLDOWN_MS){
-      console.log('[cost-guard] fetchTournamentBundle: '+tid+' 쿨다운 중 ('+Math.ceil((BUNDLE_FETCH_COOLDOWN_MS-(now-lastFetch))/1000)+'초 남음) — 캐시 반환');
+      if(window.DEBUG_READS) console.log('[cost-guard] fetchTournamentBundle cooldown cache return', tid);
       const cached=getTournamentBundleCache(tid);
       if(cached){ applyTournamentBundle(tid, cached); return cached; }
     }
@@ -12441,23 +12443,20 @@ function stopRegisterRegistrationSync(){
   _registerLiveTid='';
 }
 function startRegisterRegistrationSync(tid){
-  // v523: 접수 화면은 실시간 리스너를 쓰지 않고 120초 저읽기 갱신만 사용합니다.
+  // v525: 120초 폴링 완전 제거. 화면 진입 시 캐시 없으면 1회 읽기만 수행.
+  // 이후 갱신은 사용자가 ↻ 새로고침 버튼을 눌렀을 때만 실행.
   tid=String(tid||'').trim();
   if(!tid) return stopRegisterRegistrationSync();
   if(_registerLiveTid===tid && _registerRegsUnsub) return;
   stopRegisterRegistrationSync();
   _registerLiveTid=tid;
-
-  const run=async()=>{
-    try{
-      if(getCurrentPageName()!=='register') return;
-      if(String(ge('regTS')?.value||'')!==tid) return;
-      await refreshRegisterRegistrationsOnly(tid,{render:true,noRestart:true});
-    }catch(e){ console.warn('[cost-guard v523] register low-read refresh failed', e); }
-  };
-  setTimeout(run, 1200);
-  const timer=setInterval(run, 120000);
-  _registerRegsUnsub=function(){ clearInterval(timer); };
+  // 최초 진입 시 캐시 없으면 1회만 로드
+  const cachedBundle=getTournamentBundleCache(tid);
+  if(!cachedBundle){
+    refreshRegisterRegistrationsOnly(tid,{render:true,noRestart:true})
+      .catch(e=>console.warn('[cost-guard v525] register initial load failed', e));
+  }
+  _registerRegsUnsub=function(){}; // 정지 플래그용 더미
 }
 // ── v404: 앱 포그라운드 복귀 시 데이터 새로고침 ──────────────────────────────
 // 모바일 앱에서 백→포그라운드로 돌아올 때 PWA/Firestore 캐시가 살아있으면
@@ -12532,7 +12531,7 @@ window.refreshRegisterRegistrationsOnly = refreshRegisterRegistrationsOnly;
 async function refreshMatchesOnlyForTournament(tid, reason='manual'){
   tid=String(tid||'').trim();
   if(!tid) return null;
-  console.log('[cost-guard v523] matches-only refresh:', reason, tid);
+  if(window.DEBUG_READS) console.log('[cost-guard v524] matches-only refresh:', reason, tid);
   const prevMatchMap=buildMatchAlertStateMap(G.matches||{});
   const prevCourtMap=buildCourtNotificationStateMap(G.matches||{});
   const q=query(collection(db,'matches'), where('tournamentId','==',tid));
@@ -12556,10 +12555,11 @@ async function refreshMatchesOnlyForTournament(tid, reason='manual'){
 window.refreshMatchesOnlyForTournament=refreshMatchesOnlyForTournament;
 
 function startRealtimeTournamentSync(tid){
-  // v523: 이름은 유지하지만 실제 onSnapshot 리스너는 사용하지 않습니다.
-  // 관리자/진행자도 경기 상태(matches)만 45초 간격으로 갱신합니다.
+  // v524: 이름은 유지하지만 실제 onSnapshot 리스너는 사용하지 않습니다.
+  // bracket 화면이 아닐 때는 경기 상태 폴링도 시작하지 않습니다.
   tid=String(tid||'').trim();
   if(!tid) return stopRealtimeTournamentSync();
+  try{ if(typeof getCurrentPageName==='function' && getCurrentPageName()!=='bracket') return stopRealtimeTournamentSync(); }catch(_e){}
   if(CURRENT_LIVE_TID===tid && _realtimeMatchesUnsub) return;
   stopRealtimeTournamentSync();
   CURRENT_LIVE_TID=tid;
@@ -12590,10 +12590,11 @@ async function syncTournamentDataForPage(page, tid, force=false){
     // v398 비용 보호:
     // 참가접수 화면 진입 때마다 registrations/matches/draws 3종을 강제 재조회하지 않습니다.
     // 캐시가 없을 때만 1회 읽고, 이후 참가자 목록은 registrations 리스너가 담당합니다.
-    if(!getTournamentBundleCache(targetTid)){
+    const cachedBundle=getTournamentBundleCache(targetTid);
+    if(!cachedBundle){
       await fetchTournamentBundle(targetTid, {force:false, acceptStale:true});
     }else{
-      applyTournamentBundle(targetTid, getTournamentBundleCache(targetTid));
+      applyTournamentBundle(targetTid, cachedBundle);
     }
     startRegisterRegistrationSync(targetTid);
     return;
@@ -21156,8 +21157,15 @@ async function registerTeam(){
   let individualPlayers=[];
   let individualOwner=null;
   if(isIndividual){
+    // v524: 개발자/운영자가 대신 접수할 때는 참가자 구글 로그인 요구 금지.
+    // 이미 Firebase 관리자 계정으로 로그인되어 있으면 그 계정으로 owner를 남긴다.
+    const isPrivilegedManualRegister = !!(AD || TM || OP || REG || document.body.classList.contains('admin-mode') || document.body.classList.contains('tm-mode') || document.body.classList.contains('operator-mode'));
     try{
-      individualOwner = await requireGoogleLoginForIndividual('개인전 참가 접수');
+      if(isPrivilegedManualRegister){
+        individualOwner = auth.currentUser || {uid:'admin_manual_'+Date.now(), email:'', displayName:'관리자 대리접수'};
+      }else{
+        individualOwner = await requireGoogleLoginForIndividual('개인전 참가 접수');
+      }
     }catch(e){
       toast(e?.message||'구글 로그인이 필요합니다','error');
       return;
@@ -21237,15 +21245,29 @@ async function registerTeam(){
   const newIdx=G.teams[key].length-1;
 
   try{
-    // 개인전 신규 접수는 관리자/개발자 로그인 상태에서도 registrations 단일 문서로 저장합니다.
-    // 전체 팀목록(stT) 저장은 기존 접수 문서 삭제/권한 충돌을 만들 수 있어 신규 접수에는 쓰지 않습니다.
+    // 개인전 신규 접수는 registrations 단일 문서 저장을 우선 사용합니다.
     const useSingleRegistrationDoc = isIndividual && typeof stTPublicAppendOne === 'function';
-    if(useSingleRegistrationDoc) await stTPublicAppendOne(key, newTeam);
-    else await stT(key);
+    if(useSingleRegistrationDoc){
+      try{
+        await stTPublicAppendOne(key, newTeam);
+      }catch(writeErr){
+        // v524: 관리자/개발자 대리접수에서 단일 문서 권한/캐시 충돌이 나도 최종 저장을 한 번 더 보장.
+        const canAdminFallback = !!(AD || TM || document.body.classList.contains('admin-mode') || document.body.classList.contains('tm-mode')) && typeof stT==='function';
+        if(canAdminFallback){
+          console.warn('single registration write failed, admin fallback stT()', writeErr);
+          await stT(key);
+        }else{
+          throw writeErr;
+        }
+      }
+    }else{
+      await stT(key);
+    }
   }catch(e){
     G.teams[key].splice(newIdx,1);
     if(!G.teams[key].length) delete G.teams[key];
     sl(false);
+    console.error('registerTeam save failed', e);
     toast('등록 실패: '+(e?.message||e),'error');
     return;
   }
@@ -35343,11 +35365,10 @@ async function uploadHistFromExcel(){
         const parsedTeams = tourn.teams;
         totalTeams += parsedTeams.length;
 
-        const regSnap2 = await getDocs(collection(db,'registrations'));
+        // v524 비용보호: 전체조회 → tid 필터로 교체
+        const regSnap2 = await getDocs(query(collection(db,'registrations'), where('tournamentId','==',t_tid)));
         const existingRegs2 = regSnap2.docs.map(d=>({id:d.id,...d.data()}));
-        const existingKeySet2 = new Set(existingRegs2
-          .filter(r=>r.tournamentId===t_tid)
-          .map(r=>`${r.division}||${r.club}`));
+        const existingKeySet2 = new Set(existingRegs2.map(r=>`${r.division}||${r.club}`));
 
         const divisions2=[...new Set(parsedTeams.map(t=>t.div))].filter(Boolean);
         const divSettings2={};
@@ -35430,12 +35451,10 @@ async function uploadHistFromExcel(){
 
     if(!parsedTeams.length){ throw new Error('추출된 팀/선수 데이터가 없습니다'); }
 
-    // ── 0) 기존 등록팀 조회(중복 스킵/덮어쓰기용) ──
-    const regSnap = await getDocs(collection(db,'registrations'));
+    // ── 0) 기존 등록팀 조회(중복 스킵/덮어쓰기용) — v524 비용보호: tid 필터 적용 ──
+    const regSnap = await getDocs(query(collection(db,'registrations'), where('tournamentId','==',tid)));
     const existingRegs = regSnap.docs.map(d=>({id:d.id, ...d.data()}));
-    const existingKeySet = new Set(existingRegs
-      .filter(r=>r.tournamentId===tid)
-      .map(r=>`${r.division}||${r.club}`));
+    const existingKeySet = new Set(existingRegs.map(r=>`${r.division}||${r.club}`));
 
     // ── 1) 대회(tournaments) 문서 upsert (기존 규칙 그대로 사용 가능) ──
     const divisions = [...new Set(parsedTeams.map(t=>t.div))].filter(Boolean);
@@ -48763,6 +48782,92 @@ async function manualRefreshCurrentTournament(){
   }catch(e){ console.error(e); toast('새로고침 실패','error'); }
 }
 window.manualRefreshCurrentTournament=manualRefreshCurrentTournament;
+// v525: 참가접수 수동 새로고침
+async function manualRefreshRegister(){
+  const tid=String(ge('regTS')?.value||'').trim();
+  if(!tid){ toast('대회를 먼저 선택하세요','warning'); return; }
+  try{
+    sl(true);
+    await refreshRegisterRegistrationsOnly(tid,{render:true,noRestart:true,force:true});
+    toast('참가 명단을 최신화했습니다','success');
+  }catch(e){
+    toast('새로고침 실패: '+(e?.message||e),'error');
+  }finally{ sl(false); }
+}
+window.manualRefreshRegister=manualRefreshRegister;
+
+// v525: 선수기록 수동 새로고침
+async function manualRefreshPlayers(){
+  try{
+    sl(true);
+    await Promise.all([
+      loadRegistry(2026).catch(()=>null),
+      ensurePlayersLoaded(true).catch(()=>null),
+      ensureAllParticipationDataLoaded(true).catch(()=>null)
+    ]);
+    renderAllP();
+    toast('선수 기록을 최신화했습니다','success');
+  }catch(e){
+    toast('새로고침 실패: '+(e?.message||e),'error');
+  }finally{ sl(false); }
+}
+window.manualRefreshPlayers=manualRefreshPlayers;
+
+</script>
+
+<script id="v524DeveloperRegisterAndLoopFix">
+(function(){
+  function byId(id){return document.getElementById(id);}
+  function currentKey(){return String((byId('regTS')&&byId('regTS').value)||'')+'_'+String((byId('regDS')&&byId('regDS').value)||'');}
+  function countForKey(k){try{return (((window.G||{}).teams||{})[k]||[]).length;}catch(e){return 0;}}
+  function getSubmitBtn(){try{return document.querySelector('#aoReg button.btn.btn-primary');}catch(e){return null;}}
+  function installRegisterSubmitGuard(){
+    if(window.__v524RegisterGuardInstalled || typeof window.registerTeam!=='function') return;
+    window.__v524RegisterGuardInstalled=true;
+    const prev=window.registerTeam;
+    window.registerTeam=async function(){
+      if(window.__v524RegisterSaving){ try{toast('접수 저장 중입니다. 잠시만 기다려 주세요','info');}catch(e){} return; }
+      const k=currentKey();
+      const before=countForKey(k);
+      const btn=getSubmitBtn();
+      const oldText=btn?btn.textContent:'';
+      window.__v524RegisterSaving=true;
+      if(btn){btn.disabled=true;btn.textContent='저장 중...';}
+      try{
+        const res=await prev.apply(this,arguments);
+        setTimeout(function(){
+          try{
+            const after=countForKey(k);
+            if(after<=before && byId('regPopupModal')&&byId('regPopupModal').classList.contains('open')){
+              console.warn('[v524] registerTeam returned but list count did not increase', {key:k,before:before,after:after});
+            }
+          }catch(e){}
+        },500);
+        return res;
+      }catch(e){
+        console.error('[v524] registerTeam fatal', e);
+        try{toast('접수 처리 오류: '+(e&&e.message||e),'error');}catch(_e){}
+        throw e;
+      }finally{
+        window.__v524RegisterSaving=false;
+        if(btn){btn.disabled=false;btn.textContent=oldText||'✅ 참가 접수';}
+      }
+    };
+  }
+  const prevShow=window.showPage;
+  if(typeof prevShow==='function' && !window.__v524ShowPagePatched){
+    window.__v524ShowPagePatched=true;
+    window.showPage=function(page){
+      const r=prevShow.apply(this,arguments);
+      try{ if(page==='register' && typeof stopRealtimeTournamentSync==='function') stopRealtimeTournamentSync(); }catch(e){}
+      setTimeout(installRegisterSubmitGuard,0);
+      return r;
+    };
+  }
+  document.addEventListener('DOMContentLoaded',function(){setTimeout(installRegisterSubmitGuard,0);setTimeout(installRegisterSubmitGuard,1200);});
+  setTimeout(installRegisterSubmitGuard,0);
+  setTimeout(installRegisterSubmitGuard,1500);
+})();
 </script>
 </body>
 </html>
