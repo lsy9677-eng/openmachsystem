@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-03-v525-manual-refresh";
+  const APP_VERSION = "2026-06-03-v525a-sl-fix";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -48785,31 +48785,31 @@ window.manualRefreshCurrentTournament=manualRefreshCurrentTournament;
 // v525: 참가접수 수동 새로고침
 async function manualRefreshRegister(){
   const tid=String(ge('regTS')?.value||'').trim();
-  if(!tid){ toast('대회를 먼저 선택하세요','warning'); return; }
+  if(!tid){ if(typeof toast==='function') toast('대회를 먼저 선택하세요','warning'); return; }
   try{
-    sl(true);
+    if(typeof window.sl==='function') window.sl(true);
     await refreshRegisterRegistrationsOnly(tid,{render:true,noRestart:true,force:true});
-    toast('참가 명단을 최신화했습니다','success');
+    if(typeof toast==='function') toast('참가 명단을 최신화했습니다','success');
   }catch(e){
-    toast('새로고침 실패: '+(e?.message||e),'error');
-  }finally{ sl(false); }
+    if(typeof toast==='function') toast('새로고침 실패: '+(e?.message||e),'error');
+  }finally{ try{ if(typeof window.sl==='function') window.sl(false); }catch(_){} }
 }
 window.manualRefreshRegister=manualRefreshRegister;
 
 // v525: 선수기록 수동 새로고침
 async function manualRefreshPlayers(){
   try{
-    sl(true);
+    if(typeof window.sl==='function') window.sl(true);
     await Promise.all([
       loadRegistry(2026).catch(()=>null),
       ensurePlayersLoaded(true).catch(()=>null),
       ensureAllParticipationDataLoaded(true).catch(()=>null)
     ]);
-    renderAllP();
-    toast('선수 기록을 최신화했습니다','success');
+    if(typeof renderAllP==='function') renderAllP();
+    if(typeof toast==='function') toast('선수 기록을 최신화했습니다','success');
   }catch(e){
-    toast('새로고침 실패: '+(e?.message||e),'error');
-  }finally{ sl(false); }
+    if(typeof toast==='function') toast('새로고침 실패: '+(e?.message||e),'error');
+  }finally{ try{ if(typeof window.sl==='function') window.sl(false); }catch(_){} }
 }
 window.manualRefreshPlayers=manualRefreshPlayers;
 
