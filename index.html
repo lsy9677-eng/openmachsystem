@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-03-v525a-sl-fix";
+  const APP_VERSION = "2026-06-03-v526-register-clean";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -12501,9 +12501,9 @@ window.refreshRegisterRegistrationsOnly = refreshRegisterRegistrationsOnly;
 
     try{
       if(pg === 'register'){
-        // 참가/입금 목록은 registrations만 최신이면 된다.
-        // 기존 fetchTournamentBundle(force:true)는 matches/draws까지 읽어서 비용이 커지므로 사용하지 않는다.
-        await refreshRegisterRegistrationsOnly(tid, {render:true});
+        // v526: 참가접수 화면은 visibilitychange 자동 갱신 제거.
+        // ↻ 새로고침 버튼을 눌렀을 때만 갱신. 비용 절감.
+        return;
       } else if(pg === 'bracket'){
         if(AD || OP || REG){
           // v523 관리자: 전체 리스너 재시작 금지, 경기 상태만 저읽기 갱신
@@ -12587,14 +12587,14 @@ async function syncTournamentDataForPage(page, tid, force=false){
   if(pg==='register'){
     stopViewerBracketPolling();
     stopRealtimeTournamentSync();
-    // v398 비용 보호:
-    // 참가접수 화면 진입 때마다 registrations/matches/draws 3종을 강제 재조회하지 않습니다.
-    // 캐시가 없을 때만 1회 읽고, 이후 참가자 목록은 registrations 리스너가 담당합니다.
+    // v526: 참가접수 화면은 fetchTournamentBundle(matches/draws 포함) 대신
+    //       registrations만 1회 조회. 캐시 있으면 그대로 적용, 없으면 registrations만 읽음.
     const cachedBundle=getTournamentBundleCache(targetTid);
-    if(!cachedBundle){
-      await fetchTournamentBundle(targetTid, {force:false, acceptStale:true});
-    }else{
+    if(cachedBundle){
       applyTournamentBundle(targetTid, cachedBundle);
+    } else {
+      // matches/draws는 읽지 않고 registrations만 1회 로드
+      await refreshRegisterRegistrationsOnly(targetTid, {render:true, noRestart:true});
     }
     startRegisterRegistrationSync(targetTid);
     return;
