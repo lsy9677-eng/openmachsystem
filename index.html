@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-04-v548e-full";
+  const APP_VERSION = "2026-06-04-v550-a4-court-color-club-fit";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -14959,7 +14959,7 @@ body {
   }
 }
 
-</style>`);document.body.appendChild(el);}el.style.display=s?'block':'none';}
+</'+'style>`);document.body.appendChild(el);}el.style.display=s?'block':'none';}
 
 
 
@@ -43365,13 +43365,24 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
 .v431-team-name{font-size:11px;font-weight:900;line-height:1.35;word-break:keep-all;overflow-wrap:anywhere;white-space:normal;overflow:visible;}
 .v431-team-sub{font-size:9px;color:#64748b;font-weight:700;line-height:1.25;margin-top:1px;white-space:normal;overflow:visible;}
 /* v548d: 조 시합카드(grp-card) 지역별 색상 */
-.grp-card.v548-region-국제   .grp-hdr{background:linear-gradient(135deg,#1e40af,#1d4ed8)!important;}
-.grp-card.v548-region-원도심 .grp-hdr{background:linear-gradient(135deg,#14532d,#15803d)!important;}
-.grp-card.v548-region-장유   .grp-hdr{background:linear-gradient(135deg,#4c1d95,#7c3aed)!important;}
-.grp-card.v548-region-능동   .grp-hdr{background:linear-gradient(135deg,#7c2d12,#c2410c)!important;}
-.grp-card.v548-region-금병   .grp-hdr{background:linear-gradient(135deg,#134e4a,#0f766e)!important;}
-.grp-card.v548-region-삼계   .grp-hdr{background:linear-gradient(135deg,#831843,#be185d)!important;}
-.grp-card.v548-region-메인코트 .grp-hdr{background:linear-gradient(135deg,#78350f,#b45309)!important;}
+.grp-card.v548-region-국제   .grp-hdr,
+.indiv-prelim-grid .grp-card.v548-region-국제   .grp-hdr{background:linear-gradient(135deg,#1e40af,#1d4ed8)!important;color:#fff!important;border-left:7px solid #60a5fa!important;}
+.grp-card.v548-region-원도심 .grp-hdr,
+.indiv-prelim-grid .grp-card.v548-region-원도심 .grp-hdr{background:linear-gradient(135deg,#14532d,#15803d)!important;color:#fff!important;border-left:7px solid #4ade80!important;}
+.grp-card.v548-region-장유   .grp-hdr,
+.indiv-prelim-grid .grp-card.v548-region-장유   .grp-hdr{background:linear-gradient(135deg,#4c1d95,#7c3aed)!important;color:#fff!important;border-left:7px solid #c4b5fd!important;}
+.grp-card.v548-region-능동   .grp-hdr,
+.indiv-prelim-grid .grp-card.v548-region-능동   .grp-hdr{background:linear-gradient(135deg,#7c2d12,#c2410c)!important;color:#fff!important;border-left:7px solid #fb923c!important;}
+.grp-card.v548-region-금병   .grp-hdr,
+.indiv-prelim-grid .grp-card.v548-region-금병   .grp-hdr{background:linear-gradient(135deg,#134e4a,#0f766e)!important;color:#fff!important;border-left:7px solid #2dd4bf!important;}
+.grp-card.v548-region-삼계   .grp-hdr,
+.indiv-prelim-grid .grp-card.v548-region-삼계   .grp-hdr{background:linear-gradient(135deg,#831843,#be185d)!important;color:#fff!important;border-left:7px solid #f9a8d4!important;}
+.grp-card.v548-region-메인코트 .grp-hdr,
+.indiv-prelim-grid .grp-card.v548-region-메인코트 .grp-hdr{background:linear-gradient(135deg,#78350f,#b45309)!important;color:#fff!important;border-left:7px solid #fcd34d!important;}
+/* 지역별 헤더 텍스트 색상 강제 흰색 */
+.indiv-prelim-grid .grp-card[class*="v548-region-"]:not(.v548-region-기타) .grp-hdr span,
+.indiv-prelim-grid .grp-card[class*="v548-region-"]:not(.v548-region-기타) .grp-hdr > div:first-child > span:first-child,
+.indiv-prelim-grid .grp-card[class*="v548-region-"]:not(.v548-region-기타) .grp-hdr > div:first-child span{color:#fff!important;}
 /* v548b: 코트 지역별 색상 (named 클래스) */
 /* 국제 — 남색 */
 .v431-group-card.v548-region-국제 .v431-group-head{background:#1d4ed8 !important;}
@@ -43537,7 +43548,271 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
     // <script> 태그를 인라인에 두면 HTML 파서가 스크립트를 중간에 끊는 버그 발생.
     // Blob URL 방식으로 교체하여 파서 혼란 방지.
     const autoprint='window.onload=function(){setTimeout(function(){window.focus();window.print();},250)};';
-    const html='<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>예선 대진표 A4 출력</title><style>'+style+printCss+'</style><'+'script>'+autoprint+'<'+'/script></head><body>'+sheet.outerHTML+'</body></html>';
+    const html='<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>예선 대진표 A4 출력</title><style>'+style+printCss+'</style><'+'script>'+autoprint+'<'+'/script></head><body>'+sheet.outerHTML+'
+
+<style id="v550A4CourtColorAndClubFitStyle">
+/* v550: A4 예선대진표 출력/이미지/PDF에서도 코트 구장별 색상 구분 + 클럽명 가독성 보정 */
+.v550-a4-court-colored .v435-group-card,
+.v550-a4-court-colored.v435-group-card{
+  border-color:var(--a4-court-border,#cbd5e1) !important;
+  background:linear-gradient(180deg,var(--a4-court-soft,#f8fafc),#ffffff) !important;
+  -webkit-print-color-adjust:exact !important;
+  print-color-adjust:exact !important;
+}
+.v550-a4-court-colored .v435-group-head,
+.v550-a4-court-colored .v438-group-head,
+.v550-a4-court-colored.v435-group-card .v435-group-head,
+.v550-a4-court-colored.v435-group-card .v438-group-head{
+  background:linear-gradient(90deg,var(--a4-court-main,#0f1e3a),var(--a4-court-main2,#1e3a8a)) !important;
+  color:#fff !important;
+  border-bottom:1px solid var(--a4-court-border,#cbd5e1) !important;
+  -webkit-print-color-adjust:exact !important;
+  print-color-adjust:exact !important;
+}
+.v550-a4-court-colored .v435-court-badge,
+.v550-a4-court-colored .v438-order-badge,
+.v550-a4-court-colored .v438-time-badge,
+.v550-a4-court-colored.v435-group-card .v435-court-badge,
+.v550-a4-court-colored.v435-group-card .v438-order-badge,
+.v550-a4-court-colored.v435-group-card .v438-time-badge{
+  background:rgba(255,255,255,.94) !important;
+  color:var(--a4-court-main,#0f1e3a) !important;
+  border-color:rgba(255,255,255,.72) !important;
+  font-weight:1000 !important;
+  -webkit-print-color-adjust:exact !important;
+  print-color-adjust:exact !important;
+}
+.v550-a4-court-colored .v435-group-body,
+.v550-a4-court-colored.v435-group-card .v435-group-body{
+  background:linear-gradient(180deg,rgba(255,255,255,.86),var(--a4-court-soft,#f8fafc)) !important;
+  -webkit-print-color-adjust:exact !important;
+  print-color-adjust:exact !important;
+}
+.v550-a4-court-colored .v435-team-row,
+.v550-a4-court-colored.v435-group-card .v435-team-row{
+  background:rgba(255,255,255,.92) !important;
+  border-color:var(--a4-court-border,#dbeafe) !important;
+  -webkit-print-color-adjust:exact !important;
+  print-color-adjust:exact !important;
+}
+.v550-a4-court-colored .v435-team-no,
+.v550-a4-court-colored.v435-group-card .v435-team-no{
+  background:var(--a4-court-main,#0f1e3a) !important;
+  color:#fff !important;
+  -webkit-print-color-adjust:exact !important;
+  print-color-adjust:exact !important;
+}
+.v550-a4-court-colored .v435-head-left,
+.v550-a4-court-colored .v438-group-name,
+.v550-a4-court-colored.v435-group-card .v435-head-left,
+.v550-a4-court-colored.v435-group-card .v438-group-name{
+  color:#fff !important;
+}
+/* 클럽명/소속이 잘리지 않도록 이름은 유지, 하단 소속은 더 작고 2줄까지 허용 */
+.v550-a4-court-colored .v435-team-name,
+.v550-a4-court-colored.v435-group-card .v435-team-name{
+  font-size:7.1px !important;
+  line-height:1.05 !important;
+  margin-bottom:1px !important;
+  white-space:nowrap !important;
+  overflow:hidden !important;
+  text-overflow:ellipsis !important;
+  font-weight:1000 !important;
+}
+.v550-a4-court-colored .v435-team-sub,
+.v550-a4-court-colored.v435-group-card .v435-team-sub{
+  display:block !important;
+  font-size:4.85px !important;
+  line-height:1.03 !important;
+  max-height:10.2px !important;
+  overflow:hidden !important;
+  white-space:normal !important;
+  word-break:keep-all !important;
+  overflow-wrap:anywhere !important;
+  color:#253244 !important;
+  font-weight:800 !important;
+  letter-spacing:-.07em !important;
+}
+.v550-a4-court-colored .v435-team-row,
+.v550-a4-court-colored.v435-group-card .v435-team-row{
+  padding:3px 5px !important;
+  gap:5px !important;
+}
+@media print{
+  .v550-a4-court-colored,
+  .v550-a4-court-colored *{
+    -webkit-print-color-adjust:exact !important;
+    print-color-adjust:exact !important;
+    color-adjust:exact !important;
+  }
+}
+</'+'style>
+<'+'script id="v550A4CourtColorAndClubFitScript">
+(function(){
+  'use strict';
+  const PALETTE={
+    '국제':{main:'#2563eb',main2:'#1e40af',soft:'#eff6ff',border:'#93c5fd'},
+    '능동':{main:'#16a34a',main2:'#166534',soft:'#f0fdf4',border:'#86efac'},
+    '월든섬':{main:'#dc2626',main2:'#991b1b',soft:'#fff1f2',border:'#fca5a5'},
+    '월든섬(인조)':{main:'#dc2626',main2:'#991b1b',soft:'#fff1f2',border:'#fca5a5'},
+    '공유':{main:'#9333ea',main2:'#6b21a8',soft:'#faf5ff',border:'#d8b4fe'},
+    '공유(클레이)':{main:'#9333ea',main2:'#6b21a8',soft:'#faf5ff',border:'#d8b4fe'},
+    '금병':{main:'#ea580c',main2:'#9a3412',soft:'#fff7ed',border:'#fdba74'},
+    '삼계':{main:'#0891b2',main2:'#155e75',soft:'#ecfeff',border:'#67e8f9'},
+    '신삼계':{main:'#0891b2',main2:'#155e75',soft:'#ecfeff',border:'#67e8f9'},
+    '구삼계':{main:'#4f46e5',main2:'#3730a3',soft:'#eef2ff',border:'#a5b4fc'},
+    '원도심':{main:'#be123c',main2:'#881337',soft:'#fff1f2',border:'#fda4af'},
+    '동부':{main:'#0f766e',main2:'#115e59',soft:'#f0fdfa',border:'#5eead4'}
+  };
+  const FALLBACK=[
+    {main:'#2563eb',main2:'#1e40af',soft:'#eff6ff',border:'#93c5fd'},
+    {main:'#16a34a',main2:'#166534',soft:'#f0fdf4',border:'#86efac'},
+    {main:'#dc2626',main2:'#991b1b',soft:'#fff1f2',border:'#fca5a5'},
+    {main:'#9333ea',main2:'#6b21a8',soft:'#faf5ff',border:'#d8b4fe'},
+    {main:'#ea580c',main2:'#9a3412',soft:'#fff7ed',border:'#fdba74'},
+    {main:'#0891b2',main2:'#155e75',soft:'#ecfeff',border:'#67e8f9'},
+    {main:'#4f46e5',main2:'#3730a3',soft:'#eef2ff',border:'#a5b4fc'},
+    {main:'#be123c',main2:'#881337',soft:'#fff1f2',border:'#fda4af'},
+    {main:'#0f766e',main2:'#115e59',soft:'#f0fdfa',border:'#5eead4'},
+    {main:'#ca8a04',main2:'#854d0e',soft:'#fefce8',border:'#fde047'}
+  ];
+  function hash(s){let h=0; s=String(s||''); for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))|0; return Math.abs(h);}
+  function text(el){return String((el&&el.textContent)||'').replace(/\s+/g,' ').trim();}
+  function extractCourt(raw){
+    raw=String(raw||'').replace(/\s+/g,' ');
+    const m=raw.match(/(월든섬\(인조\)\d+|공유\(클레이\)\d+|장유국제\d+|국제\d+|장유능동\d+|능동\d+|월든섬\d+|공유\d+|금병\d+|신삼계\d+|구삼계\d+|삼계\d+|원도심\d+|동부\d+)/)
+      || raw.match(/(?:경기코트|배정코트|코트|🎾)\s*[:：]?\s*([가-힣A-Za-z()_-]+\d+)/);
+    return m&&m[1]?m[1]:'';
+  }
+  function groupFromCourt(court){
+    let g=String(court||'').trim().replace(/[\s_-]*\d+$/,'').trim();
+    if(/^장유국제/.test(g)) return '국제';
+    if(/^장유능동/.test(g)) return '능동';
+    if(/^월든섬\(인조\)/.test(g)) return '월든섬(인조)';
+    if(/^월든섬/.test(g)) return '월든섬';
+    if(/^공유\(클레이\)/.test(g)) return '공유(클레이)';
+    if(/^공유/.test(g)) return '공유';
+    if(/^신삼계/.test(g)) return '신삼계';
+    if(/^구삼계/.test(g)) return '구삼계';
+    return g;
+  }
+  function palette(group){return PALETTE[group] || FALLBACK[hash(group)%FALLBACK.length];}
+  function setVars(el,p){
+    el.style.setProperty('--a4-court-main',p.main);
+    el.style.setProperty('--a4-court-main2',p.main2||p.main);
+    el.style.setProperty('--a4-court-soft',p.soft);
+    el.style.setProperty('--a4-court-border',p.border);
+  }
+  function inlineImportant(el, prop, val){try{el.style.setProperty(prop,val,'important');}catch(e){}}
+  function colorCard(card){
+    if(!card) return;
+    const court=extractCourt(text(card));
+    if(!court) return;
+    const group=groupFromCourt(court)||court;
+    const p=palette(group);
+    card.classList.add('v550-a4-court-colored');
+    card.setAttribute('data-a4-court-group',group);
+    card.setAttribute('data-a4-court-label',court);
+    setVars(card,p);
+    card.querySelectorAll('.v435-group-head,.v438-group-head').forEach(h=>{
+      setVars(h,p);
+      inlineImportant(h,'background',`linear-gradient(90deg, ${p.main}, ${p.main2||p.main})`);
+      inlineImportant(h,'color','#ffffff');
+      inlineImportant(h,'border-bottom-color',p.border);
+      inlineImportant(h,'-webkit-print-color-adjust','exact');
+      inlineImportant(h,'print-color-adjust','exact');
+    });
+    card.querySelectorAll('.v435-court-badge,.v438-order-badge,.v438-time-badge').forEach(b=>{
+      setVars(b,p);
+      inlineImportant(b,'background','rgba(255,255,255,.94)');
+      inlineImportant(b,'color',p.main);
+      inlineImportant(b,'border-color','rgba(255,255,255,.72)');
+      inlineImportant(b,'font-weight','1000');
+    });
+    card.querySelectorAll('.v435-team-no').forEach(n=>{
+      inlineImportant(n,'background',p.main);
+      inlineImportant(n,'color','#ffffff');
+      inlineImportant(n,'-webkit-print-color-adjust','exact');
+      inlineImportant(n,'print-color-adjust','exact');
+    });
+    card.querySelectorAll('.v435-group-body').forEach(b=>{
+      inlineImportant(b,'background',`linear-gradient(180deg, rgba(255,255,255,.86), ${p.soft})`);
+    });
+    card.querySelectorAll('.v435-team-row').forEach(r=>{
+      inlineImportant(r,'background','rgba(255,255,255,.92)');
+      inlineImportant(r,'border-color',p.border);
+      inlineImportant(r,'padding','3px 5px');
+      inlineImportant(r,'gap','5px');
+    });
+    card.querySelectorAll('.v435-team-name').forEach(n=>{
+      inlineImportant(n,'font-size','7.1px');
+      inlineImportant(n,'line-height','1.05');
+      inlineImportant(n,'white-space','nowrap');
+      inlineImportant(n,'overflow','hidden');
+      inlineImportant(n,'text-overflow','ellipsis');
+    });
+    card.querySelectorAll('.v435-team-sub').forEach(sub=>{
+      inlineImportant(sub,'display','block');
+      inlineImportant(sub,'font-size','4.85px');
+      inlineImportant(sub,'line-height','1.03');
+      inlineImportant(sub,'max-height','10.2px');
+      inlineImportant(sub,'overflow','hidden');
+      inlineImportant(sub,'white-space','normal');
+      inlineImportant(sub,'word-break','keep-all');
+      inlineImportant(sub,'overflow-wrap','anywhere');
+      inlineImportant(sub,'letter-spacing','-.07em');
+      inlineImportant(sub,'font-weight','800');
+      inlineImportant(sub,'color','#253244');
+    });
+  }
+  function applyA4CourtColors(root){
+    try{
+      const scope=root||document;
+      scope.querySelectorAll('.v435-group-card').forEach(colorCard);
+      scope.querySelectorAll('.v435-a4-page,.v432-a4-page,.v435-a4-root,.v442-a4-sheet,.v443-a4-sheet').forEach(el=>el.classList.add('v550-a4-court-colored-root'));
+    }catch(e){try{console.warn('[v550] A4 court color skipped',e);}catch(_e){}}
+    return root;
+  }
+  window.v550ApplyA4CourtColors=applyA4CourtColors;
+  function wrapTool(ns){
+    try{
+      const tool=window[ns];
+      if(!tool||typeof tool.buildSheet!=='function'||tool.__v550A4Wrapped) return;
+      const orig=tool.buildSheet;
+      tool.buildSheet=function(){
+        const sheet=orig.apply(this,arguments);
+        return sheet?applyA4CourtColors(sheet):sheet;
+      };
+      tool.__v550A4Wrapped=true;
+    }catch(e){}
+  }
+  function wrapAll(){wrapTool('v437A4Tools');wrapTool('v435A4Tools');}
+  document.addEventListener('DOMContentLoaded',()=>{setTimeout(wrapAll,50);setTimeout(wrapAll,500);});
+  setTimeout(wrapAll,0);
+  // 미리보기/출력 루트가 새로 만들어질 때도 색상 재적용. v444 출력 함수가 헤더를 남색으로 덮은 뒤 다시 복구한다.
+  try{
+    new MutationObserver(function(muts){
+      let need=false;
+      for(const m of muts){
+        for(const n of m.addedNodes){
+          if(n.nodeType===1 && (n.id==='v443PrintRoot'||n.id==='v440A4PreviewOverlay'||(n.querySelector&&n.querySelector('.v435-group-card')))) need=true;
+        }
+      }
+      if(need){
+        setTimeout(()=>applyA4CourtColors(document),20);
+        setTimeout(()=>applyA4CourtColors(document),120);
+      }
+    }).observe(document.body,{childList:true,subtree:true});
+  }catch(e){}
+  const oldSheet=window.exportPrelimSheet;
+  if(typeof oldSheet==='function' && !oldSheet.__v550Wrapped){
+    const fn=function(){const r=oldSheet.apply(this,arguments); setTimeout(()=>applyA4CourtColors(document),80); setTimeout(()=>applyA4CourtColors(document),300); return r;};
+    fn.__v550Wrapped=true; window.exportPrelimSheet=fn;
+  }
+})();
+</'+'script>
+
+</body></html>';
     try{
       const blob=new Blob([html],{type:'text/html;charset=utf-8'});
       const url=URL.createObjectURL(blob);
@@ -44208,7 +44483,271 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
     const printCss='@page{size:A4 portrait;margin:0}body{margin:0;background:#fff;font-family:\'Noto Sans KR\',Arial,sans-serif}.v432-export-sheet{position:static!important;left:auto!important;top:auto!important;width:794px!important;margin:0 auto!important;z-index:auto!important}';
     const autoprint='window.onload=function(){setTimeout(function(){window.focus();window.print();},250)};';
     // <script> 태그를 분리해 HTML 파서가 끊지 못하도록 함
-    const html='<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>예선 대진표 A4 출력</title><style>'+style+printCss+'</style><'+'script>'+autoprint+'<'+'/script></head><body>'+sheet.outerHTML+'</body></html>';
+    const html='<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>예선 대진표 A4 출력</title><style>'+style+printCss+'</style><'+'script>'+autoprint+'<'+'/script></head><body>'+sheet.outerHTML+'
+
+<style id="v550A4CourtColorAndClubFitStyle">
+/* v550: A4 예선대진표 출력/이미지/PDF에서도 코트 구장별 색상 구분 + 클럽명 가독성 보정 */
+.v550-a4-court-colored .v435-group-card,
+.v550-a4-court-colored.v435-group-card{
+  border-color:var(--a4-court-border,#cbd5e1) !important;
+  background:linear-gradient(180deg,var(--a4-court-soft,#f8fafc),#ffffff) !important;
+  -webkit-print-color-adjust:exact !important;
+  print-color-adjust:exact !important;
+}
+.v550-a4-court-colored .v435-group-head,
+.v550-a4-court-colored .v438-group-head,
+.v550-a4-court-colored.v435-group-card .v435-group-head,
+.v550-a4-court-colored.v435-group-card .v438-group-head{
+  background:linear-gradient(90deg,var(--a4-court-main,#0f1e3a),var(--a4-court-main2,#1e3a8a)) !important;
+  color:#fff !important;
+  border-bottom:1px solid var(--a4-court-border,#cbd5e1) !important;
+  -webkit-print-color-adjust:exact !important;
+  print-color-adjust:exact !important;
+}
+.v550-a4-court-colored .v435-court-badge,
+.v550-a4-court-colored .v438-order-badge,
+.v550-a4-court-colored .v438-time-badge,
+.v550-a4-court-colored.v435-group-card .v435-court-badge,
+.v550-a4-court-colored.v435-group-card .v438-order-badge,
+.v550-a4-court-colored.v435-group-card .v438-time-badge{
+  background:rgba(255,255,255,.94) !important;
+  color:var(--a4-court-main,#0f1e3a) !important;
+  border-color:rgba(255,255,255,.72) !important;
+  font-weight:1000 !important;
+  -webkit-print-color-adjust:exact !important;
+  print-color-adjust:exact !important;
+}
+.v550-a4-court-colored .v435-group-body,
+.v550-a4-court-colored.v435-group-card .v435-group-body{
+  background:linear-gradient(180deg,rgba(255,255,255,.86),var(--a4-court-soft,#f8fafc)) !important;
+  -webkit-print-color-adjust:exact !important;
+  print-color-adjust:exact !important;
+}
+.v550-a4-court-colored .v435-team-row,
+.v550-a4-court-colored.v435-group-card .v435-team-row{
+  background:rgba(255,255,255,.92) !important;
+  border-color:var(--a4-court-border,#dbeafe) !important;
+  -webkit-print-color-adjust:exact !important;
+  print-color-adjust:exact !important;
+}
+.v550-a4-court-colored .v435-team-no,
+.v550-a4-court-colored.v435-group-card .v435-team-no{
+  background:var(--a4-court-main,#0f1e3a) !important;
+  color:#fff !important;
+  -webkit-print-color-adjust:exact !important;
+  print-color-adjust:exact !important;
+}
+.v550-a4-court-colored .v435-head-left,
+.v550-a4-court-colored .v438-group-name,
+.v550-a4-court-colored.v435-group-card .v435-head-left,
+.v550-a4-court-colored.v435-group-card .v438-group-name{
+  color:#fff !important;
+}
+/* 클럽명/소속이 잘리지 않도록 이름은 유지, 하단 소속은 더 작고 2줄까지 허용 */
+.v550-a4-court-colored .v435-team-name,
+.v550-a4-court-colored.v435-group-card .v435-team-name{
+  font-size:7.1px !important;
+  line-height:1.05 !important;
+  margin-bottom:1px !important;
+  white-space:nowrap !important;
+  overflow:hidden !important;
+  text-overflow:ellipsis !important;
+  font-weight:1000 !important;
+}
+.v550-a4-court-colored .v435-team-sub,
+.v550-a4-court-colored.v435-group-card .v435-team-sub{
+  display:block !important;
+  font-size:4.85px !important;
+  line-height:1.03 !important;
+  max-height:10.2px !important;
+  overflow:hidden !important;
+  white-space:normal !important;
+  word-break:keep-all !important;
+  overflow-wrap:anywhere !important;
+  color:#253244 !important;
+  font-weight:800 !important;
+  letter-spacing:-.07em !important;
+}
+.v550-a4-court-colored .v435-team-row,
+.v550-a4-court-colored.v435-group-card .v435-team-row{
+  padding:3px 5px !important;
+  gap:5px !important;
+}
+@media print{
+  .v550-a4-court-colored,
+  .v550-a4-court-colored *{
+    -webkit-print-color-adjust:exact !important;
+    print-color-adjust:exact !important;
+    color-adjust:exact !important;
+  }
+}
+</'+'style>
+<'+'script id="v550A4CourtColorAndClubFitScript">
+(function(){
+  'use strict';
+  const PALETTE={
+    '국제':{main:'#2563eb',main2:'#1e40af',soft:'#eff6ff',border:'#93c5fd'},
+    '능동':{main:'#16a34a',main2:'#166534',soft:'#f0fdf4',border:'#86efac'},
+    '월든섬':{main:'#dc2626',main2:'#991b1b',soft:'#fff1f2',border:'#fca5a5'},
+    '월든섬(인조)':{main:'#dc2626',main2:'#991b1b',soft:'#fff1f2',border:'#fca5a5'},
+    '공유':{main:'#9333ea',main2:'#6b21a8',soft:'#faf5ff',border:'#d8b4fe'},
+    '공유(클레이)':{main:'#9333ea',main2:'#6b21a8',soft:'#faf5ff',border:'#d8b4fe'},
+    '금병':{main:'#ea580c',main2:'#9a3412',soft:'#fff7ed',border:'#fdba74'},
+    '삼계':{main:'#0891b2',main2:'#155e75',soft:'#ecfeff',border:'#67e8f9'},
+    '신삼계':{main:'#0891b2',main2:'#155e75',soft:'#ecfeff',border:'#67e8f9'},
+    '구삼계':{main:'#4f46e5',main2:'#3730a3',soft:'#eef2ff',border:'#a5b4fc'},
+    '원도심':{main:'#be123c',main2:'#881337',soft:'#fff1f2',border:'#fda4af'},
+    '동부':{main:'#0f766e',main2:'#115e59',soft:'#f0fdfa',border:'#5eead4'}
+  };
+  const FALLBACK=[
+    {main:'#2563eb',main2:'#1e40af',soft:'#eff6ff',border:'#93c5fd'},
+    {main:'#16a34a',main2:'#166534',soft:'#f0fdf4',border:'#86efac'},
+    {main:'#dc2626',main2:'#991b1b',soft:'#fff1f2',border:'#fca5a5'},
+    {main:'#9333ea',main2:'#6b21a8',soft:'#faf5ff',border:'#d8b4fe'},
+    {main:'#ea580c',main2:'#9a3412',soft:'#fff7ed',border:'#fdba74'},
+    {main:'#0891b2',main2:'#155e75',soft:'#ecfeff',border:'#67e8f9'},
+    {main:'#4f46e5',main2:'#3730a3',soft:'#eef2ff',border:'#a5b4fc'},
+    {main:'#be123c',main2:'#881337',soft:'#fff1f2',border:'#fda4af'},
+    {main:'#0f766e',main2:'#115e59',soft:'#f0fdfa',border:'#5eead4'},
+    {main:'#ca8a04',main2:'#854d0e',soft:'#fefce8',border:'#fde047'}
+  ];
+  function hash(s){let h=0; s=String(s||''); for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))|0; return Math.abs(h);}
+  function text(el){return String((el&&el.textContent)||'').replace(/\s+/g,' ').trim();}
+  function extractCourt(raw){
+    raw=String(raw||'').replace(/\s+/g,' ');
+    const m=raw.match(/(월든섬\(인조\)\d+|공유\(클레이\)\d+|장유국제\d+|국제\d+|장유능동\d+|능동\d+|월든섬\d+|공유\d+|금병\d+|신삼계\d+|구삼계\d+|삼계\d+|원도심\d+|동부\d+)/)
+      || raw.match(/(?:경기코트|배정코트|코트|🎾)\s*[:：]?\s*([가-힣A-Za-z()_-]+\d+)/);
+    return m&&m[1]?m[1]:'';
+  }
+  function groupFromCourt(court){
+    let g=String(court||'').trim().replace(/[\s_-]*\d+$/,'').trim();
+    if(/^장유국제/.test(g)) return '국제';
+    if(/^장유능동/.test(g)) return '능동';
+    if(/^월든섬\(인조\)/.test(g)) return '월든섬(인조)';
+    if(/^월든섬/.test(g)) return '월든섬';
+    if(/^공유\(클레이\)/.test(g)) return '공유(클레이)';
+    if(/^공유/.test(g)) return '공유';
+    if(/^신삼계/.test(g)) return '신삼계';
+    if(/^구삼계/.test(g)) return '구삼계';
+    return g;
+  }
+  function palette(group){return PALETTE[group] || FALLBACK[hash(group)%FALLBACK.length];}
+  function setVars(el,p){
+    el.style.setProperty('--a4-court-main',p.main);
+    el.style.setProperty('--a4-court-main2',p.main2||p.main);
+    el.style.setProperty('--a4-court-soft',p.soft);
+    el.style.setProperty('--a4-court-border',p.border);
+  }
+  function inlineImportant(el, prop, val){try{el.style.setProperty(prop,val,'important');}catch(e){}}
+  function colorCard(card){
+    if(!card) return;
+    const court=extractCourt(text(card));
+    if(!court) return;
+    const group=groupFromCourt(court)||court;
+    const p=palette(group);
+    card.classList.add('v550-a4-court-colored');
+    card.setAttribute('data-a4-court-group',group);
+    card.setAttribute('data-a4-court-label',court);
+    setVars(card,p);
+    card.querySelectorAll('.v435-group-head,.v438-group-head').forEach(h=>{
+      setVars(h,p);
+      inlineImportant(h,'background',`linear-gradient(90deg, ${p.main}, ${p.main2||p.main})`);
+      inlineImportant(h,'color','#ffffff');
+      inlineImportant(h,'border-bottom-color',p.border);
+      inlineImportant(h,'-webkit-print-color-adjust','exact');
+      inlineImportant(h,'print-color-adjust','exact');
+    });
+    card.querySelectorAll('.v435-court-badge,.v438-order-badge,.v438-time-badge').forEach(b=>{
+      setVars(b,p);
+      inlineImportant(b,'background','rgba(255,255,255,.94)');
+      inlineImportant(b,'color',p.main);
+      inlineImportant(b,'border-color','rgba(255,255,255,.72)');
+      inlineImportant(b,'font-weight','1000');
+    });
+    card.querySelectorAll('.v435-team-no').forEach(n=>{
+      inlineImportant(n,'background',p.main);
+      inlineImportant(n,'color','#ffffff');
+      inlineImportant(n,'-webkit-print-color-adjust','exact');
+      inlineImportant(n,'print-color-adjust','exact');
+    });
+    card.querySelectorAll('.v435-group-body').forEach(b=>{
+      inlineImportant(b,'background',`linear-gradient(180deg, rgba(255,255,255,.86), ${p.soft})`);
+    });
+    card.querySelectorAll('.v435-team-row').forEach(r=>{
+      inlineImportant(r,'background','rgba(255,255,255,.92)');
+      inlineImportant(r,'border-color',p.border);
+      inlineImportant(r,'padding','3px 5px');
+      inlineImportant(r,'gap','5px');
+    });
+    card.querySelectorAll('.v435-team-name').forEach(n=>{
+      inlineImportant(n,'font-size','7.1px');
+      inlineImportant(n,'line-height','1.05');
+      inlineImportant(n,'white-space','nowrap');
+      inlineImportant(n,'overflow','hidden');
+      inlineImportant(n,'text-overflow','ellipsis');
+    });
+    card.querySelectorAll('.v435-team-sub').forEach(sub=>{
+      inlineImportant(sub,'display','block');
+      inlineImportant(sub,'font-size','4.85px');
+      inlineImportant(sub,'line-height','1.03');
+      inlineImportant(sub,'max-height','10.2px');
+      inlineImportant(sub,'overflow','hidden');
+      inlineImportant(sub,'white-space','normal');
+      inlineImportant(sub,'word-break','keep-all');
+      inlineImportant(sub,'overflow-wrap','anywhere');
+      inlineImportant(sub,'letter-spacing','-.07em');
+      inlineImportant(sub,'font-weight','800');
+      inlineImportant(sub,'color','#253244');
+    });
+  }
+  function applyA4CourtColors(root){
+    try{
+      const scope=root||document;
+      scope.querySelectorAll('.v435-group-card').forEach(colorCard);
+      scope.querySelectorAll('.v435-a4-page,.v432-a4-page,.v435-a4-root,.v442-a4-sheet,.v443-a4-sheet').forEach(el=>el.classList.add('v550-a4-court-colored-root'));
+    }catch(e){try{console.warn('[v550] A4 court color skipped',e);}catch(_e){}}
+    return root;
+  }
+  window.v550ApplyA4CourtColors=applyA4CourtColors;
+  function wrapTool(ns){
+    try{
+      const tool=window[ns];
+      if(!tool||typeof tool.buildSheet!=='function'||tool.__v550A4Wrapped) return;
+      const orig=tool.buildSheet;
+      tool.buildSheet=function(){
+        const sheet=orig.apply(this,arguments);
+        return sheet?applyA4CourtColors(sheet):sheet;
+      };
+      tool.__v550A4Wrapped=true;
+    }catch(e){}
+  }
+  function wrapAll(){wrapTool('v437A4Tools');wrapTool('v435A4Tools');}
+  document.addEventListener('DOMContentLoaded',()=>{setTimeout(wrapAll,50);setTimeout(wrapAll,500);});
+  setTimeout(wrapAll,0);
+  // 미리보기/출력 루트가 새로 만들어질 때도 색상 재적용. v444 출력 함수가 헤더를 남색으로 덮은 뒤 다시 복구한다.
+  try{
+    new MutationObserver(function(muts){
+      let need=false;
+      for(const m of muts){
+        for(const n of m.addedNodes){
+          if(n.nodeType===1 && (n.id==='v443PrintRoot'||n.id==='v440A4PreviewOverlay'||(n.querySelector&&n.querySelector('.v435-group-card')))) need=true;
+        }
+      }
+      if(need){
+        setTimeout(()=>applyA4CourtColors(document),20);
+        setTimeout(()=>applyA4CourtColors(document),120);
+      }
+    }).observe(document.body,{childList:true,subtree:true});
+  }catch(e){}
+  const oldSheet=window.exportPrelimSheet;
+  if(typeof oldSheet==='function' && !oldSheet.__v550Wrapped){
+    const fn=function(){const r=oldSheet.apply(this,arguments); setTimeout(()=>applyA4CourtColors(document),80); setTimeout(()=>applyA4CourtColors(document),300); return r;};
+    fn.__v550Wrapped=true; window.exportPrelimSheet=fn;
+  }
+})();
+</'+'script>
+
+</body></html>';
     try{
       const blob=new Blob([html],{type:'text/html;charset=utf-8'});
       const url=URL.createObjectURL(blob);
@@ -45169,7 +45708,7 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
       if(!sheet){toast('출력할 예선표가 없습니다','error');return;}
       const clone=forceFourColumns(sheet.cloneNode(true));
       const css=[...document.querySelectorAll('style')].map(s=>s.outerHTML).join('\n');
-      const html=`<!doctype html><html><head><meta charset="utf-8"><title>예선 대진표 출력</title>${css}<style>@page{size:A4 portrait;margin:0}html,body{margin:0!important;padding:0!important;background:#fff!important}.v435-export-sheet{position:static!important;left:auto!important;top:auto!important;width:794px!important;z-index:auto!important}.v435-a4-page{page-break-after:always!important;break-after:page!important;box-shadow:none!important;margin:0 auto!important}.v435-a4-page:last-child{page-break-after:auto!important;break-after:auto!important}</'+'style></head><body>${clone.outerHTML}
+      const html=`<!doctype html><html><head><meta charset="utf-8"><title>예선 대진표 출력</title>${css}<'+'style>@page{size:A4 portrait;margin:0}html,body{margin:0!important;padding:0!important;background:#fff!important}.v435-export-sheet{position:static!important;left:auto!important;top:auto!important;width:794px!important;z-index:auto!important}.v435-a4-page{page-break-after:always!important;break-after:page!important;box-shadow:none!important;margin:0 auto!important}.v435-a4-page:last-child{page-break-after:auto!important;break-after:auto!important}</'+'style></head><body>${clone.outerHTML}
 
 
 
@@ -45177,7 +45716,7 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
 
 
 <!-- v538: 예선 카드 버튼 정리 + 코트 대기 문자 승인창 보강 -->
-<style id="v538PrelimButtonsQueueSmsStyle">
+<'+'style id="v538PrelimButtonsQueueSmsStyle">
 /* 알림 기능은 OFF 상태이므로 예선 카드의 알림 버튼은 숨김 */
 .indiv-prelim-grid button.v538-hidden-prelim-btn{display:none!important;}
 .indiv-prelim-grid .v275-group-actions{display:none!important;}
@@ -45210,7 +45749,7 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
   .indiv-prelim-grid .indiv-group-action-card > div:last-child button{font-size:.62rem!important;padding:5px 2px!important;min-height:34px!important;}
 }
 </'+'style>
-<script id="v538PrelimButtonsQueueSmsScript">
+<'+'script id="v538PrelimButtonsQueueSmsScript">
 (function(){
   'use strict';
   const PATCH='v538-prelim-buttons-queue-sms-fix';
@@ -45381,7 +45920,7 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
 
 
 <!-- v539: 2팀/3팀 조별 예선 버튼 구조 분리 보정 -->
-<style id="v539PrelimTeamSizeButtonFixStyle">
+<'+'style id="v539PrelimTeamSizeButtonFixStyle">
 /* v539 기준
    2팀 조: 경기코트 / 조코트 / 결과입력
    3팀 이상 조: 경기코트 / 조코트 / 경기목록
@@ -45414,7 +45953,7 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
   .indiv-prelim-grid .grp-card.v539-size-3plus .v539-match-list-btn{font-size:.62rem!important;padding:5px 2px!important;}
 }
 </'+'style>
-<script id="v539PrelimTeamSizeButtonFixScript">
+<'+'script id="v539PrelimTeamSizeButtonFixScript">
 (function(){
   'use strict';
   const PATCH='v539-prelim-2team-3team-button-fix';
@@ -45531,6 +46070,270 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
   try{
     new MutationObserver(()=>{ clearTimeout(window.__v539NormalizeTimer); window.__v539NormalizeTimer=setTimeout(normalizeAll,80); }).observe(document.body,{childList:true,subtree:true});
   }catch(e){}
+})();
+</'+'script>
+
+
+
+<style id="v550A4CourtColorAndClubFitStyle">
+/* v550: A4 예선대진표 출력/이미지/PDF에서도 코트 구장별 색상 구분 + 클럽명 가독성 보정 */
+.v550-a4-court-colored .v435-group-card,
+.v550-a4-court-colored.v435-group-card{
+  border-color:var(--a4-court-border,#cbd5e1) !important;
+  background:linear-gradient(180deg,var(--a4-court-soft,#f8fafc),#ffffff) !important;
+  -webkit-print-color-adjust:exact !important;
+  print-color-adjust:exact !important;
+}
+.v550-a4-court-colored .v435-group-head,
+.v550-a4-court-colored .v438-group-head,
+.v550-a4-court-colored.v435-group-card .v435-group-head,
+.v550-a4-court-colored.v435-group-card .v438-group-head{
+  background:linear-gradient(90deg,var(--a4-court-main,#0f1e3a),var(--a4-court-main2,#1e3a8a)) !important;
+  color:#fff !important;
+  border-bottom:1px solid var(--a4-court-border,#cbd5e1) !important;
+  -webkit-print-color-adjust:exact !important;
+  print-color-adjust:exact !important;
+}
+.v550-a4-court-colored .v435-court-badge,
+.v550-a4-court-colored .v438-order-badge,
+.v550-a4-court-colored .v438-time-badge,
+.v550-a4-court-colored.v435-group-card .v435-court-badge,
+.v550-a4-court-colored.v435-group-card .v438-order-badge,
+.v550-a4-court-colored.v435-group-card .v438-time-badge{
+  background:rgba(255,255,255,.94) !important;
+  color:var(--a4-court-main,#0f1e3a) !important;
+  border-color:rgba(255,255,255,.72) !important;
+  font-weight:1000 !important;
+  -webkit-print-color-adjust:exact !important;
+  print-color-adjust:exact !important;
+}
+.v550-a4-court-colored .v435-group-body,
+.v550-a4-court-colored.v435-group-card .v435-group-body{
+  background:linear-gradient(180deg,rgba(255,255,255,.86),var(--a4-court-soft,#f8fafc)) !important;
+  -webkit-print-color-adjust:exact !important;
+  print-color-adjust:exact !important;
+}
+.v550-a4-court-colored .v435-team-row,
+.v550-a4-court-colored.v435-group-card .v435-team-row{
+  background:rgba(255,255,255,.92) !important;
+  border-color:var(--a4-court-border,#dbeafe) !important;
+  -webkit-print-color-adjust:exact !important;
+  print-color-adjust:exact !important;
+}
+.v550-a4-court-colored .v435-team-no,
+.v550-a4-court-colored.v435-group-card .v435-team-no{
+  background:var(--a4-court-main,#0f1e3a) !important;
+  color:#fff !important;
+  -webkit-print-color-adjust:exact !important;
+  print-color-adjust:exact !important;
+}
+.v550-a4-court-colored .v435-head-left,
+.v550-a4-court-colored .v438-group-name,
+.v550-a4-court-colored.v435-group-card .v435-head-left,
+.v550-a4-court-colored.v435-group-card .v438-group-name{
+  color:#fff !important;
+}
+/* 클럽명/소속이 잘리지 않도록 이름은 유지, 하단 소속은 더 작고 2줄까지 허용 */
+.v550-a4-court-colored .v435-team-name,
+.v550-a4-court-colored.v435-group-card .v435-team-name{
+  font-size:7.1px !important;
+  line-height:1.05 !important;
+  margin-bottom:1px !important;
+  white-space:nowrap !important;
+  overflow:hidden !important;
+  text-overflow:ellipsis !important;
+  font-weight:1000 !important;
+}
+.v550-a4-court-colored .v435-team-sub,
+.v550-a4-court-colored.v435-group-card .v435-team-sub{
+  display:block !important;
+  font-size:4.85px !important;
+  line-height:1.03 !important;
+  max-height:10.2px !important;
+  overflow:hidden !important;
+  white-space:normal !important;
+  word-break:keep-all !important;
+  overflow-wrap:anywhere !important;
+  color:#253244 !important;
+  font-weight:800 !important;
+  letter-spacing:-.07em !important;
+}
+.v550-a4-court-colored .v435-team-row,
+.v550-a4-court-colored.v435-group-card .v435-team-row{
+  padding:3px 5px !important;
+  gap:5px !important;
+}
+@media print{
+  .v550-a4-court-colored,
+  .v550-a4-court-colored *{
+    -webkit-print-color-adjust:exact !important;
+    print-color-adjust:exact !important;
+    color-adjust:exact !important;
+  }
+}
+</'+'style>
+<'+'script id="v550A4CourtColorAndClubFitScript">
+(function(){
+  'use strict';
+  const PALETTE={
+    '국제':{main:'#2563eb',main2:'#1e40af',soft:'#eff6ff',border:'#93c5fd'},
+    '능동':{main:'#16a34a',main2:'#166534',soft:'#f0fdf4',border:'#86efac'},
+    '월든섬':{main:'#dc2626',main2:'#991b1b',soft:'#fff1f2',border:'#fca5a5'},
+    '월든섬(인조)':{main:'#dc2626',main2:'#991b1b',soft:'#fff1f2',border:'#fca5a5'},
+    '공유':{main:'#9333ea',main2:'#6b21a8',soft:'#faf5ff',border:'#d8b4fe'},
+    '공유(클레이)':{main:'#9333ea',main2:'#6b21a8',soft:'#faf5ff',border:'#d8b4fe'},
+    '금병':{main:'#ea580c',main2:'#9a3412',soft:'#fff7ed',border:'#fdba74'},
+    '삼계':{main:'#0891b2',main2:'#155e75',soft:'#ecfeff',border:'#67e8f9'},
+    '신삼계':{main:'#0891b2',main2:'#155e75',soft:'#ecfeff',border:'#67e8f9'},
+    '구삼계':{main:'#4f46e5',main2:'#3730a3',soft:'#eef2ff',border:'#a5b4fc'},
+    '원도심':{main:'#be123c',main2:'#881337',soft:'#fff1f2',border:'#fda4af'},
+    '동부':{main:'#0f766e',main2:'#115e59',soft:'#f0fdfa',border:'#5eead4'}
+  };
+  const FALLBACK=[
+    {main:'#2563eb',main2:'#1e40af',soft:'#eff6ff',border:'#93c5fd'},
+    {main:'#16a34a',main2:'#166534',soft:'#f0fdf4',border:'#86efac'},
+    {main:'#dc2626',main2:'#991b1b',soft:'#fff1f2',border:'#fca5a5'},
+    {main:'#9333ea',main2:'#6b21a8',soft:'#faf5ff',border:'#d8b4fe'},
+    {main:'#ea580c',main2:'#9a3412',soft:'#fff7ed',border:'#fdba74'},
+    {main:'#0891b2',main2:'#155e75',soft:'#ecfeff',border:'#67e8f9'},
+    {main:'#4f46e5',main2:'#3730a3',soft:'#eef2ff',border:'#a5b4fc'},
+    {main:'#be123c',main2:'#881337',soft:'#fff1f2',border:'#fda4af'},
+    {main:'#0f766e',main2:'#115e59',soft:'#f0fdfa',border:'#5eead4'},
+    {main:'#ca8a04',main2:'#854d0e',soft:'#fefce8',border:'#fde047'}
+  ];
+  function hash(s){let h=0; s=String(s||''); for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))|0; return Math.abs(h);}
+  function text(el){return String((el&&el.textContent)||'').replace(/\s+/g,' ').trim();}
+  function extractCourt(raw){
+    raw=String(raw||'').replace(/\s+/g,' ');
+    const m=raw.match(/(월든섬\(인조\)\d+|공유\(클레이\)\d+|장유국제\d+|국제\d+|장유능동\d+|능동\d+|월든섬\d+|공유\d+|금병\d+|신삼계\d+|구삼계\d+|삼계\d+|원도심\d+|동부\d+)/)
+      || raw.match(/(?:경기코트|배정코트|코트|🎾)\s*[:：]?\s*([가-힣A-Za-z()_-]+\d+)/);
+    return m&&m[1]?m[1]:'';
+  }
+  function groupFromCourt(court){
+    let g=String(court||'').trim().replace(/[\s_-]*\d+$/,'').trim();
+    if(/^장유국제/.test(g)) return '국제';
+    if(/^장유능동/.test(g)) return '능동';
+    if(/^월든섬\(인조\)/.test(g)) return '월든섬(인조)';
+    if(/^월든섬/.test(g)) return '월든섬';
+    if(/^공유\(클레이\)/.test(g)) return '공유(클레이)';
+    if(/^공유/.test(g)) return '공유';
+    if(/^신삼계/.test(g)) return '신삼계';
+    if(/^구삼계/.test(g)) return '구삼계';
+    return g;
+  }
+  function palette(group){return PALETTE[group] || FALLBACK[hash(group)%FALLBACK.length];}
+  function setVars(el,p){
+    el.style.setProperty('--a4-court-main',p.main);
+    el.style.setProperty('--a4-court-main2',p.main2||p.main);
+    el.style.setProperty('--a4-court-soft',p.soft);
+    el.style.setProperty('--a4-court-border',p.border);
+  }
+  function inlineImportant(el, prop, val){try{el.style.setProperty(prop,val,'important');}catch(e){}}
+  function colorCard(card){
+    if(!card) return;
+    const court=extractCourt(text(card));
+    if(!court) return;
+    const group=groupFromCourt(court)||court;
+    const p=palette(group);
+    card.classList.add('v550-a4-court-colored');
+    card.setAttribute('data-a4-court-group',group);
+    card.setAttribute('data-a4-court-label',court);
+    setVars(card,p);
+    card.querySelectorAll('.v435-group-head,.v438-group-head').forEach(h=>{
+      setVars(h,p);
+      inlineImportant(h,'background',`linear-gradient(90deg, ${p.main}, ${p.main2||p.main})`);
+      inlineImportant(h,'color','#ffffff');
+      inlineImportant(h,'border-bottom-color',p.border);
+      inlineImportant(h,'-webkit-print-color-adjust','exact');
+      inlineImportant(h,'print-color-adjust','exact');
+    });
+    card.querySelectorAll('.v435-court-badge,.v438-order-badge,.v438-time-badge').forEach(b=>{
+      setVars(b,p);
+      inlineImportant(b,'background','rgba(255,255,255,.94)');
+      inlineImportant(b,'color',p.main);
+      inlineImportant(b,'border-color','rgba(255,255,255,.72)');
+      inlineImportant(b,'font-weight','1000');
+    });
+    card.querySelectorAll('.v435-team-no').forEach(n=>{
+      inlineImportant(n,'background',p.main);
+      inlineImportant(n,'color','#ffffff');
+      inlineImportant(n,'-webkit-print-color-adjust','exact');
+      inlineImportant(n,'print-color-adjust','exact');
+    });
+    card.querySelectorAll('.v435-group-body').forEach(b=>{
+      inlineImportant(b,'background',`linear-gradient(180deg, rgba(255,255,255,.86), ${p.soft})`);
+    });
+    card.querySelectorAll('.v435-team-row').forEach(r=>{
+      inlineImportant(r,'background','rgba(255,255,255,.92)');
+      inlineImportant(r,'border-color',p.border);
+      inlineImportant(r,'padding','3px 5px');
+      inlineImportant(r,'gap','5px');
+    });
+    card.querySelectorAll('.v435-team-name').forEach(n=>{
+      inlineImportant(n,'font-size','7.1px');
+      inlineImportant(n,'line-height','1.05');
+      inlineImportant(n,'white-space','nowrap');
+      inlineImportant(n,'overflow','hidden');
+      inlineImportant(n,'text-overflow','ellipsis');
+    });
+    card.querySelectorAll('.v435-team-sub').forEach(sub=>{
+      inlineImportant(sub,'display','block');
+      inlineImportant(sub,'font-size','4.85px');
+      inlineImportant(sub,'line-height','1.03');
+      inlineImportant(sub,'max-height','10.2px');
+      inlineImportant(sub,'overflow','hidden');
+      inlineImportant(sub,'white-space','normal');
+      inlineImportant(sub,'word-break','keep-all');
+      inlineImportant(sub,'overflow-wrap','anywhere');
+      inlineImportant(sub,'letter-spacing','-.07em');
+      inlineImportant(sub,'font-weight','800');
+      inlineImportant(sub,'color','#253244');
+    });
+  }
+  function applyA4CourtColors(root){
+    try{
+      const scope=root||document;
+      scope.querySelectorAll('.v435-group-card').forEach(colorCard);
+      scope.querySelectorAll('.v435-a4-page,.v432-a4-page,.v435-a4-root,.v442-a4-sheet,.v443-a4-sheet').forEach(el=>el.classList.add('v550-a4-court-colored-root'));
+    }catch(e){try{console.warn('[v550] A4 court color skipped',e);}catch(_e){}}
+    return root;
+  }
+  window.v550ApplyA4CourtColors=applyA4CourtColors;
+  function wrapTool(ns){
+    try{
+      const tool=window[ns];
+      if(!tool||typeof tool.buildSheet!=='function'||tool.__v550A4Wrapped) return;
+      const orig=tool.buildSheet;
+      tool.buildSheet=function(){
+        const sheet=orig.apply(this,arguments);
+        return sheet?applyA4CourtColors(sheet):sheet;
+      };
+      tool.__v550A4Wrapped=true;
+    }catch(e){}
+  }
+  function wrapAll(){wrapTool('v437A4Tools');wrapTool('v435A4Tools');}
+  document.addEventListener('DOMContentLoaded',()=>{setTimeout(wrapAll,50);setTimeout(wrapAll,500);});
+  setTimeout(wrapAll,0);
+  // 미리보기/출력 루트가 새로 만들어질 때도 색상 재적용. v444 출력 함수가 헤더를 남색으로 덮은 뒤 다시 복구한다.
+  try{
+    new MutationObserver(function(muts){
+      let need=false;
+      for(const m of muts){
+        for(const n of m.addedNodes){
+          if(n.nodeType===1 && (n.id==='v443PrintRoot'||n.id==='v440A4PreviewOverlay'||(n.querySelector&&n.querySelector('.v435-group-card')))) need=true;
+        }
+      }
+      if(need){
+        setTimeout(()=>applyA4CourtColors(document),20);
+        setTimeout(()=>applyA4CourtColors(document),120);
+      }
+    }).observe(document.body,{childList:true,subtree:true});
+  }catch(e){}
+  const oldSheet=window.exportPrelimSheet;
+  if(typeof oldSheet==='function' && !oldSheet.__v550Wrapped){
+    const fn=function(){const r=oldSheet.apply(this,arguments); setTimeout(()=>applyA4CourtColors(document),80); setTimeout(()=>applyA4CourtColors(document),300); return r;};
+    fn.__v550Wrapped=true; window.exportPrelimSheet=fn;
+  }
 })();
 </'+'script>
 
@@ -50492,5 +51295,422 @@ window.manualRefreshPlayers=manualRefreshPlayers;
   try{new MutationObserver(()=>{clearTimeout(window.__v543CourtBtnTimer);window.__v543CourtBtnTimer=setTimeout(fixAll,80);}).observe(document.body,{childList:true,subtree:true});}catch(e){}
 })();
 </script>
+
+
+<style id="v549CourtVenueCardColorStyle">
+/* v549: 시합 카드 구장별 색상 구분 */
+.court-venue-colored-card{
+  position:relative !important;
+  border-color:var(--court-border,#d5dbea) !important;
+  background:
+    linear-gradient(180deg,rgba(255,255,255,.94),rgba(255,255,255,.88)),
+    linear-gradient(135deg,var(--court-soft,#f8fafc),#fff) !important;
+  box-shadow:0 8px 20px rgba(15,30,58,.11) !important;
+}
+.court-venue-colored-card::before{
+  content:"";
+  position:absolute;
+  left:0;top:0;bottom:0;
+  width:7px;
+  background:var(--court-main,#d4a017);
+  z-index:1;
+  pointer-events:none;
+}
+.indiv-prelim-grid .grp-card.court-venue-colored-card .grp-hdr{
+  border-left-color:var(--court-main,#d4a017) !important;
+  background:linear-gradient(90deg,var(--court-soft,#fff7dd),#ffffff) !important;
+}
+.indiv-prelim-grid .grp-card.court-venue-colored-card .grp-hdr > div:first-child > span:first-child{
+  color:var(--court-main,#d4a017) !important;
+}
+.court-venue-badge{
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  min-height:24px !important;
+  padding:4px 9px !important;
+  border-radius:999px !important;
+  background:var(--court-main,#d4a017) !important;
+  color:#fff !important;
+  border:1px solid var(--court-border,#d4a017) !important;
+  box-shadow:0 4px 10px rgba(15,30,58,.10) !important;
+  font-weight:1000 !important;
+  line-height:1 !important;
+}
+.court-venue-badge-subtle{
+  background:var(--court-soft,#f8fafc) !important;
+  color:var(--court-main,#0f1e3a) !important;
+  border:1px solid var(--court-border,#d5dbea) !important;
+}
+@media(max-width:680px){
+  .court-venue-colored-card::before{width:6px;}
+  .court-venue-badge{min-height:22px !important;padding:3px 7px !important;font-size:.68rem !important;}
+}
+</style>
+<script id="v549CourtVenueCardColorScript">
+(function(){
+  const PALETTE=[
+    {main:'#2563eb',soft:'#eff6ff',border:'#93c5fd'},
+    {main:'#16a34a',soft:'#f0fdf4',border:'#86efac'},
+    {main:'#dc2626',soft:'#fff1f2',border:'#fca5a5'},
+    {main:'#9333ea',soft:'#faf5ff',border:'#d8b4fe'},
+    {main:'#ea580c',soft:'#fff7ed',border:'#fdba74'},
+    {main:'#0891b2',soft:'#ecfeff',border:'#67e8f9'},
+    {main:'#4f46e5',soft:'#eef2ff',border:'#a5b4fc'},
+    {main:'#be123c',soft:'#fff1f2',border:'#fda4af'},
+    {main:'#0f766e',soft:'#f0fdfa',border:'#5eead4'},
+    {main:'#ca8a04',soft:'#fefce8',border:'#fde047'}
+  ];
+  const FIXED={
+    '국제':0,'장유국제':0,
+    '능동':1,'장유능동':1,
+    '월든섬':2,'월든섬(인조)':2,'인조':2,
+    '금병':3,
+    '신삼계':4,
+    '구삼계':5,
+    '삼계':6,
+    '원도심':7,
+    '동부':8
+  };
+  function hash(s){let h=0; for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))|0; return Math.abs(h);}
+  function normText(el){return String((el&&el.textContent)||'').replace(/\s+/g,' ').trim();}
+  function extractCourt(raw){
+    raw=String(raw||'').replace(/\s+/g,' ');
+    const pats=[
+      /경기코트\s*[:：]?\s*([가-힣A-Za-z0-9()_-]+\d+)/,
+      /배정코트\s*[:：]?\s*([가-힣A-Za-z0-9()_-]+\d+)/,
+      /코트\s*[:：]?\s*([가-힣A-Za-z0-9()_-]+\d+)/,
+      /(장유국제\d+|국제\d+|장유능동\d+|능동\d+|월든섬\(인조\)\d+|월든섬\d+|금병\d+|신삼계\d+|구삼계\d+|삼계\d+|원도심\d+|동부\d+)/
+    ];
+    for(const re of pats){const m=raw.match(re); if(m&&m[1]) return m[1];}
+    return '';
+  }
+  function groupFromCourt(court){
+    let g=String(court||'').trim();
+    if(!g) return '';
+    g=g.replace(/[\s_-]*\d+$/,'').trim();
+    if(/^장유국제/.test(g)) return '국제';
+    if(/^장유능동/.test(g)) return '능동';
+    if(/^월든섬/.test(g)) return '월든섬';
+    return g || court;
+  }
+  function paletteFor(group){
+    const idx=(Object.prototype.hasOwnProperty.call(FIXED,group)?FIXED[group]:hash(group)%PALETTE.length);
+    return PALETTE[idx%PALETTE.length];
+  }
+  function setVars(el,p){
+    el.style.setProperty('--court-main',p.main);
+    el.style.setProperty('--court-soft',p.soft);
+    el.style.setProperty('--court-border',p.border);
+  }
+  function colorChip(el, group, court){
+    if(!el) return;
+    const t=normText(el);
+    if(!/(경기코트|배정코트|코트|국제|능동|월든섬|금병|삼계|원도심|동부)/.test(t)) return;
+    const targetCourt=court || extractCourt(t);
+    if(!targetCourt) return;
+    const g=groupFromCourt(targetCourt) || group;
+    const p=paletteFor(g);
+    el.classList.add('court-venue-badge');
+    el.title=`${g} 구장`;
+    setVars(el,p);
+  }
+  function colorCard(card){
+    if(!card) return;
+    const raw=normText(card);
+    const court=extractCourt(raw);
+    if(!court){
+      card.classList.remove('court-venue-colored-card');
+      card.removeAttribute('data-court-group');
+      return;
+    }
+    const group=groupFromCourt(court);
+    const p=paletteFor(group);
+    card.classList.add('court-venue-colored-card');
+    card.setAttribute('data-court-group',group);
+    card.setAttribute('data-court-label',court);
+    setVars(card,p);
+    card.querySelectorAll('button,span,div').forEach(el=>{
+      if(el===card) return;
+      colorChip(el,group,court);
+    });
+  }
+  function applyCourtVenueCardColors(){
+    try{
+      document.querySelectorAll('.indiv-prelim-grid .grp-card, .indiv-prelim-grid .m3card, .indiv-prelim-grid .match-card, #matchListPopup .mlp-card').forEach(colorCard);
+      document.querySelectorAll('.court-drop-zone, .court-wait-card, .shared-wait-stack .court-wait-card').forEach(colorCard);
+    }catch(e){try{console.warn('[v549] court venue card color skipped',e)}catch(_e){}}
+  }
+  window.applyCourtVenueCardColors=applyCourtVenueCardColors;
+  document.addEventListener('DOMContentLoaded',()=>{setTimeout(applyCourtVenueCardColors,120);setTimeout(applyCourtVenueCardColors,700);setTimeout(applyCourtVenueCardColors,1600);});
+  document.addEventListener('click',()=>setTimeout(applyCourtVenueCardColors,120),true);
+  try{new MutationObserver(()=>{clearTimeout(window.__v549CourtColorTimer);window.__v549CourtColorTimer=setTimeout(applyCourtVenueCardColors,120);}).observe(document.body,{childList:true,subtree:true,characterData:true});}catch(e){}
+})();
+</script>
+
+
+
+<style id="v550A4CourtColorAndClubFitStyle">
+/* v550: A4 예선대진표 출력/이미지/PDF에서도 코트 구장별 색상 구분 + 클럽명 가독성 보정 */
+.v550-a4-court-colored .v435-group-card,
+.v550-a4-court-colored.v435-group-card{
+  border-color:var(--a4-court-border,#cbd5e1) !important;
+  background:linear-gradient(180deg,var(--a4-court-soft,#f8fafc),#ffffff) !important;
+  -webkit-print-color-adjust:exact !important;
+  print-color-adjust:exact !important;
+}
+.v550-a4-court-colored .v435-group-head,
+.v550-a4-court-colored .v438-group-head,
+.v550-a4-court-colored.v435-group-card .v435-group-head,
+.v550-a4-court-colored.v435-group-card .v438-group-head{
+  background:linear-gradient(90deg,var(--a4-court-main,#0f1e3a),var(--a4-court-main2,#1e3a8a)) !important;
+  color:#fff !important;
+  border-bottom:1px solid var(--a4-court-border,#cbd5e1) !important;
+  -webkit-print-color-adjust:exact !important;
+  print-color-adjust:exact !important;
+}
+.v550-a4-court-colored .v435-court-badge,
+.v550-a4-court-colored .v438-order-badge,
+.v550-a4-court-colored .v438-time-badge,
+.v550-a4-court-colored.v435-group-card .v435-court-badge,
+.v550-a4-court-colored.v435-group-card .v438-order-badge,
+.v550-a4-court-colored.v435-group-card .v438-time-badge{
+  background:rgba(255,255,255,.94) !important;
+  color:var(--a4-court-main,#0f1e3a) !important;
+  border-color:rgba(255,255,255,.72) !important;
+  font-weight:1000 !important;
+  -webkit-print-color-adjust:exact !important;
+  print-color-adjust:exact !important;
+}
+.v550-a4-court-colored .v435-group-body,
+.v550-a4-court-colored.v435-group-card .v435-group-body{
+  background:linear-gradient(180deg,rgba(255,255,255,.86),var(--a4-court-soft,#f8fafc)) !important;
+  -webkit-print-color-adjust:exact !important;
+  print-color-adjust:exact !important;
+}
+.v550-a4-court-colored .v435-team-row,
+.v550-a4-court-colored.v435-group-card .v435-team-row{
+  background:rgba(255,255,255,.92) !important;
+  border-color:var(--a4-court-border,#dbeafe) !important;
+  -webkit-print-color-adjust:exact !important;
+  print-color-adjust:exact !important;
+}
+.v550-a4-court-colored .v435-team-no,
+.v550-a4-court-colored.v435-group-card .v435-team-no{
+  background:var(--a4-court-main,#0f1e3a) !important;
+  color:#fff !important;
+  -webkit-print-color-adjust:exact !important;
+  print-color-adjust:exact !important;
+}
+.v550-a4-court-colored .v435-head-left,
+.v550-a4-court-colored .v438-group-name,
+.v550-a4-court-colored.v435-group-card .v435-head-left,
+.v550-a4-court-colored.v435-group-card .v438-group-name{
+  color:#fff !important;
+}
+/* 클럽명/소속이 잘리지 않도록 이름은 유지, 하단 소속은 더 작고 2줄까지 허용 */
+.v550-a4-court-colored .v435-team-name,
+.v550-a4-court-colored.v435-group-card .v435-team-name{
+  font-size:7.1px !important;
+  line-height:1.05 !important;
+  margin-bottom:1px !important;
+  white-space:nowrap !important;
+  overflow:hidden !important;
+  text-overflow:ellipsis !important;
+  font-weight:1000 !important;
+}
+.v550-a4-court-colored .v435-team-sub,
+.v550-a4-court-colored.v435-group-card .v435-team-sub{
+  display:block !important;
+  font-size:4.85px !important;
+  line-height:1.03 !important;
+  max-height:10.2px !important;
+  overflow:hidden !important;
+  white-space:normal !important;
+  word-break:keep-all !important;
+  overflow-wrap:anywhere !important;
+  color:#253244 !important;
+  font-weight:800 !important;
+  letter-spacing:-.07em !important;
+}
+.v550-a4-court-colored .v435-team-row,
+.v550-a4-court-colored.v435-group-card .v435-team-row{
+  padding:3px 5px !important;
+  gap:5px !important;
+}
+@media print{
+  .v550-a4-court-colored,
+  .v550-a4-court-colored *{
+    -webkit-print-color-adjust:exact !important;
+    print-color-adjust:exact !important;
+    color-adjust:exact !important;
+  }
+}
+</style>
+<script id="v550A4CourtColorAndClubFitScript">
+(function(){
+  'use strict';
+  const PALETTE={
+    '국제':{main:'#2563eb',main2:'#1e40af',soft:'#eff6ff',border:'#93c5fd'},
+    '능동':{main:'#16a34a',main2:'#166534',soft:'#f0fdf4',border:'#86efac'},
+    '월든섬':{main:'#dc2626',main2:'#991b1b',soft:'#fff1f2',border:'#fca5a5'},
+    '월든섬(인조)':{main:'#dc2626',main2:'#991b1b',soft:'#fff1f2',border:'#fca5a5'},
+    '공유':{main:'#9333ea',main2:'#6b21a8',soft:'#faf5ff',border:'#d8b4fe'},
+    '공유(클레이)':{main:'#9333ea',main2:'#6b21a8',soft:'#faf5ff',border:'#d8b4fe'},
+    '금병':{main:'#ea580c',main2:'#9a3412',soft:'#fff7ed',border:'#fdba74'},
+    '삼계':{main:'#0891b2',main2:'#155e75',soft:'#ecfeff',border:'#67e8f9'},
+    '신삼계':{main:'#0891b2',main2:'#155e75',soft:'#ecfeff',border:'#67e8f9'},
+    '구삼계':{main:'#4f46e5',main2:'#3730a3',soft:'#eef2ff',border:'#a5b4fc'},
+    '원도심':{main:'#be123c',main2:'#881337',soft:'#fff1f2',border:'#fda4af'},
+    '동부':{main:'#0f766e',main2:'#115e59',soft:'#f0fdfa',border:'#5eead4'}
+  };
+  const FALLBACK=[
+    {main:'#2563eb',main2:'#1e40af',soft:'#eff6ff',border:'#93c5fd'},
+    {main:'#16a34a',main2:'#166534',soft:'#f0fdf4',border:'#86efac'},
+    {main:'#dc2626',main2:'#991b1b',soft:'#fff1f2',border:'#fca5a5'},
+    {main:'#9333ea',main2:'#6b21a8',soft:'#faf5ff',border:'#d8b4fe'},
+    {main:'#ea580c',main2:'#9a3412',soft:'#fff7ed',border:'#fdba74'},
+    {main:'#0891b2',main2:'#155e75',soft:'#ecfeff',border:'#67e8f9'},
+    {main:'#4f46e5',main2:'#3730a3',soft:'#eef2ff',border:'#a5b4fc'},
+    {main:'#be123c',main2:'#881337',soft:'#fff1f2',border:'#fda4af'},
+    {main:'#0f766e',main2:'#115e59',soft:'#f0fdfa',border:'#5eead4'},
+    {main:'#ca8a04',main2:'#854d0e',soft:'#fefce8',border:'#fde047'}
+  ];
+  function hash(s){let h=0; s=String(s||''); for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))|0; return Math.abs(h);}
+  function text(el){return String((el&&el.textContent)||'').replace(/\s+/g,' ').trim();}
+  function extractCourt(raw){
+    raw=String(raw||'').replace(/\s+/g,' ');
+    const m=raw.match(/(월든섬\(인조\)\d+|공유\(클레이\)\d+|장유국제\d+|국제\d+|장유능동\d+|능동\d+|월든섬\d+|공유\d+|금병\d+|신삼계\d+|구삼계\d+|삼계\d+|원도심\d+|동부\d+)/)
+      || raw.match(/(?:경기코트|배정코트|코트|🎾)\s*[:：]?\s*([가-힣A-Za-z()_-]+\d+)/);
+    return m&&m[1]?m[1]:'';
+  }
+  function groupFromCourt(court){
+    let g=String(court||'').trim().replace(/[\s_-]*\d+$/,'').trim();
+    if(/^장유국제/.test(g)) return '국제';
+    if(/^장유능동/.test(g)) return '능동';
+    if(/^월든섬\(인조\)/.test(g)) return '월든섬(인조)';
+    if(/^월든섬/.test(g)) return '월든섬';
+    if(/^공유\(클레이\)/.test(g)) return '공유(클레이)';
+    if(/^공유/.test(g)) return '공유';
+    if(/^신삼계/.test(g)) return '신삼계';
+    if(/^구삼계/.test(g)) return '구삼계';
+    return g;
+  }
+  function palette(group){return PALETTE[group] || FALLBACK[hash(group)%FALLBACK.length];}
+  function setVars(el,p){
+    el.style.setProperty('--a4-court-main',p.main);
+    el.style.setProperty('--a4-court-main2',p.main2||p.main);
+    el.style.setProperty('--a4-court-soft',p.soft);
+    el.style.setProperty('--a4-court-border',p.border);
+  }
+  function inlineImportant(el, prop, val){try{el.style.setProperty(prop,val,'important');}catch(e){}}
+  function colorCard(card){
+    if(!card) return;
+    const court=extractCourt(text(card));
+    if(!court) return;
+    const group=groupFromCourt(court)||court;
+    const p=palette(group);
+    card.classList.add('v550-a4-court-colored');
+    card.setAttribute('data-a4-court-group',group);
+    card.setAttribute('data-a4-court-label',court);
+    setVars(card,p);
+    card.querySelectorAll('.v435-group-head,.v438-group-head').forEach(h=>{
+      setVars(h,p);
+      inlineImportant(h,'background',`linear-gradient(90deg, ${p.main}, ${p.main2||p.main})`);
+      inlineImportant(h,'color','#ffffff');
+      inlineImportant(h,'border-bottom-color',p.border);
+      inlineImportant(h,'-webkit-print-color-adjust','exact');
+      inlineImportant(h,'print-color-adjust','exact');
+    });
+    card.querySelectorAll('.v435-court-badge,.v438-order-badge,.v438-time-badge').forEach(b=>{
+      setVars(b,p);
+      inlineImportant(b,'background','rgba(255,255,255,.94)');
+      inlineImportant(b,'color',p.main);
+      inlineImportant(b,'border-color','rgba(255,255,255,.72)');
+      inlineImportant(b,'font-weight','1000');
+    });
+    card.querySelectorAll('.v435-team-no').forEach(n=>{
+      inlineImportant(n,'background',p.main);
+      inlineImportant(n,'color','#ffffff');
+      inlineImportant(n,'-webkit-print-color-adjust','exact');
+      inlineImportant(n,'print-color-adjust','exact');
+    });
+    card.querySelectorAll('.v435-group-body').forEach(b=>{
+      inlineImportant(b,'background',`linear-gradient(180deg, rgba(255,255,255,.86), ${p.soft})`);
+    });
+    card.querySelectorAll('.v435-team-row').forEach(r=>{
+      inlineImportant(r,'background','rgba(255,255,255,.92)');
+      inlineImportant(r,'border-color',p.border);
+      inlineImportant(r,'padding','3px 5px');
+      inlineImportant(r,'gap','5px');
+    });
+    card.querySelectorAll('.v435-team-name').forEach(n=>{
+      inlineImportant(n,'font-size','7.1px');
+      inlineImportant(n,'line-height','1.05');
+      inlineImportant(n,'white-space','nowrap');
+      inlineImportant(n,'overflow','hidden');
+      inlineImportant(n,'text-overflow','ellipsis');
+    });
+    card.querySelectorAll('.v435-team-sub').forEach(sub=>{
+      inlineImportant(sub,'display','block');
+      inlineImportant(sub,'font-size','4.85px');
+      inlineImportant(sub,'line-height','1.03');
+      inlineImportant(sub,'max-height','10.2px');
+      inlineImportant(sub,'overflow','hidden');
+      inlineImportant(sub,'white-space','normal');
+      inlineImportant(sub,'word-break','keep-all');
+      inlineImportant(sub,'overflow-wrap','anywhere');
+      inlineImportant(sub,'letter-spacing','-.07em');
+      inlineImportant(sub,'font-weight','800');
+      inlineImportant(sub,'color','#253244');
+    });
+  }
+  function applyA4CourtColors(root){
+    try{
+      const scope=root||document;
+      scope.querySelectorAll('.v435-group-card').forEach(colorCard);
+      scope.querySelectorAll('.v435-a4-page,.v432-a4-page,.v435-a4-root,.v442-a4-sheet,.v443-a4-sheet').forEach(el=>el.classList.add('v550-a4-court-colored-root'));
+    }catch(e){try{console.warn('[v550] A4 court color skipped',e);}catch(_e){}}
+    return root;
+  }
+  window.v550ApplyA4CourtColors=applyA4CourtColors;
+  function wrapTool(ns){
+    try{
+      const tool=window[ns];
+      if(!tool||typeof tool.buildSheet!=='function'||tool.__v550A4Wrapped) return;
+      const orig=tool.buildSheet;
+      tool.buildSheet=function(){
+        const sheet=orig.apply(this,arguments);
+        return sheet?applyA4CourtColors(sheet):sheet;
+      };
+      tool.__v550A4Wrapped=true;
+    }catch(e){}
+  }
+  function wrapAll(){wrapTool('v437A4Tools');wrapTool('v435A4Tools');}
+  document.addEventListener('DOMContentLoaded',()=>{setTimeout(wrapAll,50);setTimeout(wrapAll,500);});
+  setTimeout(wrapAll,0);
+  // 미리보기/출력 루트가 새로 만들어질 때도 색상 재적용. v444 출력 함수가 헤더를 남색으로 덮은 뒤 다시 복구한다.
+  try{
+    new MutationObserver(function(muts){
+      let need=false;
+      for(const m of muts){
+        for(const n of m.addedNodes){
+          if(n.nodeType===1 && (n.id==='v443PrintRoot'||n.id==='v440A4PreviewOverlay'||(n.querySelector&&n.querySelector('.v435-group-card')))) need=true;
+        }
+      }
+      if(need){
+        setTimeout(()=>applyA4CourtColors(document),20);
+        setTimeout(()=>applyA4CourtColors(document),120);
+      }
+    }).observe(document.body,{childList:true,subtree:true});
+  }catch(e){}
+  const oldSheet=window.exportPrelimSheet;
+  if(typeof oldSheet==='function' && !oldSheet.__v550Wrapped){
+    const fn=function(){const r=oldSheet.apply(this,arguments); setTimeout(()=>applyA4CourtColors(document),80); setTimeout(()=>applyA4CourtColors(document),300); return r;};
+    fn.__v550Wrapped=true; window.exportPrelimSheet=fn;
+  }
+})();
+</script>
+
 </body>
 </html>
