@@ -49724,5 +49724,146 @@ window.manualRefreshPlayers=manualRefreshPlayers;
   try{new MutationObserver(rebuildMenu).observe(document.body,{childList:true,subtree:true});}catch(e){}
 })();
 </script>
+
+
+<!-- v573: 결과 저장 후 코트 승격/대기 문자 승인창 복구 -->
+<script id="v573ResultSmsAlertRestoredScript">
+(function(){
+  'use strict';
+  const PATCH='v573-result-sms-alert-restored';
+  const RECENT_KEY='v573.recentResultSmsKeys.v1';
+  const RECENT_TTL=1000*60*5;
+  function norm(v){ return String(v==null?'':v).trim(); }
+  function now(){ return Date.now(); }
+  function canManage(){
+    try{ if(typeof canManageBracket==='function' && canManageBracket()) return true; }catch(e){}
+    try{ if(window.AD||window.TM||window.OP||AD||TM||OP) return true; }catch(e){}
+    return false;
+  }
+  function getState(){
+    try{ return (typeof buildCourtNotificationStateMap==='function') ? (buildCourtNotificationStateMap((window.G&&G.matches)||{})||{}) : {}; }
+    catch(e){ console.warn('[v573] state build failed',e); return {}; }
+  }
+  function loadRecent(){
+    try{
+      const m=JSON.parse(sessionStorage.getItem(RECENT_KEY)||'{}')||{};
+      const cut=now()-RECENT_TTL;
+      Object.keys(m).forEach(k=>{ if(Number(m[k]||0)<cut) delete m[k]; });
+      return m;
+    }catch(e){ return {}; }
+  }
+  function wasRecent(k){ const m=loadRecent(); return !!m[norm(k)]; }
+  function markRecent(k){
+    k=norm(k); if(!k) return;
+    const m=loadRecent(); m[k]=now();
+    try{ sessionStorage.setItem(RECENT_KEY, JSON.stringify(m)); }catch(e){}
+  }
+  function autoSmsAllowed(kind){
+    try{ if(typeof getAutoSmsSettings==='function' && !getAutoSmsSettings().enabled) return false; }catch(e){}
+    try{ if(typeof isAutoSmsEnabled==='function' && !isAutoSmsEnabled(kind)) return false; }catch(e){}
+    return true;
+  }
+  function changedCourts(prev,next){
+    const courts=new Set();
+    try{
+      Object.entries(prev||{}).forEach(([mid,p])=>{
+        if(!p || p.status!=='current' || !p.court) return;
+        const n=(next||{})[mid];
+        const prevWinner = p.match && p.match.winner!=null;
+        const nextWinner = n && n.match && n.match.winner!=null;
+        const noLongerCurrent = !n || n.status!=='current' || String(n.court||'')!==String(p.court||'');
+        if(prevWinner || nextWinner || noLongerCurrent) courts.add(String(p.court||''));
+      });
+      // saveM3Core에서 남긴 방금 종료 코트가 있으면 보조로 사용
+      (window.__V536_RESULT_FINISHED_COURTS||[]).forEach(c=>{ if(norm(c)) courts.add(norm(c)); });
+    }catch(e){ console.warn('[v573] changed court detect failed',e); }
+    return courts;
+  }
+  function makeKey(kind,it){
+    const mid=String(it.matchId || it.mid || (it.match&&(it.match.id||it.match._id)) || '');
+    return ['v573sms',kind,it.tid||'',it.div||'',mid,it.court||'',it.queuePos||0].map(norm).join('|');
+  }
+  function buildPayload(kind,it){
+    try{
+      if(!it || !it.match || it.match.winner!=null) return null;
+      if(typeof buildCourtNotificationApprovalPayload!=='function') return null;
+      const meta={court:it.court,queuePos:Number(it.queuePos||0)||0,tid:it.tid,div:it.div,hasCurrent:!!it.hasCurrent,estimatedTimeText:it.estimatedTimeText||''};
+      const p=buildCourtNotificationApprovalPayload(kind,it.key,it.match,meta);
+      const key=makeKey(kind,it);
+      p.actionType='sms_approval';
+      p.smsKind=kind;
+      p.kind='court_sms';
+      p.dedupeKey=key;
+      p.matchId=String(it.matchId || it.mid || (it.match&&(it.match.id||it.match._id)) || p.matchId || '');
+      p.court=String(it.court||'');
+      p.queuePos=Number(it.queuePos||0)||0;
+      p.side='left';
+      if(kind==='match_started') p.title='🎾 경기 시작 문자';
+      else p.title='⏳ 코트 대기 변경 문자';
+      return p;
+    }catch(e){ console.warn('[v573] payload build failed',e); return null; }
+  }
+  function enqueuePayload(p){
+    try{
+      if(!p || !p.dedupeKey) return false;
+      if(wasRecent(p.dedupeKey)) return false;
+      if(!autoSmsAllowed(p.smsKind)) return false;
+      // 이전 v538 active 키가 남아 있더라도 결과 저장 직후 문자창은 반드시 떠야 하므로 v573 키는 세션 기준으로만 중복 차단한다.
+      markRecent(p.dedupeKey);
+      if(typeof enqueueStickyAlert==='function'){
+        enqueueStickyAlert(p,'info');
+        if(typeof markCompleteSticky==='function') setTimeout(markCompleteSticky,30);
+        return true;
+      }
+    }catch(e){ console.warn('[v573] enqueue failed',e); }
+    return false;
+  }
+  function processAfterResult(prev,next){
+    try{
+      if(!canManage()) return;
+      const courts=changedCourts(prev,next);
+      if(!courts.size) return;
+      const items=Object.entries(next||{}).map(([mid,it])=>Object.assign({matchId:mid},it||{}))
+        .filter(it=>it && it.court && courts.has(String(it.court)) && it.match && it.match.winner==null);
+      // 1) 새로 올라온 현재 경기 먼저
+      items.filter(it=>it.status==='current').forEach(it=>{
+        const old=(prev||{})[String(it.matchId)]||null;
+        if(!old || old.status!=='current' || String(old.court||'')!==String(it.court||'')) enqueuePayload(buildPayload('match_started',it));
+      });
+      // 2) 대기카드 순서 변경/승격 보조 알림
+      items.filter(it=>it.status==='waiting').sort((a,b)=>(Number(a.queuePos||0)-Number(b.queuePos||0))).forEach(it=>{
+        const old=(prev||{})[String(it.matchId)]||null;
+        const oldPos=old?Number(old.queuePos||0):0;
+        const newPos=Number(it.queuePos||0)||0;
+        if(!old || old.status!=='waiting' || String(old.court||'')!==String(it.court||'') || oldPos!==newPos){
+          enqueuePayload(buildPayload('court_changed',it));
+        }
+      });
+    }catch(e){ console.warn('[v573] result sms process failed',e); }
+  }
+  function wrapSaveM3(){
+    try{
+      const old=window.saveM3 || (typeof saveM3==='function' ? saveM3 : null);
+      if(typeof old!=='function' || old.__v573Wrapped) return;
+      const fn=async function(){
+        const prev=getState();
+        const r=await old.apply(this,arguments);
+        // stM/persist 후 DOM 렌더와 메모리 반영이 약간 늦는 경우가 있어 3회 확인한다.
+        [80,350,900].forEach(ms=>setTimeout(()=>processAfterResult(prev,getState()),ms));
+        return r;
+      };
+      fn.__v573Wrapped=true;
+      window.saveM3=fn;
+      try{ saveM3=fn; }catch(e){}
+    }catch(e){ console.warn('[v573] saveM3 wrap failed',e); }
+  }
+  function wire(){ wrapSaveM3(); }
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(wire,50));
+  setTimeout(wire,0);
+  setTimeout(wire,1000);
+  window.v573ProcessResultSmsAlerts=function(){ processAfterResult({},getState()); };
+})();
+</script>
+
 </body>
 </html>
