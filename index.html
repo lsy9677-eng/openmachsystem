@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-03-v526-register-clean";
+  const APP_VERSION = "2026-06-04-v531-notification-full-off";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -7392,6 +7392,8 @@ button:disabled{opacity:.55!important;cursor:not-allowed!important;filter:graysc
 <button class="scroll-top" id="stBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
 <script type="module">
 'use strict';
+// v531: 알림 기능 완전 비활성화 플래그 (Firestore 알림 읽기/쓰기/푸시 차단)
+window.__NOTIFICATIONS_HARD_OFF = true;
 // ── 현재 연도 (매년 자동 갱신 - 코드 수정 불필요) ──
 const REG_YEAR = new Date().getFullYear(); // 2026, 2027, 2028...
 // ── 대회 편집 복식 수 헬퍼 ──
@@ -8589,6 +8591,7 @@ async function ensureFcmServiceWorker(){
   }
 }
 async function saveCurrentFcmToken(token){
+  if(window.__NOTIFICATIONS_HARD_OFF) return false;
   const user=auth.currentUser || CURRENT_APP_USER;
   const uid=user?.uid || '';
   if(!uid || user?.isAnonymous){
@@ -8643,6 +8646,7 @@ function setPushActionButtonsBusy(isBusy=false, label='처리중...'){
 }
 
 async function disableCurrentUserPushTokens(reason='user_disabled'){
+  if(window.__NOTIFICATIONS_HARD_OFF) return 0;
   const u=auth.currentUser || CURRENT_APP_USER;
   if(!u || u.isAnonymous) return 0;
   let count=0;
@@ -8683,6 +8687,7 @@ function isPushUserExplicitlyOptedOut(){
   }catch(e){ return false; }
 }
 async function autoReconnectPushIfNeeded(reason='auto'){
+  if(window.__NOTIFICATIONS_HARD_OFF) return false;
   try{
     const u=auth.currentUser || CURRENT_APP_USER;
     if(!u || u.isAnonymous) return false;
@@ -8707,6 +8712,7 @@ try{
 }catch(e){}
 
 async function refreshCurrentFcmToken(reason='manual') {
+  if(window.__NOTIFICATIONS_HARD_OFF) return false;
   const user = auth.currentUser || CURRENT_APP_USER;
   if(!user || user.isAnonymous) return false;
   try{
@@ -8743,6 +8749,7 @@ async function refreshCurrentFcmToken(reason='manual') {
 window.refreshCurrentFcmToken=refreshCurrentFcmToken;
 
 async function repairMyPushTokenNow(){
+  if(window.__NOTIFICATIONS_HARD_OFF){ try{ toast('알림 기능은 관리자 설정으로 완전히 꺼져 있습니다. 문자로 운영하세요.','info'); }catch(e){} return false; }
   setPushActionButtonsBusy(true,'다시 연결중');
   const ok = await refreshCurrentFcmToken('manual_reconnect');
   setPushActionButtonsBusy(false);
@@ -8766,6 +8773,7 @@ function getMatchNotificationHistory(){
   }catch(e){ return []; }
 }
 function saveMatchNotificationHistory(item={}){
+  if(window.__NOTIFICATIONS_HARD_OFF){ try{ localStorage.setItem(getMatchNotificationHistoryKey(), '[]'); }catch(e){} return ''; }
   try{
     const now=new Date();
     const id=String(item.id||item.notificationId||('ntf_'+now.getTime()+'_'+Math.random().toString(36).slice(2,8)));
@@ -8805,6 +8813,7 @@ function getCurrentNotificationUid(){
 
 window.__notificationAuthStateResolved = !!(auth && auth.currentUser);
 function migrateGuestNotificationHistoryToCurrentUid(){
+  if(window.__NOTIFICATIONS_HARD_OFF) return 0;
   try{
     const uid=getCurrentNotificationUid();
     if(!uid) return 0;
@@ -8829,6 +8838,7 @@ function migrateGuestNotificationHistoryToCurrentUid(){
   }catch(e){ return 0; }
 }
 async function waitForNotificationAuthReady(opts={}){
+  if(window.__NOTIFICATIONS_HARD_OFF) return '';
   try{
     const direct=getCurrentNotificationUid();
     if(direct){ migrateGuestNotificationHistoryToCurrentUid(); return direct; }
@@ -8862,10 +8872,12 @@ async function waitForNotificationAuthReady(opts={}){
   }catch(e){ return ''; }
 }
 async function syncAdminRegistrationNotificationHubToLocalAfterAuth(opts={}){
+  if(window.__NOTIFICATIONS_HARD_OFF) return 0;
   try{ await waitForNotificationAuthReady({timeoutMs:Number(opts.timeoutMs||5000)||5000}); }catch(_e){}
   return syncAdminRegistrationNotificationHubToLocal(opts);
 }
 function scheduleAdminRegistrationHubSyncAfterAuth(reason=''){
+  if(window.__NOTIFICATIONS_HARD_OFF) return;
   try{
     [900, 2400, 5200].forEach((ms)=>{
       setTimeout(()=>syncAdminRegistrationNotificationHubToLocalAfterAuth({limit:200, timeoutMs:5200, reason}).catch(()=>{}), ms);
@@ -8885,6 +8897,7 @@ function notificationInboxDocId(uid='', notificationId=''){
   return 'inbox_'+safeNotificationDocPart(uid)+'_'+safeNotificationDocPart(notificationId);
 }
 async function saveNotificationInboxDocsForTokenDocs(tokenDocs=[], title='230MATCH 알림', body='', data={}, sendResult={}){
+  if(window.__NOTIFICATIONS_HARD_OFF) return 0;
   try{
     const notificationId=String(data.notificationId||data.id||makeClientNotificationId(data));
     const nowText=new Date().toISOString();
@@ -8954,6 +8967,7 @@ function normalizeFirestoreNotificationItem(docSnap){
   };
 }
 async function syncFirestoreNotificationInboxToLocal(){
+  if(window.__NOTIFICATIONS_HARD_OFF){ try{ localStorage.setItem(getMatchNotificationHistoryKey(), '[]'); }catch(e){} try{ updateNotificationInboxBadgesFromCache(); }catch(e){} return 0; }
   try{
     const uid=getCurrentNotificationUid();
     if(!uid){
@@ -8977,6 +8991,7 @@ window.syncFirestoreNotificationInboxToLocal=syncFirestoreNotificationInboxToLoc
 window.updateNotificationInboxBadgesFromCache=updateNotificationInboxBadgesFromCache;
 
 async function markMatchNotificationRead(id){
+  if(window.__NOTIFICATIONS_HARD_OFF) return false;
   try{
     if(!id) return;
     const list=getMatchNotificationHistory();
@@ -8997,6 +9012,7 @@ async function markMatchNotificationRead(id){
   }catch(e){ console.warn('mark notification read failed', e?.message||e); }
 }
 function updateNotificationInboxBadgesFromCache(){
+  if(window.__NOTIFICATIONS_HARD_OFF){ try{ document.querySelectorAll('[data-notification-unread-badge]').forEach(el=>{el.textContent='';el.style.display='none';}); }catch(e){} return; }
   try{
     const unread=getMatchNotificationHistory().filter(x=>x.read!==true).length;
     document.querySelectorAll('[data-notification-unread-badge]').forEach(el=>{
@@ -9007,6 +9023,7 @@ function updateNotificationInboxBadgesFromCache(){
 }
 let __notificationBadgeRefreshTimer=null;
 function updateNotificationInboxBadges(){
+  if(window.__NOTIFICATIONS_HARD_OFF){ try{ updateNotificationInboxBadgesFromCache(); }catch(e){} return; }
   updateNotificationInboxBadgesFromCache();
   try{
     const uid=getCurrentNotificationUid();
@@ -9036,6 +9053,7 @@ function ensureNotificationInboxModal(){
   return modal;
 }
 function renderNotificationInbox(){
+  if(window.__NOTIFICATIONS_HARD_OFF){ try{ const body=ge('notificationInboxBody'); if(body) body.innerHTML='<div class="empty-state" style="padding:34px 12px"><div class="empty-icon">🔕</div><p>알림 기능은 꺼져 있습니다.<br>문자 중심으로 운영하세요.</p></div>'; }catch(e){} return; }
   ensureNotificationInboxModal();
   const body=ge('notificationInboxBody');
   if(!body) return;
@@ -9061,6 +9079,7 @@ function renderNotificationInbox(){
   }).join('');
 }
 async function openNotificationInbox(){
+  if(window.__NOTIFICATIONS_HARD_OFF){ try{ toast('알림 기능은 꺼져 있습니다. 문자로 운영하세요.','info'); }catch(e){} return false; }
   ensureNotificationInboxModal();
   const body=ge('notificationInboxBody');
   if(body) body.innerHTML='<div class="empty-state" style="padding:30px 12px"><div class="empty-icon">🔔</div><p>지난 알림을 불러오는 중...</p></div>';
@@ -9071,6 +9090,7 @@ async function openNotificationInbox(){
   renderNotificationInbox();
 }
 async function markAllMatchNotificationsRead(){
+  if(window.__NOTIFICATIONS_HARD_OFF){ try{ localStorage.setItem(getMatchNotificationHistoryKey(), '[]'); updateNotificationInboxBadgesFromCache(); renderNotificationInbox(); }catch(e){} return; }
   try{
     const uid=getCurrentNotificationUid();
     if(uid){
@@ -9087,6 +9107,7 @@ async function markAllMatchNotificationsRead(){
   }catch(e){ console.warn('mark all notifications read failed', e?.message||e); }
 }
 async function clearMatchNotificationHistory(){
+  if(window.__NOTIFICATIONS_HARD_OFF){ try{ localStorage.setItem(getMatchNotificationHistoryKey(), '[]'); updateNotificationInboxBadgesFromCache(); renderNotificationInbox(); }catch(e){} return; }
   if(!confirm('지난 알림 기록을 삭제할까요?')) return;
   try{
     const uid=getCurrentNotificationUid();
@@ -9102,6 +9123,7 @@ async function clearMatchNotificationHistory(){
   }catch(e){ console.warn('remote notification clear failed', e?.message||e); toast('알림 삭제 중 오류가 발생했습니다','error'); }
 }
 function showReceivedPushConfirmAlert(title='230MATCH 알림', body='', data={}){
+  if(window.__NOTIFICATIONS_HARD_OFF) return;
   try{
     const id=saveMatchNotificationHistory({title, body, data, type:data?.type, matchId:data?.matchId||data?.mid, court:data?.court});
     const wrap=ge('stickyAlertWrap');
@@ -9153,6 +9175,7 @@ function buildNotificationBlockedGuide(){
 }
 
 async function markPushSmsFallback(reason='blocked', msg=''){
+  if(window.__NOTIFICATIONS_HARD_OFF) return false;
   const u=auth.currentUser || CURRENT_APP_USER;
   try{
     localStorage.setItem('matchPushOptOut','1');
@@ -9194,6 +9217,7 @@ async function markPushSmsFallback(reason='blocked', msg=''){
 window.markPushSmsFallback=markPushSmsFallback;
 
 async function requestMatchPushPermission(){
+  if(window.__NOTIFICATIONS_HARD_OFF){ try{ toast('알림 기능은 관리자 설정으로 완전히 꺼져 있습니다. 문자로 운영하세요.','info'); }catch(e){} return false; }
   setPushActionButtonsBusy(true,'켜는중');
   try{
     const user=auth.currentUser || CURRENT_APP_USER;
@@ -9277,6 +9301,7 @@ async function requestMatchPushPermission(){
   }
 }
 async function setupFcmForegroundListener(){
+  if(window.__NOTIFICATIONS_HARD_OFF) return false;
   if(FCM_FOREGROUND_READY) return;
   try{
     const messaging=await getFcmMessagingSafe();
@@ -9309,6 +9334,7 @@ async function setupFcmForegroundListener(){
   }catch(e){ console.warn('foreground messaging not ready',e); }
 }
 function setupServiceWorkerNotificationMessageListener(){
+  if(window.__NOTIFICATIONS_HARD_OFF) return;
   try{
     if(!('serviceWorker' in navigator) || window.__SW_NOTIFICATION_MESSAGE_READY) return;
     window.__SW_NOTIFICATION_MESSAGE_READY=true;
@@ -9327,6 +9353,7 @@ function setupServiceWorkerNotificationMessageListener(){
 }
 setupServiceWorkerNotificationMessageListener();
 function updatePushStatusLabel(){
+  if(window.__NOTIFICATIONS_HARD_OFF){ try{ document.querySelectorAll('#pushStatus,#reqPushStatus,#pushRequiredStatus').forEach(el=>{el.innerHTML='🔕 알림 기능은 꺼져 있습니다. 문자 중심으로 운영하세요.'; el.style.color='#64748b';}); document.querySelectorAll('#pushStateBadge').forEach(b=>{b.textContent='꺼짐'; b.style.background='#f1f5f9'; b.style.color='#475569';}); }catch(e){} return; }
   try{
     const enabled=localStorage.getItem('matchPushEnabled')==='1' || CURRENT_APP_PROFILE?.pushEnabled===true;
     const denied=localStorage.getItem('matchPushOptOut')==='1' || (CURRENT_APP_PROFILE?.pushDenied===true && CURRENT_APP_PROFILE?.pushSetupChoice!=='sms_fallback');
@@ -9536,6 +9563,7 @@ async function setMatchPushOptOut(flag=true){
   }
 }
 async function sendFcmPushToken(token, title, body, data={}){
+  if(window.__NOTIFICATIONS_HARD_OFF) return {ok:false, disabled:true};
   const res=await fetch('/api/send-push',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
@@ -9575,6 +9603,7 @@ async function sendFcmPushToken(token, title, body, data={}){
   return parsed || txt;
 }
 async function markInvalidPushTokenDoc(tokenDoc, reason='UNREGISTERED'){
+  if(window.__NOTIFICATIONS_HARD_OFF) return false;
   try{
     if(!tokenDoc?.id) return;
     await setDoc(doc(db,'pushTokens',tokenDoc.id),{
@@ -9588,6 +9617,7 @@ async function markInvalidPushTokenDoc(tokenDoc, reason='UNREGISTERED'){
   }catch(e){ console.warn('invalid push token cleanup skipped', e); }
 }
 async function getPushUserProfileMap(){
+  if(window.__NOTIFICATIONS_HARD_OFF) return new Map();
   const map=new Map();
   try{
     if(!(AD||TM||OP)) return map;
@@ -9628,6 +9658,7 @@ function mergePushTokenWithUserProfile(x={}, userMap=new Map()){
   };
 }
 async function getEnabledPushTokenDocs(filterFn=null){
+  if(window.__NOTIFICATIONS_HARD_OFF) return [];
   if(!(AD||TM||OP)) throw new Error('운영 권한이 필요합니다.');
   const userMap=await getPushUserProfileMap();
   const snap=await getDocs(collection(db,'pushTokens'));
@@ -9768,6 +9799,7 @@ function getMatchPushTargets(key,m){
   };
 }
 async function sendPushToTokenDocs(tokenDocs, title, body, data={}){
+  if(window.__NOTIFICATIONS_HARD_OFF) return {ok:0, fail:0, stale:0, total:0, disabled:true};
   const uniq=[];
   const seen=new Set();
   (tokenDocs||[]).forEach(x=>{
@@ -9961,6 +9993,7 @@ function isManagerUserProfileForPush(x={}){
   return role==='admin' || role==='developer' || role==='manager' || role==='tournament_admin' || (role==='operator' && approved) || (role==='tournament_manager' && approved);
 }
 async function getDeveloperAndManagerPushTokenDocs(){
+  if(window.__NOTIFICATIONS_HARD_OFF) return [];
   if(!(AD||TM)) return [];
   const adminUids=new Set();
   try{
@@ -10024,6 +10057,7 @@ function isAdminNotificationViewer(){
   }catch(e){ return !!(AD||TM); }
 }
 function saveAdminRegistrationNotificationLocalItem(reg={}, docId='', opt={}){
+  if(window.__NOTIFICATIONS_HARD_OFF) return '';
   try{
     if(!isAdminNotificationViewer()) return '';
     const built=buildAdminRegistrationNotificationPayload(reg, docId);
@@ -10092,6 +10126,7 @@ async function saveAdminRegistrationInboxForCurrentManager(reg={}, docId='', opt
   }
 }
 async function writeAdminRegistrationNotificationHub(reg={}, docId=''){
+  if(window.__NOTIFICATIONS_HARD_OFF) return false;
   try{
     if(!docId || !reg?.adminNotificationId) return false;
     const built=buildAdminRegistrationNotificationPayload(reg, docId);
@@ -10121,6 +10156,7 @@ function shouldCreateAdminRegistrationInboxFromReg(reg={}){
   return String(reg.adminNotificationType||'')==='admin_registration_created' || !!reg.adminNotificationId;
 }
 async function syncAdminRegistrationNotificationHubToLocal(opts={}){
+  if(window.__NOTIFICATIONS_HARD_OFF) return 0;
   try{
     if(!isAdminNotificationViewer()) return 0;
     const snap=await getDocs(query(collection(db,'adminRegistrationNotifications'), orderBy('createdAt','desc'), limit(Number(opts.limit||200)||200)));
@@ -10228,6 +10264,7 @@ window.handleAdminRegistrationAdded=handleAdminRegistrationAdded;
 window.processAdminRegistrationSnapshotChanges=processAdminRegistrationSnapshotChanges;
 
 async function sendRegistrationCompletePush(team,t,div){
+  if(window.__NOTIFICATIONS_HARD_OFF) return false;
   try{
     if(!isAutoNotificationEnabled('registration')) return;
     const uid=String(team?.ownerUid||auth?.currentUser?.uid||'');
@@ -10244,6 +10281,7 @@ async function sendRegistrationCompletePush(team,t,div){
   }catch(e){ console.warn('registration push skipped', e); }
 }
 async function openAdminBroadcastPushModal(){
+  if(window.__NOTIFICATIONS_HARD_OFF){ try{ toast('알림 기능은 꺼져 있습니다. 문자 기능을 사용하세요.','info'); }catch(e){} return false; }
   if(!(AD||TM)){ toast('개발자 또는 운영자 로그인 필요','info'); return; }
   const title=ge('manualPushTitle'), body=ge('manualPushBody'), target=ge('manualPushTarget');
   if(title) title.value='230MATCH 공지';
@@ -10254,6 +10292,7 @@ async function openAdminBroadcastPushModal(){
   setTimeout(updateManualPushFallbackPreview,80);
 }
 async function openManualMatchPush(key,mid){
+  if(window.__NOTIFICATIONS_HARD_OFF){ try{ toast('알림 기능은 꺼져 있습니다. 문자 기능을 사용하세요.','info'); }catch(e){} return false; }
   if(!(AD||TM||OP)){ toast('운영 권한 필요','info'); return; }
   const m=(G.matches[key]||[]).find(x=>String(x.id)===String(mid));
   if(!m){ toast('경기를 찾을 수 없습니다','error'); return; }
@@ -10268,6 +10307,7 @@ async function openManualMatchPush(key,mid){
   setTimeout(updateManualPushFallbackPreview,80);
 }
 async function openManualTeamPush(key,idx){
+  if(window.__NOTIFICATIONS_HARD_OFF){ try{ toast('알림 기능은 꺼져 있습니다. 문자 기능을 사용하세요.','info'); }catch(e){} return false; }
   if(!(AD||TM||OP)){ toast('운영 권한 필요','info'); return; }
   const team=(G.teams[key]||[])[Number(idx)];
   if(!team){ toast('명단을 찾을 수 없습니다','error'); return; }
@@ -10504,6 +10544,7 @@ async function updateManualPushFallbackPreview(){
 }
 
 async function sendManualPushFromModal(){
+  if(window.__NOTIFICATIONS_HARD_OFF){ try{ toast('알림 기능은 꺼져 있습니다. 문자 기능을 사용하세요.','info'); }catch(e){} return false; }
   try{
     if(!(AD||TM||OP)){ toast('운영 권한 필요','error'); return; }
     const ctx=window._manualPushContext||{type:'all'};
@@ -10602,6 +10643,7 @@ function refreshAutoNotificationSettingsForm(){
   set('autoNotifyMatchComplete', st.matchComplete===true);
 }
 async function saveAutoNotificationSettings(){
+  if(window.__NOTIFICATIONS_HARD_OFF){ try{ toast('자동 알림 기능은 꺼져 있습니다.','info'); }catch(e){} return false; }
   if(!(AD||TM)){ toast('개발자 또는 운영자 로그인 필요','info'); return; }
   G.meta.autoNotificationSettings=readAutoNotificationSettingsFromForm();
   sl(true);
@@ -10618,12 +10660,14 @@ async function saveAutoNotificationSettings(){
   }
 }
 async function resetAutoNotificationSettingsToDefault(){
+  if(window.__NOTIFICATIONS_HARD_OFF) return false;
   if(!(AD||TM)){ toast('개발자 또는 운영자 로그인 필요','info'); return; }
   G.meta.autoNotificationSettings={registration:true,courtWaiting:true,courtChanged:true,matchStart:true,orderSubmitted:true,matchComplete:false};
   refreshAutoNotificationSettingsForm();
   await saveAutoNotificationSettings();
 }
 function injectAutoNotificationSettingsBox(){
+  if(window.__NOTIFICATIONS_HARD_OFF) return;
   try{
     const body=document.querySelector('#mAdminSettings .modal-body');
     if(!body || ge('autoNotificationSettingsBox')) return;
@@ -10640,6 +10684,7 @@ window.resetAutoNotificationSettingsToDefault=resetAutoNotificationSettingsToDef
 window.refreshAutoNotificationSettingsForm=refreshAutoNotificationSettingsForm;
 
 function ensureAdminPushControls(){
+  if(window.__NOTIFICATIONS_HARD_OFF) return;
   try{
     const body=document.querySelector('#mAdminSettings .modal-body');
     if(!body || ge('adminPushControlBox')) return;
@@ -10654,6 +10699,7 @@ function ensureAdminPushControls(){
   }catch(e){}
 }
 function openMatchPushPromptAfterRegistration(){
+  if(window.__NOTIFICATIONS_HARD_OFF) return;
   try{
     if(!('Notification' in window)) return;
     if(Notification.permission==='granted' && localStorage.getItem('matchPushEnabled')==='1') return;
@@ -10689,6 +10735,7 @@ window.openAdminBroadcastPushModal=openAdminBroadcastPushModal;
 
 // ── v317: 알림 전체 통계 / 불가·정보부족 명단 대시보드 ─────────────────────────────
 function ensurePushStatsModal(){
+  if(window.__NOTIFICATIONS_HARD_OFF) return null;
   if(document.getElementById('mPushStats')) return;
   const wrap=document.createElement('div');
   wrap.className='modal-overlay';
@@ -10715,6 +10762,7 @@ function ensurePushStatsModal(){
   document.body.appendChild(wrap);
 }
 function injectPushStatsAdminButton(){
+  if(window.__NOTIFICATIONS_HARD_OFF) return;
   try{
     ensurePushStatsModal();
     const body=document.querySelector('#mAdminSettings .modal-body');
@@ -10838,6 +10886,7 @@ function renderStatsTargetTable(title, list=[], opts={}){
   return `<div style="margin-top:12px"><div style="font-weight:1000;color:${color};font-size:.9rem;margin-bottom:7px">${title} <span style="font-size:.78rem;color:var(--text2)">${(list||[]).length}명</span></div>${rows?`<div class="table-wrap"><table><thead><tr><th>#</th><th>이름/팀</th><th>전화번호</th><th>클럽</th><th>부서</th><th>상태</th><th>조치</th></tr></thead><tbody>${rows}</tbody></table></div>${more}`:`<div class="home-empty-note">${empty}</div>`}</div>`;
 }
 async function collectPushStatsData(){
+  if(window.__NOTIFICATIONS_HARD_OFF) return [];
   if(!(AD||TM||OP)) throw new Error('운영 권한이 필요합니다.');
   const tid=getSelectedStatsTournamentId();
   const tournament=(G.tournaments||[]).find(t=>t.id===tid)||null;
@@ -10856,6 +10905,7 @@ async function collectPushStatsData(){
 }
 let PUSH_STATS_CACHE=null;
 async function openPushStatsDashboard(){
+  if(window.__NOTIFICATIONS_HARD_OFF){ try{ toast('알림 기능은 꺼져 있습니다.','info'); }catch(e){} return false; }
   if(!(AD||TM||OP)){ toast('운영 권한이 필요합니다.','info'); return; }
   ensurePushStatsModal();
   om('mPushStats');
@@ -10950,6 +11000,7 @@ function getCurrentPushReconnectPromptId(){
   }catch(e){ return ''; }
 }
 async function publishPushReconnectPrompt(){
+  if(window.__NOTIFICATIONS_HARD_OFF) return false;
   if(!(AD||TM||OP)){ toast('관리자/운영자 권한이 필요합니다.','info'); return; }
   const tid=getSelectedStatsTournamentId();
   const t=(G.tournaments||[]).find(x=>x.id===tid)||{};
@@ -10981,6 +11032,7 @@ async function publishPushReconnectPrompt(){
   }
 }
 async function recordPushReconnectResponse(action='later', detail={}){
+  if(window.__NOTIFICATIONS_HARD_OFF) return false;
   try{
     const p=window.__pushReconnectPrompt||{};
     const id=String(p.id||p.promptId||'');
@@ -11102,6 +11154,7 @@ async function handlePushReconnectSmsFallback(){
   try{ cm('mPushReconnectPrompt'); }catch(e){}
 }
 async function checkPushReconnectPrompt(force=false){
+  if(window.__NOTIFICATIONS_HARD_OFF) return false;
   try{
     if(location.protocol==='file:') return;
     const snap=await getDoc(doc(db,'meta',PUSH_RECONNECT_PROMPT_DOC));
@@ -11133,6 +11186,7 @@ try{
 
 // ── v378: 알림 상태판 버튼 강제 표시 보강 ─────────────────────────────
 function ensureGlobalPushPromptButtonVisible(){
+  if(window.__NOTIFICATIONS_HARD_OFF) return;
   try{
     // 1) 알림 상태판 툴바 안에 버튼이 없으면 즉시 삽입
     const toolbar=document.getElementById('pushStatsToolbar');
@@ -15387,6 +15441,7 @@ function captureCourtNotificationState(){
   try{ return buildCourtNotificationStateMap(G.matches||{}); }catch(e){ return {}; }
 }
 function dispatchLocalCourtNotificationAlerts(prevState){
+  if(window.__NOTIFICATIONS_HARD_OFF) return;
   try{
     const nextState=buildCourtNotificationStateMap(G.matches||{});
     enqueueCourtSmsAlertsFromState(prevState||{}, nextState||{});
@@ -19207,6 +19262,7 @@ function makePushNotificationDocId(payload={}){
   return raw.replace(/[^A-Za-z0-9_-]/g,'_').slice(0,180) || ('push_'+Date.now());
 }
 async function enqueueMatchPushNotification(kind,key,m,meta={}){
+  if(window.__NOTIFICATIONS_HARD_OFF) return false;
   try{
     if(!isAutoNotificationEnabled(kind)){
       console.log('auto push disabled by setting', getAutoNotificationKindLabel(kind), kind);
@@ -19279,6 +19335,7 @@ function getMatchByIdAnyKey(key, mid){
   }catch(e){ return null; }
 }
 function saveAdminMatchCompleteNotification(key,m,meta={}){
+  if(window.__NOTIFICATIONS_HARD_OFF) return false;
   try{
     if(!m || !m.winner) return false;
     const {tid,div}=_k2td(key);
@@ -37495,6 +37552,7 @@ function openParticipantPersonNotifySms(name,club='',phone=''){
   }catch(e){console.warn(e);toast('알림/문자 창 열기 실패','error');}
 }
 async function v374SendSelectedPush(){
+  if(window.__NOTIFICATIONS_HARD_OFF){ try{ toast('알림 기능은 꺼져 있습니다. 문자 기능을 사용하세요.','info'); }catch(e){} return false; }
   try{
     if(!v374IsManagerLike()){toast('운영 권한 필요','error');return;}
     const recs=v374SelectedNotifyRecipients();
@@ -48869,5 +48927,81 @@ window.manualRefreshPlayers=manualRefreshPlayers;
   setTimeout(installRegisterSubmitGuard,1500);
 })();
 </script>
+
+<style id="v531NotificationFullOffStyle">
+  #topNotificationInboxBtn,
+  [data-notification-unread-badge],
+  #pushEnableBtn,
+  #pushDisableBtn,
+  button[onclick*="openNotificationInbox"],
+  button[onclick*="requestMatchPushPermission"],
+  button[onclick*="repairMyPushTokenNow"],
+  button[onclick*="openManualMatchPush"],
+  button[onclick*="openManualTeamPush"],
+  button[onclick*="openAdminBroadcastPushModal"],
+  button[onclick*="sendManualPushFromModal"],
+  button[onclick*="openPushStatsDashboard"],
+  #mManualPush,
+  #mPushRequired,
+  #mRequiredProfile,
+  #mPushStats,
+  #mNotificationInbox { display:none !important; }
+</style>
+<script id="v531NotificationFullOffPatch">
+(function(){
+  window.__NOTIFICATIONS_HARD_OFF = true;
+  function noopFalse(){ return false; }
+  function noopZero(){ return 0; }
+  function noopArr(){ return []; }
+  function hideNotificationUi(){
+    try{
+      document.querySelectorAll('#topNotificationInboxBtn,[data-notification-unread-badge],button[onclick*="openNotificationInbox"],button[onclick*="requestMatchPushPermission"],button[onclick*="repairMyPushTokenNow"],button[onclick*="openManualMatchPush"],button[onclick*="openManualTeamPush"],button[onclick*="openAdminBroadcastPushModal"],button[onclick*="sendManualPushFromModal"],button[onclick*="openPushStatsDashboard"]').forEach(function(el){ el.style.setProperty('display','none','important'); });
+      document.querySelectorAll('#pushStatus,#reqPushStatus,#pushRequiredStatus').forEach(function(el){ el.innerHTML='🔕 알림 기능은 꺼져 있습니다. 문자 중심으로 운영하세요.'; });
+      document.querySelectorAll('[data-notification-unread-badge]').forEach(function(el){ el.textContent=''; el.style.setProperty('display','none','important'); });
+      ['mNotificationInbox','mManualPush','mPushRequired','mRequiredProfile','mPushStats'].forEach(function(id){ var m=document.getElementById(id); if(m){ m.classList.remove('open','show'); m.style.setProperty('display','none','important'); } });
+      var wrap=document.getElementById('stickyAlertWrap'); if(wrap){ wrap.classList.remove('show'); wrap.innerHTML=''; }
+      try{ localStorage.setItem('matchNotificationHistory_guest','[]'); }catch(e){}
+    }catch(e){}
+  }
+  window.hideNotificationUi = hideNotificationUi;
+  window.openNotificationInbox = function(){ try{ if(typeof toast==='function') toast('알림 기능은 꺼져 있습니다. 문자로 운영하세요.','info'); }catch(e){} hideNotificationUi(); return false; };
+  window.updateNotificationInboxBadges = hideNotificationUi;
+  window.updateNotificationInboxBadgesFromCache = hideNotificationUi;
+  window.renderNotificationInbox = hideNotificationUi;
+  window.markMatchNotificationRead = noopFalse;
+  window.markAllMatchNotificationsRead = function(){ hideNotificationUi(); return false; };
+  window.clearMatchNotificationHistory = function(){ hideNotificationUi(); return false; };
+  window.saveMatchNotificationHistory = function(){ return ''; };
+  window.syncFirestoreNotificationInboxToLocal = async function(){ hideNotificationUi(); return 0; };
+  window.syncAdminRegistrationNotificationHubToLocal = async function(){ return 0; };
+  window.syncAdminRegistrationNotificationHubToLocalAfterAuth = async function(){ return 0; };
+  window.scheduleAdminRegistrationHubSyncAfterAuth = function(){ return; };
+  window.saveNotificationInboxDocsForTokenDocs = async function(){ return 0; };
+  window.writeAdminRegistrationNotificationHub = async function(){ return false; };
+  window.saveAdminRegistrationNotificationLocalItem = function(){ return ''; };
+  window.requestMatchPushPermission = async function(){ try{ if(typeof toast==='function') toast('알림 기능은 꺼져 있습니다. 문자로 운영하세요.','info'); }catch(e){} return false; };
+  window.repairMyPushTokenNow = window.requestMatchPushPermission;
+  window.autoReconnectPushIfNeeded = async function(){ return false; };
+  window.refreshCurrentFcmToken = async function(){ return false; };
+  window.setupFcmForegroundListener = async function(){ return false; };
+  window.setupServiceWorkerNotificationMessageListener = function(){ return; };
+  window.sendPushToTokenDocs = async function(){ return {ok:0,fail:0,stale:0,total:0,disabled:true}; };
+  window.getEnabledPushTokenDocs = async function(){ return []; };
+  window.getDeveloperAndManagerPushTokenDocs = async function(){ return []; };
+  window.sendRegistrationCompletePush = async function(){ return false; };
+  window.openAdminBroadcastPushModal = window.openNotificationInbox;
+  window.openManualMatchPush = window.openNotificationInbox;
+  window.openManualTeamPush = window.openNotificationInbox;
+  window.sendManualPushFromModal = window.openNotificationInbox;
+  window.enqueueMatchPushNotification = async function(){ return false; };
+  window.saveAdminMatchCompleteNotification = function(){ return false; };
+  window.dispatchLocalCourtNotificationAlerts = function(){ return; };
+  window.checkPushReconnectPrompt = async function(){ return false; };
+  document.addEventListener('DOMContentLoaded', function(){ hideNotificationUi(); setTimeout(hideNotificationUi,400); setTimeout(hideNotificationUi,1500); });
+  window.addEventListener('pageshow', function(){ setTimeout(hideNotificationUi,100); });
+  setTimeout(hideNotificationUi,0);
+})();
+</script>
+
 </body>
 </html>
