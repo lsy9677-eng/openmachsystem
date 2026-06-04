@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-04-v533-notif-zero-ui";
+  const APP_VERSION = "2026-06-04-v535-draw-sms-manual-fixed";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -43301,7 +43301,10 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
     // <script> 태그를 인라인에 두면 HTML 파서가 스크립트를 중간에 끊는 버그 발생.
     // Blob URL 방식으로 교체하여 파서 혼란 방지.
     const autoprint='window.onload=function(){setTimeout(function(){window.focus();window.print();},250)};';
-    const html='<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>예선 대진표 A4 출력</title><style>'+style+printCss+'</style><'+'script>'+autoprint+'<'+'/script></head><body>'+sheet.outerHTML+'</body></html>';
+    const html='<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>예선 대진표 A4 출력</title><style>'+style+printCss+'</style><'+'script>'+autoprint+'<'+'/script></head><body>'+sheet.outerHTML+'
+
+
+</body></html>';
     try{
       const blob=new Blob([html],{type:'text/html;charset=utf-8'});
       const url=URL.createObjectURL(blob);
@@ -43972,7 +43975,10 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
     const printCss='@page{size:A4 portrait;margin:0}body{margin:0;background:#fff;font-family:\'Noto Sans KR\',Arial,sans-serif}.v432-export-sheet{position:static!important;left:auto!important;top:auto!important;width:794px!important;margin:0 auto!important;z-index:auto!important}';
     const autoprint='window.onload=function(){setTimeout(function(){window.focus();window.print();},250)};';
     // <script> 태그를 분리해 HTML 파서가 끊지 못하도록 함
-    const html='<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>예선 대진표 A4 출력</title><style>'+style+printCss+'</style><'+'script>'+autoprint+'<'+'/script></head><body>'+sheet.outerHTML+'</body></html>';
+    const html='<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>예선 대진표 A4 출력</title><style>'+style+printCss+'</style><'+'script>'+autoprint+'<'+'/script></head><body>'+sheet.outerHTML+'
+
+
+</body></html>';
     try{
       const blob=new Blob([html],{type:'text/html;charset=utf-8'});
       const url=URL.createObjectURL(blob);
@@ -44934,6 +44940,9 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
       const clone=forceFourColumns(sheet.cloneNode(true));
       const css=[...document.querySelectorAll('style')].map(s=>s.outerHTML).join('\n');
       const html=`<!doctype html><html><head><meta charset="utf-8"><title>예선 대진표 출력</title>${css}<style>@page{size:A4 portrait;margin:0}html,body{margin:0!important;padding:0!important;background:#fff!important}.v435-export-sheet{position:static!important;left:auto!important;top:auto!important;width:794px!important;z-index:auto!important}.v435-a4-page{page-break-after:always!important;break-after:page!important;box-shadow:none!important;margin:0 auto!important}.v435-a4-page:last-child{page-break-after:auto!important;break-after:auto!important}</style></head><body>${clone.outerHTML}
+
+
+
 
 </body></html>`;
       const iframe=document.createElement('iframe');
@@ -49128,6 +49137,196 @@ window.manualRefreshPlayers=manualRefreshPlayers;
   });
   window.addEventListener('pageshow', function(){ setTimeout(zeroHideNotificationUi,80); });
   setTimeout(zeroHideNotificationUi,0);
+})();
+</script>
+
+
+<script id="v534DrawSmsManualAndDedupe">
+(function(){
+  const PATCH='v534-draw-sms-manual';
+  const ACK_KEY='v534.smsApproval.acknowledged';
+  const SUPPRESS_MS=90000;
+  function now(){ return Date.now(); }
+  function getAckMap(){
+    try{
+      const raw=localStorage.getItem(ACK_KEY)||'{}';
+      const obj=JSON.parse(raw);
+      const cutoff=now()-1000*60*60*24*7;
+      Object.keys(obj||{}).forEach(k=>{ if(Number(obj[k]||0)<cutoff) delete obj[k]; });
+      return obj&&typeof obj==='object'?obj:{};
+    }catch(e){ return {}; }
+  }
+  function saveAckMap(obj){ try{ localStorage.setItem(ACK_KEY, JSON.stringify(obj||{})); }catch(e){} }
+  function smsAckKey(item){
+    if(!item) return '';
+    const k=String(item.dedupeKey||'').trim();
+    if(k) return k;
+    return [item.actionType||'', item.smsKind||item.kind||'', item.tid||'', item.div||'', item.matchId||item.mid||'', item.smsBody||item.msg||''].map(v=>String(v||'')).join('|');
+  }
+  function markSmsAckByKey(key){
+    key=String(key||'').trim();
+    if(!key) return;
+    const m=getAckMap();
+    m[key]=now();
+    saveAckMap(m);
+  }
+  function isSmsAcked(item){
+    const key=smsAckKey(item);
+    if(!key) return false;
+    const m=getAckMap();
+    return !!m[key];
+  }
+  function getCurrentStickyItem(){
+    try{
+      const wrap=document.getElementById('stickyAlertWrap');
+      if(!wrap) return null;
+      if(String(wrap.getAttribute('data-action-type')||'')!=='sms_approval') return null;
+      return {
+        actionType:'sms_approval',
+        dedupeKey:wrap.getAttribute('data-dedupe-key')||'',
+        smsKind:wrap.getAttribute('data-sms-kind')||'',
+        tid:wrap.getAttribute('data-tid')||'',
+        div:wrap.getAttribute('data-div')||'',
+        matchId:wrap.getAttribute('data-mid')||'',
+        smsBody:wrap.getAttribute('data-sms-body')||'',
+        msg:wrap.getAttribute('data-msg')||''
+      };
+    }catch(e){ return null; }
+  }
+  function markCurrentStickySmsAck(){
+    const item=getCurrentStickyItem();
+    const key=smsAckKey(item);
+    if(key) markSmsAckByKey(key);
+  }
+  function startDrawSuppress(reason){
+    try{
+      window.__DRAW_SMS_SUPPRESS_UNTIL=now()+SUPPRESS_MS;
+      window.__DRAW_SMS_SUPPRESS_REASON=reason||'draw';
+      if(window.DEBUG_READS) console.log('[v534] suppress automatic draw SMS', reason, window.__DRAW_SMS_SUPPRESS_UNTIL);
+    }catch(e){}
+  }
+  function isDrawSuppressing(){
+    return Number(window.__DRAW_SMS_SUPPRESS_UNTIL||0)>now();
+  }
+  function isSmsApprovalPayload(payload){
+    return payload && typeof payload==='object' && String(payload.actionType||'')==='sms_approval';
+  }
+  function wrapDrawFunction(name){
+    try{
+      const orig=window[name];
+      if(typeof orig!=='function' || orig.__v534Wrapped) return;
+      const wrapped=function(){
+        startDrawSuppress(name);
+        const r=orig.apply(this, arguments);
+        if(r && typeof r.then==='function'){
+          return r.finally(()=>{ setTimeout(()=>{ window.__DRAW_SMS_SUPPRESS_UNTIL=Math.max(Number(window.__DRAW_SMS_SUPPRESS_UNTIL||0), now()+15000); },0); });
+        }
+        setTimeout(()=>{ window.__DRAW_SMS_SUPPRESS_UNTIL=Math.max(Number(window.__DRAW_SMS_SUPPRESS_UNTIL||0), now()+15000); },0);
+        return r;
+      };
+      wrapped.__v534Wrapped=true;
+      window[name]=wrapped;
+      try{ eval(name+' = window["'+name+'"]'); }catch(e){}
+    }catch(e){}
+  }
+  ['startDraw','startMainDraw','startIndividualDraw','startIndividualMainDraw','runIndividualDraw','runMainDraw','confirmDraw','confirmMainDraw'].forEach(wrapDrawFunction);
+
+  try{
+    const origEnq=window.enqueueStickyAlert;
+    if(typeof origEnq==='function' && !origEnq.__v534Wrapped){
+      const wrapped=function(payload,type){
+        try{
+          if(isSmsApprovalPayload(payload)){
+            if(isDrawSuppressing()){
+              if(window.DEBUG_READS) console.log('[v534] initial draw SMS approval suppressed', payload);
+              return;
+            }
+            if(isSmsAcked(payload)){
+              if(window.DEBUG_READS) console.log('[v534] duplicate SMS approval skipped', smsAckKey(payload));
+              return;
+            }
+          }
+        }catch(e){}
+        return origEnq.apply(this, arguments);
+      };
+      wrapped.__v534Wrapped=true;
+      window.enqueueStickyAlert=wrapped;
+      try{ enqueueStickyAlert=wrapped; }catch(e){}
+    }
+  }catch(e){}
+
+  try{
+    const origEnqCourt=window.enqueueCourtSmsAlertsFromState;
+    if(typeof origEnqCourt==='function' && !origEnqCourt.__v534Wrapped){
+      const wrapped=function(prevMap,nextMap){
+        if(isDrawSuppressing()){
+          if(window.DEBUG_READS) console.log('[v534] court SMS alerts suppressed for initial draw');
+          return;
+        }
+        return origEnqCourt.apply(this, arguments);
+      };
+      wrapped.__v534Wrapped=true;
+      window.enqueueCourtSmsAlertsFromState=wrapped;
+      try{ enqueueCourtSmsAlertsFromState=wrapped; }catch(e){}
+    }
+  }catch(e){}
+
+  try{
+    const origProcess=window.processCourtSmsAlerts;
+    if(typeof origProcess==='function' && !origProcess.__v534Wrapped){
+      const wrapped=function(prevMap,nextMap){
+        if(isDrawSuppressing()){
+          try{ if(window.COURT_ALERT_BOOTSTRAPPED && window.COURT_ALERT_BOOTSTRAPPED.value===false) window.COURT_ALERT_BOOTSTRAPPED.value=true; }catch(e){}
+          if(window.DEBUG_READS) console.log('[v534] processCourtSmsAlerts suppressed for initial draw');
+          return;
+        }
+        return origProcess.apply(this, arguments);
+      };
+      wrapped.__v534Wrapped=true;
+      window.processCourtSmsAlerts=wrapped;
+      try{ processCourtSmsAlerts=wrapped; }catch(e){}
+    }
+  }catch(e){}
+
+  try{
+    const origSend=window.sendStickyAlertSMS;
+    if(typeof origSend==='function' && !origSend.__v534Wrapped){
+      const wrapped=function(){
+        markCurrentStickySmsAck();
+        return origSend.apply(this, arguments);
+      };
+      wrapped.__v534Wrapped=true;
+      window.sendStickyAlertSMS=wrapped;
+    }
+  }catch(e){}
+
+  try{
+    const origClose=window.closeStickyAlert;
+    if(typeof origClose==='function' && !origClose.__v534Wrapped){
+      const wrapped=function(showNext){
+        markCurrentStickySmsAck();
+        return origClose.apply(this, arguments);
+      };
+      wrapped.__v534Wrapped=true;
+      window.closeStickyAlert=wrapped;
+      try{ closeStickyAlert=wrapped; }catch(e){}
+    }
+  }catch(e){}
+
+  // renderNextStickyAlert가 만든 현재 카드에 smsKind 속성 보강
+  try{
+    const obs=new MutationObserver(()=>{
+      try{
+        const wrap=document.getElementById('stickyAlertWrap');
+        if(!wrap || String(wrap.getAttribute('data-action-type')||'')!=='sms_approval') return;
+        const key=wrap.getAttribute('data-dedupe-key')||'';
+        if(key) markSmsAckByKey('__last_seen__:'+key);
+      }catch(e){}
+    });
+    document.addEventListener('DOMContentLoaded',()=>{ try{ obs.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['data-action-type','data-dedupe-key']}); }catch(e){} });
+  }catch(e){}
+
+  window.v534MarkSmsApprovalAcknowledged=function(key){ markSmsAckByKey(key); };
 })();
 </script>
 
