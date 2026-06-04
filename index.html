@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-04-v562-remove-v486-legacy-actions";
+  const APP_VERSION = "2026-06-04-v563-sms-approval-visible-after-result";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -15607,7 +15607,8 @@ function captureCourtNotificationState(){
   try{ return buildCourtNotificationStateMap(G.matches||{}); }catch(e){ return {}; }
 }
 function dispatchLocalCourtNotificationAlerts(prevState){
-  if(window.__NOTIFICATIONS_HARD_OFF) return;
+  // v563: 푸시 알림 OFF와 문자 승인창은 분리한다.
+  // __NOTIFICATIONS_HARD_OFF 때문에 결과 저장 후 대기1번 승격 문자가 막히면 안 된다.
   try{
     const nextState=buildCourtNotificationStateMap(G.matches||{});
     enqueueCourtSmsAlertsFromState(prevState||{}, nextState||{});
@@ -47404,7 +47405,7 @@ window.manualRefreshPlayers=manualRefreshPlayers;
       document.querySelectorAll('#pushStatus,#reqPushStatus,#pushRequiredStatus').forEach(function(el){ el.innerHTML='🔕 알림 기능은 꺼져 있습니다. 문자 중심으로 운영하세요.'; });
       document.querySelectorAll('[data-notification-unread-badge]').forEach(function(el){ el.textContent=''; el.style.setProperty('display','none','important'); });
       ['mNotificationInbox','mManualPush','mPushRequired','mRequiredProfile','mPushStats'].forEach(function(id){ var m=document.getElementById(id); if(m){ m.classList.remove('open','show'); m.style.setProperty('display','none','important'); } });
-      var wrap=document.getElementById('stickyAlertWrap'); if(wrap){ wrap.classList.remove('show'); wrap.innerHTML=''; }
+      var wrap=document.getElementById('stickyAlertWrap'); if(wrap && String(wrap.getAttribute('data-action-type')||'')!=='sms_approval'){ wrap.classList.remove('show'); wrap.innerHTML=''; }
       try{ localStorage.setItem('matchNotificationHistory_guest','[]'); }catch(e){}
     }catch(e){}
   }
@@ -48939,5 +48940,112 @@ window.manualRefreshPlayers=manualRefreshPlayers;
 })();
 </script>
 
+
+
+<!-- v563: 결과 저장 후 코트 승격 문자 승인창 즉시 표시 안정화 -->
+<script id="v563SmsApprovalVisibleAfterResultPatch">
+(function(){
+  'use strict';
+  const PATCH='v563-sms-approval-visible-after-result';
+  function norm(v){return String(v==null?'':v).trim();}
+  function isManager(){try{return !!(window.AD||window.TM||window.OP||AD||TM||OP);}catch(e){return false;}}
+  function smsOn(kind){
+    try{
+      if(typeof getAutoSmsSettings==='function' && getAutoSmsSettings().enabled!==true) return false;
+      if(typeof isAutoSmsEnabled==='function') return isAutoSmsEnabled(kind);
+      return true;
+    }catch(e){return false;}
+  }
+  function preserveSmsSticky(){
+    try{
+      const wrap=document.getElementById('stickyAlertWrap');
+      if(!wrap) return;
+      if(norm(wrap.getAttribute('data-action-type'))==='sms_approval' && wrap.innerHTML.trim()){
+        wrap.classList.add('show');
+        wrap.style.removeProperty('display');
+        wrap.style.removeProperty('visibility');
+        wrap.style.removeProperty('pointer-events');
+      }
+    }catch(e){}
+  }
+  // 기존 알림 OFF 패치의 MutationObserver가 문자 승인창까지 지워도 즉시 복구되도록 함.
+  try{
+    const obs=new MutationObserver(()=>setTimeout(preserveSmsSticky,0));
+    document.addEventListener('DOMContentLoaded',()=>{try{obs.observe(document.body,{childList:true,subtree:true,attributes:true});}catch(e){}});
+  }catch(e){}
+  setInterval(preserveSmsSticky, 700);
+
+  function state(){try{return typeof buildCourtNotificationStateMap==='function'?buildCourtNotificationStateMap(G.matches||{}):{};}catch(e){return {};}}
+  function changedCourts(prev,next){
+    const out=new Set();
+    try{
+      Object.entries(prev||{}).forEach(([mid,p])=>{
+        if(!p || p.status!=='current' || !p.court) return;
+        const n=(next||{})[mid];
+        // 결과 저장으로 현재 경기에서 사라진 코트만 대상
+        if(!n || n.status!=='current' || (n.match && n.match.winner!=null)) out.add(String(p.court));
+      });
+    }catch(e){}
+    return out;
+  }
+  function makePayload(kind,it,mid){
+    if(!it || !it.match || it.match.winner!=null) return null;
+    if(typeof buildCourtNotificationApprovalPayload!=='function') return null;
+    const p=buildCourtNotificationApprovalPayload(kind,it.key,it.match,{court:it.court,queuePos:it.queuePos,tid:it.tid,div:it.div});
+    p.actionType='sms_approval';
+    p.smsKind=kind;
+    p.matchId=mid;
+    p.court=String(it.court||'');
+    p.queuePos=Number(it.queuePos||0)||0;
+    p.side='left';
+    p.dedupeKey=['court_sms_v563',kind,it.tid||'',it.div||'',mid,it.court||'',it.queuePos||0].map(norm).join(':');
+    if(kind==='match_started') p.title='🎾 경기 시작 문자';
+    else if(kind==='court_changed') p.title='⏳ 대기 순서 변경 문자';
+    else p.title='⏳ 코트 대기 문자';
+    return p;
+  }
+  function enqueueImmediateAfterResult(prev,next){
+    try{
+      if(!isManager()) return;
+      const courts=changedCourts(prev,next);
+      if(!courts.size) return;
+      const payloads=[];
+      Object.entries(next||{}).forEach(([mid,n])=>{
+        if(!n || !n.court || !courts.has(String(n.court)) || !n.match || n.match.winner!=null) return;
+        const p=(prev||{})[mid]||null;
+        let kind='';
+        if(n.status==='current' && (!p || p.status!=='current' || p.court!==n.court)) kind='match_started';
+        else if(n.status==='waiting' && p && (p.status!=='waiting' || p.court!==n.court || Number(p.queuePos||0)!==Number(n.queuePos||0))) kind='court_changed';
+        else if(n.status==='waiting' && !p) kind='waiting_registered';
+        if(!kind || !smsOn(kind)) return;
+        const payload=makePayload(kind,n,mid);
+        if(payload) payloads.push(payload);
+      });
+      // 경기 시작 문자를 가장 먼저 띄움
+      payloads.sort((a,b)=> (a.smsKind==='match_started'?0:a.smsKind==='court_changed'?1:2) - (b.smsKind==='match_started'?0:b.smsKind==='court_changed'?1:2));
+      payloads.forEach(p=>{try{ if(typeof enqueueStickyAlert==='function') enqueueStickyAlert(p,'info'); }catch(e){}});
+      setTimeout(preserveSmsSticky,30);
+    }catch(e){console.warn('[v563] enqueue immediate court sms failed',e);}
+  }
+  window.v563EnqueueImmediateAfterResult=enqueueImmediateAfterResult;
+
+  // v538/v536 래퍼와 별개로 최종 안전망: saveM3Core 전후 상태 비교.
+  try{
+    const orig=window.saveM3Core || (typeof saveM3Core==='function'?saveM3Core:null);
+    if(typeof orig==='function' && !orig.__v563Wrapped){
+      const wrapped=async function(){
+        const prev=state();
+        const res=await orig.apply(this,arguments);
+        setTimeout(()=>enqueueImmediateAfterResult(prev,state()),120);
+        setTimeout(()=>enqueueImmediateAfterResult(prev,state()),650);
+        return res;
+      };
+      wrapped.__v563Wrapped=true;
+      window.saveM3Core=wrapped;
+      try{ saveM3Core=wrapped; }catch(e){}
+    }
+  }catch(e){console.warn('[v563] saveM3Core wrap failed',e);}
+})();
+</script>
 </body>
 </html>
