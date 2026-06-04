@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-04-v535-draw-sms-manual-fixed";
+  const APP_VERSION = "2026-06-04-v536-court-fixed-sms-dedupe";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -29967,6 +29967,7 @@ async function saveM3Core(){
   }
 
   const finishedCourts = hasFinalWinner ? (Array.isArray(m.courts) ? m.courts : (m.court ? [m.court] : [])) : [];
+  try{ window.__V536_RESULT_FINISHED_COURTS = finishedCourts.slice().map(String).filter(Boolean); window.__V536_RESULT_MATCH_ID = String(m.id||m._id||''); }catch(_e){}
   let promotedAfterFinish = false;
 
   sl(true);
@@ -29997,7 +29998,9 @@ async function saveM3Core(){
           advancedMain = applyAutoAdvanceInMemory(key,m.id);
         }
         promotedAfterFinish = promoteNextWaitingAfterFinishedCourts(key, finishedCourts);
-        const autoChanged = isIndividualByKey(key) && isIndividualAutoCourtAssignEnabled() ? rebuildIndividualAutoCourtAssignmentsForKey(key) : false;
+        // v536: 결과 저장 후 전체 코트 재배정 금지. 방금 끝난 코트의 대기열 승격만 반영한다.
+        // 전체 rebuild를 호출하면 다른 코트의 현재/대기 카드가 같이 흔들린다.
+        const autoChanged = false;
         await stM(key);
         wroteMatches=true;
         try{ await fbLog(`결과: ${dn1} ${alertScoreText} ${dn2}`,'⚡'); }catch(_e){ console.warn('fbLog skipped', _e); }
@@ -49330,5 +49333,150 @@ window.manualRefreshPlayers=manualRefreshPlayers;
 })();
 </script>
 
+
+
+<script id="v536CourtFixedSmsDedupePatch">
+(function(){
+  const PATCH='v536-court-fixed-sms-dedupe';
+  const ACK_KEY='v536.smsApproval.ack';
+  const LEGACY_KEYS=['v534.smsApproval.acknowledged'];
+  function now(){ return Date.now(); }
+  function loadMap(key){ try{ const v=JSON.parse(localStorage.getItem(key)||'{}'); return v&&typeof v==='object'?v:{}; }catch(e){ return {}; } }
+  function getAckMap(){
+    const out=loadMap(ACK_KEY);
+    LEGACY_KEYS.forEach(k=>{ const m=loadMap(k); Object.keys(m||{}).forEach(x=>{ if(!out[x]) out[x]=m[x]; }); });
+    const cutoff=now()-1000*60*60*24*10;
+    Object.keys(out).forEach(k=>{ if(Number(out[k]||0)<cutoff) delete out[k]; });
+    return out;
+  }
+  function saveAckMap(m){ try{ localStorage.setItem(ACK_KEY, JSON.stringify(m||{})); }catch(e){} }
+  function norm(v){ return String(v==null?'':v).trim(); }
+  function smsKey(item){
+    if(!item) return '';
+    const k=norm(item.dedupeKey);
+    if(k) return k;
+    return [item.actionType||'sms_approval', item.smsKind||item.kind||'', item.tid||'', item.div||item.division||'', item.matchId||item.mid||'', item.court||'', item.queuePos||'', item.smsBody||item.msg||''].map(norm).join('|');
+  }
+  function markAck(key){ key=norm(key); if(!key) return; const m=getAckMap(); m[key]=now(); saveAckMap(m); }
+  function isAcked(item){ const k=smsKey(item); if(!k) return false; return !!getAckMap()[k]; }
+  function currentStickyPayload(){
+    try{
+      const wrap=document.getElementById('stickyAlertWrap');
+      if(!wrap || norm(wrap.getAttribute('data-action-type'))!=='sms_approval') return null;
+      return {
+        actionType:'sms_approval',
+        dedupeKey:wrap.getAttribute('data-dedupe-key')||'',
+        smsKind:wrap.getAttribute('data-sms-kind')||'',
+        tid:wrap.getAttribute('data-tid')||'',
+        div:wrap.getAttribute('data-div')||'',
+        matchId:wrap.getAttribute('data-mid')||'',
+        smsBody:wrap.getAttribute('data-sms-body')||'',
+        msg:wrap.getAttribute('data-msg')||''
+      };
+    }catch(e){ return null; }
+  }
+  function markCurrentAck(){ const p=currentStickyPayload(); const k=smsKey(p); if(k) markAck(k); }
+  function filterByFinishedCourts(map){
+    try{
+      const cs=(window.__V536_RESULT_FINISHED_COURTS||[]).map(String).filter(Boolean);
+      if(!cs.length) return map||{};
+      const set=new Set(cs);
+      const out={};
+      Object.entries(map||{}).forEach(([mid,it])=>{ if(set.has(String(it&&it.court||''))) out[mid]=it; });
+      return out;
+    }catch(e){ return map||{}; }
+  }
+  function buildPayloadsNoComplete(prevMap,nextMap){
+    const payloads=[];
+    try{
+      // 완료된 경기 문자창은 제외한다. 실제 필요한 건 같은 코트에서 새로 올라온 현재 경기/대기 순서 변경 알림이다.
+      Object.entries(nextMap||{}).forEach(([mid,next])=>{
+        if(!next || !next.match || next.match.winner!=null) return;
+        const prev=(prevMap||{})[mid]||null;
+        let kind='';
+        if(next.status==='current' && (!prev || prev.status!=='current' || prev.court!==next.court)) kind='match_started';
+        else if(next.status==='waiting' && (!prev || prev.status==='none')) kind='waiting_registered';
+        else if(next.status==='waiting' && prev && (prev.court!==next.court || Number(prev.queuePos||0)!==Number(next.queuePos||0))) kind='court_changed';
+        if(!kind) return;
+        if(typeof buildCourtNotificationApprovalPayload!=='function') return;
+        const payload=buildCourtNotificationApprovalPayload(kind,next.key,next.match,{court:next.court,queuePos:next.queuePos,tid:next.tid,div:next.div});
+        if(kind==='match_started'){ payload.title='🎾 경기 시작 문자'; payload.side='left'; }
+        payload.dedupeKey=`court_sms:${kind}:${next.tid||''}:${next.div||''}:${mid}:${next.court||''}:${next.queuePos||0}`;
+        if(!isAcked(payload)) payloads.push(payload);
+      });
+    }catch(e){ console.warn('[v536] buildPayloadsNoComplete failed', e); }
+    return payloads;
+  }
+  function enqueueSmsPayloads(payloads){
+    if(!(window.AD||window.TM||window.OP||AD||TM||OP)) return;
+    if(!payloads || !payloads.length) return;
+    if(typeof getAutoSmsSettings==='function' && !getAutoSmsSettings().enabled) return;
+    payloads.forEach(p=>{
+      try{
+        const kind=norm(p.smsKind||p.kind);
+        if(typeof isAutoSmsEnabled==='function' && !isAutoSmsEnabled(kind)) return;
+        if(isAcked(p)) return;
+        if(typeof enqueueStickyAlert==='function') enqueueStickyAlert(p,'info');
+      }catch(e){}
+    });
+  }
+  window.enqueueCourtSmsAlertsFromState=function(prevMap,nextMap){
+    try{
+      const prev=filterByFinishedCourts(prevMap||{});
+      const next=filterByFinishedCourts(nextMap||{});
+      const payloads=buildPayloadsNoComplete(prev,next);
+      enqueueSmsPayloads(payloads);
+    }catch(e){ console.warn('[v536] enqueueCourtSmsAlertsFromState failed', e); }
+  };
+  try{ enqueueCourtSmsAlertsFromState=window.enqueueCourtSmsAlertsFromState; }catch(e){}
+  window.dispatchLocalCourtNotificationAlerts=function(prevState){
+    try{
+      const nextState=(typeof buildCourtNotificationStateMap==='function') ? buildCourtNotificationStateMap(G.matches||{}) : {};
+      window.enqueueCourtSmsAlertsFromState(prevState||{}, nextState||{});
+    }catch(e){ console.warn('[v536] dispatch court sms failed', e); }
+  };
+  try{ dispatchLocalCourtNotificationAlerts=window.dispatchLocalCourtNotificationAlerts; }catch(e){}
+  const origEnqueue=window.enqueueStickyAlert;
+  if(typeof origEnqueue==='function' && !origEnqueue.__v536Wrapped){
+    const wrapped=function(payload,type){
+      try{
+        if(payload && typeof payload==='object' && norm(payload.actionType)==='sms_approval'){
+          const k=smsKey(payload);
+          if(k && isAcked(payload)) return;
+          if(k) payload.dedupeKey=k;
+        }
+      }catch(e){}
+      return origEnqueue.apply(this,arguments);
+    };
+    wrapped.__v536Wrapped=true;
+    window.enqueueStickyAlert=wrapped;
+    try{ enqueueStickyAlert=wrapped; }catch(e){}
+  }
+  const origSend=window.sendStickyAlertSMS;
+  if(typeof origSend==='function' && !origSend.__v536Wrapped){
+    const wrapped=function(){ markCurrentAck(); return origSend.apply(this,arguments); };
+    wrapped.__v536Wrapped=true;
+    window.sendStickyAlertSMS=wrapped;
+  }
+  const origClose=window.closeStickyAlert;
+  if(typeof origClose==='function' && !origClose.__v536Wrapped){
+    const wrapped=function(showNext){ markCurrentAck(); return origClose.apply(this,arguments); };
+    wrapped.__v536Wrapped=true;
+    window.closeStickyAlert=wrapped;
+    try{ closeStickyAlert=wrapped; }catch(e){}
+  }
+  // 현재 떠 있는 같은 문자창을 닫은 뒤 다시 렌더되어도 바로 제거
+  try{
+    new MutationObserver(function(){
+      const p=currentStickyPayload();
+      if(p && isAcked(p)){
+        const wrap=document.getElementById('stickyAlertWrap');
+        if(wrap){ wrap.classList.remove('show'); wrap.innerHTML=''; }
+      }
+    }).observe(document.body,{childList:true,subtree:true,attributes:true});
+  }catch(e){}
+  window.__V536_COURT_SMS_PATCH=true;
+})();
+</script>
 </body>
 </html>
