@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-04-v550-a4-court-color-club-fit";
+  const APP_VERSION = "2026-06-04-v551-court-board-badge-scope-fix";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -51346,6 +51346,20 @@ window.manualRefreshPlayers=manualRefreshPlayers;
   .court-venue-colored-card::before{width:6px;}
   .court-venue-badge{min-height:22px !important;padding:3px 7px !important;font-size:.68rem !important;}
 }
+/* v551: 코트 현황판에서 큰 div가 배지화되어 화면이 깨지는 것 방지 */
+.court-drop-zone div.court-venue-badge,
+.court-wait-card div.court-venue-badge,
+.shared-wait-stack div.court-venue-badge,
+.court-wait-stack div.court-venue-badge{
+  display:block !important;
+  min-height:initial !important;
+  padding:0 !important;
+  border-radius:0 !important;
+  background:transparent !important;
+  color:inherit !important;
+  border:0 !important;
+  box-shadow:none !important;
+}
 </style>
 <script id="v549CourtVenueCardColorScript">
 (function(){
@@ -51403,8 +51417,22 @@ window.manualRefreshPlayers=manualRefreshPlayers;
     el.style.setProperty('--court-soft',p.soft);
     el.style.setProperty('--court-border',p.border);
   }
+  function isSafeCourtChipElement(el){
+    if(!el || el.nodeType!==1) return false;
+    if(el.classList && (el.classList.contains('court-drop-zone') || el.classList.contains('court-wait-card') || el.classList.contains('shared-wait-stack') || el.classList.contains('court-wait-stack'))) return false;
+    const t=normText(el);
+    if(!t || t.length>32) return false;
+    // div 전체 컨테이너에 배지가 붙으면 코트 현황판이 큰 파란 원/덩어리처럼 깨진다.
+    // 그래서 실제 작은 배지/버튼/스팬 또는 내용이 코트명 하나에 가까운 요소만 허용한다.
+    const tag=String(el.tagName||'').toUpperCase();
+    const hasElementChildren=el.children && el.children.length>0;
+    const looksLikeCourtOnly=/^(🎾\s*)?(경기코트\s*)?(장유국제\d+|국제\d+|장유능동\d+|능동\d+|월든섬\(인조\)\d+|월든섬\d+|금병\d+|신삼계\d+|구삼계\d+|삼계\d+|원도심\d+|동부\d+)$/i.test(t);
+    const isSmallTag=(tag==='SPAN'||tag==='BUTTON'||tag==='B'||tag==='STRONG');
+    if(hasElementChildren && !looksLikeCourtOnly) return false;
+    return isSmallTag || looksLikeCourtOnly || /badge|chip|court/i.test(String(el.className||''));
+  }
   function colorChip(el, group, court){
-    if(!el) return;
+    if(!isSafeCourtChipElement(el)) return;
     const t=normText(el);
     if(!/(경기코트|배정코트|코트|국제|능동|월든섬|금병|삼계|원도심|동부)/.test(t)) return;
     const targetCourt=court || extractCourt(t);
@@ -51414,6 +51442,19 @@ window.manualRefreshPlayers=manualRefreshPlayers;
     el.classList.add('court-venue-badge');
     el.title=`${g} 구장`;
     setVars(el,p);
+  }
+  function cleanupBadCourtVenueBadges(root){
+    try{
+      (root||document).querySelectorAll('.court-drop-zone .court-venue-badge, .court-wait-card .court-venue-badge, .shared-wait-stack .court-venue-badge').forEach(el=>{
+        if(!isSafeCourtChipElement(el)){
+          el.classList.remove('court-venue-badge','court-venue-badge-subtle');
+          el.style.removeProperty('--court-main');
+          el.style.removeProperty('--court-soft');
+          el.style.removeProperty('--court-border');
+          el.removeAttribute('title');
+        }
+      });
+    }catch(e){}
   }
   function colorCard(card){
     if(!card) return;
@@ -51430,16 +51471,20 @@ window.manualRefreshPlayers=manualRefreshPlayers;
     card.setAttribute('data-court-group',group);
     card.setAttribute('data-court-label',court);
     setVars(card,p);
-    card.querySelectorAll('button,span,div').forEach(el=>{
+    // 큰 div 컨테이너 전체에 배지가 붙는 문제 방지: 작은 요소만 색상 배지 처리
+    card.querySelectorAll('button,span,b,strong,[class*="badge"],[class*="chip"],[class*="court"]').forEach(el=>{
       if(el===card) return;
       colorChip(el,group,court);
     });
+    cleanupBadCourtVenueBadges(card);
   }
   function applyCourtVenueCardColors(){
     try{
+      cleanupBadCourtVenueBadges(document);
       document.querySelectorAll('.indiv-prelim-grid .grp-card, .indiv-prelim-grid .m3card, .indiv-prelim-grid .match-card, #matchListPopup .mlp-card').forEach(colorCard);
       document.querySelectorAll('.court-drop-zone, .court-wait-card, .shared-wait-stack .court-wait-card').forEach(colorCard);
-    }catch(e){try{console.warn('[v549] court venue card color skipped',e)}catch(_e){}}
+      cleanupBadCourtVenueBadges(document);
+    }catch(e){try{console.warn('[v551] court venue card color skipped',e)}catch(_e){}}
   }
   window.applyCourtVenueCardColors=applyCourtVenueCardColors;
   document.addEventListener('DOMContentLoaded',()=>{setTimeout(applyCourtVenueCardColors,120);setTimeout(applyCourtVenueCardColors,700);setTimeout(applyCourtVenueCardColors,1600);});
