@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-05-v607-sms-modal-fix";
+  const APP_VERSION = "2026-06-06-v607b-aligo-preview-nocompact";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -19348,14 +19348,16 @@ function _openSmsChoiceModal(phones, body, recipients){
   // 닫기
   var closeBtn=document.getElementById('v606SmsCloseBtn');
   if(closeBtn) closeBtn.onclick=function(){ modal.classList.remove('open'); };
-  // 알리고 버튼
+  // 알리고 버튼 → 미리보기 모달
   var aligoB=document.getElementById('v606AligoBtn');
   if(aligoB) aligoB.onclick=function(){
     modal.classList.remove('open');
     var ctx=window.__v606SmsCtx||{};
     var rcpt=ctx.recipients&&ctx.recipients.length?ctx.recipients:(ctx.phones||[]).map(function(p){return {phone:p};});
-    if(typeof window.v583SendAligoSms==='function'){
-      window.v583SendAligoSms(rcpt, ctx.body||'', {source:'court_card'})
+    if(typeof window.v607ShowAligoPreview==='function'){
+      window.v607ShowAligoPreview(rcpt, ctx.body||'', {source:'court_card', noCompact:true});
+    } else if(typeof window.v583SendAligoSms==='function'){
+      window.v583SendAligoSms(rcpt, ctx.body||'', {source:'court_card', noCompact:true})
         .then(function(){ toast('알리고 문자 발송 완료 ✅','success'); })
         .catch(function(e){ toast('알리고 발송 실패: '+(e.message||e),'error'); });
     }
@@ -19387,6 +19389,93 @@ function _openSmsChoiceModal(phones, body, recipients){
   };
 }
 window._openSmsChoiceModal=_openSmsChoiceModal;
+
+// v607: 알리고 발송 전 미리보기 모달
+// - 받는 사람 목록, 전체 문자 내용 표시
+// - 내용 직접 수정 가능
+// - 확인 후 실제 발송
+function v607ShowAligoPreview(recipients, body, meta){
+  meta=meta||{};
+  let modal=document.getElementById('v607AligoPreviewModal');
+  if(!modal){
+    modal=document.createElement('div');
+    modal.id='v607AligoPreviewModal';
+    modal.className='modal-overlay';
+    modal.style.zIndex='21000';
+    document.body.appendChild(modal);
+  }
+  const rcpList=recipients.map(function(r){
+    return '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f1f5f9">'
+      +'<span style="font-weight:700;font-size:.82rem">'+esc(r.name||'')+'</span>'
+      +'<span style="color:#1d4ed8;font-size:.82rem">'+esc(r.phone||'')+'</span>'
+      +'</div>';
+  }).join('');
+  // byte 계산
+  function byteLen(s){try{return new Blob([String(s||'')]).size;}catch(e){return encodeURIComponent(String(s||'')).replace(/%[0-9A-F]{2}/g,'xx').length;}}
+  function smsType(s){return byteLen(s)>90?'LMS':'SMS';}
+  const bodyEsc=String(body||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  modal.innerHTML='<div class="modal-box" style="max-width:480px">'
+    +'<div class="modal-header" style="background:#1d4ed8"><h3 style="color:#fff">📡 알리고 발송 미리보기</h3>'
+    +'<button class="modal-close" id="v607PreviewClose" style="color:#fff">✕</button></div>'
+    +'<div class="modal-body">'
+    // 받는 사람
+    +'<div style="margin-bottom:14px">'
+    +'<div style="font-size:.78rem;font-weight:900;color:#1d4ed8;margin-bottom:8px">📞 받는 사람 ('+recipients.length+'명)</div>'
+    +'<div style="padding:8px 12px;border-radius:10px;background:#f0f9ff;border:1px solid #bae6fd">'+rcpList+'</div>'
+    +'</div>'
+    // 문자 내용 - 수정 가능한 textarea
+    +'<div style="margin-bottom:10px">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
+    +'<div style="font-size:.78rem;font-weight:900;color:#1d4ed8">✉️ 발송 내용 (수정 가능)</div>'
+    +'<div id="v607ByteLabel" style="font-size:.72rem;font-weight:900;color:#0f766e;padding:2px 8px;border-radius:999px;background:#f0fdf4;border:1px solid #86efac"></div>'
+    +'</div>'
+    +'<textarea id="v607PreviewBody" rows="10" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid #93c5fd;border-radius:10px;font-size:.82rem;line-height:1.7;resize:vertical;font-family:inherit">'+bodyEsc+'</textarea>'
+    +'<div style="font-size:.72rem;color:#64748b;margin-top:4px">※ 실제 발송될 내용입니다. 필요하면 직접 수정하세요.</div>'
+    +'</div>'
+    +'</div>'
+    +'<div class="modal-footer" style="gap:8px">'
+    +'<button class="btn btn-gray" id="v607PreviewCancel">취소</button>'
+    +'<button class="btn btn-primary" id="v607PreviewSend" style="background:#1d4ed8;color:#fff;font-size:.9rem;padding:10px 20px">📡 알리고 발송 ('+recipients.length+'건)</button>'
+    +'</div>'
+    +'</div>';
+  modal.classList.add('open');
+  // byte 라벨 실시간 업데이트
+  var ta=document.getElementById('v607PreviewBody');
+  var byteLabel=document.getElementById('v607ByteLabel');
+  function updateByte(){
+    var v=ta?ta.value:'';
+    var b=byteLen(v);
+    var t=smsType(v);
+    if(byteLabel) byteLabel.textContent=b+'byte · '+t+(b>2000?' ⚠️90byte 초과':'');
+  }
+  updateByte();
+  if(ta) ta.addEventListener('input', updateByte);
+  // 닫기
+  var closeBtn=document.getElementById('v607PreviewClose');
+  var cancelBtn=document.getElementById('v607PreviewCancel');
+  function closeModal(){ modal.classList.remove('open'); }
+  if(closeBtn) closeBtn.onclick=closeModal;
+  if(cancelBtn) cancelBtn.onclick=closeModal;
+  // 발송
+  var sendBtn=document.getElementById('v607PreviewSend');
+  if(sendBtn) sendBtn.onclick=async function(){
+    var finalBody=(ta?ta.value:'').trim();
+    if(!finalBody){toast('발송 내용이 비어 있습니다','error');return;}
+    closeModal();
+    var rcpt=recipients.map(function(r){return {name:r.name||'',phone:r.phone||''};});
+    try{
+      if(typeof sl==='function') sl(true);
+      var res=await window.v583SendAligoSms(rcpt, finalBody, Object.assign({},meta,{noCompact:true}));
+      if(typeof sl==='function') sl(false);
+      var cnt=(res&&res.aligo&&res.aligo.success_cnt)||rcpt.length;
+      toast('알리고 문자 발송 완료 ✅ ('+cnt+'건)','success');
+    }catch(e){
+      try{if(typeof sl==='function') sl(false);}catch(_e){}
+      toast('알리고 발송 실패: '+((e&&e.message)||e),'error');
+    }
+  };
+}
+window.v607ShowAligoPreview=v607ShowAligoPreview;
 function getMatchNotificationRecipients(key,m){
   try{
     const {t1,t2}=getMatchTeamObjects(key,m);
@@ -38156,15 +38245,8 @@ function openParticipantTeamNotifySms(key,idx,templateMode,sendMode){
       const recs=v374GetTeamNotifyRecipients(team).filter(r=>v374Digits(r.phone).length>=9);
       if(!recs.length){toast('전화번호가 없습니다','info');return;}
       if(sendMode==='aligo'){
-        if(!confirm(`알리고로 문자 ${recs.length}건 발송할까요?\n\n${body.slice(0,60)}...`)) return;
-        (async()=>{
-          try{
-            sl(true);
-            const res=await window.v583SendAligoSms(recs.map(r=>({name:r.name,phone:r.phone})),body,{source:'participant_detail_aligo'});
-            sl(false);
-            toast('알리고 문자 발송 완료 ✅','success');
-          }catch(e){try{sl(false);}catch(_e){} toast('알리고 발송 실패: '+(e?.message||e),'error');}
-        })();
+        // v607: 미리보기 모달로 전체 내용 확인 후 발송
+        v607ShowAligoPreview(recs, body, {source:'participant_detail_aligo', smsKind: templateMode||''});
       } else {
         const phones=recs.map(r=>r.phone);
         if(typeof window._openSmsChoiceModal==='function') window._openSmsChoiceModal(phones,body,recs.map(r=>({name:r.name,phone:r.phone})));
@@ -38227,33 +38309,15 @@ async function v374SendSelectedSms(){
   const recs=v374SelectedNotifyRecipients().filter(r=>v374Digits(r.phone).length>=9);
   if(!recs.length){toast('문자 보낼 전화번호가 없습니다','info');return;}
   const body=(ge('v374NotifyBody')?.value||'').trim()||'230MATCH 안내입니다.';
-  if(!confirm(`알리고로 문자 ${recs.length}건을 발송할까요?\n\n문구를 확인한 뒤 확인을 누르면 실제 발송됩니다.`)) return;
-  try{
-    if(typeof sl==='function') sl(true);
-    const res = await window.v583SendAligoSms(recs.map(r=>({name:r.name,phone:r.phone})), body, {source:'participant_manual_selected_v586'});
-    if(typeof sl==='function') sl(false);
-    const cnt=(res&&res.aligo&&res.aligo.success_cnt)||recs.length;
-    toast(`알리고 문자 발송 완료 ✅ (${cnt}건)`,'success');
-  }catch(e){
-    try{if(typeof sl==='function') sl(false);}catch(_e){}
-    toast('알리고 발송 실패: '+(e?.message||e),'error');
-  }
+  // v607: 미리보기 모달
+  v607ShowAligoPreview(recs, body, {source:'participant_manual_selected_v586'});
 }
 async function v374SendOneSms(i){
   const r=(window.__v374NotifyRecipients||[])[Number(i)];
   if(!r||!v374Digits(r.phone)){toast('전화번호가 없습니다','info');return;}
   const body=(ge('v374NotifyBody')?.value||'').trim()||'230MATCH 안내입니다.';
-  if(!confirm(`${r.name||'선택 대상'}님에게 알리고 문자 1건을 발송할까요?`)) return;
-  try{
-    if(typeof sl==='function') sl(true);
-    const res = await window.v583SendAligoSms([{name:r.name,phone:r.phone}], body, {source:'participant_manual_one_v586'});
-    if(typeof sl==='function') sl(false);
-    const cnt=(res&&res.aligo&&res.aligo.success_cnt)||1;
-    toast(`알리고 문자 발송 완료 ✅ (${cnt}건)`,'success');
-  }catch(e){
-    try{if(typeof sl==='function') sl(false);}catch(_e){}
-    toast('알리고 발송 실패: '+(e?.message||e),'error');
-  }
+  // v607: 미리보기 모달
+  v607ShowAligoPreview([{name:r.name,phone:r.phone}], body, {source:'participant_manual_one_v586'});
 }
 
 // v606: 휴대폰 문자앱으로 발송 (선택된 전체)
@@ -51648,7 +51712,15 @@ window.manualRefreshPlayers=manualRefreshPlayers;
   try{
     const prevSend=window.v583SendAligoSms;
     if(typeof prevSend==='function' && !prevSend.__v588CompactWrapped){
-      const wrapped=function(recipients,msg,meta={}){return prevSend.call(this,recipients,compactSmsText(msg,meta),meta);};
+      const wrapped=function(recipients,msg,meta={}){
+        // v607: 참가자 개인 문자(waitlist_promoted, payment_confirmed, participant_*)는 compact 제외 - 원문 그대로 발송
+        const skip=(meta.noCompact===true)
+          || (meta.source||'').includes('participant')
+          || meta.smsKind==='waitlist_promoted'
+          || meta.smsKind==='payment_confirmed';
+        const finalMsg=skip?String(msg||'').trim():compactSmsText(msg,meta);
+        return prevSend.call(this,recipients,finalMsg,meta);
+      };
       wrapped.__v588CompactWrapped=true;
       window.v583SendAligoSms=wrapped;
     }
