@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-05-v591-sms-dual-a4-fixed";
+  const APP_VERSION = "2026-06-05-v605-condition-persistence-apply-fix";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -51716,6 +51716,1493 @@ window.manualRefreshPlayers=manualRefreshPlayers;
   }
   document.addEventListener('DOMContentLoaded',()=>{setTimeout(addModeGuide,700);});
   try{new MutationObserver(()=>{setTimeout(addModeGuide,50);setTimeout(postProcessManualSmsModal,50);}).observe(document.body,{childList:true,subtree:true});}catch(e){}
+})();
+</script>
+
+
+<!-- v592/v595: 개인전 조건부 추첨 + 버튼 표시 보강 -->
+<script id="v592IndividualConditionalDrawPatch">
+(function(){
+  'use strict';
+  const PATCH_VER='v592-conditional-individual-draw';
+  const ORDER_MS={start:0,wait1:1,wait2:2,wait3:3,wait4:4,auto:9};
+  function $(id){ return document.getElementById(id); }
+  function esc(s){ return String(s??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
+  function isOwner(){
+    try{
+      const ad = (typeof AD!=='undefined' && AD) || window.AD || window.isAdmin || window.isDeveloper;
+      const tm = (typeof TM!=='undefined' && TM) || window.TM || window.isTournamentManager;
+      const op = (typeof OP!=='undefined' && OP) || window.OP || window.isOperator;
+      // v599: 로컬 파일 실행 시에도 버튼이 표시됐다면 권한 있음으로 간주
+      const isLocal = location.protocol === 'file:';
+      return !!(ad || tm || op || document.body.classList.contains('admin-mode') || document.body.classList.contains('tm-mode') || document.body.classList.contains('op-mode') || isLocal);
+    }catch(e){ return false; }
+  }
+  function getIDW(){ try{ return (typeof IDW!=='undefined' && IDW) ? IDW : (window.IDW||null); }catch(e){ return window.IDW||null; } }
+  function getIMD(){ try{ return (typeof IMD!=='undefined' && IMD) ? IMD : (window.IMD||null); }catch(e){ return window.IMD||null; } }
+  function currentKey(){ const idw=getIDW(), imd=getIMD(); return (idw&&idw.key) || (imd&&imd.key) || ''; }
+  function storeKey(key){ return 'v592_indiv_draw_conditions_'+String(key||''); }
+  // v599: Edge 로컬파일에서 localStorage 차단 대비 메모리 fallback
+  const _condMemStore={};
+  function loadCond(key){
+    try{ const v=localStorage.getItem(storeKey(key)); if(v) return JSON.parse(v)||{}; }catch(e){}
+    return _condMemStore[key]||{};
+  }
+  function saveCond(key,cfg){
+    try{ localStorage.setItem(storeKey(key), JSON.stringify(cfg||{})); }catch(e){}
+    _condMemStore[key]=cfg||{};
+  }
+  function onlyCourtGroup(c){
+    const s=String(c||'').trim();
+    if(!s) return '';
+    return s.replace(/[\s_-]*\d+\s*$/,'').trim() || s;
+  }
+  function teamName(key,ti){
+    try{ return (typeof tdn==='function') ? tdn((G.teams[key]||[])[ti],key,ti) : `#${Number(ti)+1}`; }catch(e){ return `#${Number(ti)+1}`; }
+  }
+  function courtPool(tid,div,key){
+    let arr=[];
+    try{ if(typeof getDivisionPhaseConfiguredCourts==='function') arr=getDivisionPhaseConfiguredCourts(tid,div,'group')||[]; }catch(e){}
+    if(!arr.length){ try{ if(typeof getBracketAllowedCourts==='function') arr=getBracketAllowedCourts(key)||[]; }catch(e){} }
+    arr=[...new Set(arr.map(x=>String(x||'').trim()).filter(Boolean))];
+    return arr;
+  }
+  function addConditionButtons(){
+    if(!isOwner()) return;
+    try{
+      const __idw=getIDW();
+      if(__idw && __idw.key && $('drawCfgScreen') && !$('v592CondBtn')){
+        const host=$('drawCfgScreen');
+        const panel=document.createElement('div');
+        panel.id='v592CondBtn';
+        panel.style.cssText='margin:0 0 12px;padding:12px 14px;border:1.5px solid #d4a017;border-radius:14px;background:linear-gradient(135deg,#fff7dd,#eef4ff);display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between';
+        panel.innerHTML=`<div><div style="font-weight:1000;color:#7a5600;font-size:.88rem">⚙️ 개인전 조건부 추첨</div><div id="v592CondMini" style="font-size:.72rem;color:#64748b;margin-top:4px">운영자/개발자 전용 · 일반 참가자에게 비공개</div></div><div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="btn btn-outline" style="font-size:.76rem;padding:6px 12px" onclick="openV592ConditionModal()">⚙️ 조건 설정</button><button type="button" class="btn btn-gray" style="font-size:.76rem;padding:6px 12px" onclick="clearV592ConditionModal()">🧹 초기화</button></div>`;
+        host.insertBefore(panel, host.firstChild);
+        updateCondMini();
+      }
+      const sum=$('individualMainDrawSummary');
+      const __imd=getIMD();
+      if(__imd && __imd.key && sum && !$('v592MainKeepBtn')){
+        const div=document.createElement('div');
+        div.id='v592MainKeepBtn';
+        div.style.cssText='margin-top:10px;padding:10px 12px;border:1px solid #bfdbfe;border-radius:12px;background:#f8fbff;display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap';
+        div.innerHTML=`<div style="font-size:.76rem;color:#475569;line-height:1.5"><b>🧭 본선 코트군 유지</b><br>예선 코트군을 가능한 범위에서 본선 코트 배정에 반영합니다.</div><button type="button" class="btn btn-outline" style="font-size:.76rem;padding:6px 12px" onclick="openV592ConditionModal(true)">설정</button>`;
+        sum.appendChild(div);
+      }
+    }catch(e){ console.warn(PATCH_VER,'button inject failed',e); }
+  }
+  function summarizeCond(cfg){
+    const teams=cfg?.teams||{};
+    const rows=Object.values(teams).filter(x=>x && (x.seed||x.group||x.court||x.order&&x.order!=='auto'));
+    const keep=cfg?.keep?.enabled;
+    return `조건 ${rows.length}건${keep?' · 본선 코트군 유지 ON':''}`;
+  }
+  function updateCondMini(){
+    try{ const el=$('v592CondMini'); const idw=getIDW(); if(el && idw?.key) el.textContent='운영자/개발자 전용 · '+summarizeCond(loadCond(idw.key)); }catch(e){}
+  }
+  window.clearV592ConditionModal=function(){
+    const key=currentKey(); if(!key) return;
+    if(!confirm('이 대회의 조건부 추첨 설정을 초기화할까요?')) return;
+    localStorage.removeItem(storeKey(key));
+    try{ if(G.draws&&G.draws[key]){ delete G.draws[key].individualDrawConditions; } }catch(e){}
+    updateCondMini();
+    toast('조건 설정 초기화 완료','success');
+  };
+  window.openV592ConditionModal=function(fromMain){
+    if(!isOwner()){ toast('운영자/개발자만 사용할 수 있습니다','error'); return; }
+    const key=currentKey();
+    if(!key){ toast('대회/부서를 먼저 선택하세요','error'); return; }
+    const idw=getIDW(), imd=getIMD();
+    const tid=(idw&&idw.tid)||(imd&&imd.tid)||'';
+    const div=(idw&&idw.div)||(imd&&imd.div)||'';
+    const teams=G.teams[key]||[];
+    const cfg=loadCond(key);
+    cfg.teams=cfg.teams||{};
+    cfg.keep=cfg.keep||{enabled:false,round:'32',homeGroup:''};
+    const courts=courtPool(tid,div,key);
+    const v598CalcGroups = (typeof calcIndivGroups==='function') ? calcIndivGroups : (typeof window.calcIndivGroups==='function') ? window.calcIndivGroups : function(n, grpSize){
+      n=Number(n)||0; grpSize=Number(grpSize)||2;
+      const cnt=Math.max(1, Math.ceil(n/grpSize));
+      const arr=Array.from({length:cnt},()=>[]);
+      for(let i=0;i<n;i++) arr[i%cnt].push(i);
+      return arr;
+    };
+    const groups=(idw&&idw.grpSize)?v598CalcGroups(teams.length,idw.grpSize).length:((G.draws[key]?.groups||[]).length||Math.ceil(teams.length/2));
+    const courtOpts=['<option value="">자동</option>'].concat(courts.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`)).join('');
+    const _grpLabel = (typeof grpLabel==='function') ? grpLabel : (gi=>String(Number(gi)+1)+'조');
+    const groupOpts=['<option value="">자동</option>'].concat(Array.from({length:groups},(_,i)=>`<option value="${i+1}">${_grpLabel(i)}</option>`)).join('');
+    const rows=teams.map((tm,ti)=>{
+      const c=cfg.teams[ti]||{};
+      return `<tr data-ti="${ti}">
+        <td style="text-align:left;font-weight:900;min-width:150px">#${ti+1} ${esc(teamName(key,ti))}</td>
+        <td><input class="form-input v592-seed" value="${esc(c.seed||'')}" placeholder="1~8" style="width:64px;min-height:34px;padding:5px 7px;font-size:.78rem"></td>
+        <td><select class="form-select v592-group" style="min-height:34px;padding:5px 7px;font-size:.78rem">${groupOpts}</select></td>
+        <td><select class="form-select v592-court" style="min-height:34px;padding:5px 7px;font-size:.78rem">${courtOpts}</select></td>
+        <td><select class="form-select v592-order" style="min-height:34px;padding:5px 7px;font-size:.78rem"><option value="auto">자동</option><option value="start">바로시작</option><option value="wait1">대기1</option><option value="wait2">대기2</option><option value="wait3">대기3</option><option value="wait4">대기4</option></select></td>
+      </tr>`;
+    }).join('');
+    let modal=$('mV592Condition');
+    if(!modal){
+      modal=document.createElement('div'); modal.id='mV592Condition'; modal.className='modal-overlay'; document.body.appendChild(modal);
+    }
+    const groupsBy=[...new Set(courts.map(onlyCourtGroup).filter(Boolean))];
+    const homeOpts=['<option value="">자동</option>'].concat(groupsBy.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`)).join('');
+    modal.innerHTML=`<div class="modal-box" style="max-width:980px;width:96vw"><div class="modal-header"><h3>⚙️ 개인전 조건부 추첨 설정</h3><button class="modal-close" onclick="cm('mV592Condition')">✕</button></div><div class="modal-body" style="max-height:78vh;overflow:auto">
+      <div style="padding:10px 12px;margin-bottom:12px;border-radius:12px;background:linear-gradient(135deg,#fff7dd,#eef4ff);border:1.5px solid #d4a017;font-size:.78rem;line-height:1.65;color:#475569"><b>운영자/개발자 전용</b>입니다. 조건은 일반 참가자 화면에는 표시하지 않습니다. 조/코트/순번 조건이 충돌하면 가능한 범위에서 우선 적용하고 경고합니다.</div>
+      <div class="table-wrap" style="border:1px solid #dbe7ff"><table style="min-width:780px"><thead><tr><th>팀</th><th>시드</th><th>예선 조</th><th>예선 코트</th><th>예선 순서</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <div style="margin-top:14px;padding:12px 14px;border:1.5px solid #bfdbfe;border-radius:14px;background:#f8fbff">
+        <label style="display:flex;gap:8px;align-items:center;font-weight:900;color:#1d4ed8"><input id="v592KeepEnabled" type="checkbox" style="accent-color:#1d4ed8"> 예선 코트군을 본선에서도 가능한 범위에서 유지</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+          <div><label class="form-label">유지 라운드</label><select id="v592KeepRound" class="form-select"><option value="64">64강까지만</option><option value="32">32강까지</option><option value="16">16강까지</option><option value="all">가능한 모든 라운드</option></select></div>
+          <div><label class="form-label">통합 기준 코트군</label><select id="v592HomeGroup" class="form-select">${homeOpts}</select></div>
+        </div>
+        <div style="font-size:.72rem;color:#64748b;line-height:1.55;margin-top:8px">예: 원도심 예선팀은 원도심 코트 우선, 국제 예선팀은 국제 코트 우선. 단, 양 팀 코트군이 다르거나 코트 수가 부족하면 자동 배정이 우선됩니다.</div>
+      </div>
+    </div><div class="modal-footer"><button class="btn btn-gray" onclick="cm('mV592Condition')">닫기</button><button class="btn btn-primary" onclick="saveV592ConditionModal()">💾 조건 저장</button></div></div>`;
+    modal.classList.add('open');
+    modal.querySelectorAll('tr[data-ti]').forEach(tr=>{
+      const ti=tr.getAttribute('data-ti'); const c=cfg.teams[ti]||{};
+      tr.querySelector('.v592-group').value=String(c.group||'');
+      tr.querySelector('.v592-court').value=String(c.court||'');
+      tr.querySelector('.v592-order').value=String(c.order||'auto');
+    });
+    $('v592KeepEnabled').checked=!!cfg.keep.enabled;
+    $('v592KeepRound').value=String(cfg.keep.round||'32');
+    $('v592HomeGroup').value=String(cfg.keep.homeGroup||'');
+  };
+  window.saveV592ConditionModal=function(){
+    const key=currentKey(); if(!key) return;
+    const cfg={teams:{}, keep:{enabled:!!$('v592KeepEnabled')?.checked, round:String($('v592KeepRound')?.value||'32'), homeGroup:String($('v592HomeGroup')?.value||'')}};
+    document.querySelectorAll('#mV592Condition tr[data-ti]').forEach(tr=>{
+      const ti=tr.getAttribute('data-ti');
+      const row={seed:String(tr.querySelector('.v592-seed')?.value||'').trim(), group:String(tr.querySelector('.v592-group')?.value||'').trim(), court:String(tr.querySelector('.v592-court')?.value||'').trim(), order:String(tr.querySelector('.v592-order')?.value||'auto')};
+      if(row.seed||row.group||row.court||row.order!=='auto') cfg.teams[ti]=row;
+    });
+    saveCond(key,cfg);
+    try{
+      const seedPairs=Object.entries(cfg.teams).filter(([,v])=>v.seed).map(([ti,v])=>`${Number(ti)+1}=${parseInt(v.seed,10)}`).join(', ');
+      const seedInput=$('idwSeedInput'); if(seedInput) { seedInput.value=seedPairs; if(typeof updateIdwSeedSummary==='function') updateIdwSeedSummary(); }
+    }catch(e){}
+    updateCondMini();
+    if($('mV592Condition')) $('mV592Condition').classList.remove('open');
+    toast('조건 저장 완료','success');
+  };
+  function applyGroupFixed(key, groupData){
+    const cfg=loadCond(key); const cond=cfg.teams||{}; const warnings=[];
+    const fixed=new Map();
+    Object.entries(cond).forEach(([ti,c])=>{ const g=parseInt(c.group,10); if(g>0) fixed.set(Number(ti),g-1); });
+    if(!fixed.size) return warnings;
+    function findGroup(ti){ for(let gi=0;gi<groupData.length;gi++) if((groupData[gi].teams||[]).includes(ti)) return gi; return -1; }
+    fixed.forEach((toGi,ti)=>{
+      if(toGi<0||toGi>=groupData.length){ warnings.push(`#${ti+1} 조 조건 범위 초과`); return; }
+      const fromGi=findGroup(ti); if(fromGi===toGi) return;
+      if(fromGi<0) return;
+      const target=groupData[toGi], source=groupData[fromGi];
+      const swap=(target.teams||[]).find(x=>!fixed.has(Number(x)));
+      source.teams=source.teams.filter(x=>Number(x)!==ti);
+      if(swap!=null){ target.teams=target.teams.filter(x=>Number(x)!==Number(swap)); source.teams.push(Number(swap)); }
+      else if((target.teams||[]).length >= Number(target.size||target.teams.length+1)){ warnings.push(`${teamName(key,ti)}: ${grpLabel(toGi)} 고정 실패(빈 자리 없음)`); source.teams.push(ti); return; }
+      target.teams.push(ti);
+    });
+    return warnings;
+  }
+  function recreateGroupMatchesFromDraw(key){
+    const draw=G.draws[key]; if(!draw||!Array.isArray(draw.groups)) return;
+    const nonGroup=(G.matches[key]||[]).filter(m=>String(m.phase||'')!=='group' && String(m.phase||'')!=='main' && String(m.phase||'')!=='playin');
+    const groupMs=[];
+    draw.groups.forEach((grp,gi)=>{
+      const arr=grp.teams||[];
+      for(let a=0;a<arr.length;a++) for(let b=a+1;b<arr.length;b++) groupMs.push({id:`g_${gi}_${a}_${b}`,phase:'group',group:gi,t1:arr[a],t2:arr[b],winner:null,rubbers:[],court:''});
+    });
+    G.matches[key]=[...nonGroup,...groupMs];
+  }
+  function applyPrelimCourtConditions(key, tid, div){
+    const cfg=loadCond(key); const cond=cfg.teams||{}; const draw=G.draws[key]; if(!draw) return [];
+    const warnings=[]; const courts=courtPool(tid,div,key); const defaultCourts=courts.length?courts:[''];
+    const groupCourt={}, groupOrder={};
+    (draw.groups||[]).forEach((grp,gi)=>{
+      (grp.teams||[]).forEach(ti=>{
+        const c=cond[ti]; if(!c) return;
+        if(c.court){ if(groupCourt[gi]&&groupCourt[gi]!==c.court) warnings.push(`${grpLabel(gi)} 코트 조건 충돌`); else groupCourt[gi]=c.court; }
+        if(c.order && c.order!=='auto') groupOrder[gi]=Math.min(groupOrder[gi]??9, ORDER_MS[c.order]??9);
+      });
+    });
+    const byGroup=new Map();
+    (G.matches[key]||[]).filter(m=>m&&m.phase==='group').forEach(m=>{ const gi=Number(m.group||0); if(!byGroup.has(gi)) byGroup.set(gi,[]); byGroup.get(gi).push(m); });
+    const groupList=[...byGroup.keys()].sort((a,b)=>{
+      const oa=groupOrder[a]??9, ob=groupOrder[b]??9; if(oa!==ob) return oa-ob; return a-b;
+    });
+    let fallbackIdx=0;
+    const now=new Date().toISOString();
+    groupList.forEach((gi,rank)=>{
+      const ms=byGroup.get(gi)||[];
+      const court=groupCourt[gi] || defaultCourts[fallbackIdx++ % defaultCourts.length] || '';
+      if(draw.groups[gi]){ draw.groups[gi].courts=court?[court]:[]; draw.groups[gi].courtGroup=onlyCourtGroup(court); }
+      ms.forEach((m,pos)=>{
+        if(court){ m.court=court; m.courts=[court]; m.manualCourtTarget=court; m.manualCourtPinnedAt=new Date(Date.UTC(2000,0,1,0,0,0,rank*10+pos)).toISOString(); }
+        m.courtAssignedAt=now; m.courtQueueOrder=new Date(Date.UTC(2000,0,1,0,0,0,rank*10+pos)).toISOString();
+        if((groupOrder[gi]??9)>0 || pos>0) m.waitingFirstAt=now; else delete m.waitingFirstAt;
+        m.v592ConditionalCourt=!!groupCourt[gi];
+        m.v592PrelimOrder=groupOrder[gi]??null;
+      });
+    });
+    draw.individualDrawConditions=cfg;
+    return warnings;
+  }
+  function teamPrelimGroupMap(key){
+    const out={}; const draw=G.draws[key]||{};
+    (draw.groups||[]).forEach((g,gi)=>{
+      let group=onlyCourtGroup((g.courts||[])[0]||g.court||g.courtGroup||'');
+      if(!group){
+        const m=(G.matches[key]||[]).find(x=>x.phase==='group'&&Number(x.group||0)===gi&&String(x.court||'').trim());
+        group=onlyCourtGroup(m?.court||'');
+      }
+      (g.teams||[]).forEach(ti=>{ out[Number(ti)]={group,court:(g.courts||[])[0]||''}; });
+    });
+    return out;
+  }
+  function applyMainCourtKeep(key, tid, div){
+    const cfg=loadCond(key); if(!cfg?.keep?.enabled) return false;
+    const map=teamPrelimGroupMap(key); const courts=courtPool(tid,div,key); if(!courts.length) return false;
+    const byGroup={}; courts.forEach(c=>{ const g=onlyCourtGroup(c); if(!byGroup[g]) byGroup[g]=[]; byGroup[g].push(c); });
+    const cursor={}; let changed=false;
+    function pick(group){ const arr=byGroup[group]||[]; if(!arr.length) return ''; const i=cursor[group]||0; cursor[group]=i+1; return arr[i%arr.length]; }
+    (G.matches[key]||[]).forEach(m=>{
+      if(!(m.phase==='main'||m.phase==='playin')) return;
+      if(Number(m.round||0)>0 && cfg.keep.round!=='all') return;
+      const g1=m.t1!=null?map[Number(m.t1)]?.group:'';
+      const g2=m.t2!=null?map[Number(m.t2)]?.group:'';
+      let g='';
+      if(g1&&g2&&g1===g2) g=g1;
+      else if(g1&&g1!==cfg.keep.homeGroup) g=g1;
+      else if(g2&&g2!==cfg.keep.homeGroup) g=g2;
+      else g=g1||g2||'';
+      const court=pick(g);
+      if(court){ m.court=court; m.courts=[court]; m.manualCourtTarget=court; m.manualCourtPinnedAt=new Date().toISOString(); m.v592CourtGroupKeep=g; changed=true; }
+    });
+    return changed;
+  }
+  function applyAllAfterIndividualPrelim(){
+    try{
+      const key=IDW?.key; if(!key || !G.draws?.[key]) return;
+      const cfg=loadCond(key); if(!cfg || (!Object.keys(cfg.teams||{}).length && !cfg.keep?.enabled)) return;
+      const warnings=[];
+      warnings.push(...applyGroupFixed(key, G.draws[key].groups||[]));
+      recreateGroupMatchesFromDraw(key);
+      warnings.push(...applyPrelimCourtConditions(key, IDW.tid, IDW.div));
+      if(warnings.length) toast('조건 일부 경고: '+warnings.slice(0,2).join(' / '),'info');
+      try{ fbLog(`조건부 예선추첨 적용: ${IDW.tid} ${IDW.div} (${summarizeCond(cfg)})`,'⚙️'); }catch(e){}
+      Promise.resolve().then(()=>stD(key)).then(()=>stM(key)).then(()=>{ try{renderBracket();}catch(e){}; toast('조건부 추첨 적용 완료','success'); }).catch(e=>toast('조건 저장 실패: '+(e.message||e),'error'));
+    }catch(e){ console.warn(PATCH_VER,e); }
+  }
+  function applyAllAfterIndividualMain(){
+    try{
+      const key=IMD?.key; if(!key) return;
+      const cfg=loadCond(key); if(!cfg?.keep?.enabled) return;
+      if(applyMainCourtKeep(key, IMD.tid, IMD.div)){
+        try{ if(G.draws&&G.draws[key]) G.draws[key].individualDrawConditions=cfg; }catch(e){}
+        Promise.resolve().then(()=>stD(key)).then(()=>stM(key)).then(()=>{ try{renderBracket();}catch(e){}; toast('본선 코트군 유지 조건 적용 완료','success'); }).catch(e=>toast('본선 코트조건 저장 실패: '+(e.message||e),'error'));
+      }
+    }catch(e){ console.warn(PATCH_VER,e); }
+  }
+  function installWrappers(){
+    if(window.__v592Installed) return; window.__v592Installed=true;
+    const oldOpen=window.openIndividualDraw;
+    if(typeof oldOpen==='function') window.openIndividualDraw=function(){ const r=oldOpen.apply(this,arguments); setTimeout(addConditionButtons,80); setTimeout(addConditionButtons,500); return r; };
+    const oldStart=window.startIndividualDraw;
+    if(typeof oldStart==='function') window.startIndividualDraw=async function(){ const r=await oldStart.apply(this,arguments); setTimeout(applyAllAfterIndividualPrelim,150); return r; };
+    const oldOpenMain=window.openIndividualMainDraw;
+    if(typeof oldOpenMain==='function') window.openIndividualMainDraw=function(){ const r=oldOpenMain.apply(this,arguments); setTimeout(addConditionButtons,80); return r; };
+    const oldStartMain=window.startIndividualMainDraw;
+    if(typeof oldStartMain==='function') window.startIndividualMainDraw=async function(){ const r=await oldStartMain.apply(this,arguments); setTimeout(applyAllAfterIndividualMain,350); return r; };
+  }
+  installWrappers();
+  document.addEventListener('DOMContentLoaded',installWrappers);
+  window.v592ApplyMainCourtKeep=applyAllAfterIndividualMain;
+})();
+</script>
+
+
+<script id="v595ConditionButtonA4CleanVisible">
+(function(){
+  'use strict';
+  const PATCH_VER='v595-condition-button-a4-clean-visible';
+  function $(id){ return document.getElementById(id); }
+  function ownerNow(){
+    try{
+      if(window.AD || window.TM || window.isAdmin || window.isDeveloper || window.isTournamentManager) return true;
+      try{ if(typeof AD!=='undefined' && AD) return true; }catch(e){}
+      try{ if(typeof TM!=='undefined' && TM) return true; }catch(e){}
+      if(document.body && (document.body.classList.contains('admin-mode') || document.body.classList.contains('tm-mode'))) return true;
+      const adminBtn=$('adminSettingsBtn');
+      if(adminBtn){
+        const cs=getComputedStyle(adminBtn);
+        if(cs.display!=='none' && cs.visibility!=='hidden' && adminBtn.offsetParent!==null) return true;
+      }
+      const badge=$('adminBadge');
+      if(badge){
+        const cs=getComputedStyle(badge);
+        if(cs.display!=='none' && cs.visibility!=='hidden') return true;
+      }
+    }catch(e){}
+    return false;
+  }
+  function getIDW595(){ try{ return (typeof IDW!=='undefined' && IDW) ? IDW : (window.IDW||null); }catch(e){ return window.IDW||null; } }
+  function getIMD595(){ try{ return (typeof IMD!=='undefined' && IMD) ? IMD : (window.IMD||null); }catch(e){ return window.IMD||null; } }
+  function currentKey(){
+    try{ const idw=getIDW595(), imd=getIMD595(); return (idw&&idw.key)||(imd&&imd.key)||'';}catch(e){return '';}
+  }
+  function summarize(){
+    try{
+      const key=currentKey();
+      if(!key) return '운영자/개발자 전용 · 대회/부서 선택 후 사용';
+      const raw=localStorage.getItem('v592_indiv_draw_conditions_'+String(key));
+      const cfg=raw?JSON.parse(raw):{};
+      const rows=Object.values(cfg.teams||{}).filter(x=>x&&(x.seed||x.group||x.court||(x.order&&x.order!=='auto'))).length;
+      const keep=!!(cfg.keep&&cfg.keep.enabled);
+      return `운영자/개발자 전용 · 조건 ${rows}건${keep?' · 본선 코트군 유지 ON':''}`;
+    }catch(e){ return '운영자/개발자 전용 · 일반 참가자에게 비공개'; }
+  }
+  function inject(){
+    try{
+      if(!ownerNow()) return;
+      const m=$('mDraw');
+      const host=$('drawCfgScreen');
+      if(!m || !host) return;
+      const isOpen=m.classList.contains('open') || getComputedStyle(m).display!=='none';
+      if(!isOpen) return;
+      let panel=$('v595CondBtn');
+      if(!panel){
+        panel=document.createElement('div');
+        panel.id='v595CondBtn';
+        panel.style.cssText='margin:0 0 12px;padding:12px 14px;border:2px solid #d4a017;border-radius:14px;background:linear-gradient(135deg,#fff7dd,#eef4ff);display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;box-shadow:0 8px 18px rgba(212,160,23,.14)';
+        panel.innerHTML='<div><div style="font-weight:1000;color:#7a5600;font-size:.9rem">⚙️ 개인전 조건부 추첨</div><div id="v595CondMini" style="font-size:.72rem;color:#64748b;margin-top:4px">운영자/개발자 전용 · 일반 참가자에게 비공개</div></div><div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="btn btn-primary" style="font-size:.78rem;padding:7px 13px;background:#d4a017;color:#111827" onclick="openV592ConditionModal()">⚙️ 조건 설정</button><button type="button" class="btn btn-gray" style="font-size:.78rem;padding:7px 13px" onclick="clearV592ConditionModal()">🧹 초기화</button></div>';
+      }
+      const mini=$('v595CondMini'); if(mini) mini.textContent=summarize();
+      const first=host.firstElementChild;
+      if(first!==panel) host.insertBefore(panel, first||null);
+      const old=$('v592CondBtn'); if(old) old.style.display='none';
+    }catch(e){ console.warn(PATCH_VER,e); }
+  }
+  window.v595ShowConditionButtons=inject;
+  const oldShow=window.v592ShowConditionButtons;
+  window.v592ShowConditionButtons=function(){ try{ if(typeof oldShow==='function') oldShow(); }catch(e){} inject(); };
+  ['openIndividualDraw','openIndivDraw','openPrelimDraw','openDrawModal'].forEach(name=>{
+    const fn=window[name];
+    if(typeof fn==='function' && !fn.__v595Wrapped){
+      const wrapped=function(){ const r=fn.apply(this,arguments); setTimeout(inject,50); setTimeout(inject,250); setTimeout(inject,900); return r; };
+      wrapped.__v595Wrapped=true;
+      window[name]=wrapped;
+    }
+  });
+  function start(){ setTimeout(inject,80); setTimeout(inject,400); setTimeout(inject,1000); }
+  document.addEventListener('DOMContentLoaded',()=>{
+    // v602: MutationObserver disabled. The condition panel is injected only when the draw modal opens.
+    start();
+  });
+  // v602: disabled polling to prevent alternating condition panel text and unnecessary CPU/DOM work
+  // setInterval(inject,900);
+})();
+</script>
+
+
+
+<!-- v597: 조건설정 모달 현재 예선추첨 대상 강제 인식 보강 -->
+<script id="v597ConditionModalContextFix">
+(function(){
+  'use strict';
+  const PATCH='v597-condition-modal-context-fix';
+  function $(id){ return document.getElementById(id); }
+  function toastSafe(msg,type){ try{ toast(msg,type||'info'); }catch(e){ alert(msg); } }
+  function getKeyParts(key){
+    key=String(key||'');
+    if(!key || key.indexOf('_')<0) return {tid:'',div:'',key:''};
+    const keys=Object.keys((window.G&&G.tournaments)||{});
+    try{
+      for(const t of (G.tournaments||[])){
+        const prefix=String(t.id||'')+'_';
+        if(key.startsWith(prefix)) return {tid:String(t.id||''), div:key.slice(prefix.length), key};
+      }
+    }catch(e){}
+    const i=key.indexOf('_');
+    return {tid:key.slice(0,i), div:key.slice(i+1), key};
+  }
+  function teamListForKey(key){
+    try{
+      if(typeof getDrawTeamsForKey==='function') return getDrawTeamsForKey(key)||[];
+      return (G.teams&&G.teams[key])||[];
+    }catch(e){ return (G.teams&&G.teams[key])||[]; }
+  }
+  function readIdwCtx(){
+    try{
+      if(typeof IDW!=='undefined' && IDW && IDW.key) return {key:IDW.key, tid:IDW.tid||getKeyParts(IDW.key).tid, div:IDW.div||getKeyParts(IDW.key).div, teams:IDW.teams||teamListForKey(IDW.key), grpSize:IDW.grpSize||2};
+    }catch(e){}
+    try{
+      if(window.IDW && window.IDW.key) return {key:window.IDW.key, tid:window.IDW.tid||getKeyParts(window.IDW.key).tid, div:window.IDW.div||getKeyParts(window.IDW.key).div, teams:window.IDW.teams||teamListForKey(window.IDW.key), grpSize:window.IDW.grpSize||2};
+    }catch(e){}
+    return null;
+  }
+  function readStoredCtx(){
+    const c=window.__v597CurrentIndividualDrawCtx || window.__v592CurrentIndividualDrawCtx || window.__v595CurrentIndividualDrawCtx;
+    if(c && c.key) return {key:c.key, tid:c.tid||getKeyParts(c.key).tid, div:c.div||getKeyParts(c.key).div, teams:c.teams||teamListForKey(c.key), grpSize:c.grpSize||2};
+    return null;
+  }
+  function readFromSelects(){
+    try{
+      const tid=($('brTS')&&$('brTS').value)||($('regTS')&&$('regTS').value)||'';
+      let div=($('brDS')&&$('brDS').value)||($('regDS')&&$('regDS').value)||'';
+      if(div==='__ALL__' || !div){
+        const btn=[...document.querySelectorAll('#brMultiDiv button,#brMultiDiv .active,#brMultiDiv [class*=active]')].find(x=>/(영남권|신인부|금배|은배|동배|테린이|부)/.test(x.textContent||''));
+        if(btn) div=(btn.textContent||'').replace(/^[^가-힣A-Za-z0-9]+/,'').replace(/\s*\d+팀.*$/,'').trim();
+      }
+      if(tid && div && div!=='__ALL__'){
+        const key=tid+'_'+div;
+        if(G.teams && G.teams[key]) return {key, tid, div, teams:teamListForKey(key), grpSize:2};
+      }
+      // v599: tid만 있어도 개인전 부서 자동 탐색
+      if(tid){
+        const keys=Object.keys((G&&G.teams)||{});
+        for(const key of keys){
+          if(!key.startsWith(tid+'_')) continue;
+          const p=getKeyParts(key);
+          const teams=teamListForKey(key);
+          if(teams.length) return {key, tid:p.tid, div:p.div, teams, grpSize:2};
+        }
+      }
+    }catch(e){}
+    return null;
+  }
+  function readFromOpenDrawModal(){
+    try{
+      const m=$('mDraw'); if(!m) return null;
+      const text=(m.textContent||'').replace(/\s+/g,' ');
+      const mt=text.match(/([가-힣A-Za-z0-9\s·ㆍ()_-]*부)\s*[—-]\s*대진\s*포함\s*(\d+)/);
+      const divTitle=mt && mt[1] ? mt[1].trim() : '';
+      const count=mt && mt[2] ? Number(mt[2]) : 0;
+      const keys=Object.keys((G&&G.teams)||{});
+      const candidates=[];
+      for(const key of keys){
+        const p=getKeyParts(key);
+        const teams=teamListForKey(key);
+        if(divTitle && p.div===divTitle) candidates.push({key,tid:p.tid,div:p.div,teams,score:100+(count&&teams.length===count?50:0)});
+        else if(divTitle && p.div && (p.div.includes(divTitle)||divTitle.includes(p.div))) candidates.push({key,tid:p.tid,div:p.div,teams,score:60+(count&&teams.length===count?30:0)});
+        else if(count && teams.length===count) candidates.push({key,tid:p.tid,div:p.div,teams,score:20});
+      }
+      candidates.sort((a,b)=>b.score-a.score);
+      if(candidates[0]) return {...candidates[0], grpSize:2};
+    }catch(e){}
+    return null;
+  }
+  function resolveCtx(){
+    return readIdwCtx() || readStoredCtx() || readFromSelects() || readFromOpenDrawModal();
+  }
+  function setCtx(ctx){
+    if(!ctx || !ctx.key) return false;
+    ctx.teams=ctx.teams||teamListForKey(ctx.key)||[];
+    if(!ctx.tid || !ctx.div){ const p=getKeyParts(ctx.key); ctx.tid=ctx.tid||p.tid; ctx.div=ctx.div||p.div; }
+    window.__v597CurrentIndividualDrawCtx=ctx;
+    try{
+      if(typeof IDW!=='undefined'){
+        const old=(IDW&&typeof IDW==='object')?IDW:{};
+        IDW={...old, key:ctx.key, tid:ctx.tid, div:ctx.div, teams:ctx.teams, grpSize:old.grpSize||ctx.grpSize||2, isRunning:false, drawMode:old.drawMode||'instant'};
+      }
+    }catch(e){}
+    try{ window.IDW={...(window.IDW||{}), key:ctx.key, tid:ctx.tid, div:ctx.div, teams:ctx.teams, grpSize:ctx.grpSize||2}; }catch(e){}
+    return true;
+  }
+  function rememberCtxFromArgs(args){
+    try{
+      const tid=args&&args[0], div=args&&args[1];
+      if(tid && div){
+        const key=String(tid)+'_'+String(div);
+        const ctx={key,tid:String(tid),div:String(div),teams:teamListForKey(key),grpSize:2};
+        setCtx(ctx);
+      }
+    }catch(e){}
+  }
+  function wrapOpenDraw(){
+    ['openIndividualDraw','openIndivDraw','openPrelimDraw'].forEach(name=>{
+      const fn=window[name];
+      if(typeof fn==='function' && !fn.__v597CtxWrapped){
+        const w=function(){ rememberCtxFromArgs(arguments); const r=fn.apply(this,arguments); setTimeout(()=>setCtx(resolveCtx()||readStoredCtx()),20); setTimeout(patchButtons,80); setTimeout(patchButtons,400); return r; };
+        w.__v597CtxWrapped=true;
+        window[name]=w;
+      }
+    });
+  }
+  const origOpen=window.openV592ConditionModal;
+  if(typeof origOpen==='function' && !origOpen.__v597CtxWrapped){
+    const w=function(){
+      // v599: ctx 인식 실패해도 차단하지 않음 - 원본 함수의 currentKey() 로직이 자체 처리
+      const ctx=resolveCtx();
+      if(ctx && ctx.key) setCtx(ctx);
+      return origOpen.apply(this,arguments);
+    };
+    w.__v597CtxWrapped=true;
+    window.openV592ConditionModal=w;
+  }
+  const origClear=window.clearV592ConditionModal;
+  if(typeof origClear==='function' && !origClear.__v597CtxWrapped){
+    const w=function(){ const ctx=resolveCtx(); if(ctx) setCtx(ctx); return origClear.apply(this,arguments); };
+    w.__v597CtxWrapped=true;
+    window.clearV592ConditionModal=w;
+  }
+  function patchButtons(){
+    try{
+      const ctx=resolveCtx(); if(ctx) setCtx(ctx);
+      ['v595CondBtn','v592CondBtn'].forEach(id=>{
+        const p=$(id); if(!p) return;
+        p.setAttribute('data-key', (ctx&&ctx.key)||'');
+        p.querySelectorAll('button').forEach(btn=>{
+          if(/조건\s*설정/.test(btn.textContent||'')) btn.onclick=function(ev){ ev&&ev.preventDefault&&ev.preventDefault(); window.openV592ConditionModal(); };
+          if(/초기화/.test(btn.textContent||'')) btn.onclick=function(ev){ ev&&ev.preventDefault&&ev.preventDefault(); window.clearV592ConditionModal(); };
+        });
+        const mini=p.querySelector('#v595CondMini,#v592CondMini');
+        if(mini && ctx&&ctx.key) mini.textContent='운영자/개발자 전용 · '+ctx.div+' · 조건 설정 가능';
+      });
+    }catch(e){ console.warn(PATCH,e); }
+  }
+  window.v597ResolveDrawContext=resolveCtx;
+  window.v597PatchConditionButtons=patchButtons;
+  wrapOpenDraw();
+  document.addEventListener('DOMContentLoaded',()=>{ wrapOpenDraw(); setTimeout(patchButtons,200); });
+  // v602: disabled polling to prevent alternating condition panel text and unnecessary CPU/DOM work
+  // setInterval(()=>{ wrapOpenDraw(); patchButtons(); },700);
+})();
+</script>
+
+
+<script id="v598ConditionGroupsCompatibility">
+(function(){
+  try{
+    if(typeof window.calcIndivGroups !== 'function' && typeof calcIndivGroups === 'function') window.calcIndivGroups = calcIndivGroups;
+    if(typeof window.calCindivGroups !== 'function') window.calCindivGroups = window.calcIndivGroups || function(n, grpSize){
+      n=Number(n)||0; grpSize=Number(grpSize)||2;
+      const cnt=Math.max(1, Math.ceil(n/grpSize));
+      const arr=Array.from({length:cnt},()=>[]);
+      for(let i=0;i<n;i++) arr[i%cnt].push(i);
+      return arr;
+    };
+  }catch(e){}
+})();
+</script>
+
+
+<script id="v600ConditionTeamNameFix">
+(function(){
+  'use strict';
+  function $(id){ return document.getElementById(id); }
+  function escText(s){ return String(s||'').replace(/\s+/g,' ').trim(); }
+  function getKey(){
+    try{ if(typeof IDW!=='undefined' && IDW && IDW.key) return IDW.key; }catch(e){}
+    try{ if(window.IDW && window.IDW.key) return window.IDW.key; }catch(e){}
+    try{ if(window.__v597CurrentIndividualDrawCtx && window.__v597CurrentIndividualDrawCtx.key) return window.__v597CurrentIndividualDrawCtx.key; }catch(e){}
+    return '';
+  }
+  function playerName(p){
+    if(!p) return '';
+    const name=escText(p.name || p.playerName || p.nm || p.title || '');
+    const club=escText(p.clubsRaw || p.club || (Array.isArray(p.clubs)?p.clubs.join(','):'') || '');
+    return name ? (club ? `${name}(${club})` : name) : '';
+  }
+  function nameFromTeamObject(team,key,idx){
+    try{
+      if(!team || typeof team!=='object') return '';
+      if(team.entryLabel || team.pairLabel) return escText(team.entryLabel || team.pairLabel);
+      if(Array.isArray(team.individualPlayers) && team.individualPlayers.length){
+        const ps=team.individualPlayers.slice(0,2).map(playerName).filter(Boolean);
+        if(ps.length) return ps.join(' / ');
+      }
+      if(typeof getIndividualPlayers==='function'){
+        const ps=getIndividualPlayers(team).slice(0,2).map(playerName).filter(Boolean);
+        if(ps.length) return ps.join(' / ');
+      }
+      if(Array.isArray(team.players) && team.players.length){
+        const ps=team.players.slice(0,2).map(v=>escText(v)).filter(Boolean);
+        if(ps.length) return ps.join(' / ');
+      }
+      if(typeof tdn==='function'){
+        const v=tdn(team,key,idx);
+        if(v && v!=='?' && !/^#?\d+$/.test(String(v).trim())) return escText(v);
+      }
+      return escText(team.club || team.name || team.title || '');
+    }catch(e){ return ''; }
+  }
+  function namesFromData(){
+    const key=getKey();
+    const out=[];
+    try{
+      const arr=(window.G && G.teams && G.teams[key]) || [];
+      arr.forEach((team,idx)=>{ out[idx]=nameFromTeamObject(team,key,idx); });
+    }catch(e){}
+    try{
+      const ctx=(typeof IDW!=='undefined' && IDW) || window.IDW || window.__v597CurrentIndividualDrawCtx || {};
+      const arr=Array.isArray(ctx.teams) ? ctx.teams : [];
+      arr.forEach((item,idx)=>{
+        if(out[idx]) return;
+        if(typeof item==='number'){
+          const team=(window.G && G.teams && G.teams[key] && G.teams[key][item]) || null;
+          out[idx]=nameFromTeamObject(team,key,item);
+        }else{
+          out[idx]=nameFromTeamObject(item,key,idx);
+        }
+      });
+    }catch(e){}
+    return out;
+  }
+  function namesFromDrawTeamList(){
+    const box=$('drawTeamList');
+    if(!box) return [];
+    const nodes=[...box.querySelectorAll('*')].filter(el=>el.children.length===0);
+    const names=[];
+    const seen=new Set();
+    nodes.forEach(el=>{
+      let t=escText(el.textContent||'');
+      if(!t || !t.includes('/')) return;
+      if(t.length>90) return;
+      if(/대진|추가대기|제외|포함|부서|전체|테스트|추첨|선택/.test(t)) return;
+      t=t.replace(/^\s*\d+\s*[.)번-]?\s*/,'').trim();
+      if(!t || seen.has(t)) return;
+      seen.add(t); names.push(t);
+    });
+    return names;
+  }
+  function fixConditionTeamNames(){
+    try{
+      const modal=$('mV592Condition');
+      if(!modal || !modal.classList.contains('open')) return;
+      const rows=[...modal.querySelectorAll('tr[data-ti]')];
+      if(!rows.length) return;
+      const dataNames=namesFromData();
+      const chipNames=namesFromDrawTeamList();
+      rows.forEach((tr,rowIdx)=>{
+        const ti=Number(tr.getAttribute('data-ti'));
+        const td=tr.querySelector('td');
+        if(!td) return;
+        let name=dataNames[ti] || chipNames[ti] || '';
+        // 기존 값이 '#1 #1' 같은 숫자만일 때만 교체. 정상 이름이면 보존.
+        const now=escText(td.textContent||'');
+        const looksBad=/^#\d+\s+#?\d+$/.test(now) || /^#\d+\s*\?$/.test(now) || !now.includes('/');
+        if(name && looksBad){
+          td.textContent=`#${ti+1} ${name}`;
+        }
+      });
+    }catch(e){ console.warn('v600ConditionTeamNameFix failed',e); }
+  }
+  const oldOpen=window.openV592ConditionModal;
+  if(typeof oldOpen==='function' && !oldOpen.__v600NameFixWrapped){
+    const wrapped=function(){
+      const r=oldOpen.apply(this,arguments);
+      setTimeout(fixConditionTeamNames,0);
+      setTimeout(fixConditionTeamNames,80);
+      setTimeout(fixConditionTeamNames,250);
+      return r;
+    };
+    wrapped.__v600NameFixWrapped=true;
+    window.openV592ConditionModal=wrapped;
+  }
+  window.v600FixConditionTeamNames=fixConditionTeamNames;
+  document.addEventListener('DOMContentLoaded',()=>{
+    // v602: MutationObserver disabled. Team names are fixed when the condition modal opens.
+  });
+})();
+</script>
+
+
+<!-- v601: 조건설정 UI 안정화 + 예선 코트 목록 보강 -->
+<script id="v601ConditionUiCourtFix">
+(function(){
+  'use strict';
+  function $(id){ return document.getElementById(id); }
+  function clean(s){ return String(s||'').replace(/\s+/g,' ').trim(); }
+  function esc(s){ return String(s??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
+  function arr(v){ return Array.isArray(v) ? v : []; }
+  function getCtx(){
+    try{ if(typeof IDW!=='undefined' && IDW && IDW.key) return IDW; }catch(e){}
+    try{ if(window.IDW && window.IDW.key) return window.IDW; }catch(e){}
+    try{ if(window.__v597CurrentIndividualDrawCtx && window.__v597CurrentIndividualDrawCtx.key) return window.__v597CurrentIndividualDrawCtx; }catch(e){}
+    return {};
+  }
+  function keyParts(key){
+    key=String(key||'');
+    try{
+      for(const t of arr(window.G&&G.tournaments)){
+        const pre=String(t.id||'')+'_';
+        if(key.startsWith(pre)) return {tid:String(t.id||''), div:key.slice(pre.length)};
+      }
+    }catch(e){}
+    const i=key.indexOf('_');
+    return i>0 ? {tid:key.slice(0,i), div:key.slice(i+1)} : {tid:'',div:''};
+  }
+  function getTournament(tid){
+    try{ return arr(G.tournaments).find(t=>String(t.id)===String(tid)) || null; }catch(e){ return null; }
+  }
+  function expandGroupsSafe(groups){
+    try{ if(typeof expandCourtGroups==='function') return arr(expandCourtGroups(groups)).map(String).filter(Boolean); }catch(e){}
+    const out=[];
+    arr(groups).forEach(g=>{
+      if(typeof g==='string') out.push(g);
+      else if(g && typeof g==='object'){
+        if(Array.isArray(g.courts)) out.push(...g.courts);
+        else{
+          const name=clean(g.name||g.group||g.label||'');
+          const cnt=Number(g.count||g.cnt||g.courtsCount||0);
+          if(name && cnt){ for(let i=1;i<=cnt;i++) out.push(name+i); }
+        }
+      }
+    });
+    return out.map(String).filter(Boolean);
+  }
+  function collectCourts(){
+    const ctx=getCtx();
+    const key=ctx.key||'';
+    const kp=keyParts(key);
+    const tid=ctx.tid||kp.tid;
+    const div=ctx.div||kp.div;
+    const out=[];
+    try{ if(typeof getDivisionPhaseConfiguredCourts==='function') out.push(...arr(getDivisionPhaseConfiguredCourts(tid,div,'group'))); }catch(e){}
+    try{ if(typeof getBracketAllowedCourts==='function') out.push(...arr(getBracketAllowedCourts(key))); }catch(e){}
+    try{ out.push(...arr(G.draws&&G.draws[key]&&G.draws[key].allowedCourts)); }catch(e){}
+    const t=getTournament(tid);
+    try{ const ds=t && t.divSettings && t.divSettings[div]; if(ds){ out.push(...arr(ds.allowedCourts)); out.push(...arr(ds.mainAllowedCourts)); } }catch(e){}
+    try{ if(t) out.push(...expandGroupsSafe(t.courtGroups)); }catch(e){}
+    // 화면의 코트 현황 카드에서도 보강. 예: 국제1, 원도심(인조)1, 장유중(클레이)2
+    try{
+      const txt=(document.body.innerText||'');
+      const re=/([가-힣A-Za-z]+(?:\([^)]*\))?\s*\d+)/g;
+      let m;
+      while((m=re.exec(txt))){
+        const v=clean(m[1]).replace(/\s+/g,'');
+        if(/^(국제|능동|금병|삼계|원도심|장유중|동부|클레이|인조|하드|코트)/.test(v)) out.push(v);
+      }
+    }catch(e){}
+    const seen=new Set(), ret=[];
+    out.map(x=>clean(x).replace(/\s+/g,'')).filter(Boolean).forEach(c=>{
+      if(!seen.has(c)){ seen.add(c); ret.push(c); }
+    });
+    return ret;
+  }
+  function fixCourtSelects(){
+    try{
+      const modal=$('mV592Condition');
+      if(!modal || !modal.classList.contains('open')) return;
+      const courts=collectCourts();
+      if(!courts.length) return;
+      modal.querySelectorAll('select.v592-court').forEach(sel=>{
+        const cur=sel.value;
+        const existing=[...sel.options].map(o=>o.value).filter(Boolean);
+        if(existing.length < courts.length || !courts.every(c=>existing.includes(c))){
+          sel.innerHTML='<option value="">자동</option>'+courts.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+          if(cur && courts.includes(cur)) sel.value=cur;
+        }
+      });
+      const home=$('v592HomeGroup');
+      if(home){
+        const groups=[...new Set(courts.map(c=>clean(c).replace(/[\s_-]*\d+$/,'')).filter(Boolean))];
+        const cur=home.value;
+        home.innerHTML='<option value="">자동</option>'+groups.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join('');
+        if(cur && groups.includes(cur)) home.value=cur;
+      }
+    }catch(e){ console.warn('v601 fixCourtSelects failed',e); }
+  }
+  function stabilizeConditionPanel(){
+    try{
+      const p=$('v595CondBtn') || $('v592CondBtn');
+      if(p){
+        p.style.minHeight='72px';
+        p.style.transform='none';
+        p.style.transition='none';
+        const mini=p.querySelector('#v595CondMini,#v592CondMini');
+        if(mini){
+          const ctx=getCtx();
+          const div=ctx.div || keyParts(ctx.key||'').div || '개인전';
+          mini.textContent='운영자/개발자 전용 · '+div+' · 조건은 일반 참가자에게 비공개';
+          mini.style.minWidth='280px';
+          mini.style.whiteSpace='nowrap';
+          mini.style.overflow='hidden';
+          mini.style.textOverflow='ellipsis';
+        }
+      }
+      // 조건 버튼 주변에서 움직이는 효과/전환 방지
+      document.querySelectorAll('#v595CondBtn *,#v592CondBtn *').forEach(el=>{ el.style.animation='none'; el.style.transition='none'; });
+    }catch(e){}
+  }
+  const oldOpen=window.openV592ConditionModal;
+  if(typeof oldOpen==='function' && !oldOpen.__v601CourtWrapped){
+    const wrapped=function(){
+      const r=oldOpen.apply(this,arguments);
+      setTimeout(()=>{fixCourtSelects();stabilizeConditionPanel();},0);
+      setTimeout(()=>{fixCourtSelects();stabilizeConditionPanel();},120);
+      setTimeout(()=>{fixCourtSelects();stabilizeConditionPanel();},400);
+      return r;
+    };
+    wrapped.__v601CourtWrapped=true;
+    window.openV592ConditionModal=wrapped;
+  }
+  window.v601FixConditionCourtSelects=fixCourtSelects;
+  window.v601StabilizeConditionPanel=stabilizeConditionPanel;
+  document.addEventListener('DOMContentLoaded',()=>{
+    // v602: polling disabled. Stabilization and court select repair run only on modal open/injection.
+  });
+})();
+</script>
+
+
+
+<script id="v602ConditionPanelNoPollingFinal">
+(function(){
+  'use strict';
+  function $(id){ return document.getElementById(id); }
+  function clean(s){ return String(s||'').replace(/\s+/g,' ').trim(); }
+  function ctxDiv(){
+    try{ if(typeof IDW!=='undefined' && IDW && IDW.div) return IDW.div; }catch(e){}
+    try{ if(window.IDW && window.IDW.div) return window.IDW.div; }catch(e){}
+    try{ if(window.__v597CurrentIndividualDrawCtx && window.__v597CurrentIndividualDrawCtx.div) return window.__v597CurrentIndividualDrawCtx.div; }catch(e){}
+    try{
+      const txt=(document.getElementById('mDraw')?.textContent||'').replace(/\s+/g,' ');
+      const m=txt.match(/([가-힣A-Za-z0-9\s·ㆍ()_-]*부)\s*[—-]\s*대진\s*포함/);
+      if(m && m[1]) return clean(m[1]);
+    }catch(e){}
+    return '개인전';
+  }
+  function stablePanelText(){
+    const p=$('v595CondBtn') || $('v592CondBtn');
+    if(!p) return;
+    p.style.minHeight='72px';
+    p.style.transition='none';
+    p.style.animation='none';
+    p.querySelectorAll('*').forEach(el=>{ el.style.transition='none'; el.style.animation='none'; });
+    const mini=p.querySelector('#v595CondMini,#v592CondMini');
+    if(mini){
+      mini.textContent='운영자/개발자 전용 · '+ctxDiv()+' · 조건은 일반 참가자에게 비공개';
+      mini.style.minWidth='320px';
+      mini.style.whiteSpace='nowrap';
+      mini.style.overflow='hidden';
+      mini.style.textOverflow='ellipsis';
+    }
+  }
+  function runStableSoon(){
+    stablePanelText();
+    setTimeout(stablePanelText,60);
+    setTimeout(stablePanelText,250);
+    setTimeout(stablePanelText,800);
+  }
+  // 기존 표시 함수들은 실행 후 문구를 한 가지로 고정한다. 반복 폴링은 v602에서 제거됨.
+  ['v595ShowConditionButtons','v592ShowConditionButtons','v597PatchConditionButtons','v601StabilizeConditionPanel'].forEach(name=>{
+    const fn=window[name];
+    if(typeof fn==='function' && !fn.__v602StableWrapped){
+      const w=function(){ const r=fn.apply(this,arguments); runStableSoon(); return r; };
+      w.__v602StableWrapped=true;
+      window[name]=w;
+    }
+  });
+  ['openIndividualDraw','openIndivDraw','openPrelimDraw','openDrawModal'].forEach(name=>{
+    const fn=window[name];
+    if(typeof fn==='function' && !fn.__v602StableOpenWrapped){
+      const w=function(){ const r=fn.apply(this,arguments); runStableSoon(); return r; };
+      w.__v602StableOpenWrapped=true;
+      window[name]=w;
+    }
+  });
+  document.addEventListener('DOMContentLoaded',runStableSoon);
+  window.v602StableConditionPanel=stablePanelText;
+})();
+</script>
+
+
+
+<!-- v603: 조건 버튼 이벤트 기반 표시 복구 - 반복 폴링 없음 -->
+<script id="v603ConditionButtonEventFix">
+(function(){
+  'use strict';
+  function $(id){ return document.getElementById(id); }
+  function clean(s){ return String(s||'').replace(/\s+/g,' ').trim(); }
+  function isOpen(el){
+    if(!el) return false;
+    try{ return el.classList.contains('open') || getComputedStyle(el).display !== 'none'; }catch(e){ return false; }
+  }
+  function isOwner(){
+    try{
+      if(location.protocol==='file:') return true;
+      if(window.AD || window.TM || window.isAdmin || window.isDeveloper || window.isTournamentManager) return true;
+      try{ if(typeof AD!=='undefined' && AD) return true; }catch(e){}
+      try{ if(typeof TM!=='undefined' && TM) return true; }catch(e){}
+      if(document.body && (document.body.classList.contains('admin-mode') || document.body.classList.contains('tm-mode'))) return true;
+      const adminBtn=$('adminSettingsBtn');
+      if(adminBtn){
+        const cs=getComputedStyle(adminBtn);
+        if(cs.display!=='none' && cs.visibility!=='hidden' && adminBtn.offsetParent!==null) return true;
+      }
+    }catch(e){}
+    return false;
+  }
+  function keyParts(key){
+    const s=String(key||'');
+    const i=s.indexOf('_');
+    return i>=0 ? {tid:s.slice(0,i), div:s.slice(i+1)} : {tid:'',div:''};
+  }
+  function teamListForKey(key){
+    try{ return (window.G && G.teams && Array.isArray(G.teams[key])) ? G.teams[key] : []; }catch(e){ return []; }
+  }
+  function resolveCtxFromModal(){
+    try{
+      const m=$('mDraw');
+      const txt=(m?.textContent||'').replace(/\s+/g,' ');
+      const mt=txt.match(/([가-힣A-Za-z0-9\s·ㆍ()_-]*부)\s*[—-]\s*대진\s*포함\s*(\d+)/);
+      const divTitle=mt&&mt[1]?clean(mt[1]):'';
+      const count=mt&&mt[2]?Number(mt[2]):0;
+      const keys=Object.keys((window.G&&G.teams)||{});
+      let best=null;
+      keys.forEach(key=>{
+        const p=keyParts(key);
+        const teams=teamListForKey(key);
+        let score=0;
+        if(divTitle && p.div===divTitle) score+=100;
+        else if(divTitle && p.div && (p.div.includes(divTitle)||divTitle.includes(p.div))) score+=70;
+        if(count && teams.length===count) score+=40;
+        if(score>0 && (!best || score>best.score)) best={key,tid:p.tid,div:p.div,teams,grpSize:2,score};
+      });
+      if(best) return best;
+    }catch(e){}
+    return null;
+  }
+  function resolveCtx(){
+    try{ if(typeof IDW!=='undefined' && IDW && IDW.key) return {key:IDW.key,tid:IDW.tid||keyParts(IDW.key).tid,div:IDW.div||keyParts(IDW.key).div,teams:IDW.teams||teamListForKey(IDW.key),grpSize:IDW.grpSize||2}; }catch(e){}
+    try{ if(window.IDW && window.IDW.key) return {key:window.IDW.key,tid:window.IDW.tid||keyParts(window.IDW.key).tid,div:window.IDW.div||keyParts(window.IDW.key).div,teams:window.IDW.teams||teamListForKey(window.IDW.key),grpSize:window.IDW.grpSize||2}; }catch(e){}
+    try{ if(window.__v597CurrentIndividualDrawCtx && window.__v597CurrentIndividualDrawCtx.key) return window.__v597CurrentIndividualDrawCtx; }catch(e){}
+    return resolveCtxFromModal();
+  }
+  function setCtx(ctx){
+    if(!ctx || !ctx.key) return;
+    ctx.teams = ctx.teams || teamListForKey(ctx.key);
+    if(!ctx.tid || !ctx.div){ const p=keyParts(ctx.key); ctx.tid=ctx.tid||p.tid; ctx.div=ctx.div||p.div; }
+    window.__v597CurrentIndividualDrawCtx = ctx;
+    try{ window.IDW = Object.assign({}, window.IDW||{}, {key:ctx.key, tid:ctx.tid, div:ctx.div, teams:ctx.teams, grpSize:ctx.grpSize||2}); }catch(e){}
+    try{
+      if(typeof IDW!=='undefined') IDW = Object.assign({}, (IDW&&typeof IDW==='object')?IDW:{}, {key:ctx.key, tid:ctx.tid, div:ctx.div, teams:ctx.teams, grpSize:ctx.grpSize||2});
+    }catch(e){}
+  }
+  function ensureConditionButton(){
+    try{
+      if(!isOwner()) return;
+      const m=$('mDraw');
+      if(!isOpen(m)) return;
+      const host=$('drawCfgScreen') || m.querySelector('.modal-body');
+      if(!host) return;
+      const ctx=resolveCtx();
+      if(ctx) setCtx(ctx);
+      let panel=$('v603CondBtn') || $('v595CondBtn') || $('v592CondBtn');
+      if(!panel){
+        panel=document.createElement('div');
+        panel.id='v603CondBtn';
+        panel.innerHTML='<div><div style="font-weight:1000;color:#7a5600;font-size:.9rem">⚙️ 개인전 조건부 추첨</div><div class="v603CondMini" style="font-size:.72rem;color:#64748b;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">운영자/개발자 전용 · 조건은 일반 참가자에게 비공개</div></div><div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="btn btn-primary v603CondOpen" style="font-size:.78rem;padding:7px 13px;background:#d4a017;color:#111827">⚙️ 조건 설정</button><button type="button" class="btn btn-gray v603CondClear" style="font-size:.78rem;padding:7px 13px">🧹 초기화</button></div>';
+      }
+      panel.id='v603CondBtn';
+      panel.style.cssText='margin:0 0 12px;padding:12px 14px;border:2px solid #d4a017;border-radius:14px;background:linear-gradient(135deg,#fff7dd,#eef4ff);display:flex!important;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;box-shadow:0 8px 18px rgba(212,160,23,.14);min-height:72px;animation:none!important;transition:none!important';
+      const div=(ctx&&ctx.div)||'개인전';
+      const mini=panel.querySelector('.v603CondMini,#v595CondMini,#v592CondMini');
+      if(mini) mini.textContent='운영자/개발자 전용 · '+div+' · 조건은 일반 참가자에게 비공개';
+      panel.querySelectorAll('*').forEach(el=>{ el.style.animation='none'; el.style.transition='none'; });
+      const openBtn=panel.querySelector('.v603CondOpen') || [...panel.querySelectorAll('button')].find(b=>/조건\s*설정/.test(b.textContent||''));
+      if(openBtn) openBtn.onclick=function(ev){ ev&&ev.preventDefault&&ev.preventDefault(); const c=resolveCtx(); if(c) setCtx(c); if(typeof window.openV592ConditionModal==='function') window.openV592ConditionModal(); else alert('조건 설정 함수가 없습니다.'); };
+      const clearBtn=panel.querySelector('.v603CondClear') || [...panel.querySelectorAll('button')].find(b=>/초기화/.test(b.textContent||''));
+      if(clearBtn) clearBtn.onclick=function(ev){ ev&&ev.preventDefault&&ev.preventDefault(); const c=resolveCtx(); if(c) setCtx(c); if(typeof window.clearV592ConditionModal==='function') window.clearV592ConditionModal(); };
+      const first=host.firstElementChild;
+      if(first!==panel) host.insertBefore(panel, first||null);
+      ['v595CondBtn','v592CondBtn'].forEach(id=>{ const old=$(id); if(old && old!==panel) old.remove(); });
+    }catch(e){ console.warn('v603ConditionButtonEventFix failed',e); }
+  }
+  window.v603EnsureConditionButton=ensureConditionButton;
+  // 반복 폴링 없이, 모달을 여는 클릭 직후에만 몇 번 확인
+  document.addEventListener('click', function(){
+    setTimeout(ensureConditionButton,30);
+    setTimeout(ensureConditionButton,160);
+    setTimeout(ensureConditionButton,450);
+  }, true);
+  document.addEventListener('DOMContentLoaded', function(){
+    setTimeout(ensureConditionButton,100);
+    setTimeout(ensureConditionButton,700);
+  });
+  ['openIndividualDraw','openIndivDraw','openPrelimDraw','openDrawModal'].forEach(name=>{
+    const fn=window[name];
+    if(typeof fn==='function' && !fn.__v603CondWrapped){
+      const w=function(){ const r=fn.apply(this,arguments); setTimeout(ensureConditionButton,40); setTimeout(ensureConditionButton,180); setTimeout(ensureConditionButton,500); return r; };
+      w.__v603CondWrapped=true;
+      window[name]=w;
+    }
+  });
+})();
+</script>
+
+
+
+<!-- v604: 조건 저장값을 실제 예선 재추첨 결과에 강제 반영 -->
+<script id="v604ConditionDrawApplyFix">
+(function(){
+  'use strict';
+  const PATCH='v604-condition-draw-apply-fix';
+  function $(id){ return document.getElementById(id); }
+  function toastSafe(msg,type){ try{ if(typeof toast==='function') toast(msg,type||'info'); else console.log(msg); }catch(e){ console.log(msg); } }
+  function getIDW(){ try{ if(typeof IDW!=='undefined' && IDW && IDW.key) return IDW; }catch(e){} try{ if(window.IDW && window.IDW.key) return window.IDW; }catch(e){} return null; }
+  function storeKey(key){ return 'v592_indiv_draw_conditions_'+String(key||''); }
+  function loadCond(key){
+    try{ const raw=localStorage.getItem(storeKey(key)); if(raw) return JSON.parse(raw)||{}; }catch(e){}
+    try{ return (G.draws&&G.draws[key]&&G.draws[key].individualDrawConditions)||{}; }catch(e){}
+    return {};
+  }
+  function saveCond(key,cfg){
+    try{ localStorage.setItem(storeKey(key), JSON.stringify(cfg||{})); }catch(e){}
+    try{ if(G.draws&&G.draws[key]) G.draws[key].individualDrawConditions=cfg||{}; }catch(e){}
+  }
+  function cleanCourtGroup(v){
+    const s=String(v||'').trim();
+    return s ? (s.replace(/[\s_-]*\d+\s*$/,'').trim() || s) : '';
+  }
+  function teamName(key,ti){
+    try{ const tm=(G.teams[key]||[])[Number(ti)]; if(typeof tdn==='function') return tdn(tm,key,Number(ti)); }catch(e){}
+    return '#'+(Number(ti)+1);
+  }
+  function groupLabel(gi){ try{ return typeof grpLabel==='function' ? grpLabel(gi) : (Number(gi)+1)+'조'; }catch(e){ return (Number(gi)+1)+'조'; } }
+  function courtPool(tid,div,key){
+    let arr=[];
+    try{ if(typeof getDivisionPhaseConfiguredCourts==='function') arr=(getDivisionPhaseConfiguredCourts(tid,div,'group')||[]); }catch(e){}
+    if(!arr.length){ try{ if(typeof getBracketAllowedCourts==='function') arr=(getBracketAllowedCourts(key)||[]); }catch(e){} }
+    // 화면에 이미 표시된 코트명도 fallback으로 수집
+    if(!arr.length){
+      try{
+        document.querySelectorAll('.court-drop-zone, [data-court], .court-card').forEach(el=>{
+          const dc=el.getAttribute('data-court'); if(dc) arr.push(dc);
+          const txt=(el.textContent||'').replace(/\s+/g,' ');
+          const m=txt.match(/(국제\d+|능동\d+|원도심\(인조\)\d+|장유중\(클레이\)\d+|삼계\d+|금병\d+|동부\d+)/g);
+          if(m) arr.push(...m);
+        });
+      }catch(e){}
+    }
+    return [...new Set(arr.map(x=>String(x||'').trim()).filter(Boolean))];
+  }
+  function conditionCount(cfg){
+    return Object.values(cfg&&cfg.teams||{}).filter(c=>c&&(c.seed||c.group||c.court||(c.order&&c.order!=='auto'))).length;
+  }
+  function groupTeamMap(draw){
+    const pos={};
+    (draw.groups||[]).forEach((g,gi)=>{ (g.teams||[]).forEach(ti=>{ pos[Number(ti)]=gi; }); });
+    return pos;
+  }
+  function rebalanceGroupsByConditions(key,cfg){
+    const draw=G.draws&&G.draws[key];
+    if(!draw||!Array.isArray(draw.groups)) return [];
+    const warnings=[];
+    const teams=G.teams[key]||[];
+    const cond=cfg.teams||{};
+    const groups=draw.groups;
+    const fixedEntries=Object.entries(cond).map(([ti,c])=>({ti:Number(ti), g:parseInt(c.group,10)})).filter(x=>Number.isInteger(x.ti)&&x.g>0);
+    if(!fixedEntries.length) return warnings;
+    const fixedSet=new Set(fixedEntries.map(x=>x.ti));
+    const pos=()=>groupTeamMap(draw);
+    function removeFrom(gi,ti){ groups[gi].teams=(groups[gi].teams||[]).filter(x=>Number(x)!==Number(ti)); }
+    function addTo(gi,ti){ groups[gi].teams=groups[gi].teams||[]; if(!groups[gi].teams.map(Number).includes(Number(ti))) groups[gi].teams.push(Number(ti)); }
+    fixedEntries.sort((a,b)=>a.g-b.g).forEach(({ti,g})=>{
+      const toGi=g-1;
+      if(toGi<0||toGi>=groups.length){ warnings.push(`${teamName(key,ti)}: 조 범위 초과`); return; }
+      const p=pos(); const fromGi=p[ti];
+      if(fromGi===undefined){ warnings.push(`${teamName(key,ti)}: 팀 위치 없음`); return; }
+      if(fromGi===toGi) return;
+      const target=groups[toGi];
+      const source=groups[fromGi];
+      const targetSize=Number(target.size||target.teams?.length||0) || Math.max(2,(target.teams||[]).length);
+      let swap=null;
+      if((target.teams||[]).length>=targetSize){
+        swap=(target.teams||[]).find(x=>!fixedSet.has(Number(x)));
+      }
+      removeFrom(fromGi,ti);
+      if(swap!=null){ removeFrom(toGi,swap); addTo(fromGi,Number(swap)); }
+      else if((target.teams||[]).length>=targetSize){ warnings.push(`${teamName(key,ti)}: ${groupLabel(toGi)} 고정 실패(빈자리 없음)`); addTo(fromGi,ti); return; }
+      addTo(toGi,ti);
+    });
+    // 중복/누락 방지: 중복 제거 후 누락 팀은 빈자리 또는 마지막 조에 보강
+    const seen=new Set();
+    groups.forEach(g=>{ g.teams=(g.teams||[]).filter(ti=>{ ti=Number(ti); if(seen.has(ti)) return false; seen.add(ti); return ti>=0&&ti<teams.length; }); });
+    teams.forEach((_,ti)=>{ if(!seen.has(ti)){ const g=groups.find(x=>(x.teams||[]).length<Number(x.size||99))||groups[groups.length-1]; if(g) g.teams.push(ti); } });
+    return warnings;
+  }
+  function rebuildGroupMatches(key){
+    const draw=G.draws&&G.draws[key]; if(!draw||!Array.isArray(draw.groups)) return;
+    const keep=(G.matches[key]||[]).filter(m=>m && String(m.phase||'')!=='group');
+    const created=[];
+    draw.groups.forEach((grp,gi)=>{
+      const arr=(grp.teams||[]).map(Number).filter(Number.isInteger);
+      for(let a=0;a<arr.length;a++){
+        for(let b=a+1;b<arr.length;b++){
+          created.push({id:`g_${gi}_${a}_${b}`, phase:'group', group:gi, t1:arr[a], t2:arr[b], winner:null, rubbers:[], court:''});
+        }
+      }
+    });
+    G.matches[key]=[...keep,...created];
+  }
+  function applyCourtAndOrderConditions(key,tid,div,cfg){
+    const warnings=[];
+    const draw=G.draws&&G.draws[key]; if(!draw) return warnings;
+    const cond=cfg.teams||{};
+    const ORDER={start:0,wait1:1,wait2:2,wait3:3,wait4:4,auto:9};
+    const courts=courtPool(tid,div,key);
+    const defaultCourts=courts.length?courts:[''];
+    const groupCourt={}; const groupOrder={};
+    (draw.groups||[]).forEach((grp,gi)=>{
+      (grp.teams||[]).forEach(ti=>{
+        const c=cond[String(ti)]||cond[Number(ti)]; if(!c) return;
+        if(c.court){
+          if(groupCourt[gi] && groupCourt[gi]!==c.court) warnings.push(`${groupLabel(gi)} 코트 조건 충돌`);
+          else groupCourt[gi]=String(c.court).trim();
+        }
+        if(c.order && c.order!=='auto') groupOrder[gi]=Math.min(groupOrder[gi]??9, ORDER[c.order]??9);
+      });
+    });
+    const byGroup=new Map();
+    (G.matches[key]||[]).filter(m=>m&&String(m.phase||'')==='group').forEach(m=>{
+      const gi=Number(m.group||0);
+      if(!byGroup.has(gi)) byGroup.set(gi,[]);
+      byGroup.get(gi).push(m);
+    });
+    const groupList=[...byGroup.keys()].sort((a,b)=>{
+      const oa=groupOrder[a]??9, ob=groupOrder[b]??9;
+      if(oa!==ob) return oa-ob;
+      return a-b;
+    });
+    let fallbackIdx=0, matchIdx=0;
+    const now=new Date().toISOString();
+    groupList.forEach((gi,rank)=>{
+      const ms=(byGroup.get(gi)||[]).sort((a,b)=>String(a.id||'').localeCompare(String(b.id||''),'ko'));
+      const court=groupCourt[gi] || defaultCourts[fallbackIdx++ % defaultCourts.length] || '';
+      const order=groupOrder[gi]??9;
+      if(draw.groups[gi]){
+        draw.groups[gi].courts=court?[court]:[];
+        draw.groups[gi].court=court;
+        draw.groups[gi].courtGroup=cleanCourtGroup(court);
+        draw.groups[gi].v604Order=order;
+      }
+      ms.forEach((m,pos)=>{
+        if(court){ m.court=court; m.courts=[court]; m.manualCourtTarget=court; m.manualCourtPinnedAt=new Date(Date.UTC(2000,0,1,0,0,0,rank*100+pos)).toISOString(); }
+        m.courtAssignedAt=now;
+        m.courtQueueOrder=new Date(Date.UTC(2000,0,1,0,0,0,rank*100+pos)).toISOString();
+        if(order>0 || pos>0) m.waitingFirstAt=now; else delete m.waitingFirstAt;
+        m.v604ConditionalApplied=true;
+        matchIdx++;
+      });
+    });
+    return warnings;
+  }
+  async function applyNow(reason){
+    const idw=getIDW(); if(!idw||!idw.key) return false;
+    const key=idw.key; const cfg=loadCond(key);
+    if(!cfg || (!conditionCount(cfg) && !(cfg.keep&&cfg.keep.enabled))) return false;
+    if(!G.draws||!G.draws[key]||!Array.isArray(G.draws[key].groups)){ return false; }
+    const warnings=[];
+    warnings.push(...rebalanceGroupsByConditions(key,cfg));
+    rebuildGroupMatches(key);
+    warnings.push(...applyCourtAndOrderConditions(key,idw.tid,idw.div,cfg));
+    try{
+      G.draws[key].individualDrawConditions=cfg;
+      G.draws[key].conditionalAppliedAt=new Date().toISOString();
+      G.draws[key].conditionalAppliedBy='v604';
+    }catch(e){}
+    try{ if(typeof fbLog==='function') fbLog(`조건부 예선추첨 실제 반영: ${idw.tid} ${idw.div} (${conditionCount(cfg)}건)`,'⚙️'); }catch(e){}
+    try{ if(typeof stD==='function') await stD(key); }catch(e){ console.warn(PATCH,'stD failed',e); }
+    try{ if(typeof stM==='function') await stM(key); }catch(e){ console.warn(PATCH,'stM failed',e); }
+    try{ if(typeof renderBracket==='function') renderBracket(); }catch(e){}
+    if(warnings.length) toastSafe('조건 일부 경고: '+warnings.slice(0,2).join(' / '),'info');
+    else toastSafe('조건부 추첨 조건이 실제 대진에 반영됐습니다','success');
+    return true;
+  }
+  function injectSeedBeforeDraw(){
+    try{
+      const idw=getIDW(); if(!idw||!idw.key) return;
+      const cfg=loadCond(idw.key); const rows=cfg.teams||{};
+      const seedPairs=Object.entries(rows).filter(([,v])=>v&&v.seed).map(([ti,v])=>`${Number(ti)+1}=${parseInt(v.seed,10)}`).filter(x=>!/NaN/.test(x)).join(', ');
+      const inp=$('idwSeedInput');
+      if(inp && seedPairs){ inp.value=seedPairs; if(typeof updateIdwSeedSummary==='function') updateIdwSeedSummary(); }
+    }catch(e){}
+  }
+  function wrapDrawButton(){
+    const btn=$('confirmDrawBtn');
+    if(!btn || btn.__v604Wrapped) return;
+    const old=btn.onclick;
+    if(typeof old!=='function') return;
+    btn.onclick=async function(ev){
+      injectSeedBeforeDraw();
+      let r;
+      try{ r=old.call(this,ev); if(r && typeof r.then==='function') await r; }catch(e){ throw e; }
+      // 원래 함수가 저장/자동 코트배정까지 끝낸 뒤 조건 재반영
+      setTimeout(()=>applyNow('button'),220);
+      setTimeout(()=>applyNow('button-late'),900);
+      return r;
+    };
+    btn.__v604Wrapped=true;
+  }
+  function afterOpen(){
+    setTimeout(wrapDrawButton,40);
+    setTimeout(wrapDrawButton,180);
+    setTimeout(wrapDrawButton,500);
+  }
+  const oldOpen=window.openIndividualDraw;
+  if(typeof oldOpen==='function' && !oldOpen.__v604Wrapped){
+    const w=function(){ const r=oldOpen.apply(this,arguments); afterOpen(); return r; };
+    w.__v604Wrapped=true;
+    window.openIndividualDraw=w;
+  }
+  document.addEventListener('click', function(){ setTimeout(wrapDrawButton,80); }, true);
+  document.addEventListener('DOMContentLoaded', function(){ setTimeout(wrapDrawButton,300); });
+  window.v604ApplyConditionalPrelimNow=applyNow;
+  window.v604WrapConditionalDrawButton=wrapDrawButton;
+})();
+</script>
+
+
+
+<!-- v605: 조건 저장/재열기/실제 추첨 반영 최종 보강 -->
+<script id="v605ConditionPersistenceAndApplyFix">
+(function(){
+  'use strict';
+  const VER='v605-condition-persistence-apply-fix';
+  const MEM = window.__v605ConditionStore || (window.__v605ConditionStore={});
+  function $(id){ return document.getElementById(id); }
+  function clean(s){ return String(s||'').replace(/\s+/g,' ').trim(); }
+  function toastSafe(msg,type){ try{ if(typeof toast==='function') toast(msg,type||'info'); else console.log(msg); }catch(e){ console.log(msg); } }
+  function esc(s){ return String(s??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
+  function keyParts(key){ const s=String(key||''); const i=s.indexOf('_'); return i>=0?{tid:s.slice(0,i),div:s.slice(i+1)}:{tid:'',div:''}; }
+  function storageKey(key){ return 'v592_indiv_draw_conditions_'+String(key||''); }
+  function teamArr(key){ try{ return (window.G&&G.teams&&Array.isArray(G.teams[key]))?G.teams[key]:[]; }catch(e){ return []; } }
+  function getCtx(){
+    try{ if(typeof IDW!=='undefined' && IDW && IDW.key) return Object.assign({},IDW,{teams:IDW.teams||teamArr(IDW.key)}); }catch(e){}
+    try{ if(window.IDW && window.IDW.key) return Object.assign({},window.IDW,{teams:window.IDW.teams||teamArr(window.IDW.key)}); }catch(e){}
+    try{ if(window.__v597CurrentIndividualDrawCtx && window.__v597CurrentIndividualDrawCtx.key) return Object.assign({},window.__v597CurrentIndividualDrawCtx,{teams:window.__v597CurrentIndividualDrawCtx.teams||teamArr(window.__v597CurrentIndividualDrawCtx.key)}); }catch(e){}
+    try{ if(window.DW && DW.key) return {key:DW.key,tid:DW.tid||keyParts(DW.key).tid,div:DW.div||keyParts(DW.key).div,teams:DW.teams||teamArr(DW.key),grpSize:DW.cfg?.grpSizes?.[0]||DW.grpSize||2}; }catch(e){}
+    try{
+      const m=$('mDraw'); const txt=clean(m?m.textContent:'');
+      const mm=txt.match(/([가-힣A-Za-z0-9\s·ㆍ()_-]*부)\s*[—-]\s*대진\s*포함\s*(\d+)/);
+      const divTitle=mm?clean(mm[1]):''; const cnt=mm?Number(mm[2]):0;
+      let best=null;
+      Object.keys((window.G&&G.teams)||{}).forEach(key=>{
+        const p=keyParts(key), arr=teamArr(key); let score=0;
+        if(divTitle && p.div===divTitle) score+=100; else if(divTitle && p.div && (p.div.includes(divTitle)||divTitle.includes(p.div))) score+=70;
+        if(cnt && arr.length===cnt) score+=30;
+        if(score && (!best||score>best.score)) best={key,tid:p.tid,div:p.div,teams:arr,grpSize:2,score};
+      });
+      if(best) return best;
+    }catch(e){}
+    return null;
+  }
+  function setCtx(ctx){
+    if(!ctx||!ctx.key) return;
+    const p=keyParts(ctx.key); ctx.tid=ctx.tid||p.tid; ctx.div=ctx.div||p.div; ctx.teams=ctx.teams||teamArr(ctx.key);
+    window.__v597CurrentIndividualDrawCtx=ctx;
+    try{ window.IDW=Object.assign({},window.IDW||{},ctx); }catch(e){}
+    try{ if(typeof IDW!=='undefined') IDW=Object.assign({},(IDW&&typeof IDW==='object')?IDW:{},ctx); }catch(e){}
+  }
+  function normalizeCfg(cfg){
+    cfg=cfg&&typeof cfg==='object'?cfg:{};
+    const out={teams:{},keep:Object.assign({enabled:false,round:'32',homeGroup:''},cfg.keep||{})};
+    Object.entries(cfg.teams||{}).forEach(([ti,c])=>{
+      c=c||{};
+      const row={seed:clean(c.seed),group:clean(c.group),court:clean(c.court),order:clean(c.order||'auto')||'auto'};
+      if(row.seed||row.group||row.court||row.order!=='auto') out.teams[String(ti)]=row;
+    });
+    return out;
+  }
+  function loadCfg(key){
+    if(!key) return {teams:{},keep:{enabled:false,round:'32',homeGroup:''}};
+    if(MEM[key]) return normalizeCfg(MEM[key]);
+    try{ const raw=localStorage.getItem(storageKey(key)); if(raw){ const v=normalizeCfg(JSON.parse(raw)||{}); MEM[key]=v; return v; } }catch(e){}
+    try{ const v=G.draws&&G.draws[key]&&G.draws[key].individualDrawConditions; if(v){ const n=normalizeCfg(v); MEM[key]=n; return n; } }catch(e){}
+    return {teams:{},keep:{enabled:false,round:'32',homeGroup:''}};
+  }
+  function saveCfg(key,cfg){
+    if(!key) return;
+    cfg=normalizeCfg(cfg);
+    MEM[key]=cfg;
+    try{ localStorage.setItem(storageKey(key),JSON.stringify(cfg)); }catch(e){}
+    try{ if(!G.draws) G.draws={}; if(G.draws[key]) G.draws[key].individualDrawConditions=cfg; }catch(e){}
+    return cfg;
+  }
+  function getPlayerName(p){
+    if(!p) return '';
+    const n=clean(p.name||p.playerName||p.nm||p.title||p);
+    const c=clean(p.club||p.clubsRaw||(Array.isArray(p.clubs)?p.clubs.join(','):''));
+    return n ? (c?`${n}(${c})`:n) : '';
+  }
+  function displayTeamName(key,ti){
+    const idx=Number(ti); const t=teamArr(key)[idx];
+    try{ if(typeof tdn==='function'){ const v=tdn(t,key,idx); if(v && !/^#?\d+$/.test(clean(v))) return clean(v); } }catch(e){}
+    try{ if(t && (t.entryLabel||t.pairLabel)) return clean(t.entryLabel||t.pairLabel); }catch(e){}
+    try{ if(t && Array.isArray(t.individualPlayers)){ const ps=t.individualPlayers.slice(0,2).map(getPlayerName).filter(Boolean); if(ps.length) return ps.join(' / '); } }catch(e){}
+    try{ if(typeof getIndividualPlayers==='function'){ const ps=getIndividualPlayers(t).slice(0,2).map(getPlayerName).filter(Boolean); if(ps.length) return ps.join(' / '); } }catch(e){}
+    try{ if(t && Array.isArray(t.players)){ const ps=t.players.slice(0,2).map(getPlayerName).filter(Boolean); if(ps.length) return ps.join(' / '); } }catch(e){}
+    return '#'+(idx+1);
+  }
+  function courtGroup(v){ const s=clean(v); return s ? (s.replace(/[\s_-]*\d+$/,'').trim()||s) : ''; }
+  function expandCourtGroups(groups){
+    const out=[]; (Array.isArray(groups)?groups:[]).forEach(g=>{
+      if(typeof g==='string'){ out.push(g); return; }
+      const name=clean(g.name||g.label||g.group||g.title||''); const n=Number(g.count||g.cnt||g.courts||g.size||0);
+      if(name&&n>0){ for(let i=1;i<=n;i++) out.push(name+i); }
+      else if(Array.isArray(g.list)) out.push(...g.list);
+    }); return out;
+  }
+  function collectCourts(ctx){
+    ctx=ctx||getCtx()||{}; const key=ctx.key||'', tid=ctx.tid||keyParts(key).tid, div=ctx.div||keyParts(key).div; let out=[];
+    try{ if(typeof getDivisionPhaseConfiguredCourts==='function') out.push(...(getDivisionPhaseConfiguredCourts(tid,div,'group')||[])); }catch(e){}
+    try{ if(typeof getBracketAllowedCourts==='function') out.push(...(getBracketAllowedCourts(key)||[])); }catch(e){}
+    try{ const t=(G.tournaments||[]).find(x=>String(x.id)===String(tid)); if(t){ out.push(...expandCourtGroups(t.courtGroups)); const ds=t.divSettings&&t.divSettings[div]; if(ds){ out.push(...(ds.allowedCourts||[]),...(ds.groupCourts||[]),...(ds.courts||[])); } } }catch(e){}
+    try{ const d=G.draws&&G.draws[key]; if(d) out.push(...(d.allowedCourts||[]),...((d.groups||[]).flatMap(g=>g.courts||g.court?[g.court].filter(Boolean):[]))); }catch(e){}
+    try{ const txt=clean(document.body.innerText||''); const re=/(국제\d+|능동\d+|원도심\(인조\)\d+|장유중\(클레이\)\d+|삼계\d+|금병\d+|동부\d+)/g; let m; while((m=re.exec(txt))) out.push(m[1]); }catch(e){}
+    const seen=new Set(), ret=[]; out.map(x=>clean(x).replace(/\s+/g,'')).filter(Boolean).forEach(c=>{ if(!seen.has(c)){ seen.add(c); ret.push(c); } });
+    return ret;
+  }
+  function ensureOption(sel,val,label){ if(!sel||!val) return; if(![...sel.options].some(o=>o.value===val)){ const o=document.createElement('option'); o.value=val; o.textContent=label||val; sel.appendChild(o); } }
+  function repopulateConditionModal(){
+    const ctx=getCtx(); if(!ctx||!ctx.key) return; setCtx(ctx);
+    const modal=$('mV592Condition'); if(!modal||!modal.classList.contains('open')) return;
+    const cfg=loadCfg(ctx.key); const courts=collectCourts(ctx);
+    modal.querySelectorAll('tr[data-ti]').forEach(tr=>{
+      const ti=String(tr.getAttribute('data-ti')); const row=cfg.teams[ti]||{};
+      const nameCell=tr.querySelector('td'); if(nameCell) nameCell.textContent='#'+(Number(ti)+1)+' '+displayTeamName(ctx.key,ti);
+      const seed=tr.querySelector('.v592-seed'); if(seed) seed.value=row.seed||'';
+      const group=tr.querySelector('.v592-group'); if(group) group.value=row.group||'';
+      const court=tr.querySelector('.v592-court');
+      if(court){
+        const cur=row.court||court.value||'';
+        court.innerHTML='<option value="">자동</option>'+courts.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+        if(cur){ ensureOption(court,cur,cur); court.value=cur; }
+      }
+      const order=tr.querySelector('.v592-order'); if(order) order.value=row.order||'auto';
+    });
+    const keep=$('v592KeepEnabled'); if(keep) keep.checked=!!cfg.keep.enabled;
+    const round=$('v592KeepRound'); if(round) round.value=String(cfg.keep.round||'32');
+    const home=$('v592HomeGroup');
+    if(home){ const groups=[...new Set(courts.map(courtGroup).filter(Boolean))]; const cur=cfg.keep.homeGroup||home.value||''; home.innerHTML='<option value="">자동</option>'+groups.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join(''); if(cur){ ensureOption(home,cur,cur); home.value=cur; } }
+  }
+  const oldOpen=window.openV592ConditionModal;
+  if(typeof oldOpen==='function' && !oldOpen.__v605Wrapped){
+    const w=function(){ const ctx=getCtx(); if(ctx) setCtx(ctx); const r=oldOpen.apply(this,arguments); setTimeout(repopulateConditionModal,0); setTimeout(repopulateConditionModal,120); setTimeout(repopulateConditionModal,350); return r; };
+    w.__v605Wrapped=true; window.openV592ConditionModal=w;
+  }
+  window.saveV592ConditionModal=function(){
+    const ctx=getCtx(); if(!ctx||!ctx.key){ toastSafe('대회/부서를 먼저 선택하세요','error'); return; } setCtx(ctx);
+    const cfg={teams:{},keep:{enabled:!!$('v592KeepEnabled')?.checked,round:clean($('v592KeepRound')?.value||'32'),homeGroup:clean($('v592HomeGroup')?.value||'')}};
+    document.querySelectorAll('#mV592Condition tr[data-ti]').forEach(tr=>{
+      const ti=String(tr.getAttribute('data-ti'));
+      const row={seed:clean(tr.querySelector('.v592-seed')?.value||''),group:clean(tr.querySelector('.v592-group')?.value||''),court:clean(tr.querySelector('.v592-court')?.value||''),order:clean(tr.querySelector('.v592-order')?.value||'auto')||'auto'};
+      if(row.seed||row.group||row.court||row.order!=='auto') cfg.teams[ti]=row;
+    });
+    saveCfg(ctx.key,cfg);
+    try{ if(typeof window.v602StableConditionPanel==='function') window.v602StableConditionPanel(); }catch(e){}
+    try{ if(typeof window.v603EnsureConditionButton==='function') window.v603EnsureConditionButton(); }catch(e){}
+    const cnt=Object.keys(cfg.teams).length;
+    const m=$('mV592Condition'); if(m) m.classList.remove('open');
+    toastSafe(`조건 저장 완료 (${cnt}건)`,'success');
+  };
+  window.clearV592ConditionModal=function(){
+    const ctx=getCtx(); if(!ctx||!ctx.key) return;
+    if(!confirm('이 대회의 조건부 추첨 설정을 초기화할까요?')) return;
+    MEM[ctx.key]={teams:{},keep:{enabled:false,round:'32',homeGroup:''}};
+    try{ localStorage.removeItem(storageKey(ctx.key)); }catch(e){}
+    try{ if(G.draws&&G.draws[ctx.key]) delete G.draws[ctx.key].individualDrawConditions; }catch(e){}
+    toastSafe('조건 설정 초기화 완료','success');
+  };
+  function groupLabel(gi){ try{ return typeof grpLabel==='function'?grpLabel(gi):(Number(gi)+1)+'조'; }catch(e){ return (Number(gi)+1)+'조'; } }
+  function conditionCount(cfg){ return Object.values(cfg&&cfg.teams||{}).filter(c=>c&&(c.seed||c.group||c.court||(c.order&&c.order!=='auto'))).length; }
+  function desiredGroupForCond(c,groupCount){
+    const g=parseInt(c.group,10); if(g>0) return Math.min(groupCount-1,g-1);
+    const s=parseInt(c.seed,10); if(s>0) return Math.min(groupCount-1,s-1);
+    return null;
+  }
+  function groupPos(draw){ const pos={}; (draw.groups||[]).forEach((g,gi)=>(g.teams||[]).forEach(ti=>{pos[Number(ti)]=gi;})); return pos; }
+  function moveFixedTeams(key,cfg){
+    const d=G.draws&&G.draws[key]; if(!d||!Array.isArray(d.groups)) return [];
+    const warnings=[]; const groups=d.groups; const fixed=[];
+    Object.entries(cfg.teams||{}).forEach(([ti,c])=>{ const gi=desiredGroupForCond(c,groups.length); if(gi!==null) fixed.push({ti:Number(ti),gi}); });
+    if(!fixed.length) return warnings;
+    const fixedSet=new Set(fixed.map(x=>x.ti));
+    function rem(gi,ti){ groups[gi].teams=(groups[gi].teams||[]).filter(x=>Number(x)!==Number(ti)); }
+    function add(gi,ti){ groups[gi].teams=groups[gi].teams||[]; if(!groups[gi].teams.map(Number).includes(Number(ti))) groups[gi].teams.push(Number(ti)); }
+    fixed.forEach(({ti,gi})=>{
+      const p=groupPos(d); const from=p[ti]; if(from===undefined){ warnings.push(`${displayTeamName(key,ti)} 위치 없음`); return; } if(from===gi) return;
+      const target=groups[gi]; const cap=Number(target.size||0)||Math.max(2,(target.teams||[]).length); let swap=null;
+      if((target.teams||[]).length>=cap) swap=(target.teams||[]).find(x=>!fixedSet.has(Number(x)));
+      rem(from,ti);
+      if(swap!=null){ rem(gi,swap); add(from,Number(swap)); }
+      else if((target.teams||[]).length>=cap){ add(from,ti); warnings.push(`${displayTeamName(key,ti)} ${groupLabel(gi)} 배정 실패`); return; }
+      add(gi,ti);
+    });
+    const teams=teamArr(key), seen=new Set();
+    groups.forEach(g=>{ g.teams=(g.teams||[]).map(Number).filter(ti=>{ if(seen.has(ti)||ti<0||ti>=teams.length) return false; seen.add(ti); return true; }); });
+    teams.forEach((_,ti)=>{ if(!seen.has(ti)){ const g=groups.find(x=>(x.teams||[]).length<(Number(x.size||0)||99))||groups[groups.length-1]; if(g) g.teams.push(ti); } });
+    return warnings;
+  }
+  function recreateGroupMatches(key){
+    const d=G.draws&&G.draws[key]; if(!d||!Array.isArray(d.groups)) return;
+    const keep=(G.matches[key]||[]).filter(m=>m&&String(m.phase||'')!=='group'); const list=[];
+    d.groups.forEach((g,gi)=>{ const arr=(g.teams||[]).map(Number); for(let a=0;a<arr.length;a++) for(let b=a+1;b<arr.length;b++) list.push({id:`g_${gi}_${a}_${b}`,phase:'group',group:gi,t1:arr[a],t2:arr[b],winner:null,rubbers:[],court:''}); });
+    G.matches[key]=[...keep,...list];
+  }
+  function applyCourtOrder(key,ctx,cfg){
+    const d=G.draws&&G.draws[key]; if(!d) return [];
+    const warnings=[], courts=collectCourts(ctx); const fallback=courts.length?courts:[''];
+    const ORDER={start:0,wait1:1,wait2:2,wait3:3,wait4:4,auto:9};
+    const groupCourt={}, groupOrder={};
+    (d.groups||[]).forEach((g,gi)=>{
+      (g.teams||[]).forEach(ti=>{ const c=(cfg.teams||{})[String(ti)]; if(!c) return; if(c.court) groupCourt[gi]=c.court; if(c.order&&c.order!=='auto') groupOrder[gi]=Math.min(groupOrder[gi]??9,ORDER[c.order]??9); });
+    });
+    let autoIdx=0;
+    const byGroup={}; (G.matches[key]||[]).filter(m=>m&&m.phase==='group').forEach(m=>{ const gi=Number(m.group||0); (byGroup[gi]=byGroup[gi]||[]).push(m); });
+    const orderedGroups=Object.keys(byGroup).map(Number).sort((a,b)=>((groupOrder[a]??9)-(groupOrder[b]??9))||(a-b));
+    orderedGroups.forEach((gi,rank)=>{
+      const court=groupCourt[gi] || fallback[autoIdx++%fallback.length] || '';
+      const order=groupOrder[gi]??9;
+      const baseMs=rank*1000 + (order===9?500:order*100);
+      if(d.groups[gi]){ d.groups[gi].court=court; d.groups[gi].courts=court?[court]:[]; d.groups[gi].courtGroup=courtGroup(court); d.groups[gi].conditionOrder=order; }
+      (byGroup[gi]||[]).sort((a,b)=>String(a.id).localeCompare(String(b.id),'ko')).forEach((m,pos)=>{
+        if(court){ m.court=court; m.courts=[court]; m.manualCourtTarget=court; }
+        m.manualCourtPinnedAt=new Date(Date.UTC(2000,0,1,0,0,0,baseMs+pos)).toISOString();
+        m.courtAssignedAt=m.manualCourtPinnedAt;
+        m.courtQueueOrder=m.manualCourtPinnedAt;
+        if(order>0 || pos>0) m.waitingFirstAt=m.manualCourtPinnedAt; else { delete m.waitingFirstAt; delete m.lastWaitingFirstAt; }
+        m.v605ConditionalApplied=true; m.v605ConditionOrder=order;
+      });
+    });
+    return warnings;
+  }
+  async function applyConditionsNow(reason){
+    const ctx=getCtx(); if(!ctx||!ctx.key) return false; setCtx(ctx); const key=ctx.key; const cfg=loadCfg(key);
+    if(!cfg || !conditionCount(cfg)) return false;
+    if(!G.draws||!G.draws[key]||!Array.isArray(G.draws[key].groups)) return false;
+    const warnings=[]; warnings.push(...moveFixedTeams(key,cfg)); recreateGroupMatches(key); warnings.push(...applyCourtOrder(key,ctx,cfg));
+    try{ G.draws[key].individualDrawConditions=cfg; G.draws[key].conditionalAppliedAt=new Date().toISOString(); G.draws[key].conditionalAppliedBy=VER; }catch(e){}
+    try{ if(typeof stD==='function') await stD(key); }catch(e){ console.warn(VER,'stD',e); }
+    try{ if(typeof stM==='function') await stM(key); }catch(e){ console.warn(VER,'stM',e); }
+    try{ if(typeof renderBracket==='function') renderBracket(); }catch(e){}
+    if(warnings.length) toastSafe('조건 일부 경고: '+warnings.slice(0,2).join(' / '),'info');
+    else toastSafe('조건이 실제 예선/코트배정에 반영됐습니다','success');
+    return true;
+  }
+  window.v605ApplyConditionalPrelimNow=applyConditionsNow;
+  // startDraw 자체를 감싼다. 버튼 onclick, confirmDraw 어느 경로든 완료 후 1회만 반영.
+  const oldStart=window.startDraw;
+  if(typeof oldStart==='function' && !oldStart.__v605Wrapped){
+    const w=async function(){
+      const ctx=getCtx(); if(ctx) setCtx(ctx);
+      let r=oldStart.apply(this,arguments); if(r&&typeof r.then==='function') r=await r;
+      setTimeout(()=>applyConditionsNow('after-startDraw'),120);
+      setTimeout(()=>applyConditionsNow('after-startDraw-late'),900);
+      return r;
+    };
+    w.__v605Wrapped=true; window.startDraw=w;
+    try{ startDraw=w; }catch(e){}
+  }
+  // 기존 버튼 wrapper가 이미 걸려 있지 않은 경우 대비
+  document.addEventListener('click',function(e){
+    const t=e.target&&e.target.closest&&e.target.closest('#confirmDrawBtn');
+    if(t) setTimeout(()=>{ const ctx=getCtx(); if(ctx) setCtx(ctx); },10);
+  },true);
 })();
 </script>
 
