@@ -43565,415 +43565,95 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
     return root;
   }
 
+
   function openPrintWindowWithSheet(sheet){
     const style=document.getElementById('v431BracketExportFixStyle')?.innerHTML||'';
-    const printCss='@page{size:A4 portrait;margin:0}body{margin:0;background:#fff;font-family:\'Noto Sans KR\',Arial,sans-serif}.v431-export-sheet{position:static!important;left:auto!important;top:auto!important;width:794px!important;margin:0 auto;z-index:auto!important}.v431-a4-page{page-break-after:always;break-after:page}.v431-a4-page:last-child{page-break-after:auto}';
-    // <script> 태그를 인라인에 두면 HTML 파서가 스크립트를 중간에 끊는 버그 발생.
-    // Blob URL 방식으로 교체하여 파서 혼란 방지.
+    const printCss='@page{size:A4 portrait;margin:0}html,body{margin:0!important;padding:0!important;background:#fff!important;font-family:\'Noto Sans KR\',Arial,sans-serif}.v431-export-sheet{position:static!important;left:auto!important;top:auto!important;width:794px!important;margin:0 auto!important;z-index:auto!important}.v431-a4-page{page-break-after:always;break-after:page}.v431-a4-page:last-child{page-break-after:auto}';
     const autoprint='window.onload=function(){setTimeout(function(){window.focus();window.print();},250)};';
-    const html='<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>예선 대진표 A4 출력</title><style>'+style+printCss+'</style><'+'script>'+autoprint+'<'+'/script></head><body>'+sheet.outerHTML+'
+    const html='<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>예선 대진표 A4 출력</title><style>'+style+printCss+'</style><'+'script>'+autoprint+'<'+'/script></head><body>'+sheet.outerHTML+'</body></html>';
+    const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+    const url=URL.createObjectURL(blob);
+    const win=window.open(url,'_blank','width=920,height=1100,noopener,noreferrer');
+    setTimeout(()=>{try{URL.revokeObjectURL(url);}catch(e){}},15000);
+    if(!win) safeToast('팝업이 차단되었습니다. 브라우저 팝업 허용 후 다시 시도하세요.','error');
+  }
 
-<style id="v550A4CourtColorAndClubFitStyle">
-/* v550: A4 예선대진표 출력/이미지/PDF에서도 코트 구장별 색상 구분 + 클럽명 가독성 보정 */
-.v550-a4-court-colored .v435-group-card,
-.v550-a4-court-colored.v435-group-card{
-  border-color:var(--a4-court-border,#cbd5e1) !important;
-  background:linear-gradient(180deg,var(--a4-court-soft,#f8fafc),#ffffff) !important;
-  -webkit-print-color-adjust:exact !important;
-  print-color-adjust:exact !important;
-}
-.v550-a4-court-colored .v435-group-head,
-.v550-a4-court-colored .v438-group-head,
-.v550-a4-court-colored.v435-group-card .v435-group-head,
-.v550-a4-court-colored.v435-group-card .v438-group-head{
-  background:linear-gradient(90deg,var(--a4-court-main,#0f1e3a),var(--a4-court-main2,#1e3a8a)) !important;
-  color:#fff !important;
-  border-bottom:1px solid var(--a4-court-border,#cbd5e1) !important;
-  -webkit-print-color-adjust:exact !important;
-  print-color-adjust:exact !important;
-}
-.v550-a4-court-colored .v435-court-badge,
-.v550-a4-court-colored .v438-order-badge,
-.v550-a4-court-colored .v438-time-badge,
-.v550-a4-court-colored.v435-group-card .v435-court-badge,
-.v550-a4-court-colored.v435-group-card .v438-order-badge,
-.v550-a4-court-colored.v435-group-card .v438-time-badge{
-  background:rgba(255,255,255,.94) !important;
-  color:var(--a4-court-main,#0f1e3a) !important;
-  border-color:rgba(255,255,255,.72) !important;
-  font-weight:1000 !important;
-  -webkit-print-color-adjust:exact !important;
-  print-color-adjust:exact !important;
-}
-.v550-a4-court-colored .v435-group-body,
-.v550-a4-court-colored.v435-group-card .v435-group-body{
-  background:linear-gradient(180deg,rgba(255,255,255,.86),var(--a4-court-soft,#f8fafc)) !important;
-  -webkit-print-color-adjust:exact !important;
-  print-color-adjust:exact !important;
-}
-.v550-a4-court-colored .v435-team-row,
-.v550-a4-court-colored.v435-group-card .v435-team-row{
-  background:rgba(255,255,255,.92) !important;
-  border-color:var(--a4-court-border,#dbeafe) !important;
-  -webkit-print-color-adjust:exact !important;
-  print-color-adjust:exact !important;
-}
-.v550-a4-court-colored .v435-team-no,
-.v550-a4-court-colored.v435-group-card .v435-team-no{
-  background:var(--a4-court-main,#0f1e3a) !important;
-  color:#fff !important;
-  -webkit-print-color-adjust:exact !important;
-  print-color-adjust:exact !important;
-}
-.v550-a4-court-colored .v435-head-left,
-.v550-a4-court-colored .v438-group-name,
-.v550-a4-court-colored.v435-group-card .v435-head-left,
-.v550-a4-court-colored.v435-group-card .v438-group-name{
-  color:#fff !important;
-}
-/* 클럽명/소속이 잘리지 않도록 이름은 유지, 하단 소속은 더 작고 2줄까지 허용 */
-.v550-a4-court-colored .v435-team-name,
-.v550-a4-court-colored.v435-group-card .v435-team-name{
-  font-size:7.1px !important;
-  line-height:1.05 !important;
-  margin-bottom:1px !important;
-  white-space:nowrap !important;
-  overflow:hidden !important;
-  text-overflow:ellipsis !important;
-  font-weight:1000 !important;
-}
-.v550-a4-court-colored .v435-team-sub,
-.v550-a4-court-colored.v435-group-card .v435-team-sub{
-  display:block !important;
-  font-size:4.85px !important;
-  line-height:1.03 !important;
-  max-height:10.2px !important;
-  overflow:hidden !important;
-  white-space:normal !important;
-  word-break:keep-all !important;
-  overflow-wrap:anywhere !important;
-  color:#253244 !important;
-  font-weight:800 !important;
-  letter-spacing:-.07em !important;
-}
-.v550-a4-court-colored .v435-team-row,
-.v550-a4-court-colored.v435-group-card .v435-team-row{
-  padding:3px 5px !important;
-  gap:5px !important;
-}
-@media print{
-  .v550-a4-court-colored,
-  .v550-a4-court-colored *{
-    -webkit-print-color-adjust:exact !important;
-    print-color-adjust:exact !important;
-    color-adjust:exact !important;
-  }
-}
-</'+'style>
-<'+'script id="v550A4CourtColorAndClubFitScript">
-(function(){
-  'use strict';
-  const PALETTE={
-    '국제':{main:'#2563eb',main2:'#1e40af',soft:'#eff6ff',border:'#93c5fd'},
-    '능동':{main:'#16a34a',main2:'#166534',soft:'#f0fdf4',border:'#86efac'},
-    '월든섬':{main:'#dc2626',main2:'#991b1b',soft:'#fff1f2',border:'#fca5a5'},
-    '월든섬(인조)':{main:'#dc2626',main2:'#991b1b',soft:'#fff1f2',border:'#fca5a5'},
-    '공유':{main:'#9333ea',main2:'#6b21a8',soft:'#faf5ff',border:'#d8b4fe'},
-    '공유(클레이)':{main:'#9333ea',main2:'#6b21a8',soft:'#faf5ff',border:'#d8b4fe'},
-    '금병':{main:'#ea580c',main2:'#9a3412',soft:'#fff7ed',border:'#fdba74'},
-    '삼계':{main:'#0891b2',main2:'#155e75',soft:'#ecfeff',border:'#67e8f9'},
-    '신삼계':{main:'#0891b2',main2:'#155e75',soft:'#ecfeff',border:'#67e8f9'},
-    '구삼계':{main:'#4f46e5',main2:'#3730a3',soft:'#eef2ff',border:'#a5b4fc'},
-    '원도심':{main:'#be123c',main2:'#881337',soft:'#fff1f2',border:'#fda4af'},
-    '동부':{main:'#0f766e',main2:'#115e59',soft:'#f0fdfa',border:'#5eead4'}
-  };
-  const FALLBACK=[
-    {main:'#2563eb',main2:'#1e40af',soft:'#eff6ff',border:'#93c5fd'},
-    {main:'#16a34a',main2:'#166534',soft:'#f0fdf4',border:'#86efac'},
-    {main:'#dc2626',main2:'#991b1b',soft:'#fff1f2',border:'#fca5a5'},
-    {main:'#9333ea',main2:'#6b21a8',soft:'#faf5ff',border:'#d8b4fe'},
-    {main:'#ea580c',main2:'#9a3412',soft:'#fff7ed',border:'#fdba74'},
-    {main:'#0891b2',main2:'#155e75',soft:'#ecfeff',border:'#67e8f9'},
-    {main:'#4f46e5',main2:'#3730a3',soft:'#eef2ff',border:'#a5b4fc'},
-    {main:'#be123c',main2:'#881337',soft:'#fff1f2',border:'#fda4af'},
-    {main:'#0f766e',main2:'#115e59',soft:'#f0fdfa',border:'#5eead4'},
-    {main:'#ca8a04',main2:'#854d0e',soft:'#fefce8',border:'#fde047'}
-  ];
-  function hash(s){let h=0; s=String(s||''); for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))|0; return Math.abs(h);}
-  function text(el){return String((el&&el.textContent)||'').replace(/\s+/g,' ').trim();}
-  function extractCourt(raw){
-    raw=String(raw||'').replace(/\s+/g,' ');
-    const m=raw.match(/(월든섬\(인조\)\d+|공유\(클레이\)\d+|장유국제\d+|국제\d+|장유능동\d+|능동\d+|월든섬\d+|공유\d+|금병\d+|신삼계\d+|구삼계\d+|삼계\d+|원도심\d+|동부\d+)/)
-      || raw.match(/(?:경기코트|배정코트|코트|🎾)\s*[:：]?\s*([가-힣A-Za-z()_-]+\d+)/);
-    return m&&m[1]?m[1]:'';
-  }
-  function groupFromCourt(court){
-    let g=String(court||'').trim().replace(/[\s_-]*\d+$/,'').trim();
-    if(/^장유국제/.test(g)) return '국제';
-    if(/^장유능동/.test(g)) return '능동';
-    if(/^월든섬\(인조\)/.test(g)) return '월든섬(인조)';
-    if(/^월든섬/.test(g)) return '월든섬';
-    if(/^공유\(클레이\)/.test(g)) return '공유(클레이)';
-    if(/^공유/.test(g)) return '공유';
-    if(/^신삼계/.test(g)) return '신삼계';
-    if(/^구삼계/.test(g)) return '구삼계';
-    return g;
-  }
-  function palette(group){return PALETTE[group] || FALLBACK[hash(group)%FALLBACK.length];}
-  function setVars(el,p){
-    el.style.setProperty('--a4-court-main',p.main);
-    el.style.setProperty('--a4-court-main2',p.main2||p.main);
-    el.style.setProperty('--a4-court-soft',p.soft);
-    el.style.setProperty('--a4-court-border',p.border);
-  }
-  function inlineImportant(el, prop, val){try{el.style.setProperty(prop,val,'important');}catch(e){}}
-  function colorCard(card){
-    if(!card) return;
-    const court=extractCourt(text(card));
-    if(!court) return;
-    const group=groupFromCourt(court)||court;
-    const p=palette(group);
-    card.classList.add('v550-a4-court-colored');
-    card.setAttribute('data-a4-court-group',group);
-    card.setAttribute('data-a4-court-label',court);
-    setVars(card,p);
-    card.querySelectorAll('.v435-group-head,.v438-group-head').forEach(h=>{
-      setVars(h,p);
-      inlineImportant(h,'background',`linear-gradient(90deg, ${p.main}, ${p.main2||p.main})`);
-      inlineImportant(h,'color','#ffffff');
-      inlineImportant(h,'border-bottom-color',p.border);
-      inlineImportant(h,'-webkit-print-color-adjust','exact');
-      inlineImportant(h,'print-color-adjust','exact');
-    });
-    card.querySelectorAll('.v435-court-badge,.v438-order-badge,.v438-time-badge').forEach(b=>{
-      setVars(b,p);
-      inlineImportant(b,'background','rgba(255,255,255,.94)');
-      inlineImportant(b,'color',p.main);
-      inlineImportant(b,'border-color','rgba(255,255,255,.72)');
-      inlineImportant(b,'font-weight','1000');
-    });
-    card.querySelectorAll('.v435-team-no').forEach(n=>{
-      inlineImportant(n,'background',p.main);
-      inlineImportant(n,'color','#ffffff');
-      inlineImportant(n,'-webkit-print-color-adjust','exact');
-      inlineImportant(n,'print-color-adjust','exact');
-    });
-    card.querySelectorAll('.v435-group-body').forEach(b=>{
-      inlineImportant(b,'background',`linear-gradient(180deg, rgba(255,255,255,.86), ${p.soft})`);
-    });
-    card.querySelectorAll('.v435-team-row').forEach(r=>{
-      inlineImportant(r,'background','rgba(255,255,255,.92)');
-      inlineImportant(r,'border-color',p.border);
-      inlineImportant(r,'padding','3px 5px');
-      inlineImportant(r,'gap','5px');
-    });
-    card.querySelectorAll('.v435-team-name').forEach(n=>{
-      inlineImportant(n,'font-size','7.1px');
-      inlineImportant(n,'line-height','1.05');
-      inlineImportant(n,'white-space','nowrap');
-      inlineImportant(n,'overflow','hidden');
-      inlineImportant(n,'text-overflow','ellipsis');
-    });
-    card.querySelectorAll('.v435-team-sub').forEach(sub=>{
-      inlineImportant(sub,'display','block');
-      inlineImportant(sub,'font-size','4.85px');
-      inlineImportant(sub,'line-height','1.03');
-      inlineImportant(sub,'max-height','10.2px');
-      inlineImportant(sub,'overflow','hidden');
-      inlineImportant(sub,'white-space','normal');
-      inlineImportant(sub,'word-break','keep-all');
-      inlineImportant(sub,'overflow-wrap','anywhere');
-      inlineImportant(sub,'letter-spacing','-.07em');
-      inlineImportant(sub,'font-weight','800');
-      inlineImportant(sub,'color','#253244');
-    });
-  }
-  function applyA4CourtColors(root){
+  function prepareSheetForExport(sheet){
     try{
-      const scope=root||document;
-      scope.querySelectorAll('.v435-group-card').forEach(colorCard);
-      scope.querySelectorAll('.v435-a4-page,.v432-a4-page,.v435-a4-root,.v442-a4-sheet,.v443-a4-sheet').forEach(el=>el.classList.add('v550-a4-court-colored-root'));
-    }catch(e){try{console.warn('[v550] A4 court color skipped',e);}catch(_e){}}
-    return root;
-  }
-  window.v550ApplyA4CourtColors=applyA4CourtColors;
-  function wrapTool(ns){
-    try{
-      const tool=window[ns];
-      if(!tool||typeof tool.buildSheet!=='function'||tool.__v550A4Wrapped) return;
-      const orig=tool.buildSheet;
-      tool.buildSheet=function(){
-        const sheet=orig.apply(this,arguments);
-        return sheet?applyA4CourtColors(sheet):sheet;
-      };
-      tool.__v550A4Wrapped=true;
-    }catch(e){}
-  }
-  function wrapAll(){wrapTool('v437A4Tools');wrapTool('v435A4Tools');}
-  document.addEventListener('DOMContentLoaded',()=>{setTimeout(wrapAll,50);setTimeout(wrapAll,500);});
-  setTimeout(wrapAll,0);
-  // 미리보기/출력 루트가 새로 만들어질 때도 색상 재적용. v444 출력 함수가 헤더를 남색으로 덮은 뒤 다시 복구한다.
-  try{
-    new MutationObserver(function(muts){
-      let need=false;
-      for(const m of muts){
-        for(const n of m.addedNodes){
-          if(n.nodeType===1 && (n.id==='v443PrintRoot'||n.id==='v440A4PreviewOverlay'||(n.querySelector&&n.querySelector('.v435-group-card')))) need=true;
+      if(!sheet) return sheet;
+      sheet.classList.add('v435-print-root','v431-print-root');
+      sheet.querySelectorAll('*').forEach(el=>{
+        if(el.childNodes.length===1 && el.childNodes[0].nodeType===3){
+          const t=el.textContent||'';
+          const nt=String(t).replace(/\s*수동\s*|\s*관리자\s*조정\s*/g,'').trim();
+          if(nt!==t) el.textContent=nt;
         }
-      }
-      if(need){
-        setTimeout(()=>applyA4CourtColors(document),20);
-        setTimeout(()=>applyA4CourtColors(document),120);
-      }
-    }).observe(document.body,{childList:true,subtree:true});
-  }catch(e){}
-  const oldSheet=window.exportPrelimSheet;
-  if(typeof oldSheet==='function' && !oldSheet.__v550Wrapped){
-    const fn=function(){const r=oldSheet.apply(this,arguments); setTimeout(()=>applyA4CourtColors(document),80); setTimeout(()=>applyA4CourtColors(document),300); return r;};
-    fn.__v550Wrapped=true; window.exportPrelimSheet=fn;
-  }
-})();
-</'+'script>
-
-
-
-<!-- v442: A4 꽉찬 4열 예선표 + 인쇄 백지 최종 수정 -->
-<style id="v442A4FullPrintFixStyle">
-.v442-a4-sheet{background:#fff!important;color:#0f172a!important;font-family:'Noto Sans KR',Arial,sans-serif!important;}
-.v442-a4-sheet .v435-a4-page{width:794px!important;height:1123px!important;padding:16px 18px 18px!important;background:#fff!important;box-sizing:border-box!important;overflow:hidden!important;}
-.v442-a4-sheet .v435-title{font-size:18px!important;line-height:1.15!important;margin:0 0 3px!important;letter-spacing:-.055em!important;}
-.v442-a4-sheet .v435-sub{font-size:9.4px!important;line-height:1.15!important;margin:0 0 6px!important;}
-.v442-a4-sheet .v435-page-foot{display:none!important;}
-.v442-a4-sheet .v435-fitbox{width:758px!important;height:1052px!important;transform:none!important;transform-origin:top left!important;overflow:hidden!important;}
-.v442-a4-sheet .v435-grid{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:6px!important;align-items:stretch!important;width:100%!important;height:auto!important;}
-.v442-a4-sheet .v435-group-card{height:var(--v442-row-h,96px)!important;min-height:0!important;border-radius:7px!important;border:1.2px solid #cbd5e1!important;overflow:hidden!important;background:#fff!important;box-shadow:none!important;break-inside:avoid!important;}
-.v442-a4-sheet .v435-group-head,.v442-a4-sheet .v438-group-head{display:grid!important;grid-template-columns:30px minmax(0,1fr)!important;align-items:center!important;gap:4px!important;height:24px!important;min-height:24px!important;padding:3px 5px!important;box-sizing:border-box!important;background:#0f1e3a!important;color:#fff!important;overflow:hidden!important;}
-.v442-a4-sheet .v435-head-left,.v442-a4-sheet .v438-group-name{font-size:10px!important;font-weight:1000!important;color:#fff!important;line-height:1!important;white-space:nowrap!important;overflow:hidden!important;letter-spacing:-.04em!important;}
-.v442-a4-sheet .v435-head-right,.v442-a4-sheet .v438-head-badges{display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:2px!important;min-width:0!important;overflow:visible!important;white-space:nowrap!important;flex-wrap:nowrap!important;}
-.v442-a4-sheet .v435-court-badge,.v442-a4-sheet .v438-order-badge,.v442-a4-sheet .v438-time-badge{display:inline-flex!important;align-items:center!important;justify-content:center!important;flex:0 0 auto!important;border-radius:999px!important;font-size:7.6px!important;font-weight:1000!important;line-height:1!important;padding:2px 4px!important;white-space:nowrap!important;overflow:visible!important;text-overflow:clip!important;letter-spacing:-.055em!important;border:1px solid #bfdbfe!important;background:#eff6ff!important;color:#1d4ed8!important;}
-.v442-a4-sheet .v438-time-badge{min-width:48px!important;background:#dcfce7!important;color:#166534!important;border-color:#86efac!important;font-size:7.4px!important;padding:2px 4px!important;}
-.v442-a4-sheet .v435-court-badge{max-width:42px!important;}
-.v442-a4-sheet .v438-order-badge{max-width:34px!important;}
-.v442-a4-sheet .v435-group-body{display:flex!important;flex-direction:column!important;gap:4px!important;padding:5px!important;height:calc(var(--v442-row-h,96px) - 24px)!important;box-sizing:border-box!important;background:#f8fafc!important;overflow:hidden!important;}
-.v442-a4-sheet .v435-team-row{display:grid!important;grid-template-columns:18px minmax(0,1fr)!important;gap:4px!important;align-items:start!important;min-height:0!important;height:calc((var(--v442-row-h,96px) - 39px) / 2)!important;padding:4px!important;border-radius:5px!important;border:1px solid #e2e8f0!important;background:#fff!important;box-sizing:border-box!important;overflow:hidden!important;}
-.v442-a4-sheet .v435-team-no{width:16px!important;height:16px!important;font-size:7.5px!important;line-height:1!important;}
-.v442-a4-sheet .v435-team-name{font-size:9.3px!important;line-height:1.08!important;font-weight:1000!important;letter-spacing:-.055em!important;color:#0f172a!important;white-space:normal!important;overflow:visible!important;display:block!important;-webkit-line-clamp:unset!important;word-break:keep-all!important;overflow-wrap:anywhere!important;}
-.v442-a4-sheet .v435-team-sub{font-size:6.7px!important;line-height:1.05!important;font-weight:900!important;letter-spacing:-.055em!important;color:#334155!important;white-space:normal!important;overflow:visible!important;display:block!important;-webkit-line-clamp:unset!important;word-break:keep-all!important;overflow-wrap:anywhere!important;margin-top:1px!important;}
-.v442-a4-sheet .v437-group-match-list{display:none!important;}
-.v440-preview-body .v442-a4-sheet{transform:none!important;transform-origin:top center!important;}
-@media print{
-  @page{size:A4 portrait;margin:0;}
-  html,body{margin:0!important;padding:0!important;background:#fff!important;}
-  body>*{display:none!important;visibility:hidden!important;}
-  .v442-print-root{display:block!important;visibility:visible!important;position:static!important;left:auto!important;top:auto!important;width:794px!important;margin:0 auto!important;background:#fff!important;z-index:999999!important;}
-  .v442-print-root *{visibility:visible!important;}
-  .v442-print-root .v435-a4-page{display:block!important;visibility:visible!important;page-break-after:always!important;break-after:page!important;box-shadow:none!important;margin:0 auto!important;border:0!important;}
-  .v442-print-root .v435-a4-page:last-child{page-break-after:auto!important;break-after:auto!important;}
-}
-</style>
-<script id="v442A4FullPrintFixScript">
-(function(){
-  'use strict';
-  const A4W=794,A4H=1123;
-  let currentSheet=null;
-  function toast(msg,type){try{(window.safeToast||window.toast||console.log)(msg,type||'info');}catch(e){}}
-  function safeName(s){return String(s||'').replace(/[\\/:*?"<>|\s]+/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'').slice(0,80)||'대진표';}
-  function today(){return new Date().toISOString().slice(0,10);}
-  function getTid(){return document.getElementById('brTS')?.value || document.getElementById('regTS')?.value || '';}
-  function getDivs(tid){try{return window.v435A4Tools?.getCurrentDivs?.(tid)||[]}catch(e){return [];}}
-  async function ensureCanvas(){if(window.html2canvas)return;if(window.v435A4Tools?.ensureCanvasLib)return window.v435A4Tools.ensureCanvasLib();await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});}
-  async function ensurePdf(){if(window.jspdf?.jsPDF)return;await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});}
-  function cleanText(s){return String(s||'').replace(/^🎾\s*/,'').replace(/\s+/g,'').trim();}
-  function prepareSheet(sheet){
-    if(!sheet)return null;
-    try{
-      sheet.classList.add('v442-a4-sheet','v441-a4-sheet','v440-a4-sheet');
-      sheet.classList.remove('v435-print-root','v432-print-root','v440-temp-print','v442-print-root');
-      sheet.querySelectorAll('.v437-group-match-list').forEach(x=>x.remove());
-      sheet.querySelectorAll('.v435-court-badge').forEach(x=>{let t=cleanText(x.textContent).replace(/^코트/,'');x.textContent=t;});
-      sheet.querySelectorAll('.v438-order-badge').forEach(x=>{let t=cleanText(x.textContent);x.textContent=t;});
-      sheet.querySelectorAll('.v438-time-badge').forEach(x=>{let t=cleanText(x.textContent).replace(/^상/,'예상'); if(!/^예상/.test(t)) t='예상'+t.replace(/^예상?/,''); x.textContent=t;});
-      sheet.querySelectorAll('.v435-a4-page,.v432-a4-page').forEach(page=>{
-        const fit=page.querySelector('.v435-fitbox');
-        const grid=page.querySelector('.v435-grid');
-        if(!fit||!grid)return;
-        fit.style.transform='none';
-        fit.style.width='758px';
-        fit.style.height='1052px';
-        const cards=[...grid.querySelectorAll('.v435-group-card')];
-        const rows=Math.max(1,Math.ceil(cards.length/4));
-        const gap=6;
-        const rowH=Math.floor((1052-(rows-1)*gap)/rows);
-        const clamped=Math.max(72,Math.min(118,rowH));
-        fit.style.setProperty('--v442-row-h',clamped+'px');
-        grid.style.gridTemplateColumns='repeat(4,minmax(0,1fr))';
-        grid.style.gap=gap+'px';
-        cards.forEach(c=>{c.style.setProperty('--v442-row-h',clamped+'px'); c.style.height=clamped+'px';});
       });
-    }catch(e){console.warn('v442 prepareSheet failed',e);}
+    }catch(e){}
     return sheet;
   }
+
   function buildSheet(){
-    const id=getTid();
-    if(!id){toast('대회를 먼저 선택하세요','info');return null;}
-    const builder=window.v437A4Tools?.buildSheet || window.v435A4Tools?.buildSheet;
-    if(!builder){toast('A4 예선표 생성 기능을 찾을 수 없습니다','error');return null;}
-    const sheet=builder(id,getDivs(id));
-    if(!sheet){toast('예선 추첨 데이터가 없습니다','info');return null;}
-    return prepareSheet(sheet);
+    const tid=getCurrentTid();
+    if(!tid){ safeToast('대회를 먼저 선택하세요.','info'); return null; }
+    const divs=getCurrentDivs(tid);
+    if(!divs.length){ safeToast('출력할 부서가 없습니다.','info'); return null; }
+    return prepareSheetForExport(buildPrelimSheetElement(tid,divs));
   }
-  function ensureOverlay(){
-    let ov=document.getElementById('v440A4PreviewOverlay');
-    if(!ov){
-      ov=document.createElement('div');
-      ov.id='v440A4PreviewOverlay';
-      ov.innerHTML='<div class="v440-preview-box"><div class="v440-preview-head"><div><div class="v440-preview-title">📄 예선표 A4 출력 미리보기</div><div id="v440PreviewMeta" style="font-size:.72rem;opacity:.82;margin-top:2px"></div></div><div class="v440-preview-actions"><button class="v440-print-btn" id="v440PrintBtn">🖨️ 출력/저장</button><button class="v440-save-btn" id="v440ImgBtn">🖼️ 이미지</button><button class="v440-close-btn" id="v440CloseBtn">닫기</button></div></div><div class="v440-preview-body" id="v440PreviewBody"></div></div>';
-      document.body.appendChild(ov);
-      ov.addEventListener('click',e=>{if(e.target===ov)ov.classList.remove('show');});
-    }
-    const close=ov.querySelector('#v440CloseBtn'); if(close) close.onclick=()=>ov.classList.remove('show');
-    const print=ov.querySelector('#v440PrintBtn'); if(print) print.onclick=()=>printSheet(currentSheet);
-    const img=ov.querySelector('#v440ImgBtn'); if(img) img.onclick=()=>window.exportPrelimImage();
-    return ov;
-  }
+
   function showPreview(sheet){
-    currentSheet=prepareSheet(sheet);
-    const ov=ensureOverlay();
-    const body=ov.querySelector('#v440PreviewBody');
-    body.innerHTML='';
-    const d=prepareSheet(currentSheet.cloneNode(true));
-    d.classList.remove('v442-print-root','v440-temp-print','v435-print-root');
-    body.appendChild(d);
-    const pages=currentSheet.querySelectorAll('.v435-a4-page,.v432-a4-page').length||1;
-    const groups=currentSheet.getAttribute('data-groups')||currentSheet.getAttribute('data-v432-groups')||'';
-    const meta=ov.querySelector('#v440PreviewMeta');
-    if(meta)meta.textContent=`A4 ${pages}장${groups?` · ${groups}개 조`:''} · 4열 고정 · 화면 꽉참 · 예상시간 표시`;
-    ov.classList.add('show');
+    if(!sheet) return;
+    const clone=prepareSheetForExport(sheet.cloneNode(true));
+    const old=document.getElementById('v431A4PreviewOverlay');
+    if(old) old.remove();
+    const overlay=document.createElement('div');
+    overlay.id='v431A4PreviewOverlay';
+    overlay.style.cssText='position:fixed;inset:0;z-index:2147483100;background:rgba(15,23,42,.72);display:flex;align-items:center;justify-content:center;padding:18px;';
+    overlay.innerHTML='<div style="width:min(920px,100%);max-height:94vh;background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.38);display:flex;flex-direction:column"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;background:#0f1e3a;color:#fff;font-weight:900"><div>🖨️ A4 조편성 출력 미리보기</div><button type="button" id="v431ClosePreview" style="border:0;background:rgba(255,255,255,.15);color:#fff;width:34px;height:34px;border-radius:999px;font-size:18px;font-weight:900;cursor:pointer">×</button></div><div id="v431PreviewBody" style="overflow:auto;background:#f1f5f9;padding:14px;display:flex;justify-content:center"></div><div style="display:flex;justify-content:flex-end;gap:8px;padding:10px 14px;border-top:1px solid #e5e7eb;background:#fff"><button type="button" id="v431PrintBtn" class="btn btn-primary">🖨️ 출력</button><button type="button" id="v431ImageBtn" class="btn btn-outline">🖼️ 이미지 저장</button></div></div>';
+    document.body.appendChild(overlay);
+    const body=overlay.querySelector('#v431PreviewBody');
+    body.appendChild(clone);
+    clone.style.position='static';
+    clone.style.left='auto';
+    clone.style.top='auto';
+    clone.style.zIndex='auto';
+    clone.style.transformOrigin='top center';
+    clone.style.transform='scale(.86)';
+    clone.style.marginBottom='-120px';
+    overlay.querySelector('#v431ClosePreview').onclick=()=>overlay.remove();
+    overlay.querySelector('#v431PrintBtn').onclick=()=>openPrintWindowWithSheet(sheet.cloneNode(true));
+    overlay.querySelector('#v431ImageBtn').onclick=()=>exportImage(sheet.cloneNode(true));
   }
-  function printSheet(sheet){
+
+  async function exportImage(sheet){
     try{
-      if(!sheet){toast('출력할 예선표가 없습니다','error');return;}
-      const clone=prepareSheet(sheet.cloneNode(true));
-      clone.classList.add('v442-print-root','v440-temp-print','v435-print-root');
-      const css=[...document.querySelectorAll('style')].map(s=>s.outerHTML).join('\n');
-      const html='<!doctype html><html><head><meta charset="utf-8"><title>예선 대진표 출력</title>'+css+'<style>@page{size:A4 portrait;margin:0}html,body{margin:0!important;padding:0!important;background:#fff!important;}body>*{display:none!important;visibility:hidden!important}.v442-print-root{display:block!important;visibility:visible!important;position:static!important;width:794px!important;margin:0 auto!important;background:#fff!important}.v442-print-root *{visibility:visible!important}.v442-print-root .v435-a4-page{display:block!important;page-break-after:always!important;break-after:page!important;margin:0 auto!important;box-shadow:none!important;border:0!important}.v442-print-root .v435-a4-page:last-child{page-break-after:auto!important;break-after:auto!important}</style></head><body>'+clone.outerHTML+'</'+'body></'+'html>';
-      const iframe=document.createElement('iframe');
-      iframe.style.position='fixed'; iframe.style.left='-10000px'; iframe.style.top='0'; iframe.style.width='794px'; iframe.style.height='1123px'; iframe.style.border='0';
-      document.body.appendChild(iframe);
-      const w=iframe.contentWindow, doc=w.document;
-      doc.open(); doc.write(html); doc.close();
-      const doPrint=()=>{try{w.focus();w.print();}catch(e){console.error(e);toast('출력창 열기 실패: '+(e.message||e),'error');}};
-      iframe.onload=()=>setTimeout(doPrint,250);
-      setTimeout(doPrint,700);
-      setTimeout(()=>{try{iframe.remove();}catch(e){}},15000);
-    }catch(e){console.error(e);toast('출력 실패: '+(e.message||e),'error');}
+      sheet=prepareSheetForExport(sheet||buildSheet());
+      if(!sheet) return;
+      await ensureCanvasLib();
+      document.body.appendChild(sheet);
+      sheet.style.position='fixed'; sheet.style.left='-12000px'; sheet.style.top='0';
+      const pages=[...sheet.querySelectorAll('.v431-a4-page')];
+      for(let i=0;i<pages.length;i++){
+        const canvas=await window.html2canvas(pages[i],{backgroundColor:'#ffffff',scale:2,useCORS:true,logging:false,width:A4W,height:A4H,windowWidth:A4W,windowHeight:A4H});
+        const a=document.createElement('a');
+        a.href=canvas.toDataURL('image/png');
+        a.download=`예선대진표_A4_${today()}_${i+1}페이지.png`;
+        document.body.appendChild(a); a.click(); a.remove();
+      }
+      safeToast(`A4 조편성 이미지 저장 완료 · ${pages.length}장`,'success');
+    }catch(e){ console.error(e); safeToast('A4 이미지 저장 실패: '+(e.message||e),'error'); }
+    finally{ try{sheet&&sheet.remove();}catch(e){} }
   }
-  window.exportPrelimSheet=function(){try{const sheet=buildSheet(); if(!sheet)return; showPreview(sheet); toast('A4 출력 미리보기를 열었습니다','success');}catch(e){console.error(e);toast('A4 미리보기 실패: '+(e.message||e),'error');}};
-  window.exportPrelimImage=async function(){let sheet=null;try{sheet=buildSheet(); if(!sheet)return; const id=getTid(),t=(window.G?.tournaments||[]).find(x=>x.id===id); document.body.appendChild(sheet); sheet.style.position='fixed';sheet.style.left='-14000px';sheet.style.top='0'; await ensureCanvas(); const pages=[...sheet.querySelectorAll('.v435-a4-page,.v432-a4-page')]; for(let i=0;i<pages.length;i++){const canvas=await window.html2canvas(pages[i],{backgroundColor:'#ffffff',scale:2,useCORS:true,logging:false,width:A4W,height:A4H,windowWidth:A4W,windowHeight:A4H}); const a=document.createElement('a'); a.href=canvas.toDataURL('image/png'); a.download=`예선대진표_A4_${safeName(t?.name)}_${String(i+1).padStart(2,'0')}_${today()}.png`; document.body.appendChild(a); a.click(); a.remove();} toast(`A4 예선표 이미지 ${pages.length}장 저장 완료`,'success');}catch(e){console.error(e);toast('이미지 저장 실패: '+(e.message||e),'error');}finally{try{sheet&&sheet.remove();}catch(e){}}};
-  window.exportPrelimPDF=async function(){let sheet=null;try{sheet=buildSheet(); if(!sheet)return; const id=getTid(),t=(window.G?.tournaments||[]).find(x=>x.id===id); document.body.appendChild(sheet); sheet.style.position='fixed';sheet.style.left='-14000px';sheet.style.top='0'; await ensureCanvas(); await ensurePdf(); const {jsPDF}=window.jspdf; const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4',compress:true}); const pages=[...sheet.querySelectorAll('.v435-a4-page,.v432-a4-page')]; for(let i=0;i<pages.length;i++){const canvas=await window.html2canvas(pages[i],{backgroundColor:'#ffffff',scale:2,useCORS:true,logging:false,width:A4W,height:A4H,windowWidth:A4W,windowHeight:A4H}); if(i>0)pdf.addPage('a4','portrait'); pdf.addImage(canvas.toDataURL('image/jpeg',0.92),'JPEG',0,0,210,297);} pdf.save(`예선대진표_A4_${safeName(t?.name)}_${today()}.pdf`); toast(`A4 예선표 PDF 저장 완료 · ${pages.length}장`,'success');}catch(e){console.error(e);toast('PDF 저장 실패: '+(e.message||e),'error');}finally{try{sheet&&sheet.remove();}catch(e){}}};
+
+  window.v431A4Tools={buildSheet,showPreview,exportImage,openPrintWindowWithSheet,ensureCanvasLib,getCurrentDivs};
+  window.v435A4Tools=window.v431A4Tools;
+  window.exportPrelimSheet=function(){const sheet=buildSheet(); if(sheet) showPreview(sheet);};
+  window.exportPrelimImage=function(){return exportImage(buildSheet());};
+  window.exportPrelimPDF=function(){safeToast('PDF 저장은 지원하지 않습니다. 이미지 저장을 이용해 주세요.','info');};
   window.bracketToPDF=window.exportPrelimPDF;
 })();
 </script>
+
 
 
 <!-- v443: A4 print preview blank fix + group number clipping fix -->
@@ -51080,6 +50760,146 @@ window.manualRefreshPlayers=manualRefreshPlayers;
   }
 
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',install); else install();
+})();
+</script>
+
+
+<script id="v583AligoSmsApprovalPatch">
+(function(){
+  'use strict';
+  const ALIGO_PROXY_URL='https://tennis230-sms-proxy.lsy9677.workers.dev/send-sms';
+  const ALIGO_CLIENT_KEY='m230sms';
+
+  function normPhone(v){return String(v||'').replace(/[^0-9]/g,'');}
+  function toastMsg(msg,type){try{if(typeof window.toast==='function')return window.toast(msg,type||'info');}catch(e){} try{console.log(msg);}catch(e){}}
+  function uniqueRecipients(list){
+    const seen=new Set(), out=[];
+    (Array.isArray(list)?list:[]).forEach(r=>{
+      const phone=normPhone(r&&typeof r==='object'?r.phone:r);
+      if(!phone || seen.has(phone)) return;
+      seen.add(phone);
+      out.push({name:String((r&&typeof r==='object'&&r.name)||'').trim(), phone});
+    });
+    return out;
+  }
+  function estimateSmsType(msg){
+    try{return new Blob([String(msg||'')]).size>90?'LMS':'SMS';}catch(e){return String(msg||'').length>45?'LMS':'SMS';}
+  }
+  async function sendAligoSms(recipients,msg,meta={}){
+    const list=uniqueRecipients(recipients);
+    const body=String(msg||'').trim();
+    if(!list.length) throw new Error('문자 받을 번호가 없습니다.');
+    if(!body) throw new Error('문자 내용이 비어 있습니다.');
+    const receivers=list.map(x=>x.phone);
+    const res=await fetch(ALIGO_PROXY_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':ALIGO_CLIENT_KEY},
+      body:JSON.stringify({receivers,receiver:receivers[0],msg:body,meta})
+    });
+    const text=await res.text();
+    let data; try{data=JSON.parse(text);}catch(e){data={raw:text};}
+    if(!res.ok || data.success===false){
+      const m=(data&&data.message)||((data&&data.aligo&&data.aligo.message))||text||('HTTP '+res.status);
+      throw new Error(m);
+    }
+    return data;
+  }
+  window.v583SendAligoSms=sendAligoSms;
+
+  function getApprovalWrap(){
+    return document.getElementById('smsApprovalWrap') || document.getElementById('stickyAlertWrap');
+  }
+  function getApprovalPayload(wrap){
+    if(!wrap) return null;
+    let rec=[];
+    try{rec=JSON.parse(wrap.getAttribute('data-sms-recipients')||'[]')||[];}catch(e){rec=[];}
+    const ta=wrap.querySelector('textarea[data-aligo-sms-body]');
+    const body=(ta?ta.value:wrap.getAttribute('data-sms-body')||'').trim();
+    return {
+      recipients:uniqueRecipients(rec),
+      body,
+      smsKind:wrap.getAttribute('data-sms-kind')||'',
+      matchId:wrap.getAttribute('data-mid')||'',
+      tid:wrap.getAttribute('data-tid')||'',
+      div:wrap.getAttribute('data-div')||'',
+      dedupeKey:wrap.getAttribute('data-dedupe-key')||''
+    };
+  }
+  function enhanceApprovalPanel(){
+    try{
+      const wrap=getApprovalWrap();
+      if(!wrap || !wrap.classList.contains('show')) return;
+      const card=wrap.querySelector('.sms-approval-card,.sticky-alert-card');
+      if(!card || card.dataset.aligoEnhanced==='1') return;
+      const p=getApprovalPayload(wrap);
+      if(!p || !p.recipients.length) return;
+      card.dataset.aligoEnhanced='1';
+      const msgEl=card.querySelector('.sms-approval-msg,.sticky-alert-msg');
+      const actions=card.querySelector('.sms-approval-actions,.sticky-alert-actions');
+      if(msgEl){
+        const editor=document.createElement('div');
+        editor.className='v583-aligo-editor';
+        editor.style.cssText='margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.22)';
+        editor.innerHTML=`<div style="font-size:.76rem;font-weight:900;margin-bottom:6px;opacity:.95">문자 내용 확인/수정 · ${p.recipients.length}명 · 예상 ${estimateSmsType(p.body)}</div><textarea data-aligo-sms-body="1" style="width:100%;min-height:88px;border:0;border-radius:12px;padding:9px 10px;font-size:.82rem;line-height:1.45;font-family:'Noto Sans KR',sans-serif;resize:vertical;color:#0f172a;background:#fff">${String(p.body||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}</textarea><div style="font-size:.7rem;line-height:1.5;margin-top:5px;opacity:.9">수신자: ${p.recipients.slice(0,4).map(r=>(r.name?r.name+' ':'')+r.phone).join(', ')}${p.recipients.length>4?' 외 '+(p.recipients.length-4)+'명':''}</div>`;
+        msgEl.insertAdjacentElement('afterend',editor);
+      }
+      if(actions){
+        actions.querySelectorAll('button').forEach(btn=>{
+          if(/문자\s*보내기|문자앱|SMS/i.test(btn.textContent||'')){
+            btn.textContent='알리고 발송';
+            btn.onclick=function(ev){ev.preventDefault();ev.stopPropagation();window.v583SendCurrentApprovalSms();};
+          }
+        });
+      }
+    }catch(e){console.warn('[v583] enhance approval failed',e);}
+  }
+  window.v583SendCurrentApprovalSms=async function(){
+    const wrap=getApprovalWrap();
+    const payload=getApprovalPayload(wrap);
+    if(!payload){toastMsg('문자 승인창 정보를 찾지 못했습니다.','error');return;}
+    try{
+      const ok=confirm(`알리고로 문자 ${payload.recipients.length}건을 발송할까요?\n\n문구를 확인한 뒤 확인을 누르면 실제 발송됩니다.`);
+      if(!ok) return;
+      const btn=[...(wrap.querySelectorAll('button')||[])].find(b=>/알리고|문자/.test(b.textContent||''));
+      if(btn){btn.disabled=true;btn.textContent='발송 중...';}
+      const res=await sendAligoSms(payload.recipients,payload.body,{source:'230match',smsKind:payload.smsKind,matchId:payload.matchId,tid:payload.tid,div:payload.div,dedupeKey:payload.dedupeKey});
+      const cnt=(res&&res.aligo&&res.aligo.success_cnt)||payload.recipients.length;
+      toastMsg(`알리고 문자 발송 완료 ✅ (${cnt}건)`,'success');
+      try{ if(wrap && wrap.id==='smsApprovalWrap' && typeof window.v575CloseSmsApproval==='function') window.v575CloseSmsApproval(); else if(typeof window.closeStickyAlert==='function') window.closeStickyAlert(true); }catch(e){}
+    }catch(e){
+      toastMsg('알리고 발송 실패: '+(e&&e.message||e),'error');
+      const btn=[...(wrap?.querySelectorAll('button')||[])].find(b=>/발송 중/.test(b.textContent||''));
+      if(btn){btn.disabled=false;btn.textContent='알리고 발송';}
+    }
+  };
+
+  // 기존 문자앱 열기 함수가 호출되어도 알리고 승인 발송으로 연결
+  const oldV575=window.v575SendSmsApproval;
+  window.v575SendSmsApproval=function(){return window.v583SendCurrentApprovalSms();};
+  const oldSticky=window.sendStickyAlertSMS;
+  window.sendStickyAlertSMS=function(){return window.v583SendCurrentApprovalSms();};
+
+  // 관리자 공지 문자도 모바일 문자앱 대신 알리고 확인 발송으로 전환
+  const oldBulk=window.sendSmsBulk;
+  window.sendSmsBulk=function(clubs,body,modeLabel){
+    try{
+      const contacts=(window.G&&G.meta&&G.meta.clubContacts)||{};
+      const recipients=(clubs||[]).map(c=>({name:c,phone:contacts[c]})).filter(r=>normPhone(r.phone));
+      if(!recipients.length){toastMsg('보낼 번호가 없습니다','error');return;}
+      if(!confirm(`${modeLabel||'선택'} 문자 ${recipients.length}건을 알리고로 발송할까요?`)) return;
+      sendAligoSms(recipients,body,{source:'admin_notice',modeLabel:modeLabel||''}).then(res=>{
+        const cnt=(res&&res.aligo&&res.aligo.success_cnt)||recipients.length;
+        toastMsg(`알리고 문자 발송 완료 ✅ (${cnt}건)`,'success');
+      }).catch(e=>toastMsg('알리고 발송 실패: '+(e&&e.message||e),'error'));
+      return;
+    }catch(e){
+      if(typeof oldBulk==='function') return oldBulk.apply(this,arguments);
+      toastMsg('문자 발송 실패: '+(e&&e.message||e),'error');
+    }
+  };
+
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(enhanceApprovalPanel,100));
+  try{new MutationObserver(()=>setTimeout(enhanceApprovalPanel,20)).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['class','data-sms-body','data-sms-recipients']});}catch(e){}
 })();
 </script>
 
