@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-05-v606m-sms-aligo-phone-split";
+  const APP_VERSION = "2026-06-05-v607-sms-modal-fix";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -19298,10 +19298,14 @@ function _openSMSForRecipients(recipients=[], body=''){
   return true;
 }
 
-// v606: 문자 선택 모달 - 현재 컨텍스트를 전역에 저장 후 버튼에서 참조
+// v607: 문자 선택 모달 개선
+// - 모바일: 알리고 또는 문자앱 바로 열기 (복사 없음)
+// - PC: 알리고 또는 내용+번호 복사
+// - 발송 내용 전체 표시 (미리보기 → 전문)
 window.__v606SmsCtx=null;
 function _openSmsChoiceModal(phones, body, recipients){
-  window.__v606SmsCtx={phones, body, recipients};
+  const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  window.__v606SmsCtx={phones, body, recipients, isMobile};
   let modal=document.getElementById('v606SmsChoiceModal');
   if(!modal){
     modal=document.createElement('div');
@@ -19312,24 +19316,34 @@ function _openSmsChoiceModal(phones, body, recipients){
   }
   const hasAligo=typeof window.v583SendAligoSms==='function';
   const phoneDisplay=phones.slice(0,3).join(', ')+(phones.length>3?' 외 '+(phones.length-3)+'명':'');
-  const bodyPreview=String(body||'').slice(0,60)+(body&&body.length>60?'...':'');
-  const phoneListHtml=phones.map(function(p){return '<div>'+p+'</div>';}).join('');
+  const phoneListHtml=phones.map(function(p){return '<div style="font-size:.8rem;color:#1d4ed8;font-weight:700">'+p+'</div>';}).join('');
+  // 발송 내용 전체 표시 (최대 300자)
+  const bodyFull=String(body||'');
+  const bodyShow=bodyFull.length>300?bodyFull.slice(0,300)+'…':bodyFull;
   const aligoBtn=hasAligo
-    ? '<button class="btn btn-primary" id="v606AligoBtn" style="width:100%;margin-bottom:10px;font-size:.9rem;padding:12px">📡 알리고로 발송 (자동)</button>'
+    ? '<button class="btn btn-primary" id="v606AligoBtn" style="width:100%;margin-bottom:10px;font-size:.88rem;padding:11px;background:#1d4ed8;color:#fff">📡 알리고 자동 발송</button>'
     : '';
-  modal.innerHTML='<div class="modal-box" style="max-width:420px">'
+  // 모바일: 문자앱 바로 열기 / PC: 내용+번호 복사
+  const phoneActionBtn=isMobile
+    ? '<button class="btn btn-outline" id="v606PhoneBtn" style="width:100%;margin-bottom:10px;font-size:.88rem;padding:11px;border-color:#0f766e;color:#0f766e;font-weight:900">📱 휴대폰 문자앱으로 바로 보내기</button>'
+    : '<button class="btn btn-outline" id="v606CopyBtn" style="width:100%;margin-bottom:10px;font-size:.88rem;padding:11px">📋 내용+번호 복사 (PC→휴대폰 문자용)</button>';
+  modal.innerHTML='<div class="modal-box" style="max-width:440px">'
     +'<div class="modal-header"><h3>📨 문자 발송 방법 선택</h3>'
     +'<button class="modal-close" id="v606SmsCloseBtn">✕</button></div>'
     +'<div class="modal-body">'
-    +'<div style="font-size:.82rem;color:var(--text2);margin-bottom:14px;line-height:1.6">'
-    +'<b>받는 번호:</b> '+phoneDisplay+'<br>'
-    +'<b>내용 미리보기:</b> '+bodyPreview
+    // 받는 번호
+    +'<div style="margin-bottom:12px;padding:10px 12px;border-radius:10px;background:#f0f9ff;border:1px solid #bae6fd">'
+    +'<div style="font-size:.74rem;font-weight:900;color:#0369a1;margin-bottom:6px">📞 받는 번호 ('+phones.length+'명)</div>'
+    +phoneListHtml
+    +'</div>'
+    // 발송 내용 전문
+    +'<div style="margin-bottom:14px;padding:10px 12px;border-radius:10px;background:#f8fafc;border:1px solid #e2e8f0">'
+    +'<div style="font-size:.74rem;font-weight:900;color:#374151;margin-bottom:6px">✉️ 발송 내용</div>'
+    +'<div style="font-size:.78rem;color:#1e293b;white-space:pre-wrap;line-height:1.65;word-break:keep-all;max-height:160px;overflow-y:auto">'+bodyShow+'</div>'
     +'</div>'
     +aligoBtn
-    +'<button class="btn btn-outline" id="v606CopyBtn" style="width:100%;margin-bottom:10px;font-size:.9rem;padding:12px">📋 내용+번호 복사 (휴대폰 문자용)</button>'
-    +'<div style="padding:10px 12px;border-radius:10px;background:#f8fafc;border:1px solid #e2e8f0;font-size:.76rem;color:#64748b;line-height:1.8">'
-    +'<b>받는 번호 전체:</b><br>'+phoneListHtml
-    +'</div></div></div>';
+    +phoneActionBtn
+    +'</div></div>';
   modal.classList.add('open');
   // 닫기
   var closeBtn=document.getElementById('v606SmsCloseBtn');
@@ -19342,22 +19356,33 @@ function _openSmsChoiceModal(phones, body, recipients){
     var rcpt=ctx.recipients&&ctx.recipients.length?ctx.recipients:(ctx.phones||[]).map(function(p){return {phone:p};});
     if(typeof window.v583SendAligoSms==='function'){
       window.v583SendAligoSms(rcpt, ctx.body||'', {source:'court_card'})
-        .then(function(){ toast('알리고 문자 발송 완료','success'); })
+        .then(function(){ toast('알리고 문자 발송 완료 ✅','success'); })
         .catch(function(e){ toast('알리고 발송 실패: '+(e.message||e),'error'); });
     }
   };
-  // 복사 버튼
+  // 모바일: 문자앱 바로 열기
+  var phoneB=document.getElementById('v606PhoneBtn');
+  if(phoneB) phoneB.onclick=function(){
+    modal.classList.remove('open');
+    var ctx=window.__v606SmsCtx||{};
+    if(window.openBulkSmsInChunks){
+      window.openBulkSmsInChunks(ctx.phones||[], ctx.body||'', '문자 발송');
+    } else {
+      window.location.href='sms:'+(ctx.phones||[]).join(',')+'?body='+encodeURIComponent(ctx.body||'');
+    }
+  };
+  // PC: 내용+번호 복사
   var copyB=document.getElementById('v606CopyBtn');
   if(copyB) copyB.onclick=function(){
     modal.classList.remove('open');
     var ctx=window.__v606SmsCtx||{};
-    var lines=[ctx.body||'','','받는 번호'].concat(ctx.phones||[]);
+    var lines=(ctx.phones||[]).join('\n')+'\n\n'+ctx.body;
     if(navigator.clipboard){
-      navigator.clipboard.writeText(lines.join('\n'))
-        .then(function(){ toast('문자 내용과 번호를 복사했습니다. 휴대폰 문자앱에서 붙여넣어 보내주세요.','success'); })
+      navigator.clipboard.writeText(lines)
+        .then(function(){ toast('번호+내용을 복사했습니다. 휴대폰 문자앱에 붙여넣어 보내주세요 📋','success'); })
         .catch(function(){ toast('복사 실패 - 직접 복사해주세요','error'); });
     } else {
-      toast('이 브라우저는 클립보드 복사를 지원하지 않습니다','error');
+      alert(lines);
     }
   };
 }
@@ -21024,7 +21049,7 @@ function openIndividualEntryInfo(key, idx){
       const delLabel=(AD||TM)?'🗑 참가팀 최종삭제':(team.deleteRequested?'⏳ 삭제요청 접수됨':'🗑 삭제 요청');
       const delDisabled=(!(AD||TM) && team.deleteRequested)?'disabled':'';
       const requestInfo=team.deleteRequested?`<div style="margin:10px 0;padding:9px 11px;border-radius:12px;background:#fff7ed;border:1.5px solid #fb923c;color:#9a3412;font-size:.78rem;font-weight:900;line-height:1.55">${deleteRequestBadgeHTML(team)}<br>관리자가 환불 여부와 입금 내역 확인 후 최종 삭제합니다.</div>`:'';
-      const adminActions=canManage?`<div class="v346-detail-admin-actions"><button type="button" class="btn btn-primary" style="background:#0f766e;color:#fff" onclick="openParticipantTeamNotifySms('${esc(key)}',${Number(idx)},'','aligo')">📡 알리고</button><button type="button" class="btn btn-outline" onclick="openParticipantTeamNotifySms('${esc(key)}',${Number(idx)},'','phone')">📱 휴대폰 문자</button><button type="button" class="btn btn-outline" onclick="window.__editEntryFromDetail && window.__editEntryFromDetail('${esc(key)}',${Number(idx)})">✏️ 참가팀 수정</button><button type="button" class="btn btn-danger" ${delDisabled} onclick="window.__deleteEntryFromDetail && window.__deleteEntryFromDetail('${esc(key)}',${Number(idx)})">${delLabel}</button></div>`:'';
+      const adminActions=canManage?`<div class="v346-detail-admin-actions"><button type="button" class="btn btn-primary" style="background:#0f766e;color:#fff" onclick="openParticipantTeamNotifySms('${esc(key)}',${Number(idx)},'','aligo')">📡 알리고</button><button type="button" class="btn btn-outline" onclick="openParticipantTeamNotifySms('${esc(key)}',${Number(idx)},'','phone')">📱 휴대폰 문자</button><button type="button" class="btn btn-outline" style="background:#fff7ed;color:#9a3412;border-color:#fdba74;font-weight:900" onclick="openParticipantTeamNotifySms('${esc(key)}',${Number(idx)},'waitlist_promoted','phone')">⚡ 대기→정식등록 문자</button><button type="button" class="btn btn-outline" onclick="window.__editEntryFromDetail && window.__editEntryFromDetail('${esc(key)}',${Number(idx)})">✏️ 참가팀 수정</button><button type="button" class="btn btn-danger" ${delDisabled} onclick="window.__deleteEntryFromDetail && window.__deleteEntryFromDetail('${esc(key)}',${Number(idx)})">${delLabel}</button></div>`:'';
       body.innerHTML=`<div class="v334-info-title">${v334IndividualPairTitle(team)}</div><div class="v334-info-meta">${div?`부서: ${esc(div)}`:''}</div>${requestInfo}<div class="v334-info-list">${v334GetIndividualInfoRows(team)}</div>${adminActions}`;
     }
     om('mIndividualEntryInfo');
