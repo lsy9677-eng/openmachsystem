@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-05-v582-prelim-court-block-draw-fix";
+  const APP_VERSION = "2026-06-05-v586-aligo-manual-sms-final";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -37633,14 +37633,14 @@ function v374RenderNotifyModal(opts={}){
       <div class="v374-notify-target">${v374Esc(opts.targetText||'대상자')}</div>
       <div class="v374-notify-guide">팀 전체를 선택하거나, 필요한 참가자만 체크해서 알림/문자를 보낼 수 있습니다.</div>
       <label class="v374-all-row"><input type="checkbox" id="v374NotifyAll" checked onchange="document.querySelectorAll('#mParticipantNotifySmsBody .v374-rec-check').forEach(b=>b.checked=this.checked)"> <b>팀 전체 선택</b></label>
-      <div class="v374-rec-list">${recs.map((r,i)=>`<label class="v374-rec-row"><input type="checkbox" class="v374-rec-check" ${r.checked?'checked':''} onchange="v374SyncAllCheckbox()"><span class="v374-rec-main"><b>${v374Esc(r.name)}</b><small>${v374Esc(v374ShortClub(r.club))}${r.phone?' · '+v374Esc(r.phone):' · 전화번호 없음'}</small></span>${r.phone?`<button type="button" class="btn btn-outline" onclick="event.preventDefault();v374SendOneSms(${i})" style="min-height:30px;font-size:.72rem;padding:4px 8px">문자</button>`:''}</label>`).join('')}</div>
+      <div class="v374-rec-list">${recs.map((r,i)=>`<label class="v374-rec-row"><input type="checkbox" class="v374-rec-check" ${r.checked?'checked':''} onchange="v374SyncAllCheckbox()"><span class="v374-rec-main"><b>${v374Esc(r.name)}</b><small>${v374Esc(v374ShortClub(r.club))}${r.phone?' · '+v374Esc(r.phone):' · 전화번호 없음'}</small></span>${r.phone?`<button type="button" class="btn btn-outline" onclick="event.preventDefault();v374SendOneSms(${i})" style="min-height:30px;font-size:.72rem;padding:4px 8px">알리고</button>`:''}</label>`).join('')}</div>
       ${(opts.context&&opts.context.type==='team')?`<div id="v428NotifyTemplateBar" style="display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 8px;padding:9px 10px;border-radius:12px;background:#fff7ed;border:1.5px solid #fdba74"><button type="button" class="btn btn-outline" style="font-size:.78rem;padding:6px 10px;background:#fff;color:#9a3412;border-color:#fdba74;font-weight:900" onclick="applyParticipantSmsTemplate('waitlist_promoted')">⚡ 대기→정식등록 문구</button><button type="button" class="btn btn-outline" style="font-size:.78rem;padding:6px 10px;font-weight:900" onclick="applyParticipantSmsTemplate('payment_confirmed')">💳 입금확인 문구</button></div>`:''}
       <div class="form-group" style="margin-top:12px"><label class="form-label">알림 제목</label><input class="form-input" id="v374NotifyTitle" value="${v374Esc(defaultTitle)}"></div>
       <div class="form-group"><label class="form-label">알림/문자 내용</label><textarea class="form-textarea" id="v374NotifyBody" rows="4">${v374Esc(defaultBody)}</textarea></div>
     </div>`;
   }
   if(footer){
-    footer.innerHTML=`<button class="btn btn-primary" onclick="v374SendSelectedPush()" style="background:#2563eb;color:#fff">🔔 선택 알림</button><button class="btn btn-outline" onclick="v374SendSelectedSms()">📨 선택 문자</button><button class="btn btn-gray" onclick="cm('mParticipantNotifySms')">닫기</button>`;
+    footer.innerHTML=`<button class="btn btn-primary" onclick="v374SendSelectedPush()" style="background:#2563eb;color:#fff">🔔 선택 알림</button><button class="btn btn-outline" onclick="v374SendSelectedSms()">📨 선택 알리고 발송</button><button class="btn btn-gray" onclick="cm('mParticipantNotifySms')">닫기</button>`;
   }
   om('mParticipantNotifySms');
 }
@@ -37763,17 +37763,37 @@ function v374SmsUrl(phones,body){
   if(!list.length) return '';
   return 'sms:'+list.join(',')+'?body='+encodeURIComponent(body||'');
 }
-function v374SendSelectedSms(){
+async function v374SendSelectedSms(){
   const recs=v374SelectedNotifyRecipients().filter(r=>v374Digits(r.phone).length>=9);
   if(!recs.length){toast('문자 보낼 전화번호가 없습니다','info');return;}
   const body=(ge('v374NotifyBody')?.value||'').trim()||'230MATCH 안내입니다.';
-  if(window.openBulkSmsInChunks){window.openBulkSmsInChunks(recs.map(r=>r.phone),body,'선택 참가자 문자');}else{location.href=v374SmsUrl(recs.map(r=>r.phone),body);}
+  if(!confirm(`알리고로 문자 ${recs.length}건을 발송할까요?\n\n문구를 확인한 뒤 확인을 누르면 실제 발송됩니다.`)) return;
+  try{
+    if(typeof sl==='function') sl(true);
+    const res = await window.v583SendAligoSms(recs.map(r=>({name:r.name,phone:r.phone})), body, {source:'participant_manual_selected_v586'});
+    if(typeof sl==='function') sl(false);
+    const cnt=(res&&res.aligo&&res.aligo.success_cnt)||recs.length;
+    toast(`알리고 문자 발송 완료 ✅ (${cnt}건)`,'success');
+  }catch(e){
+    try{if(typeof sl==='function') sl(false);}catch(_e){}
+    toast('알리고 발송 실패: '+(e?.message||e),'error');
+  }
 }
-function v374SendOneSms(i){
+async function v374SendOneSms(i){
   const r=(window.__v374NotifyRecipients||[])[Number(i)];
   if(!r||!v374Digits(r.phone)){toast('전화번호가 없습니다','info');return;}
   const body=(ge('v374NotifyBody')?.value||'').trim()||'230MATCH 안내입니다.';
-  location.href=v374SmsUrl([r.phone],body);
+  if(!confirm(`${r.name||'선택 대상'}님에게 알리고 문자 1건을 발송할까요?`)) return;
+  try{
+    if(typeof sl==='function') sl(true);
+    const res = await window.v583SendAligoSms([{name:r.name,phone:r.phone}], body, {source:'participant_manual_one_v586'});
+    if(typeof sl==='function') sl(false);
+    const cnt=(res&&res.aligo&&res.aligo.success_cnt)||1;
+    toast(`알리고 문자 발송 완료 ✅ (${cnt}건)`,'success');
+  }catch(e){
+    try{if(typeof sl==='function') sl(false);}catch(_e){}
+    toast('알리고 발송 실패: '+(e?.message||e),'error');
+  }
 }
 function v374ExtractPhoneFromText(txt){
   const m=String(txt||'').match(/0\d{1,2}[-\s]?\d{3,4}[-\s]?\d{4}/);
@@ -50903,5 +50923,31 @@ window.manualRefreshPlayers=manualRefreshPlayers;
 })();
 </script>
 
+
+<script id="v586ParticipantManualAligoFinalPatch">
+(function(){
+  'use strict';
+  function relabel(){
+    try{document.querySelectorAll('#mParticipantNotifySms button').forEach(btn=>{
+      const t=(btn.textContent||'').trim();
+      if(t==='문자') btn.textContent='알리고';
+      if(/선택\s*문자/.test(t)) btn.textContent='📨 선택 알리고 발송';
+    });}catch(e){}
+  }
+  const oldRender=window.v374RenderNotifyModal;
+  if(typeof oldRender==='function' && !oldRender.__v586AligoWrapped){
+    window.v374RenderNotifyModal=function(){
+      const r=oldRender.apply(this,arguments);
+      setTimeout(relabel,0);
+      setTimeout(relabel,120);
+      return r;
+    };
+    window.v374RenderNotifyModal.__v586AligoWrapped=true;
+  }
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(relabel,300));
+  document.addEventListener('click',()=>setTimeout(relabel,0),true);
+  try{new MutationObserver(()=>setTimeout(relabel,20)).observe(document.body,{childList:true,subtree:true});}catch(e){}
+})();
+</script>
 </body>
 </html>
