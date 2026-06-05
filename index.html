@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-05-v606k-finalize-global-fn";
+  const APP_VERSION = "2026-06-05-v606l-a4-multipage-fix";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -49835,12 +49835,20 @@ window.manualRefreshPlayers=manualRefreshPlayers;
       if(root) root.remove();
       root=document.createElement('div');
       root.id='v570PrintRoot';
-      root.appendChild(sheet.cloneNode(true));
+      const cloned=sheet.cloneNode(true);
+      // 모든 페이지 display:block 강제
+      cloned.querySelectorAll('.v570-a4-page').forEach(p=>{
+        p.style.display='block';
+        p.style.pageBreakAfter='always';
+        p.style.breakAfter='page';
+      });
+      root.appendChild(cloned);
       document.body.appendChild(root);
       const cleanup=()=>{setTimeout(()=>{try{root.remove();}catch(e){}},500);};
       window.addEventListener('afterprint',cleanup,{once:true});
-      setTimeout(()=>{window.focus(); window.print();},120);
-      setTimeout(cleanup,15000);
+      // 렌더링 대기 후 출력 (이미지/폰트 로드 시간 확보)
+      setTimeout(()=>{window.focus(); window.print();},500);
+      setTimeout(cleanup,20000);
     }catch(e){console.error(e);toast('A4 조편성 출력 실패: '+(e.message||e),'error');}
   }
   async function ensureCanvas(){
@@ -49855,18 +49863,32 @@ window.manualRefreshPlayers=manualRefreshPlayers;
       const tid=currentTid();
       const t=(window.G?.tournaments||[]).find(x=>x.id===tid);
       holder=sheet.cloneNode(true);
-      holder.style.position='fixed'; holder.style.left='-14000px'; holder.style.top='0'; holder.style.width=A4W+'px'; holder.style.background='#fff';
+      holder.style.cssText='position:fixed;left:-14000px;top:0;width:'+A4W+'px;background:#fff;z-index:-1;';
       document.body.appendChild(holder);
+      // 렌더링 대기
+      await new Promise(r=>setTimeout(r,200));
       const pages=[...holder.querySelectorAll('.v570-a4-page')];
-      toast('A4 조편성 이미지 생성 중...','info');
+      if(!pages.length){ toast('저장할 페이지가 없습니다','error'); return; }
+      toast('A4 조편성 이미지 생성 중... ('+pages.length+'장)','info');
+      // 각 페이지를 순차적으로 캡처 후 딜레이를 두고 다운로드
+      const blobs=[];
       for(let i=0;i<pages.length;i++){
-        const canvas=await window.html2canvas(pages[i],{backgroundColor:'#ffffff',scale:2,useCORS:true,logging:false,width:A4W,height:A4H,windowWidth:A4W,windowHeight:A4H});
+        // 페이지를 화면 밖 고정 위치에 단독 렌더링
+        const canvas=await window.html2canvas(pages[i],{
+          backgroundColor:'#ffffff',scale:2,useCORS:true,logging:false,
+          width:A4W,height:A4H,windowWidth:A4W,windowHeight:A4H
+        });
+        blobs.push({dataUrl:canvas.toDataURL('image/png'), name:`A4조편성_${safeName(t?.name)}_${String(i+1).padStart(2,'0')}_${today()}.png`});
+      }
+      // 모든 캡처 완료 후 순차 다운로드 (브라우저 블록 방지)
+      for(let i=0;i<blobs.length;i++){
+        await new Promise(r=>setTimeout(r,300)); // 300ms 간격
         const a=document.createElement('a');
-        a.href=canvas.toDataURL('image/png');
-        a.download=`A4조편성_${safeName(t?.name)}_${String(i+1).padStart(2,'0')}_${today()}.png`;
+        a.href=blobs[i].dataUrl;
+        a.download=blobs[i].name;
         document.body.appendChild(a); a.click(); a.remove();
       }
-      toast(`A4 조편성 이미지 ${pages.length}장 저장 완료`,'success');
+      toast('A4 조편성 이미지 '+pages.length+'장 저장 완료 ✅','success');
     }catch(e){console.error(e);toast('A4 조편성 이미지 저장 실패: '+(e.message||e),'error');}
     finally{try{holder&&holder.remove();}catch(e){}}
   }
