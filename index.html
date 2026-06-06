@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-06-v607p-auto-profile-result";
+  const APP_VERSION = "2026-06-06-v607q-kakao-profile-bracketrefresh";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -11882,6 +11882,8 @@ async function handleSocialCustomTokenRedirect(){
       email:socialEmail || cred.user.email || '',
       socialProviderId:socialProviderId || ''
     });
+    // v607p: CURRENT_APP_PROFILE 반드시 세팅 (카카오/네이버 로그인 후 결과 입력 자동 확인용)
+    if(prof) CURRENT_APP_PROFILE={...(CURRENT_APP_PROFILE||{}), ...prof};
     refreshGoogleLoginUI(cred.user);
     try{ cm('mAdminSignup'); }catch(_e){}
     sl(false);
@@ -12026,15 +12028,20 @@ async function requireGoogleLoginForIndividual(action='개인전 이용'){
 
 // v607p: 이름+전화번호로 참가자 확인 - 로그인 시 자동, 미로그인 시 입력 팝업
 function verifyParticipantByNamePhone(key, m){
-  return new Promise((resolve, reject)=>{
-    // 로그인된 사용자 프로필 자동 사용 (팝업 없음)
-    const profile=window.CURRENT_APP_PROFILE||window.CURRENT_APP_USER_PROFILE||{};
+  return new Promise(async (resolve, reject)=>{
+    // CURRENT_APP_PROFILE 우선, 없으면 Firestore에서 로드
+    let profile=window.CURRENT_APP_PROFILE||window.CURRENT_APP_USER_PROFILE||{};
+    if((!profile.name && !profile.phone) && auth?.currentUser && !auth.currentUser.isAnonymous){
+      try{
+        const loaded=await getMyProfileDoc().catch(()=>({}));
+        if(loaded){ CURRENT_APP_PROFILE={...(CURRENT_APP_PROFILE||{}),...loaded}; profile=CURRENT_APP_PROFILE; }
+      }catch(_e){}
+    }
     const savedName=String(profile.name||profile.displayName||'').trim();
     const savedPhone=String(profile.phone||profile.phoneDigits||'').replace(/[^0-9]/g,'');
     if(savedName && savedPhone){
       const side=_checkNamePhoneSide(key, m, savedName, savedPhone);
       if(side){ resolve({side, method:'profile_auto'}); return; }
-      // 로그인은 됐지만 이 경기 참가자가 아님
       reject(new Error('로그인 계정(' + savedName + ')은 이 경기 참가자가 아닙니다.\n내 정보의 이름/전화번호가 접수 시 입력한 정보와 동일한지 확인해 주세요.'));
       return;
     }
@@ -25038,7 +25045,15 @@ function switchBVTab(div){
     b.style.fontWeight = active ? '700' : '400';
   });
   ge('mBVTitle').textContent = div==='__ALL__' ? `📊 전체 대진표` : `📊 ${dl(div)} 통합 대진표`;
-  renderBracketView(BV.tid, div);
+  // v607p: Firestore 최신 데이터 로드 후 렌더링
+  const tid=BV.tid;
+  if(tid && typeof loadTournamentBundle==='function'){
+    const body=ge('mBVBody');
+    if(body) body.innerHTML='<div style="text-align:center;padding:34px;color:var(--text3)">⏳ 데이터 불러오는 중...</div>';
+    loadTournamentBundle(tid).then(()=>renderBracketView(tid, div)).catch(()=>renderBracketView(tid, div));
+  } else {
+    renderBracketView(BV.tid, div);
+  }
 }
 
 function renderCombinedBracketSection(tid, div){
@@ -39524,9 +39539,10 @@ body {
     const body = ge('mBVBody');
     if(!body) return;
 
-    const toolbar = `<div class="bv-toolbar">
+    const toolbar = `<div class="bv-toolbar" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
       <button class="bv-pill${mode==="group"?" active":""}" onclick="window.__BV_MODE='group';renderBracketView('${tid}','${div}')">예선</button>
       <button class="bv-pill${mode==="main"?" active":""}${!(hasMain||hasMainPreview)?" disabled":""}" ${!(hasMain||hasMainPreview)?'style="opacity:.4;cursor:not-allowed"':''} onclick="${(hasMain||hasMainPreview)?"window.__BV_MODE='main';renderBracketView('"+tid+"','"+div+"')":"return false"}">본선(토너먼트)</button>
+      <button onclick="renderBracketView('${tid}','${div}')" style="margin-left:auto;padding:6px 14px;border-radius:999px;border:2px solid #0f766e;background:#0f766e;color:#fff;font-size:.78rem;font-weight:900;cursor:pointer;display:flex;align-items:center;gap:4px">🔄 새로고침</button>
     </div>`;
 
     if(mode==="main"){
