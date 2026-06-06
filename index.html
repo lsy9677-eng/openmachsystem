@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-06-v607b-aligo-preview-nocompact";
+  const APP_VERSION = "2026-06-06-v607k-aligo-all-modals";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -9994,6 +9994,14 @@ function buildAutoSmsSettingsPanelHTML(){
       <button class="btn btn-primary" onclick="saveAutoSmsSettings()" style="font-size:.78rem;padding:6px 12px;background:#d97706;color:#fff">💾 자동 문자 설정 저장</button>
     </div>
     <div id="autoSmsSettingsStatus" style="font-size:.72rem;color:var(--text3);line-height:1.5;margin-top:8px">권장: 필요할 때만 전체 ON. 문자앱 확인 후 전송됩니다.</div>
+  </div>
+  <div id="smsTemplateLockSettingsBlock" class="form-group" style="border-top:1px solid var(--border);padding-top:14px;margin-bottom:16px">
+    <div style="font-weight:700;font-size:.88rem;margin-bottom:6px;color:var(--primary-dark)">✉️ 문자 관리</div>
+    <div style="font-size:.72rem;color:var(--text3);margin-bottom:10px;line-height:1.5">경기 시작/대기/완료/입금확인 등 자동문자 문구를 수정하고, 개인전 참가자 전체에게 공지 문자를 보낼 수 있습니다.</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button class="btn btn-primary" onclick="openSmsTemplateLockModal()" style="width:100%">📌 고정문자 수정/고정 (실시간 미리보기)</button>
+      <button class="btn btn-primary" onclick="openIndividualParticipantSmsModal()" style="width:100%;background:#0f766e;color:#fff">📨 개인전 참가자 전체 공지 문자</button>
+    </div>
   </div>`;
 }
 function readAutoSmsSettingsFromForm(){
@@ -10043,8 +10051,17 @@ function injectAutoSmsSettingsBox(){
     box.innerHTML=buildAutoSmsSettingsPanelHTML();
     const target=ge('adminSettingsSection_common') || body;
     const ref=ge('autoNotificationSettingsBox') || target.querySelector('#adminPushControlBox') || target.firstChild;
-    if(ref && ref.parentNode===target) target.insertBefore(box.firstElementChild, ref.nextSibling);
-    else target.prepend(box.firstElementChild);
+    // 모든 자식 노드를 순서대로 삽입 (autoSmsSettingsBox + smsTemplateLockSettingsBlock)
+    const children=Array.from(box.children);
+    if(ref && ref.parentNode===target){
+      let insertAfter=ref;
+      children.forEach(child=>{
+        insertAfter.insertAdjacentElement('afterend', child);
+        insertAfter=child;
+      });
+    } else {
+      children.reverse().forEach(child=>target.prepend(child));
+    }
   }catch(e){ console.warn('injectAutoSmsSettingsBox failed', e); }
 }
 window.getAutoSmsSettings=getAutoSmsSettings;
@@ -11539,34 +11556,38 @@ async function renderDayCheckDashboard(force=false){
   if(!body) return;
   body.innerHTML='<div class="empty-state card"><div class="empty-icon">✅</div><p>대회 점검 중...</p></div>';
   try{
-    const stats=await collectPushStatsData();
-    const tid=stats.tid;
-    const t=stats.tournament;
-    const cur=stats.current;
+    const statsRaw=await collectPushStatsData();
+    // v607d: collectPushStatsData가 알림 꺼짐 시 [] 반환 → 안전 처리
+    const stats=(statsRaw && !Array.isArray(statsRaw) && typeof statsRaw==='object') ? statsRaw : null;
+    const tid=stats?.tid || getSelectedStatsTournamentId?.() || '';
+    const t=stats?.tournament || (G.tournaments||[]).find(x=>x.id===tid) || null;
+    // cur가 없으면 빈 구조로 대체
+    const cur=stats?.current || {pushPossible:[],smsFallback:[],infoMissing:[],total:0};
+    if(!cur.infoMissing) cur.infoMissing=[];
+    if(!cur.pushPossible) cur.pushPossible=[];
+    if(!cur.smsFallback) cur.smsFallback=[];
     const phoneMissing=collectDayCheckMissingPhones(tid);
-    const partnerUnlinked=collectDayCheckPartnerUnlinked(tid, stats.enabledTokens||[]);
+    const partnerUnlinked=collectDayCheckPartnerUnlinked(tid, stats?.enabledTokens||[]);
     const autoSettings=summarizeAutoNotificationSettingsForDayCheck();
     const logs=getAdminNotificationSendLogs();
     DAY_CHECK_CACHE={stats,phoneMissing,partnerUnlinked,autoSettings,logs};
-    const warnCount=cur.infoMissing.length + phoneMissing.length + partnerUnlinked.length;
+    const warnCount=phoneMissing.length + partnerUnlinked.length;
+    // 참가팀 수 계산
+    const keys=getCurrentTournamentKeysForDayCheck(tid);
+    let totalTeams=0; keys.forEach(k=>{ totalTeams+=(G.teams[k]||[]).length; });
     body.innerHTML=`
       <div style="padding:12px 14px;border-radius:16px;background:${warnCount?'linear-gradient(135deg,#fff7ed,#eff6ff)':'linear-gradient(135deg,#ecfdf5,#eff6ff)'};border:1.5px solid ${warnCount?'#fdba74':'#86efac'};margin-bottom:12px">
-        <div style="font-weight:1000;color:${warnCount?'#c2410c':'#166534'};font-size:.96rem">${warnCount?'점검 필요':'대회 준비 상태 양호'} · ${esc(t?.name||'선택된 대회 없음')}</div>
-        <div style="font-size:.76rem;color:var(--text2);line-height:1.6;margin-top:4px">정보 부족/전화번호 누락/파트너 미연결은 대회 전날까지 정리하는 것을 권장합니다.</div>
+        <div style="font-weight:1000;color:${warnCount?'#c2410c':'#166534'};font-size:.96rem">${warnCount?'점검 필요 항목 있음':'대회 준비 상태 양호'} · ${esc(t?.name||'선택된 대회 없음')}</div>
+        <div style="font-size:.76rem;color:var(--text2);line-height:1.6;margin-top:4px">전화번호 누락/파트너 미연결은 대회 전날까지 정리하는 것을 권장합니다.</div>
       </div>
       ${renderDayCheckMiniCards([
-        {label:'푸시 가능',value:cur.pushPossible.length,bg:'#dcfce7',border:'#86efac',color:'#166534'},
-        {label:'문자 대체',value:cur.smsFallback.length,bg:'#fff7ed',border:'#fdba74',color:'#c2410c'},
-        {label:'정보 부족',value:cur.infoMissing.length,bg:'#fef2f2',border:'#fecaca',color:'#b91c1c'},
-        {label:'전화번호 누락',value:phoneMissing.length,bg:'#fef2f2',border:'#fecaca',color:'#b91c1c'},
-        {label:'파트너 미연결',value:partnerUnlinked.length,bg:'#f5f3ff',border:'#c4b5fd',color:'#6d28d9'}
+        {label:'전체 참가팀',value:totalTeams,bg:'#f8fafc',border:'#cbd5e1',color:'#334155'},
+        {label:'전화번호 누락',value:phoneMissing.length,bg:phoneMissing.length?'#fef2f2':'#f0fdf4',border:phoneMissing.length?'#fecaca':'#86efac',color:phoneMissing.length?'#b91c1c':'#166534'},
+        {label:'파트너 미연결',value:partnerUnlinked.length,bg:partnerUnlinked.length?'#f5f3ff':'#f0fdf4',border:partnerUnlinked.length?'#c4b5fd':'#86efac',color:partnerUnlinked.length?'#6d28d9':'#166534'}
       ])}
-      ${renderDayCheckActionGuide({current:cur, phoneMissing, partnerUnlinked})}
-      ${renderAutoSettingsDayCheck(autoSettings)}
-      ${renderRecentSendLogsDayCheck(logs)}
-      ${renderDayCheckSimpleList('📵 전화번호 누락 명단', phoneMissing, {color:'#b91c1c', empty:'전화번호 누락이 없습니다.'})}
-      ${renderDayCheckSimpleList('🔗 파트너/회원 알림 미연결 명단', partnerUnlinked, {color:'#6d28d9', empty:'파트너 미연결 대상이 없습니다.'})}
-      ${renderStatsTargetTable('⚠️ 알림 정보 부족 명단', cur.infoMissing, {color:'#b91c1c', empty:'알림 정보 부족 대상이 없습니다.'})}`;
+      ${renderDayCheckSimpleList('📵 전화번호 누락 명단', phoneMissing, {color:'#b91c1c', empty:'✅ 전화번호 누락이 없습니다.'})}
+      ${renderDayCheckSimpleList('🔗 파트너 미연결 명단', partnerUnlinked, {color:'#6d28d9', empty:'✅ 파트너 미연결 대상이 없습니다.'})}
+      ${renderRecentSendLogsDayCheck(logs)}`;
   }catch(e){
     body.innerHTML=`<div class="home-empty-note" style="border-color:#fecaca;background:#fef2f2;color:#991b1b">대회 점검판을 불러오지 못했습니다.<br>${esc(e?.message||e)}</div>`;
   }
@@ -11579,8 +11600,7 @@ async function copyDayCheckReport(){
     const t=c.stats?.tournament?.name||'';
     const cur=c.stats?.current||{};
     const line=(arr)=> (arr||[]).map((r,i)=>`${i+1}. ${r.name||''} / ${r.club||''} / ${dl(r.div||'')||r.div||''} / ${r.reason||''}`).join('\n') || '없음';
-    const auto=c.autoSettings.map(x=>`${x.label}:${x.on?'ON':'OFF'}`).join(', ');
-    const text=`[230MATCH 대회 당일 점검]\n대회: ${t}\n\n푸시 가능: ${cur.pushPossible?.length||0}\n문자 대체: ${cur.smsFallback?.length||0}\n정보 부족: ${cur.infoMissing?.length||0}\n전화번호 누락: ${c.phoneMissing.length}\n파트너 미연결: ${c.partnerUnlinked.length}\n자동 알림: ${auto}\n최근 발송 로그: ${c.logs.length}건\n\n[전화번호 누락]\n${line(c.phoneMissing)}\n\n[파트너 미연결]\n${line(c.partnerUnlinked)}\n\n[정보 부족]\n${(cur.infoMissing||[]).map((r,i)=>`${i+1}. ${r.name||''} / ${r.club||''} / ${dl(r.div||'')||r.div||''} / 부족:${(r.missing||[]).join(', ')}`).join('\n')||'없음'}`;
+    const text=`[230MATCH 대회 당일 점검]\n대회: ${t}\n\n전화번호 누락: ${c.phoneMissing.length}명\n파트너 미연결: ${c.partnerUnlinked.length}명\n\n[전화번호 누락]\n${line(c.phoneMissing)}\n\n[파트너 미연결]\n${line(c.partnerUnlinked)}`;
     const ok=await copyTextSafe(text);
     toast(ok?'대회 점검 내용을 복사했습니다 ✅':'복사 실패','info');
   }catch(e){ toast('복사 실패: '+(e?.message||e),'error'); }
@@ -17321,6 +17341,10 @@ function openAdminSettings(){
   refreshAutoNotificationSettingsForm();
   injectAutoSmsSettingsBox();
   refreshAutoSmsSettingsForm();
+  // v607e: 문자 관리 섹션 삽입 - 탭 구조 완성 후 여러 시점에서 시도
+  [50, 150, 350, 700, 1200].forEach(function(ms){
+    setTimeout(function(){ try{ if(typeof window.addSettingsButton==='function') window.addSettingsButton(); }catch(e){} }, ms);
+  });
   // 입력 초기화
   ['aspCur','aspNew','aspNew2'].forEach(id=>{const el=ge(id);if(el)el.value='';});
   const ap=ge('adminPhoneInput'); if(ap) ap.value=(G.meta.adminPhone||'');
@@ -18305,7 +18329,7 @@ function ensureIndividualParticipantSmsModal(){
     </div>
     <div class="modal-body" style="max-height:76vh;overflow:auto">
       <div style="padding:10px 12px;background:linear-gradient(135deg,#ecfdf5,#eef4ff);border:1.5px solid #99f6e4;border-radius:12px;font-size:.78rem;color:#0f766e;line-height:1.65;margin-bottom:12px">
-        현재 접수된 <b>개인전 참가자 휴대폰 번호</b>를 모아 문자앱으로 넘깁니다. 삭제된 접수는 제외하고, 같은 번호는 1번만 발송합니다.
+        현재 접수된 <b>개인전 참가자 휴대폰 번호</b>를 모아 발송합니다. 삭제된 접수는 제외하고, 같은 번호는 1번만 발송합니다.
       </div>
       <div class="frow">
         <div class="form-group"><label class="form-label">대회</label><select class="form-select" id="individualSmsTournament" onchange="renderIndividualParticipantSmsPanel()"></select></div>
@@ -18320,7 +18344,8 @@ function ensureIndividualParticipantSmsModal(){
     <div class="modal-footer" style="gap:8px;flex-wrap:wrap">
       <button class="btn btn-gray" onclick="cm('mIndividualSms')">닫기</button>
       <button class="btn btn-outline" onclick="copyIndividualParticipantSmsTargets()">📋 번호/내용 복사</button>
-      <button class="btn btn-primary" onclick="sendIndividualParticipantSmsAll()" style="background:#0f766e;color:#fff">📨 전체 문자 열기</button>
+      <button class="btn btn-primary" onclick="sendIndividualParticipantSmsAligo()" style="background:#1d4ed8;color:#fff">📡 알리고 발송</button>
+      <button class="btn btn-primary" onclick="sendIndividualParticipantSmsAll()" style="background:#0f766e;color:#fff">📱 휴대폰 문자 (30건씩)</button>
     </div>
   </div>`;
   document.body.appendChild(wrap);
@@ -18441,19 +18466,39 @@ function sendIndividualParticipantSmsAll(){
   if(!targets.length){ toast('보낼 번호가 없습니다','error'); return; }
   const phones=[...new Set(targets.map(x=>x.phone).filter(Boolean))];
   const t=(G.tournaments||[]).find(x=>String(x.id)===String(tid));
-  if(!confirm(`${t?.name||'개인전'} ${div?dl(div):'전체 부서'} 참가자 ${phones.length}명에게 문자앱을 엽니다.\n\n계속하시겠습니까?`)) return;
   const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   if(!isMobile){
-    const copyText=`[수신자 ${targets.length}명]\n${targets.map(x=>`${x.name}(${x.div}) ${x.phoneText}`).join('\n')}\n\n[내용]\n${body}`;
-    copyTextSafe(copyText).then(ok=>toast(ok?'PC: 번호/내용이 복사됐습니다. 문자앱에 붙여넣으세요.':'복사 실패','info'));
+    const copyText=`[수신자 ${targets.length}명]\n${targets.map(x=>`${x.name}(${dl(x.div)||x.div}) ${x.phoneText}`).join('\n')}\n\n[내용]\n${body}`;
+    copyTextSafe(copyText).then(ok=>toast(ok?'PC: 번호/내용이 복사됐습니다. 휴대폰 문자앱에 붙여넣으세요.':'복사 실패','info'));
     return;
   }
-  if(window.openBulkSmsInChunks){ window.openBulkSmsInChunks(phones, body, '개인전 참가자 문자'); } else { location.href=`sms:${phones.join(',')}?body=${encodeURIComponent(body)}`; }
-  toast(`개인전 참가자 전체 문자창을 열었습니다 (${phones.length}명)`,'success');
+  // 항상 30건 청크로 발송
+  if(window.openBulkSmsInChunks){
+    window.openBulkSmsInChunks(phones, body, `개인전 참가자 공지 (${t?.name||'전체'})`);
+  } else {
+    location.href=`sms:${phones.join(',')}?body=${encodeURIComponent(body)}`;
+    toast(`문자창을 열었습니다 (${phones.length}명)`,'success');
+  }
+}
+async function sendIndividualParticipantSmsAligo(){
+  const tid=ge('individualSmsTournament')?.value||'';
+  const div=ge('individualSmsDivision')?.value||'';
+  const body=String(ge('individualSmsBody')?.value||'').trim();
+  if(!body){ toast('공지 내용을 입력하세요','error'); return; }
+  const targets=collectIndividualParticipantSmsTargets(tid, div);
+  if(!targets.length){ toast('보낼 번호가 없습니다','error'); return; }
+  if(typeof window.v607ShowAligoPreview!=='function'){ toast('알리고 모듈이 로드되지 않았습니다','error'); return; }
+  const t=(G.tournaments||[]).find(x=>String(x.id)===String(tid));
+  const rcpt=targets.map(x=>({name:x.name, phone:x.phone}));
+  // 알리고 미리보기 모달로 확인 후 발송
+  window.v607ShowAligoPreview(rcpt, body, {source:'individual_bulk_aligo', noCompact:true,
+    titleOverride:`개인전 참가자 전체 공지 · ${t?.name||''} · ${rcpt.length}명`});
 }
 window.openIndividualParticipantSmsModal=openIndividualParticipantSmsModal;
 window.renderIndividualParticipantSmsPanel=renderIndividualParticipantSmsPanel;
 window.copyIndividualParticipantSmsTargets=copyIndividualParticipantSmsTargets;
+window.sendIndividualParticipantSmsAll=sendIndividualParticipantSmsAll;
+window.sendIndividualParticipantSmsAligo=sendIndividualParticipantSmsAligo;
 window.sendIndividualParticipantSmsAll=sendIndividualParticipantSmsAll;
 
 // ── 카카오톡 발송 ───────────────────────────────────────────────────────────
@@ -19415,7 +19460,7 @@ function v607ShowAligoPreview(recipients, body, meta){
   function smsType(s){return byteLen(s)>90?'LMS':'SMS';}
   const bodyEsc=String(body||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   modal.innerHTML='<div class="modal-box" style="max-width:480px">'
-    +'<div class="modal-header" style="background:#1d4ed8"><h3 style="color:#fff">📡 알리고 발송 미리보기</h3>'
+    +'<div class="modal-header" style="background:#1d4ed8"><h3 style="color:#fff">📡 알리고 발송 미리보기'+(meta.titleOverride?' · '+esc(meta.titleOverride):'')+'</h3>'
     +'<button class="modal-close" id="v607PreviewClose" style="color:#fff">✕</button></div>'
     +'<div class="modal-body">'
     // 받는 사람
@@ -43414,7 +43459,7 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
 <script id="v419StableSmsScript">
 (function(){
   'use strict';
-  const OLD_IDS=['v412RegisterSmsQuickBar','v412RegisterSmsBar','v415RegisterSmsBar','v416RegisterSmsBar','v417RegisterSmsBar','v418RegisterSmsBar','v412AdminIndividualSmsBox','v416AdminIndividualSmsBox','v417SettingsSmsBox','v418SettingsSmsBox','mIndividualSms','sms418Modal'];
+  const OLD_IDS=['v412RegisterSmsQuickBar','v412RegisterSmsBar','v415RegisterSmsBar','v416RegisterSmsBar','v417RegisterSmsBar','v418RegisterSmsBar','v412AdminIndividualSmsBox','v416AdminIndividualSmsBox','v417SettingsSmsBox','v418SettingsSmsBox','sms418Modal'];
   const state={selected:new Set()};
   function ge(id){return document.getElementById(id);} 
   function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];});}
@@ -43474,7 +43519,7 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
   function ensureModal(){
     var old=ge('sms419Modal'); if(old)return old;
     var wrap=document.createElement('div'); wrap.className='modal-overlay'; wrap.id='sms419Modal';
-    wrap.innerHTML='<div class="modal-box" style="max-width:760px"><div class="modal-header" style="background:#0f766e"><h3 id="sms419Title">📨 선택 문자 보내기</h3><button class="modal-close" onclick="cm(\'sms419Modal\')">✕</button></div><div class="modal-body" style="max-height:78vh;overflow:auto"><div style="padding:10px 12px;background:linear-gradient(135deg,#f0fdfa,#eef4ff);border:1px solid #99f6e4;border-radius:12px;font-size:.78rem;color:#0f766e;line-height:1.6;margin-bottom:12px">팀 또는 개인을 직접 체크해서 문자 대상을 선택합니다. 입금대기/입금완료 필터도 선택할 수 있습니다.</div><div class="frow"><div class="form-group"><label class="form-label">대회</label><select class="form-select" id="sms419Tournament" onchange="sms419FillDivisions();sms419Render(true)"></select></div><div class="form-group"><label class="form-label">부서</label><select class="form-select" id="sms419Division" onchange="sms419Render(true)"></select></div></div><div class="frow"><div class="form-group"><label class="form-label">발송 기준</label><select class="form-select" id="sms419Scope" onchange="sms419Render(true)"><option value="team">참가팀별 선택</option><option value="person">개인별 선택</option></select></div><div class="form-group"><label class="form-label">입금상태</label><select class="form-select" id="sms419Filter" onchange="sms419Render(true)"><option value="all">전체</option><option value="unpaid">입금대기</option><option value="paid">입금완료</option></select></div></div><div class="form-group"><label class="form-label">문자 내용</label><textarea class="form-textarea" id="sms419Body" rows="5" placeholder="문자 내용을 입력하세요"></textarea></div><div id="sms419Preview"></div></div><div class="modal-footer" style="gap:8px;flex-wrap:wrap"><button class="btn btn-outline" onclick="sms419Copy()">📋 선택명단 복사</button><button class="btn btn-gray" onclick="cm(\'sms419Modal\')">닫기</button><button class="btn btn-primary" onclick="sms419Send()" style="background:#0f766e;color:#fff">📨 선택 문자 열기</button></div></div>';
+    wrap.innerHTML='<div class="modal-box" style="max-width:760px"><div class="modal-header" style="background:#0f766e"><h3 id="sms419Title">📨 선택 문자 보내기</h3><button class="modal-close" onclick="cm(\'sms419Modal\')">✕</button></div><div class="modal-body" style="max-height:78vh;overflow:auto"><div style="padding:10px 12px;background:linear-gradient(135deg,#f0fdfa,#eef4ff);border:1px solid #99f6e4;border-radius:12px;font-size:.78rem;color:#0f766e;line-height:1.6;margin-bottom:12px">팀 또는 개인을 직접 체크해서 문자 대상을 선택합니다. 입금대기/입금완료 필터도 선택할 수 있습니다.</div><div class="frow"><div class="form-group"><label class="form-label">대회</label><select class="form-select" id="sms419Tournament" onchange="sms419FillDivisions();sms419Render(true)"></select></div><div class="form-group"><label class="form-label">부서</label><select class="form-select" id="sms419Division" onchange="sms419Render(true)"></select></div></div><div class="frow"><div class="form-group"><label class="form-label">발송 기준</label><select class="form-select" id="sms419Scope" onchange="sms419Render(true)"><option value="team">참가팀별 선택</option><option value="person">개인별 선택</option></select></div><div class="form-group"><label class="form-label">입금상태</label><select class="form-select" id="sms419Filter" onchange="sms419Render(true)"><option value="all">전체</option><option value="unpaid">입금대기</option><option value="paid">입금완료</option></select></div></div><div class="form-group"><label class="form-label">문자 내용</label><textarea class="form-textarea" id="sms419Body" rows="5" placeholder="문자 내용을 입력하세요"></textarea></div><div id="sms419Preview"></div></div><div class="modal-footer" style="gap:8px;flex-wrap:wrap"><button class="btn btn-outline" onclick="sms419Copy()">📋 명단 복사</button><button class="btn btn-gray" onclick="cm(\'sms419Modal\')">닫기</button><button class="btn btn-primary" onclick="sms419SendAligo()" style="background:#1d4ed8;color:#fff">📡 알리고 발송</button><button class="btn btn-primary" onclick="sms419Send()" style="background:#0f766e;color:#fff">📱 휴대폰 문자</button></div></div>';
     document.body.appendChild(wrap);
     wrap.addEventListener('change',function(ev){var ch=ev.target&&ev.target.closest&&ev.target.closest('.sms419-check'); if(ch){if(ch.checked)state.selected.add(ch.value); else state.selected.delete(ch.value); updateCount();}});
     wrap.addEventListener('click',function(ev){var row=ev.target&&ev.target.closest&&ev.target.closest('.v419-row'); if(!row||ev.target.closest('input'))return; var ch=row.querySelector('.sms419-check'); if(ch){ch.checked=!ch.checked; ch.dispatchEvent(new Event('change',{bubbles:true}));}});
@@ -43494,6 +43539,17 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
   function injectRegister(){try{cleanOldSms(); var page=ge('page-register'); if(!page)return; var tid=ge('regTS')&&ge('regTS').value,t=tournaments().find(function(x){return String(x.id)===String(tid);}),old=ge('v419RegisterSmsBar'); if(!adminLike()||!t){if(old)old.remove();return;} var div=ge('regDS')&&ge('regDS').value||'',data=collect(tid,div,'team'),paid=data.rows.filter(function(r){return r.paid;}).length,unpaid=data.rows.length-paid,bar=old||document.createElement('div'); bar.id='v419RegisterSmsBar'; bar.className='v419-smsbar'; bar.innerHTML='<div><div class="v419-sms-title">📨 참가팀별 문자 보내기</div><div class="v419-sms-sub">현재 '+(div?divName(div):'전체 부서')+' · 발송 가능 '+data.rows.length+'팀 · 입금대기 '+unpaid+'팀 · 입금완료 '+paid+'팀</div></div><div class="v419-sms-actions"><button type="button" class="btn btn-outline" onclick="sms419Open(\'all\',\'team\')">참가팀 선택 문자</button><button type="button" class="btn btn-primary" onclick="sms419Open(\'unpaid\',\'team\')" style="background:#c2410c;color:#fff">입금대기팀 문자</button><button type="button" class="btn btn-primary" onclick="sms419Open(\'paid\',\'team\')" style="background:#2563eb;color:#fff">입금완료팀 문자</button></div>'; var anchor=ge('regDivisionOverview')||ge('regSection')||page.querySelector('.card'); if(anchor&&anchor.parentNode&&(!old||bar.nextSibling!==anchor))anchor.parentNode.insertBefore(bar,anchor); else if(!old)page.insertBefore(bar,page.firstChild);}catch(e){console.warn('v419 register sms failed',e);}}
   function injectSettings(){try{cleanOldSms(); if(!adminLike())return; if(ge('v419SettingsSmsBox'))return; var body=document.querySelector('#mAdminSettings .modal-body'); if(!body)return; var ref=ge('noticeContactBtns'),fg=ref&&ref.closest?ref.closest('.form-group'):null,box=document.createElement('div'); box.id='v419SettingsSmsBox'; box.className='v419-smsbar'; box.innerHTML='<div><div class="v419-sms-title">📨 개인전 참가자 문자 보내기</div><div class="v419-sms-sub">개인별로 한 명씩 선택하고 입금대기/입금완료 필터로 문자 발송합니다.</div></div><div class="v419-sms-actions"><button type="button" class="btn btn-primary" onclick="sms419Open(\'all\',\'person\')" style="background:#0f766e;color:#fff">개인별 선택 문자 보내기</button></div>'; if(fg&&fg.parentNode)fg.parentNode.insertBefore(box,fg.nextSibling); else body.appendChild(box);}catch(e){console.warn('v419 settings sms failed',e);}}
   window.sms419Open=open; window.sms419Render=render; window.sms419FillDivisions=fillDivisions; window.sms419UpdateCount=updateCount; window.sms419Select=selectMode; window.sms419Copy=copy; window.sms419Send=send; window.v419InjectRegisterSmsBar=injectRegister; window.v419InjectSettingsSmsBox=injectSettings;
+  window.sms419SendAligo=function(){
+    var body=String((ge('sms419Body')||{}).value||'').trim();
+    if(!body){toastMsg('문자 내용을 입력하세요','error');return;}
+    var rows=selectedRows();
+    if(!rows.length){toastMsg('선택된 대상이 없습니다','error');return;}
+    var seen={},rcpt=[];
+    rows.forEach(function(r){(r.phones||[]).forEach(function(p){var k=phoneKey(p.phone);if(k.length>=9&&!seen[k]){seen[k]=1;rcpt.push({name:r.name||'',phone:p.phone});}});});
+    if(!rcpt.length){toastMsg('발송 가능한 전화번호가 없습니다','error');return;}
+    if(typeof window.v607ShowAligoPreview==='function') window.v607ShowAligoPreview(rcpt,body,{source:'sms419_aligo',noCompact:true});
+    else toastMsg('알리고 모듈 로드 중입니다. 잠시 후 다시 시도하세요.','info');
+  };
   var oldShow=window.showPage; if(typeof oldShow==='function'){window.showPage=function(){var r=oldShow.apply(this,arguments); setTimeout(injectRegister,80); setTimeout(injectSettings,120); return r;};}
   var oldReg=window.onRegTC; if(typeof oldReg==='function'){window.onRegTC=function(){var r=oldReg.apply(this,arguments); setTimeout(injectRegister,120); return r;};}
   var oldOverview=window.renderRegisterDivisionOverview; if(typeof oldOverview==='function'){window.renderRegisterDivisionOverview=function(){var r=oldOverview.apply(this,arguments); setTimeout(injectRegister,120); return r;};}
@@ -43603,7 +43659,7 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
   function ensureModal(){
     let m=ge('sms421Modal'); if(m)return m;
     m=document.createElement('div'); m.className='modal-overlay'; m.id='sms421Modal';
-    m.innerHTML='<div class="modal-box" style="max-width:760px;width:96vw"><div class="modal-header"><h3 id="sms421Title">📨 개인별 선택 문자</h3><button class="modal-close" onclick="cm(\'sms421Modal\')">✕</button></div><div class="modal-body" style="max-height:76vh;overflow:auto"><div class="frow" style="margin-bottom:10px"><div class="form-group"><label class="form-label">대회</label><select class="form-select" id="sms421Tournament" onchange="sms421FillDivisions();sms421Render(false)"></select></div><div class="form-group"><label class="form-label">부서</label><select class="form-select" id="sms421Division" onchange="sms421Render(false)"></select></div></div><div class="form-group" style="margin-bottom:10px"><label class="form-label">보기 필터</label><select class="form-select" id="sms421Filter" onchange="sms421Render(false)"><option value="all">전체 참가자</option><option value="unpaid">입금대기자만</option><option value="paid">입금완료자만</option></select></div><div id="sms421Preview"></div><div class="form-group" style="margin-top:12px"><label class="form-label">문자 내용</label><textarea class="form-textarea" id="sms421Body" rows="5" placeholder="문자 내용을 입력하세요"></textarea></div></div><div class="modal-footer" style="gap:8px;flex-wrap:wrap"><button class="btn btn-outline" onclick="sms421Copy()">📋 명단/내용 복사</button><button class="btn btn-primary" onclick="sms421Send()" style="background:#0f766e;color:#fff">📨 선택 문자 열기</button></div></div>';
+    m.innerHTML='<div class="modal-box" style="max-width:760px;width:96vw"><div class="modal-header"><h3 id="sms421Title">📨 개인별 선택 문자</h3><button class="modal-close" onclick="cm(\'sms421Modal\')">✕</button></div><div class="modal-body" style="max-height:76vh;overflow:auto"><div class="frow" style="margin-bottom:10px"><div class="form-group"><label class="form-label">대회</label><select class="form-select" id="sms421Tournament" onchange="sms421FillDivisions();sms421Render(false)"></select></div><div class="form-group"><label class="form-label">부서</label><select class="form-select" id="sms421Division" onchange="sms421Render(false)"></select></div></div><div class="form-group" style="margin-bottom:10px"><label class="form-label">보기 필터</label><select class="form-select" id="sms421Filter" onchange="sms421Render(false)"><option value="all">전체 참가자</option><option value="unpaid">입금대기자만</option><option value="paid">입금완료자만</option></select></div><div id="sms421Preview"></div><div class="form-group" style="margin-top:12px"><label class="form-label">문자 내용</label><textarea class="form-textarea" id="sms421Body" rows="5" placeholder="문자 내용을 입력하세요"></textarea></div></div><div class="modal-footer" style="gap:8px;flex-wrap:wrap"><button class="btn btn-outline" onclick="sms421Copy()">📋 명단 복사</button><button class="btn btn-gray" onclick="cm(\'sms421Modal\')">닫기</button><button class="btn btn-primary" onclick="sms421SendAligo()" style="background:#1d4ed8;color:#fff">📡 알리고 발송</button><button class="btn btn-primary" onclick="sms421Send()" style="background:#0f766e;color:#fff">📱 휴대폰 문자</button></div></div>';
     document.body.appendChild(m);
     m.addEventListener('change',ev=>{const cb=ev.target&&ev.target.closest&&ev.target.closest('.sms421-check'); if(cb){if(cb.checked)S.selected.add(cb.value); else S.selected.delete(cb.value); updateCount();}});
     m.addEventListener('click',ev=>{const row=ev.target&&ev.target.closest&&ev.target.closest('.sms421-row'); if(!row||ev.target.closest('input,button,select,textarea'))return; const cb=row.querySelector('.sms421-check'); if(cb){cb.checked=!cb.checked; cb.dispatchEvent(new Event('change',{bubbles:true}));}});
@@ -43622,6 +43678,17 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
   function send(){const body=String((ge('sms421Body')||{}).value||'').trim(); if(!body){toastMsg('문자 내용을 입력하세요','error');return;} const rows=selectedRows(); if(!rows.length){toastMsg('선택된 대상이 없습니다','error');return;} const seen={},phones=[]; rows.forEach(r=>{const k=phoneKey(r.phone); if(k.length>=9&&!seen[k]){seen[k]=1; phones.push(r.phone);}}); if(!phones.length){toastMsg('발송 가능한 전화번호가 없습니다','error');return;} if(!confirm('선택한 대상 '+phones.length+'명에게 문자앱을 엽니다.\n\n계속하시겠습니까?'))return; const mobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent); if(!mobile){copy(); toastMsg('PC에서는 복사만 가능합니다. 휴대폰 문자앱에 붙여넣으세요.','info'); return;} if(window.openBulkSmsInChunks){window.openBulkSmsInChunks(phones,body,'선택 대상 문자');}else{window.location.href='sms:'+phones.join(',')+'?body='+encodeURIComponent(body);}}
   function inject(){try{if(!adminLike())return; const old=ge('v419SettingsSmsBox'); if(old)old.remove(); if(ge('sms421SettingsBox'))return; const body=document.querySelector('#mAdminSettings .modal-body'); if(!body)return; const ref=ge('noticeContactBtns'), fg=ref&&ref.closest?ref.closest('.form-group'):null; const box=document.createElement('div'); box.id='sms421SettingsBox'; box.innerHTML='<div class="sms421-title">📨 개인전 참가자 문자 보내기</div><div class="sms421-sub">설정 전용 기능입니다. 개인별로 한 명씩 선택하고, 입금대기자/입금완료자만 골라 문자 발송할 수 있습니다.</div><div class="sms421-actions"><button type="button" class="btn btn-primary" onclick="sms421Open(\'all\')" style="background:#0f766e;color:#fff">개인별 선택 문자</button><button type="button" class="btn btn-primary" onclick="sms421Open(\'unpaid\')" style="background:#c2410c;color:#fff">입금대기자 문자</button><button type="button" class="btn btn-primary" onclick="sms421Open(\'paid\')" style="background:#2563eb;color:#fff">입금완료자 문자</button></div>'; if(fg&&fg.parentNode)fg.parentNode.insertBefore(box,fg.nextSibling); else body.appendChild(box);}catch(e){console.warn('v421 settings sms inject failed',e);}}
   window.sms421Open=open; window.sms421Render=render; window.sms421FillDivisions=fillDivisions; window.sms421Select=select; window.sms421Copy=copy; window.sms421Send=send; window.v421InjectSettingsPersonSms=inject;
+  window.sms421SendAligo=function(){
+    var body=String((ge('sms421Body')||{}).value||'').trim();
+    if(!body){toastMsg('문자 내용을 입력하세요','error');return;}
+    var rows=selectedRows();
+    if(!rows.length){toastMsg('선택된 대상이 없습니다','error');return;}
+    var seen={},rcpt=[];
+    rows.forEach(function(r){var k=phoneKey(r.phone);if(k.length>=9&&!seen[k]){seen[k]=1;rcpt.push({name:r.name||'',phone:r.phone});}});
+    if(!rcpt.length){toastMsg('발송 가능한 전화번호가 없습니다','error');return;}
+    if(typeof window.v607ShowAligoPreview==='function') window.v607ShowAligoPreview(rcpt,body,{source:'sms421_aligo',noCompact:true});
+    else toastMsg('알리고 모듈 로드 중입니다. 잠시 후 다시 시도하세요.','info');
+  };
   const oldAdmin=window.openAdminSettings; if(typeof oldAdmin==='function'){window.openAdminSettings=function(){const r=oldAdmin.apply(this,arguments); [80,200,500,900,1500,2500].forEach(ms=>setTimeout(inject,ms)); return r;};}
   document.addEventListener('DOMContentLoaded',()=>{setTimeout(inject,900); setInterval(()=>{if(document.querySelector('#mAdminSettings.open'))inject();},700);});
 })();
@@ -43748,7 +43815,7 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
     let p=ge('sms423Panel'); if(p)return p;
     const body=document.querySelector('#mAdminSettings .modal-body'); if(!body)return null;
     p=document.createElement('div'); p.id='sms423Panel';
-    p.innerHTML='<div class="sms423-title">📨 개인전 참가자 문자 보내기</div><div class="sms423-sub">설정 화면 안에서 바로 선택합니다. 개인별 체크, 입금대기/입금완료 선택 후 문자앱을 열 수 있습니다.</div><div class="sms423-grid"><div class="form-group"><label class="form-label">대회</label><select class="form-select" id="sms423Tournament" onchange="sms423FillDivisions();sms423Render(false)"></select></div><div class="form-group"><label class="form-label">부서</label><select class="form-select" id="sms423Division" onchange="sms423Render(false)"></select></div><div class="form-group"><label class="form-label">보기 필터</label><select class="form-select" id="sms423Filter" onchange="sms423Render(false)"><option value="all">전체 참가자</option><option value="unpaid">입금대기자만</option><option value="paid">입금완료자만</option></select></div></div><div id="sms423Preview"></div><div class="form-group"><label class="form-label">문자 내용</label><textarea class="form-textarea" id="sms423Body" rows="5" placeholder="문자 내용을 입력하세요"></textarea></div><div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap"><button type="button" class="btn btn-outline" onclick="sms423Copy()">📋 명단/내용 복사</button><button type="button" class="btn btn-primary" onclick="sms423Send()" style="background:#0f766e;color:#fff">📨 선택 문자 열기</button></div>';
+    p.innerHTML='<div class="sms423-title">📨 개인전 참가자 문자 보내기</div><div class="sms423-sub">설정 화면 안에서 바로 선택합니다. 개인별 체크, 입금대기/입금완료 선택 후 문자앱을 열 수 있습니다.</div><div class="sms423-grid"><div class="form-group"><label class="form-label">대회</label><select class="form-select" id="sms423Tournament" onchange="sms423FillDivisions();sms423Render(false)"></select></div><div class="form-group"><label class="form-label">부서</label><select class="form-select" id="sms423Division" onchange="sms423Render(false)"></select></div><div class="form-group"><label class="form-label">보기 필터</label><select class="form-select" id="sms423Filter" onchange="sms423Render(false)"><option value="all">전체 참가자</option><option value="unpaid">입금대기자만</option><option value="paid">입금완료자만</option></select></div></div><div id="sms423Preview"></div><div class="form-group"><label class="form-label">문자 내용</label><textarea class="form-textarea" id="sms423Body" rows="5" placeholder="문자 내용을 입력하세요"></textarea></div><div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap"><button type="button" class="btn btn-outline" onclick="sms423Copy()">📋 명단 복사</button><button type="button" class="btn btn-primary" onclick="sms423SendAligo()" style="background:#1d4ed8;color:#fff">📡 알리고 발송</button><button type="button" class="btn btn-primary" onclick="sms423Send()" style="background:#0f766e;color:#fff">📱 휴대폰 문자</button></div>';
     const top=body.querySelector('.form-group, #managerApprovalSection');
     if(top&&top.parentNode) top.parentNode.insertBefore(p, top); else body.prepend(p);
     p.addEventListener('change',function(ev){const cb=ev.target&&ev.target.closest&&ev.target.closest('.sms423-check'); if(cb){if(cb.checked)S.selected.add(cb.value); else S.selected.delete(cb.value); updateCount();}});
@@ -43769,6 +43836,17 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
   function wireTopButtons(){try{const root=document.querySelector('#mAdminSettings .modal-body'); if(!root)return; root.querySelectorAll('button').forEach(btn=>{const txt=(btn.textContent||'').replace(/\s+/g,' ').trim(); const oc=String(btn.getAttribute('onclick')||''); if(/개인전\s*참가자.*문자/.test(txt)||/openIndividualParticipantSmsModal/.test(oc)){btn.textContent='📨 개인전 참가자 전체 문자 보내기'; btn.setAttribute('onclick','sms423OpenSettings(\'all\')'); btn.style.background='#0f766e'; btn.style.color='#fff';}});}catch(e){console.warn('v423 wireTopButtons failed',e);}}
   const prevOpen=window.openIndividualParticipantSmsModal;
   window.sms423OpenSettings=openSettings; window.sms423Render=render; window.sms423FillDivisions=fillDivisions; window.sms423Select=select; window.sms423Copy=copy; window.sms423Send=send;
+  window.sms423SendAligo=function(){
+    var body=String((ge('sms423Body')||{}).value||'').trim();
+    if(!body){toastMsg('문자 내용을 입력하세요','error');return;}
+    var rows=selectedRows();
+    if(!rows.length){toastMsg('선택된 대상이 없습니다','error');return;}
+    var seen={},rcpt=[];
+    rows.forEach(function(r){var k=phoneKey(r.phone);if(k.length>=9&&!seen[k]){seen[k]=1;rcpt.push({name:r.name||'',phone:r.phone});}});
+    if(!rcpt.length){toastMsg('발송 가능한 전화번호가 없습니다','error');return;}
+    if(typeof window.v607ShowAligoPreview==='function') window.v607ShowAligoPreview(rcpt,body,{source:'sms423_aligo',noCompact:true});
+    else toastMsg('알리고 모듈 로드 중입니다. 잠시 후 다시 시도하세요.','info');
+  };
   window.openIndividualParticipantSmsModal=function(mode){ if(isOpenSettings()) return openSettings(mode||'all'); if(typeof prevOpen==='function') return prevOpen.apply(this,arguments); return openSettings(mode||'all'); };
   const oldAdmin=window.openAdminSettings; if(typeof oldAdmin==='function'){window.openAdminSettings=function(){const r=oldAdmin.apply(this,arguments); [80,180,350,700,1200,2000].forEach(ms=>setTimeout(wireTopButtons,ms)); return r;};}
   document.addEventListener('DOMContentLoaded',function(){[600,1200,2200].forEach(ms=>setTimeout(wireTopButtons,ms)); setInterval(function(){if(isOpenSettings())wireTopButtons();},700);});
@@ -51978,39 +52056,141 @@ window.manualRefreshPlayers=manualRefreshPlayers;
     try{buildCourtNotificationMessage=window.buildCourtNotificationMessage;}catch(e){}
   }catch(e){}
 
+  // v607c: 미리보기 예시 샘플값
+  const PREVIEW_SAMPLES={
+    match_started:   {court:'A1', queuePos:'',  time:'',      score:'',    teamLabel:'홍길동/이철수'},
+    waiting_registered:{court:'B2', queuePos:'2', time:'약15분', score:'',    teamLabel:'홍길동/이철수'},
+    court_changed:   {court:'C3', queuePos:'1', time:'약10분', score:'',    teamLabel:'홍길동/이철수'},
+    match_completed: {court:'',   queuePos:'',  time:'',      score:'6-3', teamLabel:'홍길동/이철수'},
+    payment_confirmed:{court:'',  queuePos:'',  time:'',      score:'',    teamLabel:'홍길동/이철수'},
+    waitlist_promoted:{court:'',  queuePos:'',  time:'',      score:'',    teamLabel:'홍길동/이철수'},
+    manual_notice:   {court:'',   queuePos:'',  time:'',      score:'',    teamLabel:'홍길동/이철수', content:'공지 내용 예시'}
+  };
+
+  function renderPreviewBox(kind, tplValue){
+    try{
+      const s=PREVIEW_SAMPLES[kind]||{teamLabel:'홍길동/이철수'};
+      const vars={코트:s.court||'',대기:s.queuePos||'',시간:s.time||'',팀:s.teamLabel||'홍길동/이철수',점수:s.score||'',내용:s.content||''};
+      const result=fillTemplate(tplValue, vars);
+      const b=byteLen(result);
+      const over=b>SMS_LIMIT;
+      return `<div style="margin-top:6px;padding:9px 12px;border-radius:10px;border:1.5px solid ${over?'#fca5a5':'#86efac'};background:${over?'#fff1f2':'#f0fdf4'}">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+          <span style="font-size:.72rem;font-weight:900;color:${over?'#dc2626':'#166534'}">📱 실제 발송 미리보기</span>
+          <span style="font-size:.72rem;font-weight:900;color:${over?'#dc2626':'#166534'};padding:2px 8px;border-radius:999px;background:${over?'#fee2e2':'#dcfce7'}">${b}B${over?' ⚠️90B 초과':'  ✅'}</span>
+        </div>
+        <div style="font-size:.84rem;font-weight:700;color:${over?'#991b1b':'#14532d'};word-break:break-all;font-family:monospace">${result||'(비어 있음)'}</div>
+        <div style="font-size:.68rem;color:#64748b;margin-top:4px">예시값: 팀=홍길동/이철수 ${s.court?'코트='+s.court:''} ${s.queuePos?'대기='+s.queuePos:''} ${s.time?'시간='+s.time:''} ${s.score?'점수='+s.score:''}</div>
+      </div>`;
+    }catch(e){return '';}
+  }
+
   function modalHtml(){
     const tpl=getStoredTemplates();
-    return `<div class="modal-overlay" id="mSmsTemplateLock"><div class="modal-box" style="max-width:680px"><div class="modal-header"><h3>✉️ 문자 고정문구 관리</h3><button class="modal-close" onclick="cm('mSmsTemplateLock')">✕</button></div><div class="modal-body"><div style="padding:10px 12px;background:#fff7ed;border:1px solid #fdba74;border-radius:12px;color:#92400e;font-size:.78rem;line-height:1.6;margin-bottom:12px;font-weight:800">단문 기준은 90B입니다. 아래 문구는 발송 직전에 자동으로 90B 안에 맞춰 잘립니다.<br>사용 가능 변수: <b>{코트}</b> <b>{대기}</b> <b>{시간}</b> <b>{팀}</b> <b>{점수}</b> <b>{내용}</b></div>${KIND_LIST.map(([k,label,def])=>`<div class="form-group"><label class="form-label">${label} <span id="smsTplByte_${k}" style="font-size:.72rem;color:#166534;font-weight:900"></span></label><textarea class="form-textarea sms-template-input" id="smsTpl_${k}" data-kind="${k}" rows="2">${String(tpl[k]||def).replace(/&/g,'&amp;').replace(/</g,'&lt;')}</textarea><div style="font-size:.7rem;color:var(--text3);margin-top:3px">기본: ${def}</div></div>`).join('')}<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end"><button class="btn btn-gray" onclick="resetSmsTemplatesToDefault()">기본값 복구</button><button class="btn btn-outline" onclick="previewSmsTemplates()">미리보기 갱신</button><button class="btn btn-primary" onclick="saveSmsTemplatesFromModal()">📌 고정 저장</button></div></div><div class="modal-footer"><button class="btn btn-gray" onclick="cm('mSmsTemplateLock')">닫기</button></div></div></div>`;
-  }
-  function ensureModal(){
-    if(!document.getElementById('mSmsTemplateLock')) document.body.insertAdjacentHTML('beforeend',modalHtml());
-    updateTplByteHints();
+    const rows=KIND_LIST.map(([k,label,def])=>{
+      const val=String(tpl[k]||def).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+      const b=byteLen(tpl[k]||def);
+      const over=b>SMS_LIMIT;
+      return `<div class="form-group" style="border:1.5px solid ${over?'#fca5a5':'#e2e8f0'};border-radius:12px;padding:12px 14px;margin-bottom:12px;background:${over?'#fff1f2':'#fff'}">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <label class="form-label" style="margin:0;font-size:.84rem">${label}</label>
+          <span id="smsTplByte_${k}" style="font-size:.75rem;font-weight:900;color:${over?'#dc2626':'#166534'};padding:2px 10px;border-radius:999px;background:${over?'#fee2e2':'#dcfce7'}">${b}B${over?' ⚠️':' ✅'}</span>
+        </div>
+        <textarea class="form-textarea sms-template-input" id="smsTpl_${k}" data-kind="${k}" rows="2" style="font-family:monospace;font-size:.84rem">${val}</textarea>
+        <div id="smsTplPreview_${k}">${renderPreviewBox(k, tpl[k]||def)}</div>
+        <div style="font-size:.7rem;color:var(--text3);margin-top:5px">기본값: <code style="background:#f1f5f9;padding:1px 5px;border-radius:4px">${def}</code></div>
+      </div>`;
+    }).join('');
+    return `<div class="modal-overlay" id="mSmsTemplateLock">
+      <div class="modal-box" style="max-width:700px">
+        <div class="modal-header"><h3>✉️ 문자 고정문구 관리</h3><button class="modal-close" onclick="cm('mSmsTemplateLock')">✕</button></div>
+        <div class="modal-body">
+          <div style="padding:10px 14px;background:#fff7ed;border:1px solid #fdba74;border-radius:12px;color:#92400e;font-size:.78rem;line-height:1.7;margin-bottom:16px">
+            <b>단문 90B 이하</b>만 알리고 단문으로 발송됩니다. 초과 시 자동으로 잘립니다.<br>
+            사용 가능 변수: <code style="background:#fef3c7;padding:1px 5px;border-radius:4px">{코트}</code> <code style="background:#fef3c7;padding:1px 5px;border-radius:4px">{대기}</code> <code style="background:#fef3c7;padding:1px 5px;border-radius:4px">{시간}</code> <code style="background:#fef3c7;padding:1px 5px;border-radius:4px">{팀}</code> <code style="background:#fef3c7;padding:1px 5px;border-radius:4px">{점수}</code> <code style="background:#fef3c7;padding:1px 5px;border-radius:4px">{내용}</code><br>
+            <b>📱 실제 발송 미리보기</b>가 각 항목 아래에 실시간으로 표시됩니다.
+          </div>
+          <div style="padding:8px 12px;border-radius:10px;background:#f0f9ff;border:1px solid #bae6fd;margin-bottom:16px;font-size:.76rem;color:#0369a1;line-height:1.6">
+            💡 <b>예시 팀명</b>: 홍길동/이철수 · 코트: A1, B2, C3 · 대기: 1~2번 · 시간: 약15분<br>
+            문구를 수정하면 미리보기가 즉시 반영됩니다. <b>📌 고정 저장</b> 후 실제 발송에 적용됩니다.
+          </div>
+          ${rows}
+          <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;padding-top:4px">
+            <button class="btn btn-gray" onclick="resetSmsTemplatesToDefault()">🔄 기본값 복구</button>
+            <button class="btn btn-primary" onclick="saveSmsTemplatesFromModal()">📌 고정 저장</button>
+          </div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-gray" onclick="cm('mSmsTemplateLock')">닫기</button></div>
+      </div>
+    </div>`;
   }
   function updateTplByteHints(){
     KIND_LIST.forEach(([k])=>{
-      const ta=document.getElementById('smsTpl_'+k); const sp=document.getElementById('smsTplByte_'+k);
-      if(ta&&sp){ const b=byteLen(ta.value); sp.textContent=`${b}B`; sp.style.color=b>SMS_LIMIT?'#dc2626':'#166534'; }
+      const ta=document.getElementById('smsTpl_'+k);
+      const sp=document.getElementById('smsTplByte_'+k);
+      const pv=document.getElementById('smsTplPreview_'+k);
+      if(ta){
+        const val=ta.value||'';
+        const b=byteLen(val);
+        const over=b>SMS_LIMIT;
+        if(sp){
+          sp.textContent=`${b}B${over?' ⚠️':' ✅'}`;
+          sp.style.color=over?'#dc2626':'#166534';
+          sp.style.background=over?'#fee2e2':'#dcfce7';
+        }
+        if(pv) pv.innerHTML=renderPreviewBox(k, val);
+        // 카드 테두리 색 업데이트
+        const card=ta.closest('.form-group');
+        if(card){
+          card.style.borderColor=over?'#fca5a5':'#e2e8f0';
+          card.style.background=over?'#fff1f2':'#fff';
+        }
+      }
     });
   }
-  window.openSmsTemplateLockModal=function(){ensureModal(); try{om('mSmsTemplateLock');}catch(e){document.getElementById('mSmsTemplateLock').classList.add('open');} setTimeout(updateTplByteHints,0);};
+  window.openSmsTemplateLockModal=function(){
+    if(document.getElementById('mSmsTemplateLock')) document.getElementById('mSmsTemplateLock').remove();
+    document.body.insertAdjacentHTML('beforeend',modalHtml());
+    try{om('mSmsTemplateLock');}catch(e){document.getElementById('mSmsTemplateLock').classList.add('open');}
+    setTimeout(updateTplByteHints,0);
+  };
   window.saveSmsTemplatesFromModal=async function(){
-    ensureModal(); const obj={}; KIND_LIST.forEach(([k,l,d])=>{obj[k]=document.getElementById('smsTpl_'+k)?.value?.trim()||d;});
+    if(!document.getElementById('mSmsTemplateLock')) return;
+    const obj={}; KIND_LIST.forEach(([k,l,d])=>{obj[k]=document.getElementById('smsTpl_'+k)?.value?.trim()||d;});
     await saveTemplatesGlobal(obj); updateTplByteHints();
   };
   window.resetSmsTemplatesToDefault=function(){
-    ensureModal(); const def=defaultTemplates(); KIND_LIST.forEach(([k])=>{const ta=document.getElementById('smsTpl_'+k); if(ta) ta.value=def[k];}); updateTplByteHints();
+    if(!document.getElementById('mSmsTemplateLock')) return;
+    const def=defaultTemplates(); KIND_LIST.forEach(([k])=>{const ta=document.getElementById('smsTpl_'+k); if(ta) ta.value=def[k];}); updateTplByteHints();
+    try{toast('기본값으로 복구했습니다','info');}catch(e){}
   };
   window.previewSmsTemplates=function(){updateTplByteHints(); try{toast('미리보기 갱신 완료','info');}catch(e){}};
   document.addEventListener('input',function(ev){if(ev.target&&ev.target.classList&&ev.target.classList.contains('sms-template-input')) updateTplByteHints();},true);
 
   function addSettingsButton(){
+    // v607k: buildAutoSmsSettingsPanelHTML에 이미 포함됨 - 중복 삽입 방지
+    return;
     try{
-      const body=document.querySelector('#mAdminSettings .modal-body'); if(!body||body.querySelector('#smsTemplateLockSettingsBlock')) return;
-      const html=`<div class="form-group" id="smsTemplateLockSettingsBlock" style="border-top:1px solid var(--border);padding-top:14px;margin-bottom:16px"><div style="font-weight:700;font-size:.88rem;margin-bottom:6px;color:var(--primary-dark)">✉️ 문자 고정문구</div><div style="font-size:.72rem;color:var(--text3);margin-bottom:10px;line-height:1.5">경기 시작/대기/완료/입금확인 등 자동문자의 기본 문구를 직접 수정하고 고정합니다. 90B 초과 시 자동 축약됩니다.</div><button class="btn btn-primary" onclick="openSmsTemplateLockModal()" style="width:100%">📌 고정문자 수정/고정</button></div>`;
+      const existing=document.getElementById('smsTemplateLockSettingsBlock');
+      if(existing && document.contains(existing)) return;
+      if(existing) existing.remove();
+      const html=`<div class="form-group" id="smsTemplateLockSettingsBlock" style="border-top:1px solid var(--border);padding-top:14px;margin-bottom:16px"><div style="font-weight:700;font-size:.88rem;margin-bottom:6px;color:var(--primary-dark)">✉️ 문자 관리</div><div style="font-size:.72rem;color:var(--text3);margin-bottom:10px;line-height:1.5">경기 시작/대기/완료/입금확인 등 자동문자 문구를 수정하고, 개인전 참가자 전체에게 공지 문자를 보낼 수 있습니다.</div><div style="display:flex;flex-direction:column;gap:8px"><button class="btn btn-primary" onclick="openSmsTemplateLockModal()" style="width:100%">📌 고정문자 수정/고정 (미리보기 포함)</button><button class="btn btn-primary" onclick="openIndividualParticipantSmsModal()" style="width:100%;background:#0f766e;color:#fff">📨 개인전 참가자 전체 공지 문자</button></div></div>`;
+      // 탭 구조 완성 후: common 섹션에 직접 삽입 (autoSmsSettingsBox 바로 뒤)
+      const commonSec=document.getElementById('adminSettingsSection_common');
+      if(commonSec){
+        const autoSmsBlock=commonSec.querySelector('#autoSmsSettingsBox,#autoSmsSettingsBlock');
+        if(autoSmsBlock){ autoSmsBlock.insertAdjacentHTML('afterend', html); return; }
+        commonSec.insertAdjacentHTML('beforeend', html);
+        return;
+      }
+      // 탭 구조 미완성: modal-body에 삽입
+      const body=document.querySelector('#mAdminSettings .modal-body');
+      if(!body) return;
       const ref=body.querySelector('[data-settings-block="team-login-panel"]')||body.children[0];
       if(ref) ref.insertAdjacentHTML('beforebegin',html); else body.insertAdjacentHTML('afterbegin',html);
     }catch(e){}
   }
+  window.addSettingsButton=addSettingsButton;
   document.addEventListener('DOMContentLoaded',()=>{setTimeout(addSettingsButton,600);});
   try{new MutationObserver(()=>setTimeout(addSettingsButton,30)).observe(document.body,{childList:true,subtree:true});}catch(e){}
 
