@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-06-v607k-aligo-all-modals";
+  const APP_VERSION = "2026-06-06-v607p-auto-profile-result";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -12023,6 +12023,85 @@ async function requireGoogleLoginForIndividual(action='개인전 이용'){
   await ensureUserProfileDoc(user).catch(()=>{});
   return user;
 }
+
+// v607p: 이름+전화번호로 참가자 확인 - 로그인 시 자동, 미로그인 시 입력 팝업
+function verifyParticipantByNamePhone(key, m){
+  return new Promise((resolve, reject)=>{
+    // 로그인된 사용자 프로필 자동 사용 (팝업 없음)
+    const profile=window.CURRENT_APP_PROFILE||window.CURRENT_APP_USER_PROFILE||{};
+    const savedName=String(profile.name||profile.displayName||'').trim();
+    const savedPhone=String(profile.phone||profile.phoneDigits||'').replace(/[^0-9]/g,'');
+    if(savedName && savedPhone){
+      const side=_checkNamePhoneSide(key, m, savedName, savedPhone);
+      if(side){ resolve({side, method:'profile_auto'}); return; }
+      // 로그인은 됐지만 이 경기 참가자가 아님
+      reject(new Error('로그인 계정(' + savedName + ')은 이 경기 참가자가 아닙니다.\n내 정보의 이름/전화번호가 접수 시 입력한 정보와 동일한지 확인해 주세요.'));
+      return;
+    }
+    // 로그인 안 됐거나 이름/전화번호 미등록 → 입력 팝업
+    _showNamePhoneInputModal(key, m, resolve, reject);
+  });
+}
+function _normalizePhone(p){ return String(p||'').replace(/[^0-9]/g,''); }
+function _checkNamePhoneSide(key, m, name, phone){
+  const teams=G.teams[key]||[];
+  const t1=teams[m.t1]||teams.find(t=>t&&(t.id===m.t1||t.name===m.t1));
+  const t2=teams[m.t2]||teams.find(t=>t&&(t.id===m.t2||t.name===m.t2));
+  const ph=_normalizePhone(phone);
+  function matchTeam(team){
+    if(!team) return false;
+    const players=team.players||[];
+    const phones=(team.phones||[players.length>0?team.phone:'']).concat(team.phone2||'');
+    const allPhones=[team.phone,...(team.phones||[])].map(_normalizePhone).filter(Boolean);
+    if(allPhones.some(p=>p===ph)) return true;
+    // 이름도 확인
+    const allNames=[team.name,...players].map(n=>String(n||'').trim()).filter(Boolean);
+    return allPhones.some(p=>p===ph) || (allNames.some(n=>n===name.trim()) && allPhones.length===0);
+  }
+  if(matchTeam(t1)) return 1;
+  if(matchTeam(t2)) return 2;
+  return 0;
+}
+function _showNamePhoneInputModal(key, m, resolve, reject){
+  let modal=document.getElementById('v607NamePhoneModal');
+  if(!modal){ modal=document.createElement('div'); modal.id='v607NamePhoneModal'; modal.className='modal-overlay'; modal.style.zIndex='25000'; document.body.appendChild(modal); }
+  const teams=G.teams[key]||[];
+  const t1=teams[m.t1]||teams.find(t=>t&&(t.id===m.t1||t.name===m.t1));
+  const t2=teams[m.t2]||teams.find(t=>t&&(t.id===m.t2||t.name===m.t2));
+  const matchTitle=`${t1?.name||'팀1'} vs ${t2?.name||'팀2'}`;
+  modal.innerHTML=`<div class="modal-box" style="max-width:380px">
+    <div class="modal-header" style="background:#0f766e"><h3 style="color:#fff">🎾 참가자 확인</h3></div>
+    <div class="modal-body">
+      <div style="padding:10px 12px;background:#ecfdf5;border:1px solid #86efac;border-radius:10px;font-size:.78rem;color:#166534;margin-bottom:14px;line-height:1.6">
+        <b>${esc(matchTitle)}</b><br>접수 시 입력한 이름과 전화번호를 입력하면 결과를 저장할 수 있습니다.<br>
+        <span style="color:#0369a1">💡 로그인 후 내 정보에 이름/전화번호를 등록하면 다음부터 팝업 없이 바로 저장됩니다.</span>
+      </div>
+      <div class="form-group"><label class="form-label">이름</label><input class="form-input" id="v607VerifyName" placeholder="예: 홍길동" autocomplete="name"/></div>
+      <div class="form-group"><label class="form-label">전화번호</label><input class="form-input" id="v607VerifyPhone" placeholder="예: 010-1234-5678" inputmode="tel"/></div>
+      <div id="v607VerifyMsg" style="font-size:.78rem;color:#dc2626;margin-top:6px;min-height:18px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-gray" id="v607VerifyCancel">취소</button>
+      <button class="btn btn-primary" id="v607VerifyConfirm" style="background:#0f766e;color:#fff">확인</button>
+    </div>
+  </div>`;
+  modal.classList.add('open');
+  const nameEl=document.getElementById('v607VerifyName');
+  const phoneEl=document.getElementById('v607VerifyPhone');
+  const msgEl=document.getElementById('v607VerifyMsg');
+  if(nameEl) setTimeout(()=>nameEl.focus(),100);
+  document.getElementById('v607VerifyCancel').onclick=()=>{ modal.classList.remove('open'); reject(new Error('취소됨')); };
+  document.getElementById('v607VerifyConfirm').onclick=()=>{
+    const name=(nameEl?.value||'').trim();
+    const phone=(phoneEl?.value||'').trim();
+    if(!name||!phone){ if(msgEl) msgEl.textContent='이름과 전화번호를 모두 입력하세요.'; return; }
+    const side=_checkNamePhoneSide(key, m, name, phone);
+    if(!side){ if(msgEl) msgEl.textContent='등록된 정보와 일치하지 않습니다. 접수 시 입력한 이름/전화번호를 확인하세요.'; return; }
+    modal.classList.remove('open');
+    resolve({side, method:'name_phone', name, phone});
+  };
+  if(phoneEl) phoneEl.onkeydown=(e)=>{ if(e.key==='Enter') document.getElementById('v607VerifyConfirm')?.click(); };
+}
 function isRegistrationOwner(team){
   const uid=auth?.currentUser?.uid||'';
   return !!(uid && team && String(team.ownerUid||'')===uid);
@@ -14145,7 +14224,7 @@ async function loadMeta(){
       if(!G.meta.indivLockEnabled) G.meta.indivLockEnabled=false;
       if(!G.meta.indivLockStart) G.meta.indivLockStart='';
       if(!G.meta.indivLockEnd) G.meta.indivLockEnd='';
-      markFbWriteCache('meta','config',{pw:G.meta.pw,regPw:(G.meta.regPw||'202601'),clubs:G.clubs,adminPhone:(G.meta.adminPhone||''),clubContacts:(G.meta.clubContacts||{}),clubEmails:(G.meta.clubEmails||{}),clubPasswords:(G.meta.clubPasswords||{}),clubPasswordCustom:(G.meta.clubPasswordCustom||{}),regDeadlineDt:(G.meta.regDeadlineDt||''),adminFloatingNotice:(G.meta.adminFloatingNotice||''),adminFloatingNoticeEnabled:!!G.meta.adminFloatingNoticeEnabled,startupImagePopupEnabled:!!G.meta.startupImagePopupEnabled,startupImagePopupUrl:(G.meta.startupImagePopupUrl||'/guide/plus.png'),startupImagePopupId:(G.meta.startupImagePopupId||'startup-popup-v1'),startupImagePopupTitle:(G.meta.startupImagePopupTitle||'공지 안내'),onlineOrderEnabled:!!G.meta.onlineOrderEnabled,operatorPw:(G.meta.operatorPw||'2026court'),individualAutoCourtAssignEnabled:!!G.meta.individualAutoCourtAssignEnabled,usePlayerRegistry:!!G.meta.usePlayerRegistry,showAssociationDashboard:!!G.meta.showAssociationDashboard,useFixedClubs:!!G.meta.useFixedClubs,allowTeamDirectorLogin:!!G.meta.allowTeamDirectorLogin,allowPublicTeamRegistration:!!G.meta.allowPublicTeamRegistration,allowPublicResultEntry:!!G.meta.allowPublicResultEntry,appTitle:(G.meta.appTitle||'시합관리 시스템'),regSessionVersion:Number(G.meta.regSessionVersion||1),drawHistoryPolicyVersion:Number(G.meta.drawHistoryPolicyVersion||0),indivLockEnabled:!!G.meta.indivLockEnabled,indivLockStart:(G.meta.indivLockStart||''),indivLockEnd:(G.meta.indivLockEnd||''),autoNotificationSettings:getAutoNotificationSettings(),autoSmsSettings:getAutoSmsSettings()});
+      markFbWriteCache('meta','config',{pw:G.meta.pw,regPw:(G.meta.regPw||'202601'),clubs:G.clubs,adminPhone:(G.meta.adminPhone||''),clubContacts:(G.meta.clubContacts||{}),clubEmails:(G.meta.clubEmails||{}),clubPasswords:(G.meta.clubPasswords||{}),clubPasswordCustom:(G.meta.clubPasswordCustom||{}),regDeadlineDt:(G.meta.regDeadlineDt||''),adminFloatingNotice:(G.meta.adminFloatingNotice||''),adminFloatingNoticeEnabled:!!G.meta.adminFloatingNoticeEnabled,startupImagePopupEnabled:!!G.meta.startupImagePopupEnabled,startupImagePopupUrl:(G.meta.startupImagePopupUrl||'/guide/plus.png'),startupImagePopupId:(G.meta.startupImagePopupId||'startup-popup-v1'),startupImagePopupTitle:(G.meta.startupImagePopupTitle||'공지 안내'),onlineOrderEnabled:!!G.meta.onlineOrderEnabled,operatorPw:(G.meta.operatorPw||'2026court'),individualAutoCourtAssignEnabled:!!G.meta.individualAutoCourtAssignEnabled,usePlayerRegistry:!!G.meta.usePlayerRegistry,showAssociationDashboard:!!G.meta.showAssociationDashboard,useFixedClubs:!!G.meta.useFixedClubs,allowTeamDirectorLogin:!!G.meta.allowTeamDirectorLogin,allowPublicTeamRegistration:!!G.meta.allowPublicTeamRegistration,allowPublicResultEntry:!!G.meta.allowPublicResultEntry,appTitle:(G.meta.appTitle||'시합관리 시스템'),regSessionVersion:Number(G.meta.regSessionVersion||1),drawHistoryPolicyVersion:Number(G.meta.drawHistoryPolicyVersion||0),indivLockEnabled:!!G.meta.indivLockEnabled,indivLockStart:(G.meta.indivLockStart||''),indivLockEnd:(G.meta.indivLockEnd||''),autoNotificationSettings:getAutoNotificationSettings(),autoSmsSettings:getAutoSmsSettings(),smsTemplates:(G.meta.smsTemplates||{})});
     }else{
       await setDoc(doc(db,'meta','config'),{pw:'kimhae1234',regPw:'202601',clubs:G.clubs,adminPhone:'',clubContacts:{},clubPasswords:{},clubPasswordCustom:{},adminFloatingNotice:'',adminFloatingNoticeEnabled:false,startupImagePopupEnabled:false,startupImagePopupUrl:'/guide/plus.png',startupImagePopupId:'startup-popup-v1',startupImagePopupTitle:'공지 안내',onlineOrderEnabled:false,operatorPw:'2026court',allowTeamDirectorLogin:true,individualAutoCourtAssignEnabled:false,regSessionVersion:1,drawHistoryPolicyVersion:0,usePlayerRegistry:false,showAssociationDashboard:false,useFixedClubs:false,allowPublicTeamRegistration:false,allowPublicResultEntry:false,appTitle:'시합관리 시스템',courtGroupCatalog:DEFAULT_COURT_GROUPS.map(g=>({name:g.title,count:(g.courts||[]).length})),autoNotificationSettings:{registration:true,courtWaiting:true,courtChanged:true,matchStart:true,orderSubmitted:true,matchComplete:false},autoSmsSettings:{enabled:false,courtWaiting:true,courtChanged:true,matchStart:true,matchComplete:false}});
     }
@@ -14201,7 +14280,8 @@ async function saveMeta(){
     drawHistoryPolicyVersion:Number(G.meta.drawHistoryPolicyVersion||0),
     indivLockEnabled:!!G.meta.indivLockEnabled,
     indivLockStart:(G.meta.indivLockStart||''),
-    indivLockEnd:(G.meta.indivLockEnd||'')
+    indivLockEnd:(G.meta.indivLockEnd||''),
+    smsTemplates:(G.meta.smsTemplates||{})
   };
   try{
     if(isSameFbWrite('meta','config',payload)) return;
@@ -19608,14 +19688,45 @@ function buildCourtNotificationMessage(kind,key,m,meta={}){
   const info=describeCourtBoardMatch(key,m||{});
   const court=String(meta.court||'').trim();
   const queuePos=Number(meta.queuePos||0)||0;
-  const queueText=queuePos>0 ? `${queuePos}번째 대기` : '';
   const expectedText=getCourtSmsExpectedTimeText(kind,key,meta);
-  const expectedPart=expectedText ? `${expectedText}.` : '';
-  const prefix=`[시합관리 시스템]`;
-  if(kind==='match_started') return `${prefix} 경기 시작합니다. 5분 내에 출전하세요. ${court?`${court} 코트`:''} ${info.title||''}`.replace(/\s+/g,' ').trim();
-  if(kind==='match_completed') return `${prefix} 경기 완료되었습니다. 결과를 확인해 주세요. ${court?`${court} 코트`:''} ${info.title||''}`.replace(/\s+/g,' ').trim();
-  if(kind==='court_changed') return `${prefix} 대기 코트가 변경되었습니다. ${court?`${court} 코트`:''} ${queueText||'대기 등록'} 되었습니다. ${expectedPart} ${info.title||''}`.replace(/\s+/g,' ').trim();
-  return `${prefix} ${court?`${court} 코트`:''} ${queueText||'대기 등록'} 되었습니다. ${expectedPart} ${info.title||''}`.replace(/\s+/g,' ').trim();
+  // v607n: SMS용 팀명 공백 최소화 (홍길동/이철수vs김영희/박민수)
+  const teamLabel=String(info.title||'').trim()
+    .replace(/\s*\/\s*/g,'/')
+    .replace(/\s+vs\s+/gi,'vs')
+    .replace(/\s+/g,' ').trim();
+  // v607l: window.v589SmsTemplates.get 으로 저장된 고정문구 읽기
+  const getTpl=(typeof window.v589SmsTemplates==='object'&&typeof window.v589SmsTemplates.get==='function')
+    ? window.v589SmsTemplates.get
+    : (typeof getStoredTemplates==='function' ? getStoredTemplates : ()=>({}));
+  const tpl=getTpl();
+  // 변수 치환 (cutBytes 제거 - 저장 시 이미 관리됨)
+  function fillT(tmpl){
+    return String(tmpl||'')
+      .replace(/\{코트\}/g, court)
+      .replace(/\{대기\}/g, queuePos>0 ? String(queuePos) : '')
+      .replace(/\{시간\}/g, expectedText||'')
+      .replace(/\{팀\}/g, teamLabel)
+      .replace(/\{점수\}/g, String(meta.score||info.score||'').trim())
+      .replace(/\{내용\}/g, '')
+      .replace(/\s+/g,' ').trim();
+  }
+  if(kind==='match_started'){
+    return fillT(tpl.match_started||'[230]{코트} 시작 {팀}');
+  }
+  if(kind==='match_completed'){
+    const score=String(meta.score||info.score||'').trim();
+    return String(tpl.match_completed||'[230]{코트} 완료 {점수} {팀}')
+      .replace(/\{코트\}/g, court)
+      .replace(/\{점수\}/g, score)
+      .replace(/\{팀\}/g, teamLabel)
+      .replace(/\{대기\}/g,'').replace(/\{시간\}/g,'').replace(/\{내용\}/g,'')
+      .replace(/\s+/g,' ').trim();
+  }
+  if(kind==='court_changed'){
+    return fillT(tpl.court_changed||'[230]{코트} {대기}대기 변경 {시간} {팀}');
+  }
+  // waiting_registered
+  return fillT(tpl.waiting_registered||'[230]{코트} {대기}대기 {시간} {팀}');
 }
 function buildCourtNotificationApprovalPayload(kind,key,m,meta={}){
   const recipients=(kind==='match_completed') ? getMatchResultNotificationRecipients(key,m) : getMatchNotificationRecipients(key,m);
@@ -30657,21 +30768,16 @@ async function saveM3Core(){
     const scoreText=getIndividualActualScoreText({rubbers:newRb}) || `${sc1}:${sc2}`;
     const winnerSide=getIndividualWinnerSideByScoreText(scoreText) || (sc1>sc2?1:2);
     try{
-      const user=await requireGoogleLoginForIndividual('개인전 결과 입력');
-      const t1OwnerUid=String(t1?.ownerUid||m.t1OwnerUid||'');
-      const t2OwnerUid=String(t2?.ownerUid||m.t2OwnerUid||'');
-      if(!t1OwnerUid && !t2OwnerUid){
-        toast('참가팀 등록 계정 정보가 없어 결과 저장이 어렵습니다. 관리자에게 문의해 주세요.','error');
-        return;
-      }
-      const mySide = String(user.uid)===t1OwnerUid ? 1 : (String(user.uid)===t2OwnerUid ? 2 : 0);
+      // v607n: 구글 UID 대신 이름+전화번호로 참가자 확인
+      const verified=await verifyParticipantByNamePhone(key, m);
+      const mySide=verified.side;
       if(!mySide){
-        toast('이 경기에 참가 접수한 구글 계정으로만 결과 저장할 수 있습니다','error');
+        toast('이 경기의 참가자로 확인되지 않았습니다','error');
         return;
       }
-      participantWinnerAuth={authSide:mySide, winnerSide, scoreText, uid:user.uid};
+      participantWinnerAuth={authSide:mySide, winnerSide, scoreText, uid:auth.currentUser?.uid||'name_phone_verified'};
     }catch(e){
-      toast(e?.message||'구글 로그인이 필요합니다','error');
+      if(e?.message!=='취소됨') toast(e?.message||'참가자 확인에 실패했습니다','error');
       return;
     }
   }
@@ -51878,7 +51984,7 @@ window.manualRefreshPlayers=manualRefreshPlayers;
     ['match_started','경기 시작','[230]{코트} 시작 {팀}'],
     ['waiting_registered','코트 대기 진입','[230]{코트} {대기}대기 {시간} {팀}'],
     ['court_changed','대기/코트 변경','[230]{코트} {대기}대기 변경 {시간} {팀}'],
-    ['match_completed','경기 완료','[230]완료 {점수} {팀}'],
+    ['match_completed','경기 완료','[230]{코트} 완료 {점수} {팀}'],
     ['payment_confirmed','입금 확인','[230]입금확인 {팀}'],
     ['waitlist_promoted','대기팀 정식등록','[230]정식등록가능 {팀} 입금후회신'],
     ['manual_notice','수동/공지 문자','[230]{내용}']
@@ -52058,10 +52164,10 @@ window.manualRefreshPlayers=manualRefreshPlayers;
 
   // v607c: 미리보기 예시 샘플값
   const PREVIEW_SAMPLES={
-    match_started:   {court:'A1', queuePos:'',  time:'',      score:'',    teamLabel:'홍길동/이철수'},
-    waiting_registered:{court:'B2', queuePos:'2', time:'약15분', score:'',    teamLabel:'홍길동/이철수'},
-    court_changed:   {court:'C3', queuePos:'1', time:'약10분', score:'',    teamLabel:'홍길동/이철수'},
-    match_completed: {court:'',   queuePos:'',  time:'',      score:'6-3', teamLabel:'홍길동/이철수'},
+    match_started:   {court:'국제1', queuePos:'',  time:'',      score:'',    teamLabel:'이상형/김성희vs이상영/이상민'},
+    waiting_registered:{court:'국제2', queuePos:'2', time:'약15분', score:'',    teamLabel:'홍길동/이철수vs김영희/박민수'},
+    court_changed:   {court:'국제3', queuePos:'1', time:'약10분', score:'',    teamLabel:'홍길동/이철수vs김영희/박민수'},
+    match_completed: {court:'국제1',   queuePos:'',  time:'',      score:'6-3', teamLabel:'이상형/김성희vs이상영/이상민'},
     payment_confirmed:{court:'',  queuePos:'',  time:'',      score:'',    teamLabel:'홍길동/이철수'},
     waitlist_promoted:{court:'',  queuePos:'',  time:'',      score:'',    teamLabel:'홍길동/이철수'},
     manual_notice:   {court:'',   queuePos:'',  time:'',      score:'',    teamLabel:'홍길동/이철수', content:'공지 내용 예시'}
