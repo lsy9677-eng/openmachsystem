@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-06-v607q-kakao-profile-bracketrefresh";
+  const APP_VERSION = "2026-06-06-v607t-complete-info-only";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -5988,7 +5988,6 @@ button:disabled{opacity:.55!important;cursor:not-allowed!important;filter:graysc
 </button>
 </div>
 <div id="bracketExportBar" style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:6px;flex-wrap:wrap">
-<button class="btn btn-outline" onclick="manualRefreshCurrentTournament()" style="font-size:.78rem;padding:5px 10px">↻ 새로고침</button>
 <button class="btn btn-outline" onclick="openBracketView()" style="font-size:.78rem;padding:5px 10px">📊 전체대진표(본선포함)</button>
 <button class="btn btn-outline" id="v606FinalizeGroupOrderBtn" onclick="v606FinalizeGroupOrder()" style="font-size:.78rem;padding:5px 12px;display:none;border-color:#d4a017;color:#8a6412">🔒 조 번호 확정</button>
 <div class="login-menu-wrap js-mini-menu" id="bracketSaveMenuWrap">
@@ -5999,7 +5998,10 @@ button:disabled{opacity:.55!important;cursor:not-allowed!important;filter:graysc
 </div>
 </div>
 </div>
-<div class="sec-title">대진표 · 경기 현황 <span style="font-size:.72rem;font-weight:400;color:var(--text2)">— 저읽기 운영모드 · 경기상태 45초 갱신</span></div>
+<div class="sec-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
+  <span>대진표 · 경기 현황 <span style="font-size:.72rem;font-weight:400;color:var(--text2)">— 저읽기 운영모드 · 경기상태 45초 갱신</span></span>
+  <button onclick="manualRefreshCurrentTournament()" style="padding:7px 18px;border-radius:999px;border:none;background:#0f766e;color:#fff;font-size:.84rem;font-weight:900;cursor:pointer;display:inline-flex;align-items:center;gap:5px;box-shadow:0 2px 8px rgba(15,118,110,.25)">🔄 새로고침</button>
+</div>
 <div class="card">
 <div class="frow">
 <div class="form-group"><label class="form-label">대회</label><select class="form-select" id="brTS" onchange="onBrTC()"><option value="">-- 대회 선택 --</option></select></div>
@@ -8318,7 +8320,9 @@ function renderPersonalMatchBanner(tid, targetDivs=[]){
     })() || (getPersonalMatchStartSoonChip(status)?`<div class="my-match-summary-wrap" style="justify-content:flex-start">${getPersonalMatchStartSoonChip(status)}</div>`:'');
     const title=`${n1} <span style="color:var(--text3);font-weight:700">vs</span> ${n2}`;
     const sub=[dl(row.div), info?.label, info?.detail].filter(Boolean).join(' · ');
-    return `<div style="background:white;border:1.5px solid ${isNext?(status.code==='start_soon'?'#ef4444':'#2563eb'):(amIWinner?'#16a34a':'#2563eb')};border-radius:10px;padding:8px 12px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;cursor:pointer;box-shadow:${isNext?'0 0 0 3px rgba(37,99,235,.12)':'none'}" onclick="goBracketMatch('${tid}','${row.div}','${matchId}')"><div style="flex:1;min-width:220px"><div class="my-match-card-title">${isNext?'<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:999px;background:#eff6ff;color:#1d4ed8;font-size:.72rem;font-weight:900;margin-right:6px">다음 경기</span>':''}${title}</div><div style="font-size:.78rem;color:var(--text2);margin-top:3px">${sub}</div><div style="font-size:.78rem;color:${status.tone};font-weight:800;margin-top:5px;display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:999px;background:${status.bg};border:1px solid ${status.border}">${amIWinner?'🏆 내 승리 · ':''}${status.text}</div>${orderSummary}</div><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end"><button class="my-match-toggle-btn" onclick="event.stopPropagation();goBracketMatch('${tid}','${row.div}','${matchId}');" style="border:1px solid #2563eb;border-radius:999px;background:white;color:#1d4ed8;cursor:pointer">해당 경기로</button></div></div>`;
+    const isDone=amIWinner || status.code==='done';
+    const resultBtn=!isDone ? `<button class="my-match-toggle-btn" onclick="event.stopPropagation();openM3('${key}','${matchId}');" style="border:1px solid #0f766e;border-radius:999px;background:#0f766e;color:white;cursor:pointer;font-weight:900">✏️ 결과 입력</button>` : `<button class="my-match-toggle-btn" onclick="event.stopPropagation();openM3('${key}','${matchId}');" style="border:1px solid #94a3b8;border-radius:999px;background:#f1f5f9;color:#64748b;cursor:pointer">📋 결과 보기</button>`;
+    return `<div style="background:white;border:1.5px solid ${isNext?(status.code==='start_soon'?'#ef4444':'#2563eb'):(amIWinner?'#16a34a':'#2563eb')};border-radius:10px;padding:8px 12px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;cursor:pointer;box-shadow:${isNext?'0 0 0 3px rgba(37,99,235,.12)':'none'}" onclick="goBracketMatch('${tid}','${row.div}','${matchId}')"><div style="flex:1;min-width:220px"><div class="my-match-card-title">${isNext?'<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:999px;background:#eff6ff;color:#1d4ed8;font-size:.72rem;font-weight:900;margin-right:6px">다음 경기</span>':''}${title}</div><div style="font-size:.78rem;color:var(--text2);margin-top:3px">${sub}</div><div style="font-size:.78rem;color:${status.tone};font-weight:800;margin-top:5px;display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:999px;background:${status.bg};border:1px solid ${status.border}">${amIWinner?'🏆 내 승리 · ':''}${status.text}</div>${orderSummary}</div><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">${resultBtn}<button class="my-match-toggle-btn" onclick="event.stopPropagation();goBracketMatch('${tid}','${row.div}','${matchId}');" style="border:1px solid #2563eb;border-radius:999px;background:white;color:#1d4ed8;cursor:pointer">대진표로</button></div></div>`;
   }).join('');
   const cardsHtml = rowsWithStatus.length
     ? (cards || '')
@@ -19739,24 +19743,31 @@ function buildCourtNotificationApprovalPayload(kind,key,m,meta={}){
   const recipients=(kind==='match_completed') ? getMatchResultNotificationRecipients(key,m) : getMatchNotificationRecipients(key,m);
   const body=buildCourtNotificationMessage(kind,key,m,meta);
   const info=describeCourtBoardMatch(key,m||{});
-  const title = kind==='match_completed' ? '✅ 경기 완료 알림' : (kind==='match_started' ? '🎾 경기 시작 알림' : (kind==='court_changed' ? '🔄 대기 코트 알림' : '⏳ 대기 배정 알림'));
-  const recipientLabel = recipients.length ? recipients.map(r=>`${r.name}(${r.phone})`).join(', ') : '번호 없음';
-  const queueText = meta.queuePos>0 ? ` · ${meta.queuePos}번째 대기` : '';
+  const title = kind==='match_completed' ? '✅ 경기 완료' : (kind==='match_started' ? '🎾 경기 시작' : (kind==='court_changed' ? '🔄 대기 변경' : '⏳ 대기 배정'));
+  const queueText = meta.queuePos>0 ? ` ${meta.queuePos}번 대기` : '';
   const expectedText=getCourtSmsExpectedTimeText(kind,key,meta);
+  const court=String(meta.court||'').trim();
+  // v607t: match_completed = info_only (문자 버튼 없음, 6초 자동 닫힘, 전화번호 제거)
+  if(kind==='match_completed'){
+    const sc1=m?.sc1??''; const sc2=m?.sc2??'';
+    const score=(sc1!==''&&sc2!=='')?String(sc1)+':'+String(sc2):'';
+    const msg=[court?court+' 코트':'', info.title||'경기', score?'결과 '+score:''].filter(Boolean).join(' · ');
+    return {
+      msg, title, kind:'court_sms', smsKind:kind,
+      actionType:'info_only', autoCloseMs:6000,
+      smsRecipients:recipients, smsBody:body,
+      tid:meta.tid||'', div:meta.div||'', matchId:m?.id||m?._id||'',
+      dedupeKey:`court_sms:${kind}:${meta.tid||''}:${meta.div||''}:${m?.id||m?._id||''}:${court}:0:`
+    };
+  }
+  // match_started / court_changed / waiting_registered — 이름만 표시 (전화번호 제거)
+  const recipientLabel = recipients.length ? recipients.map(r=>r.name).join(', ') : '번호 없음';
+  const msg=[info.title||'경기', court?court+' 코트':'', queueText, expectedText||'', recipientLabel?'→ '+recipientLabel:''].filter(Boolean).join(' · ');
   return {
-    msg:`${info.title||'경기'}
-${meta.court?meta.court+' 코트':''}${queueText}${expectedText?` · ${expectedText}`:''}
-받는 사람: ${recipientLabel}`.trim(),
-    title,
-    kind:'court_sms',
-    smsKind:kind,
-    actionType:'sms_approval',
-    smsRecipients:recipients,
-    smsBody:body,
-    tid:meta.tid||'',
-    div:meta.div||'',
-    matchId:m?.id||m?._id||'',
-    dedupeKey:`court_sms:${kind}:${meta.tid||''}:${meta.div||''}:${m?.id||m?._id||''}:${meta.court||''}:${meta.queuePos||0}:${getCourtSmsExpectedTimeText(kind,key,meta)||''}`
+    msg, title, kind:'court_sms', smsKind:kind,
+    actionType:'sms_approval', smsRecipients:recipients, smsBody:body,
+    tid:meta.tid||'', div:meta.div||'', matchId:m?.id||m?._id||'',
+    dedupeKey:`court_sms:${kind}:${meta.tid||''}:${meta.div||''}:${m?.id||m?._id||''}:${court}:${meta.queuePos||0}:${getCourtSmsExpectedTimeText(kind,key,meta)||''}`
   };
 }
 const COURT_ALERT_BOOTSTRAPPED = { value:false };
@@ -34296,9 +34307,12 @@ function renderNextStickyAlert(){
   const alertTitle = item.title || (item.kind==='court_complete' ? '🎾 코트 완료 알림' : '🔔 오더 제출 알림');
   const hasSmsRecipients = Array.isArray(item.smsRecipients) && item.smsRecipients.length>0;
   const canApproveSms = item.actionType==='sms_approval' && (AD||OP);
-  const actions = canApproveSms
+  const isInfoOnly = item.actionType==='info_only';
+  const actions = isInfoOnly
+    ? `<button type="button" class="sticky-alert-btn secondary" onclick="window.closeStickyAlert()">확인</button>`
+    : canApproveSms
     ? `${hasSmsRecipients?`<button type="button" class="sticky-alert-btn primary" onclick="window.sendStickyAlertSMS()">문자 보내기</button>`:`<button type="button" class="sticky-alert-btn secondary" onclick="window.closeStickyAlert()">번호 없음</button>`}<button type="button" class="sticky-alert-btn secondary" onclick="window.closeStickyAlert()">닫기</button>`
-    : `<button type="button" class="sticky-alert-btn secondary" onclick="window.closeStickyAlert()">${item.actionType==='sms_approval'?'확인':'확인'}</button>`;
+    : `<button type="button" class="sticky-alert-btn secondary" onclick="window.closeStickyAlert()">확인</button>`;
   wrap.innerHTML=`<div class="sticky-alert-card">
     <div class="sticky-alert-title">${esc(alertTitle)}</div>
     <div class="sticky-alert-msg">${esc(item.msg||'')}</div>
