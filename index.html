@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-07-v612b-court-lock-complete";
+  const APP_VERSION = "2026-06-07-v613-reset-cache-hard-fix";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -22777,6 +22777,49 @@ function getPreservedSeedDrawState(key){
 }
 
 
+
+// v613: 대진/예선 초기화 후 이전 대진표가 캐시/보호렌더로 되살아나는 문제 방지
+function clearBracketStaleCachesForReset(tidOrKey){
+  try{
+    const raw=String(tidOrKey||'');
+    const tid = raw.includes('_') ? _k2td(raw).tid : raw;
+    const key = raw.includes('_') ? raw : '';
+    window.__BRACKET_RESETTING_UNTIL = Date.now() + 12000;
+    window.__BRACKET_ALLOW_EMPTY_UNTIL = Date.now() + 12000;
+    try{
+      if(typeof TOURNAMENT_BUNDLE_MEM !== 'undefined' && tid) delete TOURNAMENT_BUNDLE_MEM[tid];
+    }catch(_e){}
+    try{
+      if(typeof readTournamentBundleCache==='function' && typeof writeTournamentBundleCache==='function' && tid){
+        const all=readTournamentBundleCache();
+        delete all[tid];
+        writeTournamentBundleCache(all);
+      }
+    }catch(_e){}
+    try{
+      const keys=[];
+      for(let i=localStorage.length-1;i>=0;i--){
+        const k=localStorage.key(i)||'';
+        if(/TOURNAMENT_BUNDLE|tournamentBundle|bracket|drawHistory|v610|v609|court/i.test(k)){
+          if(!tid || k.includes(tid) || /TOURNAMENT_BUNDLE|tournamentBundle|v610|v609/i.test(k)) keys.push(k);
+        }
+      }
+      keys.forEach(k=>{ try{ localStorage.removeItem(k); }catch(_e){} });
+    }catch(_e){}
+    try{
+      if(window.BRACKET_PRELIM_TOGGLE && key) delete window.BRACKET_PRELIM_TOGGLE[key];
+      if(window.BRACKET_MAIN_TOGGLE && key) delete window.BRACKET_MAIN_TOGGLE[key];
+    }catch(_e){}
+    try{
+      if(window.__V610_BRACKET_CACHE){
+        if(tid){ Object.keys(window.__V610_BRACKET_CACHE).forEach(k=>{ if(k.startsWith(tid+'::')) delete window.__V610_BRACKET_CACHE[k]; }); }
+        else Object.keys(window.__V610_BRACKET_CACHE).forEach(k=>delete window.__V610_BRACKET_CACHE[k]);
+      }
+    }catch(_e){}
+  }catch(e){ console.warn('v613 clearBracketStaleCachesForReset failed', e); }
+}
+window.clearBracketStaleCachesForReset=clearBracketStaleCachesForReset;
+
 async function resetPrelimDrawOnly(key){
   const {tid,div}=_k2td(key);
   if(!confirm(`예선 리셋을 진행합니다.
@@ -22789,6 +22832,7 @@ async function resetPrelimDrawOnly(key){
 추첨 전 상태로 완전히 되돌릴까요?`)) return;
   sl(true);
   try{
+    clearBracketStaleCachesForReset(key);
     const preservedSeedDraw = getPreservedSeedDrawState(key);
     await resetMatchRecords(key);
     G.matches[key]=[];
@@ -22812,6 +22856,8 @@ async function resetPrelimDrawOnly(key){
     await fbLog(`예선 리셋: ${tid} ${dl(div)} (예선/본선 대진 전체 초기화, 시드 유지)`,'♻️');
     sl(false);
     toast('예선 리셋 완료 ✅ 예선·본선 대진은 초기화되고 관리자 시드는 유지됩니다','success');
+    clearBracketStaleCachesForReset(key);
+    const bc=ge('bracketContent'); if(bc) bc.innerHTML='<div class="empty-state card"><div class="empty-icon">🎲</div><p>예선 추첨 전 상태입니다</p></div>';
     renderBracket();
   }catch(e){ sl(false); toast('예선 리셋 실패: '+e.message,'error'); }
 }
@@ -22833,6 +22879,7 @@ async function resetMainDrawOnly(key){
 계속할까요?`)) return;
   sl(true);
   try{
+    clearBracketStaleCachesForReset(key);
     await resetMatchRecords(key);
     const preservedSeedDraw=getPreservedSeedDrawState(key);
     const preservedDraw={...draw, ...preservedSeedDraw};
@@ -22851,6 +22898,7 @@ async function resetMainDrawOnly(key){
     await fbLog(`본선 리셋: ${tid} ${dl(div)} (예선 유지 / 본선 초기화, 시드 유지)`,'♻️');
     sl(false);
     toast('본선 리셋 완료 ✅ 예선은 유지되고 관리자 시드는 그대로 유지됩니다','success');
+    clearBracketStaleCachesForReset(key);
     renderBracket();
   }catch(e){ sl(false); toast('본선 리셋 실패: '+e.message,'error'); }
 }
@@ -22867,6 +22915,7 @@ async function resetDrawOnly(key){
 예선 추첨 전 상태로 완전히 되돌릴까요?`)) return;
   sl(true);
   try{
+    clearBracketStaleCachesForReset(key);
     const preservedSeedDraw = getPreservedSeedDrawState(key);
     await resetMatchRecords(key);
     G.matches[key]=[];
@@ -22890,6 +22939,8 @@ async function resetDrawOnly(key){
     await fbLog(`전체 리셋: ${tid} ${dl(div)} (예선/본선 대진 전체 초기화, 시드 유지)`,'♻️');
     sl(false);
     toast('전체 리셋 완료 ✅ 예선·본선 대진은 초기화되고 관리자 시드는 유지됩니다','success');
+    clearBracketStaleCachesForReset(key);
+    const bc=ge('bracketContent'); if(bc) bc.innerHTML='<div class="empty-state card"><div class="empty-icon">🎲</div><p>예선 추첨 전 상태입니다</p></div>';
     renderBracket();
   }catch(e){ sl(false); toast('전체 리셋 실패: '+e.message,'error'); }
 }
@@ -36736,6 +36787,8 @@ async function hardResetAllData(){
     res.registrations = await _deleteCollectionAll('registrations');
     res.draws = await _deleteCollectionAll('draws');
     res.matches = await _deleteCollectionAll('matches');
+    try{ res.teams = await _deleteCollectionAll('teams'); }catch(e){}
+    try{ res.drawHistory = await _deleteCollectionAll('drawHistory'); }catch(e){}
     res.players = await _deleteCollectionAll('players');
     try{ res.activityLog = await _deleteCollectionAll('activityLog'); }catch(e){}
     try{ res.tourGuides  = await _deleteCollectionAll('tourGuides'); }catch(e){}
@@ -36746,11 +36799,18 @@ async function hardResetAllData(){
     G.matches = {};
     G.players = {};
     G.log = [];
+    try{
+      clearBracketStaleCachesForReset('');
+      if(typeof writeTournamentBundleCache==='function') writeTournamentBundleCache({});
+      if(typeof TOURNAMENT_BUNDLE_MEM!=='undefined') Object.keys(TOURNAMENT_BUNDLE_MEM).forEach(k=>delete TOURNAMENT_BUNDLE_MEM[k]);
+      const bc=ge('bracketContent'); if(bc) bc.innerHTML='<div class="empty-state card"><div class="empty-icon">🎲</div><p>전체 초기화 완료 — 대진표가 없습니다</p></div>';
+    }catch(_e){}
 
     popSel();
     renderTL();
     renderAllP();
     upDash();
+    try{ renderBracket(); }catch(_e){}
 
     sl(false);
     toast(`전체 리셋 완료 ✅ (대회 ${res.tournaments||0}, 팀 ${res.registrations||0}, 경기 ${res.matches||0}, 선수 ${res.players||0})`, 'success');
@@ -54785,6 +54845,7 @@ window.manualRefreshPlayers=manualRefreshPlayers;
 (function(){
   const VER='v610-stable-no-blank-bracket';
   const CACHE={};
+  window.__V610_BRACKET_CACHE = CACHE;
   let restoring=false;
   let delayedTimer=null;
   function ge(id){ return document.getElementById(id); }
@@ -54842,16 +54903,20 @@ window.manualRefreshPlayers=manualRefreshPlayers;
     return `<div class="v610-hold-banner" style="margin:8px 0 12px;padding:10px 14px;border-radius:14px;background:#eff6ff;border:1.5px solid #93c5fd;color:#1d4ed8;font-size:.82rem;font-weight:900;line-height:1.5">🔄 데이터 동기화 중이라 직전 정상 대진표를 잠시 유지합니다. 실제 데이터가 사라진 것은 아닙니다.</div>` + html;
   }
   function rememberFromDom(){
+    if(Date.now() < Number(window.__BRACKET_RESETTING_UNTIL||0)) return;
     const box=ge('bracketContent'); if(!box) return;
     const html=box.innerHTML||''; const k=sig();
     if(looksGood(html)) CACHE[k]={html,at:Date.now(),text:txt(box)};
   }
   function restoreIfNeeded(){
+    if(Date.now() < Number(window.__BRACKET_RESETTING_UNTIL||0)) return false;
     if(restoring) return false;
     const box=ge('bracketContent'); if(!box) return false;
     const k=sig(); const cur=box.innerHTML||'';
     if(looksGood(cur)){ CACHE[k]={html:cur,at:Date.now(),text:txt(box)}; return false; }
     const cached=CACHE[k];
+    if(Date.now() < Number(window.__BRACKET_ALLOW_EMPTY_UNTIL||0)) return false;
+    if(countMatchesFromG()===0 && /예선 추첨 전 상태|전체 초기화 완료|대진표가 없습니다|대회와 부서를 선택하세요/.test(String(cur||''))) return false;
     const likelyTransient = looksBad(cur) || (countMatchesFromG()===0 && cached && Date.now()-cached.at<180000);
     if(cached && Date.now()-cached.at<300000 && likelyTransient){
       restoring=true;
@@ -54903,6 +54968,7 @@ window.manualRefreshPlayers=manualRefreshPlayers;
   function install(){ wrapRenderBracket(); protectBracketContentWrites(); rememberFromDom(); }
   window.v610RememberBracketNow=rememberFromDom;
   window.v610RestoreBracketIfNeeded=restoreIfNeeded;
+  window.v610ClearBracketCache=function(tid){ try{ Object.keys(CACHE).forEach(k=>{ if(!tid || k.startsWith(String(tid)+'::')) delete CACHE[k]; }); }catch(e){} };
   document.addEventListener('DOMContentLoaded',()=>{ setTimeout(install,50); setTimeout(install,500); });
   setTimeout(install,50);
   document.addEventListener('change',e=>{ if(e.target&&['brTS','brDS'].includes(e.target.id)){ setTimeout(()=>{rememberFromDom(); protectBracketContentWrites();},120); } },true);
