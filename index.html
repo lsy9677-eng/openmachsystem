@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-07-v614b-court-lock-verified";
+  const APP_VERSION = "2026-06-07-v614c-fix-manual-label";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -13282,8 +13282,9 @@ function buildCourtBoardGroupHeadline(key, m, autoTitle, rawTitle){
   const s3=slots[2]||'3번';
   const label=String(autoTitle||'').trim();
   const detail=`예선 ${grpLabel(m.group||0)}`;
-  // v495: 코트 현황 카드에서 '예선 자동배정' 같은 일반 라벨이 팀명 대신 표시되는 문제 방지
-  if(!label || /자동\s*배정|경기\s*대기|대기중|대기\s*중/.test(label)) return {headline: rawTitle, detail};
+  // v495: 코트 현황 카드에서 일반 라벨이 팀명 대신 표시되는 문제 방지
+  // v614b: '수동 고정', '수동 공용대기' 등 수동 라벨도 팀명 대신 표시되지 않도록 필터
+  if(!label || /자동\s*배정|경기\s*대기|대기중|대기\s*중|수동\s*고정|수동\s*공용|수동\s*대기/.test(label)) return {headline: rawTitle, detail};
   if(label==='1번 vs 2번') return {headline: `${s1} vs ${s2}`, detail};
   if(label==='1번 vs 3번') return {headline: `${s1} vs ${s3}`, detail};
   if(label==='2번 vs 3번') return {headline: `${s2} vs ${s3}`, detail};
@@ -13326,7 +13327,8 @@ function describeCourtBoardMatch(key,m){
     const built=buildCourtBoardGroupHeadline(key,base||m,autoTitle,rawTitle);
     title=built.headline || title;
     // v495: 일반 자동배정 문구가 팀명보다 우선 노출되지 않도록 보정
-    if(/자동\s*배정|경기\s*대기|대기중|대기\s*중/.test(String(title||'')) && rawTitle && rawTitle!=='TBD vs TBD') title=rawTitle;
+    // v614b: 수동 고정 라벨도 팀명으로 대체
+    if(/자동\s*배정|경기\s*대기|대기중|대기\s*중|수동\s*고정|수동\s*공용|수동\s*대기/.test(String(title||'')) && rawTitle && rawTitle!=='TBD vs TBD') title=rawTitle;
     detail=built.detail || '';
   }else if(autoTitle && rawTitle && rawTitle!=='TBD vs TBD'){
     detail=rawTitle;
