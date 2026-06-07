@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-07-v613-reset-cache-hard-fix";
+  const APP_VERSION = "2026-06-07-v614b-court-lock-verified";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -12490,9 +12490,33 @@ function applyTournamentBundle(tid, bundle){
     Object.keys(courtRestore).forEach(f=>{
       if(merged[f]===undefined||merged[f]===null||merged[f]==='') merged[f]=courtRestore[f];
     });
-    // v612: manualCourtLocked 관련 필드는 메모리 스냅샷이 우선 (수동 고정 보호)
-    const MANUAL_LOCK_FIELDS=['manualCourtLocked','manualCourtLockedAt','manualCourtTarget','manualCourtPinnedAt','manualSharedHold'];
-    MANUAL_LOCK_FIELDS.forEach(f=>{ if(courtRestore[f]!==undefined) merged[f]=courtRestore[f]; });
+    // v614: 수동 코트 고정값은 Firestore/번들에 이전 자동값이 남아 있어도 메모리 스냅샷 전체를 최우선 적용
+    const _v614SnapIsManual = !!(
+      courtRestore.manualCourtLocked===true ||
+      String(courtRestore.manualCourtTarget||'').trim() ||
+      courtRestore.manualSharedHold===true ||
+      String(courtRestore.manualCourtPinnedAt||'').trim()
+    );
+    if(_v614SnapIsManual){
+      _V577_COURT_FIELDS.forEach(f=>{ if(courtRestore[f]!==undefined) merged[f]=courtRestore[f]; });
+      if(courtRestore.manualSharedHold===true){
+        merged.court='';
+        merged.courts=[];
+        delete merged.courtAssignedAt;
+        delete merged.courtQueueOrder;
+        delete merged.waitingFirstAt;
+      }else{
+        const _v614Target=String(courtRestore.manualCourtTarget||courtRestore.court||((Array.isArray(courtRestore.courts)&&courtRestore.courts[0])||'')).trim();
+        if(_v614Target){
+          merged.manualCourtTarget=_v614Target;
+          merged.court=_v614Target;
+          merged.courts=[_v614Target];
+        }
+      }
+      merged.manualCourtLocked=true;
+      merged.initialPrelimAutoCourt=false;
+      if(/예선\s*자동|자동배정/.test(String(merged.autoCourtLabel||''))) merged.autoCourtLabel='수동 고정';
+    }
     G.matches[key].push(merged);
     if(!G._matchIdsByKey[key]) G._matchIdsByKey[key]=[];
     if(x._id||x.id) G._matchIdsByKey[key].push(x._id||x.id);
@@ -13480,6 +13504,8 @@ async function moveCourtQueueCard(key, mid, targetCourt){
     m.manualCourtLockedAt=m.manualCourtLockedAt||nowIso;
     m.courts=[court];
     m.court=court;
+    m.autoCourtLabel='수동 고정';
+    m.initialPrelimAutoCourt=false;
 
     const relatedBefore=(G.matches[key]||[]).filter(x=>
       x && x.winner==null && String(x.id)!==String(mid) &&
@@ -13517,10 +13543,11 @@ async function moveCourtQueueCard(key, mid, targetCourt){
     m.manualCourtLockedAt=m.manualCourtLockedAt||nowIso;
     m.courts=[];
     m.court='';
+    m.autoCourtLabel='수동 공용대기';  // v614 fix: delete 제거
+    m.initialPrelimAutoCourt=false;
     delete m.courtAssignedAt;
     delete m.courtQueueOrder;
     delete m.waitingFirstAt;
-    delete m.autoCourtLabel;
   }
 
   sl(true);
@@ -23517,6 +23544,8 @@ function rebuildIndividualAutoCourtAssignmentsForKey(key){
   const manualPinned = list.filter(m=>{
     if(!m || m.winner!=null || !scopes.has(String(m.phase||''))) return false;
     const target=String(m.manualCourtTarget||'').trim();
+    // v614b: manualCourtLocked=true이면 코트 초기화 방지 (target 없어도 보호)
+    if(m.manualCourtLocked===true && !target && !m.manualSharedHold) return false;
     if(!target) return false;
     const allowed=getAllowedCourtsForMatch(key,m).map(String).filter(Boolean);
     if(allowed.length && !allowed.includes(target)){
@@ -45862,6 +45891,8 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
         groupMatches.forEach(m=>{
           const cur=String(m.court || (Array.isArray(m.courts)?m.courts[0]:'') || '').trim();
           if(cur) return;
+          // v614b: 공용대기 수동 고정 경기는 자동 배정 금지
+          if(m.manualCourtLocked===true || m.manualSharedHold===true) return;
           const court=[...courts].sort((a,b)=>(counts[a]||0)-(counts[b]||0) || courts.indexOf(a)-courts.indexOf(b))[0];
           if(!court) return;
           counts[court]=(counts[court]||0)+1;
@@ -51154,6 +51185,8 @@ window.manualRefreshPlayers=manualRefreshPlayers;
   function resetWrongAutoManualFields(m){
     try{
       if(!m) return;
+      // v614: 수동 고정된 경기는 자동배정 정리 함수가 고정 필드를 지우면 안 된다.
+      if(m.manualCourtLocked===true || clean(m.manualCourtTarget) || clean(m.manualCourtPinnedAt) || m.manualSharedHold===true) return;
       delete m.manualCourtTarget;
       delete m.manualCourtPinnedAt;
       m.manualSharedHold=false;
@@ -51438,6 +51471,8 @@ window.manualRefreshPlayers=manualRefreshPlayers;
   function resetAutoFields(m){
     if(!m) return;
     try{
+      // v614: 수동 고정된 경기는 자동배정 정리 함수가 고정 필드를 지우면 안 된다.
+      if(m.manualCourtLocked===true || clean(m.manualCourtTarget) || clean(m.manualCourtPinnedAt) || m.manualSharedHold===true) return;
       delete m.manualCourtTarget;
       delete m.manualCourtPinnedAt;
       m.manualSharedHold=false;
