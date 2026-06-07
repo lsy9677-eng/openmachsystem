@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-08-v615b-lock-after-finalize";
+  const APP_VERSION = "2026-06-08-v615c-auto-sms-restore";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -13556,7 +13556,19 @@ async function moveCourtQueueCard(key, mid, targetCourt){
   try{
     await persistSingleMatchDoc(key, m);
     sl(false);
-    dispatchLocalCourtNotificationAlerts(prevCourtState);
+    // v615b: dispatchLocalCourtNotificationAlerts가 v538에 의해 막혀있으므로
+    // 자동문자 승인창은 enqueueCourtSmsAlertsFromState 직접 호출
+    try{
+      const nextState=buildCourtNotificationStateMap(G.matches||{});
+      if(typeof window._origEnqueueCourtSmsAlerts==='function'){
+        window._origEnqueueCourtSmsAlerts(prevCourtState, nextState);
+      } else {
+        // v538 래핑 이전 원본 함수 사용 시도
+        const origFn = enqueueCourtSmsAlertsFromState?.__v534Wrapped
+          ? null : enqueueCourtSmsAlertsFromState;
+        if(typeof origFn==='function') origFn(prevCourtState, nextState);
+      }
+    }catch(_se){}
     toast(court ? `수동 배정 완료 ✅ → ${court}` : '공용 대기로 이동 완료 ✅','success');
     renderBracket();
   }catch(e){
@@ -48730,6 +48742,11 @@ window.manualRefreshPlayers=manualRefreshPlayers;
 
   // 기존 코트 문자 디스패치가 전체/중복으로 작동하지 않게 막고, 결과 저장 래퍼에서만 해당 코트 기준으로 생성
   try{
+    // v615b: 원본 백업 (카드 이동 시 자동문자 승인창)
+    if(typeof window.dispatchLocalCourtNotificationAlerts==='function' && !window._origEnqueueCourtSmsAlerts){
+      const _bk=window.dispatchLocalCourtNotificationAlerts;
+      window._origEnqueueCourtSmsAlerts=function(prev){ try{ _bk(prev); }catch(e){} };
+    }
     window.dispatchLocalCourtNotificationAlerts=function(){ return false; };
     try{ dispatchLocalCourtNotificationAlerts=window.dispatchLocalCourtNotificationAlerts; }catch(_e){}
   }catch(e){}
