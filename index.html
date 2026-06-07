@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-07-v614d-finalize-fix";
+  const APP_VERSION = "2026-06-07-v614f-finalize-renum";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -13284,7 +13284,7 @@ function buildCourtBoardGroupHeadline(key, m, autoTitle, rawTitle){
   const detail=`예선 ${grpLabel(m.group||0)}`;
   // v495: 코트 현황 카드에서 일반 라벨이 팀명 대신 표시되는 문제 방지
   // v614b: '수동 고정', '수동 공용대기' 등 수동 라벨도 팀명 대신 표시되지 않도록 필터
-  if(!label || /자동\s*배정|경기\s*대기|대기중|대기\s*중|수동\s*고정|수동\s*공용|수동\s*대기/.test(label)) return {headline: rawTitle, detail};
+  if(!label || /자동\s*배정|경기\s*대기|대기중|대기\s*중|수동\s*고정|수동\s*공용|수동\s*대기|조건\s*코트/.test(label)) return {headline: rawTitle, detail};
   if(label==='1번 vs 2번') return {headline: `${s1} vs ${s2}`, detail};
   if(label==='1번 vs 3번') return {headline: `${s1} vs ${s3}`, detail};
   if(label==='2번 vs 3번') return {headline: `${s2} vs ${s3}`, detail};
@@ -13328,7 +13328,7 @@ function describeCourtBoardMatch(key,m){
     title=built.headline || title;
     // v495: 일반 자동배정 문구가 팀명보다 우선 노출되지 않도록 보정
     // v614b: 수동 고정 라벨도 팀명으로 대체
-    if(/자동\s*배정|경기\s*대기|대기중|대기\s*중|수동\s*고정|수동\s*공용|수동\s*대기/.test(String(title||'')) && rawTitle && rawTitle!=='TBD vs TBD') title=rawTitle;
+    if(/자동\s*배정|경기\s*대기|대기중|대기\s*중|수동\s*고정|수동\s*공용|수동\s*대기|조건\s*코트/.test(String(title||'')) && rawTitle && rawTitle!=='TBD vs TBD') title=rawTitle;
     detail=built.detail || '';
   }else if(autoTitle && rawTitle && rawTitle!=='TBD vs TBD'){
     detail=rawTitle;
@@ -28249,7 +28249,10 @@ async function startIndividualDraw(){
           const _court=_groupCourt[gi]; const _order=_groupOrder[gi]??9;
           if(_court){ G.draws[key].groups[gi].court=_court; G.draws[key].groups[gi].courts=[_court]; }
           (_byGrp[gi]||[]).forEach((m,pos)=>{
-            if(_court){ m.court=_court; m.courts=[_court]; m.manualCourtTarget=_court; m.autoCourtLabel=''; m.initialPrelimAutoCourt=false; }
+            if(_court){ m.court=_court; m.courts=[_court]; m.manualCourtTarget=_court; m.autoCourtLabel='조건 코트'; m.initialPrelimAutoCourt=false;
+              // v614d: 조건 설정 코트는 수동 고정과 동일하게 보호
+              m.manualCourtLocked=true; m.manualCourtLockedAt=m.manualCourtLockedAt||_now2;
+            }
             // 임시 타임스탬프: order를 gi 앞에 붙여서 재정렬 후 순번 계산이 order를 인식하게 함
             const _baseMs=(_order===0?0:_order===1?10000:_order===2?20000:_order===3?30000:_order===4?40000:50000)+gi*100+pos;
             m.manualCourtPinnedAt=new Date(Date.UTC(2000,0,1,0,0,0,_baseMs)).toISOString();
@@ -54375,26 +54378,21 @@ window.manualRefreshPlayers=manualRefreshPlayers;
       const t=(window.G?.tournaments||[]).find(x=>x.id===tid);
       if(!t){ toast('대회를 선택하세요','error'); return; }
       const divs=t.divisions||[];
-      const indivDivs=divs.filter(d=>{
-        const k=tid+'_'+d;
-        return !!(window.G?.draws?.[k]?.indivMode);
-      });
+      const indivDivs=divs.filter(d=>{ const k=tid+'_'+d; return !!(window.G?.draws?.[k]?.indivMode); });
       if(!indivDivs.length){ toast('개인전 부서가 없습니다','error'); return; }
       if(!confirm('현재 코트 배정 순서대로 조 번호를 확정합니다.\n확정 후에는 수동으로 코트를 옮겨도 조 번호가 바뀌지 않습니다.\n\n계속하시겠습니까?')) return;
-      let changed=false;
       for(const div of indivDivs){
         const key=tid+'_'+div;
+        // v614e: ForKey 버전에 confirm 없이 직접 실행
         const draw=window.G?.draws?.[key];
         const matches=window.G?.matches?.[key];
         if(!draw||!Array.isArray(draw.groups)||!matches) continue;
-        // 현재 코트 기준 조 순서 재정렬
+        // manualCourtTarget 우선으로 실제 코트 읽기
+        function getEC(m){ return String(m.manualCourtTarget||m.court||(Array.isArray(m.courts)?m.courts[0]:'')||'').trim(); }
         const giCourtMap=new Map();
         matches.filter(m=>m&&m.phase==='group').forEach(m=>{
           const gi=Number(m.group||0);
-          if(!giCourtMap.has(gi)){
-            const c=String(m.court||(Array.isArray(m.courts)?m.courts[0]:'')||'').trim();
-            giCourtMap.set(gi, c||'__z__');
-          }
+          if(!giCourtMap.has(gi)) giCourtMap.set(gi, getEC(m)||'__z__');
         });
         draw.groups.forEach((g,gi)=>{
           if(!giCourtMap.has(gi)){
@@ -54406,15 +54404,9 @@ window.manualRefreshPlayers=manualRefreshPlayers;
         const sortedGis=draw.groups.map((_,gi)=>gi).sort((a,b)=>{
           const ca=courtOrder.indexOf(giCourtMap.get(a)||'__z__');
           const cb=courtOrder.indexOf(giCourtMap.get(b)||'__z__');
-          return ca!==cb ? ca-cb : a-b;
+          return ca!==cb?ca-cb:a-b;
         });
-        if(sortedGis.every((gi,newGi)=>gi===newGi)){
-          // 순서 이미 맞음 - 확정만 마킹
-          draw.v606GroupOrderFinalized=true;
-          draw.v606GroupOrderFinalizedAt=new Date().toISOString();
-          if(typeof stD==='function') await stD(key);
-          continue;
-        }
+        // 순서가 달라도 재번호 항상 실행 (gi값이 달라도 순서는 바꿔야 함)
         const giRemap=new Map(sortedGis.map((oldGi,newGi)=>[oldGi,newGi]));
         draw.groups=sortedGis.map(oldGi=>draw.groups[oldGi]);
         matches.forEach(m=>{
@@ -54431,40 +54423,42 @@ window.manualRefreshPlayers=manualRefreshPlayers;
           m.id=base+'_'+n+'_0';
           idCnt[base]++;
         });
-        // 코트별 순번 재계산
+        // 코트별 순번 재계산 + 수동 고정 표식
         const ORDER={start:0,wait1:1,wait2:2,wait3:3,wait4:4,auto:9};
         const condTeams=(draw.individualDrawConditions&&draw.individualDrawConditions.teams)||{};
-        const groupOrder={};
+        const groupOrderMap={};
         draw.groups.forEach((g,gi)=>{
           (g.teams||[]).forEach(ti=>{
             const c=condTeams[String(ti)];
-            if(c&&c.order&&c.order!=='auto'){
-              const o=ORDER[c.order]??9;
-              groupOrder[gi]=Math.min(groupOrder[gi]??9,o);
-            }
+            if(c&&c.order&&c.order!=='auto'){ const o=ORDER[c.order]??9; groupOrderMap[gi]=Math.min(groupOrderMap[gi]??9,o); }
           });
         });
-        const courtGroups=new Map();
+        const courtGrps=new Map();
         draw.groups.forEach((g,gi)=>{
           const ct=String((Array.isArray(g.courts)?g.courts[0]:'')||g.court||'').trim();
-          if(!courtGroups.has(ct)) courtGroups.set(ct,[]);
-          courtGroups.get(ct).push({gi,order:groupOrder[gi]??9});
+          if(!courtGrps.has(ct)) courtGrps.set(ct,[]);
+          courtGrps.get(ct).push({gi,order:groupOrderMap[gi]??9});
         });
         const byGi={};
         matches.filter(m=>m&&m.phase==='group').forEach(m=>{
-          const gi=Number(m.group||0);
-          if(!byGi[gi]) byGi[gi]=[];
-          byGi[gi].push(m);
+          const gi=Number(m.group||0); if(!byGi[gi]) byGi[gi]=[]; byGi[gi].push(m);
         });
-        const now=new Date().toISOString();
-        courtGroups.forEach((giList)=>{
+        const nowIso=new Date().toISOString();
+        courtGrps.forEach(giList=>{
           giList.sort((a,b)=>a.order!==b.order?a.order-b.order:a.gi-b.gi);
           let slot=0;
           giList.forEach(({gi,order})=>{
-            (byGi[gi]||[]).sort((a,b)=>String(a.id).localeCompare(String(b.id),'ko')).forEach((m,pos)=>{
+            ((byGi[gi]||[]).sort((a,b)=>String(a.id).localeCompare(String(b.id),'ko'))).forEach((m,pos)=>{
               const ts=new Date(Date.UTC(2000,0,1,0,0,0,slot*10+pos)).toISOString();
-              m.courtQueueOrder=ts; m.manualCourtPinnedAt=ts; m.courtAssignedAt=ts;
-              if(slot===0&&pos===0&&order===0){ delete m.waitingFirstAt; delete m.lastWaitingFirstAt; }
+              m.courtQueueOrder=ts; m.courtAssignedAt=ts;
+              const court=getEC(m);
+              if(court){
+                m.manualCourtTarget=court; m.court=court; m.courts=[court];
+                m.manualCourtPinnedAt=ts; m.manualCourtLocked=true;
+                m.manualCourtLockedAt=m.manualCourtLockedAt||nowIso;
+                m.autoCourtLabel='수동 고정'; m.initialPrelimAutoCourt=false;
+              }
+              if(slot===0&&pos===0&&order===0){delete m.waitingFirstAt;delete m.lastWaitingFirstAt;}
               else m.waitingFirstAt=ts;
             });
             slot++;
@@ -54472,14 +54466,14 @@ window.manualRefreshPlayers=manualRefreshPlayers;
         });
         draw.v606GroupOrderFinalized=true;
         draw.v606GroupOrderFinalizedAt=new Date().toISOString();
-        if(typeof stD==='function') await stD(key);
-        if(typeof stM==='function') await stM(key);
-        changed=true;
+        sl(true);
+        await stD(key);
+        await stM(key);
+        sl(false);
       }
-      if(typeof renderBracket==='function') renderBracket();
-      updateFinalizeBtn();
-      toast(changed?'조 번호가 현재 코트 배정 순서로 확정됐습니다 🔒':'이미 올바른 순서입니다','success');
-    }catch(e){ console.error('[v606] 조 번호 확정 실패',e); toast('확정 실패: '+(e.message||e),'error'); }
+      renderBracket();
+      toast('조 번호가 확정됐습니다 🔒','success');
+    }catch(e){ console.error('[v606] 전체 확정 실패',e); toast('확정 실패: '+(e.message||e),'error'); }
   };
 
   // 대회/부서 변경 시 버튼 표시 업데이트
@@ -54645,7 +54639,10 @@ window.manualRefreshPlayers=manualRefreshPlayers;
       if(d.groups[gi]){ d.groups[gi].court=court; d.groups[gi].courts=court?[court]:[]; d.groups[gi].courtGroup=courtGroup(court); d.groups[gi].conditionOrder=order; }
       (byGroup[gi]||[]).sort((a,b)=>String(a.id).localeCompare(String(b.id),'ko')).forEach((m,pos)=>{
         const ts=new Date(Date.UTC(2000,0,1,0,0,0,baseMs+pos)).toISOString();
-        if(court){ m.court=court; m.courts=[court]; m.manualCourtTarget=court; m.autoCourtLabel=''; m.initialPrelimAutoCourt=false; }
+        if(court){ m.court=court; m.courts=[court]; m.manualCourtTarget=court; m.autoCourtLabel='조건 코트'; m.initialPrelimAutoCourt=false;
+          // v614d: 조건 코트 = 수동 고정으로 보호
+          m.manualCourtLocked=true; m.manualCourtLockedAt=m.manualCourtLockedAt||ts;
+        }
         m.manualCourtPinnedAt=ts; m.courtAssignedAt=ts; m.courtQueueOrder=ts; m.v609ConditionalApplied=true; m.v609ConditionOrder=order; m.manualSharedHold=false;
         if(order===0 && pos===0){ delete m.waitingFirstAt; delete m.lastWaitingFirstAt; } else m.waitingFirstAt=ts;
       });
