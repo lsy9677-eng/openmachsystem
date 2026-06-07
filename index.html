@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-07-v614f-finalize-renum";
+  const APP_VERSION = "2026-06-07-v614g-finalize-forKey-always-renum";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -24041,8 +24041,9 @@ window.v606FinalizeGroupOrderForKey = async function(key){
       const cb=courtOrder.indexOf(giCourtMap.get(b)||'__z__');
       return ca!==cb?ca-cb:a-b;
     });
-    if(!sortedGis.every((gi,newGi)=>gi===newGi)){
-      const giRemap=new Map(sortedGis.map((oldGi,newGi)=>[oldGi,newGi]));
+    // v614g: 코트 순서 기준 조번호 확정은 항상 재번호를 실행한다.
+    // 기존 gi가 0,4,8,12처럼 남아 있어도 국제1→1,2,3 / 국제2→4,5,6 순서로 고정하기 위함.
+    const giRemap=new Map(sortedGis.map((oldGi,newGi)=>[oldGi,newGi]));
       draw.groups=sortedGis.map(oldGi=>draw.groups[oldGi]);
       matches.forEach(m=>{
         if(m&&m.phase==='group'&&m.group!=null){
@@ -24105,7 +24106,6 @@ window.v606FinalizeGroupOrderForKey = async function(key){
           slot++;
         });
       });
-    }
     draw.v606GroupOrderFinalized=true;
     draw.v606GroupOrderFinalizedAt=new Date().toISOString();
     sl(true);
