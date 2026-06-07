@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-06-v607t-complete-info-only";
+  const APP_VERSION = "2026-06-07-v612b-court-lock-complete";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -12429,7 +12429,7 @@ function applyTournamentBundle(tid, bundle){
   bundle=bundle||{};
   // v577: Firestore 재조회 시 메모리상 코트 배정 필드 보존 (전체 삭제 전 스냅샷)
   const _v577CourtSnap={};
-  const _V577_COURT_FIELDS=['court','courts','manualCourtTarget','manualSharedHold','manualCourtPinnedAt','courtAssignedAt','courtQueueOrder','waitingFirstAt','lastWaitingFirstAt','autoCourtLabel','initialPrelimAutoCourt'];
+  const _V577_COURT_FIELDS=['court','courts','manualCourtTarget','manualSharedHold','manualCourtPinnedAt','manualCourtLocked','manualCourtLockedAt','courtAssignedAt','courtQueueOrder','waitingFirstAt','lastWaitingFirstAt','autoCourtLabel','initialPrelimAutoCourt'];
   try{
     Object.keys(G.matches||{}).forEach(k=>{
       if(_k2td(k).tid!==tid) return;
@@ -12490,6 +12490,9 @@ function applyTournamentBundle(tid, bundle){
     Object.keys(courtRestore).forEach(f=>{
       if(merged[f]===undefined||merged[f]===null||merged[f]==='') merged[f]=courtRestore[f];
     });
+    // v612: manualCourtLocked 관련 필드는 메모리 스냅샷이 우선 (수동 고정 보호)
+    const MANUAL_LOCK_FIELDS=['manualCourtLocked','manualCourtLockedAt','manualCourtTarget','manualCourtPinnedAt','manualSharedHold'];
+    MANUAL_LOCK_FIELDS.forEach(f=>{ if(courtRestore[f]!==undefined) merged[f]=courtRestore[f]; });
     G.matches[key].push(merged);
     if(!G._matchIdsByKey[key]) G._matchIdsByKey[key]=[];
     if(x._id||x.id) G._matchIdsByKey[key].push(x._id||x.id);
@@ -13472,6 +13475,9 @@ async function moveCourtQueueCard(key, mid, targetCourt){
     m.manualCourtTarget=court;
     m.manualSharedHold=false;
     if(!sameCourt || !m.manualCourtPinnedAt) m.manualCourtPinnedAt=nowIso;
+    // v612: 수동 고정 표식 - rebuild 시 초기화 방지
+    m.manualCourtLocked=true;
+    m.manualCourtLockedAt=m.manualCourtLockedAt||nowIso;
     m.courts=[court];
     m.court=court;
 
@@ -13506,6 +13512,9 @@ async function moveCourtQueueCard(key, mid, targetCourt){
     m.manualCourtTarget='';
     m.manualSharedHold=true;
     m.manualCourtPinnedAt=nowIso;
+    // v612: 수동 고정 표식
+    m.manualCourtLocked=true;
+    m.manualCourtLockedAt=m.manualCourtLockedAt||nowIso;
     m.courts=[];
     m.court='';
     delete m.courtAssignedAt;
@@ -23429,6 +23438,8 @@ function rebuildIndividualAutoCourtAssignmentsForKey(key){
       manualSharedHold: !!m.manualSharedHold
     });
     // courtAssignedAt을 rebuild assign() 전에 보존: 다른 코트 시간이 리셋되는 버그 방지
+    // v612: 수동 고정 경기는 코트 초기화 건너뜀
+    if(m.manualCourtLocked===true || String(m.manualCourtTarget||'').trim()) return;
     m.__origCourtAssignedAt = m.courtAssignedAt || '';
     m.courts=[]; m.court=''; delete m.courtAssignedAt; delete m.courtQueueOrder; delete m.waitingFirstAt; delete m.lastWaitingFirstAt; delete m.autoCourtLabel;
   });
@@ -44355,7 +44366,7 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
     const style=document.getElementById('v431BracketExportFixStyle')?.innerHTML||'';
     const printCss='@page{size:A4 portrait;margin:0}html,body{margin:0!important;padding:0!important;background:#fff!important;font-family:\'Noto Sans KR\',Arial,sans-serif}.v431-export-sheet{position:static!important;left:auto!important;top:auto!important;width:794px!important;margin:0 auto!important;z-index:auto!important}.v431-a4-page{page-break-after:always;break-after:page}.v431-a4-page:last-child{page-break-after:auto}';
     const autoprint='window.onload=function(){setTimeout(function(){window.focus();window.print();},250)};';
-    const html='<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>예선 대진표 A4 출력</title><style>'+style+printCss+'</style><'+'script>'+autoprint+'<'+'/script></head><body>'+sheet.outerHTML+'</body></html>';
+    const html='<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>예선 대진표 A4 출력</title><style>'+style+printCss+'</style><'+'script>'+autoprint+'<'+'/script></head><body>'+sheet.outerHTML+'\n</body></html>';
     const blob=new Blob([html],{type:'text/html;charset=utf-8'});
     const url=URL.createObjectURL(blob);
     const win=window.open(url,'_blank','width=920,height=1100,noopener,noreferrer');
@@ -51059,9 +51070,13 @@ window.manualRefreshPlayers=manualRefreshPlayers;
   }
 
   function isHardManual(m){
-    // 기존 자동배정 표식은 수동으로 보지 않는다. 사용자가 코트 버튼으로 고정한 것만 보호한다.
-    if(!m || isAutoPrelim(m)) return false;
-    return !!(clean(m.manualCourtTarget) || m.manualSharedHold || clean(m.manualCourtPinnedAt));
+    // v611: 사용자가 코트/공용대기로 직접 고정한 값은 autoCourtLabel이 남아 있어도 반드시 보호한다.
+    if(!m) return false;
+    // v612: manualCourtLocked===true 도 보호
+    if(m.manualCourtLocked===true) return true;
+    if(clean(m.manualCourtTarget) || m.manualSharedHold === true || clean(m.manualCourtPinnedAt)) return true;
+    if(isAutoPrelim(m)) return false;
+    return false;
   }
 
   function getQueueItems(key, gi){
@@ -51292,9 +51307,13 @@ window.manualRefreshPlayers=manualRefreshPlayers;
   }
 
   function isManualPinned(m){
+    // v611: 수동 코트 고정/공용대기 고정은 autoCourtLabel이 남아 있어도 최우선 보호한다.
     if(!m) return false;
+    // v612: manualCourtLocked===true 도 보호
+    if(m.manualCourtLocked===true) return true;
+    if(clean(m.manualCourtTarget) || clean(m.manualCourtPinnedAt) || m.manualSharedHold === true) return true;
     if(isAutoPrelim(m)) return false;
-    return !!(clean(m.manualCourtTarget) || clean(m.manualCourtPinnedAt) || m.manualSharedHold === true);
+    return false;
   }
 
   function groupIndexesForKey(key){
@@ -51394,8 +51413,9 @@ window.manualRefreshPlayers=manualRefreshPlayers;
         const force=opts.force===true;
         // 결과가 있는 조는 경기 이력 보호. 단, 새 추첨 직후(force)에는 결과가 없어야 정상이다.
         if(!force && groupMatches.some(hasResult)) return;
-        // 사용자가 실제로 수동 고정한 조는 보호. 기존 자동배정/라운드로빈 흔적은 수동으로 보지 않는다.
-        if(!force && openMatches.some(isManualPinned)) return;
+        // v611: 사용자가 실제로 수동 고정한 조는 force 재정렬에서도 반드시 보호한다.
+        // 추첨 직후에는 수동값이 없으므로 기존 추첨 배정은 정상 적용된다.
+        if(openMatches.some(isManualPinned)) return;
 
         const grp=arr(G.draws[key].groups)[gi];
         if(grp){
@@ -54451,6 +54471,441 @@ window.manualRefreshPlayers=manualRefreshPlayers;
   setInterval(updateFinalizeBtn,2000);
   document.addEventListener('DOMContentLoaded',updateFinalizeBtn);
   setTimeout(updateFinalizeBtn,500);
+})();
+</script>
+
+
+<!-- v609: 조건팀 선배정 + 코트 현황판 중간빈화면 안정화 -->
+<script id="v609StableConditionCourtRender">
+(function(){
+  'use strict';
+  const VER='v609-stable-condition-court-render';
+  const MEM=window.__v609CourtBoardCache || (window.__v609CourtBoardCache=Object.create(null));
+  const stabilizing=window.__v609CourtStabilizing || (window.__v609CourtStabilizing=Object.create(null));
+  function clean(v){ return String(v==null?'':v).replace(/\s+/g,' ').trim(); }
+  function keyParts(key){ const s=String(key||''); const i=s.indexOf('_'); return i>=0?{tid:s.slice(0,i),div:s.slice(i+1)}:{tid:'',div:''}; }
+  function storageKey(key){ return 'v592_indiv_draw_conditions_'+String(key||''); }
+  function teamArr(key){ try{ return (window.G&&G.teams&&Array.isArray(G.teams[key]))?G.teams[key]:[]; }catch(e){ return []; } }
+  function normalizeCfg(cfg){
+    cfg=cfg&&typeof cfg==='object'?cfg:{};
+    const out={teams:{},keep:Object.assign({enabled:false,round:'32',homeGroup:''},cfg.keep||{})};
+    Object.entries(cfg.teams||{}).forEach(([ti,c])=>{
+      c=c||{};
+      const row={seed:clean(c.seed),group:clean(c.group),court:clean(c.court),order:clean(c.order||'auto')||'auto'};
+      if(row.seed||row.group||row.court||row.order!=='auto') out.teams[String(Number(ti))]=row;
+    });
+    return out;
+  }
+  function loadCfg(key){
+    if(!key) return {teams:{},keep:{enabled:false,round:'32',homeGroup:''}};
+    try{ if(window.__v605ConditionStore&&window.__v605ConditionStore[key]) return normalizeCfg(window.__v605ConditionStore[key]); }catch(e){}
+    try{ const raw=localStorage.getItem(storageKey(key)); if(raw) return normalizeCfg(JSON.parse(raw)); }catch(e){}
+    try{ if(G.draws&&G.draws[key]&&G.draws[key].individualDrawConditions) return normalizeCfg(G.draws[key].individualDrawConditions); }catch(e){}
+    return {teams:{},keep:{enabled:false,round:'32',homeGroup:''}};
+  }
+  function saveCfgIntoDraw(key,cfg){
+    try{ if(G.draws&&G.draws[key]) G.draws[key].individualDrawConditions=normalizeCfg(cfg); }catch(e){}
+    try{ if(window.__v605ConditionStore) window.__v605ConditionStore[key]=normalizeCfg(cfg); }catch(e){}
+  }
+  function conditionRows(cfg){ return Object.entries((cfg&&cfg.teams)||{}).filter(([ti,c])=>c&&(c.seed||c.group||c.court||(c.order&&c.order!=='auto'))); }
+  function conditionCount(cfg){ return conditionRows(cfg).length; }
+  function currentCtx(){
+    try{ if(typeof IDW!=='undefined' && IDW && IDW.key) return Object.assign({},IDW,{teams:IDW.teams||teamArr(IDW.key)}); }catch(e){}
+    try{ if(window.IDW && window.IDW.key) return Object.assign({},window.IDW,{teams:window.IDW.teams||teamArr(window.IDW.key)}); }catch(e){}
+    try{ if(window.__v597CurrentIndividualDrawCtx&&window.__v597CurrentIndividualDrawCtx.key) return Object.assign({},window.__v597CurrentIndividualDrawCtx,{teams:window.__v597CurrentIndividualDrawCtx.teams||teamArr(window.__v597CurrentIndividualDrawCtx.key)}); }catch(e){}
+    try{ if(typeof DW!=='undefined' && DW && DW.key) return {key:DW.key,tid:DW.tid||keyParts(DW.key).tid,div:DW.div||keyParts(DW.key).div,teams:DW.teams||teamArr(DW.key),grpSize:DW.cfg?.grpSizes?.[0]||2}; }catch(e){}
+    return null;
+  }
+  function setCtx(ctx){
+    if(!ctx||!ctx.key) return;
+    const p=keyParts(ctx.key); ctx.tid=ctx.tid||p.tid; ctx.div=ctx.div||p.div; ctx.teams=ctx.teams||teamArr(ctx.key);
+    window.__v597CurrentIndividualDrawCtx=ctx;
+    try{ window.IDW=Object.assign({},window.IDW||{},ctx); }catch(e){}
+    try{ if(typeof IDW!=='undefined') IDW=Object.assign({},(IDW&&typeof IDW==='object')?IDW:{},ctx); }catch(e){}
+  }
+  function desiredGroupIndex(c, groupCount){
+    const g=parseInt(c.group,10); if(g>0) return Math.max(0,Math.min(groupCount-1,g-1));
+    const s=parseInt(c.seed,10); if(s>0) return Math.max(0,Math.min(groupCount-1,s-1));
+    return null;
+  }
+  function makeEmptyGroups(grpSizes){ return (grpSizes||[]).map((size,gi)=>({gi,size:Number(size)||0,teams:[]})); }
+  function addToGroup(groups,gi,ti){
+    if(!groups[gi]) return false;
+    ti=Number(ti);
+    if(groups[gi].teams.map(Number).includes(ti)) return true;
+    if(groups[gi].teams.length>=Number(groups[gi].size||0)) return false;
+    groups[gi].teams.push(ti); return true;
+  }
+  function addFirstAvailable(groups,ti,startGi){
+    const n=groups.length; if(!n) return false;
+    for(let off=0;off<n;off++){ const gi=(Number(startGi||0)+off)%n; if(addToGroup(groups,gi,ti)) return true; }
+    return false;
+  }
+  function flattenGroups(gs){ const out=[]; (gs||[]).forEach(g=>(g.teams||[]).forEach(ti=>out.push(Number(ti)))); return out; }
+  function buildConditionFirstGroups(indices,teams,grpSizes,baseGroups){
+    const ctx=currentCtx(); if(!ctx||!ctx.key) return baseGroups;
+    const cfg=loadCfg(ctx.key); const rows=conditionRows(cfg); if(!rows.length) return baseGroups;
+    const groups=makeEmptyGroups(grpSizes); const used=new Set(); const groupCount=groups.length; const warnings=[];
+    rows.forEach(([tiRaw,c])=>{
+      const ti=Number(tiRaw); if(!Number.isFinite(ti)||ti<0||ti>=teams.length) return;
+      const gi=desiredGroupIndex(c,groupCount); if(gi===null) return;
+      if(addToGroup(groups,gi,ti)) used.add(ti); else warnings.push(`#${ti+1} 조건 조 배정 실패`);
+    });
+    let nextGi=0;
+    rows.forEach(([tiRaw,c])=>{
+      const ti=Number(tiRaw); if(!Number.isFinite(ti)||ti<0||ti>=teams.length||used.has(ti)) return;
+      if(c.seed||c.group||c.court||(c.order&&c.order!=='auto')){
+        if(addFirstAvailable(groups,ti,nextGi)){ used.add(ti); nextGi=(nextGi+1)%Math.max(1,groupCount); }
+        else warnings.push(`#${ti+1} 조건 우선 배정 실패`);
+      }
+    });
+    const baseOrder=flattenGroups(baseGroups).filter(ti=>!used.has(Number(ti)));
+    const allOrder=[...baseOrder, ...(indices||[]).map(Number)].filter((ti,i,arr)=>!used.has(ti)&&arr.indexOf(ti)===i);
+    allOrder.forEach(ti=>{ if(addFirstAvailable(groups,ti,0)) used.add(ti); });
+    (indices||[]).map(Number).forEach(ti=>{ if(!used.has(ti)){ addFirstAvailable(groups,ti,0); used.add(ti); } });
+    if(warnings.length) console.warn(VER,warnings);
+    window.__v609ConditionFirstApplied={key:ctx.key,count:rows.length,at:new Date().toISOString(),warnings};
+    return groups;
+  }
+  function wrapPrelimDistributor(){
+    const fn=window.getPrelimSeedDistributedGroups;
+    if(typeof fn!=='function' || fn.__v609Wrapped) return;
+    const wrapped=function(indices,teams,grpSizes,prelimSeedMap){
+      const base=fn.apply(this,arguments);
+      try{ return buildConditionFirstGroups(indices,teams,grpSizes,base); }catch(e){ console.warn(VER,'condition-first failed',e); return base; }
+    };
+    wrapped.__v609Wrapped=true; window.getPrelimSeedDistributedGroups=wrapped;
+    try{ getPrelimSeedDistributedGroups=wrapped; }catch(e){}
+  }
+  function courtGroup(v){ const s=clean(v); return s ? (s.replace(/[\s_-]*\d+$/,'').trim()||s) : ''; }
+  function expandCourtGroups(groups){
+    const out=[]; (Array.isArray(groups)?groups:[]).forEach(g=>{
+      if(typeof g==='string'){ out.push(g); return; }
+      const name=clean(g.name||g.label||g.group||g.title||''); const n=Number(g.count||g.cnt||g.courts||g.size||0);
+      if(name&&n>0){ for(let i=1;i<=n;i++) out.push(name+i); }
+      else if(Array.isArray(g.list)) out.push(...g.list);
+    });
+    return out;
+  }
+  function collectCourts(ctx){
+    ctx=ctx||currentCtx()||{}; const key=ctx.key||'', p=keyParts(key), tid=ctx.tid||p.tid, div=ctx.div||p.div; let out=[];
+    try{ if(typeof getDivisionPhaseConfiguredCourts==='function') out.push(...(getDivisionPhaseConfiguredCourts(tid,div,'group')||[])); }catch(e){}
+    try{ if(typeof getBracketAllowedCourts==='function') out.push(...(getBracketAllowedCourts(key)||[])); }catch(e){}
+    try{ const t=(G.tournaments||[]).find(x=>String(x.id)===String(tid)); if(t){ out.push(...expandCourtGroups(t.courtGroups)); const ds=t.divSettings&&t.divSettings[div]; if(ds) out.push(...(ds.allowedCourts||[]),...(ds.groupCourts||[]),...(ds.courts||[])); } }catch(e){}
+    try{ const d=G.draws&&G.draws[key]; if(d) out.push(...(d.allowedCourts||[]),...((d.groups||[]).flatMap(g=>Array.isArray(g.courts)?g.courts:(g.court?[g.court]:[])))); }catch(e){}
+    const seen=new Set(), ret=[]; out.map(x=>clean(x).replace(/\s+/g,'')).filter(Boolean).forEach(c=>{ if(!seen.has(c)){ seen.add(c); ret.push(c); } });
+    return ret;
+  }
+  function recreateGroupMatches(key){
+    const d=G.draws&&G.draws[key]; if(!d||!Array.isArray(d.groups)) return;
+    const keep=(G.matches[key]||[]).filter(m=>m&&String(m.phase||'')!=='group'); const list=[];
+    d.groups.forEach((g,gi)=>{ const arr=(g.teams||[]).map(Number); for(let a=0;a<arr.length;a++) for(let b=a+1;b<arr.length;b++) list.push({id:`g_${gi}_${a}_${b}`,phase:'group',group:gi,t1:arr[a],t2:arr[b],winner:null,rubbers:[],court:''}); });
+    G.matches[key]=[...keep,...list];
+  }
+  function applyCourtAndOrder(key,ctx,cfg){
+    const d=G.draws&&G.draws[key]; if(!d||!Array.isArray(d.groups)) return;
+    const courts=collectCourts(ctx); const fallback=courts.length?courts:[''];
+    const ORDER={start:0,wait1:1,wait2:2,wait3:3,wait4:4,auto:9};
+    const groupCourt={}, groupOrder={};
+    d.groups.forEach((g,gi)=>{
+      (g.teams||[]).forEach(ti=>{ const c=(cfg.teams||{})[String(Number(ti))]; if(!c) return; if(c.court) groupCourt[gi]=clean(c.court); if(c.order&&c.order!=='auto') groupOrder[gi]=Math.min(groupOrder[gi]??9, ORDER[c.order]??9); });
+    });
+    const byGroup={}; (G.matches[key]||[]).filter(m=>m&&String(m.phase)==='group').forEach(m=>{ const gi=Number(m.group||0); (byGroup[gi]=byGroup[gi]||[]).push(m); });
+    const orderedGroups=Object.keys(byGroup).map(Number).sort((a,b)=>{
+      const ca=groupCourt[a]||'', cb=groupCourt[b]||''; if(ca!==cb) return String(ca).localeCompare(String(cb),'ko');
+      const oa=groupOrder[a]??9, ob=groupOrder[b]??9; if(oa!==ob) return oa-ob;
+      return a-b;
+    });
+    let autoIdx=0; const courtSlot={};
+    orderedGroups.forEach(gi=>{
+      const order=groupOrder[gi]??9;
+      const court=groupCourt[gi] || fallback[autoIdx++%fallback.length] || '';
+      const slot=(courtSlot[court]=courtSlot[court]||0);
+      const baseMs=(order!==9?order*10000:90000)+slot*1000;
+      courtSlot[court]=slot+1;
+      if(d.groups[gi]){ d.groups[gi].court=court; d.groups[gi].courts=court?[court]:[]; d.groups[gi].courtGroup=courtGroup(court); d.groups[gi].conditionOrder=order; }
+      (byGroup[gi]||[]).sort((a,b)=>String(a.id).localeCompare(String(b.id),'ko')).forEach((m,pos)=>{
+        const ts=new Date(Date.UTC(2000,0,1,0,0,0,baseMs+pos)).toISOString();
+        if(court){ m.court=court; m.courts=[court]; m.manualCourtTarget=court; m.autoCourtLabel=''; m.initialPrelimAutoCourt=false; }
+        m.manualCourtPinnedAt=ts; m.courtAssignedAt=ts; m.courtQueueOrder=ts; m.v609ConditionalApplied=true; m.v609ConditionOrder=order; m.manualSharedHold=false;
+        if(order===0 && pos===0){ delete m.waitingFirstAt; delete m.lastWaitingFirstAt; } else m.waitingFirstAt=ts;
+      });
+    });
+  }
+  function applyKeepCourtGroup(key,cfg,ctx){
+    try{
+      if(!cfg.keep||!cfg.keep.enabled) return;
+      const d=G.draws&&G.draws[key]; if(!d||!Array.isArray(d.groups)) return;
+      const courts=collectCourts(ctx); if(!courts.length) return;
+      const byGroup={}; courts.forEach(c=>{ const g=courtGroup(c); (byGroup[g]=byGroup[g]||[]).push(c); });
+      const teamGroup={}; d.groups.forEach((g,gi)=>{ const cg=courtGroup((Array.isArray(g.courts)?g.courts[0]:'')||g.court||''); (g.teams||[]).forEach(ti=>teamGroup[Number(ti)]=cg); });
+      const cursor={}; function pick(g){ const arr=byGroup[g]||[]; if(!arr.length) return ''; const i=cursor[g]||0; cursor[g]=i+1; return arr[i%arr.length]; }
+      (G.matches[key]||[]).forEach(m=>{
+        if(!(m.phase==='main'||m.phase==='playin') || m.winner!=null) return;
+        const g1=m.t1!=null?teamGroup[Number(m.t1)]:''; const g2=m.t2!=null?teamGroup[Number(m.t2)]:'';
+        const g=(g1&&g1===g2)?g1:(g1||g2||clean(cfg.keep.homeGroup||'')); const c=pick(g);
+        if(c){ m.preferredCourtGroup=g; m.preferredCourt=c; if(!m.court){ m.court=c; m.courts=[c]; } m.v609KeepCourtGroup=true; }
+      });
+    }catch(e){ console.warn(VER,'keep court group failed',e); }
+  }
+  async function forceApplyAfterDraw(reason,ctxArg){
+    const ctx=ctxArg||currentCtx(); if(!ctx||!ctx.key) return false; setCtx(ctx);
+    const key=ctx.key; const cfg=loadCfg(key);
+    if(!cfg || (!conditionCount(cfg)&&!cfg.keep?.enabled)) return false;
+    if(!G.draws||!G.draws[key]||!Array.isArray(G.draws[key].groups)) return false;
+    stabilizing[key]=Date.now();
+    saveCfgIntoDraw(key,cfg);
+    if(conditionCount(cfg)){
+      const groups=G.draws[key].groups;
+      const current=flattenGroups(groups);
+      const sizes=groups.map(g=>Number(g.size||g.teams?.length||0)||2);
+      const base=groups.map((g,gi)=>({gi,size:sizes[gi],teams:[...(g.teams||[]).map(Number)]}));
+      const rebuilt=buildConditionFirstGroups(current,ctx.teams||teamArr(key),sizes,base);
+      G.draws[key].groups=rebuilt.map(g=>Object.assign({},groups[g.gi]||{}, {teams:g.teams, size:g.size}));
+      recreateGroupMatches(key);
+      applyCourtAndOrder(key,ctx,cfg);
+    }
+    applyKeepCourtGroup(key,cfg,ctx);
+    try{ G.draws[key].individualDrawConditions=cfg; G.draws[key].conditionalAppliedAt=new Date().toISOString(); G.draws[key].conditionalAppliedBy=VER; }catch(e){}
+    try{ if(typeof stD==='function') await stD(key); }catch(e){ console.warn(VER,'stD failed',e); }
+    try{ if(typeof stM==='function') await stM(key); }catch(e){ console.warn(VER,'stM failed',e); }
+    try{ if(typeof renderBracket==='function' && !window.__v609Rendering) renderBracket(); }catch(e){}
+    setTimeout(()=>{ if(stabilizing[key] && Date.now()-stabilizing[key]>1200) delete stabilizing[key]; },1300);
+    return true;
+  }
+  window.v609ApplyStableConditionalDrawNow=forceApplyAfterDraw;
+  function wrapStart(name){
+    const fn=window[name]; if(typeof fn!=='function' || fn.__v609Wrapped) return;
+    const w=async function(){
+      const ctx=currentCtx(); if(ctx){ setCtx(ctx); stabilizing[ctx.key]=Date.now(); }
+      let r=fn.apply(this,arguments); if(r&&typeof r.then==='function') r=await r;
+      setTimeout(()=>forceApplyAfterDraw('after-'+name,ctx),90);
+      setTimeout(()=>forceApplyAfterDraw('after-'+name+'-late',ctx),650);
+      return r;
+    };
+    w.__v609Wrapped=true; window[name]=w;
+    try{ if(name==='startDraw') startDraw=w; }catch(e){}
+    try{ if(name==='startIndividualDraw') startIndividualDraw=w; }catch(e){}
+  }
+  function activeMatches(key){
+    try{ return (G.matches&&G.matches[key]||[]).filter(m=>m && !m.bye && m.winner==null && ['group','playin','main'].includes(String(m.phase||'')) && m.t1!=null && m.t2!=null); }catch(e){ return []; }
+  }
+  function assignedMatchCount(key){
+    return activeMatches(key).filter(m=>String(m.court||'').trim() || (Array.isArray(m.courts)&&m.courts.length) || String(m.manualCourtTarget||'').trim()).length;
+  }
+  function isBoardBlank(html){
+    const s=String(html||'');
+    return /배정된 진행 경기 없음/.test(s) && !/시합중|코트 대기|court-wait-card|shared-wait-stack|예선\s*\d+조/.test(s.replace(/배정된 진행 경기 없음/g,''));
+  }
+  function isGoodBoard(key,html){ return activeMatches(key).length>0 && !isBoardBlank(html) && /court-drop-zone|v540-court-grid|코트 사용 현황|시합중|코트 대기|예선\s*\d+조/.test(String(html||'')); }
+  function stabilizeKeySync(key,reason){
+    if(!key || !(G.matches&&G.matches[key])) return false;
+    if(!activeMatches(key).length) return false;
+    let changed=false;
+    try{
+      // 조건값이 있으면 코트/순서를 우선 반영한다. 비동기 저장은 별도로 진행.
+      const cfg=loadCfg(key); const ctx=Object.assign(keyParts(key),{key,teams:teamArr(key)});
+      if(conditionCount(cfg)){ applyCourtAndOrder(key,ctx,cfg); saveCfgIntoDraw(key,cfg); changed=true; }
+    }catch(e){ console.warn(VER,'sync condition court/order failed',e); }
+    try{
+      const before=assignedMatchCount(key);
+      if(before===0 && typeof window.assignPrelimCourtsEvenly==='function') window.assignPrelimCourtsEvenly(key);
+      if(typeof window.rebuildIndividualAutoCourtAssignmentsForKey==='function'){
+        const c=window.rebuildIndividualAutoCourtAssignmentsForKey(key); changed=changed||!!c;
+      }
+      const after=assignedMatchCount(key);
+      changed=changed || after>before;
+      if(changed){
+        stabilizing[key]=Date.now();
+        if(typeof window.scheduleAutoCourtAssignmentSave==='function') window.scheduleAutoCourtAssignmentSave(key);
+        else if(typeof stM==='function') setTimeout(()=>stM(key).catch(()=>{}),80);
+      }
+    }catch(e){ console.warn(VER,'stabilizeKeySync failed',e); }
+    return changed;
+  }
+  window.v609StabilizeCourtBoardNow=stabilizeKeySync;
+  function getCurrentBracketKeys(){
+    const keys=[];
+    try{
+      const tid=document.getElementById('brTS')?.value || '';
+      if(!tid) return keys;
+      let divs=[];
+      try{ if(typeof getBracketSelectedDivs==='function') divs=getBracketSelectedDivs(tid)||[]; }catch(e){}
+      if(!divs.length){ const ds=document.getElementById('brDS')?.value; if(ds&&ds!=='__ALL__') divs=[ds]; }
+      if(!divs.length){ const t=(G.tournaments||[]).find(x=>String(x.id)===String(tid)); divs=t?.divisions||[]; }
+      divs.forEach(d=>keys.push(tid+'_'+d));
+    }catch(e){}
+    return keys;
+  }
+  function wrapRenderCourtBoard(){
+    const fn=window.renderCourtStatusBoard; if(typeof fn!=='function' || fn.__v609Wrapped) return;
+    const w=function(key,div){
+      let html=fn.apply(this,arguments);
+      try{
+        if(isGoodBoard(key,html)) MEM[key]={html,at:Date.now()};
+        if(activeMatches(key).length && isBoardBlank(html)){
+          stabilizeKeySync(key,'renderCourtStatusBoard');
+          const html2=fn.apply(this,arguments);
+          if(isGoodBoard(key,html2)){ MEM[key]={html:html2,at:Date.now()}; return html2; }
+          const cached=MEM[key];
+          if(cached && Date.now()-cached.at<120000){
+            return cached.html.replace('코트 사용 현황', '코트 사용 현황 <span class="badge bg-blue" style="font-size:.66rem;padding:3px 7px;margin-left:6px">동기화중</span>');
+          }
+          return `<div style="margin:10px 0 12px;padding:14px 16px;border:1.5px solid #bfdbfe;border-radius:16px;background:#eff6ff;color:#1d4ed8;font-weight:900">🎾 코트 배정 반영 중입니다. 잠시 후 자동으로 표시됩니다.</div>` + html;
+        }
+      }catch(e){ console.warn(VER,'renderCourtStatusBoard guard failed',e); }
+      return html;
+    };
+    w.__v609Wrapped=true; window.renderCourtStatusBoard=w;
+    try{ renderCourtStatusBoard=w; }catch(e){}
+  }
+  function wrapRenderBracket(){
+    const fn=window.renderBracket; if(typeof fn!=='function' || fn.__v609Wrapped) return;
+    const w=function(){
+      if(window.__v609Rendering) return fn.apply(this,arguments);
+      window.__v609Rendering=true;
+      try{ getCurrentBracketKeys().forEach(k=>stabilizeKeySync(k,'before-renderBracket')); }catch(e){}
+      try{ return fn.apply(this,arguments); }
+      finally{ window.__v609Rendering=false; }
+    };
+    w.__v609Wrapped=true; window.renderBracket=w; try{ renderBracket=w; }catch(e){}
+  }
+  function install(){ wrapPrelimDistributor(); wrapStart('startIndividualDraw'); wrapStart('startDraw'); wrapRenderCourtBoard(); wrapRenderBracket(); }
+  install();
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(install,250));
+  document.addEventListener('click',function(e){
+    const btn=e.target&&e.target.closest&&e.target.closest('#confirmDrawBtn');
+    if(btn){ const ctx=currentCtx(); if(ctx){ setCtx(ctx); stabilizing[ctx.key]=Date.now(); } }
+  },true);
+})();
+</script>
+
+
+<script id="v610StableNoBlankBracketPatch">
+(function(){
+  const VER='v610-stable-no-blank-bracket';
+  const CACHE={};
+  let restoring=false;
+  let delayedTimer=null;
+  function ge(id){ return document.getElementById(id); }
+  function txt(el){ return (el&&el.textContent||'').replace(/\s+/g,' ').trim(); }
+  function currentTid(){ return String(ge('brTS')&&ge('brTS').value||''); }
+  function currentDivs(tid){
+    try{
+      if(typeof getBracketSelectedDivs==='function'){
+        const arr=getBracketSelectedDivs(tid)||[];
+        if(arr.length) return arr.map(String).sort().join('|');
+      }
+    }catch(e){}
+    const ds=String(ge('brDS')&&ge('brDS').value||'');
+    if(ds && ds!=='__ALL__') return ds;
+    try{
+      const t=(window.G&&G.tournaments||[]).find(x=>String(x.id)===String(tid));
+      const divs=(t&&Array.isArray(t.divisions)?t.divisions:[]).map(String).sort();
+      return divs.length?divs.join('|'):'__ALL__';
+    }catch(e){ return '__ALL__'; }
+  }
+  function sig(){ const tid=currentTid(); return tid+'::'+currentDivs(tid); }
+  function countMatchesFromG(){
+    try{
+      const tid=currentTid(); if(!tid||!window.G||!G.matches) return 0;
+      const divs=currentDivs(tid).split('|').filter(Boolean);
+      let n=0;
+      for(const d of divs){
+        const key=tid+'_'+d;
+        const list=G.matches[key]||[];
+        n += list.filter(m=>m && !m.bye && m.t1!=null && m.t2!=null).length;
+      }
+      return n;
+    }catch(e){ return 0; }
+  }
+  function looksGood(html){
+    const s=String(html||'');
+    if(!s || s.length<900) return false;
+    const hasMatch=/시합중|코트 대기|경기표|예선\s*\d+조|vs|VS|결과|오더|court-drop-zone|m3card/.test(s);
+    const manyBlank=(s.match(/배정된 진행 경기 없음/g)||[]).length>=4;
+    const zeroProgress=/예선\s*진행률\s*\(0%\)|완료\s*0\s*\/\s*\d+/.test(s);
+    const hasNames=/\s\/\s/.test(s) || /\svs\s/i.test(s);
+    return hasMatch && hasNames && !(manyBlank && zeroProgress && !/시합중|코트 대기/.test(s));
+  }
+  function looksBad(html){
+    const s=String(html||'');
+    if(!s) return true;
+    const blankCnt=(s.match(/배정된 진행 경기 없음/g)||[]).length;
+    const hasNoMatches=/예선\s*진행률\s*\(0%\)|완료\s*0\s*\/\s*\d+|대회와 부서를 선택하세요|대진표가 없습니다|경기 없음/.test(s);
+    const noCourtButShould=/사용 코트\s*\d+면/.test(s) && blankCnt>=3 && !/시합중|코트 대기|대기중\s*경기/.test(s);
+    const tooShort=s.length<700;
+    return tooShort || hasNoMatches || noCourtButShould;
+  }
+  function addHoldBanner(html){
+    if(/v610-hold-banner/.test(String(html||''))) return html;
+    return `<div class="v610-hold-banner" style="margin:8px 0 12px;padding:10px 14px;border-radius:14px;background:#eff6ff;border:1.5px solid #93c5fd;color:#1d4ed8;font-size:.82rem;font-weight:900;line-height:1.5">🔄 데이터 동기화 중이라 직전 정상 대진표를 잠시 유지합니다. 실제 데이터가 사라진 것은 아닙니다.</div>` + html;
+  }
+  function rememberFromDom(){
+    const box=ge('bracketContent'); if(!box) return;
+    const html=box.innerHTML||''; const k=sig();
+    if(looksGood(html)) CACHE[k]={html,at:Date.now(),text:txt(box)};
+  }
+  function restoreIfNeeded(){
+    if(restoring) return false;
+    const box=ge('bracketContent'); if(!box) return false;
+    const k=sig(); const cur=box.innerHTML||'';
+    if(looksGood(cur)){ CACHE[k]={html:cur,at:Date.now(),text:txt(box)}; return false; }
+    const cached=CACHE[k];
+    const likelyTransient = looksBad(cur) || (countMatchesFromG()===0 && cached && Date.now()-cached.at<180000);
+    if(cached && Date.now()-cached.at<300000 && likelyTransient){
+      restoring=true;
+      box.innerHTML=addHoldBanner(cached.html);
+      restoring=false;
+      clearTimeout(delayedTimer);
+      delayedTimer=setTimeout(()=>{
+        try{
+          const before=box.innerHTML||'';
+          if(typeof window.renderBracket==='function') window.renderBracket();
+          const after=box.innerHTML||'';
+          if(looksBad(after) && looksGood(before)) box.innerHTML=before;
+        }catch(e){}
+      },900);
+      return true;
+    }
+    return false;
+  }
+  function wrapRenderBracket(){
+    const fn=window.renderBracket;
+    if(typeof fn!=='function' || fn.__v610Wrapped) return;
+    const wrapped=function(){
+      rememberFromDom();
+      const r=fn.apply(this,arguments);
+      try{ restoreIfNeeded(); }catch(e){ console.warn(VER,'restore after render failed',e); }
+      setTimeout(()=>{ try{ restoreIfNeeded(); }catch(e){} },80);
+      setTimeout(()=>{ try{ restoreIfNeeded(); }catch(e){} },320);
+      return r;
+    };
+    wrapped.__v610Wrapped=true;
+    window.renderBracket=wrapped;
+    try{ renderBracket=wrapped; }catch(e){}
+  }
+  function protectBracketContentWrites(){
+    const box=ge('bracketContent');
+    if(!box || box.__v610Protected) return;
+    box.__v610Protected=true;
+    const mo=new MutationObserver(()=>{
+      if(restoring) return;
+      try{
+        const html=box.innerHTML||''; const k=sig();
+        if(looksGood(html)) CACHE[k]={html,at:Date.now(),text:txt(box)};
+        else restoreIfNeeded();
+      }catch(e){}
+    });
+    mo.observe(box,{childList:true,subtree:false});
+    box.__v610Observer=mo;
+  }
+  function install(){ wrapRenderBracket(); protectBracketContentWrites(); rememberFromDom(); }
+  window.v610RememberBracketNow=rememberFromDom;
+  window.v610RestoreBracketIfNeeded=restoreIfNeeded;
+  document.addEventListener('DOMContentLoaded',()=>{ setTimeout(install,50); setTimeout(install,500); });
+  setTimeout(install,50);
+  document.addEventListener('change',e=>{ if(e.target&&['brTS','brDS'].includes(e.target.id)){ setTimeout(()=>{rememberFromDom(); protectBracketContentWrites();},120); } },true);
 })();
 </script>
 </body>
