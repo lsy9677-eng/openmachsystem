@@ -13689,9 +13689,14 @@ async function moveCourtQueueCard(key, mid, targetCourt, beforeMid){
     m.manualCourtLockedAt=m.manualCourtLockedAt||nowIso;
     sl(true);
     try{
-      // v617: _id 없으면 전체 저장으로 먼저 확정
-      if(!m._id) await stM(key);
-      await persistSingleMatchDoc(key, m);
+      // v617: 전체 stM + draw 잠금 저장
+      await stM(key);
+      if(G.draws && G.draws[key]){
+        G.draws[key].v615FinalizedLock = true;
+        G.draws[key].v615FinalizedLockAt = G.draws[key].v615FinalizedLockAt || new Date().toISOString();
+        try{ if(typeof __FB_WRITE_CACHE!=='undefined'){ if(__FB_WRITE_CACHE.draws) delete __FB_WRITE_CACHE.draws[key]; } }catch(_ce){}
+        await stD(key);
+      }
       sl(false);
       toast('대기 순서 변경 완료 ✅','success');
       renderBracket();
@@ -13757,20 +13762,24 @@ async function moveCourtQueueCard(key, mid, targetCourt, beforeMid){
 
   sl(true);
   try{
-    // v617: _id 없으면 전체 stM으로 먼저 _id 확정 후 단건 저장
-    if(!m._id){
-      await stM(key);
+    // v617: 전체 stM으로 모든 경기 _id 확정 + 자동재배정 차단 잠금
+    // 1) 모든 경기 _id 확정 (배치 저장)
+    await stM(key);
+    // 2) 수동 이동 후 자동재배정이 덮어쓰지 못하도록 draw 잠금
+    if(G.draws && G.draws[key]){
+      G.draws[key].v615FinalizedLock = true;
+      G.draws[key].v615FinalizedLockAt = G.draws[key].v615FinalizedLockAt || new Date().toISOString();
+      // 캐시 무효화 후 저장
+      try{ if(typeof __FB_WRITE_CACHE!=='undefined'){ if(__FB_WRITE_CACHE.draws) delete __FB_WRITE_CACHE.draws[key]; } }catch(_ce){}
+      await stD(key);
     }
-    await persistSingleMatchDoc(key, m);
     sl(false);
-    // v615b: dispatchLocalCourtNotificationAlerts가 v538에 의해 막혀있으므로
-    // 자동문자 승인창은 enqueueCourtSmsAlertsFromState 직접 호출
+    // v615b: 자동문자 승인창
     try{
       const nextState=buildCourtNotificationStateMap(G.matches||{});
       if(typeof window._origEnqueueCourtSmsAlerts==='function'){
         window._origEnqueueCourtSmsAlerts(prevCourtState, nextState);
       } else {
-        // v538 래핑 이전 원본 함수 사용 시도
         const origFn = enqueueCourtSmsAlertsFromState?.__v534Wrapped
           ? null : enqueueCourtSmsAlertsFromState;
         if(typeof origFn==='function') origFn(prevCourtState, nextState);
@@ -23158,6 +23167,8 @@ async function resetPrelimAndRedraw(key){
 추첨 전 상태로 완전히 되돌릴까요?`)) return;
   sl(true);
   try{
+    // v617: 재추첨 시 확정 잠금 해제
+    try{ if(G.draws&&G.draws[key]){ delete G.draws[key].v615FinalizedLock; delete G.draws[key].v615FinalizedLockAt; delete G.draws[key].v606GroupOrderFinalized; } }catch(e){}
     clearBracketStaleCachesForReset(key);
     const preservedSeedDraw = getPreservedSeedDrawState(key);
     await resetMatchRecords(key);
