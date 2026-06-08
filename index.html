@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-09-v632-clean-bracket-bar-no-gap";
+  const APP_VERSION = "2026-06-09-v633-held-badge-visible";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -59265,6 +59265,224 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
     [80,250,600,1200,2500].forEach(function(ms){ setTimeout(apply,ms); });
     try{ new MutationObserver(applySoon).observe(document.body,{childList:true,subtree:true}); }catch(e){}
     setInterval(apply,1000);
+  });
+})();
+</script>
+
+
+<!-- v633: 참가자 목록 보류 표시 전원 노출 보강 -->
+<style id="v633HeldBadgeVisibleForAllStyle">
+.v336-entry-row.v633-held-row,
+.rr-team-card.v633-held-row{
+  background:linear-gradient(135deg,#faf5ff,#ffffff)!important;
+  border-left:4px solid #a855f7!important;
+}
+.v633-held-badge{
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  width:auto!important;
+  min-width:auto!important;
+  max-width:max-content!important;
+  height:22px!important;
+  min-height:22px!important;
+  margin:3px 0 0 0!important;
+  padding:2px 8px!important;
+  border-radius:999px!important;
+  border:1.5px solid #c4b5fd!important;
+  background:#f3e8ff!important;
+  color:#6d28d9!important;
+  font-size:.62rem!important;
+  font-weight:1000!important;
+  line-height:1!important;
+  white-space:nowrap!important;
+  box-sizing:border-box!important;
+}
+.v336-entry-names .v633-held-badge{
+  align-self:flex-start!important;
+}
+@media(max-width:680px){
+  .v633-held-badge{
+    height:21px!important;
+    min-height:21px!important;
+    padding:2px 7px!important;
+    font-size:.58rem!important;
+  }
+}
+</style>
+<script id="v633HeldBadgeVisibleForAllScript">
+(function(){
+  'use strict';
+  if(window.__v633HeldBadgeVisibleForAll) return;
+  window.__v633HeldBadgeVisibleForAll = true;
+
+  function heldTeam(t){
+    try{
+      return !!(t && (
+        t.registrationStatus === 'held' ||
+        t.v626Status === 'held' ||
+        t.status === 'held' ||
+        t.waitStatus === 'held' ||
+        t.v385Status === 'held' ||
+        t.reserveStatus === 'held' ||
+        t.held === true ||
+        t.isHeld === true ||
+        t.hold === true ||
+        !!t._heldAt
+      ));
+    }catch(e){ return false; }
+  }
+
+  function normalize(s){
+    return String(s == null ? '' : s)
+      .replace(/[\/｜|]/g,' ')
+      .replace(/상세|입금대기|입금확인|보류해제|보류|추가대기\s*\d+|추가대기|대기|삭제|수정|Google|Naver|Kakao/g,' ')
+      .replace(/\s+/g,' ')
+      .trim();
+  }
+
+  function teamLabel(t){
+    try{
+      if(typeof getIndividualDisplayLine === 'function'){
+        var v = normalize(getIndividualDisplayLine(t));
+        if(v) return v;
+      }
+    }catch(e){}
+    try{
+      if(Array.isArray(t.individualPlayers)){
+        return normalize(t.individualPlayers.map(function(p){return (p && p.name) || '';}).filter(Boolean).join(' '));
+      }
+      if(Array.isArray(t.players)){
+        return normalize(t.players.slice(0,2).join(' '));
+      }
+      return normalize(t.entryLabel || t.pairLabel || t.club || t.name || '');
+    }catch(e){ return ''; }
+  }
+
+  function currentRegTid(){
+    try{
+      var el = document.getElementById('regTS');
+      return el && el.value || '';
+    }catch(e){ return ''; }
+  }
+
+  function candidateKeys(){
+    try{
+      var keys = Object.keys((window.G && G.teams) || {});
+      var tid = currentRegTid();
+      if(tid) keys = keys.filter(function(k){ return String(k).indexOf(String(tid) + '_') === 0; });
+      return keys;
+    }catch(e){ return []; }
+  }
+
+  function findTeamForRow(row){
+    try{
+      if(!row || !window.G || !G.teams) return null;
+
+      var rowNoText = '';
+      var numEl = row.querySelector('.v336-entry-num, .rr-team-num, .team-num');
+      if(numEl) rowNoText = numEl.textContent || '';
+      if(!rowNoText) rowNoText = (row.textContent || '').slice(0, 8);
+      var no = Number((String(rowNoText).match(/\d{1,4}/) || [])[0] || NaN);
+
+      var rowText = normalize(row.textContent || '');
+      var keys = candidateKeys();
+
+      // 1) 화면 번호와 배열 순서/저장 번호가 맞는 경우 우선 매칭
+      if(Number.isFinite(no)){
+        for(var ki=0; ki<keys.length; ki++){
+          var list = G.teams[keys[ki]] || [];
+          for(var i=0; i<list.length; i++){
+            var t = list[i] || {};
+            if(Number(t.regNo || t.no || t.v626EffectiveNo || (i + 1)) === no){
+              return {key:keys[ki], idx:i, team:t};
+            }
+          }
+        }
+      }
+
+      // 2) 이름으로 보조 매칭
+      for(var k2=0; k2<keys.length; k2++){
+        var arr = G.teams[keys[k2]] || [];
+        for(var j=0; j<arr.length; j++){
+          var label = teamLabel(arr[j]);
+          if(!label) continue;
+          var parts = label.split(/\s+/).filter(function(x){return x.length >= 2;});
+          var hit = parts.length && parts.every(function(name){ return rowText.indexOf(name) >= 0; });
+          if(hit) return {key:keys[k2], idx:j, team:arr[j]};
+        }
+      }
+    }catch(e){}
+    return null;
+  }
+
+  function upsertBadge(row, held){
+    try{
+      row.classList.toggle('v633-held-row', !!held);
+      row.classList.toggle('v632-held-row', !!held);
+      row.classList.toggle('v626-held-row', !!held);
+
+      var badge = row.querySelector('.v633-held-badge');
+      if(!held){
+        if(badge) badge.remove();
+        return;
+      }
+
+      if(!badge){
+        badge = document.createElement('span');
+        badge.className = 'v633-held-badge';
+        badge.textContent = '⏸ 보류';
+
+        var nameBox = row.querySelector('.v336-entry-names') || row.querySelector('.rr-team-info') || row;
+        var clubLine = nameBox.querySelector('.v336-club-line');
+        if(clubLine) nameBox.insertBefore(badge, clubLine);
+        else nameBox.appendChild(badge);
+      }else{
+        badge.textContent = '⏸ 보류';
+      }
+      badge.title = '관리자가 보류로 지정한 팀입니다.';
+    }catch(e){}
+  }
+
+  function applyHeldBadgesForAll(){
+    try{
+      document.querySelectorAll('#page-register .v336-entry-row, #page-register .rr-team-card').forEach(function(row){
+        var info = findTeamForRow(row);
+        if(!info) return;
+        upsertBadge(row, heldTeam(info.team));
+      });
+    }catch(e){}
+  }
+
+  window.v633ApplyHeldBadgesForAll = applyHeldBadgesForAll;
+
+  function runSoon(){
+    setTimeout(applyHeldBadgesForAll, 0);
+    setTimeout(applyHeldBadgesForAll, 120);
+    setTimeout(applyHeldBadgesForAll, 500);
+  }
+
+  ['showPage','renderRL','renderRegisterDivisionOverview','onRegTC','manualRefreshRegister','loadData','upDash'].forEach(function(name){
+    try{
+      var old = window[name];
+      if(typeof old !== 'function' || old.__v633HeldBadgeWrapped) return;
+      var fn = function(){
+        var r = old.apply(this, arguments);
+        runSoon();
+        return r;
+      };
+      fn.__v633HeldBadgeWrapped = true;
+      window[name] = fn;
+      try{ eval(name + '=window["' + name + '"]'); }catch(e){}
+    }catch(e){}
+  });
+
+  document.addEventListener('DOMContentLoaded', function(){
+    runSoon();
+    try{
+      new MutationObserver(function(){ runSoon(); }).observe(document.body, {childList:true, subtree:true});
+    }catch(e){}
+    setInterval(applyHeldBadgesForAll, 1200);
   });
 })();
 </script>
