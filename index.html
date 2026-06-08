@@ -57341,6 +57341,9 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
     draw.v617eManualCourtPlacements=snap.placements;
     draw.v617eAutoAssignBlocked=true;
     draw.v617eStatus='manual_court_saved';
+    // v617e fix: 수동저장 즉시 자동재배정 차단 잠금
+    draw.v615FinalizedLock=true;
+    draw.v615FinalizedLockAt=draw.v615FinalizedLockAt||now;
     return snap;
   }
 
@@ -57440,26 +57443,30 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
     if(draw) await setDoc(doc(db2,'draws',key), {...draw,_u:now,updatedAt:now});
 
     const q=query(collection(db2,'matches'), where('tournamentId','==',tid), where('division','==',div));
-    const old=await getDocs(q);
-    let batch=writeBatch(db2), cnt=0;
-    old.forEach(ds=>{ batch.delete(ds.ref); cnt++; if(cnt>=430){ /* Firestore batch safety handled below by splitting not possible inside forEach */ } });
-    // 보통 경기 수가 500 미만이라 1배치로 처리. 초과 시에는 예외 방지를 위해 새 배치로 나눔.
-    if(cnt>=430){
-      batch=writeBatch(db2); cnt=0;
-      old.forEach(ds=>{ batch.delete(ds.ref); cnt++; if(cnt===430){ /* noop */ } });
+    const existSnap=await getDocs(q);
+    // 삭제: 배치 499개씩 나눔
+    const delRefs=[]; existSnap.forEach(ds=>delRefs.push(ds.ref));
+    for(let i=0;i<delRefs.length;i+=499){
+      const b=writeBatch(db2);
+      delRefs.slice(i,i+499).forEach(r=>b.delete(r));
+      await b.commit();
     }
-    matches.forEach((m,i)=>{
-      if(!m) return;
-      const payload={...m};
-      delete payload._id;
-      payload.tournamentId=tid;
-      payload.division=div;
-      payload.updatedAt=now;
-      if(!payload.createdAt) payload.createdAt=now;
-      const id=escId(key+'_'+(payload.id ?? i));
-      batch.set(doc(db2,'matches',id), payload);
-    });
-    await batch.commit();
+    // 저장: 배치 499개씩 나눔
+    const writeItems=matches.filter(m=>!!m);
+    for(let i=0;i<writeItems.length;i+=499){
+      const b=writeBatch(db2);
+      writeItems.slice(i,i+499).forEach((m,j)=>{
+        const payload={...m};
+        delete payload._id;
+        payload.tournamentId=tid;
+        payload.division=div;
+        payload.updatedAt=now;
+        if(!payload.createdAt) payload.createdAt=now;
+        const id=escId(key+'_'+(payload.id ?? (i+j)));
+        b.set(doc(db2,'matches',id), payload);
+      });
+      await b.commit();
+    }
     try{ if(typeof waitForPendingWrites==='function') await waitForPendingWrites(db2); }catch(e){}
     try{
       if(window.__FB_WRITE_CACHE){
@@ -57560,6 +57567,21 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
     try{ eval(name+'=window["'+name+'"]'); }catch(e){}
   }
   ['rebuildIndividualAutoCourtAssignmentsForKey','applyPrelimCourtBlockDistribution','assignPrelimCourtsEvenly','ensureIndividualAutoCourtAssignmentsForKey'].forEach(wrapAutoBlock);
+
+  // v617e fix: applyPrelimCourtOrderBlockFix 자체를 래핑해서 수동저장 후 완전 차단
+  (function(){
+    const oldFix=window.applyPrelimCourtOrderBlockFix;
+    if(typeof oldFix!=='function' || oldFix.__v617eWrapped) return;
+    const w=function(key, opts={}){
+      try{
+        if(key && isManualSavedOrFinalized(key)) return false;
+      }catch(e){}
+      return oldFix.apply(this,arguments);
+    };
+    w.__v617eWrapped=true;
+    window.applyPrelimCourtOrderBlockFix=w;
+    try{ eval('applyPrelimCourtOrderBlockFix=window.applyPrelimCourtOrderBlockFix'); }catch(e){}
+  })();
 
   function ensureTopButtons(){
     const finalBtn=document.getElementById('v606FinalizeGroupOrderBtn');
