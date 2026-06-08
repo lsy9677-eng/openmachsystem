@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-08-v617f-manual-court-lock-final";
+  const APP_VERSION = "2026-06-08-v620h-stT-debug";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -5318,6 +5318,8 @@ body {
 .v385-waitlist-row{background:linear-gradient(135deg,#fffaf5,#ffffff)!important;border-color:#fdba74!important}
 .v336-entry-row.v385-waitlist-row{border-left:4px solid #fb923c!important}
 .rr-team-card.v385-waitlist-row{border:1.5px solid #fdba74!important;box-shadow:0 8px 18px rgba(251,146,60,.12)!important}
+.v620-move-btn{display:inline-flex!important;align-items:center!important;justify-content:center!important;min-height:22px!important;height:22px!important;padding:1px 7px!important;font-size:.65rem!important;border-radius:999px!important;font-weight:900!important;white-space:nowrap!important;cursor:pointer!important;border:1px solid #cbd5e1!important;background:#f8fafc!important;color:#374151!important}
+.v620-move-btn:hover{background:#e2e8f0!important}
 @media(max-width:680px){.v385-waitlist-badge{font-size:.62rem;padding:3px 6px}}
 </style>
 
@@ -5762,6 +5764,10 @@ button:disabled{opacity:.55!important;cursor:not-allowed!important;filter:graysc
     font-size:.70rem!important;
   }
 }
+</style>
+
+<style id="v619HeldButtonVisibleStyle">
+
 </style>
 </head>
 <body>
@@ -12530,6 +12536,7 @@ function getTournamentBundleCache(tid){
 function applyTournamentBundle(tid, bundle){
   if(!tid) return;
   bundle=bundle||{};
+
   // v577: Firestore 재조회 시 메모리상 코트 배정 필드 보존 (전체 삭제 전 스냅샷)
   const _v577CourtSnap={};
   const _V577_COURT_FIELDS=['court','courts','manualCourtTarget','manualSharedHold','manualCourtPinnedAt','manualCourtLocked','manualCourtLockedAt','courtAssignedAt','courtQueueOrder','waitingFirstAt','lastWaitingFirstAt','autoCourtLabel','initialPrelimAutoCourt','v615FinalizedLock','v616cManualFinalized','v617GroupOrderLocked','v617eManualCourtSaved','finalGroupNo','displayGroupNo','confirmedGroupNo','group'];
@@ -12568,12 +12575,9 @@ function applyTournamentBundle(tid, bundle){
       const aq=Number(a.queueOrder), bq=Number(b.queueOrder);
       const aWait=(Number.isFinite(aq)&&aq>=max)||(a.registrationStatus==='waitlist');
       const bWait=(Number.isFinite(bq)&&bq>=max)||(b.registrationStatus==='waitlist');
-      // 확정 vs 대기: 확정이 항상 앞
       if(!aWait && bWait) return -1;
       if(aWait && !bWait) return 1;
-      // 대기자끼리는 registeredAt(접수 시각) 오름차순으로만 정렬 — queueOrder 무시
       if(aWait && bWait) return String(a.registeredAt||'').localeCompare(String(b.registeredAt||''));
-      // 확정자끼리는 기존 queueOrder → registeredAt
       if(Number.isFinite(aq)&&Number.isFinite(bq)&&aq!==bq) return aq-bq;
       return (a.registeredAt||'').localeCompare(b.registeredAt||'');
     });
@@ -12647,6 +12651,7 @@ function applyTournamentBundle(tid, bundle){
     G.draws[id]=payload;
     markFbWriteCache('draws', id, payload||{});
   });
+
 }
 
 let ALL_PARTICIPATION_CACHE_TS = 0;
@@ -12709,8 +12714,8 @@ async function ensureAllParticipationDataLoaded(force=false){
       const {tid:_t2, div:_d2}= _k2td(k);
       const max2=getDivisionMaxTeams(_t2, _d2)||Infinity;
       const aq=Number(a.queueOrder), bq=Number(b.queueOrder);
-      const aWait=(Number.isFinite(aq)&&aq>=max2)||(a.registrationStatus==='waitlist');
-      const bWait=(Number.isFinite(bq)&&bq>=max2)||(b.registrationStatus==='waitlist');
+      const aWait=(a.registrationStatus!=='held')&&((Number.isFinite(aq)&&aq>=max2)||(a.registrationStatus==='waitlist'));
+      const bWait=(b.registrationStatus!=='held')&&((Number.isFinite(bq)&&bq>=max2)||(b.registrationStatus==='waitlist'));
       if(!aWait && bWait) return -1;
       if(aWait && !bWait) return 1;
       if(aWait && bWait) return String(a.registeredAt||'').localeCompare(String(b.registeredAt||''));
@@ -13437,7 +13442,7 @@ function buildCourtBoardGroupHeadline(key, m, autoTitle, rawTitle){
   const detail=`예선 ${grpLabel(m.group||0)}`;
   // v495: 코트 현황 카드에서 일반 라벨이 팀명 대신 표시되는 문제 방지
   // v614b: '수동 고정', '수동 공용대기' 등 수동 라벨도 팀명 대신 표시되지 않도록 필터
-  if(!label || /자동\s*배정|경기\s*대기|대기중|대기\s*중|수동\s*고정|수동\s*공용|수동\s*대기|조건\s*코트/.test(label)) return {headline: rawTitle, detail};
+  if(!label || /자동\s*배정|경기\s*대기|대기중|대기\s*중|수동|조건\s*코트|확정\s*고정/.test(label)) return {headline: rawTitle, detail};
   if(label==='1번 vs 2번') return {headline: `${s1} vs ${s2}`, detail};
   if(label==='1번 vs 3번') return {headline: `${s1} vs ${s3}`, detail};
   if(label==='2번 vs 3번') return {headline: `${s2} vs ${s3}`, detail};
@@ -13846,10 +13851,12 @@ async function moveCourtQueueCard(key, mid, targetCourt, beforeMid){
         if(typeof origFn==='function') origFn(prevCourtState, nextState);
       }
     }catch(_se){}
+    console.log('[v620] 코트 이동 저장 완료:', key, court||'공용대기');
     toast(court ? `수동 배정 완료 ✅ → ${court}` : '공용 대기로 이동 완료 ✅','success');
     renderBracket();
   }catch(e){
     sl(false);
+    console.error('[v620] 코트 이동 저장 실패:', e);
     toast('이동 저장 실패: '+e.message,'error');
   }
 }
@@ -14675,7 +14682,12 @@ async function purgeLegacyDrawHistoryOnce(){
   // 운영 안정화: 추첨 기록 자동 삭제를 더 이상 실행하지 않습니다.
   return;
 }
-async function fbSet(col,key,data){await setDoc(doc(db,col,key),{...data,_u:new Date().toISOString()});}
+async function fbSet(col,key,data){
+  const payload={...data,_u:new Date().toISOString()};
+  // v620fix: undefined 필드 제거 (Firebase 거부)
+  Object.keys(payload).forEach(k=>{ if(payload[k]===undefined) delete payload[k]; });
+  await setDoc(doc(db,col,key),payload);
+}
 
 /** ===== 문서형 구조(마이그레이션): registrations / matches ===== */
 function _k2td(key){const i=key.lastIndexOf('_');return {tid:key.slice(0,i), div:key.slice(i+1)};}
@@ -14787,11 +14799,16 @@ async function stT(key){
     ...(t.deleteRequestBy ? {deleteRequestBy: t.deleteRequestBy} : {}),
     ...(t.deleteRequestByEmail ? {deleteRequestByEmail: t.deleteRequestByEmail} : {}),
     ...(t.deleteRequestByName ? {deleteRequestByName: t.deleteRequestByName} : {}),
-    ...(t.deleteRequestStatus ? {deleteRequestStatus: t.deleteRequestStatus} : {})
+    ...(t.deleteRequestStatus ? {deleteRequestStatus: t.deleteRequestStatus} : {}),
+    ...(t.registrationStatus ? {registrationStatus: t.registrationStatus} : {}),
+    ...(t._heldAt ? {_heldAt: t._heldAt} : {})
   }));
   const hashPayload={ docs: docsForHash, ids:[...curIds].sort(), deleted:[...toDel].sort() };
-  if(isSameFbWrite('teams', key, hashPayload)) return;
-
+  if(isSameFbWrite('teams', key, hashPayload)){
+    console.log('[stT] 캐시 동일 - 저장 스킵됨:', key);
+    return;
+  }
+  console.log('[stT] 저장 시작:', key, '팀수:', cur.length);
   const batch=writeBatch(db);
   cur.forEach(t=>{
     const docId=t._id;
@@ -14821,12 +14838,17 @@ async function stT(key){
       ...(t.deleteRequestBy ? {deleteRequestBy: t.deleteRequestBy} : {}),
       ...(t.deleteRequestByEmail ? {deleteRequestByEmail: t.deleteRequestByEmail} : {}),
       ...(t.deleteRequestByName ? {deleteRequestByName: t.deleteRequestByName} : {}),
-      ...(t.deleteRequestStatus ? {deleteRequestStatus: t.deleteRequestStatus} : {})
+      ...(t.deleteRequestStatus ? {deleteRequestStatus: t.deleteRequestStatus} : {}),
+      ...(t.registrationStatus ? {registrationStatus: t.registrationStatus} : {}),
+      ...(t._heldAt ? {_heldAt: t._heldAt} : {})
     };
+    // undefined 필드 제거 (Firebase 거부)
+    Object.keys(payload).forEach(k=>{ if(payload[k]===undefined) delete payload[k]; });
     batch.set(doc(db,'registrations',docId), payload, {merge:true});
   });
   toDel.forEach(id=>batch.delete(doc(db,'registrations',id)));
   await batch.commit();
+  console.log('[stT] 저장 완료:', key);
   markFbWriteCache('teams', key, hashPayload);
   if(!G._regIdsByKey) G._regIdsByKey={};
   G._regIdsByKey[key]=[...curIds];
@@ -14954,6 +14976,8 @@ async function stM(key){
     const docId=x._id;
     const payload={...x};
     delete payload._id;
+    // v620fix: undefined 필드 제거 (Firebase 거부)
+    Object.keys(payload).forEach(k=>{ if(payload[k]===undefined) delete payload[k]; });
     payload.tournamentId = tid;
     payload.division = div;
     payload.updatedAt = new Date().toISOString();
@@ -14975,6 +14999,8 @@ async function persistSingleMatchDoc(key, matchObj){
   enrichMatchParticipantOwners(key, matchObj);
   const payload={...matchObj};
   delete payload._id;
+  // v620fix: undefined 필드 제거
+  Object.keys(payload).forEach(k=>{ if(payload[k]===undefined) delete payload[k]; });
   payload.tournamentId=tid;
   payload.division=div;
   payload.updatedAt=new Date().toISOString();
@@ -21819,9 +21845,17 @@ function buildRegisterRosterGrid(tid,div,teams,key){
         : `<div class="v336-entry-action v346-entry-action-simple v347-payment-only-action">
             ${buildPaymentStatusHTML(key,realIdx)}
           </div>`;
+      // v620e: 번호 입력 버튼 (관리자만 작동, 항상 표시)
+      const moveBtn=`<button class="v620-move-btn" onclick="moveTeamOrder('${esc(key)}',${realIdx})" title="번호로 이동">✎ ${realIdx+1}번</button>`;
+      const promoteBtn=(isWaitlisted&&(AD||TM))
+        ? `<button class="btn btn-outline" style="min-height:24px;height:24px;padding:2px 8px;font-size:.62rem;border-radius:999px" onclick="promoteWaitlistedTeam('${esc(key)}',${realIdx})">일반전환</button>`
+        : '';
+      const extraLine=(waitBadge||deleteReqBadge||promoteBtn||moveBtn)
+        ? `<div style="margin-top:3px;display:flex;gap:4px;align-items:center;flex-wrap:wrap">${waitBadge||''}${deleteReqBadge||''}${promoteBtn}${moveBtn}</div>`
+        : '';
       return `<div class="v336-entry-row v347-entry-row-detail-inline ${isWaitlisted?'v385-waitlist-row':''}">
         <div class="v336-entry-num">${i+1}</div>
-        <div class="v336-entry-names v347-entry-names">${v348IndividualPairTitleWithDetail(team,key,realIdx)}${(waitBadge||deleteReqBadge)?`<div style="margin-top:3px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">${waitBadge||''}${deleteReqBadge||''}${(isWaitlisted&&(AD||TM))?`<button class="btn btn-outline" style="min-height:24px;height:24px;padding:2px 8px;font-size:.62rem;border-radius:999px" onclick="promoteWaitlistedTeam('${esc(key)}',${realIdx})">일반전환</button>`:''}</div>`:''}</div>
+        <div class="v336-entry-names v347-entry-names">${v348IndividualPairTitleWithDetail(team,key,realIdx)}${extraLine}</div>
         ${actionBtns}
       </div>`;
     }
@@ -44656,6 +44690,25 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
   function renumberQueueOrder(key){
     try{ (G.teams?.[key]||[]).forEach((t,i)=>{ t.queueOrder=i; }); }catch(e){}
   }
+  // v620: 보류 팀은 정원 계산에서 제외하고 queueOrder 부여
+  // 비보류 팀: 0,1,2,... 순서대로 / 보류 팀: 큰 값(맨 뒤지만 대기보다 앞은 정렬 rank로 처리)
+  function renumberQueueOrderExcludeHeld(key){
+    try{
+      const arr=(G.teams?.[key]||[]);
+      let nonHeldSeq=0;
+      arr.forEach((t)=>{
+        if(!t) return;
+        if(t.registrationStatus==='held'){
+          // 보류는 정원 계산에서 빠지도록 매우 큰 값(정렬은 rank로 처리됨)
+          t.queueOrder=9000+nonHeldSeq;
+        } else {
+          t.queueOrder=nonHeldSeq;
+          nonHeldSeq++;
+        }
+      });
+    }catch(e){ console.warn('renumberQueueOrderExcludeHeld failed',e); }
+  }
+  window.renumberQueueOrderExcludeHeld=renumberQueueOrderExcludeHeld;
   window.promoteWaitlistedTeam = async function(key, idx){
     try{
       if(!(window.AD||window.TM)){ toastSafe('관리자만 전환할 수 있습니다.','error'); return; }
@@ -44670,8 +44723,11 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
       const msg=`${name}\n\n대기팀을 일반 참가로 전환합니다.\n현재 정원(${max}팀)이 이미 꽉 찬 상태라면 마지막 일반 참가팀은 대기 순번으로 밀립니다. 진행할까요?`;
       if(!confirm(msg)) return;
       const item=arr.splice(idx,1)[0];
-      const insertAt=Math.max(0, Math.min(max-1, arr.length));
+      // v617: 보류(held) 항목 앞, 확정 구간 마지막에 삽입
+      const heldIdx=arr.findIndex(t=>t&&t.registrationStatus==='held');
+      const insertAt=heldIdx>=0 ? heldIdx : Math.max(0, Math.min(max-1, arr.length));
       arr.splice(insertAt,0,item);
+      item.registrationStatus='confirmed'; // 일반전환 시 상태 확정
       renumberQueueOrder(key);
       if(typeof sl==='function') sl(true);
       if(typeof stT==='function') await stT(key);
@@ -44687,6 +44743,60 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
     }
   };
 
+  // v620: 관리자 순서 이동 (위/아래)
+  // v620e: 번호 직접 입력으로 순서 변경
+  window.moveTeamOrder = async function(key, idx){
+    try{
+      const _can=(()=>{
+        try{ if(typeof AD!=='undefined'&&AD) return true; }catch(e){}
+        try{ if(typeof TM!=='undefined'&&TM) return true; }catch(e){}
+        try{ if(window.AD||window.TM) return true; }catch(e){}
+        try{ if(document.body&&(document.body.classList.contains('admin-mode')||document.body.classList.contains('tm-mode'))) return true; }catch(e){}
+        return false;
+      })();
+      if(!_can){ if(typeof toast==='function') toast('관리자/운영자만 순서를 변경할 수 있습니다.','info'); return; }
+      key=String(key||''); idx=Number(idx);
+      const arr=G.teams?.[key]||[];
+      const team=arr[idx];
+      if(!team) return;
+      const name=(typeof getIndividualDisplayLine==='function')?getIndividualDisplayLine(team):(team.entryLabel||team.pairLabel||team.club||'');
+      const input=window.prompt(name+'\n\n이동할 번호를 입력하세요 (1~'+arr.length+'):', String(idx+1));
+      if(input===null) return;
+      const newPos=parseInt(input,10);
+      if(!Number.isFinite(newPos)||newPos<1||newPos>arr.length){ if(typeof toast==='function') toast('올바른 번호를 입력하세요.','error'); return; }
+      const newIdx=newPos-1;
+      if(newIdx===idx) return;
+      // 현재 위치에서 빼서 새 위치에 삽입
+      const removed=arr.splice(idx,1)[0];
+      arr.splice(newIdx,0,removed);
+      // queueOrder 재부여
+      arr.forEach((t,i)=>{ if(t) t.queueOrder=i; });
+      // 캐시 강제 무효화 후 저장
+      try{
+        if(window.__FB_WRITE_CACHE){
+          if(window.__FB_WRITE_CACHE.teams) window.__FB_WRITE_CACHE.teams[key]='';
+          if(window.__FB_WRITE_CACHE.matches) window.__FB_WRITE_CACHE.matches[key]='';
+        }
+      }catch(_e){}
+      if(typeof sl==='function') sl(true);
+      // stT는 isSameFbWrite 캐시가 있어서 스킵될 수 있으므로 캐시를 완전히 날리고 저장
+      try{
+        if(window.__FB_WRITE_CACHE && window.__FB_WRITE_CACHE.teams){
+          delete window.__FB_WRITE_CACHE.teams[key];
+        }
+      }catch(_e){}
+      if(typeof stT==='function') await stT(key);
+      if(typeof sl==='function') sl(false);
+      if(typeof toast==='function') toast((newPos)+'번으로 이동했습니다 ✅','success');
+      // 저장 완료 후 렌더링 (Firebase 재조회 없이 메모리 기준으로만)
+      try{ renderRegisterDivisionOverview(); }catch(_e){}
+      try{ renderRL(); }catch(_e){}
+      try{ upDash(); }catch(_e){}
+    }catch(e){
+      try{ if(typeof sl==='function') sl(false); }catch(_e){}
+      if(typeof toast==='function') toast('순서 변경 실패: '+(e?.message||e),'error');
+    }
+  };
   // 대회 편집창이 열릴 때 정원 설명을 보강한다.
   const oldOpenET=window.openET;
   if(typeof oldOpenET==='function'){
@@ -55914,6 +56024,7 @@ window.manualRefreshPlayers=manualRefreshPlayers;
     return courts.map(c => mp.get(String(c)) || {court:String(c),current:null,waiting:[],related:[]});
   }
   function orderedOldGroupsFromCurrentBoard(key, matches){
+    // v620f: getCourtStatusSnapshot으로 코트 현황판 순서 그대로 사용
     const seen=new Set();
     const out=[];
     function add(m){
@@ -55924,25 +56035,23 @@ window.manualRefreshPlayers=manualRefreshPlayers;
       if(seen.has(k)) return;
       seen.add(k); out.push(g);
     }
-    const items=snapshotItems(key);
-    items.forEach(item=>{
-      if(item && item.current) add(item.current);
-      (Array.isArray(item&&item.waiting)?item.waiting:[]).forEach(add);
-    });
-
-    // 화면 스냅샷에 누락된 조는 현재 저장된 코트/대기순서 기준으로 뒤에 보강
+    // 1순위: 코트 현황판 스냅샷 순서 (코트순 → 대기순)
+    try{
+      if(typeof getCourtStatusSnapshot==='function'){
+        const snaps=getCourtStatusSnapshot(key)||[];
+        snaps.forEach(s=>{
+          if(s && s.current) add(s.current);
+          (s && Array.isArray(s.waiting)?s.waiting:[]).forEach(add);
+        });
+      }
+    }catch(_e){}
+    // 2순위: 스냅샷에 없는 경기는 코트명순 → group번호순으로 보강
     (matches||[]).filter(m=>m&&m.phase==='group').slice().sort((a,b)=>{
-      const ca=matchCourt(a), cb=matchCourt(b);
-      const ia=items.findIndex(x=>String(x.court)===ca), ib=items.findIndex(x=>String(x.court)===cb);
-      const ra=ia>=0?ia:9999, rb=ib>=0?ib:9999;
-      if(ra!==rb) return ra-rb;
-      const qa=String(a.courtQueueOrder||a.waitingFirstAt||a.courtAssignedAt||a.manualCourtPinnedAt||'');
-      const qb=String(b.courtQueueOrder||b.waitingFirstAt||b.courtAssignedAt||b.manualCourtPinnedAt||'');
-      if(qa!==qb) return qa.localeCompare(qb);
-      const ga=oldGroupOf(a), gb=oldGroupOf(b);
-      return (ga??0)-(gb??0);
+      const ca=matchCourt(a)||'zzz', cb=matchCourt(b)||'zzz';
+      const courtCmp=ca.localeCompare(cb,'ko',{numeric:true});
+      if(courtCmp!==0) return courtCmp;
+      return (oldGroupOf(a)??0)-(oldGroupOf(b)??0);
     }).forEach(add);
-
     return out;
   }
   function groupObjectForOldGroup(oldG, originalGroups, groupMatches){
@@ -57087,6 +57196,8 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
         }
         const payload = {...m};
         delete payload._id;
+        // v620fix: undefined 필드 제거 (Firebase는 undefined 거부)
+        Object.keys(payload).forEach(k=>{ if(payload[k]===undefined) delete payload[k]; });
         payload.tournamentId = tid;
         payload.division = div;
         payload.updatedAt = now;
@@ -57550,6 +57661,8 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
       writeItems.slice(i,i+499).forEach((m,j)=>{
         const payload={...m};
         delete payload._id;
+        // v620fix: undefined 필드 제거 (Firebase 거부)
+        Object.keys(payload).forEach(k=>{ if(payload[k]===undefined) delete payload[k]; });
         payload.tournamentId=tid;
         payload.division=div;
         payload.updatedAt=now;
@@ -57562,6 +57675,8 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
         }
         if(!firestoreId) firestoreId=escId(key+'_'+(payload.id??(i+j)));
         if(!m._id) m._id=firestoreId;
+        // undefined 필드 제거 (Firebase 거부)
+        Object.keys(payload).forEach(k=>{ if(payload[k]===undefined) delete payload[k]; });
         b.set(doc(db2,'matches',firestoreId), payload, {merge:true});
       });
       await b.commit();
@@ -57613,7 +57728,10 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
         draw.v615FinalizedLock=true;
         draw.v615FinalizedLockAt=draw.v615FinalizedLockAt||now;
         draw.v617eAutoAssignBlocked=true;
-        await setDoc(doc(db2,'draws',key), {...draw,_u:now,updatedAt:now});
+        const drawPayload={...draw,_u:now,updatedAt:now};
+        // v620fix: undefined 필드 제거
+        Object.keys(drawPayload).forEach(k=>{ if(drawPayload[k]===undefined) delete drawPayload[k]; });
+        await setDoc(doc(db2,'draws',key), drawPayload);
       }
 
       // matches 저장 - 삭제 없이 merge:true로 업데이트 (삭제 중 폴링으로 데이터 유실 방지)
@@ -57634,6 +57752,8 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
         writeItems.slice(i,i+499).forEach((m,j)=>{
           const payload={...m};
           delete payload._id;
+          // v620fix: undefined 필드 제거 (Firebase 거부)
+          Object.keys(payload).forEach(k=>{ if(payload[k]===undefined) delete payload[k]; });
           payload.tournamentId=tid;
           payload.division=div;
           payload.updatedAt=now;
@@ -57649,7 +57769,9 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
             firestoreId=(crypto&&crypto.randomUUID)?crypto.randomUUID():('m_'+Date.now()+'_'+Math.random().toString(36).slice(2));
           }
           if(!m._id) m._id=firestoreId;
-          b.set(doc(db2,'matches',firestoreId), payload, {merge:true});
+          // undefined 필드 제거 (Firebase 거부)
+        Object.keys(payload).forEach(k=>{ if(payload[k]===undefined) delete payload[k]; });
+        b.set(doc(db2,'matches',firestoreId), payload, {merge:true});
         });
         await b.commit();
       }
@@ -57703,7 +57825,8 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
     const keys=selectedKeys();
     if(!keys.length){ toastSafe('개인전 예선 조가 없습니다.','error'); return; }
     const notSaved=keys.filter(k=>!getDraw(k)?.v617eManualCourtSaved);
-    if(notSaved.length){ toastSafe('먼저 💾 현재 코트배정 수동저장을 눌러 저장하세요. 조번호 확정은 저장된 배치 기준으로만 실행됩니다.','error'); return; }
+    // v619fix: 수동저장 없이도 현재 메모리 배치 기준으로 바로 확정 가능
+    // if(notSaved.length){ toastSafe('먼저 💾 현재 코트배정 수동저장을 눌러 저장하세요.','error'); return; }
     if(!confirm('방금 수동저장한 코트배정 기준으로 조번호를 1조부터 다시 확정합니다.\n\n확정 후에는 새로고침/재접속/본선 진행 중에도 바뀌면 안 됩니다.\n바꾸려면 예선 초기화 또는 재추첨이 필요합니다.\n\n계속하시겠습니까?')) return;
     try{
       slSafe(true);
@@ -57721,7 +57844,8 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
   window.v606FinalizeGroupOrderForKey = async function(key){
     if(!canOperate()){ toastSafe('관리자/운영자만 사용할 수 있습니다.','info'); return; }
     if(!key){ toastSafe('대회/부서를 선택하세요.','error'); return; }
-    if(!getDraw(key)?.v617eManualCourtSaved){ toastSafe('먼저 이 부서의 현재 코트배정을 수동저장하세요.','error'); return; }
+    // v619fix: 수동저장 없이도 확정 가능
+    // if(!getDraw(key)?.v617eManualCourtSaved){ toastSafe('먼저 이 부서의 현재 코트배정을 수동저장하세요.','error'); return; }
     if(!confirm('이 부서의 수동저장된 배치 기준으로 조번호를 확정합니다.\n\n계속하시겠습니까?')) return;
     try{
       slSafe(true);
@@ -57772,6 +57896,7 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
   })();
 
   function ensureTopButtons(){
+    // v620: 조번호 확정 버튼만 유지, 코트저장 버튼 제거
     const finalBtn=document.getElementById('v606FinalizeGroupOrderBtn');
     if(!finalBtn) return;
     finalBtn.textContent='🔒 조번호 확정';
@@ -57779,33 +57904,17 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
     finalBtn.style.display='inline-flex';
     finalBtn.style.borderColor='#d4a017';
     finalBtn.style.color='#8a6412';
-    if(!document.getElementById('v617eManualCourtSaveBtn')){
-      const b=document.createElement('button');
-      b.type='button';
-      b.id='v617eManualCourtSaveBtn';
-      b.className='btn btn-outline';
-      b.style.cssText='font-size:.78rem;padding:5px 12px;display:inline-flex;border-color:#2563eb;color:#1d4ed8;font-weight:900';
-      b.textContent='💾 현재 코트배정 수동저장';
-      b.onclick=function(){ window.v617eManualCourtSave(); };
-      finalBtn.parentNode.insertBefore(b,finalBtn);
-    }
+    // 코트저장 버튼이 있으면 제거
+    const old=document.getElementById('v617eManualCourtSaveBtn');
+    if(old) old.remove();
   }
   function ensurePerKeyButtons(){
+    // v620: 조번호 확정 버튼 텍스트만 정리, 코트저장 버튼 없음
     document.querySelectorAll('button[onclick^="v606FinalizeGroupOrderForKey"]').forEach(btn=>{
       btn.textContent=btn.textContent.replace(/조 번호 확정됨|조 번호 확정/g,'조번호 확정');
-      const onclick=btn.getAttribute('onclick')||'';
-      const m=onclick.match(/v606FinalizeGroupOrderForKey\(['"]([^'"]+)['"]\)/);
-      const key=m&&m[1];
-      if(!key || btn.dataset.v617ePaired==='1') return;
-      btn.dataset.v617ePaired='1';
-      const save=document.createElement('button');
-      save.type='button';
-      save.className='btn btn-outline v617e-save-key-btn';
-      save.style.cssText='padding:4px 10px;font-size:.72rem;min-height:34px;white-space:nowrap;font-weight:900;border-color:#2563eb;color:#1d4ed8';
-      save.textContent='💾 코트저장';
-      save.onclick=function(ev){ ev.preventDefault(); ev.stopPropagation(); window.v617eManualCourtSave(key); };
-      btn.parentNode.insertBefore(save,btn);
     });
+    // 혹시 남은 코트저장 버튼 제거
+    document.querySelectorAll('.v617e-save-key-btn').forEach(b=>b.remove());
   }
   function refreshButtons(){ ensureTopButtons(); ensurePerKeyButtons(); }
   window.v617eRefreshManualFinalizeButtons=refreshButtons;
@@ -57958,6 +58067,527 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
   }
 
   console.log('[v617f] 관리자 수동배정 절대 보호 설치 완료');
+})();
+</script>
+
+
+<!-- v618: 관리자/운영자 수동 코트배정 절대 우선 저장/확정 최종 패치 -->
+<script type="module" id="v618AdminManualAbsoluteLockScript">
+import { initializeApp, getApp, getApps } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatch, waitForPendingWrites } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+(function(){
+  'use strict';
+  if(window.__v618AdminManualAbsoluteLockInstalled) return;
+  window.__v618AdminManualAbsoluteLockInstalled = true;
+
+  const PATCH='[v618]';
+  const FB={apiKey:"AIzaSyAbc17RiYyxCqgbMBkxkMoiRdNTmy2q65w",authDomain:"open-match-manager.firebaseapp.com",projectId:"open-match-manager",storageBucket:"open-match-manager.firebasestorage.app",messagingSenderId:"195671806262",appId:"1:195671806262:web:89691574839266cea1a397"};
+  const app = getApps().length ? getApp() : initializeApp(FB);
+  const db2 = getFirestore(app);
+
+  const arr=v=>Array.isArray(v)?v:[];
+  const clean=v=>String(v==null?'':v).replace(/\s+/g,' ').trim();
+  const nowIso=()=>new Date().toISOString();
+  const nval=v=>{ const n=Number(v); return Number.isFinite(n)?n:null; };
+  const toastSafe=(m,t)=>{ try{ if(typeof window.toast==='function') window.toast(m,t||'info'); else console.log(PATCH,m); }catch(e){ console.log(PATCH,m); } };
+  const slSafe=v=>{ try{ if(typeof window.sl==='function') window.sl(!!v); }catch(e){} };
+  const canOperate=()=>{
+    try{
+      if(typeof window.canManageBracket==='function' && window.canManageBracket()) return true;
+      return !!(window.isAdmin || window.isOperator || window.isTournamentManager || document.body.classList.contains('admin-mode') || document.body.classList.contains('operator-mode') || document.body.classList.contains('tm-mode'));
+    }catch(e){ return false; }
+  };
+  const escId=s=>clean(s).replace(/[\/\\#?\[\]\s]+/g,'_').slice(0,140) || ('doc_'+Date.now());
+
+  function keyParts(key){
+    const s=String(key||'');
+    const i=s.lastIndexOf('_');
+    return i>=0 ? {tid:s.slice(0,i), div:s.slice(i+1)} : {tid:s, div:''};
+  }
+  function getDraw(key){ return window.G && window.G.draws ? window.G.draws[key] : null; }
+  function getMatches(key){ return arr(window.G && window.G.matches && window.G.matches[key]); }
+  function getTeams(key){ return arr(window.G && window.G.teams && window.G.teams[key]); }
+  function isGroupMatch(m){ return !!m && String(m.phase||'')==='group'; }
+  function matchId(m,i){ return String(m && (m.id!=null ? m.id : ('idx_'+i))); }
+  function teamSig(m){
+    return [m?.t1,m?.t2,m?.t3].map(v=>v==null?'':String(v)).filter(Boolean).sort().join('|');
+  }
+  function groupKeyOf(m){
+    if(m && clean(m.v618StableGroupKey)) return clean(m.v618StableGroupKey);
+    if(m && clean(m.v617eManualGroupKey)) return clean(m.v617eManualGroupKey);
+    const g=nval(m?.group);
+    if(g!=null) return 'g:'+g;
+    const sig=teamSig(m);
+    return sig ? 't:'+sig : 'm:'+clean(m?.id||'');
+  }
+  function matchCourt(m){
+    if(!m) return '';
+    if(m.manualSharedHold===true) return '';
+    return clean(m.manualCourtTarget || m.court || arr(m.courts)[0] || m.__sharedCourtLabel || '');
+  }
+  function matchQueue(m){
+    return clean(m?.courtQueueOrder || m?.manualCourtPinnedAt || m?.waitingFirstAt || m?.courtAssignedAt || m?.id || '');
+  }
+  function courtOrderForKey(key){
+    const out=[]; const add=c=>{ c=clean(c); if(c && !out.includes(c)) out.push(c); };
+    try{
+      if(typeof window.getCourtStatusSnapshot==='function') arr(window.getCourtStatusSnapshot(key)).forEach(s=>add(s?.court||s?.label));
+    }catch(e){}
+    try{
+      if(typeof window.getDisplayCourtFilters==='function') arr(window.getDisplayCourtFilters(key)).forEach(add);
+    }catch(e){}
+    try{
+      if(typeof window.getUsedCourtsForKey==='function') arr(window.getUsedCourtsForKey(key)).forEach(add);
+    }catch(e){}
+    getMatches(key).forEach(m=>add(matchCourt(m)));
+    return out;
+  }
+  function courtRankMap(key){
+    const courts=courtOrderForKey(key);
+    const map=new Map(courts.map((c,i)=>[clean(c),i]));
+    return {courts,map};
+  }
+  function groupObjects(key){
+    const matches=getMatches(key).filter(isGroupMatch);
+    const {map}=courtRankMap(key);
+    const group=new Map();
+    matches.forEach((m,i)=>{
+      const gk=groupKeyOf(m);
+      if(!m.v618StableGroupKey) m.v618StableGroupKey=gk;
+      if(!m.v617eManualGroupKey) m.v617eManualGroupKey=gk;
+      const c=matchCourt(m);
+      const r=c ? (map.has(c)?map.get(c):9998) : 9999;
+      const q=matchQueue(m) || String(i).padStart(5,'0');
+      if(!group.has(gk)){
+        group.set(gk,{groupKey:gk,court:c,courtRank:r,queue:q,oldGroup:nval(m.group),matches:[m],teamSig:teamSig(m)});
+      }else{
+        const g=group.get(gk);
+        g.matches.push(m);
+        if(r<g.courtRank || (r===g.courtRank && q<g.queue)){
+          g.court=c; g.courtRank=r; g.queue=q;
+        }
+      }
+    });
+    return [...group.values()].sort((a,b)=>{
+      if(a.courtRank!==b.courtRank) return a.courtRank-b.courtRank;
+      if(a.queue!==b.queue) return String(a.queue).localeCompare(String(b.queue),'ko');
+      const ag=nval(a.oldGroup), bg=nval(b.oldGroup);
+      if(ag!=null && bg!=null && ag!==bg) return ag-bg;
+      return String(a.groupKey).localeCompare(String(b.groupKey),'ko');
+    });
+  }
+  function buildSnapshot(key){
+    const {courts,map}=courtRankMap(key);
+    const groups=groupObjects(key);
+    const placements=[];
+    getMatches(key).forEach((m,i)=>{
+      if(!isGroupMatch(m)) return;
+      const c=matchCourt(m);
+      const cr=c ? (map.has(c)?map.get(c):9998) : 9999;
+      placements.push({
+        matchId:matchId(m,i),
+        groupKey:groupKeyOf(m),
+        court:c,
+        courtIndex:cr,
+        queue:matchQueue(m),
+        shared:m.manualSharedHold===true
+      });
+    });
+    return {savedAt:nowIso(), courts, groups:groups.map(g=>({groupKey:g.groupKey,court:g.court,courtIndex:g.courtRank,queue:g.queue,oldGroup:g.oldGroup,teamSig:g.teamSig})), placements};
+  }
+
+  window.__V618_LOCK_STORE = window.__V618_LOCK_STORE || {};
+  function rememberLocks(key){
+    try{
+      const store={draw:{}, matches:{}};
+      const d=getDraw(key);
+      if(d){
+        ['v617eManualCourtSaved','v617eManualCourtSavedAt','v617eManualCourtSnapshot','v617eManualCourtOrder','v617eManualCourtPlacements','v617eAutoAssignBlocked','v617eStatus','v617eGroupOrderFinalized','v617eGroupOrderFinalizedAt','v617eFinalGroupOrder','v615FinalizedLock','v615FinalizedLockAt','v616cManualFinalized','v606GroupOrderFinalized','v606GroupOrderFinalizedAt'].forEach(f=>{ if(d[f]!==undefined) store.draw[f]=d[f]; });
+      }
+      getMatches(key).forEach((m,i)=>{
+        if(!m) return;
+        if(m.manualCourtLocked || m.manualSharedHold || m.manualCourtTarget || m.v617eManualCourtSaved || m.v617GroupOrderLocked || m.v615FinalizedLock){
+          const mid=matchId(m,i);
+          store.matches[mid]={
+            court:m.court,
+            courts:Array.isArray(m.courts)?[...m.courts]:m.courts,
+            manualCourtTarget:m.manualCourtTarget,
+            manualSharedHold:m.manualSharedHold,
+            manualCourtLocked:m.manualCourtLocked,
+            manualCourtLockedAt:m.manualCourtLockedAt,
+            manualCourtPinnedAt:m.manualCourtPinnedAt,
+            courtAssignedAt:m.courtAssignedAt,
+            courtQueueOrder:m.courtQueueOrder,
+            waitingFirstAt:m.waitingFirstAt,
+            lastWaitingFirstAt:m.lastWaitingFirstAt,
+            autoCourtLabel:m.autoCourtLabel,
+            initialPrelimAutoCourt:m.initialPrelimAutoCourt,
+            v617eManualCourtSaved:m.v617eManualCourtSaved,
+            v617eManualCourtSavedAt:m.v617eManualCourtSavedAt,
+            v617eManualGroupKey:m.v617eManualGroupKey,
+            v618StableGroupKey:m.v618StableGroupKey,
+            finalGroupNo:m.finalGroupNo,
+            displayGroupNo:m.displayGroupNo,
+            confirmedGroupNo:m.confirmedGroupNo,
+            v617FinalGroupNo:m.v617FinalGroupNo,
+            v617GroupOrderLocked:m.v617GroupOrderLocked,
+            v615FinalizedLock:m.v615FinalizedLock,
+            v616cManualFinalized:m.v616cManualFinalized
+          };
+        }
+      });
+      window.__V618_LOCK_STORE[key]=store;
+    }catch(e){}
+  }
+  function restoreLocks(key){
+    try{
+      const store=window.__V618_LOCK_STORE && window.__V618_LOCK_STORE[key];
+      if(!store) return false;
+      const d=getDraw(key);
+      if(d && store.draw) Object.assign(d, store.draw);
+      const byId=new Map();
+      getMatches(key).forEach((m,i)=>byId.set(matchId(m,i),m));
+      Object.entries(store.matches||{}).forEach(([mid,s])=>{
+        const m=byId.get(mid);
+        if(!m) return;
+        Object.assign(m,s);
+        if(Array.isArray(s.courts)) m.courts=[...s.courts];
+      });
+      return true;
+    }catch(e){ return false; }
+  }
+
+  function applyManualSaveLocal(key){
+    const draw=getDraw(key), matches=getMatches(key);
+    if(!draw || !matches.length) return false;
+    const now=nowIso();
+    const snap=buildSnapshot(key);
+
+    matches.forEach((m,i)=>{
+      if(!isGroupMatch(m)) return;
+      const c=matchCourt(m);
+      const q=matchQueue(m) || new Date(Date.UTC(2000,0,1,0,0,i,0)).toISOString();
+      const gk=groupKeyOf(m);
+      m.v618StableGroupKey=gk;
+      m.v617eManualGroupKey=gk;
+      if(m.manualSharedHold===true || !c){
+        m.manualSharedHold=true;
+        m.manualCourtTarget='';
+        m.court='';
+        m.courts=[];
+        m.autoCourtLabel='수동 공용대기';
+      }else{
+        m.manualSharedHold=false;
+        m.manualCourtTarget=c;
+        m.court=c;
+        m.courts=[c];
+        if(/예선\s*자동|자동배정/.test(String(m.autoCourtLabel||'')) || !m.autoCourtLabel) m.autoCourtLabel='수동저장 고정';
+      }
+      m.courtQueueOrder=q;
+      if(!m.courtAssignedAt && c) m.courtAssignedAt=q;
+      m.manualCourtPinnedAt=m.manualCourtPinnedAt||q;
+      m.manualCourtLocked=true;
+      m.manualCourtLockedAt=m.manualCourtLockedAt||now;
+      m.initialPrelimAutoCourt=false;
+      m.v617eManualCourtSaved=true;
+      m.v617eManualCourtSavedAt=now;
+      m.v615FinalizedLock=true;
+      m.updatedAt=now;
+    });
+
+    draw.v617eManualCourtSaved=true;
+    draw.v617eManualCourtSavedAt=now;
+    draw.v617eManualCourtSnapshot=snap;
+    draw.v617eManualCourtOrder=snap.groups.map(g=>g.groupKey);
+    draw.v617eManualCourtPlacements=snap.placements;
+    draw.v617eAutoAssignBlocked=true;
+    draw.v617eStatus=draw.v617eGroupOrderFinalized?'group_order_finalized':'manual_court_saved';
+    draw.v615FinalizedLock=true;
+    draw.v615FinalizedLockAt=draw.v615FinalizedLockAt||now;
+    draw.updatedAt=now;
+    rememberLocks(key);
+    return true;
+  }
+
+  function applyFinalizeLocal(key){
+    const draw=getDraw(key), matches=getMatches(key);
+    if(!draw || !matches.length) return false;
+
+    applyManualSaveLocal(key);
+    const now=nowIso();
+    const snap=draw.v617eManualCourtSnapshot || buildSnapshot(key);
+    const order=(arr(draw.v617eManualCourtOrder).length?arr(draw.v617eManualCourtOrder):arr(snap.groups).map(g=>g.groupKey)).map(clean).filter(Boolean);
+    const existing=new Set(order);
+    groupObjects(key).forEach(g=>{ if(!existing.has(g.groupKey)){ order.push(g.groupKey); existing.add(g.groupKey); } });
+    const groupIndex=new Map(order.map((g,i)=>[g,i]));
+    const groupCourt=new Map(arr(snap.groups).map(g=>[clean(g.groupKey),clean(g.court)]));
+    const placeById=new Map(arr(snap.placements).map(p=>[String(p.matchId),p]));
+
+    matches.forEach((m,i)=>{
+      if(!isGroupMatch(m)) return;
+      const mid=matchId(m,i);
+      const p=placeById.get(mid);
+      const gk=clean(m.v618StableGroupKey || m.v617eManualGroupKey || (p&&p.groupKey) || groupKeyOf(m));
+      const idx=groupIndex.get(gk);
+      if(idx==null) return;
+      const finalNo=idx+1;
+      const c=clean((p&&p.court) || groupCourt.get(gk) || matchCourt(m));
+      m.v618StableGroupKey=gk;
+      m.v617eManualGroupKey=gk;
+      m.v617OriginalGroup=(m.v617OriginalGroup ?? m.originalGroup ?? m.group);
+      m.group=idx;
+      m.finalGroupNo=finalNo;
+      m.displayGroupNo=finalNo;
+      m.confirmedGroupNo=finalNo;
+      m.v617FinalGroupNo=finalNo;
+      if(p && p.queue) m.courtQueueOrder=p.queue;
+      if(p && p.shared){
+        m.manualSharedHold=true;
+        m.manualCourtTarget='';
+        m.court='';
+        m.courts=[];
+        m.autoCourtLabel='수동 공용대기·조번호 확정 고정';
+      }else if(c){
+        m.manualSharedHold=false;
+        m.manualCourtTarget=c;
+        m.court=c;
+        m.courts=[c];
+        m.autoCourtLabel='수동저장·조번호 확정 고정';
+      }
+      m.manualCourtLocked=true;
+      m.manualCourtLockedAt=m.manualCourtLockedAt||now;
+      m.v617eManualCourtSaved=true;
+      m.v617eManualCourtSavedAt=m.v617eManualCourtSavedAt||now;
+      m.v617eGroupOrderFinalized=true;
+      m.v617eGroupOrderFinalizedAt=now;
+      m.v617GroupOrderLocked=true;
+      m.v615FinalizedLock=true;
+      m.v616cManualFinalized=true;
+      m.initialPrelimAutoCourt=false;
+      m.updatedAt=now;
+    });
+
+    if(Array.isArray(draw.groups)){
+      draw.groups=draw.groups.map((g,idx0)=>{
+        const oldIdx = nval(g.group);
+        let gk = clean(g.v618StableGroupKey || g.v617eManualGroupKey);
+        if(!gk && oldIdx!=null) gk='g:'+oldIdx;
+        if(!gk) gk='g:'+idx0;
+        let idx=groupIndex.has(gk)?groupIndex.get(gk):idx0;
+        const finalNo=idx+1;
+        return {...g, v618StableGroupKey:gk, v617eManualGroupKey:gk, group:idx, finalGroupNo:finalNo, displayGroupNo:finalNo, confirmedGroupNo:finalNo, v617GroupOrderLocked:true, court:groupCourt.get(gk)||g.court, courts:groupCourt.get(gk)?[groupCourt.get(gk)]:g.courts};
+      });
+    }
+    draw.v606GroupOrderFinalized=true;
+    draw.v606GroupOrderFinalizedAt=now;
+    draw.v617eGroupOrderFinalized=true;
+    draw.v617eGroupOrderFinalizedAt=now;
+    draw.v617eFinalGroupOrder=order.slice();
+    draw.v617eManualCourtSaved=true;
+    draw.v617eAutoAssignBlocked=true;
+    draw.v617eStatus='group_order_finalized';
+    draw.v615FinalizedLock=true;
+    draw.v616cManualFinalized=true;
+    draw.updatedAt=now;
+    rememberLocks(key);
+    return true;
+  }
+
+  async function persistKey(key){
+    const {tid,div}=keyParts(key);
+    const draw=getDraw(key);
+    const matches=getMatches(key);
+    if(!tid || !div) throw new Error('대회/부서 키 오류: '+key);
+    const now=nowIso();
+    if(draw){
+      const dp={...draw,_u:now,updatedAt:now};
+      Object.keys(dp).forEach(k=>{ if(dp[k]===undefined) delete dp[k]; });
+      await setDoc(doc(db2,'draws',key), dp, {merge:true});
+    }
+
+    const existSnap=await getDocs(query(collection(db2,'matches'), where('tournamentId','==',tid), where('division','==',div)));
+    const byLogicId=new Map(), bySig=new Map();
+    existSnap.forEach(ds=>{
+      const d=ds.data()||{};
+      if(d.id!=null) byLogicId.set(String(d.id), ds.id);
+      const sig=[d.phase||'',d.round??'',d.matchNo??'',d.group??'',d.t1??'',d.t2??''].map(String).join('|');
+      bySig.set(sig, ds.id);
+    });
+    const writeItems=matches.filter(Boolean);
+    for(let i=0;i<writeItems.length;i+=450){
+      const b=writeBatch(db2);
+      writeItems.slice(i,i+450).forEach((m,j)=>{
+        const payload={...m};
+        delete payload._id;
+        // undefined 필드 제거 (Firebase 거부)
+        Object.keys(payload).forEach(k=>{ if(payload[k]===undefined) delete payload[k]; });
+        payload.tournamentId=tid;
+        payload.division=div;
+        payload.updatedAt=now;
+        if(!payload.createdAt) payload.createdAt=now;
+        let firestoreId=clean(m._id);
+        if(!firestoreId && m.id!=null) firestoreId=byLogicId.get(String(m.id))||'';
+        if(!firestoreId){
+          const sig=[m.phase||'',m.round??'',m.matchNo??'',m.group??'',m.t1??'',m.t2??''].map(String).join('|');
+          firestoreId=bySig.get(sig)||'';
+        }
+        if(!firestoreId) firestoreId=escId(key+'_'+(payload.id??(i+j)));
+        if(!m._id) m._id=firestoreId;
+        // undefined 필드 제거 (Firebase 거부)
+        Object.keys(payload).forEach(k=>{ if(payload[k]===undefined) delete payload[k]; });
+        b.set(doc(db2,'matches',firestoreId), payload, {merge:true});
+      });
+      await b.commit();
+    }
+    try{ if(typeof waitForPendingWrites==='function') await waitForPendingWrites(db2); }catch(e){}
+    try{
+      if(window.__FB_WRITE_CACHE){
+        if(window.__FB_WRITE_CACHE.draws) window.__FB_WRITE_CACHE.draws[key]='';
+        if(window.__FB_WRITE_CACHE.matches) window.__FB_WRITE_CACHE.matches[key]='';
+      }
+      for(const k of Object.keys(localStorage)){
+        if((k.includes('TOURNAMENT_BUNDLE') || k.includes('tournamentBundle') || k.includes('Bundle')) && k.includes(tid)) localStorage.removeItem(k);
+      }
+    }catch(e){}
+  }
+
+  function activeKeys(){
+    try{
+      const tid=clean(document.getElementById('brTS')?.value||'');
+      if(!tid || !window.G) return [];
+      const explicit=[];
+      document.querySelectorAll('#brMultiDiv .dpill.active,[data-br-div].active').forEach(el=>{
+        let d=clean(el.getAttribute('data-div')||el.getAttribute('data-br-div')||'');
+        if(!d) d=clean(el.textContent||'').replace(/^[^\w가-힣]+/,'').trim();
+        if(d && !/전체/.test(d)) explicit.push(d);
+      });
+      let divs=explicit;
+      if(!divs.length){
+        const sel=clean(document.getElementById('brDS')?.value||'');
+        if(sel && sel!=='__ALL__') divs=[sel];
+      }
+      if(!divs.length){
+        divs=Object.keys((window.G&&window.G.draws)||{}).filter(k=>k.startsWith(tid+'_')).map(k=>k.slice(tid.length+1));
+      }
+      return [...new Set(divs.map(d=>tid+'_'+d))].filter(k=>getDraw(k) && getMatches(k).some(isGroupMatch));
+    }catch(e){ return []; }
+  }
+
+  async function manualSave(keys, silent){
+    let cnt=0;
+    for(const key of keys){
+      if(applyManualSaveLocal(key)){
+        await persistKey(key);
+        cnt++;
+      }
+    }
+    if(!silent) toastSafe(cnt?'현재 코트배정 수동저장 완료 💾':'저장할 예선 코트배정이 없습니다.', cnt?'success':'error');
+    try{ if(typeof window.renderBracket==='function') window.renderBracket(); }catch(e){}
+    setTimeout(()=>{ try{ refreshButtons(); }catch(e){} },80);
+    return cnt;
+  }
+  async function finalize(keys){
+    let cnt=0;
+    for(const key of keys){
+      // 저장 안 된 상태에서도 무조건 현재 상태를 먼저 저장한 뒤 확정한다.
+      applyManualSaveLocal(key);
+      if(applyFinalizeLocal(key)){
+        await persistKey(key);
+        cnt++;
+      }
+    }
+    toastSafe(cnt?'조번호 확정 완료 🔒 관리자 수동배정 기준으로 고정되었습니다.':'확정할 예선 조가 없습니다.', cnt?'success':'error');
+    try{ if(typeof window.renderBracket==='function') window.renderBracket(); }catch(e){}
+    setTimeout(()=>{ try{ refreshButtons(); }catch(e){} },80);
+    return cnt;
+  }
+
+  const oldDirect=window.v617eDirectSaveKey;
+  window.v617eDirectSaveKey=async function(key){
+    if(!key) return;
+    applyManualSaveLocal(key);
+    await persistKey(key);
+    try{ if(typeof oldDirect==='function' && oldDirect!==window.v617eDirectSaveKey) await oldDirect(key); }catch(e){ console.warn(PATCH,'legacy direct save ignored after v618 persist',e); }
+    rememberLocks(key);
+    console.log(PATCH,'direct manual lock saved',key);
+  };
+
+  window.v617eManualCourtSave=async function(keyOpt){
+    if(!canOperate()){ toastSafe('관리자/운영자만 사용할 수 있습니다.','info'); return; }
+    const keys=keyOpt?[keyOpt]:activeKeys();
+    if(!keys.length){ toastSafe('저장할 개인전 예선 조가 없습니다.','error'); return; }
+    if(!confirm('현재 화면의 코트배정/공용대기/대기순서를 관리자 수동값으로 저장합니다.\n\n저장 후에는 자동배정·새로고침·조번호 확정이 이 값을 덮어쓰지 않습니다.\n\n계속하시겠습니까?')) return;
+    try{ slSafe(true); await manualSave(keys,false); }
+    catch(e){ console.error(PATCH,'manual save failed',e); toastSafe('수동저장 실패: '+(e&&e.message||e),'error'); }
+    finally{ slSafe(false); }
+  };
+
+  window.v606FinalizeGroupOrder=async function(){
+    if(!canOperate()){ toastSafe('관리자/운영자만 사용할 수 있습니다.','info'); return; }
+    const keys=activeKeys();
+    if(!keys.length){ toastSafe('개인전 예선 조가 없습니다.','error'); return; }
+    if(!confirm('현재 코트배정 상태를 먼저 저장한 뒤, 그 순서 기준으로 조번호를 1조부터 확정합니다.\n\n관리자/운영자가 다시 바꾸기 전까지 자동배정이 덮어쓰지 않습니다.\n\n계속하시겠습니까?')) return;
+    try{ slSafe(true); await finalize(keys); }
+    catch(e){ console.error(PATCH,'finalize failed',e); toastSafe('조번호 확정 실패: '+(e&&e.message||e),'error'); }
+    finally{ slSafe(false); }
+  };
+  window.v606FinalizeGroupOrderForKey=async function(key){
+    if(!canOperate()){ toastSafe('관리자/운영자만 사용할 수 있습니다.','info'); return; }
+    if(!key){ toastSafe('대회/부서를 선택하세요.','error'); return; }
+    if(!confirm('이 부서의 현재 코트배정을 저장하고 조번호를 확정합니다.\n\n계속하시겠습니까?')) return;
+    try{ slSafe(true); await finalize([key]); }
+    catch(e){ console.error(PATCH,'finalize key failed',e); toastSafe('조번호 확정 실패: '+(e&&e.message||e),'error'); }
+    finally{ slSafe(false); }
+  };
+
+  function isKeyLocked(key){
+    const d=getDraw(key);
+    return !!(d && (d.v617eManualCourtSaved || d.v617eGroupOrderFinalized || d.v617eAutoAssignBlocked || d.v615FinalizedLock || d.v616cManualFinalized));
+  }
+  function blockAuto(name){
+    const old=window[name];
+    if(typeof old!=='function' || old.__v618Blocked) return;
+    const w=function(){
+      const key=[...arguments].find(a=>typeof a==='string' && getDraw(a));
+      if(key && isKeyLocked(key)){ restoreLocks(key); return false; }
+      return old.apply(this,arguments);
+    };
+    w.__v618Blocked=true;
+    window[name]=w;
+    try{ eval(name+'=window["'+name+'"]'); }catch(e){}
+  }
+  ['rebuildIndividualAutoCourtAssignmentsForKey','ensureIndividualAutoCourtAssignmentsForKey','assignPrelimCourtsEvenly','applyPrelimCourtBlockDistribution','applyPrelimCourtOrderBlockFix','restorePrelimMatchesFromDraw','healActiveBracketKeys'].forEach(blockAuto);
+
+  // v620: wrapRestore 제거 (메모리 보호 불필요 - Firebase 저장으로 충분)
+
+  function refreshButtons(){
+    // v620: 조번호 확정 버튼만, 코트저장 버튼 완전 제거
+    try{
+      const finalBtn=document.getElementById('v606FinalizeGroupOrderBtn');
+      if(finalBtn){
+        finalBtn.textContent='🔒 조번호 확정';
+        finalBtn.onclick=function(ev){ if(ev){ev.preventDefault();ev.stopPropagation();} window.v606FinalizeGroupOrder(); };
+        finalBtn.style.display='inline-flex';
+        finalBtn.style.borderColor='#d4a017';
+        finalBtn.style.color='#8a6412';
+      }
+      // 코트저장 버튼 제거
+      ['v617eManualCourtSaveBtn','v618ManualCourtSaveBtn'].forEach(id=>{
+        const el=document.getElementById(id); if(el) el.remove();
+      });
+      document.querySelectorAll('.v617e-save-key-btn,.v618-save-key-btn').forEach(b=>b.remove());
+      document.querySelectorAll('button[onclick^="v606FinalizeGroupOrderForKey"]').forEach(btn=>{
+        btn.textContent='🔒 조번호 확정';
+      });
+    }catch(e){}
+  }
+  window.v618RefreshManualFinalizeButtons=refreshButtons;
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(refreshButtons,80));
+  else setTimeout(refreshButtons,80);
+  [300,900,1800,3500].forEach(ms=>setTimeout(refreshButtons,ms));
+
+  console.log(PATCH,'관리자/운영자 수동배정 최우선 저장/확정 패치 설치 완료');
 })();
 </script>
 
