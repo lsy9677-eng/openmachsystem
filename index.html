@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-08-v616-manual-finalize-stable";
+  const APP_VERSION = "2026-06-08-v615f-seed-only-lock";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -22947,6 +22947,8 @@ async function resetMainDrawOnly(key){
 }
 
 async function resetDrawOnly(key){
+  // v615f: 초기화 시 확정 잠금 해제
+  try{ if(window.G&&G.draws&&G.draws[key]){ delete G.draws[key].v615FinalizedLock; delete G.draws[key].v615FinalizedLockAt; delete G.draws[key].v606GroupOrderFinalized; } }catch(e){}
   const {tid,div}=_k2td(key);
   if(!confirm(`전체 리셋을 진행합니다.
 
@@ -23502,6 +23504,11 @@ function getIndividualMainAutoQueue(key){
   ];
 }
 function rebuildIndividualAutoCourtAssignmentsForKey(key){
+  // v615f: 조번호 확정 후 완전 잠금
+  if(window.G && G.draws){
+    const keys=key?[key]:Object.keys(G.draws);
+    if(keys.every(k=>G.draws[k]&&G.draws[k].v615FinalizedLock===true)) return false;
+  }
   // [BUG FIX] 예선(group) 경기가 있으면 자동배정 스위치 여부와 무관하게 예선 코트배정 실행.
   // 기존: isIndividualAutoCourtAssignEnabled()가 false면 즉시 return → 예선 배정 전혀 안 됨.
   // 수정: 예선 경기 미배정이 있으면 assignPrelimCourtsEvenly 먼저 실행, 그 후 스위치 체크.
@@ -24020,6 +24027,7 @@ function scheduleAutoCourtAssignmentSave(key){
   return true;
 }
 function ensureIndividualAutoCourtAssignmentsForKey(key){
+  if(window.G&&G.draws&&G.draws[key]&&G.draws[key].v615FinalizedLock===true) return false;
   const changed = rebuildIndividualAutoCourtAssignmentsForKey(key);
   if(changed) scheduleAutoCourtAssignmentSave(key);
   return changed;
@@ -24112,6 +24120,9 @@ function _v615DoFinalizeKey(key){
 
   draw.v606GroupOrderFinalized=true;
   draw.v606GroupOrderFinalizedAt=new Date().toISOString();
+  // v615f: 조번호 확정 후 완전 잠금 플래그
+  draw.v615FinalizedLock=true;
+  draw.v615FinalizedLockAt=new Date().toISOString();
   return true;
 }
 window.v606FinalizeGroupOrderForKey = async function(key){
@@ -51244,6 +51255,8 @@ window.manualRefreshPlayers=manualRefreshPlayers;
   function applyPrelimCourtOrderBlockFix(key, opts={}){
     try{
       if(!key || !window.G || !G.draws || !G.matches || !G.draws[key] || !isIndiv(key)) return false;
+      // v615f: 조번호 확정 후 완전 잠금
+      if(G.draws[key].v615FinalizedLock===true && !opts.forceUnlock) return false;
       const groups=arr(G.draws[key].groups);
       const courts=getPrelimPool(key);
       if(!groups.length || !courts.length) return false;
@@ -51534,6 +51547,8 @@ window.manualRefreshPlayers=manualRefreshPlayers;
   function applyPrelimCourtBlockDistribution(key, opts={}){
     try{
       if(!key || !window.G || !G.matches || !G.draws || !G.draws[key] || !isIndividualKey(key)) return false;
+      // v615f: 조번호 확정 후 완전 잠금 - 자동 재배정 차단
+      if(G.draws[key].v615FinalizedLock===true && !opts.forceUnlock) return false;
 
       const courts=getPrelimCourtPool(key);
       const groups=groupIndexesForKey(key);
@@ -51658,6 +51673,7 @@ window.manualRefreshPlayers=manualRefreshPlayers;
 
   // 기존 assignPrelimCourtsEvenly가 라운드로빈/최소개수 방식으로 되돌리는 것을 차단한다.
   window.assignPrelimCourtsEvenly=function(key){
+  if(window.G&&G.draws&&G.draws[key]&&G.draws[key].v615FinalizedLock===true) return false;
     return applyPrelimCourtBlockDistribution(key,{force:true, save:false});
   };
 
@@ -52820,7 +52836,18 @@ window.manualRefreshPlayers=manualRefreshPlayers;
     return s.replace(/[\s_-]*\d+\s*$/,'').trim() || s;
   }
   function teamName(key,ti){
-    try{ return (typeof tdn==='function') ? tdn((G.teams[key]||[])[ti],key,ti) : `#${Number(ti)+1}`; }catch(e){ return `#${Number(ti)+1}`; }
+    try{
+      const tm=(G.teams[key]||[])[Number(ti)];
+      if(!tm) return '';
+      if(typeof window.tdn==='function'){ try{ const r=window.tdn(tm,key,Number(ti)); if(r && r!=='?') return r; }catch(e2){} }
+      if(tm.entryLabel) return tm.entryLabel;
+      if(tm.pairLabel) return tm.pairLabel;
+      const ps=(tm.individualPlayers||[]).slice(0,2).map(p=>String(p&&p.name||'').trim()).filter(Boolean);
+      if(ps.length) return ps.join(' / ');
+      const pl=(tm.players||[]).slice(0,2).map(n=>String(n||'').trim()).filter(Boolean);
+      if(pl.length) return pl.join(' / ');
+      return tm.club||'';
+    }catch(e){ return ''; }
   }
   function courtPool(tid,div,key){
     let arr=[];
@@ -52899,8 +52926,7 @@ window.manualRefreshPlayers=manualRefreshPlayers;
         <td style="text-align:left;font-weight:900;min-width:150px">#${ti+1} ${esc(teamName(key,ti))}</td>
         <td><input class="form-input v592-seed" value="${esc(c.seed||'')}" placeholder="1~8" style="width:64px;min-height:34px;padding:5px 7px;font-size:.78rem"></td>
         <td><select class="form-select v592-group" style="min-height:34px;padding:5px 7px;font-size:.78rem">${groupOpts}</select></td>
-        <td><select class="form-select v592-court" style="min-height:34px;padding:5px 7px;font-size:.78rem">${courtOpts}</select></td>
-        <td><select class="form-select v592-order" style="min-height:34px;padding:5px 7px;font-size:.78rem"><option value="auto">자동</option><option value="start">바로시작</option><option value="wait1">대기1</option><option value="wait2">대기2</option><option value="wait3">대기3</option><option value="wait4">대기4</option></select></td>
+
       </tr>`;
     }).join('');
     let modal=$('mV592Condition');
@@ -52911,7 +52937,7 @@ window.manualRefreshPlayers=manualRefreshPlayers;
     const homeOpts=['<option value="">자동</option>'].concat(groupsBy.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`)).join('');
     modal.innerHTML=`<div class="modal-box" style="max-width:980px;width:96vw"><div class="modal-header"><h3>⚙️ 개인전 조건부 추첨 설정</h3><button class="modal-close" onclick="cm('mV592Condition')">✕</button></div><div class="modal-body" style="max-height:78vh;overflow:auto">
       <div style="padding:10px 12px;margin-bottom:12px;border-radius:12px;background:linear-gradient(135deg,#fff7dd,#eef4ff);border:1.5px solid #d4a017;font-size:.78rem;line-height:1.65;color:#475569"><b>운영자/개발자 전용</b>입니다. 조건은 일반 참가자 화면에는 표시하지 않습니다. 조/코트/순번 조건이 충돌하면 가능한 범위에서 우선 적용하고 경고합니다.</div>
-      <div class="table-wrap" style="border:1px solid #dbe7ff"><table style="min-width:780px"><thead><tr><th>팀</th><th>시드</th><th>예선 조</th><th>예선 코트</th><th>예선 순서</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <div class="table-wrap" style="border:1px solid #dbe7ff"><table style="min-width:780px"><thead><tr><th>팀</th><th>시드</th><th>예선 조</th></tr></thead><tbody>${rows}</tbody></table></div>
       <div style="margin-top:14px;padding:12px 14px;border:1.5px solid #bfdbfe;border-radius:14px;background:#f8fbff">
         <label style="display:flex;gap:8px;align-items:center;font-weight:900;color:#1d4ed8"><input id="v592KeepEnabled" type="checkbox" style="accent-color:#1d4ed8"> 예선 코트군을 본선에서도 가능한 범위에서 유지</label>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
@@ -52937,8 +52963,8 @@ window.manualRefreshPlayers=manualRefreshPlayers;
     const cfg={teams:{}, keep:{enabled:!!$('v592KeepEnabled')?.checked, round:String($('v592KeepRound')?.value||'32'), homeGroup:String($('v592HomeGroup')?.value||'')}};
     document.querySelectorAll('#mV592Condition tr[data-ti]').forEach(tr=>{
       const ti=tr.getAttribute('data-ti');
-      const row={seed:String(tr.querySelector('.v592-seed')?.value||'').trim(), group:String(tr.querySelector('.v592-group')?.value||'').trim(), court:String(tr.querySelector('.v592-court')?.value||'').trim(), order:String(tr.querySelector('.v592-order')?.value||'auto')};
-      if(row.seed||row.group||row.court||row.order!=='auto') cfg.teams[ti]=row;
+      const row={seed:String(tr.querySelector('.v592-seed')?.value||'').trim(), group:String(tr.querySelector('.v592-group')?.value||'').trim()};
+      if(row.seed||row.group) cfg.teams[ti]=row;
     });
     saveCond(key,cfg);
     try{
@@ -53821,8 +53847,18 @@ window.manualRefreshPlayers=manualRefreshPlayers;
     return s ? (s.replace(/[\s_-]*\d+\s*$/,'').trim() || s) : '';
   }
   function teamName(key,ti){
-    try{ const tm=(G.teams[key]||[])[Number(ti)]; if(typeof tdn==='function') return tdn(tm,key,Number(ti)); }catch(e){}
-    return '#'+(Number(ti)+1);
+    try{
+      const tm=(G.teams[key]||[])[Number(ti)];
+      if(!tm) return '';
+      if(typeof window.tdn==='function'){ try{ const r=window.tdn(tm,key,Number(ti)); if(r && r!=='?') return r; }catch(e2){} }
+      if(tm.entryLabel) return tm.entryLabel;
+      if(tm.pairLabel) return tm.pairLabel;
+      const ps=(tm.individualPlayers||[]).slice(0,2).map(p=>String(p&&p.name||'').trim()).filter(Boolean);
+      if(ps.length) return ps.join(' / ');
+      const pl=(tm.players||[]).slice(0,2).map(n=>String(n||'').trim()).filter(Boolean);
+      if(pl.length) return pl.join(' / ');
+      return tm.club||'';
+    }catch(e){ return ''; }
   }
   function groupLabel(gi){ try{ return typeof grpLabel==='function' ? grpLabel(gi) : (Number(gi)+1)+'조'; }catch(e){ return (Number(gi)+1)+'조'; } }
   function courtPool(tid,div,key){
@@ -54131,7 +54167,7 @@ window.manualRefreshPlayers=manualRefreshPlayers;
       const nameCell=tr.querySelector('td'); if(nameCell) nameCell.textContent='#'+(Number(ti)+1)+' '+displayTeamName(ctx.key,ti);
       const seed=tr.querySelector('.v592-seed'); if(seed) seed.value=row.seed||'';
       const group=tr.querySelector('.v592-group'); if(group) group.value=row.group||'';
-      const court=tr.querySelector('.v592-court');
+      const court=tr.querySelector('.v592-court'); // v615f: court hidden
       if(court){
         const cur=row.court||court.value||'';
         court.innerHTML='<option value="">자동</option>'+courts.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
@@ -54190,7 +54226,7 @@ window.manualRefreshPlayers=manualRefreshPlayers;
     const cfg={teams:{},keep:{enabled:!!$('v592KeepEnabled')?.checked,round:clean($('v592KeepRound')?.value||'32'),homeGroup:clean($('v592HomeGroup')?.value||'')}};
     document.querySelectorAll('#mV592Condition tr[data-ti]').forEach(tr=>{
       const ti=String(tr.getAttribute('data-ti'));
-      const row={seed:clean(tr.querySelector('.v592-seed')?.value||''),group:clean(tr.querySelector('.v592-group')?.value||''),court:clean(tr.querySelector('.v592-court')?.value||''),order:clean(tr.querySelector('.v592-order')?.value||'auto')||'auto'};
+      const row={seed:clean(tr.querySelector('.v592-seed')?.value||''),group:clean(tr.querySelector('.v592-group')?.value||'')}; // v615f: court/order 제거
       if(row.seed||row.group||row.court||row.order!=='auto') cfg.teams[ti]=row;
     });
     saveCfg(ctx.key,cfg);
@@ -55854,264 +55890,6 @@ window.manualRefreshPlayers=manualRefreshPlayers;
 
   window.v615eApplyStableCourtOrderForKey=applyAndSave;
   window.v615eReapplyVisibleConditionKeys=reapplyVisibleConditionKeys;
-})();
-</script>
-
-
-
-<!-- v616: 실전 수동 배치 + 조번호 확정 절대 고정 안정본 -->
-<style id="v616ManualFinalizeStableStyle">
-  /* 조건부 추첨 설정은 실전 안정본에서 제거. 시드 설정은 유지. */
-  #v592CondBtn,
-  #v592MainKeepBtn,
-  #mV592Condition,
-  [id*="ConditionModal"],
-  [id*="CondBtn"]{
-    display:none !important;
-  }
-  .v616-finalized-lock-badge{
-    display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:999px;
-    background:#dcfce7;color:#166534;border:1px solid #86efac;font-size:.74rem;font-weight:1000;
-  }
-</style>
-<script id="v616ManualFinalizeStableScript">
-(function(){
-  'use strict';
-  const VER='v616-manual-finalize-stable';
-  function toastSafe(msg,type){ try{ if(typeof toast==='function') toast(msg,type||'info'); else alert(msg); }catch(e){ alert(msg); } }
-  function keyOfCurrent(){
-    try{ const t=(document.getElementById('brTS')||{}).value||''; const d=(document.getElementById('brDS')||{}).value||''; if(t&&d&&d!=='__ALL__') return t+'_'+d; }catch(e){}
-    try{ const idw=(typeof IDW!=='undefined'&&IDW)||window.IDW; if(idw&&idw.key) return idw.key; }catch(e){}
-    try{ const imd=(typeof IMD!=='undefined'&&IMD)||window.IMD; if(imd&&imd.key) return imd.key; }catch(e){}
-    return '';
-  }
-  function clearWriteCache(key){
-    try{ if(window.__FB_WRITE_CACHE){ ['matches','draws','teams'].forEach(b=>{ try{ if(window.__FB_WRITE_CACHE[b]) delete window.__FB_WRITE_CACHE[b][key]; }catch(e){} }); } }catch(e){}
-    try{ if(typeof markFbWriteCache==='function'){ markFbWriteCache('matches',key,null); markFbWriteCache('draws',key,null); } }catch(e){}
-  }
-  function removeConditionConfigForKey(key){
-    if(!key) return;
-    try{ localStorage.removeItem('v592_indiv_draw_conditions_'+String(key)); }catch(e){}
-    try{ if(window.G&&G.draws&&G.draws[key]){ delete G.draws[key].individualDrawConditions; delete G.draws[key].conditionalAppliedAt; delete G.draws[key].conditionalAppliedBy; } }catch(e){}
-  }
-  function natNum(s){ const m=String(s||'').match(/(\d+)\s*$/); return m?Number(m[1]):9999; }
-  function natPrefix(s){ return String(s||'').replace(/[\s_-]*\d+\s*$/,'').trim(); }
-  function courtOrderList(key){
-    let arr=[]; const kd=(typeof _k2td==='function')?_k2td(key):{tid:'',div:''};
-    try{ if(typeof getDivisionPhaseConfiguredCourts==='function') arr=getDivisionPhaseConfiguredCourts(kd.tid,kd.div,'group')||[]; }catch(e){}
-    try{ if(!arr.length && typeof getBracketAllowedCourts==='function') arr=getBracketAllowedCourts(key)||[]; }catch(e){}
-    try{ if(!arr.length){ (G.matches[key]||[]).forEach(m=>{ const c=getCourt(m); if(c) arr.push(c); }); } }catch(e){}
-    arr=[...new Set(arr.map(x=>String(x||'').trim()).filter(Boolean))];
-    arr.sort((a,b)=>natPrefix(a).localeCompare(natPrefix(b),'ko') || natNum(a)-natNum(b) || String(a).localeCompare(String(b),'ko'));
-    return arr;
-  }
-  function getCourt(m){
-    return String((Array.isArray(m&&m.courts)&&m.courts[0]) || (m&&m.court) || (m&&m.manualCourtTarget) || '').trim();
-  }
-  function groupIndexByTeams(key,m){
-    try{
-      const groups=(G.draws[key]&&G.draws[key].groups)||[];
-      const a=Number(m.t1), b=Number(m.t2);
-      for(let gi=0; gi<groups.length; gi++){
-        const ts=(groups[gi]&&groups[gi].teams)||[];
-        if(ts.map(Number).includes(a) && ts.map(Number).includes(b)) return gi;
-      }
-    }catch(e){}
-    const g=Number(m&&m.group);
-    return Number.isFinite(g)?g:-1;
-  }
-  function groupSortItems(key){
-    const draw=G.draws[key]; const groups=(draw&&Array.isArray(draw.groups))?draw.groups:[];
-    const matches=(G.matches[key]||[]).filter(m=>m&&String(m.phase||'')==='group');
-    const courts=courtOrderList(key); const courtRank=new Map(courts.map((c,i)=>[String(c),i]));
-    const byGi=new Map();
-    groups.forEach((g,gi)=>{
-      byGi.set(gi,{oldGi:gi, group:g, courts:[], orders:[], ids:[], minCourtRank:999999, minOrder:'9999-99-99T99:99:99.999Z', noCourtOrder:gi});
-    });
-    matches.forEach(m=>{
-      const gi=groupIndexByTeams(key,m); if(!byGi.has(gi)) return;
-      const it=byGi.get(gi); const c=getCourt(m); const order=String(m.courtQueueOrder||m.manualCourtPinnedAt||m.courtAssignedAt||m.id||'');
-      if(c){ it.courts.push(c); it.minCourtRank=Math.min(it.minCourtRank, courtRank.has(c)?courtRank.get(c):900000+natNum(c)); }
-      if(order && order<it.minOrder) it.minOrder=order;
-      if(m.id!=null) it.ids.push(String(m.id));
-    });
-    return [...byGi.values()].sort((a,b)=>{
-      if(a.minCourtRank!==b.minCourtRank) return a.minCourtRank-b.minCourtRank;
-      if(a.minOrder!==b.minOrder) return String(a.minOrder).localeCompare(String(b.minOrder));
-      return a.oldGi-b.oldGi;
-    });
-  }
-  function makeSnapshot(key){
-    const snap={createdAt:new Date().toISOString(), groups:[], matches:{}};
-    try{
-      const draw=G.draws[key]||{};
-      (draw.groups||[]).forEach((g,gi)=>snap.groups.push({gi, teams:(g.teams||[]).map(Number), label:g.label||'', finalGroupNo:Number(g.finalGroupNo||g.displayGroupNo||gi+1)}));
-      (G.matches[key]||[]).filter(m=>m&&String(m.phase||'')==='group').forEach(m=>{
-        snap.matches[String(m.id)]={
-          id:String(m.id), group:Number(m.group||0), finalGroupNo:Number(m.finalGroupNo||m.displayGroupNo||Number(m.group||0)+1),
-          court:getCourt(m), courts:Array.isArray(m.courts)?m.courts.slice():(getCourt(m)?[getCourt(m)]:[]),
-          courtAssignedAt:m.courtAssignedAt||'', courtQueueOrder:m.courtQueueOrder||'',
-          waitingFirstAt:m.waitingFirstAt||'', lastWaitingFirstAt:m.lastWaitingFirstAt||'',
-          manualCourtTarget:m.manualCourtTarget||getCourt(m)||'', manualCourtPinnedAt:m.manualCourtPinnedAt||m.courtAssignedAt||'',
-          t1:m.t1, t2:m.t2
-        };
-      });
-    }catch(e){}
-    return snap;
-  }
-  function isFinalized(key){ try{ const d=G.draws[key]; return !!(d&&(d.v616ManualFinalized||d.v606GroupOrderFinalized)); }catch(e){ return false; } }
-  function enforceFinalizedSnapshot(key){
-    try{
-      if(!key || !isFinalized(key)) return false;
-      const draw=G.draws[key]||{}; const snap=draw.v616FinalizedSnapshot; if(!snap||!snap.matches) return false;
-      let changed=false;
-      (G.matches[key]||[]).forEach(m=>{
-        if(!m || String(m.phase||'')!=='group') return;
-        const s=snap.matches[String(m.id)]; if(!s) return;
-        const fields={
-          group:Number(s.group||0), finalGroupNo:Number(s.finalGroupNo||Number(s.group||0)+1), displayGroupNo:Number(s.finalGroupNo||Number(s.group||0)+1),
-          court:s.court||'', courts:Array.isArray(s.courts)?s.courts.slice():(s.court?[s.court]:[]),
-          courtAssignedAt:s.courtAssignedAt||m.courtAssignedAt||'', courtQueueOrder:s.courtQueueOrder||m.courtQueueOrder||'',
-          waitingFirstAt:s.waitingFirstAt||m.waitingFirstAt||'', lastWaitingFirstAt:s.lastWaitingFirstAt||m.lastWaitingFirstAt||'',
-          manualCourtTarget:s.manualCourtTarget||s.court||'', manualCourtPinnedAt:s.manualCourtPinnedAt||s.courtAssignedAt||m.manualCourtPinnedAt||'',
-          manualCourtLocked:true, v616ManualFinalized:true, autoCourtLabel:'조번호 확정 고정'
-        };
-        Object.keys(fields).forEach(k=>{ const nv=fields[k]; if(JSON.stringify(m[k])!==JSON.stringify(nv)){ m[k]=nv; changed=true; } });
-      });
-      if(Array.isArray(snap.groups)&&Array.isArray(draw.groups)){
-        draw.groups.forEach((g,gi)=>{ if(!g) return; const no=gi+1; ['finalGroupNo','displayGroupNo','v616FinalGroupNo'].forEach(k=>{ if(g[k]!==no){ g[k]=no; changed=true; } }); });
-      }
-      return changed;
-    }catch(e){ console.warn(VER,'enforce failed',e); return false; }
-  }
-  async function saveKey(key){
-    clearWriteCache(key);
-    try{ if(typeof stD==='function') await stD(key); }catch(e){ console.warn(VER,'stD failed',e); }
-    clearWriteCache(key);
-    try{ if(typeof stM==='function') await stM(key); }catch(e){ console.warn(VER,'stM failed',e); }
-    try{ if(typeof cacheTournamentBundleFromMemory==='function') cacheTournamentBundleFromMemory((typeof _k2td==='function'?_k2td(key).tid:'')); }catch(e){}
-  }
-  async function finalizeManualOrder(key){
-    if(!key) { toastSafe('대회/부서를 먼저 선택하세요','error'); return false; }
-    if(!G.draws || !G.draws[key] || !Array.isArray(G.draws[key].groups) || !G.draws[key].groups.length){ toastSafe('확정할 예선 조가 없습니다','error'); return false; }
-    removeConditionConfigForKey(key);
-    const draw=G.draws[key]; const sorted=groupSortItems(key);
-    if(!sorted.length){ toastSafe('확정할 조를 찾지 못했습니다','error'); return false; }
-    const now=new Date().toISOString();
-    const oldGroups=(draw.groups||[]).slice();
-    const orderedGroups=sorted.map((it,newIdx)=>{
-      const g={...(oldGroups[it.oldGi]||it.group||{})};
-      const finalNo=newIdx+1;
-      g.finalGroupNo=finalNo; g.displayGroupNo=finalNo; g.v616FinalGroupNo=finalNo; g.v616OriginalGroupIndex=it.oldGi;
-      g.v616ManualFinalized=true; g.v616FinalizedAt=now;
-      const c=(it.courts&&it.courts[0])||String(g.court||'').trim();
-      if(c){ g.court=c; g.courts=[c]; }
-      return g;
-    });
-    const oldToNew=new Map(); sorted.forEach((it,newIdx)=>oldToNew.set(it.oldGi,newIdx));
-    draw.groups=orderedGroups;
-    const matches=G.matches[key]||[];
-    matches.forEach(m=>{
-      if(!m || String(m.phase||'')!=='group') return;
-      const oldGi=groupIndexByTeamsFromOldGroups(oldGroups,m);
-      const newGi=oldToNew.has(oldGi)?oldToNew.get(oldGi):(Number.isFinite(Number(m.group))?Number(m.group):0);
-      const c=getCourt(m);
-      m.v616OriginalGroupIndex=oldGi;
-      m.group=newGi;
-      m.finalGroupNo=newGi+1; m.displayGroupNo=newGi+1; m.v616FinalGroupNo=newGi+1;
-      if(c){ m.court=c; m.courts=[c]; m.manualCourtTarget=c; }
-      else { m.court=''; m.courts=[]; }
-      if(!m.courtAssignedAt) m.courtAssignedAt=now;
-      if(!m.courtQueueOrder) m.courtQueueOrder=m.manualCourtPinnedAt||m.courtAssignedAt||now;
-      m.manualCourtLocked=true;
-      m.manualCourtPinnedAt=m.manualCourtPinnedAt||m.courtAssignedAt||now;
-      m.v616ManualFinalized=true;
-      m.autoCourtLabel='조번호 확정 고정';
-    });
-    draw.v606GroupOrderFinalized=true;
-    draw.v616ManualFinalized=true;
-    draw.v616ManualFinalizedAt=now;
-    draw.v616ManualFinalizedBy='manual-screen-order';
-    draw.v616ConditionSettingsRemoved=true;
-    draw.v616FinalizedSnapshot=makeSnapshot(key);
-    await saveKey(key);
-    try{ if(typeof renderBracket==='function') renderBracket(); }catch(e){}
-    toastSafe('현재 코트 화면 순서대로 조번호가 확정·잠금 처리되었습니다. 초기화/재추첨 전까지 자동 변경되지 않습니다.','success');
-    return true;
-  }
-  function groupIndexByTeamsFromOldGroups(groups,m){
-    try{
-      const a=Number(m.t1), b=Number(m.t2);
-      for(let gi=0; gi<groups.length; gi++){ const ts=(groups[gi]&&groups[gi].teams||[]).map(Number); if(ts.includes(a)&&ts.includes(b)) return gi; }
-    }catch(e){}
-    const g=Number(m&&m.v616OriginalGroupIndex!=null?m.v616OriginalGroupIndex:m&&m.group); return Number.isFinite(g)?g:-1;
-  }
-  window.v616FinalizeManualGroupOrderForKey=finalizeManualOrder;
-  window.v606FinalizeGroupOrderForKey=function(key){ return finalizeManualOrder(key); };
-  try{ v606FinalizeGroupOrderForKey=window.v606FinalizeGroupOrderForKey; }catch(e){}
-  window.v606FinalizeGroupOrder=function(){ const key=keyOfCurrent(); return finalizeManualOrder(key); };
-  try{ v606FinalizeGroupOrder=window.v606FinalizeGroupOrder; }catch(e){}
-
-  function wrapNoCondition(){
-    ['openV592ConditionModal','saveV592ConditionModal','clearV592ConditionModal'].forEach(fn=>{
-      window[fn]=function(){ toastSafe('실전 안정본에서는 조건 설정을 제거했습니다. 시드 설정만 사용하고 코트/대기순서는 수동 배치 후 조번호 확정으로 고정하세요.','info'); };
-      try{ eval(fn+'=window["'+fn+'"]'); }catch(e){}
-    });
-  }
-  function wrapOpenDraw(){
-    const orig=window.openDraw;
-    if(typeof orig==='function' && !orig.__v616Wrapped){
-      const w=function(tid,div){ try{ removeConditionConfigForKey(String(tid||'')+'_'+String(div||'')); }catch(e){} return orig.apply(this,arguments); };
-      w.__v616Wrapped=true; window.openDraw=w; try{ openDraw=w; }catch(e){}
-    }
-    const origStart=window.startDraw;
-    if(typeof origStart==='function' && !origStart.__v616Wrapped){
-      const w=function(){ try{ const idw=(typeof IDW!=='undefined'&&IDW)||window.IDW; if(idw&&idw.key) removeConditionConfigForKey(idw.key); }catch(e){} return origStart.apply(this,arguments); };
-      w.__v616Wrapped=true; window.startDraw=w; try{ startDraw=w; }catch(e){}
-    }
-  }
-  function wrapAutoMutators(){
-    ['rebuildIndividualAutoCourtAssignmentsForKey','assignPrelimCourtsEvenly','applyPrelimCourtBlockDistribution'].forEach(fn=>{
-      const orig=window[fn];
-      if(typeof orig==='function' && !orig.__v616Wrapped){
-        const w=function(key){
-          key=String(key||keyOfCurrent()||'');
-          if(key && isFinalized(key)){ enforceFinalizedSnapshot(key); return false; }
-          return orig.apply(this,arguments);
-        };
-        w.__v616Wrapped=true; window[fn]=w; try{ eval(fn+'=window["'+fn+'"]'); }catch(e){}
-      }
-    });
-  }
-  function wrapRenders(){
-    ['renderBracket','renderCourtStatusBoard','renderBracketHTMLForDiv','manualRefreshCurrentTournament','showPage'].forEach(fn=>{
-      const orig=window[fn];
-      if(typeof orig==='function' && !orig.__v616Wrapped){
-        const w=function(){
-          try{
-            if(fn==='renderBracketHTMLForDiv' && arguments.length>=2){ const k=String(arguments[0])+'_'+String(arguments[1]); enforceFinalizedSnapshot(k); }
-            else { const k=keyOfCurrent(); if(k) enforceFinalizedSnapshot(k); }
-          }catch(e){}
-          return orig.apply(this,arguments);
-        };
-        w.__v616Wrapped=true; window[fn]=w; try{ eval(fn+'=window["'+fn+'"]'); }catch(e){}
-      }
-    });
-  }
-  function addFinalizedBadge(){
-    try{
-      const key=keyOfCurrent(); if(!key || !isFinalized(key)) return;
-      const btn=document.getElementById('v606FinalizeGroupOrderBtn');
-      if(btn){ btn.style.display='inline-flex'; btn.textContent='🔒 조 번호 확정됨'; btn.style.background='#dcfce7'; btn.style.borderColor='#86efac'; btn.style.color='#166534'; }
-    }catch(e){}
-  }
-  function init(){
-    wrapNoCondition(); wrapOpenDraw(); wrapAutoMutators(); wrapRenders(); addFinalizedBadge();
-    document.querySelectorAll('#v592CondBtn,#v592MainKeepBtn,#mV592Condition').forEach(el=>{ try{ el.remove(); }catch(e){} });
-  }
-  window.v616EnforceFinalizedSnapshot=enforceFinalizedSnapshot;
-  document.addEventListener('DOMContentLoaded',()=>{ setTimeout(init,200); setTimeout(init,900); });
-  setTimeout(init,1200);
 })();
 </script>
 
