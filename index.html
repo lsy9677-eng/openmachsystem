@@ -53257,13 +53257,15 @@ window.manualRefreshPlayers=manualRefreshPlayers;
     const courtOpts=['<option value="">자동</option>'].concat(courts.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`)).join('');
     const _grpLabel = (typeof grpLabel==='function') ? grpLabel : (gi=>String(Number(gi)+1)+'조');
     const groupOpts=['<option value="">자동</option>'].concat(Array.from({length:groups},(_,i)=>`<option value="${i+1}">${_grpLabel(i)}</option>`)).join('');
+    const orderOpts=['<option value="auto">자동</option>','<option value="start">1번(선시합)</option>','<option value="wait1">2번대기</option>','<option value="wait2">3번대기</option>','<option value="wait3">4번대기</option>','<option value="wait4">5번대기</option>'].join('');
     const rows=teams.map((tm,ti)=>{
       const c=cfg.teams[ti]||{};
       return `<tr data-ti="${ti}">
         <td style="text-align:left;font-weight:900;min-width:150px">#${ti+1} ${esc(teamName(key,ti))}</td>
         <td><input class="form-input v592-seed" value="${esc(c.seed||'')}" placeholder="1~8" style="width:64px;min-height:34px;padding:5px 7px;font-size:.78rem"></td>
         <td><select class="form-select v592-group" style="min-height:34px;padding:5px 7px;font-size:.78rem">${groupOpts}</select></td>
-
+        <td><select class="form-select v592-court" style="min-height:34px;padding:5px 7px;font-size:.78rem">${courtOpts}</select></td>
+        <td><select class="form-select v592-order" style="min-height:34px;padding:5px 7px;font-size:.78rem">${orderOpts}</select></td>
       </tr>`;
     }).join('');
     let modal=$('mV592Condition');
@@ -53274,7 +53276,7 @@ window.manualRefreshPlayers=manualRefreshPlayers;
     const homeOpts=['<option value="">자동</option>'].concat(groupsBy.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`)).join('');
     modal.innerHTML=`<div class="modal-box" style="max-width:980px;width:96vw"><div class="modal-header"><h3>⚙️ 개인전 조건부 추첨 설정</h3><button class="modal-close" onclick="cm('mV592Condition')">✕</button></div><div class="modal-body" style="max-height:78vh;overflow:auto">
       <div style="padding:10px 12px;margin-bottom:12px;border-radius:12px;background:linear-gradient(135deg,#fff7dd,#eef4ff);border:1.5px solid #d4a017;font-size:.78rem;line-height:1.65;color:#475569"><b>운영자/개발자 전용</b>입니다. 조건은 일반 참가자 화면에는 표시하지 않습니다. 조/코트/순번 조건이 충돌하면 가능한 범위에서 우선 적용하고 경고합니다.</div>
-      <div class="table-wrap" style="border:1px solid #dbe7ff"><table style="min-width:780px"><thead><tr><th>팀</th><th>시드</th><th>예선 조</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <div class="table-wrap" style="border:1px solid #dbe7ff"><table style="min-width:900px"><thead><tr><th>팀</th><th>시드</th><th>예선 조</th><th>구장(코트)</th><th>대기순번</th></tr></thead><tbody>${rows}</tbody></table></div>
       <div style="margin-top:14px;padding:12px 14px;border:1.5px solid #bfdbfe;border-radius:14px;background:#f8fbff">
         <label style="display:flex;gap:8px;align-items:center;font-weight:900;color:#1d4ed8"><input id="v592KeepEnabled" type="checkbox" style="accent-color:#1d4ed8"> 예선 코트군을 본선에서도 가능한 범위에서 유지</label>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
@@ -53288,8 +53290,8 @@ window.manualRefreshPlayers=manualRefreshPlayers;
     modal.querySelectorAll('tr[data-ti]').forEach(tr=>{
       const ti=tr.getAttribute('data-ti'); const c=cfg.teams[ti]||{};
       tr.querySelector('.v592-group').value=String(c.group||'');
-      tr.querySelector('.v592-court').value=String(c.court||'');
-      tr.querySelector('.v592-order').value=String(c.order||'auto');
+      const courtSel=tr.querySelector('.v592-court'); if(courtSel) courtSel.value=String(c.court||'');
+      const orderSel=tr.querySelector('.v592-order'); if(orderSel) orderSel.value=String(c.order||'auto');
     });
     $('v592KeepEnabled').checked=!!cfg.keep.enabled;
     $('v592KeepRound').value=String(cfg.keep.round||'32');
@@ -53300,8 +53302,15 @@ window.manualRefreshPlayers=manualRefreshPlayers;
     const cfg={teams:{}, keep:{enabled:!!$('v592KeepEnabled')?.checked, round:String($('v592KeepRound')?.value||'32'), homeGroup:String($('v592HomeGroup')?.value||'')}};
     document.querySelectorAll('#mV592Condition tr[data-ti]').forEach(tr=>{
       const ti=tr.getAttribute('data-ti');
-      const row={seed:String(tr.querySelector('.v592-seed')?.value||'').trim(), group:String(tr.querySelector('.v592-group')?.value||'').trim()};
-      if(row.seed||row.group) cfg.teams[ti]=row;
+      const row={
+        seed:String(tr.querySelector('.v592-seed')?.value||'').trim(),
+        group:String(tr.querySelector('.v592-group')?.value||'').trim(),
+        court:String(tr.querySelector('.v592-court')?.value||'').trim(),
+        order:String(tr.querySelector('.v592-order')?.value||'auto').trim()
+      };
+      // auto 순번은 저장 안 함(기본값)
+      if(row.order==='auto') delete row.order;
+      if(row.seed||row.group||row.court||(row.order&&row.order!=='auto')) cfg.teams[ti]=row;
     });
     saveCond(key,cfg);
     try{
@@ -54563,8 +54572,14 @@ window.manualRefreshPlayers=manualRefreshPlayers;
     const cfg={teams:{},keep:{enabled:!!$('v592KeepEnabled')?.checked,round:clean($('v592KeepRound')?.value||'32'),homeGroup:clean($('v592HomeGroup')?.value||'')}};
     document.querySelectorAll('#mV592Condition tr[data-ti]').forEach(tr=>{
       const ti=String(tr.getAttribute('data-ti'));
-      const row={seed:clean(tr.querySelector('.v592-seed')?.value||''),group:clean(tr.querySelector('.v592-group')?.value||'')}; // v615f: court/order 제거
-      if(row.seed||row.group||row.court||row.order!=='auto') cfg.teams[ti]=row;
+      const row={
+        seed:clean(tr.querySelector('.v592-seed')?.value||''),
+        group:clean(tr.querySelector('.v592-group')?.value||''),
+        court:clean(tr.querySelector('.v592-court')?.value||''),
+        order:clean(tr.querySelector('.v592-order')?.value||'auto')
+      };
+      if(row.order==='auto') delete row.order;
+      if(row.seed||row.group||row.court||(row.order&&row.order!=='auto')) cfg.teams[ti]=row;
     });
     saveCfg(ctx.key,cfg);
     try{ if(typeof window.v602StableConditionPanel==='function') window.v602StableConditionPanel(); }catch(e){}
