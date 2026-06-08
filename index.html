@@ -13689,6 +13689,8 @@ async function moveCourtQueueCard(key, mid, targetCourt, beforeMid){
     m.manualCourtLockedAt=m.manualCourtLockedAt||nowIso;
     sl(true);
     try{
+      // v617: _id 없으면 전체 저장으로 먼저 확정
+      if(!m._id) await stM(key);
       await persistSingleMatchDoc(key, m);
       sl(false);
       toast('대기 순서 변경 완료 ✅','success');
@@ -13755,6 +13757,10 @@ async function moveCourtQueueCard(key, mid, targetCourt, beforeMid){
 
   sl(true);
   try{
+    // v617: _id 없으면 전체 stM으로 먼저 _id 확정 후 단건 저장
+    if(!m._id){
+      await stM(key);
+    }
     await persistSingleMatchDoc(key, m);
     sl(false);
     // v615b: dispatchLocalCourtNotificationAlerts가 v538에 의해 막혀있으므로
