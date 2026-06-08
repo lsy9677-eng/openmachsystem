@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-09-v624-dom-finalize-participant-order-stable";
+  const APP_VERSION = "2026-06-09-v632-clean-bracket-bar-no-gap";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -21952,12 +21952,14 @@ function renderRegisterDivisionOverview(){
     if(isRegisterUnpaidOnlyActive()){
       teams = teams.filter(tm=>!(typeof getTeamPaymentPaid==='function' && getTeamPaymentPaid(tm)));
     }
-    // v623: 관리자 번호 변경/대기 전환 후에는 queueOrder가 참가 목록 표시 순서의 기준이다.
+    // v625: 보류자는 확정 정원에서 제외한다.
+    // 표시 순서: 확정 참가자(정원까지) → 보류자 → 추가대기자.
     // queueOrder가 없는 기존 접수만 등록시간으로 보강한다.
     teams = teams.slice().sort((a,b)=>{
+      try{
+        if(window.v625CompareRegisterItems) return window.v625CompareRegisterItems(key,a,b);
+      }catch(_e){}
       const aq=Number(a.queueOrder), bq=Number(b.queueOrder);
-      const ah=a.registrationStatus==='held', bh=b.registrationStatus==='held';
-      if(ah!==bh) return ah?1:-1;
       if(Number.isFinite(aq) && Number.isFinite(bq) && aq!==bq) return aq-bq;
       if(Number.isFinite(aq) && !Number.isFinite(bq)) return -1;
       if(!Number.isFinite(aq) && Number.isFinite(bq)) return 1;
@@ -44368,7 +44370,7 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
   function open(filter,scope){if(!adminLike()){toastMsg('관리자 또는 운영자 로그인 필요','info');return;} cleanOldSms(); ensureModal(); var tid=currentTid(); fillTournaments(tid); var d=ge('sms419Division'),cur=ge('regDS')&&ge('regDS').value; if(d&&cur&&[].slice.call(d.options).some(function(o){return o.value===cur;}))d.value=cur; ge('sms419Scope').value=scope||'team'; ge('sms419Filter').value=filter||'all'; var t=tournaments().find(function(x){return String(x.id)===String(ge('sms419Tournament').value);}); ge('sms419Body').value=defaultMsg(t,filter||'all'); state.selected.clear(); render(false); if(filter==='unpaid'||filter==='paid')selectMode(filter); try{om('sms419Modal');}catch(e){ge('sms419Modal').classList.add('open');}}
   function copy(){var body=String((ge('sms419Body')||{}).value||'').trim(); if(!body){toastMsg('문자 내용을 입력하세요','error');return;} var rows=selectedRows(); if(!rows.length){toastMsg('선택된 대상이 없습니다','error');return;} var txt='[수신자 '+rows.length+'건]\n'+rows.map(function(r){return r.name+' ('+(r.paid?'입금완료':'입금대기')+') '+r.phoneText;}).join('\n')+'\n\n[내용]\n'+body; try{navigator.clipboard.writeText(txt).then(function(){toastMsg('선택 명단과 내용이 복사됐습니다','success');});}catch(e){alert(txt);}}
   function send(){var body=String((ge('sms419Body')||{}).value||'').trim(); if(!body){toastMsg('문자 내용을 입력하세요','error');return;} var rows=selectedRows(); if(!rows.length){toastMsg('선택된 대상이 없습니다','error');return;} var seen={},phones=[]; rows.forEach(function(r){(r.phones||[]).forEach(function(p){var k=phoneKey(p.phone); if(k.length>=9&&!seen[k]){seen[k]=1; phones.push(p.phone);}});}); if(!phones.length){toastMsg('발송 가능한 전화번호가 없습니다','error');return;} if(!confirm('선택한 대상 '+phones.length+'명에게 문자앱을 엽니다.\n\n계속하시겠습니까?'))return; var mobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent); if(!mobile){copy(); toastMsg('PC에서는 복사만 가능합니다. 휴대폰 문자앱에 붙여넣으세요.','info');return;} if(window.openBulkSmsInChunks){window.openBulkSmsInChunks(phones,body,'선택 대상 문자');}else{window.location.href='sms:'+phones.join(',')+'?body='+encodeURIComponent(body);}}
-  function injectRegister(){try{cleanOldSms(); var page=ge('page-register'); if(!page)return; var tid=ge('regTS')&&ge('regTS').value,t=tournaments().find(function(x){return String(x.id)===String(tid);}),old=ge('v419RegisterSmsBar'); if(!adminLike()||!t){if(old)old.remove();return;} var div=ge('regDS')&&ge('regDS').value||'',data=collect(tid,div,'team'),paid=data.rows.filter(function(r){return r.paid;}).length,unpaid=data.rows.length-paid,bar=old||document.createElement('div'); bar.id='v419RegisterSmsBar'; bar.className='v419-smsbar'; bar.innerHTML='<div><div class="v419-sms-title">📨 참가팀별 문자 보내기</div><div class="v419-sms-sub">현재 '+(div?divName(div):'전체 부서')+' · 발송 가능 '+data.rows.length+'팀 · 입금대기 '+unpaid+'팀 · 입금완료 '+paid+'팀</div></div><div class="v419-sms-actions"><button type="button" class="btn btn-outline" onclick="sms419Open(\'all\',\'team\')">참가팀 선택 문자</button><button type="button" class="btn btn-primary" onclick="sms419Open(\'unpaid\',\'team\')" style="background:#c2410c;color:#fff">입금대기팀 문자</button><button type="button" class="btn btn-primary" onclick="sms419Open(\'paid\',\'team\')" style="background:#2563eb;color:#fff">입금완료팀 문자</button></div>'; var anchor=ge('regDivisionOverview')||ge('regSection')||page.querySelector('.card'); if(anchor&&anchor.parentNode&&(!old||bar.nextSibling!==anchor))anchor.parentNode.insertBefore(bar,anchor); else if(!old)page.insertBefore(bar,page.firstChild);}catch(e){console.warn('v419 register sms failed',e);}}
+  function injectRegister(){try{cleanOldSms(); var page=ge('page-register'); if(!page)return; var tid=ge('regTS')&&ge('regTS').value,t=tournaments().find(function(x){return String(x.id)===String(tid);}),old=ge('v419RegisterSmsBar'); if(!adminLike()||!t){if(old)old.remove();return;} var div=ge('regDS')&&ge('regDS').value||'',data=collect(tid,div,'team'),paid=data.rows.filter(function(r){return r.paid;}).length,unpaid=data.rows.length-paid,bar=old||document.createElement('div'); bar.id='v419RegisterSmsBar'; bar.className='v419-smsbar'; bar.innerHTML='<div><div class="v419-sms-title">📨 참가팀별 문자 보내기</div><div class="v419-sms-sub">현재 '+(div?divName(div):'전체 부서')+' · 발송 가능 '+data.rows.length+'팀 · 입금대기 '+unpaid+'팀 · 입금완료 '+paid+'팀</div></div><div class="v419-sms-actions"><button type="button" class="btn btn-outline" onclick="sms419Open(\'all\',\'team\')">참가팀 선택 문자</button><button type="button" class="btn btn-primary" onclick="sms419Open(\'unpaid\',\'team\')" style="background:#c2410c;color:#fff">입금대기팀 문자</button><button type="button" class="btn btn-primary" onclick="sms419Open(\'paid\',\'team\')" style="background:#2563eb;color:#fff">입금완료팀 문자</button></div>'; var anchor=ge('regDivisionOverview')||ge('regSection')||page.querySelector('.card'); if(!old&&anchor&&anchor.parentNode)anchor.parentNode.insertBefore(bar,anchor); else if(!old)page.insertBefore(bar,page.firstChild);}catch(e){console.warn('v419 register sms failed',e);}}
   function injectSettings(){try{cleanOldSms(); if(!adminLike())return; if(ge('v419SettingsSmsBox'))return; var body=document.querySelector('#mAdminSettings .modal-body'); if(!body)return; var ref=ge('noticeContactBtns'),fg=ref&&ref.closest?ref.closest('.form-group'):null,box=document.createElement('div'); box.id='v419SettingsSmsBox'; box.className='v419-smsbar'; box.innerHTML='<div><div class="v419-sms-title">📨 개인전 참가자 문자 보내기</div><div class="v419-sms-sub">개인별로 한 명씩 선택하고 입금대기/입금완료 필터로 문자 발송합니다.</div></div><div class="v419-sms-actions"><button type="button" class="btn btn-primary" onclick="sms419Open(\'all\',\'person\')" style="background:#0f766e;color:#fff">개인별 선택 문자 보내기</button></div>'; if(fg&&fg.parentNode)fg.parentNode.insertBefore(box,fg.nextSibling); else body.appendChild(box);}catch(e){console.warn('v419 settings sms failed',e);}}
   window.sms419Open=open; window.sms419Render=render; window.sms419FillDivisions=fillDivisions; window.sms419UpdateCount=updateCount; window.sms419Select=selectMode; window.sms419Copy=copy; window.sms419Send=send; window.v419InjectRegisterSmsBar=injectRegister; window.v419InjectSettingsSmsBox=injectSettings;
   window.sms419SendAligo=function(){
@@ -55131,7 +55133,6 @@ window.manualRefreshPlayers=manualRefreshPlayers;
       const btn=document.getElementById('v606FinalizeGroupOrderBtn');
       if(!btn) return;
       const isAdmin=(typeof AD!=='undefined'&&AD)||(typeof TM!=='undefined'&&TM)||(typeof OP!=='undefined'&&OP)||window.AD||window.TM||window.OP;
-      btn.style.display=isAdmin?'inline-flex':'none';
       if(!isAdmin) return;
       const tid=document.getElementById('brTS')?.value||'';
       const t=(window.G?.tournaments||[]).find(x=>x.id===tid);
@@ -55180,7 +55181,7 @@ window.manualRefreshPlayers=manualRefreshPlayers;
     if(e.target&&(e.target.id==='brTS'||e.target.id==='brDS')) setTimeout(updateFinalizeBtn,100);
   });
   // 주기적 업데이트
-  setInterval(updateFinalizeBtn,2000);
+  // v631fix: setInterval 제거 (버튼 깜빡임 방지)
   document.addEventListener('DOMContentLoaded',updateFinalizeBtn);
   setTimeout(updateFinalizeBtn,500);
 })();
@@ -55670,7 +55671,6 @@ window.manualRefreshPlayers=manualRefreshPlayers;
       if(!btn) return;
       const keys=currentIndivKeys();
       const show=canOperate() && keys.length>0;
-      btn.style.display=show?'inline-flex':'none';
       if(!show) return;
       const finalized=keys.some(k=>G.draws&&G.draws[k]&&G.draws[k].v606GroupOrderFinalized);
       if(finalized){
@@ -55721,7 +55721,7 @@ window.manualRefreshPlayers=manualRefreshPlayers;
   }
   document.addEventListener('change',function(e){ if(e.target&&(/^(brTS|brDS)$/.test(e.target.id||''))) setTimeout(updateBtnStable,0); },true);
   document.addEventListener('DOMContentLoaded',()=>{ updateBtnStable(); setTimeout(updateBtnStable,300); setTimeout(updateBtnStable,1200); });
-  setInterval(updateBtnStable,300);
+  // v631fix: setInterval 제거
   window.__v614jUpdateFinalizeBtnStable=updateBtnStable;
 })();
 </script>
@@ -58612,669 +58612,660 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
 
 
 <!-- v623: 조번호 확정/참가순서 저장 최종 안정화 -->
-<script id="v623OrderFinalizeRegistrationOrderFix">
+
+<style id="v626FinalHoldCapacityGroupOrderStyle">
+#v626ParticipantControlBar{
+  display:flex!important;justify-content:flex-end;gap:8px;align-items:center;flex-wrap:wrap;
+  margin:8px 0 10px;position:sticky;top:86px;z-index:260;background:rgba(255,255,255,.98);
+  padding:8px;border:1.5px solid #dbeafe;border-radius:12px;box-shadow:0 6px 16px rgba(15,30,58,.08)
+}
+#v626ParticipantControlBar .btn{white-space:nowrap!important;font-size:.78rem!important;padding:6px 12px!important;min-height:34px!important;border-radius:10px!important;font-weight:900!important}
+.v626-held-toggle-btn{display:inline-flex!important;align-items:center!important;justify-content:center!important;min-height:22px!important;height:22px!important;padding:1px 7px!important;font-size:.62rem!important;border-radius:999px!important;font-weight:900!important;white-space:nowrap!important;cursor:pointer!important;border:1px solid #d8b4fe!important;background:#faf5ff!important;color:#7c3aed!important}
+.v626-held-toggle-btn.is-held{background:#f3e8ff!important;color:#6d28d9!important;border-color:#c4b5fd!important}
+.v336-entry-row.v626-held-row{background:linear-gradient(135deg,#faf5ff,#ffffff)!important;border-left:4px solid #a855f7!important}
+@media(max-width:680px){#v626ParticipantControlBar{top:76px;justify-content:stretch}#v626ParticipantControlBar .btn{flex:1 1 auto;font-size:.72rem!important;padding:6px 8px!important}}
+</style>
+<script id="v626FinalHoldCapacityGroupOrderScript">
 (function(){
   'use strict';
-  if(window.__v623OrderFinalizeRegistrationOrderFix) return;
-  window.__v623OrderFinalizeRegistrationOrderFix=true;
+  if(window.__v626FinalHoldCapacityGroupOrder) return;
+  window.__v626FinalHoldCapacityGroupOrder=true;
+  const PATCH='[v626]';
+  const VERSION='2026-06-09-v626-final-hold-capacity-group-order';
 
-  function canAdmin(){
-    try{return !!((typeof AD!=='undefined'&&AD)||(typeof TM!=='undefined'&&TM)||window.AD||window.TM||document.body.classList.contains('admin-mode')||document.body.classList.contains('tm-mode'));}catch(e){return false;}
-  }
-  function canOperate(){
-    try{return !!(canAdmin()||(typeof OP!=='undefined'&&OP)||window.OP||document.body.classList.contains('operator-mode')||document.body.classList.contains('op-mode')||location.protocol==='file:');}catch(e){return false;}
-  }
-  function toastMsg(msg,type){try{ if(typeof toast==='function') toast(msg,type||'info'); else alert(msg); }catch(e){ alert(msg); }}
+  function ge(id){return document.getElementById(id);}
   function clean(v){return String(v==null?'':v).replace(/\s+/g,' ').trim();}
-  function keyParts(key){try{ if(typeof _k2td==='function') return _k2td(key); }catch(e){} const s=String(key||''),i=s.indexOf('_'); return i>=0?{tid:s.slice(0,i),div:s.slice(i+1)}:{tid:'',div:''};}
-  function num(v){const n=Number(v); return Number.isFinite(n)?n:null;}
+  function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+  function toastMsg(msg,type){try{ if(typeof toast==='function') toast(msg,type||'info'); else alert(msg); }catch(e){alert(msg);}}
+  function slOn(v){try{ if(typeof sl==='function') sl(!!v); }catch(e){}}
+  function isAdminLike(){try{return !!((typeof AD!=='undefined'&&AD)||(typeof TM!=='undefined'&&TM)||window.AD||window.TM||document.body.classList.contains('admin-mode')||document.body.classList.contains('tm-mode'));}catch(e){return false;}}
+  function isOperatorLike(){try{return !!(isAdminLike()||(typeof OP!=='undefined'&&OP)||window.OP||document.body.classList.contains('operator-mode')||document.body.classList.contains('op-mode')||location.protocol==='file:');}catch(e){return false;}}
+  function keyParts(key){try{ if(typeof _k2td==='function') return _k2td(key); }catch(e){} const s=String(key||''), i=s.indexOf('_'); return i>=0?{tid:s.slice(0,i),div:s.slice(i+1)}:{tid:'',div:''};}
+  function maxForKey(key){const p=keyParts(key); try{return Number(getDivisionMaxTeams(p.tid,p.div)||0)||0;}catch(e){return 0;}}
+  function isHeld(t){return !!(t&&(t.registrationStatus==='held'||t.held===true||t.isHeld===true||t._heldAt));}
+  function isDeleted(t){return !!(t&&(t.deleted===true||t._deleted===true));}
+  function registeredTime(t,idx){const n=Date.parse(String(t&&((t.registeredAt)||(t.createdAt)||(t.createdAtText)||(t.adminNotificationCreatedAt)||(t.updatedAt))||'')); return Number.isFinite(n)?n:(9000000000000000+Number(idx||0));}
+  function orderVal(t,idx){const q=Number(t&&t.queueOrder); return Number.isFinite(q)?q:registeredTime(t,idx);}
+  function sortItem(a,b){const av=orderVal(a.t,a.i), bv=orderVal(b.t,b.i); if(av!==bv) return av-bv; return a.i-b.i;}
+  function activeNonHeld(key){return (window.G&&G.teams&&G.teams[key]||[]).filter(t=>t&&!isDeleted(t)&&!isHeld(t));}
+
+  function cleanFirestoreValue(v, seen){
+    if(v===undefined) return undefined;
+    if(v===null || typeof v!=='object') return v;
+    seen=seen||new WeakSet(); if(seen.has(v)) return v; seen.add(v);
+    if(Array.isArray(v)){for(let i=0;i<v.length;i++){const nv=cleanFirestoreValue(v[i],seen); v[i]=(nv===undefined)?null:nv;} return v;}
+    Object.keys(v).forEach(k=>{const nv=cleanFirestoreValue(v[k],seen); if(nv===undefined) delete v[k]; else v[k]=nv;});
+    return v;
+  }
+  function cleanKey(key){try{cleanFirestoreValue(window.G&&G.teams&&G.teams[key]);}catch(e){} try{cleanFirestoreValue(window.G&&G.matches&&G.matches[key]);}catch(e){} try{cleanFirestoreValue(window.G&&G.draws&&G.draws[key]);}catch(e){}}
+
+  function reflowRegistrationKey(key){
+    key=String(key||'');
+    const arr=window.G&&G.teams&&G.teams[key];
+    if(!Array.isArray(arr)) return false;
+    const max=maxForKey(key);
+    const items=arr.map((t,i)=>({t,i})).filter(x=>x.t&&!isDeleted(x.t));
+    const held=items.filter(x=>isHeld(x.t)).sort(sortItem);
+    const active=items.filter(x=>!isHeld(x.t)).sort(sortItem);
+    const confirmed=max>0?active.slice(0,max):active.slice();
+    const wait=max>0?active.slice(max):[];
+    const ordered=[...confirmed,...held,...wait].map(x=>x.t);
+    // 삭제/비정상 항목은 뒤에 보존한다.
+    arr.forEach(t=>{if(t&&!ordered.includes(t)) ordered.push(t);});
+    let changed=ordered.length!==arr.length || ordered.some((t,i)=>arr[i]!==t);
+    confirmed.forEach((x,i)=>{const t=x.t; if(t.registrationStatus!=='confirmed') changed=true; t.registrationStatus='confirmed'; t.waitlistNo=0; t.queueOrder=i; t.v626EffectiveNo=i+1; t.v626Status='confirmed'; delete t._waitlistAuto;});
+    held.forEach((x,i)=>{const t=x.t; if(t.registrationStatus!=='held') changed=true; t.registrationStatus='held'; t._heldAt=t._heldAt||new Date().toISOString(); t.waitlistNo=0; t.queueOrder=(max>0?max:confirmed.length)+0.25+i*0.001; t.v626EffectiveNo=''; t.v626Status='held';});
+    wait.forEach((x,i)=>{const t=x.t; if(t.registrationStatus!=='waitlist'||Number(t.waitlistNo)!==i+1) changed=true; t.registrationStatus='waitlist'; t.waitlistNo=i+1; t.queueOrder=(max>0?max:confirmed.length)+held.length+i+1; t.v626EffectiveNo=(max>0?max:confirmed.length)+held.length+i+1; t.v626Status='waitlist'; t._waitlistAuto=true;});
+    if(changed) window.G.teams[key]=ordered;
+    return changed;
+  }
+  window.v626ReflowRegistrationKey=reflowRegistrationKey;
+
+  function compareRegisterItems(key,a,b){
+    function rank(t){ if(isHeld(t)) return 1; if(t&&t.registrationStatus==='waitlist') return 2; const q=Number(t&&t.queueOrder), max=maxForKey(key); if(max>0&&Number.isFinite(q)&&q>=max+1) return 2; return 0; }
+    const ra=rank(a), rb=rank(b); if(ra!==rb) return ra-rb;
+    const aq=orderVal(a, a&&a._origIdx), bq=orderVal(b, b&&b._origIdx); if(aq!==bq) return aq-bq;
+    return Number(a&&a._origIdx||0)-Number(b&&b._origIdx||0);
+  }
+  window.v626CompareRegisterItems=compareRegisterItems;
+  window.v625CompareRegisterItems=compareRegisterItems;
+
+  function isWaitlistedForKey(key,idx){
+    const arr=window.G&&G.teams&&G.teams[key]||[], team=arr[Number(idx)];
+    if(!team||isHeld(team)) return false;
+    const max=maxForKey(key); if(!max) return false;
+    const active=activeNonHeld(key).sort((a,b)=>orderVal(a,0)-orderVal(b,0));
+    return active.indexOf(team)>=max;
+  }
+  function waitlistNoForKey(key,idx){
+    const arr=window.G&&G.teams&&G.teams[key]||[], team=arr[Number(idx)];
+    if(!team||isHeld(team)) return 0;
+    const max=maxForKey(key); if(!max) return 0;
+    const active=activeNonHeld(key).sort((a,b)=>orderVal(a,0)-orderVal(b,0));
+    const pos=active.indexOf(team); return pos>=max?pos-max+1:0;
+  }
+  function confirmedCountForKey(key){const max=maxForKey(key), active=activeNonHeld(key); return max?Math.min(active.length,max):active.length;}
+  function waitCountForKey(key){const max=maxForKey(key), active=activeNonHeld(key); return max?Math.max(0,active.length-max):0;}
+  function drawTeamsForKey(key){reflowRegistrationKey(key); const max=maxForKey(key), active=activeNonHeld(key).sort((a,b)=>orderVal(a,0)-orderVal(b,0)); return max?active.slice(0,max):active.slice();}
+  window.isTeamWaitlistedForKey=isWaitlistedForKey;
+  window.getWaitlistNoForKey=waitlistNoForKey;
+  window.getConfirmedTeamCountForKey=confirmedCountForKey;
+  window.getWaitlistedTeamCountForKey=waitCountForKey;
+  window.getDrawTeamsForKey=drawTeamsForKey;
+  try{isTeamWaitlistedForKey=window.isTeamWaitlistedForKey; getWaitlistNoForKey=window.getWaitlistNoForKey; getConfirmedTeamCountForKey=window.getConfirmedTeamCountForKey; getWaitlistedTeamCountForKey=window.getWaitlistedTeamCountForKey; getDrawTeamsForKey=window.getDrawTeamsForKey;}catch(e){}
+
+  async function saveTeams(key){
+    cleanKey(key);
+    try{ if(window.__FB_WRITE_CACHE&&window.__FB_WRITE_CACHE.teams) delete window.__FB_WRITE_CACHE.teams[key]; }catch(e){}
+    if(typeof window.stT==='function') await window.stT(key); else if(typeof stT==='function') await stT(key); else throw new Error('stT 저장 함수가 없습니다.');
+    try{ if(typeof waitForPendingWrites==='function'&&window.db) await waitForPendingWrites(window.db); }catch(e){}
+  }
+  window.setTeamHeld=async function(key,idx,held){
+    try{
+      if(!isAdminLike()){toastMsg('관리자/운영자만 보류 설정할 수 있습니다.','info'); return;}
+      key=String(key||''); idx=Number(idx); const arr=window.G&&G.teams&&G.teams[key]||[], team=arr[idx];
+      if(!team){toastMsg('대상을 찾을 수 없습니다.','error'); return;}
+      const nm=(typeof getIndividualDisplayLine==='function')?getIndividualDisplayLine(team):(team.entryLabel||team.pairLabel||team.club||'선택팀');
+      if(held){ if(!confirm(nm+'\n\n보류로 설정합니다.\n이 팀은 정원 계산과 조추첨에서 제외되고 확정팀 아래로 이동합니다.\n계속할까요?')) return; team.registrationStatus='held'; team._heldAt=new Date().toISOString(); }
+      else{ if(!confirm(nm+'\n\n보류를 해제합니다.\n현재 접수 순서 기준으로 확정/대기가 다시 계산됩니다.\n계속할까요?')) return; delete team._heldAt; team.registrationStatus='confirmed'; }
+      reflowRegistrationKey(key); slOn(true); await saveTeams(key); slOn(false);
+      try{ if(typeof renderRegisterDivisionOverview==='function') renderRegisterDivisionOverview(); if(typeof renderRL==='function') renderRL(); if(typeof upDash==='function') upDash(); }catch(e){}
+      setTimeout(function(){ensureParticipantToolbar(); ensureRowHoldButtons();},80);
+      toastMsg(held?'보류 처리 완료: 정원/조추첨에서 제외했습니다.':'보류 해제 완료','success');
+    }catch(e){slOn(false); console.error(PATCH,'setTeamHeld failed',e); toastMsg('보류 저장 실패: '+(e.message||e),'error');}
+  };
+  try{setTeamHeld=window.setTeamHeld;}catch(e){}
+
+  function currentRegisterKey(){
+    const tid=ge('regTS')&&ge('regTS').value||''; if(!tid) return '';
+    let div=ge('regDS')&&ge('regDS').value||'';
+    if(!div||div==='__ALL__'){
+      try{const t=(window.G&&G.tournaments||[]).find(x=>String(x.id)===String(tid)); div=(t&&t.divisions||[]).find(d=>Array.isArray(window.G&&G.teams&&G.teams[tid+'_'+d])&&G.teams[tid+'_'+d].length)||(t&&t.divisions&&t.divisions[0])||'';}catch(e){}
+    }
+    return div?tid+'_'+div:'';
+  }
+  function teamLabel(t){try{if(typeof getIndividualDisplayLine==='function') return clean(getIndividualDisplayLine(t));}catch(e){} const ps=(t&&t.individualPlayers||[]).slice(0,2).map(p=>clean(p&&p.name)).filter(Boolean); return ps.length?ps.join(' / '):clean(t&&((t.entryLabel)||(t.pairLabel)||((t.players||[]).slice(0,2).join(' / '))||(t.club))||'참가자');}
+
+  function ensureParticipantToolbar(){
+    try{
+      const page=ge('page-register'); if(!page) return;
+      const overview=ge('regDivisionOverview');
+      let bar=ge('v626ParticipantControlBar');
+      if(!bar){
+        bar=document.createElement('div'); bar.id='v626ParticipantControlBar';
+        bar.innerHTML='<button id="v626OpenParticipantOrderBtn" type="button" class="btn btn-outline" style="border-color:#1d4ed8;color:#1d4ed8">🔢 참가자 순서변경</button><button id="v626ReflowHeldBtn" type="button" class="btn btn-outline" style="border-color:#7c3aed;color:#6d28d9">⏸ 보류/정원 재정리</button>';
+      }
+      const parent=(overview&&overview.parentNode)||page;
+      if(overview){ if(bar.parentNode!==parent||bar.nextSibling!==overview) parent.insertBefore(bar, overview); }
+      else if(!bar.parentNode) page.insertBefore(bar, page.firstChild);
+      const shouldShow=isAdminLike();
+      if(shouldShow) bar.dataset.everVisible='1';
+      bar.style.setProperty('display',(shouldShow||bar.dataset.everVisible==='1')?'flex':'none','important');
+      const open=ge('v626OpenParticipantOrderBtn'); if(open) open.onclick=function(){openOrderModal(currentRegisterKey());};
+      const ref=ge('v626ReflowHeldBtn'); if(ref) ref.onclick=async function(){const key=currentRegisterKey(); if(!key){toastMsg('대회를 먼저 선택하세요.','info'); return;} try{reflowRegistrationKey(key); slOn(true); await saveTeams(key); slOn(false); try{renderRegisterDivisionOverview(); renderRL(); upDash();}catch(e){} setTimeout(function(){ensureParticipantToolbar(); ensureRowHoldButtons();},80); toastMsg('보류자를 제외하고 정원/대기를 재계산했습니다.','success');}catch(e){slOn(false); toastMsg('재정리 실패: '+(e.message||e),'error');}};
+    }catch(e){console.warn(PATCH,'toolbar failed',e);}
+  }
+
+  function ensureRowHoldButtons(){
+    try{
+      if(!isAdminLike()) return;
+      document.querySelectorAll('.v336-entry-row').forEach(row=>{
+        const move=row.querySelector('.v620-move-btn'); if(!move) return;
+        const raw=String(move.getAttribute('onclick')||'');
+        const m=raw.match(/moveTeamOrder\(\s*['\"]([^'\"]+)['\"]\s*,\s*(\d+)/); if(!m) return;
+        const key=m[1], idx=Number(m[2]); const team=window.G&&G.teams&&G.teams[key]&&G.teams[key][idx]; if(!team) return;
+        const held=isHeld(team);
+        row.classList.toggle('v626-held-row', held);
+        let btn=row.querySelector('.v626-held-toggle-btn');
+        if(!btn){btn=document.createElement('button'); btn.type='button'; btn.className='v626-held-toggle-btn'; move.insertAdjacentElement('afterend',btn);}
+        btn.classList.toggle('is-held',held);
+        btn.textContent=held?'▶ 보류해제':'⏸ 보류';
+        btn.onclick=function(ev){ev&&ev.preventDefault&&ev.preventDefault(); ev&&ev.stopPropagation&&ev.stopPropagation(); window.setTeamHeld(key,idx,!held);};
+      });
+    }catch(e){console.warn(PATCH,'hold button failed',e);}
+  }
+
+  function openOrderModal(key){
+    key=String(key||''); if(!key||!Array.isArray(window.G&&G.teams&&G.teams[key])||!G.teams[key].length){toastMsg('참가 목록이 없습니다. 대회를 먼저 선택하세요.','info'); return;}
+    reflowRegistrationKey(key); const arr=G.teams[key];
+    let modal=ge('v626OrderModal');
+    if(!modal){modal=document.createElement('div'); modal.id='v626OrderModal'; modal.className='modal-overlay'; modal.innerHTML='<div class="modal-box" style="max-width:820px"><div class="modal-header"><h3>🔢 참가자 순서변경</h3><button class="modal-close" id="v626OrderClose">✕</button></div><div class="modal-body"><div style="padding:10px 12px;margin-bottom:10px;border:1px solid #dbeafe;border-radius:12px;background:#f8fbff;font-size:.8rem;line-height:1.6;color:#334155;font-weight:800">번호를 바꾸고 완료를 누르면 저장됩니다. 보류자는 정원 계산에서 제외되어 확정 참가자 아래, 추가대기 위로 정리됩니다.</div><div id="v626OrderRows" style="display:flex;flex-direction:column;gap:6px;max-height:60vh;overflow:auto"></div></div><div class="modal-footer"><button class="btn btn-gray" id="v626OrderCancel">닫기</button><button class="btn btn-primary" id="v626OrderSave">✅ 순서변경 완료</button></div></div>'; document.body.appendChild(modal); ge('v626OrderClose').onclick=ge('v626OrderCancel').onclick=function(){modal.classList.remove('open');};}
+    const rows=ge('v626OrderRows'); rows.innerHTML='';
+    arr.forEach((t,i)=>{const status=isHeld(t)?'⏸ 보류':(isWaitlistedForKey(key,i)?'추가대기 '+waitlistNoForKey(key,i):'확정 '+(i+1)); const row=document.createElement('div'); row.className='v626-order-row'; row.dataset.idx=String(i); row.style.cssText='display:grid;grid-template-columns:80px minmax(0,1fr) 88px;gap:8px;align-items:center;padding:9px 10px;border:1px solid #e5e7eb;border-radius:12px;background:'+(isHeld(t)?'#faf5ff':'#fff'); row.innerHTML='<div style="font-size:.78rem;font-weight:900;color:#64748b">현재 '+(i+1)+'번</div><div style="min-width:0"><div style="font-size:.9rem;font-weight:1000;color:#0f172a;line-height:1.35;word-break:keep-all">'+esc(teamLabel(t))+'</div><div style="font-size:.72rem;color:#64748b;margin-top:2px">'+esc(status)+'</div></div><input class="form-input v626-order-input" type="number" min="1" max="'+arr.length+'" value="'+(i+1)+'" style="height:36px;min-height:36px;text-align:center;font-weight:900">'; rows.appendChild(row);});
+    ge('v626OrderSave').onclick=async function(){try{const items=[...document.querySelectorAll('#v626OrderRows .v626-order-row')].map((r,pos)=>({idx:Number(r.dataset.idx), want:Number(r.querySelector('.v626-order-input')&&r.querySelector('.v626-order-input').value||pos+1), pos})).filter(x=>Number.isFinite(x.idx)&&arr[x.idx]); items.sort((a,b)=>(a.want-b.want)||(a.pos-b.pos)); const ordered=items.map(x=>arr[x.idx]); arr.forEach(t=>{if(!ordered.includes(t)) ordered.push(t);}); G.teams[key]=ordered; reflowRegistrationKey(key); slOn(true); await saveTeams(key); slOn(false); modal.classList.remove('open'); try{renderRegisterDivisionOverview(); renderRL(); upDash();}catch(e){} setTimeout(function(){ensureParticipantToolbar(); ensureRowHoldButtons();},80); toastMsg('참가자 순서가 저장되었습니다.','success');}catch(e){slOn(false); console.error(PATCH,'order save failed',e); toastMsg('순서 저장 실패: '+(e.message||e),'error');}};
+    modal.classList.add('open');
+  }
+  window.openParticipantOrderModal=openOrderModal;
+  window.moveTeamOrder=async function(key,idx){key=String(key||''); idx=Number(idx); const arr=window.G&&G.teams&&G.teams[key]||[]; if(!arr[idx]){toastMsg('대상 참가자를 찾을 수 없습니다.','error'); return;} const pos=parseInt(prompt(teamLabel(arr[idx])+'\n\n이동할 번호를 입력하세요 (1~'+arr.length+'):',String(idx+1)),10); if(!Number.isFinite(pos)||pos<1||pos>arr.length) return; const item=arr.splice(idx,1)[0]; arr.splice(pos-1,0,item); reflowRegistrationKey(key); try{slOn(true); await saveTeams(key); slOn(false); try{renderRegisterDivisionOverview(); renderRL(); upDash();}catch(e){} setTimeout(function(){ensureParticipantToolbar(); ensureRowHoldButtons();},80); toastMsg(pos+'번으로 이동했습니다.','success');}catch(e){slOn(false); toastMsg('순서 변경 실패: '+(e.message||e),'error');}};
+  try{moveTeamOrder=window.moveTeamOrder; openParticipantOrderModal=window.openParticipantOrderModal;}catch(e){}
+
+  function midOf(m){return String(m&&(m.id||m._id)||'');}
+  function teamGroupIdx(m, groups){
+    const t1=Number(m&&m.t1), t2=Number(m&&m.t2);
+    for(let i=0;i<(groups||[]).length;i++){const ts=Array.isArray(groups[i]&&groups[i].teams)?groups[i].teams.map(Number):[]; if((Number.isFinite(t1)&&ts.includes(t1))||(Number.isFinite(t2)&&ts.includes(t2))) return i;}
+    const g=Number(m&&m.group); return Number.isFinite(g)?g:null;
+  }
   function mCourt(m){const arr=Array.isArray(m&&m.courts)?m.courts:[]; return clean((m&&m.manualCourtTarget)||(m&&m.court)||arr[0]||'');}
-  function orderValue(m){
-    const v=String((m&&m.courtQueueOrder)||(m&&m.courtAssignedAt)||(m&&m.manualCourtPinnedAt)||(m&&m.waitingFirstAt)||'');
-    const t=Date.parse(v); if(Number.isFinite(t)) return t;
-    const n=Number(v); return Number.isFinite(n)?n:9000000000000000;
-  }
-  function sortCourtName(a,b){return clean(a).localeCompare(clean(b),'ko',{numeric:true,sensitivity:'base'});}
-  function groupIdxFromMatch(m, draw){
-    const g=num(m&&m.group); if(g!=null) return g;
-    const groups=Array.isArray(draw&&draw.groups)?draw.groups:[];
-    const t1=num(m&&m.t1), t2=num(m&&m.t2);
-    for(let i=0;i<groups.length;i++){
-      const ts=(groups[i]&&Array.isArray(groups[i].teams))?groups[i].teams.map(Number):[];
-      if((t1!=null&&ts.includes(t1))||(t2!=null&&ts.includes(t2))) return i;
-    }
-    return null;
-  }
-  function buildGroupOrderFromBoard(key, draw, matches){
-    const groups=Array.isArray(draw&&draw.groups)?draw.groups:[];
-    const max=groups.length;
-    const seen=new Set(), out=[];
-    function add(m){
-      if(!m||String(m.phase)!=='group') return;
-      const gi=groupIdxFromMatch(m,draw);
-      if(gi==null||gi<0||gi>=max||seen.has(gi)) return;
-      seen.add(gi); out.push(gi);
-    }
+  function queueOrder(m){const raw=String((m&&m.courtQueueOrder)||(m&&m.courtAssignedAt)||(m&&m.manualCourtPinnedAt)||(m&&m.waitingFirstAt)||(m&&m.lastWaitingFirstAt)||''); const t=Date.parse(raw); if(Number.isFinite(t)) return t; const n=Number(raw); return Number.isFinite(n)?n:9000000000000000;}
+  function readVisibleMatchIds(key){
+    const out=[], seen=new Set();
+    function add(id){id=clean(id); if(id&&!seen.has(id)){seen.add(id); out.push(id);}}
     try{
-      const snap=(typeof getCourtStatusSnapshot==='function')?(getCourtStatusSnapshot(key)||[]):[];
-      snap.forEach(item=>{ add(item&&item.current); (Array.isArray(item&&item.waiting)?item.waiting:[]).forEach(add); (Array.isArray(item&&item.related)?item.related:[]).forEach(add); });
-    }catch(e){}
-    const courtOrder=[];
-    try{
-      const cfg=(typeof getDivisionCourtConfig==='function')?getDivisionCourtConfig(key):null;
-      if(cfg&&Array.isArray(cfg.list)) cfg.list.forEach(c=>{if(clean(c)) courtOrder.push(clean(c));});
-      const used=[...new Set((matches||[]).filter(m=>m&&m.phase==='group').map(mCourt).filter(Boolean))].sort(sortCourtName);
-      used.forEach(c=>{ if(!courtOrder.includes(c)) courtOrder.push(c); });
-    }catch(e){}
-    const courtRank=c=>{const i=courtOrder.indexOf(clean(c)); return i>=0?i:9999;};
-    (matches||[]).filter(m=>m&&String(m.phase)==='group').slice().sort((a,b)=>{
-      const ca=mCourt(a), cb=mCourt(b);
-      const ra=courtRank(ca), rb=courtRank(cb);
-      if(ra!==rb) return ra-rb;
-      const oa=orderValue(a), ob=orderValue(b);
-      if(oa!==ob) return oa-ob;
-      return String(a.id||'').localeCompare(String(b.id||''),'ko',{numeric:true});
-    }).forEach(add);
-    for(let i=0;i<max;i++) if(!seen.has(i)) out.push(i);
+      document.querySelectorAll('.v540-court-grid .court-drop-zone').forEach(zone=>{
+        zone.querySelectorAll('[onclick*="showCourtMovePicker"]').forEach(el=>{
+          const raw=String(el.getAttribute('onclick')||'');
+          const m=raw.match(/showCourtMovePicker\(\s*['\"]([^'\"]+)['\"]\s*,\s*['\"]([^'\"]+)['\"]/);
+          if(m&&String(m[1])===String(key)) add(m[2]);
+        });
+      });
+    }catch(e){console.warn(PATCH,'DOM match id read failed',e);}
     return out;
   }
-  function renumberKeyByCurrentCourtOrder(key){
-    const draw=window.G&&G.draws&&G.draws[key];
-    const matches=(window.G&&G.matches&&G.matches[key])||[];
-    if(!draw||!Array.isArray(draw.groups)||!Array.isArray(matches)||!draw.groups.length) return false;
-    const order=buildGroupOrderFromBoard(key,draw,matches);
-    if(!order.length) return false;
-    const oldToNew=new Map(); order.forEach((oldIdx,newIdx)=>oldToNew.set(Number(oldIdx),Number(newIdx)));
-    const original=draw.groups.slice();
-    draw.groups=order.map((oldIdx,newIdx)=>{
-      const g=Object.assign({}, original[oldIdx]||{teams:[]});
-      g.group=newIdx;
-      g.name=(newIdx+1)+'조';
-      g.finalGroupNo=newIdx+1;
-      g.displayGroupNo=newIdx+1;
-      g.confirmedGroupNo=newIdx+1;
-      g.v623GroupOrderLocked=true;
-      return g;
-    });
-    const now=new Date().toISOString();
-    matches.forEach(m=>{
-      if(!m||String(m.phase)!=='group') return;
-      const old=groupIdxFromMatch(m,{groups:original});
-      const ng=oldToNew.get(Number(old));
-      if(Number.isFinite(ng)){
-        m.group=ng;
-        m.finalGroupNo=ng+1;
-        m.displayGroupNo=ng+1;
-        m.confirmedGroupNo=ng+1;
-        m.v614mFinalGroupNo=ng+1;
-      }
-      const c=mCourt(m);
-      if(c){m.manualCourtTarget=c; m.court=c; m.courts=[c];}
-      m.manualCourtLocked=true;
-      m.manualCourtLockedAt=m.manualCourtLockedAt||now;
-      m.manualCourtPinnedAt=m.manualCourtPinnedAt||m.courtQueueOrder||m.courtAssignedAt||now;
-      m.autoCourtLabel='조번호 확정 고정';
-      m.initialPrelimAutoCourt=false;
-      m.v623GroupOrderLocked=true;
-    });
-    draw.v606GroupOrderFinalized=true;
-    draw.v606GroupOrderFinalizedAt=now;
-    draw.v615FinalizedLock=true;
-    draw.v615FinalizedLockAt=draw.v615FinalizedLockAt||now;
-    draw.v623FinalizedByCourtOrder=true;
-    draw.v623FinalizedAt=now;
-    return true;
+  function fallbackMatchIds(key){
+    const matches=(window.G&&G.matches&&G.matches[key]||[]).filter(m=>m&&String(m.phase)==='group');
+    const courtOrder=[];
+    try{const cfg=(typeof getCourtBoardConfiguredCourtsV505==='function')?getCourtBoardConfiguredCourtsV505(key):null; if(cfg&&Array.isArray(cfg.list)) cfg.list.forEach(c=>{c=clean(c); if(c&&!courtOrder.includes(c)) courtOrder.push(c);});}catch(e){}
+    [...new Set(matches.map(mCourt).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ko',{numeric:true,sensitivity:'base'})).forEach(c=>{if(!courtOrder.includes(c)) courtOrder.push(c);});
+    const rank=c=>{const i=courtOrder.indexOf(clean(c)); return i>=0?i:9999;};
+    return matches.slice().sort((a,b)=>{const ra=rank(mCourt(a)), rb=rank(mCourt(b)); if(ra!==rb) return ra-rb; const qa=queueOrder(a), qb=queueOrder(b); if(qa!==qb) return qa-qb; return midOf(a).localeCompare(midOf(b),'ko',{numeric:true});}).map(midOf).filter(Boolean);
   }
+  function groupOrderFromVisible(key){
+    const draw=window.G&&G.draws&&G.draws[key], groups=Array.isArray(draw&&draw.groups)?draw.groups:[], matches=window.G&&G.matches&&G.matches[key]||[];
+    const seen=new Set(), order=[];
+    function addByMid(mid){const m=matches.find(x=>midOf(x)===String(mid)); if(!m||String(m.phase)!=='group') return; const gi=teamGroupIdx(m,groups); if(gi==null||gi<0||gi>=groups.length||seen.has(gi)) return; seen.add(gi); order.push(gi);}
+    const domIds=readVisibleMatchIds(key); domIds.forEach(addByMid); fallbackMatchIds(key).forEach(addByMid); for(let i=0;i<groups.length;i++) if(!seen.has(i)) order.push(i);
+    console.log(PATCH,'visible group order',key,'domIds=',domIds,'order=',order.map(x=>x+1));
+    return order;
+  }
+  function renumberKeyByVisibleOrder(key){
+    const draw=window.G&&G.draws&&G.draws[key], matches=window.G&&G.matches&&G.matches[key]||[];
+    if(!draw||!Array.isArray(draw.groups)||!draw.groups.length||!Array.isArray(matches)) return false;
+    const oldGroups=draw.groups.slice(); const order=groupOrderFromVisible(key); if(!order.length) return false;
+    const oldToNew=new Map(order.map((oldIdx,newIdx)=>[Number(oldIdx),Number(newIdx)])); const now=new Date().toISOString();
+    draw.groups=order.map((oldIdx,newIdx)=>{const g=Object.assign({},oldGroups[oldIdx]||{teams:[]}); g.group=newIdx; g.name=(newIdx+1)+'조'; g.finalGroupNo=newIdx+1; g.displayGroupNo=newIdx+1; g.confirmedGroupNo=newIdx+1; g.v626VisibleOrderLocked=true; return g;});
+    matches.forEach(m=>{if(!m||String(m.phase)!=='group') return; const oldIdx=teamGroupIdx(m,oldGroups); const ng=oldToNew.get(Number(oldIdx)); if(Number.isFinite(ng)){m.group=ng; m.finalGroupNo=ng+1; m.displayGroupNo=ng+1; m.confirmedGroupNo=ng+1; m.v614mFinalGroupNo=ng+1; m.v626VisibleOrderGroupNo=ng+1;} const c=mCourt(m); if(c){m.manualCourtTarget=c; m.court=c; m.courts=[c];} m.manualCourtLocked=true; m.manualCourtLockedAt=m.manualCourtLockedAt||now; m.manualCourtPinnedAt=m.manualCourtPinnedAt||m.courtQueueOrder||m.courtAssignedAt||now; m.autoCourtLabel='조번호 확정 고정'; m.initialPrelimAutoCourt=false; m.v626VisibleOrderLocked=true;});
+    draw.v606GroupOrderFinalized=true; draw.v606GroupOrderFinalizedAt=now; draw.v615FinalizedLock=true; draw.v615FinalizedLockAt=draw.v615FinalizedLockAt||now; draw.v626FinalizedByVisibleCourtOrder=true; draw.v626FinalizedAt=now; return true;
+  }
+  async function saveDrawMatch(key){cleanKey(key); try{if(window.__FB_WRITE_CACHE){if(window.__FB_WRITE_CACHE.draws) delete window.__FB_WRITE_CACHE.draws[key]; if(window.__FB_WRITE_CACHE.matches) delete window.__FB_WRITE_CACHE.matches[key];}}catch(e){} if(typeof stD==='function') await stD(key); if(typeof stM==='function') await stM(key); try{ if(typeof waitForPendingWrites==='function'&&window.db) await waitForPendingWrites(window.db); }catch(e){} }
+  function activeKeys(){const out=[]; try{const tid=ge('brTS')&&ge('brTS').value||''; const t=(window.G&&G.tournaments||[]).find(x=>String(x.id)===String(tid)); if(t){(t.divisions||[]).forEach(div=>{const k=tid+'_'+div; if(window.G&&G.draws&&G.draws[k]&&G.draws[k].indivMode&&Array.isArray(G.draws[k].groups)) out.push(k);});}}catch(e){} if(!out.length){try{Object.keys(window.G&&G.draws||{}).forEach(k=>{if(G.draws[k]&&G.draws[k].indivMode&&Array.isArray(G.draws[k].groups)) out.push(k);});}catch(e){}} return [...new Set(out)];}
+  async function finalizeAll(){if(!isOperatorLike()){toastMsg('관리자/운영자/진행자만 사용할 수 있습니다.','info'); return;} const keys=activeKeys(); if(!keys.length){toastMsg('개인전 예선 조가 없습니다.','error'); return;} if(!confirm('현재 화면의 코트 현황판 순서 그대로 1조부터 다시 매깁니다.\n\n국제1 현재경기→대기1→대기2 다음 국제2 현재경기→대기1… 순서입니다.\n계속하시겠습니까?')) return; try{slOn(true); let n=0; for(const k of keys){if(renumberKeyByVisibleOrder(k)){await saveDrawMatch(k); n++;}} slOn(false); try{renderBracket();}catch(e){} setTimeout(function(){ensureFinalizeButton();},80); toastMsg(n?'조번호 확정 완료: 화면 코트 순서대로 저장했습니다.':'확정할 조가 없습니다.', n?'success':'error');}catch(e){slOn(false); console.error(PATCH,'finalize failed',e); toastMsg('조번호 확정 실패: '+(e.message||e),'error');}}
+  async function finalizeKey(key){key=String(key||''); if(!isOperatorLike()){toastMsg('관리자/운영자/진행자만 사용할 수 있습니다.','info'); return;} if(!key){toastMsg('부서를 찾을 수 없습니다.','error'); return;} if(!confirm('이 부서의 현재 코트 현황판 순서 그대로 1조부터 확정합니다.\n계속하시겠습니까?')) return; try{slOn(true); const ok=renumberKeyByVisibleOrder(key); if(ok) await saveDrawMatch(key); slOn(false); try{renderBracket();}catch(e){} setTimeout(function(){ensureFinalizeButton();},80); toastMsg(ok?'조번호 확정 완료':'확정할 조가 없습니다.',ok?'success':'error');}catch(e){slOn(false); console.error(PATCH,'finalize key failed',e); toastMsg('조번호 확정 실패: '+(e.message||e),'error');}}
+  window.v626FinalizeGroupOrder=finalizeAll; window.v626FinalizeGroupOrderForKey=finalizeKey; window.v606FinalizeGroupOrder=finalizeAll; window.v606FinalizeGroupOrderForKey=finalizeKey; try{v606FinalizeGroupOrder=window.v606FinalizeGroupOrder; v606FinalizeGroupOrderForKey=window.v606FinalizeGroupOrderForKey;}catch(e){}
+  function ensureFinalizeButton(){const btn=ge('v606FinalizeGroupOrderBtn'); if(!btn) return; const show=!!(isOperatorLike()&&activeKeys().length); btn.textContent='🔒 조번호 확정'; btn.onclick=function(ev){ev&&ev.preventDefault&&ev.preventDefault(); ev&&ev.stopPropagation&&ev.stopPropagation(); finalizeAll(); return false;}; btn.style.setProperty('display',show?'inline-flex':'none','important'); btn.style.setProperty('visibility',show?'visible':'hidden','important'); btn.style.setProperty('opacity',show?'1':'0','important'); btn.style.setProperty('pointer-events',show?'auto':'none','important'); btn.style.setProperty('width','126px','important'); btn.style.setProperty('min-width','126px','important'); btn.style.setProperty('max-width','126px','important'); btn.style.setProperty('height','36px','important'); btn.style.setProperty('min-height','36px','important'); btn.style.setProperty('max-height','36px','important'); btn.style.setProperty('padding','0 8px','important'); btn.style.setProperty('font-size','.72rem','important'); btn.style.setProperty('line-height','1','important'); btn.style.setProperty('transform','none','important'); btn.style.setProperty('transition','none','important'); btn.style.setProperty('animation','none','important');}
+  window.updateFinalizeBtn=ensureFinalizeButton;
 
-  window.v606FinalizeGroupOrder = async function(){
-    if(!canOperate()){ toastMsg('관리자/운영자/진행자만 사용할 수 있습니다.','info'); return; }
-    try{
-      const tid=document.getElementById('brTS')?.value||'';
-      const t=(window.G?.tournaments||[]).find(x=>String(x.id)===String(tid));
-      if(!t){ toastMsg('대회를 선택하세요','error'); return; }
-      const divs=(t.divisions||[]).filter(d=>!!(window.G?.draws?.[tid+'_'+d]?.indivMode));
-      if(!divs.length){ toastMsg('개인전 부서가 없습니다','error'); return; }
-      if(!confirm('현재 코트 현황판 카드 순서 그대로 1조부터 다시 번호를 매깁니다.\n\n확정 후 새로고침해도 이 순서가 유지됩니다.\n\n계속하시겠습니까?')) return;
-      if(typeof sl==='function') sl(true);
-      let changed=0;
-      for(const div of divs){
-        const key=tid+'_'+div;
-        if(renumberKeyByCurrentCourtOrder(key)){
-          changed++;
-          try{ if(window.__FB_WRITE_CACHE){ if(window.__FB_WRITE_CACHE.draws) delete window.__FB_WRITE_CACHE.draws[key]; if(window.__FB_WRITE_CACHE.matches) delete window.__FB_WRITE_CACHE.matches[key]; } }catch(e){}
-          if(typeof stD==='function') await stD(key);
-          if(typeof stM==='function') await stM(key);
-          if(typeof window.v617eDirectSaveKey==='function') await window.v617eDirectSaveKey(key);
-        }
-      }
-      if(typeof sl==='function') sl(false);
-      try{ if(typeof renderBracket==='function') renderBracket(); }catch(e){}
-      try{ if(typeof updateFinalizeBtn==='function') setTimeout(updateFinalizeBtn,80); }catch(e){}
-      toastMsg(changed?'조 번호 확정 완료 ✅':'확정할 조가 없습니다.','success');
-    }catch(e){ try{ if(typeof sl==='function') sl(false); }catch(_){} console.error('[v623] finalize failed',e); toastMsg('조 번호 확정 실패: '+(e.message||e),'error'); }
-  };
+  // Display fix: label/detail must prefer final confirmed group number, not stale old m.group label.
+  function finalNo(m){const n=Number(m&&(m.v626VisibleOrderGroupNo??m.v614mFinalGroupNo??m.finalGroupNo??m.confirmedGroupNo??m.displayGroupNo)); return Number.isFinite(n)&&n>0?n:null;}
+  const oldDescribe=window.describeCourtBoardMatch;
+  if(typeof oldDescribe==='function'&&!oldDescribe.__v626Wrapped){const fn=function(key,m){const r=oldDescribe.apply(this,arguments)||{}; const no=finalNo((m&&m.__autoItem&&m.__autoItem.match)||m); if(no&&String(((m&&m.__autoItem&&m.__autoItem.match)||m)?.phase||'')==='group'){r.label='예선 '+no+'조'; if(r.detail) r.detail=String(r.detail).replace(/예선\s*\d+조/g,'예선 '+no+'조'); else r.detail='예선 '+no+'조';} return r;}; fn.__v626Wrapped=true; window.describeCourtBoardMatch=fn; try{describeCourtBoardMatch=fn;}catch(e){}}
+  const oldHeadline=window.buildCourtBoardGroupHeadline;
+  if(typeof oldHeadline==='function'&&!oldHeadline.__v626Wrapped){const fn=function(key,m,autoTitle,rawTitle){const r=oldHeadline.apply(this,arguments)||{}; const no=finalNo(m); if(no) r.detail='예선 '+no+'조'; return r;}; fn.__v626Wrapped=true; window.buildCourtBoardGroupHeadline=fn; try{buildCourtBoardGroupHeadline=fn;}catch(e){}}
 
-  function normalizeTeamOrder(key){
-    const arr=(window.G&&G.teams&&G.teams[key])||[];
-    const kp=keyParts(key);
-    const max=(typeof getDivisionMaxTeams==='function')?Number(getDivisionMaxTeams(kp.tid,kp.div)||0):0;
-    arr.forEach((t,i)=>{
-      if(!t) return;
-      t.queueOrder=i;
-      if(t.registrationStatus!=='held'){
-        if(max>0 && i>=max) t.registrationStatus='waitlist';
-        else if(t.registrationStatus==='waitlist') t.registrationStatus='confirmed';
-      }
-    });
-  }
-  async function saveTeamOrderKey(key){
-    try{ if(window.__FB_WRITE_CACHE&&window.__FB_WRITE_CACHE.teams) delete window.__FB_WRITE_CACHE.teams[key]; }catch(e){}
-    if(typeof window.stT==='function') await window.stT(key);
-    else if(typeof stT==='function') await stT(key);
-    else throw new Error('stT 저장 함수가 없습니다.');
-  }
-  window.moveTeamOrder = async function(key, idx){
-    try{
-      if(!canAdmin()){ toastMsg('관리자/운영자만 순서를 변경할 수 있습니다.','info'); return; }
-      key=String(key||''); idx=Number(idx);
-      const arr=window.G&&G.teams&&G.teams[key];
-      if(!Array.isArray(arr)||!arr[idx]){ toastMsg('대상 참가자를 찾을 수 없습니다.','error'); return; }
-      const team=arr[idx];
-      const name=(typeof getIndividualDisplayLine==='function')?getIndividualDisplayLine(team):(team.entryLabel||team.pairLabel||team.club||'선택팀');
-      const input=prompt(name+'\n\n이동할 번호를 입력하세요 (1~'+arr.length+'):', String(idx+1));
-      if(input===null) return;
-      const pos=parseInt(input,10);
-      if(!Number.isFinite(pos)||pos<1||pos>arr.length){ toastMsg('올바른 번호를 입력하세요.','error'); return; }
-      const newIdx=pos-1;
-      if(newIdx===idx) return;
-      const item=arr.splice(idx,1)[0];
-      arr.splice(newIdx,0,item);
-      normalizeTeamOrder(key);
-      if(typeof sl==='function') sl(true);
-      await saveTeamOrderKey(key);
-      if(typeof sl==='function') sl(false);
-      try{ renderRegisterDivisionOverview(); renderRL(); upDash(); }catch(e){}
-      toastMsg(pos+'번으로 이동했습니다 ✅','success');
-    }catch(e){ try{ if(typeof sl==='function') sl(false); }catch(_){} console.error('[v623] moveTeamOrder failed',e); toastMsg('순서 변경 실패: '+(e.message||e),'error'); }
-  };
+  function reflowCurrent(){try{const tid=(ge('regTS')&&ge('regTS').value)||(ge('brTS')&&ge('brTS').value)||''; Object.keys(window.G&&G.teams||{}).forEach(k=>{if(!tid||keyParts(k).tid===tid) reflowRegistrationKey(k);});}catch(e){}}
+  function wrap(name,after){const old=window[name]; if(typeof old!=='function'||old.__v626Wrapped) return; const fn=function(){reflowCurrent(); const r=old.apply(this,arguments); setTimeout(function(){try{after&&after(); ensureRowHoldButtons();}catch(e){}},0); setTimeout(function(){try{after&&after(); ensureRowHoldButtons();}catch(e){}},120); return r;}; fn.__v626Wrapped=true; window[name]=fn; try{eval(name+'=window["'+name+'"]');}catch(e){}}
+  wrap('renderRegisterDivisionOverview',ensureParticipantToolbar); wrap('renderRL',ensureParticipantToolbar); wrap('renderBracket',ensureFinalizeButton);
+  document.addEventListener('click',function(ev){const btn=ev.target&&ev.target.closest&&ev.target.closest('#v606FinalizeGroupOrderBtn,button[onclick^="v606FinalizeGroupOrderForKey"]'); if(!btn) return; ev.preventDefault(); ev.stopPropagation(); if(ev.stopImmediatePropagation) ev.stopImmediatePropagation(); const raw=String(btn.getAttribute('onclick')||''); const m=raw.match(/v606FinalizeGroupOrderForKey\(['\"]([^'\"]+)/); if(m) finalizeKey(m[1]); else finalizeAll();},true);
+  document.addEventListener('DOMContentLoaded',function(){reflowCurrent(); ensureFinalizeButton(); ensureParticipantToolbar(); ensureRowHoldButtons(); [150,500,1200,2500].forEach(ms=>setTimeout(function(){reflowCurrent(); ensureFinalizeButton(); ensureParticipantToolbar(); ensureRowHoldButtons();},ms)); try{new MutationObserver(function(){ensureFinalizeButton(); ensureParticipantToolbar(); ensureRowHoldButtons();}).observe(document.body,{childList:true,subtree:true});}catch(e){} });
+  setTimeout(function(){reflowCurrent(); ensureFinalizeButton(); ensureParticipantToolbar(); ensureRowHoldButtons();},0);
+  // v631fix: ensureFinalizeButton setInterval 제거
+  setInterval(function(){try{ensureRowHoldButtons();}catch(e){}},1200);
+  console.log(PATCH,'installed',VERSION);
 })();
 </script>
 
-<script id="v624DomFinalizeParticipantOrderStable">
+
+
+
+
+<!-- v632: 조 번호 확정 버튼 깜빡임 방지 + 버튼줄 공백 제거 -->
+<style id="v632CleanBracketBarNoGapStyle">
+/* 참가 접수에서 기능 안정화에 불필요한 버튼만 화면에서 제거 */
+#v626ParticipantControlBar,
+#v626OrderModal,
+.v620-move-btn{
+  display:none!important;
+  visibility:hidden!important;
+  opacity:0!important;
+  pointer-events:none!important;
+}
+
+/* 보류/보류해제 기능 버튼은 유지 */
+.v626-held-toggle-btn{
+  display:inline-flex!important;
+  visibility:visible!important;
+  opacity:1!important;
+  pointer-events:auto!important;
+}
+
+/* 대진표 상단 버튼줄: 숨은 조번호 버튼 자리를 예약하지 않음 */
+#bracketExportBar{
+  display:flex!important;
+  justify-content:flex-end!important;
+  align-items:center!important;
+  gap:6px!important;
+  flex-wrap:wrap!important;
+  min-height:38px!important;
+  height:auto!important;
+  margin:0 0 6px 0!important;
+  padding:0!important;
+  position:relative!important;
+  transform:none!important;
+}
+
+#bracketExportBar > button,
+#bracketExportBar > .login-menu-wrap,
+#bracketExportBar > .login-menu-wrap > button{
+  flex:0 0 auto!important;
+  height:36px!important;
+  min-height:36px!important;
+  max-height:36px!important;
+  margin:0!important;
+  padding:0 12px!important;
+  border-radius:10px!important;
+  font-size:.74rem!important;
+  line-height:1!important;
+  white-space:nowrap!important;
+  transform:none!important;
+  transition:none!important;
+  animation:none!important;
+  box-sizing:border-box!important;
+}
+
+#bracketExportBar > button:first-child{
+  width:154px!important;
+  min-width:154px!important;
+  max-width:154px!important;
+}
+
+#v606FinalizeGroupOrderBtn{
+  width:126px!important;
+  min-width:126px!important;
+  max-width:126px!important;
+  height:36px!important;
+  min-height:36px!important;
+  max-height:36px!important;
+  padding:0 8px!important;
+  border-color:#d4a017!important;
+  color:#8a6412!important;
+  background:#fff!important;
+}
+
+#v606FinalizeGroupOrderBtn.v632-hidden{
+  display:none!important;
+  visibility:hidden!important;
+  opacity:0!important;
+  pointer-events:none!important;
+}
+
+#v606FinalizeGroupOrderBtn.v632-visible{
+  display:inline-flex!important;
+  visibility:visible!important;
+  opacity:1!important;
+  pointer-events:auto!important;
+}
+
+#bracketSaveMenuWrap{
+  width:154px!important;
+  min-width:154px!important;
+  max-width:154px!important;
+}
+
+#bracketSaveMenuWrap > button{
+  width:100%!important;
+  min-width:100%!important;
+  max-width:100%!important;
+}
+
+#bracketSaveMenuWrap .login-menu-panel{
+  top:calc(100% + 6px)!important;
+  right:0!important;
+  left:auto!important;
+}
+
+/* 이전 패치의 예약용 클래스가 남아도 공백을 만들지 않음 */
+#v606FinalizeGroupOrderBtn.v631-hidden-reserved,
+#v606FinalizeGroupOrderBtn.v629-hidden-reserved,
+#v606FinalizeGroupOrderBtn.v628-hidden-reserved{
+  display:none!important;
+  visibility:hidden!important;
+  opacity:0!important;
+  pointer-events:none!important;
+}
+
+@media(max-width:680px){
+  #bracketExportBar{
+    gap:5px!important;
+    justify-content:flex-end!important;
+    min-height:36px!important;
+    margin-bottom:6px!important;
+  }
+  #bracketExportBar > button,
+  #bracketExportBar > .login-menu-wrap,
+  #bracketExportBar > .login-menu-wrap > button{
+    height:34px!important;
+    min-height:34px!important;
+    max-height:34px!important;
+    padding:0 7px!important;
+    font-size:.62rem!important;
+    border-radius:9px!important;
+  }
+  #bracketExportBar > button:first-child{
+    width:128px!important;
+    min-width:128px!important;
+    max-width:128px!important;
+  }
+  #v606FinalizeGroupOrderBtn{
+    width:106px!important;
+    min-width:106px!important;
+    max-width:106px!important;
+    padding:0 4px!important;
+    font-size:.58rem!important;
+  }
+  #bracketSaveMenuWrap{
+    width:128px!important;
+    min-width:128px!important;
+    max-width:128px!important;
+  }
+}
+
+/* 보류팀은 일반 회원 화면에서도 명확히 보이게 표시 */
+.v336-entry-row.v632-held-row, .rr-team-card.v632-held-row,
+.v336-entry-row.v626-held-row, .rr-team-card.v626-held-row{
+  background:linear-gradient(135deg,#faf5ff,#ffffff)!important;
+  border-left:4px solid #a855f7!important;
+}
+.v632-held-badge{
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  min-height:24px!important;
+  height:24px!important;
+  padding:2px 8px!important;
+  border-radius:999px!important;
+  border:1.5px solid #c4b5fd!important;
+  background:#f3e8ff!important;
+  color:#6d28d9!important;
+  font-size:.62rem!important;
+  font-weight:1000!important;
+  line-height:1!important;
+  white-space:nowrap!important;
+  box-sizing:border-box!important;
+  pointer-events:none!important;
+  cursor:default!important;
+}
+@media(max-width:680px){
+  .v632-held-badge{font-size:.58rem!important;padding:2px 6px!important;height:23px!important;min-height:23px!important;}
+}
+</style>
+<script id="v632CleanBracketBarNoGapScript">
 (function(){
   'use strict';
-  if(window.__v624DomFinalizeParticipantOrderStable) return;
-  window.__v624DomFinalizeParticipantOrderStable = true;
+  if(window.__v632CleanBracketBarNoGap) return;
+  window.__v632CleanBracketBarNoGap = true;
 
-  const PATCH = '[v624]';
+  function byId(id){ return document.getElementById(id); }
 
-  function q(id){ return document.getElementById(id); }
-  function clean(s){ return String(s == null ? '' : s).replace(/\s+/g,' ').trim(); }
-  function toastMsg(msg,type){
-    try{ if(typeof toast === 'function') toast(msg,type||'info'); else alert(msg); }
-    catch(e){ alert(msg); }
-  }
-  function canAdmin(){
+  function adminLike(){
     try{
-      return !!(
-        (typeof AD !== 'undefined' && AD) ||
-        (typeof TM !== 'undefined' && TM) ||
-        window.AD || window.TM ||
+      return !!(window.AD || window.TM || window.OP ||
         document.body.classList.contains('admin-mode') ||
-        document.body.classList.contains('tm-mode')
-      );
+        document.body.classList.contains('tm-mode') ||
+        document.body.classList.contains('operator-mode'));
     }catch(e){ return false; }
   }
-  function canOperate(){
+
+  function hasConfirmTarget(){
     try{
-      return !!(
-        canAdmin() ||
-        (typeof OP !== 'undefined' && OP) ||
-        window.OP ||
-        document.body.classList.contains('operator-mode') ||
-        document.body.classList.contains('op-mode') ||
-        location.protocol === 'file:'
-      );
+      if(!window.G || !G.matches) return false;
+      var tid = (typeof getCurrentTid==='function') ? getCurrentTid() : (window.currentTid || (byId('brTS') && byId('brTS').value) || '');
+      var keys = Object.keys(G.matches || {});
+      if(tid) keys = keys.filter(function(k){ return String(k).indexOf(String(tid)+'_') === 0; });
+      return keys.some(function(k){
+        var list = G.matches[k] || [];
+        return list.some(function(m){ return String(m && m.phase || '') === 'group'; });
+      });
+    }catch(e){
+      return adminLike();
+    }
+  }
+
+  function setImportant(el, prop, val){
+    try{
+      if(el.style.getPropertyValue(prop)!==String(val) || el.style.getPropertyPriority(prop)!=='important'){
+        el.style.setProperty(prop, val, 'important');
+      }
+    }catch(e){}
+  }
+
+  function stableBracketBar(){
+    try{
+      var bar = byId('bracketExportBar');
+      var btn = byId('v606FinalizeGroupOrderBtn');
+      var saveWrap = byId('bracketSaveMenuWrap');
+      if(!bar || !btn) return;
+
+      setImportant(bar,'display','flex');
+      setImportant(bar,'justify-content','flex-end');
+      setImportant(bar,'align-items','center');
+      setImportant(bar,'gap','6px');
+      setImportant(bar,'flex-wrap','wrap');
+      setImportant(bar,'transform','none');
+      setImportant(bar,'transition','none');
+      setImportant(bar,'animation','none');
+
+      var show = adminLike() && hasConfirmTarget();
+      btn.classList.toggle('v632-visible', show);
+      btn.classList.toggle('v632-hidden', !show);
+      btn.classList.remove('v631-hidden-reserved','v629-hidden-reserved','v628-hidden-reserved');
+
+      btn.textContent = '🔒 조번호 확정';
+      btn.onclick = function(ev){
+        if(ev){ ev.preventDefault(); ev.stopPropagation(); }
+        try{
+          if(typeof window.v626FinalizeGroupOrder === 'function') window.v626FinalizeGroupOrder();
+          else if(typeof window.v606FinalizeGroupOrder === 'function') window.v606FinalizeGroupOrder();
+        }catch(e){
+          if(typeof toast==='function') toast('조번호 확정 실패: '+(e.message||e),'error');
+          else alert('조번호 확정 실패: '+(e.message||e));
+        }
+        return false;
+      };
+
+      setImportant(btn,'display',show?'inline-flex':'none');
+      setImportant(btn,'visibility',show?'visible':'hidden');
+      setImportant(btn,'opacity',show?'1':'0');
+      setImportant(btn,'pointer-events',show?'auto':'none');
+      setImportant(btn,'align-items','center');
+      setImportant(btn,'justify-content','center');
+      setImportant(btn,'transform','none');
+      setImportant(btn,'transition','none');
+      setImportant(btn,'animation','none');
+
+      if(saveWrap){
+        setImportant(saveWrap,'display','block');
+        setImportant(saveWrap,'position','relative');
+        setImportant(saveWrap,'transform','none');
+        setImportant(saveWrap,'transition','none');
+        setImportant(saveWrap,'animation','none');
+      }
+    }catch(e){}
+  }
+
+  function heldTeam(team){
+    try{
+      return !!(team && (team.registrationStatus==='held' || team.v626Status==='held' || team.status==='held' ||
+        team.hold===true || team.held===true || team.isHeld===true || team.waitStatus==='held' ||
+        team.v385Status==='held' || team.reserveStatus==='held'));
     }catch(e){ return false; }
   }
-  function keyParts(key){
-    try{ if(typeof _k2td === 'function') return _k2td(key); }catch(e){}
-    const s=String(key||''); const i=s.indexOf('_');
-    return i>=0 ? {tid:s.slice(0,i), div:s.slice(i+1)} : {tid:'',div:''};
+
+  function teamKeys(){
+    try{return Object.keys((window.G && G.teams) || {});}catch(e){return [];}
   }
-  function nat(a,b){ return clean(a).localeCompare(clean(b),'ko',{numeric:true,sensitivity:'base'}); }
-  function num(v){ const n=Number(v); return Number.isFinite(n)?n:null; }
-  function matchId(m){ return String(m && (m.id || m._id) || ''); }
-  function mCourt(m){
-    const arr=Array.isArray(m && m.courts) ? m.courts : [];
-    return clean((m && m.manualCourtTarget) || (m && m.court) || arr[0] || '');
-  }
-  function orderValue(m){
-    const raw=String((m && (m.courtQueueOrder || m.courtAssignedAt || m.manualCourtPinnedAt || m.waitingFirstAt || m.lastWaitingFirstAt)) || '');
-    const t=Date.parse(raw);
-    if(Number.isFinite(t)) return t;
-    const n=Number(raw);
-    return Number.isFinite(n) ? n : 9000000000000000;
-  }
-  function groupIdxFromMatch(m, groups){
-    const g=num(m && m.group);
-    if(g != null) return g;
-    const t1=num(m && m.t1), t2=num(m && m.t2);
-    for(let i=0;i<(groups||[]).length;i++){
-      const ts=Array.isArray(groups[i] && groups[i].teams) ? groups[i].teams.map(Number) : [];
-      if((t1!=null && ts.includes(t1)) || (t2!=null && ts.includes(t2))) return i;
-    }
+
+  function getTeamByMoveButton(move){
+    try{
+      var row = move.closest('.v336-entry-row, .rr-team-card, tr, li, div');
+      var txt = (row && row.textContent || '').replace(/\s+/g,' ').trim();
+      var no = Number((txt.match(/^\s*(\d{1,3})\b/) || [])[1] || NaN);
+      var names = txt.replace(/상세|입금대기|입금확인|보류해제|보류|추가대기\s*\d+|추가대기|대기|삭제|수정/g,'').replace(/\s+/g,' ');
+      var keys = teamKeys();
+      for(var ki=0; ki<keys.length; ki++){
+        var list = G.teams[keys[ki]] || [];
+        for(var i=0; i<list.length; i++){
+          var t = list[i] || {};
+          if(Number.isFinite(no) && Number(t.regNo || t.no || (i+1)) === no) return {key:keys[ki], idx:i, team:t};
+          var label = '';
+          if(Array.isArray(t.individualPlayers)) label = t.individualPlayers.map(function(p){return (p && p.name) || '';}).filter(Boolean).join(' ');
+          else if(Array.isArray(t.players)) label = t.players.join(' ');
+          label = label || t.club || t.name || '';
+          if(label && names.indexOf(label.split('/')[0].trim()) >= 0) return {key:keys[ki], idx:i, team:t};
+        }
+      }
+    }catch(e){}
     return null;
   }
 
-  function getActiveIndividualKeys(){
-    const keys=[];
+  function heldBadges(){
     try{
-      const tid=q('brTS')?.value || '';
-      const t=(window.G?.tournaments||[]).find(x=>String(x.id)===String(tid));
-      if(t){
-        (t.divisions||[]).forEach(div=>{
-          const key=tid+'_'+div;
-          if(window.G?.draws?.[key]?.indivMode && Array.isArray(window.G?.draws?.[key]?.groups)) keys.push(key);
-        });
-      }
-    }catch(e){}
-    if(!keys.length){
-      try{
-        Object.keys(window.G?.draws||{}).forEach(k=>{
-          if(window.G?.draws?.[k]?.indivMode && Array.isArray(window.G?.draws?.[k]?.groups)) keys.push(k);
-        });
-      }catch(e){}
-    }
-    return [...new Set(keys)];
-  }
+      var isAdmin = adminLike();
+      document.querySelectorAll('.v336-entry-row, .rr-team-card.individual-entry-card, .rr-team-card').forEach(function(row){
+        var move = row.querySelector('.v620-move-btn');
+        if(!move) return;
+        var info = getTeamByMoveButton(move);
+        if(!info) return;
+        var held = heldTeam(info.team);
+        row.classList.toggle('v632-held-row', held);
+        row.classList.toggle('v626-held-row', held);
+        var badge = row.querySelector('.v632-held-badge');
+        if(!held){ if(badge) badge.remove(); return; }
 
-  // 화면에 실제로 보이는 코트 카드 순서에서 match id를 읽는다.
-  // 이 함수가 핵심이다. 자동배정 데이터 추정값이 아니라 현재 DOM에 표시된 순서가 기준이다.
-  function readVisibleCourtMatchIds(key){
-    const ids=[];
-    const seen=new Set();
-    try{
-      const grid=document.querySelector('.v540-court-grid');
-      if(!grid) return ids;
-      const zones=[...grid.querySelectorAll('.court-drop-zone')];
-      zones.forEach(zone=>{
-        const html=zone.innerHTML || '';
-        const re=new RegExp("showCourtMovePicker\\(\\s*['\\\"]"+String(key).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+"['\\\"]\\s*,\\s*['\\\"]([^'\\\"]+)['\\\"]","g");
-        let m;
-        while((m=re.exec(html))){
-          const id=clean(m[1]);
-          if(id && !seen.has(id)){
-            seen.add(id);
-            ids.push(id);
+        var adminToggle = row.querySelector('.v626-held-toggle-btn');
+        if(isAdmin){
+          if(!adminToggle){
+            adminToggle = document.createElement('button');
+            adminToggle.type='button';
+            adminToggle.className='v626-held-toggle-btn is-held';
+            move.insertAdjacentElement('afterend', adminToggle);
           }
+          adminToggle.classList.add('is-held');
+          adminToggle.textContent='▶ 보류해제';
+          adminToggle.onclick=function(ev){
+            if(ev){ ev.preventDefault(); ev.stopPropagation(); }
+            if(typeof window.setTeamHeld==='function') window.setTeamHeld(info.key, info.idx, false);
+          };
+          if(badge) badge.remove();
+        }else{
+          if(adminToggle) adminToggle.remove();
+          if(!badge){
+            badge=document.createElement('span');
+            badge.className='v632-held-badge';
+            move.insertAdjacentElement('afterend', badge);
+          }
+          badge.textContent='⏸ 보류';
+          badge.title='보류팀';
         }
       });
-    }catch(e){ console.warn(PATCH,'visible DOM read failed',e); }
-    return ids;
-  }
-
-  function fallbackMatchOrder(key, draw, matches){
-    const courtOrder=[];
-    try{
-      const kp=keyParts(key);
-      let arr=[];
-      if(typeof getDivisionPhaseConfiguredCourts === 'function') arr=getDivisionPhaseConfiguredCourts(kp.tid,kp.div,'group')||[];
-      if(!arr.length && typeof getBracketAllowedCourts === 'function') arr=getBracketAllowedCourts(key)||[];
-      arr.map(clean).filter(Boolean).forEach(c=>{ if(!courtOrder.includes(c)) courtOrder.push(c); });
-    }catch(e){}
-    [...new Set((matches||[]).map(mCourt).filter(Boolean))].sort(nat).forEach(c=>{
-      if(!courtOrder.includes(c)) courtOrder.push(c);
-    });
-    const rank=c=>{ const i=courtOrder.indexOf(clean(c)); return i>=0?i:9999; };
-    return (matches||[])
-      .filter(m=>m && String(m.phase)==='group')
-      .slice()
-      .sort((a,b)=>{
-        const ra=rank(mCourt(a)), rb=rank(mCourt(b));
-        if(ra!==rb) return ra-rb;
-        const oa=orderValue(a), ob=orderValue(b);
-        if(oa!==ob) return oa-ob;
-        const ga=groupIdxFromMatch(a, draw.groups), gb=groupIdxFromMatch(b, draw.groups);
-        if(ga!==gb) return ga-gb;
-        return matchId(a).localeCompare(matchId(b),'ko',{numeric:true});
-      })
-      .map(matchId)
-      .filter(Boolean);
-  }
-
-  function buildGroupOrderByVisibleBoard(key){
-    const draw=window.G?.draws?.[key];
-    const matches=window.G?.matches?.[key] || [];
-    const groups=Array.isArray(draw?.groups) ? draw.groups : [];
-    const seen=new Set();
-    const order=[];
-    function addById(mid){
-      const m=(matches||[]).find(x=>matchId(x)===String(mid));
-      if(!m || String(m.phase)!=='group') return;
-      const gi=groupIdxFromMatch(m, groups);
-      if(gi==null || gi<0 || gi>=groups.length || seen.has(gi)) return;
-      seen.add(gi); order.push(gi);
-    }
-    readVisibleCourtMatchIds(key).forEach(addById);
-    // DOM에서 못 읽은 그룹은 코트/대기순서 기준으로 뒤에 채운다.
-    fallbackMatchOrder(key, draw, matches).forEach(addById);
-    for(let i=0;i<groups.length;i++) if(!seen.has(i)) order.push(i);
-    return order;
-  }
-
-  function renumberKeyExactlyAsBoard(key){
-    const draw=window.G?.draws?.[key];
-    const matches=window.G?.matches?.[key] || [];
-    if(!draw || !Array.isArray(draw.groups) || !draw.groups.length) return false;
-    const oldGroups=draw.groups.slice();
-    const order=buildGroupOrderByVisibleBoard(key);
-    if(!order.length) return false;
-    const oldToNew=new Map(order.map((oldIdx,newIdx)=>[Number(oldIdx),Number(newIdx)]));
-    const now=new Date().toISOString();
-
-    draw.groups=order.map((oldIdx,newIdx)=>{
-      const g=Object.assign({}, oldGroups[oldIdx] || {teams:[]});
-      g.group=newIdx;
-      g.name=(newIdx+1)+'조';
-      g.finalGroupNo=newIdx+1;
-      g.displayGroupNo=newIdx+1;
-      g.confirmedGroupNo=newIdx+1;
-      g.v624BoardOrderLocked=true;
-      return g;
-    });
-
-    matches.forEach(m=>{
-      if(!m || String(m.phase)!=='group') return;
-      const old=groupIdxFromMatch(m, oldGroups);
-      const ng=oldToNew.get(Number(old));
-      if(Number.isFinite(ng)){
-        m.group=ng;
-        m.finalGroupNo=ng+1;
-        m.displayGroupNo=ng+1;
-        m.confirmedGroupNo=ng+1;
-        m.v614mFinalGroupNo=ng+1;
-        m.v624BoardOrderGroupNo=ng+1;
-      }
-      const c=mCourt(m);
-      if(c){
-        m.manualCourtTarget=c;
-        m.court=c;
-        m.courts=[c];
-      }
-      m.manualCourtLocked=true;
-      m.manualCourtLockedAt=m.manualCourtLockedAt || now;
-      m.manualCourtPinnedAt=m.manualCourtPinnedAt || m.courtQueueOrder || m.courtAssignedAt || now;
-      m.autoCourtLabel='조번호 확정 고정';
-      m.initialPrelimAutoCourt=false;
-      m.v624BoardOrderLocked=true;
-    });
-
-    draw.v606GroupOrderFinalized=true;
-    draw.v606GroupOrderFinalizedAt=now;
-    draw.v615FinalizedLock=true;
-    draw.v615FinalizedLockAt=draw.v615FinalizedLockAt || now;
-    draw.v624FinalizedByVisibleBoard=true;
-    draw.v624FinalizedAt=now;
-    return true;
-  }
-
-  async function saveKey(key){
-    try{
-      if(window.__FB_WRITE_CACHE){
-        if(window.__FB_WRITE_CACHE.draws) delete window.__FB_WRITE_CACHE.draws[key];
-        if(window.__FB_WRITE_CACHE.matches) delete window.__FB_WRITE_CACHE.matches[key];
-        if(window.__FB_WRITE_CACHE.teams) delete window.__FB_WRITE_CACHE.teams[key];
-      }
-    }catch(e){}
-    if(typeof stD === 'function') await stD(key);
-    if(typeof stM === 'function') await stM(key);
-    try{ if(typeof waitForPendingWrites === 'function' && window.db) await waitForPendingWrites(window.db); }catch(e){}
-  }
-
-  window.v606FinalizeGroupOrder = async function(){
-    if(!canOperate()){ toastMsg('관리자/운영자/진행자만 사용할 수 있습니다.','info'); return; }
-    const keys=getActiveIndividualKeys();
-    if(!keys.length){ toastMsg('개인전 예선 조가 없습니다.','error'); return; }
-    if(!confirm('화면에 보이는 코트 순서 그대로 조번호를 다시 매깁니다.\n\n예: 국제1 현재경기→대기1→대기2 다음 국제2 현재경기→대기1… 순서로 1조부터 확정합니다.\n\n계속하시겠습니까?')) return;
-    try{
-      if(typeof sl==='function') sl(true);
-      let changed=0;
-      for(const key of keys){
-        if(renumberKeyExactlyAsBoard(key)){
-          await saveKey(key);
-          changed++;
-        }
-      }
-      if(typeof sl==='function') sl(false);
-      try{ if(typeof renderBracket==='function') renderBracket(); }catch(e){}
-      setTimeout(ensureFinalizeButtonVisible,80);
-      toastMsg(changed ? '화면 코트 순서대로 조번호 확정 완료 ✅' : '확정할 조가 없습니다.','success');
-    }catch(e){
-      try{ if(typeof sl==='function') sl(false); }catch(_){}
-      console.error(PATCH,'finalize failed',e);
-      toastMsg('조번호 확정 실패: '+(e.message||e),'error');
-    }
-  };
-
-  window.v606FinalizeGroupOrderForKey = async function(key){
-    if(!canOperate()){ toastMsg('관리자/운영자/진행자만 사용할 수 있습니다.','info'); return; }
-    key=String(key||'');
-    if(!key){ toastMsg('부서를 선택하세요.','error'); return; }
-    if(!confirm('이 부서의 현재 코트 현황판 순서 그대로 1조부터 확정합니다.\n계속하시겠습니까?')) return;
-    try{
-      if(typeof sl==='function') sl(true);
-      const ok=renumberKeyExactlyAsBoard(key);
-      if(ok) await saveKey(key);
-      if(typeof sl==='function') sl(false);
-      try{ if(typeof renderBracket==='function') renderBracket(); }catch(e){}
-      setTimeout(ensureFinalizeButtonVisible,80);
-      toastMsg(ok?'조번호 확정 완료 ✅':'확정할 조가 없습니다.','success');
-    }catch(e){
-      try{ if(typeof sl==='function') sl(false); }catch(_){}
-      console.error(PATCH,'finalize key failed',e);
-      toastMsg('조번호 확정 실패: '+(e.message||e),'error');
-    }
-  };
-
-  function ensureFinalizeButtonVisible(){
-    try{
-      const btn=q('v606FinalizeGroupOrderBtn');
-      if(!btn) return;
-      if(canOperate() && getActiveIndividualKeys().length){
-        btn.style.setProperty('display','inline-flex','important');
-        btn.style.setProperty('visibility','visible','important');
-        btn.style.setProperty('opacity','1','important');
-        btn.textContent='🔒 조 번호 확정';
-        btn.onclick=function(ev){ ev&&ev.preventDefault&&ev.preventDefault(); window.v606FinalizeGroupOrder(); };
-      }
     }catch(e){}
   }
-  window.updateFinalizeBtn = ensureFinalizeButtonVisible;
 
-  function getRegKey(){
-    const tid=q('regTS')?.value || '';
-    let div=q('regDS')?.value || '';
-    if(!tid) return '';
-    if(!div || div==='__ALL__'){
-      try{
-        const t=(window.G?.tournaments||[]).find(x=>String(x.id)===String(tid));
-        div=(t?.divisions||[]).find(d=>Array.isArray(window.G?.teams?.[tid+'_'+d]) && window.G.teams[tid+'_'+d].length) || (t?.divisions||[])[0] || '';
-      }catch(e){}
-    }
-    return div ? tid+'_'+div : '';
+  var scheduled=false;
+  function applySoon(){
+    if(scheduled) return;
+    scheduled=true;
+    requestAnimationFrame(function(){
+      scheduled=false;
+      stableBracketBar();
+      heldBadges();
+    });
   }
-  function getTeamName(tm){
+  function apply(){ stableBracketBar(); heldBadges(); }
+  window.v632CleanBracketBarNoGap=apply;
+
+  function wrap(name){
     try{
-      if(typeof getIndividualDisplayLine==='function') return clean(getIndividualDisplayLine(tm));
+      var old=window[name];
+      if(typeof old!=='function' || old.__v632Wrapped) return;
+      var fn=function(){
+        var r=old.apply(this, arguments);
+        setTimeout(apply,0);
+        setTimeout(apply,120);
+        return r;
+      };
+      fn.__v632Wrapped=true;
+      window[name]=fn;
+      try{ eval(name+'=window["'+name+'"]'); }catch(e){}
     }catch(e){}
-    const ps=(tm?.individualPlayers||[]).slice(0,2).map(p=>clean(p?.name)).filter(Boolean);
-    if(ps.length) return ps.join(' / ');
-    return clean(tm?.entryLabel || tm?.pairLabel || (tm?.players||[]).slice(0,2).join(' / ') || tm?.club || '참가자');
   }
-  function normalizeOrderAfterSave(key){
-    const arr=window.G?.teams?.[key] || [];
-    const kp=keyParts(key);
-    const max=(typeof getDivisionMaxTeams==='function') ? Number(getDivisionMaxTeams(kp.tid,kp.div)||0) : 0;
-    arr.forEach((tm,i)=>{
-      if(!tm) return;
-      tm.queueOrder=i;
-      tm.v624ManualOrder=true;
-      if(tm.registrationStatus==='held') return;
-      if(max>0 && i>=max) tm.registrationStatus='waitlist';
-      else if(tm.registrationStatus==='waitlist') tm.registrationStatus='confirmed';
-      if(max>0 && i<max) tm.waitlistNo=0;
-    });
-  }
-  async function saveTeamOrder(key){
-    try{ if(window.__FB_WRITE_CACHE?.teams) delete window.__FB_WRITE_CACHE.teams[key]; }catch(e){}
-    if(typeof stT === 'function') await stT(key);
-    else throw new Error('stT 저장 함수가 없습니다.');
-    try{ if(typeof waitForPendingWrites === 'function' && window.db) await waitForPendingWrites(window.db); }catch(e){}
-  }
-  function ensureParticipantOrderButton(){
-    try{
-      const host=q('regDivisionOverview') || q('page-register');
-      if(!host || !canAdmin()) return;
-      const key=getRegKey();
-      if(!key) return;
-      let bar=q('v624ParticipantOrderToolbar');
-      if(!bar){
-        bar=document.createElement('div');
-        bar.id='v624ParticipantOrderToolbar';
-        bar.style.cssText='display:flex;justify-content:flex-end;gap:8px;align-items:center;margin:8px 0 10px;position:sticky;top:86px;z-index:50;background:rgba(255,255,255,.96);padding:8px;border:1px solid #dbeafe;border-radius:12px;box-shadow:0 6px 16px rgba(15,30,58,.08)';
-        bar.innerHTML='<button id="v624OpenParticipantOrderBtn" type="button" class="btn btn-outline" style="font-size:.78rem;padding:6px 12px;border-color:#1d4ed8;color:#1d4ed8;font-weight:900">🔢 참가자 순서변경</button>';
-      }
-      if(host.firstElementChild!==bar) host.insertBefore(bar, host.firstChild);
-      const btn=q('v624OpenParticipantOrderBtn');
-      if(btn){
-        btn.onclick=function(){ openParticipantOrderModal(getRegKey()); };
-        btn.style.setProperty('display','inline-flex','important');
-      }
-    }catch(e){ console.warn(PATCH,'ensure order button failed',e); }
-  }
-  function openParticipantOrderModal(key){
-    key=String(key||'');
-    const arr=window.G?.teams?.[key] || [];
-    if(!key || !arr.length){ toastMsg('참가 목록이 없습니다.','info'); return; }
-    let modal=q('v624ParticipantOrderModal');
-    if(!modal){
-      modal=document.createElement('div');
-      modal.id='v624ParticipantOrderModal';
-      modal.className='modal-overlay';
-      modal.innerHTML='<div class="modal-box" style="max-width:760px"><div class="modal-header"><h3>🔢 참가자 순서변경</h3><button class="modal-close" id="v624OrderClose">✕</button></div><div class="modal-body"><div style="padding:10px 12px;margin-bottom:10px;border:1px solid #dbeafe;border-radius:12px;background:#f8fbff;font-size:.8rem;line-height:1.6;color:#334155;font-weight:800">번호를 바꾸고 완료를 누르면 그 순서가 Firebase에 저장됩니다. 새로고침해도 이 순서가 기준입니다.</div><div id="v624OrderRows" style="display:flex;flex-direction:column;gap:6px;max-height:60vh;overflow:auto"></div></div><div class="modal-footer"><button class="btn btn-gray" id="v624OrderCancel">닫기</button><button class="btn btn-primary" id="v624OrderSave">✅ 순서변경 완료</button></div></div>';
-      document.body.appendChild(modal);
-      q('v624OrderClose').onclick=q('v624OrderCancel').onclick=function(){ modal.classList.remove('open'); };
-    }
-    const rows=q('v624OrderRows');
-    rows.innerHTML='';
-    const current=arr.map((tm,idx)=>({tm,idx})).sort((a,b)=>{
-      const ah=a.tm?.registrationStatus==='held', bh=b.tm?.registrationStatus==='held';
-      if(ah!==bh) return ah?1:-1;
-      const aq=Number(a.tm?.queueOrder), bq=Number(b.tm?.queueOrder);
-      if(Number.isFinite(aq)&&Number.isFinite(bq)&&aq!==bq) return aq-bq;
-      return a.idx-b.idx;
-    });
-    current.forEach((it,displayIdx)=>{
-      const held=it.tm?.registrationStatus==='held';
-      const row=document.createElement('div');
-      row.className='v624-order-row';
-      row.dataset.oldIdx=String(it.idx);
-      row.style.cssText='display:grid;grid-template-columns:76px minmax(0,1fr) 82px;gap:8px;align-items:center;padding:9px 10px;border:1px solid #e5e7eb;border-radius:12px;background:'+(held?'#faf5ff':'#fff');
-      row.innerHTML='<div style="font-size:.78rem;font-weight:900;color:#64748b">현재 '+(displayIdx+1)+'번</div><div style="min-width:0"><div style="font-size:.9rem;font-weight:1000;color:#0f172a;line-height:1.35;word-break:keep-all">'+escapeHtml(getTeamName(it.tm))+'</div><div style="font-size:.72rem;color:#64748b;margin-top:2px">'+(held?'⏸ 보류':'참가')+'</div></div><input class="form-input v624-order-input" type="number" min="1" max="'+arr.length+'" value="'+(displayIdx+1)+'" style="height:36px;min-height:36px;text-align:center;font-weight:900">';
-      rows.appendChild(row);
-    });
-    q('v624OrderSave').onclick=async function(){
-      try{
-        const rows=[...document.querySelectorAll('#v624OrderRows .v624-order-row')];
-        const items=rows.map((r,i)=>({oldIdx:Number(r.dataset.oldIdx), want:Number(r.querySelector('.v624-order-input')?.value||i+1), pos:i}))
-          .filter(x=>Number.isFinite(x.oldIdx) && arr[x.oldIdx]);
-        items.sort((a,b)=>{
-          const ah=arr[a.oldIdx]?.registrationStatus==='held', bh=arr[b.oldIdx]?.registrationStatus==='held';
-          if(ah!==bh) return ah?1:-1;
-          if(a.want!==b.want) return a.want-b.want;
-          return a.pos-b.pos;
-        });
-        const reordered=items.map(x=>arr[x.oldIdx]);
-        // 혹시 빠진 항목이 있으면 뒤에 보존
-        arr.forEach(tm=>{ if(!reordered.includes(tm)) reordered.push(tm); });
-        window.G.teams[key]=reordered;
-        normalizeOrderAfterSave(key);
-        if(typeof sl==='function') sl(true);
-        await saveTeamOrder(key);
-        if(typeof sl==='function') sl(false);
-        modal.classList.remove('open');
-        try{ if(typeof renderRegisterDivisionOverview==='function') renderRegisterDivisionOverview(); if(typeof renderRL==='function') renderRL(); if(typeof upDash==='function') upDash(); }catch(e){}
-        setTimeout(ensureParticipantOrderButton,80);
-        toastMsg('참가자 순서가 저장되었습니다 ✅','success');
-      }catch(e){
-        try{ if(typeof sl==='function') sl(false); }catch(_){}
-        console.error(PATCH,'participant order save failed',e);
-        toastMsg('순서 저장 실패: '+(e.message||e),'error');
-      }
-    };
-    modal.classList.add('open');
-  }
-  function escapeHtml(s){
-    return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  }
-  window.openParticipantOrderModal = openParticipantOrderModal;
 
-  // 기존 prompt 방식도 최종 모달/저장 방식과 같은 정렬 기준으로 보강
-  window.moveTeamOrder = async function(key, idx){
-    key=String(key||''); idx=Number(idx);
-    const arr=window.G?.teams?.[key] || [];
-    if(!arr[idx]){ toastMsg('대상 참가자를 찾을 수 없습니다.','error'); return; }
-    const pos=parseInt(prompt(getTeamName(arr[idx])+'\n\n이동할 번호를 입력하세요 (1~'+arr.length+'):', String(idx+1)),10);
-    if(!Number.isFinite(pos)||pos<1||pos>arr.length) return;
-    const item=arr.splice(idx,1)[0];
-    arr.splice(pos-1,0,item);
-    normalizeOrderAfterSave(key);
-    try{
-      if(typeof sl==='function') sl(true);
-      await saveTeamOrder(key);
-      if(typeof sl==='function') sl(false);
-      if(typeof renderRegisterDivisionOverview==='function') renderRegisterDivisionOverview();
-      if(typeof renderRL==='function') renderRL();
-      setTimeout(ensureParticipantOrderButton,80);
-      toastMsg(pos+'번으로 이동했습니다 ✅','success');
-    }catch(e){
-      try{ if(typeof sl==='function') sl(false); }catch(_){}
-      toastMsg('순서 변경 실패: '+(e.message||e),'error');
-    }
-  };
+  ['showPage','renderBracket','onBrTC','renderRegisterDivisionOverview','renderRL','onRegTC','loadData','upDash'].forEach(wrap);
 
-  function wrapRenderers(){
-    [['renderBracket',ensureFinalizeButtonVisible],['renderRL',ensureParticipantOrderButton],['renderRegisterDivisionOverview',ensureParticipantOrderButton]].forEach(([name,after])=>{
-      const old=window[name];
-      if(typeof old==='function' && !old.__v624Wrapped){
-        const fn=function(){
-          const r=old.apply(this,arguments);
-          setTimeout(after,0); setTimeout(after,80); setTimeout(after,300);
-          return r;
-        };
-        fn.__v624Wrapped=true;
-        window[name]=fn;
-        try{ eval(name+'=fn'); }catch(e){}
-      }
-    });
-  }
   document.addEventListener('DOMContentLoaded',function(){
-    wrapRenderers();
-    setTimeout(ensureFinalizeButtonVisible,100);
-    setTimeout(ensureParticipantOrderButton,100);
-    setTimeout(ensureFinalizeButtonVisible,800);
-    setTimeout(ensureParticipantOrderButton,800);
-    try{
-      new MutationObserver(function(){
-        ensureFinalizeButtonVisible();
-        ensureParticipantOrderButton();
-      }).observe(document.body,{childList:true,subtree:true});
-    }catch(e){}
+    apply();
+    [80,250,600,1200,2500].forEach(function(ms){ setTimeout(apply,ms); });
+    try{ new MutationObserver(applySoon).observe(document.body,{childList:true,subtree:true}); }catch(e){}
+    setInterval(apply,1000);
   });
-  setTimeout(wrapRenderers,0);
-  setTimeout(ensureFinalizeButtonVisible,0);
-  setTimeout(ensureParticipantOrderButton,0);
 })();
 </script>
 
