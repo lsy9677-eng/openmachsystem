@@ -23195,9 +23195,24 @@ async function resetPrelimAndRedraw(key){
     clearBracketStaleCachesForReset(key);
     const bc=ge('bracketContent'); if(bc) bc.innerHTML='<div class="empty-state card"><div class="empty-icon">🎲</div><p>예선 추첨 전 상태입니다</p></div>';
     renderBracket();
-    // 초기화 완료 후 바로 추첨 모달 열기
+    // 초기화 완료 후 추첨 모달 열기 + 조건 설정 버튼 강제 주입
     setTimeout(()=>{
       if(typeof openDraw==='function') openDraw(tid, div);
+      // 모달 열린 후 v603CondBtn으로 안정 주입 (v603 패치와 동일 ID 사용)
+      function __forceCondBtn(){
+        try{
+          const host = document.getElementById('drawCfgScreen');
+          if(!host || typeof window.openV592ConditionModal!=='function') return;
+          let panel = document.getElementById('v603CondBtn')||document.getElementById('v595CondBtn')||document.getElementById('v592CondBtn');
+          if(!panel){ panel=document.createElement('div'); host.insertBefore(panel, host.firstChild); }
+          else if(host.firstElementChild!==panel) host.insertBefore(panel, host.firstChild);
+          panel.id='v603CondBtn';
+          panel.style.cssText='margin:0 0 12px;padding:12px 14px;border:2px solid #d4a017;border-radius:14px;background:linear-gradient(135deg,#fff7dd,#eef4ff);display:flex!important;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;box-shadow:0 8px 18px rgba(212,160,23,.14);min-height:72px';
+          panel.innerHTML='<div><div style="font-weight:1000;color:#7a5600;font-size:.9rem">⚙️ 개인전 조건부 추첨</div><div class="v603CondMini" style="font-size:.72rem;color:#64748b;margin-top:4px">조건을 설정하면 추첨 시 자동 반영됩니다</div></div><div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="btn btn-primary v603CondOpen" style="font-size:.78rem;padding:7px 13px;background:#d4a017;color:#111827" onclick="openV592ConditionModal()">⚙️ 조건 설정</button><button type="button" class="btn btn-gray v603CondClear" style="font-size:.78rem;padding:7px 13px" onclick="clearV592ConditionModal()">🧹 초기화</button></div>';
+        }catch(e){}
+      }
+      setTimeout(__forceCondBtn, 600);
+      setTimeout(__forceCondBtn, 1200);
     }, 300);
   }catch(e){ sl(false); toast('예선 재추첨 초기화 실패: '+e.message,'error'); }
 }
@@ -24569,7 +24584,6 @@ function renderBracketHTMLForDiv(tid,div,isAll){
           <button class="btn btn-outline" style="padding:4px 10px;font-size:.72rem;min-height:34px;white-space:nowrap;font-weight:800" onclick="toggleMiniMenu(event,'${prelimMenuWrapId}')">🎲 예선 추첨 관리</button>
           <div class="login-menu-panel" style="min-width:210px">
             ${canManageBracket()&&!draw?`<button class="btn-sm login-menu-item" onclick="closeMiniMenu('${prelimMenuWrapId}');${prelimRedrawAction}" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">🎲 예선 추첨 시작</button>`:''}
-            ${(canManageBracket()&&isIndividualByKey(key))?`<button class="btn-sm login-menu-item" onclick="closeMiniMenu('${prelimMenuWrapId}');openConditionModalFromMenu('${key}','${tid}','${div}')" style="background:#fff7dd;color:#7a5600;border:1px solid #f6d365;font-weight:800">⚙️ 추첨 조건 설정</button>`:''}
             <button class="btn-sm login-menu-item" onclick="closeMiniMenu('${prelimMenuWrapId}');openLatestSavedDraw('${tid}','${div}','prelim')" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12);${latestPrelimSavedDraw?'':'opacity:.5;cursor:not-allowed;'}" ${latestPrelimSavedDraw?'':'disabled'}>📋 예선 결과 보기</button>
             <button class="btn-sm login-menu-item" onclick="closeMiniMenu('${prelimMenuWrapId}');openDrawHistory('${tid}','${div}','prelim')" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">🗂 예선 추첨 기록</button>
             ${canManageBracket()?`<button class="btn-sm login-menu-item" onclick="closeMiniMenu('${prelimMenuWrapId}');resetPrelimDrawOnly('${key}')" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">♻️ 예선 기록 초기화</button>`:''}
@@ -28396,6 +28410,32 @@ function openIndividualDraw(tid,div){
   // 기본값 선택 표시
   updatePreview(2);
   window._idwUpdatePreview=updatePreview;
+
+  // v617: 조건 설정 버튼 강제 주입 - v603CondBtn ID 사용으로 후속 패치와 충돌 방지
+  function _injectCondBtn(){
+    try{
+      const host=document.getElementById('drawCfgScreen');
+      if(!host) return;
+      if(typeof window.openV592ConditionModal!=='function') return;
+      // 기존 버튼 재활용 또는 새로 생성
+      let panel=document.getElementById('v603CondBtn')||document.getElementById('v595CondBtn')||document.getElementById('v592CondBtn');
+      if(!panel){
+        panel=document.createElement('div');
+        host.insertBefore(panel, host.firstChild);
+      } else if(panel.parentElement!==host){
+        host.insertBefore(panel, host.firstChild);
+      } else {
+        // 이미 host 안에 있고 첫 번째 자식이 아니면 앞으로 이동
+        if(host.firstElementChild!==panel) host.insertBefore(panel, host.firstChild);
+      }
+      panel.id='v603CondBtn';
+      panel.style.cssText='margin:0 0 12px;padding:12px 14px;border:2px solid #d4a017;border-radius:14px;background:linear-gradient(135deg,#fff7dd,#eef4ff);display:flex!important;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;box-shadow:0 8px 18px rgba(212,160,23,.14);min-height:72px';
+      panel.innerHTML='<div><div style="font-weight:1000;color:#7a5600;font-size:.9rem">⚙️ 개인전 조건부 추첨</div><div class="v603CondMini" style="font-size:.72rem;color:#64748b;margin-top:4px">조건을 설정하면 추첨 시 자동 반영됩니다</div></div><div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="btn btn-primary v603CondOpen" style="font-size:.78rem;padding:7px 13px;background:#d4a017;color:#111827" onclick="openV592ConditionModal()">⚙️ 조건 설정</button><button type="button" class="btn btn-gray v603CondClear" style="font-size:.78rem;padding:7px 13px" onclick="clearV592ConditionModal()">🧹 초기화</button></div>';
+    }catch(e){}
+  }
+  setTimeout(_injectCondBtn, 80);
+  setTimeout(_injectCondBtn, 400);
+  setTimeout(_injectCondBtn, 1000);
 }
 
 window.selectIndivGrpSize=function(gs){
