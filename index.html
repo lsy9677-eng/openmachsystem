@@ -23175,12 +23175,38 @@ async function resetPrelimAndRedraw(key){
     }
     await fbLog(`예선 재추첨: ${tid} ${dl(div)} (예선/본선 대진 전체 초기화, 시드 유지)`,'♻️');
     sl(false);
-    toast('예선 재추첨 준비 완료 ✅ 예선·본선 대진이 초기화되었습니다','success');
     clearBracketStaleCachesForReset(key);
     const bc=ge('bracketContent'); if(bc) bc.innerHTML='<div class="empty-state card"><div class="empty-icon">🎲</div><p>예선 추첨 전 상태입니다</p></div>';
     renderBracket();
+    // 초기화 완료 후 바로 추첨 모달 열기
+    setTimeout(()=>{
+      if(typeof openDraw==='function') openDraw(tid, div);
+    }, 300);
   }catch(e){ sl(false); toast('예선 재추첨 초기화 실패: '+e.message,'error'); }
 }
+
+// v617: 예선 추첨 관리 메뉴에서 직접 조건 설정 모달 열기
+function openConditionModalFromMenu(key, tid, div){
+  try{
+    // IDW가 세팅 안 되어 있으면 임시 세팅
+    const teams = G.teams[key] || [];
+    if(!window.IDW || !window.IDW.key){
+      window.IDW = Object.assign({}, window.IDW||{}, {key, tid, div, teams, grpSize:2, isRunning:false});
+      try{ IDW = window.IDW; }catch(e){}
+    } else if(window.IDW.key !== key){
+      window.IDW = Object.assign({}, window.IDW, {key, tid, div, teams});
+      try{ IDW = window.IDW; }catch(e){}
+    }
+    if(typeof window.openV592ConditionModal === 'function'){
+      window.openV592ConditionModal();
+    } else {
+      toast('조건 설정 기능을 불러오는 중입니다. 잠시 후 다시 시도하세요.','info');
+    }
+  }catch(e){
+    toast('조건 설정 열기 실패: '+e.message, 'error');
+  }
+}
+window.openConditionModalFromMenu = openConditionModalFromMenu;
 
 async function resetMainDrawOnly(key){
   const {tid,div}=_k2td(key);
@@ -24526,6 +24552,7 @@ function renderBracketHTMLForDiv(tid,div,isAll){
           <button class="btn btn-outline" style="padding:4px 10px;font-size:.72rem;min-height:34px;white-space:nowrap;font-weight:800" onclick="toggleMiniMenu(event,'${prelimMenuWrapId}')">🎲 예선 추첨 관리</button>
           <div class="login-menu-panel" style="min-width:210px">
             ${canManageBracket()&&!draw?`<button class="btn-sm login-menu-item" onclick="closeMiniMenu('${prelimMenuWrapId}');${prelimRedrawAction}" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">🎲 예선 추첨 시작</button>`:''}
+            ${(canManageBracket()&&isIndividualByKey(key))?`<button class="btn-sm login-menu-item" onclick="closeMiniMenu('${prelimMenuWrapId}');openConditionModalFromMenu('${key}','${tid}','${div}')" style="background:#fff7dd;color:#7a5600;border:1px solid #f6d365;font-weight:800">⚙️ 추첨 조건 설정</button>`:''}
             <button class="btn-sm login-menu-item" onclick="closeMiniMenu('${prelimMenuWrapId}');openLatestSavedDraw('${tid}','${div}','prelim')" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12);${latestPrelimSavedDraw?'':'opacity:.5;cursor:not-allowed;'}" ${latestPrelimSavedDraw?'':'disabled'}>📋 예선 결과 보기</button>
             <button class="btn-sm login-menu-item" onclick="closeMiniMenu('${prelimMenuWrapId}');openDrawHistory('${tid}','${div}','prelim')" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">🗂 예선 추첨 기록</button>
             ${canManageBracket()?`<button class="btn-sm login-menu-item" onclick="closeMiniMenu('${prelimMenuWrapId}');resetPrelimDrawOnly('${key}')" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">♻️ 예선 기록 초기화</button>`:''}
