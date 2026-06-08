@@ -23074,16 +23074,16 @@ async function resetPrelimDrawOnly(key){
   if(!confirm(`예선 기록 초기화를 진행합니다.
 
 - 예선 경기 결과/오더만 초기화
-- 예선 대진표(조 편성)는 유지
+- 예선 대진표(조 편성) 유지
+- 코트 배정/대기순서 유지 ← 코트 현황판 그대로
 - 본선 경기 결과도 함께 제거
-- 본선 대진표는 유지
 - 팀 등록/시드 유지
 
-경기 기록만 지우고 대진표는 그대로 두시겠습니까?`)) return;
+경기 기록만 지우고 코트 배정은 그대로 두시겠습니까?`)) return;
   sl(true);
   try{
     clearBracketStaleCachesForReset(key);
-    // 경기 기록 초기화 (선수 승패 조정)
+    // 선수 승패 차감
     const matches=G.matches[key]||[];
     const teams=G.teams[key]||[];
     const affected=new Set();
@@ -23094,13 +23094,46 @@ async function resetPrelimDrawOnly(key){
       (lt?.players||[]).forEach(n=>{const k=getPlayerKey(n,baseClub(lt?.club||''));if(G.players[k]){G.players[k].losses=Math.max(0,(G.players[k].losses||0)-1);affected.add(k);}});
     }
     if(affected.size>0) enqueuePlayerPersist([...affected], 4000);
-    G.matches[key]=[];
+    // 결과 필드만 초기화 - 코트 배정(court/courts/courtQueueOrder 등) 유지
+    matches.forEach(m=>{
+      if(!m) return;
+      const keep={
+        court:m.court, courts:Array.isArray(m.courts)?[...m.courts]:m.courts,
+        manualCourtTarget:m.manualCourtTarget, manualCourtLocked:m.manualCourtLocked,
+        manualCourtLockedAt:m.manualCourtLockedAt, manualCourtPinnedAt:m.manualCourtPinnedAt,
+        manualSharedHold:m.manualSharedHold, courtAssignedAt:m.courtAssignedAt,
+        courtQueueOrder:m.courtQueueOrder, waitingFirstAt:m.waitingFirstAt,
+        lastWaitingFirstAt:m.lastWaitingFirstAt, autoCourtLabel:m.autoCourtLabel,
+        initialPrelimAutoCourt:m.initialPrelimAutoCourt,
+        v615FinalizedLock:m.v615FinalizedLock, v616cManualFinalized:m.v616cManualFinalized,
+        finalGroupNo:m.finalGroupNo, displayGroupNo:m.displayGroupNo
+      };
+      m.winner=null; m.sc1=null; m.sc2=null; m.score1=null; m.score2=null; m.rubbers=[];
+      delete m.result; delete m.resultText; delete m.resultSavedAt; delete m.resultSavedBy;
+      delete m.completedAt; delete m.completedBy; delete m.finishedAt; delete m.finishAt;
+      delete m.winReason; delete m.loser; delete m.walkover; delete m.retired;
+      delete m.order1; delete m.order2; delete m.orderA; delete m.orderB;
+      delete m.homeOrder; delete m.awayOrder; delete m.orders; delete m.order;
+      delete m.orderSubmitted; delete m.orderSubmittedAt; delete m.orderSubmittedBy;
+      delete m.orderSubmit1; delete m.orderSubmit2; delete m.orderSubmitted1; delete m.orderSubmitted2;
+      delete m.homeOrderSubmitted; delete m.awayOrderSubmitted;
+      delete m.submitHomeAt; delete m.submitAwayAt; delete m.homeSubmittedAt; delete m.awaySubmittedAt;
+      delete m.orderOpen; delete m.orderLocked; delete m.bothSubmitted;
+      Object.assign(m, keep);
+      if(Array.isArray(keep.courts)) m.courts=[...keep.courts];
+    });
+    // 본선 경기도 결과만 초기화
+    if(G.mainMatches && G.mainMatches[key]){
+      (G.mainMatches[key]||[]).forEach(m=>{
+        if(!m) return;
+        m.winner=null; m.sc1=null; m.sc2=null; m.rubbers=[];
+        delete m.result; delete m.resultText; delete m.completedAt; delete m.finishedAt;
+      });
+    }
     await stM(key);
-    if(G.mainMatches && G.mainMatches[key]) delete G.mainMatches[key];
-    // 대진표(G.draws[key])는 건드리지 않음
-    await fbLog(`예선 기록 초기화: ${tid} ${dl(div)} (대진 유지, 경기 기록만 삭제)`,'♻️');
+    await fbLog(`예선 기록 초기화: ${tid} ${dl(div)} (코트 배정 유지, 경기 기록만 삭제)`,'♻️');
     sl(false);
-    toast('예선 기록 초기화 완료 ✅ 대진표는 유지됩니다','success');
+    toast('예선 기록 초기화 완료 ✅ 코트 배정/대기순서는 그대로 유지됩니다','success');
     clearBracketStaleCachesForReset(key);
     renderBracket();
   }catch(e){ sl(false); toast('예선 초기화 실패: '+e.message,'error'); }
@@ -24492,7 +24525,7 @@ function renderBracketHTMLForDiv(tid,div,isAll){
         ${showPrelimDrawManageMenus ? `<div class="login-menu-wrap js-mini-menu" id="${prelimMenuWrapId}">
           <button class="btn btn-outline" style="padding:4px 10px;font-size:.72rem;min-height:34px;white-space:nowrap;font-weight:800" onclick="toggleMiniMenu(event,'${prelimMenuWrapId}')">🎲 예선 추첨 관리</button>
           <div class="login-menu-panel" style="min-width:210px">
-            ${canManageBracket()?`<button class="btn-sm login-menu-item" onclick="closeMiniMenu('${prelimMenuWrapId}');${prelimRedrawAction}" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">${draw?'🎲 예선 재추첨':'🎲 예선 추첨 시작'}</button>`:''}
+            ${canManageBracket()&&!draw?`<button class="btn-sm login-menu-item" onclick="closeMiniMenu('${prelimMenuWrapId}');${prelimRedrawAction}" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">🎲 예선 추첨 시작</button>`:''}
             <button class="btn-sm login-menu-item" onclick="closeMiniMenu('${prelimMenuWrapId}');openLatestSavedDraw('${tid}','${div}','prelim')" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12);${latestPrelimSavedDraw?'':'opacity:.5;cursor:not-allowed;'}" ${latestPrelimSavedDraw?'':'disabled'}>📋 예선 결과 보기</button>
             <button class="btn-sm login-menu-item" onclick="closeMiniMenu('${prelimMenuWrapId}');openDrawHistory('${tid}','${div}','prelim')" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">🗂 예선 추첨 기록</button>
             ${canManageBracket()?`<button class="btn-sm login-menu-item" onclick="closeMiniMenu('${prelimMenuWrapId}');resetPrelimDrawOnly('${key}')" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">♻️ 예선 기록 초기화</button>`:''}
