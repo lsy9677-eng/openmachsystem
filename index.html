@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-08-v617e-manual-save-then-finalize";
+  const APP_VERSION = "2026-06-08-v617f-manual-court-lock-final";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -12532,7 +12532,7 @@ function applyTournamentBundle(tid, bundle){
   bundle=bundle||{};
   // v577: Firestore 재조회 시 메모리상 코트 배정 필드 보존 (전체 삭제 전 스냅샷)
   const _v577CourtSnap={};
-  const _V577_COURT_FIELDS=['court','courts','manualCourtTarget','manualSharedHold','manualCourtPinnedAt','manualCourtLocked','manualCourtLockedAt','courtAssignedAt','courtQueueOrder','waitingFirstAt','lastWaitingFirstAt','autoCourtLabel','initialPrelimAutoCourt'];
+  const _V577_COURT_FIELDS=['court','courts','manualCourtTarget','manualSharedHold','manualCourtPinnedAt','manualCourtLocked','manualCourtLockedAt','courtAssignedAt','courtQueueOrder','waitingFirstAt','lastWaitingFirstAt','autoCourtLabel','initialPrelimAutoCourt','v615FinalizedLock','v616cManualFinalized','v617GroupOrderLocked','v617eManualCourtSaved','finalGroupNo','displayGroupNo','confirmedGroupNo','group'];
   try{
     Object.keys(G.matches||{}).forEach(k=>{
       if(_k2td(k).tid!==tid) return;
@@ -12593,15 +12593,25 @@ function applyTournamentBundle(tid, bundle){
     Object.keys(courtRestore).forEach(f=>{
       if(merged[f]===undefined||merged[f]===null||merged[f]==='') merged[f]=courtRestore[f];
     });
-    // v614: 수동 코트 고정값은 Firestore/번들에 이전 자동값이 남아 있어도 메모리 스냅샷 전체를 최우선 적용
+    // v614+v617fix: 수동 코트 고정값은 메모리 스냅샷이 최우선
+    // v617fix: 확정 플래그도 수동으로 간주
     const _v614SnapIsManual = !!(
       courtRestore.manualCourtLocked===true ||
       String(courtRestore.manualCourtTarget||'').trim() ||
       courtRestore.manualSharedHold===true ||
-      String(courtRestore.manualCourtPinnedAt||'').trim()
+      String(courtRestore.manualCourtPinnedAt||'').trim() ||
+      courtRestore.v615FinalizedLock===true ||
+      courtRestore.v616cManualFinalized===true ||
+      courtRestore.v617GroupOrderLocked===true ||
+      courtRestore.v617eManualCourtSaved===true
     );
     if(_v614SnapIsManual){
       _V577_COURT_FIELDS.forEach(f=>{ if(courtRestore[f]!==undefined) merged[f]=courtRestore[f]; });
+      // v617fix: 확정 플래그도 복원
+      ['v615FinalizedLock','v616cManualFinalized','v617GroupOrderLocked','v617eManualCourtSaved',
+       'finalGroupNo','displayGroupNo','confirmedGroupNo','group'].forEach(f=>{
+        if(courtRestore[f]!==undefined) merged[f]=courtRestore[f];
+      });
       if(courtRestore.manualSharedHold===true){
         merged.court='';
         merged.courts=[];
@@ -12930,7 +12940,47 @@ async function refreshMatchesOnlyForTournament(tid, reason='manual'){
   try{ snap=(typeof getDocsFromServer==='function') ? await getDocsFromServer(q) : await getDocs(q); }
   catch(_e){ snap=await getDocs(q); }
   const bundle=getTournamentBundleCache(tid)||{};
-  const next={...(bundle||{}), matches:snap.docs.map(d=>({_id:d.id,...(d.data()||{})}))};
+
+  // v617fix: Firebase에서 읽기 전에 메모리의 수동 고정 상태를 스냅샷
+  const _manualSnap={}; // firestore_doc_id -> 수동 고정 필드
+  const _MANUAL_FIELDS=['court','courts','manualCourtTarget','manualSharedHold','manualCourtPinnedAt',
+    'manualCourtLocked','manualCourtLockedAt','courtAssignedAt','courtQueueOrder',
+    'waitingFirstAt','lastWaitingFirstAt','autoCourtLabel','initialPrelimAutoCourt',
+    'v615FinalizedLock','v616cManualFinalized','v617GroupOrderLocked','v617eManualCourtSaved',
+    'group','finalGroupNo','displayGroupNo','confirmedGroupNo'];
+  try{
+    Object.keys(G.matches||{}).forEach(k=>{
+      if(_k2td(k).tid!==tid) return;
+      (G.matches[k]||[]).forEach(m=>{
+        if(!m) return;
+        const isManual=!!(m.manualCourtLocked===true ||
+          String(m.manualCourtTarget||'').trim() ||
+          String(m.manualCourtPinnedAt||'').trim() ||
+          m.v615FinalizedLock===true ||
+          m.v616cManualFinalized===true ||
+          m.v617GroupOrderLocked===true ||
+          m.v617eManualCourtSaved===true);
+        if(!isManual) return;
+        const docId=String(m._id||m.id||'');
+        if(!docId) return;
+        const snap={};
+        _MANUAL_FIELDS.forEach(f=>{ if(m[f]!==undefined && m[f]!==null) snap[f]=m[f]; });
+        _manualSnap[docId]=snap;
+      });
+    });
+  }catch(_e){}
+
+  // Firebase 데이터에 수동 고정 상태 덮어씌우기
+  const rawMatches=snap.docs.map(d=>({_id:d.id,...(d.data()||{})}));
+  const patchedMatches=rawMatches.map(m=>{
+    const docId=String(m._id||m.id||'');
+    const manual=_manualSnap[docId];
+    if(!manual) return m;
+    // 수동 고정 경기: 메모리 값이 Firebase 값보다 우선
+    return {...m, ...manual, _id:m._id};
+  });
+
+  const next={...(bundle||{}), matches:patchedMatches};
   saveTournamentBundleCache(tid,next);
   // v577: applyTournamentBundle 완전히 끝난 뒤 렌더 (중간 상태에서 renderBracket 호출 방지)
   applyTournamentBundle(tid,next);
@@ -46469,11 +46519,21 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
           changed=true;
         }
       });
-      // 조 대진은 있는데 코트가 없으면 최초 예선 자동배정 복구
-      if(assignPrelimCourtsEvenly(key)) changed=true;
+      // v617f: 수동 고정된 key면 자동배정 복구 건너뜀
+      const _v617fKeyLocked=(()=>{
+        try{
+          const d=window.G&&window.G.draws&&window.G.draws[key];
+          if(d&&(d.v615FinalizedLock||d.v616cManualFinalized||d.v617eManualCourtSaved||d.v617eAutoAssignBlocked)) return true;
+          const ms=window.G&&window.G.matches&&window.G.matches[key];
+          if(Array.isArray(ms)&&ms.some(m=>m&&!m.manualSharedHold&&(m.manualCourtLocked===true||String(m.manualCourtTarget||'').trim()))) return true;
+        }catch(_e){}
+        return false;
+      })();
+      // 조 대진은 있는데 코트가 없으면 최초 예선 자동배정 복구 (수동 고정 아닐 때만)
+      if(!_v617fKeyLocked && assignPrelimCourtsEvenly(key)) changed=true;
       // 개인전 자동 코트 배정 엔진이 켜져 있으면 한 번 더 정규화하되, 예선 경기 생성 직후에는 강제 저장까지 연결.
       try{
-        if(typeof rebuildIndividualAutoCourtAssignmentsForKey==='function' && typeof isIndividualByKey==='function' && isIndividualByKey(key) && typeof isIndividualAutoCourtAssignEnabled==='function' && isIndividualAutoCourtAssignEnabled()){
+        if(!_v617fKeyLocked && typeof rebuildIndividualAutoCourtAssignmentsForKey==='function' && typeof isIndividualByKey==='function' && isIndividualByKey(key) && typeof isIndividualAutoCourtAssignEnabled==='function' && isIndividualAutoCourtAssignEnabled()){
           if(rebuildIndividualAutoCourtAssignmentsForKey(key)) changed=true;
         }
       }catch(e){}
@@ -46491,7 +46551,18 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
       return [...new Set((target||[]).map(d=>`${tid}_${d}`))];
     }catch(e){ return []; }
   }
-  function healActiveBracketKeys(opts={}){ getActiveBracketKeys().forEach(k=>restorePrelimMatchesFromDraw(k, opts)); }
+  function healActiveBracketKeys(opts={}){
+    getActiveBracketKeys().forEach(k=>{
+      // v617f: 수동 고정된 key는 건드리지 않음
+      try{
+        const d=window.G&&window.G.draws&&window.G.draws[k];
+        if(d&&(d.v615FinalizedLock||d.v616cManualFinalized||d.v617eManualCourtSaved||d.v617eAutoAssignBlocked)) return;
+        const ms=window.G&&window.G.matches&&window.G.matches[k];
+        if(Array.isArray(ms)&&ms.some(m=>m&&!m.manualSharedHold&&(m.manualCourtLocked===true||String(m.manualCourtTarget||'').trim()))) return;
+      }catch(_e){}
+      restorePrelimMatchesFromDraw(k, opts);
+    });
+  }
   window.restorePrelimMatchesFromDraw = restorePrelimMatchesFromDraw;
   window.healActiveBracketPrelimMatches = healActiveBracketKeys;
   window.assignPrelimCourtsEvenly = assignPrelimCourtsEvenly;
@@ -51814,7 +51885,16 @@ window.manualRefreshPlayers=manualRefreshPlayers;
 
   function heal(keys, opts={}){
     let changed=false;
-    (keys&&keys.length?keys:activeKeys()).forEach(k=>{ if(applyPrelimCourtOrderBlockFix(k,opts)) changed=true; });
+    (keys&&keys.length?keys:activeKeys()).forEach(k=>{
+      // v617f: 수동 고정된 key는 heal에서 완전 제외
+      try{
+        const d=window.G&&window.G.draws&&window.G.draws[k];
+        if(d&&(d.v615FinalizedLock||d.v616cManualFinalized||d.v617eManualCourtSaved||d.v617eAutoAssignBlocked)) return;
+        const ms=window.G&&window.G.matches&&window.G.matches[k];
+        if(Array.isArray(ms)&&ms.some(m=>m&&!m.manualSharedHold&&(m.manualCourtLocked===true||String(m.manualCourtTarget||'').trim()))) return;
+      }catch(_e){}
+      if(applyPrelimCourtOrderBlockFix(k,opts)) changed=true;
+    });
     return changed;
   }
 
