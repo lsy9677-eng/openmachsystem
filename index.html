@@ -2080,6 +2080,7 @@ body.slider-ready .page:not(.active){
 .court-wait-card{cursor:grab;user-select:none;-webkit-user-drag:element;}
 .court-wait-card:active{cursor:grabbing;}
 .court-wait-card.dragging{opacity:.45;transform:scale(.99);}
+.court-wait-card.drag-over-card{box-shadow:0 -3px 0 0 #2563eb,0 4px 12px rgba(37,99,235,.18);border-color:#2563eb !important;transform:translateY(-2px);}
 .shared-wait-stack{display:flex;flex-direction:column;gap:6px;}
 .court-wait-stack{display:flex;flex-direction:column;gap:6px;}
 .shared-wait-stack .court-wait-card{margin-top:0;}
@@ -13477,7 +13478,38 @@ function onCourtDropOver(ev){
 function onCourtDropLeave(ev){
   ev.currentTarget && ev.currentTarget.classList.remove('drag-over');
 }
-async function moveCourtQueueCard(key, mid, targetCourt){
+// v616: 같은 코트 내 순서 변경 - 카드 위에 드롭 시 beforeMid 카드 앞으로 끼워넣기
+function onCourtCardDropOnCard(ev, key, targetMid){
+  ev.preventDefault();
+  ev.stopPropagation();
+  ev.currentTarget && ev.currentTarget.classList.remove('drag-over-card');
+  const data=getCourtBoardDropToken(ev.dataTransfer.getData('text/plain'));
+  if(!data || String(data.key)!==String(key) || !data.mid) return;
+  if(String(data.mid)===String(targetMid)) return; // 자기 자신
+  const list=G.matches[key]||[];
+  const draggedM=list.find(x=>String(x.id)===String(data.mid));
+  const targetM=list.find(x=>String(x.id)===String(targetMid));
+  if(!draggedM||!targetM) return;
+  const draggedCourt=String(draggedM.court||((Array.isArray(draggedM.courts)&&draggedM.courts[0])||'')).trim();
+  const targetCourt=String(targetM.court||((Array.isArray(targetM.courts)&&targetM.courts[0])||'')).trim();
+  // 같은 코트 내 순서 변경
+  if(draggedCourt && draggedCourt===targetCourt){
+    moveCourtQueueCard(key, data.mid, draggedCourt, String(targetMid));
+  } else {
+    // 다른 코트 카드가 이 카드 위에 드롭된 경우 - 코트 이동만
+    moveCourtQueueCard(key, data.mid, targetCourt);
+  }
+}
+function onCourtCardDragOverCard(ev, key, targetMid){
+  ev.preventDefault();
+  ev.stopPropagation();
+  try{ ev.dataTransfer.dropEffect='move'; }catch(e){}
+  ev.currentTarget && ev.currentTarget.classList.add('drag-over-card');
+}
+function onCourtCardDragLeaveCard(ev){
+  ev.currentTarget && ev.currentTarget.classList.remove('drag-over-card');
+}
+async function moveCourtQueueCard(key, mid, targetCourt, beforeMid){
   if(!canManageBracket()){ toast('관리자 또는 경기진행자만 이동할 수 있습니다','info'); return; }
   const prevCourtState=captureCourtNotificationState();
   const list=G.matches[key]||[];
@@ -13495,6 +13527,45 @@ async function moveCourtQueueCard(key, mid, targetCourt){
   const prevCourt=String(m.court||((Array.isArray(m.courts)&&m.courts[0])||'')).trim();
   const sameCourt=!!court && prevCourt===court;
   const nowIso=new Date().toISOString();
+
+  // v616: 같은 코트 내 순서 변경 (beforeMid 지정 시)
+  if(sameCourt && beforeMid){
+    const courtMatches=(G.matches[key]||[])
+      .filter(x=>x && x.winner==null && String(x.id)!==String(mid) &&
+        (Array.isArray(x.courts)?x.courts:[x.court||'']).map(String).includes(court))
+      .sort((a,b)=>{
+        const aa=String(a.courtQueueOrder||a.courtAssignedAt||'');
+        const bb=String(b.courtQueueOrder||b.courtAssignedAt||'');
+        return aa!==bb?aa.localeCompare(bb):String(a.id||'').localeCompare(String(b.id||''),'ko');
+      });
+    const beforeIdx=courtMatches.findIndex(x=>String(x.id)===String(beforeMid));
+    let newOrder;
+    if(beforeIdx<=0){
+      // 맨 앞으로
+      const firstOrder=String(courtMatches[0]?.courtQueueOrder||courtMatches[0]?.courtAssignedAt||nowIso);
+      // 1초 앞 시간
+      const t=new Date(firstOrder); t.setMilliseconds(t.getMilliseconds()-500);
+      newOrder=t.toISOString();
+    } else {
+      // 앞 카드와 타겟 카드 사이 중간 시간
+      const prevOrder=String(courtMatches[beforeIdx-1]?.courtQueueOrder||courtMatches[beforeIdx-1]?.courtAssignedAt||nowIso);
+      const nextOrder=String(courtMatches[beforeIdx]?.courtQueueOrder||courtMatches[beforeIdx]?.courtAssignedAt||nowIso);
+      const t1=new Date(prevOrder).getTime(), t2=new Date(nextOrder).getTime();
+      const mid2=t1+(t2-t1)/2;
+      newOrder=new Date(mid2).toISOString();
+    }
+    m.courtQueueOrder=newOrder;
+    m.manualCourtLocked=true;
+    m.manualCourtLockedAt=m.manualCourtLockedAt||nowIso;
+    sl(true);
+    try{
+      await persistSingleMatchDoc(key, m);
+      sl(false);
+      toast('대기 순서 변경 완료 ✅','success');
+      renderBracket();
+    }catch(e){ sl(false); toast('순서 변경 저장 실패: '+e.message,'error'); }
+    return;
+  }
 
   if(court){
     // v450: 수동 이동은 이동한 카드 1개만 시간 변경한다. 전체 자동 재배정 함수 호출 금지.
@@ -13648,6 +13719,9 @@ window.onCourtDropOver = onCourtDropOver;
 window.onCourtDropLeave = onCourtDropLeave;
 window.onCourtDrop = onCourtDrop;
 window.moveCourtQueueCard = moveCourtQueueCard;
+window.onCourtCardDropOnCard = onCourtCardDropOnCard;
+window.onCourtCardDragOverCard = onCourtCardDragOverCard;
+window.onCourtCardDragLeaveCard = onCourtCardDragLeaveCard;
 window.showCourtMovePicker = showCourtMovePicker;
 window.closeCourtMovePicker = closeCourtMovePicker;
 window.applyCourtMovePicker = applyCourtMovePicker;
@@ -13917,7 +13991,7 @@ function renderCourtStatusBoard(key, div){
           ${sharedWaiting.length>sharedWaitingDefaultVisibleCount?`<button class="btn btn-outline court-shared-toggle-btn" type="button" style="font-size:.68rem;padding:4px 9px;min-height:28px;border-color:#e8b353;color:#9a6400;background:#fff7df" onclick="return toggleCourtBoardSharedExpanded(event,'${key}',${sharedWaitingExpanded?'false':'true'})">${sharedWaitingExpanded?`접기 (${sharedWaiting.length})`:`더보기 +${sharedWaitingHiddenCount}`}</button>`:''}
         </div>
       </div>
-      ${sharedWaitingVisible.length?`<div class="shared-wait-stack">${sharedWaitingVisible.map((w,idx)=>{ const wi=describeCourtBoardMatch(key,w); const priority=idx+1; const headline=((wi.title&&wi.title!=='TBD vs TBD')?wi.title:((wi.rawTitle&&wi.rawTitle!=='TBD vs TBD')?wi.rawTitle:(wi.autoTitle||'경기 대기'))); const targetCourt=String(w.__sharedCourtLabel||'').trim(); const detailParts=[wi.label, targetCourt?`${targetCourt} 배정예정`:'공용 대기']; const isManual=(!!w.manualSharedHold || !!String(w.manualCourtTarget||'').trim()) && !(w.initialPrelimAutoCourt && !canManageBracket()); const assignedElapsed = buildElapsedMetaLine(w.courtAssignedAt||'', 'wait_placed'); const metaEntries=[]; if(assignedElapsed.clock) metaEntries.push({...assignedElapsed, prefix:'대기배치'}); return `<div class="court-wait-card" draggable="${canManageBracket()?'true':'false'}" ondragstart="onCourtCardDragStart(event,'${key}','${String(w.id)}')" ondragend="onCourtCardDragEnd(event)" style="padding:8px 10px;border-radius:10px;background:${getCourtBoardPhaseColor(wi,w).bg};border:2px solid ${getCourtBoardPhaseColor(wi,w).bd}"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px"><div style="min-width:0;flex:1"><div style="font-size:.78rem;font-weight:900;color:${getCourtBoardPhaseColor(wi,w).fg};line-height:1.35;word-break:keep-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(headline)}</div><div style="font-size:.72rem;color:${getCourtBoardPhaseColor(wi,w).fg};margin-top:3px">${esc(detailParts.join(' · '))}</div>${renderElapsedMetaBlocks(metaEntries, getCourtBoardPhaseColor(wi,w).fg)}<div class="v490-court-action-row" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin-top:6px;width:100%">${courtBoardStableResultButtonsHtml(key,w)}${canManageBracket()?`<button class="btn btn-outline" type="button" style="font-size:.6rem;padding:2px 2px;min-height:28px;white-space:nowrap;width:100%;justify-content:center" onclick="sendCourtCardSms('${key}','${String(w.id)}','${targetCourt?'court_changed':'queue_registered'}','${targetCourt}',${priority})">문자</button>`:''}<button class="btn btn-outline" type="button" style="font-size:.6rem;padding:2px 2px;min-height:28px;white-space:nowrap;width:100%;justify-content:center" onclick="showCourtMovePicker('${key}','${String(w.id)}')">코트</button></div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px"><span class="court-wait-priority">${priority}</span>${(isManual&&canManageBracket())?'<span class="badge bg-blue" style="font-size:.66rem;padding:3px 7px">수동</span>':''}</div></div></div>`; }).join('')}</div>${sharedWaitingHiddenCount?`<div style="margin-top:8px;font-size:.74rem;color:#9a6400;font-weight:700">아래 더보기로 나머지 ${sharedWaitingHiddenCount}경기 확인</div>`:''}`:`<div style="padding:10px 12px;border:1px dashed #f6d28b;border-radius:10px;background:#fff;font-size:.78rem;color:#9a6400">여기로 카드를 옮기면 공용 대기 상태로 유지됩니다.</div>`}
+      ${sharedWaitingVisible.length?`<div class="shared-wait-stack">${sharedWaitingVisible.map((w,idx)=>{ const wi=describeCourtBoardMatch(key,w); const priority=idx+1; const headline=((wi.title&&wi.title!=='TBD vs TBD')?wi.title:((wi.rawTitle&&wi.rawTitle!=='TBD vs TBD')?wi.rawTitle:(wi.autoTitle||'경기 대기'))); const targetCourt=String(w.__sharedCourtLabel||'').trim(); const detailParts=[wi.label, targetCourt?`${targetCourt} 배정예정`:'공용 대기']; const isManual=(!!w.manualSharedHold || !!String(w.manualCourtTarget||'').trim()) && !(w.initialPrelimAutoCourt && !canManageBracket()); const assignedElapsed = buildElapsedMetaLine(w.courtAssignedAt||'', 'wait_placed'); const metaEntries=[]; if(assignedElapsed.clock) metaEntries.push({...assignedElapsed, prefix:'대기배치'}); return `<div class="court-wait-card" draggable="${canManageBracket()?'true':'false'}" ondragstart="onCourtCardDragStart(event,'${key}','${String(w.id)}')" ondragend="onCourtCardDragEnd(event)" ondragover="onCourtCardDragOverCard(event,'${key}','${String(w.id)}')" ondragleave="onCourtCardDragLeaveCard(event)" ondrop="onCourtCardDropOnCard(event,'${key}','${String(w.id)}')" style="padding:8px 10px;border-radius:10px;background:${getCourtBoardPhaseColor(wi,w).bg};border:2px solid ${getCourtBoardPhaseColor(wi,w).bd}"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px"><div style="min-width:0;flex:1"><div style="font-size:.78rem;font-weight:900;color:${getCourtBoardPhaseColor(wi,w).fg};line-height:1.35;word-break:keep-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(headline)}</div><div style="font-size:.72rem;color:${getCourtBoardPhaseColor(wi,w).fg};margin-top:3px">${esc(detailParts.join(' · '))}</div>${renderElapsedMetaBlocks(metaEntries, getCourtBoardPhaseColor(wi,w).fg)}<div class="v490-court-action-row" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin-top:6px;width:100%">${courtBoardStableResultButtonsHtml(key,w)}${canManageBracket()?`<button class="btn btn-outline" type="button" style="font-size:.6rem;padding:2px 2px;min-height:28px;white-space:nowrap;width:100%;justify-content:center" onclick="sendCourtCardSms('${key}','${String(w.id)}','${targetCourt?'court_changed':'queue_registered'}','${targetCourt}',${priority})">문자</button>`:''}<button class="btn btn-outline" type="button" style="font-size:.6rem;padding:2px 2px;min-height:28px;white-space:nowrap;width:100%;justify-content:center" onclick="showCourtMovePicker('${key}','${String(w.id)}')">코트</button></div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px"><span class="court-wait-priority">${priority}</span>${(isManual&&canManageBracket())?'<span class="badge bg-blue" style="font-size:.66rem;padding:3px 7px">수동</span>':''}</div></div></div>`; }).join('')}</div>${sharedWaitingHiddenCount?`<div style="margin-top:8px;font-size:.74rem;color:#9a6400;font-weight:700">아래 더보기로 나머지 ${sharedWaitingHiddenCount}경기 확인</div>`:''}`:`<div style="padding:10px 12px;border:1px dashed #f6d28b;border-radius:10px;background:#fff;font-size:.78rem;color:#9a6400">여기로 카드를 옮기면 공용 대기 상태로 유지됩니다.</div>`}
       <div class="court-drop-hint">카드를 각 코트로 드래그하거나, 코트 선택 버튼으로 수동 배정할 수 있습니다. 코트에서 다시 이 영역으로 드래그하거나 공용 대기를 선택하면 복귀합니다.</div>
     </div>`;
   const cards=hasCourts ? processedItems.map(item=>{
@@ -13952,7 +14026,7 @@ function renderCourtStatusBoard(key, div){
               // 대기카드: 대기시작 시각 1개만
               if(waitElapsed.clock) metaEntries.push({...waitElapsed, prefix:'대기시작'});
               const estimatedTimeText = getCourtEstimatedTimeText(key, idx, !!item.current);
-              return `<div class="court-wait-card" draggable="${canManageBracket()?'true':'false'}" ondragstart="onCourtCardDragStart(event,'${key}','${String(w.id)}')" ondragend="onCourtCardDragEnd(event)" style="padding:8px 10px;border-radius:10px;background:${getCourtBoardPhaseColor(wi,w).bg};border:2px solid ${getCourtBoardPhaseColor(wi,w).bd}">
+              return `<div class="court-wait-card" draggable="${canManageBracket()?'true':'false'}" ondragstart="onCourtCardDragStart(event,'${key}','${String(w.id)}')" ondragend="onCourtCardDragEnd(event)" ondragover="onCourtCardDragOverCard(event,'${key}','${String(w.id)}')" ondragleave="onCourtCardDragLeaveCard(event)" ondrop="onCourtCardDropOnCard(event,'${key}','${String(w.id)}')" style="padding:8px 10px;border-radius:10px;background:${getCourtBoardPhaseColor(wi,w).bg};border:2px solid ${getCourtBoardPhaseColor(wi,w).bd}">
                 <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
                   <div style="min-width:0;flex:1"><div style="font-size:.78rem;font-weight:900;color:${getCourtBoardPhaseColor(wi,w).fg};line-height:1.35;word-break:keep-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(wi.title)}</div><div style="font-size:.72rem;color:${getCourtBoardPhaseColor(wi,w).fg};margin-top:3px">${esc([wi.label, '대기중'].filter(Boolean).join(' · '))}</div>${renderElapsedMetaBlocks(metaEntries, getCourtBoardPhaseColor(wi,w).fg)}${estimatedTimeText?`<div class="v490-estimated-time" style="display:inline-flex;align-items:center;margin-top:4px;padding:3px 8px;border-radius:999px;background:#fff7ed;color:#9a3412;border:1px solid #fdba74;font-size:.64rem;font-weight:900;white-space:nowrap">${esc(estimatedTimeText)}</div>`:''}<div class="v490-court-action-row" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin-top:6px;width:100%">${courtBoardStableResultButtonsHtml(key,w)}${canManageBracket()?`<button class="btn btn-outline" type="button" style="font-size:.6rem;padding:2px 2px;min-height:28px;white-space:nowrap;width:100%;justify-content:center" onclick="sendCourtCardSms('${key}','${String(w.id)}','court_changed','${String(item.court||'')}',${priority})">문자</button>`:''}<button class="btn btn-outline" type="button" style="font-size:.6rem;padding:2px 2px;min-height:28px;white-space:nowrap;width:100%;justify-content:center" onclick="showCourtMovePicker('${key}','${String(w.id)}')">코트</button></div></div>
                   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px"><span class="court-wait-priority">${priority}</span>${(isManual&&canManageBracket())?'<span class="badge bg-blue" style="font-size:.66rem;padding:3px 7px">수동</span>':''}</div>
