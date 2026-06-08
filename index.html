@@ -13689,12 +13689,16 @@ async function moveCourtQueueCard(key, mid, targetCourt, beforeMid){
     m.manualCourtLockedAt=m.manualCourtLockedAt||nowIso;
     sl(true);
     try{
-      // v617: 전체 stM + draw 잠금 저장
-      await stM(key);
+      // v617fix: draw 잠금 먼저
       if(G.draws && G.draws[key]){
         G.draws[key].v615FinalizedLock = true;
         G.draws[key].v615FinalizedLockAt = G.draws[key].v615FinalizedLockAt || new Date().toISOString();
-        try{ if(typeof __FB_WRITE_CACHE!=='undefined'){ if(__FB_WRITE_CACHE.draws) delete __FB_WRITE_CACHE.draws[key]; } }catch(_ce){}
+      }
+      try{ window.__FB_WRITE_CACHE.draws[key]=''; window.__FB_WRITE_CACHE.matches[key]=''; }catch(_ce){}
+      if(typeof window.v617eDirectSaveKey==='function'){
+        await window.v617eDirectSaveKey(key);
+      } else {
+        await stM(key);
         await stD(key);
       }
       sl(false);
@@ -13762,15 +13766,22 @@ async function moveCourtQueueCard(key, mid, targetCourt, beforeMid){
 
   sl(true);
   try{
-    // v617: 전체 stM으로 모든 경기 _id 확정 + 자동재배정 차단 잠금
-    // 1) 모든 경기 _id 확정 (배치 저장)
-    await stM(key);
-    // 2) 수동 이동 후 자동재배정이 덮어쓰지 못하도록 draw 잠금
+    // v617fix: draw 잠금 먼저 (메모리)
     if(G.draws && G.draws[key]){
       G.draws[key].v615FinalizedLock = true;
       G.draws[key].v615FinalizedLockAt = G.draws[key].v615FinalizedLockAt || new Date().toISOString();
-      // 캐시 무효화 후 저장
-      try{ if(typeof __FB_WRITE_CACHE!=='undefined'){ if(__FB_WRITE_CACHE.draws) delete __FB_WRITE_CACHE.draws[key]; } }catch(_ce){}
+    }
+    // v617fix: 캐시 무효화 (전역 const이므로 window 경유)
+    try{ window.__FB_WRITE_CACHE.draws[key]=''; }catch(_ce){}
+    try{ window.__FB_WRITE_CACHE.matches[key]=''; }catch(_ce){}
+    // v617fix: v617e 직접 저장 함수 사용 (캐시 우회, Firestore 직접 쓰기)
+    if(typeof window.v617eManualCourtSave==='function'){
+      // v617e의 rewriteKeyDirect를 통해 확실히 저장
+      await window.v617eDirectSaveKey(key);
+    } else {
+      // fallback: 기존 방식
+      await stM(key);
+      try{ window.__FB_WRITE_CACHE.draws[key]=''; }catch(_ce){}
       await stD(key);
     }
     sl(false);
@@ -51745,7 +51756,8 @@ window.manualRefreshPlayers=manualRefreshPlayers;
         const groupMatches=arr(G.matches[key]).filter(m=>m && String(m.phase||'')==='group' && Number(m.group)===Number(gi));
         const openMatches=groupMatches.filter(m=>m && m.winner==null);
         // 이미 결과가 있는 조/수동 고정 조는 건드리지 않는다. 자동 배정 조는 재정렬 대상.
-        if(openMatches.some(isHardManual) || groupMatches.some(hasResult)) return;
+        // v617fix: 완료 경기 포함 전체에서 manualCourtLocked 체크
+        if(groupMatches.some(isHardManual) || openMatches.some(isHardManual) || groupMatches.some(hasResult)) return;
 
         const g=groups[gi];
         if(g){
@@ -57492,6 +57504,57 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
     return changed;
   }
 
+  // v617fix: 코트 이동 등 수동 배정 직후 호출되는 직접 저장 함수
+  window.v617eDirectSaveKey = async function(key){
+    if(!key) return;
+    try{
+      const draw=getDraw(key), matches=getMatchList(key);
+      const now=nowIso();
+      // draw 잠금 보장
+      if(draw){
+        draw.v615FinalizedLock=true;
+        draw.v615FinalizedLockAt=draw.v615FinalizedLockAt||now;
+        draw.v617eAutoAssignBlocked=true;
+        // draw 저장
+        await setDoc(doc(db2,'draws',key), {...draw,_u:now,updatedAt:now});
+      }
+      // matches 저장 (기존 문서 덮어쓰기, _id 없으면 escId로 생성)
+      const {tid,div}=keyParts(key);
+      const existSnap=await getDocs(query(collection(db2,'matches'), where('tournamentId','==',tid), where('division','==',div)));
+      const byFirestoreId=new Map();
+      existSnap.forEach(ds=>{ const d=ds.data(); if(d.id!=null) byFirestoreId.set(String(d.id), ds.id); });
+      const writeItems=matches.filter(m=>!!m);
+      for(let i=0;i<writeItems.length;i+=499){
+        const b=writeBatch(db2);
+        writeItems.slice(i,i+499).forEach((m,j)=>{
+          const payload={...m};
+          delete payload._id;
+          payload.tournamentId=tid;
+          payload.division=div;
+          payload.updatedAt=now;
+          if(!payload.createdAt) payload.createdAt=now;
+          // 기존 Firestore 문서 ID 우선 사용
+          const firestoreId = clean(m._id) || byFirestoreId.get(String(m.id||'')) || escId(key+'_'+(m.id??i+j));
+          if(!m._id) m._id=firestoreId; // 메모리에도 반영
+          b.set(doc(db2,'matches',firestoreId), payload, {merge:true});
+        });
+        await b.commit();
+      }
+      try{ if(typeof waitForPendingWrites==='function') await waitForPendingWrites(db2); }catch(e){}
+      // localStorage 번들 캐시 무효화
+      try{
+        const tid2=keyParts(key).tid;
+        const cacheKey='230match_bundle_'+tid2;
+        localStorage.removeItem(cacheKey);
+      }catch(e){}
+      // __FB_WRITE_CACHE 무효화
+      try{ if(window.__FB_WRITE_CACHE){ window.__FB_WRITE_CACHE.draws[key]=''; window.__FB_WRITE_CACHE.matches[key]=''; } }catch(e){}
+    }catch(e){
+      console.error('[v617e] directSaveKey failed', key, e);
+      throw e;
+    }
+  };
+
   window.v617eManualCourtSave = async function(keyOpt){
     if(!canOperate()){ toastSafe('관리자/운영자만 사용할 수 있습니다.','info'); return; }
     const keys=keyOpt?[keyOpt]:selectedKeys();
@@ -57633,5 +57696,145 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
   setInterval(refreshButtons,2500);
 })();
 </script>
+<!-- v617f: 관리자/운영자 수동 배정 절대 보호 - 모든 자동배정 함수 원천 차단 -->
+<script>
+(function(){
+  'use strict';
+  if(window.__v617fManualLockInstalled) return;
+  window.__v617fManualLockInstalled = true;
+
+  // 수동 고정 경기 판별
+  // manualSharedHold(공용대기)는 자동배정 대상이므로 잠금에서 제외
+  function isLocked(m){
+    if(!m) return false;
+    // 특정 코트에 수동 배정된 경우만 잠금
+    if(m.manualCourtLocked===true && !m.manualSharedHold && String(m.manualCourtTarget||'').trim()) return true;
+    if(m.manualCourtLocked===true && String(m.manualCourtTarget||'').trim()) return true;
+    if(m.v609ConditionalApplied===true) return true;
+    if(m.v615FinalizedLock===true) return true;
+    if(m.v616cManualFinalized===true) return true;
+    if(m.v617GroupOrderLocked===true) return true;
+    if(m.v617eManualCourtSaved===true) return true;
+    // 주의: manualSharedHold(공용대기), manualCourtPinnedAt만으로는 잠금 안 함
+    // 공용대기 경기는 자동배정이 코트로 넣어줘야 함
+    return false;
+  }
+
+  // 해당 key가 잠긴 상태인지 - draw 기준 우선
+  // 경기 단위 잠금은 rebuildIndividualAutoCourtAssignmentsForKey 내부에서 개별 처리
+  function isKeyLocked(key){
+    try{
+      const draw = window.G && window.G.draws && window.G.draws[key];
+      // draw 레벨 잠금만 key 전체 차단 (경기 단위는 아래 patchMatchCourtReset으로 개별 보호)
+      if(draw && (draw.v615FinalizedLock || draw.v616cManualFinalized || draw.v617eManualCourtSaved || draw.v617eAutoAssignBlocked)) return true;
+    }catch(e){}
+    return false;
+  }
+
+  // 경기 단위 잠금 여부 (공용대기 제외)
+  function isMatchLocked(m){
+    if(!m) return false;
+    if(m.manualSharedHold===true) return false; // 공용대기는 자동배정 허용
+    return isLocked(m);
+  }
+
+  // 자동배정 함수들을 래핑해서 수동 고정 경기는 절대 건드리지 못하게 함
+  function guardFn(name){
+    const orig = window[name];
+    if(typeof orig !== 'function' || orig.__v617fGuarded) return;
+    window[name] = function(key){
+      // key가 잠긴 상태면 완전 차단
+      if(key && isKeyLocked(key)) return false;
+      // key 없이 전체 실행 시 → 잠긴 key들은 개별 차단
+      // (원본 함수가 내부에서 개별 경기를 건드릴 때 아래 patchMatches로 보호)
+      return orig.apply(this, arguments);
+    };
+    window[name].__v617fGuarded = true;
+    try{ eval(name + ' = window["' + name + '"]'); }catch(e){}
+  }
+
+  // 자동배정이 경기 코트를 초기화하기 전에 수동 고정 경기는 복원
+  function patchMatchCourtReset(key){
+    const matches = window.G && window.G.matches && window.G.matches[key];
+    if(!Array.isArray(matches)) return;
+    // 자동배정 함수가 m.courts=[], m.court='' 하기 전 스냅샷 저장 (공용대기 제외)
+    matches.forEach(m=>{
+      if(!m || !isMatchLocked(m)) return;
+      m.__v617fCourtSnap = {
+        court: m.court,
+        courts: Array.isArray(m.courts) ? [...m.courts] : m.courts,
+        manualCourtTarget: m.manualCourtTarget,
+        manualCourtPinnedAt: m.manualCourtPinnedAt,
+        courtQueueOrder: m.courtQueueOrder,
+        waitingFirstAt: m.waitingFirstAt,
+        courtAssignedAt: m.courtAssignedAt,
+        manualCourtLocked: true,
+        manualCourtLockedAt: m.manualCourtLockedAt,
+        autoCourtLabel: m.autoCourtLabel,
+        initialPrelimAutoCourt: false
+      };
+    });
+  }
+
+  function restoreMatchCourtSnap(key){
+    const matches = window.G && window.G.matches && window.G.matches[key];
+    if(!Array.isArray(matches)) return;
+    matches.forEach(m=>{
+      if(!m || !m.__v617fCourtSnap) return; // 공용대기는 스냅샷 없으므로 자동 제외
+      const s = m.__v617fCourtSnap;
+      Object.assign(m, s);
+      delete m.__v617fCourtSnap;
+    });
+  }
+
+  // rebuildIndividualAutoCourtAssignmentsForKey: 핵심 함수 래핑
+  const origRebuild = window.rebuildIndividualAutoCourtAssignmentsForKey;
+  if(typeof origRebuild === 'function' && !origRebuild.__v617fGuarded){
+    window.rebuildIndividualAutoCourtAssignmentsForKey = function(key){
+      if(key && isKeyLocked(key)) return false;
+      patchMatchCourtReset(key);
+      const r = origRebuild.apply(this, arguments);
+      restoreMatchCourtSnap(key);
+      return r;
+    };
+    window.rebuildIndividualAutoCourtAssignmentsForKey.__v617fGuarded = true;
+    try{ rebuildIndividualAutoCourtAssignmentsForKey = window.rebuildIndividualAutoCourtAssignmentsForKey; }catch(e){}
+  }
+
+  // 나머지 자동배정 함수들 차단
+  ['ensureIndividualAutoCourtAssignmentsForKey',
+   'applyPrelimCourtOrderBlockFix',
+   'applyPrelimCourtBlockDistribution',
+   'assignPrelimCourtsEvenly'
+  ].forEach(guardFn);
+
+  // stM 래핑: 저장 전 수동 고정 경기 보호 확인
+  const origStM = window.stM;
+  if(typeof origStM === 'function' && !origStM.__v617fGuarded){
+    window.stM = async function(key){
+      // 저장 전 수동 고정 경기의 manualCourtLocked 보장
+      try{
+        const matches = window.G && window.G.matches && window.G.matches[key];
+        if(Array.isArray(matches)) matches.forEach(m=>{
+          if(!m) return;
+          // 공용대기(manualSharedHold)는 자동배정 대상 - manualCourtLocked 강제 설정 안 함
+          if(m.manualSharedHold===true) return;
+          if(String(m.manualCourtTarget||'').trim() || m.v617eManualCourtSaved===true){
+            m.manualCourtLocked = true;
+            m.initialPrelimAutoCourt = false;
+            if(/예선\s*자동|자동배정/.test(String(m.autoCourtLabel||''))) m.autoCourtLabel = '수동 고정';
+          }
+        });
+      }catch(e){}
+      return origStM.apply(this, arguments);
+    };
+    window.stM.__v617fGuarded = true;
+    try{ stM = window.stM; }catch(e){}
+  }
+
+  console.log('[v617f] 관리자 수동배정 절대 보호 설치 완료');
+})();
+</script>
+
 </body>
 </html>
