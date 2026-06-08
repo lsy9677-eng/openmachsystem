@@ -57454,16 +57454,16 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
     if(!tid || !div) throw new Error('대회/부서 키를 확인할 수 없습니다: '+key);
     if(draw) await setDoc(doc(db2,'draws',key), {...draw,_u:now,updatedAt:now});
 
-    const q=query(collection(db2,'matches'), where('tournamentId','==',tid), where('division','==',div));
-    const existSnap=await getDocs(q);
-    // 삭제: 배치 499개씩 나눔
-    const delRefs=[]; existSnap.forEach(ds=>delRefs.push(ds.ref));
-    for(let i=0;i<delRefs.length;i+=499){
-      const b=writeBatch(db2);
-      delRefs.slice(i,i+499).forEach(r=>b.delete(r));
-      await b.commit();
-    }
-    // 저장: 배치 499개씩 나눔
+    // v617fix: 삭제 없이 merge:true로 저장 (삭제 중 폴링으로 데이터 유실 방지)
+    const existSnap=await getDocs(query(collection(db2,'matches'), where('tournamentId','==',tid), where('division','==',div)));
+    const byLogicId=new Map();
+    const bySig=new Map();
+    existSnap.forEach(ds=>{
+      const d=ds.data()||{};
+      if(d.id!=null) byLogicId.set(String(d.id), ds.id);
+      const sig=[d.phase||'',d.round??'',d.matchNo??'',d.group??'',d.t1??'',d.t2??''].map(String).join('|');
+      bySig.set(sig, ds.id);
+    });
     const writeItems=matches.filter(m=>!!m);
     for(let i=0;i<writeItems.length;i+=499){
       const b=writeBatch(db2);
@@ -57474,12 +57474,28 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
         payload.division=div;
         payload.updatedAt=now;
         if(!payload.createdAt) payload.createdAt=now;
-        const id=escId(key+'_'+(payload.id ?? (i+j)));
-        b.set(doc(db2,'matches',id), payload);
+        let firestoreId=clean(m._id);
+        if(!firestoreId && m.id!=null) firestoreId=byLogicId.get(String(m.id))||'';
+        if(!firestoreId){
+          const sig=[m.phase||'',m.round??'',m.matchNo??'',m.group??'',m.t1??'',m.t2??''].map(String).join('|');
+          firestoreId=bySig.get(sig)||'';
+        }
+        if(!firestoreId) firestoreId=escId(key+'_'+(payload.id??(i+j)));
+        if(!m._id) m._id=firestoreId;
+        b.set(doc(db2,'matches',firestoreId), payload, {merge:true});
       });
       await b.commit();
     }
     try{ if(typeof waitForPendingWrites==='function') await waitForPendingWrites(db2); }catch(e){}
+    // localStorage 번들 캐시 전체 무효화
+    try{
+      for(let i=localStorage.length-1;i>=0;i--){
+        const k=localStorage.key(i);
+        if(k && (k.includes('bundle')||k.includes('Bundle')) && k.includes(tid)){
+          localStorage.removeItem(k);
+        }
+      }
+    }catch(e){}
     try{
       if(window.__FB_WRITE_CACHE){
         if(window.__FB_WRITE_CACHE.draws) delete window.__FB_WRITE_CACHE.draws[key];
@@ -57509,20 +57525,29 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
     if(!key) return;
     try{
       const draw=getDraw(key), matches=getMatchList(key);
+      const {tid,div}=keyParts(key);
       const now=nowIso();
-      // draw 잠금 보장
+
+      // draw 잠금 보장 후 저장
       if(draw){
         draw.v615FinalizedLock=true;
         draw.v615FinalizedLockAt=draw.v615FinalizedLockAt||now;
         draw.v617eAutoAssignBlocked=true;
-        // draw 저장
         await setDoc(doc(db2,'draws',key), {...draw,_u:now,updatedAt:now});
       }
-      // matches 저장 (기존 문서 덮어쓰기, _id 없으면 escId로 생성)
-      const {tid,div}=keyParts(key);
+
+      // matches 저장 - 삭제 없이 merge:true로 업데이트 (삭제 중 폴링으로 데이터 유실 방지)
+      // 기존 Firestore 문서 ID 매핑
       const existSnap=await getDocs(query(collection(db2,'matches'), where('tournamentId','==',tid), where('division','==',div)));
-      const byFirestoreId=new Map();
-      existSnap.forEach(ds=>{ const d=ds.data(); if(d.id!=null) byFirestoreId.set(String(d.id), ds.id); });
+      const byLogicId=new Map(); // logic id -> firestore doc id
+      const bySig=new Map();     // sig -> firestore doc id
+      existSnap.forEach(ds=>{
+        const d=ds.data()||{};
+        if(d.id!=null) byLogicId.set(String(d.id), ds.id);
+        const sig=[d.phase||'',d.round??'',d.matchNo??'',d.group??'',d.t1??'',d.t2??''].map(String).join('|');
+        bySig.set(sig, ds.id);
+      });
+
       const writeItems=matches.filter(m=>!!m);
       for(let i=0;i<writeItems.length;i+=499){
         const b=writeBatch(db2);
@@ -57533,22 +57558,42 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
           payload.division=div;
           payload.updatedAt=now;
           if(!payload.createdAt) payload.createdAt=now;
-          // 기존 Firestore 문서 ID 우선 사용
-          const firestoreId = clean(m._id) || byFirestoreId.get(String(m.id||'')) || escId(key+'_'+(m.id??i+j));
-          if(!m._id) m._id=firestoreId; // 메모리에도 반영
+          // Firestore 문서 ID 결정 (기존 ID 재사용으로 문서 교체 없이 업데이트)
+          let firestoreId=clean(m._id);
+          if(!firestoreId && m.id!=null) firestoreId=byLogicId.get(String(m.id))||'';
+          if(!firestoreId){
+            const sig=[m.phase||'',m.round??'',m.matchNo??'',m.group??'',m.t1??'',m.t2??''].map(String).join('|');
+            firestoreId=bySig.get(sig)||'';
+          }
+          if(!firestoreId){
+            firestoreId=(crypto&&crypto.randomUUID)?crypto.randomUUID():('m_'+Date.now()+'_'+Math.random().toString(36).slice(2));
+          }
+          if(!m._id) m._id=firestoreId;
           b.set(doc(db2,'matches',firestoreId), payload, {merge:true});
         });
         await b.commit();
       }
+
       try{ if(typeof waitForPendingWrites==='function') await waitForPendingWrites(db2); }catch(e){}
-      // localStorage 번들 캐시 무효화
+
+      // localStorage 번들 캐시 무효화 (다음 폴링이 신선한 데이터 읽도록)
       try{
-        const tid2=keyParts(key).tid;
-        const cacheKey='230match_bundle_'+tid2;
-        localStorage.removeItem(cacheKey);
+        ['230match_bundle_'+tid, 'tm_bundle_'+tid, 'bundle_'+tid].forEach(k=>{
+          try{ localStorage.removeItem(k); }catch(e){}
+        });
+        // 모든 번들 캐시 키 스캔
+        for(let i=0;i<localStorage.length;i++){
+          const k=localStorage.key(i);
+          if(k && (k.includes('bundle') || k.includes('Bundle')) && k.includes(tid)){
+            try{ localStorage.removeItem(k); }catch(e){}
+          }
+        }
       }catch(e){}
+
       // __FB_WRITE_CACHE 무효화
       try{ if(window.__FB_WRITE_CACHE){ window.__FB_WRITE_CACHE.draws[key]=''; window.__FB_WRITE_CACHE.matches[key]=''; } }catch(e){}
+
+      console.log('[v617e] directSaveKey 완료:', key, writeItems.length+'건');
     }catch(e){
       console.error('[v617e] directSaveKey failed', key, e);
       throw e;
