@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-08-v615f-seed-only-lock";
+  const APP_VERSION = "2026-06-08-v616f-prelim-court-plain";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -5660,6 +5660,108 @@ button:disabled{opacity:.55!important;cursor:not-allowed!important;filter:graysc
 .court-drop-zone .v490-court-action-row .btn,.court-drop-zone .v490-court-action-row button{width:100%!important;min-width:0!important;min-height:28px!important;height:28px!important;padding:2px 2px!important;margin:0!important;border-radius:8px!important;font-size:.6rem!important;font-weight:900!important;justify-content:center!important;white-space:nowrap!important;box-shadow:none!important;}
 .court-drop-zone .v451-court-push-btn{display:none!important;}
 @media(max-width:680px){.v546-court-start-panel{align-items:stretch!important}.v546-court-start-panel>div:last-child{width:100%;display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important}.v546-court-start-panel input[type="time"]{flex:0 0 108px}.v546-court-start-panel button{width:100%!important;font-size:.62rem!important;padding:3px 3px!important}}
+</style>
+
+<style id="v616ePrelimCourtHorizontalStyle">
+/* v616e: 개인전 예선 경기표 코트 표기 가로 고정 */
+.indiv-prelim-grid .v616d-prelim-court-line{
+  display:flex!important;
+  flex-direction:row!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+  gap:5px!important;
+  flex-wrap:nowrap!important;
+  visibility:visible!important;
+  opacity:1!important;
+  overflow-x:auto!important;
+  overflow-y:hidden!important;
+  -webkit-overflow-scrolling:touch!important;
+  white-space:nowrap!important;
+  writing-mode:horizontal-tb!important;
+}
+.indiv-prelim-grid .v616d-prelim-court-line *,
+.indiv-prelim-grid .v616d-prelim-court-line span,
+.indiv-prelim-grid .v616d-prelim-court-line .badge{
+  writing-mode:horizontal-tb!important;
+  text-orientation:mixed!important;
+  white-space:nowrap!important;
+  word-break:keep-all!important;
+  overflow-wrap:normal!important;
+  flex:0 0 auto!important;
+  max-width:none!important;
+  width:auto!important;
+  min-width:auto!important;
+}
+.indiv-prelim-grid .v616d-prelim-court-line .badge{
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  visibility:visible!important;
+  opacity:1!important;
+}
+.indiv-prelim-grid .v616d-prelim-court-line .btn{
+  flex:0 0 auto!important;
+  white-space:nowrap!important;
+}
+@media(max-width:680px){
+  .indiv-prelim-grid .v616d-prelim-court-line{
+    padding:7px 8px!important;
+    font-size:.68rem!important;
+    gap:4px!important;
+    scrollbar-width:none!important;
+  }
+  .indiv-prelim-grid .v616d-prelim-court-line::-webkit-scrollbar{display:none!important;}
+  .indiv-prelim-grid .v616d-prelim-court-line .badge{
+    font-size:.64rem!important;
+    padding:2px 6px!important;
+    border-radius:999px!important;
+  }
+  .indiv-prelim-grid .v616d-prelim-court-line .btn{
+    display:none!important;
+  }
+}
+</style>
+
+<style id="v616fPrelimCourtPlainStyle">
+/* v616f: 예선 경기표 코트 표기 - 좁은 카드에서도 깨지지 않는 단순 텍스트 */
+.indiv-prelim-grid .v616d-prelim-court-line{display:none!important;}
+.indiv-prelim-grid .v616f-prelim-court-text{
+  display:block!important;
+  visibility:visible!important;
+  opacity:1!important;
+  padding:7px 10px!important;
+  min-height:32px!important;
+  background:#fffdf5!important;
+  border-bottom:1px solid #e5e7eb!important;
+  color:#0f1e3a!important;
+  font-size:.78rem!important;
+  font-weight:900!important;
+  line-height:1.35!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  writing-mode:horizontal-tb!important;
+  word-break:keep-all!important;
+}
+.indiv-prelim-grid .v616f-prelim-court-text *{
+  writing-mode:horizontal-tb!important;
+  white-space:nowrap!important;
+  word-break:keep-all!important;
+}
+.indiv-prelim-grid .v616f-prelim-court-text b{
+  color:#475569!important;
+  margin-right:6px!important;
+}
+.indiv-prelim-grid .v616f-prelim-court-text span{
+  color:#1d4ed8!important;
+}
+@media(max-width:680px){
+  .indiv-prelim-grid .v616f-prelim-court-text{
+    padding:6px 8px!important;
+    min-height:30px!important;
+    font-size:.70rem!important;
+  }
+}
 </style>
 </head>
 <body>
@@ -13485,16 +13587,44 @@ function onCourtCardDropOnCard(ev, key, targetMid){
   ev.currentTarget && ev.currentTarget.classList.remove('drag-over-card');
   const data=getCourtBoardDropToken(ev.dataTransfer.getData('text/plain'));
   if(!data || String(data.key)!==String(key) || !data.mid) return;
-  if(String(data.mid)===String(targetMid)) return; // 자기 자신
+  // __current__ 접두사: 시합중 카드 위에 드롭 → 해당 코트 맨 앞 대기로
+  const isCurrentTarget=String(targetMid).startsWith('__current__');
+  const realTargetMid=isCurrentTarget?String(targetMid).replace('__current__',''):String(targetMid);
+  if(String(data.mid)===realTargetMid) return; // 자기 자신
   const list=G.matches[key]||[];
   const draggedM=list.find(x=>String(x.id)===String(data.mid));
-  const targetM=list.find(x=>String(x.id)===String(targetMid));
-  if(!draggedM||!targetM) return;
+  if(!draggedM) return;
   const draggedCourt=String(draggedM.court||((Array.isArray(draggedM.courts)&&draggedM.courts[0])||'')).trim();
+  if(isCurrentTarget){
+    // 시합중 카드 위 드롭: 해당 코트 1번 대기(맨 앞)로 순서 이동
+    const currentM=list.find(x=>String(x.id)===realTargetMid);
+    const court=currentM?String(currentM.court||((Array.isArray(currentM.courts)&&currentM.courts[0])||'')).trim():draggedCourt;
+    if(!court) return;
+    // 현재 그 코트 대기 1번 카드를 찾아 그 앞으로 삽입
+    const courtWaiting=(list||[])
+      .filter(x=>x && x.winner==null && String(x.id)!==String(data.mid) &&
+        (Array.isArray(x.courts)?x.courts:[x.court||'']).map(String).includes(court) &&
+        String(x.id)!==realTargetMid)
+      .sort((a,b)=>{
+        const aa=String(a.courtQueueOrder||a.courtAssignedAt||'');
+        const bb=String(b.courtQueueOrder||b.courtAssignedAt||'');
+        return aa!==bb?aa.localeCompare(bb):String(a.id||'').localeCompare(String(b.id||''),'ko');
+      });
+    if(courtWaiting.length){
+      // 1번 대기 앞으로
+      moveCourtQueueCard(key, data.mid, court, String(courtWaiting[0].id));
+    } else {
+      // 대기 없으면 해당 코트로 이동
+      moveCourtQueueCard(key, data.mid, court);
+    }
+    return;
+  }
+  const targetM=list.find(x=>String(x.id)===realTargetMid);
+  if(!targetM) return;
   const targetCourt=String(targetM.court||((Array.isArray(targetM.courts)&&targetM.courts[0])||'')).trim();
   // 같은 코트 내 순서 변경
   if(draggedCourt && draggedCourt===targetCourt){
-    moveCourtQueueCard(key, data.mid, draggedCourt, String(targetMid));
+    moveCourtQueueCard(key, data.mid, draggedCourt, realTargetMid);
   } else {
     // 다른 코트 카드가 이 카드 위에 드롭된 경우 - 코트 이동만
     moveCourtQueueCard(key, data.mid, targetCourt);
@@ -14009,8 +14139,9 @@ function renderCourtStatusBoard(key, div){
     const currentMetaEntries=[];
     // 현재경기: 시합시작 시각 1개만 표시
     if(currentElapsed.clock) currentMetaEntries.push({...currentElapsed, prefix:'시합시작'});
+    const currentMid=String(item.current?.id||'');
     const line = info
-      ? `<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px"><div style="font-size:.84rem;font-weight:900;color:var(--primary-dark);line-height:1.35;flex:1;word-break:keep-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(info.title)}</div><div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;justify-content:flex-end">${(isCurrentManual&&canManageBracket())?'<span class="badge bg-blue" style="font-size:.66rem;padding:3px 7px">수동</span>':''}${currentElapsed.badge?`<span class="badge" style="font-size:.66rem;padding:3px 7px;background:${currentElapsed.badge.bg};color:${currentElapsed.badge.color};border:1px solid ${currentElapsed.badge.bd}">${currentElapsed.badge.text}</span>`:''}</div></div>${phaseChip}${renderElapsedMetaBlocks(currentMetaEntries, currentElapsed.badge?currentElapsed.badge.color:'var(--text2)')}<div class="v490-court-action-row" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin-top:6px;width:100%">${courtBoardStableResultButtonsHtml(key,item.current)}${canManageBracket()?`<button class="btn btn-outline" type="button" style="font-size:.6rem;padding:2px 2px;min-height:28px;white-space:nowrap;width:100%;justify-content:center" onclick="sendCourtCardSms('${key}','${String(item.current?.id||'')}','match_started','${String(item.court||'')}',0)">문자</button>`:''}<button class="btn btn-outline" type="button" style="font-size:.6rem;padding:2px 2px;min-height:28px;white-space:nowrap;width:100%;justify-content:center" onclick="showCourtMovePicker('${key}','${String(item.current?.id||'')}')">코트</button></div>`
+      ? `<div ${canManageBracket()&&currentMid?`ondragover="onCourtCardDragOverCard(event,'${key}','__current__${currentMid}')" ondragleave="onCourtCardDragLeaveCard(event)" ondrop="onCourtCardDropOnCard(event,'${key}','__current__${currentMid}')"`:''} style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px"><div style="font-size:.84rem;font-weight:900;color:var(--primary-dark);line-height:1.35;flex:1;word-break:keep-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(info.title)}</div><div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;justify-content:flex-end">${(isCurrentManual&&canManageBracket())?'<span class="badge bg-blue" style="font-size:.66rem;padding:3px 7px">수동</span>':''}${currentElapsed.badge?`<span class="badge" style="font-size:.66rem;padding:3px 7px;background:${currentElapsed.badge.bg};color:${currentElapsed.badge.color};border:1px solid ${currentElapsed.badge.bd}">${currentElapsed.badge.text}</span>`:''}</div></div>${phaseChip}${renderElapsedMetaBlocks(currentMetaEntries, currentElapsed.badge?currentElapsed.badge.color:'var(--text2)')}<div class="v490-court-action-row" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin-top:6px;width:100%">${courtBoardStableResultButtonsHtml(key,item.current)}${canManageBracket()?`<button class="btn btn-outline" type="button" style="font-size:.6rem;padding:2px 2px;min-height:28px;white-space:nowrap;width:100%;justify-content:center" onclick="sendCourtCardSms('${key}','${String(item.current?.id||'')}','match_started','${String(item.court||'')}',0)">문자</button>`:''}<button class="btn btn-outline" type="button" style="font-size:.6rem;padding:2px 2px;min-height:28px;white-space:nowrap;width:100%;justify-content:center" onclick="showCourtMovePicker('${key}','${String(item.current?.id||'')}')">코트</button></div>`
       : `<div style="font-size:.84rem;font-weight:800;color:#64748b;line-height:1.45">배정된 진행 경기 없음</div>
          <div style="font-size:.74rem;color:var(--text3);margin-top:4px">경기 코트 배정을 하면 이 코트에 표시됩니다.</div>`;
     const waitingList=[...(item.__visibleWaiting||[])];
@@ -22937,9 +23068,48 @@ function clearBracketStaleCachesForReset(tidOrKey){
 }
 window.clearBracketStaleCachesForReset=clearBracketStaleCachesForReset;
 
+// v616: 예선 초기화 = 경기 기록만 삭제, 대진표 유지
 async function resetPrelimDrawOnly(key){
   const {tid,div}=_k2td(key);
-  if(!confirm(`예선 리셋을 진행합니다.
+  if(!confirm(`예선 기록 초기화를 진행합니다.
+
+- 예선 경기 결과/오더만 초기화
+- 예선 대진표(조 편성)는 유지
+- 본선 경기 결과도 함께 제거
+- 본선 대진표는 유지
+- 팀 등록/시드 유지
+
+경기 기록만 지우고 대진표는 그대로 두시겠습니까?`)) return;
+  sl(true);
+  try{
+    clearBracketStaleCachesForReset(key);
+    // 경기 기록 초기화 (선수 승패 조정)
+    const matches=G.matches[key]||[];
+    const teams=G.teams[key]||[];
+    const affected=new Set();
+    for(const m of matches){
+      if(m.winner==null) continue;
+      const wt=teams[m.winner],lt=teams[m.winner===m.t1?m.t2:m.t1];
+      (wt?.players||[]).forEach(n=>{const k=getPlayerKey(n,baseClub(wt?.club||''));if(G.players[k]){G.players[k].wins=Math.max(0,(G.players[k].wins||0)-1);affected.add(k);}});
+      (lt?.players||[]).forEach(n=>{const k=getPlayerKey(n,baseClub(lt?.club||''));if(G.players[k]){G.players[k].losses=Math.max(0,(G.players[k].losses||0)-1);affected.add(k);}});
+    }
+    if(affected.size>0) enqueuePlayerPersist([...affected], 4000);
+    G.matches[key]=[];
+    await stM(key);
+    if(G.mainMatches && G.mainMatches[key]) delete G.mainMatches[key];
+    // 대진표(G.draws[key])는 건드리지 않음
+    await fbLog(`예선 기록 초기화: ${tid} ${dl(div)} (대진 유지, 경기 기록만 삭제)`,'♻️');
+    sl(false);
+    toast('예선 기록 초기화 완료 ✅ 대진표는 유지됩니다','success');
+    clearBracketStaleCachesForReset(key);
+    renderBracket();
+  }catch(e){ sl(false); toast('예선 초기화 실패: '+e.message,'error'); }
+}
+
+// v616: 예선 재추첨 = 대진표+기록 전체 초기화 (기존 resetPrelimDrawOnly 동작)
+async function resetPrelimAndRedraw(key){
+  const {tid,div}=_k2td(key);
+  if(!confirm(`예선 재추첨을 진행합니다.
 
 - 예선 대진표/예선 경기/예선 결과/오더를 모두 초기화
 - 본선 대진표/본선 경기/본선 결과도 함께 제거
@@ -22970,13 +23140,13 @@ async function resetPrelimDrawOnly(key){
       try{ await deleteDoc(doc(db,'draws',key)); }catch(_e){}
       delete G.draws[key];
     }
-    await fbLog(`예선 리셋: ${tid} ${dl(div)} (예선/본선 대진 전체 초기화, 시드 유지)`,'♻️');
+    await fbLog(`예선 재추첨: ${tid} ${dl(div)} (예선/본선 대진 전체 초기화, 시드 유지)`,'♻️');
     sl(false);
-    toast('예선 리셋 완료 ✅ 예선·본선 대진은 초기화되고 관리자 시드는 유지됩니다','success');
+    toast('예선 재추첨 준비 완료 ✅ 예선·본선 대진이 초기화되었습니다','success');
     clearBracketStaleCachesForReset(key);
     const bc=ge('bracketContent'); if(bc) bc.innerHTML='<div class="empty-state card"><div class="empty-icon">🎲</div><p>예선 추첨 전 상태입니다</p></div>';
     renderBracket();
-  }catch(e){ sl(false); toast('예선 리셋 실패: '+e.message,'error'); }
+  }catch(e){ sl(false); toast('예선 재추첨 초기화 실패: '+e.message,'error'); }
 }
 
 async function resetMainDrawOnly(key){
@@ -24325,7 +24495,8 @@ function renderBracketHTMLForDiv(tid,div,isAll){
             ${canManageBracket()?`<button class="btn-sm login-menu-item" onclick="closeMiniMenu('${prelimMenuWrapId}');${prelimRedrawAction}" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">${draw?'🎲 예선 재추첨':'🎲 예선 추첨 시작'}</button>`:''}
             <button class="btn-sm login-menu-item" onclick="closeMiniMenu('${prelimMenuWrapId}');openLatestSavedDraw('${tid}','${div}','prelim')" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12);${latestPrelimSavedDraw?'':'opacity:.5;cursor:not-allowed;'}" ${latestPrelimSavedDraw?'':'disabled'}>📋 예선 결과 보기</button>
             <button class="btn-sm login-menu-item" onclick="closeMiniMenu('${prelimMenuWrapId}');openDrawHistory('${tid}','${div}','prelim')" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">🗂 예선 추첨 기록</button>
-            ${canManageBracket()?`<button class="btn-sm login-menu-item" onclick="closeMiniMenu('${prelimMenuWrapId}');resetPrelimDrawOnly('${key}')" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">♻️ 예선 초기화</button>`:''}
+            ${canManageBracket()?`<button class="btn-sm login-menu-item" onclick="closeMiniMenu('${prelimMenuWrapId}');resetPrelimDrawOnly('${key}')" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">♻️ 예선 기록 초기화</button>`:''}
+            ${(canManageBracket()&&draw)?`<button class="btn-sm login-menu-item" onclick="closeMiniMenu('${prelimMenuWrapId}');resetPrelimAndRedraw('${key}')" style="background:#fff5f5;color:#b91c1c;border:1px solid #fecaca">🔄 예선 재추첨(대진 초기화)</button>`:''}
           </div>
         </div>` : ``}
         ${isGroupKO && showMainDrawManageMenus ? `<div class="login-menu-wrap js-mini-menu" id="${mainMenuWrapId}">
@@ -24443,14 +24614,27 @@ function renderBracketHTMLForDiv(tid,div,isAll){
       const grpDone=gms.length>0&&gms.every(m=>getMatchResultState(key,m).done);
 
       const grpCourts = getGroupDisplayCourts(key, gi);
+      // v616f: 예선 경기표 코트 표기는 실제 코트현황판에서 쓰는 manualCourtTarget까지 포함해서 표시
+      const _courtRawList = [
+        ...(grpCourts||[]),
+        ...gms.flatMap(m=>[
+          ...(Array.isArray(m?.courts)?m.courts:[]),
+          m?.court,
+          m?.manualCourtTarget,
+          m?.__sharedCourtLabel
+        ])
+      ].map(v=>String(v||'').trim()).filter(Boolean);
+      const _liveCourts = [...new Set(_courtRawList.filter(c=>!/(공용\s*대기|대기중|조번호|확정\s*고정)/.test(c)))];
       // v548d: 코트명 또는 부서명에서 지역 추출
       const _grpRegion = (()=>{
-        const src = grpCourts[0] || div || '';
+        const src = _liveCourts[0] || grpCourts[0] || div || '';
         return typeof extractCourtRegion==='function' ? extractCourtRegion(src) : '기타';
       })();
-      const courtBadges = grpCourts.length
-        ? grpCourts.map(c=>`<span class="badge bg-blue" style="font-size:.82rem;padding:3px 9px">🎾 ${c}</span>`).join(' ')
+      const courtBadges = _liveCourts.length
+        ? _liveCourts.map(c=>`<span class="badge bg-blue" style="font-size:.82rem;padding:3px 9px">🎾 ${c}</span>`).join(' ')
         : (AD ? `<span class="badge bg-gray" style="font-size:.82rem;padding:3px 9px">코트: 미배정</span>` : ``);
+      const _courtText = _liveCourts.length ? _liveCourts.join(' / ') : '미배정';
+      const _courtTextSafe = String(_courtText).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
       const grpCourtShareBadges = getGroupCourtShareBadges(key,gi);
       const doneCnt=gms.filter(m=>getMatchResultState(key,m).done).length;
       const indivMode=isIndividualByKey(key);
@@ -24486,6 +24670,7 @@ function renderBracketHTMLForDiv(tid,div,isAll){
             ${indivMode?`<button id="indivGroupToggle_${key}_${gi}" class="btn btn-outline" style="padding:5px 13px;font-size:.86rem;white-space:nowrap;background:rgba(255,255,255,.18);border:1.5px solid rgba(255,255,255,.5);color:white;border-radius:999px;font-weight:700" onclick="toggleIndividualGroupMatches('${key}',${gi})">📂 경기 보기</button>`:''}
           </div>
         </div>
+        ${indivMode?`<div class="v616f-prelim-court-text"><b>🎾 코트</b><span>${_courtTextSafe}</span></div>`:''}
         ${grpMemo?renderNoticeTicker(grpMemo,'📢 공지(조)'):''}`;
       if(!indivMode){
         html+=`<div style="border-bottom:2px solid var(--border)">`;
@@ -25076,12 +25261,19 @@ function mCard(m,key,dn1,dn2,done,sc1,sc2,label){
     const grpCourtShareBadges=(m.phase==='group' && m.group!=null)?getGroupCourtShareBadges(key, Number(m.group)):'';
     const matchMemo=getMatchMemoByObj(m);
     const matchCourts=Array.isArray(m.courts)?m.courts:(m.court?[m.court]:[]);
-    const groupCourtUI=canManageBracket() && m.phase==='group' && m.group!=null
-      ? `<button style="padding:5px 12px;font-size:.78rem;white-space:nowrap;background:#fff;color:var(--primary-dark);border:1.5px solid var(--border);border-radius:999px;font-weight:800" onclick="openGroupCourtModal('${key}',${Number(m.group)})">🎾 조코트 ${grpCourts.length?grpCourts.join('/'): '미배정'}</button>`
+    // v616: 조 코트 - 관리자는 버튼, 일반도 코트 있으면 뱃지
+    const _indivGrpCourts = (m.phase==='group' && m.group!=null)
+      ? [...new Set([...grpCourts, ...matchCourts])].filter(Boolean)
+      : [];
+    const groupCourtUI = m.phase==='group' && m.group!=null
+      ? (canManageBracket()
+        ? `<button style="padding:5px 12px;font-size:.78rem;white-space:nowrap;background:#fff;color:var(--primary-dark);border:1.5px solid var(--border);border-radius:999px;font-weight:800" onclick="openGroupCourtModal('${key}',${Number(m.group)})">🎾 조코트 ${_indivGrpCourts.length?_indivGrpCourts.join('/'): '미배정'}</button>`
+        : (_indivGrpCourts.length ? `<span class="badge bg-blue" style="font-size:.74rem;padding:4px 9px">🎾 ${_indivGrpCourts.join(' / ')}</span>` : ''))
       : '';
+    // v616: 개인전에서 matchCourtUI는 관리자만(일반은 groupCourtUI에서 코트 표시)
     const matchCourtUI=canManageBracket()
       ? `<button style="padding:5px 12px;font-size:.78rem;white-space:nowrap;background:#fff;color:var(--primary-dark);border:1.5px solid var(--border);border-radius:999px;font-weight:800" onclick="openMatchCourtModal('${key}','${m.id}')">🎾 경기코트 ${matchCourts.length?matchCourts.join('/'): '미배정'}</button>`
-      : (matchCourts.length?`<span class="badge bg-gray" style="font-size:.74rem;padding:4px 9px">🎾 경기코트 ${matchCourts.join('/')}</span>`:'');
+      : '';
     const matchMemoUI=canManageBracket()
       ? `<button style="padding:5px 12px;font-size:.78rem;white-space:nowrap;background:#fff;color:${matchMemo?'#7a5600':'var(--primary-dark)'};border:1.5px solid ${matchMemo?'#f6d365':'var(--border)'};border-radius:999px;font-weight:800" onclick="openMatchMemoModal('${key}','${m.id}')">📢 공지(경기)${matchMemo?' 수정':' 입력'}</button>`
       : (matchMemo?renderNoticeTicker(matchMemo,'📢 공지(경기)',true):'');
@@ -38779,7 +38971,7 @@ Object.assign(window,{ openHomeRegisterWithTournament, openHomeRegisterWithTourn
   showPage,toggleAdmin,doLogin,openAdminSettings,saveAdminPassword,goBracket,onGuideFilesSelected,removeGuideFile,openGuide,loadHistFromDB,uploadHistFromExcel,previewHistExcel,renderGuidePreview,onHistGuideFilesSelected,uploadHistGuideFiles,manageHistGuide,deleteHistGuideFile,removeHistGuidePending,
   createTournament,renderTL,chgTS,delT,openET,saveET,openTD,applyRec,saveDivS,
   onRegTC,renderRL,renderRegisterDivisionOverview,selectRegDivision,registerTeam,delTeam,phint,openPHist,openETeam,saveETeam,etUpdateSlots,updateRegisterSlots,
-  onBrTC,renderBracket,toggleBracketDivision,setBracketSelectedDivs,saveBracketDivisionSettings,applyBracketRecommend,resetPrelimDrawOnly,resetMainDrawOnly,resetDrawOnly,openDraw,openDrawHistory,openLatestSavedDraw,openLatestMainSavedDraw,openSavedDrawHistory,saveDrawModalImage,saveSavedDrawImage,confirmDraw,startDraw,buildMain,openMainDraw,startMainDraw,prepareMainExternalDraw,updateMainSeedPreview,spawnConfetti,celebrateGroupComplete,
+  onBrTC,renderBracket,toggleBracketDivision,setBracketSelectedDivs,saveBracketDivisionSettings,applyBracketRecommend,resetPrelimDrawOnly,resetPrelimAndRedraw,resetMainDrawOnly,resetDrawOnly,openDraw,openDrawHistory,openLatestSavedDraw,openLatestMainSavedDraw,openSavedDrawHistory,saveDrawModalImage,saveSavedDrawImage,confirmDraw,startDraw,buildMain,openMainDraw,startMainDraw,prepareMainExternalDraw,updateMainSeedPreview,spawnConfetti,celebrateGroupComplete,
   openManualEdit,saveManualEdit,toggleByeEdit,
   openM3,saveM3,tC,setCourt,toggleGroupCourtUI,onGroupCourtChange,openGroupCourtModal,saveGroupCourtModal,setOperationViewMode,
   openMatchCourtModal,saveMatchCourtModal,autoOrderMatches,runAutoOrder,
