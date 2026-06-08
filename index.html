@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-08-v615c-auto-sms-restore";
+  const APP_VERSION = "2026-06-08-v615e2-finalize-cache";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -24119,6 +24119,8 @@ window.v606FinalizeGroupOrderForKey = async function(key){
     const ok=_v615DoFinalizeKey(key);
     if(!ok){ toast('확정할 예선 경기가 없습니다','info'); return; }
     sl(true);
+    // v615e: 캐시 무효화 → 조번호 확정 반드시 Firebase 저장
+    try{ if(typeof __FB_WRITE_CACHE!=="undefined"){ if(__FB_WRITE_CACHE.matches) delete __FB_WRITE_CACHE.matches[key]; if(__FB_WRITE_CACHE.draws) delete __FB_WRITE_CACHE.draws[key]; } }catch(_ce){}
     await stD(key);
     await stM(key);
     sl(false);
@@ -48742,8 +48744,20 @@ window.manualRefreshPlayers=manualRefreshPlayers;
 
   // 기존 코트 문자 디스패치가 전체/중복으로 작동하지 않게 막고, 결과 저장 래퍼에서만 해당 코트 기준으로 생성
   try{
-    // v615b: 원본 백업 (카드 이동 시 자동문자 승인창)
-    if(typeof window.dispatchLocalCourtNotificationAlerts==='function' && !window._origEnqueueCourtSmsAlerts){
+    // v615c: 원본 백업 (카드 이동 시 자동문자 승인창)
+    // enqueueCourtSmsAlertsFromState 원본을 직접 백업
+    if(!window._origEnqueueCourtSmsAlerts && typeof enqueueCourtSmsAlertsFromState==='function'){
+      const _bkEnq=enqueueCourtSmsAlertsFromState;
+      window._origEnqueueCourtSmsAlerts=function(prev, next){
+        try{
+          if(next) _bkEnq(prev, next);
+          else {
+            const ns=buildCourtNotificationStateMap(window.G&&G.matches||{});
+            _bkEnq(prev, ns);
+          }
+        }catch(e){}
+      };
+    } else if(!window._origEnqueueCourtSmsAlerts && typeof window.dispatchLocalCourtNotificationAlerts==='function'){
       const _bk=window.dispatchLocalCourtNotificationAlerts;
       window._origEnqueueCourtSmsAlerts=function(prev){ try{ _bk(prev); }catch(e){} };
     }
@@ -53948,6 +53962,8 @@ window.manualRefreshPlayers=manualRefreshPlayers;
       G.draws[key].conditionalAppliedBy='v604';
     }catch(e){}
     try{ if(typeof fbLog==='function') fbLog(`조건부 예선추첨 실제 반영: ${idw.tid} ${idw.div} (${conditionCount(cfg)}건)`,'⚙️'); }catch(e){}
+    // v615c: isSameFbWrite 캐시 강제 무효화 → manualCourtLocked 반드시 Firebase에 저장
+    try{ if(typeof __FB_WRITE_CACHE!=='undefined'){ if(__FB_WRITE_CACHE.matches) delete __FB_WRITE_CACHE.matches[key]; if(__FB_WRITE_CACHE.draws) delete __FB_WRITE_CACHE.draws[key]; } }catch(e){}
     try{ if(typeof stD==='function') await stD(key); }catch(e){ console.warn(PATCH,'stD failed',e); }
     try{ if(typeof stM==='function') await stM(key); }catch(e){ console.warn(PATCH,'stM failed',e); }
     try{ if(typeof renderBracket==='function') renderBracket(); }catch(e){}
@@ -54401,6 +54417,8 @@ window.manualRefreshPlayers=manualRefreshPlayers;
       for(const div of indivDivs){
         const key=tid+'_'+div;
         if(typeof _v615DoFinalizeKey==='function') _v615DoFinalizeKey(key);
+        // v615e: 캐시 무효화
+        try{ if(typeof __FB_WRITE_CACHE!=="undefined"){ if(__FB_WRITE_CACHE.matches) delete __FB_WRITE_CACHE.matches[key]; if(__FB_WRITE_CACHE.draws) delete __FB_WRITE_CACHE.draws[key]; } }catch(_ce){}
         await stD(key);
         await stM(key);
       }
@@ -55449,6 +55467,379 @@ window.manualRefreshPlayers=manualRefreshPlayers;
       if(typeof toast==='function') toast('조 번호 확정 실패: '+(e.message||e),'error');
     }
   };
+})();
+</script>
+
+
+<script id="v615eStableCourtOrderAndSmsFix">
+(function(){
+  'use strict';
+  const VER='v615e-stable-court-order-sms-fix';
+
+  function arr(v){ return Array.isArray(v)?v:[]; }
+  function clean(v){ return String(v||'').replace(/\s+/g,' ').trim(); }
+  function toastSafe(msg,type){ try{ if(typeof toast==='function') toast(msg,type||'info'); else console.log(msg); }catch(e){ console.log(msg); } }
+  function keyParts(key){ const s=String(key||''); const i=s.indexOf('_'); return i>=0?{tid:s.slice(0,i),div:s.slice(i+1)}:{tid:'',div:''}; }
+  function storeKey(key){ return 'v592_indiv_draw_conditions_'+String(key||''); }
+  function loadCond(key){
+    try{ if(window.__v605ConditionStore && window.__v605ConditionStore[key]) return window.__v605ConditionStore[key]||{}; }catch(e){}
+    try{ const raw=localStorage.getItem(storeKey(key)); if(raw) return JSON.parse(raw)||{}; }catch(e){}
+    try{ return (window.G&&G.draws&&G.draws[key]&&G.draws[key].individualDrawConditions)||{}; }catch(e){}
+    return {};
+  }
+  function isIndividualKeySafe(key){
+    try{ if(typeof isIndividualByKey==='function') return !!isIndividualByKey(key); }catch(e){}
+    try{ return !!(window.G&&G.draws&&G.draws[key]&&G.draws[key].indivMode); }catch(e){}
+    return false;
+  }
+  function getCourts(key){
+    const {tid,div}=keyParts(key);
+    let out=[];
+    try{ if(typeof getDivisionPhaseConfiguredCourts==='function') out=getDivisionPhaseConfiguredCourts(tid,div,'group')||[]; }catch(e){}
+    if(!out.length){ try{ if(typeof getBracketAllowedCourts==='function') out=getBracketAllowedCourts(key)||[]; }catch(e){} }
+    if(!out.length){ try{ if(typeof getPrelimCourtPool==='function') out=getPrelimCourtPool(key)||[]; }catch(e){} }
+    return [...new Set(arr(out).map(x=>clean(x)).filter(Boolean))];
+  }
+  function conditionCount(cfg){
+    try{
+      const teams=(cfg&&cfg.teams)||{};
+      return Object.values(teams).filter(c=>c&&(c.seed||c.group||c.court||(c.order&&c.order!=='auto'))).length;
+    }catch(e){ return 0; }
+  }
+  function matchCourt(m){
+    return clean(m&&((Array.isArray(m.courts)&&m.courts[0])||m.court||m.manualCourtTarget||''));
+  }
+  function matchSort(a,b){
+    const ai=String(a.id||''), bi=String(b.id||'');
+    if(ai!==bi) return ai.localeCompare(bi,'ko');
+    return 0;
+  }
+  function slotIso(n){
+    return new Date(Date.UTC(2000,0,1,0,0,Math.max(0,Number(n)||0),0)).toISOString();
+  }
+  function invalidateKeyCache(key){
+    try{
+      if(typeof __FB_WRITE_CACHE!=='undefined'){
+        if(__FB_WRITE_CACHE.matches) delete __FB_WRITE_CACHE.matches[key];
+        if(__FB_WRITE_CACHE.draws) delete __FB_WRITE_CACHE.draws[key];
+        if(__FB_WRITE_CACHE.meta!==undefined) __FB_WRITE_CACHE.meta='';
+      }
+    }catch(e){}
+  }
+
+  function buildGroupConditionMap(key,cfg){
+    const draw=window.G&&G.draws&&G.draws[key];
+    const cond=(cfg&&cfg.teams)||{};
+    const ORDER={start:0,wait1:1,wait2:2,wait3:3,wait4:4,auto:null};
+    const groupCourt=Object.create(null);
+    const groupOrder=Object.create(null);
+    const conditionGroups=new Set();
+
+    arr(draw&&draw.groups).forEach((grp,gi)=>{
+      arr(grp&&grp.teams).forEach(ti=>{
+        const c=cond[String(ti)] || cond[Number(ti)];
+        if(!c) return;
+        if(c.court){
+          groupCourt[gi]=clean(c.court);
+          conditionGroups.add(Number(gi));
+        }
+        if(c.order && c.order!=='auto'){
+          const v=ORDER[c.order];
+          if(v!==null && v!==undefined){
+            groupOrder[gi]=Math.min(groupOrder[gi]??99, v);
+            conditionGroups.add(Number(gi));
+          }
+        }
+      });
+    });
+    return {groupCourt,groupOrder,conditionGroups};
+  }
+
+  function applyStableCourtOrderForKey(key, source){
+    try{
+      if(!key || !window.G || !G.matches || !G.draws || !G.draws[key] || !isIndividualKeySafe(key)) return false;
+      const cfg=loadCond(key);
+      if(!cfg || !conditionCount(cfg)) return false;
+
+      const draw=G.draws[key];
+      const matches=arr(G.matches[key]).filter(m=>m&&String(m.phase||'')==='group'&&m.winner==null);
+      if(!matches.length) return false;
+
+      const courts=getCourts(key);
+      const {groupCourt,groupOrder,conditionGroups}=buildGroupConditionMap(key,cfg);
+      const byGroup=new Map();
+      matches.forEach(m=>{
+        const gi=Number(m.group||0);
+        if(!byGroup.has(gi)) byGroup.set(gi,[]);
+        byGroup.get(gi).push(m);
+      });
+
+      const courtToItems=new Map();
+      const nowIso=new Date().toISOString();
+
+      [...byGroup.entries()].sort((a,b)=>Number(a[0])-Number(b[0])).forEach(([gi,ms])=>{
+        ms.sort(matchSort);
+        const grp=arr(draw.groups)[gi]||{};
+        const chosenCourt=clean(groupCourt[gi] || grp.court || arr(grp.courts)[0] || matchCourt(ms[0]) || courts[gi % Math.max(1,courts.length)] || '');
+        if(!chosenCourt) return;
+        if(!courtToItems.has(chosenCourt)) courtToItems.set(chosenCourt,[]);
+        const explicitSlot=(groupOrder[gi]!==undefined && groupOrder[gi]!==null && Number.isFinite(Number(groupOrder[gi]))) ? Number(groupOrder[gi]) : null;
+        ms.forEach((m,pos)=>{
+          courtToItems.get(chosenCourt).push({
+            m, gi:Number(gi), pos,
+            condition:conditionGroups.has(Number(gi)),
+            targetSlot:explicitSlot===null ? null : explicitSlot+pos
+          });
+        });
+      });
+
+      let changed=false;
+      const orderedCourts=[...new Set([...courts, ...courtToItems.keys()].map(String).filter(Boolean))];
+
+      orderedCourts.forEach(court=>{
+        const items=arr(courtToItems.get(court));
+        if(!items.length) return;
+        const desired=new Map();
+        const auto=[];
+        items.forEach(it=>{
+          if(it.targetSlot!==null){
+            const s=Math.max(0,Number(it.targetSlot)||0);
+            if(!desired.has(s)) desired.set(s,[]);
+            desired.get(s).push(it);
+          }else{
+            auto.push(it);
+          }
+        });
+        auto.sort((a,b)=>a.gi-b.gi || a.pos-b.pos || matchSort(a.m,b.m));
+        desired.forEach(v=>v.sort((a,b)=>a.gi-b.gi || a.pos-b.pos || matchSort(a.m,b.m)));
+
+        const output=[];
+        let slot=0, guard=0;
+        while((auto.length || desired.size) && guard++<10000){
+          if(desired.has(slot)){
+            output.push(...desired.get(slot));
+            desired.delete(slot);
+            slot++;
+            continue;
+          }
+          if(auto.length){
+            output.push(auto.shift());
+            slot++;
+            continue;
+          }
+          const future=[...desired.keys()].sort((a,b)=>a-b)[0];
+          if(future===undefined) break;
+          slot=future;
+        }
+
+        output.forEach((it,idx)=>{
+          const m=it.m;
+          const before=JSON.stringify({
+            court:m.court||'', courts:m.courts||[], q:m.courtQueueOrder||'', wait:m.waitingFirstAt||'',
+            locked:m.manualCourtLocked===true, target:m.manualCourtTarget||'', label:m.autoCourtLabel||''
+          });
+          m.court=court;
+          m.courts=[court];
+          m.manualCourtTarget=court;
+          m.manualCourtLocked=true;
+          m.manualCourtLockedAt=m.manualCourtLockedAt||nowIso;
+          m.manualCourtPinnedAt=m.manualCourtPinnedAt||slotIso(idx);
+          m.courtAssignedAt=m.courtAssignedAt||nowIso;
+          m.courtQueueOrder=slotIso(idx);
+          if(idx>0) m.waitingFirstAt=m.waitingFirstAt||nowIso;
+          else delete m.waitingFirstAt;
+          m.autoCourtLabel=it.condition?'조건 고정':'조건 적용 후 고정';
+          m.initialPrelimAutoCourt=false;
+          m.v615eStableCourtOrder=true;
+          const after=JSON.stringify({
+            court:m.court||'', courts:m.courts||[], q:m.courtQueueOrder||'', wait:m.waitingFirstAt||'',
+            locked:m.manualCourtLocked===true, target:m.manualCourtTarget||'', label:m.autoCourtLabel||''
+          });
+          if(before!==after) changed=true;
+        });
+      });
+
+      arr(draw.groups).forEach((grp,gi)=>{
+        const ms=arr(G.matches[key]).filter(m=>m&&String(m.phase||'')==='group'&&Number(m.group)===Number(gi));
+        const c=clean(groupCourt[gi] || (ms[0]&&matchCourt(ms[0])) || grp.court || arr(grp.courts)[0] || '');
+        if(c){
+          const before=JSON.stringify({court:grp.court||'', courts:grp.courts||[]});
+          grp.court=c;
+          grp.courts=[c];
+          try{ if(typeof cleanCourtGroup==='function') grp.courtGroup=cleanCourtGroup(c); }catch(e){}
+          if(JSON.stringify({court:grp.court||'', courts:grp.courts||[]})!==before) changed=true;
+        }
+      });
+
+      draw.individualDrawConditions=cfg;
+      draw.v615eStableCourtOrderAppliedAt=nowIso;
+      draw.v615eStableCourtOrderSource=source||'manual';
+      invalidateKeyCache(key);
+      return changed;
+    }catch(e){
+      console.warn('[v615e] applyStableCourtOrderForKey failed',key,e);
+      return false;
+    }
+  }
+
+  async function saveKey(key){
+    invalidateKeyCache(key);
+    try{ if(typeof stD==='function') await stD(key); }catch(e){ console.warn('[v615e] stD failed',e); }
+    try{ if(typeof stM==='function') await stM(key); }catch(e){ console.warn('[v615e] stM failed',e); }
+  }
+
+  async function applyAndSave(key, source, doRender){
+    const changed=applyStableCourtOrderForKey(key,source);
+    if(changed) await saveKey(key);
+    if(doRender!==false){
+      try{ if(typeof renderBracket==='function') renderBracket(); }catch(e){}
+      try{ if(typeof renderCourtStatusBoard==='function' && typeof refreshCurrentBracket==='function') refreshCurrentBracket(); }catch(e){}
+    }
+    return changed;
+  }
+
+  const prevApply=window.v604ApplyConditionalPrelimNow;
+  window.v604ApplyConditionalPrelimNow=async function(){
+    let r=false;
+    try{ if(typeof prevApply==='function') r=await prevApply.apply(this,arguments); }catch(e){}
+    try{
+      let key='';
+      try{ key=(window.IDW&&window.IDW.key)||''; }catch(e){}
+      if(!key){
+        const tid=document.getElementById('brTS')?.value||document.getElementById('regTS')?.value||'';
+        const div=document.getElementById('brDS')?.value||document.getElementById('regDS')?.value||'';
+        key=tid&&div ? `${tid}_${div}` : '';
+      }
+      if(key) r=(await applyAndSave(key,'v604-manual',true))||r;
+    }catch(e){ console.warn('[v615e] v604Apply wrapper failed',e); }
+    return r;
+  };
+
+  function patchDrawConfirm(){
+    const btn=document.getElementById('confirmDrawBtn');
+    if(!btn || btn.__v615eStableOrderWrapped) return;
+    const old=btn.onclick;
+    if(typeof old!=='function') return;
+    btn.onclick=async function(ev){
+      const r=old.call(this,ev);
+      try{ if(r&&typeof r.then==='function') await r; }catch(e){ throw e; }
+      const run=()=>{ try{ window.v604ApplyConditionalPrelimNow(); }catch(e){} };
+      setTimeout(run,450);
+      setTimeout(run,1300);
+      setTimeout(run,2600);
+      return r;
+    };
+    btn.__v615eStableOrderWrapped=true;
+  }
+
+  function selectedKeys(){
+    try{
+      const tid=document.getElementById('brTS')?.value||document.getElementById('regTS')?.value||'';
+      let keys=Object.keys((window.G&&G.draws)||{});
+      if(!tid) return keys;
+      return keys.filter(k=>keyParts(k).tid===tid);
+    }catch(e){ return []; }
+  }
+
+  async function reapplyVisibleConditionKeys(source){
+    const keys=selectedKeys().filter(k=>conditionCount(loadCond(k))>0);
+    let changed=false;
+    for(const k of keys){ if(await applyAndSave(k,source,false)) changed=true; }
+    if(changed){ try{ if(typeof renderBracket==='function') renderBracket(); }catch(e){} }
+    return changed;
+  }
+
+  const oldFinalizeKey=window.v606FinalizeGroupOrderForKey;
+  if(typeof oldFinalizeKey==='function' && !oldFinalizeKey.__v615eWrapped){
+    const w=async function(key){
+      const r=await oldFinalizeKey.apply(this,arguments);
+      try{ if(key) await saveKey(key); }catch(e){}
+      return r;
+    };
+    w.__v615eWrapped=true;
+    window.v606FinalizeGroupOrderForKey=w;
+  }
+
+  const oldFinalizeAll=window.v606FinalizeGroupOrder;
+  if(typeof oldFinalizeAll==='function' && !oldFinalizeAll.__v615eWrapped){
+    const w=async function(){
+      const r=await oldFinalizeAll.apply(this,arguments);
+      try{
+        for(const k of selectedKeys()) await saveKey(k);
+      }catch(e){}
+      return r;
+    };
+    w.__v615eWrapped=true;
+    window.v606FinalizeGroupOrder=w;
+  }
+
+  function installSmsBackup(){
+    try{
+      if(typeof enqueueCourtSmsAlertsFromState==='function'){
+        const direct=enqueueCourtSmsAlertsFromState;
+        window._origEnqueueCourtSmsAlerts=function(prev,next){
+          try{
+            const ns=next || (typeof buildCourtNotificationStateMap==='function' ? buildCourtNotificationStateMap((window.G&&G.matches)||{}) : null);
+            if(ns) direct(prev,ns);
+          }catch(e){ console.warn('[v615e] sms direct failed',e); }
+        };
+      }
+    }catch(e){}
+  }
+
+  const oldSaveSms=window.saveAutoSmsSettings;
+  if(typeof oldSaveSms==='function' && !oldSaveSms.__v615eWrapped){
+    const w=async function(){
+      try{
+        if(window.G&&G.meta&&typeof readAutoSmsSettingsFromForm==='function'){
+          G.meta.autoSmsSettings=readAutoSmsSettingsFromForm();
+          if(typeof __FB_WRITE_CACHE!=='undefined') __FB_WRITE_CACHE.meta='';
+        }
+      }catch(e){}
+      const r=await oldSaveSms.apply(this,arguments);
+      try{ if(typeof __FB_WRITE_CACHE!=='undefined') __FB_WRITE_CACHE.meta=''; }catch(e){}
+      installSmsBackup();
+      return r;
+    };
+    w.__v615eWrapped=true;
+    window.saveAutoSmsSettings=w;
+  }
+
+  const oldMove=window.moveCourtQueueCard;
+  if(typeof oldMove==='function' && !oldMove.__v615eWrapped){
+    const w=async function(key,mid,targetCourt){
+      let prev=null;
+      try{ if(typeof captureCourtNotificationState==='function') prev=captureCourtNotificationState(); }catch(e){}
+      const r=await oldMove.apply(this,arguments);
+      setTimeout(()=>{
+        try{
+          installSmsBackup();
+          if(prev && typeof window._origEnqueueCourtSmsAlerts==='function'){
+            const next=typeof buildCourtNotificationStateMap==='function' ? buildCourtNotificationStateMap((window.G&&G.matches)||{}) : null;
+            if(next) window._origEnqueueCourtSmsAlerts(prev,next);
+          }
+        }catch(e){}
+      },500);
+      return r;
+    };
+    w.__v615eWrapped=true;
+    window.moveCourtQueueCard=w;
+  }
+
+  function install(){
+    installSmsBackup();
+    patchDrawConfirm();
+    setTimeout(patchDrawConfirm,200);
+    setTimeout(patchDrawConfirm,800);
+    setTimeout(()=>reapplyVisibleConditionKeys('startup'),1200);
+  }
+
+  document.addEventListener('click',()=>setTimeout(patchDrawConfirm,80),true);
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',install);
+  else install();
+
+  window.v615eApplyStableCourtOrderForKey=applyAndSave;
+  window.v615eReapplyVisibleConditionKeys=reapplyVisibleConditionKeys;
 })();
 </script>
 
