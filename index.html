@@ -49120,9 +49120,25 @@ window.manualRefreshPlayers=manualRefreshPlayers;
     if(typeof orig==='function' && !orig.__v538Wrapped){
       const wrapped=async function(){
         const prev=getState();
+        // v617: 경기 완료/코트 변경 알림을 위해 courts 상태도 백업
+        let prevCourtState=null;
+        try{ if(typeof buildCourtNotificationStateMap==='function') prevCourtState=buildCourtNotificationStateMap(window.G&&G.matches||{}); }catch(e){}
         const res=await orig.apply(this,arguments);
         setTimeout(()=>{ try{ enqueueQueueSmsAfterResult(prev,getState()); }catch(e){} }, 250);
         setTimeout(()=>{ try{ cleanupPrelimButtons(document); }catch(e){} }, 350);
+        // v617: 내 PC에서 결과 저장 시에도 완료/배정 알림 발생
+        setTimeout(()=>{
+          try{
+            if(prevCourtState && typeof buildCourtNotificationStateMap==='function'){
+              const nextCourtState=buildCourtNotificationStateMap(window.G&&G.matches||{});
+              if(typeof window._origEnqueueCourtSmsAlerts==='function'){
+                window._origEnqueueCourtSmsAlerts(prevCourtState, nextCourtState);
+              } else if(typeof window.enqueueCourtSmsAlertsFromState==='function'){
+                window.enqueueCourtSmsAlertsFromState(prevCourtState, nextCourtState);
+              }
+            }
+          }catch(e){ console.warn('[v617] court alert after saveM3Core failed', e); }
+        }, 500);
         return res;
       };
       wrapped.__v538Wrapped=true;
