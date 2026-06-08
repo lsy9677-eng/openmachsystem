@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-08-v617b-finalize-persist-lock";
+  const APP_VERSION = "2026-06-08-v617d-sms-confirmed-waitlist";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -57084,5 +57084,96 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
 })();
 </script>
 
+
+
+<!-- v617d: settings SMS targets separated by confirmed / waitlist / paid status -->
+<style id="v617dSmsConfirmedWaitlistStyle">
+#sms423Panel .sms423-chip.confirmed{background:#dcfce7;color:#166534;border:1px solid #86efac}
+#sms423Panel .sms423-chip.waitlist{background:#fff7ed;color:#c2410c;border:1px solid #fdba74}
+#sms423Panel .sms423-row.waitlist{border-left:4px solid #fb923c;background:#fffaf5}
+#sms423Panel .sms423-row.confirmed{border-left:4px solid #16a34a}
+#sms423Panel .sms617d-safe-note{padding:9px 11px;border-radius:12px;background:#fff7ed;border:1px solid #fdba74;color:#9a3412;font-size:.74rem;font-weight:900;line-height:1.55;margin:0 0 10px}
+#sms423Panel .sms617d-filter-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px}
+@media(max-width:680px){#sms423Panel .sms617d-filter-grid{grid-template-columns:1fr}}
+</style>
+<script id="v617dSmsConfirmedWaitlistScript">
+(function(){
+  'use strict';
+  var S={selected:new Set()};
+  function ge(id){return document.getElementById(id);} 
+  function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];});}
+  function toastMsg(msg,type){try{if(typeof toast==='function')return toast(msg,type||'info');}catch(e){} alert(msg);} 
+  function phoneKey(v){return String(v||'').replace(/[^0-9]/g,'');}
+  function normPhone(v){return String(v||'').replace(/[^0-9+]/g,'');}
+  function fmtPhone(v){try{if(typeof formatPhoneLoose==='function')return formatPhoneLoose(v);}catch(e){} return String(v||'');}
+  function divLabel(d){try{return typeof dl==='function'?dl(d):String(d||'');}catch(e){return String(d||'');}}
+  function isOpenSettings(){var m=ge('mAdminSettings');return !!(m&&m.classList.contains('open'));}
+  function adminLike(){try{if(typeof AD!=='undefined'&&AD)return true;}catch(e){} try{if(typeof TM!=='undefined'&&TM)return true;}catch(e){} try{if(window.AD||window.TM)return true;}catch(e){} try{if(document.body.classList.contains('admin-mode')||document.body.classList.contains('tm-mode'))return true;}catch(e){} return isOpenSettings();}
+  function isIndividual(t){try{if(typeof isIndividualTournament==='function'&&isIndividualTournament(t))return true;}catch(e){} var type=String((t&&(t.tournamentType||t.type||t.mode))||''); if(type==='individual_pair')return true; try{var ds=(t&&t.divisions)||[];return ds.some(function(d){return ((window.G&&G.teams&&G.teams[t.id+'_'+d])||[]).some(function(x){return Array.isArray(x.individualPlayers)||x.tournamentType==='individual_pair';});});}catch(e){} return false;}
+  function tournaments(){return ((window.G&&G.tournaments)||[]).filter(isIndividual);} 
+  function currentTid(){var opts=[ge('sms423Tournament')&&ge('sms423Tournament').value,ge('regTS')&&ge('regTS').value,ge('brTS')&&ge('brTS').value].filter(Boolean); var list=tournaments(); for(var i=0;i<opts.length;i++){if(list.some(function(t){return String(t.id)===String(opts[i]);}))return opts[i];} return ((list.find(function(t){return ['open','ongoing'].indexOf(String(t.status||''))>=0;})||list[0]||{}).id)||'';}
+  function playersOf(team){try{if(typeof getIndividualPlayers==='function')return getIndividualPlayers(team)||[];}catch(e){} if(Array.isArray(team&&team.individualPlayers))return team.individualPlayers; if(Array.isArray(team&&team.players))return team.players.slice(0,2).map(function(v){return typeof v==='string'?{name:v}:v;}); return [];} 
+  function phoneOf(o){return o&&(o.phone||o.phoneNumber||o.mobile||o.tel||o.contact||o.contactPhone)||'';}
+  function paidOf(team){try{if(typeof getTeamPaymentPaid==='function')return !!getTeamPaymentPaid(team);}catch(e){} var s=String((team&&(team.paymentStatus||team.payStatus||team.feeStatus))||'').toLowerCase(); return !!(team&&(team.feePaid===true||team.paymentPaid===true||team.paid===true||s==='paid'||s==='입금완료'||s==='입금확인'));}
+  function deleted(team){return !team||team.deleted===true||String(team.status||'')==='deleted';}
+  function maxTeamsOf(t,div){try{if(typeof getDivisionMaxTeams==='function')return Number(getDivisionMaxTeams(t.id,div)||0)||0;}catch(e){} var v=Number(t&&t.divSettings&&t.divSettings[div]&&t.divSettings[div].maxTeams||0); return Number.isFinite(v)&&v>0?v:0;}
+  function waitInfo(t,div,key,idx,team){
+    var explicit=!!(team&&(team.registrationStatus==='waitlist'||team.waitlisted===true||team.isWaitlist===true||team.waitlist===true));
+    var max=maxTeamsOf(t,div);
+    var byOrder=max>0 && Number(idx)>=max;
+    var wait=explicit||byOrder;
+    var no=Number(team&&team.waitlistNo||0)||0;
+    if(wait&&!no&&max>0)no=Math.max(1,Number(idx)-max+1);
+    try{if(typeof isTeamWaitlistedForKey==='function'&&isTeamWaitlistedForKey(key,idx)){wait=true;if(!no&&typeof getWaitlistNoForKey==='function')no=Number(getWaitlistNoForKey(key,idx)||0)||no;}}catch(e){}
+    return {wait:!!wait,no:no||0,max:max};
+  }
+  function teamName(team,idx){var ps=playersOf(team).slice(0,2).map(function(p){return String((p&&p.name)||'').trim();}).filter(Boolean);return ps.join(' / ')||String(team&&(team.pairLabel||team.entryLabel||team.club)||('참가팀 '+(idx+1)));}
+  function collect(tid,divFilter){
+    var t=tournaments().find(function(x){return String(x.id)===String(tid);}); if(!t)return {t:null,rows:[],missing:0,teams:0,confirmedTeams:0,waitTeams:0};
+    var divs=divFilter?[divFilter]:(t.divisions||[]),rows=[],seen={},stats={missing:0,teams:0,confirmedTeams:0,waitTeams:0};
+    divs.forEach(function(div){var key=t.id+'_'+div, arr=((window.G&&G.teams&&G.teams[key])||[]); arr.forEach(function(team,idx){
+      if(deleted(team))return; var wi=waitInfo(t,div,key,idx,team); stats.teams++; if(wi.wait)stats.waitTeams++; else stats.confirmedTeams++;
+      var paid=paidOf(team), label=teamName(team,idx), fallback=team.ownerPhone||team.phone||team.contactPhone||team.managerPhone||'', baseClub=String(team.club||'').trim();
+      playersOf(team).slice(0,2).forEach(function(p,pi){
+        var name=String((p&&p.name)||('참가자'+(pi+1))).trim(); var club=String((p&&(p.club||p.clubsRaw))||baseClub||'').trim(); var raw=phoneOf(p)||(pi===0?fallback:''); var ph=normPhone(raw), pk=phoneKey(ph);
+        if(pk.length<9){stats.missing++; return;} var id='p617d|'+t.id+'|'+div+'|'+idx+'|'+pi+'|'+pk; if(seen[id])return; seen[id]=1;
+        var status=wi.wait?('추가대기'+(wi.no?' '+wi.no+'번':'')):'확정팀';
+        rows.push({id:id,paid:paid,wait:wi.wait,waitNo:wi.no,name:name,club:club,meta:divLabel(div)+' · '+(idx+1)+'번 참가팀 · '+status+' · '+label,phone:ph,phoneText:fmtPhone(ph)});
+      });
+    });});
+    return {t:t,rows:rows,missing:stats.missing,teams:stats.teams,confirmedTeams:stats.confirmedTeams,waitTeams:stats.waitTeams};
+  }
+  function ensurePanel(){
+    var body=document.querySelector('#mAdminSettings .modal-body'); if(!body)return null;
+    var p=ge('sms423Panel'); if(!p){p=document.createElement('div'); p.id='sms423Panel'; var top=body.querySelector('.form-group, #managerApprovalSection'); if(top&&top.parentNode) top.parentNode.insertBefore(p,top); else body.prepend(p);} 
+    p.innerHTML='<div class="sms423-title">📨 개인전 참가자 문자 보내기</div><div class="sms423-sub">확정팀과 추가대기자를 분리했습니다. 기본값은 안전하게 <b>확정팀 전체</b>입니다.</div><div class="sms617d-safe-note">⚠️ 대회 공지용은 보통 <b>확정팀 전체/확정팀 입금완료/확정팀 입금대기</b>를 사용하세요. 추가대기자는 별도 버튼으로만 발송됩니다.</div><div class="sms617d-filter-grid"><div class="form-group"><label class="form-label">대회</label><select class="form-select" id="sms423Tournament" onchange="sms423FillDivisions();sms423Render(false)"></select></div><div class="form-group"><label class="form-label">부서</label><select class="form-select" id="sms423Division" onchange="sms423Render(false)"></select></div><div class="form-group"><label class="form-label">보기 필터</label><select class="form-select" id="sms423Filter" onchange="sms423Render(false)"><option value="confirmed_all">확정팀 전체</option><option value="confirmed_unpaid">확정팀 입금대기</option><option value="confirmed_paid">확정팀 입금완료</option><option value="waitlist_all">추가대기자 전체</option><option value="waitlist_unpaid">추가대기자 입금대기</option><option value="waitlist_paid">추가대기자 입금완료</option><option value="all">전체 참가자 + 추가대기자</option></select></div></div><div id="sms423Preview"></div><div class="form-group"><label class="form-label">문자 내용</label><textarea class="form-textarea" id="sms423Body" rows="5" placeholder="문자 내용을 입력하세요"></textarea></div><div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap"><button type="button" class="btn btn-outline" onclick="sms423Copy()">📋 명단 복사</button><button type="button" class="btn btn-primary" onclick="sms423SendAligo()" style="background:#1d4ed8;color:#fff">📡 알리고 발송</button><button type="button" class="btn btn-primary" onclick="sms423Send()" style="background:#0f766e;color:#fff">📱 휴대폰 문자</button></div>';
+    p.addEventListener('change',function(ev){var cb=ev.target&&ev.target.closest&&ev.target.closest('.sms423-check'); if(cb){if(cb.checked)S.selected.add(cb.value); else S.selected.delete(cb.value); updateCount();}});
+    p.addEventListener('click',function(ev){var row=ev.target&&ev.target.closest&&ev.target.closest('.sms423-row'); if(!row||ev.target.closest('input,button,select,textarea'))return; var cb=row.querySelector('.sms423-check'); if(cb){cb.checked=!cb.checked; cb.dispatchEvent(new Event('change',{bubbles:true}));}});
+    return p;
+  }
+  function fillTournaments(selected){var sel=ge('sms423Tournament'); if(!sel)return; var list=tournaments(); sel.innerHTML=list.map(function(t){return '<option value="'+esc(t.id)+'">'+esc(t.name||'개인전 대회')+'</option>';}).join(''); if(selected&&list.some(function(t){return String(t.id)===String(selected);}))sel.value=selected; else if(list[0])sel.value=list[0].id; fillDivisions();}
+  function fillDivisions(){var tid=ge('sms423Tournament')&&ge('sms423Tournament').value,t=tournaments().find(function(x){return String(x.id)===String(tid);}),sel=ge('sms423Division'); if(!sel)return; var cur=sel.value; sel.innerHTML='<option value="">전체 부서</option>'+((t&&t.divisions)||[]).map(function(d){return '<option value="'+esc(d)+'">'+esc(divLabel(d))+'</option>';}).join(''); if(cur&&[].slice.call(sel.options).some(function(o){return o.value===cur;}))sel.value=cur;}
+  function passFilter(r,f){if(f==='confirmed_all')return !r.wait; if(f==='confirmed_unpaid')return !r.wait&&!r.paid; if(f==='confirmed_paid')return !r.wait&&r.paid; if(f==='waitlist_all')return r.wait; if(f==='waitlist_unpaid')return r.wait&&!r.paid; if(f==='waitlist_paid')return r.wait&&r.paid; if(f==='paid')return r.paid; if(f==='unpaid')return !r.paid; return true;}
+  function visibleRows(){var tid=ge('sms423Tournament')&&ge('sms423Tournament').value, div=ge('sms423Division')&&ge('sms423Division').value, filter=ge('sms423Filter')&&ge('sms423Filter').value||'confirmed_all'; var data=collect(tid,div); var rows=data.rows.filter(function(r){return passFilter(r,filter);}); return {data:data,rows:rows,filter:filter};}
+  function modeLabel(f){return {confirmed_all:'확정팀 전체',confirmed_unpaid:'확정팀 입금대기',confirmed_paid:'확정팀 입금완료',waitlist_all:'추가대기자 전체',waitlist_unpaid:'추가대기자 입금대기',waitlist_paid:'추가대기자 입금완료',all:'전체+대기'}[f]||'선택';}
+  function render(keep){var box=ge('sms423Preview'); if(!box)return; if(!keep)S.selected.clear(); var v=visibleRows(), rows=v.rows, paid=rows.filter(function(r){return r.paid;}).length, unpaid=rows.length-paid, waitRows=rows.filter(function(r){return r.wait;}).length, confirmedRows=rows.length-waitRows; box.innerHTML='<div class="sms423-stat"><div id="sms423Count">선택 0명</div><div style="font-size:.73rem;color:#64748b;margin-top:3px">현재 필터: <b>'+esc(modeLabel(v.filter))+'</b> · 표시 '+rows.length+'명 · 확정 '+confirmedRows+'명 · 추가대기 '+waitRows+'명 · 입금대기 '+unpaid+'명 · 입금완료 '+paid+'명 · 번호 없음 '+v.data.missing+'명</div><div style="font-size:.72rem;color:#475569;margin-top:3px">전체 팀 기준: 확정 '+v.data.confirmedTeams+'팀 · 추가대기 '+v.data.waitTeams+'팀</div></div><div class="sms423-actions"><button type="button" class="btn btn-outline" onclick="sms617dSetFilter(\'confirmed_all\')">확정 전체 선택</button><button type="button" class="btn btn-outline" onclick="sms617dSetFilter(\'confirmed_unpaid\')" style="background:#fff7ed;color:#c2410c;border-color:#fdba74">확정 입금대기</button><button type="button" class="btn btn-outline" onclick="sms617dSetFilter(\'confirmed_paid\')" style="background:#eff6ff;color:#1d4ed8;border-color:#93c5fd">확정 입금완료</button><button type="button" class="btn btn-outline" onclick="sms617dSetFilter(\'waitlist_all\')" style="background:#fff7ed;color:#9a3412;border-color:#fdba74">추가대기자</button><button type="button" class="btn btn-gray" onclick="sms423Select(\'none\')">선택 해제</button></div>'+(rows.length?'<div class="sms423-list">'+rows.map(function(r){var ch=S.selected.has(r.id); return '<div class="sms423-row '+(r.wait?'waitlist':'confirmed')+' '+(r.paid?'paid':'unpaid')+(ch?' selected':'')+'" data-id="'+esc(r.id)+'"><input type="checkbox" class="sms423-check" value="'+esc(r.id)+'" data-paid="'+(r.paid?'1':'0')+'" data-wait="'+(r.wait?'1':'0')+'" '+(ch?'checked':'')+'><span><span class="sms423-name">'+esc(r.name)+' '+(r.club?'<span style="color:#64748b;font-weight:800">'+esc(r.club)+'</span>':'')+'<span class="sms423-chip '+(r.wait?'waitlist':'confirmed')+'">'+(r.wait?('추가대기'+(r.waitNo?' '+r.waitNo+'번':'')):'확정팀')+'</span><span class="sms423-chip '+(r.paid?'paid':'unpaid')+'">'+(r.paid?'입금완료':'입금대기')+'</span></span><div class="sms423-meta">'+esc(r.meta||'')+'</div></span><span class="sms423-phone">'+esc(r.phoneText)+'</span></div>';}).join('')+'</div>':'<div style="padding:10px 12px;background:#fff1f2;border:1px solid #fecaca;border-radius:10px;color:#dc2626;font-size:.8rem">표시할 발송 대상이 없습니다.</div>'); updateCount();}
+  function updateCount(){var boxes=[].slice.call(document.querySelectorAll('#sms423Preview .sms423-check')), selected=boxes.filter(function(x){return x.checked;}), paid=selected.filter(function(x){return x.dataset.paid==='1';}).length, wait=selected.filter(function(x){return x.dataset.wait==='1';}).length; boxes.forEach(function(x){if(x.checked)S.selected.add(x.value); else S.selected.delete(x.value); var row=x.closest('.sms423-row'); if(row)row.classList.toggle('selected',x.checked);}); var el=ge('sms423Count'); if(el)el.textContent='선택 '+selected.length+'명 · 확정 '+(selected.length-wait)+'명 · 추가대기 '+wait+'명 · 입금대기 '+(selected.length-paid)+'명 · 입금완료 '+paid+'명';}
+  function select(mode){var v=visibleRows(); if(mode==='none')S.selected.clear(); else v.rows.forEach(function(r){if(mode==='all'||passFilter(r,mode))S.selected.add(r.id);}); render(true);}
+  function setFilter(mode){var sel=ge('sms423Filter'); if(sel)sel.value=mode||'confirmed_all'; S.selected.clear(); render(false); select('all'); var t=tournaments().find(function(x){return String(x.id)===String(ge('sms423Tournament')&&ge('sms423Tournament').value);}); var body=ge('sms423Body'); if(body&&!String(body.value||'').trim())body.value=defaultMsg(t,mode||'confirmed_all');}
+  function selectedRows(){var v=visibleRows(); return v.rows.filter(function(r){return S.selected.has(r.id);});}
+  function defaultMsg(t,filter){var name=(t&&t.name)||'개인전 대회'; if(filter==='confirmed_unpaid')return '[230MATCH 공지]\n'+name+'\n확정팀 중 참가비 입금 대기 안내드립니다.'; if(filter==='confirmed_paid')return '[230MATCH 공지]\n'+name+'\n확정팀 입금완료자 대상 공지입니다.'; if(filter&&filter.indexOf('waitlist')===0)return '[230MATCH 공지]\n'+name+'\n추가대기자 대상 안내입니다.'; return '[230MATCH 공지]\n'+name+'\n확정팀 참가자 대상 공지입니다.';}
+  function openSettings(mode){if(!adminLike()){toastMsg('관리자 또는 운영자 로그인 필요','info');return;} var p=ensurePanel(); if(!p){toastMsg('설정 화면을 먼저 열어주세요','info');return;} fillTournaments(currentTid()); var curDiv=ge('regDS')&&ge('regDS').value, d=ge('sms423Division'); if(d&&curDiv&&[].slice.call(d.options).some(function(o){return o.value===curDiv;}))d.value=curDiv; var f=mode||'confirmed_all'; var sel=ge('sms423Filter'); if(sel)sel.value=f; var t=tournaments().find(function(x){return String(x.id)===String(ge('sms423Tournament').value);}); ge('sms423Body').value=defaultMsg(t,f); S.selected.clear(); render(false); select('all'); try{p.scrollIntoView({behavior:'smooth',block:'start'});}catch(e){} }
+  function copy(){var body=String((ge('sms423Body')||{}).value||'').trim(); if(!body){toastMsg('문자 내용을 입력하세요','error');return;} var rows=selectedRows(); if(!rows.length){toastMsg('선택된 대상이 없습니다','error');return;} var txt='[수신자 '+rows.length+'명]\n'+rows.map(function(r){return r.name+' ('+(r.wait?'추가대기':'확정팀')+' · '+(r.paid?'입금완료':'입금대기')+') '+r.phoneText;}).join('\n')+'\n\n[내용]\n'+body; try{navigator.clipboard.writeText(txt).then(function(){toastMsg('선택 명단과 내용이 복사됐습니다','success');});}catch(e){alert(txt);} }
+  function phoneRows(rows){var seen={},out=[]; rows.forEach(function(r){var k=phoneKey(r.phone); if(k.length>=9&&!seen[k]){seen[k]=1; out.push(r.phone);}}); return out;}
+  function send(){var body=String((ge('sms423Body')||{}).value||'').trim(); if(!body){toastMsg('문자 내용을 입력하세요','error');return;} var rows=selectedRows(); if(!rows.length){toastMsg('선택된 대상이 없습니다','error');return;} var phones=phoneRows(rows); if(!phones.length){toastMsg('발송 가능한 전화번호가 없습니다','error');return;} if(!confirm('선택한 대상 '+phones.length+'명에게 문자앱을 엽니다.\n\n계속하시겠습니까?'))return; var mobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent); if(!mobile){copy(); toastMsg('PC에서는 복사만 가능합니다. 휴대폰 문자앱에 붙여넣으세요.','info'); return;} if(window.openBulkSmsInChunks){window.openBulkSmsInChunks(phones,body,'선택 대상 문자');}else{window.location.href='sms:'+phones.join(',')+'?body='+encodeURIComponent(body);} }
+  function sendAligo(){var body=String((ge('sms423Body')||{}).value||'').trim(); if(!body){toastMsg('문자 내용을 입력하세요','error');return;} var rows=selectedRows(); if(!rows.length){toastMsg('선택된 대상이 없습니다','error');return;} var seen={},rcpt=[]; rows.forEach(function(r){var k=phoneKey(r.phone); if(k.length>=9&&!seen[k]){seen[k]=1; rcpt.push({name:(r.wait?'[대기] ':'')+(r.name||''),phone:r.phone});}}); if(!rcpt.length){toastMsg('발송 가능한 전화번호가 없습니다','error');return;} if(typeof window.v607ShowAligoPreview==='function')window.v607ShowAligoPreview(rcpt,body,{source:'sms617d_aligo',noCompact:true}); else toastMsg('알리고 모듈 로드 중입니다. 잠시 후 다시 시도하세요.','info');}
+  function wireTopButtons(){try{var root=document.querySelector('#mAdminSettings .modal-body'); if(!root)return; root.querySelectorAll('button').forEach(function(btn){var txt=(btn.textContent||'').replace(/\s+/g,' ').trim(), oc=String(btn.getAttribute('onclick')||''); if(/개인전\s*참가자.*문자/.test(txt)||/openIndividualParticipantSmsModal|sms423OpenSettings/.test(oc)){btn.textContent='📨 확정팀 참가자 문자'; btn.setAttribute('onclick','sms423OpenSettings(\'confirmed_all\')'); btn.style.background='#0f766e'; btn.style.color='#fff';}});}catch(e){}}
+  window.sms423OpenSettings=openSettings; window.sms423Render=render; window.sms423FillDivisions=fillDivisions; window.sms423Select=select; window.sms423Copy=copy; window.sms423Send=send; window.sms423SendAligo=sendAligo; window.sms617dSetFilter=setFilter;
+  var oldOpenAdmin=window.openAdminSettings; if(typeof oldOpenAdmin==='function'&&!oldOpenAdmin.__sms617d){var wrapped=function(){var r=oldOpenAdmin.apply(this,arguments); [80,200,500,900,1500].forEach(function(ms){setTimeout(function(){ensurePanel(); wireTopButtons(); fillTournaments(currentTid()); if(ge('sms423Filter')){ge('sms423Filter').value='confirmed_all'; render(false);} },ms);}); return r;}; wrapped.__sms617d=true; window.openAdminSettings=wrapped;}
+  window.openIndividualParticipantSmsModal=function(){openSettings('confirmed_all');};
+  document.addEventListener('DOMContentLoaded',function(){[500,1000,1800].forEach(function(ms){setTimeout(function(){if(isOpenSettings()){ensurePanel(); wireTopButtons(); fillTournaments(currentTid()); render(false);}},ms);});});
+  setInterval(function(){if(isOpenSettings()){wireTopButtons(); if(!ge('sms423Panel')){ensurePanel(); fillTournaments(currentTid()); render(false);}}},1000);
+})();
+</script>
 </body>
 </html>
