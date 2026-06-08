@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-08-v615e2-finalize-cache";
+  const APP_VERSION = "2026-06-08-v615e4-conditional-guard";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -15607,9 +15607,11 @@ function getCourtQueueInfo(key, court){
     if(aa!==bb) return aa.localeCompare(bb);
     return String(a.id||'').localeCompare(String(b.id||''));
   });
-  const active=related[0] || null;
-  const waiting=related.slice(1);
-  return {active, waiting, related};
+  // v615e: waitingFirstAt이 있는 경기는 대기 상태 → active가 될 수 없음
+  // 단, 코트에 waitingFirstAt 없는 경기가 하나도 없으면 순서대로 첫번째가 active
+  const activeCandidate = related.find(m => !String(m.waitingFirstAt||'').trim()) || related[0] || null;
+  const waiting = related.filter(m => m !== activeCandidate);
+  return {active: activeCandidate, waiting, related};
 }
 
 function isRuntimeTimestampUsable(iso=''){
@@ -51210,6 +51212,8 @@ window.manualRefreshPlayers=manualRefreshPlayers;
     // v612: manualCourtLocked===true 도 보호
     if(m.manualCourtLocked===true) return true;
     if(clean(m.manualCourtTarget) || m.manualSharedHold === true || clean(m.manualCourtPinnedAt)) return true;
+    // v615e3: 조건부 추첨 적용된 경기도 보호 (대기1/2/3 설정 경기)
+    if(m.v609ConditionalApplied===true) return true;
     if(isAutoPrelim(m)) return false;
     return false;
   }
@@ -51230,7 +51234,7 @@ window.manualRefreshPlayers=manualRefreshPlayers;
     try{
       if(!m) return;
       // v614: 수동 고정된 경기는 자동배정 정리 함수가 고정 필드를 지우면 안 된다.
-      if(m.manualCourtLocked===true || clean(m.manualCourtTarget) || clean(m.manualCourtPinnedAt) || m.manualSharedHold===true) return;
+      if(m.manualCourtLocked===true || clean(m.manualCourtTarget) || clean(m.manualCourtPinnedAt) || m.manualSharedHold===true || m.v609ConditionalApplied===true) return;
       delete m.manualCourtTarget;
       delete m.manualCourtPinnedAt;
       m.manualSharedHold=false;
@@ -51449,6 +51453,8 @@ window.manualRefreshPlayers=manualRefreshPlayers;
     // v612: manualCourtLocked===true 도 보호
     if(m.manualCourtLocked===true) return true;
     if(clean(m.manualCourtTarget) || clean(m.manualCourtPinnedAt) || m.manualSharedHold === true) return true;
+    // v615e3: 조건부 추첨 적용된 경기도 보호
+    if(m.v609ConditionalApplied===true) return true;
     if(isAutoPrelim(m)) return false;
     return false;
   }
@@ -51516,7 +51522,7 @@ window.manualRefreshPlayers=manualRefreshPlayers;
     if(!m) return;
     try{
       // v614: 수동 고정된 경기는 자동배정 정리 함수가 고정 필드를 지우면 안 된다.
-      if(m.manualCourtLocked===true || clean(m.manualCourtTarget) || clean(m.manualCourtPinnedAt) || m.manualSharedHold===true) return;
+      if(m.manualCourtLocked===true || clean(m.manualCourtTarget) || clean(m.manualCourtPinnedAt) || m.manualSharedHold===true || m.v609ConditionalApplied===true) return;
       delete m.manualCourtTarget;
       delete m.manualCourtPinnedAt;
       m.manualSharedHold=false;
