@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-09-v657-sms-realtime-admin-only";
+  const APP_VERSION = "2026-06-09-v658-court-board-manual-group-sync";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -61435,6 +61435,192 @@ import { getFirestore, collection, query, orderBy, limit, onSnapshot } from "htt
   document.addEventListener('visibilitychange',()=>{if(document.hidden){stop();return;} if(canManage()) start(); else stop();});
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{if(canManage())start();else stop();},350));else setTimeout(()=>{if(canManage())start();else stop();},350);
   window.__v656RestartSmsBridge=function(){stop();if(canManage())start();};
+})();
+</script>
+
+
+<!-- v658: 코트 현황판도 수동 조번호 기준으로 동기화 -->
+<script id="v658CourtBoardManualGroupSyncScript">
+(function(){
+  'use strict';
+  if(window.__v658CourtBoardManualGroupSyncInstalled) return;
+  window.__v658CourtBoardManualGroupSyncInstalled = true;
+  const VER='v658-court-board-manual-group-sync';
+  const arr=v=>Array.isArray(v)?v:[];
+  function manualNo(key, gi){
+    try{
+      if(typeof window.v650GetManualGroupNo==='function') return Number(window.v650GetManualGroupNo(key, gi)) || (Number(gi)+1);
+      const d=window.G&&G.draws&&G.draws[key];
+      const idx=Number(gi);
+      const g=arr(d&&d.groups)[idx];
+      const map=(d&&d.manualGroupNoMap&&typeof d.manualGroupNoMap==='object')?d.manualGroupNoMap:{};
+      const raw=(g&&(g.manualGroupNo??g.displayGroupNo??g.confirmedGroupNo))??map[String(idx)];
+      const n=Number(raw);
+      return Number.isFinite(n)&&n>0?n:(idx+1);
+    }catch(e){return Number(gi)+1;}
+  }
+  function manualNoFromMatch(key,m){
+    try{
+      const raw=m&&(m.manualGroupNo??m.displayGroupNo??m.confirmedGroupNo??m.finalGroupNo);
+      const n=Number(raw);
+      if(Number.isFinite(n)&&n>0) return n;
+    }catch(e){}
+    return manualNo(key, Number(m&&m.group||0));
+  }
+  function manualLabel(key,mOrGi){
+    const n=(typeof mOrGi==='object')?manualNoFromMatch(key,mOrGi):manualNo(key,Number(mOrGi));
+    return String(n)+'조';
+  }
+  function hasManualMode(key){
+    try{
+      const d=window.G&&G.draws&&G.draws[key];
+      if(!d) return false;
+      if(d.v650ManualGroupMode===true) return true;
+      const map=d.manualGroupNoMap;
+      if(map&&typeof map==='object'&&Object.keys(map).length) return true;
+      return arr(d.groups).some(g=>g&&(g.manualGroupNo||g.displayGroupNo||g.confirmedGroupNo));
+    }catch(e){return false;}
+  }
+  function hardenManualMode(key){
+    try{
+      if(!hasManualMode(key)) return;
+      const d=G.draws[key];
+      d.v650ManualGroupMode=true;
+      // 기존 자동 코트/조 재정렬 패치가 수동 조번호를 다시 덮지 않도록 로컬 잠금 표시.
+      d.v617eAutoAssignBlocked=true;
+      d.v617eManualCourtSaved=true;
+      arr(d.groups).forEach((g,gi)=>{
+        if(!g) return;
+        const n=manualNo(key,gi);
+        g.manualGroupNo=n;
+        g.displayGroupNo=n;
+        g.confirmedGroupNo=n;
+      });
+      arr(G.matches&&G.matches[key]).forEach(m=>{
+        if(!m || String(m.phase||'')!=='group') return;
+        const n=manualNo(key, Number(m.group||0));
+        m.manualGroupNo=n;
+        m.displayGroupNo=n;
+        m.confirmedGroupNo=n;
+        m.finalGroupNo=n;
+        m.v650ManualGroupNo=true;
+        m.v617GroupOrderLocked=true;
+      });
+    }catch(e){console.warn(VER,'harden failed',key,e);}
+  }
+  function hardenAll(){try{Object.keys((window.G&&G.draws)||{}).forEach(hardenManualMode);}catch(e){}}
+
+  try{
+    const old=window.v650ApplyManualGroupNoLocal;
+    if(typeof old==='function' && !old.__v658Wrapped){
+      const fn=function(key,gi,no){const r=old.apply(this,arguments);try{hardenManualMode(key);}catch(e){}return r;};
+      fn.__v658Wrapped=true; window.v650ApplyManualGroupNoLocal=fn; try{v650ApplyManualGroupNoLocal=fn;}catch(e){}
+    }
+  }catch(e){}
+
+  try{
+    const old=window.describeCourtBoardMatch;
+    if(typeof old==='function' && !old.__v658Wrapped){
+      const fn=function(key,m){
+        const out=old.apply(this,arguments)||{};
+        try{
+          const base=(m&&m.__autoItem&&m.__autoItem.match)?m.__autoItem.match:m;
+          if(base && String(base.phase||'')==='group'){
+            const lbl='예선 '+manualLabel(key,base);
+            out.label=lbl;
+            if(out.detail) out.detail=String(out.detail).replace(/예선\s*\d+조/g,lbl);
+            else out.detail=lbl;
+          }
+        }catch(e){}
+        return out;
+      };
+      fn.__v658Wrapped=true; window.describeCourtBoardMatch=fn; try{describeCourtBoardMatch=fn;}catch(e){}
+    }
+  }catch(e){}
+
+  try{
+    const old=window.buildCourtBoardGroupHeadline;
+    if(typeof old==='function' && !old.__v658Wrapped){
+      const fn=function(key,m,autoTitle,rawTitle){const out=old.apply(this,arguments)||{};try{if(m&&String(m.phase||'')==='group') out.detail='예선 '+manualLabel(key,m);}catch(e){}return out;};
+      fn.__v658Wrapped=true; window.buildCourtBoardGroupHeadline=fn; try{buildCourtBoardGroupHeadline=fn;}catch(e){}
+    }
+  }catch(e){}
+
+  try{
+    const old=window.getCourtStatusSnapshot;
+    if(typeof old==='function' && !old.__v658Wrapped){
+      const fn=function(key){
+        hardenManualMode(key);
+        const res=old.apply(this,arguments)||[];
+        try{
+          const cmp=(a,b)=>{
+            const na=String(a&&a.phase)==='group'?manualNoFromMatch(key,a):9999;
+            const nb=String(b&&b.phase)==='group'?manualNoFromMatch(key,b):9999;
+            if(na!==nb) return na-nb;
+            const qa=String(a&&a.courtQueueOrder||a&&a.courtAssignedAt||'');
+            const qb=String(b&&b.courtQueueOrder||b&&b.courtAssignedAt||'');
+            if(qa!==qb) return qa.localeCompare(qb);
+            return String(a&&a.id||'').localeCompare(String(b&&b.id||''),'ko');
+          };
+          res.forEach(item=>{ if(Array.isArray(item.related)) item.related.sort(cmp); if(Array.isArray(item.waiting)) item.waiting.sort(cmp); if(Array.isArray(item.__visibleWaiting)) item.__visibleWaiting.sort(cmp); if(Array.isArray(item.__overflowWaiting)) item.__overflowWaiting.sort(cmp); });
+        }catch(e){}
+        return res;
+      };
+      fn.__v658Wrapped=true; window.getCourtStatusSnapshot=fn; try{getCourtStatusSnapshot=fn;}catch(e){}
+    }
+  }catch(e){}
+
+  try{
+    const old=window.getIndividualAutoAssignmentPlan;
+    if(typeof old==='function' && !old.__v658Wrapped){
+      const fn=function(key){
+        if(!hasManualMode(key)) return old.apply(this,arguments);
+        try{
+          hardenManualMode(key);
+          const groups=arr(G.draws&&G.draws[key]&&G.draws[key].groups);
+          const targetGroups=groups.map((_,i)=>i).sort((a,b)=>manualNo(key,a)-manualNo(key,b) || a-b);
+          const pool=((typeof getIndividualAutoCourtPool==='function')?getIndividualAutoCourtPool(key,'group'):[]).map(String).filter(Boolean);
+          const plan={pool:[...new Set(pool)],fixed:{},shared:[]};
+          if(!targetGroups.length||!plan.pool.length) return plan;
+          const courtCount=Math.max(1,plan.pool.length);
+          const basePerCourt=Math.floor(targetGroups.length/courtCount);
+          let cursor=0;
+          for(let courtIdx=0; courtIdx<courtCount; courtIdx++){
+            const court=plan.pool[courtIdx]||''; if(!court) continue;
+            const assigned=targetGroups.slice(cursor,cursor+basePerCourt); cursor+=basePerCourt;
+            if(assigned.length){ if(!plan.fixed[court]) plan.fixed[court]=[]; plan.fixed[court].push(...assigned); }
+          }
+          let ci=0;
+          while(cursor<targetGroups.length){ const court=plan.pool[ci%courtCount]||''; if(court){ if(!plan.fixed[court]) plan.fixed[court]=[]; plan.fixed[court].push(targetGroups[cursor]); } ci++; cursor++; }
+          Object.entries(plan.fixed).forEach(([court,gis])=>{
+            const perGroup=arr(gis).map(gi=>{try{return arr(getIndividualGroupAutoQueue(key,gi));}catch(e){return [];}});
+            const maxLen=Math.max(0,...perGroup.map(x=>x.length));
+            for(let idx=0; idx<maxLen; idx++) perGroup.forEach(q=>{const item=q[idx]; if(!item) return; if(!plan.fixed.__items) plan.fixed.__items={}; if(!plan.fixed.__items[court]) plan.fixed.__items[court]=[]; plan.fixed.__items[court].push(item);});
+          });
+          return plan;
+        }catch(e){console.warn(VER,'manual plan failed',e); return old.apply(this,arguments);}
+      };
+      fn.__v658Wrapped=true; window.getIndividualAutoAssignmentPlan=fn; try{getIndividualAutoAssignmentPlan=fn;}catch(e){}
+    }
+  }catch(e){}
+
+  ['applyTournamentBundle','refreshMatchesOnlyForTournament','fetchTournamentBundle','renderCourtStatusBoard','renderBracket','onBrTC','manualRefreshCurrentTournament'].forEach(name=>{
+    try{
+      const old=window[name];
+      if(typeof old!=='function' || old.__v658Wrapped) return;
+      const fn=function(){
+        const r=old.apply(this,arguments);
+        const after=()=>{try{hardenAll();}catch(e){}};
+        if(r&&typeof r.then==='function') return r.then(v=>{after();return v;}).catch(e=>{after();throw e;});
+        after(); return r;
+      };
+      fn.__v658Wrapped=true; window[name]=fn; try{eval(name+'=fn');}catch(e){}
+    }catch(e){}
+  });
+
+  document.addEventListener('DOMContentLoaded',()=>{setTimeout(hardenAll,0);setTimeout(hardenAll,500);setTimeout(hardenAll,1600);});
+  setTimeout(hardenAll,0); setTimeout(hardenAll,800);
+  window.v658SyncManualGroupToCourtBoard=function(key){try{key?hardenManualMode(key):hardenAll(); if(typeof renderBracket==='function') renderBracket();}catch(e){console.warn(VER,e);}};
 })();
 </script>
 
