@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-09-v644-final-stable";
+  const APP_VERSION = "2026-06-09-v644-court-time-server-sync";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -6135,7 +6135,7 @@ button:disabled{opacity:.55!important;cursor:not-allowed!important;filter:graysc
 </div>
 </div>
 <div class="sec-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
-  <span>대진표 · 경기 현황 <span style="font-size:.72rem;font-weight:400;color:var(--text2)">— 전체 대진표는 수동 최신화 · 코트/진행경기만 자동 최소 갱신</span> <span id="bracketFreshnessBadge" style="display:inline-flex;margin-left:6px;padding:3px 8px;border-radius:999px;background:#eef2ff;color:#1d4ed8;font-size:.66rem;font-weight:900;vertical-align:middle">v642</span></span>
+  <span>대진표 · 경기 현황 <span style="font-size:.72rem;font-weight:400;color:var(--text2)">— 전체 대진표는 수동 최신화 · 코트/진행경기만 자동 최소 갱신</span> <span id="bracketFreshnessBadge" style="display:inline-flex;margin-left:6px;padding:3px 8px;border-radius:999px;background:#eef2ff;color:#1d4ed8;font-size:.66rem;font-weight:900;vertical-align:middle">v644</span></span>
   <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
     <button onclick="manualRefreshCurrentTournament()" style="padding:7px 14px;border-radius:999px;border:none;background:#0f766e;color:#fff;font-size:.84rem;font-weight:900;cursor:pointer;display:inline-flex;align-items:center;gap:5px;box-shadow:0 2px 8px rgba(15,118,110,.25)">🔄 최신 대진표</button>
     <button onclick="window.__hardClearAppCacheAndReload&&window.__hardClearAppCacheAndReload()" style="padding:7px 12px;border-radius:999px;border:1px solid #cbd5e1;background:#fff;color:#334155;font-size:.78rem;font-weight:900;cursor:pointer;display:inline-flex;align-items:center;gap:5px">🧹 캐시초기화</button>
@@ -14120,16 +14120,44 @@ function getCourtStartStore(){
 function setCourtStartStore(obj){
   try{ localStorage.setItem(COURT_START_CONTROL_KEY, JSON.stringify(obj||{})); }catch(e){}
 }
+function getCourtStartTournamentConfig(key){
+  try{
+    const k=String(key||'');
+    const td=(typeof _k2td==='function') ? _k2td(k) : {tid:k.split('_')[0]};
+    const t=(G.tournaments||[]).find(x=>String(x.id)===String(td.tid));
+    const all=t && t.courtStartControls;
+    const cfg=all && (all[k] || all[encodeURIComponent(k)]);
+    if(cfg && typeof cfg==='object') return {time: cfg.time || '09:00', actualStartAt: cfg.actualStartAt || ''};
+  }catch(e){}
+  return null;
+}
 function getCourtStartConfig(key){
+  // v644: PC/휴대폰 기준시각 불일치 방지. 서버 저장값을 정본으로 우선 사용한다.
+  const serverCfg=getCourtStartTournamentConfig(key);
+  if(serverCfg) return serverCfg;
   const store=getCourtStartStore();
   const cfg=store[String(key||'')]||{};
   return {time: cfg.time || '09:00', actualStartAt: cfg.actualStartAt || ''};
 }
+function persistCourtStartConfigToServer(key, cfg){
+  try{
+    const k=String(key||'');
+    const td=(typeof _k2td==='function') ? _k2td(k) : {tid:k.split('_')[0]};
+    const tid=String(td.tid||'');
+    if(!tid || typeof db==='undefined' || typeof setDoc!=='function' || typeof doc!=='function') return;
+    const payload={courtStartControls:{}};
+    payload.courtStartControls[k]={time: cfg.time || '09:00', actualStartAt: cfg.actualStartAt || '', updatedAtText:new Date().toISOString()};
+    setDoc(doc(db,'tournaments',tid), payload, {merge:true}).catch(e=>console.warn('court start server sync failed', e));
+  }catch(e){ console.warn('court start server sync failed', e); }
+}
 function setCourtStartConfig(key, patch){
   const store=getCourtStartStore();
   const k=String(key||'');
-  store[k]={...(store[k]||{}), ...(patch||{})};
+  const prev=getCourtStartConfig(k);
+  const next={...(prev||{}), ...(patch||{})};
+  store[k]=next;
   setCourtStartStore(store);
+  persistCourtStartConfigToServer(k,next);
 }
 function parseCourtBaseDate(key){
   const cfg=getCourtStartConfig(key);
@@ -14560,6 +14588,13 @@ async function initFB(){
     onSnapshot(query(collection(db,'tournaments'),orderBy('createdAt','desc')), s=>{
       G.tournaments=s.docs.map(d=>({id:d.id,...d.data()})).filter(t=>!t.deleted);
       onDU(); // UI 갱신만. Firestore 추가 읽기 없음.
+      // v644: 예선 기준시각/실제 시작시각은 tournaments 문서에 저장된다. 다른 기기에서 바뀌면 현재 대진표만 재렌더링한다.
+      try{
+        if(document.querySelector('#page-bracket.active') && typeof renderBracket==='function'){
+          clearTimeout(window.__v644CourtStartRenderTimer);
+          window.__v644CourtStartRenderTimer=setTimeout(()=>{ try{ renderBracket(); }catch(_e){} }, 150);
+        }
+      }catch(_e){}
     },e=>console.error(e));
 
     // 선수기록은 로컬 캐시 우선
