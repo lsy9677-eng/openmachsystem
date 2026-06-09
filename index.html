@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-09-v651-manual-group-number-button-visible";
+  const APP_VERSION = "2026-06-09-v653-group-card-sms-recipients-fix";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -10648,7 +10648,7 @@ function renderGroupQuickActionButtons(key, gi){
     ? `<button class="btn btn-accent" style="flex:1;min-width:86px;padding:10px 12px;font-size:.86rem;font-weight:900;border-radius:12px" onclick="openGroupFirstMatchResult('${key}',${Number(gi)})">⚡ 결과</button>`
     : '';
   const gameBtn = `<button class="btn btn-outline" style="flex:1;min-width:86px;padding:10px 12px;font-size:.86rem;font-weight:900;border-radius:12px;background:#fff;color:#1d4ed8;border-color:#93c5fd" onclick="openGroupMatchListPopupFromButton(this)">📋 경기</button>`;
-  const alarmBtn = `<button class="btn btn-outline" style="flex:1;min-width:86px;padding:10px 12px;font-size:.86rem;font-weight:900;border-radius:12px;background:#eff6ff;color:#1d4ed8;border-color:#93c5fd" onclick="openGroupManualPush('${key}',${Number(gi)})">알림</button>`;
+  const alarmBtn = `<button class="btn btn-outline" style="flex:1;min-width:86px;padding:10px 12px;font-size:.86rem;font-weight:900;border-radius:12px;background:#eff6ff;color:#1d4ed8;border-color:#93c5fd" onclick="openGroupSmsFromCard('${key}',${Number(gi)})">문자</button>`;
   return `<div class="v300-group-actions" data-team-count="${teamCount}" style="display:grid;grid-template-columns:repeat(${teamCount<=2?3:2},minmax(0,1fr));gap:8px;padding:10px 12px;border-top:1px solid var(--border);background:linear-gradient(135deg,#f8fbff,#fffdf5)">${resultBtn}${gameBtn}${alarmBtn}</div>`;
 }
 
@@ -60945,5 +60945,228 @@ import { getFirestore, doc, setDoc, onSnapshot, serverTimestamp } from "https://
 })();
 </script>
 
+
+
+<!-- v652: 예선 조 카드 '알림' 버튼을 실제 문자 발송 버튼으로 전환 -->
+<style id="v652GroupCardSmsButtonStyle">
+.indiv-prelim-grid .v300-group-actions button,
+.indiv-prelim-grid .v300-group-actions .btn{
+  white-space:nowrap!important;
+}
+.indiv-prelim-grid .v300-group-actions button[data-v652-sms="1"]{
+  background:#eff6ff!important;
+  color:#1d4ed8!important;
+  border-color:#93c5fd!important;
+}
+</style>
+<script id="v652GroupCardSmsButtonScript">
+(function(){
+  'use strict';
+  function v652Esc(s){
+    try{ return (typeof esc==='function') ? esc(s) : String(s||'').replace(/[&<>\"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]||c;}); }catch(e){ return String(s||''); }
+  }
+  function v652Toast(msg,type){
+    try{ if(typeof toast==='function') toast(msg,type||'info'); else if(typeof toastMsg==='function') toastMsg(msg,type||'info'); else alert(msg); }catch(e){}
+  }
+  function v652IsMobile(){ return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent||''); }
+  function v652PhoneDigits(p){ return String(p||'').replace(/[^0-9+]/g,''); }
+  function v652GroupLabel(gi){
+    try{ if(typeof grpLabel==='function') return grpLabel(Number(gi)); }catch(e){}
+    return (Number(gi)+1)+'조';
+  }
+  function v652KeyInfo(key){
+    try{ if(typeof _k2td==='function') return _k2td(key)||{}; }catch(e){}
+    const parts=String(key||'').split('_');
+    return {tid:parts[0]||'', div:parts.slice(1).join('_')||''};
+  }
+  function v652TeamName(key, idx){
+    try{
+      const team=(G.teams[key]||[])[Number(idx)];
+      if(!team) return '';
+      if(typeof tdn==='function') return tdn(team,key,idx)||'';
+      if(team.entryLabel||team.pairLabel) return team.entryLabel||team.pairLabel;
+      if(Array.isArray(team.individualPlayers)) return team.individualPlayers.map(p=>p&&p.name).filter(Boolean).slice(0,2).join(' / ');
+      return team.club||'';
+    }catch(e){ return ''; }
+  }
+  function v652BuildGroupSmsBody(key, gi){
+    try{
+      const info=v652KeyInfo(key);
+      const div=String(info.div||'').trim();
+      const group=v652GroupLabel(gi);
+      const ms=(G.matches[key]||[]).filter(m=>m && m.phase==='group' && Number(m.group)===Number(gi));
+      const pending=ms.find(m=>!(typeof getMatchResultState==='function' ? (getMatchResultState(key,m)||{}).done : m.done));
+      const m=pending||ms[0]||null;
+      let line='';
+      if(m){
+        const a=v652TeamName(key,m.t1)||'1팀';
+        const b=v652TeamName(key,m.t2)||'2팀';
+        const court=String(m.courtLabel||m.court||m.assignedCourt||m.courtName||'').trim();
+        line='\n'+a+' vs '+b+(court?'\n코트: '+court:'');
+      }
+      return `[230MATCH] ${div?div+' ':''}${group} 경기 안내입니다.${line}\n대진표와 코트 현황을 확인해 주세요.`;
+    }catch(e){
+      return `[230MATCH] ${v652GroupLabel(gi)} 경기 안내입니다.\n대진표와 코트 현황을 확인해 주세요.`;
+    }
+  }
+  function v652AddTeamRecipients(list, team){
+    try{
+      if(!team) return;
+      if(typeof v374GetTeamNotifyRecipients==='function'){
+        list.push(...(v374GetTeamNotifyRecipients(team)||[]));
+        return;
+      }
+      if(Array.isArray(team.individualPlayers) && team.individualPlayers.length){
+        team.individualPlayers.slice(0,2).forEach((p,i)=>{
+          list.push({
+            name:String(p?.name||`참가자${i+1}`).trim(),
+            phone:String(p?.phone||p?.mobile||p?.phoneNumber||'').trim(),
+            club:String(p?.clubsRaw||((Array.isArray(p?.clubs)&&p.clubs[0])||team?.club||'')).trim(),
+            role:'player'
+          });
+        });
+        return;
+      }
+      const club=String(team?.club||'').trim();
+      const phone=String(team?.phone||team?.mobile||team?.phoneNumber||((G.meta?.clubContacts||{})[club])||'').trim();
+      const label=String(team?.entryLabel||team?.pairLabel||club||'팀').trim();
+      list.push({name:label, phone, club, role:'team'});
+    }catch(e){}
+  }
+  function v652GetGroupTeamIndexes(key, gi){
+    const set=new Set();
+    try{
+      const grp=G.draws?.[key]?.groups?.[Number(gi)];
+      if(grp && Array.isArray(grp.teams)){
+        grp.teams.forEach(v=>{ const n=Number(v); if(Number.isFinite(n)) set.add(n); });
+      }
+    }catch(e){}
+    try{
+      (G.matches[key]||[]).forEach(m=>{
+        if(!m || m.phase!=='group' || Number(m.group)!==Number(gi)) return;
+        [m.t1,m.t2].forEach(v=>{ const n=Number(v); if(Number.isFinite(n)) set.add(n); });
+      });
+    }catch(e){}
+    return [...set];
+  }
+  function v652UniqueRecipientsLoose(list){
+    try{
+      const src=(list||[]).map(r=>({
+        name:String(r?.name||r?.entryLabel||r?.pairLabel||'대상자').trim(),
+        phone:(typeof formatPhoneLoose==='function'?formatPhoneLoose(r?.phone||r?.tel||r?.mobile||r?.phoneNumber||''):String(r?.phone||r?.tel||r?.mobile||r?.phoneNumber||'').trim()),
+        club:String(r?.club||r?.clubsRaw||'').trim(),
+        role:String(r?.role||'').trim()
+      }));
+      if(typeof uniqueSmsRecipientsByPhone==='function') return uniqueSmsRecipientsByPhone(src)||[];
+      const seen=new Set();
+      return src.filter(r=>{
+        const d=String(r.phone||'').replace(/[^0-9]/g,'');
+        if(d.length<9 || seen.has(d)) return false;
+        seen.add(d); return true;
+      });
+    }catch(e){ return []; }
+  }
+  function v652GetGroupSmsRecipients(key, gi){
+    try{
+      const list=[];
+      const indexes=v652GetGroupTeamIndexes(key,gi);
+      indexes.forEach(idx=>v652AddTeamRecipients(list,(G.teams[key]||[])[idx]));
+      let out=v652UniqueRecipientsLoose(list);
+      if(out.length) return out;
+
+      // 마지막 fallback: 기존 알림 대상 함수 사용
+      try{
+        if(typeof getManualPushSmsFallbackRecipients==='function'){
+          out=v652UniqueRecipientsLoose(getManualPushSmsFallbackRecipients({type:'group',key:key,gi:Number(gi)})||[]);
+          if(out.length) return out;
+        }
+      }catch(e){}
+      try{
+        const ms=(G.matches[key]||[]).filter(m=>m && m.phase==='group' && Number(m.group)===Number(gi));
+        const legacy=[];
+        ms.forEach(m=>{ if(typeof getMatchNotificationRecipients==='function') legacy.push(...(getMatchNotificationRecipients(key,m)||[])); });
+        return v652UniqueRecipientsLoose(legacy);
+      }catch(e){}
+    }catch(e){}
+    return [];
+  }
+  window.openGroupSmsFromCard=function(key, gi){
+    try{
+      if(typeof canShowMatchActionButtons==='function' && !canShowMatchActionButtons()){ v652Toast('운영 권한 필요','info'); return false; }
+      const recipients=v652GetGroupSmsRecipients(key,gi).filter(r=>v652PhoneDigits(r.phone||r.tel||'').length>=9);
+      const body=v652BuildGroupSmsBody(key,gi);
+      if(!recipients.length){ v652Toast('문자 발송 가능한 전화번호가 없습니다. 참가자 전화번호를 확인하세요.','info'); return false; }
+      const phones=[...new Set(recipients.map(r=>v652PhoneDigits(r.phone||r.tel||'')).filter(p=>p.length>=9))];
+      const names=recipients.slice(0,5).map(r=>String(r.name||r.club||'대상자')).join(', ')+(recipients.length>5?' 외 '+(recipients.length-5)+'명':'');
+      if(typeof enqueueStickyAlert==='function'){
+        enqueueStickyAlert({
+          title:'📨 문자 발송',
+          msg:`${v652GroupLabel(gi)} 대상 ${phones.length}명에게 문자 발송 준비\n${names}`,
+          type:'info',
+          actionType:'sms_approval',
+          smsRecipients:recipients,
+          smsBody:body,
+          tid:v652KeyInfo(key).tid||'',
+          div:v652KeyInfo(key).div||'',
+          matchId:'',
+          smsKind:'group_manual_sms',
+          dedupeKey:`group_sms:${key}:${gi}:${Date.now()}`
+        });
+        v652Toast('문자 발송 카드가 표시되었습니다.','info');
+        return true;
+      }
+      if(!confirm(`${v652GroupLabel(gi)} 대상 ${phones.length}명에게 문자앱을 엽니다.\n\n계속하시겠습니까?`)) return false;
+      if(v652IsMobile()){
+        if(typeof openBulkSmsInChunks==='function') openBulkSmsInChunks(phones,body,`${v652GroupLabel(gi)} 문자`);
+        else location.href='sms:'+phones.join(',')+'?body='+encodeURIComponent(body);
+      }else{
+        try{ navigator.clipboard&&navigator.clipboard.writeText(body); }catch(e){}
+        v652Toast('PC에서는 문자 내용을 복사했습니다. 휴대폰 문자앱에 붙여넣으세요.','info');
+      }
+      return true;
+    }catch(e){ console.warn('openGroupSmsFromCard failed', e); v652Toast('문자 발송 준비 중 오류가 발생했습니다.','error'); return false; }
+  };
+  // 기존 인라인 onclick이 openGroupManualPush를 호출하더라도 문자 기능으로 동작하도록 덮어씀
+  window.openGroupManualPush=function(key, gi){ return window.openGroupSmsFromCard(key, gi); };
+  function normalizeGroupActionButtons(root){
+    try{
+      (root||document).querySelectorAll('.indiv-prelim-grid .v300-group-actions button, .indiv-prelim-grid .v300-group-actions .btn').forEach(btn=>{
+        const t=(btn.textContent||'').trim();
+        if(/알림/.test(t)){
+          btn.textContent='문자';
+          btn.setAttribute('data-v652-sms','1');
+        }
+      });
+    }catch(e){}
+  }
+  const oldRender=window.renderGroupQuickActionButtons;
+  if(typeof oldRender==='function' && !oldRender.__v652Wrapped){
+    const fn=function(key,gi){
+      let html=oldRender.apply(this,arguments)||'';
+      html=String(html).replace(/openGroupManualPush\(/g,'openGroupSmsFromCard(').replace(/>\s*(?:🔔\s*)?알림\s*</g,'>문자<');
+      return html;
+    };
+    fn.__v652Wrapped=true;
+    window.renderGroupQuickActionButtons=fn;
+  }
+  function wrap(name){
+    try{
+      if(typeof window[name]==='function' && !window[name].__v652SmsWrapped){
+        const old=window[name];
+        const fn=function(){ const r=old.apply(this,arguments); setTimeout(()=>normalizeGroupActionButtons(document),40); setTimeout(()=>normalizeGroupActionButtons(document),250); return r; };
+        fn.__v652SmsWrapped=true;
+        window[name]=fn;
+      }
+    }catch(e){}
+  }
+  function boot(){
+    ['renderBracket','onBrTC','manualRefreshCurrentTournament','showPage'].forEach(wrap);
+    normalizeGroupActionButtons(document);
+    setTimeout(()=>normalizeGroupActionButtons(document),300);
+    setTimeout(()=>normalizeGroupActionButtons(document),1200);
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
+})();
+</script>
 </body>
 </html>
