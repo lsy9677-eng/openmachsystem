@@ -13513,7 +13513,7 @@ function describeCourtBoardMatch(key,m){
   else if((base||m).phase==='playin') label='진출전';
   else if((base||m).phase==='main') label=getMainRoundLabelByRoundIndex((base||m).round||0, key) || '본선';
   else if((base||m).phase==='bronze') label='3·4위전';
-  const score=(st.started || st.done) ? `${st.disp1??st.sc1??0}:${st.disp2??st.sc2??0}` : '';
+  const score=(st.started || st.done) ? (isIndividualByKey(key) && typeof getIndividualActualScoreText==='function' ? (getIndividualActualScoreText(base||m) || `${st.disp1??st.sc1??0}:${st.disp2??st.sc2??0}`) : `${st.disp1??st.sc1??0}:${st.disp2??st.sc2??0}`) : '';
   let title=(autoTitle || rawTitle);
   let detail='';
   if(String((base||m)?.phase||'')==='group'){
@@ -20120,7 +20120,15 @@ function buildCourtNotificationMessage(kind,key,m,meta={}){
     return fillT(tpl.match_started||'[230]{코트} 시작 {팀}');
   }
   if(kind==='match_completed'){
-    const score=String(meta.score||info.score||'').trim();
+    // v640: 완료 문자 본문도 개인전 실제 게임 스코어 우선
+    const score=String(
+      meta.score
+      || (typeof getIndividualActualScoreText==='function' ? getIndividualActualScoreText(m) : '')
+      || m?.actualScoreText
+      || m?.scoreText
+      || info.score
+      || ''
+    ).trim();
     return String(tpl.match_completed||'[230]{코트} 완료 {점수} {팀}')
       .replace(/\{코트\}/g, court)
       .replace(/\{점수\}/g, score)
@@ -20144,8 +20152,14 @@ function buildCourtNotificationApprovalPayload(kind,key,m,meta={}){
   const court=String(meta.court||'').trim();
   // v607t: match_completed = info_only (문자 버튼 없음, 6초 자동 닫힘, 전화번호 제거)
   if(kind==='match_completed'){
-    const sc1=m?.sc1??''; const sc2=m?.sc2??'';
-    const score=(sc1!==''&&sc2!=='')?String(sc1)+':'+String(sc2):'';
+    // v640: 개인전 완료 알림은 매치 승수(1:0)가 아니라 실제 게임 스코어(6:2, 6:4)를 표시
+    const score = String(
+      meta.score
+      || (typeof getIndividualActualScoreText==='function' ? getIndividualActualScoreText(m) : '')
+      || m?.actualScoreText
+      || m?.scoreText
+      || ''
+    ).trim();
     const msg=[court?court+' 코트':'', info.title||'경기', score?'결과 '+score:''].filter(Boolean).join(' · ');
     return {
       msg, title, kind:'court_sms', smsKind:kind,
@@ -31471,7 +31485,10 @@ async function saveM3Core(){
   m.winner=hasFinalWinner ? (sc1>sc2?m.t1:m.t2) : null;
   m.sc1=sc1;
   m.sc2=sc2;
-  m.scoreText=`${sc1}:${sc2}`;
+  // v640: 개인전은 팀 승수(1:0)가 아니라 실제 게임 스코어(6:2 등)를 대표 점수로 저장
+  const actualResultScoreText = isIndividualByKey(key) ? (getIndividualActualScoreText({rubbers:newRb}) || `${sc1}:${sc2}`) : `${sc1}:${sc2}`;
+  m.scoreText=actualResultScoreText;
+  if(isIndividualByKey(key)) m.actualScoreText=actualResultScoreText;
   attachMatchAudit(m, hasFinalWinner?'result_save':'score_save');
   if(hasFinalWinner){
     if(!m.completedAt) m.completedAt=new Date().toISOString();
@@ -59666,6 +59683,67 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
   document.addEventListener('DOMContentLoaded',function(){setTimeout(applySingleA4Button,0);setTimeout(applySingleA4Button,700);});
   setTimeout(applySingleA4Button,0);setTimeout(applySingleA4Button,1200);setTimeout(applySingleA4Button,2200);
   try{new MutationObserver(function(){setTimeout(applySingleA4Button,0);}).observe(document.body,{childList:true,subtree:true});}catch(e){}
+})();
+</script>
+
+<style id="v640ResultAlertActualScoreStyle">
+/* v640: 결과 알림의 대표 점수는 개인전 실제 게임 스코어 기준 */
+</style>
+<script id="v640ResultAlertActualScorePatch">
+(function(){
+  'use strict';
+  function actualScore(m){
+    try{
+      return String(
+        (typeof getIndividualActualScoreText==='function' ? getIndividualActualScoreText(m) : '')
+        || (m && m.actualScoreText)
+        || (m && m.scoreText)
+        || ''
+      ).trim();
+    }catch(e){ return String((m&&m.actualScoreText)||(m&&m.scoreText)||'').trim(); }
+  }
+  function patch(){
+    try{
+      var old=window.buildCourtNotificationApprovalPayload;
+      if(typeof old==='function' && !old.__v640ActualScore){
+        var fn=function(kind,key,m,meta){
+          meta=meta||{};
+          if(kind==='match_completed'){
+            var sc=actualScore(m);
+            if(sc) meta=Object.assign({},meta,{score:sc});
+          }
+          var p=old.call(this,kind,key,m,meta);
+          if(kind==='match_completed' && p){
+            var score=actualScore(m) || String(meta.score||'').trim();
+            if(score){
+              p.msg=String(p.msg||'').replace(/결과\s+\d+\s*[:：]\s*\d+/,'결과 '+score);
+              p.smsBody=String(p.smsBody||'').replace(/완료\s+\d+\s*[:：]\s*\d+/,'완료 '+score);
+            }
+          }
+          return p;
+        };
+        fn.__v640ActualScore=true;
+        window.buildCourtNotificationApprovalPayload=fn;
+        try{ buildCourtNotificationApprovalPayload=fn; }catch(e){}
+      }
+      var oldMsg=window.buildCourtNotificationMessage;
+      if(typeof oldMsg==='function' && !oldMsg.__v640ActualScore){
+        var fnMsg=function(kind,key,m,meta){
+          meta=meta||{};
+          if(kind==='match_completed'){
+            var sc=actualScore(m);
+            if(sc) meta=Object.assign({},meta,{score:sc});
+          }
+          return oldMsg.call(this,kind,key,m,meta);
+        };
+        fnMsg.__v640ActualScore=true;
+        window.buildCourtNotificationMessage=fnMsg;
+        try{ buildCourtNotificationMessage=fnMsg; }catch(e){}
+      }
+    }catch(e){ console.warn('[v640] result alert score patch failed', e); }
+  }
+  document.addEventListener('DOMContentLoaded',function(){ setTimeout(patch,0); setTimeout(patch,800); });
+  setTimeout(patch,0); setTimeout(patch,1500); setTimeout(patch,3000);
 })();
 </script>
 
