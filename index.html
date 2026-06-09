@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-09-v644-court-time-server-sync";
+  const APP_VERSION = "2026-06-09-v646-cross-device-sms-syntax-fixed";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -59946,6 +59946,233 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
     },500);
   });
   window.__V642_PATCH=VER;
+})();
+</script>
+
+
+
+<!-- v645: cross-device manager SMS alert bridge (mobile result save -> PC manager alert) -->
+<style id="v645CrossDeviceSmsBridgeStyle">
+#smsApprovalWrap.v645-remote-show[data-sms-kind="match_completed"] .sms-approval-card,
+#stickyAlertWrap.v645-remote-complete .sticky-alert-card{
+  background:linear-gradient(135deg,#991b1b,#dc2626)!important;
+  color:#fff!important;
+  border-color:#fecaca!important;
+}
+#smsApprovalWrap.v645-remote-show[data-sms-kind="match_completed"] .sms-approval-btn.primary{color:#b91c1c!important;}
+</style>
+<script type="module" id="v645CrossDeviceSmsBridgeScript">
+import { initializeApp, getApp, getApps } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, doc, setDoc, getDocs, query, orderBy, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+(function(){
+  'use strict';
+  if(window.__v645CrossDeviceSmsBridgeInstalled) return;
+  window.__v645CrossDeviceSmsBridgeInstalled=true;
+  const FB={apiKey:"AIzaSyAbc17RiYyxCqgbMBkxkMoiRdNTmy2q65w",authDomain:"open-match-manager.firebaseapp.com",projectId:"open-match-manager",storageBucket:"open-match-manager.firebasestorage.app",messagingSenderId:"195671806262",appId:"1:195671806262:web:89691574839266cea1a397"};
+  const app=getApps().length?getApp():initializeApp(FB);
+  const db=getFirestore(app);
+  const COL='adminSmsEvents';
+  const DEVICE_KEY='v645.smsBridge.deviceId';
+  const SEEN_KEY='v645.smsBridge.seen';
+  const MIRRORED_KEY='v645.smsBridge.mirrored';
+  const POLL_MS=5000;
+  const TTL_MS=1000*60*20;
+  const norm=v=>String(v==null?'':v).trim();
+  const now=()=>Date.now();
+  const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  function deviceId(){
+    try{let id=localStorage.getItem(DEVICE_KEY); if(!id){id='dev_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,10); localStorage.setItem(DEVICE_KEY,id);} return id;}catch(e){return 'dev_'+Math.random().toString(36).slice(2,10);}
+  }
+  const MY_DEVICE=deviceId();
+  function mapGet(k){try{const m=JSON.parse(localStorage.getItem(k)||'{}')||{};const cut=now()-TTL_MS;Object.keys(m).forEach(x=>{if(Number(m[x]||0)<cut)delete m[x];});return m;}catch(e){return {};}}
+  function mapHas(k,id){return !!mapGet(k)[id];}
+  function mapPut(k,id){try{const m=mapGet(k);m[id]=now();localStorage.setItem(k,JSON.stringify(m));}catch(e){}}
+  function safeId(s){return norm(s).replace(/[^A-Za-z0-9_-]/g,'_').slice(0,180)||('evt_'+Date.now());}
+  function canManage(){try{return !!(window.AD||window.OP||window.TM||document.body.classList.contains('admin-mode')||document.body.classList.contains('operator-mode')||document.body.classList.contains('tm-mode')||(typeof window.canManageBracket==='function'&&window.canManageBracket()));}catch(e){return false;}}
+  function currentTid(){try{return norm(document.getElementById('brTS')?.value||window._currentTournamentId||'');}catch(e){return '';}}
+  function currentPage(){try{return typeof window.getCurrentPageName==='function'?window.getCurrentPageName():document.querySelector('.page.active')?.id?.replace(/^page-/,'')||'';}catch(e){return '';}}
+  function phonesFromRecipients(recs){
+    const out=[], seen={};
+    (Array.isArray(recs)?recs:[]).forEach(r=>{const ph=norm((r&&r.phone)||r).replace(/[^0-9+]/g,''); const key=ph.replace(/[^0-9]/g,''); if(key.length>=9&&!seen[key]){seen[key]=1;out.push(ph);}});
+    return out;
+  }
+  function teamName(t){
+    try{
+      if(!t) return '';
+      if(Array.isArray(t.individualPlayers)&&t.individualPlayers.length) return t.individualPlayers.slice(0,2).map(p=>norm(p&&p.name)).filter(Boolean).join(' / ');
+      if(Array.isArray(t.players)&&t.players.length){
+        const ps=t.players.slice(0,2).map(p=>typeof p==='string'?p:norm(p&&p.name)).filter(Boolean);
+        if(ps.length) return ps.join(' / ');
+      }
+      return norm(t.pairLabel||t.entryLabel||t.club||t.name||'');
+    }catch(e){return '';}
+  }
+  function matchTeams(key,m){
+    try{
+      const teams=(window.G&&window.G.teams&&window.G.teams[key])||[];
+      const a=teams[Number(m&&m.t1)], b=teams[Number(m&&m.t2)];
+      return [teamName(a)||norm(m&&m.label1)||'팀 A', teamName(b)||norm(m&&m.label2)||'팀 B'];
+    }catch(e){return [norm(m&&m.label1)||'팀 A',norm(m&&m.label2)||'팀 B'];}
+  }
+  function collectPhonesFromMatch(key,m){
+    const out=[], seen={};
+    function add(v){const ph=norm(v).replace(/[^0-9+]/g,''); const k=ph.replace(/[^0-9]/g,''); if(k.length>=9&&!seen[k]){seen[k]=1;out.push({name:'',phone:ph});}}
+    try{
+      const teams=(window.G&&window.G.teams&&window.G.teams[key])||[];
+      [teams[Number(m&&m.t1)],teams[Number(m&&m.t2)]].filter(Boolean).forEach(t=>{
+        [t.phone,t.contactPhone,t.directorPhone,t.managerPhone,t.leaderPhone].forEach(add);
+        (Array.isArray(t.individualPlayers)?t.individualPlayers:[]).forEach(p=>add(p&&p.phone));
+        (Array.isArray(t.players)?t.players:[]).forEach(p=>{if(typeof p==='object')add(p.phone);});
+      });
+    }catch(e){}
+    return out;
+  }
+  function actualScore(m){
+    try{return norm((typeof window.getIndividualActualScoreText==='function'?window.getIndividualActualScoreText(m):'')||(m&&m.actualScoreText)||(m&&m.scoreText)||(m&&m.score)||'');}catch(e){return norm((m&&m.actualScoreText)||(m&&m.scoreText)||'');}
+  }
+  function matchByCtx(ctx){
+    try{return ((window.G&&window.G.matches&&window.G.matches[ctx.key])||[]).find(x=>String(x&&(x.id||x._id))===String(ctx.mid))||null;}catch(e){return null;}
+  }
+  function courtOf(m){try{const arr=Array.isArray(m&&m.courts)?m.courts:[];return norm((m&&m.court)||(m&&m.manualCourtTarget)||arr[0]||'');}catch(e){return '';}}
+  async function writeEvent(payload){
+    try{
+      if(!payload) return false;
+      const dedupe=norm(payload.dedupeKey)||['v645',payload.smsKind,payload.tid,payload.div,payload.matchId,payload.court,payload.msg].join('|');
+      const id=safeId(dedupe);
+      if(mapHas(MIRRORED_KEY,id)) return false;
+      mapPut(MIRRORED_KEY,id);
+      await setDoc(doc(db,COL,id),{
+        ...payload,
+        eventId:id,
+        sourceDeviceId:MY_DEVICE,
+        status:'pending',
+        app:'230MATCH',
+        createdAt:serverTimestamp(),
+        createdAtText:new Date().toISOString(),
+        expiresAtText:new Date(Date.now()+TTL_MS).toISOString()
+      },{merge:true});
+      return true;
+    }catch(e){console.warn('[v645] admin sms event write skipped',e&&e.message||e);return false;}
+  }
+  function payloadFromWrap(w){
+    try{
+      if(!w||w.getAttribute('data-v645-remote')==='1') return null;
+      const shown=w.classList.contains('show')||w.classList.contains('v616g-show');
+      if(!shown) return null;
+      const smsKind=norm(w.getAttribute('data-sms-kind')||'');
+      const actionType=norm(w.getAttribute('data-action-type')||'sms_approval') || 'sms_approval';
+      if(!smsKind && !/경기\s*완료|대기|시작|문자/.test(w.innerText||'')) return null;
+      const title=norm(w.querySelector('.sms-approval-title,.sticky-alert-title')?.textContent||'문자 확인');
+      const msg=norm(w.querySelector('.sms-approval-msg,.sticky-alert-msg')?.textContent||'');
+      const body=norm(w.getAttribute('data-sms-body')||msg);
+      let rec=[]; try{rec=JSON.parse(w.getAttribute('data-sms-recipients')||'[]')||[];}catch(e){rec=[];}
+      const dedupe=norm(w.getAttribute('data-dedupe-key')||[smsKind,title,msg,body].join('|'));
+      const tid=norm(w.getAttribute('data-tid')||currentTid());
+      return {title,msg,smsBody:body,smsRecipients:rec,smsPhones:phonesFromRecipients(rec),smsKind:smsKind||'court_changed',actionType,tid,div:norm(w.getAttribute('data-div')||''),matchId:norm(w.getAttribute('data-mid')||''),court:norm(w.getAttribute('data-court')||''),dedupeKey:dedupe};
+    }catch(e){return null;}
+  }
+  function installMirrorObserver(){
+    const obs=new MutationObserver(()=>{
+      ['smsApprovalWrap','stickyAlertWrap'].forEach(id=>{
+        const w=document.getElementById(id); const p=payloadFromWrap(w); if(p) writeEvent(p);
+      });
+    });
+    obs.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['class','data-sms-kind','data-dedupe-key']});
+  }
+  function installOpenM3Ctx(){
+    const old=window.openM3;
+    if(typeof old==='function'&&!old.__v645Ctx){
+      const fn=function(key,mid){window.__v645M3Ctx={key:norm(key),mid:norm(mid),at:Date.now()};return old.apply(this,arguments);};
+      fn.__v645Ctx=true; window.openM3=fn;
+    }
+  }
+  function buildCompletePayloadFromCtx(ctx){
+    try{
+      if(!ctx||!ctx.key||!ctx.mid) return null;
+      const m=matchByCtx(ctx); if(!m||m.winner==null) return null;
+      const [a,b]=matchTeams(ctx.key,m);
+      const score=actualScore(m);
+      const court=courtOf(m);
+      const kd=String(ctx.key).split('_'); const tid=kd.shift()||''; const div=kd.join('_');
+      const title='✅ 경기 완료 문자';
+      const msg=[court?court+' 코트':'', `${a} vs ${b}`, score?'결과 '+score:'결과 입력 완료'].filter(Boolean).join(' · ');
+      const smsBody=['[230]',court?court+' 완료':'경기 완료',score,`${a}vs${b}`].filter(Boolean).join(' ').replace(/\s+/g,' ').trim();
+      const rec=collectPhonesFromMatch(ctx.key,m);
+      return {title,msg,smsBody,smsRecipients:rec,smsPhones:phonesFromRecipients(rec),smsKind:'match_completed',actionType:'sms_approval',tid,div,matchId:String(m.id||m._id||ctx.mid),court,dedupeKey:['v645_complete',tid,div,ctx.mid,court,score].join('|')};
+    }catch(e){return null;}
+  }
+  function installSaveBridge(){
+    ['saveM3','saveM3Core'].forEach(name=>{
+      const old=window[name];
+      if(typeof old==='function'&&!old.__v645Bridge){
+        const fn=async function(){
+          const ctx=window.__v645M3Ctx||window._m3Ctx||{};
+          const r=await old.apply(this,arguments);
+          setTimeout(()=>{const p=buildCompletePayloadFromCtx(ctx); if(p) writeEvent(p);},700);
+          setTimeout(()=>{const p=buildCompletePayloadFromCtx(ctx); if(p) writeEvent(p);},1800);
+          return r;
+        };
+        fn.__v645Bridge=true; window[name]=fn;
+      }
+    });
+  }
+  function ensurePanel(){let w=document.getElementById('smsApprovalWrap'); if(!w){w=document.createElement('div');w.id='smsApprovalWrap';document.body.appendChild(w);} return w;}
+  function renderRemote(p){
+    try{
+      if(!canManage()) return false;
+      const id=norm(p.eventId||p.dedupeKey); if(!id||mapHas(SEEN_KEY,id)) return false;
+      mapPut(SEEN_KEY,id);
+      const w=ensurePanel();
+      if(w.classList.contains('show')||w.classList.contains('v616g-show')) return false;
+      const rec=Array.isArray(p.smsRecipients)?p.smsRecipients:(Array.isArray(p.smsPhones)?p.smsPhones.map(ph=>({phone:ph})):[]);
+      const hasPhones=phonesFromRecipients(rec).length>0;
+      const actions=hasPhones
+        ? '<button type="button" class="sms-approval-btn primary" onclick="window.v645SendRemoteSms()">문자 보내기</button><button type="button" class="sms-approval-btn secondary" onclick="window.v645CloseRemoteSms()">닫기</button>'
+        : '<button type="button" class="sms-approval-btn secondary" onclick="window.v645CloseRemoteSms()">번호 없음</button>';
+      w.innerHTML='<div class="sms-approval-card"><div class="sms-approval-title">'+esc(p.title||'문자 확인')+'</div><div class="sms-approval-msg">'+esc(p.msg||p.smsBody||'')+'</div><div class="sms-approval-actions">'+actions+'</div></div>';
+      w.setAttribute('data-v645-remote','1');
+      w.setAttribute('data-sms-kind',norm(p.smsKind||'court_changed'));
+      w.setAttribute('data-sms-body',norm(p.smsBody||p.msg||''));
+      w.setAttribute('data-sms-recipients',JSON.stringify(rec));
+      w.setAttribute('data-dedupe-key',id);
+      w.classList.add('show','left-side','v616g-show','v645-remote-show');
+      try{ if(typeof window.toast==='function') window.toast('다른 기기에서 결과/코트 변경이 감지되었습니다','info'); }catch(e){}
+      return true;
+    }catch(e){console.warn('[v645] remote render failed',e);return false;}
+  }
+  window.v645CloseRemoteSms=function(){const w=document.getElementById('smsApprovalWrap'); if(w){w.classList.remove('show','left-side','v616g-show','v645-remote-show'); w.innerHTML=''; w.removeAttribute('data-v645-remote');}};
+  window.v645SendRemoteSms=function(){
+    try{
+      const w=ensurePanel();
+      const rec=JSON.parse(w.getAttribute('data-sms-recipients')||'[]')||[];
+      const body=w.getAttribute('data-sms-body')||'';
+      const phones=phonesFromRecipients(rec);
+      if(!phones.length){try{window.toast&&window.toast('문자 받을 번호가 없습니다','error');}catch(e){}return;}
+      if(window.openBulkSmsInChunks) window.openBulkSmsInChunks(phones,body,'경기 자동문자');
+      else window.location.href='sms:'+phones.join(',')+'?body='+encodeURIComponent(body);
+      window.v645CloseRemoteSms();
+    }catch(e){try{window.toast&&window.toast('문자앱 열기 실패: '+(e&&e.message||e),'error');}catch(_){} }
+  };
+  async function poll(){
+    try{
+      if(!canManage()) return;
+      if(currentPage()!=='bracket' && !document.getElementById('smsApprovalWrap')) return;
+      const snap=await getDocs(query(collection(db,COL),orderBy('createdAtText','desc'),limit(10)));
+      const cutoff=Date.now()-TTL_MS;
+      const rows=[];
+      snap.forEach(d=>{const x={eventId:d.id,...(d.data()||{})}; rows.push(x);});
+      rows.reverse().forEach(x=>{
+        if(x.sourceDeviceId===MY_DEVICE) return;
+        const t=Date.parse(x.createdAtText||''); if(t&&t<cutoff) return;
+        const tid=currentTid(); if(tid && x.tid && String(x.tid)!==tid) return;
+        renderRemote(x);
+      });
+    }catch(e){/* permission/no index 등은 조용히 무시 */}
+  }
+  function init(){installOpenM3Ctx(); installSaveBridge(); installMirrorObserver(); setInterval(poll,POLL_MS); setTimeout(poll,1800); setTimeout(poll,4500);}
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(init,300)); else setTimeout(init,300);
+  setTimeout(()=>{installOpenM3Ctx(); installSaveBridge();},1500);
+  setTimeout(()=>{installOpenM3Ctx(); installSaveBridge();},3500);
 })();
 </script>
 
