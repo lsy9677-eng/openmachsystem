@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-09-v646-cross-device-sms-syntax-fixed";
+  const APP_VERSION = "2026-06-09-v647a-final-stable";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -58100,7 +58100,7 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
     try{ renderBracket=w; }catch(e){}
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(refreshButtons,500)); else setTimeout(refreshButtons,200);
-  setInterval(refreshButtons,2500);
+  // v647fix: setInterval(refreshButtons) 제거 - 버튼 깜빡임 방지
 })();
 </script>
 <!-- v617f: 관리자/운영자 수동 배정 절대 보호 - 모든 자동배정 함수 원천 차단 -->
@@ -58741,9 +58741,7 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
       if(finalBtn){
         finalBtn.textContent='🔒 조번호 확정';
         finalBtn.onclick=function(ev){ if(ev){ev.preventDefault();ev.stopPropagation();} window.v606FinalizeGroupOrder(); };
-        finalBtn.style.display='inline-flex';
-        finalBtn.style.borderColor='#d4a017';
-        finalBtn.style.color='#8a6412';
+        // v647fix: display 직접 설정 안 함 (ensureFinalizeButton이 담당)
       }
       // 코트저장 버튼 제거
       ['v617eManualCourtSaveBtn','v618ManualCourtSaveBtn'].forEach(id=>{
@@ -60176,5 +60174,135 @@ import { getFirestore, collection, doc, setDoc, getDocs, query, orderBy, limit, 
 })();
 </script>
 
+
+
+<!-- v647: initial open/resume server refresh - mobile/PWA first view equals manual refresh -->
+<script id="v647InitialOpenServerRefresh">
+(function(){
+  const VER='v647-initial-open-server-refresh';
+  if(window.__V647_INITIAL_OPEN_REFRESH===VER) return;
+  window.__V647_INITIAL_OPEN_REFRESH=VER;
+
+  const LAST_RUN_KEY='v647_initial_open_refresh_last';
+  const MIN_INTERVAL_MS=45000; // 같은 화면 반복 진입 시 읽기 폭증 방지
+  let running=false;
+  let retryTimer=null;
+
+  function now(){ return Date.now(); }
+  function geSafe(id){ try{ return document.getElementById(id); }catch(e){ return null; } }
+  function currentPage(){
+    try{
+      const active=document.querySelector('.page.active');
+      if(active && active.id) return active.id.replace(/^page-/,'');
+    }catch(e){}
+    try{ return document.querySelector('.nav-tab.active')?.dataset?.page || ''; }catch(e){ return ''; }
+  }
+  function selectedTid(page){
+    page=page||currentPage();
+    if(page==='bracket') return String(geSafe('brTS')?.value||'').trim();
+    if(page==='register') return String(geSafe('regTS')?.value||'').trim();
+    if(page==='ranking') return String(geSafe('rankTS')?.value||'').trim();
+    return String(geSafe('brTS')?.value||geSafe('regTS')?.value||'').trim();
+  }
+  function readLast(){
+    try{ return JSON.parse(sessionStorage.getItem(LAST_RUN_KEY)||'{}')||{}; }catch(e){ return {}; }
+  }
+  function writeLast(obj){ try{ sessionStorage.setItem(LAST_RUN_KEY, JSON.stringify(obj||{})); }catch(e){} }
+  function recentlyRan(page,tid){
+    const k=page+':'+tid;
+    const last=Number(readLast()[k]||0);
+    return last && (now()-last<MIN_INTERVAL_MS);
+  }
+  function markRan(page,tid){
+    const all=readLast();
+    all[page+':'+tid]=now();
+    writeLast(all);
+  }
+  function markBadge(kind){
+    try{
+      if(typeof window.updateBracketFreshnessBadge==='function') window.updateBracketFreshnessBadge(kind||'server');
+      const b=geSafe('bracketFreshnessBadge');
+      if(b && kind==='initial'){
+        b.textContent=(APP_VERSION||VER).replace(/^2026-06-09-/,'')+' · 최초 최신화';
+        b.style.background='#dcfce7'; b.style.color='#166534';
+      }
+    }catch(e){}
+  }
+
+  async function silentRefresh(page, tid){
+    if(!tid || running) return false;
+    if(recentlyRan(page,tid)) return false;
+    running=true;
+    markRan(page,tid);
+    try{
+      // 참가접수: 수동 새로고침과 동일하게 등록목록만 서버에서 최신화
+      if(page==='register'){
+        if(typeof window.refreshRegisterRegistrationsOnly==='function'){
+          await window.refreshRegisterRegistrationsOnly(tid,{render:true,noRestart:true,force:true});
+        }else if(typeof window.manualRefreshRegister==='function'){
+          await window.manualRefreshRegister();
+        }
+        return true;
+      }
+
+      // 대진표: 수동 최신 대진표와 동일하게 서버 정본 우선, 로컬 코트/시간 캐시가 덮지 못하게 함
+      if(page==='bracket'){
+        try{ if(typeof TOURNAMENT_BUNDLE_MEM!=='undefined' && TOURNAMENT_BUNDLE_MEM) delete TOURNAMENT_BUNDLE_MEM[tid]; }catch(e){}
+        try{ if(typeof window.clearTournamentBundleCacheForTid==='function') window.clearTournamentBundleCacheForTid(tid); }catch(e){}
+        try{ window.__V641_ALLOW_LOCAL_COURT_OVERLAY=false; window.__V642_ALLOW_LOCAL_COURT_OVERLAY=false; }catch(e){}
+        if(typeof window.fetchTournamentBundle==='function'){
+          await window.fetchTournamentBundle(tid,{force:true,acceptStale:true,bypassCooldown:true});
+        }
+        if(typeof window.renderBracket==='function') window.renderBracket();
+        try{ if(typeof window.initBracketNotice==='function') window.initBracketNotice(); }catch(e){}
+        markBadge('initial');
+        return true;
+      }
+      return false;
+    }catch(e){
+      console.warn('[v647] initial server refresh failed', e);
+      return false;
+    }finally{
+      running=false;
+    }
+  }
+
+  function scheduleInitial(reason){
+    clearTimeout(retryTimer);
+    let attempts=0;
+    const tick=()=>{
+      attempts++;
+      const page=currentPage();
+      const tid=selectedTid(page);
+      if((page==='bracket'||page==='register') && tid){
+        silentRefresh(page,tid);
+        return;
+      }
+      if(attempts<12){ retryTimer=setTimeout(tick,700); }
+    };
+    retryTimer=setTimeout(tick, reason==='pageshow'?250:900);
+  }
+
+  // 화면 진입/재개 시 최초 1회는 서버 최신값 확인. 새로고침 버튼을 누른 것과 같은 효과지만 무음 처리.
+  document.addEventListener('DOMContentLoaded',()=>scheduleInitial('dom'));
+  window.addEventListener('pageshow',()=>scheduleInitial('pageshow'));
+  document.addEventListener('visibilitychange',()=>{ if(!document.hidden) scheduleInitial('visible'); });
+
+  // 대회 선택 후에도 최초 1회 최신화. 기존 핸들러 뒤에 조용히 실행한다.
+  ['onBrTC','onRegTC','showPage'].forEach(name=>{
+    const old=window[name];
+    if(typeof old==='function' && !old.__v647Wrapped){
+      const fn=function(){
+        const r=old.apply(this,arguments);
+        setTimeout(()=>scheduleInitial(name),450);
+        return r;
+      };
+      fn.__v647Wrapped=true;
+      window[name]=fn;
+      try{ eval(name+'=window[name]'); }catch(e){}
+    }
+  });
+})();
+</script>
 </body>
 </html>
