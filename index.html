@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-09-v648-fix";
+  const APP_VERSION = "2026-06-09-v648-fix2";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -13023,7 +13023,11 @@ async function refreshMatchesOnlyForTournament(tid, reason='manual'){
     return {...m, ...manual, _id:m._id};
   });
 
-  const next={...(bundle||{}), matches:patchedMatches};
+  // v648fix: bundle에 regs가 없으면 현재 G.teams에서 복원 (팀 데이터 소실 방지)
+  const existingRegs=(bundle&&Array.isArray(bundle.regs)&&bundle.regs.length>0)
+    ? bundle.regs
+    : Object.keys(G.teams||{}).filter(k=>_k2td(k).tid===tid).flatMap(k=>(G.teams[k]||[]));
+  const next={...(bundle||{}), matches:patchedMatches, regs:existingRegs};
   saveTournamentBundleCache(tid,next);
   // v577: applyTournamentBundle 완전히 끝난 뒤 렌더 (중간 상태에서 renderBracket 호출 방지)
   applyTournamentBundle(tid,next);
