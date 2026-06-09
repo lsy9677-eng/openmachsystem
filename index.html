@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-09-v647c-alert-safe";
+  const APP_VERSION = "2026-06-09-v648-team-preserve-refresh";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -6135,7 +6135,7 @@ button:disabled{opacity:.55!important;cursor:not-allowed!important;filter:graysc
 </div>
 </div>
 <div class="sec-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
-  <span>대진표 · 경기 현황 <span style="font-size:.72rem;font-weight:400;color:var(--text2)">— 전체 대진표는 수동 최신화 · 코트/진행경기만 자동 최소 갱신</span> <span id="bracketFreshnessBadge" style="display:inline-flex;margin-left:6px;padding:3px 8px;border-radius:999px;background:#eef2ff;color:#1d4ed8;font-size:.66rem;font-weight:900;vertical-align:middle">v644</span></span>
+  <span>대진표 · 경기 현황 <span style="font-size:.72rem;font-weight:400;color:var(--text2)">— 전체 대진표는 수동 최신화 · 코트/진행경기만 자동 최소 갱신</span> <span id="bracketFreshnessBadge" style="display:inline-flex;margin-left:6px;padding:3px 8px;border-radius:999px;background:#eef2ff;color:#1d4ed8;font-size:.66rem;font-weight:900;vertical-align:middle">v648</span></span>
   <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
     <button onclick="manualRefreshCurrentTournament()" style="padding:7px 14px;border-radius:999px;border:none;background:#0f766e;color:#fff;font-size:.84rem;font-weight:900;cursor:pointer;display:inline-flex;align-items:center;gap:5px;box-shadow:0 2px 8px rgba(15,118,110,.25)">🔄 최신 대진표</button>
     <button onclick="window.__hardClearAppCacheAndReload&&window.__hardClearAppCacheAndReload()" style="padding:7px 12px;border-radius:999px;border:1px solid #cbd5e1;background:#fff;color:#334155;font-size:.78rem;font-weight:900;cursor:pointer;display:inline-flex;align-items:center;gap:5px">🧹 캐시초기화</button>
@@ -60348,6 +60348,178 @@ import { getFirestore, collection, doc, setDoc, getDocs, query, orderBy, limit, 
   // 45초마다 메모리 기반 알림 체크
   setInterval(checkAlerts, 45000);
 
+})();
+</script>
+
+
+<!-- v648: matches-only refresh must preserve registrations/teams to prevent TBD cards -->
+<script id="v648TeamPreserveOnMatchesRefresh">
+(function(){
+  'use strict';
+  const VER='v648-team-preserve-refresh';
+  if(window.__V648_TEAM_PRESERVE_REFRESH===VER) return;
+  window.__V648_TEAM_PRESERVE_REFRESH=VER;
+
+  function keyInfo(k){
+    try{ return (typeof _k2td==='function') ? _k2td(k) : {tid:String(k).split('_')[0], div:String(k).split('_').slice(1).join('_')}; }
+    catch(e){ return {tid:'',div:''}; }
+  }
+  function collectRegsFromMemory(tid){
+    const regs=[];
+    try{
+      Object.keys((window.G&&G.teams)||{}).forEach(k=>{
+        const kd=keyInfo(k);
+        if(String(kd.tid)!==String(tid)) return;
+        (G.teams[k]||[]).forEach(t=>{
+          if(!t || t.deleted) return;
+          regs.push({
+            ...(t||{}),
+            _id:t._id||t.id||'',
+            tournamentId:tid,
+            division:t.division||kd.div,
+            players:t.players||[]
+          });
+        });
+      });
+    }catch(e){}
+    return regs;
+  }
+  async function fetchRegsFromServer(tid){
+    try{
+      if(typeof db==='undefined' || typeof collection!=='function' || typeof query!=='function' || typeof where!=='function') return [];
+      const q=query(collection(db,'registrations'), where('tournamentId','==',tid));
+      const read=(typeof getDocsFromServer==='function') ? getDocsFromServer : getDocs;
+      const snap=await read(q);
+      return snap.docs.map(d=>({_id:d.id,...(d.data()||{})})).filter(x=>!x.deleted);
+    }catch(e){
+      try{
+        const q=query(collection(db,'registrations'), where('tournamentId','==',tid));
+        const snap=await getDocs(q);
+        return snap.docs.map(d=>({_id:d.id,...(d.data()||{})})).filter(x=>!x.deleted);
+      }catch(_e){ return []; }
+    }
+  }
+  function cacheRegs(tid, regs){
+    try{
+      if(!Array.isArray(regs) || !regs.length) return;
+      const cache=(typeof getTournamentBundleCache==='function' && getTournamentBundleCache(tid)) || {};
+      const next={...(cache||{}), regs};
+      if(typeof saveTournamentBundleCache==='function') saveTournamentBundleCache(tid,next);
+    }catch(e){}
+  }
+  function memoryHasTeams(tid){
+    try{
+      return Object.keys((window.G&&G.teams)||{}).some(k=>String(keyInfo(k).tid)===String(tid) && Array.isArray(G.teams[k]) && G.teams[k].length);
+    }catch(e){ return false; }
+  }
+  function countTidMatches(tid){
+    try{
+      let n=0;
+      Object.keys((window.G&&G.matches)||{}).forEach(k=>{ if(String(keyInfo(k).tid)===String(tid)) n+=(G.matches[k]||[]).length; });
+      return n;
+    }catch(e){ return 0; }
+  }
+  async function ensureRegsBeforeMatchesOnly(tid){
+    try{
+      const cache=(typeof getTournamentBundleCache==='function' && getTournamentBundleCache(tid)) || {};
+      if(Array.isArray(cache.regs) && cache.regs.length) return cache.regs;
+      const mem=collectRegsFromMemory(tid);
+      if(mem.length){ cacheRegs(tid,mem); return mem; }
+      const server=await fetchRegsFromServer(tid);
+      if(server.length){ cacheRegs(tid,server); return server; }
+    }catch(e){}
+    return [];
+  }
+
+  // team resolver 보강: match.t1/t2가 registration 문서 id(_id)로 저장된 경우도 팀명을 찾는다.
+  function resolveTeamByRef(key, ref){
+    try{
+      const teams=(window.G&&G.teams&&G.teams[key]) || [];
+      if(ref===undefined || ref===null) return null;
+      if(teams[ref]) return teams[ref];
+      const s=String(ref);
+      return teams.find(t=>t && (
+        String(t._id||'')===s ||
+        String(t.id||'')===s ||
+        String(t.registrationId||'')===s ||
+        String(t.entryId||'')===s ||
+        String(t.no||'')===s ||
+        String(t.queueOrder||'')===s ||
+        String(t.name||'')===s ||
+        String(t.pairLabel||'')===s ||
+        String(t.entryLabel||'')===s
+      )) || null;
+    }catch(e){ return null; }
+  }
+  try{
+    const oldGet=window.getMatchTeamObjects;
+    window.getMatchTeamObjects=function(key,m){
+      const t1=resolveTeamByRef(key,m&&m.t1);
+      const t2=resolveTeamByRef(key,m&&m.t2);
+      if(t1||t2) return {t1,t2};
+      return oldGet ? oldGet(key,m) : {t1:null,t2:null};
+    };
+    try{ getMatchTeamObjects=window.getMatchTeamObjects; }catch(e){}
+  }catch(e){}
+  try{
+    const oldSafe=window.getCourtBoardSafeTeamName;
+    window.getCourtBoardSafeTeamName=function(key,teamIdx){
+      const t=resolveTeamByRef(key,teamIdx);
+      if(t) return (typeof getCourtBoardTeamName==='function') ? getCourtBoardTeamName(t,key,teamIdx) : (t.pairLabel||t.entryLabel||t.club||'TBD');
+      return oldSafe ? oldSafe(key,teamIdx) : 'TBD';
+    };
+    try{ getCourtBoardSafeTeamName=window.getCourtBoardSafeTeamName; }catch(e){}
+  }catch(e){}
+
+  // 핵심: 코트/진행경기 최소 갱신(matches-only)이 registrations 없는 캐시를 적용해서 G.teams를 지우지 못하게 함.
+  try{
+    const oldRefresh=window.refreshMatchesOnlyForTournament;
+    if(typeof oldRefresh==='function' && !oldRefresh.__v648Wrapped){
+      const wrapped=async function(tid,reason){
+        tid=String(tid||'').trim();
+        if(tid) await ensureRegsBeforeMatchesOnly(tid);
+        const r=await oldRefresh.apply(this,arguments);
+        // 그래도 팀이 비어 있고 경기만 있으면 즉시 registrations를 보충하고 한 번 더 적용
+        try{
+          if(tid && !memoryHasTeams(tid) && countTidMatches(tid)>0){
+            const regs=await fetchRegsFromServer(tid);
+            if(regs.length){
+              const cache=(typeof getTournamentBundleCache==='function' && getTournamentBundleCache(tid)) || {};
+              const next={...(cache||{}), regs, matches:Array.isArray(cache.matches)?cache.matches:[], draws:Array.isArray(cache.draws)?cache.draws:[]};
+              if(typeof saveTournamentBundleCache==='function') saveTournamentBundleCache(tid,next);
+              if(typeof applyTournamentBundle==='function') applyTournamentBundle(tid,next);
+              if(typeof getCurrentPageName==='function' && getCurrentPageName()==='bracket' && String(document.getElementById('brTS')?.value||'')===tid){
+                if(typeof renderBracket==='function') renderBracket();
+                try{ if(typeof initBracketNotice==='function') initBracketNotice(); }catch(e){}
+              }
+            }
+          }
+        }catch(e){}
+        return r;
+      };
+      wrapped.__v648Wrapped=true;
+      window.refreshMatchesOnlyForTournament=wrapped;
+      try{ refreshMatchesOnlyForTournament=wrapped; }catch(e){}
+    }
+  }catch(e){}
+
+  // 첫 진입 최신화도 팀 데이터까지 확보한 뒤 렌더링되도록 보강
+  function postOpenRepair(){
+    try{
+      const tid=String(document.getElementById('brTS')?.value||'').trim();
+      if(!tid || (typeof getCurrentPageName==='function' && getCurrentPageName()!=='bracket')) return;
+      if(!memoryHasTeams(tid) && countTidMatches(tid)>0){
+        ensureRegsBeforeMatchesOnly(tid).then(regs=>{
+          if(!regs || !regs.length) return;
+          const cache=(typeof getTournamentBundleCache==='function' && getTournamentBundleCache(tid)) || {};
+          if(typeof applyTournamentBundle==='function') applyTournamentBundle(tid,{...(cache||{}), regs});
+          if(typeof renderBracket==='function') renderBracket();
+        }).catch(()=>{});
+      }
+    }catch(e){}
+  }
+  document.addEventListener('DOMContentLoaded',()=>{ setTimeout(postOpenRepair,2200); setTimeout(postOpenRepair,5200); });
+  window.addEventListener('pageshow',()=>setTimeout(postOpenRepair,1800));
 })();
 </script>
 
