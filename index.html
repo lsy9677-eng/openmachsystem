@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-09-v654-result-court-sms-force";
+  const APP_VERSION = "2026-06-09-v655-result-sms-immediate";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -31792,6 +31792,7 @@ async function saveM3Core(){
       }
     }
     dispatchLocalCourtNotificationAlerts(prevCourtState);
+    try{ if(window.v655ForceResultCourtSms) window.v655ForceResultCourtSms(prevCourtState,key,m,hasFinalWinner); }catch(_v655e){ console.warn('[v655] immediate sms failed', _v655e); }
     sl(false);closeResultModalAfterSave();toast(hasFinalWinner ? '결과 저장 ✅' : (isTieState ? '동점 상태로 실시간 스코어 저장 ✅' : '실시간 스코어 저장 ✅'),'success');renderBracket();
   }catch(e){sl(false);toast('저장 실패: '+e.message,'error');}
 }
@@ -61305,5 +61306,52 @@ import { getFirestore, doc, setDoc, onSnapshot, serverTimestamp } from "https://
 })();
 </script>
 
+
+<style id="v655ImmediateSmsStyle">
+#smsApprovalWrap.v655-show{display:block!important;position:fixed!important;left:18px!important;right:auto!important;bottom:22px!important;z-index:2147483200!important;max-width:min(430px,calc(100vw - 28px))!important;}
+#smsApprovalWrap.v655-show .sms-approval-card{background:linear-gradient(135deg,#1d4ed8,#0f766e)!important;color:#fff!important;border-radius:16px!important;box-shadow:0 16px 36px rgba(15,30,58,.28)!important;padding:14px 16px!important;border:1px solid rgba(255,255,255,.18)!important;}
+#smsApprovalWrap.v655-show[data-sms-kind="match_completed"] .sms-approval-card{background:linear-gradient(135deg,#dc2626,#991b1b)!important;}
+#smsApprovalWrap.v655-show .sms-approval-title{font-size:.92rem!important;font-weight:1000!important;margin-bottom:6px!important;line-height:1.35!important;}
+#smsApprovalWrap.v655-show .sms-approval-msg{font-size:.84rem!important;line-height:1.6!important;white-space:pre-line!important;word-break:keep-all!important;}
+#smsApprovalWrap.v655-show .sms-approval-actions{display:flex!important;justify-content:flex-end!important;gap:8px!important;margin-top:12px!important;flex-wrap:wrap!important;}
+#smsApprovalWrap.v655-show .sms-approval-btn{border:none!important;border-radius:999px!important;padding:8px 14px!important;font-size:.78rem!important;font-weight:1000!important;cursor:pointer!important;min-height:36px!important;}
+#smsApprovalWrap.v655-show .sms-approval-btn.primary{background:#fff!important;color:#1d4ed8!important;}
+#smsApprovalWrap.v655-show[data-sms-kind="match_completed"] .sms-approval-btn.primary{color:#b91c1c!important;}
+#smsApprovalWrap.v655-show .sms-approval-btn.secondary{background:rgba(255,255,255,.16)!important;color:#fff!important;border:1px solid rgba(255,255,255,.22)!important;}
+@media(max-width:680px){#smsApprovalWrap.v655-show{left:10px!important;right:10px!important;bottom:max(96px,calc(env(safe-area-inset-bottom,0px) + 82px))!important;max-width:none!important;}#smsApprovalWrap.v655-show .sms-approval-card{border-radius:14px!important;padding:13px 14px!important;}#smsApprovalWrap.v655-show .sms-approval-actions{justify-content:stretch!important;}#smsApprovalWrap.v655-show .sms-approval-btn{flex:1 1 0!important;padding:9px 10px!important;}}
+</style>
+<script id="v655ImmediateResultCourtSmsScript">
+(function(){
+  'use strict';
+  if(window.__v655ImmediateSmsInstalled) return;
+  window.__v655ImmediateSmsInstalled=true;
+  const RECENT_KEY='v655.immediate.sms.recent.v1';
+  const Q=[];
+  const norm=v=>String(v==null?'':v).replace(/\s+/g,' ').trim();
+  const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const digits=v=>String(v||'').replace(/[^0-9]/g,'');
+  function recent(){try{const o=JSON.parse(sessionStorage.getItem(RECENT_KEY)||'{}')||{};const cut=Date.now()-1000*60*4;Object.keys(o).forEach(k=>{if((+o[k]||0)<cut)delete o[k];});return o;}catch(e){return {};}}
+  function mark(k){try{const o=recent();o[k]=Date.now();sessionStorage.setItem(RECENT_KEY,JSON.stringify(o));}catch(e){}}
+  function seen(k){return !!recent()[k];}
+  function parts(key){try{return typeof _k2td==='function'?_k2td(key):{tid:String(key||'').split('_')[0]||'',div:String(key||'').split('_').slice(1).join('_')||''};}catch(e){return {tid:'',div:''};}}
+  function getMatch(key,mid){try{return ((G&&G.matches&&G.matches[key])||[]).find(m=>String(m&&m.id||'')===String(mid))||null;}catch(e){return null;}}
+  function state(){try{return typeof buildCourtNotificationStateMap==='function'?(buildCourtNotificationStateMap((G&&G.matches)||{})||{}):{};}catch(e){return {};}}
+  function teamName(key,m,side){try{const teams=(G&&G.teams&&G.teams[key])||[];const idx=side===1?m.t1:m.t2;const t=teams[Number(idx)];if(t&&typeof tdn==='function')return norm(tdn(t,key,idx));if(t&&Array.isArray(t.individualPlayers)){const a=t.individualPlayers.map(p=>norm(p&&p.name)).filter(Boolean);if(a.length)return a.join(' / ');}if(t&&Array.isArray(t.players)){const a=t.players.map(p=>typeof p==='string'?p:norm(p&&p.name)).filter(Boolean);if(a.length)return a.join(' / ');}return side===1?'1번':'2번';}catch(e){return side===1?'1번':'2번';}}
+  function score(m){try{return norm((typeof getIndividualActualScoreText==='function'?getIndividualActualScoreText(m):'')||m.actualScoreText||m.scoreText||((m.sc1!=null&&m.sc2!=null)?(m.sc1+':'+m.sc2):''));}catch(e){return norm(m&&m.scoreText||'');}}
+  function add(out,seen,r){const phone=norm((r&&r.phone)||(r&&r.mobile)||(r&&r.tel)||r);const k=digits(phone);if(k.length<9||seen[k])return;seen[k]=1;out.push({name:norm((r&&r.name)||(r&&r.playerName)||(r&&r.club)||''),phone});}
+  function recipients(key,m,kind){let arr=[];try{if(kind==='match_completed'&&typeof getMatchResultNotificationRecipients==='function')arr=getMatchResultNotificationRecipients(key,m)||[];}catch(e){}try{if(!arr.length&&typeof getMatchNotificationRecipients==='function')arr=getMatchNotificationRecipients(key,m)||[];}catch(e){}const out=[], seen={};(Array.isArray(arr)?arr:[]).forEach(x=>add(out,seen,x));if(out.length)return out;try{const teams=(G&&G.teams&&G.teams[key])||[];[teams[Number(m.t1)],teams[Number(m.t2)]].filter(Boolean).forEach(t=>{[t.phone,t.contactPhone,t.directorPhone,t.managerPhone,t.leaderPhone].forEach(ph=>add(out,seen,{name:t.club||'',phone:ph}));(Array.isArray(t.individualPlayers)?t.individualPlayers:[]).forEach(p=>add(out,seen,p));(Array.isArray(t.players)?t.players:[]).forEach(p=>{if(typeof p==='object')add(out,seen,p);});});}catch(e){}return out;}
+  function body(kind,key,m,meta){try{if(typeof buildCourtNotificationMessage==='function'){const b=buildCourtNotificationMessage(kind,key,m,meta||{});if(norm(b))return b;}}catch(e){}const a=teamName(key,m,1),b=teamName(key,m,2),sc=score(m),court=norm(meta&&meta.court),q=Number(meta&&meta.queuePos||0)||0;if(kind==='match_completed')return ['[230] 경기 결과',sc?('결과 '+sc):'',a+' vs '+b].filter(Boolean).join(' · ');if(kind==='match_started')return ['[230] 경기 시작',court?court+' 코트':'',a+' vs '+b,'코트 내 몸풀기 2분 후 바로 시합 시작 바랍니다.'].filter(Boolean).join(' · ');return ['[230] 코트 대기',court?court+' 코트':'',q?('대기 '+q+'번'):'',a+' vs '+b].filter(Boolean).join(' · ');}
+  function title(kind){return kind==='match_completed'?'✅ 경기 결과 문자':kind==='match_started'?'🎾 자동 코트 배치 문자':'⏳ 코트 대기 문자';}
+  function payload(kind,key,m,meta){const pp=parts(key);const mid=norm(m&&m.id||meta&&meta.matchId||'');const msg=body(kind,key,m,meta||{});return {kind,key,mid,title:title(kind),msg,smsBody:msg,smsRecipients:recipients(key,m,kind),dedupe:['v655',kind,pp.tid,pp.div,mid,norm(meta&&meta.court),Number(meta&&meta.queuePos||0)||0,score(m)].join('|')};}
+  function ensure(){let w=document.getElementById('smsApprovalWrap');if(!w){w=document.createElement('div');w.id='smsApprovalWrap';document.body.appendChild(w);}return w;}
+  function close(){const w=document.getElementById('smsApprovalWrap');if(w){w.classList.remove('show','left-side','v616g-show','v645-remote-show','v654-show','v655-show');w.innerHTML='';w.removeAttribute('data-v655');}if(Q.length)setTimeout(()=>render(Q.shift()),80);}
+  function send(){try{const w=ensure();const rec=JSON.parse(w.getAttribute('data-sms-recipients')||'[]')||[];const msg=w.getAttribute('data-sms-body')||'';if(typeof _openSMSForRecipients==='function')_openSMSForRecipients(rec,msg);else{const phones=rec.map(r=>r.phone||r).filter(Boolean);if(!phones.length){toast&&toast('문자 받을 번호가 없습니다','error');return;}location.href='sms:'+phones.join(',')+'?body='+encodeURIComponent(msg);}close();try{toast('문자 발송창을 열었습니다','success');}catch(e){}}catch(e){try{toast('문자창 열기 실패: '+(e&&e.message||e),'error');}catch(_){}}}
+  function render(p){if(!p)return false;const w=ensure();if(w.classList.contains('v655-show')||w.classList.contains('show')&&w.getAttribute('data-v655')==='1'){Q.push(p);return true;}const rec=Array.isArray(p.smsRecipients)?p.smsRecipients:[];const cnt=rec.filter(r=>digits(r&&r.phone||r).length>=9).length;const actions=cnt?'<button type="button" class="sms-approval-btn primary" onclick="window.v655SendSmsApproval()">문자 보내기</button><button type="button" class="sms-approval-btn secondary" onclick="window.v655CloseSmsApproval()">닫기</button>':'<button type="button" class="sms-approval-btn secondary" onclick="window.v655CloseSmsApproval()">번호 없음</button>';w.innerHTML='<div class="sms-approval-card"><div class="sms-approval-title">'+esc(p.title)+' · '+cnt+'명</div><div class="sms-approval-msg">'+esc(p.msg)+'</div><div class="sms-approval-actions">'+actions+'</div></div>';w.setAttribute('data-v655','1');w.setAttribute('data-sms-kind',p.kind);w.setAttribute('data-sms-body',p.smsBody||p.msg||'');w.setAttribute('data-sms-recipients',JSON.stringify(rec));w.classList.add('show','left-side','v655-show');return true;}
+  function enqueue(p){if(!p||!p.dedupe||seen(p.dedupe))return false;mark(p.dedupe);return render(p);}
+  function scanCourtChanges(prev,key,doneMid){try{const next=state();const courts=new Set();Object.entries(prev||{}).forEach(([mid,old])=>{if(!old||!old.court)return;const n=next[mid];if(String(mid)===String(doneMid)||old.status==='current'&&(!n||n.status!=='current'||norm(n.court)!==norm(old.court)))courts.add(norm(old.court));});(window.__V536_RESULT_FINISHED_COURTS||[]).forEach(c=>{c=norm(c);if(c)courts.add(c);});Object.entries(next||{}).forEach(([mid,it])=>{if(!it||!it.court||!courts.has(norm(it.court))||!it.match||it.match.winner!=null)return;const old=(prev||{})[mid];if(it.status==='current'&&(!old||old.status!=='current'||norm(old.court)!==norm(it.court)))enqueue(payload('match_started',it.key,it.match,{court:it.court,matchId:mid}));if(it.status==='waiting'){const op=old?Number(old.queuePos||0):0,np=Number(it.queuePos||0)||0;if(!old||old.status!=='waiting'||norm(old.court)!==norm(it.court)||op!==np)enqueue(payload('court_changed',it.key,it.match,{court:it.court,queuePos:np,matchId:mid}));}});}catch(e){console.warn('[v655] scan court failed',e);}}
+  window.v655CloseSmsApproval=close;window.v655SendSmsApproval=send;
+  window.v655ForceResultCourtSms=function(prevCourtState,key,m,hasFinalWinner){try{if(!hasFinalWinner||!key||!m||m.winner==null)return;const mm=getMatch(key,m.id)||m;enqueue(payload('match_completed',key,mm,{matchId:mm.id}));[120,350,800,1500,2600].forEach(ms=>setTimeout(()=>scanCourtChanges(prevCourtState||{},key,mm.id),ms));}catch(e){console.warn('[v655] force failed',e);}};
+})();
+</script>
 </body>
 </html>
