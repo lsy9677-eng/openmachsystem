@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-09-v633-held-badge-visible";
+  const APP_VERSION = "2026-06-09-v636-promote-manual-confirmed-no-stripe";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -21767,8 +21767,10 @@ function buildRegisterRosterGrid(tid,div,teams,key){
   const isWomen=(div==='여성부');
   const __cards = teams.map((team,i)=>{
     const realIdx=(typeof team._origIdx==='number')?team._origIdx:i;
-    const isWaitlisted=isTeamWaitlistedForKey(key, realIdx);
-    const waitBadge=waitlistBadgeHTML(key, realIdx);
+    const isHeldTeamForRoster=!!(team&&(team.registrationStatus==='held'||team.v626Status==='held'||team.status==='held'||team.waitStatus==='held'||team.v385Status==='held'||team.reserveStatus==='held'||team.held===true||team.isHeld===true||team.hold===true||team._heldAt));
+    const isWaitlisted=(!isHeldTeamForRoster)&&isTeamWaitlistedForKey(key, realIdx);
+    const waitBadge=(!isHeldTeamForRoster)?waitlistBadgeHTML(key, realIdx):'';
+    const heldBadge=isHeldTeamForRoster?'<span class="v635-held-badge">⏸ 보류</span>':'';
     const deleteReqBadge=deleteRequestBadgeHTML(team);
     const isIndividual=isIndividualTournament((G.tournaments||[]).find(x=>x.id===tid));
     const dn=isIndividual
@@ -21848,29 +21850,30 @@ function buildRegisterRosterGrid(tid,div,teams,key){
           </div>`;
       // v620e: 번호 입력 버튼 (관리자만 작동, 항상 표시)
       const moveBtn=`<button class="v620-move-btn" onclick="moveTeamOrder('${esc(key)}',${realIdx})" title="번호로 이동">✎ ${realIdx+1}번</button>`;
-      const promoteBtn=(isWaitlisted&&(AD||TM))
+      const promoteBtn=(isWaitlisted&&(!isHeldTeamForRoster)&&(typeof canPromoteWaitlistedTeam==='function'?canPromoteWaitlistedTeam():(AD||TM)))
         ? `<button class="btn btn-outline" style="min-height:24px;height:24px;padding:2px 8px;font-size:.62rem;border-radius:999px" onclick="promoteWaitlistedTeam('${esc(key)}',${realIdx})">일반전환</button>`
         : '';
-      const extraLine=(waitBadge||deleteReqBadge||promoteBtn||moveBtn)
-        ? `<div style="margin-top:3px;display:flex;gap:4px;align-items:center;flex-wrap:wrap">${waitBadge||''}${deleteReqBadge||''}${promoteBtn}${moveBtn}</div>`
+      const extraLine=(heldBadge||waitBadge||deleteReqBadge||promoteBtn||moveBtn)
+        ? `<div style="margin-top:3px;display:flex;gap:4px;align-items:center;flex-wrap:wrap">${heldBadge||''}${waitBadge||''}${deleteReqBadge||''}${promoteBtn}${moveBtn}</div>`
         : '';
-      return `<div class="v336-entry-row v347-entry-row-detail-inline ${isWaitlisted?'v385-waitlist-row':''}">
+      return `<div class="v336-entry-row v347-entry-row-detail-inline ${isWaitlisted?'v385-waitlist-row':''} ${isHeldTeamForRoster?'v635-held-row v633-held-row v626-held-row':''}">
         <div class="v336-entry-num">${i+1}</div>
         <div class="v336-entry-names v347-entry-names">${v348IndividualPairTitleWithDetail(team,key,realIdx)}${extraLine}</div>
         ${actionBtns}
       </div>`;
     }
 
-    return `<div class="${cardClass} ${isWaitlisted?'v385-waitlist-row':''}">
+    return `<div class="${cardClass} ${isWaitlisted?'v385-waitlist-row':''} ${isHeldTeamForRoster?'v635-held-row v633-held-row v626-held-row':''}">
       <div class="rr-team-header">
         <div class="rr-team-info">
           <span class="rr-team-num">${i+1}</span>
           <span class="${titleClass}">${headerName}</span>
           ${headerCount?`<span class="rr-team-count">${headerCount}</span>`:''}
+          ${heldBadge}
           ${waitBadge}
           ${deleteReqBadge}
           ${buildPaymentStatusHTML(key,realIdx)}
-          ${isWaitlisted&&(AD||TM)?`<button class="btn btn-outline" style="min-height:28px;height:28px;padding:3px 9px;font-size:.66rem;border-radius:999px;background:#fff" onclick="promoteWaitlistedTeam('${esc(key)}',${realIdx})">일반전환</button>`:''}
+          ${isWaitlisted&&(!isHeldTeamForRoster)&&(typeof canPromoteWaitlistedTeam==='function'?canPromoteWaitlistedTeam():(AD||TM))?`<button class="btn btn-outline" style="min-height:28px;height:28px;padding:3px 9px;font-size:.66rem;border-radius:999px;background:#fff" onclick="promoteWaitlistedTeam('${esc(key)}',${realIdx})">일반전환</button>`:''}
         </div>
         ${adminBtns}
       </div>
@@ -44718,9 +44721,19 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
     }catch(e){ console.warn('renumberQueueOrderExcludeHeld failed',e); }
   }
   window.renumberQueueOrderExcludeHeld=renumberQueueOrderExcludeHeld;
+  function canPromoteWaitlistedTeam(){
+    try{ if(typeof AD!=='undefined' && AD) return true; }catch(e){}
+    try{ if(typeof TM!=='undefined' && TM) return true; }catch(e){}
+    try{ if(window.AD || window.TM) return true; }catch(e){}
+    try{
+      if(document.body && (document.body.classList.contains('admin-mode') || document.body.classList.contains('tm-mode'))) return true;
+    }catch(e){}
+    return false;
+  }
+  window.canPromoteWaitlistedTeam=canPromoteWaitlistedTeam;
   window.promoteWaitlistedTeam = async function(key, idx){
     try{
-      if(!(window.AD||window.TM)){ toastSafe('관리자만 전환할 수 있습니다.','error'); return; }
+      if(!canPromoteWaitlistedTeam()){ toastSafe('개발자/운영자만 전환할 수 있습니다.','error'); return; }
       key=String(key||''); idx=Number(idx);
       const arr=G.teams?.[key]||[];
       if(!arr.length || !arr[idx]){ toastSafe('대상 참가팀을 찾을 수 없습니다.','error'); return; }
@@ -59270,13 +59283,17 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
 </script>
 
 
-<!-- v633: 참가자 목록 보류 표시 전원 노출 보강 -->
-<style id="v633HeldBadgeVisibleForAllStyle">
+
+<!-- v635: 보류 완전 별도 + 일반전환 정원 판정 안정화 -->
+<style id="v635HeldSeparatePromoteStableStyle">
+.v336-entry-row.v635-held-row,
+.rr-team-card.v635-held-row,
 .v336-entry-row.v633-held-row,
 .rr-team-card.v633-held-row{
   background:linear-gradient(135deg,#faf5ff,#ffffff)!important;
   border-left:4px solid #a855f7!important;
 }
+.v635-held-badge,
 .v633-held-badge{
   display:inline-flex!important;
   align-items:center!important;
@@ -59286,7 +59303,7 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
   max-width:max-content!important;
   height:22px!important;
   min-height:22px!important;
-  margin:3px 0 0 0!important;
+  margin:0!important;
   padding:2px 8px!important;
   border-radius:999px!important;
   border:1.5px solid #c4b5fd!important;
@@ -59297,193 +59314,258 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
   line-height:1!important;
   white-space:nowrap!important;
   box-sizing:border-box!important;
+  animation:none!important;
+  transition:none!important;
 }
-.v336-entry-names .v633-held-badge{
-  align-self:flex-start!important;
-}
-@media(max-width:680px){
-  .v633-held-badge{
-    height:21px!important;
-    min-height:21px!important;
-    padding:2px 7px!important;
-    font-size:.58rem!important;
-  }
-}
+.v336-entry-row.v635-held-row .v385-waitlist-badge,
+.rr-team-card.v635-held-row .v385-waitlist-badge{display:none!important;}
+@media(max-width:680px){.v635-held-badge,.v633-held-badge{height:21px!important;min-height:21px!important;padding:2px 7px!important;font-size:.58rem!important;}}
 </style>
-<script id="v633HeldBadgeVisibleForAllScript">
+<script id="v635HeldSeparatePromoteStableScript">
 (function(){
   'use strict';
-  if(window.__v633HeldBadgeVisibleForAll) return;
-  window.__v633HeldBadgeVisibleForAll = true;
-
-  function heldTeam(t){
-    try{
-      return !!(t && (
-        t.registrationStatus === 'held' ||
-        t.v626Status === 'held' ||
-        t.status === 'held' ||
-        t.waitStatus === 'held' ||
-        t.v385Status === 'held' ||
-        t.reserveStatus === 'held' ||
-        t.held === true ||
-        t.isHeld === true ||
-        t.hold === true ||
-        !!t._heldAt
-      ));
-    }catch(e){ return false; }
+  if(window.__v635HeldSeparatePromoteStable) return;
+  window.__v635HeldSeparatePromoteStable=true;
+  function toastMsg(msg,type){try{ if(typeof toast==='function') toast(msg,type||'info'); else alert(msg); }catch(e){alert(msg);}}
+  function isHeld(t){return !!(t&&(t.registrationStatus==='held'||t.v626Status==='held'||t.status==='held'||t.waitStatus==='held'||t.v385Status==='held'||t.reserveStatus==='held'||t.held===true||t.isHeld===true||t.hold===true||t._heldAt));}
+  function isDeleted(t){return !!(t&&(t.deleted===true||t._deleted===true));}
+  function isExplicitWait(t){return !!(t&&!isHeld(t)&&(t.registrationStatus==='waitlist'||t.waitlisted===true||t.isWaitlist===true||t.waitlist===true||Number(t.waitlistNo||0)>0));}
+  function keyParts(key){try{ if(typeof _k2td==='function') return _k2td(key); }catch(e){} var s=String(key||''),i=s.indexOf('_'); return i>=0?{tid:s.slice(0,i),div:s.slice(i+1)}:{tid:'',div:''};}
+  function maxForKey(key){var p=keyParts(key); try{return Number(getDivisionMaxTeams(p.tid,p.div)||0)||0;}catch(e){return 0;}}
+  function regTime(t,idx){var n=Date.parse(String(t&&((t.registeredAt)||(t.createdAt)||(t.createdAtText)||(t.adminNotificationCreatedAt)||(t.updatedAt))||'')); return Number.isFinite(n)?n:(9000000000000000+Number(idx||0));}
+  function orderVal(t,idx){var q=Number(t&&t.queueOrder); return Number.isFinite(q)?q:regTime(t,idx);}
+  function activeForKey(key){return ((window.G&&G.teams&&G.teams[key])||[]).map(function(t,i){return {t:t,i:i};}).filter(function(x){return x.t&&!isDeleted(x.t)&&!isHeld(x.t);}).sort(function(a,b){var av=orderVal(a.t,a.i),bv=orderVal(b.t,b.i); return (av-bv)||(a.i-b.i);});}
+  function splitActive(key){
+    var max=maxForKey(key), active=activeForKey(key), confirmed=[], wait=[];
+    active.forEach(function(x){
+      if(isExplicitWait(x.t)){ wait.push(x); return; }
+      if(max>0 && confirmed.length>=max) wait.push(x); else confirmed.push(x);
+    });
+    return {max:max, active:active, confirmed:confirmed, wait:wait};
   }
-
-  function normalize(s){
-    return String(s == null ? '' : s)
-      .replace(/[\/｜|]/g,' ')
-      .replace(/상세|입금대기|입금확인|보류해제|보류|추가대기\s*\d+|추가대기|대기|삭제|수정|Google|Naver|Kakao/g,' ')
-      .replace(/\s+/g,' ')
-      .trim();
+  function reflowKey(key){
+    key=String(key||''); var arr=window.G&&G.teams&&G.teams[key]; if(!Array.isArray(arr)) return false;
+    var max=maxForKey(key), items=arr.map(function(t,i){return {t:t,i:i};}).filter(function(x){return x.t&&!isDeleted(x.t);});
+    var held=items.filter(function(x){return isHeld(x.t);}).sort(function(a,b){var av=orderVal(a.t,a.i),bv=orderVal(b.t,b.i); return (av-bv)||(a.i-b.i);});
+    var active=items.filter(function(x){return !isHeld(x.t);}).sort(function(a,b){var av=orderVal(a.t,a.i),bv=orderVal(b.t,b.i); return (av-bv)||(a.i-b.i);});
+    var confirmed=[], wait=[];
+    active.forEach(function(x){
+      if(isExplicitWait(x.t)){ wait.push(x); return; }
+      if(max>0 && confirmed.length>=max) wait.push(x); else confirmed.push(x);
+    });
+    var ordered=confirmed.concat(held).concat(wait).map(function(x){return x.t;});
+    arr.forEach(function(t){if(t&&!ordered.includes(t)) ordered.push(t);});
+    var changed=ordered.length!==arr.length || ordered.some(function(t,i){return arr[i]!==t;});
+    confirmed.forEach(function(x,i){var t=x.t; if(t.registrationStatus!=='confirmed') changed=true; t.registrationStatus='confirmed'; t.waitlistNo=0; t.queueOrder=i; t.v626EffectiveNo=i+1; t.v626Status='confirmed'; delete t._waitlistAuto;});
+    held.forEach(function(x,i){var t=x.t; if(t.registrationStatus!=='held') changed=true; t.registrationStatus='held'; t._heldAt=t._heldAt||new Date().toISOString(); t.waitlistNo=0; t.queueOrder=100000+i; t.v626EffectiveNo=''; t.v626Status='held';});
+    wait.forEach(function(x,i){var t=x.t; if(t.registrationStatus!=='waitlist'||Number(t.waitlistNo)!==i+1) changed=true; t.registrationStatus='waitlist'; t.waitlistNo=i+1; t.queueOrder=(max>0?max:confirmed.length)+i+1; t.v626EffectiveNo=(max>0?max:confirmed.length)+i+1; t.v626Status='waitlist'; t._waitlistAuto=true;});
+    if(changed) G.teams[key]=ordered;
+    return changed;
   }
-
-  function teamLabel(t){
+  function isWaitlistedForKey(key,idx){var arr=window.G&&G.teams&&G.teams[key]||[], team=arr[Number(idx)]; if(!team||isHeld(team)) return false; if(isExplicitWait(team)) return true; var sp=splitActive(key); return sp.max>0 && sp.active.map(function(x){return x.t;}).indexOf(team)>=sp.max;}
+  function waitlistNoForKey(key,idx){var arr=window.G&&G.teams&&G.teams[key]||[], team=arr[Number(idx)]; if(!team||isHeld(team)) return 0; var sp=splitActive(key); var waitTeams=sp.wait.map(function(x){return x.t;}); var pos=waitTeams.indexOf(team); return pos>=0?pos+1:0;}
+  function confirmedCountForKey(key){return splitActive(key).confirmed.length;}
+  function waitCountForKey(key){return splitActive(key).wait.length;}
+  function drawTeamsForKey(key){reflowKey(key); return splitActive(key).confirmed.map(function(x){return x.t;});}
+  window.v635ReflowRegistrationKey=reflowKey;
+  window.isTeamWaitlistedForKey=isWaitlistedForKey;
+  window.getWaitlistNoForKey=waitlistNoForKey;
+  window.getConfirmedTeamCountForKey=confirmedCountForKey;
+  window.getWaitlistedTeamCountForKey=waitCountForKey;
+  window.getDrawTeamsForKey=drawTeamsForKey;
+  try{isTeamWaitlistedForKey=window.isTeamWaitlistedForKey; getWaitlistNoForKey=window.getWaitlistNoForKey; getConfirmedTeamCountForKey=window.getConfirmedTeamCountForKey; getWaitlistedTeamCountForKey=window.getWaitlistedTeamCountForKey; getDrawTeamsForKey=window.getDrawTeamsForKey;}catch(e){}
+  window.canPromoteWaitlistedTeam=function(){try{return !!((typeof AD!=='undefined'&&AD)||(typeof TM!=='undefined'&&TM)||window.AD||window.TM||document.body.classList.contains('admin-mode')||document.body.classList.contains('tm-mode'));}catch(e){return false;}};
+  window.promoteWaitlistedTeam=async function(key,idx){
     try{
-      if(typeof getIndividualDisplayLine === 'function'){
-        var v = normalize(getIndividualDisplayLine(t));
-        if(v) return v;
-      }
-    }catch(e){}
-    try{
-      if(Array.isArray(t.individualPlayers)){
-        return normalize(t.individualPlayers.map(function(p){return (p && p.name) || '';}).filter(Boolean).join(' '));
-      }
-      if(Array.isArray(t.players)){
-        return normalize(t.players.slice(0,2).join(' '));
-      }
-      return normalize(t.entryLabel || t.pairLabel || t.club || t.name || '');
-    }catch(e){ return ''; }
-  }
-
-  function currentRegTid(){
-    try{
-      var el = document.getElementById('regTS');
-      return el && el.value || '';
-    }catch(e){ return ''; }
-  }
-
-  function candidateKeys(){
-    try{
-      var keys = Object.keys((window.G && G.teams) || {});
-      var tid = currentRegTid();
-      if(tid) keys = keys.filter(function(k){ return String(k).indexOf(String(tid) + '_') === 0; });
-      return keys;
-    }catch(e){ return []; }
-  }
-
-  function findTeamForRow(row){
-    try{
-      if(!row || !window.G || !G.teams) return null;
-
-      var rowNoText = '';
-      var numEl = row.querySelector('.v336-entry-num, .rr-team-num, .team-num');
-      if(numEl) rowNoText = numEl.textContent || '';
-      if(!rowNoText) rowNoText = (row.textContent || '').slice(0, 8);
-      var no = Number((String(rowNoText).match(/\d{1,4}/) || [])[0] || NaN);
-
-      var rowText = normalize(row.textContent || '');
-      var keys = candidateKeys();
-
-      // 1) 화면 번호와 배열 순서/저장 번호가 맞는 경우 우선 매칭
-      if(Number.isFinite(no)){
-        for(var ki=0; ki<keys.length; ki++){
-          var list = G.teams[keys[ki]] || [];
-          for(var i=0; i<list.length; i++){
-            var t = list[i] || {};
-            if(Number(t.regNo || t.no || t.v626EffectiveNo || (i + 1)) === no){
-              return {key:keys[ki], idx:i, team:t};
-            }
-          }
+      if(!window.canPromoteWaitlistedTeam()){toastMsg('개발자/운영자만 전환할 수 있습니다.','error');return;}
+      key=String(key||''); idx=Number(idx); var arr=window.G&&G.teams&&G.teams[key]||[]; var team=arr[idx];
+      if(!team){toastMsg('대상 참가팀을 찾을 수 없습니다.','error');return;}
+      if(isHeld(team)){toastMsg('보류팀은 먼저 보류해제 후 일반전환하세요. 보류는 정원 계산에서 완전히 제외됩니다.','info');return;}
+      if(!isWaitlistedForKey(key,idx)&&!isExplicitWait(team)){toastMsg('이미 일반 참가 상태입니다.','info');return;}
+      var label='선택팀'; try{label=(typeof getIndividualDisplayLine==='function'?getIndividualDisplayLine(team):(team.entryLabel||team.pairLabel||team.club||label));}catch(e){}
+      var sp=splitActive(key); var max=sp.max;
+      var msg=label+'\n\n대기팀을 일반 참가로 전환합니다.\n보류팀은 정원 계산에서 완전히 제외하고, 확정 참가자와 추가대기자 사이에 별도 표시됩니다.'+(max>0?'\n현재 정원: '+max+'팀':'\n이 부서에 정원값이 없어도 명시적 대기 상태는 일반 참가로 전환합니다.')+'\n계속할까요?';
+      if(!confirm(msg)) return;
+      var item=arr.splice(idx,1)[0];
+      item.registrationStatus='confirmed'; item.waitlistNo=0; item.v626Status='confirmed'; delete item._waitlistAuto;
+      var insertAt=arr.length;
+      if(max>0){
+        var nonHeldSeen=0; insertAt=arr.length;
+        for(var i=0;i<arr.length;i++){
+          if(isHeld(arr[i])){insertAt=i; break;}
+          if(!isExplicitWait(arr[i])) nonHeldSeen++;
+          if(nonHeldSeen>=max){insertAt=i; break;}
         }
-      }
-
-      // 2) 이름으로 보조 매칭
-      for(var k2=0; k2<keys.length; k2++){
-        var arr = G.teams[keys[k2]] || [];
-        for(var j=0; j<arr.length; j++){
-          var label = teamLabel(arr[j]);
-          if(!label) continue;
-          var parts = label.split(/\s+/).filter(function(x){return x.length >= 2;});
-          var hit = parts.length && parts.every(function(name){ return rowText.indexOf(name) >= 0; });
-          if(hit) return {key:keys[k2], idx:j, team:arr[j]};
-        }
-      }
-    }catch(e){}
-    return null;
-  }
-
-  function upsertBadge(row, held){
-    try{
-      row.classList.toggle('v633-held-row', !!held);
-      row.classList.toggle('v632-held-row', !!held);
-      row.classList.toggle('v626-held-row', !!held);
-
-      var badge = row.querySelector('.v633-held-badge');
-      if(!held){
-        if(badge) badge.remove();
-        return;
-      }
-
-      if(!badge){
-        badge = document.createElement('span');
-        badge.className = 'v633-held-badge';
-        badge.textContent = '⏸ 보류';
-
-        var nameBox = row.querySelector('.v336-entry-names') || row.querySelector('.rr-team-info') || row;
-        var clubLine = nameBox.querySelector('.v336-club-line');
-        if(clubLine) nameBox.insertBefore(badge, clubLine);
-        else nameBox.appendChild(badge);
+        insertAt=Math.max(0,Math.min(insertAt,arr.length));
       }else{
-        badge.textContent = '⏸ 보류';
+        var firstSpecial=arr.findIndex(function(t){return isHeld(t)||isExplicitWait(t);});
+        insertAt=firstSpecial>=0?firstSpecial:arr.length;
       }
-      badge.title = '관리자가 보류로 지정한 팀입니다.';
-    }catch(e){}
+      arr.splice(insertAt,0,item);
+      reflowKey(key);
+      try{ if(typeof sl==='function') sl(true); }catch(e){}
+      if(typeof window.stT==='function') await window.stT(key); else if(typeof stT==='function') await stT(key); else throw new Error('stT 저장 함수가 없습니다.');
+      try{ if(typeof sl==='function') sl(false); }catch(e){}
+      try{renderRegisterDivisionOverview(); renderRL(); upDash();}catch(e){}
+      toastMsg('일반 참가로 전환했습니다 ✅','success');
+      try{setTimeout(function(){ if(typeof openParticipantTeamNotifySms==='function') openParticipantTeamNotifySms(key, Math.max(0,insertAt), 'waitlist_promoted');},180);}catch(e){}
+    }catch(e){try{ if(typeof sl==='function') sl(false); }catch(_e){} console.error('[v635] promote failed',e); toastMsg('일반 전환 실패: '+(e&&e.message||e),'error');}
+  };
+  function markHeldRows(){
+    try{document.querySelectorAll('#page-register .v336-entry-row, #page-register .rr-team-card').forEach(function(row){var has=row.querySelector('.v635-held-badge,.v633-held-badge'); if(has){row.classList.add('v635-held-row','v633-held-row','v626-held-row'); row.classList.remove('v385-waitlist-row');}});}catch(e){}
   }
+  var oldRender=window.renderRegisterDivisionOverview;
+  if(typeof oldRender==='function'&&!oldRender.__v635Wrapped){
+    var fn=function(){var r=oldRender.apply(this,arguments); try{markHeldRows();}catch(e){} return r;}; fn.__v635Wrapped=true; window.renderRegisterDivisionOverview=fn; try{renderRegisterDivisionOverview=window.renderRegisterDivisionOverview;}catch(e){}
+  }
+  ['renderRL','manualRefreshRegister','onRegTC','showPage'].forEach(function(name){try{var old=window[name]; if(typeof old==='function'&&!old.__v635Wrapped){var fn=function(){var r=old.apply(this,arguments); setTimeout(markHeldRows,0); setTimeout(markHeldRows,120); return r;}; fn.__v635Wrapped=true; window[name]=fn; try{eval(name+'=window["'+name+'"]');}catch(e){}}}catch(e){}});
+  document.addEventListener('DOMContentLoaded',function(){try{var tid=(document.getElementById('regTS')&&document.getElementById('regTS').value)||''; Object.keys(window.G&&G.teams||{}).forEach(function(k){if(!tid||k.indexOf(tid+'_')===0) reflowKey(k);}); markHeldRows();}catch(e){}});
+})();
+</script>
 
-  function applyHeldBadgesForAll(){
+
+<style id="v636ManualPromoteNoStripeStyle">
+/* v636: 수동 일반전환 팀은 추가대기 줄/왼쪽 주황띠를 절대 적용하지 않음 */
+.v336-entry-row.v636-manual-confirmed,
+.rr-team-card.v636-manual-confirmed{
+  border-left:0!important;
+  background:#fff!important;
+  border-color:#dbe7ff!important;
+}
+.v336-entry-row.v636-manual-confirmed .v385-waitlist-badge,
+.rr-team-card.v636-manual-confirmed .v385-waitlist-badge{
+  display:none!important;
+}
+.v336-entry-row.v636-manual-confirmed .v620-promote-btn,
+.rr-team-card.v636-manual-confirmed .v620-promote-btn{
+  display:none!important;
+}
+</style>
+<script id="v636ManualPromoteNoStripeScript">
+(function(){
+  'use strict';
+  if(window.__v636ManualPromoteNoStripe) return;
+  window.__v636ManualPromoteNoStripe=true;
+  function toastMsg(msg,type){try{ if(typeof toast==='function') toast(msg,type||'info'); else alert(msg); }catch(e){alert(msg);}}
+  function isHeld(t){return !!(t&&(t.registrationStatus==='held'||t.v626Status==='held'||t.status==='held'||t.waitStatus==='held'||t.v385Status==='held'||t.reserveStatus==='held'||t.held===true||t.isHeld===true||t.hold===true||t._heldAt));}
+  function isDeleted(t){return !!(t&&(t.deleted===true||t._deleted===true));}
+  function isManualConfirmed(t){return !!(t&&(t.registrationStatus==='confirmed')&&(t._manualConfirmed===true||t.manualConfirmed===true||t.v636ManualConfirmed===true||t.promotedFromWaitlist===true));}
+  function isExplicitWait(t){return !!(t&&!isHeld(t)&&!isManualConfirmed(t)&&(t.registrationStatus==='waitlist'||t.waitlisted===true||t.isWaitlist===true||t.waitlist===true||Number(t.waitlistNo||0)>0));}
+  function keyParts(key){try{ if(typeof _k2td==='function') return _k2td(key); }catch(e){} var s=String(key||''),i=s.indexOf('_'); return i>=0?{tid:s.slice(0,i),div:s.slice(i+1)}:{tid:'',div:''};}
+  function maxForKey(key){var p=keyParts(key); try{return Number(getDivisionMaxTeams(p.tid,p.div)||0)||0;}catch(e){return 0;}}
+  function regTime(t,idx){var n=Date.parse(String(t&&((t.registeredAt)||(t.createdAt)||(t.createdAtText)||(t.adminNotificationCreatedAt)||(t.updatedAt))||'')); return Number.isFinite(n)?n:(9000000000000000+Number(idx||0));}
+  function orderVal(t,idx){var q=Number(t&&t.queueOrder); return Number.isFinite(q)?q:regTime(t,idx);}
+  function activeItems(key){return ((window.G&&G.teams&&G.teams[key])||[]).map(function(t,i){return {t:t,i:i};}).filter(function(x){return x.t&&!isDeleted(x.t)&&!isHeld(x.t);}).sort(function(a,b){var av=orderVal(a.t,a.i),bv=orderVal(b.t,b.i); return (av-bv)||(a.i-b.i);});}
+  function splitActive(key){
+    var max=maxForKey(key), active=activeItems(key), confirmed=[], wait=[];
+    active.forEach(function(x){
+      if(isExplicitWait(x.t)){ wait.push(x); return; }
+      if(isManualConfirmed(x.t)){ confirmed.push(x); return; }
+      if(max>0 && confirmed.filter(function(y){return !isManualConfirmed(y.t);}).length>=max) wait.push(x); else confirmed.push(x);
+    });
+    return {max:max, active:active, confirmed:confirmed, wait:wait};
+  }
+  function reflowKey(key){
+    key=String(key||''); var arr=window.G&&G.teams&&G.teams[key]; if(!Array.isArray(arr)) return false;
+    var max=maxForKey(key), items=arr.map(function(t,i){return {t:t,i:i};}).filter(function(x){return x.t&&!isDeleted(x.t);});
+    var held=items.filter(function(x){return isHeld(x.t);}).sort(function(a,b){var av=orderVal(a.t,a.i),bv=orderVal(b.t,b.i); return (av-bv)||(a.i-b.i);});
+    var active=items.filter(function(x){return !isHeld(x.t);}).sort(function(a,b){var av=orderVal(a.t,a.i),bv=orderVal(b.t,b.i); return (av-bv)||(a.i-b.i);});
+    var confirmed=[], wait=[];
+    active.forEach(function(x){
+      if(isExplicitWait(x.t)){ wait.push(x); return; }
+      if(isManualConfirmed(x.t)){ confirmed.push(x); return; }
+      if(max>0 && confirmed.filter(function(y){return !isManualConfirmed(y.t);}).length>=max) wait.push(x); else confirmed.push(x);
+    });
+    var ordered=confirmed.concat(held).concat(wait).map(function(x){return x.t;});
+    arr.forEach(function(t){if(t&&!ordered.includes(t)) ordered.push(t);});
+    var changed=ordered.length!==arr.length || ordered.some(function(t,i){return arr[i]!==t;});
+    confirmed.forEach(function(x,i){var t=x.t; if(t.registrationStatus!=='confirmed') changed=true; t.registrationStatus='confirmed'; t.waitlistNo=0; t.queueOrder=i; t.v626EffectiveNo=i+1; t.v626Status='confirmed'; delete t._waitlistAuto; t.waitlisted=false; t.isWaitlist=false; t.waitlist=false;});
+    held.forEach(function(x,i){var t=x.t; if(t.registrationStatus!=='held') changed=true; t.registrationStatus='held'; t._heldAt=t._heldAt||new Date().toISOString(); t.waitlistNo=0; t.queueOrder=100000+i; t.v626EffectiveNo=''; t.v626Status='held';});
+    wait.forEach(function(x,i){var t=x.t; if(t.registrationStatus!=='waitlist'||Number(t.waitlistNo)!==i+1) changed=true; t.registrationStatus='waitlist'; t.waitlistNo=i+1; t.queueOrder=(max>0?max:confirmed.length)+i+1; t.v626EffectiveNo=(max>0?max:confirmed.length)+i+1; t.v626Status='waitlist'; t._waitlistAuto=true;});
+    if(changed) G.teams[key]=ordered;
+    return changed;
+  }
+  function isWaitlistedForKey(key,idx){
+    var arr=window.G&&G.teams&&G.teams[key]||[], team=arr[Number(idx)];
+    if(!team||isHeld(team)||isManualConfirmed(team)) return false;
+    if(isExplicitWait(team)) return true;
+    var sp=splitActive(key), waitTeams=sp.wait.map(function(x){return x.t;});
+    return waitTeams.indexOf(team)>=0;
+  }
+  function waitlistNoForKey(key,idx){
+    var arr=window.G&&G.teams&&G.teams[key]||[], team=arr[Number(idx)];
+    if(!team||isHeld(team)||isManualConfirmed(team)) return 0;
+    var sp=splitActive(key), waitTeams=sp.wait.map(function(x){return x.t;}), pos=waitTeams.indexOf(team);
+    return pos>=0?pos+1:0;
+  }
+  function drawTeamsForKey(key){reflowKey(key); return splitActive(key).confirmed.map(function(x){return x.t;});}
+  window.v636ReflowRegistrationKey=reflowKey;
+  window.v635ReflowRegistrationKey=reflowKey;
+  window.v626ReflowRegistrationKey=reflowKey;
+  window.isTeamWaitlistedForKey=isWaitlistedForKey;
+  window.getWaitlistNoForKey=waitlistNoForKey;
+  window.getConfirmedTeamCountForKey=function(key){return splitActive(key).confirmed.length;};
+  window.getWaitlistedTeamCountForKey=function(key){return splitActive(key).wait.length;};
+  window.getDrawTeamsForKey=drawTeamsForKey;
+  try{isTeamWaitlistedForKey=window.isTeamWaitlistedForKey; getWaitlistNoForKey=window.getWaitlistNoForKey; getConfirmedTeamCountForKey=window.getConfirmedTeamCountForKey; getWaitlistedTeamCountForKey=window.getWaitlistedTeamCountForKey; getDrawTeamsForKey=window.getDrawTeamsForKey; v626ReflowRegistrationKey=reflowKey;}catch(e){}
+  window.canPromoteWaitlistedTeam=function(){try{return !!((typeof AD!=='undefined'&&AD)||(typeof TM!=='undefined'&&TM)||window.AD||window.TM||document.body.classList.contains('admin-mode')||document.body.classList.contains('tm-mode'));}catch(e){return false;}};
+  function cleanPromotedTeam(t){
+    t.registrationStatus='confirmed'; t.v626Status='confirmed'; t.v636ManualConfirmed=true; t._manualConfirmed=true; t.manualConfirmed=true; t.promotedFromWaitlist=true;
+    t.waitlistNo=0; t.waitlisted=false; t.isWaitlist=false; t.waitlist=false;
+    delete t._waitlistAuto; delete t.v385Status; delete t.waitStatus; delete t.reserveStatus;
+  }
+  window.promoteWaitlistedTeam=async function(key,idx){
+    try{
+      if(!window.canPromoteWaitlistedTeam()){toastMsg('개발자/운영자만 전환할 수 있습니다.','error');return;}
+      key=String(key||''); idx=Number(idx); var arr=window.G&&G.teams&&G.teams[key]||[], team=arr[idx];
+      if(!team){toastMsg('대상 참가팀을 찾을 수 없습니다.','error');return;}
+      if(isHeld(team)){toastMsg('보류팀은 먼저 보류해제 후 일반전환하세요.','info');return;}
+      var label='선택팀'; try{label=(typeof getIndividualDisplayLine==='function'?getIndividualDisplayLine(team):(team.entryLabel||team.pairLabel||team.club||label));}catch(e){}
+      var already=isManualConfirmed(team)&&!isWaitlistedForKey(key,idx);
+      if(!already){
+        if(!confirm(label+'\n\n이 팀을 일반 참가로 확정합니다.\n정원이 꽉 차 있어도 이 팀은 추가대기가 아니라 일반 참가로 고정됩니다.\n보류팀은 정원 계산에서 완전히 제외됩니다.\n계속할까요?')) return;
+      }
+      var item=arr.splice(idx,1)[0]; cleanPromotedTeam(item);
+      var sp=splitActive(key), max=sp.max, insertAt=arr.length;
+      if(max>0){
+        var normalConfirmed=0; insertAt=arr.length;
+        for(var i=0;i<arr.length;i++){
+          if(isHeld(arr[i])||isExplicitWait(arr[i])){insertAt=i; break;}
+          if(!isManualConfirmed(arr[i])) normalConfirmed++;
+          if(normalConfirmed>=max){insertAt=i+1; break;}
+        }
+      }else{
+        var firstSpecial=arr.findIndex(function(t){return isHeld(t)||isExplicitWait(t);});
+        insertAt=firstSpecial>=0?firstSpecial:arr.length;
+      }
+      arr.splice(Math.max(0,Math.min(insertAt,arr.length)),0,item);
+      reflowKey(key);
+      try{ if(typeof sl==='function') sl(true); }catch(e){}
+      if(typeof window.stT==='function') await window.stT(key); else if(typeof stT==='function') await stT(key); else throw new Error('stT 저장 함수가 없습니다.');
+      try{ if(typeof waitForPendingWrites==='function'&&window.db) await waitForPendingWrites(window.db); }catch(e){}
+      try{ if(typeof sl==='function') sl(false); }catch(e){}
+      try{ if(typeof renderRegisterDivisionOverview==='function') renderRegisterDivisionOverview(); if(typeof renderRL==='function') renderRL(); if(typeof upDash==='function') upDash(); }catch(e){}
+      setTimeout(markManualRows,0); setTimeout(markManualRows,160);
+      toastMsg(already?'일반 참가 상태를 다시 고정했습니다 ✅':'일반 참가로 확정했습니다 ✅','success');
+      try{setTimeout(function(){ if(!already&&typeof openParticipantTeamNotifySms==='function') openParticipantTeamNotifySms(key, Math.max(0,insertAt), 'waitlist_promoted');},180);}catch(e){}
+    }catch(e){try{ if(typeof sl==='function') sl(false); }catch(_e){} console.error('[v636] promote failed',e); toastMsg('일반 전환 실패: '+(e&&e.message||e),'error');}
+  };
+  function markManualRows(){
     try{
       document.querySelectorAll('#page-register .v336-entry-row, #page-register .rr-team-card').forEach(function(row){
-        var info = findTeamForRow(row);
-        if(!info) return;
-        upsertBadge(row, heldTeam(info.team));
+        var text=(row.textContent||'');
+        if(/일반전환/.test(text) && /추가대기/.test(text)) return;
+        if(!/추가대기/.test(text) && !/보류/.test(text)) row.classList.remove('v385-waitlist-row');
       });
+      var key=''; try{var tid=(document.getElementById('regTS')||{}).value||'', div=(document.getElementById('regDS')||{}).value||''; if(tid&&div&&div!=='__ALL__') key=tid+'_'+div;}catch(e){}
+      if(key&&window.G&&G.teams&&G.teams[key]){
+        var rows=[].slice.call(document.querySelectorAll('#page-register .v336-entry-row, #page-register .rr-team-card'));
+        G.teams[key].forEach(function(t,i){ if(!isManualConfirmed(t)) return; var row=rows[i]; if(row){row.classList.add('v636-manual-confirmed'); row.classList.remove('v385-waitlist-row');}});
+      }
     }catch(e){}
   }
-
-  window.v633ApplyHeldBadgesForAll = applyHeldBadgesForAll;
-
-  function runSoon(){
-    setTimeout(applyHeldBadgesForAll, 0);
-    setTimeout(applyHeldBadgesForAll, 120);
-    setTimeout(applyHeldBadgesForAll, 500);
-  }
-
-  ['showPage','renderRL','renderRegisterDivisionOverview','onRegTC','manualRefreshRegister','loadData','upDash'].forEach(function(name){
-    try{
-      var old = window[name];
-      if(typeof old !== 'function' || old.__v633HeldBadgeWrapped) return;
-      var fn = function(){
-        var r = old.apply(this, arguments);
-        runSoon();
-        return r;
-      };
-      fn.__v633HeldBadgeWrapped = true;
-      window[name] = fn;
-      try{ eval(name + '=window["' + name + '"]'); }catch(e){}
-    }catch(e){}
-  });
-
-  document.addEventListener('DOMContentLoaded', function(){
-    runSoon();
-    try{
-      new MutationObserver(function(){ runSoon(); }).observe(document.body, {childList:true, subtree:true});
-    }catch(e){}
-    setInterval(applyHeldBadgesForAll, 1200);
-  });
+  ['renderRL','renderRegisterDivisionOverview','manualRefreshRegister','onRegTC'].forEach(function(name){try{var old=window[name]; if(typeof old==='function'&&!old.__v636Wrapped){var fn=function(){var r=old.apply(this,arguments); setTimeout(markManualRows,0); setTimeout(markManualRows,150); return r;}; fn.__v636Wrapped=true; window[name]=fn; try{eval(name+'=window["'+name+'"]');}catch(e){}}}catch(e){}});
+  document.addEventListener('DOMContentLoaded',function(){setTimeout(markManualRows,300);});
 })();
 </script>
 
