@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-09-v648c-finalize-lock";
+  const APP_VERSION = "2026-06-09-v648-fix";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -12975,8 +12975,6 @@ window.refreshRegisterRegistrationsOnly = refreshRegisterRegistrationsOnly;
 async function refreshMatchesOnlyForTournament(tid, reason='manual'){
   tid=String(tid||'').trim();
   if(!tid) return null;
-  // v648fix: 조번호 확정 저장 중이면 폴링 스킵
-  if(window.__v648FinalizingNow && reason!=='manual') return null;
   if(window.DEBUG_READS) console.log('[cost-guard v524] matches-only refresh:', reason, tid);
   const prevMatchMap=buildMatchAlertStateMap(G.matches||{});
   const prevCourtMap=buildCourtNotificationStateMap(G.matches||{});
@@ -13050,11 +13048,11 @@ function startRealtimeTournamentSync(tid){
   if(CURRENT_LIVE_TID===tid && _realtimeMatchesUnsub) return;
   stopRealtimeTournamentSync();
   CURRENT_LIVE_TID=tid;
-  setTimeout(()=>{ window.__V641_ALLOW_LOCAL_COURT_OVERLAY=true /*v648fix*/; refreshMatchesOnlyForTournament(tid,'admin-bracket-initial').catch(e=>console.warn(e)); }, 1200);
+  setTimeout(()=>{ window.__V641_ALLOW_LOCAL_COURT_OVERLAY=false; refreshMatchesOnlyForTournament(tid,'admin-bracket-initial').catch(e=>console.warn(e)); }, 1200);
   const timer=setInterval(()=>{
     try{
       if(getCurrentPageName()==='bracket' && String(ge('brTS')?.value||'')===tid){
-        window.__V641_ALLOW_LOCAL_COURT_OVERLAY=true /*v648fix*/;
+        window.__V641_ALLOW_LOCAL_COURT_OVERLAY=false;
         refreshMatchesOnlyForTournament(tid,'admin-bracket-60s').catch(e=>console.warn(e));
       }
     }catch(e){}
@@ -13095,7 +13093,7 @@ async function syncTournamentDataForPage(page, tid, force=false, opts={}){
     if(pg==='bracket' && force){
       try{ clearTournamentBundleCacheForTid(targetTid); }catch(_e){}
       try{ _bundleFetchCooldown[targetTid]=0; }catch(_e){}
-      window.__V641_ALLOW_LOCAL_COURT_OVERLAY=true /*v648fix*/;
+      window.__V641_ALLOW_LOCAL_COURT_OVERLAY=false;
     }
     if(force || !hasCache) await fetchTournamentBundle(targetTid, {force:!!force, acceptStale:true, bypassCooldown:true});
     if(pg==='bracket' && String(ge('brTS')?.value||'')===targetTid){ try{ renderBracket(); initBracketNotice(); updateBracketFreshnessBadge('server'); }catch(_e){} }
@@ -13105,7 +13103,7 @@ async function syncTournamentDataForPage(page, tid, force=false, opts={}){
     if(pg==='bracket' && force){
       try{ clearTournamentBundleCacheForTid(targetTid); }catch(_e){}
       try{ _bundleFetchCooldown[targetTid]=0; }catch(_e){}
-      window.__V641_ALLOW_LOCAL_COURT_OVERLAY=true /*v648fix*/;
+      window.__V641_ALLOW_LOCAL_COURT_OVERLAY=false;
     }
     await fetchTournamentBundle(targetTid, {force:!!force, acceptStale:true, bypassCooldown:(pg==='bracket'?true:!!options.bypassCooldown)});
     if(pg==='bracket' && String(ge('brTS')?.value||'')===targetTid){ try{ renderBracket(); initBracketNotice(); updateBracketFreshnessBadge('server'); }catch(_e){} }
@@ -48789,7 +48787,7 @@ async function manualRefreshCurrentTournament(){
       try{ if(typeof TOURNAMENT_BUNDLE_MEM!=='undefined') delete TOURNAMENT_BUNDLE_MEM[tid]; }catch(_e){}
       try{ if(typeof _bundleFetchCooldown!=='undefined') _bundleFetchCooldown[tid]=0; }catch(_e){}
       try{ if(typeof clearTournamentBundleCacheForTid==='function') clearTournamentBundleCacheForTid(tid); }catch(_e){}
-      window.__V641_ALLOW_LOCAL_COURT_OVERLAY=true /*v648fix*/;
+      window.__V641_ALLOW_LOCAL_COURT_OVERLAY=false;
       window.__V641_BRACKET_HARD_REFRESHING=true;
       try{
         await fetchTournamentBundle(tid,{force:true,acceptStale:true,bypassCooldown:true});
@@ -58664,42 +58662,21 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
   }
   async function finalize(keys){
     let cnt=0;
-    // v648fix: 저장 중 폴링 일시 차단
-    const _oldUnsub = window._realtimeMatchesUnsub;
-    try{ if(typeof window.stopRealtimeTournamentSync==='function') window.stopRealtimeTournamentSync(); }catch(e){}
-    window.__v648FinalizingNow = true;
-    try{
-      for(const key of keys){
-        applyManualSaveLocal(key);
-        if(applyFinalizeLocal(key)){
-          await persistKey(key);
-          // 저장 완료 확인 - draw의 v615FinalizedLock이 실제로 저장됐는지
-          try{
-            const {tid,div}=keyParts(key);
-            const saved=await getDoc(doc(db2,'draws',key));
-            if(saved.exists() && saved.data().v615FinalizedLock===true){
-              console.log('[v648] 조번호 확정 Firebase 저장 확인:', key);
-            } else {
-              // 한 번 더 저장
-              console.warn('[v648] 재저장 시도:', key);
-              await persistKey(key);
-            }
-          }catch(e){ console.warn('[v648] 저장 확인 실패:', e); }
-          cnt++;
-        }
+    for(const key of keys){
+      applyManualSaveLocal(key);
+      if(applyFinalizeLocal(key)){
+        await persistKey(key);
+        cnt++;
       }
-    }finally{
-      window.__v648FinalizingNow = false;
-      // 폴링 재개
-      try{
-        const tid=keys.length>0?keyParts(keys[0]).tid:'';
-        if(tid && typeof window.startRealtimeTournamentSync==='function'){
-          setTimeout(()=>window.startRealtimeTournamentSync(tid), 2000);
-        }
-      }catch(e){}
     }
-    toastSafe(cnt?'조번호 확정 완료 🔒 저장되었습니다.':'확정할 예선 조가 없습니다.', cnt?'success':'error');
-    try{ if(typeof window.renderBracket==='function') window.renderBracket(); }catch(e){}
+    if(cnt>0){
+      // 저장 완료 대기 후 렌더링
+      try{ if(typeof waitForPendingWrites==='function') await waitForPendingWrites(db2); }catch(e){}
+      toastSafe('조번호 확정 완료 🔒 저장되었습니다.','success');
+      try{ if(typeof window.renderBracket==='function') window.renderBracket(); }catch(e){}
+    } else {
+      toastSafe('확정할 예선 조가 없습니다.','error');
+    }
     setTimeout(()=>{ try{ refreshButtons(); }catch(e){} },80);
     return cnt;
   }
@@ -59835,7 +59812,7 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
 
 <script id="v641BracketServerTruthPatch">
 (function(){
-  try{ window.__V641_ALLOW_LOCAL_COURT_OVERLAY=true /*v648fix*/; }catch(e){}
+  try{ window.__V641_ALLOW_LOCAL_COURT_OVERLAY=false; }catch(e){}
   const VER='v641-bracket-server-truth';
   function mark(){
     try{
@@ -59854,7 +59831,7 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
 (function(){
   'use strict';
   const VER='v643-syntax-fixed-cost-optimized';
-  try{ window.__V641_ALLOW_LOCAL_COURT_OVERLAY=true /*v648fix*/; window.__V642_ALLOW_LOCAL_COURT_OVERLAY=true /*v648fix*/; }catch(e){}
+  try{ window.__V641_ALLOW_LOCAL_COURT_OVERLAY=false; window.__V642_ALLOW_LOCAL_COURT_OVERLAY=false; }catch(e){}
 
   function isManageAuto(){
     try{ return !!(window.AD || window.OP || window.TM || AD || OP || TM); }catch(e){ return !!(window.AD||window.OP||window.TM); }
@@ -59902,8 +59879,8 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
   const oldRefreshMatches=window.refreshMatchesOnlyForTournament || (typeof refreshMatchesOnlyForTournament==='function'?refreshMatchesOnlyForTournament:null);
   if(typeof oldRefreshMatches==='function' && !oldRefreshMatches.__v642Wrapped){
     const fn=async function(tid,reason){
-      window.__V641_ALLOW_LOCAL_COURT_OVERLAY=true /*v648fix*/;
-      window.__V642_ALLOW_LOCAL_COURT_OVERLAY=true /*v648fix*/;
+      window.__V641_ALLOW_LOCAL_COURT_OVERLAY=false;
+      window.__V642_ALLOW_LOCAL_COURT_OVERLAY=false;
       const r=await oldRefreshMatches.call(this,tid,reason||'lite');
       try{ markBadge('auto'); }catch(e){}
       return r;
@@ -59948,7 +59925,7 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
   if(typeof oldManual==='function' && !oldManual.__v642Wrapped){
     const fn=async function(){
       window.__V642_MANUAL_BRACKET_REFRESH=true;
-      window.__V641_ALLOW_LOCAL_COURT_OVERLAY=true /*v648fix*/;
+      window.__V641_ALLOW_LOCAL_COURT_OVERLAY=false;
       try{
         const r=await oldManual.apply(this,arguments);
         try{ markBadge('manual'); }catch(e){}
@@ -60277,7 +60254,7 @@ import { getFirestore, collection, doc, setDoc, getDocs, query, orderBy, limit, 
       if(page==='bracket'){
         try{ if(typeof TOURNAMENT_BUNDLE_MEM!=='undefined' && TOURNAMENT_BUNDLE_MEM) delete TOURNAMENT_BUNDLE_MEM[tid]; }catch(e){}
         try{ if(typeof window.clearTournamentBundleCacheForTid==='function') window.clearTournamentBundleCacheForTid(tid); }catch(e){}
-        try{ window.__V641_ALLOW_LOCAL_COURT_OVERLAY=true /*v648fix*/; window.__V642_ALLOW_LOCAL_COURT_OVERLAY=true /*v648fix*/; }catch(e){}
+        try{ window.__V641_ALLOW_LOCAL_COURT_OVERLAY=false; window.__V642_ALLOW_LOCAL_COURT_OVERLAY=false; }catch(e){}
         if(typeof window.fetchTournamentBundle==='function'){
           await window.fetchTournamentBundle(tid,{force:true,acceptStale:true,bypassCooldown:true});
         }
@@ -60316,11 +60293,8 @@ import { getFirestore, collection, doc, setDoc, getDocs, query, orderBy, limit, 
   window.addEventListener('pageshow',()=>scheduleInitial('pageshow'));
   document.addEventListener('visibilitychange',()=>{
     if(document.hidden) return;
-    // v648fix: 앱 복귀 시 쿨다운 무시하고 항상 갱신 (PWA 백그라운드 복귀 대응)
-    const page=currentPage(), tid=selectedTid(page);
-    if(page && tid){
-      const all=readLast(); delete all[page+':'+tid]; writeLast(all);
-    }
+    // 앱 복귀 시 쿨다운 무시하고 항상 갱신
+    try{ const p=currentPage(), t=selectedTid(p); if(p&&t){ const a=readLast(); delete a[p+':'+t]; writeLast(a); } }catch(e){}
     scheduleInitial('visible');
   });
 
@@ -60595,8 +60569,8 @@ import { getFirestore, collection, doc, setDoc, getDocs, query, orderBy, limit, 
     tid=norm(tid); if(!tid) return null;
     try{
       window.__V642_MANUAL_BRACKET_REFRESH=true;
-      window.__V641_ALLOW_LOCAL_COURT_OVERLAY=true /*v648fix*/;
-      window.__V642_ALLOW_LOCAL_COURT_OVERLAY=true /*v648fix*/;
+      window.__V641_ALLOW_LOCAL_COURT_OVERLAY=false;
+      window.__V642_ALLOW_LOCAL_COURT_OVERLAY=false;
       let bundle=null;
       if(typeof fetchTournamentBundle==='function'){
         bundle=await fetchTournamentBundle(tid,{force:true,bypassCooldown:true,acceptStale:false,reason:reason||'v649'});
