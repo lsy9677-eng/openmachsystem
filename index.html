@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-09-v641-bracket-server-truth";
+  const APP_VERSION = "2026-06-09-v644-final-stable";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -6135,7 +6135,7 @@ button:disabled{opacity:.55!important;cursor:not-allowed!important;filter:graysc
 </div>
 </div>
 <div class="sec-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
-  <span>대진표 · 경기 현황 <span style="font-size:.72rem;font-weight:400;color:var(--text2)">— 진입/새로고침 시 서버 최신값 강제 확인</span> <span id="bracketFreshnessBadge" style="display:inline-flex;margin-left:6px;padding:3px 8px;border-radius:999px;background:#eef2ff;color:#1d4ed8;font-size:.66rem;font-weight:900;vertical-align:middle">v638</span></span>
+  <span>대진표 · 경기 현황 <span style="font-size:.72rem;font-weight:400;color:var(--text2)">— 전체 대진표는 수동 최신화 · 코트/진행경기만 자동 최소 갱신</span> <span id="bracketFreshnessBadge" style="display:inline-flex;margin-left:6px;padding:3px 8px;border-radius:999px;background:#eef2ff;color:#1d4ed8;font-size:.66rem;font-weight:900;vertical-align:middle">v642</span></span>
   <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
     <button onclick="manualRefreshCurrentTournament()" style="padding:7px 14px;border-radius:999px;border:none;background:#0f766e;color:#fff;font-size:.84rem;font-weight:900;cursor:pointer;display:inline-flex;align-items:center;gap:5px;box-shadow:0 2px 8px rgba(15,118,110,.25)">🔄 최신 대진표</button>
     <button onclick="window.__hardClearAppCacheAndReload&&window.__hardClearAppCacheAndReload()" style="padding:7px 12px;border-radius:999px;border:1px solid #cbd5e1;background:#fff;color:#334155;font-size:.78rem;font-weight:900;cursor:pointer;display:inline-flex;align-items:center;gap:5px">🧹 캐시초기화</button>
@@ -12483,7 +12483,7 @@ function shouldUseRealtimeForTournament(page, tid){
   // 화면 깜빡임과 Firestore 읽기 폭증이 동시에 발생할 수 있다.
   // 실시간 리스너는 관리자/진행자/경기이사만 사용하고,
   // 일반 사용자는 캐시/수동 새로고침 흐름을 사용한다.
-  return !!(AD || OP || REG);
+  return !!(AD || OP || TM);
 }
 function isViewerReadOnlyMode(){
   return !(AD || OP || REG);
@@ -12584,7 +12584,7 @@ function applyTournamentBundle(tid, bundle){
   const _V577_COURT_FIELDS=['court','courts','manualCourtTarget','manualSharedHold','manualCourtPinnedAt','manualCourtLocked','manualCourtLockedAt','courtAssignedAt','courtQueueOrder','waitingFirstAt','lastWaitingFirstAt','autoCourtLabel','initialPrelimAutoCourt','v615FinalizedLock','v616cManualFinalized','v617GroupOrderLocked','v617eManualCourtSaved','finalGroupNo','displayGroupNo','confirmedGroupNo','group'];
   try{
     if(window.__V641_ALLOW_LOCAL_COURT_OVERLAY!==true) throw new Error('v641 server truth: local court overlay disabled');
-    Object.keys(G.matches||{}).forEach(k=>{
+    if(window.__V642_ALLOW_LOCAL_COURT_OVERLAY===true) Object.keys(G.matches||{}).forEach(k=>{
       if(_k2td(k).tid!==tid) return;
       (G.matches[k]||[]).forEach(m=>{
         const mid=String(m._id||m.id||''); if(!mid) return;
@@ -12952,26 +12952,19 @@ window.refreshRegisterRegistrationsOnly = refreshRegisterRegistrationsOnly;
 
     try{
       if(pg === 'register'){
-        // v526: 참가접수 화면은 visibilitychange 자동 갱신 제거.
-        // ↻ 새로고침 버튼을 눌렀을 때만 갱신. 비용 절감.
+        // 참가접수 화면은 버튼을 눌렀을 때만 갱신한다.
         return;
       } else if(pg === 'bracket'){
-        if(AD || OP || REG){
-          // v523 관리자: 전체 리스너 재시작 금지, 경기 상태만 저읽기 갱신
+        // v642 비용 보호: 화면 복귀 시 전체 대진표 강제 재조회 금지.
+        // 관리자/진행자만 코트/진행 경기 상태 확인용 matches 최소 갱신을 수행한다.
+        if(AD || OP || TM){
           if(CURRENT_LIVE_TID !== tid){
-            await fetchTournamentBundle(tid, {force:true, acceptStale:true});
             startRealtimeTournamentSync(tid);
           }else{
-            await refreshMatchesOnlyForTournament(tid,'visibilitychange');
+            await refreshMatchesOnlyForTournament(tid,'visibilitychange-lite');
           }
         } else {
-          // 일반 회원 뷰어: 강제 1회 재조회 + 렌더
-          try{ if(TOURNAMENT_BUNDLE_MEM[tid]) delete TOURNAMENT_BUNDLE_MEM[tid]; }catch(_e){}
-          await fetchTournamentBundle(tid, {force:true, acceptStale:true});
-          if(getCurrentPageName()==='bracket' && String(ge('brTS')?.value||'')===tid){
-            try{ renderBracket(); }catch(_e){}
-            try{ initBracketNotice(); }catch(_e){}
-          }
+          return;
         }
       }
     }catch(e){ console.warn('v404 app resume refresh failed', e); }
@@ -13060,10 +13053,10 @@ function startRealtimeTournamentSync(tid){
     try{
       if(getCurrentPageName()==='bracket' && String(ge('brTS')?.value||'')===tid){
         window.__V641_ALLOW_LOCAL_COURT_OVERLAY=false;
-        refreshMatchesOnlyForTournament(tid,'admin-bracket-45s').catch(e=>console.warn(e));
+        refreshMatchesOnlyForTournament(tid,'admin-bracket-60s').catch(e=>console.warn(e));
       }
     }catch(e){}
-  },45000);
+  },60000);
   _realtimeMatchesUnsub=function(){ clearInterval(timer); };
   _realtimeRegsUnsub=null;
   _realtimeDrawsUnsub=null;
@@ -16434,8 +16427,8 @@ function showPage(n){
   setTimeout(()=>window.updatePageSliderHeight && window.updatePageSliderHeight(), 0);
   try{
     const _syncTid = getSelectedTournamentIdForPage(n) || getRealtimeTargetTournamentId() || null;
-    // v445: 대진표 화면은 결과 동기화가 핵심이므로 화면 진입 시 서버 기준 1회 확인한다.
-    syncTournamentDataForPage(n, _syncTid, n==='bracket', n==='bracket'?{bypassCooldown:true, renderAfter:true}:{}).catch(e=>console.warn('page sync failed', e));
+    // v642 비용 보호: 대진표 화면 진입은 캐시/서버 정본 1회만 확인하고, 전체 강제 재조회는 '최신 대진표' 버튼에서만 수행한다.
+    syncTournamentDataForPage(n, _syncTid, false, n==='bracket'?{bypassCooldown:false, renderAfter:true}:{}).catch(e=>console.warn('page sync failed', e));
   }catch(e){}
   ensureViewerBracketPolling(n, getSelectedTournamentIdForPage(n) || getRealtimeTargetTournamentId() || null);
   refreshRoleUI();
@@ -22957,9 +22950,8 @@ function initBracketNotice(){
 function onBrTC(){
   const tid=ge('brTS').value, ds=ge('brDS');
   try{
-    // v445: 대진표 진입/대회 변경 시 기존 10분 캐시를 그대로 쓰지 말고
-    // 서버 기준 1회 동기화 후 실시간 리스너를 연결한다.
-    syncTournamentDataForPage('bracket', tid || getRealtimeTargetTournamentId() || null, true, {bypassCooldown:true, renderAfter:true}).catch(e=>console.warn('bracket sync failed', e));
+    // v642 비용 보호: 대회 변경 시 캐시가 없을 때만 서버에서 읽고, 강제 전체 재조회는 '최신 대진표' 버튼에서만 수행한다.
+    syncTournamentDataForPage('bracket', tid || getRealtimeTargetTournamentId() || null, false, {bypassCooldown:false, renderAfter:true}).catch(e=>console.warn('bracket sync failed', e));
   }catch(e){}
   if(!tid){
     if(ds) ds.innerHTML='<option value="__ALL__">전체</option>';
@@ -45241,7 +45233,7 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
     const style=document.getElementById('v431BracketExportFixStyle')?.innerHTML||'';
     const printCss='@page{size:A4 portrait;margin:0}html,body{margin:0!important;padding:0!important;background:#fff!important;font-family:\'Noto Sans KR\',Arial,sans-serif}.v431-export-sheet{position:static!important;left:auto!important;top:auto!important;width:794px!important;margin:0 auto!important;z-index:auto!important}.v431-a4-page{page-break-after:always;break-after:page}.v431-a4-page:last-child{page-break-after:auto}';
     const autoprint='window.onload=function(){setTimeout(function(){window.focus();window.print();},250)};';
-    const html='<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>예선 대진표 A4 출력</title><style>'+style+printCss+'</style><'+'script>'+autoprint+'<'+'/script></head><body>'+sheet.outerHTML+'\n\n</body></html>';
+    const html='<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>예선 대진표 A4 출력</title><style>'+style+printCss+'</style><'+'script>'+autoprint+'<'+'/script></head><body>'+sheet.outerHTML+'</body></html>';
     const blob=new Blob([html],{type:'text/html;charset=utf-8'});
     const url=URL.createObjectURL(blob);
     const win=window.open(url,'_blank','width=920,height=1100,noopener,noreferrer');
@@ -58049,9 +58041,7 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
     if(!finalBtn) return;
     finalBtn.textContent='🔒 조번호 확정';
     finalBtn.onclick=function(){ window.v606FinalizeGroupOrder(); };
-    finalBtn.style.display='inline-flex';
-    finalBtn.style.borderColor='#d4a017';
-    finalBtn.style.color='#8a6412';
+    // v643fix: display 직접 설정 안 함 (ensureFinalizeButton이 담당)
     // 코트저장 버튼이 있으면 제거
     const old=document.getElementById('v617eManualCourtSaveBtn');
     if(old) old.remove();
@@ -58995,7 +58985,7 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
   function wrap(name,after){const old=window[name]; if(typeof old!=='function'||old.__v626Wrapped) return; const fn=function(){reflowCurrent(); const r=old.apply(this,arguments); setTimeout(function(){try{after&&after(); ensureRowHoldButtons();}catch(e){}},0); setTimeout(function(){try{after&&after(); ensureRowHoldButtons();}catch(e){}},120); return r;}; fn.__v626Wrapped=true; window[name]=fn; try{eval(name+'=window["'+name+'"]');}catch(e){}}
   wrap('renderRegisterDivisionOverview',ensureParticipantToolbar); wrap('renderRL',ensureParticipantToolbar); wrap('renderBracket',ensureFinalizeButton);
   document.addEventListener('click',function(ev){const btn=ev.target&&ev.target.closest&&ev.target.closest('#v606FinalizeGroupOrderBtn,button[onclick^="v606FinalizeGroupOrderForKey"]'); if(!btn) return; ev.preventDefault(); ev.stopPropagation(); if(ev.stopImmediatePropagation) ev.stopImmediatePropagation(); const raw=String(btn.getAttribute('onclick')||''); const m=raw.match(/v606FinalizeGroupOrderForKey\(['\"]([^'\"]+)/); if(m) finalizeKey(m[1]); else finalizeAll();},true);
-  document.addEventListener('DOMContentLoaded',function(){reflowCurrent(); ensureFinalizeButton(); ensureParticipantToolbar(); ensureRowHoldButtons(); [150,500,1200,2500].forEach(ms=>setTimeout(function(){reflowCurrent(); ensureFinalizeButton(); ensureParticipantToolbar(); ensureRowHoldButtons();},ms)); try{new MutationObserver(function(){ensureFinalizeButton(); ensureParticipantToolbar(); ensureRowHoldButtons();}).observe(document.body,{childList:true,subtree:true});}catch(e){} });
+  document.addEventListener('DOMContentLoaded',function(){reflowCurrent(); ensureFinalizeButton(); ensureParticipantToolbar(); ensureRowHoldButtons(); [150,500,1200,2500].forEach(ms=>setTimeout(function(){reflowCurrent(); ensureFinalizeButton(); ensureParticipantToolbar(); ensureRowHoldButtons();},ms)); try{new MutationObserver(function(){try{ensureRowHoldButtons();}catch(e){}}).observe(document.body,{childList:true,subtree:true});}catch(e){} });
   setTimeout(function(){reflowCurrent(); ensureFinalizeButton(); ensureParticipantToolbar(); ensureRowHoldButtons();},0);
   // v631fix: ensureFinalizeButton setInterval 제거
   setInterval(function(){try{ensureRowHoldButtons();}catch(e){}},1200);
@@ -59789,7 +59779,7 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
   function mark(){
     try{
       const el=document.getElementById('bracketFreshnessBadge');
-      if(el){
+      if(el && !/server-truth|서버정본/.test(el.textContent||'')){
         el.title='PC와 휴대폰 모두 서버 저장 대진표를 정본으로 표시합니다.';
       }
     }catch(e){}
@@ -59798,5 +59788,131 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
   window.__V641_PATCH=VER;
 })();
 </script>
+
+<script id="v642CostOptimizedManualBracketPatch">
+(function(){
+  'use strict';
+  const VER='v643-syntax-fixed-cost-optimized';
+  try{ window.__V641_ALLOW_LOCAL_COURT_OVERLAY=false; window.__V642_ALLOW_LOCAL_COURT_OVERLAY=false; }catch(e){}
+
+  function isManageAuto(){
+    try{ return !!(window.AD || window.OP || window.TM || AD || OP || TM); }catch(e){ return !!(window.AD||window.OP||window.TM); }
+  }
+  function currentPage(){ try{return (typeof getCurrentPageName==='function')?getCurrentPageName():'';}catch(e){return '';} }
+  function bracketTid(){
+    try{ return String((document.getElementById('brTS')||{}).value || (typeof getRealtimeTargetTournamentId==='function'?getRealtimeTargetTournamentId():'') || '').trim(); }
+    catch(e){ return ''; }
+  }
+  function markBadge(source){
+    try{
+      const el=document.getElementById('bracketFreshnessBadge'); if(!el) return;
+      const d=new Date(); const hh=String(d.getHours()).padStart(2,'0'); const mm=String(d.getMinutes()).padStart(2,'0');
+      const label=source==='auto'?'진행갱신':source==='manual'?'수동최신':'비용최적화';
+      el.textContent='v642 · '+label+' '+hh+':'+mm;
+      el.title='전체 대진표는 수동 최신화, 자동 갱신은 관리자/진행자 코트·진행경기 상태에만 최소 적용됩니다.';
+    }catch(e){}
+  }
+
+  // 일반 관람자/경기이사는 대진표 자동 전체 재조회 금지. 관리자/진행자만 코트 진행상태 최소 갱신.
+  window.shouldUseRealtimeForTournament=function(page,tid){
+    const pg=page||currentPage();
+    if(pg!=='bracket') return false;
+    if(!String(tid||'').trim()) return false;
+    return isManageAuto();
+  };
+
+  // 화면 진입/대회변경에서 강제 전체 재조회가 걸려도 수동 버튼이 아니면 force를 낮춘다.
+  const oldSync=window.syncTournamentDataForPage || (typeof syncTournamentDataForPage==='function'?syncTournamentDataForPage:null);
+  if(typeof oldSync==='function' && !oldSync.__v642Wrapped){
+    const fn=async function(page,tid,force,opts){
+      const pg=page||currentPage();
+      if(pg==='bracket' && !window.__V642_MANUAL_BRACKET_REFRESH){
+        force=false;
+        opts=Object.assign({},opts||{}, {bypassCooldown:false});
+      }
+      return oldSync.call(this,page,tid,force,opts||{});
+    };
+    fn.__v642Wrapped=true;
+    window.syncTournamentDataForPage=fn;
+    try{ syncTournamentDataForPage=fn; }catch(e){}
+  }
+
+  // matches-only 갱신도 로컬 임시 코트값을 서버값 위에 덮지 못하게 한다.
+  const oldRefreshMatches=window.refreshMatchesOnlyForTournament || (typeof refreshMatchesOnlyForTournament==='function'?refreshMatchesOnlyForTournament:null);
+  if(typeof oldRefreshMatches==='function' && !oldRefreshMatches.__v642Wrapped){
+    const fn=async function(tid,reason){
+      window.__V641_ALLOW_LOCAL_COURT_OVERLAY=false;
+      window.__V642_ALLOW_LOCAL_COURT_OVERLAY=false;
+      const r=await oldRefreshMatches.call(this,tid,reason||'lite');
+      try{ markBadge('auto'); }catch(e){}
+      return r;
+    };
+    fn.__v642Wrapped=true;
+    window.refreshMatchesOnlyForTournament=fn;
+    try{ refreshMatchesOnlyForTournament=fn; }catch(e){}
+  }
+
+  // 자동 루프는 관리자/진행자만, 60초 주기. 전체 대진표/참가자/draws는 건드리지 않는다.
+  let v642Timer=null, v642Tid='';
+  function stopLite(){ if(v642Timer){ try{clearInterval(v642Timer);}catch(e){} } v642Timer=null; v642Tid=''; }
+  window.stopRealtimeTournamentSync=function(){
+    stopLite();
+    try{ CURRENT_LIVE_TID=''; }catch(e){}
+    try{ if(_realtimeMatchesUnsub){ _realtimeMatchesUnsub(); } }catch(e){}
+    try{ _realtimeMatchesUnsub=null; _realtimeRegsUnsub=null; _realtimeDrawsUnsub=null; }catch(e){}
+  };
+  window.startRealtimeTournamentSync=function(tid){
+    tid=String(tid||'').trim();
+    if(!tid || currentPage()!=='bracket' || !isManageAuto()){ return stopLite(); }
+    if(v642Timer && v642Tid===tid) return;
+    stopLite();
+    v642Tid=tid;
+    try{ CURRENT_LIVE_TID=tid; }catch(e){}
+    setTimeout(()=>{
+      if(currentPage()==='bracket' && bracketTid()===tid && isManageAuto() && typeof window.refreshMatchesOnlyForTournament==='function'){
+        window.refreshMatchesOnlyForTournament(tid,'v642-initial-lite').catch(()=>{});
+      }
+    },1200);
+    v642Timer=setInterval(()=>{
+      if(currentPage()==='bracket' && bracketTid()===tid && isManageAuto() && typeof window.refreshMatchesOnlyForTournament==='function'){
+        window.refreshMatchesOnlyForTournament(tid,'v642-60s-lite').catch(()=>{});
+      }
+    },60000);
+    try{ _realtimeMatchesUnsub=stopLite; _realtimeRegsUnsub=null; _realtimeDrawsUnsub=null; }catch(e){}
+  };
+  try{ startRealtimeTournamentSync=window.startRealtimeTournamentSync; stopRealtimeTournamentSync=window.stopRealtimeTournamentSync; }catch(e){}
+
+  // '최신 대진표' 버튼만 전체 서버 정본을 강제 재조회한다.
+  const oldManual=window.manualRefreshCurrentTournament || (typeof manualRefreshCurrentTournament==='function'?manualRefreshCurrentTournament:null);
+  if(typeof oldManual==='function' && !oldManual.__v642Wrapped){
+    const fn=async function(){
+      window.__V642_MANUAL_BRACKET_REFRESH=true;
+      window.__V641_ALLOW_LOCAL_COURT_OVERLAY=false;
+      try{
+        const r=await oldManual.apply(this,arguments);
+        try{ markBadge('manual'); }catch(e){}
+        return r;
+      }finally{
+        window.__V642_MANUAL_BRACKET_REFRESH=false;
+      }
+    };
+    fn.__v642Wrapped=true;
+    window.manualRefreshCurrentTournament=fn;
+    try{ manualRefreshCurrentTournament=fn; }catch(e){}
+  }
+
+  document.addEventListener('DOMContentLoaded',()=>{
+    setTimeout(()=>{
+      markBadge('load');
+      try{
+        const title=document.querySelector('#page-bracket .sec-title span span');
+        if(title) title.textContent='— 전체 대진표는 수동 최신화 · 코트/진행경기만 자동 최소 갱신';
+      }catch(e){}
+    },500);
+  });
+  window.__V642_PATCH=VER;
+})();
+</script>
+
 </body>
 </html>
