@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-09-v653-group-card-sms-recipients-fix";
+  const APP_VERSION = "2026-06-09-v654-result-court-sms-force";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -61168,5 +61168,142 @@ import { getFirestore, doc, setDoc, onSnapshot, serverTimestamp } from "https://
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
 })();
 </script>
+
+
+<!-- v654: 결과 저장 직후 결과문자 + 자동 코트배치/대기문자 즉시 생성 강제 복구 -->
+<style id="v654ResultCourtSmsForceStyle">
+#smsApprovalWrap.v654-show{
+  display:block!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;
+  position:fixed!important;left:20px!important;right:auto!important;bottom:24px!important;z-index:2147483640!important;
+  max-width:min(460px,calc(100vw - 24px))!important;
+}
+#smsApprovalWrap.v654-show .sms-approval-card{
+  display:block!important;visibility:visible!important;opacity:1!important;
+  background:linear-gradient(135deg,#0f766e,#0d9488)!important;color:#fff!important;border-radius:16px!important;
+  box-shadow:0 16px 36px rgba(15,118,110,.34)!important;padding:14px 16px!important;border:1px solid rgba(255,255,255,.22)!important;
+}
+#smsApprovalWrap.v654-show[data-sms-kind="match_completed"] .sms-approval-card{background:linear-gradient(135deg,#dc2626,#991b1b)!important;box-shadow:0 16px 36px rgba(220,38,38,.34)!important;}
+#smsApprovalWrap.v654-show[data-sms-kind="match_started"] .sms-approval-card{background:linear-gradient(135deg,#1d4ed8,#2563eb)!important;box-shadow:0 16px 36px rgba(37,99,235,.32)!important;}
+#smsApprovalWrap.v654-show .sms-approval-title{font-size:.92rem!important;font-weight:1000!important;line-height:1.35!important;margin-bottom:6px!important;}
+#smsApprovalWrap.v654-show .sms-approval-msg{font-size:.84rem!important;line-height:1.6!important;white-space:pre-line!important;word-break:keep-all!important;}
+#smsApprovalWrap.v654-show .sms-approval-actions{display:flex!important;justify-content:flex-end!important;gap:8px!important;margin-top:12px!important;flex-wrap:wrap!important;}
+#smsApprovalWrap.v654-show .sms-approval-btn{border:none!important;border-radius:999px!important;padding:8px 14px!important;font-size:.78rem!important;font-weight:1000!important;cursor:pointer!important;min-height:36px!important;}
+#smsApprovalWrap.v654-show .sms-approval-btn.primary{background:#fff!important;color:#0f766e!important;}
+#smsApprovalWrap.v654-show[data-sms-kind="match_completed"] .sms-approval-btn.primary{color:#b91c1c!important;}
+#smsApprovalWrap.v654-show[data-sms-kind="match_started"] .sms-approval-btn.primary{color:#1d4ed8!important;}
+#smsApprovalWrap.v654-show .sms-approval-btn.secondary{background:rgba(255,255,255,.16)!important;color:#fff!important;border:1px solid rgba(255,255,255,.22)!important;}
+@media(max-width:680px){
+  #smsApprovalWrap.v654-show{left:10px!important;right:10px!important;bottom:max(96px,calc(env(safe-area-inset-bottom,0px) + 82px))!important;max-width:none!important;}
+  #smsApprovalWrap.v654-show .sms-approval-card{border-radius:14px!important;padding:13px 14px!important;}
+  #smsApprovalWrap.v654-show .sms-approval-actions{justify-content:stretch!important;}
+  #smsApprovalWrap.v654-show .sms-approval-btn{flex:1 1 0!important;padding:9px 10px!important;}
+}
+</style>
+<script id="v654ResultCourtSmsForceScript">
+(function(){
+  'use strict';
+  if(window.__v654ResultCourtSmsForceInstalled) return;
+  window.__v654ResultCourtSmsForceInstalled=true;
+  const RECENT_KEY='v654.result.court.sms.recent.v1';
+  const RECENT_TTL=1000*60*4;
+  const QUEUE=[];
+  const norm=v=>String(v==null?'':v).replace(/\s+/g,' ').trim();
+  const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const toastSafe=(m,t)=>{try{if(typeof window.toast==='function')window.toast(m,t||'info');else console.log(m);}catch(e){}};
+  function recent(){try{const m=JSON.parse(sessionStorage.getItem(RECENT_KEY)||'{}')||{};const cut=Date.now()-RECENT_TTL;Object.keys(m).forEach(k=>{if(Number(m[k]||0)<cut)delete m[k];});return m;}catch(e){return {};}}
+  function seen(k){return !!recent()[norm(k)];}
+  function mark(k){k=norm(k);if(!k)return;const m=recent();m[k]=Date.now();try{sessionStorage.setItem(RECENT_KEY,JSON.stringify(m));}catch(e){}}
+  function canManage(){try{if(typeof canManageBracket==='function'&&canManageBracket())return true;}catch(e){}try{if(window.AD||window.OP||window.TM||AD||OP||TM)return true;}catch(e){}try{if(document.body&&(document.body.classList.contains('admin-mode')||document.body.classList.contains('tm-mode')||document.body.classList.contains('operator-mode')))return true;}catch(e){}return false;}
+  function keyParts(key){try{return typeof _k2td==='function'?_k2td(key):{tid:String(key||'').split('_')[0]||'',div:String(key||'').split('_').slice(1).join('_')||''};}catch(e){return {tid:'',div:''};}}
+  function currentCtx(){
+    try{
+      const k1=(window._m3Ctx&&window._m3Ctx.key)||'';
+      const m1=(window._m3Ctx&&window._m3Ctx.mid)||'';
+      const k2=(typeof CM_key!=='undefined'&&CM_key)?CM_key:(window.CM_key||'');
+      const m2=(typeof CM_id!=='undefined'&&CM_id)?CM_id:(window.CM_id||'');
+      const key=norm(k1||k2), mid=norm(m1||m2);
+      if(!key||!mid)return null;
+      const kp=keyParts(key);
+      return {key,mid,tid:kp.tid,div:kp.div};
+    }catch(e){return null;}
+  }
+  function matchById(key,mid){try{if(typeof getMatchByIdAnyKey==='function')return getMatchByIdAnyKey(key,mid)||null;}catch(e){}try{return ((G&&G.matches&&G.matches[key])||[]).find(x=>String(x&&(x.id||x._id)||'')===String(mid))||null;}catch(e){return null;}}
+  function state(){try{return typeof buildCourtNotificationStateMap==='function'?(buildCourtNotificationStateMap((G&&G.matches)||{})||{}):{};}catch(e){return {};}}
+  function courtsOf(m,fallback){const out=[];const add=c=>{c=norm(c);if(c&&!out.includes(c))out.push(c);};try{(Array.isArray(m&&m.courts)?m.courts:[]).forEach(add);}catch(e){}try{[m&&m.court,m&&m.manualCourtTarget,fallback].forEach(add);}catch(e){}return out;}
+  function scoreOf(m){try{return norm((typeof getIndividualActualScoreText==='function'?getIndividualActualScoreText(m):'')||(m&&m.actualScoreText)||(m&&m.scoreText)||((m&&m.sc1!=null&&m&&m.sc2!=null)?(m.sc1+':'+m.sc2):''));}catch(e){return norm((m&&m.scoreText)||'');}}
+  function teamTitle(key,m,side){
+    try{const teams=(G&&G.teams&&G.teams[key])||[];const idx=side===1?m.t1:m.t2;const t=teams[Number(idx)];if(t&&typeof tdn==='function')return norm(tdn(t,key,idx));
+      if(t&&Array.isArray(t.individualPlayers)){const ns=t.individualPlayers.map(p=>norm(p&&p.name)).filter(Boolean);if(ns.length)return ns.join(' / ');} if(t&&Array.isArray(t.players)){const ns=t.players.map(p=>typeof p==='string'?p:norm(p&&p.name)).filter(Boolean);if(ns.length)return ns.join(' / ');}return side===1?'1번':'2번';}catch(e){return side===1?'1번':'2번';}
+  }
+  function phoneDigits(v){return String(v||'').replace(/[^0-9]/g,'');}
+  function addRecipient(out,seen,r){
+    try{const phone=norm(r&&r.phone||r&&r.mobile||r&&r.tel||r);const k=phoneDigits(phone);if(k.length<9||seen[k])return;seen[k]=1;out.push({name:norm(r&&r.name||r&&r.playerName||r&&r.club||''),phone});}catch(e){}
+  }
+  function fallbackRecipients(key,m,mode){
+    const out=[], seen={};
+    try{
+      const teams=(G&&G.teams&&G.teams[key])||[];
+      [teams[Number(m&&m.t1)],teams[Number(m&&m.t2)]].filter(Boolean).forEach(t=>{
+        [t.phone,t.contactPhone,t.directorPhone,t.managerPhone,t.leaderPhone].forEach(ph=>addRecipient(out,seen,{name:t.club||'',phone:ph}));
+        (Array.isArray(t.individualPlayers)?t.individualPlayers:[]).forEach(p=>{if(mode==='result'&&p&&p.receiveResultSms===false)return;if(mode!=='result'&&p&&p.receiveOrderSms===false)return;addRecipient(out,seen,p);});
+        (Array.isArray(t.players)?t.players:[]).forEach(p=>{if(typeof p==='object')addRecipient(out,seen,p);});
+      });
+    }catch(e){}
+    return out;
+  }
+  function recipientsFor(kind,key,m){
+    let r=[];
+    try{if(kind==='match_completed'&&typeof getMatchResultNotificationRecipients==='function')r=getMatchResultNotificationRecipients(key,m)||[];}catch(e){}
+    try{if(!r.length&&typeof getMatchNotificationRecipients==='function')r=getMatchNotificationRecipients(key,m)||[];}catch(e){}
+    if(!r.length)r=fallbackRecipients(key,m,kind==='match_completed'?'result':'order');
+    const out=[], seen={};(Array.isArray(r)?r:[]).forEach(x=>addRecipient(out,seen,x));
+    return out;
+  }
+  function bodyFor(kind,key,m,meta){
+    try{if(typeof buildCourtNotificationMessage==='function'){const b=buildCourtNotificationMessage(kind,key,m,meta||{});if(norm(b))return b;}}catch(e){}
+    const a=teamTitle(key,m,1), b=teamTitle(key,m,2), score=scoreOf(m), court=norm(meta&&meta.court), q=Number(meta&&meta.queuePos||0)||0;
+    if(kind==='match_completed')return ['[230] 경기 완료',court?court+' 코트':'',score?'결과 '+score:'',a+' vs '+b].filter(Boolean).join(' · ');
+    if(kind==='match_started')return ['[230] 경기 시작',court?court+' 코트':'',a+' vs '+b,'코트 내 몸풀기 2분 후 바로 시합 시작 바랍니다.'].filter(Boolean).join(' · ');
+    return ['[230] 코트 대기',court?court+' 코트':'',q?('대기 '+q+'번'):'',a+' vs '+b].filter(Boolean).join(' · ');
+  }
+  function titleFor(kind){if(kind==='match_completed')return '✅ 경기 결과 문자';if(kind==='match_started')return '🎾 자동 코트 배치 문자';return '⏳ 코트 대기 문자';}
+  function payload(kind,key,m,meta){
+    const kp=keyParts(key); const mid=norm((m&&(m.id||m._id))||(meta&&meta.matchId)||''); const body=bodyFor(kind,key,m,meta||{}); const rec=recipientsFor(kind,key,m);
+    return {title:titleFor(kind),msg:body,smsBody:body,smsRecipients:rec,smsKind:kind,actionType:'sms_approval',tid:kp.tid,div:kp.div,key,matchId:mid,court:norm(meta&&meta.court),queuePos:Number(meta&&meta.queuePos||0)||0,dedupeKey:['v654',kind,kp.tid,kp.div,mid,norm(meta&&meta.court),Number(meta&&meta.queuePos||0)||0,scoreOf(m)].join('|')};
+  }
+  function ensureWrap(){let w=document.getElementById('smsApprovalWrap');if(!w){w=document.createElement('div');w.id='smsApprovalWrap';document.body.appendChild(w);}return w;}
+  function close(){const w=document.getElementById('smsApprovalWrap');if(w){w.classList.remove('show','left-side','v616g-show','v654-show');w.innerHTML='';w.removeAttribute('data-v654');}if(QUEUE.length)setTimeout(()=>render(QUEUE.shift()),90);}
+  function send(){try{const w=ensureWrap();const rec=JSON.parse(w.getAttribute('data-sms-recipients')||'[]')||[];const body=w.getAttribute('data-sms-body')||'';if(typeof _openSMSForRecipients==='function'){if(!_openSMSForRecipients(rec,body))return;}else{const phones=rec.map(r=>r&&r.phone?r.phone:r).filter(Boolean);if(!phones.length){toastSafe('문자 받을 번호가 없습니다','error');return;}window.location.href='sms:'+phones.join(',')+'?body='+encodeURIComponent(body);}close();toastSafe('문자 발송창을 열었습니다','success');}catch(e){toastSafe('문자창 열기 실패: '+(e&&e.message||e),'error');}}
+  function render(p){
+    try{if(!p)return false;const w=ensureWrap();if(w.classList.contains('show')||w.classList.contains('v654-show')){QUEUE.push(p);return true;}const rec=Array.isArray(p.smsRecipients)?p.smsRecipients:[];const count=rec.filter(r=>phoneDigits(r&&r.phone||r).length>=9).length;const actions=count?'<button type="button" class="sms-approval-btn primary" onclick="window.v654SendSmsApproval()">문자 보내기</button><button type="button" class="sms-approval-btn secondary" onclick="window.v654CloseSmsApproval()">닫기</button>':'<button type="button" class="sms-approval-btn secondary" onclick="window.v654CloseSmsApproval()">번호 없음</button>';w.innerHTML='<div class="sms-approval-card"><div class="sms-approval-title">'+esc(p.title||'문자 승인')+' · '+count+'명</div><div class="sms-approval-msg">'+esc(p.msg||p.smsBody||'')+'</div><div class="sms-approval-actions">'+actions+'</div></div>';w.setAttribute('data-v654','1');w.setAttribute('data-sms-kind',norm(p.smsKind));w.setAttribute('data-sms-body',String(p.smsBody||p.msg||''));w.setAttribute('data-sms-recipients',JSON.stringify(rec));w.setAttribute('data-dedupe-key',norm(p.dedupeKey));w.classList.add('show','left-side','v654-show');return true;}catch(e){console.warn('[v654] render failed',e);return false;}
+  }
+  function enqueue(p){try{if(!p||!p.dedupeKey)return false;if(seen(p.dedupeKey))return false;mark(p.dedupeKey);return render(p);}catch(e){console.warn('[v654] enqueue failed',e);return false;}}
+  function changedCourts(prev,next,ctx){
+    const courts=new Set();
+    try{Object.entries(prev||{}).forEach(([mid,p])=>{if(!p||!p.court)return;const n=(next||{})[mid];const mm=matchById(p.key,mid)||p.match;const finished=mm&&mm.winner!=null;const leftCurrent=p.status==='current'&&(!n||n.status!=='current'||norm(n.court)!==norm(p.court));if(finished||leftCurrent)courts.add(norm(p.court));});}catch(e){}
+    try{(window.__V536_RESULT_FINISHED_COURTS||[]).forEach(c=>{c=norm(c);if(c)courts.add(c);});}catch(e){}
+    try{if(ctx){const m=matchById(ctx.key,ctx.mid);courtsOf(m,'').forEach(c=>courts.add(c));Object.entries(prev||{}).forEach(([mid,p])=>{if(String(mid)===String(ctx.mid)&&p&&p.court)courts.add(norm(p.court));});}}catch(e){}
+    return courts;
+  }
+  function process(prev,ctx){
+    try{
+      if(!canManage())return;
+      const next=state(); const courts=changedCourts(prev,next,ctx); let made=0;
+      if(ctx&&ctx.key&&ctx.mid){const m=matchById(ctx.key,ctx.mid);if(m&&m.winner!=null){const cs=courtsOf(m,'');(cs.length?cs:['']).forEach(c=>{if(enqueue(payload('match_completed',ctx.key,m,{court:c,matchId:ctx.mid})))made++;});}}
+      const items=Object.entries(next||{}).map(([mid,it])=>Object.assign({matchId:mid},it||{})).filter(it=>it&&it.court&&courts.has(norm(it.court))&&it.match&&it.match.winner==null);
+      items.filter(it=>it.status==='current').forEach(it=>{const old=(prev||{})[norm(it.matchId)]||null;if(!old||old.status!=='current'||norm(old.court)!==norm(it.court)){if(enqueue(payload('match_started',it.key,it.match,{court:it.court,queuePos:0,matchId:it.matchId})))made++;}});
+      items.filter(it=>it.status==='waiting').sort((a,b)=>Number(a.queuePos||0)-Number(b.queuePos||0)).forEach(it=>{const old=(prev||{})[norm(it.matchId)]||null;const oldPos=old?Number(old.queuePos||0):0;const newPos=Number(it.queuePos||0)||0;if(!old||old.status!=='waiting'||norm(old.court)!==norm(it.court)||oldPos!==newPos){if(enqueue(payload('court_changed',it.key,it.match,{court:it.court,queuePos:newPos,matchId:it.matchId})))made++;}});
+      if(made) console.log('[v654] sms panels queued',made);
+    }catch(e){console.warn('[v654] process failed',e);}
+  }
+  function schedule(prev,ctx){[120,350,900,1600,2800,5200].forEach(ms=>setTimeout(()=>process(prev||{},ctx),ms));}
+  function wrap(name){try{const old=window[name];if(typeof old!=='function'||old.__v654Wrapped)return;const fn=async function(){const ctx=currentCtx();const prev=state();const r=await old.apply(this,arguments);schedule(prev,ctx);return r;};fn.__v654Wrapped=true;window[name]=fn;try{eval(name+'=window["'+name+'"]');}catch(e){};}catch(e){console.warn('[v654] wrap failed',name,e);}}
+  window.v654CloseSmsApproval=close; window.v654SendSmsApproval=send; window.v654ForceCheck=function(){process({},currentCtx());};
+  function install(){wrap('saveM3Core');wrap('saveM3');}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,80));else setTimeout(install,0);
+  setTimeout(install,700);setTimeout(install,2200);setTimeout(install,5000);
+})();
+</script>
+
 </body>
 </html>
