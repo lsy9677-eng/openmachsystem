@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-09-v639-a4-group-button-label";
+  const APP_VERSION = "2026-06-09-v641-bracket-server-truth";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -12553,6 +12553,17 @@ function saveTournamentBundleCache(tid, payload){
   keys.slice(8).forEach(k=>{ delete all[k]; });
   writeTournamentBundleCache(all);
 }
+function clearTournamentBundleCacheForTid(tid){
+  try{ if(TOURNAMENT_BUNDLE_MEM && TOURNAMENT_BUNDLE_MEM[tid]) delete TOURNAMENT_BUNDLE_MEM[tid]; }catch(e){}
+  try{
+    const raw=localStorage.getItem(TOURNAMENT_BUNDLE_CACHE_KEY);
+    if(raw){
+      const all=JSON.parse(raw)||{};
+      if(all && all[tid]){ delete all[tid]; localStorage.setItem(TOURNAMENT_BUNDLE_CACHE_KEY, JSON.stringify(all)); }
+    }
+  }catch(e){}
+}
+window.clearTournamentBundleCacheForTid=clearTournamentBundleCacheForTid;
 function getTournamentBundleCache(tid){
   if(!tid) return null;
   const mem=TOURNAMENT_BUNDLE_MEM[tid];
@@ -12572,6 +12583,7 @@ function applyTournamentBundle(tid, bundle){
   const _v577CourtSnap={};
   const _V577_COURT_FIELDS=['court','courts','manualCourtTarget','manualSharedHold','manualCourtPinnedAt','manualCourtLocked','manualCourtLockedAt','courtAssignedAt','courtQueueOrder','waitingFirstAt','lastWaitingFirstAt','autoCourtLabel','initialPrelimAutoCourt','v615FinalizedLock','v616cManualFinalized','v617GroupOrderLocked','v617eManualCourtSaved','finalGroupNo','displayGroupNo','confirmedGroupNo','group'];
   try{
+    if(window.__V641_ALLOW_LOCAL_COURT_OVERLAY!==true) throw new Error('v641 server truth: local court overlay disabled');
     Object.keys(G.matches||{}).forEach(k=>{
       if(_k2td(k).tid!==tid) return;
       (G.matches[k]||[]).forEach(m=>{
@@ -12621,16 +12633,17 @@ function applyTournamentBundle(tid, bundle){
     const div=x.division; if(!div) return;
     const key=tid+'_'+div;
     if(!G.matches[key]) G.matches[key]=[];
-    // v577: Firestore 데이터에 코트 필드 없으면 메모리 스냅샷에서 복원
+    // v641: 대진표/코트 현황은 서버 저장값을 정본으로 사용한다.
+    // 기존 메모리 스냅샷 복원은 기기별 화면 불일치(PC/휴대폰 다른 대진표)의 원인이 되므로 기본 차단.
     const mid=String(x._id||x.id||'');
-    const courtRestore=mid&&_v577CourtSnap[mid]?_v577CourtSnap[mid]:{};
+    const courtRestore=(window.__V641_ALLOW_LOCAL_COURT_OVERLAY===true && mid&&_v577CourtSnap[mid])?_v577CourtSnap[mid]:{};
     const merged={_id:x._id||x.id||'', ...x};
     Object.keys(courtRestore).forEach(f=>{
       if(merged[f]===undefined||merged[f]===null||merged[f]==='') merged[f]=courtRestore[f];
     });
     // v614+v617fix: 수동 코트 고정값은 메모리 스냅샷이 최우선
     // v617fix: 확정 플래그도 수동으로 간주
-    const _v614SnapIsManual = !!(
+    const _v614SnapIsManual = !!(window.__V641_ALLOW_LOCAL_COURT_OVERLAY===true && (
       courtRestore.manualCourtLocked===true ||
       String(courtRestore.manualCourtTarget||'').trim() ||
       courtRestore.manualSharedHold===true ||
@@ -12639,7 +12652,7 @@ function applyTournamentBundle(tid, bundle){
       courtRestore.v616cManualFinalized===true ||
       courtRestore.v617GroupOrderLocked===true ||
       courtRestore.v617eManualCourtSaved===true
-    );
+    ));
     if(_v614SnapIsManual){
       _V577_COURT_FIELDS.forEach(f=>{ if(courtRestore[f]!==undefined) merged[f]=courtRestore[f]; });
       // v617fix: 확정 플래그도 복원
@@ -13042,10 +13055,11 @@ function startRealtimeTournamentSync(tid){
   if(CURRENT_LIVE_TID===tid && _realtimeMatchesUnsub) return;
   stopRealtimeTournamentSync();
   CURRENT_LIVE_TID=tid;
-  setTimeout(()=>refreshMatchesOnlyForTournament(tid,'admin-bracket-initial').catch(e=>console.warn(e)), 1200);
+  setTimeout(()=>{ window.__V641_ALLOW_LOCAL_COURT_OVERLAY=false; refreshMatchesOnlyForTournament(tid,'admin-bracket-initial').catch(e=>console.warn(e)); }, 1200);
   const timer=setInterval(()=>{
     try{
       if(getCurrentPageName()==='bracket' && String(ge('brTS')?.value||'')===tid){
+        window.__V641_ALLOW_LOCAL_COURT_OVERLAY=false;
         refreshMatchesOnlyForTournament(tid,'admin-bracket-45s').catch(e=>console.warn(e));
       }
     }catch(e){}
@@ -13083,12 +13097,22 @@ async function syncTournamentDataForPage(page, tid, force=false, opts={}){
   if(shouldUseRealtimeForTournament(pg, targetTid)){
     stopViewerBracketPolling();
     const hasCache=!!getTournamentBundleCache(targetTid);
-    if(force || !hasCache) await fetchTournamentBundle(targetTid, {force:!!force, acceptStale:true, bypassCooldown:!!options.bypassCooldown});
+    if(pg==='bracket' && force){
+      try{ clearTournamentBundleCacheForTid(targetTid); }catch(_e){}
+      try{ _bundleFetchCooldown[targetTid]=0; }catch(_e){}
+      window.__V641_ALLOW_LOCAL_COURT_OVERLAY=false;
+    }
+    if(force || !hasCache) await fetchTournamentBundle(targetTid, {force:!!force, acceptStale:true, bypassCooldown:true});
     if(pg==='bracket' && String(ge('brTS')?.value||'')===targetTid){ try{ renderBracket(); initBracketNotice(); updateBracketFreshnessBadge('server'); }catch(_e){} }
     startRealtimeTournamentSync(targetTid);
   }else{
     stopRealtimeTournamentSync();
-    await fetchTournamentBundle(targetTid, {force:!!force, acceptStale:true, bypassCooldown:!!options.bypassCooldown});
+    if(pg==='bracket' && force){
+      try{ clearTournamentBundleCacheForTid(targetTid); }catch(_e){}
+      try{ _bundleFetchCooldown[targetTid]=0; }catch(_e){}
+      window.__V641_ALLOW_LOCAL_COURT_OVERLAY=false;
+    }
+    await fetchTournamentBundle(targetTid, {force:!!force, acceptStale:true, bypassCooldown:(pg==='bracket'?true:!!options.bypassCooldown)});
     if(pg==='bracket' && String(ge('brTS')?.value||'')===targetTid){ try{ renderBracket(); initBracketNotice(); updateBracketFreshnessBadge('server'); }catch(_e){} }
     ensureViewerBracketPolling(pg, targetTid);
   }
@@ -48732,8 +48756,17 @@ async function manualRefreshCurrentTournament(){
     if(effectivePg==='register'){
       await refreshRegisterRegistrationsOnly(tid,{render:true,noRestart:true});
     }else if(effectivePg==='bracket'){
-      // v638: 대진표 새로고침은 경기만이 아니라 팀/조편성/경기 전체를 서버 기준으로 다시 읽는다.
-      await fetchTournamentBundle(tid,{force:true,acceptStale:true,bypassCooldown:true});
+      // v641: 대진표 새로고침은 PC/휴대폰 모두 같은 서버 저장값만 사용한다.
+      try{ if(typeof TOURNAMENT_BUNDLE_MEM!=='undefined') delete TOURNAMENT_BUNDLE_MEM[tid]; }catch(_e){}
+      try{ if(typeof _bundleFetchCooldown!=='undefined') _bundleFetchCooldown[tid]=0; }catch(_e){}
+      try{ if(typeof clearTournamentBundleCacheForTid==='function') clearTournamentBundleCacheForTid(tid); }catch(_e){}
+      window.__V641_ALLOW_LOCAL_COURT_OVERLAY=false;
+      window.__V641_BRACKET_HARD_REFRESHING=true;
+      try{
+        await fetchTournamentBundle(tid,{force:true,acceptStale:true,bypassCooldown:true});
+      }finally{
+        window.__V641_BRACKET_HARD_REFRESHING=false;
+      }
       if(typeof renderBracket==='function') renderBracket();
       try{ initBracketNotice(); }catch(_e){}
       try{ updateBracketFreshnessBadge('manual'); }catch(_e){}
@@ -59747,5 +59780,23 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
 })();
 </script>
 
+
+
+<script id="v641BracketServerTruthPatch">
+(function(){
+  try{ window.__V641_ALLOW_LOCAL_COURT_OVERLAY=false; }catch(e){}
+  const VER='v641-bracket-server-truth';
+  function mark(){
+    try{
+      const el=document.getElementById('bracketFreshnessBadge');
+      if(el){
+        el.title='PC와 휴대폰 모두 서버 저장 대진표를 정본으로 표시합니다.';
+      }
+    }catch(e){}
+  }
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(mark,500));
+  window.__V641_PATCH=VER;
+})();
+</script>
 </body>
 </html>
