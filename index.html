@@ -11,32 +11,63 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-09-v637-a4-group-single-button";
+  const APP_VERSION = "2026-06-09-v639-a4-group-button-label";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
     const key = "APP_VERSION";
+    const reloadKey = "APP_VERSION_RELOADED";
     const prev = localStorage.getItem(key);
+
+    async function clearRuntimeCache(){
+      try {
+        if ('serviceWorker' in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations().catch(()=>[]);
+          await Promise.all(regs.map(r => r.unregister().catch(()=>{})));
+        }
+      } catch (_) {}
+      try {
+        if ('caches' in window) {
+          const keys = await caches.keys().catch(()=>[]);
+          await Promise.all(keys.map(k => caches.delete(k).catch(()=>{})));
+        }
+      } catch (_) {}
+    }
 
     if (prev !== APP_VERSION) {
       localStorage.setItem(key, APP_VERSION);
-
-      // Cache Storage(PWA/서비스워커 캐시 포함) 삭제 시도
-      const bust = () => {
-        location.reload();
-};
-
-      if ("caches" in window) {
-        caches.keys()
-          .then(keys => Promise.all(keys.map(k => caches.delete(k))))
-          .catch(() => {}
-          )
-          .finally(bust);
-      } else {
-        bust();
-      }
+      const reloadMark = APP_VERSION + ':' + location.pathname;
+      clearRuntimeCache().finally(() => {
+        // 같은 버전에서 무한 새로고침 방지. 단, URL에 캐시버스터를 붙여 SW/브라우저 캐시를 우회한다.
+        if (sessionStorage.getItem(reloadKey) !== reloadMark) {
+          sessionStorage.setItem(reloadKey, reloadMark);
+          const url = new URL(location.href);
+          url.searchParams.set('__v', APP_VERSION);
+          url.searchParams.set('__ts', Date.now().toString());
+          location.replace(url.toString());
+        }
+      });
     }
   })();
+
+  window.__hardClearAppCacheAndReload = async function(){
+    try {
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations().catch(()=>[]);
+        await Promise.all(regs.map(r => r.unregister().catch(()=>{})));
+      }
+      if ('caches' in window) {
+        const keys = await caches.keys().catch(()=>[]);
+        await Promise.all(keys.map(k => caches.delete(k).catch(()=>{})));
+      }
+      try{ localStorage.removeItem('TOURNAMENT_BUNDLE_CACHE'); }catch(_e){}
+      try{ sessionStorage.clear(); }catch(_e){}
+    } catch(_e) {}
+    const url = new URL(location.href);
+    url.searchParams.set('__v', APP_VERSION);
+    url.searchParams.set('__hard', Date.now().toString());
+    location.replace(url.toString());
+  };
 
 // === simplified order modal mode ===
 window.ORDER_SIMPLE_MODE = true;
@@ -6100,12 +6131,15 @@ button:disabled{opacity:.55!important;cursor:not-allowed!important;filter:graysc
 <button class="btn btn-outline" onclick="openBracketView()" style="font-size:.78rem;padding:5px 10px">📊 전체대진표(본선포함)</button>
 <button class="btn btn-outline" id="v606FinalizeGroupOrderBtn" onclick="v606FinalizeGroupOrder()" style="font-size:.78rem;padding:5px 12px;display:none;border-color:#d4a017;color:#8a6412">🔒 조 번호 확정</button>
 <div class="login-menu-wrap js-mini-menu" id="bracketSaveMenuWrap">
-<button class="btn btn-outline" onclick="window.v570OpenA4GroupSheet ? window.v570OpenA4GroupSheet() : window.v566OpenA4GroupPreview()" style="font-size:.78rem;padding:5px 12px">🖨️ 조편성 미리보기/출력(A4)</button>
+<button class="btn btn-outline" onclick="window.v570OpenA4GroupSheet ? window.v570OpenA4GroupSheet() : window.v566OpenA4GroupPreview()" style="font-size:.78rem;padding:5px 12px">🖨️ 조편성 저장/출력(A4)</button>
 </div>
 </div>
 <div class="sec-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
-  <span>대진표 · 경기 현황 <span style="font-size:.72rem;font-weight:400;color:var(--text2)">— 저읽기 운영모드 · 경기상태 45초 갱신</span></span>
-  <button onclick="manualRefreshCurrentTournament()" style="padding:7px 18px;border-radius:999px;border:none;background:#0f766e;color:#fff;font-size:.84rem;font-weight:900;cursor:pointer;display:inline-flex;align-items:center;gap:5px;box-shadow:0 2px 8px rgba(15,118,110,.25)">🔄 새로고침</button>
+  <span>대진표 · 경기 현황 <span style="font-size:.72rem;font-weight:400;color:var(--text2)">— 진입/새로고침 시 서버 최신값 강제 확인</span> <span id="bracketFreshnessBadge" style="display:inline-flex;margin-left:6px;padding:3px 8px;border-radius:999px;background:#eef2ff;color:#1d4ed8;font-size:.66rem;font-weight:900;vertical-align:middle">v638</span></span>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+    <button onclick="manualRefreshCurrentTournament()" style="padding:7px 14px;border-radius:999px;border:none;background:#0f766e;color:#fff;font-size:.84rem;font-weight:900;cursor:pointer;display:inline-flex;align-items:center;gap:5px;box-shadow:0 2px 8px rgba(15,118,110,.25)">🔄 최신 대진표</button>
+    <button onclick="window.__hardClearAppCacheAndReload&&window.__hardClearAppCacheAndReload()" style="padding:7px 12px;border-radius:999px;border:1px solid #cbd5e1;background:#fff;color:#334155;font-size:.78rem;font-weight:900;cursor:pointer;display:inline-flex;align-items:center;gap:5px">🧹 캐시초기화</button>
+  </div>
 </div>
 <div class="card">
 <div class="frow">
@@ -12486,6 +12520,7 @@ function ensureViewerBracketPolling(page, tid){
     return;
   }
   const pg=page||getCurrentPageName();
+  const options=opts||{};
   const targetTid=String(tid || getSelectedTournamentIdForPage(pg) || getRealtimeTargetTournamentId() || '').trim();
   if(!isViewerReadOnlyMode() || pg!=='bracket' || !targetTid){
     stopViewerBracketPolling();
@@ -12754,11 +12789,12 @@ const BUNDLE_FETCH_COOLDOWN_MS = 5 * 60 * 1000; // v524: 5분 쿨다운
 async function fetchTournamentBundle(tid, opts={}){
   const options=opts||{};
   const force=!!options.force;
+  const bypassCooldown=!!options.bypassCooldown;
   if(!tid) return null;
   const now=Date.now();
-  // v544: 캐시가 있으면 쿨다운 적용, 캐시가 없으면 쿨다운 무시하고 반드시 읽기
+  // v638: 대진표 최신화 요청은 쿨다운/메모리 캐시를 우회한다.
   const existingCache = getTournamentBundleCache(tid);
-  if(existingCache){
+  if(existingCache && !bypassCooldown){
     if(force){
       const lastFetch=_bundleFetchCooldown[tid]||0;
       if(now-lastFetch < BUNDLE_FETCH_COOLDOWN_MS){
@@ -13018,8 +13054,9 @@ function startRealtimeTournamentSync(tid){
   _realtimeRegsUnsub=null;
   _realtimeDrawsUnsub=null;
 }
-async function syncTournamentDataForPage(page, tid, force=false){
+async function syncTournamentDataForPage(page, tid, force=false, opts={}){
   const pg=page||getCurrentPageName();
+  const options=opts||{};
   const targetTid=String(tid || getSelectedTournamentIdForPage(pg) || getRealtimeTargetTournamentId() || '').trim();
   if(!targetTid){
     if(!shouldUseRealtimeForTournament(pg,'')) stopRealtimeTournamentSync();
@@ -13046,11 +13083,13 @@ async function syncTournamentDataForPage(page, tid, force=false){
   if(shouldUseRealtimeForTournament(pg, targetTid)){
     stopViewerBracketPolling();
     const hasCache=!!getTournamentBundleCache(targetTid);
-    if(force || !hasCache) await fetchTournamentBundle(targetTid, {force:!!force, acceptStale:true});
+    if(force || !hasCache) await fetchTournamentBundle(targetTid, {force:!!force, acceptStale:true, bypassCooldown:!!options.bypassCooldown});
+    if(pg==='bracket' && String(ge('brTS')?.value||'')===targetTid){ try{ renderBracket(); initBracketNotice(); updateBracketFreshnessBadge('server'); }catch(_e){} }
     startRealtimeTournamentSync(targetTid);
   }else{
     stopRealtimeTournamentSync();
-    await fetchTournamentBundle(targetTid, {force:!!force, acceptStale:true});
+    await fetchTournamentBundle(targetTid, {force:!!force, acceptStale:true, bypassCooldown:!!options.bypassCooldown});
+    if(pg==='bracket' && String(ge('brTS')?.value||'')===targetTid){ try{ renderBracket(); initBracketNotice(); updateBracketFreshnessBadge('server'); }catch(_e){} }
     ensureViewerBracketPolling(pg, targetTid);
   }
 }
@@ -16372,7 +16411,7 @@ function showPage(n){
   try{
     const _syncTid = getSelectedTournamentIdForPage(n) || getRealtimeTargetTournamentId() || null;
     // v445: 대진표 화면은 결과 동기화가 핵심이므로 화면 진입 시 서버 기준 1회 확인한다.
-    syncTournamentDataForPage(n, _syncTid, n==='bracket').catch(e=>console.warn('page sync failed', e));
+    syncTournamentDataForPage(n, _syncTid, n==='bracket', n==='bracket'?{bypassCooldown:true, renderAfter:true}:{}).catch(e=>console.warn('page sync failed', e));
   }catch(e){}
   ensureViewerBracketPolling(n, getSelectedTournamentIdForPage(n) || getRealtimeTargetTournamentId() || null);
   refreshRoleUI();
@@ -22882,7 +22921,7 @@ function onBrTC(){
   try{
     // v445: 대진표 진입/대회 변경 시 기존 10분 캐시를 그대로 쓰지 말고
     // 서버 기준 1회 동기화 후 실시간 리스너를 연결한다.
-    syncTournamentDataForPage('bracket', tid || getRealtimeTargetTournamentId() || null, true).catch(e=>console.warn('bracket sync failed', e));
+    syncTournamentDataForPage('bracket', tid || getRealtimeTargetTournamentId() || null, true, {bypassCooldown:true, renderAfter:true}).catch(e=>console.warn('bracket sync failed', e));
   }catch(e){}
   if(!tid){
     if(ds) ds.innerHTML='<option value="__ALL__">전체</option>';
@@ -39553,21 +39592,33 @@ document.addEventListener('DOMContentLoaded',()=>{
 
 </script>
 <script>
-  // 배포 안정화 모드: 기존 service worker 자동 해제 + 캐시 정리
-  // 이번 버전은 새 service worker를 다시 등록하지 않습니다.
+  // v638 배포 안정화: 서비스워커/캐시 자동 해제. 컨트롤 중이면 1회 캐시버스터로 재진입.
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", async () => {
+      let hadController = !!navigator.serviceWorker.controller;
       try {
         const regs = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(regs.map(r => r.unregister()));
+        hadController = hadController || regs.length>0;
+        await Promise.all(regs.map(r => r.unregister().catch(()=>{})));
       } catch (_) {}
 
       try {
         if ("caches" in window) {
           const keys = await caches.keys();
-          await Promise.all(keys.map(k => caches.delete(k)));
+          await Promise.all(keys.map(k => caches.delete(k).catch(()=>{})));
         }
       } catch (_) {}
+
+      try{
+        const mark='v638_sw_cleared_'+APP_VERSION;
+        if(hadController && sessionStorage.getItem(mark)!=='1'){
+          sessionStorage.setItem(mark,'1');
+          const url=new URL(location.href);
+          url.searchParams.set('__v',APP_VERSION);
+          url.searchParams.set('__swclear',Date.now().toString());
+          location.replace(url.toString());
+        }
+      }catch(_e){}
     });
   }
 
@@ -48622,6 +48673,27 @@ body:not(.reg-popup-open) div[id^="regInlineForm_"] > #aoReg{display:none!import
 </script>
 
 
+
+<script id="v638BracketFreshnessHelper">
+function updateBracketFreshnessBadge(source){
+  try{
+    const el=document.getElementById('bracketFreshnessBadge');
+    if(!el) return;
+    const d=new Date();
+    const hh=String(d.getHours()).padStart(2,'0');
+    const mm=String(d.getMinutes()).padStart(2,'0');
+    const ss=String(d.getSeconds()).padStart(2,'0');
+    const label=source==='manual'?'수동최신':(source==='server'?'서버확인':'최신확인');
+    el.textContent=`${APP_VERSION.replace(/^2026-06-09-/, '')} · ${label} ${hh}:${mm}:${ss}`;
+    el.style.background='#dcfce7';
+    el.style.color='#166534';
+    setTimeout(()=>{ try{ el.style.background='#eef2ff'; el.style.color='#1d4ed8'; }catch(_e){} }, 1600);
+  }catch(e){}
+}
+window.updateBracketFreshnessBadge=updateBracketFreshnessBadge;
+document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>updateBracketFreshnessBadge('load'),400));
+</script>
+
 <script id="v523ManualRefreshFunction">
 async function manualRefreshCurrentTournament(){
   try{
@@ -48643,12 +48715,16 @@ async function manualRefreshCurrentTournament(){
     if(effectivePg==='register'){
       await refreshRegisterRegistrationsOnly(tid,{render:true,noRestart:true});
     }else if(effectivePg==='bracket'){
-      await refreshMatchesOnlyForTournament(tid,'manual-refresh');
+      // v638: 대진표 새로고침은 경기만이 아니라 팀/조편성/경기 전체를 서버 기준으로 다시 읽는다.
+      await fetchTournamentBundle(tid,{force:true,acceptStale:true,bypassCooldown:true});
+      if(typeof renderBracket==='function') renderBracket();
+      try{ initBracketNotice(); }catch(_e){}
+      try{ updateBracketFreshnessBadge('manual'); }catch(_e){}
     }else{
-      await fetchTournamentBundle(tid,{force:true,acceptStale:true});
+      await fetchTournamentBundle(tid,{force:true,acceptStale:true,bypassCooldown:true});
       onDU();
     }
-    toast('새로고침 완료','success');
+    toast('최신 대진표를 다시 불러왔습니다','success');
   }catch(e){ console.error(e); toast('새로고침 실패','error'); }
 }
 window.manualRefreshCurrentTournament=manualRefreshCurrentTournament;
@@ -51103,7 +51179,7 @@ window.manualRefreshPlayers=manualRefreshPlayers;
     try{
       const mainBtn=document.querySelector('#bracketSaveMenuWrap > button');
       if(mainBtn){
-        mainBtn.innerHTML='🖨️ 조편성 미리보기/출력(A4)';
+        mainBtn.innerHTML='🖨️ 조편성 저장/출력(A4)';
         mainBtn.setAttribute('onclick','window.v570OpenA4GroupSheet ? window.v570OpenA4GroupSheet() : window.v566OpenA4GroupPreview()');
       }
       const panel=document.getElementById('bracketSaveMenuPanel');
@@ -59579,7 +59655,7 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
         wrap.insertBefore(btn, wrap.firstChild);
       }
       btn.className='btn btn-outline';
-      btn.textContent='🖨️ 조편성 미리보기/출력(A4)';
+      btn.textContent='🖨️ 조편성 저장/출력(A4)';
       btn.setAttribute('onclick','window.v570OpenA4GroupSheet ? window.v570OpenA4GroupSheet() : window.v566OpenA4GroupPreview()');
       btn.style.fontSize='.78rem';
       btn.style.padding='5px 12px';
