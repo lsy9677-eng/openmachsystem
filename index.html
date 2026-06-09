@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-09-v636-promote-manual-confirmed-no-stripe";
+  const APP_VERSION = "2026-06-09-v637-a4-group-single-button";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -6100,11 +6100,7 @@ button:disabled{opacity:.55!important;cursor:not-allowed!important;filter:graysc
 <button class="btn btn-outline" onclick="openBracketView()" style="font-size:.78rem;padding:5px 10px">📊 전체대진표(본선포함)</button>
 <button class="btn btn-outline" id="v606FinalizeGroupOrderBtn" onclick="v606FinalizeGroupOrder()" style="font-size:.78rem;padding:5px 12px;display:none;border-color:#d4a017;color:#8a6412">🔒 조 번호 확정</button>
 <div class="login-menu-wrap js-mini-menu" id="bracketSaveMenuWrap">
-<button class="btn btn-outline" onclick="toggleBracketSaveMenu(event)" style="font-size:.78rem;padding:5px 12px">💾 조편성(출력/저장)</button>
-<div class="login-menu-panel" id="bracketSaveMenuPanel" style="min-width:210px">
-<button class="btn-sm login-menu-item" onclick="event.stopPropagation();closeBracketSaveMenu();window.v566OpenA4GroupPreview()" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">🖨️ 조편성 출력</button>
-<button class="btn-sm login-menu-item" onclick="event.stopPropagation();closeBracketSaveMenu();window.v566SaveA4GroupImage()" style="background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)">🖼️ 조편성 이미지 저장</button>
-</div>
+<button class="btn btn-outline" onclick="window.v570OpenA4GroupSheet ? window.v570OpenA4GroupSheet() : window.v566OpenA4GroupPreview()" style="font-size:.78rem;padding:5px 12px">🖨️ 조편성 미리보기/출력(A4)</button>
 </div>
 </div>
 <div class="sec-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
@@ -51106,19 +51102,14 @@ window.manualRefreshPlayers=manualRefreshPlayers;
   function rebuildMenu(){
     try{
       const mainBtn=document.querySelector('#bracketSaveMenuWrap > button');
-      if(mainBtn) mainBtn.innerHTML='💾 조편성(출력/저장)';
-      const panel=document.getElementById('bracketSaveMenuPanel');
-      if(!panel) return;
-      const buttons=[
-        ['🖨️ A4 조편성 출력','event.stopPropagation();closeBracketSaveMenu();window.v570OpenA4GroupSheet();'],
-        ['🖼️ A4 조편성 이미지 저장','event.stopPropagation();closeBracketSaveMenu();window.v570SaveA4GroupSheetImage();']
-      ];
-      const cur=[...panel.querySelectorAll('button')].map(b=>[(b.textContent||'').trim(),String(b.getAttribute('onclick')||'')]);
-      const same=cur.length===2 && cur.every((x,i)=>x[0]===buttons[i][0] && x[1]===buttons[i][1]);
-      if(!same){
-        panel.innerHTML='';
-        buttons.forEach(([label,onclick])=>{const b=document.createElement('button');b.type='button';b.className='btn-sm login-menu-item';b.textContent=label;b.setAttribute('onclick',onclick);b.style.cssText='background:#fff;color:#0f1e3a;border:1px solid rgba(15,30,58,.12)';panel.appendChild(b);});
+      if(mainBtn){
+        mainBtn.innerHTML='🖨️ 조편성 미리보기/출력(A4)';
+        mainBtn.setAttribute('onclick','window.v570OpenA4GroupSheet ? window.v570OpenA4GroupSheet() : window.v566OpenA4GroupPreview()');
       }
+      const panel=document.getElementById('bracketSaveMenuPanel');
+      if(panel) panel.remove();
+      const wrap=document.getElementById('bracketSaveMenuWrap');
+      if(wrap) wrap.classList.remove('open');
     }catch(e){}
   }
   window.v570OpenA4GroupSheet=exportSheet;
@@ -59566,6 +59557,39 @@ import { getFirestore, collection, doc, getDocs, query, where, setDoc, writeBatc
   }
   ['renderRL','renderRegisterDivisionOverview','manualRefreshRegister','onRegTC'].forEach(function(name){try{var old=window[name]; if(typeof old==='function'&&!old.__v636Wrapped){var fn=function(){var r=old.apply(this,arguments); setTimeout(markManualRows,0); setTimeout(markManualRows,150); return r;}; fn.__v636Wrapped=true; window[name]=fn; try{eval(name+'=window["'+name+'"]');}catch(e){}}}catch(e){}});
   document.addEventListener('DOMContentLoaded',function(){setTimeout(markManualRows,300);});
+})();
+</script>
+
+
+<!-- v637: A4 조편성 상단 버튼 단일화 -->
+<style id="v637A4SingleButtonStyle">
+#bracketSaveMenuPanel{display:none!important;}
+#bracketSaveMenuWrap.open .login-menu-panel{display:none!important;}
+</style>
+<script id="v637A4SingleButtonScript">
+(function(){
+  'use strict';
+  function applySingleA4Button(){
+    try{
+      var wrap=document.getElementById('bracketSaveMenuWrap');
+      if(!wrap) return;
+      var btn=wrap.querySelector(':scope > button') || wrap.querySelector('button');
+      if(!btn){
+        btn=document.createElement('button');
+        wrap.insertBefore(btn, wrap.firstChild);
+      }
+      btn.className='btn btn-outline';
+      btn.textContent='🖨️ 조편성 미리보기/출력(A4)';
+      btn.setAttribute('onclick','window.v570OpenA4GroupSheet ? window.v570OpenA4GroupSheet() : window.v566OpenA4GroupPreview()');
+      btn.style.fontSize='.78rem';
+      btn.style.padding='5px 12px';
+      wrap.classList.remove('open');
+      wrap.querySelectorAll('.login-menu-panel, #bracketSaveMenuPanel').forEach(function(p){p.remove();});
+    }catch(e){}
+  }
+  document.addEventListener('DOMContentLoaded',function(){setTimeout(applySingleA4Button,0);setTimeout(applySingleA4Button,700);});
+  setTimeout(applySingleA4Button,0);setTimeout(applySingleA4Button,1200);setTimeout(applySingleA4Button,2200);
+  try{new MutationObserver(function(){setTimeout(applySingleA4Button,0);}).observe(document.body,{childList:true,subtree:true});}catch(e){}
 })();
 </script>
 
