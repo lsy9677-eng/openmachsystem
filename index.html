@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-09-v655-result-sms-immediate";
+  const APP_VERSION = "2026-06-09-v657-sms-realtime-admin-only";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -60150,7 +60150,7 @@ import { getFirestore, collection, doc, setDoc, getDocs, query, orderBy, limit, 
   function mapHas(k,id){return !!mapGet(k)[id];}
   function mapPut(k,id){try{const m=mapGet(k);m[id]=now();localStorage.setItem(k,JSON.stringify(m));}catch(e){}}
   function safeId(s){return norm(s).replace(/[^A-Za-z0-9_-]/g,'_').slice(0,180)||('evt_'+Date.now());}
-  function canManage(){try{return !!(window.AD||window.OP||window.TM||document.body.classList.contains('admin-mode')||document.body.classList.contains('operator-mode')||document.body.classList.contains('tm-mode')||(typeof window.canManageBracket==='function'&&window.canManageBracket()));}catch(e){return false;}}
+  function canManage(){try{return !!(window.AD||window.OP||window.TM||document.body.classList.contains('admin-mode')||document.body.classList.contains('operator-mode')||document.body.classList.contains('op-mode')||document.body.classList.contains('tm-mode')||window.LOGIN_PORTAL_MODE==='developer'||window.LOGIN_PORTAL_MODE==='tournament_admin'||window.LOGIN_PORTAL_MODE==='operator');}catch(e){return false;}}
   function currentTid(){try{return norm(document.getElementById('brTS')?.value||window._currentTournamentId||'');}catch(e){return '';}}
   function currentPage(){try{return typeof window.getCurrentPageName==='function'?window.getCurrentPageName():document.querySelector('.page.active')?.id?.replace(/^page-/,'')||'';}catch(e){return '';}}
   function phonesFromRecipients(recs){
@@ -61353,5 +61353,90 @@ import { getFirestore, doc, setDoc, onSnapshot, serverTimestamp } from "https://
   window.v655ForceResultCourtSms=function(prevCourtState,key,m,hasFinalWinner){try{if(!hasFinalWinner||!key||!m||m.winner==null)return;const mm=getMatch(key,m.id)||m;enqueue(payload('match_completed',key,mm,{matchId:mm.id}));[120,350,800,1500,2600].forEach(ms=>setTimeout(()=>scanCourtChanges(prevCourtState||{},key,mm.id),ms));}catch(e){console.warn('[v655] force failed',e);}};
 })();
 </script>
+
+
+<!-- v657: SMS realtime bridge 관리자/진행자 전용 제한 - 일반회원/경기이사 리스너 OFF -->
+<!-- v656: cross-device SMS approval realtime bridge - 상대 기기 문자 확인창 즉시 표시 -->
+<style id="v656RealtimeSmsBridgeStyle">
+#smsApprovalWrap.v656-remote-show{display:block!important;position:fixed!important;left:18px!important;right:auto!important;bottom:22px!important;z-index:2147483300!important;max-width:min(430px,calc(100vw - 28px))!important;}
+#smsApprovalWrap.v656-remote-show .sms-approval-card{background:linear-gradient(135deg,#1d4ed8,#0f766e)!important;color:#fff!important;border-radius:16px!important;box-shadow:0 16px 36px rgba(15,30,58,.30)!important;padding:14px 16px!important;border:1px solid rgba(255,255,255,.18)!important;}
+#smsApprovalWrap.v656-remote-show[data-sms-kind="match_completed"] .sms-approval-card{background:linear-gradient(135deg,#dc2626,#991b1b)!important;}
+#smsApprovalWrap.v656-remote-show[data-sms-kind="match_started"] .sms-approval-card{background:linear-gradient(135deg,#1d4ed8,#2563eb)!important;}
+#smsApprovalWrap.v656-remote-show .sms-approval-title{font-size:.92rem!important;font-weight:1000!important;margin-bottom:6px!important;line-height:1.35!important;}
+#smsApprovalWrap.v656-remote-show .sms-approval-msg{font-size:.84rem!important;line-height:1.6!important;white-space:pre-line!important;word-break:keep-all!important;}
+#smsApprovalWrap.v656-remote-show .sms-approval-actions{display:flex!important;justify-content:flex-end!important;gap:8px!important;margin-top:12px!important;flex-wrap:wrap!important;}
+#smsApprovalWrap.v656-remote-show .sms-approval-btn{border:none!important;border-radius:999px!important;padding:8px 14px!important;font-size:.78rem!important;font-weight:1000!important;cursor:pointer!important;min-height:36px!important;}
+#smsApprovalWrap.v656-remote-show .sms-approval-btn.primary{background:#fff!important;color:#1d4ed8!important;}
+#smsApprovalWrap.v656-remote-show[data-sms-kind="match_completed"] .sms-approval-btn.primary{color:#b91c1c!important;}
+#smsApprovalWrap.v656-remote-show .sms-approval-btn.secondary{background:rgba(255,255,255,.16)!important;color:#fff!important;border:1px solid rgba(255,255,255,.22)!important;}
+@media(max-width:680px){#smsApprovalWrap.v656-remote-show{left:10px!important;right:10px!important;bottom:max(96px,calc(env(safe-area-inset-bottom,0px) + 82px))!important;max-width:none!important;}#smsApprovalWrap.v656-remote-show .sms-approval-card{border-radius:14px!important;padding:13px 14px!important;}#smsApprovalWrap.v656-remote-show .sms-approval-actions{justify-content:stretch!important;}#smsApprovalWrap.v656-remote-show .sms-approval-btn{flex:1 1 0!important;padding:9px 10px!important;}}
+</style>
+<script type="module" id="v656RealtimeSmsBridgeScript">
+import { initializeApp, getApp, getApps } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, query, orderBy, limit, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+(function(){
+  'use strict';
+  if(window.__v656RealtimeSmsBridgeInstalled) return;
+  window.__v656RealtimeSmsBridgeInstalled=true;
+  const FB={apiKey:"AIzaSyAbc17RiYyxCqgbMBkxkMoiRdNTmy2q65w",authDomain:"open-match-manager.firebaseapp.com",projectId:"open-match-manager",storageBucket:"open-match-manager.firebasestorage.app",messagingSenderId:"195671806262",appId:"1:195671806262:web:89691574839266cea1a397"};
+  const app=getApps().length?getApp():initializeApp(FB);
+  const db=getFirestore(app);
+  const COL='adminSmsEvents';
+  const DEVICE_KEY='v645.smsBridge.deviceId';
+  const SEEN_KEYS=['v656.smsBridge.seen','v645.smsBridge.seen'];
+  const TTL_MS=1000*60*20;
+  const Q=[];
+  let unsub=null;
+  const norm=v=>String(v==null?'':v).replace(/\s+/g,' ').trim();
+  const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const digits=v=>String(v||'').replace(/[^0-9]/g,'');
+  function deviceId(){try{let id=localStorage.getItem(DEVICE_KEY);if(!id){id='dev_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,10);localStorage.setItem(DEVICE_KEY,id);}return id;}catch(e){return 'dev_'+Math.random().toString(36).slice(2,10);}}
+  const MY_DEVICE=deviceId();
+  function mapGet(k){try{const m=JSON.parse(localStorage.getItem(k)||'{}')||{};const cut=Date.now()-TTL_MS;Object.keys(m).forEach(x=>{if(Number(m[x]||0)<cut)delete m[x];});return m;}catch(e){return {};}}
+  function isSeen(id){return SEEN_KEYS.some(k=>!!mapGet(k)[id]);}
+  function markSeen(id){SEEN_KEYS.forEach(k=>{try{const m=mapGet(k);m[id]=Date.now();localStorage.setItem(k,JSON.stringify(m));}catch(e){}});}
+  function canManage(){try{return !!(window.AD||window.OP||window.TM||document.body.classList.contains('admin-mode')||document.body.classList.contains('operator-mode')||document.body.classList.contains('op-mode')||document.body.classList.contains('tm-mode')||window.LOGIN_PORTAL_MODE==='developer'||window.LOGIN_PORTAL_MODE==='tournament_admin'||window.LOGIN_PORTAL_MODE==='operator');}catch(e){return false;}}
+  function currentTid(){try{return norm(document.getElementById('brTS')?.value||window._currentTournamentId||'');}catch(e){return '';}}
+  function currentPage(){try{return typeof window.getCurrentPageName==='function'?window.getCurrentPageName():document.querySelector('.page.active')?.id?.replace(/^page-/,'')||'';}catch(e){return '';}}
+  function phonesFromRecipients(recs){const out=[], seen={};(Array.isArray(recs)?recs:[]).forEach(r=>{const ph=norm((r&&r.phone)||r).replace(/[^0-9+]/g,'');const k=digits(ph);if(k.length>=9&&!seen[k]){seen[k]=1;out.push(ph);}});return out;}
+  function ensure(){let w=document.getElementById('smsApprovalWrap');if(!w){w=document.createElement('div');w.id='smsApprovalWrap';document.body.appendChild(w);}return w;}
+  function busy(){const w=document.getElementById('smsApprovalWrap');return !!(w&&(w.classList.contains('show')||w.classList.contains('v616g-show')||w.classList.contains('v654-show')||w.classList.contains('v655-show')||w.classList.contains('v656-remote-show')));}
+  function next(){if(Q.length&&!busy()) setTimeout(()=>render(Q.shift()),70);}
+  function close(){const w=document.getElementById('smsApprovalWrap');if(w){w.classList.remove('show','left-side','v616g-show','v645-remote-show','v654-show','v655-show','v656-remote-show');w.innerHTML='';w.removeAttribute('data-v656-remote');}next();}
+  function send(){try{const w=ensure();const rec=JSON.parse(w.getAttribute('data-sms-recipients')||'[]')||[];const body=w.getAttribute('data-sms-body')||'';const phones=phonesFromRecipients(rec);if(!phones.length){try{window.toast&&window.toast('문자 받을 번호가 없습니다','error');}catch(e){}return;}if(window.openBulkSmsInChunks)window.openBulkSmsInChunks(phones,body,'경기 자동문자');else location.href='sms:'+phones.join(',')+'?body='+encodeURIComponent(body);close();}catch(e){try{window.toast&&window.toast('문자앱 열기 실패: '+(e&&e.message||e),'error');}catch(_){}}}
+  function render(p){
+    try{
+      if(!canManage()) return false;
+      const id=norm(p.eventId||p.dedupeKey); if(!id||isSeen(id)) return false;
+      const tid=currentTid(); if(tid&&p.tid&&String(p.tid)!==tid) return false;
+      if(p.sourceDeviceId===MY_DEVICE) return false;
+      const created=Date.parse(p.createdAtText||''); if(created&&created<Date.now()-TTL_MS) return false;
+      if(busy()){Q.push(p); return true;}
+      markSeen(id);
+      const w=ensure();
+      const rec=Array.isArray(p.smsRecipients)?p.smsRecipients:(Array.isArray(p.smsPhones)?p.smsPhones.map(ph=>({phone:ph})):[]);
+      const count=phonesFromRecipients(rec).length;
+      const actions=count?'<button type="button" class="sms-approval-btn primary" onclick="window.v656SendRemoteSms()">문자 보내기</button><button type="button" class="sms-approval-btn secondary" onclick="window.v656CloseRemoteSms()">닫기</button>':'<button type="button" class="sms-approval-btn secondary" onclick="window.v656CloseRemoteSms()">번호 없음</button>';
+      w.innerHTML='<div class="sms-approval-card"><div class="sms-approval-title">'+esc(p.title||'문자 확인')+' · '+count+'명</div><div class="sms-approval-msg">'+esc(p.msg||p.smsBody||'')+'</div><div class="sms-approval-actions">'+actions+'</div></div>';
+      w.setAttribute('data-v656-remote','1');
+      w.setAttribute('data-sms-kind',norm(p.smsKind||'court_changed'));
+      w.setAttribute('data-sms-body',norm(p.smsBody||p.msg||''));
+      w.setAttribute('data-sms-recipients',JSON.stringify(rec));
+      w.setAttribute('data-dedupe-key',id);
+      w.classList.add('show','left-side','v656-remote-show');
+      try{window.toast&&window.toast('다른 기기에서 문자 확인창이 도착했습니다','info');}catch(e){}
+      return true;
+    }catch(e){console.warn('[v656] render failed',e);return false;}
+  }
+  window.v656CloseRemoteSms=close; window.v656SendRemoteSms=send;
+  function handleSnap(snap){try{if(!canManage())return; if(currentPage()!=='bracket'&&!document.getElementById('smsApprovalWrap'))return; const rows=[]; snap.docChanges().forEach(ch=>{if(ch.type==='added'||ch.type==='modified')rows.push({eventId:ch.doc.id,...(ch.doc.data()||{})});}); rows.sort((a,b)=>Date.parse(a.createdAtText||'')-Date.parse(b.createdAtText||'')); rows.forEach(render);}catch(e){console.warn('[v656] snapshot handle failed',e);}}
+  function start(){try{if(!canManage()){stop();return;} if(unsub)return; const q=query(collection(db,COL),orderBy('createdAtText','desc'),limit(20)); unsub=onSnapshot(q,handleSnap,err=>console.warn('[v656] realtime sms bridge skipped',err&&err.message||err));}catch(e){console.warn('[v656] start failed',e&&e.message||e);}}
+  function stop(){try{if(unsub)unsub();}catch(e){}unsub=null;}
+  document.addEventListener('visibilitychange',()=>{if(document.hidden){stop();return;} if(canManage()) start(); else stop();});
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{if(canManage())start();else stop();},350));else setTimeout(()=>{if(canManage())start();else stop();},350);
+  window.__v656RestartSmsBridge=function(){stop();if(canManage())start();};
+})();
+</script>
+
 </body>
 </html>
