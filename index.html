@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-09-v648-fix3";
+  const APP_VERSION = "2026-06-09-v648-fix4";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -12641,9 +12641,15 @@ function applyTournamentBundle(tid, bundle){
     Object.keys(courtRestore).forEach(f=>{
       if(merged[f]===undefined||merged[f]===null||merged[f]==='') merged[f]=courtRestore[f];
     });
-    // v614+v617fix: 수동 코트 고정값은 메모리 스냅샷이 최우선
-    // v617fix: 확정 플래그도 수동으로 간주
-    const _v614SnapIsManual = !!(window.__V641_ALLOW_LOCAL_COURT_OVERLAY===true && (
+    // v648fix3: 서버 데이터 자체에 확정 플래그가 있으면 로컬 스냅샷 없이도 보호
+    const _serverIsFinalized = !!(
+      x.v615FinalizedLock===true ||
+      x.v616cManualFinalized===true ||
+      x.v617GroupOrderLocked===true ||
+      x.v617eManualCourtSaved===true ||
+      x.manualCourtLocked===true
+    );
+    const _v614SnapIsManual = _serverIsFinalized || !!(window.__V641_ALLOW_LOCAL_COURT_OVERLAY===true && (
       courtRestore.manualCourtLocked===true ||
       String(courtRestore.manualCourtTarget||'').trim() ||
       courtRestore.manualSharedHold===true ||
@@ -12655,10 +12661,11 @@ function applyTournamentBundle(tid, bundle){
     ));
     if(_v614SnapIsManual){
       _V577_COURT_FIELDS.forEach(f=>{ if(courtRestore[f]!==undefined) merged[f]=courtRestore[f]; });
-      // v617fix: 확정 플래그도 복원
+      // v648fix3: 서버 확정값도 보존 (courtRestore 우선, 없으면 서버값 유지)
       ['v615FinalizedLock','v616cManualFinalized','v617GroupOrderLocked','v617eManualCourtSaved',
        'finalGroupNo','displayGroupNo','confirmedGroupNo','group'].forEach(f=>{
         if(courtRestore[f]!==undefined) merged[f]=courtRestore[f];
+        // courtRestore에 없으면 서버값(x) 유지 - merged에 이미 있으므로 덮어쓰지 않음
       });
       if(courtRestore.manualSharedHold===true){
         merged.court='';
