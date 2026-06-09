@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-09-v648-fix4";
+  const APP_VERSION = "2026-06-09-v648-fix5";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -60588,10 +60588,11 @@ import { getFirestore, collection, doc, setDoc, getDocs, query, orderBy, limit, 
   }
   async function fullServerRefresh(tid, reason){
     tid=norm(tid); if(!tid) return null;
+    // v648fix5: after-finalize 이유로는 실행하지 않음 (조번호 무효화 방지)
+    if(reason==='after-finalize') return null;
     try{
       window.__V642_MANUAL_BRACKET_REFRESH=true;
-      window.__V641_ALLOW_LOCAL_COURT_OVERLAY=false;
-      window.__V642_ALLOW_LOCAL_COURT_OVERLAY=false;
+      // v648fix5: ALLOW_LOCAL_COURT_OVERLAY를 false로 설정하지 않음 (확정된 조번호 보호)
       let bundle=null;
       if(typeof fetchTournamentBundle==='function'){
         bundle=await fetchTournamentBundle(tid,{force:true,bypassCooldown:true,acceptStale:false,reason:reason||'v649'});
