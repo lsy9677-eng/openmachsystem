@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-09-v659-result-save-sms-stabilize";
+  const APP_VERSION = "2026-06-09-v660-print-result-save-fix";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -45424,74 +45424,19 @@ html body:not(.admin-mode):not(.tm-mode) #regTabQuickAdd{
 
 
   function openPrintWindowWithSheet(sheet){
-    const style=document.getElementById('v431BracketExportFixStyle')?.innerHTML||'';
-    const printCss='@page{size:A4 portrait;margin:0}html,body{margin:0!important;padding:0!important;background:#fff!important;font-family:\'Noto Sans KR\',Arial,sans-serif}.v431-export-sheet{position:static!important;left:auto!important;top:auto!important;width:794px!important;margin:0 auto!important;z-index:auto!important}.v431-a4-page{page-break-after:always;break-after:page}.v431-a4-page:last-child{page-break-after:auto}';
-    const autoprint='window.onload=function(){setTimeout(function(){window.focus();window.print();},250)};';
-    const html='<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>예선 대진표 A4 출력</title><style>'+style+printCss+'</style><'+'script>'+autoprint+'<'+'/script></head><body>'+sheet.outerHTML+'
-
-<!-- v659: 결과 저장 반영/문자 확인창 안정화 - 서버 재저장 + 로컬 문자 강제 표시 -->
-<style id="v659ResultSaveSmsStabilizeStyle">
-#smsApprovalWrap.v659-show{display:block!important;position:fixed!important;left:18px!important;right:auto!important;bottom:22px!important;z-index:2147483400!important;max-width:min(430px,calc(100vw - 28px))!important;}
-#smsApprovalWrap.v659-show .sms-approval-card{background:linear-gradient(135deg,#1d4ed8,#0f766e)!important;color:#fff!important;border-radius:16px!important;box-shadow:0 16px 36px rgba(15,30,58,.30)!important;padding:14px 16px!important;border:1px solid rgba(255,255,255,.18)!important;}
-#smsApprovalWrap.v659-show[data-sms-kind="match_completed"] .sms-approval-card{background:linear-gradient(135deg,#dc2626,#991b1b)!important;}
-#smsApprovalWrap.v659-show[data-sms-kind="match_started"] .sms-approval-card{background:linear-gradient(135deg,#1d4ed8,#2563eb)!important;}
-#smsApprovalWrap.v659-show .sms-approval-title{font-size:.92rem!important;font-weight:1000!important;margin-bottom:6px!important;line-height:1.35!important;}
-#smsApprovalWrap.v659-show .sms-approval-msg{font-size:.84rem!important;line-height:1.6!important;white-space:pre-line!important;word-break:keep-all!important;}
-#smsApprovalWrap.v659-show .sms-approval-actions{display:flex!important;justify-content:flex-end!important;gap:8px!important;margin-top:12px!important;flex-wrap:wrap!important;}
-#smsApprovalWrap.v659-show .sms-approval-btn{border:none!important;border-radius:999px!important;padding:8px 14px!important;font-size:.78rem!important;font-weight:1000!important;cursor:pointer!important;min-height:36px!important;}
-#smsApprovalWrap.v659-show .sms-approval-btn.primary{background:#fff!important;color:#1d4ed8!important;}
-#smsApprovalWrap.v659-show[data-sms-kind="match_completed"] .sms-approval-btn.primary{color:#b91c1c!important;}
-#smsApprovalWrap.v659-show .sms-approval-btn.secondary{background:rgba(255,255,255,.16)!important;color:#fff!important;border:1px solid rgba(255,255,255,.22)!important;}
-@media(max-width:680px){#smsApprovalWrap.v659-show{left:10px!important;right:10px!important;bottom:max(96px,calc(env(safe-area-inset-bottom,0px) + 82px))!important;max-width:none!important;}#smsApprovalWrap.v659-show .sms-approval-card{border-radius:14px!important;padding:13px 14px!important;}#smsApprovalWrap.v659-show .sms-approval-actions{justify-content:stretch!important;}#smsApprovalWrap.v659-show .sms-approval-btn{flex:1 1 0!important;padding:9px 10px!important;}}
-</style>
-<script type="module" id="v659ResultSaveSmsStabilizeScript">
-import { initializeApp, getApp, getApps } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, doc, writeBatch, waitForPendingWrites } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-(function(){
-  'use strict';
-  if(window.__v659ResultSaveSmsStabilizeInstalled) return;
-  window.__v659ResultSaveSmsStabilizeInstalled=true;
-  const FB={apiKey:"AIzaSyAbc17RiYyxCqgbMBkxkMoiRdNTmy2q65w",authDomain:"open-match-manager.firebaseapp.com",projectId:"open-match-manager",storageBucket:"open-match-manager.firebasestorage.app",messagingSenderId:"195671806262",appId:"1:195671806262:web:89691574839266cea1a397"};
-  const app=getApps().length?getApp():initializeApp(FB);
-  const db=getFirestore(app);
-  const auth=getAuth(app);
-  const RECENT='v659.result.save.sms.recent.v1';
-  const arr=v=>Array.isArray(v)?v:[];
-  const norm=v=>String(v==null?'':v).replace(/\s+/g,' ').trim();
-  const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const digits=v=>String(v||'').replace(/[^0-9]/g,'');
-  function canManage(){try{return !!(window.AD||window.OP||window.TM||document.body.classList.contains('admin-mode')||document.body.classList.contains('tm-mode')||document.body.classList.contains('operator-mode')||document.body.classList.contains('op-mode')||window.LOGIN_PORTAL_MODE==='developer'||window.LOGIN_PORTAL_MODE==='tournament_admin'||window.LOGIN_PORTAL_MODE==='operator');}catch(e){return false;}}
-  function ctx(){try{const k=(typeof CM_key!=='undefined'&&CM_key)?CM_key:(window.CM_key||'');const id=(typeof CM_id!=='undefined'&&CM_id)?CM_id:(window.CM_id||'');return {key:String(k||''),id:String(id||'')};}catch(e){return {key:'',id:''};}}
-  function splitKey(key){const a=String(key||'').split('_');return {tid:a[0]||'',div:a.slice(1).join('_')||''};}
-  function matchById(key,id){try{return arr(window.G&&G.matches&&G.matches[key]).find(m=>String(m&&(m.id||m._id))===String(id))||null;}catch(e){return null;}}
-  function teamName(t){try{if(!t)return'';if(Array.isArray(t.individualPlayers)&&t.individualPlayers.length)return t.individualPlayers.slice(0,2).map(p=>norm(p&&p.name)).filter(Boolean).join(' / ');if(Array.isArray(t.players)&&t.players.length)return t.players.slice(0,2).map(p=>typeof p==='string'?p:norm(p&&p.name)).filter(Boolean).join(' / ');return norm(t.pairLabel||t.entryLabel||t.club||t.name||'');}catch(e){return'';}}
-  function matchNames(key,m){try{const teams=arr(window.G&&G.teams&&G.teams[key]);return [teamName(teams[Number(m&&m.t1)])||norm(m&&m.label1)||'팀 A',teamName(teams[Number(m&&m.t2)])||norm(m&&m.label2)||'팀 B'];}catch(e){return [norm(m&&m.label1)||'팀 A',norm(m&&m.label2)||'팀 B'];}}
-  function scoreText(m){try{return norm((typeof window.getIndividualActualScoreText==='function'?window.getIndividualActualScoreText(m):'')||(m&&m.actualScoreText)||(m&&m.scoreText)||((m&&m.sc1!=null&&m&&m.sc2!=null)?(m.sc1+':'+m.sc2):''));}catch(e){return norm((m&&m.scoreText)||'');}}
-  function collectRecipients(key,m){const out=[],seen={};function add(name,phone){const ph=norm(phone).replace(/[^0-9+]/g,'');const k=digits(ph);if(k.length>=9&&!seen[k]){seen[k]=1;out.push({name:norm(name),phone:ph});}}try{const teams=arr(window.G&&G.teams&&G.teams[key]);[teams[Number(m&&m.t1)],teams[Number(m&&m.t2)]].filter(Boolean).forEach(t=>{add(teamName(t),t.phone||t.contactPhone||t.directorPhone||t.managerPhone||t.leaderPhone);arr(t.individualPlayers).forEach(p=>add(p&&p.name,p&&p.phone));arr(t.players).forEach(p=>{if(p&&typeof p==='object')add(p.name,p.phone);});});}catch(e){}return out;}
-  function seen(k){try{const m=JSON.parse(localStorage.getItem(RECENT)||'{}')||{};return !!m[k];}catch(e){return false;}}
-  function mark(k){try{let m=JSON.parse(localStorage.getItem(RECENT)||'{}')||{};const cut=Date.now()-1000*60*20;Object.keys(m).forEach(x=>{if(Number(m[x]||0)<cut)delete m[x];});m[k]=Date.now();localStorage.setItem(RECENT,JSON.stringify(m));}catch(e){}}
-  function ensureWrap(){let w=document.getElementById('smsApprovalWrap');if(!w){w=document.createElement('div');w.id='smsApprovalWrap';document.body.appendChild(w);}return w;}
-  function busy(){const w=document.getElementById('smsApprovalWrap');return !!(w&&(w.classList.contains('show')||w.classList.contains('v654-show')||w.classList.contains('v655-show')||w.classList.contains('v656-remote-show')||w.classList.contains('v659-show')));}
-  const QUEUE=[];
-  function close(){const w=document.getElementById('smsApprovalWrap');if(w){w.classList.remove('show','left-side','v616g-show','v645-remote-show','v654-show','v655-show','v656-remote-show','v659-show');w.innerHTML='';w.removeAttribute('data-v659');}if(QUEUE.length)setTimeout(()=>renderSms(QUEUE.shift()),80);}
-  function send(){try{const w=ensureWrap();let rec=[];try{rec=JSON.parse(w.getAttribute('data-sms-recipients')||'[]')||[];}catch(e){}const phones=rec.map(r=>norm((r&&r.phone)||r).replace(/[^0-9+]/g,'')).filter(p=>digits(p).length>=9);const body=w.getAttribute('data-sms-body')||'';if(!phones.length){try{window.toast&&window.toast('문자 받을 번호가 없습니다','error');}catch(e){}return;}if(window.openBulkSmsInChunks)window.openBulkSmsInChunks([...new Set(phones)],body,'경기 결과/코트 문자');else location.href='sms:'+([...new Set(phones)].join(','))+'?body='+encodeURIComponent(body);close();}catch(e){try{window.toast&&window.toast('문자앱 열기 실패: '+(e&&e.message||e),'error');}catch(_){}}}
-  function renderSms(p){try{if(!p)return false;if(busy()){QUEUE.push(p);return true;}const cnt=arr(p.rec).filter(r=>digits(r&&r.phone||r).length>=9).length;const actions=cnt?'<button type="button" class="sms-approval-btn primary" onclick="window.v659SendSmsApproval()">문자 보내기</button><button type="button" class="sms-approval-btn secondary" onclick="window.v659CloseSmsApproval()">닫기</button>':'<button type="button" class="sms-approval-btn secondary" onclick="window.v659CloseSmsApproval()">번호 없음</button>';const w=ensureWrap();w.innerHTML='<div class="sms-approval-card"><div class="sms-approval-title">'+esc(p.title)+' · '+cnt+'명</div><div class="sms-approval-msg">'+esc(p.body)+'</div><div class="sms-approval-actions">'+actions+'</div></div>';w.setAttribute('data-v659','1');w.setAttribute('data-sms-kind',p.kind||'match_completed');w.setAttribute('data-sms-body',p.body||'');w.setAttribute('data-sms-recipients',JSON.stringify(p.rec||[]));w.classList.add('show','left-side','v659-show');return true;}catch(e){console.warn('[v659] sms render failed',e);return false;}}
-  function queueResultSms(key,m){try{if(!canManage()||!m||m.winner==null)return;const sc=scoreText(m);const dedupe=['v659','result',key,m.id||m._id,sc].join('|');if(seen(dedupe))return;mark(dedupe);const names=matchNames(key,m);const body=`[경기 결과]\n${names[0]} vs ${names[1]}\n결과: ${sc||((m.sc1||0)+':'+(m.sc2||0))}\n확인 부탁드립니다.`;renderSms({title:'✅ 경기 결과 문자',kind:'match_completed',body,rec:collectRecipients(key,m)});}catch(e){console.warn('[v659] result sms failed',e);}}
-  async function forcePersistMatches(key){try{if(!key||!canManage())return false;const user=auth.currentUser;if(!user){console.warn('[v659] Firebase auth missing - server write may be blocked');try{window.toast&&window.toast('Firebase 인증이 없어 서버 저장이 막힐 수 있습니다. 운영자/개발자 로그인 상태를 확인하세요','error');}catch(e){}return false;}const list=arr(window.G&&G.matches&&G.matches[key]);if(!list.length)return false;const kp=splitKey(key);const batch=writeBatch(db);const nowIso=new Date().toISOString();list.forEach(m=>{if(!m)return;if(!m._id)m._id='m_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8);const payload={...m};delete payload._id;Object.keys(payload).forEach(k=>{if(payload[k]===undefined)delete payload[k];});payload.tournamentId=kp.tid;payload.division=kp.div;payload.updatedAt=nowIso;if(!payload.createdAt)payload.createdAt=nowIso;batch.set(doc(db,'matches',m._id),payload,{merge:true});});await batch.commit();try{await waitForPendingWrites(db);}catch(e){}try{if(window.__FB_WRITE_CACHE&&window.__FB_WRITE_CACHE.matches)delete window.__FB_WRITE_CACHE.matches[key];}catch(e){}console.log('[v659] matches force persisted',key,list.length);return true;}catch(e){console.error('[v659] matches force persist failed',e);try{window.toast&&window.toast('결과 서버 저장 실패: '+(e&&e.message||e),'error');}catch(_){ }return false;}}
-  async function afterSave(c,attempt){try{if(!c||!c.key||!c.id)return;const m=matchById(c.key,c.id);if(!m)return;const hasScore=arr(m.rubbers).some(r=>r&&(r.score1!=null||r.score2!=null))||m.winner!=null||m.sc1!=null||m.sc2!=null;if(!hasScore)return;await forcePersistMatches(c.key);if(m.winner!=null)queueResultSms(c.key,m);try{if(typeof window.renderBracket==='function')window.renderBracket();}catch(e){}try{if(typeof window.renderCourtStatusBoard==='function')window.renderCourtStatusBoard(c.key);}catch(e){}try{if(typeof window.manualRefreshCurrentTournament==='function'&&attempt===2)setTimeout(()=>window.manualRefreshCurrentTournament(),300);}catch(e){}}catch(e){console.warn('[v659] after save failed',e);}}
-  function install(){try{const old=window.saveM3;if(typeof old!=='function'||old.__v659Wrapped)return;const fn=async function(){const c=ctx();const r=await old.apply(this,arguments);[120,550,1200].forEach((ms,i)=>setTimeout(()=>afterSave(c,i),ms));return r;};fn.__v659Wrapped=true;window.saveM3=fn;try{saveM3=fn;}catch(e){}console.log('[v659] saveM3 persistence guard installed');}catch(e){console.warn('[v659] install failed',e);}}
-  window.v659CloseSmsApproval=close;window.v659SendSmsApproval=send;window.v659ForcePersistCurrentResult=function(){const c=ctx();afterSave(c,2);};
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,300));else setTimeout(install,300);
-})();
-</script>
-
-</body></html>';
-    const blob=new Blob([html],{type:'text/html;charset=utf-8'});
-    const url=URL.createObjectURL(blob);
-    const win=window.open(url,'_blank','width=920,height=1100,noopener,noreferrer');
-    setTimeout(()=>{try{URL.revokeObjectURL(url);}catch(e){}},15000);
-    if(!win) safeToast('팝업이 차단되었습니다. 브라우저 팝업 허용 후 다시 시도하세요.','error');
+    try{
+      sheet=prepareSheetForExport(sheet||buildSheet());
+      if(!sheet) return;
+      const style=document.getElementById('v431BracketExportFixStyle')?.innerHTML||'';
+      const printCss='@page{size:A4 portrait;margin:0}html,body{margin:0!important;padding:0!important;background:#fff!important;font-family:\'Noto Sans KR\',Arial,sans-serif}.v431-export-sheet{position:static!important;left:auto!important;top:auto!important;width:794px!important;margin:0 auto!important;z-index:auto!important}.v431-a4-page{page-break-after:always;break-after:page}.v431-a4-page:last-child{page-break-after:auto}';
+      const html='<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>예선 대진표 A4 출력</title><style>'+style+printCss+'</style></head><body>'+sheet.outerHTML+'</body></html>';
+      const win=window.open('','_blank','width=920,height=1100,noopener,noreferrer');
+      if(!win){ safeToast('팝업이 차단되었습니다. 브라우저 팝업 허용 후 다시 시도하세요.','error'); return; }
+      win.document.open();
+      win.document.write(html);
+      win.document.close();
+      setTimeout(()=>{try{win.focus();win.print();}catch(e){}},350);
+    }catch(e){ console.error(e); safeToast('A4 조편성 출력 실패: '+(e.message||e),'error'); }
   }
 
   function prepareSheetForExport(sheet){
@@ -61684,35 +61629,33 @@ import { getFirestore, collection, query, orderBy, limit, onSnapshot } from "htt
 </script>
 
 
-
-<!-- v659: 결과 저장 반영/문자 확인창 안정화 - 서버 재저장 + 로컬 문자 강제 표시 -->
-<style id="v659ResultSaveSmsStabilizeStyle">
-#smsApprovalWrap.v659-show{display:block!important;position:fixed!important;left:18px!important;right:auto!important;bottom:22px!important;z-index:2147483400!important;max-width:min(430px,calc(100vw - 28px))!important;}
-#smsApprovalWrap.v659-show .sms-approval-card{background:linear-gradient(135deg,#1d4ed8,#0f766e)!important;color:#fff!important;border-radius:16px!important;box-shadow:0 16px 36px rgba(15,30,58,.30)!important;padding:14px 16px!important;border:1px solid rgba(255,255,255,.18)!important;}
-#smsApprovalWrap.v659-show[data-sms-kind="match_completed"] .sms-approval-card{background:linear-gradient(135deg,#dc2626,#991b1b)!important;}
-#smsApprovalWrap.v659-show[data-sms-kind="match_started"] .sms-approval-card{background:linear-gradient(135deg,#1d4ed8,#2563eb)!important;}
-#smsApprovalWrap.v659-show .sms-approval-title{font-size:.92rem!important;font-weight:1000!important;margin-bottom:6px!important;line-height:1.35!important;}
-#smsApprovalWrap.v659-show .sms-approval-msg{font-size:.84rem!important;line-height:1.6!important;white-space:pre-line!important;word-break:keep-all!important;}
-#smsApprovalWrap.v659-show .sms-approval-actions{display:flex!important;justify-content:flex-end!important;gap:8px!important;margin-top:12px!important;flex-wrap:wrap!important;}
-#smsApprovalWrap.v659-show .sms-approval-btn{border:none!important;border-radius:999px!important;padding:8px 14px!important;font-size:.78rem!important;font-weight:1000!important;cursor:pointer!important;min-height:36px!important;}
-#smsApprovalWrap.v659-show .sms-approval-btn.primary{background:#fff!important;color:#1d4ed8!important;}
-#smsApprovalWrap.v659-show[data-sms-kind="match_completed"] .sms-approval-btn.primary{color:#b91c1c!important;}
-#smsApprovalWrap.v659-show .sms-approval-btn.secondary{background:rgba(255,255,255,.16)!important;color:#fff!important;border:1px solid rgba(255,255,255,.22)!important;}
-@media(max-width:680px){#smsApprovalWrap.v659-show{left:10px!important;right:10px!important;bottom:max(96px,calc(env(safe-area-inset-bottom,0px) + 82px))!important;max-width:none!important;}#smsApprovalWrap.v659-show .sms-approval-card{border-radius:14px!important;padding:13px 14px!important;}#smsApprovalWrap.v659-show .sms-approval-actions{justify-content:stretch!important;}#smsApprovalWrap.v659-show .sms-approval-btn{flex:1 1 0!important;padding:9px 10px!important;}}
+<!-- v660: A4 코드노출 복구 + 결과 저장/문자 확인창 재보강 -->
+<style id="v660ResultSaveSmsFixStyle">
+#smsApprovalWrap.v660-show{display:block!important;position:fixed!important;left:18px!important;right:auto!important;bottom:22px!important;z-index:2147483400!important;max-width:min(430px,calc(100vw - 28px))!important;}
+#smsApprovalWrap.v660-show .sms-approval-card{background:linear-gradient(135deg,#1d4ed8,#0f766e)!important;color:#fff!important;border-radius:16px!important;box-shadow:0 16px 36px rgba(15,30,58,.30)!important;padding:14px 16px!important;border:1px solid rgba(255,255,255,.18)!important;}
+#smsApprovalWrap.v660-show[data-sms-kind="match_completed"] .sms-approval-card{background:linear-gradient(135deg,#dc2626,#991b1b)!important;}
+#smsApprovalWrap.v660-show .sms-approval-title{font-size:.92rem!important;font-weight:1000!important;margin-bottom:6px!important;line-height:1.35!important;}
+#smsApprovalWrap.v660-show .sms-approval-msg{font-size:.84rem!important;line-height:1.6!important;white-space:pre-line!important;word-break:keep-all!important;}
+#smsApprovalWrap.v660-show .sms-approval-actions{display:flex!important;justify-content:flex-end!important;gap:8px!important;margin-top:12px!important;flex-wrap:wrap!important;}
+#smsApprovalWrap.v660-show .sms-approval-btn{border:none!important;border-radius:999px!important;padding:8px 14px!important;font-size:.78rem!important;font-weight:1000!important;cursor:pointer!important;min-height:36px!important;}
+#smsApprovalWrap.v660-show .sms-approval-btn.primary{background:#fff!important;color:#1d4ed8!important;}
+#smsApprovalWrap.v660-show[data-sms-kind="match_completed"] .sms-approval-btn.primary{color:#b91c1c!important;}
+#smsApprovalWrap.v660-show .sms-approval-btn.secondary{background:rgba(255,255,255,.16)!important;color:#fff!important;border:1px solid rgba(255,255,255,.22)!important;}
+@media(max-width:680px){#smsApprovalWrap.v660-show{left:10px!important;right:10px!important;bottom:max(96px,calc(env(safe-area-inset-bottom,0px) + 82px))!important;max-width:none!important;}#smsApprovalWrap.v660-show .sms-approval-card{border-radius:14px!important;padding:13px 14px!important;}#smsApprovalWrap.v660-show .sms-approval-actions{justify-content:stretch!important;}#smsApprovalWrap.v660-show .sms-approval-btn{flex:1 1 0!important;padding:9px 10px!important;}}
 </style>
-<script type="module" id="v659ResultSaveSmsStabilizeScript">
+<script type="module" id="v660ResultSaveSmsFixScript">
 import { initializeApp, getApp, getApps } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, doc, writeBatch, waitForPendingWrites } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 (function(){
   'use strict';
-  if(window.__v659ResultSaveSmsStabilizeInstalled) return;
-  window.__v659ResultSaveSmsStabilizeInstalled=true;
+  if(window.__v660ResultSaveSmsFixInstalled) return;
+  window.__v660ResultSaveSmsFixInstalled=true;
   const FB={apiKey:"AIzaSyAbc17RiYyxCqgbMBkxkMoiRdNTmy2q65w",authDomain:"open-match-manager.firebaseapp.com",projectId:"open-match-manager",storageBucket:"open-match-manager.firebasestorage.app",messagingSenderId:"195671806262",appId:"1:195671806262:web:89691574839266cea1a397"};
   const app=getApps().length?getApp():initializeApp(FB);
   const db=getFirestore(app);
   const auth=getAuth(app);
-  const RECENT='v659.result.save.sms.recent.v1';
+  const RECENT='v660.result.save.sms.recent.v1';
   const arr=v=>Array.isArray(v)?v:[];
   const norm=v=>String(v==null?'':v).replace(/\s+/g,' ').trim();
   const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -61725,19 +61668,19 @@ import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-aut
   function matchNames(key,m){try{const teams=arr(window.G&&G.teams&&G.teams[key]);return [teamName(teams[Number(m&&m.t1)])||norm(m&&m.label1)||'팀 A',teamName(teams[Number(m&&m.t2)])||norm(m&&m.label2)||'팀 B'];}catch(e){return [norm(m&&m.label1)||'팀 A',norm(m&&m.label2)||'팀 B'];}}
   function scoreText(m){try{return norm((typeof window.getIndividualActualScoreText==='function'?window.getIndividualActualScoreText(m):'')||(m&&m.actualScoreText)||(m&&m.scoreText)||((m&&m.sc1!=null&&m&&m.sc2!=null)?(m.sc1+':'+m.sc2):''));}catch(e){return norm((m&&m.scoreText)||'');}}
   function collectRecipients(key,m){const out=[],seen={};function add(name,phone){const ph=norm(phone).replace(/[^0-9+]/g,'');const k=digits(ph);if(k.length>=9&&!seen[k]){seen[k]=1;out.push({name:norm(name),phone:ph});}}try{const teams=arr(window.G&&G.teams&&G.teams[key]);[teams[Number(m&&m.t1)],teams[Number(m&&m.t2)]].filter(Boolean).forEach(t=>{add(teamName(t),t.phone||t.contactPhone||t.directorPhone||t.managerPhone||t.leaderPhone);arr(t.individualPlayers).forEach(p=>add(p&&p.name,p&&p.phone));arr(t.players).forEach(p=>{if(p&&typeof p==='object')add(p.name,p.phone);});});}catch(e){}return out;}
-  function seen(k){try{const m=JSON.parse(localStorage.getItem(RECENT)||'{}')||{};return !!m[k];}catch(e){return false;}}
-  function mark(k){try{let m=JSON.parse(localStorage.getItem(RECENT)||'{}')||{};const cut=Date.now()-1000*60*20;Object.keys(m).forEach(x=>{if(Number(m[x]||0)<cut)delete m[x];});m[k]=Date.now();localStorage.setItem(RECENT,JSON.stringify(m));}catch(e){}}
+  function seenKey(k){try{const m=JSON.parse(localStorage.getItem(RECENT)||'{}')||{};return !!m[k];}catch(e){return false;}}
+  function markKey(k){try{let m=JSON.parse(localStorage.getItem(RECENT)||'{}')||{};const cut=Date.now()-1000*60*20;Object.keys(m).forEach(x=>{if(Number(m[x]||0)<cut)delete m[x];});m[k]=Date.now();localStorage.setItem(RECENT,JSON.stringify(m));}catch(e){}}
   function ensureWrap(){let w=document.getElementById('smsApprovalWrap');if(!w){w=document.createElement('div');w.id='smsApprovalWrap';document.body.appendChild(w);}return w;}
-  function busy(){const w=document.getElementById('smsApprovalWrap');return !!(w&&(w.classList.contains('show')||w.classList.contains('v654-show')||w.classList.contains('v655-show')||w.classList.contains('v656-remote-show')||w.classList.contains('v659-show')));}
+  function busy(){const w=document.getElementById('smsApprovalWrap');return !!(w&&(w.classList.contains('show')||w.classList.contains('v654-show')||w.classList.contains('v655-show')||w.classList.contains('v656-remote-show')||w.classList.contains('v660-show')));}
   const QUEUE=[];
-  function close(){const w=document.getElementById('smsApprovalWrap');if(w){w.classList.remove('show','left-side','v616g-show','v645-remote-show','v654-show','v655-show','v656-remote-show','v659-show');w.innerHTML='';w.removeAttribute('data-v659');}if(QUEUE.length)setTimeout(()=>renderSms(QUEUE.shift()),80);}
+  function close(){const w=document.getElementById('smsApprovalWrap');if(w){w.classList.remove('show','left-side','v616g-show','v645-remote-show','v654-show','v655-show','v656-remote-show','v659-show','v660-show');w.innerHTML='';w.removeAttribute('data-v660');}if(QUEUE.length)setTimeout(()=>renderSms(QUEUE.shift()),80);}
   function send(){try{const w=ensureWrap();let rec=[];try{rec=JSON.parse(w.getAttribute('data-sms-recipients')||'[]')||[];}catch(e){}const phones=rec.map(r=>norm((r&&r.phone)||r).replace(/[^0-9+]/g,'')).filter(p=>digits(p).length>=9);const body=w.getAttribute('data-sms-body')||'';if(!phones.length){try{window.toast&&window.toast('문자 받을 번호가 없습니다','error');}catch(e){}return;}if(window.openBulkSmsInChunks)window.openBulkSmsInChunks([...new Set(phones)],body,'경기 결과/코트 문자');else location.href='sms:'+([...new Set(phones)].join(','))+'?body='+encodeURIComponent(body);close();}catch(e){try{window.toast&&window.toast('문자앱 열기 실패: '+(e&&e.message||e),'error');}catch(_){}}}
-  function renderSms(p){try{if(!p)return false;if(busy()){QUEUE.push(p);return true;}const cnt=arr(p.rec).filter(r=>digits(r&&r.phone||r).length>=9).length;const actions=cnt?'<button type="button" class="sms-approval-btn primary" onclick="window.v659SendSmsApproval()">문자 보내기</button><button type="button" class="sms-approval-btn secondary" onclick="window.v659CloseSmsApproval()">닫기</button>':'<button type="button" class="sms-approval-btn secondary" onclick="window.v659CloseSmsApproval()">번호 없음</button>';const w=ensureWrap();w.innerHTML='<div class="sms-approval-card"><div class="sms-approval-title">'+esc(p.title)+' · '+cnt+'명</div><div class="sms-approval-msg">'+esc(p.body)+'</div><div class="sms-approval-actions">'+actions+'</div></div>';w.setAttribute('data-v659','1');w.setAttribute('data-sms-kind',p.kind||'match_completed');w.setAttribute('data-sms-body',p.body||'');w.setAttribute('data-sms-recipients',JSON.stringify(p.rec||[]));w.classList.add('show','left-side','v659-show');return true;}catch(e){console.warn('[v659] sms render failed',e);return false;}}
-  function queueResultSms(key,m){try{if(!canManage()||!m||m.winner==null)return;const sc=scoreText(m);const dedupe=['v659','result',key,m.id||m._id,sc].join('|');if(seen(dedupe))return;mark(dedupe);const names=matchNames(key,m);const body=`[경기 결과]\n${names[0]} vs ${names[1]}\n결과: ${sc||((m.sc1||0)+':'+(m.sc2||0))}\n확인 부탁드립니다.`;renderSms({title:'✅ 경기 결과 문자',kind:'match_completed',body,rec:collectRecipients(key,m)});}catch(e){console.warn('[v659] result sms failed',e);}}
-  async function forcePersistMatches(key){try{if(!key||!canManage())return false;const user=auth.currentUser;if(!user){console.warn('[v659] Firebase auth missing - server write may be blocked');try{window.toast&&window.toast('Firebase 인증이 없어 서버 저장이 막힐 수 있습니다. 운영자/개발자 로그인 상태를 확인하세요','error');}catch(e){}return false;}const list=arr(window.G&&G.matches&&G.matches[key]);if(!list.length)return false;const kp=splitKey(key);const batch=writeBatch(db);const nowIso=new Date().toISOString();list.forEach(m=>{if(!m)return;if(!m._id)m._id='m_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8);const payload={...m};delete payload._id;Object.keys(payload).forEach(k=>{if(payload[k]===undefined)delete payload[k];});payload.tournamentId=kp.tid;payload.division=kp.div;payload.updatedAt=nowIso;if(!payload.createdAt)payload.createdAt=nowIso;batch.set(doc(db,'matches',m._id),payload,{merge:true});});await batch.commit();try{await waitForPendingWrites(db);}catch(e){}try{if(window.__FB_WRITE_CACHE&&window.__FB_WRITE_CACHE.matches)delete window.__FB_WRITE_CACHE.matches[key];}catch(e){}console.log('[v659] matches force persisted',key,list.length);return true;}catch(e){console.error('[v659] matches force persist failed',e);try{window.toast&&window.toast('결과 서버 저장 실패: '+(e&&e.message||e),'error');}catch(_){ }return false;}}
-  async function afterSave(c,attempt){try{if(!c||!c.key||!c.id)return;const m=matchById(c.key,c.id);if(!m)return;const hasScore=arr(m.rubbers).some(r=>r&&(r.score1!=null||r.score2!=null))||m.winner!=null||m.sc1!=null||m.sc2!=null;if(!hasScore)return;await forcePersistMatches(c.key);if(m.winner!=null)queueResultSms(c.key,m);try{if(typeof window.renderBracket==='function')window.renderBracket();}catch(e){}try{if(typeof window.renderCourtStatusBoard==='function')window.renderCourtStatusBoard(c.key);}catch(e){}try{if(typeof window.manualRefreshCurrentTournament==='function'&&attempt===2)setTimeout(()=>window.manualRefreshCurrentTournament(),300);}catch(e){}}catch(e){console.warn('[v659] after save failed',e);}}
-  function install(){try{const old=window.saveM3;if(typeof old!=='function'||old.__v659Wrapped)return;const fn=async function(){const c=ctx();const r=await old.apply(this,arguments);[120,550,1200].forEach((ms,i)=>setTimeout(()=>afterSave(c,i),ms));return r;};fn.__v659Wrapped=true;window.saveM3=fn;try{saveM3=fn;}catch(e){}console.log('[v659] saveM3 persistence guard installed');}catch(e){console.warn('[v659] install failed',e);}}
-  window.v659CloseSmsApproval=close;window.v659SendSmsApproval=send;window.v659ForcePersistCurrentResult=function(){const c=ctx();afterSave(c,2);};
+  function renderSms(p){try{if(!p)return false;if(busy()){QUEUE.push(p);return true;}const cnt=arr(p.rec).filter(r=>digits(r&&r.phone||r).length>=9).length;const actions=cnt?'<button type="button" class="sms-approval-btn primary" onclick="window.v660SendSmsApproval()">문자 보내기</button><button type="button" class="sms-approval-btn secondary" onclick="window.v660CloseSmsApproval()">닫기</button>':'<button type="button" class="sms-approval-btn secondary" onclick="window.v660CloseSmsApproval()">번호 없음</button>';const w=ensureWrap();w.innerHTML='<div class="sms-approval-card"><div class="sms-approval-title">'+esc(p.title)+' · '+cnt+'명</div><div class="sms-approval-msg">'+esc(p.body)+'</div><div class="sms-approval-actions">'+actions+'</div></div>';w.setAttribute('data-v660','1');w.setAttribute('data-sms-kind',p.kind||'match_completed');w.setAttribute('data-sms-body',p.body||'');w.setAttribute('data-sms-recipients',JSON.stringify(p.rec||[]));w.classList.add('show','left-side','v660-show');return true;}catch(e){console.warn('[v660] sms render failed',e);return false;}}
+  function queueResultSms(key,m){try{if(!canManage()||!m||m.winner==null)return;const sc=scoreText(m);const dedupe=['v660','result',key,m.id||m._id,sc].join('|');if(seenKey(dedupe))return;markKey(dedupe);const names=matchNames(key,m);const body=`[경기 결과]\n${names[0]} vs ${names[1]}\n결과: ${sc||((m.sc1||0)+':'+(m.sc2||0))}\n확인 부탁드립니다.`;renderSms({title:'✅ 경기 결과 문자',kind:'match_completed',body,rec:collectRecipients(key,m)});}catch(e){console.warn('[v660] result sms failed',e);}}
+  async function forcePersistMatches(key){try{if(!key||!canManage())return false;const user=auth.currentUser;if(!user){console.warn('[v660] Firebase auth missing');try{window.toast&&window.toast('Firebase 인증이 없어 서버 저장이 막힐 수 있습니다. 운영자/개발자 로그인 상태를 확인하세요','error');}catch(e){}return false;}const list=arr(window.G&&G.matches&&G.matches[key]);if(!list.length)return false;const kp=splitKey(key);const batch=writeBatch(db);const nowIso=new Date().toISOString();list.forEach(m=>{if(!m)return;if(!m._id)m._id='m_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8);const payload={...m};delete payload._id;Object.keys(payload).forEach(k=>{if(payload[k]===undefined)delete payload[k];});payload.tournamentId=kp.tid;payload.division=kp.div;payload.updatedAt=nowIso;if(!payload.createdAt)payload.createdAt=nowIso;batch.set(doc(db,'matches',m._id),payload,{merge:true});});await batch.commit();try{await waitForPendingWrites(db);}catch(e){}try{if(window.__FB_WRITE_CACHE&&window.__FB_WRITE_CACHE.matches)delete window.__FB_WRITE_CACHE.matches[key];}catch(e){}console.log('[v660] matches force persisted',key,list.length);return true;}catch(e){console.error('[v660] matches force persist failed',e);try{window.toast&&window.toast('결과 서버 저장 실패: '+(e&&e.message||e),'error');}catch(_){ }return false;}}
+  async function afterSave(c,attempt){try{if(!c||!c.key||!c.id)return;const m=matchById(c.key,c.id);if(!m)return;const hasScore=arr(m.rubbers).some(r=>r&&(r.score1!=null||r.score2!=null))||m.winner!=null||m.sc1!=null||m.sc2!=null;if(!hasScore)return;await forcePersistMatches(c.key);if(m.winner!=null)queueResultSms(c.key,m);try{if(typeof window.renderBracket==='function')window.renderBracket();}catch(e){}try{if(typeof window.renderCourtStatusBoard==='function')window.renderCourtStatusBoard(c.key);}catch(e){}try{if(typeof window.manualRefreshCurrentTournament==='function'&&attempt===2)setTimeout(()=>window.manualRefreshCurrentTournament(),300);}catch(e){}}catch(e){console.warn('[v660] after save failed',e);}}
+  function install(){try{const old=window.saveM3;if(typeof old!=='function'||old.__v660Wrapped)return;const fn=async function(){const c=ctx();const r=await old.apply(this,arguments);[80,350,900,1600].forEach((ms,i)=>setTimeout(()=>afterSave(c,i),ms));return r;};fn.__v660Wrapped=true;window.saveM3=fn;try{saveM3=fn;}catch(e){}console.log('[v660] saveM3 persistence guard installed');}catch(e){console.warn('[v660] install failed',e);}}
+  window.v660CloseSmsApproval=close;window.v660SendSmsApproval=send;window.v660ForcePersistCurrentResult=function(){const c=ctx();afterSave(c,2);};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,300));else setTimeout(install,300);
 })();
 </script>
