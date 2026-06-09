@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-09-v647a-final-stable";
+  const APP_VERSION = "2026-06-09-v647c-alert-safe";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -12941,7 +12941,7 @@ window.refreshRegisterRegistrationsOnly = refreshRegisterRegistrationsOnly;
   document.addEventListener('visibilitychange', async ()=>{
     if(document.visibilityState !== 'visible') return;
     const now = Date.now();
-    const minGap = (AD || OP || REG) ? 30000 : 120000; // 관리자 30초, 일반 2분
+    const minGap = (AD || OP || REG) ? 15000 : 120000; // 관리자 15초, 일반 2분
     if(now - __lastAppResumeRefresh < minGap) return;
     __lastAppResumeRefresh = now;
 
@@ -13056,7 +13056,7 @@ function startRealtimeTournamentSync(tid){
         refreshMatchesOnlyForTournament(tid,'admin-bracket-60s').catch(e=>console.warn(e));
       }
     }catch(e){}
-  },60000);
+  },45000);
   _realtimeMatchesUnsub=function(){ clearInterval(timer); };
   _realtimeRegsUnsub=null;
   _realtimeDrawsUnsub=null;
@@ -60304,5 +60304,52 @@ import { getFirestore, collection, doc, setDoc, getDocs, query, orderBy, limit, 
   });
 })();
 </script>
+<!-- v647c: 메모리 기반 알림 폴링 - Firebase 읽기 없이 알림만 체크 -->
+<script id="v647cMemoryAlertPoller">
+(function(){
+  'use strict';
+  if(window.__v647cAlertPollerInstalled) return;
+  window.__v647cAlertPollerInstalled = true;
+
+  let _prevCourtMap = null;
+  let _bootstrapped = false;
+
+  function checkAlerts(){
+    try{
+      // 관리자/운영자만
+      const isOp=(typeof AD!=='undefined'&&AD)||(typeof TM!=='undefined'&&TM)||window.AD||window.TM||
+        !!(document.body&&document.body.classList.contains('admin-mode'));
+      if(!isOp) return;
+
+      // 대진표 화면이면 기존 폴링이 처리
+      if(typeof getCurrentPageName==='function' && getCurrentPageName()==='bracket') return;
+
+      if(typeof buildCourtNotificationStateMap!=='function') return;
+      const nextMap = buildCourtNotificationStateMap(window.G&&window.G.matches||{});
+
+      if(!_bootstrapped){
+        // 첫 번째는 기준값만 저장
+        _prevCourtMap = nextMap;
+        _bootstrapped = true;
+        return;
+      }
+
+      if(!_prevCourtMap){ _prevCourtMap = nextMap; return; }
+
+      // Firebase 읽기 없이 메모리 상태 변화만 체크
+      if(typeof processCourtSmsAlerts==='function'){
+        processCourtSmsAlerts(_prevCourtMap, nextMap);
+      }
+      _prevCourtMap = nextMap;
+
+    }catch(e){}
+  }
+
+  // 45초마다 메모리 기반 알림 체크
+  setInterval(checkAlerts, 45000);
+
+})();
+</script>
+
 </body>
 </html>
