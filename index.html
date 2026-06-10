@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-10-v687-stable-finalize-a4";
+  const APP_VERSION = "2026-06-10-v693-developer-finalize-permission";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -45914,7 +45914,7 @@ body.admin-mode #v689PermanentFinalizeBtn,body.tm-mode #v689PermanentFinalizeBtn
   'use strict';
   if(window.__v689NoFlickerFinalize) return;
   window.__v689NoFlickerFinalize=true;
-  const VERSION='2026-06-10-v689-no-flicker-finalize-a4-cleanup';
+  const VERSION='2026-06-10-v693-developer-finalize-permission';
   const ge=id=>document.getElementById(id);
   const txt=el=>String(el&&el.textContent||'').replace(/\s+/g,' ').trim();
   function isManager(){try{return !!(document.body.classList.contains('admin-mode')||document.body.classList.contains('tm-mode')||document.body.classList.contains('operator-mode')||document.body.classList.contains('op-mode')||window.ADMIN_MODE||window.IS_ADMIN||window.OPERATOR_MODE||window.TOURNAMENT_MANAGER_MODE);}catch(e){return false;}}
@@ -45976,6 +45976,160 @@ body.admin-mode #v689PermanentFinalizeBtn,body.tm-mode #v689PermanentFinalizeBtn
   document.addEventListener('click',function(ev){const b=ev.target&&ev.target.closest&&ev.target.closest('button'); if(!b||b.id==='v689PermanentFinalizeBtn') return; const t=txt(b),oc=String(b.getAttribute('onclick')||''); if(/조번호\s*(수동저장|확정)|현재\s*코트배정\s*확정|수동배정\s*최종저장/.test(t)||/v650OpenManualGroupNoBulkCurrent|v606FinalizeGroupOrder|v626FinalizeGroupOrder|v686FinalizeByCourtOrder/.test(oc)){ev.preventDefault();ev.stopPropagation();if(ev.stopImmediatePropagation)ev.stopImmediatePropagation();return false;}},true);
   setTimeout(stableApply,0);
   console.log('[v689] no-flicker finalize button installed',VERSION);
+})();
+</script>
+
+
+
+
+
+
+
+
+<!-- v692: A4 출력 복구 + 빈 구형 팝업만 제거 -->
+<style id="v692A4RestoreStyle">
+/* 구형/빈 A4 팝업만 숨김. v688 안정형 A4 팝업은 사용 */
+#mA4Preview,#mA4,#a4PreviewOverlay,#groupSheetPreviewOverlay,#v570A4PreviewOverlay,#v566A4PreviewOverlay,#v431A4PreviewOverlay,#v431PreviewOverlay{
+  display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important;
+}
+#bracketSaveMenuWrap{display:inline-flex!important;visibility:visible!important;opacity:1!important;}
+#bracketSaveMenuWrap > button{display:inline-flex!important;visibility:visible!important;opacity:1!important;}
+#v688A4PreviewOverlay{position:fixed!important;inset:0!important;z-index:2147483600!important;display:none;align-items:center!important;justify-content:center!important;background:rgba(15,23,42,.68)!important;padding:18px!important;box-sizing:border-box!important;}
+#v688A4PreviewOverlay.show{display:flex!important;}
+#v688A4PreviewOverlay .v688-preview-body:empty::before{content:'조편성표를 만드는 중입니다. 잠시만 기다려 주세요.';display:block;padding:28px;text-align:center;color:#64748b;font-weight:900;}
+</style>
+<script id="v692A4RestoreScript">
+(function(){
+  'use strict';
+  const VERSION='2026-06-10-v693-developer-finalize-permission';
+  function ge(id){return document.getElementById(id);}
+  function text(el){return String((el&&el.textContent)||'').replace(/\s+/g,' ').trim();}
+  function notify(msg,type){try{ if(typeof window.toast==='function') window.toast(msg,type||'info'); else console.log('[v692]',msg); }catch(e){} }
+  function removeBlankLegacyA4(){
+    try{
+      ['mA4Preview','mA4','a4PreviewOverlay','groupSheetPreviewOverlay','v570A4PreviewOverlay','v566A4PreviewOverlay','v431A4PreviewOverlay','v431PreviewOverlay'].forEach(id=>{const el=ge(id); if(el){el.classList.remove('open','show'); el.style.setProperty('display','none','important');}});
+      document.querySelectorAll('.modal-overlay.open,.modal-overlay.show, div').forEach(el=>{
+        if(el.id==='v688A4PreviewOverlay') return;
+        const t=text(el);
+        if(/A4\s*조편성\s*출력\s*미리보기|조편성\s*출력\s*미리보기/.test(t) && /출력|이미지\s*저장/.test(t)){
+          el.classList.remove('open','show');
+          el.style.setProperty('display','none','important');
+          el.style.setProperty('visibility','hidden','important');
+          el.style.setProperty('opacity','0','important');
+          el.style.setProperty('pointer-events','none','important');
+        }
+      });
+    }catch(e){}
+  }
+  function fallbackOpenA4(){
+    removeBlankLegacyA4();
+    const fn=window.v688OpenA4GroupSheet || window.v687OpenA4GroupSheet || window.v570OpenA4GroupSheet || window.v566OpenA4GroupPreview;
+    if(typeof fn==='function'){
+      try{ return fn(); }catch(e){ console.error('[v692] 기존 A4 함수 실패',e); notify('A4 생성 중 오류: '+(e.message||e),'error'); return false; }
+    }
+    notify('A4 출력 함수를 찾지 못했습니다.','error');
+    return false;
+  }
+  function patchButtons(){
+    try{
+      const wrap=ge('bracketSaveMenuWrap');
+      if(wrap){wrap.style.setProperty('display','inline-flex','important'); wrap.style.setProperty('visibility','visible','important');}
+      document.querySelectorAll('button').forEach(b=>{
+        const t=text(b), oc=String(b.getAttribute('onclick')||'');
+        if(/조편성\s*저장\/출력|A4|조편성.*출력/.test(t) || /v566OpenA4GroupPreview|v570OpenA4GroupSheet|v687OpenA4GroupSheet|v688OpenA4GroupSheet/.test(oc)){
+          b.style.setProperty('display','inline-flex','important');
+          b.style.setProperty('visibility','visible','important');
+          b.onclick=function(ev){ if(ev){ev.preventDefault(); ev.stopPropagation(); if(ev.stopImmediatePropagation) ev.stopImmediatePropagation();} return fallbackOpenA4(); };
+          b.setAttribute('onclick','window.v692OpenA4GroupSheet&&window.v692OpenA4GroupSheet();return false;');
+        }
+      });
+    }catch(e){}
+  }
+  window.v692OpenA4GroupSheet=fallbackOpenA4;
+  // 구 함수 이름도 다시 살려둠
+  ['v688OpenA4GroupSheet','v687OpenA4GroupSheet','v570OpenA4GroupSheet','v566OpenA4GroupPreview'].forEach(name=>{
+    if(typeof window[name]!=='function') window[name]=fallbackOpenA4;
+  });
+  function apply(){removeBlankLegacyA4();patchButtons();}
+  document.addEventListener('DOMContentLoaded',()=>{apply();[50,200,700,1500,3000].forEach(ms=>setTimeout(apply,ms));});
+  try{new MutationObserver(()=>{removeBlankLegacyA4();}).observe(document.documentElement,{childList:true,subtree:true});}catch(e){}
+  setTimeout(apply,0);
+  console.log('[v692] A4 restored; only blank legacy popup is removed', VERSION);
+})();
+</script>
+
+
+
+<!-- v693: 개발자 로그인도 조번호 확정 권한으로 인정 + 내부 권한 함수 보정 -->
+<style id="v693DeveloperFinalizePermissionStyle">
+body.admin-mode #v689FinalizeSlot,
+body.tm-mode #v689FinalizeSlot,
+body.operator-mode #v689FinalizeSlot,
+body.op-mode #v689FinalizeSlot,
+body.developer-mode #v689FinalizeSlot,
+body.dev-mode #v689FinalizeSlot{display:inline-flex!important;visibility:visible!important;opacity:1!important;}
+body.admin-mode #v689PermanentFinalizeBtn,
+body.tm-mode #v689PermanentFinalizeBtn,
+body.operator-mode #v689PermanentFinalizeBtn,
+body.op-mode #v689PermanentFinalizeBtn,
+body.developer-mode #v689PermanentFinalizeBtn,
+body.dev-mode #v689PermanentFinalizeBtn{display:inline-flex!important;visibility:visible!important;opacity:1!important;}
+</style>
+<script id="v693DeveloperFinalizePermissionScript">
+(function(){
+  'use strict';
+  const VERSION='2026-06-10-v693-developer-finalize-permission';
+  function readFlag(name){
+    try{ if(typeof window[name] !== 'undefined' && window[name]) return true; }catch(e){}
+    try{ return !!eval(name); }catch(e){ return false; }
+  }
+  function isManagerLike(){
+    try{
+      const b=document.body;
+      const classOk=!!(b && (b.classList.contains('admin-mode')||b.classList.contains('tm-mode')||b.classList.contains('operator-mode')||b.classList.contains('op-mode')||b.classList.contains('developer-mode')||b.classList.contains('dev-mode')));
+      const flagOk=readFlag('AD')||readFlag('TM')||readFlag('OP')||readFlag('DEV')||readFlag('DEVELOPER')||!!window.ADMIN_MODE||!!window.IS_ADMIN||!!window.OPERATOR_MODE||!!window.TOURNAMENT_MANAGER_MODE;
+      const badgeOk=Array.from(document.querySelectorAll('#adminBadge,.admin-badge,.btn-sm')).some(el=>/개발자|관리자|운영자|진행자/.test(String(el.textContent||'')) && getComputedStyle(el).display!=='none');
+      return !!(classOk||flagOk||badgeOk);
+    }catch(e){ return false; }
+  }
+  const previousCanManageBracket=window.canManageBracket;
+  window.v693CanManageBracket=isManagerLike;
+  window.canManageBracket=function(){
+    if(isManagerLike()) return true;
+    try{ if(typeof previousCanManageBracket==='function' && previousCanManageBracket()) return true; }catch(e){}
+    return false;
+  };
+  function toastMsg(m,t){try{if(typeof toast==='function') toast(m,t||'info'); else console.log('[v693]',m);}catch(e){}}
+  function finalizeCore(){
+    if(!isManagerLike()){ toastMsg('관리자/운영자/진행자/개발자만 사용할 수 있습니다.','info'); return false; }
+    const fns=[window.v686FinalizeByCourtOrder,window.v626FinalizeGroupOrder,window.v606FinalizeGroupOrder,window.v650OpenManualGroupNoBulkCurrent];
+    for(const fn of fns){
+      if(typeof fn==='function'){
+        try{ return fn(); }
+        catch(e){ console.error('[v693] finalize failed',e); toastMsg('조번호 확정 실패: '+(e.message||e),'error'); return false; }
+      }
+    }
+    toastMsg('조번호 확정 함수를 찾지 못했습니다.','error');
+    return false;
+  }
+  function patchFinalizeButton(){
+    try{
+      const btn=document.getElementById('v689PermanentFinalizeBtn');
+      const slot=document.getElementById('v689FinalizeSlot');
+      const show=isManagerLike();
+      if(slot) slot.style.setProperty('display',show?'inline-flex':'none','important');
+      if(btn){
+        btn.style.setProperty('display',show?'inline-flex':'none','important');
+        btn.onclick=function(ev){ if(ev){ev.preventDefault();ev.stopPropagation(); if(ev.stopImmediatePropagation) ev.stopImmediatePropagation();} return finalizeCore(); };
+        btn.setAttribute('onclick','window.v693FinalizeGroupOrder&&window.v693FinalizeGroupOrder();return false;');
+      }
+    }catch(e){}
+  }
+  window.v693FinalizeGroupOrder=finalizeCore;
+  document.addEventListener('DOMContentLoaded',()=>{patchFinalizeButton(); [100,500,1200,2500].forEach(ms=>setTimeout(patchFinalizeButton,ms));});
+  try{new MutationObserver(()=>patchFinalizeButton()).observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style']});}catch(e){}
+  setTimeout(patchFinalizeButton,0);
+  console.log('[v693] developer finalize permission fixed',VERSION);
 })();
 </script>
 
@@ -66319,7 +66473,7 @@ body:not(.admin-mode):not(.tm-mode):not(.operator-mode):not(.op-mode) button[onc
   'use strict';
   if(window.__v688FinalizeA4HardFix) return;
   window.__v688FinalizeA4HardFix=true;
-  const VERSION='2026-06-10-v689-no-flicker-finalize-a4-cleanup';
+  const VERSION='2026-06-10-v693-developer-finalize-permission';
   function ge(id){return document.getElementById(id);} 
   function clean(s){return String(s==null?'':s).replace(/\s+/g,' ').trim();}
   function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
@@ -66395,7 +66549,7 @@ body.admin-mode #v689PermanentFinalizeBtn,body.tm-mode #v689PermanentFinalizeBtn
   'use strict';
   if(window.__v689NoFlickerFinalize) return;
   window.__v689NoFlickerFinalize=true;
-  const VERSION='2026-06-10-v689-no-flicker-finalize-a4-cleanup';
+  const VERSION='2026-06-10-v693-developer-finalize-permission';
   const ge=id=>document.getElementById(id);
   const txt=el=>String(el&&el.textContent||'').replace(/\s+/g,' ').trim();
   function isManager(){try{return !!(document.body.classList.contains('admin-mode')||document.body.classList.contains('tm-mode')||document.body.classList.contains('operator-mode')||document.body.classList.contains('op-mode')||window.ADMIN_MODE||window.IS_ADMIN||window.OPERATOR_MODE||window.TOURNAMENT_MANAGER_MODE);}catch(e){return false;}}
@@ -66457,6 +66611,160 @@ body.admin-mode #v689PermanentFinalizeBtn,body.tm-mode #v689PermanentFinalizeBtn
   document.addEventListener('click',function(ev){const b=ev.target&&ev.target.closest&&ev.target.closest('button'); if(!b||b.id==='v689PermanentFinalizeBtn') return; const t=txt(b),oc=String(b.getAttribute('onclick')||''); if(/조번호\s*(수동저장|확정)|현재\s*코트배정\s*확정|수동배정\s*최종저장/.test(t)||/v650OpenManualGroupNoBulkCurrent|v606FinalizeGroupOrder|v626FinalizeGroupOrder|v686FinalizeByCourtOrder/.test(oc)){ev.preventDefault();ev.stopPropagation();if(ev.stopImmediatePropagation)ev.stopImmediatePropagation();return false;}},true);
   setTimeout(stableApply,0);
   console.log('[v689] no-flicker finalize button installed',VERSION);
+})();
+</script>
+
+
+
+
+
+
+
+
+<!-- v692: A4 출력 복구 + 빈 구형 팝업만 제거 -->
+<style id="v692A4RestoreStyle">
+/* 구형/빈 A4 팝업만 숨김. v688 안정형 A4 팝업은 사용 */
+#mA4Preview,#mA4,#a4PreviewOverlay,#groupSheetPreviewOverlay,#v570A4PreviewOverlay,#v566A4PreviewOverlay,#v431A4PreviewOverlay,#v431PreviewOverlay{
+  display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important;
+}
+#bracketSaveMenuWrap{display:inline-flex!important;visibility:visible!important;opacity:1!important;}
+#bracketSaveMenuWrap > button{display:inline-flex!important;visibility:visible!important;opacity:1!important;}
+#v688A4PreviewOverlay{position:fixed!important;inset:0!important;z-index:2147483600!important;display:none;align-items:center!important;justify-content:center!important;background:rgba(15,23,42,.68)!important;padding:18px!important;box-sizing:border-box!important;}
+#v688A4PreviewOverlay.show{display:flex!important;}
+#v688A4PreviewOverlay .v688-preview-body:empty::before{content:'조편성표를 만드는 중입니다. 잠시만 기다려 주세요.';display:block;padding:28px;text-align:center;color:#64748b;font-weight:900;}
+</style>
+<script id="v692A4RestoreScript">
+(function(){
+  'use strict';
+  const VERSION='2026-06-10-v693-developer-finalize-permission';
+  function ge(id){return document.getElementById(id);}
+  function text(el){return String((el&&el.textContent)||'').replace(/\s+/g,' ').trim();}
+  function notify(msg,type){try{ if(typeof window.toast==='function') window.toast(msg,type||'info'); else console.log('[v692]',msg); }catch(e){} }
+  function removeBlankLegacyA4(){
+    try{
+      ['mA4Preview','mA4','a4PreviewOverlay','groupSheetPreviewOverlay','v570A4PreviewOverlay','v566A4PreviewOverlay','v431A4PreviewOverlay','v431PreviewOverlay'].forEach(id=>{const el=ge(id); if(el){el.classList.remove('open','show'); el.style.setProperty('display','none','important');}});
+      document.querySelectorAll('.modal-overlay.open,.modal-overlay.show, div').forEach(el=>{
+        if(el.id==='v688A4PreviewOverlay') return;
+        const t=text(el);
+        if(/A4\s*조편성\s*출력\s*미리보기|조편성\s*출력\s*미리보기/.test(t) && /출력|이미지\s*저장/.test(t)){
+          el.classList.remove('open','show');
+          el.style.setProperty('display','none','important');
+          el.style.setProperty('visibility','hidden','important');
+          el.style.setProperty('opacity','0','important');
+          el.style.setProperty('pointer-events','none','important');
+        }
+      });
+    }catch(e){}
+  }
+  function fallbackOpenA4(){
+    removeBlankLegacyA4();
+    const fn=window.v688OpenA4GroupSheet || window.v687OpenA4GroupSheet || window.v570OpenA4GroupSheet || window.v566OpenA4GroupPreview;
+    if(typeof fn==='function'){
+      try{ return fn(); }catch(e){ console.error('[v692] 기존 A4 함수 실패',e); notify('A4 생성 중 오류: '+(e.message||e),'error'); return false; }
+    }
+    notify('A4 출력 함수를 찾지 못했습니다.','error');
+    return false;
+  }
+  function patchButtons(){
+    try{
+      const wrap=ge('bracketSaveMenuWrap');
+      if(wrap){wrap.style.setProperty('display','inline-flex','important'); wrap.style.setProperty('visibility','visible','important');}
+      document.querySelectorAll('button').forEach(b=>{
+        const t=text(b), oc=String(b.getAttribute('onclick')||'');
+        if(/조편성\s*저장\/출력|A4|조편성.*출력/.test(t) || /v566OpenA4GroupPreview|v570OpenA4GroupSheet|v687OpenA4GroupSheet|v688OpenA4GroupSheet/.test(oc)){
+          b.style.setProperty('display','inline-flex','important');
+          b.style.setProperty('visibility','visible','important');
+          b.onclick=function(ev){ if(ev){ev.preventDefault(); ev.stopPropagation(); if(ev.stopImmediatePropagation) ev.stopImmediatePropagation();} return fallbackOpenA4(); };
+          b.setAttribute('onclick','window.v692OpenA4GroupSheet&&window.v692OpenA4GroupSheet();return false;');
+        }
+      });
+    }catch(e){}
+  }
+  window.v692OpenA4GroupSheet=fallbackOpenA4;
+  // 구 함수 이름도 다시 살려둠
+  ['v688OpenA4GroupSheet','v687OpenA4GroupSheet','v570OpenA4GroupSheet','v566OpenA4GroupPreview'].forEach(name=>{
+    if(typeof window[name]!=='function') window[name]=fallbackOpenA4;
+  });
+  function apply(){removeBlankLegacyA4();patchButtons();}
+  document.addEventListener('DOMContentLoaded',()=>{apply();[50,200,700,1500,3000].forEach(ms=>setTimeout(apply,ms));});
+  try{new MutationObserver(()=>{removeBlankLegacyA4();}).observe(document.documentElement,{childList:true,subtree:true});}catch(e){}
+  setTimeout(apply,0);
+  console.log('[v692] A4 restored; only blank legacy popup is removed', VERSION);
+})();
+</script>
+
+
+
+<!-- v693: 개발자 로그인도 조번호 확정 권한으로 인정 + 내부 권한 함수 보정 -->
+<style id="v693DeveloperFinalizePermissionStyle">
+body.admin-mode #v689FinalizeSlot,
+body.tm-mode #v689FinalizeSlot,
+body.operator-mode #v689FinalizeSlot,
+body.op-mode #v689FinalizeSlot,
+body.developer-mode #v689FinalizeSlot,
+body.dev-mode #v689FinalizeSlot{display:inline-flex!important;visibility:visible!important;opacity:1!important;}
+body.admin-mode #v689PermanentFinalizeBtn,
+body.tm-mode #v689PermanentFinalizeBtn,
+body.operator-mode #v689PermanentFinalizeBtn,
+body.op-mode #v689PermanentFinalizeBtn,
+body.developer-mode #v689PermanentFinalizeBtn,
+body.dev-mode #v689PermanentFinalizeBtn{display:inline-flex!important;visibility:visible!important;opacity:1!important;}
+</style>
+<script id="v693DeveloperFinalizePermissionScript">
+(function(){
+  'use strict';
+  const VERSION='2026-06-10-v693-developer-finalize-permission';
+  function readFlag(name){
+    try{ if(typeof window[name] !== 'undefined' && window[name]) return true; }catch(e){}
+    try{ return !!eval(name); }catch(e){ return false; }
+  }
+  function isManagerLike(){
+    try{
+      const b=document.body;
+      const classOk=!!(b && (b.classList.contains('admin-mode')||b.classList.contains('tm-mode')||b.classList.contains('operator-mode')||b.classList.contains('op-mode')||b.classList.contains('developer-mode')||b.classList.contains('dev-mode')));
+      const flagOk=readFlag('AD')||readFlag('TM')||readFlag('OP')||readFlag('DEV')||readFlag('DEVELOPER')||!!window.ADMIN_MODE||!!window.IS_ADMIN||!!window.OPERATOR_MODE||!!window.TOURNAMENT_MANAGER_MODE;
+      const badgeOk=Array.from(document.querySelectorAll('#adminBadge,.admin-badge,.btn-sm')).some(el=>/개발자|관리자|운영자|진행자/.test(String(el.textContent||'')) && getComputedStyle(el).display!=='none');
+      return !!(classOk||flagOk||badgeOk);
+    }catch(e){ return false; }
+  }
+  const previousCanManageBracket=window.canManageBracket;
+  window.v693CanManageBracket=isManagerLike;
+  window.canManageBracket=function(){
+    if(isManagerLike()) return true;
+    try{ if(typeof previousCanManageBracket==='function' && previousCanManageBracket()) return true; }catch(e){}
+    return false;
+  };
+  function toastMsg(m,t){try{if(typeof toast==='function') toast(m,t||'info'); else console.log('[v693]',m);}catch(e){}}
+  function finalizeCore(){
+    if(!isManagerLike()){ toastMsg('관리자/운영자/진행자/개발자만 사용할 수 있습니다.','info'); return false; }
+    const fns=[window.v686FinalizeByCourtOrder,window.v626FinalizeGroupOrder,window.v606FinalizeGroupOrder,window.v650OpenManualGroupNoBulkCurrent];
+    for(const fn of fns){
+      if(typeof fn==='function'){
+        try{ return fn(); }
+        catch(e){ console.error('[v693] finalize failed',e); toastMsg('조번호 확정 실패: '+(e.message||e),'error'); return false; }
+      }
+    }
+    toastMsg('조번호 확정 함수를 찾지 못했습니다.','error');
+    return false;
+  }
+  function patchFinalizeButton(){
+    try{
+      const btn=document.getElementById('v689PermanentFinalizeBtn');
+      const slot=document.getElementById('v689FinalizeSlot');
+      const show=isManagerLike();
+      if(slot) slot.style.setProperty('display',show?'inline-flex':'none','important');
+      if(btn){
+        btn.style.setProperty('display',show?'inline-flex':'none','important');
+        btn.onclick=function(ev){ if(ev){ev.preventDefault();ev.stopPropagation(); if(ev.stopImmediatePropagation) ev.stopImmediatePropagation();} return finalizeCore(); };
+        btn.setAttribute('onclick','window.v693FinalizeGroupOrder&&window.v693FinalizeGroupOrder();return false;');
+      }
+    }catch(e){}
+  }
+  window.v693FinalizeGroupOrder=finalizeCore;
+  document.addEventListener('DOMContentLoaded',()=>{patchFinalizeButton(); [100,500,1200,2500].forEach(ms=>setTimeout(patchFinalizeButton,ms));});
+  try{new MutationObserver(()=>patchFinalizeButton()).observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style']});}catch(e){}
+  setTimeout(patchFinalizeButton,0);
+  console.log('[v693] developer finalize permission fixed',VERSION);
 })();
 </script>
 
