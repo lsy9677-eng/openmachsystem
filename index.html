@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-11-v704-firestore-hard-reset-final";
+  const APP_VERSION = "2026-06-11-v716-a4-venue-title-blue";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -25281,9 +25281,11 @@ function renderBracketHTMLForDiv(tid,div,isAll){
     html+=`<div class="sec-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
       <span>${isIndividualByKey(key)?'📋 예선 경기표':'📋 예선 조별 대진표'}</span>
     </div>`;
+    if(isIndivKey){ html += v713PrelimSortBarHtml(key); }
     html+=`<div id="${prelimToggleId}" class="${isIndivKey?'indiv-prelim-grid':'prelim-standard-grid'}" style="display:${prelimCollapsed?'none':(isIndivKey?'grid':'block')} !important">`;
-    draw.groups.forEach((grp,gi)=>{
-      if(visibleGroupIndexes.length && !visibleGroupIndexes.includes(Number(gi))) return;
+    v713PrelimGroupIndexes(key, draw, visibleGroupIndexes).forEach((gi)=>{
+      const grp = draw.groups[gi];
+      if(!grp) return;
       const adv=cfg.advance||2;
       const stats=calcGS(key,gi,grp.teams,teams);
       const gms=gMs.filter(m=>m.group===gi);
@@ -25330,12 +25332,12 @@ function renderBracketHTMLForDiv(tid,div,isAll){
         <div class="grp-hdr">
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
             <span style="font-size:1.15rem;font-weight:900;letter-spacing:.5px">${grpLabel(gi)}</span>
-            <span style="font-size:.75rem;opacity:.85;font-weight:600">${grp.teams.length}${indivMode?'조':'팀'}</span>
+            <span style="font-size:.75rem;opacity:.85;font-weight:600">${grp.teams.length}팀</span>
             ${grpDone?'<span style="background:rgba(255,255,255,.25);padding:2px 9px;border-radius:999px;font-size:.7rem;font-weight:700">✅ 완료</span>'
               :`<span style="background:rgba(255,255,255,.18);padding:2px 9px;border-radius:999px;font-size:.7rem;font-weight:600">${doneCnt}/${gms.length} 경기</span>`}
             ${simpleGroupHint}
             ${indivMode&&indivFlow?`<span style="font-size:.72rem;font-weight:700;background:rgba(255,255,255,.14);padding:4px 9px;border-radius:999px">${indivFlow}</span>`:''}
-            ${canManageBracket()&&indivMode?`<button class="btn btn-outline v665-prelim-group-court-btn" style="padding:4px 10px;font-size:.76rem;white-space:nowrap;background:rgba(255,255,255,.95);border:1.5px solid #93c5fd;color:#1d4ed8;border-radius:999px;font-weight:900" onclick="v665OpenPrelimGroupCourtModal('${key}',${gi})">🎾 코트선택${_liveCourts.length?` · ${_liveCourts[0]}`:''}</button>`:''}
+            ${''}
             ${indivMode&&stats.some(s=>s.tiePending)&&canManageBracket()?`<button class="btn btn-outline" style="padding:4px 10px;font-size:.76rem;white-space:nowrap;background:rgba(255,248,223,.22);border:1.5px solid #f6d365;color:#fff3bf;border-radius:999px;font-weight:800" onclick="openIndividualTieAgePrompt('${key}',${gi})">🎂 동률 나이입력</button>`:''}
           </div>
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
@@ -25343,8 +25345,8 @@ function renderBracketHTMLForDiv(tid,div,isAll){
             ${grpCourtShareBadges}
             ${grpMemoHeaderUI}
             ${canManageBracket()?`<button class="btn btn-outline" style="padding:5px 13px;font-size:.88rem;white-space:nowrap;background:rgba(255,255,255,.18);border:1.5px solid rgba(255,255,255,.5);color:white;border-radius:999px;font-weight:700" onclick="openGroupSmsModal('${key}',${gi})">📨 문자보내기</button>`:''}
-            ${canManageBracket()?`<button class="btn btn-outline" style="padding:5px 13px;font-size:.88rem;white-space:nowrap;background:rgba(255,255,255,.18);border:1.5px solid rgba(255,255,255,.5);color:white;border-radius:999px;font-weight:600" onclick="openGroupCourtModal('${key}',${gi})">🎾 코트배정</button>`:''}
-            ${canManageBracket()&&indivMode?`<button class="btn btn-outline v650-manual-groupno-btn" style="padding:5px 13px;font-size:.88rem;white-space:nowrap;background:rgba(255,248,223,.22);border:1.5px solid #f6d365;color:#fff3bf;border-radius:999px;font-weight:900" onclick="v650PromptManualGroupNo('${key}',${gi})">🔢 조번호</button>`:''}
+            ${''}
+            ${''}
             ${indivMode?`<button id="indivGroupToggle_${key}_${gi}" class="btn btn-outline" style="padding:5px 13px;font-size:.86rem;white-space:nowrap;background:rgba(255,255,255,.18);border:1.5px solid rgba(255,255,255,.5);color:white;border-radius:999px;font-weight:700" onclick="toggleIndividualGroupMatches('${key}',${gi})">📂 경기 보기</button>`:''}
           </div>
         </div>
@@ -25635,6 +25637,62 @@ function renderBracketHTMLForDiv(tid,div,isAll){
   return html;
 }
 
+
+
+
+// v713: 예선 경기표 소스 단계 정렬/팀수 표시
+function v713GetPrelimSortMode(key){
+  try{return localStorage.getItem('V713_PRELIM_SORT_MODE_'+String(key||''))||'asc';}catch(e){return 'asc';}
+}
+function v713SetPrelimSortMode(key,mode){
+  try{localStorage.setItem('V713_PRELIM_SORT_MODE_'+String(key||''),mode||'asc');}catch(e){}
+  try{ if(typeof renderBracket==='function') renderBracket(); }catch(e){}
+  setTimeout(()=>{try{ if(typeof v713CleanPrelimAfterRender==='function') v713CleanPrelimAfterRender(); }catch(e){}},120);
+}
+function v713GroupDisplayNo(draw,gi){
+  try{
+    const g=(draw&&draw.groups&&draw.groups[Number(gi)])||{};
+    const vals=[g.finalGroupNo,g.confirmedGroupNo,g.displayGroupNo,g.lockedGroupNo,g.manualGroupNo,g.groupNo,g.no];
+    for(const v of vals){const n=Number(v); if(Number.isFinite(n)&&n>0) return n;}
+  }catch(e){}
+  return Number(gi)+1;
+}
+function v713GroupCourtForSort(key,gi){
+  try{
+    const arr=(typeof getGroupDisplayCourts==='function') ? (getGroupDisplayCourts(key,gi)||[]) : [];
+    if(arr.length) return String(arr[0]||'');
+    const ms=(G&&G.matches&&G.matches[key]||[]).filter(m=>m&&String(m.phase||'')==='group'&&Number(m.group)===Number(gi));
+    for(const m of ms){
+      const c=(Array.isArray(m.courts)&&m.courts[0])||m.court||m.manualCourtTarget||m.__sharedCourtLabel||'';
+      if(c) return String(c);
+    }
+  }catch(e){}
+  return 'ZZZ';
+}
+function v713PrelimGroupIndexes(key,draw,visibleGroupIndexes){
+  try{
+    const groups=(draw&&Array.isArray(draw.groups))?draw.groups:[];
+    let idxs=groups.map((_,i)=>i).filter(i=>!visibleGroupIndexes||!visibleGroupIndexes.length||visibleGroupIndexes.includes(Number(i)));
+    const mode=v713GetPrelimSortMode(key);
+    idxs.sort((a,b)=>{
+      const an=v713GroupDisplayNo(draw,a), bn=v713GroupDisplayNo(draw,b);
+      if(mode==='desc') return bn-an;
+      if(mode==='court'){
+        const cm=String(v713GroupCourtForSort(key,a)).localeCompare(String(v713GroupCourtForSort(key,b)),'ko',{numeric:true});
+        if(cm) return cm;
+      }
+      return an-bn;
+    });
+    return idxs;
+  }catch(e){
+    return (draw&&Array.isArray(draw.groups)?draw.groups.map((_,i)=>i):[]);
+  }
+}
+function v713PrelimSortBarHtml(key){
+  const mode=v713GetPrelimSortMode(key);
+  const btn=(m,label)=>`<button type="button" class="${mode===m?'active':''}" onclick="v713SetPrelimSortMode('${key}', '${m}')">${label}</button>`;
+  return `<div class="v713-prelim-sortbar"><span>📋 예선 경기표 정렬</span>${btn('asc','조번호 ↑')}${btn('desc','조번호 ↓')}${btn('court','코트순')}</div>`;
+}
 
 function v308RoundLabelFromIndex(totalR, idx){
   if(idx===totalR-1) return '결승';
@@ -47010,6 +47068,693 @@ button[onclick*="__hardClearAppCacheAndReload"],button[onclick*="캐시"],button
   document.addEventListener('DOMContentLoaded',()=>setTimeout(rebind,300));
   setTimeout(rebind,500);
   console.log('[v710] manual draw key context fixed',VERSION);
+})();
+</script>
+
+
+
+<!-- v711: 예선 경기표 표시 정리 + 조번호확정 후 표시 순서 고정 -->
+<style id="v711PrelimOrderCleanStyle">
+/* v711: 예선 카드의 조번호/코트 설정 보조 버튼은 코트 현황판에서 처리하므로 숨김 */
+.indiv-prelim-grid .v711-hide-control,
+.indiv-prelim-grid button.v711-hide-control,
+.indiv-prelim-grid .btn.v711-hide-control{display:none!important;visibility:hidden!important;pointer-events:none!important;}
+/* 카드 헤더 흔들림 방지 */
+.indiv-prelim-grid .grp-card{transition:none!important;}
+.indiv-prelim-grid .grp-hdr button[disabled]{display:none!important;}
+</style>
+<script id="v711PrelimOrderCleanScript">
+(function(){
+  'use strict';
+  if(window.__v711PrelimOrderCleanInstalled) return;
+  window.__v711PrelimOrderCleanInstalled=true;
+  const VERSION='2026-06-11-v711-prelim-order-clean';
+  function $(id){return document.getElementById(id);} 
+  function clean(s){return String(s==null?'':s).replace(/\s+/g,' ').trim();}
+  function toastMsg(m,t){try{ if(typeof toast==='function') toast(m,t||'info'); else if(typeof safeToast==='function') safeToast(m,t||'info'); else console.log('[v711]',m); }catch(e){console.log('[v711]',m);} }
+  function tid(){return ($('brTS')&&$('brTS').value)||($('regTS')&&$('regTS').value)||($('rankTS')&&$('rankTS').value)||'';}
+  function currentKeys(){try{const t=tid(); const keys=Object.keys((window.G&&G.draws)||{}).filter(k=>!t||String(k).indexOf(t+'_')===0); return keys.filter(k=>G.draws[k]&&Array.isArray(G.draws[k].groups));}catch(e){return [];}}
+  function arr(v){return Array.isArray(v)?v:[];}
+  function courtLabel(raw){let s=clean(raw).replace(/\s+/g,''); let m=s.match(/(국제|능동|장유|삼계|금병|원도심|동부|클레이|하드)\d+/); if(m) return m[0]; m=s.match(/(\d+)번?코트/); if(m) return m[1]+'번코트'; m=s.match(/코트[:：]?([A-Za-z가-힣]*\d+)/); if(m) return m[1]; return s;}
+  function courtOfMatch(m){let c=clean(m&&(m.court||m.manualCourtTarget||m.assignedCourt||m.currentCourt)); if(!c&&m&&Array.isArray(m.courts)&&m.courts[0]) c=clean(m.courts[0]); return courtLabel(c);}
+  function groupMatches(key,gi){return arr(G&&G.matches&&G.matches[key]).filter(m=>m&&String(m.phase||'')==='group'&&Number(m.group)===Number(gi)&&!m.bye);}
+  function groupCourt(g,ms){let c=clean(g&&(g.court||g.manualCourt||g.manualCourtTarget||g.assignedCourt)); if(!c&&g&&Array.isArray(g.courts)&&g.courts[0]) c=clean(g.courts[0]); if(!c){for(const m of ms){c=courtOfMatch(m); if(c) break;}} return courtLabel(c);}
+  function orderedGroups(key){
+    const draw=(G&&G.draws&&G.draws[key])||{};
+    return arr(draw.groups).map((g,gi)=>{
+      const ms=groupMatches(key,gi);
+      const court=groupCourt(g,ms);
+      let ord='999999';
+      for(const m of ms){const cand=m.manualCourtPinnedAt||m.courtQueueOrder||m.courtAssignedAt||m.waitingFirstAt||m.id||''; if(cand&&String(cand)<String(ord)) ord=String(cand);}
+      if(ord==='999999') ord=String(gi).padStart(4,'0');
+      const no=Number(g.confirmedGroupNo||g.finalGroupNo||g.displayGroupNo||g.manualGroupNo||g.v702GroupNo||0);
+      return {g,gi,ms,court,ord,no};
+    }).sort((a,b)=>{
+      const an=Number(a.no||0), bn=Number(b.no||0);
+      if(an>0&&bn>0&&an!==bn) return an-bn;
+      const cm=String(a.court||'ZZZ').localeCompare(String(b.court||'ZZZ'),'ko',{numeric:true});
+      if(cm) return cm;
+      return String(a.ord).localeCompare(String(b.ord),'ko',{numeric:true})||a.gi-b.gi;
+    });
+  }
+  async function saveKey(key){try{ if(window.__FB_WRITE_CACHE){try{if(__FB_WRITE_CACHE.draws)delete __FB_WRITE_CACHE.draws[key]; if(__FB_WRITE_CACHE.matches)delete __FB_WRITE_CACHE.matches[key];}catch(e){}} if(typeof stD==='function') await stD(key); if(typeof stM==='function') await stM(key); try{ if(typeof waitForPendingWrites==='function'&&typeof db!=='undefined') await waitForPendingWrites(db); }catch(e){} }catch(e){console.warn('[v711] saveKey failed',key,e);} }
+  function normalizeLockedLabels(key){
+    try{
+      const draw=G.draws[key]; if(!draw||!Array.isArray(draw.groups)) return 0;
+      let count=0;
+      const locked=!!(draw.v702Locked||draw.v711Locked||draw.v701GroupCourtLocked||draw.v700GroupCourtLocked||draw.v697GroupCourtLocked);
+      const list=orderedGroups(key);
+      let next=1;
+      list.forEach(item=>{
+        const oldNo=Number(item.g.confirmedGroupNo||item.g.finalGroupNo||item.g.displayGroupNo||item.g.manualGroupNo||item.g.v702GroupNo||0);
+        const no=(locked&&oldNo>0)?oldNo:next++;
+        item.g.confirmedGroupNo=no; item.g.finalGroupNo=no; item.g.displayGroupNo=no; item.g.manualGroupNo=no; item.g.v702GroupNo=no;
+        item.g.name=no+'조'; item.g.label=no+'조'; item.g.title=no+'조'; item.g.groupLabel=no+'조';
+        item.g.v711DisplayOrder=no; item.g.v711OriginalGroupIndex=item.gi;
+        item.ms.forEach(m=>{m.groupNo=no; m.confirmedGroupNo=no; m.finalGroupNo=no; m.displayGroupNo=no; m.v702GroupNo=no; m.groupLabel=no+'조'; m.groupName=no+'조'; m.v711DisplayOrder=no; count++;});
+      });
+      draw.v711Locked=true; draw.v711DisplaySorted=true; draw.v711NormalizedAt=new Date().toISOString();
+      return count;
+    }catch(e){console.warn('[v711] normalizeLockedLabels failed',e); return 0;}
+  }
+  function groupNoMap(){
+    const map={};
+    try{currentKeys().forEach(key=>{const draw=G.draws[key]; arr(draw.groups).forEach((g,gi)=>{const old=gi+1; const no=Number(g.confirmedGroupNo||g.finalGroupNo||g.displayGroupNo||g.manualGroupNo||g.v702GroupNo||0); if(no>0) map[old]=no;});});}catch(e){}
+    return map;
+  }
+  function replaceTextNodeText(root,fn){
+    try{const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,null); const nodes=[]; while(w.nextNode()) nodes.push(w.currentNode); nodes.forEach(n=>{const before=n.nodeValue; const after=fn(before); if(after!==before) n.nodeValue=after;});}catch(e){}
+  }
+  function cleanCardHeader(card,map){
+    const hdr=card.querySelector('.grp-hdr')||card;
+    replaceTextNodeText(hdr,function(t){
+      let s=String(t||'');
+      // "35조 2조 0/1 경기"에서 두 번째 "2조"는 조당 팀수 표기라 혼동되므로 제거
+      s=s.replace(/(\d+)조\s+(?:2조|3조|4조|5조)\s+(?=\d+\/\d+\s*경기|경기|단판|진행순서)/g,function(_,old){const no=map[Number(old)]||Number(old); return no+'조 ';});
+      // 첫 번째 조번호도 확정 번호로 치환
+      s=s.replace(/(^|\s)(\d+)조(?=\s|$|\d+\/\d+|경기|단판|진행순서)/,function(m,p,old){const no=map[Number(old)]||Number(old); return p+no+'조';});
+      return s;
+    });
+  }
+  function hidePrelimSettingButtons(scope){
+    try{(scope||document).querySelectorAll('.indiv-prelim-grid .grp-card button, .indiv-prelim-grid .grp-card .btn').forEach(b=>{
+      const t=clean(b.textContent);
+      const oc=b.getAttribute&&clean(b.getAttribute('onclick')||'');
+      // 경기 결과/경기목록/문자 버튼은 유지. 코트/조번호 수동설정 버튼만 제거.
+      if(/코트\s*선택|코트선택|조번호|조\s*번호|번호\s*저장|수동\s*저장/.test(t)||/openGroupCourtModal|v665OpenPrelimGroupCourtModal|v650|manualGroupNo|GroupNo/.test(oc)){
+        b.classList.add('v711-hide-control');
+        b.style.display='none'; b.style.visibility='hidden'; b.style.pointerEvents='none';
+      }
+    });}catch(e){}
+  }
+  function sortPrelimCardsByConfirmedNo(){
+    try{
+      const map=groupNoMap();
+      document.querySelectorAll('.indiv-prelim-grid').forEach(grid=>{
+        const cards=[...grid.querySelectorAll(':scope > .grp-card')];
+        cards.forEach((card,idx)=>{
+          cleanCardHeader(card,map);
+          const txt=clean((card.querySelector('.grp-hdr')||card).textContent);
+          const m=txt.match(/(\d+)조/);
+          const no=m?Number(m[1]):9999+idx;
+          card.style.order=String(no);
+          card.dataset.v711Order=String(no);
+        });
+      });
+      hidePrelimSettingButtons(document);
+    }catch(e){console.warn('[v711] sort/clean display failed',e);}
+  }
+  async function normalizeSaveAllCurrentKeys(){
+    const keys=currentKeys(); let total=0;
+    for(const key of keys){total+=normalizeLockedLabels(key); await saveKey(key);} 
+    return total;
+  }
+  // 기존 잠금 버튼 실행 후 예선표 표시명/정렬까지 확정합니다.
+  const oldLock=window.v702FinalizeGroupNoAndCourtLock;
+  if(typeof oldLock==='function' && !oldLock.__v711Wrapped){
+    const w=async function(){
+      const r=await oldLock.apply(this,arguments);
+      try{ await normalizeSaveAllCurrentKeys(); }catch(e){console.warn('[v711] normalize after lock failed',e);} 
+      try{ if(typeof renderBracket==='function') renderBracket(); }catch(e){}
+      setTimeout(sortPrelimCardsByConfirmedNo,120);
+      setTimeout(sortPrelimCardsByConfirmedNo,700);
+      toastMsg('예선 경기표도 확정 조번호 순서로 정리했습니다.','success');
+      return r;
+    };
+    w.__v711Wrapped=true; w.__v711Old=oldLock; window.v702FinalizeGroupNoAndCourtLock=w;
+    ['v650OpenManualGroupNoBulkCurrent','v626FinalizeGroupOrder','v606FinalizeGroupOrder','v693FinalizeGroupOrder','v694FinalizeCurrentCourtOrder','v696LockCurrentCourts','v697FinalizeGroupNoAndCourtLock','v700FinalizeGroupNoAndCourtLock','v701FinalizeGroupNoAndCourtLock'].forEach(n=>{try{window[n]=w; eval(n+'=window["'+n+'"];');}catch(e){}});
+  }
+  const oldRender=window.renderBracket;
+  if(typeof oldRender==='function' && !oldRender.__v711Wrapped){
+    const w=function(){const r=oldRender.apply(this,arguments); setTimeout(sortPrelimCardsByConfirmedNo,0); setTimeout(sortPrelimCardsByConfirmedNo,300); return r;};
+    w.__v711Wrapped=true; w.__v711Old=oldRender; window.renderBracket=w; try{renderBracket=w;}catch(e){}
+  }
+  document.addEventListener('DOMContentLoaded',()=>{setTimeout(sortPrelimCardsByConfirmedNo,500);});
+  document.addEventListener('click',function(ev){
+    const btn=ev.target&&ev.target.closest&&ev.target.closest('button,.btn'); if(!btn) return;
+    const t=clean(btn.textContent), oc=btn.getAttribute&&clean(btn.getAttribute('onclick')||'');
+    if(/코트\s*선택|코트선택|조번호|조\s*번호|번호\s*저장|수동\s*저장/.test(t)||/openGroupCourtModal|v665OpenPrelimGroupCourtModal|v650/.test(oc)){
+      if(btn.closest&&btn.closest('.indiv-prelim-grid')){ev.preventDefault();ev.stopImmediatePropagation();btn.classList.add('v711-hide-control');btn.style.display='none';return false;}
+    }
+  },true);
+  // 수동 생성 직후에도 카드 정리
+  ['v709CreateManualPrelimSharedQueue','v707CreateManualPrelimSharedQueue','v706ManualPrelimCreate','v680CreateManualPrelimSharedQueue'].forEach(n=>{try{const old=window[n]; if(typeof old==='function'&&!old.__v711Wrapped){const w=async function(){const r=await old.apply(this,arguments); setTimeout(sortPrelimCardsByConfirmedNo,500); setTimeout(sortPrelimCardsByConfirmedNo,1500); return r;}; w.__v711Wrapped=true; w.__v711Old=old; window[n]=w; try{eval(n+'=window["'+n+'"];');}catch(e){} }}catch(e){}});
+  setTimeout(sortPrelimCardsByConfirmedNo,1200);
+  console.log('[v711] prelim order clean installed',VERSION);
+})();
+</script>
+
+
+<!-- v712: 예선 경기표 조당 팀수 표기 + 조번호 정렬 컨트롤 -->
+<style id="v712PrelimSortTeamLabelStyle">
+.v712-prelim-sortbar{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:flex-end!important;
+  gap:6px!important;
+  flex-wrap:wrap!important;
+  margin:8px 0 10px!important;
+  padding:8px 10px!important;
+  border:1px solid #dbeafe!important;
+  border-radius:14px!important;
+  background:linear-gradient(135deg,#ffffff,#f8fbff)!important;
+}
+.v712-prelim-sortbar .v712-label{
+  margin-right:auto!important;
+  font-size:.78rem!important;
+  font-weight:900!important;
+  color:#334155!important;
+  white-space:nowrap!important;
+}
+.v712-prelim-sortbar button{
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  min-height:32px!important;
+  padding:5px 10px!important;
+  border-radius:999px!important;
+  border:1.5px solid #cbd5e1!important;
+  background:#fff!important;
+  color:#0f1e3a!important;
+  font-size:.74rem!important;
+  font-weight:900!important;
+  cursor:pointer!important;
+  box-shadow:none!important;
+  transition:none!important;
+  white-space:nowrap!important;
+}
+.v712-prelim-sortbar button.active{
+  background:#0f1e3a!important;
+  color:#fff!important;
+  border-color:#0f1e3a!important;
+}
+.indiv-prelim-grid .grp-hdr,
+.indiv-prelim-grid .grp-hdr *{
+  transition:none!important;
+}
+@media(max-width:680px){
+  .v712-prelim-sortbar{justify-content:stretch!important;gap:5px!important;padding:7px!important;}
+  .v712-prelim-sortbar .v712-label{width:100%!important;margin-right:0!important;font-size:.72rem!important;}
+  .v712-prelim-sortbar button{flex:1 1 0!important;min-width:0!important;font-size:.68rem!important;padding:5px 5px!important;}
+}
+</style>
+<script id="v712PrelimSortTeamLabelScript">
+(function(){
+  'use strict';
+  if(window.__v712PrelimSortTeamLabelInstalled) return;
+  window.__v712PrelimSortTeamLabelInstalled=true;
+  const VERSION='2026-06-11-v716-a4-venue-title-blue';
+  const STORE_KEY='V712_PRELIM_SORT_MODE';
+  function clean(s){return String(s==null?'':s).replace(/\s+/g,' ').trim();}
+  function getMode(){try{return localStorage.getItem(STORE_KEY)||'asc';}catch(e){return 'asc';}}
+  function setMode(mode){try{localStorage.setItem(STORE_KEY,mode);}catch(e){} }
+  function numericGroupNo(card){
+    try{
+      const txt=clean((card.querySelector('.grp-hdr')||card).textContent);
+      const m=txt.match(/(\d+)\s*조/);
+      return m?Number(m[1]):999999;
+    }catch(e){return 999999;}
+  }
+  function courtText(card){
+    try{
+      let txt=clean(card.textContent);
+      let m=txt.match(/코트\s*[:：]?\s*([가-힣A-Za-z]+\(?[가-힣A-Za-z]*\)?\d+|국제\d+|원도심\(인조\)\d+|원도심\d+|능동\d+|장유\d+|삼계\d+|금병\d+|동부\d+)/);
+      if(m) return m[1].replace(/\s+/g,'');
+      return 'ZZZ';
+    }catch(e){return 'ZZZ';}
+  }
+  function replaceTextNodes(root, fn){
+    try{
+      const walker=document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+      const nodes=[];
+      while(walker.nextNode()) nodes.push(walker.currentNode);
+      nodes.forEach(n=>{const before=n.nodeValue; const after=fn(before); if(after!==before)n.nodeValue=after;});
+    }catch(e){}
+  }
+  function fixTeamCountLabel(card){
+    try{
+      const hdr=card.querySelector('.grp-hdr')||card;
+      replaceTextNodes(hdr, function(t){
+        let s=String(t||'');
+        // 첫 번째 "35조"는 조번호, 바로 뒤의 "2조/3조"는 조당 팀수이므로 "2팀/3팀"으로 바꾼다.
+        s=s.replace(/(\d+\s*조)\s+(2|3|4|5)\s*조(?=\s+\d+\s*\/\s*\d+\s*경기|\s+경기|\s+단판|\s+진행순서)/g, '$1 $2팀');
+        // 이미 v711에서 두 번째 표기를 제거해 "35조 0/1 경기"가 된 경우, 팀 수는 카드의 순위 행 기준으로 복구한다.
+        if(/\d+\s*조\s+\d+\s*\/\s*\d+\s*경기/.test(s) && !/\d+\s*팀/.test(s)){
+          const rows=card.querySelectorAll('.gs-row').length || card.querySelectorAll('[class*="gs-row"]').length;
+          if(rows>=2 && rows<=5){
+            s=s.replace(/(\d+\s*조)\s+(?=\d+\s*\/\s*\d+\s*경기)/, '$1 '+rows+'팀 ');
+          }
+        }
+        return s;
+      });
+    }catch(e){}
+  }
+  function ensureSortBar(grid){
+    try{
+      if(!grid || grid.__v712SortBarInstalled) return;
+      const bar=document.createElement('div');
+      bar.className='v712-prelim-sortbar';
+      bar.innerHTML='<span class="v712-label">📋 예선 경기표 정렬</span><button type="button" data-mode="asc">조번호 ↑</button><button type="button" data-mode="desc">조번호 ↓</button><button type="button" data-mode="court">코트순</button>';
+      bar.addEventListener('click', function(ev){
+        const btn=ev.target && ev.target.closest && ev.target.closest('button[data-mode]');
+        if(!btn) return;
+        ev.preventDefault(); ev.stopPropagation();
+        const mode=btn.getAttribute('data-mode')||'asc';
+        setMode(mode);
+        sortOneGrid(grid, mode, true);
+      }, true);
+      grid.parentNode.insertBefore(bar, grid);
+      grid.__v712SortBarInstalled=true;
+    }catch(e){console.warn('[v712] ensureSortBar failed',e);}
+  }
+  function updateBarActive(grid, mode){
+    try{
+      const bar=grid && grid.previousElementSibling && grid.previousElementSibling.classList.contains('v712-prelim-sortbar') ? grid.previousElementSibling : null;
+      if(!bar) return;
+      bar.querySelectorAll('button[data-mode]').forEach(b=>b.classList.toggle('active', (b.getAttribute('data-mode')||'asc')===mode));
+    }catch(e){}
+  }
+  function sortOneGrid(grid, mode, forceDom){
+    try{
+      ensureSortBar(grid);
+      mode=mode||getMode();
+      const cards=[...grid.querySelectorAll(':scope > .grp-card')];
+      cards.forEach(fixTeamCountLabel);
+      const sorted=cards.slice().sort((a,b)=>{
+        const ag=numericGroupNo(a), bg=numericGroupNo(b);
+        if(mode==='desc') return bg-ag;
+        if(mode==='court'){
+          const cm=courtText(a).localeCompare(courtText(b),'ko',{numeric:true});
+          if(cm) return cm;
+          return ag-bg;
+        }
+        return ag-bg;
+      });
+      sorted.forEach((card,idx)=>{
+        card.style.order=String(idx+1);
+        card.dataset.v712SortOrder=String(idx+1);
+        if(forceDom) grid.appendChild(card);
+      });
+      updateBarActive(grid, mode);
+    }catch(e){console.warn('[v712] sortOneGrid failed',e);}
+  }
+  function applyAll(mode, forceDom){
+    try{
+      document.querySelectorAll('.indiv-prelim-grid').forEach(grid=>sortOneGrid(grid, mode||getMode(), !!forceDom));
+    }catch(e){}
+  }
+  window.v712SortPrelimCards=function(mode){setMode(mode||'asc'); applyAll(mode||'asc', true);};
+  window.v712FixPrelimTeamLabels=function(){applyAll(getMode(), false);};
+  const oldRender=window.renderBracket;
+  if(typeof oldRender==='function' && !oldRender.__v712Wrapped){
+    const w=function(){const r=oldRender.apply(this,arguments); setTimeout(()=>applyAll(getMode(),false),0); setTimeout(()=>applyAll(getMode(),false),350); return r;};
+    w.__v712Wrapped=true; w.__v712Old=oldRender; window.renderBracket=w; try{renderBracket=w;}catch(e){}
+  }
+  document.addEventListener('DOMContentLoaded',()=>{setTimeout(()=>applyAll(getMode(),false),300);setTimeout(()=>applyAll(getMode(),false),1200);});
+  document.addEventListener('click',function(ev){
+    const btn=ev.target&&ev.target.closest&&ev.target.closest('button,.btn'); if(!btn) return;
+    if(/조번호확정\+코트잠금|조번호\s*확정|코트잠금/.test(clean(btn.textContent||''))){setTimeout(()=>{setMode('asc');applyAll('asc',true);},900);}
+  },true);
+  setTimeout(()=>applyAll(getMode(),false),1600);
+  console.log('[v712] prelim sort/team label installed',VERSION);
+})();
+</script>
+
+
+
+<!-- v713: source-level prelim sort and hard cleanup -->
+<style id="v713SourcePrelimSortStyle">
+.v713-prelim-sortbar{display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:6px!important;flex-wrap:wrap!important;margin:8px 0 10px!important;padding:8px 10px!important;border:1px solid #dbeafe!important;border-radius:14px!important;background:linear-gradient(135deg,#fff,#f8fbff)!important;position:relative!important;z-index:5!important;}
+.v713-prelim-sortbar span{margin-right:auto!important;font-size:.78rem!important;font-weight:900!important;color:#334155!important;white-space:nowrap!important;}
+.v713-prelim-sortbar button{display:inline-flex!important;align-items:center!important;justify-content:center!important;min-height:32px!important;padding:5px 10px!important;border-radius:999px!important;border:1.5px solid #cbd5e1!important;background:#fff!important;color:#0f1e3a!important;font-size:.74rem!important;font-weight:900!important;cursor:pointer!important;box-shadow:none!important;transition:none!important;white-space:nowrap!important;}
+.v713-prelim-sortbar button.active{background:#0f1e3a!important;color:#fff!important;border-color:#0f1e3a!important;}
+#bracketContent .grp-card button[onclick*="v665OpenPrelimGroupCourtModal"],
+#bracketContent .grp-card button[onclick*="openGroupCourtModal"],
+#bracketContent .grp-card button[onclick*="v650PromptManualGroupNo"],
+#bracketContent .grp-card button[onclick*="v650"],
+#bracketContent .grp-card .v650-manual-groupno-btn,
+#bracketContent .grp-card .v665-prelim-group-court-btn{display:none!important;visibility:hidden!important;pointer-events:none!important;}
+@media(max-width:680px){.v713-prelim-sortbar{justify-content:stretch!important;gap:5px!important;padding:7px!important}.v713-prelim-sortbar span{width:100%!important;margin-right:0!important;font-size:.72rem!important}.v713-prelim-sortbar button{flex:1 1 0!important;min-width:0!important;font-size:.68rem!important;padding:5px 5px!important}}
+</style>
+<script id="v713SourcePrelimSortScript">
+(function(){
+  'use strict';
+  if(window.__v713SourcePrelimSortInstalled) return; window.__v713SourcePrelimSortInstalled=true;
+  function clean(s){return String(s==null?'':s).replace(/\s+/g,' ').trim();}
+  function textWalk(root,fn){try{const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,null);const nodes=[];while(w.nextNode())nodes.push(w.currentNode);nodes.forEach(n=>{const b=n.nodeValue,a=fn(b,n);if(a!==b)n.nodeValue=a;});}catch(e){}}
+  function isPrelimCard(card){const t=clean(card.textContent); return /\d+\s*조/.test(t)&&/(진행순서|순위\s*현황|\d+\s*\/\s*\d+\s*경기)/.test(t);}
+  window.v713CleanPrelimAfterRender=function(){
+    try{
+      document.querySelectorAll('#bracketContent .grp-card').forEach(card=>{
+        if(!isPrelimCard(card)) return;
+        textWalk(card.querySelector('.grp-hdr')||card,function(t){
+          let s=String(t||'');
+          s=s.replace(/(\d+\s*조)\s+(2|3|4|5)\s*조(?=\s+\d+\s*\/\s*\d+\s*경기|\s+경기|\s+단판|\s+진행순서)/g,'$1 $2팀');
+          return s;
+        });
+        card.querySelectorAll('button,.btn').forEach(b=>{
+          const t=clean(b.textContent), oc=clean(b.getAttribute&&b.getAttribute('onclick')||'');
+          if(/코트\s*선택|코트선택|코트\s*배정|조번호|조\s*번호/.test(t)||/v665OpenPrelimGroupCourtModal|openGroupCourtModal|v650PromptManualGroupNo|v650/.test(oc)){
+            b.style.setProperty('display','none','important');
+            b.style.setProperty('visibility','hidden','important');
+            b.style.setProperty('pointer-events','none','important');
+          }
+        });
+      });
+    }catch(e){console.warn('[v713] cleanup failed',e);}
+  };
+  const oldRender=window.renderBracket;
+  if(typeof oldRender==='function' && !oldRender.__v713SourceWrapped){
+    const w=function(){const r=oldRender.apply(this,arguments); setTimeout(window.v713CleanPrelimAfterRender,0); setTimeout(window.v713CleanPrelimAfterRender,350); return r;};
+    w.__v713SourceWrapped=true; w.__v713Old=oldRender; window.renderBracket=w; try{renderBracket=w;}catch(e){}
+  }
+  document.addEventListener('DOMContentLoaded',()=>{setTimeout(window.v713CleanPrelimAfterRender,300);setTimeout(window.v713CleanPrelimAfterRender,1500);});
+  document.addEventListener('click',function(ev){const b=ev.target&&ev.target.closest&&ev.target.closest('button,.btn'); if(!b)return; const t=clean(b.textContent), oc=clean(b.getAttribute&&b.getAttribute('onclick')||''); if((/코트\s*선택|코트선택|코트\s*배정|조번호|조\s*번호/.test(t)||/v665OpenPrelimGroupCourtModal|openGroupCourtModal|v650PromptManualGroupNo|v650/.test(oc)) && b.closest('#bracketContent .grp-card')){ev.preventDefault();ev.stopImmediatePropagation();b.style.setProperty('display','none','important');return false;}},true);
+  setTimeout(window.v713CleanPrelimAfterRender,1200);
+  console.log('[v713] source prelim sort/team label installed');
+})();
+</script>
+
+
+
+<!-- v714: A4 예상시간 + 코트별 타이틀 색상 패치 -->
+<style id="v714A4TimeCourtColorStyle">
+#v702A4Overlay .v714-a4-card{border:1.5px solid #cbd5e1;border-radius:10px;overflow:hidden;break-inside:avoid;background:#fff;}
+#v702A4Overlay .v714-a4-card-head{display:flex;justify-content:space-between;align-items:center;gap:4px;color:#fff;padding:5px 7px;font-size:10px;font-weight:1000;background:var(--v714-court-color,#0f1e3a)!important;}
+#v702A4Overlay .v714-a4-time{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;background:rgba(255,255,255,.95);color:#0f1e3a;padding:2px 6px;font-size:8px;font-weight:1000;white-space:nowrap;}
+#v702A4Overlay .v714-a4-tag{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;background:rgba(255,255,255,.20);border:1px solid rgba(255,255,255,.38);color:#fff;padding:2px 5px;font-size:8px;font-weight:1000;white-space:nowrap;}
+#v702A4Overlay .v714-a4-card-body{padding:5px;}
+#v702A4Overlay .v714-a4-court-strip{display:flex;align-items:center;justify-content:space-between;gap:5px;background:#f8fafc;border-bottom:1px solid #e5e7eb;padding:4px 6px;font-size:8px;font-weight:900;color:#334155;}
+#v702A4Overlay .v714-a4-court-dot{display:inline-flex;width:8px;height:8px;border-radius:999px;background:var(--v714-court-color,#0f1e3a);margin-right:4px;}
+#v702A4Overlay .v714-a4-row{display:grid;grid-template-columns:18px minmax(0,1fr);gap:5px;align-items:center;border-bottom:1px solid #e5e7eb;padding:3px 0;min-height:22px;}
+#v702A4Overlay .v714-a4-row:last-child{border-bottom:0;}
+#v702A4Overlay .v714-a4-no{width:16px;height:16px;border-radius:999px;background:#eef2ff;color:#1d4ed8;font-size:8px;font-weight:1000;display:flex;align-items:center;justify-content:center;}
+#v702A4Overlay .v714-a4-name{font-size:10px;font-weight:1000;color:#111827;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+#v702A4Overlay .v714-a4-meta{font-size:7px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+@media print{
+  #v702PrintRoot .v714-a4-card{border:1.5px solid #cbd5e1;border-radius:10px;overflow:hidden;break-inside:avoid;background:#fff;}
+  #v702PrintRoot .v714-a4-card-head{display:flex;justify-content:space-between;align-items:center;gap:4px;color:#fff;padding:5px 7px;font-size:10px;font-weight:1000;background:var(--v714-court-color,#0f1e3a)!important;}
+  #v702PrintRoot .v714-a4-time{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;background:rgba(255,255,255,.95);color:#0f1e3a;padding:2px 6px;font-size:8px;font-weight:1000;white-space:nowrap;}
+  #v702PrintRoot .v714-a4-tag{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;background:rgba(255,255,255,.20);border:1px solid rgba(255,255,255,.38);color:#fff;padding:2px 5px;font-size:8px;font-weight:1000;white-space:nowrap;}
+  #v702PrintRoot .v714-a4-court-strip{display:flex;align-items:center;justify-content:space-between;gap:5px;background:#f8fafc;border-bottom:1px solid #e5e7eb;padding:4px 6px;font-size:8px;font-weight:900;color:#334155;}
+  #v702PrintRoot .v714-a4-court-dot{display:inline-flex;width:8px;height:8px;border-radius:999px;background:var(--v714-court-color,#0f1e3a);margin-right:4px;}
+  #v702PrintRoot .v714-a4-row{display:grid;grid-template-columns:18px minmax(0,1fr);gap:5px;align-items:center;border-bottom:1px solid #e5e7eb;padding:3px 0;min-height:22px;}
+  #v702PrintRoot .v714-a4-row:last-child{border-bottom:0;}
+  #v702PrintRoot .v714-a4-no{width:16px;height:16px;border-radius:999px;background:#eef2ff;color:#1d4ed8;font-size:8px;font-weight:1000;display:flex;align-items:center;justify-content:center;}
+  #v702PrintRoot .v714-a4-name{font-size:10px;font-weight:1000;color:#111827;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  #v702PrintRoot .v714-a4-meta{font-size:7px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+}
+</style>
+<script id="v714A4TimeCourtColorScript">
+(function(){
+  'use strict';
+  if(window.__v714A4TimeCourtColorInstalled) return; window.__v714A4TimeCourtColorInstalled=true;
+  const VERSION='2026-06-11-v716-a4-venue-title-blue';
+  const palette=['#0f1e3a','#1d4ed8','#047857','#b45309','#7c3aed','#be123c','#0f766e','#4338ca','#15803d','#c2410c','#0369a1','#6d28d9'];
+  function $(id){return document.getElementById(id)}
+  function arr(v){return Array.isArray(v)?v:[]}
+  function clean(s){return String(s||'').replace(/\s+/g,' ').trim()}
+  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+  function toastMsg(m,t){try{if(typeof toast==='function')toast(m,t||'info');else if(typeof safeToast==='function')safeToast(m,t||'info');else console.log('[v714]',m)}catch(e){console.log('[v714]',m)}}
+  function currentTid(){return clean(($('brTS')&&$('brTS').value)||($('regTS')&&$('regTS').value)||'')}
+  function currentDivs(tid){try{const t=arr(window.G&&G.tournaments).find(x=>String(x.id)===String(tid)); const all=arr(t&&t.divisions); const sel=$('brDS'); if(sel&&sel.value&&sel.value!=='__ALL__')return [sel.value]; if(Array.isArray(window.BR_MULTI_DIVS)&&window.BR_MULTI_DIVS.length&&!BR_MULTI_DIVS.includes('__ALL__'))return BR_MULTI_DIVS.filter(d=>all.includes(d)); const keys=Object.keys((G&&G.draws)||{}).filter(k=>k.startsWith(tid+'_')).map(k=>k.slice(String(tid).length+1)); return keys.length?keys:all;}catch(e){return []}}
+  function keysForCurrent(){const tid=currentTid(); if(!tid)return []; return currentDivs(tid).map(d=>tid+'_'+d).filter(k=>G&&G.draws&&G.draws[k]&&Array.isArray(G.draws[k].groups));}
+  function courtLabel(raw){let s=clean(raw).replace(/\s+/g,''); if(!s)return ''; let m=s.match(/(장유중|국제|능동|원도심\(인조\)|원도심|삼계|금병|동부|클레이|하드)[가-힣()]*\d*/); if(m){ let rest=s.slice(m.index+m[0].length).match(/^\d+/); return m[0]+(rest&&!/\d$/.test(m[0])?rest[0]:''); } m=s.match(/(\d+)번?코트/); if(m)return m[1]+'번코트'; m=s.match(/코트[:：]?([A-Za-z가-힣()]*\d+)/); if(m)return m[1]; return s;}
+  function courtOfMatch(m){let c=clean(m&&(m.court||m.manualCourtTarget||m.assignedCourt||m.currentCourt)); if(!c&&m&&Array.isArray(m.courts)&&m.courts[0])c=clean(m.courts[0]); return courtLabel(c)}
+  function groupMatches(key,gi){return arr(G&&G.matches&&G.matches[key]).filter(m=>m&&String(m.phase||'')==='group'&&Number(m.group)===Number(gi)&&!m.bye)}
+  function groupCourt(g,ms){let c=clean(g&&(g.court||g.manualCourt||g.manualCourtTarget||g.assignedCourt)); if(!c&&g&&Array.isArray(g.courts)&&g.courts[0])c=clean(g.courts[0]); if(!c){for(const m of ms){c=courtOfMatch(m); if(c)break;}} return courtLabel(c)}
+  function groupNo(g,gi){return Number(g&&(g.confirmedGroupNo||g.finalGroupNo||g.displayGroupNo||g.manualGroupNo||g.v702GroupNo||g.v711GroupNo||0))||gi+1}
+  function teamLabel(team){try{if(!team)return '미정'; if(typeof getIndividualPlayers==='function'){const ps=getIndividualPlayers(team).slice(0,2).map(p=>clean(p&&p.name)).filter(Boolean); if(ps.length)return ps.join(' / ');} if(Array.isArray(team.individualPlayers)){const ps=team.individualPlayers.slice(0,2).map(p=>clean((p&&p.name)||p)).filter(Boolean); if(ps.length)return ps.join(' / ');} if(Array.isArray(team.players)){const ps=team.players.slice(0,2).map(p=>clean((p&&p.name)||p)).filter(Boolean); if(ps.length)return ps.join(' / ');} return clean(team.club||team.name||team.pairLabel||team.entryLabel||'팀');}catch(e){return '팀'}}
+  function teamSub(team,name){try{const club=clean(team&&team.club); if(club&&club!==name)return club; if(Array.isArray(team&&team.individualPlayers)){return team.individualPlayers.slice(0,2).map(p=>clean(p&&p.club)).filter(Boolean).join(' · ');} return '';}catch(e){return ''}}
+  function hashColor(court){const c=clean(court)||'미배정'; let n=0; for(let i=0;i<c.length;i++)n=(n*31+c.charCodeAt(i))>>>0; return palette[n%palette.length];}
+  function isClayCourt(court){return /장유중|클레이|clay/i.test(clean(court));}
+  function minutesToTime(min){const h=Math.floor(min/60),m=min%60; return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');}
+  function collectItems(){const out=[]; keysForCurrent().forEach(key=>{const draw=G.draws[key]||{}; const teams=arr(G.teams&&G.teams[key]); arr(draw.groups).forEach((g,gi)=>{const ms=groupMatches(key,gi); const no=groupNo(g,gi); const court=groupCourt(g,ms)||'미배정'; let ord='999999'; for(const m of ms){const cand=m.manualCourtPinnedAt||m.courtQueueOrder||m.courtAssignedAt||m.waitingFirstAt||m.id||''; if(cand&&String(cand)<String(ord))ord=String(cand);} if(ord==='999999')ord=String(gi).padStart(4,'0'); const rows=arr(g.teams).map((ti,idx)=>{const t=teams[ti]; const nm=teamLabel(t); return {slot:idx+1,name:nm,sub:teamSub(t,nm)};}); if(rows.length)out.push({key,gi,no,court,ord,color:hashColor(court),rows});});}); out.sort((a,b)=>String(a.court||'ZZZ').localeCompare(String(b.court||'ZZZ'),'ko',{numeric:true})||String(a.ord).localeCompare(String(b.ord),'ko',{numeric:true})||a.no-b.no); const cnt={}; out.forEach(it=>{const c=it.court||'미배정'; const start=isClayCourt(c)?600:540; const idx=cnt[c]||0; it.expectedTime=minutesToTime(start+idx*30); cnt[c]=idx+1;}); out.sort((a,b)=>String(a.court||'ZZZ').localeCompare(String(b.court||'ZZZ'),'ko',{numeric:true})||a.expectedTime.localeCompare(b.expectedTime)||a.no-b.no); return out;}
+  function buildA4(){const items=collectItems(); const root=document.createElement('div'); root.className='v702-a4-sheet v714-a4-sheet'; if(!items.length){root.innerHTML='<div class="v702-a4-empty">A4로 표시할 예선 대진표 데이터가 없습니다.<br>대회/부서를 선택하고 예선 조추첨 또는 수동 예선 생성이 저장되어 있는지 확인하세요.</div>'; return root;} const per=40,pages=Math.ceil(items.length/per),total=items.reduce((s,it)=>s+it.rows.length,0),tid=currentTid(); const t=arr(G&&G.tournaments).find(x=>String(x.id)===String(tid)); for(let i=0;i<items.length;i+=per){const chunk=items.slice(i,i+per),pno=Math.floor(i/per)+1; const page=document.createElement('div'); page.className='v702-a4-page'; page.innerHTML='<div class="v702-a4-title-main">'+esc((t&&t.name)||'대회')+' 예선 대진표</div><div class="v702-a4-sub">'+esc(pno+'/'+pages+'페이지 · '+items.length+'개 조 · '+total+'팀 · 예상시간 기준: 장유중/클레이 10:00, 그 외 09:00 · 코트별 30분 간격')+'</div><div class="v702-a4-grid">'+chunk.map(it=>'<div class="v714-a4-card" style="--v714-court-color:'+esc(it.color)+'"><div class="v714-a4-card-head"><div>'+esc(it.court+' · '+it.no+'조')+'</div><div class="v702-a4-tags"><span class="v714-a4-time">⏱ '+esc(it.expectedTime)+'</span><span class="v714-a4-tag">'+esc(it.no)+'조</span></div></div><div class="v714-a4-court-strip"><span><i class="v714-a4-court-dot"></i>코트 '+esc(it.court)+'</span><span>예상 '+esc(it.expectedTime)+'</span></div><div class="v714-a4-card-body">'+it.rows.map(r=>'<div class="v714-a4-row"><div class="v714-a4-no">'+esc(r.slot)+'</div><div><div class="v714-a4-name">'+esc(r.name)+'</div>'+(r.sub?'<div class="v714-a4-meta">'+esc(r.sub)+'</div>':'')+'</div></div>').join('')+'</div></div>').join('')+'</div><div class="v702-a4-foot">230MATCH · '+esc(new Date().toLocaleString('ko-KR'))+'</div>'; root.appendChild(page);} return root;}
+  let currentSheet=null;
+  function closeOldA4(){['v431A4PreviewOverlay','v566A4PreviewOverlay','v570A4PreviewOverlay','v688A4PreviewOverlay','v694A4Overlay','v698A4Overlay','v699A4Overlay','v701A4Overlay','mA4','mA4Preview','a4PreviewOverlay','groupSheetPreviewOverlay'].forEach(id=>{const el=$(id); if(el){try{el.classList.remove('open','show')}catch(e){} el.style.display='none';}})}
+  function overlay(){let ov=$('v702A4Overlay'); if(!ov){ov=document.createElement('div'); ov.id='v702A4Overlay'; ov.innerHTML='<div class="v702-a4-box"><div class="v702-a4-head"><div>📄 A4 대진표 출력/저장</div><div class="v702-a4-actions"><button type="button" class="v702-print" id="v702PrintA4">🖨️ 출력</button><button type="button" class="v702-save" id="v702SaveA4">🖼️ 이미지 저장</button><button type="button" class="v702-close" id="v702CloseA4">닫기</button></div></div><div id="v702A4Body"></div></div>'; document.body.appendChild(ov); ov.addEventListener('click',e=>{if(e.target===ov)ov.classList.remove('show')});} $('v702CloseA4').onclick=()=>ov.classList.remove('show'); $('v702PrintA4').onclick=printA4; $('v702SaveA4').onclick=saveA4; return ov;}
+  window.v714BuildA4=buildA4;
+  window.v714OpenA4=function(){try{closeOldA4(); const ov=overlay(); const body=$('v702A4Body'); body.innerHTML=''; currentSheet=buildA4(); body.appendChild(currentSheet); ov.classList.add('show');}catch(e){console.error('[v714] A4 open failed',e); toastMsg('A4 열기 실패: '+(e.message||e),'error');}};
+  window.v702OpenA4=window.v714OpenA4;
+  function printA4(){try{const sheet=(currentSheet||buildA4()).cloneNode(true); let root=$('v702PrintRoot'); if(root)root.remove(); root=document.createElement('div'); root.id='v702PrintRoot'; root.appendChild(sheet); document.body.appendChild(root); setTimeout(()=>{window.print(); setTimeout(()=>{try{root.remove()}catch(e){}},700)},120);}catch(e){toastMsg('출력 실패: '+(e.message||e),'error')}}
+  async function ensureHtml2Canvas(){if(window.html2canvas)return; await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';s.onload=res;s.onerror=()=>rej(new Error('html2canvas 로드 실패'));document.head.appendChild(s);});}
+  async function saveA4(){let holder=null; try{await ensureHtml2Canvas(); const sheet=(currentSheet||buildA4()).cloneNode(true); holder=document.createElement('div'); holder.style.cssText='position:fixed;left:-12000px;top:0;background:#fff;z-index:-1'; holder.appendChild(sheet); document.body.appendChild(holder); const pages=[...holder.querySelectorAll('.v702-a4-page')]; if(!pages.length){toastMsg('저장할 페이지가 없습니다','error');return;} for(let i=0;i<pages.length;i++){const canvas=await html2canvas(pages[i],{backgroundColor:'#fff',scale:2,useCORS:true,logging:false,width:794,height:1123,windowWidth:794,windowHeight:1123}); const blob=await new Promise(r=>canvas.toBlob(r,'image/png')); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='A4_예선대진표_예상시간_'+String(i+1).padStart(2,'0')+'.png'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1000); await new Promise(r=>setTimeout(r,150));} toastMsg('A4 이미지 저장 완료','success');}catch(e){console.error('[v714] image save failed',e);toastMsg('이미지 저장 실패: '+(e.message||e),'error')}finally{try{holder&&holder.remove()}catch(e){}}}
+  document.addEventListener('click',function(ev){const btn=ev.target&&ev.target.closest&&ev.target.closest('button,a'); if(!btn)return; const t=clean(btn.textContent), id=btn.id||''; if(id==='v702A4Btn'||/A4|대진표 출력|조편성 출력/.test(t)){ev.preventDefault();ev.stopImmediatePropagation();window.v714OpenA4();return false;}},true);
+  setTimeout(()=>{try{const b=$('v702A4Btn'); if(b)b.onclick=e=>{e&&e.preventDefault();window.v714OpenA4();};}catch(e){}},400);
+  console.log('[v714] A4 expected time/court color installed');
+})();
+</script>
+
+
+
+<!-- v715: A4 구장별 타이틀 색상 패치 - 코트별 색상이 아니라 구장별 동일 색상 -->
+<style id="v715A4VenueColorStyle">
+#v702A4Overlay .v714-a4-card-head,
+#v702PrintRoot .v714-a4-card-head{
+  background:var(--v715-venue-color,var(--v714-court-color,#0f1e3a))!important;
+}
+#v702A4Overlay .v714-a4-court-dot,
+#v702PrintRoot .v714-a4-court-dot{
+  background:var(--v715-venue-color,var(--v714-court-color,#0f1e3a))!important;
+}
+#v702A4Overlay .v715-venue-tag,
+#v702PrintRoot .v715-venue-tag{
+  display:inline-flex;align-items:center;justify-content:center;border-radius:999px;
+  background:rgba(255,255,255,.20);border:1px solid rgba(255,255,255,.38);
+  color:#fff;padding:2px 5px;font-size:8px;font-weight:1000;white-space:nowrap;
+}
+</style>
+<script id="v715A4VenueColorScript">
+(function(){
+  'use strict';
+  if(window.__v715A4VenueColorInstalled) return;
+  window.__v715A4VenueColorInstalled=true;
+  const VERSION='2026-06-11-v716-a4-venue-title-blue';
+  function $(id){return document.getElementById(id)}
+  function arr(v){return Array.isArray(v)?v:[]}
+  function clean(s){return String(s||'').replace(/\s+/g,' ').trim()}
+  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+  function toastMsg(m,t){try{if(typeof toast==='function')toast(m,t||'info');else if(typeof safeToast==='function')safeToast(m,t||'info');else console.log('[v715]',m)}catch(e){console.log('[v715]',m)}}
+  function currentTid(){return clean(($('brTS')&&$('brTS').value)||($('regTS')&&$('regTS').value)||'')}
+  function currentDivs(tid){
+    try{
+      const t=arr(window.G&&G.tournaments).find(x=>String(x.id)===String(tid));
+      const all=arr(t&&t.divisions);
+      const sel=$('brDS');
+      if(sel&&sel.value&&sel.value!=='__ALL__')return [sel.value];
+      if(Array.isArray(window.BR_MULTI_DIVS)&&window.BR_MULTI_DIVS.length&&!BR_MULTI_DIVS.includes('__ALL__'))return BR_MULTI_DIVS.filter(d=>all.includes(d));
+      const keys=Object.keys((G&&G.draws)||{}).filter(k=>k.startsWith(tid+'_')).map(k=>k.slice(String(tid).length+1));
+      return keys.length?keys:all;
+    }catch(e){return []}
+  }
+  function keysForCurrent(){const tid=currentTid(); if(!tid)return []; return currentDivs(tid).map(d=>tid+'_'+d).filter(k=>G&&G.draws&&G.draws[k]&&Array.isArray(G.draws[k].groups));}
+  function courtLabel(raw){
+    let s=clean(raw).replace(/\s+/g,''); if(!s)return '';
+    let m=s.match(/(장유중|국제|능동|원도심\(인조\)|원도심|삼계|금병|동부|클레이|하드)[가-힣()]*\d*/);
+    if(m){ let rest=s.slice(m.index+m[0].length).match(/^\d+/); return m[0]+(rest&&!/\d$/.test(m[0])?rest[0]:''); }
+    m=s.match(/(\d+)번?코트/); if(m)return m[1]+'번코트';
+    m=s.match(/코트[:：]?([A-Za-z가-힣()]*\d+)/); if(m)return m[1];
+    return s;
+  }
+  function venueOfCourt(court){
+    const s=clean(court).replace(/\s+/g,'');
+    if(/장유중|클레이/i.test(s)) return '장유중 클레이';
+    if(/원도심/i.test(s)) return '원도심(인조)';
+    if(/국제/i.test(s)) return '국제';
+    if(/능동/i.test(s)) return '능동';
+    if(/삼계/i.test(s)) return '삼계';
+    if(/금병/i.test(s)) return '금병';
+    if(/동부/i.test(s)) return '동부';
+    if(/하드/i.test(s)) return '하드';
+    return s||'미배정';
+  }
+  function venueColor(venue){
+    const v=clean(venue);
+    if(/국제/.test(v)) return '#1d4ed8';        // 국제: 코트색 계열 블루
+    if(/원도심/.test(v)) return '#047857';      // 녹색
+    if(/장유중|클레이/.test(v)) return '#b45309'; // 갈색/클레이
+    if(/능동/.test(v)) return '#1d4ed8';        // 파랑
+    if(/삼계/.test(v)) return '#7c3aed';        // 보라
+    if(/금병/.test(v)) return '#be123c';        // 진홍
+    if(/동부/.test(v)) return '#0f766e';        // 청록
+    return '#334155';
+  }
+  function courtOfMatch(m){let c=clean(m&&(m.court||m.manualCourtTarget||m.assignedCourt||m.currentCourt)); if(!c&&m&&Array.isArray(m.courts)&&m.courts[0])c=clean(m.courts[0]); return courtLabel(c)}
+  function groupMatches(key,gi){return arr(G&&G.matches&&G.matches[key]).filter(m=>m&&String(m.phase||'')==='group'&&Number(m.group)===Number(gi)&&!m.bye)}
+  function groupCourt(g,ms){let c=clean(g&&(g.court||g.manualCourt||g.manualCourtTarget||g.assignedCourt)); if(!c&&g&&Array.isArray(g.courts)&&g.courts[0])c=clean(g.courts[0]); if(!c){for(const m of ms){c=courtOfMatch(m); if(c)break;}} return courtLabel(c)}
+  function groupNo(g,gi){return Number(g&&(g.confirmedGroupNo||g.finalGroupNo||g.displayGroupNo||g.manualGroupNo||g.v702GroupNo||g.v711GroupNo||0))||gi+1}
+  function teamLabel(team){try{if(!team)return '미정'; if(typeof getIndividualPlayers==='function'){const ps=getIndividualPlayers(team).slice(0,2).map(p=>clean(p&&p.name)).filter(Boolean); if(ps.length)return ps.join(' / ');} if(Array.isArray(team.individualPlayers)){const ps=team.individualPlayers.slice(0,2).map(p=>clean((p&&p.name)||p)).filter(Boolean); if(ps.length)return ps.join(' / ');} if(Array.isArray(team.players)){const ps=team.players.slice(0,2).map(p=>clean((p&&p.name)||p)).filter(Boolean); if(ps.length)return ps.join(' / ');} return clean(team.club||team.name||team.pairLabel||team.entryLabel||'팀');}catch(e){return '팀'}}
+  function teamSub(team,name){try{const club=clean(team&&team.club); if(club&&club!==name)return club; if(Array.isArray(team&&team.individualPlayers)){return team.individualPlayers.slice(0,2).map(p=>clean(p&&p.club)).filter(Boolean).join(' · ');} return '';}catch(e){return ''}}
+  function isClayCourt(court){return /장유중|클레이|clay/i.test(clean(court));}
+  function minutesToTime(min){const h=Math.floor(min/60),m=min%60; return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');}
+  function collectItems(){
+    const out=[];
+    keysForCurrent().forEach(key=>{
+      const draw=G.draws[key]||{}; const teams=arr(G.teams&&G.teams[key]);
+      arr(draw.groups).forEach((g,gi)=>{
+        const ms=groupMatches(key,gi); const no=groupNo(g,gi); const court=groupCourt(g,ms)||'미배정'; const venue=venueOfCourt(court);
+        let ord='999999';
+        for(const m of ms){const cand=m.manualCourtPinnedAt||m.courtQueueOrder||m.courtAssignedAt||m.waitingFirstAt||m.id||''; if(cand&&String(cand)<String(ord))ord=String(cand);}
+        if(ord==='999999')ord=String(gi).padStart(4,'0');
+        const rows=arr(g.teams).map((ti,idx)=>{const t=teams[ti]; const nm=teamLabel(t); return {slot:idx+1,name:nm,sub:teamSub(t,nm)};});
+        if(rows.length)out.push({key,gi,no,court,venue,ord,color:venueColor(venue),rows});
+      });
+    });
+    out.sort((a,b)=>String(a.court||'ZZZ').localeCompare(String(b.court||'ZZZ'),'ko',{numeric:true})||String(a.ord).localeCompare(String(b.ord),'ko',{numeric:true})||a.no-b.no);
+    const cnt={};
+    out.forEach(it=>{const c=it.court||'미배정'; const start=isClayCourt(c)?600:540; const idx=cnt[c]||0; it.expectedTime=minutesToTime(start+idx*30); cnt[c]=idx+1;});
+    out.sort((a,b)=>String(a.court||'ZZZ').localeCompare(String(b.court||'ZZZ'),'ko',{numeric:true})||a.expectedTime.localeCompare(b.expectedTime)||a.no-b.no);
+    return out;
+  }
+  function buildA4(){
+    const items=collectItems(); const root=document.createElement('div'); root.className='v702-a4-sheet v714-a4-sheet v715-a4-sheet';
+    if(!items.length){root.innerHTML='<div class="v702-a4-empty">A4로 표시할 예선 대진표 데이터가 없습니다.<br>대회/부서를 선택하고 예선 조추첨 또는 수동 예선 생성이 저장되어 있는지 확인하세요.</div>'; return root;}
+    const per=40,pages=Math.ceil(items.length/per),total=items.reduce((s,it)=>s+it.rows.length,0),tid=currentTid();
+    const t=arr(G&&G.tournaments).find(x=>String(x.id)===String(tid));
+    for(let i=0;i<items.length;i+=per){
+      const chunk=items.slice(i,i+per),pno=Math.floor(i/per)+1; const page=document.createElement('div'); page.className='v702-a4-page';
+      page.innerHTML='<div class="v702-a4-title-main">'+esc((t&&t.name)||'대회')+' 예선 대진표</div><div class="v702-a4-sub">'+esc(pno+'/'+pages+'페이지 · '+items.length+'개 조 · '+total+'팀 · 예상시간 기준: 장유중/클레이 10:00, 그 외 09:00 · 코트별 30분 간격 · 구장별 타이틀 색상')+'</div><div class="v702-a4-grid">'+chunk.map(it=>'<div class="v714-a4-card" style="--v714-court-color:'+esc(it.color)+';--v715-venue-color:'+esc(it.color)+'"><div class="v714-a4-card-head"><div>'+esc(it.court+' · '+it.no+'조')+'</div><div class="v702-a4-tags"><span class="v714-a4-time">⏱ '+esc(it.expectedTime)+'</span><span class="v715-venue-tag">'+esc(it.venue)+'</span><span class="v714-a4-tag">'+esc(it.no)+'조</span></div></div><div class="v714-a4-court-strip"><span><i class="v714-a4-court-dot"></i>코트 '+esc(it.court)+'</span><span>예상 '+esc(it.expectedTime)+'</span></div><div class="v714-a4-card-body">'+it.rows.map(r=>'<div class="v714-a4-row"><div class="v714-a4-no">'+esc(r.slot)+'</div><div><div class="v714-a4-name">'+esc(r.name)+'</div>'+(r.sub?'<div class="v714-a4-meta">'+esc(r.sub)+'</div>':'')+'</div></div>').join('')+'</div></div>').join('')+'</div><div class="v702-a4-foot">230MATCH · '+esc(new Date().toLocaleString('ko-KR'))+'</div>';
+      root.appendChild(page);
+    }
+    return root;
+  }
+  let currentSheet=null;
+  function closeOldA4(){['v431A4PreviewOverlay','v566A4PreviewOverlay','v570A4PreviewOverlay','v688A4PreviewOverlay','v694A4Overlay','v698A4Overlay','v699A4Overlay','v701A4Overlay','mA4','mA4Preview','a4PreviewOverlay','groupSheetPreviewOverlay'].forEach(id=>{const el=$(id); if(el){try{el.classList.remove('open','show')}catch(e){} el.style.display='none';}})}
+  function overlay(){
+    let ov=$('v702A4Overlay');
+    if(!ov){ov=document.createElement('div'); ov.id='v702A4Overlay'; ov.innerHTML='<div class="v702-a4-box"><div class="v702-a4-head"><div>📄 A4 대진표 출력/저장</div><div class="v702-a4-actions"><button type="button" class="v702-print" id="v702PrintA4">🖨️ 출력</button><button type="button" class="v702-save" id="v702SaveA4">🖼️ 이미지 저장</button><button type="button" class="v702-close" id="v702CloseA4">닫기</button></div></div><div id="v702A4Body"></div></div>'; document.body.appendChild(ov); ov.addEventListener('click',e=>{if(e.target===ov)ov.classList.remove('show')});}
+    $('v702CloseA4').onclick=()=>ov.classList.remove('show'); $('v702PrintA4').onclick=printA4; $('v702SaveA4').onclick=saveA4; return ov;
+  }
+  window.v715BuildA4=buildA4;
+  window.v714BuildA4=buildA4;
+  window.v715OpenA4=function(){try{closeOldA4(); const ov=overlay(); const body=$('v702A4Body'); body.innerHTML=''; currentSheet=buildA4(); body.appendChild(currentSheet); ov.classList.add('show');}catch(e){console.error('[v715] A4 open failed',e); toastMsg('A4 열기 실패: '+(e.message||e),'error');}};
+  window.v714OpenA4=window.v715OpenA4;
+  window.v702OpenA4=window.v715OpenA4;
+  function printA4(){try{const sheet=(currentSheet||buildA4()).cloneNode(true); let root=$('v702PrintRoot'); if(root)root.remove(); root=document.createElement('div'); root.id='v702PrintRoot'; root.appendChild(sheet); document.body.appendChild(root); setTimeout(()=>{window.print(); setTimeout(()=>{try{root.remove()}catch(e){}},700)},120);}catch(e){toastMsg('출력 실패: '+(e.message||e),'error')}}
+  async function ensureHtml2Canvas(){if(window.html2canvas)return; await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});}
+  async function saveA4(){let holder=null; try{await ensureHtml2Canvas(); const sheet=(currentSheet||buildA4()).cloneNode(true); holder=document.createElement('div'); holder.style.cssText='position:fixed;left:-12000px;top:0;background:#fff;z-index:-1'; holder.appendChild(sheet); document.body.appendChild(holder); const pages=[...holder.querySelectorAll('.v702-a4-page')]; if(!pages.length){toastMsg('저장할 페이지가 없습니다','error');return;} for(let i=0;i<pages.length;i++){const canvas=await html2canvas(pages[i],{backgroundColor:'#fff',scale:2,useCORS:true,logging:false,width:794,height:1123,windowWidth:794,windowHeight:1123}); const blob=await new Promise(r=>canvas.toBlob(r,'image/png')); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='A4_예선대진표_구장별색상_'+String(i+1).padStart(2,'0')+'.png'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1000); await new Promise(r=>setTimeout(r,150));} toastMsg('A4 이미지 저장 완료','success');}catch(e){console.error('[v715] image save failed',e);toastMsg('이미지 저장 실패: '+(e.message||e),'error')}finally{try{holder&&holder.remove()}catch(e){}}}
+  document.addEventListener('click',function(ev){const btn=ev.target&&ev.target.closest&&ev.target.closest('button,a'); if(!btn)return; const t=clean(btn.textContent), id=btn.id||''; if(id==='v702A4Btn'||/A4|대진표 출력|조편성 출력/.test(t)){ev.preventDefault();ev.stopImmediatePropagation();window.v715OpenA4();return false;}},true);
+  setTimeout(()=>{try{const b=$('v702A4Btn'); if(b)b.onclick=e=>{e&&e.preventDefault();window.v715OpenA4();};}catch(e){}},400);
+  console.log('[v715] A4 venue color installed');
+})();
+</script>
+
+
+
+<!-- v716: A4 구장별 타이틀 간격 통일 + 국제 구장 블루 -->
+<style id="v716A4VenueTitleUniformStyle">
+/* A4 카드 타이틀 높이/간격 통일 */
+#v702A4Overlay .v714-a4-card-head,
+#v702PrintRoot .v714-a4-card-head{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) auto!important;
+  align-items:center!important;
+  gap:5px!important;
+  min-height:31px!important;
+  height:31px!important;
+  padding:5px 7px!important;
+  box-sizing:border-box!important;
+  overflow:hidden!important;
+  line-height:1!important;
+}
+#v702A4Overlay .v714-a4-card-head > div:first-child,
+#v702PrintRoot .v714-a4-card-head > div:first-child{
+  min-width:0!important;
+  display:block!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  line-height:1.05!important;
+}
+#v702A4Overlay .v702-a4-tags,
+#v702PrintRoot .v702-a4-tags{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:flex-end!important;
+  gap:3px!important;
+  flex-wrap:nowrap!important;
+  min-width:0!important;
+  white-space:nowrap!important;
+}
+/* 구장명 태그는 타이틀 안에서 중복이라 숨겨서 칸 높이와 줄바꿈을 통일 */
+#v702A4Overlay .v715-venue-tag,
+#v702PrintRoot .v715-venue-tag{
+  display:none!important;
+}
+#v702A4Overlay .v714-a4-time,
+#v702PrintRoot .v714-a4-time{
+  padding:2px 5px!important;
+  font-size:7.5px!important;
+  line-height:1!important;
+}
+#v702A4Overlay .v714-a4-tag,
+#v702PrintRoot .v714-a4-tag{
+  padding:2px 5px!important;
+  font-size:7.5px!important;
+  line-height:1!important;
+}
+</style>
+<script id="v716A4VenueTitleUniformScript">
+(function(){
+  'use strict';
+  if(window.__v716A4VenueTitleUniformInstalled) return;
+  window.__v716A4VenueTitleUniformInstalled=true;
+  function fixInternationalBlue(root){
+    try{
+      (root||document).querySelectorAll('.v714-a4-card').forEach(card=>{
+        const h=card.querySelector('.v714-a4-card-head');
+        const txt=(h&&h.textContent||'').replace(/\s+/g,' ');
+        if(/국제\s*\d*|국제/.test(txt)){
+          card.style.setProperty('--v715-venue-color','#1d4ed8');
+          card.style.setProperty('--v714-court-color','#1d4ed8');
+        }
+      });
+    }catch(e){}
+  }
+  const oldOpen=window.v715OpenA4||window.v714OpenA4||window.v702OpenA4;
+  if(typeof oldOpen==='function'){
+    window.v716OpenA4=function(){
+      const r=oldOpen.apply(this,arguments);
+      setTimeout(()=>fixInternationalBlue(document.getElementById('v702A4Overlay')||document),0);
+      setTimeout(()=>fixInternationalBlue(document.getElementById('v702A4Overlay')||document),250);
+      return r;
+    };
+    window.v715OpenA4=window.v716OpenA4;
+    window.v714OpenA4=window.v716OpenA4;
+    window.v702OpenA4=window.v716OpenA4;
+  }
+  document.addEventListener('click',function(ev){
+    const b=ev.target&&ev.target.closest&&ev.target.closest('button,a');
+    if(!b) return;
+    const t=(b.textContent||'').replace(/\s+/g,' ');
+    if(/A4|대진표 출력|조편성 출력/.test(t)){
+      setTimeout(()=>fixInternationalBlue(document.getElementById('v702A4Overlay')||document),80);
+      setTimeout(()=>fixInternationalBlue(document.getElementById('v702A4Overlay')||document),400);
+    }
+  },true);
+  setTimeout(()=>fixInternationalBlue(document),600);
+  console.log('[v716] A4 venue title uniform + international blue installed');
 })();
 </script>
 
