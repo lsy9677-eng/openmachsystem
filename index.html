@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-11-v716-a4-venue-title-blue";
+  const APP_VERSION = "2026-06-11-v717-a4-single-group-label";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -47283,7 +47283,7 @@ button[onclick*="__hardClearAppCacheAndReload"],button[onclick*="캐시"],button
   'use strict';
   if(window.__v712PrelimSortTeamLabelInstalled) return;
   window.__v712PrelimSortTeamLabelInstalled=true;
-  const VERSION='2026-06-11-v716-a4-venue-title-blue';
+  const VERSION='2026-06-11-v717-a4-single-group-label';
   const STORE_KEY='V712_PRELIM_SORT_MODE';
   function clean(s){return String(s==null?'':s).replace(/\s+/g,' ').trim();}
   function getMode(){try{return localStorage.getItem(STORE_KEY)||'asc';}catch(e){return 'asc';}}
@@ -47489,7 +47489,7 @@ button[onclick*="__hardClearAppCacheAndReload"],button[onclick*="캐시"],button
 (function(){
   'use strict';
   if(window.__v714A4TimeCourtColorInstalled) return; window.__v714A4TimeCourtColorInstalled=true;
-  const VERSION='2026-06-11-v716-a4-venue-title-blue';
+  const VERSION='2026-06-11-v717-a4-single-group-label';
   const palette=['#0f1e3a','#1d4ed8','#047857','#b45309','#7c3aed','#be123c','#0f766e','#4338ca','#15803d','#c2410c','#0369a1','#6d28d9'];
   function $(id){return document.getElementById(id)}
   function arr(v){return Array.isArray(v)?v:[]}
@@ -47510,7 +47510,7 @@ button[onclick*="__hardClearAppCacheAndReload"],button[onclick*="캐시"],button
   function isClayCourt(court){return /장유중|클레이|clay/i.test(clean(court));}
   function minutesToTime(min){const h=Math.floor(min/60),m=min%60; return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');}
   function collectItems(){const out=[]; keysForCurrent().forEach(key=>{const draw=G.draws[key]||{}; const teams=arr(G.teams&&G.teams[key]); arr(draw.groups).forEach((g,gi)=>{const ms=groupMatches(key,gi); const no=groupNo(g,gi); const court=groupCourt(g,ms)||'미배정'; let ord='999999'; for(const m of ms){const cand=m.manualCourtPinnedAt||m.courtQueueOrder||m.courtAssignedAt||m.waitingFirstAt||m.id||''; if(cand&&String(cand)<String(ord))ord=String(cand);} if(ord==='999999')ord=String(gi).padStart(4,'0'); const rows=arr(g.teams).map((ti,idx)=>{const t=teams[ti]; const nm=teamLabel(t); return {slot:idx+1,name:nm,sub:teamSub(t,nm)};}); if(rows.length)out.push({key,gi,no,court,ord,color:hashColor(court),rows});});}); out.sort((a,b)=>String(a.court||'ZZZ').localeCompare(String(b.court||'ZZZ'),'ko',{numeric:true})||String(a.ord).localeCompare(String(b.ord),'ko',{numeric:true})||a.no-b.no); const cnt={}; out.forEach(it=>{const c=it.court||'미배정'; const start=isClayCourt(c)?600:540; const idx=cnt[c]||0; it.expectedTime=minutesToTime(start+idx*30); cnt[c]=idx+1;}); out.sort((a,b)=>String(a.court||'ZZZ').localeCompare(String(b.court||'ZZZ'),'ko',{numeric:true})||a.expectedTime.localeCompare(b.expectedTime)||a.no-b.no); return out;}
-  function buildA4(){const items=collectItems(); const root=document.createElement('div'); root.className='v702-a4-sheet v714-a4-sheet'; if(!items.length){root.innerHTML='<div class="v702-a4-empty">A4로 표시할 예선 대진표 데이터가 없습니다.<br>대회/부서를 선택하고 예선 조추첨 또는 수동 예선 생성이 저장되어 있는지 확인하세요.</div>'; return root;} const per=40,pages=Math.ceil(items.length/per),total=items.reduce((s,it)=>s+it.rows.length,0),tid=currentTid(); const t=arr(G&&G.tournaments).find(x=>String(x.id)===String(tid)); for(let i=0;i<items.length;i+=per){const chunk=items.slice(i,i+per),pno=Math.floor(i/per)+1; const page=document.createElement('div'); page.className='v702-a4-page'; page.innerHTML='<div class="v702-a4-title-main">'+esc((t&&t.name)||'대회')+' 예선 대진표</div><div class="v702-a4-sub">'+esc(pno+'/'+pages+'페이지 · '+items.length+'개 조 · '+total+'팀 · 예상시간 기준: 장유중/클레이 10:00, 그 외 09:00 · 코트별 30분 간격')+'</div><div class="v702-a4-grid">'+chunk.map(it=>'<div class="v714-a4-card" style="--v714-court-color:'+esc(it.color)+'"><div class="v714-a4-card-head"><div>'+esc(it.court+' · '+it.no+'조')+'</div><div class="v702-a4-tags"><span class="v714-a4-time">⏱ '+esc(it.expectedTime)+'</span><span class="v714-a4-tag">'+esc(it.no)+'조</span></div></div><div class="v714-a4-court-strip"><span><i class="v714-a4-court-dot"></i>코트 '+esc(it.court)+'</span><span>예상 '+esc(it.expectedTime)+'</span></div><div class="v714-a4-card-body">'+it.rows.map(r=>'<div class="v714-a4-row"><div class="v714-a4-no">'+esc(r.slot)+'</div><div><div class="v714-a4-name">'+esc(r.name)+'</div>'+(r.sub?'<div class="v714-a4-meta">'+esc(r.sub)+'</div>':'')+'</div></div>').join('')+'</div></div>').join('')+'</div><div class="v702-a4-foot">230MATCH · '+esc(new Date().toLocaleString('ko-KR'))+'</div>'; root.appendChild(page);} return root;}
+  function buildA4(){const items=collectItems(); const root=document.createElement('div'); root.className='v702-a4-sheet v714-a4-sheet'; if(!items.length){root.innerHTML='<div class="v702-a4-empty">A4로 표시할 예선 대진표 데이터가 없습니다.<br>대회/부서를 선택하고 예선 조추첨 또는 수동 예선 생성이 저장되어 있는지 확인하세요.</div>'; return root;} const per=40,pages=Math.ceil(items.length/per),total=items.reduce((s,it)=>s+it.rows.length,0),tid=currentTid(); const t=arr(G&&G.tournaments).find(x=>String(x.id)===String(tid)); for(let i=0;i<items.length;i+=per){const chunk=items.slice(i,i+per),pno=Math.floor(i/per)+1; const page=document.createElement('div'); page.className='v702-a4-page'; page.innerHTML='<div class="v702-a4-title-main">'+esc((t&&t.name)||'대회')+' 예선 대진표</div><div class="v702-a4-sub">'+esc(pno+'/'+pages+'페이지 · '+items.length+'개 조 · '+total+'팀 · 예상시간 기준: 장유중/클레이 10:00, 그 외 09:00 · 코트별 30분 간격')+'</div><div class="v702-a4-grid">'+chunk.map(it=>'<div class="v714-a4-card" style="--v714-court-color:'+esc(it.color)+'"><div class="v714-a4-card-head"><div>'+esc(it.court+' · '+it.no+'조')+'</div><div class="v702-a4-tags"><span class="v714-a4-time">⏱ '+esc(it.expectedTime)+'</span></div></div><div class="v714-a4-court-strip"><span><i class="v714-a4-court-dot"></i>코트 '+esc(it.court)+'</span><span>예상 '+esc(it.expectedTime)+'</span></div><div class="v714-a4-card-body">'+it.rows.map(r=>'<div class="v714-a4-row"><div class="v714-a4-no">'+esc(r.slot)+'</div><div><div class="v714-a4-name">'+esc(r.name)+'</div>'+(r.sub?'<div class="v714-a4-meta">'+esc(r.sub)+'</div>':'')+'</div></div>').join('')+'</div></div>').join('')+'</div><div class="v702-a4-foot">230MATCH · '+esc(new Date().toLocaleString('ko-KR'))+'</div>'; root.appendChild(page);} return root;}
   let currentSheet=null;
   function closeOldA4(){['v431A4PreviewOverlay','v566A4PreviewOverlay','v570A4PreviewOverlay','v688A4PreviewOverlay','v694A4Overlay','v698A4Overlay','v699A4Overlay','v701A4Overlay','mA4','mA4Preview','a4PreviewOverlay','groupSheetPreviewOverlay'].forEach(id=>{const el=$(id); if(el){try{el.classList.remove('open','show')}catch(e){} el.style.display='none';}})}
   function overlay(){let ov=$('v702A4Overlay'); if(!ov){ov=document.createElement('div'); ov.id='v702A4Overlay'; ov.innerHTML='<div class="v702-a4-box"><div class="v702-a4-head"><div>📄 A4 대진표 출력/저장</div><div class="v702-a4-actions"><button type="button" class="v702-print" id="v702PrintA4">🖨️ 출력</button><button type="button" class="v702-save" id="v702SaveA4">🖼️ 이미지 저장</button><button type="button" class="v702-close" id="v702CloseA4">닫기</button></div></div><div id="v702A4Body"></div></div>'; document.body.appendChild(ov); ov.addEventListener('click',e=>{if(e.target===ov)ov.classList.remove('show')});} $('v702CloseA4').onclick=()=>ov.classList.remove('show'); $('v702PrintA4').onclick=printA4; $('v702SaveA4').onclick=saveA4; return ov;}
@@ -47550,7 +47550,7 @@ button[onclick*="__hardClearAppCacheAndReload"],button[onclick*="캐시"],button
   'use strict';
   if(window.__v715A4VenueColorInstalled) return;
   window.__v715A4VenueColorInstalled=true;
-  const VERSION='2026-06-11-v716-a4-venue-title-blue';
+  const VERSION='2026-06-11-v717-a4-single-group-label';
   function $(id){return document.getElementById(id)}
   function arr(v){return Array.isArray(v)?v:[]}
   function clean(s){return String(s||'').replace(/\s+/g,' ').trim()}
@@ -47634,7 +47634,7 @@ button[onclick*="__hardClearAppCacheAndReload"],button[onclick*="캐시"],button
     const t=arr(G&&G.tournaments).find(x=>String(x.id)===String(tid));
     for(let i=0;i<items.length;i+=per){
       const chunk=items.slice(i,i+per),pno=Math.floor(i/per)+1; const page=document.createElement('div'); page.className='v702-a4-page';
-      page.innerHTML='<div class="v702-a4-title-main">'+esc((t&&t.name)||'대회')+' 예선 대진표</div><div class="v702-a4-sub">'+esc(pno+'/'+pages+'페이지 · '+items.length+'개 조 · '+total+'팀 · 예상시간 기준: 장유중/클레이 10:00, 그 외 09:00 · 코트별 30분 간격 · 구장별 타이틀 색상')+'</div><div class="v702-a4-grid">'+chunk.map(it=>'<div class="v714-a4-card" style="--v714-court-color:'+esc(it.color)+';--v715-venue-color:'+esc(it.color)+'"><div class="v714-a4-card-head"><div>'+esc(it.court+' · '+it.no+'조')+'</div><div class="v702-a4-tags"><span class="v714-a4-time">⏱ '+esc(it.expectedTime)+'</span><span class="v715-venue-tag">'+esc(it.venue)+'</span><span class="v714-a4-tag">'+esc(it.no)+'조</span></div></div><div class="v714-a4-court-strip"><span><i class="v714-a4-court-dot"></i>코트 '+esc(it.court)+'</span><span>예상 '+esc(it.expectedTime)+'</span></div><div class="v714-a4-card-body">'+it.rows.map(r=>'<div class="v714-a4-row"><div class="v714-a4-no">'+esc(r.slot)+'</div><div><div class="v714-a4-name">'+esc(r.name)+'</div>'+(r.sub?'<div class="v714-a4-meta">'+esc(r.sub)+'</div>':'')+'</div></div>').join('')+'</div></div>').join('')+'</div><div class="v702-a4-foot">230MATCH · '+esc(new Date().toLocaleString('ko-KR'))+'</div>';
+      page.innerHTML='<div class="v702-a4-title-main">'+esc((t&&t.name)||'대회')+' 예선 대진표</div><div class="v702-a4-sub">'+esc(pno+'/'+pages+'페이지 · '+items.length+'개 조 · '+total+'팀 · 예상시간 기준: 장유중/클레이 10:00, 그 외 09:00 · 코트별 30분 간격 · 구장별 타이틀 색상')+'</div><div class="v702-a4-grid">'+chunk.map(it=>'<div class="v714-a4-card" style="--v714-court-color:'+esc(it.color)+';--v715-venue-color:'+esc(it.color)+'"><div class="v714-a4-card-head"><div>'+esc(it.court+' · '+it.no+'조')+'</div><div class="v702-a4-tags"><span class="v714-a4-time">⏱ '+esc(it.expectedTime)+'</span><span class="v715-venue-tag">'+esc(it.venue)+'</span></div></div><div class="v714-a4-court-strip"><span><i class="v714-a4-court-dot"></i>코트 '+esc(it.court)+'</span><span>예상 '+esc(it.expectedTime)+'</span></div><div class="v714-a4-card-body">'+it.rows.map(r=>'<div class="v714-a4-row"><div class="v714-a4-no">'+esc(r.slot)+'</div><div><div class="v714-a4-name">'+esc(r.name)+'</div>'+(r.sub?'<div class="v714-a4-meta">'+esc(r.sub)+'</div>':'')+'</div></div>').join('')+'</div></div>').join('')+'</div><div class="v702-a4-foot">230MATCH · '+esc(new Date().toLocaleString('ko-KR'))+'</div>';
       root.appendChild(page);
     }
     return root;
@@ -47755,6 +47755,120 @@ button[onclick*="__hardClearAppCacheAndReload"],button[onclick*="캐시"],button
   },true);
   setTimeout(()=>fixInternationalBlue(document),600);
   console.log('[v716] A4 venue title uniform + international blue installed');
+})();
+</script>
+
+
+<!-- v717: A4 조번호 중복 배지 제거 + 타이틀 여백 확보 -->
+<style id="v717A4SingleGroupLabelStyle">
+#v702A4Overlay .v714-a4-tag,
+#v702PrintRoot .v714-a4-tag{
+  display:none !important;
+}
+#v702A4Overlay .v714-a4-card-head,
+#v702PrintRoot .v714-a4-card-head{
+  display:flex !important;
+  align-items:center !important;
+  justify-content:space-between !important;
+  gap:5px !important;
+  min-height:24px !important;
+  padding:5px 7px !important;
+}
+#v702A4Overlay .v714-a4-card-head > div:first-child,
+#v702PrintRoot .v714-a4-card-head > div:first-child{
+  flex:1 1 auto !important;
+  min-width:0 !important;
+  white-space:nowrap !important;
+  overflow:hidden !important;
+  text-overflow:ellipsis !important;
+  line-height:1.15 !important;
+}
+#v702A4Overlay .v702-a4-tags,
+#v702PrintRoot .v702-a4-tags{
+  flex:0 0 auto !important;
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:flex-end !important;
+  gap:4px !important;
+  min-width:auto !important;
+}
+#v702A4Overlay .v714-a4-time,
+#v702PrintRoot .v714-a4-time{
+  min-width:42px !important;
+  padding:2px 6px !important;
+  font-size:8px !important;
+  line-height:1.15 !important;
+}
+</style>
+<script id="v717A4SingleGroupLabelScript">
+(function(){
+  'use strict';
+  if(window.__v717A4SingleGroupLabelInstalled) return;
+  window.__v717A4SingleGroupLabelInstalled=true;
+
+  function cleanA4GroupBadges(root){
+    try{
+      (root||document).querySelectorAll('.v714-a4-tag').forEach(el=>el.remove());
+      (root||document).querySelectorAll('.v714-a4-card-head').forEach(head=>{
+        const title=head.children && head.children[0];
+        if(title){
+          title.style.setProperty('flex','1 1 auto','important');
+          title.style.setProperty('min-width','0','important');
+          title.style.setProperty('white-space','nowrap','important');
+          title.style.setProperty('overflow','hidden','important');
+          title.style.setProperty('text-overflow','ellipsis','important');
+        }
+        const tags=head.querySelector('.v702-a4-tags');
+        if(tags){
+          tags.querySelectorAll('.v714-a4-tag').forEach(el=>el.remove());
+          tags.style.setProperty('flex','0 0 auto','important');
+        }
+      });
+    }catch(e){}
+  }
+
+  function wrapOpen(name){
+    const old=window[name];
+    if(typeof old==='function' && !old.__v717Wrapped){
+      const w=function(){
+        const r=old.apply(this, arguments);
+        setTimeout(()=>cleanA4GroupBadges(document.getElementById('v702A4Overlay')||document),0);
+        setTimeout(()=>cleanA4GroupBadges(document.getElementById('v702A4Overlay')||document),150);
+        setTimeout(()=>cleanA4GroupBadges(document),450);
+        return r;
+      };
+      w.__v717Wrapped=true;
+      w.__v717Old=old;
+      window[name]=w;
+    }
+  }
+  ['v715OpenA4','v716OpenA4','v714OpenA4','v702OpenA4'].forEach(wrapOpen);
+
+  const oldBuild=window.v714BuildA4||window.v715BuildA4;
+  if(typeof oldBuild==='function' && !oldBuild.__v717Wrapped){
+    const b=function(){
+      const r=oldBuild.apply(this, arguments);
+      cleanA4GroupBadges(r);
+      return r;
+    };
+    b.__v717Wrapped=true;
+    b.__v717Old=oldBuild;
+    window.v714BuildA4=b;
+    window.v715BuildA4=b;
+  }
+
+  document.addEventListener('click',function(ev){
+    const b=ev.target&&ev.target.closest&&ev.target.closest('button,a');
+    if(!b) return;
+    const t=(b.textContent||'').replace(/\s+/g,' ');
+    if(/A4|대진표 출력|조편성 출력|이미지 저장|출력/.test(t)){
+      setTimeout(()=>cleanA4GroupBadges(document),80);
+      setTimeout(()=>cleanA4GroupBadges(document),350);
+    }
+  },true);
+
+  setTimeout(()=>cleanA4GroupBadges(document),600);
+  console.log('[v717] A4 duplicate group badge removed');
 })();
 </script>
 
