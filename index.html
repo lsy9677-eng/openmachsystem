@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-11-v727-member-result-participant-gate";
+  const APP_VERSION = "2026-06-11-v728-member-result-participant-gate";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -49055,6 +49055,370 @@ button[onclick*="__hardClearAppCacheAndReload"],button[onclick*="캐시"],button
   function wrapRender(){var fn=window.renderBracket;if(typeof fn==='function'&&!fn.__v727Wrapped){var w=function(){var r=fn.apply(this,arguments);schedule();return r;};w.__v727Wrapped=true;window.renderBracket=w;}}
   function start(){wrapRender();schedule();try{new MutationObserver(function(){wrapRender();schedule();}).observe(document.body,{childList:true,subtree:true});}catch(e){}}
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start); else start();
+})();
+</script>
+
+<!-- v728: 예선 수동배정 전용 - 항상 코트순 재번호 + 자동배정 완전삭제 + 잠금 후 고정유지 -->
+<script id="v728ManualPrelimCourtLockScript">
+(function(){
+  'use strict';
+  if(window.__v728ManualPrelimInstalled) return;
+  window.__v728ManualPrelimInstalled=true;
+  const VER='2026-06-11-v728-manual-prelim-court-lock';
+
+  /* ── 헬퍼 ── */
+  function log(){console.log.apply(console,['[v728]'].concat(Array.prototype.slice.call(arguments)));}
+  function warn(){console.warn.apply(console,['[v728]'].concat(Array.prototype.slice.call(arguments)));}
+  function toast(m,t){try{if(typeof window.toast==='function')window.toast(m,t||'info');else if(typeof window.safeToast==='function')window.safeToast(m,t||'info');else alert(m);}catch(e){}}
+  function sl(v){try{if(typeof window.showLoading==='function')window.showLoading(v);}catch(e){}}
+  function arr(x){return Array.isArray(x)?x:[];}
+  function G(){return window.G||{};}
+  function currentTid(){try{return window.currentTid&&typeof window.currentTid==='function'?window.currentTid():(window._currentTid||window.__currentTid||'');}catch(e){return '';}}
+  function currentDiv(){try{return window.currentDiv&&typeof window.currentDiv==='function'?window.currentDiv():(window._currentDiv||window.__currentDiv||'');}catch(e){return '';}}
+  function keysForCurrent(){
+    try{
+      const tid=currentTid(); if(!tid) return [];
+      const div=currentDiv();
+      if(div){return [tid+'_'+div];}
+      return Object.keys((window.G&&window.G.draws)||{}).filter(k=>k.startsWith(tid+'_'));
+    }catch(e){return [];}
+  }
+  function groupMatches(key,gi){
+    try{const ms=arr((window.G&&window.G.matches&&window.G.matches[key])||[]);return ms.filter(m=>Number(m.group)===gi&&m.phase==='group');}catch(e){return [];}
+  }
+  function groupCourt(g,ms){
+    const c=String(g.court||g.manualCourt||g.manualCourtTarget||'').trim();
+    if(c) return c;
+    for(const m of ms){const mc=String(m.court||m.manualCourtTarget||'').trim();if(mc) return mc;}
+    return '';
+  }
+  async function saveKey(key){
+    try{
+      if(window.__FB_WRITE_CACHE){try{if(window.__FB_WRITE_CACHE.draws)delete window.__FB_WRITE_CACHE.draws[key];if(window.__FB_WRITE_CACHE.matches)delete window.__FB_WRITE_CACHE.matches[key];}catch(e){}}
+      if(typeof window.stD==='function') await window.stD(key);
+      if(typeof window.stM==='function') await window.stM(key);
+      try{if(typeof window.waitForPendingWrites==='function'&&typeof window.db!=='undefined') await window.waitForPendingWrites(window.db);}catch(e){}
+    }catch(e){warn('saveKey failed',key,e);}
+  }
+  function clearCache(){try{if(typeof window.clearBundleCache==='function')window.clearBundleCache(currentTid());}catch(e){}}
+
+  /* ── 1. 예선 자동배정 함수들 완전 차단 (stub 교체) ── */
+  const PRELIM_AUTO_ASSIGN_NAMES=[
+    'applyCourtAssignmentToDraw',
+    'assignPrelimCourtsEvenly','applyPrelimCourtBlockDistribution',
+    'applyPrelimCourtConditions','applyPrelimCourtOrderBlockFix',
+    'rebalancePrelimGroupCourts','rebuildIndividualAutoCourtAssignmentsForKey',
+    'ensureIndividualAutoCourtAssignmentsForKey',
+    'restorePrelimMatchesFromDraw','recreateGroupMatchesFromDraw',
+    'buildFreshGroupMatchesFromDraw','forceApplyAfterDraw',
+    'applyAllAfterIndividualPrelim',
+    'scheduleAutoCourtAssignmentSave',
+    'resetWrongAutoManualFields','clearAutoManualFlags'
+  ];
+  function stubAutoAssign(){
+    PRELIM_AUTO_ASSIGN_NAMES.forEach(function(n){
+      try{
+        var old=window[n];
+        if(old&&old.__v728Stubbed) return;
+        var stub=function(){
+          // applyCourtAssignmentToDraw는 {} 반환해야 draw 생성이 안 깨짐
+          if(n==='applyCourtAssignmentToDraw') return {};
+          return false;
+        };
+        stub.__v728Stubbed=true; stub.__v728Old=old;
+        window[n]=stub;
+        try{eval(n+'=window["'+n+'"]');}catch(e){}
+      }catch(e){}
+    });
+  }
+  stubAutoAssign();
+  // 1초 후 재확인 (다른 패치가 복원하는 경우 대비)
+  setTimeout(stubAutoAssign,1200);
+  setTimeout(stubAutoAssign,3500);
+
+  /* ── 2. 예선 조번호 재번호 핵심 함수 ── */
+  // 코트 이름 → (코트번호, 코트명) 정렬용 키
+  function courtSortKey(courtStr){
+    var s=String(courtStr||'').trim();
+    if(!s||s==='ZZZ') return {n:9999,s:'ZZZ'};
+    var m=s.match(/(\d+)/); return {n:m?parseInt(m[1],10):9999, s:s};
+  }
+
+  // 현재 코트 배정 순서로 그룹 정렬 (코트번호 오름차순 → 같은코트 내 배정시간 오름차순)
+  function getGroupOrderedByCourt(key){
+    var draw=(window.G&&window.G.draws&&window.G.draws[key])||{};
+    var groups=arr(draw.groups);
+    return groups.map(function(g,gi){
+      var ms=groupMatches(key,gi);
+      var court=groupCourt(g,ms);
+      // 배정시간: 가장 이른 경기의 courtQueueOrder/courtAssignedAt/manualCourtPinnedAt
+      var ord='999999';
+      ms.forEach(function(m){
+        var cand=String(m.manualCourtPinnedAt||m.courtQueueOrder||m.courtAssignedAt||m.waitingFirstAt||'');
+        if(cand&&cand<ord) ord=cand;
+      });
+      if(ord==='999999') ord=String(gi).padStart(5,'0');
+      return {g:g,gi:gi,ms:ms,court:court,ord:ord,ck:courtSortKey(court)};
+    }).sort(function(a,b){
+      // 1차: 코트 번호 오름차순
+      if(a.ck.n!==b.ck.n) return a.ck.n-b.ck.n;
+      // 2차: 코트 이름 사전순
+      if(a.ck.s!==b.ck.s) return a.ck.s.localeCompare(b.ck.s,'ko',{numeric:true});
+      // 3차: 배정 순서(시간) 오름차순
+      return a.ord.localeCompare(b.ord,'ko',{numeric:true})||a.gi-b.gi;
+    });
+  }
+
+  /* ── 3. 🔒 조번호확정+코트잠금 완전 재구현 ──
+      - already 조건 제거: 항상 코트순으로 1번부터 새로 번호 부여
+      - 잠금 후 snapshot 저장 → 이후 polling/렌더링 시 자동 재적용
+  */
+  window.v728FinalizeCourtOrder=async function(){
+    if(typeof window.isManager==='function'&&!window.isManager()){
+      toast('관리자/운영자/진행자만 사용할 수 있습니다','error'); return false;
+    }
+    var keys=keysForCurrent();
+    if(!keys.length){toast('대회/부서를 선택하거나 예선 조를 먼저 생성하세요','error'); return false;}
+    if(!confirm('현재 코트 배정 순서대로 조번호를 재부여하고 잠급니다.\n\n1코트 순서대로 1조, 2조, 3조 → 2코트 순서대로 4조, 5조...\n\n이미 잠겨 있어도 항상 현재 코트 순서로 새로 번호를 매깁니다.\n계속할까요?')) return false;
+    try{
+      sl(true);
+      var grandTotal=0;
+      for(var ki=0;ki<keys.length;ki++){
+        var key=keys[ki];
+        var draw=(window.G&&window.G.draws&&window.G.draws[key]);
+        if(!draw) continue;
+        var ordered=getGroupOrderedByCourt(key);
+        var snap={lockedAt:new Date().toISOString(),version:VER,groups:{}};
+        var next=1;
+        ordered.forEach(function(item){
+          var no=next++;  // ← always reassign (no "already" shortcut)
+          var court=item.court||'';
+          // group 객체 갱신
+          item.g.confirmedGroupNo=no; item.g.finalGroupNo=no;
+          item.g.displayGroupNo=no;  item.g.manualGroupNo=no;
+          item.g.v702GroupNo=no;     item.g.v728GroupNo=no;
+          item.g.courtLocked=true;   item.g.v702CourtLocked=true;
+          item.g.v702AutoBlocked=true; item.g.v728Locked=true;
+          if(court){
+            item.g.courts=[court]; item.g.court=court;
+            item.g.manualCourt=court; item.g.manualCourtTarget=court;
+          }
+          snap.groups[item.gi]={no:no,court:court,sourceGi:item.gi};
+          // 경기 갱신
+          item.ms.forEach(function(m){
+            m.groupNo=no; m.confirmedGroupNo=no; m.finalGroupNo=no;
+            m.displayGroupNo=no; m.v702GroupNo=no; m.v728GroupNo=no;
+            m.manualCourtLocked=true; m.v702CourtLocked=true;
+            m.v702SnapshotLocked=true; m.v702AutoBlocked=true; m.v728Locked=true;
+            if(court){m.court=court; m.courts=[court]; m.manualCourtTarget=court;}
+            m.initialPrelimAutoCourt=false; m.v728LockedAt=snap.lockedAt;
+            grandTotal++;
+          });
+        });
+        // draw 잠금 플래그 세트 (v702/v711 호환)
+        draw.v702Locked=true; draw.v702LockedAt=snap.lockedAt;
+        draw.v702AutoBlocked=true; draw.v711Locked=true;
+        draw.v728Locked=true; draw.v728LockedAt=snap.lockedAt;
+        // snapshot 저장 (모든 버전 키에 동일 저장)
+        draw.v702Snapshot=snap; draw.v701Snapshot=snap;
+        draw.v700Snapshot=snap; draw.v697CourtSnapshot=snap;
+        draw.v728Snapshot=snap;
+        // 캐시 무효화 후 서버 저장
+        if(window.__FB_WRITE_CACHE){
+          try{if(window.__FB_WRITE_CACHE.draws)delete window.__FB_WRITE_CACHE.draws[key];}catch(e){}
+          try{if(window.__FB_WRITE_CACHE.matches)delete window.__FB_WRITE_CACHE.matches[key];}catch(e){}
+        }
+        await saveKey(key);
+      }
+      clearCache();
+      sl(false);
+      stubAutoAssign(); // 저장 후 재차단
+      try{if(typeof window.renderBracket==='function') window.renderBracket();}catch(e){}
+      toast('✅ 조번호 확정+코트잠금 완료: '+grandTotal+'경기 저장. 자동배정 차단됨.','success');
+      log('finalize done, total matches locked:',grandTotal);
+      return true;
+    }catch(e){
+      sl(false);
+      warn('v728FinalizeCourtOrder failed',e);
+      toast('잠금 실패: '+(e.message||e),'error');
+      return false;
+    }
+  };
+
+  /* ── 4. v711 normalizeLockedLabels 패치 ──
+     v711이 잠금 후 normalizeLockedLabels()를 호출해서
+     "locked && oldNo > 0 → 기존 번호 유지" 로직으로 v728 새 번호를 덮어씀.
+     → v728이 이미 번호를 부여한 경우에는 항상 새 번호(confirmedGroupNo)를 그대로 사용.
+  */
+  function patchV711Normalize(){
+    // v711 스크립트 내부 함수라 window에 없음. wrapper IIFE 실행 전 window 스코프에 없으므로
+    // v702FinalizeGroupNoAndCourtLock 래퍼가 normalizeSaveAllCurrentKeys를 호출하는 걸
+    // 우리가 직접 window.normalizeSaveAllCurrentKeys를 교체해서 막는다.
+    // (v711 IIFE 안 함수라 직접 접근 불가 → v702 래퍼 자체를 교체)
+    try{
+      var cur=window.v702FinalizeGroupNoAndCourtLock;
+      if(!cur||cur.__v728Override) return;
+      // v711 래퍼(__v711Wrapped)든 아니든 완전히 v728 함수로 교체
+      var fn=window.v728FinalizeCourtOrder;
+      fn.__v728Override=true;
+      window.v702FinalizeGroupNoAndCourtLock=fn;
+      try{eval('v702FinalizeGroupNoAndCourtLock=window["v702FinalizeGroupNoAndCourtLock"]');}catch(e){}
+    }catch(e){}
+  }
+
+  /* ── 5. 기존 잠금 버튼들을 v728 함수로 교체 ── */
+  function overrideLockFunctions(){
+    var LOCK_NAMES=[
+      'v702FinalizeGroupNoAndCourtLock',
+      'v701FinalizeGroupNoAndCourtLock','v700FinalizeGroupNoAndCourtLock',
+      'v697FinalizeGroupNoAndCourtLock','v696LockCurrentCourts',
+      'v694FinalizeCurrentCourtOrder','v693FinalizeGroupOrder',
+      'v626FinalizeGroupOrder','v606FinalizeGroupOrder',
+      'v650OpenManualGroupNoBulkCurrent','v650OpenManualGroupNoBulk',
+      'v606FinalizeGroupOrderForKey'
+    ];
+    var fn=window.v728FinalizeCourtOrder;
+    fn.__v728Override=true;
+    LOCK_NAMES.forEach(function(n){
+      try{
+        window[n]=fn;
+        try{eval(n+'=window["'+n+'"]');}catch(e){}
+      }catch(e){}
+    });
+  }
+  // v711보다 나중에 실행되도록 충분히 지연
+  setTimeout(overrideLockFunctions,100);
+  setTimeout(overrideLockFunctions,800);
+  setTimeout(overrideLockFunctions,2500);
+  setTimeout(patchV711Normalize,150);
+  setTimeout(patchV711Normalize,900);
+  setTimeout(patchV711Normalize,2600);
+
+  /* ── 6. 툴바 버튼 및 클릭 이벤트 강화 ── */
+  function patchToolbarButtons(){
+    try{
+      var lockBtn=document.getElementById('v702LockBtn');
+      if(lockBtn&&!lockBtn.__v728Patched){
+        lockBtn.__v728Patched=true;
+        lockBtn.onclick=function(e){e.preventDefault();e.stopImmediatePropagation();window.v728FinalizeCourtOrder();return false;};
+        lockBtn.textContent='🔒 조번호확정+코트잠금';
+      }
+    }catch(e){}
+  }
+  // 클릭 이벤트 캡처링으로 조번호 잠금 버튼 클릭을 v728로 라우팅
+  document.addEventListener('click',function(ev){
+    try{
+      var btn=ev.target&&ev.target.closest&&ev.target.closest('button,.btn');
+      if(!btn) return;
+      var id=btn.id||'';
+      var t=(btn.textContent||'').replace(/\s+/g,' ').trim();
+      if(id==='v702LockBtn'||/조번호.*코트잠금|코트잠금|조번호.*확정/.test(t)){
+        ev.preventDefault(); ev.stopImmediatePropagation();
+        window.v728FinalizeCourtOrder();
+        return false;
+      }
+    }catch(e){}
+  },true);  // capture=true: 다른 핸들러보다 먼저 실행
+
+  /* ── 6. polling/renderBracket 후 snapshot 재적용 강화 ── */
+  // v702 reapplyLockedSnapshots가 이미 있지만 v728 snapshot도 처리
+  function v728ReapplySnapshots(){
+    try{
+      var draws=(window.G&&window.G.draws)||{};
+      Object.keys(draws).forEach(function(key){
+        var d=draws[key];
+        var snap=d&&(d.v728Snapshot||d.v702Snapshot||d.v701Snapshot||d.v700Snapshot||d.v697CourtSnapshot);
+        if(!snap||!snap.groups) return;
+        var groups=arr(d.groups);
+        Object.keys(snap.groups).forEach(function(oldGi){
+          var s=snap.groups[oldGi];
+          var gi=Number(oldGi);
+          var g=groups[gi]; if(!g) return;
+          var no=Number(s.no||0);
+          var court=String(s.court||'').trim();
+          if(no>0){
+            g.confirmedGroupNo=no; g.finalGroupNo=no;
+            g.displayGroupNo=no;  g.manualGroupNo=no;
+            g.v702GroupNo=no;     g.v728GroupNo=no;
+          }
+          if(court){
+            g.courts=[court]; g.court=court;
+            g.manualCourt=court; g.manualCourtTarget=court;
+            g.courtLocked=true; g.v702CourtLocked=true;
+          }
+          groupMatches(key,gi).forEach(function(m,i){
+            if(no>0){m.groupNo=no;m.confirmedGroupNo=no;m.finalGroupNo=no;m.displayGroupNo=no;m.v702GroupNo=no;m.v728GroupNo=no;}
+            if(court){
+              m.court=court; m.courts=[court]; m.manualCourtTarget=court;
+              m.manualCourtLocked=true; m.v702CourtLocked=true;
+              if(!m.courtAssignedAt) m.courtAssignedAt=new Date(Date.now()+i).toISOString();
+              delete m.initialPrelimAutoCourt;
+            }
+          });
+        });
+      });
+    }catch(e){warn('reapply failed',e);}
+  }
+
+  // renderBracket, applyTournamentBundle 래핑
+  function wrapRenderForReapply(){
+    ['renderBracket','applyTournamentBundle'].forEach(function(n){
+      try{
+        var fn=window[n];
+        if(typeof fn!=='function'||fn.__v728Wrapped) return;
+        var w=function(){
+          var r=fn.apply(this,arguments);
+          try{v728ReapplySnapshots();}catch(e){}
+          try{stubAutoAssign();}catch(e){}
+          return r;
+        };
+        w.__v728Wrapped=true; w.__v728Old=fn;
+        window[n]=w;
+        try{eval(n+'=window["'+n+'"]');}catch(e){}
+      }catch(e){}
+    });
+  }
+  wrapRenderForReapply();
+  setTimeout(wrapRenderForReapply,1500);
+
+  /* ── 7. 예선 재추첨(초기화) 시 v728 잠금도 해제 ── */
+  var origReset=window.v702ResetCurrentPrelimOnly;
+  if(typeof origReset==='function'&&!origReset.__v728ResetWrapped){
+    var wrappedReset=async function(){
+      var r=await origReset.apply(this,arguments);
+      // 잠금 해제
+      var keys=keysForCurrent();
+      keys.forEach(function(key){
+        var d=window.G&&window.G.draws&&window.G.draws[key];
+        if(!d) return;
+        ['v728Locked','v728LockedAt','v728Snapshot',
+         'v702Locked','v702LockedAt','v702Snapshot','v702AutoBlocked',
+         'v711Locked','v711NormalizedAt',
+         'v615FinalizedLock','v615FinalizedLockAt','v606GroupOrderFinalized'].forEach(function(k){
+          delete d[k];
+        });
+      });
+      return r;
+    };
+    wrappedReset.__v728ResetWrapped=true;
+    window.v702ResetCurrentPrelimOnly=wrappedReset;
+  }
+
+  /* ── 9. DOMContentLoaded + 지연 초기화 ── */
+  function init(){
+    stubAutoAssign();
+    overrideLockFunctions();
+    patchV711Normalize();
+    wrapRenderForReapply();
+    v728ReapplySnapshots();
+    patchToolbarButtons();
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init);
+  else init();
+  setTimeout(init,800);
+  setTimeout(init,2500);
+
+  log('installed',VER);
 })();
 </script>
 
