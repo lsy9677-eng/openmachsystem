@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-11-v727-member-result-participant-gate";
+  const APP_VERSION = "2026-06-11-v733-match-complete-red-alert";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -6380,7 +6380,7 @@ button:disabled{opacity:.55!important;cursor:not-allowed!important;filter:graysc
 </div>
 </div>
 <div class="sec-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
-  <span>대진표 · 경기 현황 <span style="font-size:.72rem;font-weight:400;color:var(--text2)">— 전체 대진표는 수동 최신화 · 코트/진행경기만 자동 최소 갱신</span> <span id="bracketFreshnessBadge" style="display:inline-flex;margin-left:6px;padding:3px 8px;border-radius:999px;background:#eef2ff;color:#1d4ed8;font-size:.66rem;font-weight:900;vertical-align:middle">v722</span></span>
+  <span>대진표 · 경기 현황 <span style="font-size:.72rem;font-weight:400;color:var(--text2)">— 전체 대진표는 수동 최신화 · 코트/진행경기만 자동 최소 갱신</span> <span id="bracketFreshnessBadge" style="display:inline-flex;margin-left:6px;padding:3px 8px;border-radius:999px;background:#eef2ff;color:#1d4ed8;font-size:.66rem;font-weight:900;vertical-align:middle">v731</span></span>
   <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
     <button onclick="manualRefreshCurrentTournament()" style="padding:7px 14px;border-radius:999px;border:none;background:#0f766e;color:#fff;font-size:.84rem;font-weight:900;cursor:pointer;display:inline-flex;align-items:center;gap:5px;box-shadow:0 2px 8px rgba(15,118,110,.25)">🔄 최신 대진표</button>
     <button onclick="window.__hardClearAppCacheAndReload&&window.__hardClearAppCacheAndReload()" style="padding:7px 12px;border-radius:999px;border:1px solid #cbd5e1;background:#fff;color:#334155;font-size:.78rem;font-weight:900;cursor:pointer;display:inline-flex;align-items:center;gap:5px">🧹 캐시초기화</button>
@@ -48919,6 +48919,9 @@ button[onclick*="__hardClearAppCacheAndReload"],button[onclick*="캐시"],button
   }
   function ensureButtons(){
     try{
+      // v731: 관리자/운영자/진행자 화면에는 원본 v300 버튼줄이 이미 있으므로
+      // v726 보강 버튼을 추가하지 않는다. 중복 생성의 핵심 원인.
+      if(document.body && (document.body.classList.contains('admin-mode')||document.body.classList.contains('operator-mode')||document.body.classList.contains('tm-mode')||window.AD||window.OP||window.TM)){ return; }
       // 개별 예선 경기카드 안 결과 버튼 보강
       document.querySelectorAll('.indiv-prelim-grid .m3card[data-match-id], .indiv-prelim-grid .match-card[data-match-id]').forEach(function(card){
         var info=findMatchInfoFromCard(card); if(!info || !isIndivKey(info.key)) return;
@@ -49016,6 +49019,9 @@ button[onclick*="__hardClearAppCacheAndReload"],button[onclick*="캐시"],button
   }
   function ensureGroupButtons(){
     try{
+      // v731: 관리자/운영자/진행자 화면은 renderGroupQuickActionButtons(v300)의 원본 버튼줄을 사용한다.
+      // 일반회원에게만 경기목록 진입 버튼을 보강한다.
+      if(isManager()) return;
       document.querySelectorAll('.indiv-prelim-grid .grp-card').forEach(function(grp){
         var first=grp.querySelector('.grp-matches-section .m3card[data-match-id], .grp-matches-section .match-card[data-match-id]');
         if(!first) return;
@@ -49055,6 +49061,976 @@ button[onclick*="__hardClearAppCacheAndReload"],button[onclick*="캐시"],button
   function wrapRender(){var fn=window.renderBracket;if(typeof fn==='function'&&!fn.__v727Wrapped){var w=function(){var r=fn.apply(this,arguments);schedule();return r;};w.__v727Wrapped=true;window.renderBracket=w;}}
   function start(){wrapRender();schedule();try{new MutationObserver(function(){wrapRender();schedule();}).observe(document.body,{childList:true,subtree:true});}catch(e){}}
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start); else start();
+})();
+</script>
+
+
+
+<!-- v728: 조번호확정+코트잠금 후 수동수정 모드 추가 -->
+<style id="v728UnlockManualReEditStyle">
+#bracketExportBar{
+  grid-template-columns:repeat(5,minmax(0,1fr))!important;
+}
+#bracketExportBar>#v728EditLockBtn{
+  display:flex!important;
+  visibility:visible!important;
+  pointer-events:auto!important;
+  width:100%!important;
+  height:44px!important;
+  min-height:44px!important;
+  margin:0!important;
+  padding:0 10px!important;
+  border-radius:14px!important;
+  font-size:.82rem!important;
+  font-weight:1000!important;
+  line-height:1!important;
+  white-space:nowrap!important;
+  align-items:center!important;
+  justify-content:center!important;
+  box-shadow:none!important;
+  transform:none!important;
+  transition:none!important;
+  animation:none!important;
+  border:2px solid #7c3aed!important;
+  background:#f5f3ff!important;
+  color:#5b21b6!important;
+}
+#bracketExportBar>#v728EditLockBtn.v728-active{
+  border-color:#ea580c!important;
+  background:#fff7ed!important;
+  color:#c2410c!important;
+}
+@media(max-width:680px){
+  #bracketExportBar{grid-template-columns:1fr!important;gap:7px!important;}
+  #bracketExportBar .v702-toolbar-btn,
+  #bracketExportBar>#v728EditLockBtn{height:42px!important;min-height:42px!important;font-size:.78rem!important;}
+}
+</style>
+<script id="v728UnlockManualReEditScript">
+(function(){
+  'use strict';
+  if(window.__v728UnlockManualReEditInstalled) return;
+  window.__v728UnlockManualReEditInstalled=true;
+  const VERSION='2026-06-11-v728-unlock-manual-reedit';
+  const $=id=>document.getElementById(id);
+  const clean=v=>String(v==null?'':v).replace(/\s+/g,' ').trim();
+  const arr=v=>Array.isArray(v)?v:[];
+  function toastMsg(m,t){try{ if(typeof toast==='function') toast(m,t||'info'); else if(typeof safeToast==='function') safeToast(m,t||'info'); else console.log('[v728]',m);}catch(e){console.log('[v728]',m)}}
+  function isManager(){
+    try{ if(typeof canManageBracket==='function') return !!canManageBracket(); }catch(e){}
+    try{ const b=document.body; if(b&&(b.classList.contains('admin-mode')||b.classList.contains('operator-mode')||b.classList.contains('op-mode')||b.classList.contains('tm-mode')||b.classList.contains('developer-mode')||b.classList.contains('dev-mode'))) return true; }catch(e){}
+    try{ if(window.ADMIN_MODE||window.IS_ADMIN||window.OPERATOR_MODE||window.TOURNAMENT_MANAGER_MODE||window.IS_DEVELOPER||window.DEVELOPER_MODE||window.DEV_LOGIN||window.ADMIN_LOGIN) return true; }catch(e){}
+    return false;
+  }
+  function currentTid(){return clean(($('brTS')&&$('brTS').value)||($('regTS')&&$('regTS').value));}
+  function keyOf(tid,div){return String(tid||'')+'_'+String(div||'');}
+  function tournament(tid){try{return arr(window.G&&G.tournaments).find(t=>String(t.id)===String(tid))||null;}catch(e){return null;}}
+  function selectedDivs(tid){
+    try{ if(typeof getBracketSelectedDivs==='function'){ const ds=arr(getBracketSelectedDivs(tid)).filter(Boolean); if(ds.length && !ds.includes('__ALL__')) return ds; } }catch(e){}
+    try{ const sel=$('brDS'); if(sel&&sel.value&&sel.value!=='__ALL__') return [sel.value]; }catch(e){}
+    try{ if(Array.isArray(window.BR_MULTI_DIVS)&&BR_MULTI_DIVS.length&&!BR_MULTI_DIVS.includes('__ALL__')) return BR_MULTI_DIVS.filter(Boolean); }catch(e){}
+    const t=tournament(tid); const ds=arr(t&&t.divisions).filter(Boolean);
+    if(ds.length) return ds;
+    try{ return Object.keys((G&&G.draws)||{}).filter(k=>String(k).startsWith(tid+'_')).map(k=>String(k).slice(String(tid).length+1)); }catch(e){ return []; }
+  }
+  function keysForCurrent(requireGroups){
+    const tid=currentTid(); if(!tid) return [];
+    return selectedDivs(tid).map(d=>keyOf(tid,d)).filter(k=>!requireGroups || (window.G&&G.draws&&G.draws[k]&&Array.isArray(G.draws[k].groups)));
+  }
+  async function saveKey(key){
+    try{ if(window.__FB_WRITE_CACHE){ if(__FB_WRITE_CACHE.draws) delete __FB_WRITE_CACHE.draws[key]; if(__FB_WRITE_CACHE.matches) delete __FB_WRITE_CACHE.matches[key]; } }catch(e){}
+    if(typeof window.v617eDirectSaveKey==='function') return await window.v617eDirectSaveKey(key);
+    if(typeof stD==='function') await stD(key);
+    if(typeof stM==='function') await stM(key);
+    try{ if(typeof waitForPendingWrites==='function'&&typeof db!=='undefined') await waitForPendingWrites(db); }catch(e){}
+    try{ if(typeof cacheTournamentBundleFromMemory==='function') cacheTournamentBundleFromMemory(String(key).split('_')[0]); }catch(e){}
+  }
+  function clearBundleCache(tid){
+    try{ Object.keys(localStorage||{}).forEach(k=>{ if(/BUNDLE|TOURNAMENT|MATCH|DRAW|BRACKET|CACHE/i.test(k)) localStorage.removeItem(k); }); }catch(e){}
+    try{ Object.keys(sessionStorage||{}).forEach(k=>{ if(/BUNDLE|TOURNAMENT|MATCH|DRAW|BRACKET|CACHE/i.test(k)) sessionStorage.removeItem(k); }); }catch(e){}
+  }
+  function firstCourtFromGroupMatches(key,gi){
+    try{
+      const ms=arr(G&&G.matches&&G.matches[key]).filter(m=>m&&String(m.phase||'')==='group'&&Number(m.group)===Number(gi)&&!m.bye);
+      for(const m of ms){
+        const c=clean(m.manualCourtTarget||m.court||((Array.isArray(m.courts)&&m.courts[0])||''));
+        if(c) return c;
+      }
+    }catch(e){}
+    return '';
+  }
+  function syncGroupCourtsFromMatches(key){
+    const draw=G&&G.draws&&G.draws[key];
+    if(!draw||!Array.isArray(draw.groups)) return 0;
+    let n=0;
+    draw.groups.forEach((g,gi)=>{
+      const c=firstCourtFromGroupMatches(key,gi);
+      if(c){
+        g.court=c; g.manualCourt=c; g.manualCourtTarget=c; g.courts=[c];
+      }else{
+        delete g.court; delete g.manualCourt; delete g.manualCourtTarget; g.courts=[];
+      }
+      g.v728SyncedCourtAt=new Date().toISOString();
+      n++;
+    });
+    return n;
+  }
+  function hasLockedSnapshot(key){
+    const d=G&&G.draws&&G.draws[key];
+    return !!(d&&(d.v702Snapshot||d.v701Snapshot||d.v700Snapshot||d.v697CourtSnapshot||d.v702Locked||d.v701GroupCourtLocked||d.v700GroupCourtLocked||d.v697GroupCourtLocked));
+  }
+  function removeSnapshotOnly(key){
+    const draw=G&&G.draws&&G.draws[key]; if(!draw) return 0;
+    let changed=0;
+    ['v702Snapshot','v701Snapshot','v700Snapshot','v697CourtSnapshot'].forEach(f=>{ if(draw[f]){ delete draw[f]; changed++; } });
+    draw.v728ManualReEditMode=true;
+    draw.v728ManualReEditAt=new Date().toISOString();
+    // 자동 재배정은 계속 차단한다. 단, 옛 스냅샷 복원만 해제한다.
+    draw.v702AutoBlocked=true;
+    draw.v617eAutoAssignBlocked=true;
+    arr(draw.groups).forEach(g=>{
+      if(!g) return;
+      delete g.v702CourtLocked;
+      g.v728ManualReEditMode=true;
+      g.v702AutoBlocked=true;
+    });
+    arr(G&&G.matches&&G.matches[key]).forEach(m=>{
+      if(!m) return;
+      delete m.v702SnapshotLocked;
+      delete m.v702CourtLocked;
+      m.v728ManualReEditMode=true;
+      m.v702AutoBlocked=true;
+      // 수동 배정값은 보호해야 자동 복구가 덮어쓰지 않는다.
+      if(clean(m.manualCourtTarget||m.court||((Array.isArray(m.courts)&&m.courts[0])||'')) || m.manualSharedHold){
+        m.manualCourtLocked=true;
+        m.manualCourtLockedAt=m.manualCourtLockedAt||new Date().toISOString();
+        m.initialPrelimAutoCourt=false;
+      }
+    });
+    syncGroupCourtsFromMatches(key);
+    return changed;
+  }
+  window.v728UnlockCourtLockForManualEditCurrent=async function(){
+    if(!isManager()){toastMsg('관리자/운영자/진행자만 사용할 수 있습니다','error');return false;}
+    const keys=keysForCurrent(true).filter(k=>G&&G.draws&&G.draws[k]);
+    if(!keys.length){toastMsg('대회/부서를 먼저 선택하세요','error');return false;}
+    const locked=keys.filter(hasLockedSnapshot);
+    const msg=locked.length
+      ? '조번호확정+코트잠금 이후 수동수정 모드로 전환합니다.\n\n- 현재 조번호/코트 배정은 유지\n- 옛 잠금 스냅샷 복원만 해제\n- 자동 재배정은 계속 차단\n\n이후 코트현황판에서 코트를 옮긴 뒤, 마지막에 다시 [조번호확정+코트잠금]을 눌러 새 상태를 잠그세요.'
+      : '현재 선택 부서에 잠금 스냅샷이 거의 없습니다. 그래도 수동수정 모드로 저장할까요?';
+    if(!confirm(msg)) return false;
+    try{
+      if(typeof sl==='function') sl(true);
+      let changed=0;
+      for(const key of keys){ changed+=removeSnapshotOnly(key); await saveKey(key); }
+      clearBundleCache(currentTid());
+      if(typeof sl==='function') sl(false);
+      try{ if(typeof renderBracket==='function') renderBracket(); }catch(e){}
+      setTimeout(installButton,60);
+      toastMsg('수동수정 모드 전환 완료 ✅ 이제 코트현황판에서 옮긴 뒤 다시 잠금하세요.','success');
+      return true;
+    }catch(e){ if(typeof sl==='function') sl(false); console.error('[v728] unlock failed',e); toastMsg('수동수정 모드 전환 실패: '+(e.message||e),'error'); return false; }
+  };
+  async function syncCurrentBeforeLock(){
+    const keys=keysForCurrent(true).filter(k=>G&&G.draws&&G.draws[k]);
+    keys.forEach(key=>syncGroupCourtsFromMatches(key));
+  }
+  function markEditOffForCurrent(){
+    const keys=keysForCurrent(true).filter(k=>G&&G.draws&&G.draws[k]);
+    keys.forEach(key=>{
+      const d=G.draws[key]; if(!d)return;
+      delete d.v728ManualReEditMode; d.v728RelockedAt=new Date().toISOString();
+      arr(d.groups).forEach(g=>{if(g)delete g.v728ManualReEditMode;});
+      arr(G&&G.matches&&G.matches[key]).forEach(m=>{if(m)delete m.v728ManualReEditMode;});
+    });
+  }
+  function wrapLock(){
+    const old=window.v702FinalizeGroupNoAndCourtLock;
+    if(typeof old!=='function'||old.__v728Wrapped) return;
+    const w=async function(){
+      try{ await syncCurrentBeforeLock(); }catch(e){ console.warn('[v728] sync before lock failed',e); }
+      const ok=await old.apply(this,arguments);
+      if(ok){ try{ markEditOffForCurrent(); }catch(e){} setTimeout(installButton,80); }
+      return ok;
+    };
+    w.__v728Wrapped=true; w.__v728Old=old;
+    window.v702FinalizeGroupNoAndCourtLock=w;
+    ['v650OpenManualGroupNoBulkCurrent','v626FinalizeGroupOrder','v606FinalizeGroupOrder','v693FinalizeGroupOrder','v694FinalizeCurrentCourtOrder','v696LockCurrentCourts','v697FinalizeGroupNoAndCourtLock','v700FinalizeGroupNoAndCourtLock','v701FinalizeGroupNoAndCourtLock'].forEach(n=>{try{window[n]=w; eval(n+'=window["'+n+'"];');}catch(e){}});
+  }
+  function currentEditMode(){
+    return keysForCurrent(true).some(k=>G&&G.draws&&G.draws[k]&&G.draws[k].v728ManualReEditMode);
+  }
+  function installButton(){
+    try{
+      wrapLock();
+      const bar=$('bracketExportBar'); if(!bar) return;
+      let btn=$('v728EditLockBtn');
+      if(!btn){
+        btn=document.createElement('button'); btn.id='v728EditLockBtn'; btn.type='button'; btn.className='btn btn-outline v728-toolbar-btn';
+        btn.onclick=function(e){e.preventDefault(); e.stopPropagation(); window.v728UnlockCourtLockForManualEditCurrent();};
+        const lock=$('v702LockBtn'); if(lock&&lock.parentNode===bar) bar.insertBefore(btn, lock.nextSibling); else bar.appendChild(btn);
+      }
+      const edit=currentEditMode();
+      btn.classList.toggle('v728-active',edit);
+      btn.textContent=edit?'🛠 수정중 · 다시잠금':'🔓 잠금해제/수정';
+      btn.title='조번호확정+코트잠금 후에도 현재 상태를 유지한 채 수동 코트 이동을 다시 할 수 있게 합니다.';
+    }catch(e){console.warn('[v728] install button failed',e)}
+  }
+  // 코트 이동 버튼을 누를 때 조 카드의 대표 코트도 최신 경기 위치에 맞춰 정리한다.
+  const oldMove=window.moveCourtQueueCard;
+  if(typeof oldMove==='function'&&!oldMove.__v728Wrapped){
+    const w=async function(key,mid,targetCourt,beforeMid){
+      try{
+        const m=arr(G&&G.matches&&G.matches[key]).find(x=>String(x.id)===String(mid));
+        const gi=Number(m&&m.group);
+        const g=G&&G.draws&&G.draws[key]&&G.draws[key].groups&&G.draws[key].groups[gi];
+        if(g&&String(m&&m.phase||'')==='group'){
+          const c=clean(targetCourt||'');
+          if(c){g.court=c;g.manualCourt=c;g.manualCourtTarget=c;g.courts=[c];}
+          else {delete g.court;delete g.manualCourt;delete g.manualCourtTarget;g.courts=[];}
+          g.v728ManualMovedAt=new Date().toISOString();
+        }
+      }catch(e){}
+      const r=await oldMove.apply(this,arguments);
+      try{ syncGroupCourtsFromMatches(key); }catch(e){}
+      return r;
+    };
+    w.__v728Wrapped=true; w.__v728Old=oldMove; window.moveCourtQueueCard=w;
+  }
+  const oldRender=window.renderBracket;
+  if(typeof oldRender==='function'&&!oldRender.__v728ButtonWrapped){
+    const w=function(){ const r=oldRender.apply(this,arguments); setTimeout(installButton,30); return r; };
+    w.__v728ButtonWrapped=true; window.renderBracket=w; try{renderBracket=w;}catch(e){}
+  }
+  document.addEventListener('DOMContentLoaded',()=>{installButton(); setTimeout(installButton,500); setTimeout(installButton,1500);});
+  setTimeout(installButton,0); setTimeout(installButton,800); setTimeout(installButton,1800);
+  console.log('[v728] unlock manual re-edit installed',VERSION);
+})();
+</script>
+
+
+
+<!-- v729: 잠금해제/수정 버튼 항상 표시 보강 -->
+<style id="v729UnlockButtonAlwaysVisibleStyle">
+#bracketExportBar #v729EditLockBtn,
+.v729-section-edit-lock-btn{
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  visibility:visible!important;
+  opacity:1!important;
+  pointer-events:auto!important;
+  min-height:34px!important;
+  border:2px solid #7c3aed!important;
+  background:#f5f3ff!important;
+  color:#5b21b6!important;
+  font-weight:1000!important;
+  white-space:nowrap!important;
+  box-shadow:none!important;
+  transform:none!important;
+  animation:none!important;
+  line-height:1.1!important;
+}
+#bracketExportBar #v729EditLockBtn{
+  width:100%!important;
+  height:44px!important;
+  min-height:44px!important;
+  padding:0 12px!important;
+  border-radius:14px!important;
+  font-size:.82rem!important;
+}
+#bracketExportBar #v729EditLockBtn.v729-active,
+.v729-section-edit-lock-btn.v729-active{
+  border-color:#ea580c!important;
+  background:#fff7ed!important;
+  color:#c2410c!important;
+}
+.v729-section-edit-lock-btn{
+  padding:4px 10px!important;
+  font-size:.72rem!important;
+  border-radius:10px!important;
+}
+@media(max-width:680px){
+  #bracketExportBar #v729EditLockBtn{height:42px!important;min-height:42px!important;font-size:.78rem!important;}
+  .v729-section-edit-lock-btn{font-size:.66rem!important;padding:4px 8px!important;min-height:32px!important;}
+}
+</style>
+<script id="v729UnlockButtonAlwaysVisibleScript">
+(function(){
+  'use strict';
+  if(window.__v729UnlockButtonAlwaysVisibleInstalled) return;
+  window.__v729UnlockButtonAlwaysVisibleInstalled=true;
+  const VERSION='2026-06-11-v729-unlock-button-always-visible';
+  const $=id=>document.getElementById(id);
+  const clean=v=>String(v==null?'':v).replace(/\s+/g,' ').trim();
+  function isManager(){
+    try{ if(typeof canManageBracket==='function') return !!canManageBracket(); }catch(e){}
+    try{ const b=document.body; if(b&&(b.classList.contains('admin-mode')||b.classList.contains('operator-mode')||b.classList.contains('op-mode')||b.classList.contains('tm-mode')||b.classList.contains('developer-mode')||b.classList.contains('dev-mode'))) return true; }catch(e){}
+    try{ if(window.ADMIN_MODE||window.IS_ADMIN||window.OPERATOR_MODE||window.TOURNAMENT_MANAGER_MODE||window.IS_DEVELOPER||window.DEVELOPER_MODE||window.DEV_LOGIN||window.ADMIN_LOGIN) return true; }catch(e){}
+    return false;
+  }
+  function currentEditMode(){
+    try{
+      if(typeof v728UnlockCourtLockForManualEditCurrent==='function'){
+        const tid=clean(($('brTS')&&$('brTS').value)||'');
+        if(!tid) return false;
+        const draws=(window.G&&G.draws)||{};
+        return Object.keys(draws).some(k=>String(k).startsWith(tid+'_')&&draws[k]&&draws[k].v728ManualReEditMode);
+      }
+    }catch(e){}
+    return false;
+  }
+  function onUnlockClick(ev){
+    try{ if(ev){ev.preventDefault();ev.stopPropagation();ev.stopImmediatePropagation&&ev.stopImmediatePropagation();} }catch(e){}
+    if(!isManager()){
+      try{ if(typeof toast==='function') toast('관리자/운영자/진행자만 사용할 수 있습니다','error'); else alert('관리자/운영자/진행자만 사용할 수 있습니다'); }catch(e){}
+      return false;
+    }
+    if(typeof window.v728UnlockCourtLockForManualEditCurrent==='function'){
+      return window.v728UnlockCourtLockForManualEditCurrent();
+    }
+    try{ if(typeof toast==='function') toast('잠금해제 함수가 아직 로드되지 않았습니다. 새로고침 후 다시 시도하세요.','error'); else alert('잠금해제 함수가 아직 로드되지 않았습니다. 새로고침 후 다시 시도하세요.'); }catch(e){}
+    return false;
+  }
+  function labelButton(btn){
+    const edit=currentEditMode();
+    btn.classList.toggle('v729-active',edit);
+    btn.textContent=edit?'🛠 수정중 · 다시잠금':'🔓 잠금해제/수정';
+    btn.title='조번호확정+코트잠금 후에도 현재 상태를 유지한 채 수동 코트 이동을 다시 할 수 있게 합니다.';
+  }
+  function installTopButton(){
+    const bar=$('bracketExportBar');
+    if(!bar || !isManager()) return;
+    let btn=$('v729EditLockBtn') || $('v728EditLockBtn');
+    if(btn && btn.id==='v728EditLockBtn') btn.id='v729EditLockBtn';
+    if(!btn){
+      btn=document.createElement('button');
+      btn.id='v729EditLockBtn';
+      btn.type='button';
+      btn.className='btn btn-outline v729-toolbar-btn';
+      btn.addEventListener('click',onUnlockClick,true);
+      const buttons=[...bar.querySelectorAll('button')];
+      const lock=buttons.find(b=>/조번호.*코트잠금|코트잠금|조번호.*확정/.test(clean(b.textContent)));
+      const a4=buttons.find(b=>/A4|대진표 출력|조편성 출력/.test(clean(b.textContent)));
+      if(lock&&lock.parentNode===bar) bar.insertBefore(btn, lock.nextSibling);
+      else if(a4&&a4.parentNode===bar) bar.insertBefore(btn, a4);
+      else bar.appendChild(btn);
+    }
+    labelButton(btn);
+    try{
+      bar.style.display='grid';
+      if(window.innerWidth>680) bar.style.gridTemplateColumns='repeat(4,minmax(0,1fr))';
+    }catch(e){}
+  }
+  function installSectionButtons(){
+    const root=$('bracketContent')||document.body;
+    if(!root || !isManager()) return;
+    const anchors=[...root.querySelectorAll('button')].filter(b=>{
+      const t=clean(b.textContent);
+      return /조번호\s*수동저장|조번호\s*수동저장됨|자동코트배정|전체\s*초기화/.test(t);
+    });
+    anchors.forEach(anchor=>{
+      const parent=anchor.parentElement;
+      if(!parent || parent.querySelector(':scope > .v729-section-edit-lock-btn')) return;
+      const btn=document.createElement('button');
+      btn.type='button';
+      btn.className='btn btn-outline v729-section-edit-lock-btn';
+      btn.addEventListener('click',onUnlockClick,true);
+      labelButton(btn);
+      // 조번호 수동저장 버튼 바로 뒤가 가장 직관적이다. 없으면 자동코트배정/전체초기화 근처에 넣는다.
+      if(/조번호\s*수동/.test(clean(anchor.textContent))) parent.insertBefore(btn, anchor.nextSibling);
+      else parent.insertBefore(btn, parent.querySelector('button[onclick*="resetDrawOnly"]') || anchor.nextSibling);
+    });
+    root.querySelectorAll('.v729-section-edit-lock-btn').forEach(labelButton);
+  }
+  let scheduled=false;
+  function installAll(){
+    scheduled=false;
+    try{ installTopButton(); installSectionButtons(); }catch(e){ console.warn('[v729] install failed',e); }
+  }
+  function schedule(){ if(scheduled) return; scheduled=true; setTimeout(installAll,30); }
+  const oldRender=window.renderBracket;
+  if(typeof oldRender==='function'&&!oldRender.__v729UnlockButtonWrapped){
+    const w=function(){ const r=oldRender.apply(this,arguments); schedule(); setTimeout(installAll,250); return r; };
+    w.__v729UnlockButtonWrapped=true;
+    window.renderBracket=w;
+    try{ renderBracket=w; }catch(e){}
+  }
+  // 다른 구버전 스크립트가 버튼줄을 다시 그려도 곧바로 복구한다.
+  try{ new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true}); }catch(e){}
+  document.addEventListener('DOMContentLoaded',()=>{installAll(); setTimeout(installAll,300); setTimeout(installAll,1200);});
+  setTimeout(installAll,0); setTimeout(installAll,400); setTimeout(installAll,1200); setTimeout(installAll,2500);
+  // 클릭 캡처 보강: 동적으로 생성된 동일 버튼도 항상 우리 함수가 먼저 처리한다.
+  document.addEventListener('click',function(ev){
+    const btn=ev.target&&ev.target.closest&&ev.target.closest('#v729EditLockBtn,#v728EditLockBtn,.v729-section-edit-lock-btn');
+    if(btn) return onUnlockClick(ev);
+  },true);
+  console.log('[v729] unlock button always visible installed',VERSION);
+})();
+</script>
+
+
+
+<!-- v730: 잠금해제/수정 버튼 실제 표시/동작 강제 보강 -->
+<style id="v730UnlockVisibleRealFixStyle">
+#v730UnlockEmergencyRow{
+  display:none;
+  align-items:center;
+  justify-content:flex-end;
+  gap:8px;
+  margin:8px 0 12px;
+  padding:10px 12px;
+  border:2px dashed #7c3aed;
+  border-radius:16px;
+  background:linear-gradient(135deg,#f5f3ff,#fff);
+  box-shadow:0 8px 18px rgba(124,58,237,.10);
+}
+#v730UnlockEmergencyRow.show{display:flex!important;}
+#v730UnlockEmergencyRow .v730-note{
+  flex:1;
+  min-width:0;
+  color:#4c1d95;
+  font-size:.78rem;
+  font-weight:900;
+  line-height:1.45;
+  word-break:keep-all;
+}
+#v730TopUnlockBtn,
+#v730EmergencyUnlockBtn,
+.v730-section-unlock-btn{
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  visibility:visible!important;
+  opacity:1!important;
+  pointer-events:auto!important;
+  min-height:38px!important;
+  border:2px solid #7c3aed!important;
+  background:#f5f3ff!important;
+  color:#5b21b6!important;
+  border-radius:12px!important;
+  font-weight:1000!important;
+  white-space:nowrap!important;
+  box-shadow:none!important;
+  transform:none!important;
+  animation:none!important;
+  line-height:1.1!important;
+  cursor:pointer!important;
+}
+#v730TopUnlockBtn{width:100%!important;height:44px!important;padding:0 12px!important;font-size:.82rem!important;}
+#v730EmergencyUnlockBtn{min-width:190px!important;padding:8px 14px!important;font-size:.84rem!important;}
+.v730-section-unlock-btn{padding:6px 10px!important;font-size:.72rem!important;min-height:34px!important;}
+#v730TopUnlockBtn.v730-active,
+#v730EmergencyUnlockBtn.v730-active,
+.v730-section-unlock-btn.v730-active{
+  border-color:#ea580c!important;
+  background:#fff7ed!important;
+  color:#c2410c!important;
+}
+@media(max-width:680px){
+  #v730UnlockEmergencyRow{display:none;align-items:stretch;flex-direction:column;margin:8px 0 10px;padding:10px;}
+  #v730UnlockEmergencyRow .v730-note{font-size:.72rem;}
+  #v730EmergencyUnlockBtn,#v730TopUnlockBtn{width:100%!important;min-width:0!important;height:42px!important;min-height:42px!important;font-size:.78rem!important;}
+  .v730-section-unlock-btn{font-size:.66rem!important;padding:4px 8px!important;min-height:32px!important;}
+}
+</style>
+<script id="v730UnlockVisibleRealFixScript">
+(function(){
+  'use strict';
+  if(window.__v730UnlockVisibleRealFixInstalled) return;
+  window.__v730UnlockVisibleRealFixInstalled=true;
+  const VERSION='2026-06-11-v731-duplicate-result-button-fix';
+  const $=id=>document.getElementById(id);
+  const clean=v=>String(v==null?'':v).replace(/\s+/g,' ').trim();
+  const arr=v=>Array.isArray(v)?v:[];
+  function toastMsg(m,t){try{ if(typeof toast==='function') toast(m,t||'info'); else if(typeof safeToast==='function') safeToast(m,t||'info'); else console.log('[v730]',m); }catch(e){console.log('[v730]',m)}}
+  function visible(el){try{ return !!(el && getComputedStyle(el).display!=='none' && getComputedStyle(el).visibility!=='hidden' && getComputedStyle(el).opacity!=='0'); }catch(e){return !!el}}
+  function privileged(){
+    try{ if(typeof canManageBracket==='function' && canManageBracket()) return true; }catch(e){}
+    try{ if(window.AD||window.OP||window.TM||window.ADMIN_MODE||window.IS_ADMIN||window.OPERATOR_MODE||window.TOURNAMENT_MANAGER_MODE||window.IS_DEVELOPER||window.DEVELOPER_MODE||window.DEV_LOGIN||window.ADMIN_LOGIN||window.__developerMode) return true; }catch(e){}
+    try{ const b=document.body; if(b&&(b.classList.contains('admin-mode')||b.classList.contains('operator-mode')||b.classList.contains('op-mode')||b.classList.contains('tm-mode')||b.classList.contains('developer-mode')||b.classList.contains('dev-mode'))) return true; }catch(e){}
+    try{ const badge=$('adminBadge'); if(visible(badge)&&/개발자|관리자|운영자|진행자/.test(clean(badge.textContent))) return true; }catch(e){}
+    return false;
+  }
+  function currentTid(){return clean(($('brTS')&&$('brTS').value)||($('regTS')&&$('regTS').value)||'');}
+  function tournament(tid){try{return arr(window.G&&G.tournaments).find(t=>String(t.id)===String(tid))||null;}catch(e){return null}}
+  function keyOf(tid,div){return String(tid||'')+'_'+String(div||'');}
+  function selectedDivs(tid){
+    try{ if(typeof getBracketSelectedDivs==='function'){ const ds=arr(getBracketSelectedDivs(tid)).filter(Boolean); if(ds.length && !ds.includes('__ALL__')) return ds; } }catch(e){}
+    try{ const sel=$('brDS'); if(sel&&sel.value&&sel.value!=='__ALL__') return [sel.value]; }catch(e){}
+    try{ if(Array.isArray(window.BR_MULTI_DIVS)&&BR_MULTI_DIVS.length&&!BR_MULTI_DIVS.includes('__ALL__')) return BR_MULTI_DIVS.filter(Boolean); }catch(e){}
+    const t=tournament(tid); const ds=arr(t&&t.divisions).filter(Boolean); if(ds.length) return ds;
+    try{ return Object.keys((G&&G.draws)||{}).filter(k=>String(k).startsWith(tid+'_')).map(k=>String(k).slice(String(tid).length+1)); }catch(e){ return []; }
+  }
+  function keysForCurrent(requireGroups){const tid=currentTid(); if(!tid) return []; return selectedDivs(tid).map(d=>keyOf(tid,d)).filter(k=>!requireGroups || (window.G&&G.draws&&G.draws[k]&&Array.isArray(G.draws[k].groups)));}
+  async function saveKey(key){
+    try{ if(window.__FB_WRITE_CACHE){ if(__FB_WRITE_CACHE.draws) delete __FB_WRITE_CACHE.draws[key]; if(__FB_WRITE_CACHE.matches) delete __FB_WRITE_CACHE.matches[key]; } }catch(e){}
+    if(typeof window.v617eDirectSaveKey==='function') return await window.v617eDirectSaveKey(key);
+    if(typeof stD==='function') await stD(key);
+    if(typeof stM==='function') await stM(key);
+    try{ if(typeof waitForPendingWrites==='function'&&typeof db!=='undefined') await waitForPendingWrites(db); }catch(e){}
+    try{ if(typeof cacheTournamentBundleFromMemory==='function') cacheTournamentBundleFromMemory(String(key).split('_')[0]); }catch(e){}
+  }
+  function clearBundleCache(tid){
+    try{ Object.keys(localStorage||{}).forEach(k=>{ if(/BUNDLE|TOURNAMENT|MATCH|DRAW|BRACKET|CACHE/i.test(k)) localStorage.removeItem(k); }); }catch(e){}
+    try{ Object.keys(sessionStorage||{}).forEach(k=>{ if(/BUNDLE|TOURNAMENT|MATCH|DRAW|BRACKET|CACHE/i.test(k)) sessionStorage.removeItem(k); }); }catch(e){}
+  }
+  function firstCourtFromGroupMatches(key,gi){
+    try{
+      const ms=arr(G&&G.matches&&G.matches[key]).filter(m=>m&&String(m.phase||'')==='group'&&Number(m.group)===Number(gi)&&!m.bye);
+      for(const m of ms){ const c=clean(m.manualCourtTarget||m.court||((Array.isArray(m.courts)&&m.courts[0])||'')); if(c) return c; }
+    }catch(e){}
+    return '';
+  }
+  function syncGroupCourtsFromMatches(key){
+    const draw=G&&G.draws&&G.draws[key]; if(!draw||!Array.isArray(draw.groups)) return 0; let n=0;
+    draw.groups.forEach((g,gi)=>{ if(!g)return; const c=firstCourtFromGroupMatches(key,gi); if(c){g.court=c;g.manualCourt=c;g.manualCourtTarget=c;g.courts=[c];} else {delete g.court;delete g.manualCourt;delete g.manualCourtTarget;g.courts=[];} g.v730SyncedCourtAt=new Date().toISOString(); n++; });
+    return n;
+  }
+  function hasSnapshotOrLock(key){ const d=G&&G.draws&&G.draws[key]; return !!(d&&(d.v702Snapshot||d.v701Snapshot||d.v700Snapshot||d.v697CourtSnapshot||d.v702Locked||d.v701GroupCourtLocked||d.v700GroupCourtLocked||d.v697GroupCourtLocked||d.v728ManualReEditMode)); }
+  function removeSnapshotOnly(key){
+    const draw=G&&G.draws&&G.draws[key]; if(!draw) return 0; let changed=0;
+    ['v702Snapshot','v701Snapshot','v700Snapshot','v697CourtSnapshot'].forEach(f=>{ if(draw[f]){ delete draw[f]; changed++; } });
+    draw.v728ManualReEditMode=true; draw.v730ManualReEditMode=true; draw.v730ManualReEditAt=new Date().toISOString();
+    // 조번호와 현재 코트 배정은 유지하고, 과거 스냅샷 복원만 해제한다.
+    draw.v702AutoBlocked=true; draw.v617eAutoAssignBlocked=true; draw.v730AutoReassignBlocked=true;
+    arr(draw.groups).forEach(g=>{ if(!g)return; delete g.v702CourtLocked; g.v728ManualReEditMode=true; g.v730ManualReEditMode=true; g.v702AutoBlocked=true; });
+    arr(G&&G.matches&&G.matches[key]).forEach(m=>{
+      if(!m)return;
+      delete m.v702SnapshotLocked; delete m.v702CourtLocked;
+      m.v728ManualReEditMode=true; m.v730ManualReEditMode=true; m.v702AutoBlocked=true; m.v730AutoReassignBlocked=true;
+      const c=clean(m.manualCourtTarget||m.court||((Array.isArray(m.courts)&&m.courts[0])||''));
+      if(c||m.manualSharedHold){ m.manualCourtLocked=true; m.manualCourtLockedAt=m.manualCourtLockedAt||new Date().toISOString(); m.initialPrelimAutoCourt=false; }
+    });
+    syncGroupCourtsFromMatches(key);
+    return changed;
+  }
+  window.v730UnlockCourtLockForManualEditCurrent=async function(){
+    if(!privileged()){ toastMsg('관리자/운영자/진행자만 사용할 수 있습니다','error'); return false; }
+    const keys=keysForCurrent(true).filter(k=>G&&G.draws&&G.draws[k]);
+    if(!keys.length){ toastMsg('대회/부서를 먼저 선택하세요','error'); return false; }
+    const locked=keys.filter(hasSnapshotOrLock);
+    const msg=locked.length
+      ? '잠금해제/수정 모드로 전환합니다.\n\n- 현재 조번호/코트 배정은 유지\n- 옛 잠금 스냅샷 복원만 해제\n- 자동 재배정은 계속 차단\n\n이후 코트현황판에서 수동 이동 후, 마지막에 다시 [조번호확정+코트잠금]을 누르세요.'
+      : '선택 부서에 잠금 스냅샷이 거의 없습니다. 그래도 수동수정 모드로 저장할까요?';
+    if(!confirm(msg)) return false;
+    try{
+      if(typeof sl==='function') sl(true);
+      let changed=0; for(const key of keys){ changed+=removeSnapshotOnly(key); await saveKey(key); }
+      clearBundleCache(currentTid()); if(typeof sl==='function') sl(false);
+      try{ if(typeof renderBracket==='function') renderBracket(); }catch(e){}
+      setTimeout(ensureAll,80); setTimeout(ensureAll,600);
+      toastMsg('잠금해제/수정 모드 완료 ✅ 코트현황판에서 옮긴 뒤 다시 잠금하세요.','success');
+      return true;
+    }catch(e){ if(typeof sl==='function') sl(false); console.error('[v730] unlock failed',e); toastMsg('잠금해제 실패: '+(e.message||e),'error'); return false; }
+  };
+  function currentEditMode(){ try{return keysForCurrent(true).some(k=>G&&G.draws&&G.draws[k]&&(G.draws[k].v728ManualReEditMode||G.draws[k].v730ManualReEditMode));}catch(e){return false;} }
+  function onClick(ev){ try{ if(ev){ev.preventDefault();ev.stopPropagation();ev.stopImmediatePropagation&&ev.stopImmediatePropagation();} }catch(e){} return window.v730UnlockCourtLockForManualEditCurrent(); }
+  function label(btn){ const edit=currentEditMode(); btn.classList.toggle('v730-active',edit); btn.textContent=edit?'🛠 수정중 · 다시잠금':'🔓 잠금해제/수정'; btn.title='현재 조번호와 코트 배정은 유지하고, 잠금 스냅샷만 풀어 수동 이동을 다시 허용합니다.'; }
+  function bind(btn){ if(!btn)return; if(!btn.__v730Bound){ btn.addEventListener('click',onClick,true); btn.__v730Bound=true; } label(btn); }
+  function updateBadge(){ try{ const b=$('bracketFreshnessBadge'); if(b){ b.textContent='v731'; b.style.background='#f5f3ff'; b.style.color='#5b21b6'; b.title='v731 중복 결과/경기 버튼 정리 + 잠금해제 표시 보강'; } }catch(e){} }
+  function ensureTopButton(){
+    const bar=$('bracketExportBar'); if(!bar||!privileged()) return;
+    let btn=$('v730TopUnlockBtn');
+    if(!btn){
+      btn=document.createElement('button'); btn.id='v730TopUnlockBtn'; btn.type='button'; btn.className='btn btn-outline';
+      const buttons=[...bar.querySelectorAll('button')];
+      const lock=buttons.find(b=>/조번호.*코트잠금|코트잠금|조번호.*확정/.test(clean(b.textContent)));
+      const a4=buttons.find(b=>/A4|대진표 출력|조편성 출력/.test(clean(b.textContent)));
+      if(lock&&lock.parentNode===bar) bar.insertBefore(btn,lock.nextSibling);
+      else if(a4&&a4.parentNode===bar) bar.insertBefore(btn,a4);
+      else bar.appendChild(btn);
+    }
+    bind(btn);
+    try{ bar.style.display='grid'; bar.style.gridTemplateColumns=window.innerWidth>680?'repeat(4,minmax(0,1fr))':'1fr'; }catch(e){}
+  }
+  function ensureEmergencyRow(){
+    const page=$('page-bracket'); const bar=$('bracketExportBar'); if(!page||!privileged()) return;
+    let row=$('v730UnlockEmergencyRow');
+    if(!row){
+      row=document.createElement('div'); row.id='v730UnlockEmergencyRow';
+      row.innerHTML='<div class="v730-note">🔧 조번호확정+코트잠금 후 코트를 다시 옮겨야 하면 먼저 이 버튼을 누르세요.</div><button type="button" id="v730EmergencyUnlockBtn">🔓 잠금해제/수정</button>';
+      if(bar&&bar.parentNode) bar.parentNode.insertBefore(row,bar.nextSibling); else page.insertBefore(row,page.firstChild);
+    }
+    row.classList.add('show'); bind($('v730EmergencyUnlockBtn'));
+  }
+  function ensureSectionButtons(){
+    const root=$('bracketContent')||document.body; if(!root||!privileged()) return;
+    const anchors=[...root.querySelectorAll('button')].filter(b=>/조번호\s*수동저장|조번호\s*수동저장됨|자동코트배정|전체\s*초기화/.test(clean(b.textContent)));
+    anchors.forEach(anchor=>{
+      const parent=anchor.parentElement; if(!parent) return;
+      let btn=parent.querySelector(':scope > .v730-section-unlock-btn');
+      if(!btn){ btn=document.createElement('button'); btn.type='button'; btn.className='btn btn-outline v730-section-unlock-btn';
+        if(/조번호\s*수동/.test(clean(anchor.textContent))) parent.insertBefore(btn,anchor.nextSibling);
+        else parent.insertBefore(btn,anchor.nextSibling);
+      }
+      bind(btn);
+    });
+  }
+  let scheduled=false;
+  function ensureAll(){ scheduled=false; try{ updateBadge(); ensureTopButton(); ensureEmergencyRow(); ensureSectionButtons(); }catch(e){ console.warn('[v730] ensure failed',e); } }
+  function schedule(){ if(scheduled) return; scheduled=true; setTimeout(ensureAll,50); }
+  const oldRender=window.renderBracket;
+  if(typeof oldRender==='function'&&!oldRender.__v730UnlockVisibleWrapped){ const w=function(){ const r=oldRender.apply(this,arguments); schedule(); setTimeout(ensureAll,250); return r; }; w.__v730UnlockVisibleWrapped=true; window.renderBracket=w; try{renderBracket=w;}catch(e){} }
+  document.addEventListener('click',function(ev){ const btn=ev.target&&ev.target.closest&&ev.target.closest('#v730TopUnlockBtn,#v730EmergencyUnlockBtn,.v730-section-unlock-btn'); if(btn) return onClick(ev); },true);
+  try{ new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true,attributes:false}); }catch(e){}
+  document.addEventListener('DOMContentLoaded',()=>{ensureAll(); setTimeout(ensureAll,250); setTimeout(ensureAll,1200);});
+  setTimeout(ensureAll,0); setTimeout(ensureAll,300); setTimeout(ensureAll,1000); setTimeout(ensureAll,2500);
+  let n=0; const timer=setInterval(()=>{ensureAll(); if(++n>180) clearInterval(timer);},1000);
+  console.log('[v730] unlock button visible real fix installed',VERSION);
+})();
+</script>
+
+
+
+<!-- v731: 예선 조 카드 결과/경기 버튼 중복 제거 -->
+<style id="v731DuplicateGroupActionFixStyle">
+/* 관리자/운영자 화면에서는 원본 v300 버튼줄만 사용한다. */
+body.admin-mode .indiv-prelim-grid .grp-card:has(.v300-group-actions) .v275-group-actions,
+body.operator-mode .indiv-prelim-grid .grp-card:has(.v300-group-actions) .v275-group-actions,
+body.tm-mode .indiv-prelim-grid .grp-card:has(.v300-group-actions) .v275-group-actions{
+  display:none!important;
+}
+/* 중복 보정 버튼이 남아도 화면을 밀지 않게 한다. */
+.indiv-prelim-grid .grp-card .v731-remove-duplicate-action{display:none!important;}
+</style>
+<script id="v731DuplicateGroupActionFixScript">
+(function(){
+  'use strict';
+  if(window.__v731DuplicateGroupActionFixInstalled) return;
+  window.__v731DuplicateGroupActionFixInstalled=true;
+  const VERSION='2026-06-11-v731-duplicate-result-button-fix';
+  function isManager(){
+    try{return !!(document.body.classList.contains('admin-mode')||document.body.classList.contains('operator-mode')||document.body.classList.contains('tm-mode')||window.AD||window.OP||window.TM);}catch(e){return false;}
+  }
+  function txt(el){return String((el&&el.textContent)||'').replace(/\s+/g,' ').trim();}
+  function isInjected(btn){
+    try{return !!(btn && (btn.classList.contains('v726-indiv-result-btn')||btn.classList.contains('v727-group-game-btn')||btn.getAttribute('data-v726-result')==='1'||btn.closest('.v727-member-actions')));}catch(e){return false;}
+  }
+  function isVisible(el){
+    try{const cs=getComputedStyle(el);return cs.display!=='none'&&cs.visibility!=='hidden'&&cs.opacity!=='0';}catch(e){return true;}
+  }
+  function hasNativeButton(card, pattern){
+    try{
+      return Array.from(card.querySelectorAll('.v300-group-actions button')).some(b=>pattern.test(txt(b)) && isVisible(b));
+    }catch(e){return false;}
+  }
+  function cleanupOne(card){
+    if(!card) return;
+    const hasNativeRow=!!card.querySelector('.v300-group-actions');
+    // 관리자 화면: 원본 버튼줄이 있으면 v726/v727이 만든 보강 버튼줄은 전부 제거한다.
+    if(isManager() && hasNativeRow){
+      card.querySelectorAll('.v275-group-actions').forEach(row=>{
+        if(row.classList.contains('v727-member-actions') || row.querySelector('.v726-indiv-result-btn,.v727-group-game-btn,button[data-v726-result="1"]')) row.remove();
+      });
+      return;
+    }
+    // 일반회원 화면: 원본 버튼이 있는 경우에만 중복 보강 버튼 제거. 원본이 없으면 보강 버튼 유지.
+    const nativeResult=hasNativeButton(card,/결과/);
+    const nativeGame=hasNativeButton(card,/경기|목록/);
+    card.querySelectorAll('.v275-group-actions').forEach(row=>{
+      row.querySelectorAll('button').forEach(btn=>{
+        const t=txt(btn);
+        if(isInjected(btn) && nativeResult && /결과/.test(t)) btn.remove();
+        if(isInjected(btn) && nativeGame && /경기|목록/.test(t)) btn.remove();
+      });
+      // 같은 버튼줄 안에서 텍스트 기준 중복 제거. 원본/앞쪽 버튼을 남긴다.
+      const seen={};
+      Array.from(row.querySelectorAll('button')).forEach(btn=>{
+        const t=txt(btn).replace(/[⚡✏️📋📄]/g,'').replace(/입력|수정/g,'').trim();
+        const key=/결과/.test(t)?'result':(/경기|목록/.test(t)?'game':(/문자|알림/.test(t)?'sms':t));
+        if(seen[key] && key){ btn.remove(); } else if(key){ seen[key]=true; }
+      });
+      if(!row.querySelector('button')) row.remove();
+      else {
+        const visible=Array.from(row.querySelectorAll('button')).filter(isVisible).length;
+        if(visible) row.style.gridTemplateColumns='repeat('+visible+',minmax(0,1fr))';
+      }
+    });
+  }
+  function cleanupAll(){
+    try{
+      document.querySelectorAll('.indiv-prelim-grid .grp-card').forEach(cleanupOne);
+      const b=document.getElementById('bracketFreshnessBadge');
+      if(b){b.textContent='v731';b.title='v731 중복 결과/경기 버튼 정리';}
+    }catch(e){console.warn('[v731] duplicate cleanup failed',e);}
+  }
+  let scheduled=false;
+  function schedule(){
+    if(scheduled) return;
+    scheduled=true;
+    setTimeout(()=>{scheduled=false;cleanupAll();},60);
+  }
+  const oldRender=window.renderBracket;
+  if(typeof oldRender==='function' && !oldRender.__v731DuplicateFixWrapped){
+    const w=function(){const r=oldRender.apply(this,arguments); schedule(); setTimeout(cleanupAll,240); return r;};
+    w.__v731DuplicateFixWrapped=true; window.renderBracket=w; try{renderBracket=w;}catch(e){}
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>{cleanupAll();setTimeout(cleanupAll,400);});
+  else {cleanupAll();setTimeout(cleanupAll,400);}
+  try{new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true});}catch(e){}
+  console.log('[v731] duplicate group result/game button fix installed',VERSION);
+})();
+</script>
+
+
+<!-- v732: 잠금해제/수정 후 다시 잠글 때 조번호 재부여 -->
+<style id="v732RelockRenumberStyle">
+#bracketFreshnessBadge{background:#ecfdf5!important;color:#047857!important;}
+</style>
+<script id="v732RelockRenumberScript">
+(function(){
+  'use strict';
+  if(window.__v732RelockRenumberInstalled) return;
+  window.__v732RelockRenumberInstalled=true;
+  const VERSION='2026-06-11-v732-relock-renumber-after-manual-move';
+  const $=id=>document.getElementById(id);
+  const arr=v=>Array.isArray(v)?v:[];
+  const clean=v=>String(v==null?'':v).replace(/\s+/g,' ').trim();
+  function toastMsg(m,t){try{ if(typeof toast==='function') toast(m,t||'info'); else if(typeof safeToast==='function') safeToast(m,t||'info'); else console.log('[v732]',m); }catch(e){console.log('[v732]',m)}}
+  function currentTid(){return clean(($('brTS')&&$('brTS').value)||($('regTS')&&$('regTS').value)||'');}
+  function tournament(tid){try{return arr(window.G&&G.tournaments).find(t=>String(t.id)===String(tid))||null;}catch(e){return null;}}
+  function selectedDivs(tid){
+    try{ if(typeof getBracketSelectedDivs==='function'){ const ds=arr(getBracketSelectedDivs(tid)).filter(Boolean); if(ds.length && !ds.includes('__ALL__')) return ds; } }catch(e){}
+    try{ const sel=$('brDS'); if(sel&&sel.value&&sel.value!=='__ALL__') return [sel.value]; }catch(e){}
+    try{ if(Array.isArray(window.BR_MULTI_DIVS)&&BR_MULTI_DIVS.length&&!BR_MULTI_DIVS.includes('__ALL__')) return BR_MULTI_DIVS.filter(Boolean); }catch(e){}
+    const t=tournament(tid); const ds=arr(t&&t.divisions).filter(Boolean); if(ds.length) return ds;
+    try{ return Object.keys((G&&G.draws)||{}).filter(k=>String(k).startsWith(tid+'_')).map(k=>String(k).slice(String(tid).length+1)); }catch(e){ return []; }
+  }
+  function keyOf(tid,div){return String(tid||'')+'_'+String(div||'');}
+  function keysForCurrent(requireGroups){
+    const tid=currentTid(); if(!tid) return [];
+    return selectedDivs(tid).map(d=>keyOf(tid,d)).filter(k=>!requireGroups || (window.G&&G.draws&&G.draws[k]&&Array.isArray(G.draws[k].groups)));
+  }
+  function groupMatches(key,gi){
+    try{return arr(G&&G.matches&&G.matches[key]).filter(m=>m&&String(m.phase||'')==='group'&&Number(m.group)===Number(gi)&&!m.bye);}catch(e){return [];}
+  }
+  async function saveKey(key){
+    try{ if(window.__FB_WRITE_CACHE){ if(__FB_WRITE_CACHE.draws) delete __FB_WRITE_CACHE.draws[key]; if(__FB_WRITE_CACHE.matches) delete __FB_WRITE_CACHE.matches[key]; } }catch(e){}
+    if(typeof window.v617eDirectSaveKey==='function') return await window.v617eDirectSaveKey(key);
+    if(typeof stD==='function') await stD(key);
+    if(typeof stM==='function') await stM(key);
+    try{ if(typeof waitForPendingWrites==='function'&&typeof db!=='undefined') await waitForPendingWrites(db); }catch(e){}
+    try{ if(typeof cacheTournamentBundleFromMemory==='function') cacheTournamentBundleFromMemory(String(key).split('_')[0]); }catch(e){}
+  }
+  function clearBundleCache(tid){
+    try{ Object.keys(localStorage||{}).forEach(k=>{/BUNDLE|TOURNAMENT|MATCH|DRAW|BRACKET|CACHE/i.test(k)&&localStorage.removeItem(k);}); }catch(e){}
+    try{ Object.keys(sessionStorage||{}).forEach(k=>{/BUNDLE|TOURNAMENT|MATCH|DRAW|BRACKET|CACHE/i.test(k)&&sessionStorage.removeItem(k);}); }catch(e){}
+    try{ if(window.__FB_WRITE_CACHE){ if(__FB_WRITE_CACHE.draws) Object.keys(__FB_WRITE_CACHE.draws).forEach(k=>delete __FB_WRITE_CACHE.draws[k]); if(__FB_WRITE_CACHE.matches) Object.keys(__FB_WRITE_CACHE.matches).forEach(k=>delete __FB_WRITE_CACHE.matches[k]); } }catch(e){}
+  }
+  function isManualEditKey(key){
+    const d=G&&G.draws&&G.draws[key];
+    return !!(d&&(d.v728ManualReEditMode||d.v730ManualReEditMode||d.v732ForceRelockRenumber));
+  }
+  function prepareForceRenumber(key){
+    const d=G&&G.draws&&G.draws[key]; if(!d) return false;
+    if(!isManualEditKey(key)) return false;
+    // 핵심: 기존 잠금 플래그가 남아 있으면 v702가 oldNo를 그대로 재사용한다.
+    // 다시 잠글 때는 현재 코트/순서 기준으로 1번부터 새로 매기도록 draw-level 잠금만 해제한다.
+    ['v702Locked','v701GroupCourtLocked','v700GroupCourtLocked','v697GroupCourtLocked'].forEach(f=>{try{delete d[f];}catch(e){}});
+    ['v702Snapshot','v701Snapshot','v700Snapshot','v697CourtSnapshot'].forEach(f=>{try{delete d[f];}catch(e){}});
+    d.v732ForceRelockRenumber=true;
+    d.v732ForceRelockRenumberAt=new Date().toISOString();
+    return true;
+  }
+  function normalizeLabelsAfterRelock(key){
+    const d=G&&G.draws&&G.draws[key]; if(!d||!Array.isArray(d.groups)) return 0;
+    let n=0;
+    d.groups.forEach((g,gi)=>{
+      if(!g) return;
+      const no=Number(g.confirmedGroupNo||g.finalGroupNo||g.displayGroupNo||g.manualGroupNo||g.v702GroupNo||0);
+      if(no>0){
+        g.confirmedGroupNo=no; g.finalGroupNo=no; g.displayGroupNo=no; g.manualGroupNo=no; g.v702GroupNo=no;
+        g.name=no+'조'; g.label=no+'조'; g.groupLabel=no+'조';
+      }
+      delete g.v728ManualReEditMode; delete g.v730ManualReEditMode;
+      groupMatches(key,gi).forEach(m=>{
+        if(no>0){
+          m.groupNo=no; m.confirmedGroupNo=no; m.finalGroupNo=no; m.displayGroupNo=no; m.v702GroupNo=no;
+          m.groupLabel=no+'조'; m.prelimGroupLabel=no+'조';
+        }
+        delete m.v728ManualReEditMode; delete m.v730ManualReEditMode;
+        n++;
+      });
+    });
+    delete d.v728ManualReEditMode; delete d.v730ManualReEditMode;
+    d.v732RelockRenumberedAt=new Date().toISOString();
+    return n;
+  }
+  function updateBadge(){
+    try{const b=$('bracketFreshnessBadge'); if(b){b.textContent='v732'; b.title='v732 잠금해제 후 재잠금 시 조번호 재부여';}}
+    catch(e){}
+  }
+  function wrapLock(){
+    const old=window.v702FinalizeGroupNoAndCourtLock;
+    if(typeof old!=='function' || old.__v732RelockRenumberWrapped) return;
+    const w=async function(){
+      const keys=keysForCurrent(true).filter(k=>G&&G.draws&&G.draws[k]);
+      const needs=keys.filter(isManualEditKey);
+      let confirmedByV732=false;
+      if(needs.length){
+        const msg='수동수정 후 다시 잠급니다.\n\n현재 코트현황판 순서 기준으로 조번호를 1번부터 다시 부여하고, 그 상태로 코트를 잠급니다.\n\n계속할까요?';
+        if(!confirm(msg)) return false;
+        confirmedByV732=true;
+        needs.forEach(prepareForceRenumber);
+      }
+      const origConfirm=window.confirm;
+      if(confirmedByV732){
+        let consumed=false;
+        window.confirm=function(msg){
+          if(!consumed && /현재\s*코트\s*배정\s*상태|조번호를\s*확정|코트를\s*서버에\s*잠급니다/.test(String(msg||''))){ consumed=true; return true; }
+          return origConfirm.apply(window,arguments);
+        };
+      }
+      let ok=false;
+      try{ ok=await old.apply(this,arguments); }
+      finally{ if(confirmedByV732) window.confirm=origConfirm; }
+      if(ok && needs.length){
+        try{
+          let total=0;
+          for(const key of needs){ total+=normalizeLabelsAfterRelock(key); await saveKey(key); }
+          clearBundleCache(currentTid());
+          try{ if(typeof renderBracket==='function') renderBracket(); }catch(e){}
+          toastMsg('수동 이동 기준 조번호 재부여 완료 ✅ '+total+'경기 저장','success');
+        }catch(e){ console.error('[v732] post relock save failed',e); toastMsg('재잠금 후 조번호 저장 보정 실패: '+(e.message||e),'error'); }
+      }
+      return ok;
+    };
+    w.__v732RelockRenumberWrapped=true;
+    w.__v732Old=old;
+    window.v702FinalizeGroupNoAndCourtLock=w;
+    ['v650OpenManualGroupNoBulkCurrent','v626FinalizeGroupOrder','v606FinalizeGroupOrder','v693FinalizeGroupOrder','v694FinalizeCurrentCourtOrder','v696LockCurrentCourts','v697FinalizeGroupNoAndCourtLock','v700FinalizeGroupNoAndCourtLock','v701FinalizeGroupNoAndCourtLock'].forEach(n=>{try{window[n]=w; eval(n+'=window["'+n+'"];');}catch(e){}});
+  }
+  function install(){updateBadge();wrapLock();}
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>{install();setTimeout(install,500);});
+  else {install();setTimeout(install,500);}
+  setTimeout(install,1000); setTimeout(install,2500);
+  console.log('[v732] relock renumber after manual move installed',VERSION);
+})();
+</script>
+
+
+
+<!-- v733: 경기/시합 완료 알림 빨간색 창 복구 -->
+<style id="v733MatchCompleteRedAlertStyle">
+/* 경기 완료/시합 종료 알림은 위험/종료 성격이므로 기존처럼 빨간색으로 표시 */
+.sticky-alert-wrap.match-complete-alert .sticky-alert-card,
+.sticky-alert-wrap.v733-complete-alert .sticky-alert-card{
+  background:linear-gradient(135deg,#b91c1c,#ef4444) !important;
+  color:#fff !important;
+  border:1px solid rgba(255,255,255,.22) !important;
+  box-shadow:0 16px 36px rgba(185,28,28,.34) !important;
+}
+.sticky-alert-wrap.match-complete-alert .sticky-alert-btn.primary,
+.sticky-alert-wrap.v733-complete-alert .sticky-alert-btn.primary{
+  background:#fff !important;
+  color:#b91c1c !important;
+}
+.sticky-alert-wrap.match-complete-alert .sticky-alert-btn.secondary,
+.sticky-alert-wrap.v733-complete-alert .sticky-alert-btn.secondary{
+  background:rgba(255,255,255,.16) !important;
+  color:#fff !important;
+  border:1px solid rgba(255,255,255,.26) !important;
+}
+</style>
+<script id="v733MatchCompleteRedAlertScript">
+(function(){
+  'use strict';
+  if(window.__v733MatchCompleteRedAlertInstalled) return;
+  window.__v733MatchCompleteRedAlertInstalled=true;
+  const VERSION='2026-06-11-v733-match-complete-red-alert';
+  function $(id){return document.getElementById(id);}
+  function isCompletePayload(item){
+    try{
+      const s=[item&&item.kind,item&&item.smsKind,item&&item.actionType,item&&item.title,item&&item.msg,item&&item.type].map(v=>String(v||'')).join(' ');
+      if(/match_completed|matchComplete|match_completed_admin|court_complete/i.test(s)) return true;
+      if(/경기\s*(완료|종료)|시합\s*(완료|종료)|결과\s*저장|완료\s*알림/.test(s) && !/접수\s*완료|로그인\s*완료|저장\s*완료/.test(s)) return true;
+    }catch(e){}
+    return false;
+  }
+  function setCompleteClass(flag){
+    const wrap=$('stickyAlertWrap');
+    if(!wrap) return;
+    wrap.classList.toggle('match-complete-alert', !!flag);
+    wrap.classList.toggle('v733-complete-alert', !!flag);
+    if(flag) wrap.setAttribute('data-v733-complete','1'); else wrap.removeAttribute('data-v733-complete');
+  }
+  function updateBadge(){
+    try{const b=$('bracketFreshnessBadge'); if(b){b.textContent='v733'; b.title='v733 시합 종료 알림 빨간색 창 복구';}}catch(e){}
+  }
+
+  // 기존 close 함수가 class를 지우지 않아 다음 알림에 빨간색이 남지 않도록 보강
+  const oldClose=window.closeStickyAlert;
+  if(typeof oldClose==='function' && !oldClose.__v733RedCloseWrapped){
+    const w=function(){ setCompleteClass(false); return oldClose.apply(this,arguments); };
+    w.__v733RedCloseWrapped=true;
+    window.closeStickyAlert=w;
+    try{ closeStickyAlert=w; }catch(e){}
+  }
+
+  // sticky alert 큐 진입 시 완료 알림 표시 클래스를 붙임
+  const oldRender=window.renderNextStickyAlert;
+  if(typeof oldRender==='function' && !oldRender.__v733RedRenderWrapped){
+    const w=function(){
+      const q=Array.isArray(window.STICKY_ALERT_QUEUE)?window.STICKY_ALERT_QUEUE:null;
+      const item=q&&q.length?q[0]:null;
+      const r=oldRender.apply(this,arguments);
+      setTimeout(function(){
+        const wrap=$('stickyAlertWrap');
+        if(!wrap || !wrap.classList.contains('show')) return;
+        const txt=[wrap.getAttribute('data-sms-kind'),wrap.getAttribute('data-action-type'),wrap.textContent||''].join(' ');
+        const flag=isCompletePayload(item)||/match_completed|경기\s*(완료|종료)|시합\s*(완료|종료)|완료\s*알림/.test(txt);
+        setCompleteClass(flag);
+      },0);
+      return r;
+    };
+    w.__v733RedRenderWrapped=true;
+    window.renderNextStickyAlert=w;
+    try{ renderNextStickyAlert=w; }catch(e){}
+  }
+
+  // enqueue 단계에서도 정보 보존: 완료 알림에는 kind를 명확히 부여
+  const oldEnqueue=window.enqueueStickyAlert;
+  if(typeof oldEnqueue==='function' && !oldEnqueue.__v733RedEnqueueWrapped){
+    const w=function(payload,type){
+      try{
+        if(payload && typeof payload==='object' && isCompletePayload(payload)){
+          payload={...payload, kind:payload.kind||'match_completed', smsKind:payload.smsKind||'match_completed', actionType:payload.actionType||'info_only'};
+        }
+      }catch(e){}
+      return oldEnqueue.call(this,payload,type);
+    };
+    w.__v733RedEnqueueWrapped=true;
+    window.enqueueStickyAlert=w;
+    try{ enqueueStickyAlert=w; }catch(e){}
+  }
+
+  // 실제 수신 푸시 확인창도 완료/종료 알림이면 빨간색
+  const oldReceived=window.showReceivedPushConfirmAlert;
+  if(typeof oldReceived==='function' && !oldReceived.__v733RedReceivedWrapped){
+    const w=function(title,body,data){
+      const complete=isCompletePayload({title, msg:body, ...(data||{})});
+      const r=oldReceived.apply(this,arguments);
+      setTimeout(()=>setCompleteClass(complete),0);
+      return r;
+    };
+    w.__v733RedReceivedWrapped=true;
+    window.showReceivedPushConfirmAlert=w;
+    try{ showReceivedPushConfirmAlert=w; }catch(e){}
+  }
+  const oldCloseReceived=window.closeReceivedPushConfirmAlert;
+  if(typeof oldCloseReceived==='function' && !oldCloseReceived.__v733RedReceivedCloseWrapped){
+    const w=function(){ setCompleteClass(false); return oldCloseReceived.apply(this,arguments); };
+    w.__v733RedReceivedCloseWrapped=true;
+    window.closeReceivedPushConfirmAlert=w;
+    try{ closeReceivedPushConfirmAlert=w; }catch(e){}
+  }
+
+  updateBadge();
+  document.addEventListener('DOMContentLoaded',updateBadge);
+  setTimeout(updateBadge,400);
+  setTimeout(updateBadge,1200);
+  console.log('[v733] match complete red alert installed', VERSION);
 })();
 </script>
 
