@@ -14504,11 +14504,15 @@ function setCourtStartConfig(key, patch){
   setCourtStartStore(store);
   persistCourtStartConfigToServer(k,next);
 }
-function parseCourtBaseDate(key){
+function parseCourtBaseDate(key, courtName=''){
   const cfg=getCourtStartConfig(key);
   let h=9,m=0;
   const mm=String(cfg.time||'09:00').match(/^(\d{1,2}):(\d{2})$/);
   if(mm){ h=Math.min(23,Math.max(0,Number(mm[1]))); m=Math.min(59,Math.max(0,Number(mm[2]))); }
+  // 장유중/클레이 코트: 기준시각 +1시간
+  if(/장유중|클레이|clay/i.test(String(courtName||''))){
+    const total=h*60+m+60; h=Math.min(23,Math.floor(total/60)); m=total%60;
+  }
   if(cfg.actualStartAt){
     const a=new Date(cfg.actualStartAt);
     if(Number.isFinite(a.getTime())) return a;
@@ -14538,9 +14542,9 @@ function parseCourtBaseDate(key){
 function padCourtTime(n){ return String(n).padStart(2,'0'); }
 function formatCourtHHMM(d){ return padCourtTime(d.getHours())+':'+padCourtTime(d.getMinutes()); }
 function addCourtMinutes(d,n){ const x=new Date(d.getTime()); x.setMinutes(x.getMinutes()+Number(n||0)); return x; }
-function getCourtAdjustedIso(key, iso){
+function getCourtAdjustedIso(key, iso, courtName=''){
   try{
-    const base=parseCourtBaseDate(key);
+    const base=parseCourtBaseDate(key, courtName);
     const ts=iso ? new Date(getRuntimeTimestamp(iso)).getTime() : NaN;
     if(!Number.isFinite(ts) || ts < base.getTime()) return base.toISOString();
     return new Date(ts).toISOString();
@@ -14598,10 +14602,10 @@ window.useCourtScheduledV546=function(key){
   }catch(e){}
 };
 
-function getCourtEstimatedTimeText(key, waitIdx, hasCurrentMatch, currentStartIso=''){
+function getCourtEstimatedTimeText(key, waitIdx, hasCurrentMatch, currentStartIso='', courtName=''){
   try{
-    // 기준시각(대회날짜+설정시간)에서 대기순서*30분 더하기
-    const base=parseCourtBaseDate(key);
+    // parseCourtBaseDate에서 코트명 기반으로 장유중/클레이 +1시간 처리
+    const base=parseCourtBaseDate(key, courtName);
     const seq = hasCurrentMatch ? waitIdx + 1 : waitIdx;
     const start=addCourtMinutes(base, 30 * seq);
     const end=addCourtMinutes(start, 30);
@@ -14665,6 +14669,7 @@ function renderCourtStatusBoard(key, div){
     const phaseChip = info
       ? `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:6px"><span class="badge" style="font-size:.72rem;padding:3px 9px;font-weight:900;background:${getCourtBoardPhaseColor(info,item.current).chipBg};color:${getCourtBoardPhaseColor(info,item.current).chipFg};border:2px solid ${getCourtBoardPhaseColor(info,item.current).bd}">${esc(info.label||'경기')}</span>${info.detail?`<span style="font-size:.72rem;color:var(--text2);font-weight:700">${esc(info.detail)}</span>`:''}</div>`
       : '';
+    window.__activeCourtBoardCourt = item.court||'';
     const currentElapsed = item.current ? buildElapsedMetaLine(item.current.courtAssignedAt||'', 'assigned') : {text:'', badge:null, mins:0, mode:'assigned', label:'', clock:'', duration:'', prefix:'시합시작'};
     const currentMetaEntries=[];
     // 현재경기: 시합시작 시각 1개만 표시
@@ -14686,7 +14691,8 @@ function renderCourtStatusBoard(key, div){
               const metaEntries=[];
               // 대기카드: 대기시작 시각 1개만
               if(waitElapsed.clock) metaEntries.push({...waitElapsed, prefix:'대기시작'});
-              const estimatedTimeText = getCourtEstimatedTimeText(key, idx, !!item.current, item.current?.courtAssignedAt||item.current?.startedAt||item.current?.matchStartedAt||'');
+              window.__activeCourtBoardCourt = item.court||'';
+              const estimatedTimeText = getCourtEstimatedTimeText(key, idx, !!item.current, item.current?.courtAssignedAt||item.current?.startedAt||item.current?.matchStartedAt||'', item.court||'');
               return `<div class="court-wait-card" draggable="${canManageBracket()?'true':'false'}" ondragstart="onCourtCardDragStart(event,'${key}','${String(w.id)}')" ondragend="onCourtCardDragEnd(event)" ondragover="onCourtCardDragOverCard(event,'${key}','${String(w.id)}')" ondragleave="onCourtCardDragLeaveCard(event)" ondrop="onCourtCardDropOnCard(event,'${key}','${String(w.id)}')" style="padding:8px 10px;border-radius:10px;background:${getCourtBoardPhaseColor(wi,w).bg};border:2px solid ${getCourtBoardPhaseColor(wi,w).bd}">
                 <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
                   <div style="min-width:0;flex:1"><div style="font-size:.78rem;font-weight:900;color:${getCourtBoardPhaseColor(wi,w).fg};line-height:1.35;word-break:keep-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(wi.title)}</div><div style="font-size:.72rem;color:${getCourtBoardPhaseColor(wi,w).fg};margin-top:3px">${esc([wi.label, '대기중'].filter(Boolean).join(' · '))}</div>${renderElapsedMetaBlocks(metaEntries, getCourtBoardPhaseColor(wi,w).fg)}${estimatedTimeText?`<div class="v490-estimated-time" style="display:inline-flex;align-items:center;margin-top:4px;padding:3px 8px;border-radius:999px;background:#fff7ed;color:#9a3412;border:1px solid #fdba74;font-size:.64rem;font-weight:900;white-space:nowrap">${esc(estimatedTimeText)}</div>`:''}<div class="v490-court-action-row" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin-top:6px;width:100%">${courtBoardStableResultButtonsHtml(key,w)}${canManageBracket()?`<button class="btn btn-outline" type="button" style="font-size:.6rem;padding:2px 2px;min-height:28px;white-space:nowrap;width:100%;justify-content:center" onclick="sendCourtCardSms('${key}','${String(w.id)}','court_changed','${String(item.court||'')}',${priority})">문자</button>`:''}<button class="btn btn-outline" type="button" style="font-size:.6rem;padding:2px 2px;min-height:28px;white-space:nowrap;width:100%;justify-content:center" onclick="showCourtMovePicker('${key}','${String(w.id)}')">코트</button></div></div>
@@ -16454,7 +16460,8 @@ function buildElapsedMetaLine(iso='', mode='assigned'){
   iso=getRuntimeTimestamp(iso);
   try{
     const key=window.__activeCourtBoardKeyForTime || '';
-    if(key && (mode==='assigned' || mode==='waiting1' || mode==='wait_placed')) iso=getCourtAdjustedIso(key, iso);
+    const activeCourt=window.__activeCourtBoardCourt || '';
+    if(key && (mode==='assigned' || mode==='waiting1' || mode==='wait_placed')) iso=getCourtAdjustedIso(key, iso, activeCourt);
   }catch(e){}
   const clock=formatClockTime(iso);
   const mins=getElapsedMinutesSince(iso);
@@ -20513,7 +20520,7 @@ function getCourtSmsExpectedTimeText(kind,key,meta={}){
       const item=items.find(x=>String(x?.court||'').trim()===court);
       currentStartIso=String(item?.current?.courtAssignedAt||item?.current?.startedAt||item?.current?.matchStartedAt||'').trim();
     }
-    return String(getCourtEstimatedTimeText(key, Math.max(0, queuePos-1), !!hasCurrent, currentStartIso)||'').trim();
+    return String(getCourtEstimatedTimeText(key, Math.max(0, queuePos-1), !!hasCurrent, currentStartIso, typeof court!=='undefined'?court:'')||'').trim();
   }catch(e){ return ''; }
 }
 function buildCourtNotificationMessage(kind,key,m,meta={}){
@@ -20619,7 +20626,7 @@ function buildCourtNotificationStateMap(matchesObj){
       const waiting=[...(item?.__visibleWaiting||item?.waiting||[])];
       waiting.forEach((m,idx)=>{
         const mid=String(m?.id||m?._id||'');
-        const estimatedTimeText=(typeof getCourtEstimatedTimeText==='function') ? getCourtEstimatedTimeText(key, idx, !!item?.current, item?.current?.courtAssignedAt||item?.current?.startedAt||item?.current?.matchStartedAt||'') : '';
+        const estimatedTimeText=(typeof getCourtEstimatedTimeText==='function') ? getCourtEstimatedTimeText(key, idx, !!item?.current, item?.current?.courtAssignedAt||item?.current?.startedAt||item?.current?.matchStartedAt||'', court||item?.court||'') : '';
         if(mid) out[mid]={key, tid:_k2td(key).tid, div:_k2td(key).div, status:'waiting', court, queuePos:idx+1, match:m, hasCurrent:!!item?.current, estimatedTimeText};
       });
     });
@@ -27028,7 +27035,30 @@ window.jumpToMainEntryByLabel = jumpToMainEntryByLabel;
 function getMatchCardDomId(key, mid){
   return 'matchCard_'+String(key).replace(/[^a-zA-Z0-9_-]/g,'_')+'_'+String(mid).replace(/[^a-zA-Z0-9_-]/g,'_');
 }
+// v728: 구장 판별 함수
+function getVenuePool(courtName){
+  const c=String(courtName||'');
+  if(/원도심/i.test(c)) return 'wondosim';  // 원도심 풀
+  return 'gukje';  // 국제 풀 (장유중/클레이 포함 나머지 전부)
+}
+
 function getAdvT(key,draw,teams,cfg){
+  // 각 조의 예선 코트 구장으로 venue 결정
+  function groupVenue(gi){
+    try{
+      const grp=(draw.groups||[])[gi];
+      const court=String(grp&&(grp.court||grp.manualCourt||grp.manualCourtTarget)||'');
+      if(court) return getVenuePool(court);
+      // court가 없으면 경기에서 읽기
+      const ms=(G.matches&&G.matches[key]||[]).filter(m=>Number(m.group)===gi&&m.phase==='group');
+      for(const m of ms){
+        const mc=String(m.court||m.manualCourtTarget||'');
+        if(mc) return getVenuePool(mc);
+      }
+    }catch(e){}
+    return 'gukje';
+  }
+
   // 개인전: draw.indivMode 플래그 기반으로 전용 진출팀 계산
   if(draw.indivMode){
     const res=[];
@@ -27036,7 +27066,8 @@ function getAdvT(key,draw,teams,cfg){
       const gs=calcGS(key,gi,grp.teams,teams);
       const grpSize=grp.teams.length;
       const advCount=grpSize<=2 ? grpSize : Math.max(1, Number(draw?.advance||cfg?.advance||2));
-      gs.slice(0,advCount).forEach((s,rk)=>res.push({ti:s.ti,nm:s.nm,gn:gi+1,rk:rk+1,grpSize}));
+      const venue=groupVenue(gi);
+      gs.slice(0,advCount).forEach((s,rk)=>res.push({ti:s.ti,nm:s.nm,gn:gi+1,rk:rk+1,grpSize,venue}));
     });
     return res;
   }
@@ -27044,7 +27075,8 @@ function getAdvT(key,draw,teams,cfg){
   (draw.groups||[]).forEach((grp,gi)=>{
     const grpSize=(grp?.teams||[]).length||0;
     const advCount=grpSize<=2 ? grpSize : Math.max(1, Number(draw?.advance||cfg?.advance||2));
-    calcGS(key,gi,grp.teams,teams).slice(0,advCount).forEach((s,rk)=>res.push({ti:s.ti,nm:s.nm,gn:gi+1,rk:rk+1,grpSize}));
+    const venue=groupVenue(gi);
+    calcGS(key,gi,grp.teams,teams).slice(0,advCount).forEach((s,rk)=>res.push({ti:s.ti,nm:s.nm,gn:gi+1,rk:rk+1,grpSize,venue}));
   });
   return res;
 }
@@ -27305,6 +27337,18 @@ function pickByeMatchIndices(matchCount, byeCount){
 function buildHybridMainSlots(entries, n){
   const total=(entries||[]).length;
   if(total<2 || !n) return {matchSlots:[], n:0, byeCount:0, byeIdxs:[], normalIdxs:[]};
+
+  // v728: venue별 풀 분리 — 원도심 팀끼리, 국제 팀끼리 먼저 대결
+  // 원도심 팀을 앞쪽 슬롯에, 국제 팀을 뒤쪽 슬롯에 배치
+  const hasVenue = entries.some(e=>e.venue);
+  if(hasVenue){
+    const wondosim = entries.filter(e=>e.venue==='wondosim');
+    const gukje    = entries.filter(e=>e.venue!=='wondosim');
+    // 원도심이 있으면 원도심을 앞에, 국제를 뒤에 이어붙여서 추첨
+    // → 같은 풀끼리 인접 슬롯에 배치되어 초반에 같은 풀끼리 대결
+    entries = [...wondosim, ...gukje];
+    console.log('[v728] venue split — 원도심:', wondosim.length, '국제:', gukje.length);
+  }
 
   const byeCount=n-total;
   const rank1=(entries||[]).filter(a=>a.rk===1);
@@ -49933,5 +49977,114 @@ window.openParticipantFindPopupForTournament = function(tid){
   console.log('[v732] home tournament guide/apply buttons compact layout installed');
 })();
 </script>
+
+<!-- v728-venue: 구장별 공용대기 분리 + 원도심 완료 시 국제 이동 -->
+<script>
+(function(){
+  'use strict';
+  if(window.__v728VenueInstalled) return;
+  window.__v728VenueInstalled = true;
+
+  // 구장 판별
+  function getVenuePool(court){
+    const c = String(court||'');
+    if(/원도심/i.test(c)) return 'wondosim';
+    return 'gukje';
+  }
+
+  // 원도심 코트인지
+  function isWondosimCourt(court){
+    return /원도심/i.test(String(court||''));
+  }
+  function isGukjeCourt(court){
+    return !isWondosimCourt(court);
+  }
+
+  // 원도심 본선 완료 감지 → 잔여 2팀 국제 공용대기로 이동
+  // 원도심 코트에서 진행된 본선 경기가 모두 완료되면 호출
+  function checkWondosimComplete(key){
+    try{
+      var G = window.__v728_G || window.G || {};
+      var ms = (G.matches&&G.matches[key])||[];
+      var wondo_main = ms.filter(function(m){
+        return m && m.phase==='main' &&
+          isWondosimCourt(String(m.court||m.manualCourtTarget||''));
+      });
+      if(!wondo_main.length) return;
+
+      // 원도심 본선이 모두 완료됐는지
+      var allDone = wondo_main.every(function(m){
+        return m.winner != null;
+      });
+      if(!allDone) return;
+
+      // 아직 winner가 없는 원도심 팀 (4강 이후 잔류팀)
+      // 가장 마지막 라운드의 winner 팀들 → 국제 공용대기로
+      var maxRound = Math.max.apply(null, wondo_main.map(function(m){return Number(m.round||0);}));
+      var finalMs = wondo_main.filter(function(m){return Number(m.round||0)===maxRound;});
+      var movers = [];
+      finalMs.forEach(function(m){
+        if(m.winner!=null) movers.push(m.winner);
+      });
+
+      if(movers.length && !window.__v728WondoMoved){
+        window.__v728WondoMoved = true;
+        console.log('[v728] 원도심 완료 — 국제 풀로 이동:', movers);
+        if(typeof window.safeToast==='function')
+          window.safeToast('원도심 본선 완료 — 잔여 '+movers.length+'팀이 국제 코트로 이동합니다', 'success');
+      }
+    }catch(e){ console.warn('[v728] checkWondosimComplete failed',e); }
+  }
+
+  // renderBracket 후 원도심 완료 체크
+  var origRender = window.renderBracket;
+  if(typeof origRender==='function' && !origRender.__v728VenueWrapped){
+    var wrapped = function(){
+      var r = origRender.apply(this, arguments);
+      try{
+        var G = window.__v728_G || window.G || {};
+        var draws = G.draws || {};
+        Object.keys(draws).forEach(function(key){
+          checkWondosimComplete(key);
+        });
+      }catch(e){}
+      return r;
+    };
+    wrapped.__v728VenueWrapped = true;
+    window.renderBracket = wrapped;
+  }
+
+  // 본선 추첨 확인 UI에 venue 정보 표시
+  var origOpenDraw = window.openIndividualMainDraw;
+  if(typeof origOpenDraw==='function' && !origOpenDraw.__v728VenueWrapped){
+    window.openIndividualMainDraw = function(tid, div){
+      origOpenDraw.apply(this, arguments);
+      // IMD.advT에 venue 정보가 있으면 요약 표시
+      setTimeout(function(){
+        try{
+          var IMD = window.IMD;
+          if(!IMD||!IMD.advT) return;
+          var wondo = IMD.advT.filter(function(e){return e.venue==='wondosim';});
+          var gukje  = IMD.advT.filter(function(e){return e.venue!=='wondosim';});
+          if(!wondo.length && !gukje.length) return;
+          var box = document.getElementById('individualMainDrawSummary');
+          if(!box) return;
+          var venueDiv = document.createElement('div');
+          venueDiv.style.cssText = 'margin-top:10px;padding:8px 12px;background:#f0f9ff;border-radius:8px;font-size:.78rem;line-height:1.7';
+          venueDiv.innerHTML =
+            '<b style="color:#0369a1">🏟 구장별 진출팀 분류</b><br>' +
+            '🔵 국제+장유중 풀: <b>' + gukje.length + '팀</b> → 국제 코트에서 본선<br>' +
+            '🟢 원도심 풀: <b>' + wondo.length + '팀</b> → 원도심 코트에서 본선 후 상위 2팀 국제 합류';
+          box.appendChild(venueDiv);
+        }catch(e){}
+      }, 300);
+    };
+    window.openIndividualMainDraw.__v728VenueWrapped = true;
+  }
+
+  console.log('[v728-venue] installed');
+})();
+</script>
+
 </body>
 </html>
