@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-11-v725-member-result-open-freeze-fix";
+  const APP_VERSION = "2026-06-11-v727-member-result-participant-gate";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -12445,6 +12445,15 @@ async function requireGoogleLoginForIndividual(action='개인전 이용'){
 // v607p: 이름+전화번호로 참가자 확인 - 로그인 시 자동, 미로그인 시 입력 팝업
 function verifyParticipantByNamePhone(key, m){
   return new Promise(async (resolve, reject)=>{
+    const authKey=String(key)+'|'+String(m?.id||m?._id||'');
+    try{
+      const cached=(window.__v726IndividualResultAuth||{})[authKey];
+      if(cached && cached.side && Date.now()-Number(cached.at||0)<30*60*1000){
+        resolve({...cached, method:cached.method||'cached'});
+        return;
+      }
+    }catch(_e){}
+
     // CURRENT_APP_PROFILE 우선, 없으면 Firestore에서 로드
     let profile=window.CURRENT_APP_PROFILE||window.CURRENT_APP_USER_PROFILE||{};
     if((!profile.name && !profile.phone) && auth?.currentUser && !auth.currentUser.isAnonymous){
@@ -12457,29 +12466,62 @@ function verifyParticipantByNamePhone(key, m){
     const savedPhone=String(profile.phone||profile.phoneDigits||'').replace(/[^0-9]/g,'');
     if(savedName && savedPhone){
       const side=_checkNamePhoneSide(key, m, savedName, savedPhone);
-      if(side){ resolve({side, method:'profile_auto'}); return; }
-      reject(new Error('로그인 계정(' + savedName + ')은 이 경기 참가자가 아닙니다.\n내 정보의 이름/전화번호가 접수 시 입력한 정보와 동일한지 확인해 주세요.'));
-      return;
+      if(side){
+        const verified={side, method:'profile_auto', name:savedName, phone:savedPhone, at:Date.now()};
+        window.__v726IndividualResultAuth=window.__v726IndividualResultAuth||{};
+        window.__v726IndividualResultAuth[authKey]=verified;
+        resolve(verified);
+        return;
+      }
+      // v726: 로그인 프로필이 경기 참가자와 다르면 바로 차단하지 않고, 현장 입력 확인 팝업을 띄운다.
+      // 사용자가 접수 당시 입력한 이름/전화번호를 직접 입력해 검증할 수 있게 한다.
     }
-    // 로그인 안 됐거나 이름/전화번호 미등록 → 입력 팝업
     _showNamePhoneInputModal(key, m, resolve, reject);
   });
 }
 function _normalizePhone(p){ return String(p||'').replace(/[^0-9]/g,''); }
+function _normalizeVerifyName(n){
+  try{ if(typeof cleanName==='function') return cleanName(n); }catch(_e){}
+  return String(n||'').replace(/\s+/g,'').trim();
+}
+function _sameVerifyPhone(a,b){
+  const x=_normalizePhone(a), y=_normalizePhone(b);
+  if(!x||!y) return false;
+  if(x===y) return true;
+  // +82/0 표기 차이를 흡수하되, 너무 짧은 번호로는 허용하지 않는다.
+  if(x.length>=8 && y.length>=8 && x.slice(-8)===y.slice(-8)) return true;
+  return false;
+}
 function _checkNamePhoneSide(key, m, name, phone){
   const teams=G.teams[key]||[];
   const t1=teams[m.t1]||teams.find(t=>t&&(t.id===m.t1||t.name===m.t1));
   const t2=teams[m.t2]||teams.find(t=>t&&(t.id===m.t2||t.name===m.t2));
-  const ph=_normalizePhone(phone);
+  const targetName=_normalizeVerifyName(name);
+  function entriesFromTeam(team){
+    const out=[];
+    if(!team) return out;
+    if(Array.isArray(team.individualPlayers)){
+      team.individualPlayers.forEach((p,idx)=>{
+        out.push({name:p?.name||'', phone:p?.phone||p?.mobile||p?.tel||p?.contactPhone||'', source:'individualPlayers', idx});
+      });
+    }
+    const players=Array.isArray(team.players)?team.players:[];
+    const phones=Array.isArray(team.phones)?team.phones:[];
+    players.forEach((n,idx)=>{
+      out.push({name:n||'', phone:phones[idx] || (idx===0?team.phone:'') || (idx===1?team.phone2:'') || '', source:'players', idx});
+    });
+    // 일부 과거 데이터 호환
+    if(team.name || team.phone) out.push({name:team.name||team.entryLabel||team.pairLabel||'', phone:team.phone||'', source:'team'});
+    if(team.player1 || team.phone1) out.push({name:team.player1||'', phone:team.phone1||'', source:'legacy1'});
+    if(team.player2 || team.phone2) out.push({name:team.player2||'', phone:team.phone2||'', source:'legacy2'});
+    return out.filter(e=>_normalizeVerifyName(e.name) || _normalizePhone(e.phone));
+  }
   function matchTeam(team){
-    if(!team) return false;
-    const players=team.players||[];
-    const phones=(team.phones||[players.length>0?team.phone:'']).concat(team.phone2||'');
-    const allPhones=[team.phone,...(team.phones||[])].map(_normalizePhone).filter(Boolean);
-    if(allPhones.some(p=>p===ph)) return true;
-    // 이름도 확인
-    const allNames=[team.name,...players].map(n=>String(n||'').trim()).filter(Boolean);
-    return allPhones.some(p=>p===ph) || (allNames.some(n=>n===name.trim()) && allPhones.length===0);
+    return entriesFromTeam(team).some(e=>{
+      const n=_normalizeVerifyName(e.name);
+      if(!n || n!==targetName) return false;
+      return _sameVerifyPhone(e.phone, phone);
+    });
   }
   if(matchTeam(t1)) return 1;
   if(matchTeam(t2)) return 2;
@@ -12521,7 +12563,12 @@ function _showNamePhoneInputModal(key, m, resolve, reject){
     const side=_checkNamePhoneSide(key, m, name, phone);
     if(!side){ if(msgEl) msgEl.textContent='등록된 정보와 일치하지 않습니다. 접수 시 입력한 이름/전화번호를 확인하세요.'; return; }
     modal.classList.remove('open');
-    resolve({side, method:'name_phone', name, phone});
+    const verified={side, method:'name_phone', name, phone, at:Date.now()};
+    try{
+      window.__v726IndividualResultAuth=window.__v726IndividualResultAuth||{};
+      window.__v726IndividualResultAuth[String(key)+'|'+String(m?.id||m?._id||'')]=verified;
+    }catch(_e){}
+    resolve(verified);
   };
   if(phoneEl) phoneEl.onkeydown=(e)=>{ if(e.key==='Enter') document.getElementById('v607VerifyConfirm')?.click(); };
 }
@@ -31380,11 +31427,29 @@ function ensureM3ResultFooterButtons(){
 }
 window.ensureM3ResultFooterButtons=ensureM3ResultFooterButtons;
 
-function openM3(key,mid){
-  const m=(G.matches[key]||[]).find(m=>m.id===mid);if(!m)return;
+async function openM3(key,mid){
+  const m=(G.matches[key]||[]).find(m=>String(m.id)===String(mid));if(!m)return;
   const indivAuth=getIndividualResultAuthState(key,m);
-  // v289: 개인전은 결과 입력창 자체는 열리게 둔다. 저장 권한은 saveM3에서 다시 검증한다.
-  if(!(AD||TM||canEditMatchByDirector(key,m)||indivAuth.allowed||isPublicResultEntryEnabled()||isIndividualByKey(key))){
+  const isIndividualOpen=isIndividualByKey(key);
+  const directorCanOpen=!isIndividualOpen && canEditMatchByDirector(key,m);
+  const canOpenAsStaff=!!(AD||TM||OP||canManageBracket());
+  // v727: 개인전 일반회원은 같은 클럽/일반 로그인 여부와 무관하게
+  // 반드시 '해당 경기 참가자의 이름+전화번호' 확인을 먼저 통과해야 결과창이 열린다.
+  // 다른 사람 경기는 결과창 자체가 열리지 않는다.
+  if(isIndividualOpen && !canOpenAsStaff){
+    try{
+      const verified=await verifyParticipantByNamePhone(key,m);
+      if(!verified || !verified.side){
+        toast('이 경기의 참가자로 확인되지 않았습니다','error');
+        return;
+      }
+      window.__v726IndividualResultAuth=window.__v726IndividualResultAuth||{};
+      window.__v726IndividualResultAuth[String(key)+'|'+String(m.id||mid)]={...verified, at:Date.now()};
+    }catch(e){
+      if(e?.message!=='취소됨') toast(e?.message||'참가자 확인이 필요합니다','error');
+      return;
+    }
+  }else if(!(canOpenAsStaff||directorCanOpen||isPublicResultEntryEnabled()||isIndividualOpen)){
     toast('해당 경기 참가팀 로그인 또는 운영 권한이 필요합니다','error');
     return;
   }
@@ -31894,7 +31959,10 @@ async function saveM3Core(){
   const list=G.matches[key]||[];const idx=list.findIndex(m=>m.id===mid);if(idx<0)return;
   const m=list[idx];
   const indivAuth=getIndividualResultAuthState(key,m);
-  const canLocalMatchEdit=(OP||canEditMatchByDirector(key,m));
+  const isIndividualSave=isIndividualByKey(key);
+  // v726: 개인전은 같은 클럽 일반회원이라는 이유만으로 저장 권한을 주지 않는다.
+  // 관리자/운영자/진행자 또는 이름+전화번호로 확인된 실제 참가자만 저장 가능.
+  const canLocalMatchEdit=(OP||(!isIndividualSave && canEditMatchByDirector(key,m)));
   const canStandardEdit=(AD||TM||canLocalMatchEdit);
   const canDirectFirestoreWrite=hasFirebaseStaffWriteAuth();
   let participantWinnerAuth=null;
@@ -31980,6 +32048,7 @@ async function saveM3Core(){
   const prevW=m.winner;
 
   if(validScoreCount===0){
+    if(isIndividualByKey(key)){ toast('점수를 선택한 뒤 결과저장을 눌러 주세요','info'); return; }
     if(prevW!=null && !m.bye){toast('이미 결과가 확정된 경기는 점수 없이 저장할 수 없습니다','error');return;}
     if(!pairChanged){toast('변경된 페어가 없습니다','info');return;}
     m.rubbers=newRb;
@@ -32984,7 +33053,7 @@ function getOrderSubmissions(match){
 function getIndividualResultAuthState(key,m){
   try{
     if(!isIndividualByKey(key) || !m) return {allowed:false, reason:'not_individual'};
-    if(AD || OP || canEditMatchByDirector(key,m)) return {allowed:true, reason:'staff'};
+    if(AD || TM || OP || isPublicResultEntryEnabled()) return {allowed:true, reason:'staff'};
     const teams=G.teams[key]||[];
     const t1=teams[m.t1]??teams.find(t=>t&&((t.id!=null&&t.id===m.t1)||(t.name&&t.name===m.t1)));
     const t2=teams[m.t2]??teams.find(t=>t&&((t.id!=null&&t.id===m.t2)||(t.name&&t.name===m.t2)));
@@ -48770,6 +48839,221 @@ button[onclick*="__hardClearAppCacheAndReload"],button[onclick*="캐시"],button
     var close=ev.target && ev.target.closest && ev.target.closest('#opStickyRibbon .closex');
     if(close){ ev.preventDefault(); ev.stopPropagation(); hideOpRibbonPersist(); }
   },true);
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start); else start();
+})();
+</script>
+
+
+<style id="v726MemberIndividualResultButtonFixStyle">
+/* v726: 일반회원도 개인전 예선 경기표에서 결과 버튼을 볼 수 있게 하되, 클릭 시 참가자 확인 후만 열린다. */
+.indiv-prelim-grid .v726-indiv-result-btn{display:inline-flex!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;align-items:center!important;justify-content:center!important;min-height:32px!important;border-radius:10px!important;font-weight:900!important;white-space:nowrap!important;}
+.indiv-prelim-grid .v275-group-actions .v726-indiv-result-btn{width:100%!important;height:34px!important;font-size:.66rem!important;padding:0 4px!important;}
+.indiv-prelim-grid .v301-result-action-row .v726-indiv-result-btn{font-size:.78rem!important;padding:6px 12px!important;}
+#v607NamePhoneModal{z-index:25000!important;}
+#v607NamePhoneModal.open{display:flex!important;}
+</style>
+<script id="v726MemberIndividualResultButtonFixScript">
+(function(){
+  'use strict';
+  if(window.__v726MemberIndividualResultButtonFixInstalled) return;
+  window.__v726MemberIndividualResultButtonFixInstalled=true;
+
+  function $(id){return document.getElementById(id);}
+  function arr(v){return Array.isArray(v)?v:[];}
+  function isIndivKey(key){
+    try{ if(typeof window.isIndividualByKey==='function') return !!window.isIndividualByKey(key); }catch(e){}
+    try{
+      var tid=String(key||'').split('_')[0];
+      var t=arr(window.G&&G.tournaments).find(function(x){return String(x.id)===tid;});
+      return !!(t && String(t.type||t.tournamentType||'')==='individual_pair');
+    }catch(e){return false;}
+  }
+  function findMatchInfoFromCard(card){
+    try{
+      var key=card && (card.getAttribute('data-key') || (card.dataset&&card.dataset.key));
+      var mid=card && (card.getAttribute('data-match-id') || (card.dataset&&card.dataset.matchId));
+      if(key && mid) return {key:key, mid:String(mid)};
+      var btn=card && card.querySelector && card.querySelector('button[onclick*="openM3"]');
+      var oc=String(btn&&btn.getAttribute('onclick')||'');
+      var m=oc.match(/openM3\(['"]([^'"]+)['"]\s*,\s*['"]([^'"]+)['"]\)/);
+      if(m) return {key:m[1], mid:m[2]};
+      if(mid && window.G&&G.matches){
+        for(var k in G.matches){
+          var hit=arr(G.matches[k]).find(function(x){return String(x.id||x._id||'')===String(mid);});
+          if(hit) return {key:k, mid:String(hit.id||hit._id)};
+        }
+      }
+    }catch(e){}
+    return null;
+  }
+  function openResult(key, mid){
+    try{
+      if(typeof window.openM3==='function') return window.openM3(key, mid);
+      if(typeof window.toast==='function') window.toast('결과 입력 기능을 아직 불러오지 못했습니다. 새로고침 후 다시 시도해 주세요.','error');
+    }catch(e){
+      console.error('[v726] open result failed', e);
+      try{ if(typeof window.toast==='function') window.toast('결과 입력창을 열 수 없습니다. 새로고침 후 다시 시도해 주세요.','error'); }catch(_e){}
+    }
+  }
+  function makeBtn(info, done){
+    var b=document.createElement('button');
+    b.type='button';
+    b.className='btn '+(done?'btn-gray':'btn-accent')+' v726-indiv-result-btn';
+    b.setAttribute('data-v726-result','1');
+    b.setAttribute('data-v301-result','1');
+    b.setAttribute('data-key',info.key);
+    b.setAttribute('data-mid',info.mid);
+    b.textContent=done?'✏️ 결과 수정':'⚡ 결과 입력';
+    b.onclick=function(ev){
+      try{ ev.preventDefault(); ev.stopPropagation(); }catch(e){}
+      openResult(info.key, info.mid);
+    };
+    return b;
+  }
+  function matchDone(info){
+    try{
+      var m=arr(window.G&&G.matches&&G.matches[info.key]).find(function(x){return String(x.id||x._id||'')===String(info.mid);});
+      if(typeof window.getMatchResultState==='function') return !!window.getMatchResultState(info.key,m).done;
+      return !!(m && m.winner!=null);
+    }catch(e){return false;}
+  }
+  function ensureButtons(){
+    try{
+      // 개별 예선 경기카드 안 결과 버튼 보강
+      document.querySelectorAll('.indiv-prelim-grid .m3card[data-match-id], .indiv-prelim-grid .match-card[data-match-id]').forEach(function(card){
+        var info=findMatchInfoFromCard(card); if(!info || !isIndivKey(info.key)) return;
+        if(card.querySelector('button[data-v301-result="1"],button[data-v302-result="1"],button.v726-indiv-result-btn')) return;
+        var row=card.querySelector('.v301-result-action-row') || card.querySelector('.m3body > div:first-child > div:last-child') || card.querySelector('.m3body');
+        if(!row) return;
+        row.appendChild(makeBtn(info, matchDone(info)));
+      });
+      // 2팀 예선 조 카드의 상단 빠른 결과 버튼 보강
+      document.querySelectorAll('.indiv-prelim-grid .grp-card').forEach(function(grp){
+        var first=grp.querySelector('.grp-matches-section .m3card[data-match-id], .grp-matches-section .match-card[data-match-id]');
+        if(!first) return;
+        var info=findMatchInfoFromCard(first); if(!info || !isIndivKey(info.key)) return;
+        var teamRows=grp.querySelectorAll('.gs-row').length;
+        if(teamRows && teamRows>2) return; // 3팀 이상은 경기 목록 팝업에서 경기별 입력
+        var actions=grp.querySelector('.v275-group-actions');
+        if(!actions){
+          actions=document.createElement('div');
+          actions.className='v275-group-actions';
+          var sec=grp.querySelector('.grp-matches-section');
+          if(sec) grp.insertBefore(actions,sec); else grp.appendChild(actions);
+        }
+        if(actions.querySelector('button[data-v726-result="1"],button[data-v301-result="1"],button.result-fast-btn')) return;
+        var btn=makeBtn(info, matchDone(info));
+        btn.textContent=matchDone(info)?'✏️ 결과':'⚡ 결과';
+        btn.classList.add('result-fast-btn');
+        actions.insertBefore(btn, actions.firstChild);
+      });
+    }catch(e){ console.warn('[v726] ensure result buttons failed', e); }
+  }
+  window.v726EnsureMemberIndividualResultButtons=ensureButtons;
+
+  // v725의 클릭 가로채기가 먼저 동작하더라도, 이 보강 버튼은 openM3의 참가자 확인을 거친다.
+  document.addEventListener('click',function(ev){
+    var btn=ev.target&&ev.target.closest&&ev.target.closest('button[data-v726-result="1"]');
+    if(!btn) return;
+    ev.preventDefault(); ev.stopImmediatePropagation();
+    openResult(btn.getAttribute('data-key'), btn.getAttribute('data-mid'));
+  },true);
+
+  function schedule(){ setTimeout(ensureButtons,0); setTimeout(ensureButtons,160); setTimeout(ensureButtons,650); }
+  function wrapRender(){
+    var fn=window.renderBracket;
+    if(typeof fn!=='function' || fn.__v726Wrapped) return;
+    var wrapped=function(){ var r=fn.apply(this,arguments); schedule(); return r; };
+    wrapped.__v726Wrapped=true;
+    window.renderBracket=wrapped;
+  }
+  function start(){
+    wrapRender(); schedule();
+    try{ new MutationObserver(function(){ wrapRender(); schedule(); }).observe(document.body,{childList:true,subtree:true}); }catch(e){}
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start); else start();
+})();
+</script>
+
+
+<style id="v727MemberGroupGameButtonStyle">
+.indiv-prelim-grid .v727-group-game-btn{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:100%!important;min-height:34px!important;height:34px!important;border-radius:10px!important;font-size:.66rem!important;font-weight:900!important;white-space:nowrap!important;}
+.indiv-prelim-grid .v275-group-actions.v727-member-actions{display:grid!important;visibility:visible!important;opacity:1!important;gap:6px!important;padding:8px!important;background:#fff!important;border-top:1px solid #e5e7eb!important;}
+</style>
+<script id="v727MemberGroupGameButtonScript">
+(function(){
+  'use strict';
+  if(window.__v727MemberGroupGameButtonInstalled) return;
+  window.__v727MemberGroupGameButtonInstalled=true;
+  function arr(v){return Array.isArray(v)?v:[];}
+  function isManager(){try{return !!(document.body.classList.contains('admin-mode')||document.body.classList.contains('operator-mode')||document.body.classList.contains('tm-mode')||window.AD||window.OP||window.TM);}catch(e){return false;}}
+  function isIndivKey(key){
+    try{if(typeof window.isIndividualByKey==='function') return !!window.isIndividualByKey(key);}catch(e){}
+    try{var tid=String(key||'').split('_')[0];var t=arr(window.G&&G.tournaments).find(function(x){return String(x.id)===tid;});return !!(t&&String(t.type||t.tournamentType||'')==='individual_pair');}catch(e){return false;}
+  }
+  function infoFromMatchEl(el){
+    try{
+      var key=el && (el.getAttribute('data-key') || (el.dataset&&el.dataset.key));
+      var mid=el && (el.getAttribute('data-match-id') || (el.dataset&&el.dataset.matchId));
+      if(key&&mid) return {key:key,mid:String(mid)};
+      if(mid && window.G&&G.matches){
+        for(var k in G.matches){if(arr(G.matches[k]).some(function(m){return String(m.id||m._id||'')===String(mid);})){return {key:k,mid:String(mid)};}}
+      }
+    }catch(e){}
+    return null;
+  }
+  function openGame(btn){
+    try{ if(typeof window.openGroupMatchListPopupFromButton==='function') window.openGroupMatchListPopupFromButton(btn); }
+    catch(e){ try{ if(typeof window.toast==='function') window.toast('경기 목록을 열 수 없습니다. 새로고침 후 다시 시도해 주세요.','error'); }catch(_e){} }
+  }
+  function makeGameButton(){
+    var b=document.createElement('button');
+    b.type='button'; b.className='btn btn-outline v727-group-game-btn';
+    b.textContent='📋 경기';
+    b.style.background='#fff'; b.style.color='#1d4ed8'; b.style.borderColor='#93c5fd';
+    b.onclick=function(ev){try{ev.preventDefault();ev.stopPropagation();}catch(e){} openGame(b);};
+    return b;
+  }
+  function ensureGroupButtons(){
+    try{
+      document.querySelectorAll('.indiv-prelim-grid .grp-card').forEach(function(grp){
+        var first=grp.querySelector('.grp-matches-section .m3card[data-match-id], .grp-matches-section .match-card[data-match-id]');
+        if(!first) return;
+        var info=infoFromMatchEl(first); if(!info||!isIndivKey(info.key)) return;
+        var actions=grp.querySelector('.v275-group-actions');
+        if(!actions){
+          actions=document.createElement('div'); actions.className='v275-group-actions v727-member-actions';
+          var sec=grp.querySelector('.grp-matches-section'); if(sec) grp.insertBefore(actions,sec); else grp.appendChild(actions);
+        }
+        actions.classList.add('v727-member-actions');
+        if(!actions.querySelector('.v727-group-game-btn') && !actions.querySelector('button[onclick*="openGroupMatchListPopupFromButton"]')){
+          actions.appendChild(makeGameButton());
+        }
+        var visibleButtons=Array.prototype.slice.call(actions.querySelectorAll('button')).filter(function(x){return x.style.display!=='none';});
+        actions.style.gridTemplateColumns='repeat('+Math.max(1,visibleButtons.length)+',minmax(0,1fr))';
+      });
+    }catch(e){console.warn('[v727] group game button ensure failed',e);}
+  }
+  function patchPopupBuilder(){
+    try{
+      var old=window.v281BuildPopupCardFromMatch;
+      if(typeof old!=='function'||old.__v727Wrapped) return;
+      var wrapped=function(matchEl,idx){
+        var card=old.apply(this,arguments);
+        try{
+          var first=card&&card.querySelector('.mlp-actions button:first-child');
+          if(first){first.textContent=/완료|수정/.test((matchEl&&matchEl.textContent)||'')?'✏️ 결과수정':'✏️ 결과입력';first.style.display='inline-flex';}
+          var second=card&&card.querySelector('.mlp-actions button:nth-child(2)');
+          if(second&&!isManager()){second.style.display='none';var acts=card.querySelector('.mlp-actions');if(acts)acts.style.gridTemplateColumns='1fr';}
+        }catch(e){}
+        return card;
+      };
+      wrapped.__v727Wrapped=true; window.v281BuildPopupCardFromMatch=wrapped;
+    }catch(e){}
+  }
+  function schedule(){setTimeout(function(){patchPopupBuilder();ensureGroupButtons();},0);setTimeout(ensureGroupButtons,180);setTimeout(ensureGroupButtons,700);}
+  function wrapRender(){var fn=window.renderBracket;if(typeof fn==='function'&&!fn.__v727Wrapped){var w=function(){var r=fn.apply(this,arguments);schedule();return r;};w.__v727Wrapped=true;window.renderBracket=w;}}
+  function start(){wrapRender();schedule();try{new MutationObserver(function(){wrapRender();schedule();}).observe(document.body,{childList:true,subtree:true});}catch(e){}}
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start); else start();
 })();
 </script>
