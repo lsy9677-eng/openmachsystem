@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-11-v729-guide-visible-for-all-tournaments";
+  const APP_VERSION = "2026-06-11-v730-final-court-only-prelim-cards";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -6384,7 +6384,7 @@ button:disabled{opacity:.55!important;cursor:not-allowed!important;filter:graysc
 </div>
 </div>
 <div class="sec-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
-  <span>대진표 · 경기 현황 <span style="font-size:.72rem;font-weight:400;color:var(--text2)">— 전체 대진표는 수동 최신화 · 코트/진행경기만 자동 최소 갱신</span> <span id="bracketFreshnessBadge" style="display:inline-flex;margin-left:6px;padding:3px 8px;border-radius:999px;background:#eef2ff;color:#1d4ed8;font-size:.66rem;font-weight:900;vertical-align:middle">v729</span></span>
+  <span>대진표 · 경기 현황 <span style="font-size:.72rem;font-weight:400;color:var(--text2)">— 전체 대진표는 수동 최신화 · 코트/진행경기만 자동 최소 갱신</span> <span id="bracketFreshnessBadge" style="display:inline-flex;margin-left:6px;padding:3px 8px;border-radius:999px;background:#eef2ff;color:#1d4ed8;font-size:.66rem;font-weight:900;vertical-align:middle">v730</span></span>
   <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
     <button onclick="manualRefreshCurrentTournament()" style="padding:7px 14px;border-radius:999px;border:none;background:#0f766e;color:#fff;font-size:.84rem;font-weight:900;cursor:pointer;display:inline-flex;align-items:center;gap:5px;box-shadow:0 2px 8px rgba(15,118,110,.25)">🔄 최신 대진표</button>
     <button onclick="window.__hardClearAppCacheAndReload&&window.__hardClearAppCacheAndReload()" style="padding:7px 12px;border-radius:999px;border:1px solid #cbd5e1;background:#fff;color:#334155;font-size:.78rem;font-weight:900;cursor:pointer;display:inline-flex;align-items:center;gap:5px">🧹 캐시초기화</button>
@@ -25357,17 +25357,25 @@ function renderBracketHTMLForDiv(tid,div,isAll){
       const grpDone=gms.length>0&&gms.every(m=>getMatchResultState(key,m).done);
 
       const grpCourts = getGroupDisplayCourts(key, gi);
-      // v616f: 예선 경기표 코트 표기는 실제 코트현황판에서 쓰는 manualCourtTarget까지 포함해서 표시
-      const _courtRawList = [
-        ...(grpCourts||[]),
-        ...gms.flatMap(m=>[
-          ...(Array.isArray(m?.courts)?m.courts:[]),
-          m?.court,
-          m?.manualCourtTarget,
-          m?.__sharedCourtLabel
-        ])
-      ].map(v=>String(v||'').trim()).filter(Boolean);
-      const _liveCourts = [...new Set(_courtRawList.filter(c=>!/(공용\s*대기|대기중|조번호|확정\s*고정)/.test(c)))];
+      // v730: 예선 경기표 코트 표기는 이동 이력 배열을 모두 보여주지 않고 최종 코트만 표시한다.
+      const _courtNoiseRe = /(공용\s*대기|대기중|조번호|확정\s*고정|미배정)/;
+      const _cleanCourt = (v)=>String(v||'').trim();
+      const _validCourt = (v)=>{ const c=_cleanCourt(v); return !!c && !_courtNoiseRe.test(c); };
+      const _lastValidCourt = (arr)=>{
+        const a=(Array.isArray(arr)?arr:[]).map(_cleanCourt).filter(_validCourt);
+        return a.length ? a[a.length-1] : '';
+      };
+      const _pickFinalCourt = (obj)=>{
+        if(!obj) return '';
+        // 현재 배정 필드가 최우선. courts 배열은 이동 흔적이 남을 수 있으므로 마지막 값만 fallback으로 사용.
+        const direct=[obj.manualCourtTarget, obj.court, obj.__sharedCourtLabel, obj.currentCourt, obj.assignedCourt, obj.manualCourt]
+          .map(_cleanCourt).filter(_validCourt);
+        if(direct.length) return direct[0];
+        return _lastValidCourt(obj.courts);
+      };
+      const _matchFinalCourts = [...new Set((gms||[]).map(_pickFinalCourt).filter(Boolean))];
+      const _groupFinalCourt = _pickFinalCourt(grp) || _lastValidCourt(grpCourts);
+      const _liveCourts = _matchFinalCourts.length ? _matchFinalCourts : (_groupFinalCourt ? [_groupFinalCourt] : []);
       // v548d: 코트명 또는 부서명에서 지역 추출
       const _grpRegion = (()=>{
         const src = _liveCourts[0] || grpCourts[0] || div || '';
@@ -49539,5 +49547,377 @@ window.openParticipantFindPopupForTournament = function(tid){
 })();
 </script>
 
+
+<style id="v730FinalCourtOnlyPrelimCardsStyle">
+/* v730: 예선 경기표의 코트 이동 이력은 숨기고 최종 코트만 보여준다. */
+.indiv-prelim-grid .v616f-prelim-court-text span{font-weight:1000!important;color:#1d4ed8!important;}
+</style>
+<script id="v730FinalCourtOnlyPrelimCardsScript">
+(function(){
+  'use strict';
+  const APP_V730='v730-final-court-only-prelim-cards';
+  function clean(s){return String(s||'').trim();}
+  function valid(s){s=clean(s); return !!s && !/(공용\s*대기|대기중|조번호|확정\s*고정|미배정)/.test(s);}
+  function finalFromText(s){
+    const parts=String(s||'').split('/').map(clean).filter(valid);
+    return parts.length ? parts[parts.length-1] : clean(s);
+  }
+  function normalizePrelimCourtText(){
+    try{
+      document.querySelectorAll('.indiv-prelim-grid .v616f-prelim-court-text span').forEach(span=>{
+        const before=clean(span.textContent);
+        const after=finalFromText(before);
+        if(after && before!==after) span.textContent=after;
+      });
+    }catch(e){}
+  }
+  window.v730NormalizePrelimCourtText=normalizePrelimCourtText;
+  const oldRender=window.renderBracket;
+  if(typeof oldRender==='function' && !oldRender.__v730FinalCourtOnly){
+    const wrapped=function(){
+      const r=oldRender.apply(this, arguments);
+      setTimeout(normalizePrelimCourtText, 0);
+      setTimeout(normalizePrelimCourtText, 150);
+      return r;
+    };
+    wrapped.__v730FinalCourtOnly=true;
+    window.renderBracket=wrapped;
+  }
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(normalizePrelimCourtText,700));
+  console.log('['+APP_V730+'] installed');
+})();
+</script>
+
+
+<style id="v731A4CurrentCourtBoardReflectStyle">
+#bracketFreshnessBadge::after{content:' · v731';}
+</style>
+<script id="v731A4CurrentCourtBoardReflectScript">
+(function(){
+  'use strict';
+  if(window.__v731A4CurrentCourtBoardReflectInstalled) return;
+  window.__v731A4CurrentCourtBoardReflectInstalled=true;
+  const APP_V='v731-a4-current-court-board-reflect';
+  function $(id){return document.getElementById(id)}
+  function arr(v){return Array.isArray(v)?v:[]}
+  function clean(s){return String(s==null?'':s).replace(/\s+/g,' ').trim()}
+  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+  function toastMsg(m,t){try{if(typeof toast==='function')toast(m,t||'info');else if(typeof safeToast==='function')safeToast(m,t||'info');else console.log('['+APP_V+']',m)}catch(e){console.log('['+APP_V+']',m)}}
+  function currentTid(){return clean(($('brTS')&&$('brTS').value)||($('regTS')&&$('regTS').value)||'')}
+  function currentDivs(tid){
+    try{
+      const t=arr(window.G&&G.tournaments).find(x=>String(x.id)===String(tid));
+      const all=arr(t&&t.divisions);
+      if(typeof getSelectedBracketDivs==='function'){
+        const s=arr(getSelectedBracketDivs()).filter(Boolean);
+        if(s.length && !s.includes('__ALL__')) return s;
+      }
+      const sel=$('brDS');
+      if(sel&&sel.value&&sel.value!=='__ALL__') return [sel.value];
+      if(Array.isArray(window.BR_MULTI_DIVS)&&window.BR_MULTI_DIVS.length&&!window.BR_MULTI_DIVS.includes('__ALL__')) return window.BR_MULTI_DIVS.filter(d=>all.includes(d));
+      const keys=Object.keys((G&&G.draws)||{}).filter(k=>k.startsWith(tid+'_')).map(k=>k.slice(String(tid).length+1));
+      return keys.length?keys:all;
+    }catch(e){return []}
+  }
+  function keysForCurrent(){const tid=currentTid(); if(!tid)return []; return currentDivs(tid).map(d=>tid+'_'+d).filter(k=>G&&G.draws&&G.draws[k]&&Array.isArray(G.draws[k].groups));}
+  function validCourt(s){s=clean(s); return !!s && !/(공용\s*대기|대기중|조번호|확정|고정|미배정|빈코트|배정된\s*진행\s*경기\s*없음)/.test(s)}
+  function lastCourtFromValue(v){
+    if(Array.isArray(v)){
+      const xs=v.map(lastCourtFromValue).filter(validCourt);
+      return xs.length?xs[xs.length-1]:'';
+    }
+    let s=clean(v);
+    if(!s) return '';
+    // 화면 표시처럼 "원도심(인조)3 / 국제5" 형태로 이력이 붙은 경우 마지막 값만 사용
+    if(s.indexOf('/')>=0){
+      const xs=s.split('/').map(x=>clean(x)).filter(validCourt);
+      if(xs.length) s=xs[xs.length-1];
+    }
+    return validCourt(s)?s:'';
+  }
+  function courtLabel(raw){
+    let s=lastCourtFromValue(raw).replace(/\s+/g,'');
+    if(!s) return '';
+    let m=s.match(/(장유중|국제|능동|원도심\(인조\)|원도심|삼계|금병|동부|클레이|하드)[가-힣()]*\d*/);
+    if(m){
+      let rest=s.slice(m.index+m[0].length).match(/^\d+/);
+      return m[0]+(rest&&!/\d$/.test(m[0])?rest[0]:'');
+    }
+    m=s.match(/(\d+)번?코트/); if(m) return m[1]+'번코트';
+    m=s.match(/코트[:：]?([A-Za-z가-힣()]*\d+)/); if(m) return m[1];
+    return s;
+  }
+  function venueOfCourt(court){
+    const s=clean(court).replace(/\s+/g,'');
+    if(/장유중|클레이/i.test(s)) return '장유중 클레이';
+    if(/원도심/i.test(s)) return '원도심(인조)';
+    if(/국제/i.test(s)) return '국제';
+    if(/능동/i.test(s)) return '능동';
+    if(/삼계/i.test(s)) return '삼계';
+    if(/금병/i.test(s)) return '금병';
+    if(/동부/i.test(s)) return '동부';
+    if(/하드/i.test(s)) return '하드';
+    return s||'미배정';
+  }
+  function venueColor(venue){
+    const v=clean(venue);
+    if(/국제/.test(v)) return '#1d4ed8';
+    if(/원도심/.test(v)) return '#047857';
+    if(/장유중|클레이/.test(v)) return '#b45309';
+    if(/능동/.test(v)) return '#1d4ed8';
+    if(/삼계/.test(v)) return '#7c3aed';
+    if(/금병/.test(v)) return '#be123c';
+    if(/동부/.test(v)) return '#0f766e';
+    return '#334155';
+  }
+  function matchCourt(m){
+    if(!m) return '';
+    // 코트현황판에서 카드 이동 시 변경되는 match 값이 최종값이다. draw.groups.courts보다 우선한다.
+    const candidates=[m.manualCourtTarget,m.currentCourt,m.assignedCourt,m.__sharedCourtLabel,m.court,m.courts];
+    for(const c of candidates){const v=courtLabel(c); if(validCourt(v)) return v;}
+    return '';
+  }
+  function groupMatches(key,gi){return arr(G&&G.matches&&G.matches[key]).filter(m=>m&&String(m.phase||'')==='group'&&Number(m.group)===Number(gi)&&!m.bye)}
+  function groupCourt(g,ms){
+    // 핵심 수정: A4는 코트현황판의 현재 match 코트를 최우선으로 본다.
+    const sorted=arr(ms).slice().sort((a,b)=>String(a.manualCourtPinnedAt||a.courtQueueOrder||a.courtAssignedAt||a.id||'').localeCompare(String(b.manualCourtPinnedAt||b.courtQueueOrder||b.courtAssignedAt||b.id||''),'ko',{numeric:true}));
+    for(const m of sorted){const c=matchCourt(m); if(validCourt(c)) return c;}
+    // match 값이 아직 없을 때만 draw.group 값 사용. 배열이면 마지막 코트만 사용한다.
+    const groupCandidates=[g&&g.manualCourtTarget,g&&g.currentCourt,g&&g.assignedCourt,g&&g.manualCourt,g&&g.court,g&&g.courts];
+    for(const c of groupCandidates){const v=courtLabel(c); if(validCourt(v)) return v;}
+    return '';
+  }
+  function groupNo(g,gi){return Number(g&&(g.confirmedGroupNo||g.finalGroupNo||g.displayGroupNo||g.manualGroupNo||g.v702GroupNo||g.v711GroupNo||0))||gi+1}
+  function teamLabel(team){try{if(!team)return '미정'; if(typeof getIndividualPlayers==='function'){const ps=getIndividualPlayers(team).slice(0,2).map(p=>clean(p&&p.name)).filter(Boolean); if(ps.length)return ps.join(' / ');} if(Array.isArray(team.individualPlayers)){const ps=team.individualPlayers.slice(0,2).map(p=>clean((p&&p.name)||p)).filter(Boolean); if(ps.length)return ps.join(' / ');} if(Array.isArray(team.players)){const ps=team.players.slice(0,2).map(p=>clean((p&&p.name)||p)).filter(Boolean); if(ps.length)return ps.join(' / ');} return clean(team.club||team.name||team.pairLabel||team.entryLabel||'팀');}catch(e){return '팀'}}
+  function teamSub(team,name){try{const club=clean(team&&team.club); if(club&&club!==name)return club; if(Array.isArray(team&&team.individualPlayers)){return team.individualPlayers.slice(0,2).map(p=>clean(p&&p.club)).filter(Boolean).join(' · ');} return '';}catch(e){return ''}}
+  function isClayCourt(court){return /장유중|클레이|clay/i.test(clean(court))}
+  function minutesToTime(min){const h=Math.floor(min/60),m=min%60; return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')}
+  function collectItems(){
+    const out=[];
+    keysForCurrent().forEach(key=>{
+      const draw=G.draws[key]||{};
+      const teams=arr(G.teams&&G.teams[key]);
+      arr(draw.groups).forEach((g,gi)=>{
+        const ms=groupMatches(key,gi);
+        const no=groupNo(g,gi);
+        const court=groupCourt(g,ms)||'미배정';
+        const venue=venueOfCourt(court);
+        let ord='9999999999999';
+        for(const m of ms){
+          const cand=m.manualCourtPinnedAt||m.courtQueueOrder||m.courtAssignedAt||m.waitingFirstAt||m.id||'';
+          if(cand&&String(cand)<String(ord)) ord=String(cand);
+        }
+        if(ord==='9999999999999') ord=String(gi).padStart(4,'0');
+        const rows=arr(g.teams).map((ti,idx)=>{const t=teams[ti]; const nm=teamLabel(t); return {slot:idx+1,name:nm,sub:teamSub(t,nm)};});
+        if(rows.length) out.push({key,gi,no,court,venue,ord,color:venueColor(venue),rows});
+      });
+    });
+    // 코트현황판 최종 코트 기준 정렬
+    out.sort((a,b)=>String(a.court||'ZZZ').localeCompare(String(b.court||'ZZZ'),'ko',{numeric:true})||String(a.ord).localeCompare(String(b.ord),'ko',{numeric:true})||a.no-b.no);
+    const cnt={};
+    out.forEach(it=>{const c=it.court||'미배정'; const start=isClayCourt(c)?600:540; const idx=cnt[c]||0; it.expectedTime=minutesToTime(start+idx*30); cnt[c]=idx+1;});
+    out.sort((a,b)=>String(a.court||'ZZZ').localeCompare(String(b.court||'ZZZ'),'ko',{numeric:true})||a.expectedTime.localeCompare(b.expectedTime)||a.no-b.no);
+    return out;
+  }
+  function buildA4(){
+    const items=collectItems();
+    const root=document.createElement('div'); root.className='v702-a4-sheet v714-a4-sheet v715-a4-sheet v731-a4-sheet';
+    if(!items.length){root.innerHTML='<div class="v702-a4-empty">A4로 표시할 예선 대진표 데이터가 없습니다.<br>대회/부서를 선택하고 예선 조추첨 또는 수동 예선 생성이 저장되어 있는지 확인하세요.</div>'; return root;}
+    const per=48,pages=Math.ceil(items.length/per),total=items.reduce((s,it)=>s+it.rows.length,0),tid=currentTid();
+    const t=arr(G&&G.tournaments).find(x=>String(x.id)===String(tid));
+    for(let i=0;i<items.length;i+=per){
+      const chunk=items.slice(i,i+per),pno=Math.floor(i/per)+1;
+      const page=document.createElement('div'); page.className='v702-a4-page';
+      page.innerHTML='<div class="v702-a4-title-main">'+esc((t&&t.name)||'대회')+' 예선 대진표</div><div class="v702-a4-sub">'+esc(pno+'/'+pages+'페이지 · '+items.length+'개 조 · '+total+'팀 · 코트현황판 최종 배정 기준 · 코트별 30분 간격')+'</div><div class="v702-a4-grid">'+chunk.map(it=>'<div class="v714-a4-card" style="--v714-court-color:'+esc(it.color)+';--v715-venue-color:'+esc(it.color)+'"><div class="v714-a4-card-head"><div>'+esc(it.court+' · '+it.no+'조')+'</div><div class="v702-a4-tags"><span class="v714-a4-time">⏱ 예상 '+esc(it.expectedTime)+'</span><span class="v715-venue-tag">'+esc(it.venue)+'</span></div></div><div class="v714-a4-court-strip"><span><i class="v714-a4-court-dot"></i>코트 '+esc(it.court)+'</span></div><div class="v714-a4-card-body">'+it.rows.map(r=>'<div class="v714-a4-row"><div class="v714-a4-no">'+esc(r.slot)+'</div><div><div class="v714-a4-name">'+esc(r.name)+'</div>'+(r.sub?'<div class="v714-a4-meta">'+esc(r.sub)+'</div>':'')+'</div></div>').join('')+'</div></div>').join('')+'</div><div class="v702-a4-foot">230MATCH · '+esc(new Date().toLocaleString('ko-KR'))+'</div>';
+      root.appendChild(page);
+    }
+    return root;
+  }
+  let currentSheet=null;
+  function closeOldA4(){['v431A4PreviewOverlay','v566A4PreviewOverlay','v570A4PreviewOverlay','v688A4PreviewOverlay','v694A4Overlay','v698A4Overlay','v699A4Overlay','v701A4Overlay','mA4','mA4Preview','a4PreviewOverlay','groupSheetPreviewOverlay'].forEach(id=>{const el=$(id); if(el){try{el.classList.remove('open','show')}catch(e){} el.style.display='none';}})}
+  function overlay(){
+    let ov=$('v702A4Overlay');
+    if(!ov){
+      ov=document.createElement('div'); ov.id='v702A4Overlay';
+      ov.innerHTML='<div class="v702-a4-box"><div class="v702-a4-head"><div>📄 A4 대진표 출력/저장</div><div class="v702-a4-actions"><button type="button" class="v702-print" id="v702PrintA4">🖨️ 출력</button><button type="button" class="v702-save" id="v702SaveA4">🖼️ 이미지 저장</button><button type="button" class="v702-close" id="v702CloseA4">닫기</button></div></div><div id="v702A4Body"></div></div>';
+      document.body.appendChild(ov); ov.addEventListener('click',e=>{if(e.target===ov)ov.classList.remove('show')});
+    }
+    $('v702CloseA4').onclick=()=>ov.classList.remove('show');
+    $('v702PrintA4').onclick=printA4;
+    $('v702SaveA4').onclick=saveA4;
+    return ov;
+  }
+  function openA4(){
+    try{
+      closeOldA4();
+      const ov=overlay();
+      const body=$('v702A4Body'); body.innerHTML='';
+      currentSheet=buildA4(); body.appendChild(currentSheet);
+      ov.classList.add('show');
+    }catch(e){console.error('[v731] A4 open failed',e); toastMsg('A4 열기 실패: '+(e.message||e),'error')}
+  }
+  function printA4(){
+    try{
+      const sheet=(currentSheet||buildA4()).cloneNode(true);
+      let root=$('v702PrintRoot'); if(root)root.remove();
+      root=document.createElement('div'); root.id='v702PrintRoot'; root.appendChild(sheet); document.body.appendChild(root);
+      setTimeout(()=>{window.print(); setTimeout(()=>{try{root.remove()}catch(e){}},700)},120);
+    }catch(e){toastMsg('출력 실패: '+(e.message||e),'error')}
+  }
+  async function ensureHtml2Canvas(){
+    if(window.html2canvas) return;
+    await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';s.onload=res;s.onerror=()=>rej(new Error('html2canvas 로드 실패'));document.head.appendChild(s);});
+  }
+  async function saveA4(){
+    let holder=null;
+    try{
+      await ensureHtml2Canvas();
+      const sheet=(currentSheet||buildA4()).cloneNode(true);
+      holder=document.createElement('div'); holder.style.cssText='position:fixed;left:-12000px;top:0;background:#fff;z-index:-1'; holder.appendChild(sheet); document.body.appendChild(holder);
+      const pages=[...holder.querySelectorAll('.v702-a4-page')];
+      if(!pages.length){toastMsg('저장할 페이지가 없습니다','error'); return;}
+      for(let i=0;i<pages.length;i++){
+        const canvas=await html2canvas(pages[i],{backgroundColor:'#fff',scale:2,useCORS:true,logging:false,width:794,height:1123,windowWidth:794,windowHeight:1123});
+        const blob=await new Promise(r=>canvas.toBlob(r,'image/png'));
+        const url=URL.createObjectURL(blob); const a=document.createElement('a');
+        a.href=url; a.download='A4_예선대진표_최종코트_'+String(i+1).padStart(2,'0')+'.png'; document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(()=>URL.revokeObjectURL(url),1000); await new Promise(r=>setTimeout(r,150));
+      }
+      toastMsg('A4 이미지 저장 완료','success');
+    }catch(e){console.error('[v731] image save failed',e); toastMsg('이미지 저장 실패: '+(e.message||e),'error')}
+    finally{try{holder&&holder.remove()}catch(e){}}
+  }
+  window.v731BuildA4=buildA4;
+  window.v731OpenA4=openA4;
+  window.v715BuildA4=buildA4;
+  window.v714BuildA4=buildA4;
+  window.v702OpenA4=openA4;
+  window.v715OpenA4=openA4;
+  window.v714OpenA4=openA4;
+  document.addEventListener('click',function(ev){
+    const btn=ev.target&&ev.target.closest&&ev.target.closest('button,a'); if(!btn) return;
+    const t=clean(btn.textContent), id=btn.id||'';
+    if(id==='v702A4Btn'||/A4|대진표 출력|조편성 출력/.test(t)){
+      ev.preventDefault(); ev.stopImmediatePropagation(); openA4(); return false;
+    }
+  },true);
+  try{const badge=$('bracketFreshnessBadge'); if(badge) badge.textContent='v731 · A4최종코트';}catch(e){}
+  console.log('['+APP_V+'] installed');
+})();
+</script>
+
+
+
+<style id="v732HomeTournamentButtonsCompactStyle">
+/* v732: 홈 현재 대회 카드의 요강/신청 버튼이 과도하게 커지며 제목을 밀어내는 문제 수정 */
+.home-current-tournament-row{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) auto!important;
+  align-items:center!important;
+  gap:12px!important;
+}
+.home-current-tournament-row .home-panel-row-main{
+  min-width:0!important;
+  width:100%!important;
+}
+.home-current-tournament-row .home-panel-row-title{
+  white-space:normal!important;
+  overflow:visible!important;
+  text-overflow:clip!important;
+  word-break:keep-all!important;
+  overflow-wrap:anywhere!important;
+}
+.home-current-tournament-row > div:last-child{
+  display:grid!important;
+  grid-template-columns:repeat(2,minmax(72px,1fr))!important;
+  gap:8px!important;
+  align-items:center!important;
+  justify-content:end!important;
+  width:auto!important;
+  min-width:154px!important;
+  max-width:220px!important;
+}
+.home-current-tournament-row button.home-panel-badge{
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  width:100%!important;
+  height:36px!important;
+  min-height:36px!important;
+  padding:0 12px!important;
+  border-radius:12px!important;
+  font-size:.78rem!important;
+  font-weight:1000!important;
+  line-height:1!important;
+  white-space:nowrap!important;
+  box-sizing:border-box!important;
+}
+@media(max-width:680px){
+  .home-current-tournament-row{
+    grid-template-columns:1fr!important;
+    gap:9px!important;
+    padding:13px 12px!important;
+  }
+  .home-current-tournament-row > div:last-child{
+    width:100%!important;
+    min-width:0!important;
+    max-width:none!important;
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:8px!important;
+  }
+  .home-current-tournament-row button.home-panel-badge{
+    height:38px!important;
+    min-height:38px!important;
+    border-radius:11px!important;
+    font-size:.78rem!important;
+  }
+  .home-current-tournament-row .home-panel-row-title{
+    font-size:.94rem!important;
+    line-height:1.42!important;
+  }
+  .home-current-tournament-row .home-panel-row-sub{
+    font-size:.8rem!important;
+    line-height:1.35!important;
+  }
+}
+#bracketFreshnessBadge::before{content:'v732 ';}
+</style>
+
+<script id="v732HomeTournamentButtonsCompactScript">
+(function(){
+  'use strict';
+  if(window.__v732HomeTournamentButtonsCompactInstalled) return;
+  window.__v732HomeTournamentButtonsCompactInstalled=true;
+  function compactHomeTournamentButtons(){
+    try{
+      document.querySelectorAll('.home-current-tournament-row').forEach(row=>{
+        const actions=row.lastElementChild;
+        if(!actions) return;
+        actions.querySelectorAll('button.home-panel-badge').forEach(btn=>{
+          const t=(btn.textContent||'').trim();
+          if(/요강/.test(t)) btn.textContent='📌 요강';
+          else if(/신청/.test(t)) btn.textContent='📝 신청';
+        });
+      });
+    }catch(e){}
+  }
+  const oldRenderHome=window.renderHome;
+  if(typeof oldRenderHome==='function' && !oldRenderHome.__v732CompactButtons){
+    const wrapped=function(){
+      const r=oldRenderHome.apply(this, arguments);
+      setTimeout(compactHomeTournamentButtons,0);
+      setTimeout(compactHomeTournamentButtons,120);
+      return r;
+    };
+    wrapped.__v732CompactButtons=true;
+    window.renderHome=wrapped;
+  }
+  document.addEventListener('DOMContentLoaded',()=>{
+    setTimeout(compactHomeTournamentButtons,300);
+    setTimeout(compactHomeTournamentButtons,1200);
+  });
+  console.log('[v732] home tournament guide/apply buttons compact layout installed');
+})();
+</script>
 </body>
 </html>
