@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-11-v717-a4-single-group-label";
+  const APP_VERSION = "2026-06-11-v721-a4-preview-exact-print-save";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -47869,6 +47869,708 @@ button[onclick*="__hardClearAppCacheAndReload"],button[onclick*="캐시"],button
 
   setTimeout(()=>cleanA4GroupBadges(document),600);
   console.log('[v717] A4 duplicate group badge removed');
+})();
+</script>
+
+
+
+<!-- v718: A4 출력/이미지 저장을 미리보기 DOM 그대로 고화질 캡처하도록 통일 -->
+<style id="v718A4ExactOutputStyle">
+#v718PrintRoot{display:none;}
+@media print{
+  body>*:not(#v718PrintRoot){display:none!important;visibility:hidden!important;}
+  #v718PrintRoot{display:block!important;visibility:visible!important;background:#fff!important;position:static!important;margin:0!important;padding:0!important;}
+  #v718PrintRoot *{visibility:visible!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;}
+  #v718PrintRoot .v718-print-page{width:210mm!important;height:297mm!important;margin:0!important;padding:0!important;page-break-after:always!important;break-after:page!important;overflow:hidden!important;background:#fff!important;}
+  #v718PrintRoot .v718-print-page:last-child{page-break-after:auto!important;break-after:auto!important;}
+  #v718PrintRoot img{display:block!important;width:210mm!important;height:297mm!important;object-fit:contain!important;margin:0!important;padding:0!important;background:#fff!important;}
+  @page{size:A4 portrait;margin:0;}
+}
+</style>
+<script id="v718A4ExactOutputScript">
+(function(){
+  'use strict';
+  if(window.__v718A4ExactOutputInstalled) return;
+  window.__v718A4ExactOutputInstalled = true;
+  const VERSION = '2026-06-11-v721-a4-preview-exact-print-save';
+
+  function $(id){ return document.getElementById(id); }
+  function toastMsg(msg,type){
+    try{ if(typeof toast==='function') toast(msg,type||'info'); else if(typeof safeToast==='function') safeToast(msg,type||'info'); else console.log('[v718]',msg); }
+    catch(_){ console.log('[v718]',msg); }
+  }
+  function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+  async function ensureHtml2Canvas(){
+    if(window.html2canvas) return;
+    await new Promise((resolve,reject)=>{
+      const old=[...document.scripts].find(s=>/html2canvas/i.test(s.src||''));
+      if(old){ old.addEventListener('load',resolve,{once:true}); old.addEventListener('error',()=>reject(new Error('html2canvas 로드 실패')),{once:true}); return; }
+      const sc=document.createElement('script');
+      sc.src='https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+      sc.onload=resolve;
+      sc.onerror=()=>reject(new Error('html2canvas 로드 실패'));
+      document.head.appendChild(sc);
+    });
+  }
+
+  function getPreviewPages(){
+    let pages=[...document.querySelectorAll('#v702A4Body .v702-a4-page')];
+    if(!pages.length && typeof window.v702OpenA4==='function'){
+      try{ window.v702OpenA4(); }catch(e){ console.warn('[v718] open preview failed',e); }
+      pages=[...document.querySelectorAll('#v702A4Body .v702-a4-page')];
+    }
+    return pages;
+  }
+
+  function clonePageForCapture(page){
+    const clone=page.cloneNode(true);
+    clone.style.transform='none';
+    clone.style.margin='0';
+    clone.style.width='794px';
+    clone.style.minHeight='1123px';
+    clone.style.height='1123px';
+    clone.style.boxShadow='none';
+    clone.style.background='#ffffff';
+    clone.style.webkitPrintColorAdjust='exact';
+    clone.style.printColorAdjust='exact';
+    clone.querySelectorAll('*').forEach(el=>{
+      el.style.webkitPrintColorAdjust='exact';
+      el.style.printColorAdjust='exact';
+      el.style.colorAdjust='exact';
+      el.style.animation='none';
+      el.style.transition='none';
+    });
+    return clone;
+  }
+
+  async function renderPreviewPagesToBlobs(scale){
+    await ensureHtml2Canvas();
+    const pages=getPreviewPages();
+    if(!pages.length) throw new Error('미리보기 페이지를 찾지 못했습니다. A4 미리보기를 먼저 열어주세요.');
+
+    const holder=document.createElement('div');
+    holder.id='v718CaptureHolder';
+    holder.style.cssText='position:fixed;left:-20000px;top:0;width:794px;background:#fff;z-index:-1;opacity:1;pointer-events:none;';
+    document.body.appendChild(holder);
+    const blobs=[];
+    try{
+      for(let i=0;i<pages.length;i++){
+        holder.innerHTML='';
+        const clone=clonePageForCapture(pages[i]);
+        holder.appendChild(clone);
+        await sleep(80);
+        const canvas=await window.html2canvas(clone,{
+          backgroundColor:'#ffffff',
+          scale:scale || 3,
+          useCORS:true,
+          allowTaint:true,
+          logging:false,
+          width:794,
+          height:1123,
+          windowWidth:794,
+          windowHeight:1123,
+          scrollX:0,
+          scrollY:0,
+          onclone:function(doc){
+            try{
+              doc.querySelectorAll('.v702-a4-page,.v714-a4-card-head,.v702-a4-card-head,.v702-a4-card,.v702-a4-tag').forEach(el=>{
+                el.style.webkitPrintColorAdjust='exact';
+                el.style.printColorAdjust='exact';
+                el.style.colorAdjust='exact';
+              });
+            }catch(_e){}
+          }
+        });
+        const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png',1));
+        if(!blob) throw new Error('이미지 변환 실패');
+        blobs.push(blob);
+      }
+      return blobs;
+    }finally{
+      try{ holder.remove(); }catch(_e){}
+    }
+  }
+
+  function fileBaseName(){
+    try{
+      const title=(document.querySelector('#v702A4Body .v702-a4-title-main')?.textContent || 'A4_대진표').replace(/[\\/:*?"<>|]+/g,'_').replace(/\s+/g,'_');
+      return title || 'A4_대진표';
+    }catch(_){ return 'A4_대진표'; }
+  }
+
+  async function blobsToObjectUrls(blobs){
+    return blobs.map(blob=>URL.createObjectURL(blob));
+  }
+
+  window.v718SaveA4PreviewExact = async function(){
+    let urls=[];
+    try{
+      toastMsg('미리보기와 동일한 고화질 이미지 생성 중...','info');
+      const blobs=await renderPreviewPagesToBlobs(4);
+      urls=await blobsToObjectUrls(blobs);
+      const base=fileBaseName();
+      for(let i=0;i<urls.length;i++){
+        const a=document.createElement('a');
+        a.href=urls[i];
+        a.download=base+'_'+String(i+1).padStart(2,'0')+'.png';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        await sleep(180);
+      }
+      toastMsg('미리보기와 동일한 고화질 이미지 저장 완료','success');
+    }catch(e){
+      console.error('[v718] save exact failed',e);
+      toastMsg('이미지 저장 실패: '+(e.message||e),'error');
+    }finally{
+      setTimeout(()=>urls.forEach(u=>{try{URL.revokeObjectURL(u)}catch(_){}}),3000);
+    }
+  };
+
+  window.v718PrintA4PreviewExact = async function(){
+    let urls=[];
+    try{
+      toastMsg('미리보기와 동일한 출력용 이미지 생성 중...','info');
+      const blobs=await renderPreviewPagesToBlobs(3);
+      urls=await blobsToObjectUrls(blobs);
+      let root=$('v718PrintRoot');
+      if(root) root.remove();
+      root=document.createElement('div');
+      root.id='v718PrintRoot';
+      root.innerHTML=urls.map((u,i)=>'<div class="v718-print-page"><img alt="A4 page '+(i+1)+'" src="'+u+'"></div>').join('');
+      document.body.appendChild(root);
+      await Promise.all([...root.querySelectorAll('img')].map(img=>new Promise(res=>{ if(img.complete) res(); else { img.onload=res; img.onerror=res; } })));
+      await sleep(150);
+      window.print();
+      setTimeout(()=>{ try{root.remove();}catch(_e){} urls.forEach(u=>{try{URL.revokeObjectURL(u)}catch(_){}}); },1800);
+    }catch(e){
+      console.error('[v718] print exact failed',e);
+      toastMsg('출력 실패: '+(e.message||e),'error');
+      urls.forEach(u=>{try{URL.revokeObjectURL(u)}catch(_){}});
+    }
+  };
+
+  function bindExactButtons(){
+    const p=$('v702PrintA4'), s=$('v702SaveA4');
+    if(p && !p.__v718ExactBound){ p.__v718ExactBound=true; p.onclick=function(ev){ev&&ev.preventDefault();ev&&ev.stopPropagation();window.v718PrintA4PreviewExact();}; }
+    if(s && !s.__v718ExactBound){ s.__v718ExactBound=true; s.onclick=function(ev){ev&&ev.preventDefault();ev&&ev.stopPropagation();window.v718SaveA4PreviewExact();}; }
+  }
+
+  const oldOpen=window.v702OpenA4;
+  if(typeof oldOpen==='function' && !oldOpen.__v718Wrapped){
+    const wrapped=function(){
+      const r=oldOpen.apply(this,arguments);
+      setTimeout(bindExactButtons,0);
+      setTimeout(bindExactButtons,120);
+      return r;
+    };
+    wrapped.__v718Wrapped=true;
+    window.v702OpenA4=wrapped;
+  }
+
+  document.addEventListener('click',function(ev){
+    const target=ev.target && ev.target.closest && ev.target.closest('#v702PrintA4,#v702SaveA4');
+    if(!target) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    if(target.id==='v702PrintA4') window.v718PrintA4PreviewExact();
+    if(target.id==='v702SaveA4') window.v718SaveA4PreviewExact();
+  },true);
+
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(bindExactButtons,500));
+  setTimeout(bindExactButtons,800);
+  console.log('[v718] A4 preview-exact print/save installed', VERSION);
+})();
+</script>
+
+<!-- v719: A4 미리보기/출력 색상 강제 인라인 복원 -->
+<style id="v719A4InlineColorFixStyle">
+#v702A4Overlay .v714-a4-card-head,
+#v702PrintRoot .v714-a4-card-head{
+  color:#fff !important;
+}
+#v702A4Overlay .v714-a4-name,
+#v702PrintRoot .v714-a4-name{
+  color:#111827 !important;
+}
+#v702A4Overlay .v714-a4-meta,
+#v702PrintRoot .v714-a4-meta{
+  color:#64748b !important;
+}
+#v702A4Overlay .v714-a4-no,
+#v702PrintRoot .v714-a4-no{
+  background:#eef2ff !important;
+  color:#1d4ed8 !important;
+}
+</style>
+<script id="v719A4InlineColorFixScript">
+(function(){
+  'use strict';
+  if(window.__v719A4InlineColorFixInstalled) return;
+  window.__v719A4InlineColorFixInstalled=true;
+
+  function $(id){ return document.getElementById(id); }
+  function clean(s){ return String(s==null?'':s).replace(/\s+/g,' ').trim(); }
+  function venueColor(text){
+    const t=clean(text);
+    if(/국제/.test(t)) return '#2563eb';
+    if(/원도심\(인조\)|원도심/.test(t)) return '#198754';
+    if(/장유중|클레이|clay/i.test(t)) return '#b45309';
+    if(/능동/.test(t)) return '#7c3aed';
+    if(/삼계/.test(t)) return '#0f766e';
+    if(/금병/.test(t)) return '#c2410c';
+    if(/동부/.test(t)) return '#be185d';
+    return '#0f1e3a';
+  }
+  function applyInlineColors(root){
+    try{
+      (root||document).querySelectorAll('.v714-a4-card').forEach(card=>{
+        const head=card.querySelector('.v714-a4-card-head');
+        const strip=card.querySelector('.v714-a4-court-strip');
+        const dot=card.querySelector('.v714-a4-court-dot');
+        const time=card.querySelector('.v714-a4-time');
+        const sourceText=clean((head&&head.textContent)||' '+(strip&&strip.textContent)||card.textContent);
+        const color=venueColor(sourceText);
+        card.style.setProperty('--v714-court-color', color, 'important');
+        card.style.setProperty('--v715-venue-color', color, 'important');
+        card.style.background='#ffffff';
+        card.style.border='1.5px solid #cbd5e1';
+        if(head){
+          head.style.setProperty('background', color, 'important');
+          head.style.setProperty('color', '#ffffff', 'important');
+          head.querySelectorAll('*').forEach(el=>el.style.setProperty('color','#ffffff','important'));
+        }
+        if(strip){
+          strip.style.background='#f8fafc';
+          strip.style.color='#334155';
+        }
+        if(dot) dot.style.setProperty('background', color, 'important');
+        if(time){
+          time.style.setProperty('background','#ffffff','important');
+          time.style.setProperty('color','#0f172a','important');
+          time.style.setProperty('border','1px solid rgba(255,255,255,.65)','important');
+          time.style.setProperty('border-radius','999px','important');
+          time.style.setProperty('padding','2px 6px','important');
+        }
+      });
+    }catch(e){ console.warn('[v719] inline color apply failed', e); }
+  }
+
+  function bindAfterOpen(){
+    const root=$('v702A4Overlay')||document;
+    applyInlineColors(root);
+    setTimeout(()=>applyInlineColors(root), 80);
+    setTimeout(()=>applyInlineColors(root), 250);
+  }
+
+  ['v702OpenA4','v714OpenA4','v715OpenA4','v716OpenA4'].forEach(name=>{
+    const old=window[name];
+    if(typeof old==='function' && !old.__v719Wrapped){
+      const wrapped=function(){
+        const r=old.apply(this, arguments);
+        bindAfterOpen();
+        return r;
+      };
+      wrapped.__v719Wrapped=true;
+      wrapped.__v719Old=old;
+      window[name]=wrapped;
+    }
+  });
+
+  document.addEventListener('click', function(ev){
+    const btn=ev.target && ev.target.closest && ev.target.closest('button,a');
+    if(!btn) return;
+    const t=clean(btn.textContent);
+    if(/A4|대진표 출력|조편성 출력|출력|이미지 저장/.test(t)){
+      setTimeout(bindAfterOpen, 50);
+      setTimeout(bindAfterOpen, 220);
+      setTimeout(()=>applyInlineColors(document), 600);
+    }
+  }, true);
+
+  document.addEventListener('DOMContentLoaded', function(){ setTimeout(()=>applyInlineColors(document), 800); });
+  setTimeout(()=>applyInlineColors(document), 1200);
+  console.log('[v719] A4 inline color fix installed');
+})();
+</script>
+
+
+<!-- v721: A4 미리보기 화면 그대로 출력/저장 최종 패치 -->
+<style id="v721A4PreviewExactPrintSaveStyle">
+#v721PrintRoot{display:none;}
+@media print{
+  body > *:not(#v721PrintRoot){
+    display:none !important;
+    visibility:hidden !important;
+  }
+  #v721PrintRoot{
+    display:block !important;
+    visibility:visible !important;
+    position:static !important;
+    inset:auto !important;
+    width:210mm !important;
+    margin:0 !important;
+    padding:0 !important;
+    background:#fff !important;
+  }
+  #v721PrintRoot *{
+    visibility:visible !important;
+    -webkit-print-color-adjust:exact !important;
+    print-color-adjust:exact !important;
+    color-adjust:exact !important;
+  }
+  #v721PrintRoot .v721-print-page{
+    display:block !important;
+    width:210mm !important;
+    height:297mm !important;
+    margin:0 !important;
+    padding:0 !important;
+    page-break-after:always !important;
+    break-after:page !important;
+    overflow:hidden !important;
+    background:#fff !important;
+  }
+  #v721PrintRoot .v721-print-page:last-child{
+    page-break-after:auto !important;
+    break-after:auto !important;
+  }
+  #v721PrintRoot img{
+    display:block !important;
+    width:210mm !important;
+    height:297mm !important;
+    object-fit:contain !important;
+    margin:0 !important;
+    padding:0 !important;
+    background:#fff !important;
+  }
+  @page{
+    size:A4 portrait;
+    margin:0;
+  }
+}
+</style>
+
+<script id="v721A4PreviewExactPrintSaveScript">
+(function(){
+  'use strict';
+  if(window.__v721A4PreviewExactPrintSaveInstalled) return;
+  window.__v721A4PreviewExactPrintSaveInstalled = true;
+
+  function $(id){ return document.getElementById(id); }
+  function sleep(ms){ return new Promise(function(resolve){ setTimeout(resolve, ms); }); }
+  function msg(text, type){
+    try{
+      if(typeof toast === 'function') toast(text, type || 'info');
+      else if(typeof safeToast === 'function') safeToast(text, type || 'info');
+      else console.log('[v721]', text);
+    }catch(_e){ console.log('[v721]', text); }
+  }
+
+  async function ensureHtml2Canvas(){
+    if(window.html2canvas) return;
+    await new Promise(function(resolve, reject){
+      var already = Array.prototype.slice.call(document.scripts).find(function(s){
+        return /html2canvas/i.test(s.src || '');
+      });
+      if(already){
+        already.addEventListener('load', resolve, {once:true});
+        already.addEventListener('error', function(){ reject(new Error('html2canvas 로드 실패')); }, {once:true});
+        return;
+      }
+      var s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+      s.onload = resolve;
+      s.onerror = function(){ reject(new Error('html2canvas 로드 실패')); };
+      document.head.appendChild(s);
+    });
+  }
+
+  function ensurePreviewOpen(){
+    var pages = Array.prototype.slice.call(document.querySelectorAll('#v702A4Body .v702-a4-page'));
+    if(pages.length) return pages;
+
+    var openFn = window.v716OpenA4 || window.v715OpenA4 || window.v714OpenA4 || window.v702OpenA4;
+    if(typeof openFn === 'function'){
+      try{ openFn(); }catch(e){ console.warn('[v721] open A4 failed', e); }
+    }
+    return Array.prototype.slice.call(document.querySelectorAll('#v702A4Body .v702-a4-page'));
+  }
+
+  function forceInlineForCapture(root){
+    try{
+      if(window.__v719A4InlineColorFixInstalled && typeof window.__v719ApplyInlineColors === 'function'){
+        window.__v719ApplyInlineColors(root);
+      }
+    }catch(_e){}
+
+    try{
+      (root || document).querySelectorAll('.v714-a4-card').forEach(function(card){
+        var head = card.querySelector('.v714-a4-card-head');
+        var strip = card.querySelector('.v714-a4-court-strip');
+        var dot = card.querySelector('.v714-a4-court-dot');
+        var title = (head && head.textContent || '') + ' ' + (strip && strip.textContent || '');
+        var color = '#0f1e3a';
+        if(/국제/.test(title)) color = '#2563eb';
+        else if(/원도심/.test(title)) color = '#198754';
+        else if(/장유중|클레이|clay/i.test(title)) color = '#b45309';
+        else if(/능동/.test(title)) color = '#7c3aed';
+        else if(/삼계/.test(title)) color = '#0f766e';
+        else if(/금병/.test(title)) color = '#c2410c';
+        else if(/동부/.test(title)) color = '#be185d';
+
+        card.style.setProperty('--v714-court-color', color, 'important');
+        card.style.setProperty('--v715-venue-color', color, 'important');
+        card.style.setProperty('background', '#ffffff', 'important');
+        card.style.setProperty('border', '1.5px solid #cbd5e1', 'important');
+
+        if(head){
+          head.style.setProperty('background', color, 'important');
+          head.style.setProperty('color', '#ffffff', 'important');
+          head.querySelectorAll('*').forEach(function(el){
+            el.style.setProperty('color', '#ffffff', 'important');
+          });
+        }
+        if(strip){
+          strip.style.setProperty('background', '#f8fafc', 'important');
+          strip.style.setProperty('color', '#334155', 'important');
+        }
+        if(dot) dot.style.setProperty('background', color, 'important');
+      });
+
+      (root || document).querySelectorAll('.v702-a4-page').forEach(function(page){
+        page.style.setProperty('background', '#ffffff', 'important');
+        page.style.setProperty('-webkit-print-color-adjust', 'exact', 'important');
+        page.style.setProperty('print-color-adjust', 'exact', 'important');
+      });
+      (root || document).querySelectorAll('.v702-a4-page *').forEach(function(el){
+        el.style.setProperty('-webkit-print-color-adjust', 'exact', 'important');
+        el.style.setProperty('print-color-adjust', 'exact', 'important');
+      });
+    }catch(e){ console.warn('[v721] inline color failed', e); }
+  }
+
+  function pageFileBase(){
+    try{
+      var title = (document.querySelector('#v702A4Body .v702-a4-title-main') || {}).textContent || 'A4_예선대진표';
+      return title.replace(/[\\/:*?"<>|]+/g, '_').replace(/\s+/g, '_').replace(/_+$/,'') || 'A4_예선대진표';
+    }catch(_e){ return 'A4_예선대진표'; }
+  }
+
+  async function capturePreviewPages(scale){
+    await ensureHtml2Canvas();
+
+    var pages = ensurePreviewOpen();
+    await sleep(150);
+    pages = Array.prototype.slice.call(document.querySelectorAll('#v702A4Body .v702-a4-page'));
+    if(!pages.length) throw new Error('A4 미리보기 페이지를 찾지 못했습니다.');
+
+    var overlay = $('v702A4Overlay');
+    var body = $('v702A4Body');
+    var old = {
+      overlayDisplay: overlay ? overlay.style.display : '',
+      overlayVisibility: overlay ? overlay.style.visibility : '',
+      overlayOpacity: overlay ? overlay.style.opacity : '',
+      bodyOverflow: body ? body.style.overflow : '',
+      bodyMaxHeight: body ? body.style.maxHeight : '',
+      bodyHeight: body ? body.style.height : '',
+      bodyScrollTop: body ? body.scrollTop : 0
+    };
+
+    var blobs = [];
+    try{
+      if(overlay){
+        overlay.style.display = 'flex';
+        overlay.style.visibility = 'visible';
+        overlay.style.opacity = '1';
+      }
+      if(body){
+        body.style.overflow = 'visible';
+        body.style.maxHeight = 'none';
+        body.style.height = 'auto';
+      }
+
+      forceInlineForCapture(document);
+
+      for(var i=0; i<pages.length; i++){
+        var page = pages[i];
+        forceInlineForCapture(page);
+        try{ page.scrollIntoView({block:'start'}); }catch(_e){}
+        if(body) body.scrollTop = page.offsetTop || 0;
+        await sleep(120);
+
+        var width = Math.ceil(page.scrollWidth || page.offsetWidth || 794);
+        var height = Math.ceil(page.scrollHeight || page.offsetHeight || 1123);
+
+        var canvas = await window.html2canvas(page, {
+          backgroundColor:'#ffffff',
+          scale: scale || 4,
+          useCORS:true,
+          allowTaint:true,
+          logging:false,
+          width: width,
+          height: height,
+          windowWidth: width,
+          windowHeight: height,
+          scrollX:0,
+          scrollY:0,
+          onclone:function(doc){
+            try{
+              var cloneRoot = doc.querySelector('#v702A4Body') || doc;
+              cloneRoot.querySelectorAll('.v702-a4-page,.v702-a4-page *').forEach(function(el){
+                el.style.setProperty('-webkit-print-color-adjust','exact','important');
+                el.style.setProperty('print-color-adjust','exact','important');
+              });
+            }catch(_e){}
+          }
+        });
+
+        var blob = await new Promise(function(resolve){
+          canvas.toBlob(resolve, 'image/png', 1);
+        });
+        if(!blob) throw new Error('이미지 변환 실패');
+        blobs.push(blob);
+      }
+      return blobs;
+    }finally{
+      if(body){
+        body.style.overflow = old.bodyOverflow;
+        body.style.maxHeight = old.bodyMaxHeight;
+        body.style.height = old.bodyHeight;
+        body.scrollTop = old.bodyScrollTop || 0;
+      }
+      if(overlay){
+        overlay.style.display = old.overlayDisplay;
+        overlay.style.visibility = old.overlayVisibility;
+        overlay.style.opacity = old.overlayOpacity;
+      }
+    }
+  }
+
+  window.v721SaveA4PreviewExact = async function(){
+    var urls = [];
+    try{
+      msg('A4 미리보기 화면 그대로 고화질 저장 중...', 'info');
+      var blobs = await capturePreviewPages(4);
+      urls = blobs.map(function(b){ return URL.createObjectURL(b); });
+      var base = pageFileBase();
+      for(var i=0; i<urls.length; i++){
+        var a = document.createElement('a');
+        a.href = urls[i];
+        a.download = base + '_' + String(i+1).padStart(2,'0') + '.png';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        await sleep(180);
+      }
+      msg('A4 미리보기 화면 그대로 이미지 저장 완료', 'success');
+    }catch(e){
+      console.error('[v721] save failed', e);
+      msg('이미지 저장 실패: ' + (e.message || e), 'error');
+    }finally{
+      setTimeout(function(){
+        urls.forEach(function(u){ try{ URL.revokeObjectURL(u); }catch(_e){} });
+      }, 3000);
+    }
+  };
+
+  window.v721PrintA4PreviewExact = async function(){
+    var urls = [];
+    try{
+      msg('A4 미리보기 화면 그대로 출력 준비 중...', 'info');
+      var blobs = await capturePreviewPages(3);
+      urls = blobs.map(function(b){ return URL.createObjectURL(b); });
+
+      var oldRoot = $('v721PrintRoot') || $('v720PrintRoot') || $('v718PrintRoot');
+      if(oldRoot) oldRoot.remove();
+
+      var root = document.createElement('div');
+      root.id = 'v721PrintRoot';
+      root.innerHTML = urls.map(function(u, i){
+        return '<div class="v721-print-page"><img alt="A4 page '+(i+1)+'" src="'+u+'"></div>';
+      }).join('');
+      document.body.appendChild(root);
+
+      await Promise.all(Array.prototype.slice.call(root.querySelectorAll('img')).map(function(img){
+        return new Promise(function(resolve){
+          if(img.complete) resolve();
+          else { img.onload = resolve; img.onerror = resolve; }
+        });
+      }));
+
+      await sleep(200);
+      window.print();
+
+      setTimeout(function(){
+        try{ root.remove(); }catch(_e){}
+        urls.forEach(function(u){ try{ URL.revokeObjectURL(u); }catch(_e){} });
+      }, 2000);
+    }catch(e){
+      console.error('[v721] print failed', e);
+      msg('출력 실패: ' + (e.message || e), 'error');
+      urls.forEach(function(u){ try{ URL.revokeObjectURL(u); }catch(_e){} });
+    }
+  };
+
+  function bindA4Buttons(){
+    var printBtn = $('v702PrintA4');
+    var saveBtn = $('v702SaveA4');
+    if(printBtn){
+      printBtn.onclick = function(ev){
+        if(ev){ ev.preventDefault(); ev.stopPropagation(); }
+        window.v721PrintA4PreviewExact();
+        return false;
+      };
+    }
+    if(saveBtn){
+      saveBtn.onclick = function(ev){
+        if(ev){ ev.preventDefault(); ev.stopPropagation(); }
+        window.v721SaveA4PreviewExact();
+        return false;
+      };
+    }
+  }
+
+  function afterOpenBind(){
+    setTimeout(bindA4Buttons, 0);
+    setTimeout(bindA4Buttons, 120);
+    setTimeout(bindA4Buttons, 400);
+    setTimeout(function(){ forceInlineForCapture(document); }, 180);
+  }
+
+  ['v702OpenA4','v714OpenA4','v715OpenA4','v716OpenA4'].forEach(function(name){
+    var old = window[name];
+    if(typeof old === 'function' && !old.__v721Wrapped){
+      var wrapped = function(){
+        var r = old.apply(this, arguments);
+        afterOpenBind();
+        return r;
+      };
+      wrapped.__v721Wrapped = true;
+      wrapped.__v721Old = old;
+      window[name] = wrapped;
+    }
+  });
+
+  // 이전 패치의 문서 캡처 리스너가 호출하더라도 최종 v721 함수가 실행되도록 덮어씀.
+  window.v718PrintA4PreviewExact = window.v721PrintA4PreviewExact;
+  window.v718SaveA4PreviewExact = window.v721SaveA4PreviewExact;
+  window.v720PrintA4PreviewSame = window.v721PrintA4PreviewExact;
+  window.v720SaveA4PreviewSame = window.v721SaveA4PreviewExact;
+
+  document.addEventListener('click', function(ev){
+    var btn = ev.target && ev.target.closest && ev.target.closest('#v702PrintA4,#v702SaveA4');
+    if(!btn) return;
+    ev.preventDefault();
+    ev.stopImmediatePropagation();
+    if(btn.id === 'v702PrintA4') window.v721PrintA4PreviewExact();
+    if(btn.id === 'v702SaveA4') window.v721SaveA4PreviewExact();
+    return false;
+  }, true);
+
+  document.addEventListener('DOMContentLoaded', function(){ setTimeout(bindA4Buttons, 700); });
+  setTimeout(bindA4Buttons, 1000);
+  console.log('[v721] A4 preview exact print/save installed');
 })();
 </script>
 
