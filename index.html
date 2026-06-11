@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-11-v722-score-button-global-fix";
+  const APP_VERSION = "2026-06-11-v723-expected-time-rebase";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -14527,9 +14527,16 @@ window.useCourtScheduledV546=function(key){
   }catch(e){}
 };
 
-function getCourtEstimatedTimeText(key, waitIdx, hasCurrentMatch){
+function getCourtEstimatedTimeText(key, waitIdx, hasCurrentMatch, currentStartIso=''){
   try{
-    const base=parseCourtBaseDate(key);
+    let base=parseCourtBaseDate(key);
+    // v723: 현재 시합이 실제로 시작/승격된 시각이 있으면 그 시각을 기준으로
+    // 대기 1번=+30분, 대기 2번=+60분으로 예상시간을 다시 계산한다.
+    // 대기카드의 waitingFirstAt(대기 시작 시간)은 그대로 두고, 예상 시합시간만 현재 경기 시작 기준으로 재산정한다.
+    if(hasCurrentMatch && currentStartIso){
+      const cur=new Date(currentStartIso);
+      if(Number.isFinite(cur.getTime())) base=cur;
+    }
     const seq = waitIdx + (hasCurrentMatch ? 1 : 0);
     const start=addCourtMinutes(base,30*seq);
     const end=addCourtMinutes(start,30);
@@ -14614,7 +14621,7 @@ function renderCourtStatusBoard(key, div){
               const metaEntries=[];
               // 대기카드: 대기시작 시각 1개만
               if(waitElapsed.clock) metaEntries.push({...waitElapsed, prefix:'대기시작'});
-              const estimatedTimeText = getCourtEstimatedTimeText(key, idx, !!item.current);
+              const estimatedTimeText = getCourtEstimatedTimeText(key, idx, !!item.current, item.current?.courtAssignedAt||item.current?.startedAt||item.current?.matchStartedAt||'');
               return `<div class="court-wait-card" draggable="${canManageBracket()?'true':'false'}" ondragstart="onCourtCardDragStart(event,'${key}','${String(w.id)}')" ondragend="onCourtCardDragEnd(event)" ondragover="onCourtCardDragOverCard(event,'${key}','${String(w.id)}')" ondragleave="onCourtCardDragLeaveCard(event)" ondrop="onCourtCardDropOnCard(event,'${key}','${String(w.id)}')" style="padding:8px 10px;border-radius:10px;background:${getCourtBoardPhaseColor(wi,w).bg};border:2px solid ${getCourtBoardPhaseColor(wi,w).bd}">
                 <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
                   <div style="min-width:0;flex:1"><div style="font-size:.78rem;font-weight:900;color:${getCourtBoardPhaseColor(wi,w).fg};line-height:1.35;word-break:keep-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(wi.title)}</div><div style="font-size:.72rem;color:${getCourtBoardPhaseColor(wi,w).fg};margin-top:3px">${esc([wi.label, '대기중'].filter(Boolean).join(' · '))}</div>${renderElapsedMetaBlocks(metaEntries, getCourtBoardPhaseColor(wi,w).fg)}${estimatedTimeText?`<div class="v490-estimated-time" style="display:inline-flex;align-items:center;margin-top:4px;padding:3px 8px;border-radius:999px;background:#fff7ed;color:#9a3412;border:1px solid #fdba74;font-size:.64rem;font-weight:900;white-space:nowrap">${esc(estimatedTimeText)}</div>`:''}<div class="v490-court-action-row" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin-top:6px;width:100%">${courtBoardStableResultButtonsHtml(key,w)}${canManageBracket()?`<button class="btn btn-outline" type="button" style="font-size:.6rem;padding:2px 2px;min-height:28px;white-space:nowrap;width:100%;justify-content:center" onclick="sendCourtCardSms('${key}','${String(w.id)}','court_changed','${String(item.court||'')}',${priority})">문자</button>`:''}<button class="btn btn-outline" type="button" style="font-size:.6rem;padding:2px 2px;min-height:28px;white-space:nowrap;width:100%;justify-content:center" onclick="showCourtMovePicker('${key}','${String(w.id)}')">코트</button></div></div>
@@ -20434,7 +20441,14 @@ function getCourtSmsExpectedTimeText(kind,key,meta={}){
       const item=items.find(x=>String(x?.court||'').trim()===court);
       hasCurrent=!!item?.current;
     }
-    return String(getCourtEstimatedTimeText(key, Math.max(0, queuePos-1), !!hasCurrent)||'').trim();
+    let currentStartIso=String(meta.currentStartIso||meta.currentStartAt||'').trim();
+    if(!currentStartIso){
+      const court=String(meta.court||'').trim();
+      const items=(typeof getCourtStatusSnapshot==='function') ? (getCourtStatusSnapshot(key)||[]) : [];
+      const item=items.find(x=>String(x?.court||'').trim()===court);
+      currentStartIso=String(item?.current?.courtAssignedAt||item?.current?.startedAt||item?.current?.matchStartedAt||'').trim();
+    }
+    return String(getCourtEstimatedTimeText(key, Math.max(0, queuePos-1), !!hasCurrent, currentStartIso)||'').trim();
   }catch(e){ return ''; }
 }
 function buildCourtNotificationMessage(kind,key,m,meta={}){
@@ -20540,7 +20554,7 @@ function buildCourtNotificationStateMap(matchesObj){
       const waiting=[...(item?.__visibleWaiting||item?.waiting||[])];
       waiting.forEach((m,idx)=>{
         const mid=String(m?.id||m?._id||'');
-        const estimatedTimeText=(typeof getCourtEstimatedTimeText==='function') ? getCourtEstimatedTimeText(key, idx, !!item?.current) : '';
+        const estimatedTimeText=(typeof getCourtEstimatedTimeText==='function') ? getCourtEstimatedTimeText(key, idx, !!item?.current, item?.current?.courtAssignedAt||item?.current?.startedAt||item?.current?.matchStartedAt||'') : '';
         if(mid) out[mid]={key, tid:_k2td(key).tid, div:_k2td(key).div, status:'waiting', court, queuePos:idx+1, match:m, hasCurrent:!!item?.current, estimatedTimeText};
       });
     });
