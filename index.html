@@ -14600,17 +14600,11 @@ window.useCourtScheduledV546=function(key){
 
 function getCourtEstimatedTimeText(key, waitIdx, hasCurrentMatch, currentStartIso=''){
   try{
-    let base=parseCourtBaseDate(key);
-    // v723: 현재 시합이 실제로 시작/승격된 시각이 있으면 그 시각을 기준으로
-    // 대기 1번=+30분, 대기 2번=+60분으로 예상시간을 다시 계산한다.
-    // 대기카드의 waitingFirstAt(대기 시작 시간)은 그대로 두고, 예상 시합시간만 현재 경기 시작 기준으로 재산정한다.
-    if(hasCurrentMatch && currentStartIso){
-      const cur=new Date(currentStartIso);
-      if(Number.isFinite(cur.getTime())) base=cur;
-    }
-    const seq = waitIdx + (hasCurrentMatch ? 1 : 0);
-    const start=addCourtMinutes(base,30*seq);
-    const end=addCourtMinutes(start,30);
+    // 기준시각(대회날짜+설정시간)에서 대기순서*30분 더하기
+    const base=parseCourtBaseDate(key);
+    const seq = hasCurrentMatch ? waitIdx + 1 : waitIdx;
+    const start=addCourtMinutes(base, 30 * seq);
+    const end=addCourtMinutes(start, 30);
     return `⏱ 예상 시합시간 ${formatCourtHHMM(start)}~${formatCourtHHMM(end)}`;
   }catch(e){ return ''; }
 }
