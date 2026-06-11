@@ -14748,13 +14748,33 @@ function setIndividualGroupMatchesOpen(key, gi, isOpen){
   window.INDIV_GROUP_MATCH_OPEN[key][Number(gi)] = !!isOpen;
 }
 function getGroupDisplayCourts(key, gi){
-  const stored=((G.draws?.[key]?.groups?.[Number(gi)]?.courts)||[]).map(String).filter(Boolean);
-  const live=(G.matches?.[key]||[])
-    .filter(m=>m && m.phase==='group' && Number(m.group)===Number(gi))
-    .flatMap(m=>getMatchCourtsForStatusBoard(key,m)||[])
-    .map(String)
-    .filter(Boolean);
-  return [...new Set([...stored, ...live])];
+  // v728: 최종 코트 1개만 반환 (이동 이력 제거)
+  const noise=/(공용\s*대기|대기중|조번호|확정\s*고정|미배정)/;
+  const clean=v=>String(v||'').trim();
+  const valid=v=>{const c=clean(v);return !!c&&!noise.test(c);};
+
+  // 1. 경기의 현재 코트 우선 (manualCourtTarget > court 순)
+  const matchCourts=(G.matches?.[key]||[])
+    .filter(m=>m&&m.phase==='group'&&Number(m.group)===Number(gi))
+    .map(m=>clean(m.manualCourtTarget||m.court||''))
+    .filter(valid);
+
+  if(matchCourts.length){
+    // 모두 같은 코트면 1개, 다르면 마지막 1개만
+    const unique=[...new Set(matchCourts)];
+    return [unique[unique.length-1]];
+  }
+
+  // 2. 그룹 객체의 코트
+  const grp=G.draws?.[key]?.groups?.[Number(gi)];
+  const grpCourt=clean(grp?.manualCourtTarget||grp?.court||'');
+  if(valid(grpCourt)) return [grpCourt];
+
+  // 3. courts 배열 마지막값
+  const stored=((grp?.courts)||[]).map(clean).filter(valid);
+  if(stored.length) return [stored[stored.length-1]];
+
+  return [];
 }
 function getFilteredGroupCourtAssignments(key, groupIndexes){
   const selectedCourts=(getSelectedCourtFilters(key)||[]).filter(Boolean).map(String);
@@ -25408,8 +25428,12 @@ function renderBracketHTMLForDiv(tid,div,isAll){
         if(direct.length) return direct[0];
         return _lastValidCourt(obj.courts);
       };
-      const _matchFinalCourts = [...new Set((gms||[]).map(_pickFinalCourt).filter(Boolean))];
+      // v728: 최종 코트 1개만 — 여러 경기에 걸쳐 코트가 다를 경우 가장 마지막 코트만 표시
+      const _allMatchCourts = (gms||[]).map(_pickFinalCourt).filter(Boolean);
       const _groupFinalCourt = _pickFinalCourt(grp) || _lastValidCourt(grpCourts);
+      // 코트가 1종류면 그대로, 여러 종류면 마지막 1개만
+      const _uniqueCourts = [...new Set(_allMatchCourts)];
+      const _matchFinalCourts = _uniqueCourts.length <= 1 ? _uniqueCourts : [_uniqueCourts[_uniqueCourts.length-1]];
       const _liveCourts = _matchFinalCourts.length ? _matchFinalCourts : (_groupFinalCourt ? [_groupFinalCourt] : []);
       // v548d: 코트명 또는 부서명에서 지역 추출
       const _grpRegion = (()=>{
@@ -25760,7 +25784,8 @@ function v713SetPrelimSortMode(key,mode){
 function v713GroupDisplayNo(draw,gi){
   try{
     const g=(draw&&draw.groups&&draw.groups[Number(gi)])||{};
-    const vals=[g.finalGroupNo,g.confirmedGroupNo,g.displayGroupNo,g.lockedGroupNo,g.manualGroupNo,g.groupNo,g.no];
+    // v728: confirmedGroupNo 최우선 (조번호 확정+저장 결과)
+    const vals=[g.confirmedGroupNo,g.finalGroupNo,g.displayGroupNo,g.manualGroupNo,g.v728GroupNo,g.v702GroupNo,g.lockedGroupNo,g.groupNo,g.no];
     for(const v of vals){const n=Number(v); if(Number.isFinite(n)&&n>0) return n;}
   }catch(e){}
   return Number(gi)+1;
@@ -26382,7 +26407,14 @@ function renderCombinedBracketSection(tid, div){
   let groupsHTML = '';
   if(draw.groups?.length){
     groupsHTML = `<div style="display:flex;flex-wrap:wrap;gap:12px">`;
-    draw.groups.forEach((grp, gi)=>{
+    // v728: 조번호(confirmedGroupNo) 순서대로 정렬
+    const _sortedGroupIdxs = draw.groups.map((_,gi)=>gi).sort((a,b)=>{
+      const na=Number(draw.groups[a].confirmedGroupNo||draw.groups[a].finalGroupNo||draw.groups[a].displayGroupNo||a+1);
+      const nb=Number(draw.groups[b].confirmedGroupNo||draw.groups[b].finalGroupNo||draw.groups[b].displayGroupNo||b+1);
+      return na-nb;
+    });
+    _sortedGroupIdxs.forEach((gi)=>{
+      const grp=draw.groups[gi];
       const grpMs = gMs.filter(m=>m.group===gi);
       const stats = calcGS(key, gi, grp.teams, teams);
       const grpDone = grpMs.length>0 && grpMs.every(m=>getMatchResultState(key,m).done);
