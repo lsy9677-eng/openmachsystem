@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-11-v733-match-complete-red-alert";
+  const APP_VERSION = "2026-06-11-v735-stable-no-freeze";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -50031,6 +50031,218 @@ body.tm-mode .indiv-prelim-grid .grp-card:has(.v300-group-actions) .v275-group-a
   setTimeout(updateBadge,400);
   setTimeout(updateBadge,1200);
   console.log('[v733] match complete red alert installed', VERSION);
+})();
+</script>
+
+
+
+<!-- v735: v734 freeze rollback + safe one-click lock + safe my-match direct result -->
+<style id="v735StableNoFreezeStyle">
+#bracketFreshnessBadge{background:#f0fdf4!important;color:#166534!important;}
+.v735-lock-running{opacity:.62!important;pointer-events:none!important;filter:grayscale(.08)!important;}
+.v735-my-result-btn{border:1px solid #0f766e!important;border-radius:999px!important;background:#0f766e!important;color:#fff!important;cursor:pointer!important;font-weight:1000!important;}
+.v735-my-view-btn{border:1px solid #94a3b8!important;border-radius:999px!important;background:#f1f5f9!important;color:#475569!important;cursor:pointer!important;font-weight:900!important;}
+.v735-direct-tip{font-size:.72rem;color:#0f766e;font-weight:900;margin-top:6px;line-height:1.45;}
+</style>
+<script id="v735StableNoFreezeScript">
+(function(){
+  'use strict';
+  if(window.__v735StableNoFreezeInstalled) return;
+  window.__v735StableNoFreezeInstalled=true;
+  const VERSION='2026-06-11-v735-stable-no-freeze';
+  const $=id=>document.getElementById(id);
+  const clean=v=>String(v==null?'':v).replace(/\s+/g,' ').trim();
+  const arr=v=>Array.isArray(v)?v:[];
+  let running=false;
+  let installTimer=null;
+  function toastMsg(m,t){try{ if(typeof toast==='function') toast(m,t||'info'); else if(typeof safeToast==='function') safeToast(m,t||'info'); else console.log('[v735]',m); }catch(e){console.log('[v735]',m)}}
+  function isManager(){
+    try{const b=document.body;if(b&&(b.classList.contains('admin-mode')||b.classList.contains('operator-mode')||b.classList.contains('op-mode')||b.classList.contains('tm-mode')||b.classList.contains('developer-mode')||b.classList.contains('dev-mode')))return true;}catch(e){}
+    try{if(window.ADMIN_MODE||window.IS_ADMIN||window.OPERATOR_MODE||window.TOURNAMENT_MANAGER_MODE||window.IS_DEVELOPER||window.DEVELOPER_MODE||window.__developerMode)return true;}catch(e){}
+    try{return [...document.querySelectorAll('#adminBadge,.admin-badge,.btn-sm')].some(el=>/개발자|관리자|운영자|진행자/.test(clean(el.textContent)) && getComputedStyle(el).display!=='none')}catch(e){return false}
+  }
+  function currentTid(){return clean(($('brTS')&&$('brTS').value)||($('regTS')&&$('regTS').value)||'');}
+  function tournament(tid){try{return arr(window.G&&G.tournaments).find(t=>String(t.id)===String(tid))||null;}catch(e){return null;}}
+  function selectedDivs(tid){
+    try{ if(typeof getBracketSelectedDivs==='function'){ const ds=arr(getBracketSelectedDivs(tid)).filter(Boolean); if(ds.length && !ds.includes('__ALL__')) return ds; } }catch(e){}
+    try{ const sel=$('brDS'); if(sel&&sel.value&&sel.value!=='__ALL__') return [sel.value]; }catch(e){}
+    try{ if(Array.isArray(window.BR_MULTI_DIVS)&&window.BR_MULTI_DIVS.length&&!window.BR_MULTI_DIVS.includes('__ALL__')) return window.BR_MULTI_DIVS.filter(Boolean); }catch(e){}
+    const t=tournament(tid); const ds=arr(t&&t.divisions).filter(Boolean); if(ds.length) return ds;
+    try{ return Object.keys((G&&G.draws)||{}).filter(k=>String(k).startsWith(tid+'_')).map(k=>String(k).slice(String(tid).length+1)); }catch(e){ return []; }
+  }
+  function keysForCurrent(requireGroups){
+    const tid=currentTid(); if(!tid) return [];
+    return selectedDivs(tid).map(d=>String(tid)+'_'+String(d)).filter(k=>!requireGroups || (window.G&&G.draws&&G.draws[k]&&Array.isArray(G.draws[k].groups)));
+  }
+  function groupMatches(key,gi){
+    try{return arr(G&&G.matches&&G.matches[key]).filter(m=>m&&String(m.phase||'')==='group'&&Number(m.group)===Number(gi)&&!m.bye);}catch(e){return [];}
+  }
+  function courtLabel(raw){
+    let s=clean(raw).replace(/\s+/g,''); if(!s)return '';
+    let m=s.match(/(국제|능동|장유|삼계|금병|원도심|동부|클레이|하드)\d+/); if(m)return m[0];
+    m=s.match(/(\d+)번?코트/); if(m)return m[1]+'번코트';
+    m=s.match(/코트[:：]?([A-Za-z가-힣]*\d+)/); if(m)return m[1];
+    return s;
+  }
+  function courtOfMatch(m){
+    let c='';
+    try{ if(Array.isArray(m&&m.courts)&&m.courts[0]) c=m.courts[0]; }catch(e){}
+    if(!c) c=(m&&m.manualCourtTarget)||m?.court||m?.assignedCourt||m?.courtName||m?.courtLabel||'';
+    return courtLabel(c);
+  }
+  function groupCourt(g,ms){
+    let c='';
+    try{ if(Array.isArray(g&&g.courts)&&g.courts[0]) c=g.courts[0]; }catch(e){}
+    if(!c) c=(g&&g.manualCourtTarget)||g?.manualCourt||g?.court||g?.assignedCourt||'';
+    if(!c){ const freq={}; arr(ms).forEach(m=>{const cc=courtOfMatch(m); if(cc)freq[cc]=(freq[cc]||0)+1;}); c=Object.keys(freq).sort((a,b)=>freq[b]-freq[a]||String(a).localeCompare(String(b),'ko',{numeric:true}))[0]||''; }
+    return courtLabel(c);
+  }
+  function groupOrderForLock(key){
+    const draw=(G&&G.draws&&G.draws[key])||{}, groups=arr(draw.groups);
+    return groups.map((g,gi)=>{
+      const ms=groupMatches(key,gi); const court=groupCourt(g,ms);
+      let ord='999999999999';
+      for(const m of ms){
+        const cand=m.manualCourtPinnedAt||m.courtQueueOrder||m.courtAssignedAt||m.waitingFirstAt||m.lastWaitingFirstAt||m.startedAt||m.id||'';
+        if(cand && String(cand)<String(ord)) ord=String(cand);
+      }
+      if(ord==='999999999999') ord=String(gi).padStart(5,'0');
+      return {g,gi,ms,court,ord};
+    }).sort((a,b)=>{
+      const ac=a.court||'ZZZ', bc=b.court||'ZZZ';
+      const cm=String(ac).localeCompare(String(bc),'ko',{numeric:true}); if(cm)return cm;
+      return String(a.ord).localeCompare(String(b.ord),'ko',{numeric:true})||a.gi-b.gi;
+    });
+  }
+  async function saveKey(key){
+    try{ if(window.__FB_WRITE_CACHE){ if(__FB_WRITE_CACHE.draws) delete __FB_WRITE_CACHE.draws[key]; if(__FB_WRITE_CACHE.matches) delete __FB_WRITE_CACHE.matches[key]; } }catch(e){}
+    if(typeof window.v617eDirectSaveKey==='function') return await window.v617eDirectSaveKey(key);
+    if(typeof stD==='function') await stD(key);
+    if(typeof stM==='function') await stM(key);
+    try{ if(typeof waitForPendingWrites==='function'&&typeof db!=='undefined') await waitForPendingWrites(db); }catch(e){}
+  }
+  function clearBundleCache(tid){
+    try{ Object.keys(localStorage||{}).forEach(k=>{/BUNDLE|TOURNAMENT|MATCH|DRAW|BRACKET|CACHE/i.test(k)&&localStorage.removeItem(k);}); }catch(e){}
+    try{ Object.keys(sessionStorage||{}).forEach(k=>{/BUNDLE|TOURNAMENT|MATCH|DRAW|BRACKET|CACHE/i.test(k)&&sessionStorage.removeItem(k);}); }catch(e){}
+    try{ if(window.__FB_WRITE_CACHE){ if(__FB_WRITE_CACHE.draws) Object.keys(__FB_WRITE_CACHE.draws).forEach(k=>delete __FB_WRITE_CACHE.draws[k]); if(__FB_WRITE_CACHE.matches) Object.keys(__FB_WRITE_CACHE.matches).forEach(k=>delete __FB_WRITE_CACHE.matches[k]); } }catch(e){}
+    try{ if(typeof cacheTournamentBundleFromMemory==='function' && tid) cacheTournamentBundleFromMemory(tid); }catch(e){}
+  }
+  function setLockButtonsBusy(flag,label){
+    try{
+      document.querySelectorAll('button').forEach(btn=>{
+        const txt=clean(btn.textContent||'');
+        if(btn.id==='v702LockBtn'||/조번호.*코트잠금|코트잠금|조번호확정/.test(txt)){
+          btn.classList.toggle('v735-lock-running',!!flag);
+          btn.disabled=!!flag;
+          if(flag){ btn.dataset.v735OldText=btn.textContent; btn.textContent=label||'🔒 저장 중…'; }
+          else if(btn.dataset.v735OldText){ btn.textContent=btn.dataset.v735OldText; delete btn.dataset.v735OldText; }
+        }
+      });
+    }catch(e){}
+  }
+  async function v735Finalize(){
+    if(running){toastMsg('이미 잠금 저장 중입니다. 잠시만 기다려 주세요.','info'); return false;}
+    if(!isManager()){toastMsg('관리자/운영자/진행자만 사용할 수 있습니다','error');return false;}
+    const keys=keysForCurrent(true).filter(k=>G&&G.draws&&G.draws[k]&&Array.isArray(G.draws[k].groups));
+    if(!keys.length){toastMsg('대회/부서를 선택하거나 예선 조를 먼저 생성하세요','error');return false;}
+    if(!confirm('현재 코트현황판/예선표 순서 기준으로 조번호를 다시 확정하고, 코트를 잠급니다.\n\n수동으로 옮긴 상태가 있으면 그 상태 기준으로 1번부터 재번호가 부여됩니다.\n\n계속할까요?')) return false;
+    running=true; setLockButtonsBusy(true,'🔒 조번호·코트 저장 중…');
+    try{
+      if(typeof sl==='function') sl(true);
+      let total=0, groupTotal=0; const now=new Date().toISOString();
+      for(const key of keys){
+        const draw=G.draws[key];
+        const ordered=groupOrderForLock(key);
+        const snap={lockedAt:now,version:VERSION,groups:{}};
+        let next=1;
+        ordered.forEach(item=>{
+          const no=next++; groupTotal++;
+          const g=item.g||{}; const court=item.court||'';
+          g.confirmedGroupNo=no; g.finalGroupNo=no; g.displayGroupNo=no; g.manualGroupNo=no; g.v702GroupNo=no;
+          g.name=no+'조'; g.label=no+'조'; g.groupLabel=no+'조';
+          g.courtLocked=true; g.v702CourtLocked=true; g.v702AutoBlocked=true; g.v735LockedAt=now;
+          delete g.v728ManualReEditMode; delete g.v730ManualReEditMode; delete g.v732ForceRelockRenumber;
+          if(court){ g.courts=[court]; g.manualCourt=court; g.manualCourtTarget=court; g.court=court; }
+          snap.groups[item.gi]={no,court,sourceGi:item.gi};
+          item.ms.forEach(m=>{
+            m.groupNo=no; m.confirmedGroupNo=no; m.finalGroupNo=no; m.displayGroupNo=no; m.v702GroupNo=no;
+            m.groupLabel=no+'조'; m.prelimGroupLabel=no+'조';
+            m.manualCourtLocked=true; m.v702CourtLocked=true; m.v702SnapshotLocked=true; m.v702AutoBlocked=true;
+            m.initialPrelimAutoCourt=false; m.v702LockedAt=now; m.v735LockedAt=now;
+            delete m.v728ManualReEditMode; delete m.v730ManualReEditMode;
+            if(court){ m.court=court; m.courts=[court]; m.manualCourtTarget=court; }
+            total++;
+          });
+        });
+        draw.v702Locked=true; draw.v701GroupCourtLocked=true; draw.v700GroupCourtLocked=true; draw.v697GroupCourtLocked=true;
+        draw.v702LockedAt=now; draw.v735LockedAt=now; draw.v702AutoBlocked=true;
+        draw.v702Snapshot=snap; draw.v701Snapshot=snap; draw.v700Snapshot=snap; draw.v697CourtSnapshot=snap;
+        delete draw.v728ManualReEditMode; delete draw.v730ManualReEditMode; delete draw.v732ForceRelockRenumber;
+        await saveKey(key);
+      }
+      clearBundleCache(currentTid());
+      try{ if(typeof sl==='function') sl(false); }catch(e){}
+      try{ if(typeof renderBracket==='function') renderBracket(); }catch(e){}
+      toastMsg('조번호확정+코트잠금 완료 ✅ '+groupTotal+'개 조 · '+total+'경기 저장','success');
+      setTimeout(()=>setLockButtonsBusy(false),350);
+      running=false;
+      return true;
+    }catch(e){
+      try{ if(typeof sl==='function') sl(false); }catch(_e){}
+      console.error('[v735] one click lock failed',e);
+      toastMsg('잠금 실패: '+(e.message||e),'error');
+      running=false; setLockButtonsBusy(false);
+      return false;
+    }
+  }
+  function hookLock(){
+    window.v735FinalizeGroupNoAndCourtLock=v735Finalize;
+    window.v734FinalizeGroupNoAndCourtLock=v735Finalize;
+    window.v702FinalizeGroupNoAndCourtLock=v735Finalize;
+    ['v650OpenManualGroupNoBulkCurrent','v626FinalizeGroupOrder','v606FinalizeGroupOrder','v693FinalizeGroupOrder','v694FinalizeCurrentCourtOrder','v696LockCurrentCourts','v697FinalizeGroupNoAndCourtLock','v700FinalizeGroupNoAndCourtLock','v701FinalizeGroupNoAndCourtLock'].forEach(n=>{try{window[n]=v735Finalize;}catch(e){} try{eval(n+'=window["'+n+'"]');}catch(e){}});
+    const b=$('v702LockBtn'); if(b){ b.onclick=function(e){ if(e){e.preventDefault();e.stopPropagation();} return v735Finalize(); }; }
+  }
+  function resultButtonHTML(key,matchId,done){
+    const label=done?'📋 결과 보기':'✏️ 결과 입력';
+    const cls=done?'v735-my-view-btn':'v735-my-result-btn';
+    return `<button type="button" class="my-match-toggle-btn ${cls}" onclick="event.stopPropagation();event.preventDefault();if(window.openM3){openM3('${String(key).replace(/'/g,"\\'")}','${String(matchId).replace(/'/g,"\\'")}');}">${label}</button>`;
+  }
+  function hookMyNextCard(){
+    const old=window.renderPersonalNextMatchCard;
+    if(typeof old!=='function' || old.__v735DirectResultWrapped) return;
+    const w=function(row){
+      let html=old.apply(this,arguments);
+      try{
+        if(!row||!html) return html;
+        const m=row.match||{}, key=row.key||'', matchId=clean(row.matchId||m.id||m._id||'');
+        if(!key||!matchId) return html;
+        const status=row.status||(typeof getPersonalMatchStatusLabel==='function'?getPersonalMatchStatusLabel(key,m):{});
+        const done=!!(status&&(status.code==='done'||(status.winSide&&row.mySide===status.winSide)));
+        const btn=resultButtonHTML(key,matchId,done);
+        if(!/v735-my-result-btn|v735-my-view-btn|결과 입력|결과 보기/.test(html)){
+          html=html.replace(/(<button[^>]*>해당 경기로<\/button>)/, btn+'$1');
+          html=html.replace('</div>\n  </div>', '<div class="v735-direct-tip">내 경기 모아보기에서 바로 결과 입력 가능 · 대진표 이동은 보조 기능</div></div>\n  </div>');
+        }
+      }catch(e){console.warn('[v735] next card direct result failed',e)}
+      return html;
+    };
+    w.__v735DirectResultWrapped=true; w.__v735Old=old; window.renderPersonalNextMatchCard=w;
+    try{ renderPersonalNextMatchCard=w; }catch(e){}
+  }
+  function updateBadge(){
+    try{const b=$('bracketFreshnessBadge'); if(b){b.textContent='v735'; b.title='v735 안정화: 무한 감시 제거 + 원클릭 잠금 + 내 경기 바로 결과입력'; b.style.background='#f0fdf4'; b.style.color='#166534';}}catch(e){}
+  }
+  function install(){
+    if(installTimer){clearTimeout(installTimer); installTimer=null;}
+    hookLock();
+    hookMyNextCard();
+    updateBadge();
+  }
+  window.v735SafeInstall=install;
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>{install();setTimeout(install,600);setTimeout(install,1800);});
+  else {install();setTimeout(install,600);setTimeout(install,1800);}
+  // v734에서 페이지를 멈추게 만든 document.body 전체 MutationObserver는 사용하지 않음.
+  console.log('[v735] stable no-freeze patch installed',VERSION);
 })();
 </script>
 
