@@ -6236,7 +6236,7 @@ button:disabled{opacity:.55!important;cursor:not-allowed!important;filter:graysc
 <div style="display:flex;gap:4px;flex-wrap:nowrap;align-items:center;justify-content:flex-end;flex:0 0 auto;white-space:nowrap">
 <button class="btn btn-outline" onclick="manualRefreshRegister()" style="font-size:.68rem;padding:4px 8px;min-height:32px;white-space:nowrap">↻ 새로고침</button>
 <button class="btn btn-outline" onclick="saveRegListImage44()" style="font-size:.68rem;padding:4px 8px;min-height:32px;white-space:nowrap">🖼️ 이미지 저장</button>
-<button class="btn btn-outline" onclick="saveRegListExcel44()" style="font-size:.68rem;padding:4px 8px;min-height:32px;white-space:nowrap">📊 엑셀 저장</button>
+<button class="btn btn-outline" onclick="saveRegListExcel44()" style="font-size:.68rem;padding:4px 8px;min-height:32px;white-space:nowrap">📊 엑셀 저장</button><button class="btn btn-outline" onclick="saveRegListExcelBulk44()" style="font-size:.68rem;padding:4px 8px;min-height:32px;white-space:nowrap;border-color:#0f766e;color:#0f766e">📥 일괄등록용 엑셀</button>
 <button class="btn btn-outline" onclick="saveRegListPDF44()" style="font-size:.68rem;padding:4px 8px;min-height:32px;white-space:nowrap">📄 PDF 저장</button>
 </div>
 </div>
@@ -6377,7 +6377,7 @@ button:disabled{opacity:.55!important;cursor:not-allowed!important;filter:graysc
 </button>
 </div>
 <div id="bracketExportBar" style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:6px;flex-wrap:wrap">
-<button class="btn btn-outline" id="v735HardcodedMainBtn" onclick="openBracketView()" style="font-size:.78rem;padding:5px 10px;display:none">📊 전체대진표(본선포함)</button>
+<button class="btn btn-outline" onclick="openBracketView()" style="font-size:.78rem;padding:5px 10px">📊 전체대진표(본선포함)</button>
 <button class="btn btn-outline" id="v606FinalizeGroupOrderBtn" onclick="v650OpenManualGroupNoBulkCurrent()" style="font-size:.78rem;padding:5px 12px;display:none;border-color:#d4a017;color:#8a6412">🔢 조번호 수동저장</button>
 <div class="login-menu-wrap js-mini-menu" id="bracketSaveMenuWrap">
 <button class="btn btn-outline" onclick="window.v570OpenA4GroupSheet ? window.v570OpenA4GroupSheet() : window.v566OpenA4GroupPreview()" style="font-size:.78rem;padding:5px 12px">🖨️ 조편성 저장/출력(A4)</button>
@@ -26288,9 +26288,6 @@ function mCard(m,key,dn1,dn2,done,sc1,sc2,label){
 let BV = { tid: null, div: '__ALL__' };
 
 function openBracketView(){
-  // v735: 관리자/운영자만 전체대진표 열람 가능
-  const _canView=(typeof canManageBracket==='function'&&canManageBracket())||(typeof isManager==='function'&&isManager())||(typeof isDeveloper==='function'&&isDeveloper());
-  if(!_canView){ toast('관리자 또는 운영자만 전체 대진표를 볼 수 있습니다','info'); return; }
   const tid = ge('brTS')?.value;
   if(!tid){ toast('대회를 먼저 선택하세요','info'); return; }
   const t = G.tournaments.find(t=>t.id===tid);
@@ -36225,6 +36222,81 @@ async function saveRegListExcel44(){
   }catch(e){toast('엑셀 저장 실패: '+e.message,'error');}
 }
 
+// v735: 일괄등록용 엑셀 다운로드 (두 시트: 일괄등록형식 + 원본형식)
+async function saveRegListExcelBulk44(){
+  const tid=ge('regTS')?.value||'';
+  if(!tid){toast('대회를 먼저 선택해 주세요','info');return;}
+  const t=G.tournaments.find(x=>x.id===tid);
+  if(!t){toast('대회를 먼저 선택해 주세요','info');return;}
+  try{
+    await ensureXLSX();
+    const selDiv=ge('regDS')?.value||'';
+    const allDivs=[...(t.divisions||[])].sort((a,b)=>divOrder44(a)-divOrder44(b));
+    const targetDivs=(selDiv&&allDivs.includes(selDiv))?[selDiv]:allDivs;
+
+    // ── 시트1: 일괄등록 형식 (참가No / 이름 / 구력 / 소속 / 전화번호) ──
+    const bulkRows=[['참가 No','이름','구력','소속','전화번호']];
+    targetDivs.forEach(div=>{
+      const key=tid+'_'+div;
+      const teams=(G.teams[key]||[]).slice();
+      const sorted=teams.map((team,i)=>({team,sortIdx:i})).sort((x,y)=>{
+        const aq=Number.isFinite(Number(x.team.queueOrder))?Number(x.team.queueOrder):Infinity;
+        const bq=Number.isFinite(Number(y.team.queueOrder))?Number(y.team.queueOrder):Infinity;
+        if(aq!==bq) return aq-bq;
+        return String(x.team.registeredAt||'').localeCompare(String(y.team.registeredAt||''));
+      });
+      sorted.forEach(({team},idx)=>{
+        const teamName=tdn(team,key,idx);
+        const players=(team.players||[]).filter(Boolean);
+        const dbl=Number(team.mainPlayerCount||team.doublesCount||5);
+        const main=players.slice(0,dbl*2);
+        // 이름: 참가자1/참가자2/... 형식
+        const nameStr=main.join('/');
+        bulkRows.push([idx+1, nameStr, '', teamName, '']);
+      });
+    });
+
+    // ── 시트2: 원본 형식 (부서/팀순번/클럽명/구분/번호/선수명) ──
+    const origRows=[['부서','팀순번','클럽명','구분','번호','선수명']];
+    targetDivs.forEach(div=>{
+      const key=tid+'_'+div;
+      const teams=(G.teams[key]||[]).slice();
+      const sorted=teams.map((team,i)=>({team,sortIdx:i})).sort((x,y)=>{
+        const aq=Number.isFinite(Number(x.team.queueOrder))?Number(x.team.queueOrder):Infinity;
+        const bq=Number.isFinite(Number(y.team.queueOrder))?Number(y.team.queueOrder):Infinity;
+        if(aq!==bq) return aq-bq;
+        return String(x.team.registeredAt||'').localeCompare(String(y.team.registeredAt||''));
+      });
+      if(!sorted.length){origRows.push([dl(div),'','','등록팀없음','','']);return;}
+      sorted.forEach(({team},idx)=>{
+        const teamName=tdn(team,key,idx);
+        const players=(team.players||[]).filter(Boolean);
+        const dbl=Number(team.mainPlayerCount||team.doublesCount||5);
+        const main=players.slice(0,dbl*2);
+        const sub=players.slice(dbl*2);
+        main.forEach((p,pidx)=>origRows.push([dl(div),idx+1,teamName,'주전',pidx+1,p]));
+        sub.forEach((p,sidx)=>origRows.push([dl(div),idx+1,teamName,'후보',sidx+1,p]));
+      });
+      origRows.push(['','','','','','']);
+    });
+
+    const wb=XLSX.utils.book_new();
+
+    const wsBulk=XLSX.utils.aoa_to_sheet(bulkRows);
+    wsBulk['!cols']=[{wch:10},{wch:24},{wch:10},{wch:28},{wch:14}];
+    XLSX.utils.book_append_sheet(wb,wsBulk,'📥 일괄등록형식');
+
+    const wsOrig=XLSX.utils.aoa_to_sheet(origRows);
+    wsOrig['!cols']=[{wch:12},{wch:8},{wch:18},{wch:10},{wch:8},{wch:18}];
+    XLSX.utils.book_append_sheet(wb,wsOrig,'원본형식');
+
+    const divLabel=selDiv?dl(selDiv):'전체';
+    const fname=`일괄등록_${(t?.name||'').replace(/\s/g,'')}_${divLabel}_${new Date().toISOString().substring(0,10)}.xlsx`;
+    XLSX.writeFile(wb,fname);
+    toast('일괄등록용 엑셀 저장 완료 📥','success');
+  }catch(e){toast('저장 실패: '+e.message,'error');}
+}
+
 async function saveRegistryFilteredImageHQ(){
   if(!AD){ toast('관리자 로그인 필요','info'); return; }
   const body=ge('regTabBody');
@@ -40073,7 +40145,7 @@ Object.assign(window,{ openHomeRegisterWithTournament, openHomeRegisterWithTourn
   onRegClubChange,onRegContactInput,saveRegContact,
   renderAdminContactList,saveContactFromAdmin,renderAdminDirectorEmailSection,renderAdminNoticeSection,toggleContactList,saveFloatingNoticeSettings,clearFloatingNotice,hideFloatingNoticeForNow,
   prefillNoticeMsg,renderNoticeContactBtns,captureAndShareBracket,
-  saveRegListImage44,saveRegListExcel44,saveRegListKakao44,saveRegListPDF44,saveRegistryFilteredImageHQ,
+  saveRegListImage44,saveRegListExcel44,saveRegListExcelBulk44,saveRegListKakao44,saveRegListPDF44,saveRegistryFilteredImageHQ,
   toggleClubSel,selAllClubs,sendSmsSelected,sendSmsAll,sendKakaoSelected,sendKakaoAll,copyMsgOnly,openKakaoApp,triggerOrderPhoto,
   gDS,om,cm,toast,ge,esc,setRbSc,togglePlayerDropdown,choosePlayerFromDropdown,removeSelectedPlayerFromDropdown,
   buildDrawPresets,updateAdvPresets,updateMainSizeDisplay,calcGroupPresets,updateDrawAllowedCourtsSummary,toggleAllDrawAllowedCourts,
@@ -46169,12 +46241,12 @@ button[onclick*="__hardClearAppCacheAndReload"],button[onclick*="캐시"],button
             if(typeof safeToast==='function') safeToast(h?'전체대진표 활성화됨':'전체대진표 비활성화됨','success');
           };
           v728RefreshToggle();
-          // v735: 관리자/운영자만 전체대진표 버튼 + ON/OFF 토글 표시. 일반회원에게는 노출 안 함.
+          // 관리자/개발자만 토글 버튼 표시
           const isAdminUser=(typeof canManageBracket==='function'&&canManageBracket())||(typeof isManager==='function'&&isManager())||(typeof isDeveloper==='function'&&isDeveloper());
           if(isAdminUser){
             bar.append(main,reset,lock,a4,toggle728);
           } else {
-            bar.append(reset,lock,a4);
+            bar.append(main,reset,lock,a4);
           }
           } }
   function blockAutoFunctions(){AUTO_BLOCK_NAMES.forEach(n=>{try{const old=window[n] || (function(){try{return eval(n)}catch(_){return null}})(); if(old&&old.__v702Blocked)return; const blocked=function(){ if(window.__V702_EXPLICIT_DRAW_RUNNING===true) return typeof old==='function'?old.apply(this,arguments):false; console.warn('[v702 blocked auto]',n,arguments[0]||''); return false; }; blocked.__v702Blocked=true; blocked.__old=old; window[n]=blocked; try{eval(n+'=window["'+n+'"]')}catch(e){} }catch(e){}});}
