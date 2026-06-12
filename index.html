@@ -30261,8 +30261,18 @@ async function startIndividualMainDraw(){
     }catch(_e){ console.warn('[v606] keep court group failed',_e); }
   }
 
+  // v762: mainPlan 저장 + stD 호출 추가
+  try{
+    if(typeof buildHybridMainSlots==='function' && IMD){
+      const plan=IMD._lastPlan||null;
+      if(plan && typeof getMainDrawPlanStorageValue==='function'){
+        G.draws[key]={...(G.draws[key]||{}), mainPlan:getMainDrawPlanStorageValue(plan,false), mainUpdatedAt:new Date().toISOString()};
+      }
+    }
+  }catch(_e){}
+
   sl(true);
-  stM(key).then(()=>{
+  Promise.all([stM(key), (typeof stD==='function'?stD(key):Promise.resolve())]).then(()=>{
     sl(false);
     try{
       setMainSectionCollapsed(key,false);
@@ -30273,6 +30283,10 @@ async function startIndividualMainDraw(){
     }catch(e){}
     toast(isPrelimDone ? '본선 대진 추첨 완료' : '본선 대진 추첨 완료 (조 순위 표시 — 예선 완료 후 이름 확정)','success');
     try{ renderBracket(); }catch(e){}
+    // v762: 코트 자동배정
+    setTimeout(()=>{
+      try{ if(typeof window.v760RunMainAutoAssign==='function') window.v760RunMainAutoAssign(key); }catch(e){}
+    }, 800);
   }).catch(e=>{ sl(false); toast('저장 실패: '+e.message,'error'); });
 }
 
