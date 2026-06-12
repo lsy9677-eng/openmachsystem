@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-12-v733-a4-save-close";
+  const APP_VERSION = "2026-06-12-v734-a4-hq-save";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -6377,7 +6377,7 @@ button:disabled{opacity:.55!important;cursor:not-allowed!important;filter:graysc
 </button>
 </div>
 <div id="bracketExportBar" style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:6px;flex-wrap:wrap">
-<button class="btn btn-outline" onclick="openBracketView()" style="font-size:.78rem;padding:5px 10px">📊 전체대진표(본선포함)</button>
+<button class="btn btn-outline" id="v735HardcodedMainBtn" onclick="openBracketView()" style="font-size:.78rem;padding:5px 10px;display:none">📊 전체대진표(본선포함)</button>
 <button class="btn btn-outline" id="v606FinalizeGroupOrderBtn" onclick="v650OpenManualGroupNoBulkCurrent()" style="font-size:.78rem;padding:5px 12px;display:none;border-color:#d4a017;color:#8a6412">🔢 조번호 수동저장</button>
 <div class="login-menu-wrap js-mini-menu" id="bracketSaveMenuWrap">
 <button class="btn btn-outline" onclick="window.v570OpenA4GroupSheet ? window.v570OpenA4GroupSheet() : window.v566OpenA4GroupPreview()" style="font-size:.78rem;padding:5px 12px">🖨️ 조편성 저장/출력(A4)</button>
@@ -26288,6 +26288,9 @@ function mCard(m,key,dn1,dn2,done,sc1,sc2,label){
 let BV = { tid: null, div: '__ALL__' };
 
 function openBracketView(){
+  // v735: 관리자/운영자만 전체대진표 열람 가능
+  const _canView=(typeof canManageBracket==='function'&&canManageBracket())||(typeof isManager==='function'&&isManager())||(typeof isDeveloper==='function'&&isDeveloper());
+  if(!_canView){ toast('관리자 또는 운영자만 전체 대진표를 볼 수 있습니다','info'); return; }
   const tid = ge('brTS')?.value;
   if(!tid){ toast('대회를 먼저 선택하세요','info'); return; }
   const t = G.tournaments.find(t=>t.id===tid);
@@ -46166,12 +46169,12 @@ button[onclick*="__hardClearAppCacheAndReload"],button[onclick*="캐시"],button
             if(typeof safeToast==='function') safeToast(h?'전체대진표 활성화됨':'전체대진표 비활성화됨','success');
           };
           v728RefreshToggle();
-          // 관리자/개발자만 토글 버튼 표시
+          // v735: 관리자/운영자만 전체대진표 버튼 + ON/OFF 토글 표시. 일반회원에게는 노출 안 함.
           const isAdminUser=(typeof canManageBracket==='function'&&canManageBracket())||(typeof isManager==='function'&&isManager())||(typeof isDeveloper==='function'&&isDeveloper());
           if(isAdminUser){
             bar.append(main,reset,lock,a4,toggle728);
           } else {
-            bar.append(main,reset,lock,a4);
+            bar.append(reset,lock,a4);
           }
           } }
   function blockAutoFunctions(){AUTO_BLOCK_NAMES.forEach(n=>{try{const old=window[n] || (function(){try{return eval(n)}catch(_){return null}})(); if(old&&old.__v702Blocked)return; const blocked=function(){ if(window.__V702_EXPLICIT_DRAW_RUNNING===true) return typeof old==='function'?old.apply(this,arguments):false; console.warn('[v702 blocked auto]',n,arguments[0]||''); return false; }; blocked.__v702Blocked=true; blocked.__old=old; window[n]=blocked; try{eval(n+'=window["'+n+'"]')}catch(e){} }catch(e){}});}
@@ -50236,6 +50239,335 @@ window.openParticipantFindPopupForTournament = function(tid){
   console.log('[v733] A4 save close patch installed');
 })();
 </script>
+
+
+
+<!-- v734: A4 저장/출력 이미지 고화질 보정 - 모바일 축소 transform 제거 + 4배율 PNG 저장 -->
+<style id="v734A4HighQualitySaveStyle">
+#v734A4CaptureHolder{
+  position:fixed!important;
+  left:-100000px!important;
+  top:0!important;
+  width:794px!important;
+  background:#fff!important;
+  z-index:-1!important;
+  overflow:visible!important;
+  pointer-events:none!important;
+}
+#v734A4CaptureHolder .v702-a4-sheet{
+  display:block!important;
+  width:794px!important;
+  background:#fff!important;
+}
+#v734A4CaptureHolder .v702-a4-page{
+  width:794px!important;
+  height:1123px!important;
+  min-height:1123px!important;
+  max-height:1123px!important;
+  margin:0!important;
+  padding:28px!important;
+  box-sizing:border-box!important;
+  background:#fff!important;
+  overflow:hidden!important;
+  transform:none!important;
+  zoom:1!important;
+  box-shadow:none!important;
+  page-break-after:always!important;
+  break-after:page!important;
+  -webkit-print-color-adjust:exact!important;
+  print-color-adjust:exact!important;
+}
+#v734A4CaptureHolder .v702-a4-page *{
+  -webkit-print-color-adjust:exact!important;
+  print-color-adjust:exact!important;
+}
+</style>
+<script id="v734A4HighQualitySavePatch">
+(function(){
+  'use strict';
+  if(window.__v734A4HighQualitySaveInstalled) return;
+  window.__v734A4HighQualitySaveInstalled = true;
+
+  var A4_W = 794;
+  var A4_H = 1123;
+  var HQ_SCALE = 4; // 794x1123 → 3176x4492px. A4 출력용으로 충분한 고화질.
+
+  function $(id){ return document.getElementById(id); }
+  function msg(text, type){
+    try{
+      if(typeof toastMsg === 'function') toastMsg(text, type || 'info');
+      else if(typeof toast === 'function') toast(text, type || 'info');
+      else if(typeof safeToast === 'function') safeToast(text, type || 'info');
+      else console.log('[v734]', text);
+    }catch(_e){ console.log('[v734]', text); }
+  }
+  function sleep(ms){ return new Promise(function(resolve){ setTimeout(resolve, ms); }); }
+
+  async function ensureHtml2Canvas(){
+    if(window.html2canvas) return;
+    await new Promise(function(resolve, reject){
+      var old = Array.prototype.slice.call(document.scripts).find(function(s){ return /html2canvas/i.test(s.src || ''); });
+      if(old){
+        if(window.html2canvas){ resolve(); return; }
+        old.addEventListener('load', resolve, {once:true});
+        old.addEventListener('error', function(){ reject(new Error('html2canvas 로드 실패')); }, {once:true});
+        return;
+      }
+      var s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+      s.onload = resolve;
+      s.onerror = function(){ reject(new Error('html2canvas 로드 실패')); };
+      document.head.appendChild(s);
+    });
+  }
+
+  function sanitizeFileName(name){
+    return String(name || 'A4_예선대진표').replace(/[\\/:*?"<>|]+/g, '_').replace(/\s+/g, '_').replace(/_+$/,'') || 'A4_예선대진표';
+  }
+  function pageFileBase(){
+    try{
+      var title = (document.querySelector('#v702A4Body .v702-a4-title-main') || {}).textContent || 'A4_예선대진표';
+      return sanitizeFileName(title);
+    }catch(_e){ return 'A4_예선대진표'; }
+  }
+
+  function getSheetClone(){
+    var previewSheet = document.querySelector('#v702A4Body .v702-a4-sheet');
+    if(previewSheet) return previewSheet.cloneNode(true);
+    var body = $('v702A4Body');
+    if(body && body.querySelector('.v702-a4-page')){
+      var wrap = document.createElement('div');
+      wrap.className = 'v702-a4-sheet v714-a4-sheet v715-a4-sheet v731-a4-sheet';
+      Array.prototype.slice.call(body.querySelectorAll('.v702-a4-page')).forEach(function(p){ wrap.appendChild(p.cloneNode(true)); });
+      return wrap;
+    }
+    var build = window.v731BuildA4 || window.v715BuildA4 || window.v714BuildA4 || null;
+    if(typeof build === 'function') return build().cloneNode(true);
+    return null;
+  }
+
+  function forceCaptureLayout(root){
+    try{
+      if(window.__v719A4InlineColorFixInstalled && typeof window.__v719ApplyInlineColors === 'function'){
+        window.__v719ApplyInlineColors(root);
+      }
+    }catch(_e){}
+    try{
+      Array.prototype.slice.call(root.querySelectorAll('.v714-a4-card')).forEach(function(card){
+        var head = card.querySelector('.v714-a4-card-head');
+        var strip = card.querySelector('.v714-a4-court-strip');
+        var dot = card.querySelector('.v714-a4-court-dot');
+        var txt = ((head && head.textContent) || '') + ' ' + ((strip && strip.textContent) || '');
+        var color = '#0f1e3a';
+        if(/국제|능동/.test(txt)) color = '#1d4ed8';
+        else if(/원도심/.test(txt)) color = '#047857';
+        else if(/장유중|클레이|clay/i.test(txt)) color = '#b45309';
+        else if(/삼계/.test(txt)) color = '#7c3aed';
+        else if(/금병/.test(txt)) color = '#be123c';
+        else if(/동부/.test(txt)) color = '#0f766e';
+        card.style.setProperty('--v714-court-color', color, 'important');
+        card.style.setProperty('--v715-venue-color', color, 'important');
+        if(head){
+          head.style.setProperty('background', color, 'important');
+          head.style.setProperty('color', '#ffffff', 'important');
+          Array.prototype.slice.call(head.querySelectorAll('*')).forEach(function(el){ el.style.setProperty('color','#ffffff','important'); });
+        }
+        if(strip){
+          strip.style.setProperty('background', '#f8fafc', 'important');
+          strip.style.setProperty('color', '#334155', 'important');
+        }
+        if(dot) dot.style.setProperty('background', color, 'important');
+      });
+      Array.prototype.slice.call(root.querySelectorAll('.v702-a4-page')).forEach(function(page){
+        page.style.setProperty('width', A4_W + 'px', 'important');
+        page.style.setProperty('height', A4_H + 'px', 'important');
+        page.style.setProperty('min-height', A4_H + 'px', 'important');
+        page.style.setProperty('max-height', A4_H + 'px', 'important');
+        page.style.setProperty('margin', '0', 'important');
+        page.style.setProperty('padding', '28px', 'important');
+        page.style.setProperty('box-sizing', 'border-box', 'important');
+        page.style.setProperty('overflow', 'hidden', 'important');
+        page.style.setProperty('transform', 'none', 'important');
+        page.style.setProperty('zoom', '1', 'important');
+        page.style.setProperty('box-shadow', 'none', 'important');
+        page.style.setProperty('background', '#ffffff', 'important');
+        page.style.setProperty('-webkit-print-color-adjust', 'exact', 'important');
+        page.style.setProperty('print-color-adjust', 'exact', 'important');
+      });
+      Array.prototype.slice.call(root.querySelectorAll('.v702-a4-page *')).forEach(function(el){
+        el.style.setProperty('-webkit-print-color-adjust', 'exact', 'important');
+        el.style.setProperty('print-color-adjust', 'exact', 'important');
+      });
+    }catch(e){ console.warn('[v734] capture layout fix failed', e); }
+  }
+
+  async function captureA4PagesAsBlobs(scale){
+    await ensureHtml2Canvas();
+    var sheet = getSheetClone();
+    if(!sheet) throw new Error('A4 대진표를 만들 수 없습니다.');
+    var oldHolder = $('v734A4CaptureHolder');
+    if(oldHolder) oldHolder.remove();
+    var holder = document.createElement('div');
+    holder.id = 'v734A4CaptureHolder';
+    holder.appendChild(sheet);
+    document.body.appendChild(holder);
+    try{
+      forceCaptureLayout(holder);
+      await sleep(180);
+      var pages = Array.prototype.slice.call(holder.querySelectorAll('.v702-a4-page'));
+      if(!pages.length) throw new Error('저장할 A4 페이지가 없습니다.');
+      var blobs = [];
+      for(var i=0; i<pages.length; i++){
+        var canvas = await window.html2canvas(pages[i], {
+          backgroundColor:'#ffffff',
+          scale: scale || HQ_SCALE,
+          useCORS:true,
+          allowTaint:true,
+          logging:false,
+          width:A4_W,
+          height:A4_H,
+          windowWidth:A4_W,
+          windowHeight:A4_H,
+          scrollX:0,
+          scrollY:0,
+          onclone:function(doc){
+            var h = doc.getElementById('v734A4CaptureHolder') || doc;
+            try{
+              Array.prototype.slice.call(h.querySelectorAll('.v702-a4-page,.v702-a4-page *')).forEach(function(el){
+                el.style.setProperty('transform','none','important');
+                el.style.setProperty('-webkit-print-color-adjust','exact','important');
+                el.style.setProperty('print-color-adjust','exact','important');
+              });
+            }catch(_e){}
+          }
+        });
+        var blob = await new Promise(function(resolve){ canvas.toBlob(resolve, 'image/png', 1); });
+        if(!blob) throw new Error('이미지 변환 실패');
+        blobs.push(blob);
+      }
+      return blobs;
+    }finally{
+      try{ holder.remove(); }catch(_e){}
+    }
+  }
+
+  window.v734SaveA4HighQuality = async function(){
+    var urls = [];
+    try{
+      msg('A4 대진표 고화질 저장 중... (4배율)', 'info');
+      var blobs = await captureA4PagesAsBlobs(HQ_SCALE);
+      urls = blobs.map(function(b){ return URL.createObjectURL(b); });
+      var base = pageFileBase() + '_고화질';
+      for(var i=0; i<urls.length; i++){
+        var a = document.createElement('a');
+        a.href = urls[i];
+        a.download = base + '_' + String(i+1).padStart(2,'0') + '.png';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        await sleep(180);
+      }
+      msg('A4 고화질 이미지 저장 완료', 'success');
+      try{ if(window.v733CloseA4PreviewAfterSave) window.v733CloseA4PreviewAfterSave(); }catch(_e){}
+    }catch(e){
+      console.error('[v734] high quality save failed', e);
+      msg('이미지 저장 실패: ' + (e.message || e), 'error');
+    }finally{
+      setTimeout(function(){ urls.forEach(function(u){ try{ URL.revokeObjectURL(u); }catch(_e){} }); }, 3000);
+    }
+  };
+
+  window.v734PrintA4HighQuality = async function(){
+    var urls = [];
+    try{
+      msg('A4 고화질 출력 준비 중...', 'info');
+      var blobs = await captureA4PagesAsBlobs(3);
+      urls = blobs.map(function(b){ return URL.createObjectURL(b); });
+      var old = $('v734PrintRoot') || $('v721PrintRoot') || $('v718PrintRoot') || $('v702PrintRoot');
+      if(old) old.remove();
+      var root = document.createElement('div');
+      root.id = 'v734PrintRoot';
+      root.innerHTML = urls.map(function(u, i){ return '<div class="v734-print-page"><img alt="A4 page '+(i+1)+'" src="'+u+'"></div>'; }).join('');
+      document.body.appendChild(root);
+      await Promise.all(Array.prototype.slice.call(root.querySelectorAll('img')).map(function(img){
+        return new Promise(function(resolve){ if(img.complete) resolve(); else { img.onload = resolve; img.onerror = resolve; } });
+      }));
+      await sleep(200);
+      window.print();
+      setTimeout(function(){
+        try{ root.remove(); }catch(_e){}
+        urls.forEach(function(u){ try{ URL.revokeObjectURL(u); }catch(_e){} });
+      }, 2500);
+    }catch(e){
+      console.error('[v734] high quality print failed', e);
+      msg('출력 실패: ' + (e.message || e), 'error');
+      urls.forEach(function(u){ try{ URL.revokeObjectURL(u); }catch(_e){} });
+    }
+  };
+
+  function bindButtons(){
+    var printBtn = $('v702PrintA4');
+    var saveBtn = $('v702SaveA4');
+    if(saveBtn){
+      saveBtn.textContent = '🖼️ 고화질 저장';
+      saveBtn.onclick = function(ev){ if(ev){ ev.preventDefault(); ev.stopPropagation(); } window.v734SaveA4HighQuality(); return false; };
+    }
+    if(printBtn){
+      printBtn.onclick = function(ev){ if(ev){ ev.preventDefault(); ev.stopPropagation(); } window.v734PrintA4HighQuality(); return false; };
+    }
+  }
+
+  ['v702OpenA4','v714OpenA4','v715OpenA4','v716OpenA4','v731OpenA4'].forEach(function(name){
+    var old = window[name];
+    if(typeof old === 'function' && !old.__v734HQWrapped){
+      var wrapped = function(){
+        var r = old.apply(this, arguments);
+        setTimeout(bindButtons, 0);
+        setTimeout(bindButtons, 120);
+        setTimeout(bindButtons, 450);
+        return r;
+      };
+      wrapped.__v734HQWrapped = true;
+      wrapped.__v734Old = old;
+      window[name] = wrapped;
+    }
+  });
+
+  // 기존 capture-phase 리스너가 호출하더라도 최종 고화질 함수가 실행되도록 전역 함수도 덮어쓴다.
+  window.v721SaveA4PreviewExact = window.v734SaveA4HighQuality;
+  window.v718SaveA4PreviewExact = window.v734SaveA4HighQuality;
+  window.v720SaveA4PreviewSame = window.v734SaveA4HighQuality;
+  window.v721PrintA4PreviewExact = window.v734PrintA4HighQuality;
+  window.v718PrintA4PreviewExact = window.v734PrintA4HighQuality;
+  window.v720PrintA4PreviewSame = window.v734PrintA4HighQuality;
+
+  document.addEventListener('click', function(ev){
+    var btn = ev.target && ev.target.closest && ev.target.closest('#v702PrintA4,#v702SaveA4');
+    if(!btn) return;
+    ev.preventDefault();
+    ev.stopImmediatePropagation();
+    if(btn.id === 'v702SaveA4') window.v734SaveA4HighQuality();
+    else window.v734PrintA4HighQuality();
+    return false;
+  }, true);
+
+  document.addEventListener('DOMContentLoaded', function(){ setTimeout(bindButtons, 700); setTimeout(bindButtons, 1500); });
+  setTimeout(bindButtons, 1200);
+  try{ var badge = $('bracketFreshnessBadge'); if(badge) badge.textContent = 'v734 · A4고화질'; }catch(_e){}
+  console.log('[v734] A4 high-quality save/print patch installed');
+})();
+</script>
+<style id="v734A4HighQualityPrintStyle">
+@media print{
+  body>*:not(#v734PrintRoot):not(#v721PrintRoot):not(#v702PrintRoot){display:none!important;visibility:hidden!important;}
+  #v734PrintRoot{display:block!important;visibility:visible!important;position:static!important;background:#fff!important;}
+  #v734PrintRoot *{visibility:visible!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
+  #v734PrintRoot .v734-print-page{width:210mm!important;height:297mm!important;margin:0!important;padding:0!important;page-break-after:always!important;break-after:page!important;overflow:hidden!important;background:#fff!important;}
+  #v734PrintRoot .v734-print-page:last-child{page-break-after:auto!important;break-after:auto!important;}
+  #v734PrintRoot img{display:block!important;width:210mm!important;height:297mm!important;object-fit:contain!important;margin:0!important;padding:0!important;background:#fff!important;}
+  @page{size:A4 portrait;margin:0;}
+}
+</style>
 
 </body>
 </html>
