@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-12-v747-personal-match-result";
+  const APP_VERSION = "2026-06-12-v754";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -14642,7 +14642,7 @@ function renderCourtStatusBoard(key, div){
   });
   const v684ManualSharedModeActive=(isIndividualByKey(key) && (function(){try{ const d=(G.draws&&G.draws[key])||{}; if(d.manualPrelimSharedMode||d.v680ManualSharedMode||d.v680AllSharedQueue||d.v683PairManualMode) return true; return ((G.matches&&G.matches[key])||[]).some(m=>m&&m.winner==null&&String(m.phase||'')==='group'&&(m.manualSharedHold||m.v680ManualSharedQueue||m.v683PairManualMatch)&&!String(m.court||m.manualCourtTarget||'').trim()&&!(Array.isArray(m.courts)&&m.courts.filter(Boolean).length)); }catch(e){return false;}})());
   const sharedWaiting=(isIndividualByKey(key) && (isIndividualAutoCourtAssignEnabled() || v684ManualSharedModeActive)) ? getCourtBoardSharedOverflowItems(key, processedItems, selectedCourts, boardCourts) : [];
-  const sharedWaitingDefaultVisibleCount=10;
+  const sharedWaitingDefaultVisibleCount=9999; // v750: 구장별 공용대기 분리를 위해 전체 표시
   const sharedWaitingExpanded=!!st.sharedExpanded;
   const sharedWaitingVisible=(sharedWaitingExpanded ? sharedWaiting : sharedWaiting.slice(0,sharedWaitingDefaultVisibleCount));
   const sharedWaitingHiddenCount=Math.max(0, sharedWaiting.length-sharedWaitingVisible.length);
@@ -27430,30 +27430,18 @@ function hybridSpreadOrder(count){
 }
 
 function pickByeMatchIndices(matchCount, byeCount){
+  // v753: PDF 대진표 라벨 출력 기준 — 4칸 묶음의 마지막(홀수 인덱스)이 부전승
+  // 순번 기준: 4,8,12,...→ 경기 인덱스 1,3,5,7,...(홀수)
+  // 이 패턴이 PDF 인쇄본과 정확히 일치해야 라벨지를 붙일 수 있음
   if(byeCount<=0) return [];
-  const parents=Math.max(1, Math.ceil(matchCount/2));
-  const parentOrder=hybridSpreadOrder(parents);
   const out=[];
-  const used=new Set();
-
-  for(const p of parentOrder){
-    if(out.length>=byeCount) break;
-    const a=p*2, b=a+1;
-    if(a<matchCount && !used.has(a)){ out.push(a); used.add(a); continue; }
-    if(b<matchCount && !used.has(b)){ out.push(b); used.add(b); }
+  // 홀수 인덱스(1,3,5...) 순서로 byeCount개 선택
+  for(let i=1; i<matchCount && out.length<byeCount; i+=2){
+    out.push(i);
   }
-  if(out.length<byeCount){
-    for(const p of parentOrder){
-      if(out.length>=byeCount) break;
-      const a=p*2, b=a+1;
-      if(b<matchCount && !used.has(b)){ out.push(b); used.add(b); continue; }
-      if(a<matchCount && !used.has(a)){ out.push(a); used.add(a); }
-    }
-  }
-  if(out.length<byeCount){
-    for(let i=0;i<matchCount && out.length<byeCount;i++){
-      if(!used.has(i)){ out.push(i); used.add(i); }
-    }
+  // 홀수만으로 부족한 경우(byeCount가 매우 많을 때) 짝수도 추가
+  for(let i=0; i<matchCount && out.length<byeCount; i+=2){
+    out.push(i);
   }
   return out.slice(0, byeCount);
 }
@@ -27528,15 +27516,15 @@ function buildHybridMainSlots(entries, n){
     return {matchSlots, n, byeCount, byeIdxs, normalIdxs};
   }
 
-  // v606: rank2 랜덤 셔플 (조2위 중 랜덤으로 부전승 배정)
-  const rank2Shuffled=[...rank2]; for(let _i=rank2Shuffled.length-1;_i>0;_i--){const _j=Math.floor(Math.random()*(_i+1));[rank2Shuffled[_i],rank2Shuffled[_j]]=[rank2Shuffled[_j],rank2Shuffled[_i]];}
-  const byeRank1Count=Math.min(byeCount, rank1.length);
-  const byeRank1=rank1.slice(0, byeRank1Count);
-  const byeRank2=rank2Shuffled.slice(0, Math.max(0, byeCount-byeRank1Count));
-  const remainRank2=rank2Shuffled.slice(Math.max(0, byeCount-byeRank1Count));
-  const normalRank1=rank1.slice(byeRank1Count);
-
-  const byeAll=[...byeRank1, ...byeRank2];
+  // v753: 부전승 균등 배정 — 1위/2위 구분 없이 모든 팀을 섞어 부전승 배정
+  // 기존 방식은 1위팀에 부전승 몰아주기 → 불공정. 이제 전체 셔플 후 균등 배정.
+  const allEntries=[...rank1,...rank2];
+  for(let _i=allEntries.length-1;_i>0;_i--){const _j=Math.floor(Math.random()*(_i+1));[allEntries[_i],allEntries[_j]]=[allEntries[_j],allEntries[_i]];}
+  const byeAll=allEntries.slice(0, byeCount);
+  const normalAll=allEntries.slice(byeCount);
+  // rank1/rank2 재분류 (normalAll 기준)
+  const normalRank1=normalAll.filter(e=>e.rk===1);
+  const remainRank2=normalAll.filter(e=>e.rk!==1);
   byeIdxs.forEach((slotIdx, i)=>{
     const team=byeAll[i];
     if(!team) return;
@@ -51118,6 +51106,248 @@ window.openParticipantFindPopupForTournament = function(tid){
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
   setTimeout(boot,600); setTimeout(boot,1600);
   console.log('[v748] main venue split + autocourt patch installed');
+})();
+</script>
+
+
+<!-- v753: 구장별 공용대기 분리 + 본선 자동 코트 배정 통합 패치 -->
+<style id="v753VenueSharedStyle">
+.v753-shared-wrapper{display:grid;grid-template-columns:repeat(2,minmax(300px,1fr));gap:14px;width:100%;box-sizing:border-box;}
+.v753-shared-section{border-radius:13px;border:1.5px solid #dbe7ff;background:#fff;overflow:hidden;display:flex;flex-direction:column;}
+.v753-shared-section.v753-gukje{border-color:#93c5fd;background:#eff6ff;}
+.v753-shared-section.v753-wondosim{border-color:#86efac;background:#f0fdf4;}
+.v753-shared-section.v753-other{border-color:#e5e7eb;background:#f9fafb;}
+.v753-shared-head{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;font-size:.82rem;font-weight:900;}
+.v753-shared-section.v753-gukje .v753-shared-head{color:#1e40af;background:#dbeafe;}
+.v753-shared-section.v753-wondosim .v753-shared-head{color:#166534;background:#dcfce7;}
+.v753-shared-section.v753-other .v753-shared-head{color:#374151;background:#f3f4f6;}
+.v753-shared-body{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:7px;padding:9px;align-items:start;}
+.v753-shared-empty{font-size:.74rem;color:#9ca3af;padding:10px;text-align:center;}
+@media(max-width:700px){.v753-shared-wrapper{grid-template-columns:1fr;}}
+</style>
+<script id="v753UnifiedVenuePatch">
+(function(){
+  'use strict';
+  if(window.__v753Installed) return;
+  window.__v753Installed=true;
+  const clean=v=>String(v==null?'':v).trim();
+  const arr=v=>Array.isArray(v)?v:[];
+
+  // ── 카드 구장 판별 ──────────────────────────────────────────
+  function cardVenue(card){
+    if(!card) return 'gukje';
+    // 1) 배지 스팬 직접 확인 (🟢 원도심 / 🔵 국제)
+    const spans=[].slice.call(card.querySelectorAll('span'));
+    for(const s of spans){
+      const t=clean(s.textContent);
+      if(/원도심/.test(t)) return 'wondosim';
+      if(/국제/.test(t)) return 'gukje';
+    }
+    // 2) 전체 텍스트
+    const txt=clean(card.textContent||'');
+    if(/원도심/.test(txt)) return 'wondosim';
+    if(/국제/.test(txt)) return 'gukje';
+    // 3) data 속성
+    const dc=card.dataset&&card.dataset.court||card.getAttribute&&card.getAttribute('data-court')||'';
+    if(/원도심/.test(dc)) return 'wondosim';
+    return 'gukje';
+  }
+
+  // ── 공용대기 DOM 분리 ─────────────────────────────────────
+  function makeSection(cls, label, cards){
+    const sec=document.createElement('div');
+    sec.className='v753-shared-section '+cls;
+    const head=document.createElement('div');
+    head.className='v753-shared-head';
+    head.textContent=label+' ('+cards.length+'경기)';
+    sec.appendChild(head);
+    const body=document.createElement('div');
+    body.className='v753-shared-body';
+    if(cards.length===0){
+      const empty=document.createElement('div');
+      empty.className='v753-shared-empty';
+      empty.textContent='대기 없음';
+      body.appendChild(empty);
+    } else {
+      cards.forEach(c=>body.appendChild(c));
+    }
+    sec.appendChild(body);
+    return sec;
+  }
+
+  function splitSharedQueueDom(){
+    try{
+      const stacks=[].slice.call(document.querySelectorAll('#bracketContent .shared-wait-stack'));
+      stacks.forEach(stack=>{
+        // 이미 v753으로 처리된 경우 스킵
+        if(stack.querySelector(':scope > .v753-shared-wrapper')) return;
+        // 이전 버전 래퍼 제거
+        const oldWraps=stack.querySelectorAll('.v749-shared-sections,.v750-shared-wrapper,.v751-shared-wrapper');
+        oldWraps.forEach(w=>{ while(w.firstChild) stack.insertBefore(w.firstChild, w); w.remove(); });
+
+        const cards=[].slice.call(stack.querySelectorAll(':scope > .court-wait-card'));
+        if(!cards.length) return;
+        const groups={gukje:[],wondosim:[],other:[]};
+        cards.forEach(c=>{ const v=cardVenue(c); groups[v in groups?v:'other'].push(c); });
+        if((groups.gukje.length+groups.wondosim.length)<1) return;
+
+        const wrap=document.createElement('div');
+        wrap.className='v753-shared-wrapper';
+        wrap.appendChild(makeSection('v753-gukje','🔵 국제 공용대기',groups.gukje));
+        wrap.appendChild(makeSection('v753-wondosim','🟢 원도심 공용대기',groups.wondosim));
+        if(groups.other.length) wrap.appendChild(makeSection('v753-other','⏳ 기타',groups.other));
+        stack.replaceChildren(wrap);
+
+        // 헤더 텍스트 갱신
+        const zone=stack.closest('.court-drop-zone')||stack.parentElement;
+        if(zone){
+          const head=zone.querySelector('div[style*="font-size:.84rem"],div[style*="공용대기"]');
+          if(head && /공용대기/.test(clean(head.textContent)))
+            head.textContent='⏳ 구장별 공용대기 '+cards.length+'경기';
+          const toggle=zone.querySelector('.court-shared-toggle-btn');
+          if(toggle) toggle.style.display='none';
+        }
+      });
+    }catch(e){ console.warn('[v753] splitSharedQueueDom failed',e); }
+  }
+  window.v753SplitSharedQueueDom=splitSharedQueueDom;
+
+  // ── 본선 자동 코트 배정 ───────────────────────────────────
+  function isWondo(c){ return /원도심/.test(clean(c)); }
+  function isGukje(c){ return /국제/.test(clean(c)); }
+
+  function getMainCourtPool(key){
+    const parts=String(key||'').split('_');
+    const tid=parts[0], div=parts.slice(1).join('_');
+    let pool=[];
+    try{ if(typeof getDivisionPhaseConfiguredCourts==='function') pool=getDivisionPhaseConfiguredCourts(tid,div,'main')||[]; }catch(e){}
+    try{ if(!arr(pool).length && typeof getBracketAllowedCourts==='function') pool=getBracketAllowedCourts(key)||[]; }catch(e){}
+    try{ if(!arr(pool).length && typeof getTournamentCourtList==='function') pool=getTournamentCourtList(tid,true)||[]; }catch(e){}
+    return [...new Set(arr(pool).map(clean).filter(Boolean))];
+  }
+
+  function runMainAutoAssign(key){
+    if(!key) return;
+    const pool=getMainCourtPool(key);
+    if(!pool.length){ console.warn('[v754] mainCourtPool empty for',key); return; }
+    const matches=arr(window.G&&G.matches&&G.matches[key]);
+
+    // 코트별 현재 배정 수 계산 (진행중 + 대기)
+    const queueCount={};
+    pool.forEach(c=>{ queueCount[c]=0; });
+    matches.forEach(m=>{
+      const c=clean(m&&m.court);
+      if(c && c in queueCount) queueCount[c]++;
+    });
+
+    // 구장별 코트 분류
+    const wondoPool=pool.filter(isWondo);
+    const gukjePool=pool.filter(c=>!isWondo(c)&&isGukje(c));
+    const otherPool=pool.filter(c=>!isWondo(c)&&!isGukje(c));
+
+    // 배정 대상: 코트 없는 본선/진출전 준비 경기
+    // 코트당 최대 2개(현재+대기1)까지만 배정
+    const mainReady=matches.filter(m=>
+      m&&!m.winner&&!m.bye&&
+      /^(main|playin)$/.test(String(m.phase||''))&&
+      m.t1!=null&&m.t2!=null&&
+      !clean(m.court)&&
+      !m.manualCourtLocked
+    );
+    if(!mainReady.length){ console.log('[v754] no main matches to assign'); return; }
+
+    let assigned=0;
+    mainReady.forEach(m=>{
+      // venue 추론
+      let venue='gukje';
+      try{ if(typeof window.v749InferMatchVenue==='function') venue=window.v749InferMatchVenue(key,m); }catch(e){}
+      const candidatePool=
+        venue==='wondosim'&&wondoPool.length?wondoPool:
+        gukjePool.length?gukjePool:
+        otherPool.length?otherPool:pool;
+
+      // 대기수 2 미만인 코트 중 가장 적은 것 선택 (현재+대기1 = 최대 2)
+      const eligible=candidatePool.filter(c=>(queueCount[c]||0)<2);
+      const target=eligible.length
+        ? eligible.slice().sort((a,b)=>(queueCount[a]||0)-(queueCount[b]||0))[0]
+        : candidatePool.slice().sort((a,b)=>(queueCount[a]||0)-(queueCount[b]||0))[0];
+
+      if(target){
+        m.court=target;
+        m.autoCourtLabel='본선 자동배정(v754)';
+        queueCount[target]=(queueCount[target]||0)+1;
+        assigned++;
+      }
+    });
+
+    console.log('[v754] mainAutoAssign: assigned',assigned,'/',mainReady.length,'matches');
+
+    if(assigned>0){
+      try{ if(typeof stM==='function') stM(key).catch(e=>console.warn('[v754] stM failed',e)); }catch(e){}
+      try{ if(typeof renderBracket==='function') setTimeout(()=>renderBracket(),300); }catch(e){}
+    }
+  }
+  window.v753RunMainAutoAssign=runMainAutoAssign;
+  window.v754RunMainAutoAssign=runMainAutoAssign;
+
+  // ── renderBracket 래핑 (단일, 중복 방지) ─────────────────
+  function wrapOnce(){
+    const fn=window.renderBracket;
+    if(typeof fn!=='function' || fn.__v753Wrapped) return;
+    const wrapped=function(){
+      const r=fn.apply(this,arguments);
+      setTimeout(splitSharedQueueDom,80);
+      return r;
+    };
+    wrapped.__v753Wrapped=true;
+    window.renderBracket=wrapped;
+    try{ renderBracket=wrapped; }catch(e){}
+  }
+
+  // ── 본선 추첨 감지 → 자동 코트 배정 ──────────────────────
+  function watchMainDrawAndAssign(){
+    const orig=window.saveMainDraw||window.runMainDraw||window.commitMainDraw;
+    if(typeof orig==='function' && !orig.__v753AssignWrapped){
+      const name=Object.keys(window).find(k=>window[k]===orig);
+      const wrapped=function(){
+        const r=orig.apply(this,arguments);
+        // 추첨 저장 후 약간 딜레이 후 자동 배정
+        setTimeout(()=>{
+          try{
+            const keys=Object.keys((window.G&&G.matches)||{});
+            keys.forEach(k=>{ if(arr(G.matches[k]).some(m=>m&&/^(main|playin)$/.test(String(m.phase||'')))) runMainAutoAssign(k); });
+          }catch(e){ console.warn('[v753] post-draw assign failed',e); }
+        }, 800);
+        return r;
+      };
+      wrapped.__v753AssignWrapped=true;
+      if(name) window[name]=wrapped;
+    }
+  }
+
+  function boot(){
+    wrapOnce();
+    splitSharedQueueDom();
+    watchMainDrawAndAssign();
+    try{ const b=document.getElementById('bracketFreshnessBadge'); if(b) b.textContent='v753'; }catch(e){}
+  }
+
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot);
+  else boot();
+  setTimeout(boot,400);
+  setTimeout(splitSharedQueueDom,1200);
+  setTimeout(splitSharedQueueDom,3000);
+
+  // MutationObserver — 단일 등록
+  let _splitTimer=null;
+  try{
+    new MutationObserver(()=>{
+      clearTimeout(_splitTimer);
+      _splitTimer=setTimeout(splitSharedQueueDom,120);
+    }).observe(document.body,{childList:true,subtree:true});
+  }catch(e){}
+
+  console.log('[v753] unified venue/autocourt patch installed');
 })();
 </script>
 
