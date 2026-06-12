@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-13-v762";
+  const APP_VERSION = "2026-06-13-v763";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -51165,8 +51165,20 @@ function runMainAutoAssign(key){
   });
   console.log('[v760] assigned',assigned,'matches');
   if(assigned>0){
-    try{ if(typeof stM==='function') stM(key).catch(function(e){console.warn('[v760] stM failed',e);}); }catch(e){}
-    try{ if(typeof renderBracket==='function') setTimeout(function(){renderBracket();},300); }catch(e){}
+    try{
+      // v763: 저장 전 overlay 허용 — 폴링이 덮어씌우는 것 방지
+      window.__V641_ALLOW_LOCAL_COURT_OVERLAY=true;
+      if(typeof stM==='function'){
+        stM(key).then(function(){
+          console.log('[v760] stM saved');
+          window.__V641_ALLOW_LOCAL_COURT_OVERLAY=false;
+          try{ if(typeof renderBracket==='function') renderBracket(); }catch(e){}
+        }).catch(function(e){
+          console.warn('[v760] stM failed',e);
+          window.__V641_ALLOW_LOCAL_COURT_OVERLAY=false;
+        });
+      }
+    }catch(e){ window.__V641_ALLOW_LOCAL_COURT_OVERLAY=false; }
   }
 }
 window.v760RunMainAutoAssign=runMainAutoAssign;
