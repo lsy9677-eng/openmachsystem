@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-12-v737-aligo-restore";
+  const APP_VERSION = "2026-06-12-v739-aligo-exact-proxy";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -20382,125 +20382,76 @@ function _openSmsChoiceModal(phones, body, recipients){
 window._openSmsChoiceModal=_openSmsChoiceModal;
 
 
-// v737: 알리고 실제 발송 함수 복구
-// - v607 미리보기/참가자 상세/선택 문자 기능이 호출하는 window.v583SendAligoSms를 다시 정의한다.
-// - 알리고 키는 클라이언트에 두지 않고 Cloudflare Functions API로만 전달한다.
+// v739: 알리고 발송 복구 - 기존에 정상 작동하던 Worker 엔드포인트로 고정
+// - tennis230.pages.dev 주소는 그대로 사용하고, 실제 SMS 발송만 별도 Worker로 POST한다.
+// - 이전 정상본(v583AligoSmsApprovalPatch)의 URL/헤더/페이로드 형식을 복원한다.
 (function(){
   'use strict';
-  if(typeof window.v583SendAligoSms === 'function' && window.v583SendAligoSms.__v737Restored) return;
+  const ALIGO_PROXY_URL='https://tennis230-sms-proxy.lsy9677.workers.dev/send-sms';
+  const ALIGO_CLIENT_KEY='m230sms';
 
-  function onlyPhone(v){
-    return String(v||'').replace(/[^0-9]/g,'');
-  }
-  function normalizePhone(v){
-    const p=onlyPhone(v);
-    if(!p) return '';
-    if(p.startsWith('82') && p.length>=11) return '0'+p.slice(2);
-    return p;
-  }
-  function normalizeRecipients(recipients){
-    const seen=new Set();
-    const out=[];
-    (Array.isArray(recipients)?recipients:[]).forEach((r,idx)=>{
-      const obj=(typeof r==='string')?{phone:r}:Object(r||{});
-      const phone=normalizePhone(obj.phone||obj.tel||obj.mobile||obj.receiver||obj.to||'');
+  function normPhone(v){return String(v||'').replace(/[^0-9]/g,'');}
+  function toastMsg(msg,type){try{if(typeof window.toast==='function')return window.toast(msg,type||'info');}catch(e){} try{console.log(msg);}catch(e){}}
+  function uniqueRecipients(list){
+    const seen=new Set(), out=[];
+    (Array.isArray(list)?list:[]).forEach((r,idx)=>{
+      const obj=(r&&typeof r==='object')?r:{phone:r};
+      let phone=normPhone(obj.phone||obj.tel||obj.mobile||obj.receiver||obj.to||'');
+      if(phone.startsWith('82') && phone.length>=11) phone='0'+phone.slice(2);
       if(!phone || seen.has(phone)) return;
       seen.add(phone);
-      out.push({
-        name:String(obj.name||obj.label||obj.club||('수신자'+(idx+1))).trim(),
-        phone
-      });
+      out.push({name:String(obj.name||obj.label||obj.club||('수신자'+(idx+1))).trim(), phone});
     });
     return out;
   }
-  async function parseResponse(res){
-    const text=await res.text();
-    let data={};
-    if(text){
-      try{ data=JSON.parse(text); }
-      catch(_){ data={raw:text}; }
-    }
-    return data;
+  function estimateSmsType(msg){
+    try{return new Blob([String(msg||'')]).size>90?'LMS':'SMS';}catch(e){return String(msg||'').length>45?'LMS':'SMS';}
   }
-  function normalizeResult(data, recipients){
-    data=data||{};
-    const aligo=data.aligo||data.result||data.data||{};
-    const rawCode=String(data.result_code ?? data.resultCode ?? aligo.result_code ?? aligo.resultCode ?? '').trim();
-    const err=data.error||data.message||data.msg||aligo.message||aligo.msg||'';
-    if(data.ok===false || data.success===false || rawCode==='-1' || rawCode==='0'){
-      throw new Error(String(err||'알리고 서버가 실패 응답을 반환했습니다'));
-    }
-    const cnt=Number(aligo.success_cnt ?? aligo.successCount ?? data.success_cnt ?? data.successCount ?? data.sent ?? data.count ?? recipients.length) || recipients.length;
-    return Object.assign({}, data, {
-      ok:true,
-      aligo:Object.assign({}, aligo, {success_cnt:cnt})
-    });
-  }
-
-  async function postAligoEndpoint(endpoint, payload){
-    const res=await fetch(endpoint, {
+  async function sendAligoSms(recipients,msg,meta={}){
+    const list=uniqueRecipients(recipients);
+    const body=String(msg||'').trim();
+    if(!list.length) throw new Error('문자 받을 번호가 없습니다.');
+    if(!body) throw new Error('문자 내용이 비어 있습니다.');
+    const receivers=list.map(x=>x.phone);
+    const payload={
+      receivers,
+      receiver:receivers[0],
+      recipients:list,
+      targets:list,
+      phones:receivers,
+      to:receivers,
+      msg:body,
+      body,
+      message:body,
+      content:body,
+      type:estimateSmsType(body),
+      title:String((meta&&meta.title)||'230MATCH 문자').slice(0,40),
+      meta:Object.assign({app:'230MATCH',version:'v739-aligo-exact-proxy'},meta||{})
+    };
+    const res=await fetch(ALIGO_PROXY_URL,{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
-      credentials:'same-origin',
+      mode:'cors',
+      headers:{'Content-Type':'application/json','x-api-key':ALIGO_CLIENT_KEY},
+      credentials:'omit',
       body:JSON.stringify(payload)
     });
-    const data=await parseResponse(res);
-    if(!res.ok){
-      const e=new Error(data.error||data.message||data.msg||('HTTP '+res.status));
-      e.status=res.status;
-      e.data=data;
-      throw e;
+    const text=await res.text();
+    let data; try{data=JSON.parse(text);}catch(e){data={raw:text};}
+    if(!res.ok || data.success===false || data.ok===false){
+      const m=(data&&data.message)||(data&&data.error)||((data&&data.aligo&&data.aligo.message))||text||('HTTP '+res.status);
+      const err=new Error(m);
+      err.status=res.status;
+      err.data=data;
+      throw err;
     }
-    return data;
+    const aligo=data.aligo||data.result||data.data||{};
+    const cnt=Number(aligo.success_cnt ?? aligo.successCount ?? data.success_cnt ?? data.successCount ?? data.sent ?? data.count ?? list.length) || list.length;
+    return Object.assign({}, data, {ok:true, aligo:Object.assign({}, aligo, {success_cnt:cnt})});
   }
-
-  async function v583SendAligoSms(recipients, body, meta){
-    meta=meta||{};
-    const rcpt=normalizeRecipients(recipients);
-    const msg=String(body||'').trim();
-    if(!rcpt.length) throw new Error('보낼 번호가 없습니다');
-    if(!msg) throw new Error('발송 내용이 비어 있습니다');
-
-    const phones=rcpt.map(r=>r.phone);
-    const payload={
-      recipients:rcpt,
-      targets:rcpt,
-      phones,
-      receiver:phones.join(','),
-      to:phones,
-      body:msg,
-      message:msg,
-      msg,
-      content:msg,
-      title:String(meta.title||meta.titleOverride||'230MATCH 문자').slice(0,40),
-      sender:String((window.G&&G.meta&&(G.meta.aligoSender||G.meta.smsSender||G.meta.adminPhone))||''),
-      meta:Object.assign({app:'230MATCH',version:'v737-aligo-restore'},meta||{})
-    };
-
-    const endpoints=[];
-    if(meta.endpoint) endpoints.push(meta.endpoint);
-    if(window.ALIGO_API_ENDPOINT) endpoints.push(window.ALIGO_API_ENDPOINT);
-    endpoints.push('/api/send-aligo','/api/send-aligo-sms','/api/aligo-send','/api/aligo/send','/api/aligo','/api/send-sms','/api/sms');
-
-    let lastErr=null;
-    const tried=[];
-    for(const ep of [...new Set(endpoints.filter(Boolean))]){
-      tried.push(ep);
-      try{
-        const data=await postAligoEndpoint(ep,payload);
-        return normalizeResult(data, rcpt);
-      }catch(e){
-        lastErr=e;
-        // 라우트가 없는 경우만 다음 후보로 넘어간다. 실제 알리고 서버 오류/인증 오류는 중복발송 방지를 위해 즉시 중단한다.
-        if(e && (e.status===404 || e.status===405 || e.status===501)) continue;
-        throw e;
-      }
-    }
-    const msg2=(lastErr&&lastErr.message)||'알리고 API 엔드포인트를 찾지 못했습니다';
-    throw new Error(msg2+' · 확인한 경로: '+tried.join(', '));
-  }
-  v583SendAligoSms.__v737Restored=true;
-  window.v583SendAligoSms=v583SendAligoSms;
+  sendAligoSms.__v739ExactProxy=true;
+  window.v583SendAligoSms=sendAligoSms;
+  try{window.ALIGO_API_ENDPOINT=ALIGO_PROXY_URL;}catch(e){}
+  console.log('[v739] Aligo exact proxy restored:', ALIGO_PROXY_URL);
 })();
 
 // v607: 알리고 발송 전 미리보기 모달
@@ -50762,6 +50713,18 @@ window.openParticipantFindPopupForTournament = function(tid){
   @page{size:A4 portrait;margin:0;}
 }
 </style>
+
+
+<script id="v739AligoBadgeScript">
+(function(){
+  function mark(){
+    try{var b=document.getElementById('bracketFreshnessBadge'); if(b) b.textContent='v739 · 알리고복구';}catch(e){}
+    try{document.body.setAttribute('data-aligo-version','v739-exact-proxy');}catch(e){}
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',mark); else mark();
+  setTimeout(mark,1000);
+})();
+</script>
 
 </body>
 </html>
