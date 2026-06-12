@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-12-v741";
+  const APP_VERSION = "2026-06-12-v747-personal-match-result";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -50728,6 +50728,155 @@ window.openParticipantFindPopupForTournament = function(tid){
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',mark); else mark();
   setTimeout(mark,1000);
+})();
+</script>
+
+
+
+<!-- v747: 개인전 내 경기 모아보기 결과입력 버튼 강제 보강 -->
+<style id="v747PersonalMatchResultButtonStyle">
+#bracketFilterBanner .v747-personal-result-btn{
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  min-height:32px!important;
+  padding:5px 12px!important;
+  border-radius:999px!important;
+  border:1px solid #0f766e!important;
+  background:#0f766e!important;
+  color:#fff!important;
+  font-size:.82rem!important;
+  font-weight:900!important;
+  line-height:1.15!important;
+  white-space:nowrap!important;
+  cursor:pointer!important;
+}
+#bracketFilterBanner .v747-personal-result-btn.done{
+  border-color:#16a34a!important;
+  background:#ecfdf5!important;
+  color:#166534!important;
+}
+@media(max-width:680px){
+  #bracketFilterBanner .v747-personal-result-btn{font-size:.78rem!important;padding:5px 10px!important;min-height:32px!important;}
+}
+</style>
+<script id="v747PersonalMatchResultButtonScript">
+(function(){
+  'use strict';
+  if(window.__v747PersonalMatchResultButtonInstalled) return;
+  window.__v747PersonalMatchResultButtonInstalled=true;
+
+  function $(id){ return document.getElementById(id); }
+  function txt(el){ return String((el && el.textContent) || '').replace(/\s+/g,' ').trim(); }
+  function parseGoBracketArgs(btn){
+    try{
+      var oc=String(btn && btn.getAttribute && btn.getAttribute('onclick') || '');
+      var m=oc.match(/goBracketMatch\(['"]([^'"]+)['"]\s*,\s*['"]([^'"]+)['"]\s*,\s*['"]([^'"]+)['"]\)/);
+      if(m) return {tid:m[1], div:m[2], mid:m[3]};
+    }catch(e){}
+    return null;
+  }
+  function matchDoneFromStore(info){
+    try{
+      var key=info.tid+'_'+info.div;
+      var list=(window.G && G.matches && G.matches[key]) || [];
+      var m=list.find(function(x){ return String(x && (x.id || x._id || ''))===String(info.mid); });
+      if(m && typeof window.getMatchResultState==='function') return !!window.getMatchResultState(key,m).done;
+      return !!(m && (m.winner!=null || m.resultDone || m.completed));
+    }catch(e){ return false; }
+  }
+  function openResult(info){
+    try{
+      if(!info || !info.tid || !info.div || !info.mid) throw new Error('missing match info');
+      var key=info.tid+'_'+info.div;
+      if(typeof window.openM3!=='function') throw new Error('openM3 not ready');
+      window.openM3(key, String(info.mid));
+      setTimeout(function(){
+        try{
+          var body=$('mM3B');
+          var target=(body && (body.querySelector('.v300-score-card') || body.querySelector('.indiv-score-compact') || body.querySelector('.score-inputs') || body.querySelector('.rb-sc-row'))) || $('mM3SaveResultBtn');
+          if(target && target.scrollIntoView) target.scrollIntoView({behavior:'smooth', block:'center'});
+        }catch(_e){}
+      },260);
+    }catch(e){
+      console.error('[v747] personal result open failed', e);
+      try{ if(typeof window.toast==='function') window.toast('결과 입력창을 열 수 없습니다. 새로고침 후 다시 시도해 주세요.','error'); }catch(_e){}
+    }
+  }
+  window.v747OpenPersonalMatchResult=function(tid, div, mid){ openResult({tid:tid, div:div, mid:mid}); };
+
+  function makeResultButton(info, done){
+    var b=document.createElement('button');
+    b.type='button';
+    b.className='my-match-toggle-btn v747-personal-result-btn'+(done?' done':'');
+    b.setAttribute('data-v747-result','1');
+    b.setAttribute('data-tid',info.tid);
+    b.setAttribute('data-div',info.div);
+    b.setAttribute('data-mid',info.mid);
+    b.textContent=done?'✏️ 결과수정':'⚡ 결과입력';
+    b.onclick=function(ev){
+      try{ ev.preventDefault(); ev.stopPropagation(); }catch(e){}
+      openResult(info);
+      return false;
+    };
+    return b;
+  }
+  function cardLooksDone(card){
+    var t=txt(card);
+    return /경기\s*완료|완료|결과\s*보기|결과\s*수정|내\s*승리|패\b/.test(t);
+  }
+  function ensurePersonalResultButtons(){
+    try{
+      var root=$('bracketFilterBanner');
+      if(!root) return;
+      if(!/개인전\s*내\s*경기|내\s*다음\s*경기|내\s*경기\s*모아보기/.test(txt(root))) return;
+      var navBtns=Array.prototype.slice.call(root.querySelectorAll('button')).filter(function(b){
+        var t=txt(b);
+        return t==='해당 경기로' || t==='대진표로';
+      });
+      navBtns.forEach(function(nav){
+        var actionRow=nav.parentElement;
+        if(!actionRow) return;
+        if(actionRow.querySelector('button[data-v747-result="1"]')) return;
+        var already=Array.prototype.slice.call(actionRow.querySelectorAll('button')).some(function(x){ return /결과\s*(입력|수정|보기)?|결과입력|결과수정/.test(txt(x)); });
+        if(already) return;
+        var info=parseGoBracketArgs(nav);
+        if(!info) return;
+        var card=nav.closest('div[style*="border"]') || actionRow.parentElement;
+        var done=matchDoneFromStore(info) || cardLooksDone(card);
+        actionRow.insertBefore(makeResultButton(info, done), nav);
+      });
+    }catch(e){ console.warn('[v747] ensure personal result buttons failed', e); }
+  }
+  window.v747EnsurePersonalMatchResultButtons=ensurePersonalResultButtons;
+
+  function schedule(){
+    setTimeout(ensurePersonalResultButtons,0);
+    setTimeout(ensurePersonalResultButtons,120);
+    setTimeout(ensurePersonalResultButtons,450);
+    setTimeout(ensurePersonalResultButtons,1000);
+  }
+  function wrapRender(){
+    try{
+      var fn=window.renderBracket;
+      if(typeof fn==='function' && !fn.__v747PersonalResultWrapped){
+        var w=function(){ var r=fn.apply(this, arguments); schedule(); return r; };
+        w.__v747PersonalResultWrapped=true;
+        window.renderBracket=w;
+      }
+    }catch(e){}
+  }
+  function start(){
+    wrapRender();
+    schedule();
+    try{
+      var root=$('bracketFilterBanner') || document.body;
+      new MutationObserver(function(){ wrapRender(); ensurePersonalResultButtons(); }).observe(root,{childList:true,subtree:true});
+    }catch(e){}
+    try{ var badge=$('bracketFreshnessBadge'); if(badge) badge.textContent='v747 · 내경기 결과입력'; }catch(e){}
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start); else start();
+  window.addEventListener('load',schedule);
 })();
 </script>
 
