@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-12-v754";
+  const APP_VERSION = "2026-06-13-v755";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -31160,6 +31160,19 @@ async function startMainDraw(){
         }
       }catch(e){}
       try{ renderBracket(); }catch(e){}
+      // v754: 본선 추첨 완료 후 matches 로드 → 자동 코트 배정
+      setTimeout(async()=>{
+        try{
+          if(!arr(window.G&&G.matches&&G.matches[key]).length){
+            if(typeof refreshMatchesOnlyForTournament==='function'){
+              await refreshMatchesOnlyForTournament(key,'post-draw');
+            }
+          }
+          if(typeof window.v753RunMainAutoAssign==='function'){
+            window.v753RunMainAutoAssign(key);
+          }
+        }catch(e){ console.warn('[v754] post-draw autoAssign failed',e); }
+      }, 1000);
     }
 
     await saveMainDrawHistoryEntry({
@@ -51220,9 +51233,46 @@ window.openParticipantFindPopupForTournament = function(tid){
     const parts=String(key||'').split('_');
     const tid=parts[0], div=parts.slice(1).join('_');
     let pool=[];
+
+    // 1) 기존 함수 시도
     try{ if(typeof getDivisionPhaseConfiguredCourts==='function') pool=getDivisionPhaseConfiguredCourts(tid,div,'main')||[]; }catch(e){}
     try{ if(!arr(pool).length && typeof getBracketAllowedCourts==='function') pool=getBracketAllowedCourts(key)||[]; }catch(e){}
     try{ if(!arr(pool).length && typeof getTournamentCourtList==='function') pool=getTournamentCourtList(tid,true)||[]; }catch(e){}
+
+    // 2) G.tournaments에서 직접 추출
+    if(!arr(pool).length){
+      try{
+        const t=(window.G&&G.tournaments||[]).find(t=>t.id===tid);
+        if(t){
+          const mc=arr(t.mainCourts||t.courts||t.courtList);
+          const allC=arr(t.courtGroupCatalog||[]).flatMap(g=>
+            Array.from({length:Number(g.count||0)},(_,i)=>`${g.name}${i+1}`)
+          );
+          pool=[...new Set([...mc,...allC].filter(Boolean))];
+        }
+      }catch(e){}
+    }
+
+    // 3) G.meta.courtGroupCatalog에서 추출 (가장 안정적)
+    if(!arr(pool).length){
+      try{
+        const catalog=arr(window.G&&G.meta&&G.meta.courtGroupCatalog);
+        if(catalog.length){
+          pool=catalog.flatMap(g=>
+            Array.from({length:Number(g.count||0)},(_,i)=>`${g.name}${i+1}`)
+          );
+        }
+      }catch(e){}
+    }
+
+    // 4) 현재 코트보드 DOM에서 직접 추출 (최후 수단)
+    if(!arr(pool).length){
+      try{
+        pool=[...document.querySelectorAll('.court-drop-zone[data-court]')]
+          .map(el=>clean(el.dataset.court)).filter(Boolean);
+      }catch(e){}
+    }
+
     return [...new Set(arr(pool).map(clean).filter(Boolean))];
   }
 
