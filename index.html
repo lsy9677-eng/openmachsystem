@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-12-v734-a4-hq-save";
+  const APP_VERSION = "2026-06-12-v737-aligo-restore";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -20380,6 +20380,128 @@ function _openSmsChoiceModal(phones, body, recipients){
   };
 }
 window._openSmsChoiceModal=_openSmsChoiceModal;
+
+
+// v737: 알리고 실제 발송 함수 복구
+// - v607 미리보기/참가자 상세/선택 문자 기능이 호출하는 window.v583SendAligoSms를 다시 정의한다.
+// - 알리고 키는 클라이언트에 두지 않고 Cloudflare Functions API로만 전달한다.
+(function(){
+  'use strict';
+  if(typeof window.v583SendAligoSms === 'function' && window.v583SendAligoSms.__v737Restored) return;
+
+  function onlyPhone(v){
+    return String(v||'').replace(/[^0-9]/g,'');
+  }
+  function normalizePhone(v){
+    const p=onlyPhone(v);
+    if(!p) return '';
+    if(p.startsWith('82') && p.length>=11) return '0'+p.slice(2);
+    return p;
+  }
+  function normalizeRecipients(recipients){
+    const seen=new Set();
+    const out=[];
+    (Array.isArray(recipients)?recipients:[]).forEach((r,idx)=>{
+      const obj=(typeof r==='string')?{phone:r}:Object(r||{});
+      const phone=normalizePhone(obj.phone||obj.tel||obj.mobile||obj.receiver||obj.to||'');
+      if(!phone || seen.has(phone)) return;
+      seen.add(phone);
+      out.push({
+        name:String(obj.name||obj.label||obj.club||('수신자'+(idx+1))).trim(),
+        phone
+      });
+    });
+    return out;
+  }
+  async function parseResponse(res){
+    const text=await res.text();
+    let data={};
+    if(text){
+      try{ data=JSON.parse(text); }
+      catch(_){ data={raw:text}; }
+    }
+    return data;
+  }
+  function normalizeResult(data, recipients){
+    data=data||{};
+    const aligo=data.aligo||data.result||data.data||{};
+    const rawCode=String(data.result_code ?? data.resultCode ?? aligo.result_code ?? aligo.resultCode ?? '').trim();
+    const err=data.error||data.message||data.msg||aligo.message||aligo.msg||'';
+    if(data.ok===false || data.success===false || rawCode==='-1' || rawCode==='0'){
+      throw new Error(String(err||'알리고 서버가 실패 응답을 반환했습니다'));
+    }
+    const cnt=Number(aligo.success_cnt ?? aligo.successCount ?? data.success_cnt ?? data.successCount ?? data.sent ?? data.count ?? recipients.length) || recipients.length;
+    return Object.assign({}, data, {
+      ok:true,
+      aligo:Object.assign({}, aligo, {success_cnt:cnt})
+    });
+  }
+
+  async function postAligoEndpoint(endpoint, payload){
+    const res=await fetch(endpoint, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      credentials:'same-origin',
+      body:JSON.stringify(payload)
+    });
+    const data=await parseResponse(res);
+    if(!res.ok){
+      const e=new Error(data.error||data.message||data.msg||('HTTP '+res.status));
+      e.status=res.status;
+      e.data=data;
+      throw e;
+    }
+    return data;
+  }
+
+  async function v583SendAligoSms(recipients, body, meta){
+    meta=meta||{};
+    const rcpt=normalizeRecipients(recipients);
+    const msg=String(body||'').trim();
+    if(!rcpt.length) throw new Error('보낼 번호가 없습니다');
+    if(!msg) throw new Error('발송 내용이 비어 있습니다');
+
+    const phones=rcpt.map(r=>r.phone);
+    const payload={
+      recipients:rcpt,
+      targets:rcpt,
+      phones,
+      receiver:phones.join(','),
+      to:phones,
+      body:msg,
+      message:msg,
+      msg,
+      content:msg,
+      title:String(meta.title||meta.titleOverride||'230MATCH 문자').slice(0,40),
+      sender:String((window.G&&G.meta&&(G.meta.aligoSender||G.meta.smsSender||G.meta.adminPhone))||''),
+      meta:Object.assign({app:'230MATCH',version:'v737-aligo-restore'},meta||{})
+    };
+
+    const endpoints=[];
+    if(meta.endpoint) endpoints.push(meta.endpoint);
+    if(window.ALIGO_API_ENDPOINT) endpoints.push(window.ALIGO_API_ENDPOINT);
+    endpoints.push('/api/send-aligo','/api/send-aligo-sms','/api/aligo-send','/api/aligo/send','/api/aligo','/api/send-sms','/api/sms');
+
+    let lastErr=null;
+    const tried=[];
+    for(const ep of [...new Set(endpoints.filter(Boolean))]){
+      tried.push(ep);
+      try{
+        const data=await postAligoEndpoint(ep,payload);
+        return normalizeResult(data, rcpt);
+      }catch(e){
+        lastErr=e;
+        // 라우트가 없는 경우만 다음 후보로 넘어간다. 실제 알리고 서버 오류/인증 오류는 중복발송 방지를 위해 즉시 중단한다.
+        if(e && (e.status===404 || e.status===405 || e.status===501)) continue;
+        throw e;
+      }
+    }
+    const msg2=(lastErr&&lastErr.message)||'알리고 API 엔드포인트를 찾지 못했습니다';
+    throw new Error(msg2+' · 확인한 경로: '+tried.join(', '));
+  }
+  v583SendAligoSms.__v737Restored=true;
+  window.v583SendAligoSms=v583SendAligoSms;
+})();
 
 // v607: 알리고 발송 전 미리보기 모달
 // - 받는 사람 목록, 전체 문자 내용 표시
