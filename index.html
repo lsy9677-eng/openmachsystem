@@ -27203,12 +27203,13 @@ function getAdvT(key,draw,teams,cfg){
   });
   return res;
 }
-function getPreviewAdvSlots(draw,cfg){
+function getPreviewAdvSlots(draw,cfg,key=''){
   const res=[];
   (draw?.groups||[]).forEach((grp,gi)=>{
     const grpSize=(grp?.teams||[]).length||0;
     const advCount=grpSize<=2 ? grpSize : Math.max(1, Number(draw?.advance||cfg?.advance||2));
-    for(let rk=1; rk<=advCount; rk++) res.push({nm:`${grpLabel(gi)} ${rk}위`, gn:gi+1, rk, placeholder:true, grpSize});
+    const venue=(typeof v748InferGroupVenueFromDraw==='function') ? v748InferGroupVenueFromDraw(draw, key, gi) : 'gukje';
+    for(let rk=1; rk<=advCount; rk++) res.push({nm:`${grpLabel(gi)} ${rk}위`, gn:gi+1, rk, placeholder:true, grpSize, venue});
   });
   return res;
 }
@@ -30169,7 +30170,7 @@ function openIndividualMainDraw(tid,div){
   const gDone=gMs.filter(m=>getMatchResultState(key,m).done).length;
   const isPrelimDone = gMs.length>0 && gDone===gMs.length;
 
-  const advT=isPrelimDone ? getAdvT(key,draw,teams,cfg) : getPreviewAdvSlots(draw,cfg);
+  const advT=isPrelimDone ? getAdvT(key,draw,teams,cfg) : getPreviewAdvSlots(draw,cfg,key);
   if(!advT.length){ toast('예선 진출 자리가 없습니다','error'); return; }
 
   const spec=computeMainBracketSpec(advT.length);
@@ -30220,6 +30221,13 @@ async function startIndividualMainDraw(){
   const groupMs=allMs.filter(m=>m.phase==='group');
   const mainMatches=buildIndivMainMatchesFixed(advT, key, teams, !isPrelimDone);
   G.matches[key]=[...groupMs,...mainMatches];
+
+  // v748: 본선 추첨 직후 구장 태그(원도심/국제)와 코트 자동 배분을 즉시 적용한다.
+  // v702 자동복구 차단 패치가 rebuild 함수를 막고 있어도 명시적 본선 추첨 작업 중에는 허용한다.
+  try{
+    if(typeof v748ApplyVenueToMainMatches==='function') v748ApplyVenueToMainMatches(key);
+    if(typeof v748RunMainAutoCourtRebuild==='function') v748RunMainAutoCourtRebuild(key);
+  }catch(_v748e){ console.warn('[v748] main draw venue/autocourt post process failed', _v748e); }
 
   // v606: 본선 코트군 유지 - 관리자가 설정한 경우에만 적용
   if(_v606Keep.enabled){
@@ -50877,6 +50885,239 @@ window.openParticipantFindPopupForTournament = function(tid){
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start); else start();
   window.addEventListener('load',schedule);
+})();
+</script>
+
+
+<!-- v748: 본선 구장 분리 + 추첨 직후 자동 코트 배분 복구 -->
+<script id="v748MainVenueAutoCourtPatch">
+(function(){
+  'use strict';
+  if(window.__v748MainVenueAutoCourtInstalled) return;
+  window.__v748MainVenueAutoCourtInstalled=true;
+  const VERSION='v748-main-venue-autocourt';
+  const clean=v=>String(v==null?'':v).trim();
+  const arr=v=>Array.isArray(v)?v:[];
+  function toastMsg(m,t='info'){
+    try{ if(typeof toast==='function') toast(m,t); else if(typeof safeToast==='function') safeToast(m,t); else console.log('[v748]',m); }catch(e){ console.log('[v748]',m); }
+  }
+  function keyParts(key){
+    try{ if(typeof _k2td==='function') return _k2td(key); }catch(e){}
+    const s=String(key||''), i=s.indexOf('_');
+    return i>=0 ? {tid:s.slice(0,i), div:s.slice(i+1)} : {tid:'', div:''};
+  }
+  function isWondoCourt(c){ return /원도심/i.test(clean(c)); }
+  function isJangyuSchoolCourt(c){ return /장유\s*중|장유중|중학교/i.test(clean(c)); }
+  function isInternationalCourt(c){ return /국제/i.test(clean(c)); }
+  function venueOfCourt(c){ return isWondoCourt(c) ? 'wondosim' : 'gukje'; }
+  function groupCourtsFromDrawAndMatches(draw,key,gi){
+    const out=[];
+    try{
+      const g=arr(draw&&draw.groups)[Number(gi)]||{};
+      arr(g.courts).forEach(c=>{ if(clean(c)) out.push(clean(c)); });
+      ['court','manualCourt','manualCourtTarget','assignedCourt'].forEach(k=>{ if(clean(g[k])) out.push(clean(g[k])); });
+    }catch(e){}
+    try{
+      arr(window.G&&G.matches&&G.matches[key]).forEach(m=>{
+        if(!m || String(m.phase||'')!=='group' || Number(m.group)!==Number(gi)) return;
+        arr(m.courts).forEach(c=>{ if(clean(c)) out.push(clean(c)); });
+        ['court','manualCourtTarget','manualCourt','assignedCourt'].forEach(k=>{ if(clean(m[k])) out.push(clean(m[k])); });
+      });
+    }catch(e){}
+    return [...new Set(out.map(clean).filter(Boolean))];
+  }
+  function inferGroupVenue(draw,key,gi){
+    try{
+      const courts=groupCourtsFromDrawAndMatches(draw,key,gi);
+      if(courts.some(isWondoCourt)) return 'wondosim';
+    }catch(e){}
+    return 'gukje';
+  }
+  window.v748InferGroupVenueFromDraw=function(draw,key,gi){ return inferGroupVenue(draw,key,gi); };
+
+  function parseGroupNoFromLabel(label){
+    const s=clean(label);
+    let m=s.match(/(\d+)\s*조/);
+    if(m) return Number(m[1]);
+    m=s.match(/([A-Z])\s*조/i);
+    if(m) return m[1].toUpperCase().charCodeAt(0)-64;
+    return 0;
+  }
+  function venueFromSourceLabel(key,label){
+    const no=parseGroupNoFromLabel(label);
+    if(!no) return '';
+    const draw=(window.G&&G.draws&&G.draws[key])||{};
+    return inferGroupVenue(draw,key,no-1);
+  }
+  function venueFromTeamIndex(key,ti){
+    try{
+      const n=Number(ti);
+      if(!Number.isFinite(n)) return '';
+      const draw=(G.draws&&G.draws[key])||{};
+      const groups=arr(draw.groups);
+      for(let gi=0; gi<groups.length; gi++){
+        if(arr(groups[gi]&&groups[gi].teams).map(Number).includes(n)) return inferGroupVenue(draw,key,gi);
+      }
+    }catch(e){}
+    return '';
+  }
+  function inferMatchVenue(key,m){
+    if(!m) return 'gukje';
+    const existing=clean(m.venue||m.__venue);
+    if(existing==='wondosim') return 'wondosim';
+    const candidates=[];
+    ['source1Label','source2Label','winnerLabel'].forEach(k=>{ const v=venueFromSourceLabel(key,m[k]); if(v) candidates.push(v); });
+    const v1=venueFromTeamIndex(key,m.t1), v2=venueFromTeamIndex(key,m.t2);
+    if(v1) candidates.push(v1);
+    if(v2) candidates.push(v2);
+    return candidates.includes('wondosim') ? 'wondosim' : 'gukje';
+  }
+  function applyVenueToMainMatches(key){
+    let changed=false;
+    try{
+      arr(G&&G.matches&&G.matches[key]).forEach(m=>{
+        if(!m || !/^(main|playin)$/.test(String(m.phase||''))) return;
+        const venue=inferMatchVenue(key,m);
+        if(m.venue!==venue || m.__venue!==venue){ m.venue=venue; m.__venue=venue; changed=true; }
+      });
+    }catch(e){ console.warn('[v748] apply venue failed', e); }
+    return changed;
+  }
+  window.v748ApplyVenueToMainMatches=applyVenueToMainMatches;
+
+  function mainCourtPoolForVenue(key,venue){
+    const p=keyParts(key);
+    let pool=[];
+    try{ if(typeof getDivisionPhaseConfiguredCourts==='function') pool=getDivisionPhaseConfiguredCourts(p.tid,p.div,'main')||[]; }catch(e){}
+    try{ if(!pool.length && typeof getBracketAllowedCourts==='function') pool=getBracketAllowedCourts(key)||[]; }catch(e){}
+    try{ if(!pool.length && typeof getTournamentCourtList==='function') pool=getTournamentCourtList(p.tid,true)||[]; }catch(e){}
+    pool=[...new Set(arr(pool).map(clean).filter(Boolean))];
+    if(venue==='wondosim'){
+      const w=pool.filter(isWondoCourt);
+      return w.length?w:[];
+    }
+    // 본선 국제 풀: 장유중/클레이/능동 등 예선 전용 코트가 섞여 있으면 제외하고 국제 코트 우선.
+    const intl=pool.filter(c=>!isWondoCourt(c) && isInternationalCourt(c));
+    if(intl.length) return intl;
+    return pool.filter(c=>!isWondoCourt(c) && !isJangyuSchoolCourt(c));
+  }
+  function runMainAutoCourtRebuild(key){
+    if(!key || !(window.G&&G.matches&&G.matches[key])) return false;
+    applyVenueToMainMatches(key);
+    const oldExplicit=window.__V702_EXPLICIT_DRAW_RUNNING;
+    let oldMetaFlag;
+    let changed=false;
+    try{
+      window.__V702_EXPLICIT_DRAW_RUNNING=true;
+      if(window.G&&G.meta){ oldMetaFlag=G.meta.individualAutoCourtAssignEnabled; G.meta.individualAutoCourtAssignEnabled=true; }
+      if(typeof rebuildIndividualAutoCourtAssignmentsForKey==='function'){
+        changed=!!rebuildIndividualAutoCourtAssignmentsForKey(key);
+      }
+      // rebuild가 v702에 의해 막혔거나 아무 코트도 못 붙이면 최소 1차 수동 분배로 복구.
+      const ready=arr(G.matches[key]).filter(m=>m && !m.winner && !m.bye && /^(main|playin)$/.test(String(m.phase||'')) && m.t1!=null && m.t2!=null);
+      const assigned=ready.filter(m=>arr(m.courts).length || clean(m.court)).length;
+      if(ready.length && assigned===0){
+        changed = directDistributeReadyMain(key) || changed;
+      }
+    }catch(e){ console.warn('[v748] auto court rebuild failed', e); }
+    finally{
+      if(window.G&&G.meta && oldMetaFlag!==undefined) G.meta.individualAutoCourtAssignEnabled=oldMetaFlag;
+      window.__V702_EXPLICIT_DRAW_RUNNING=oldExplicit;
+    }
+    return changed;
+  }
+  window.v748RunMainAutoCourtRebuild=runMainAutoCourtRebuild;
+
+  function directDistributeReadyMain(key){
+    let changed=false;
+    try{
+      const list=arr(G.matches[key]);
+      const byVenue={wondosim:[],gukje:[]};
+      const ordered=(typeof getIndividualMainAutoQueue==='function'?getIndividualMainAutoQueue(key):list.map(m=>({match:m})))
+        .map(x=>x&&x.match?x.match:null)
+        .filter(m=>m && !m.winner && !m.bye && /^(main|playin)$/.test(String(m.phase||'')) && m.t1!=null && m.t2!=null)
+        .filter(m=>!clean(m.manualCourtTarget) && !arr(m.courts).length && !clean(m.court));
+      ordered.forEach(m=>{ const v=inferMatchVenue(key,m); byVenue[v==='wondosim'?'wondosim':'gukje'].push(m); });
+      const nowBase=Date.now();
+      ['wondosim','gukje'].forEach(venue=>{
+        const courts=mainCourtPoolForVenue(key,venue);
+        if(!courts.length) return;
+        const counts=Object.fromEntries(courts.map(c=>[c, arr(list).filter(m=>m&&!m.winner&&/^(main|playin)$/.test(String(m.phase||''))&&(arr(m.courts).includes(c)||clean(m.court)===c)).length]));
+        byVenue[venue].forEach(m=>{
+          let best=''; let bestCount=999;
+          courts.forEach(c=>{ const n=Number(counts[c]||0); if(n<bestCount && n<2){ best=c; bestCount=n; } });
+          if(!best) return; // 코트별 현재+대기1이 꽉 찬 경우 공용대기에 남김
+          const n=Number(counts[best]||0);
+          m.court=best; m.courts=[best];
+          m.courtAssignedAt=m.courtAssignedAt||new Date(nowBase+Object.values(counts).reduce((a,b)=>a+b,0)).toISOString();
+          m.courtQueueOrder=m.courtQueueOrder||new Date(Date.UTC(2000,0,1,0,0,0,Object.values(counts).reduce((a,b)=>a+b,0))).toISOString();
+          if(n>=1 && !m.waitingFirstAt) m.waitingFirstAt=new Date().toISOString();
+          m.venue=venue; m.__venue=venue;
+          counts[best]=n+1;
+          changed=true;
+        });
+      });
+    }catch(e){ console.warn('[v748] direct distribute failed', e); }
+    return changed;
+  }
+
+  function scheduleFix(key, save){
+    setTimeout(async ()=>{
+      try{
+        if(!key) return;
+        const changed=runMainAutoCourtRebuild(key);
+        if(changed && save && typeof stM==='function') await stM(key);
+        if(changed && typeof renderBracket==='function') renderBracket();
+      }catch(e){ console.warn('[v748] scheduled fix failed', e); }
+    }, 220);
+  }
+  function wrapStartIndividualMainDraw(){
+    try{
+      const old=window.startIndividualMainDraw;
+      if(typeof old!=='function' || old.__v748Wrapped) return;
+      const wrapped=async function(){
+        const key=(window.IMD&&IMD.key)||'';
+        const prev=window.__V702_EXPLICIT_DRAW_RUNNING;
+        window.__V702_EXPLICIT_DRAW_RUNNING=true;
+        try{ return await old.apply(this, arguments); }
+        finally{
+          const k=(window.IMD&&IMD.key)||key;
+          scheduleFix(k,true);
+          setTimeout(()=>{ try{ window.__V702_EXPLICIT_DRAW_RUNNING=prev; }catch(e){} }, 1600);
+        }
+      };
+      wrapped.__v748Wrapped=true;
+      window.startIndividualMainDraw=wrapped;
+      try{ startIndividualMainDraw=wrapped; }catch(e){}
+    }catch(e){}
+  }
+  function wrapAutoAdv(){
+    try{
+      const old=window.autoAdv;
+      if(typeof old!=='function' || old.__v748Wrapped) return;
+      const wrapped=async function(key,mid){
+        const r=await old.apply(this, arguments);
+        try{
+          if(key && typeof isIndividualByKey==='function' && isIndividualByKey(key)){
+            const changed=runMainAutoCourtRebuild(key);
+            if(changed && typeof stM==='function') await stM(key);
+          }
+        }catch(e){ console.warn('[v748] autoAdv follow-up failed', e); }
+        return r;
+      };
+      wrapped.__v748Wrapped=true;
+      window.autoAdv=wrapped;
+      try{ autoAdv=wrapped; }catch(e){}
+    }catch(e){}
+  }
+  function boot(){
+    wrapStartIndividualMainDraw();
+    wrapAutoAdv();
+    try{ const badge=document.getElementById('bracketFreshnessBadge'); if(badge) badge.textContent='v748 · 본선 구장/코트 자동배분'; }catch(e){}
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
+  setTimeout(boot,600); setTimeout(boot,1600);
+  console.log('[v748] main venue split + autocourt patch installed');
 })();
 </script>
 
