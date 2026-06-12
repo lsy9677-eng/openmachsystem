@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-11-v730-final-court-only-prelim-cards";
+  const APP_VERSION = "2026-06-12-v733-a4-save-close";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -48717,6 +48717,7 @@ button[onclick*="__hardClearAppCacheAndReload"],button[onclick*="캐시"],button
         await sleep(180);
       }
       msg('A4 미리보기 화면 그대로 이미지 저장 완료', 'success');
+      try{ if(window.v733CloseA4PreviewAfterSave) window.v733CloseA4PreviewAfterSave(); }catch(_e){}
     }catch(e){
       console.error('[v721] save failed', e);
       msg('이미지 저장 실패: ' + (e.message || e), 'error');
@@ -49930,6 +49931,7 @@ window.openParticipantFindPopupForTournament = function(tid){
         setTimeout(()=>URL.revokeObjectURL(url),1000); await new Promise(r=>setTimeout(r,150));
       }
       toastMsg('A4 이미지 저장 완료','success');
+      try{ if(window.v733CloseA4PreviewAfterSave) window.v733CloseA4PreviewAfterSave(); }catch(_e){}
     }catch(e){console.error('[v731] image save failed',e); toastMsg('이미지 저장 실패: '+(e.message||e),'error')}
     finally{try{holder&&holder.remove()}catch(e){}}
   }
@@ -50171,6 +50173,67 @@ window.openParticipantFindPopupForTournament = function(tid){
   }
 
   console.log('[v728-venue] installed');
+})();
+</script>
+
+
+<!-- v733: A4 저장 완료 후 미리보기 창 자동 닫기 -->
+<script id="v733A4SaveClosePatch">
+(function(){
+  'use strict';
+  if(window.__v733A4SaveClosePatchInstalled) return;
+  window.__v733A4SaveClosePatchInstalled = true;
+
+  function closeA4Preview(){
+    try{
+      var ids = [
+        'v702A4Overlay','v431A4PreviewOverlay','v566A4PreviewOverlay','v570A4PreviewOverlay',
+        'v688A4PreviewOverlay','v694A4Overlay','v698A4Overlay','v699A4Overlay','v701A4Overlay',
+        'mA4','mA4Preview','a4PreviewOverlay','groupSheetPreviewOverlay'
+      ];
+      ids.forEach(function(id){
+        var el = document.getElementById(id);
+        if(!el) return;
+        try{ el.classList.remove('show','open','active'); }catch(_e){}
+        try{ el.style.display = 'none'; }catch(_e){}
+      });
+      try{ document.body.classList.remove('modal-open','a4-open'); }catch(_e){}
+    }catch(e){ console.warn('[v733] A4 close failed', e); }
+  }
+
+  window.v733CloseA4PreviewAfterSave = function(){
+    setTimeout(closeA4Preview, 350);
+  };
+
+  function wrapSaveFunction(name){
+    var old = window[name];
+    if(typeof old !== 'function' || old.__v733SaveCloseWrapped) return;
+    var wrapped = async function(){
+      var success = false;
+      try{
+        var result = await old.apply(this, arguments);
+        success = true;
+        return result;
+      }finally{
+        if(success) window.v733CloseA4PreviewAfterSave();
+      }
+    };
+    wrapped.__v733SaveCloseWrapped = true;
+    wrapped.__v733Old = old;
+    window[name] = wrapped;
+  }
+
+  ['v721SaveA4PreviewExact','v718SaveA4PreviewExact','v720SaveA4PreviewSame'].forEach(wrapSaveFunction);
+
+  document.addEventListener('DOMContentLoaded', function(){
+    ['v721SaveA4PreviewExact','v718SaveA4PreviewExact','v720SaveA4PreviewSame'].forEach(wrapSaveFunction);
+  });
+
+  try{
+    var badge = document.getElementById('bracketFreshnessBadge');
+    if(badge) badge.textContent = 'v733 · A4저장닫힘';
+  }catch(_e){}
+  console.log('[v733] A4 save close patch installed');
 })();
 </script>
 
