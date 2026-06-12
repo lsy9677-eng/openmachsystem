@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-12-v739-aligo-exact-proxy";
+  const APP_VERSION = "2026-06-12-v741";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -914,6 +914,7 @@ table tr:nth-child(even):hover td{background:var(--panel2);}
 .sticky-alert-wrap.show{display:block;animation:tIn .22s ease;}
 .sticky-alert-wrap.left-side{right:auto;left:20px;}
 .sticky-alert-card{background:linear-gradient(135deg,#1d4ed8,#2563eb);color:#fff;border-radius:16px;box-shadow:0 16px 36px rgba(37,99,235,.28);padding:14px 16px;border:1px solid rgba(255,255,255,.18);}
+.sticky-alert-card.complete{background:linear-gradient(135deg,#dc2626,#ef4444);box-shadow:0 16px 36px rgba(220,38,38,.32);}
 .sticky-alert-title{font-size:.92rem;font-weight:900;display:flex;align-items:center;gap:8px;margin-bottom:6px;}
 .sticky-alert-msg{font-size:.84rem;line-height:1.6;opacity:.97;word-break:keep-all;}
 .sticky-alert-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px;flex-wrap:wrap;}
@@ -26361,6 +26362,9 @@ function mCard(m,key,dn1,dn2,done,sc1,sc2,label){
 let BV = { tid: null, div: '__ALL__' };
 
 function openBracketView(){
+  // v740: 관리자/운영자만 전체대진표 열람 가능
+  const _canView=(typeof canManageBracket==='function'&&canManageBracket())||(typeof isManager==='function'&&isManager())||(typeof isDeveloper==='function'&&isDeveloper());
+  if(!_canView){ toast('관리자 또는 운영자만 전체 대진표를 볼 수 있습니다','info'); return; }
   const tid = ge('brTS')?.value;
   if(!tid){ toast('대회를 먼저 선택하세요','info'); return; }
   const t = G.tournaments.find(t=>t.id===tid);
@@ -35788,12 +35792,13 @@ function renderNextStickyAlert(){
   const hasSmsRecipients = Array.isArray(item.smsRecipients) && item.smsRecipients.length>0;
   const canApproveSms = item.actionType==='sms_approval' && (AD||OP);
   const isInfoOnly = item.actionType==='info_only';
+  const isComplete = item.smsKind==='match_completed' || String(item.kind||'').includes('completed');
   const actions = isInfoOnly
     ? `<button type="button" class="sticky-alert-btn secondary" onclick="window.closeStickyAlert()">확인</button>`
     : canApproveSms
     ? `${hasSmsRecipients?`<button type="button" class="sticky-alert-btn primary" onclick="window.sendStickyAlertSMS()">문자 보내기</button>`:`<button type="button" class="sticky-alert-btn secondary" onclick="window.closeStickyAlert()">번호 없음</button>`}<button type="button" class="sticky-alert-btn secondary" onclick="window.closeStickyAlert()">닫기</button>`
     : `<button type="button" class="sticky-alert-btn secondary" onclick="window.closeStickyAlert()">확인</button>`;
-  wrap.innerHTML=`<div class="sticky-alert-card">
+  wrap.innerHTML=`<div class="sticky-alert-card${isComplete?' complete':''}">
     <div class="sticky-alert-title">${esc(alertTitle)}</div>
     <div class="sticky-alert-msg">${esc(item.msg||'')}</div>
     <div class="sticky-alert-actions">${actions}</div>
@@ -46314,12 +46319,12 @@ button[onclick*="__hardClearAppCacheAndReload"],button[onclick*="캐시"],button
             if(typeof safeToast==='function') safeToast(h?'전체대진표 활성화됨':'전체대진표 비활성화됨','success');
           };
           v728RefreshToggle();
-          // 관리자/개발자만 토글 버튼 표시
+          // v740: 관리자/운영자만 전체대진표 버튼+토글 표시. 일반회원은 main 버튼 없음.
           const isAdminUser=(typeof canManageBracket==='function'&&canManageBracket())||(typeof isManager==='function'&&isManager())||(typeof isDeveloper==='function'&&isDeveloper());
           if(isAdminUser){
             bar.append(main,reset,lock,a4,toggle728);
           } else {
-            bar.append(main,reset,lock,a4);
+            bar.append(reset,lock,a4);
           }
           } }
   function blockAutoFunctions(){AUTO_BLOCK_NAMES.forEach(n=>{try{const old=window[n] || (function(){try{return eval(n)}catch(_){return null}})(); if(old&&old.__v702Blocked)return; const blocked=function(){ if(window.__V702_EXPLICIT_DRAW_RUNNING===true) return typeof old==='function'?old.apply(this,arguments):false; console.warn('[v702 blocked auto]',n,arguments[0]||''); return false; }; blocked.__v702Blocked=true; blocked.__old=old; window[n]=blocked; try{eval(n+'=window["'+n+'"]')}catch(e){} }catch(e){}});}
@@ -50718,7 +50723,7 @@ window.openParticipantFindPopupForTournament = function(tid){
 <script id="v739AligoBadgeScript">
 (function(){
   function mark(){
-    try{var b=document.getElementById('bracketFreshnessBadge'); if(b) b.textContent='v739 · 알리고복구';}catch(e){}
+    try{var b=document.getElementById('bracketFreshnessBadge'); if(b) b.textContent='v740';}catch(e){}
     try{document.body.setAttribute('data-aligo-version','v739-exact-proxy');}catch(e){}
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',mark); else mark();
