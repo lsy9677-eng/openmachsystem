@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-13-v812";
+  const APP_VERSION = "2026-06-13-v813";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -6052,14 +6052,23 @@ button:disabled{opacity:.55!important;cursor:not-allowed!important;filter:graysc
 // ── 잠금 상태 확인 ──
 window.v799IsLocked=function(key){
   try{
-    if(!key) key=String((document.getElementById('brTS')||{}).value||'').trim();
+    if(!key){
+      const el=document.getElementById('brTS');
+      key=el?String(el.value||'').trim():'';
+      if(!key && window.G && G.draws) key=Object.keys(G.draws)[0]||'';
+    }
     return !!(window.G&&G.draws&&G.draws[key]&&G.draws[key].mainBracketLocked);
   }catch(e){return false;}
 };
 
 // ── 관리자 여부 ──
 window.v799CanView=function(){
-  return !!(window.AD||window.OP||window.TM||(typeof canManageBracket==='function'&&canManageBracket()));
+  // AD/OP/TM 전역변수 직접 체크
+  if(window.AD===true||window.OP===true||window.TM===true) return true;
+  try{ if(typeof canManageBracket==='function'&&canManageBracket()) return true; }catch(e){}
+  // 개발자 모드 체크
+  try{ if(document.body.classList.contains('admin-mode')) return true; }catch(e){}
+  return false;
 };
 
 // ── 가림막 HTML ──
@@ -6067,37 +6076,17 @@ window.v810MaskHTML='<div style="padding:80px 20px;text-align:center;"><div styl
 
 // ── renderBracket 래핑 (잠금 시 가림막으로 교체) ──
 window.v810WrapRenderBracket=function(){
-  // renderBracketTree 래핑 — 잠금 시 접힘 상태로 반환
-  const origTree=window.renderBracketTree;
-  if(typeof origTree==='function'&&!origTree.__v810Wrapped){
-    const wrappedTree=function(key,mMs,teams){
-      const html=origTree.apply(this,arguments);
-      const locked=window.v799IsLocked();
-      const canView=window.v799CanView();
-      if(locked&&!canView){
-        // 잠금 상태: 가림막만
-        return '<div style="padding:60px 20px;text-align:center;background:#f8fafc;border:2px dashed #cbd5e1;border-radius:18px;margin:16px 0"><div style="font-size:3rem;margin-bottom:12px">\uD83D\uDD12</div><div style="font-size:1.1rem;font-weight:900;color:#1e293b;margin-bottom:8px">본선 대진표 준비중</div><div style="font-size:.85rem;color:#64748b">운영진이 공개하면 볼 수 있습니다</div></div>';
-      }
-      if(locked&&canView){
-        // 관리자: 접힘 상태 + 펼치기 버튼
-        const uid='bTree_'+Date.now();
-        return '<div><button type="button" onclick="var d=document.getElementById(\''+uid+'\');d.style.display=d.style.display===\'none\'?\'block\':\'none\';this.textContent=d.style.display===\'none\'?\'🌳 본선 대진표 펼치기 (관리자전용)\':' + "'" + '🌳 본선 대진표 접기' + "'" + '" style="width:100%;padding:12px;border-radius:10px;border:2px dashed #dc2626;background:#fff5f5;color:#dc2626;font-size:.85rem;font-weight:900;cursor:pointer;margin:8px 0">\uD83C\uDF33 본선 대진표 펼치기 (관리자전용)</button><div id="'+uid+'" style="display:none">'+html+'</div></div>';
-      }
-      return html;
-    };
-    wrappedTree.__v810Wrapped=true;
-    window.renderBracketTree=wrappedTree;
-    try{renderBracketTree=wrappedTree;}catch(e){}
-  }
   
   const orig=window.renderBracket;
   if(typeof orig!=='function'||orig.__v810Wrapped) return;
   const wrapped=function(){
     const key=String((document.getElementById('brTS')||{}).value||'').trim();
-    if(window.v799IsLocked(key)&&!window.v799CanView()){
-      // 가림막만 표시 — 원본 renderBracket 실행 안 함
+    // 잠금 확인: G.draws에서 직접 확인 (함수 불필요)
+    const locked=!!(window.G&&G.draws&&G.draws[key]&&G.draws[key].mainBracketLocked);
+    const isAdmin=!!(window.AD||window.OP||window.TM);
+    if(locked&&!isAdmin){
       const cont=document.getElementById('bracketContent');
-      if(cont) cont.innerHTML=window.v810MaskHTML;
+      if(cont) cont.innerHTML='<div style="padding:80px 20px;text-align:center;background:#f8fafc;border-radius:18px;margin:16px 0"><div style="font-size:3rem;margin-bottom:12px">\uD83D\uDD12</div><div style="font-size:1.1rem;font-weight:900;color:#1e293b;margin-bottom:8px">본선 대진표 준비중</div><div style="font-size:.85rem;color:#64748b">운영진이 공개하면 볼 수 있습니다</div></div>';
       return;
     }
     return orig.apply(this,arguments);
