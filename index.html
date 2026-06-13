@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-13-v798";
+  const APP_VERSION = "2026-06-13-v803";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -30367,13 +30367,10 @@ function getV784ExpectedMainEntryCount(key, advT, teams){
 // 개인전 본선 대진 생성 — play-in 포함
 // groupLabelOnly=true: 예선 미완료 시 ti 대신 null, source*Label에 "A조1위" 형태만 저장
 function buildIndivMainMatchesFixed(advT, key, teams, groupLabelOnly=false){
-  // v798: PDF 고정 테이블
-  // 슬롯 0~95 = 국제+장유중 (96슬롯)
-  // 슬롯 96~127 = 원도심 (32슬롯)
-  // 각 4칸 묶음: [경기(짝수), 부전승(짝수+1... 아니고]
-  // PDF 패턴: 순번1,2(경기) / 순번3(부전승) / 순번4,5(경기) / ...
-  // 앱 pair구조: (짝수=경기, 홀수=부전승) 절대 고정
-  // 슬롯0=경기, 슬롯1=부전승, 슬롯2=경기, 슬롯3=부전승 ... 반복
+  // v799: 구장별 조 고정 배정
+  // 원도심(슬롯48~63): 33조~44조의 1위·2위만
+  // 국제+장유중(슬롯0~47): 나머지 조 팀들
+  // 홀수슬롯=부전승(조1위우선), 짝수슬롯=경기 — 절대고정
 
   const all=(advT||[]).map(e=>({...e,
     nm:e.nm||getMainEntryBracketLabel(e)||`T${e.ti??''}`,
@@ -30388,118 +30385,83 @@ function buildIndivMainMatchesFixed(advT, key, teams, groupLabelOnly=false){
     return a;
   }
 
-  // venue 분리
-  const wondo=all.filter(e=>e.venue==='wondosim');
-  const gukje=all.filter(e=>e.venue!=='wondosim');
+  // 33조~44조 = 원도심, 나머지 = 국제
+  // gn은 1-based 조번호
+  const WONDO_GNS=new Set([33,34,35,36,37,38,39,40,41,42,43,44]);
+  const wondo=all.filter(e=>WONDO_GNS.has(Number(e.gn||0)));
+  const gukje=all.filter(e=>!WONDO_GNS.has(Number(e.gn||0)));
 
-  // 슬롯 채우기 함수
-  // totalSlots: 할당된 총 슬롯 수
-  // offset: 시작 슬롯 번호
-  // 홀수슬롯=부전승(조1위 우선), 짝수슬롯=경기
+  console.log('[v799] 원도심(33~44조):', wondo.length, '팀, 국제:', gukje.length, '팀');
+
+  // 슬롯 채우기: 홀수=부전승(조1위우선), 짝수=경기
   function makeMatches(entries, totalSlots, offset, venue){
-    const byeSlotCount = totalSlots/2;   // 부전승 슬롯 수
-    const gameSlotCount = totalSlots/2;  // 경기 슬롯 수
-
-    // 팀 풀: 조1위 먼저(셔플), 나머지(셔플)
-    const r1 = shuffle(entries.filter(e=>Number(e.rk||0)===1));
-    const r2 = shuffle(entries.filter(e=>Number(e.rk||0)!==1));
-    const pool = [...r1, ...r2];
-
-    // 앞 byeSlotCount개 → 부전승슬롯, 나머지 → 경기슬롯
-    const byeTeams = pool.slice(0, byeSlotCount);
-    const gameTeams = pool.slice(byeSlotCount);
-
-    const out = [];
-    for(let i=0; i<totalSlots; i++){
-      const absSlot = offset + i;
-      if(i%2 === 1){
-        // 홀수 = 부전승
-        const idx = Math.floor(i/2);
-        const team = byeTeams[idx]||null;
-        const ti = team&&team.ti!=null ? Number(team.ti) : null;
+    const byeSlotCount=totalSlots/2;
+    const r1=shuffle(entries.filter(e=>Number(e.rk||0)===1));
+    const r2=shuffle(entries.filter(e=>Number(e.rk||0)!==1));
+    const pool=[...r1,...r2];
+    const byeTeams=pool.slice(0,byeSlotCount);
+    const gameTeams=pool.slice(byeSlotCount);
+    const out=[];
+    for(let i=0;i<totalSlots;i++){
+      const absSlot=offset+i;
+      if(i%2===1){
+        const idx=Math.floor(i/2);
+        const team=byeTeams[idx]||null;
+        const ti=team&&team.ti!=null?Number(team.ti):null;
         out.push({
-          id:`main_r0_${absSlot}`, phase:'main', round:0, slot:absSlot,
-          t1:ti, t2:null, winner:ti, rubbers:[], bye:true, court:'',
-          venue, __venue:venue,
-          source1Label: team ? getMainEntryBracketLabel(team)||String(team.nm||'') : '',
-          source2Label: '부전승'
+          id:`main_r0_${absSlot}`,phase:'main',round:0,slot:absSlot,
+          t1:ti,t2:null,winner:ti,rubbers:[],bye:true,court:'',
+          venue,__venue:venue,
+          source1Label:team?getMainEntryBracketLabel(team)||String(team.nm||''):'',
+          source2Label:'부전승'
         });
-      } else {
-        // 짝수 = 경기
-        const idx = Math.floor(i/2);
-        const tm1 = gameTeams[idx*2]||null;
-        const tm2 = gameTeams[idx*2+1]||null;
-        const ti1 = tm1&&tm1.ti!=null ? Number(tm1.ti) : null;
-        const ti2 = tm2&&tm2.ti!=null ? Number(tm2.ti) : null;
+      }else{
+        const idx=Math.floor(i/2);
+        const tm1=gameTeams[idx*2]||null;
+        const tm2=gameTeams[idx*2+1]||null;
+        const ti1=tm1&&tm1.ti!=null?Number(tm1.ti):null;
+        const ti2=tm2&&tm2.ti!=null?Number(tm2.ti):null;
         out.push({
-          id:`main_r0_${absSlot}`, phase:'main', round:0, slot:absSlot,
-          t1:ti1, t2:ti2, winner:null, rubbers:[], bye:false, court:'',
-          venue, __venue:venue,
-          source1Label: tm1 ? getMainEntryBracketLabel(tm1)||String(tm1.nm||'') : '',
-          source2Label: tm2 ? getMainEntryBracketLabel(tm2)||String(tm2.nm||'') : ''
+          id:`main_r0_${absSlot}`,phase:'main',round:0,slot:absSlot,
+          t1:ti1,t2:ti2,winner:null,rubbers:[],bye:false,court:'',
+          venue,__venue:venue,
+          source1Label:tm1?getMainEntryBracketLabel(tm1)||String(tm1.nm||''):'',
+          source2Label:tm2?getMainEntryBracketLabel(tm2)||String(tm2.nm||''):''
         });
       }
     }
     return out;
   }
 
-  // 상위 라운드 생성
-  function addUpper(offset, count, venue, r0matches){
+  function addUpper(offset,count,venue,r0matches){
     const out=[];
-    let prev=count, round=1;
+    let prev=count,round=1;
     while(prev>1){
       const hs=Math.ceil(prev/2);
       for(let i=0;i<hs;i++){
-        out.push({id:`main_r${round}_${offset+i}`, phase:'main', round,
-          slot:offset+i, t1:null, t2:null, winner:null, rubbers:[],
-          bye:false, court:'', venue, __venue:venue});
+        out.push({id:`main_r${round}_${offset+i}`,phase:'main',round,
+          slot:offset+i,t1:null,t2:null,winner:null,rubbers:[],bye:false,court:'',venue,__venue:venue});
       }
-      // 부전승 자동진출
       r0matches.filter(m=>m.round===round-1&&m.bye&&m.winner!=null&&m.slot>=offset&&m.slot<offset+prev)
         .forEach(bm=>{
-          const li=bm.slot-offset, ni=Math.floor(li/2);
+          const li=bm.slot-offset,ni=Math.floor(li/2);
           const nm=out.find(x=>x.round===round&&x.slot===offset+ni);
-          if(!nm) return;
+          if(!nm)return;
           if(li%2===0){if(nm.t1==null)nm.t1=bm.winner;}
           else{if(nm.t2==null)nm.t2=bm.winner;}
         });
-      prev=hs; round++;
+      prev=hs;round++;
     }
     return out;
   }
 
+  // 국제 48슬롯(0~47), 원도심 16슬롯(48~63)
   let matches=[];
-
-  // 국제 96슬롯(0~95), 원도심 32슬롯(96~127)
-  // 국제 72팀 → 96슬롯: 경기48개+부전승48개? NO
-  // 96슬롯/2=48 부전승, 96슬롯/2=48 경기 → 팀48+48=96... 국제72팀이면 초과
-  // 실제: 슬롯=nextPow2(팀수)/2 기준이 아니라 고정
-  // 국제72팀, 슬롯96개 → byeCount=96-72=24, 경기슬롯48개(2팀씩=96), 부전승슬롯48개(1팀씩=48)
-  // 합=144 ≠ 72... 맞지 않음
-  // 
-  // 올바른 계산:
-  // 국제72팀, 96슬롯 → 경기슬롯=48, 부전승슬롯=48
-  // byeTeams=48명, gameTeams=24명(2명씩 12경기만)... 72명 부족
-  //
-  // 정답: 국제72팀 → 48슬롯(경기24+부전승24=팀48+24=72) 맞음!
-  // 원도심24팀 → 16슬롯(경기8+부전승8=팀16+8=24) 맞음!
-  // 국제 슬롯: 0~47, 원도심 슬롯: 48~63
-
-  if(gukje.length>=2 && wondo.length>=2){
-    const gMatches = makeMatches(gukje, 48, 0, 'gukje');
-    const wMatches = makeMatches(wondo, 16, 48, 'wondosim');
-    matches = [...gMatches, ...wMatches];
-    matches.push(...addUpper(0, 48, 'gukje', gMatches));
-    matches.push(...addUpper(48, 16, 'wondosim', wMatches));
-  } else if(gukje.length>=2){
-    const gMatches = makeMatches(gukje, 48, 0, 'gukje');
-    matches = gMatches;
-    matches.push(...addUpper(0, 48, 'gukje', gMatches));
-  } else {
-    const wMatches = makeMatches(wondo, 16, 48, 'wondosim');
-    matches = wMatches;
-    matches.push(...addUpper(48, 16, 'wondosim', wMatches));
-  }
+  const gMs=makeMatches(gukje,48,0,'gukje');
+  const wMs=makeMatches(wondo,16,48,'wondosim');
+  matches=[...gMs,...wMs];
+  matches.push(...addUpper(0,48,'gukje',gMs));
+  matches.push(...addUpper(48,16,'wondosim',wMs));
 
   if(groupLabelOnly){
     const lbl=new Map();
@@ -53227,9 +53189,17 @@ setTimeout(boot,800);
   }
   function ensurePanel(){
     try{
+      // v800: 관리자(AD/OP/TM)만 이 패널 표시
+      const canSee=!!(window.AD||window.OP||window.TM||(typeof canManageBracket==='function'&&canManageBracket()));
+      const existingPanel=document.getElementById('v789ModernCupFixedPanel');
+      if(!canSee){
+        if(existingPanel) existingPanel.style.display='none';
+        return;
+      }
+      if(existingPanel) existingPanel.style.display='';
       const page=document.getElementById('page-bracket');
       if(!page) return;
-      let panel=document.getElementById('v789ModernCupFixedPanel');
+      let panel=existingPanel;
       if(!panel){
         panel=document.createElement('div');
         panel.id='v789ModernCupFixedPanel';
@@ -53870,8 +53840,69 @@ setTimeout(boot,800);
 
 <script id="v798FinalScript">
 (function(){
-// v798: window 노출
+// v799: window 노출
 window.buildIndivMainMatchesFixed=buildIndivMainMatchesFixed;
+
+// A4 대진표 — v731 버전(파란 헤더 카드형) 고정
+// v734 고화질 저장/출력은 유지하되, buildA4/openA4는 v731 버전 사용
+(function pinV731A4(){
+  function doPin(){
+    if(typeof window.v731BuildA4!=='function') return;
+    // buildA4 고정
+    window.buildA4=window.v731BuildA4;
+    window.v702BuildA4=window.v731BuildA4;
+    window.v714BuildA4=window.v731BuildA4;
+    window.v715BuildA4=window.v731BuildA4;
+    // openA4 고정 (v734 래핑 전 원본)
+    if(typeof window.v731OpenA4==='function'){
+      const openFn=window.v731OpenA4.__v734HQWrapped
+        ? window.v731OpenA4  // 이미 래핑됨 → 그대로 사용 (저장버튼 고화질 유지)
+        : window.v731OpenA4;
+      window.v702OpenA4=openFn;
+      window.v714OpenA4=openFn;
+      window.v715OpenA4=openFn;
+    }
+    console.log('[v799] A4 v731 고정 완료');
+  }
+  doPin();
+  setTimeout(doPin,500);
+  setTimeout(doPin,1500);
+})();
+
+// autoAdv 완료 후 자동 대기 올리기 (시합 완료 → 다음 대기 경기 코트 배정)
+(function wrapAutoAdvV799(){
+  function doWrap(){
+    try{
+      const old=window.autoAdv;
+      if(typeof old!=='function'||old.__v799Wrapped) return;
+      const wrapped=async function(key,mid){
+        const r=await old.apply(this,arguments);
+        try{
+          if(key){
+            if(typeof applyVenueToMain==='function') applyVenueToMain(key);
+            const changed=typeof window.v771AssignMainCourts==='function'
+              ? window.v771AssignMainCourts(key,false)
+              : false;
+            if(changed && typeof stM==='function'){
+              try{if(window.__FB_WRITE_CACHE&&window.__FB_WRITE_CACHE.matches)delete window.__FB_WRITE_CACHE.matches[key];}catch(e){}
+              await stM(key);
+            }
+            if(typeof renderBracket==='function') setTimeout(()=>renderBracket(),200);
+          }
+        }catch(e){ console.warn('[v799] autoAdv 후처리 실패',e); }
+        return r;
+      };
+      wrapped.__v799Wrapped=true;
+      window.autoAdv=wrapped;
+      try{ autoAdv=wrapped; }catch(e){}
+      console.log('[v799] autoAdv 래핑 완료 — 시합완료 후 자동 대기 배정');
+    }catch(e){ console.warn('[v799] autoAdv 래핑 실패',e); }
+  }
+  // 모든 패치 로드 후 실행 보장
+  doWrap();
+  setTimeout(doWrap, 800);
+  setTimeout(doWrap, 2000);
+})();
 
 // 본선 대진표 확정 버튼 핸들러
 window.v793FixedDraw=async function(key){
@@ -53945,6 +53976,136 @@ setTimeout(()=>{
     });
   }catch(e){}
 },2000);
+
+// ── v799: 본선 대진표 잠금/공개 ──────────────────────────────
+// draw.mainBracketLocked = true → 비관리자에게 가림막 표시
+// 관리자: 🔒잠금 / 🔓공개 버튼으로 토글
+// 일반 참가자: "본선 대진표는 추첨 후 공개됩니다" 화면
+
+window.v799LockBracket=async function(key, lock){
+  try{
+    if(!key){key=(document.getElementById('brTS')||{}).value||''; key=String(key).trim();}
+    if(!key||!G?.draws?.[key]) return;
+    G.draws[key].mainBracketLocked=!!lock;
+    const _stD=window.stD;
+    if(typeof _stD==='function'){
+      try{if(window.__FB_WRITE_CACHE?.draws)delete window.__FB_WRITE_CACHE.draws[key];}catch(e){}
+      await _stD(key);
+    }
+    v799ApplyBracketLock();
+    const msg=lock?'🔒 본선 대진표가 잠겼습니다. 참가자에게 보이지 않습니다.':'🔓 본선 대진표가 공개되었습니다.';
+    if(typeof toastMsg==='function') toastMsg(msg,'success');
+    else if(typeof toast==='function') toast(msg,'success');
+    console.log('[v799] bracketLocked:',lock,key);
+  }catch(e){ console.error('[v799] lock failed',e); }
+};
+
+function v799IsLocked(key){
+  try{
+    if(!key){key=(document.getElementById('brTS')||{}).value||'';}
+    return !!(G?.draws?.[key]?.mainBracketLocked);
+  }catch(e){ return false; }
+}
+
+function v799CanView(){
+  // 관리자(AD)/운영자(OP)/팀매니저(TM)는 항상 볼 수 있음
+  return !!(window.AD||window.OP||window.TM||window.canManageBracket?.());
+}
+
+function v799ApplyBracketLock(){
+  try{
+    const key=(document.getElementById('brTS')||{}).value||'';
+    const locked=v799IsLocked(key);
+    const canView=v799CanView();
+
+    // 기존 가림막 제거
+    document.querySelectorAll('#v799-bracket-mask').forEach(el=>el.remove());
+
+    // 잠금 버튼 업데이트
+    document.querySelectorAll('.v799-lock-btn').forEach(btn=>{
+      btn.textContent=locked?'🔓 본선 공개':'🔒 본선 잠금';
+      btn.style.background=locked?'#16a34a':'#dc2626';
+      btn.style.borderColor=locked?'#16a34a':'#dc2626';
+      btn.setAttribute('onclick',`v799LockBracket('${key}',${!locked})`);
+    });
+
+    // 비관리자 + 잠금 상태 → 브래킷 가림
+    const bracketContent=document.getElementById('bracketContent');
+    if(!bracketContent) return;
+    if(locked && !canView){
+      const mask=document.createElement('div');
+      mask.id='v799-bracket-mask';
+      mask.style.cssText='position:relative;z-index:10;background:#f8fafc;border:2px dashed #cbd5e1;border-radius:18px;padding:60px 20px;text-align:center;margin:16px 0;';
+      mask.innerHTML=`
+        <div style="font-size:2.5rem;margin-bottom:16px">🔒</div>
+        <div style="font-size:1.1rem;font-weight:900;color:#334155;margin-bottom:8px">본선 대진표 준비중</div>
+        <div style="font-size:.85rem;color:#64748b">추첨이 완료되면 운영진이 공개합니다.</div>
+      `;
+      bracketContent.style.display='none';
+      bracketContent.parentNode.insertBefore(mask, bracketContent);
+    } else {
+      bracketContent.style.display='';
+    }
+  }catch(e){ console.warn('[v799] applyLock 실패',e); }
+}
+window.v799ApplyBracketLock=v799ApplyBracketLock;
+
+// renderBracket 래핑 — 렌더 후 잠금 적용
+(function(){
+  const oldRender=window.renderBracket;
+  if(typeof oldRender!=='function'||oldRender.__v799LockWrapped) return;
+  const wrapped=function(){
+    const r=oldRender.apply(this,arguments);
+    setTimeout(v799ApplyBracketLock,100);
+    return r;
+  };
+  wrapped.__v799LockWrapped=true;
+  window.renderBracket=wrapped;
+  try{renderBracket=wrapped;}catch(e){}
+})();
+
+// 잠금 버튼 삽입 (관리자만) — 코트현황판 + 대진표 export bar 두 곳에
+setTimeout(()=>{
+  try{
+    if(!v799CanView()) return;
+    const key=(document.getElementById('brTS')||{}).value||'';
+    const locked=v799IsLocked(key);
+
+    function makeLockBtn(k,lk){
+      const lb=document.createElement('button');
+      lb.className='btn btn-primary v799-lock-btn';
+      lb.type='button';
+      lb.style.cssText='min-height:32px;padding:4px 13px;border-radius:10px;font-size:.75rem;font-weight:900;margin:3px 4px;background:'+(lk?'#16a34a':'#dc2626')+';border-color:'+(lk?'#16a34a':'#dc2626');
+      lb.textContent=lk?'🔓 본선 공개':'🔒 본선 잠금';
+      lb.setAttribute('onclick',`v799LockBracket('${k}',${!lk})`);
+      return lb;
+    }
+
+    // 1) 코트현황판 버튼 옆
+    if(!document.querySelector('.v799-lock-btn-court')){
+      document.querySelectorAll('[onclick*="v773RunMainAssign"]').forEach(btn=>{
+        const lb=makeLockBtn(key,locked);
+        lb.classList.add('v799-lock-btn-court');
+        lb.style.minHeight='30px';lb.style.height='30px';lb.style.fontSize='.68rem';
+        btn.parentNode.insertBefore(lb,btn);
+      });
+    }
+
+    // 2) 대진표 페이지 export bar 근처
+    if(!document.querySelector('.v799-lock-btn-bracket')){
+      const exportBar=document.getElementById('bracketExportBar');
+      if(exportBar){
+        const lb=makeLockBtn(key,locked);
+        lb.classList.add('v799-lock-btn-bracket');
+        exportBar.appendChild(lb);
+      }
+    }
+  }catch(e){ console.warn('[v800] lock btn insert failed',e); }
+},2500);
+
+// 페이지 로드 후 잠금 상태 적용
+setTimeout(v799ApplyBracketLock,1500);
+setTimeout(v799ApplyBracketLock,3000);
 
 })();
 </script>
