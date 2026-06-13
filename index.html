@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-13-v768";
+  const APP_VERSION = "2026-06-13-v782";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -13840,7 +13840,7 @@ function buildCourtBoardGroupHeadline(key, m, autoTitle, rawTitle){
   const detail=`예선 ${grpLabel(m.group||0)}`;
   // v495: 코트 현황 카드에서 일반 라벨이 팀명 대신 표시되는 문제 방지
   // v614b: '수동 고정', '수동 공용대기' 등 수동 라벨도 팀명 대신 표시되지 않도록 필터
-  if(!label || /자동\s*배정|경기\s*대기|대기중|대기\s*중|수동|조건\s*코트|확정\s*고정/.test(label)) return {headline: rawTitle, detail};
+  if(!label || /자동\s*배정|경기\s*대기|대기중|대기\s*중|수동|조건\s*코트|확정\s*고정|\(v\d+\)/.test(label)) return {headline: rawTitle, detail};
   if(label==='1번 vs 2번') return {headline: `${s1} vs ${s2}`, detail};
   if(label==='1번 vs 3번') return {headline: `${s1} vs ${s3}`, detail};
   if(label==='2번 vs 3번') return {headline: `${s2} vs ${s3}`, detail};
@@ -13887,7 +13887,13 @@ function describeCourtBoardMatch(key,m){
     if(/자동\s*배정|경기\s*대기|대기중|대기\s*중|수동\s*고정|수동\s*공용|수동\s*대기|조건\s*코트/.test(String(title||'')) && rawTitle && rawTitle!=='TBD vs TBD') title=rawTitle;
     detail=built.detail || '';
   }else if(autoTitle && rawTitle && rawTitle!=='TBD vs TBD'){
-    detail=rawTitle;
+    // 본선 경기: autoTitle이 '자동배정' 류이면 title을 rawTitle(팀명)으로 교체
+    if(/자동\s*배정|자동배정|\(v\d+\)/.test(autoTitle)){
+      title=rawTitle;
+      detail='';
+    }else{
+      detail=rawTitle;
+    }
   }else if(!autoTitle && rawTitle && rawTitle!=='TBD vs TBD'){
     detail='';
   }
@@ -14569,6 +14575,7 @@ function renderCourtStartControlHtml(key){
         <button class="btn btn-outline" type="button" style="min-height:30px;height:30px;padding:4px 9px;border-radius:10px;font-size:.68rem;font-weight:1000" onclick="saveCourtStartTimeV546('${escFn(key)}')"${disabled}>💾 저장</button>
         <button class="btn btn-accent" type="button" style="min-height:30px;height:30px;padding:4px 9px;border-radius:10px;font-size:.68rem;font-weight:1000" onclick="startCourtNowV546('${escFn(key)}')"${disabled}>▶ 지금 시작</button>
         <button class="btn btn-gray" type="button" style="min-height:30px;height:30px;padding:4px 9px;border-radius:10px;font-size:.68rem;font-weight:1000" onclick="useCourtScheduledV546('${escFn(key)}')"${disabled}>예약시간 사용</button>
+        <button class="btn btn-primary" type="button" style="min-height:30px;height:30px;padding:4px 11px;border-radius:10px;font-size:.68rem;font-weight:1000;background:#7c3aed;border-color:#7c3aed" onclick="v773RunMainAssign('${escFn(key)}')" title="빈 코트에 본선 경기를 구장별 자동 배분합니다">🎯 본선 코트 배정</button>
       </div>
     </div>`;
   }catch(e){ return ''; }
@@ -14648,15 +14655,60 @@ function renderCourtStatusBoard(key, div){
   const sharedWaitingHiddenCount=Math.max(0, sharedWaiting.length-sharedWaitingVisible.length);
   const waitingCount=processedItems.reduce((sum,item)=>sum+((item.__visibleWaiting||[]).length),0);
   const emptyCount=processedItems.filter(x=>x.status==='empty').length;
+  // v772: 공용대기 venue별 2분할 렌더링
+  // sharedWaitingVisible을 국제(gukje)/원도심(wondo)으로 분리
+  // venue는 m.venue || m.__venue 우선, 없으면 v771InferMatchVenue로 추론
+  function __v772makeCardHtml(key, w, priority){
+    const wi=describeCourtBoardMatch(key,w);
+    const headline=((wi.title&&wi.title!=='TBD vs TBD')?wi.title:((wi.rawTitle&&wi.rawTitle!=='TBD vs TBD')?wi.rawTitle:(wi.autoTitle||'경기 대기')));
+    const targetCourt=String(w.__sharedCourtLabel||'').trim();
+    const wVenue=String(w.venue||w.__venue||'');
+    const venueBadge=(w.phase==='main'||w.phase==='playin')?(wVenue==='wondosim'?'<span style="font-size:.62rem;font-weight:900;padding:2px 6px;border-radius:999px;background:#dcfce7;color:#166534;border:1px solid #86efac;margin-right:3px">🟢 원도심</span>':'<span style="font-size:.62rem;font-weight:900;padding:2px 6px;border-radius:999px;background:#dbeafe;color:#1e40af;border:1px solid #93c5fd;margin-right:3px">🔵 국제</span>'):'';
+    const detailParts=[wi.label, targetCourt?`${targetCourt} 배정예정`:'공용 대기'];
+    const isManual=(!!w.manualSharedHold || !!String(w.manualCourtTarget||'').trim()) && !(w.initialPrelimAutoCourt && !canManageBracket());
+    const assignedElapsed = buildElapsedMetaLine(w.courtAssignedAt||'', 'wait_placed');
+    const metaEntries=[]; if(assignedElapsed.clock) metaEntries.push({...assignedElapsed, prefix:'대기배치'});
+    return `<div class="court-wait-card" draggable="${canManageBracket()?'true':'false'}" ondragstart="onCourtCardDragStart(event,'${key}','${String(w.id)}')" ondragend="onCourtCardDragEnd(event)" ondragover="onCourtCardDragOverCard(event,'${key}','${String(w.id)}')" ondragleave="onCourtCardDragLeaveCard(event)" ondrop="onCourtCardDropOnCard(event,'${key}','${String(w.id)}')" style="padding:8px 10px;border-radius:10px;background:${getCourtBoardPhaseColor(wi,w).bg};border:2px solid ${getCourtBoardPhaseColor(wi,w).bd}"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px"><div style="min-width:0;flex:1"><div style="font-size:.78rem;font-weight:900;color:${getCourtBoardPhaseColor(wi,w).fg};line-height:1.35;word-break:keep-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(headline)}</div><div style="font-size:.72rem;color:${getCourtBoardPhaseColor(wi,w).fg};margin-top:3px">${venueBadge}${esc(detailParts.join(' · '))}</div>${renderElapsedMetaBlocks(metaEntries, getCourtBoardPhaseColor(wi,w).fg)}<div class="v490-court-action-row" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin-top:6px;width:100%">${courtBoardStableResultButtonsHtml(key,w)}${canManageBracket()?`<button class="btn btn-outline" type="button" style="font-size:.6rem;padding:2px 2px;min-height:28px;white-space:nowrap;width:100%;justify-content:center" onclick="sendCourtCardSms('${key}','${String(w.id)}','${targetCourt?'court_changed':'queue_registered'}','${targetCourt}',${priority})">문자</button>`:''}<button class="btn btn-outline" type="button" style="font-size:.6rem;padding:2px 2px;min-height:28px;white-space:nowrap;width:100%;justify-content:center" onclick="showCourtMovePicker('${key}','${String(w.id)}')">코트</button></div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px"><span class="court-wait-priority">${priority}</span>${(isManual&&canManageBracket())?'<span class="badge bg-blue" style="font-size:.66rem;padding:3px 7px">수동</span>':''}</div></div></div>`;
+  }
+  // venue 판별 함수 (m.venue 없으면 v771InferMatchVenue 사용)
+  function __v772venueOf(key, w){
+    const v=String(w.venue||w.__venue||'').trim();
+    if(v==='wondosim') return 'wondosim';
+    if(v==='gukje') return 'gukje';
+    try{ if(typeof v771InferMatchVenue==='function') return v771InferMatchVenue(key,w)||'gukje'; }catch(e){}
+    return 'gukje';
+  }
+  // 분리
+  const __v772gukje=[], __v772wondo=[];
+  sharedWaitingVisible.forEach(w=>{
+    (__v772venueOf(key,w)==='wondosim' ? __v772wondo : __v772gukje).push(w);
+  });
+  function __v772secBody(key, list){
+    if(!list.length) return '<div style="padding:13px;text-align:center;color:#64748b;font-size:.75rem;font-weight:800;background:#fff;border:1px dashed #cbd5e1;border-radius:10px;grid-column:1/-1">대기 없음</div>';
+    return list.map((w,idx)=>__v772makeCardHtml(key,w,idx+1)).join('');
+  }
+  const __v772gridStyle='display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:7px;padding:9px;align-items:start;';
+  const __v772splitHtml = sharedWaitingVisible.length ? `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%;box-sizing:border-box;margin-top:2px;">
+      <div style="border-radius:14px;overflow:hidden;border:2px solid #93c5fd;background:#eff6ff;min-width:0;">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 13px;font-weight:900;font-size:.84rem;background:#dbeafe;color:#1e40af;">
+          <span>🔵 국제 공용대기</span><span style="font-size:.76rem;font-weight:800">${__v772gukje.length}경기</span>
+        </div>
+        <div style="${__v772gridStyle}">${__v772secBody(key,__v772gukje)}</div>
+      </div>
+      <div style="border-radius:14px;overflow:hidden;border:2px solid #86efac;background:#f0fdf4;min-width:0;">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 13px;font-weight:900;font-size:.84rem;background:#dcfce7;color:#166534;">
+          <span>🟢 원도심 공용대기</span><span style="font-size:.76rem;font-weight:800">${__v772wondo.length}경기</span>
+        </div>
+        <div style="${__v772gridStyle}">${__v772secBody(key,__v772wondo)}</div>
+      </div>
+    </div>` : '<div style="padding:10px 12px;border:1px dashed #f6d28b;border-radius:10px;background:#fff;font-size:.78rem;color:#9a6400">여기로 카드를 옮기면 공용 대기 상태로 유지됩니다.</div>';
   const sharedWaitingHtml = `<div class="court-drop-zone" ondragover="onCourtDropOver(event)" ondragleave="onCourtDropLeave(event)" ondrop="onCourtDrop(event,'${key}','')" style="margin-bottom:12px;padding:12px 14px;border:1px solid #f6d28b;border-radius:14px;background:#fff8e8">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px">
-        <div style="font-size:.84rem;font-weight:900;color:#9a6400">⏳ 공용대기 ${sharedWaiting.length}경기</div>
-        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-          <div style="font-size:.7rem;color:#9a6400">위 카드가 우선순위 1번</div>
-          ${sharedWaiting.length>sharedWaitingDefaultVisibleCount?`<button class="btn btn-outline court-shared-toggle-btn" type="button" style="font-size:.68rem;padding:4px 9px;min-height:28px;border-color:#e8b353;color:#9a6400;background:#fff7df" onclick="return toggleCourtBoardSharedExpanded(event,'${key}',${sharedWaitingExpanded?'false':'true'})">${sharedWaitingExpanded?`접기 (${sharedWaiting.length})`:`더보기 +${sharedWaitingHiddenCount}`}</button>`:''}
-        </div>
+        <div style="font-size:.84rem;font-weight:900;color:#9a6400">⏳ 구장별 공용대기 ${sharedWaiting.length}경기</div>
+        <div style="font-size:.7rem;color:#9a6400">각 구장별 위 카드가 우선순위 1번</div>
       </div>
-      ${sharedWaitingVisible.length?`<div class="shared-wait-stack">${sharedWaitingVisible.map((w,idx)=>{ const wi=describeCourtBoardMatch(key,w); const priority=idx+1; const headline=((wi.title&&wi.title!=='TBD vs TBD')?wi.title:((wi.rawTitle&&wi.rawTitle!=='TBD vs TBD')?wi.rawTitle:(wi.autoTitle||'경기 대기'))); const targetCourt=String(w.__sharedCourtLabel||'').trim(); const wVenue=String(w.venue||w.__venue||''); const venueBadge=(w.phase==='main'||w.phase==='playin')?(wVenue==='wondosim'?'<span style="font-size:.62rem;font-weight:900;padding:2px 6px;border-radius:999px;background:#dcfce7;color:#166534;border:1px solid #86efac;margin-right:3px">🟢 원도심</span>':'<span style="font-size:.62rem;font-weight:900;padding:2px 6px;border-radius:999px;background:#dbeafe;color:#1e40af;border:1px solid #93c5fd;margin-right:3px">🔵 국제</span>'):''; const detailParts=[wi.label, targetCourt?`${targetCourt} 배정예정`:'공용 대기']; const isManual=(!!w.manualSharedHold || !!String(w.manualCourtTarget||'').trim()) && !(w.initialPrelimAutoCourt && !canManageBracket()); const assignedElapsed = buildElapsedMetaLine(w.courtAssignedAt||'', 'wait_placed'); const metaEntries=[]; if(assignedElapsed.clock) metaEntries.push({...assignedElapsed, prefix:'대기배치'}); return `<div class="court-wait-card" draggable="${canManageBracket()?'true':'false'}" ondragstart="onCourtCardDragStart(event,'${key}','${String(w.id)}')" ondragend="onCourtCardDragEnd(event)" ondragover="onCourtCardDragOverCard(event,'${key}','${String(w.id)}')" ondragleave="onCourtCardDragLeaveCard(event)" ondrop="onCourtCardDropOnCard(event,'${key}','${String(w.id)}')" style="padding:8px 10px;border-radius:10px;background:${getCourtBoardPhaseColor(wi,w).bg};border:2px solid ${getCourtBoardPhaseColor(wi,w).bd}"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px"><div style="min-width:0;flex:1"><div style="font-size:.78rem;font-weight:900;color:${getCourtBoardPhaseColor(wi,w).fg};line-height:1.35;word-break:keep-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(headline)}</div><div style="font-size:.72rem;color:${getCourtBoardPhaseColor(wi,w).fg};margin-top:3px">${venueBadge}${esc(detailParts.join(' · '))}</div>${renderElapsedMetaBlocks(metaEntries, getCourtBoardPhaseColor(wi,w).fg)}<div class="v490-court-action-row" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin-top:6px;width:100%">${courtBoardStableResultButtonsHtml(key,w)}${canManageBracket()?`<button class="btn btn-outline" type="button" style="font-size:.6rem;padding:2px 2px;min-height:28px;white-space:nowrap;width:100%;justify-content:center" onclick="sendCourtCardSms('${key}','${String(w.id)}','${targetCourt?'court_changed':'queue_registered'}','${targetCourt}',${priority})">문자</button>`:''}<button class="btn btn-outline" type="button" style="font-size:.6rem;padding:2px 2px;min-height:28px;white-space:nowrap;width:100%;justify-content:center" onclick="showCourtMovePicker('${key}','${String(w.id)}')">코트</button></div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px"><span class="court-wait-priority">${priority}</span>${(isManual&&canManageBracket())?'<span class="badge bg-blue" style="font-size:.66rem;padding:3px 7px">수동</span>':''}</div></div></div>`; }).join('')}</div>${sharedWaitingHiddenCount?`<div style="margin-top:8px;font-size:.74rem;color:#9a6400;font-weight:700">아래 더보기로 나머지 ${sharedWaitingHiddenCount}경기 확인</div>`:''}`:`<div style="padding:10px 12px;border:1px dashed #f6d28b;border-radius:10px;background:#fff;font-size:.78rem;color:#9a6400">여기로 카드를 옮기면 공용 대기 상태로 유지됩니다.</div>`}
+      ${__v772splitHtml}
       <div class="court-drop-hint">카드를 각 코트로 드래그하거나, 코트 선택 버튼으로 수동 배정할 수 있습니다. 코트에서 다시 이 영역으로 드래그하거나 공용 대기를 선택하면 복귀합니다.</div>
     </div>`;
   const cards=hasCourts ? processedItems.map(item=>{
@@ -27183,12 +27235,16 @@ function getAdvT(key,draw,teams,cfg){
   function groupVenue(gi){
     try{
       const grp=(draw.groups||[])[gi];
-      const court=String(grp&&(grp.court||grp.manualCourt||grp.manualCourtTarget)||'');
-      if(court) return getVenuePool(court);
-      // court가 없으면 경기에서 읽기
+      // courts 배열 우선, 없으면 단수 필드
+      const courtSrc=String(
+        (Array.isArray(grp?.courts) && grp.courts[0]) ||
+        grp?.court || grp?.manualCourt || grp?.manualCourtTarget || ''
+      );
+      if(courtSrc) return getVenuePool(courtSrc);
+      // 경기에서 읽기
       const ms=(G.matches&&G.matches[key]||[]).filter(m=>Number(m.group)===gi&&m.phase==='group');
       for(const m of ms){
-        const mc=String(m.court||m.manualCourtTarget||'');
+        const mc=String((Array.isArray(m.courts)&&m.courts[0])||m.court||m.manualCourtTarget||'');
         if(mc) return getVenuePool(mc);
       }
     }catch(e){}
@@ -27443,19 +27499,17 @@ function hybridSpreadOrder(count){
 }
 
 function pickByeMatchIndices(matchCount, byeCount){
-  // v753: PDF 대진표 라벨 출력 기준 — 4칸 묶음의 마지막(홀수 인덱스)이 부전승
-  // 순번 기준: 4,8,12,...→ 경기 인덱스 1,3,5,7,...(홀수)
-  // 이 패턴이 PDF 인쇄본과 정확히 일치해야 라벨지를 붙일 수 있음
+  // v773: 부전승은 pair(2칸) 내에서 홀수 위치(2i+1)에 1개씩 배치
+  // [팀vs팀(짝수), 부전승(홀수)] 패턴 보장
   if(byeCount<=0) return [];
   const out=[];
-  // 홀수 인덱스(1,3,5...) 순서로 byeCount개 선택
-  for(let i=1; i<matchCount && out.length<byeCount; i+=2){
-    out.push(i);
-  }
-  // 홀수만으로 부족한 경우(byeCount가 매우 많을 때) 짝수도 추가
-  for(let i=0; i<matchCount && out.length<byeCount; i+=2){
-    out.push(i);
-  }
+  const pairCount=Math.floor(matchCount/2);
+  // 1단계: pair당 홀수 슬롯(1,3,5...) — pair당 최대 1개 부전승
+  for(let p=0;p<pairCount&&out.length<byeCount;p++) out.push(2*p+1);
+  // 2단계: 부족하면 짝수 슬롯도 사용 (byeCount가 pairCount 초과 시)
+  for(let p=0;p<pairCount&&out.length<byeCount;p++) out.push(2*p);
+  // 홀수 matchCount 처리
+  if(matchCount%2===1&&out.length<byeCount) out.push(matchCount-1);
   return out.slice(0, byeCount);
 }
 
@@ -30293,38 +30347,135 @@ async function startIndividualMainDraw(){
 // 개인전 본선 대진 생성 — play-in 포함
 // groupLabelOnly=true: 예선 미완료 시 ti 대신 null, source*Label에 "A조1위" 형태만 저장
 function buildIndivMainMatchesFixed(advT, key, teams, groupLabelOnly=false){
-  const seededEntries=(advT||[]).map(e=>({
+  // v778: 단순 직접 배치
+  // 원도심팀 / 국제팀 분리 추첨, 각각 독립 브래킷
+  const all=(advT||[]).map(e=>({
     ...e,
     nm:e.nm||getMainEntryBracketLabel(e)||`T${e.ti??''}`,
     _groupLabel:`${grpLabel((e.gn||1)-1)} ${e.rk}위`
   }));
-  const plan=buildSeededMainSlots(seededEntries, nextPow2(Math.max(2, seededEntries.length)), Date.now()%10+1, key, 'individual');
-  let matches=buildMainMatches((plan?.matchSlots)||[], plan?.n||0, (plan?.playInMatches)||[]);
+
+  const wondo=all.filter(e=>e.venue==='wondosim');
+  const gukje=all.filter(e=>e.venue!=='wondosim');
+  const canSplit=wondo.length>=2 && gukje.length>=2;
+
+  let matches;
+  if(canSplit){
+    const wMs=_buildSimpleBracketMatches(wondo, 'wondosim', 0);
+    const wCount=nextPow2(Math.max(2,wondo.length))/2;
+    const gMs=_buildSimpleBracketMatches(gukje, 'gukje', wCount);
+    matches=[...wMs, ...gMs];
+  }else{
+    matches=_buildSimpleBracketMatches(all, all.some(e=>e.venue==='wondosim')?'wondosim':'gukje', 0);
+  }
 
   if(groupLabelOnly){
-    const labelByTeam=new Map();
-    seededEntries.forEach(e=>{ if(e && e.ti!=null) labelByTeam.set(Number(e.ti), String(e._groupLabel||e.nm||'')); });
+    const lbl=new Map();
+    all.forEach(e=>{ if(e&&e.ti!=null) lbl.set(Number(e.ti), String(e._groupLabel||e.nm||'')); });
     matches=matches.map(m=>{
-      const out={...m};
-      if(out.phase==='playin'){
-        if(out.t1!=null) out.source1Label = labelByTeam.get(Number(out.t1)) || out.source1Label || 'TBD';
-        if(out.t2!=null) out.source2Label = labelByTeam.get(Number(out.t2)) || out.source2Label || 'TBD';
-        out.t1=null;
-        out.t2=null;
-        out.winner=null;
-      }else if(out.phase==='main' && Number(out.round||0)===0){
-        if(out.t1!=null) out.source1Label = labelByTeam.get(Number(out.t1)) || out.source1Label || '';
-        if(out.t2!=null) out.source2Label = labelByTeam.get(Number(out.t2)) || out.source2Label || '';
-        if(out.source1PlayInId) out.source1Label = `진출전 승자${out.source1PlayInId}`;
-        if(out.source2PlayInId) out.source2Label = out.bye ? '부전승' : `진출전 승자${out.source2PlayInId}`;
-        out.t1=null;
-        out.t2=null;
-        out.winner=null;
+      const o={...m};
+      if(o.phase==='main'&&Number(o.round||0)===0){
+        if(o.t1!=null) o.source1Label=lbl.get(Number(o.t1))||o.source1Label||'';
+        if(o.t2!=null) o.source2Label=lbl.get(Number(o.t2))||o.source2Label||'';
+        o.t1=null; o.t2=null; o.winner=null;
       }
-      return out;
+      return o;
     });
   }
   return matches;
+}
+
+// 단순 브래킷 생성:
+// 1위팀 전부 → 2위팀 전부 순으로 슬롯 배치
+// 홀수 슬롯(index 1,3,5...): t1=팀, t2=null(부전승)
+// 짝수 슬롯(index 0,2,4...): t1=팀, t2=팀 (정상경기)
+function _buildSimpleBracketMatches(entries, venue, slotOffset){
+  if(!entries||entries.length<2) return [];
+  const N=nextPow2(Math.max(2,entries.length));
+  const matchCount=N/2;
+  const byeCount=N-entries.length;
+
+  // 팀 순서: 1위 → 2위 → 나머지
+  const rank1=entries.filter(e=>Number(e.rk||0)===1);
+  const rank2=entries.filter(e=>Number(e.rk||0)===2);
+  const rest=entries.filter(e=>Number(e.rk||0)>2);
+  const ordered=[...rank1,...rank2,...rest];
+
+  // 슬롯 구성: pair단위 (2i=경기, 2i+1=부전승) 반복
+  // 부전승 슬롯 수 = byeCount, 이를 홀수 슬롯에 분산
+  const byeSlots=new Set();
+  for(let p=0;p<matchCount&&byeSlots.size<byeCount;p++) byeSlots.add(2*p+1);
+
+  // 팀 배치: byeSlots는 t1만, 일반슬롯은 t1+t2
+  const slots=Array.from({length:matchCount},(_,i)=>({t1:null,t2:null,bye:byeSlots.has(i)}));
+  let ptr=0;
+  for(let i=0;i<matchCount;i++){
+    if(slots[i].bye){
+      slots[i].t1=ordered[ptr++]||null;
+    }else{
+      slots[i].t1=ordered[ptr++]||null;
+      slots[i].t2=ordered[ptr++]||null;
+    }
+  }
+
+  // round 0 경기 생성
+  const out=[];
+  for(let i=0;i<matchCount;i++){
+    const s=slots[i];
+    const t1ti=s.t1&&s.t1.ti!=null?s.t1.ti:null;
+    const t2ti=s.t2&&s.t2.ti!=null?s.t2.ti:null;
+    const m={
+      id:`main_r0_${slotOffset+i}`,phase:'main',round:0,slot:slotOffset+i,
+      t1:t1ti,t2:t2ti,winner:null,rubbers:[],bye:s.bye,court:'',
+      venue,__venue:venue,
+      source1Label:s.t1?getMainEntryBracketLabel(s.t1)||String(s.t1.nm||''):'',
+      source2Label:s.bye?'부전승':(s.t2?getMainEntryBracketLabel(s.t2)||String(s.t2.nm||''):'')
+    };
+    if(s.bye&&t1ti!=null) m.winner=t1ti;
+    out.push(m);
+  }
+
+  // 상위 라운드 생성
+  let prevCount=matchCount, round=1;
+  while(prevCount>1){
+    const hs=Math.ceil(prevCount/2);
+    for(let i=0;i<hs;i++){
+      out.push({id:`main_r${round}_${slotOffset+i}`,phase:'main',round,slot:slotOffset+i,
+        t1:null,t2:null,winner:null,rubbers:[],bye:false,court:'',venue,__venue:venue});
+    }
+    // 부전승 자동 진출
+    const r0ms=out.filter(m=>Number(m.round||0)===round-1&&m.bye&&m.winner!=null&&m.slot>=slotOffset&&m.slot<slotOffset+prevCount);
+    r0ms.forEach(bm=>{
+      const localSlot=bm.slot-slotOffset;
+      const nextLocal=Math.floor(localSlot/2);
+      const nm=out.find(x=>x.phase==='main'&&Number(x.round||0)===round&&x.slot===slotOffset+nextLocal);
+      if(!nm) return;
+      if(localSlot%2===0){if(nm.t1==null)nm.t1=bm.winner;}
+      else{if(nm.t2==null)nm.t2=bm.winner;}
+    });
+    prevCount=hs; round++;
+  }
+  return out;
+}
+function _applyGroupLabelOnly(matches, seededEntries, groupLabelOnly){
+  if(!groupLabelOnly) return matches;
+  const labelByTeam=new Map();
+  seededEntries.forEach(e=>{ if(e&&e.ti!=null) labelByTeam.set(Number(e.ti), String(e._groupLabel||e.nm||'')); });
+  return matches.map(m=>{
+    const out={...m};
+    if(out.phase==='playin'){
+      if(out.t1!=null) out.source1Label=labelByTeam.get(Number(out.t1))||out.source1Label||'TBD';
+      if(out.t2!=null) out.source2Label=labelByTeam.get(Number(out.t2))||out.source2Label||'TBD';
+      out.t1=null; out.t2=null; out.winner=null;
+    }else if(out.phase==='main'&&Number(out.round||0)===0){
+      if(out.t1!=null) out.source1Label=labelByTeam.get(Number(out.t1))||out.source1Label||'';
+      if(out.t2!=null) out.source2Label=labelByTeam.get(Number(out.t2))||out.source2Label||'';
+      if(out.source1PlayInId) out.source1Label=`진출전 승자${out.source1PlayInId}`;
+      if(out.source2PlayInId) out.source2Label=out.bye?'부전승':`진출전 승자${out.source2PlayInId}`;
+      out.t1=null; out.t2=null; out.winner=null;
+    }
+    return out;
+  });
 }
 
 
@@ -30586,157 +30737,91 @@ function chooseBestMainLeaf(positions, entry, leaves, n, rnd){
   return bestPos;
 }
 function buildSeededMainSlots(entries, n, seed, tid, div){
-  const total=(entries||[]).length;
+  // v778: _buildSimpleBracketMatches 기반 단순 추첨
+  const all=(entries||[]).map(e=>({...e}));
+  const venue=all.some(e=>e.venue==='wondosim')?'wondosim':'gukje';
+  const total=all.length;
   const spec=computeMainBracketSpec(total);
-  if(total<2 || !spec.mainSize) return {matchSlots:[], n:0, byeCount:0, byeIdxs:[], normalIdxs:[], revealOrder:[], playInMatches:[], spec};
-
-  const rnd=seededMainRng(seed, tid, div, total);
-  const manualSeedMap=getMainManualSeedMap(entries);
-
-  const toSeeded = (list)=> (list||[]).map(e=>({...e, seedNo:manualSeedMap[Number(e?.ti)]||null}));
-  const allSeeded=toSeeded(entries);
-  let playInEntries=[];
-  let mainPool=[];
+  if(total<2||!spec.mainSize) return {matchSlots:[],n:0,byeCount:0,byeIdxs:[],normalIdxs:[],revealOrder:[],playInMatches:[],spec};
 
   if(spec.playInTeams>0){
-    const manualProtected=new Set(Object.keys(manualSeedMap).map(v=>Number(v)));
-    const candidates=shuffleSeeded(
-      allSeeded.filter(e=>!manualProtected.has(Number(e?.ti))).sort((a,b)=>{
-        const ra=Number(a?.rk||99), rb=Number(b?.rk||99);
-        if(ra!==rb) return rb-ra; // 2위 우선 진출전
-        return Number(a?.gn||0)-Number(b?.gn||0);
-      }),
-      rnd
-    );
-    const playMap=new Set();
-    playInEntries=candidates.slice(0, spec.playInTeams).map((e,i)=>{
-      playMap.add(Number(e.ti));
-      return {...e, playInId:Math.floor(i/2)+1};
-    });
-    mainPool=allSeeded.filter(e=>!playMap.has(Number(e.ti)));
-    const placeholders=Array.from({length:spec.winnersNeeded},(_,i)=>({
-      nm:`진출전 승자${i+1}`,
-      gn:null,
-      rk:2,
-      placeholder:true,
-      playInPlaceholder:true,
-      playInId:i+1,
-      seedNo:null
+    // playin이 필요한 경우 기존 로직 유지 (팀수가 정확히 2의 거듭제곱이 아닌 특수 케이스)
+    const rnd=seededMainRng(seed,tid,div,total);
+    const rank2=shuffleSeeded(all.filter(a=>Number(a.rk||0)!==1),rnd);
+    const playInEntries=rank2.slice(0,spec.playInTeams).map((e,i)=>({...e,playInId:Math.floor(i/2)+1}));
+    const playMap=new Set(playInEntries.map(e=>Number(e.ti)));
+    const mainPool=[...all.filter(e=>!playMap.has(Number(e.ti))),
+      ...Array.from({length:spec.winnersNeeded},(_,i)=>({nm:`진출전 승자${i+1}`,gn:null,rk:2,placeholder:true,playInId:i+1,seedNo:null}))];
+    const mainSize=spec.mainSize;
+    const byeCount=mainSize-mainPool.length;
+    const matchCount=mainSize/2;
+    const byeSlots=new Set();
+    for(let p=0;p<matchCount&&byeSlots.size<byeCount;p++) byeSlots.add(2*p+1);
+    const rank1=mainPool.filter(e=>!e.placeholder&&Number(e.rk||0)===1);
+    const others=mainPool.filter(e=>e.placeholder||Number(e.rk||0)!==1);
+    const ordered=[...rank1,...others];
+    const slots=Array.from({length:matchCount},(_,i)=>({t1:null,t2:null,bye:byeSlots.has(i)}));
+    let ptr=0;
+    for(let i=0;i<matchCount;i++){
+      if(slots[i].bye){ slots[i].t1=ordered[ptr++]||null; }
+      else{ slots[i].t1=ordered[ptr++]||null; slots[i].t2=ordered[ptr++]||null; }
+    }
+    const matchSlots=slots.map((s,i)=>({
+      id:i,slot:i,
+      t1:s.t1?{...s.t1}:null,
+      t2:s.t2?{...s.t2}:null,
+      bye:s.bye,
+      source1Label:s.t1?getMainEntryBracketLabel(s.t1)||'':'',
+      source2Label:s.bye?'부전승':(s.t2?getMainEntryBracketLabel(s.t2)||'':'')
     }));
-    mainPool=[...mainPool, ...placeholders];
-  }else{
-    mainPool=[...allSeeded];
-  }
-
-  const mainSize=spec.mainSize;
-  const byeCount=mainSize-mainPool.length;
-  const matchCount=mainSize/2;
-  const matchSlots=Array.from({length:matchCount},(_,i)=>({id:i,t1:null,t2:null,bye:false}));
-  const seedEntries=(mainPool||[])
-    .filter(x=>!x.placeholder && x.seedNo>=1 && x.seedNo<=Math.min(8, mainSize))
-    .sort((a,b)=>a.seedNo-b.seedNo);
-
-  const remaining=(mainPool||[]).filter(e=>e.placeholder || e.seedNo==null);
-  const rank1=shuffleSeeded(remaining.filter(a=>!a.placeholder && a.rk===1), rnd);
-  const others=shuffleSeeded(remaining.filter(a=>a.placeholder || a.rk!==1), rnd);
-
-  const leaves=Array.from({length:mainSize},()=>null);
-  const stdOrder=buildStandardSeedLeafOrder(mainSize);
-  const seedPosByNo={};
-  stdOrder.forEach((seedNo, leafIdx)=>{ seedPosByNo[seedNo]=leafIdx; });
-
-  seedEntries.forEach((entry)=>{
-    const pos=seedPosByNo[entry.seedNo];
-    if(pos==null || pos<0 || pos>=mainSize) return;
-    leaves[pos]={...entry};
-  });
-
-  const getOpenPositions=()=>leaves.map((v,i)=>v?null:i).filter(v=>v!=null);
-  [...rank1, ...others].forEach(entry=>{
-    const opens=getOpenPositions();
-    if(!opens.length) return;
-    const pos=entry.placeholder
-      ? opens[Math.floor(rnd()*opens.length)]
-      : chooseBestMainLeaf(opens, entry, leaves, mainSize, rnd);
-    if(pos!=null) leaves[pos]={...entry};
-  });
-
-  for(let i=0;i<matchCount;i++){
-    const a=leaves[i*2]||null;
-    const b=leaves[i*2+1]||null;
-    if(a) matchSlots[i].t1={...a};
-    if(b) matchSlots[i].t2={...b};
-    if((a&&!b) || (!a&&b)){
-      matchSlots[i].bye=true;
-      if(!a && b){
-        matchSlots[i].t1={...b};
-        matchSlots[i].t2=null;
-      }
-    }
-  }
-
-  // v763: PDF 패턴 — 부전승을 홀수 slot(1,3,5...)으로 재배치
-  {
-    const byeMs=matchSlots.filter(s=>s.bye);
-    const normalMs=matchSlots.filter(s=>!s.bye);
-    if(byeMs.length>0){
-      // 홀수 slot에 부전승 배치
-      const targetByeSlots=[];
-      for(let i=1;i<matchCount&&targetByeSlots.length<byeMs.length;i+=2) targetByeSlots.push(i);
-      for(let i=0;i<matchCount&&targetByeSlots.length<byeMs.length;i+=2) targetByeSlots.push(i);
-      const targetNormalSlots=[];
-      const byeSet=new Set(targetByeSlots);
-      for(let i=0;i<matchCount;i++) if(!byeSet.has(i)) targetNormalSlots.push(i);
-      // slot 번호 재할당
-      byeMs.forEach((s,i)=>{ s.id=`main_r0_${targetByeSlots[i]}`; s.slot=targetByeSlots[i]; });
-      normalMs.forEach((s,i)=>{ s.id=`main_r0_${targetNormalSlots[i]}`; s.slot=targetNormalSlots[i]; });
-      // slot 순 정렬
-      matchSlots.sort((a,b)=>a.slot-b.slot);
-    }
-  }
-
-  const byeIdxs=[], normalIdxs=[];
-  matchSlots.forEach((slot,idx)=>{ if(slot.bye) byeIdxs.push(idx); else normalIdxs.push(idx); });
-  matchSlots.forEach((slot)=>{
-    slot.source1Label = getMainEntryBracketLabel(slot.t1) || slot.source1Label || '';
-    slot.source2Label = slot.bye ? '부전승' : (getMainEntryBracketLabel(slot.t2) || slot.source2Label || '');
-  });
-
-  const revealOrder=[];
-  byeIdxs.forEach(slotIdx=>{
-    const slot=matchSlots[slotIdx];
-    if(slot?.t1) revealOrder.push({slotIdx, side:'t1', team:slot.t1, bye:true});
-  });
-  normalIdxs.forEach(slotIdx=>{
-    const slot=matchSlots[slotIdx];
-    if(slot?.t1) revealOrder.push({slotIdx, side:'t1', team:slot.t1, bye:false});
-  });
-  normalIdxs.forEach(slotIdx=>{
-    const slot=matchSlots[slotIdx];
-    if(slot?.t2) revealOrder.push({slotIdx, side:'t2', team:slot.t2, bye:false});
-  });
-
-  const playInMatches=[];
-  if(spec.playInMatches>0){
+    matchSlots.forEach(s=>{ if(s.bye&&s.t1?.ti!=null) s.winner=s.t1.ti; });
+    const byeIdxs=matchSlots.map((s,i)=>s.bye?i:null).filter(v=>v!=null);
+    const normalIdxs=matchSlots.map((s,i)=>!s.bye?i:null).filter(v=>v!=null);
+    const revealOrder=[];
+    byeIdxs.forEach(si=>{const s=matchSlots[si];if(s?.t1)revealOrder.push({slotIdx:si,side:'t1',team:s.t1,bye:true});});
+    normalIdxs.forEach(si=>{const s=matchSlots[si];if(s?.t1)revealOrder.push({slotIdx:si,side:'t1',team:s.t1,bye:false});});
+    normalIdxs.forEach(si=>{const s=matchSlots[si];if(s?.t2)revealOrder.push({slotIdx:si,side:'t2',team:s.t2,bye:false});});
+    const playInMatches=[];
     for(let i=0;i<spec.playInMatches;i++){
-      const a=playInEntries[i*2]||null;
-      const b=playInEntries[i*2+1]||null;
-      const target = matchSlots.findIndex(ms=>(ms?.t1?.playInId===i+1)||(ms?.t2?.playInId===i+1));
-      const targetSide = target>=0 && matchSlots[target]?.t1?.playInId===i+1 ? 't1' : 't2';
-      playInMatches.push({
-        id:`playin_${i}`,
-        t1:a, t2:b,
-        source1Label:getMainEntryBracketLabel(a) || 'TBD',
-        source2Label:getMainEntryBracketLabel(b) || 'TBD',
-        winnerLabel:`진출전 승자${i+1}`,
-        playInId:i+1,
-        targetSlot: target,
-        targetSide
-      });
+      const a=playInEntries[i*2]||null,b=playInEntries[i*2+1]||null;
+      const target=matchSlots.findIndex(ms=>(ms?.t1?.playInId===i+1)||(ms?.t2?.playInId===i+1));
+      const targetSide=target>=0&&matchSlots[target]?.t1?.playInId===i+1?'t1':'t2';
+      playInMatches.push({id:`playin_${i}`,t1:a,t2:b,source1Label:getMainEntryBracketLabel(a)||'TBD',source2Label:getMainEntryBracketLabel(b)||'TBD',winnerLabel:`진출전 승자${i+1}`,playInId:i+1,targetSlot:target,targetSide});
     }
+    return {matchSlots,n:mainSize,byeCount,byeIdxs,normalIdxs,revealOrder,playInMatches,spec};
   }
 
-  return {matchSlots, n:mainSize, byeCount, byeIdxs, normalIdxs, revealOrder, playInMatches, spec};
+  // 일반 케이스: 단순 배치
+  const mainSize=spec.mainSize;
+  const byeCount=mainSize-total;
+  const matchCount=mainSize/2;
+  const byeSlots=new Set();
+  for(let p=0;p<matchCount&&byeSlots.size<byeCount;p++) byeSlots.add(2*p+1);
+  const rank1=all.filter(e=>Number(e.rk||0)===1);
+  const rank2=all.filter(e=>Number(e.rk||0)!==1);
+  const ordered=[...rank1,...rank2];
+  const slots=Array.from({length:matchCount},(_,i)=>({t1:null,t2:null,bye:byeSlots.has(i)}));
+  let ptr=0;
+  for(let i=0;i<matchCount;i++){
+    if(slots[i].bye){ slots[i].t1=ordered[ptr++]||null; }
+    else{ slots[i].t1=ordered[ptr++]||null; slots[i].t2=ordered[ptr++]||null; }
+  }
+  const matchSlots=slots.map((s,i)=>({
+    id:i,slot:i,
+    t1:s.t1?{...s.t1}:null,
+    t2:s.t2?{...s.t2}:null,
+    bye:s.bye,
+    source1Label:s.t1?getMainEntryBracketLabel(s.t1)||'':'',
+    source2Label:s.bye?'부전승':(s.t2?getMainEntryBracketLabel(s.t2)||'':'')
+  }));
+  matchSlots.forEach(s=>{ if(s.bye&&s.t1?.ti!=null) s.winner=s.t1.ti; });
+  const byeIdxs=matchSlots.map((s,i)=>s.bye?i:null).filter(v=>v!=null);
+  const normalIdxs=matchSlots.map((s,i)=>!s.bye?i:null).filter(v=>v!=null);
+  const revealOrder=[];
+  byeIdxs.forEach(si=>{const s=matchSlots[si];if(s?.t1)revealOrder.push({slotIdx:si,side:'t1',team:s.t1,bye:true});});
+  normalIdxs.forEach(si=>{const s=matchSlots[si];if(s?.t1)revealOrder.push({slotIdx:si,side:'t1',team:s.t1,bye:false});});
+  normalIdxs.forEach(si=>{const s=matchSlots[si];if(s?.t2)revealOrder.push({slotIdx:si,side:'t2',team:s.t2,bye:false});});
+  return {matchSlots,n:mainSize,byeCount,byeIdxs,normalIdxs,revealOrder,playInMatches:[],spec};
 }
 function rouletteBallHTML(text, cls='', extraStyle=''){
   return `<div class="leaf-card-stage ${cls||''}" style="${extraStyle||''}">${text}</div>`;
@@ -51081,1129 +51166,522 @@ window.openParticipantFindPopupForTournament = function(tid){
 </script>
 
 
-<!-- v760: 구장별 공용대기 분리 (경량화 — MutationObserver 없음) -->
-<style id="v760SharedStyle">
-.v760-wrap{display:grid;grid-template-columns:1fr 1fr;gap:14px;width:100%;box-sizing:border-box;margin-top:6px;}
-.v760-sec{border-radius:13px;overflow:hidden;border:1.5px solid #dbe7ff;background:#fff;min-width:0;}
-.v760-sec.gukje{border-color:#93c5fd;background:#eff6ff;}
-.v760-sec.wondo{border-color:#86efac;background:#f0fdf4;}
-.v760-head{padding:9px 12px;font-size:.82rem;font-weight:900;display:flex;align-items:center;justify-content:space-between;}
-.v760-sec.gukje .v760-head{color:#1e40af;background:#dbeafe;}
-.v760-sec.wondo .v760-head{color:#166534;background:#dcfce7;}
-.v760-body{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:7px;padding:9px;align-items:start;}
-.v760-empty{font-size:.74rem;color:#9ca3af;padding:10px;text-align:center;grid-column:1/-1;}
-@media(max-width:900px){.v760-body{grid-template-columns:1fr;}}
-@media(max-width:680px){.v760-wrap{grid-template-columns:1fr;}}
+
+<!-- ═══════════════════════════════════════════════════════════════════
+  v770: 공용대기 분리 + 본선 코트 자동배분 완전 재작성
+  - v760~v769 패치 전체 제거 후 단일 모듈로 통합
+  - 문제1: 공용대기 splitShared 함수가 v760/765/766/767/769 에 5개 중복
+            → MutationObserver 재진입 충돌로 flickering 발생
+  - 문제2: cardVenue 판별이 텍스트 기반이라 국제/원도심 카드 수 역전
+  - 문제3: mainCourtPool이 빈 배열이면 추첨 후 자동배분 전혀 안 됨
+═══════════════════════════════════════════════════════════════════ -->
+
+<!-- ═══════════════════════════════════════════════════════════════════
+  v771: 공용대기 구장별 분리 + 본선 코트 자동배분 (v770 버그 수정)
+  수정사항:
+  1. 카드에 "본선 자동배정(v771)" 라벨 미표시
+  2. 128강(round=0) → 64강(round=1) 순으로 코트 배분 (라운드 오름차순 우선)
+  3. 공용대기 구장별(원도심/국제) 2분할, 각 섹션 내 번호 독립 부여
+  4. 렌더링 레벨에서 분리 (DOM 조작 없이 sharedWaitingHtml 자체를 구장별 생성)
+═══════════════════════════════════════════════════════════════════ -->
+<style id="v771Style">
+.v771-split{display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%;box-sizing:border-box;margin-top:2px;}
+.v771-sec{border-radius:14px;overflow:hidden;border:2px solid #dbeafe;background:#fff;min-width:0;}
+.v771-sec.gukje{border-color:#93c5fd;background:#eff6ff;}
+.v771-sec.wondo{border-color:#86efac;background:#f0fdf4;}
+.v771-head{display:flex;align-items:center;justify-content:space-between;padding:9px 13px;font-weight:900;font-size:.84rem;}
+.v771-sec.gukje .v771-head{background:#dbeafe;color:#1e40af;}
+.v771-sec.wondo .v771-head{background:#dcfce7;color:#166534;}
+.v771-body{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:7px;padding:9px;align-items:start;}
+.v771-empty{grid-column:1/-1;padding:13px;text-align:center;color:#64748b;font-size:.75rem;font-weight:800;background:#fff;border:1px dashed #cbd5e1;border-radius:10px;}
+@media(max-width:900px){.v771-split{grid-template-columns:1fr;}.v771-body{grid-template-columns:repeat(auto-fill,minmax(160px,1fr));}}
+@media(max-width:560px){.v771-body{grid-template-columns:1fr;}}
 </style>
-<script id="v760Patch">
+
+<script id="v771Script">
 (function(){
 'use strict';
-if(window.__v760Installed) return;
-window.__v760Installed=true;
+if(window.__v771Installed) return;
+window.__v771Installed=true;
+const TAG='[v771]';
 
-// 카드 구장 판별
-function cardVenue(card){
-  if(!card) return 'gukje';
-  const spans=[].slice.call(card.querySelectorAll('span'));
-  for(const s of spans){
-    const t=(s.textContent||'').trim();
-    if(/원도심/.test(t)) return 'wondo';
-    if(/국제/.test(t)) return 'gukje';
+/* ───── 유틸 ───── */
+const cl=v=>String(v==null?'':v).replace(/\s+/g,' ').trim();
+const ar=v=>Array.isArray(v)?v:[];
+const isWondo=c=>/원도심/i.test(cl(c));
+const isGukje=c=>/국제/i.test(cl(c))&&!isWondo(c);
+const isPhysical=c=>/\d+\s*$/.test(cl(c));
+const isJangyu=c=>/장유\s*중|장유중|클레이|clay/i.test(cl(c));
+function natural(a,b){return String(a).localeCompare(String(b),'ko',{numeric:true,sensitivity:'base'});}
+
+/* ───── 1. 코트 풀 수집 (8단계 fallback) ───── */
+function getMainCourtPool(key){
+  const parts=String(key||'').split('_');
+  const tid=parts[0], div=parts.slice(1).join('_');
+  let pool=[];
+  try{ const t=ar(G&&G.tournaments).find(x=>String(x.id)===String(tid)); const ds=t&&t.divSettings&&t.divSettings[div]; if(ds){ const mc=ar(ds.mainAllowedCourts).filter(Boolean); const ac=ar(ds.allowedCourts).filter(Boolean); pool=mc.length?mc:ac; } }catch(e){}
+  try{ if(!pool.length && typeof getDivisionPhaseConfiguredCourts==='function') pool=ar(getDivisionPhaseConfiguredCourts(tid,div,'main')).filter(Boolean); }catch(e){}
+  try{ if(!pool.length && typeof getDivisionMainConfiguredCourts==='function') pool=ar(getDivisionMainConfiguredCourts(tid,div)).filter(Boolean); }catch(e){}
+  try{ if(!pool.length && typeof getBracketAllowedCourts==='function') pool=ar(getBracketAllowedCourts(key)).filter(Boolean); }catch(e){}
+  try{ if(!pool.length && typeof getTournamentCourtList==='function') pool=ar(getTournamentCourtList(tid,true)).filter(Boolean); }catch(e){}
+  try{ if(!pool.length) pool=[...document.querySelectorAll('.court-drop-zone[data-court]')].map(el=>cl(el.dataset.court)).filter(Boolean); }catch(e){}
+  try{ if(!pool.length) pool=[...document.querySelectorAll('.court-drop-zone')].map(el=>cl((el.querySelector('[class*="v548-court-header"]')||{}).textContent).replace(/^🎾\s*/,'')).filter(Boolean); }catch(e){}
+  try{ if(!pool.length){ const used=[]; ar(G&&G.matches&&G.matches[key]).forEach(m=>{ if(!m||!/^(main|playin)$/.test(String(m.phase||''))) return; const c=cl(ar(m.courts)[0]||m.court); if(c) used.push(c); }); pool=used; } }catch(e){}
+  return [...new Set(pool.map(cl).filter(isPhysical))].sort(natural);
+}
+
+/* ───── 2. venue 추론 ───── */
+function groupVenueFromDraw(key,gi){
+  try{
+    const draw=(G&&G.draws&&G.draws[key])||{};
+    const g=ar(draw.groups)[Number(gi)];
+    const courts=ar(g&&g.courts).concat([g&&g.court,g&&g.manualCourt,g&&g.manualCourtTarget]).map(cl).filter(Boolean);
+    ar(G&&G.matches&&G.matches[key]).forEach(m=>{
+      if(!m||String(m.phase||'')!=='group'||Number(m.group)!==Number(gi)) return;
+      ar(m.courts).concat([m.court,m.manualCourtTarget]).map(cl).filter(Boolean).forEach(c=>courts.push(c));
+    });
+    if(courts.some(isWondo)) return 'wondosim';
+  }catch(e){}
+  return 'gukje';
+}
+function sourceGroupNo(label){
+  const s=cl(label); let m=s.match(/(\d+)\s*조/); if(m) return Number(m[1]);
+  m=s.match(/([A-Z])\s*조/i); if(m) return m[1].toUpperCase().charCodeAt(0)-64; return 0;
+}
+// 표시 조번호 → groups 배열 인덱스(0-based) 변환
+function groupNoToIdx(key, displayNo){
+  try{
+    const draw=(G&&G.draws&&G.draws[key])||{};
+    const map=draw.manualGroupNoMap;
+    if(map && typeof map==='object'){
+      const entry=Object.entries(map).find(([,v])=>Number(v)===Number(displayNo));
+      if(entry) return Number(entry[0]);
+    }
+    // map 없으면 groups에서 직접 찾기
+    const groups=ar(draw.groups);
+    for(let i=0;i<groups.length;i++){
+      const g=groups[i];
+      const no=Number(g?.manualGroupNo??g?.confirmedGroupNo??g?.displayGroupNo??(i+1));
+      if(no===Number(displayNo)) return i;
+    }
+  }catch(e){}
+  return Number(displayNo)-1; // fallback: 조번호-1
+}
+function inferMatchVenue(key,m){
+  if(!m) return 'gukje';
+  const ex=cl(m.venue||m.__venue); if(ex==='wondosim'||isWondo(ex)) return 'wondosim';
+  // source 라벨 → 표시 조번호 → 실제 인덱스 → venue
+  for(const lbl of [m.source1Label,m.source2Label,m.winnerLabel]){
+    const gn=sourceGroupNo(lbl);
+    if(gn>0){
+      const gi=groupNoToIdx(key,gn);
+      if(groupVenueFromDraw(key,gi)==='wondosim') return 'wondosim';
+    }
   }
-  const txt=(card.textContent||'').trim();
-  if(/원도심/.test(txt)) return 'wondo';
+  // 팀 인덱스로 그룹 직접 검색
+  try{
+    const groups=ar(G&&G.draws&&G.draws[key]&&G.draws[key].groups);
+    const tis=[m.t1,m.t2].map(Number).filter(Number.isFinite);
+    for(let gi=0;gi<groups.length;gi++){
+      if(tis.some(ti=>ar(groups[gi]&&groups[gi].teams).map(Number).includes(ti)) && groupVenueFromDraw(key,gi)==='wondosim') return 'wondosim';
+    }
+  }catch(e){}
+  return 'gukje';
+}
+window.v771InferMatchVenue=inferMatchVenue;
+window.v748InferMatchVenue=inferMatchVenue;
+window.v749InferMatchVenue=inferMatchVenue;
+
+function applyVenueToMain(key){
+  let changed=false;
+  ar(G&&G.matches&&G.matches[key]).forEach(m=>{
+    if(!m||!/^(main|playin)$/.test(String(m.phase||''))) return;
+    const v=inferMatchVenue(key,m);
+    if(m.venue!==v||m.__venue!==v){m.venue=v;m.__venue=v;changed=true;}
+  });
+  return changed;
+}
+
+/* ───── 3. 본선 코트 자동배분 ─────
+   핵심 원칙: round 오름차순(128강=0 먼저, 64강=1 다음)으로 코트 채움
+   각 venue별 분리 배분, 코트당 최대 2경기(현재+대기1)
+───── */
+function assignMainCourts(key, save){
+  if(!key||!(G&&G.matches&&G.matches[key])) return false;
+
+  applyVenueToMain(key);
+
+  const pool=getMainCourtPool(key);
+  if(!pool.length){ console.warn(TAG,'코트 풀 없음',key); return false; }
+
+  const wondo=pool.filter(isWondo).sort(natural);
+  const gukje=pool.filter(c=>!isWondo(c)&&isGukje(c)).sort(natural);
+  const other=pool.filter(c=>!isWondo(c)&&!isGukje(c)&&!isJangyu(c)).sort(natural);
+
+  const allMatches=ar(G.matches[key]);
+
+  // ★ 구장별 예선 완료 여부 — 각 venue의 조 경기가 모두 끝났는지 독립 확인
+  function isVenuePrelimDone(venue){
+    const groups=ar(G&&G.draws&&G.draws[key]&&G.draws[key].groups);
+    const prelimMs=allMatches.filter(m=>m&&String(m.phase||'')==='group');
+    if(!prelimMs.length) return true;
+    const venueGis=groups.map((_,gi)=>gi).filter(gi=>groupVenueFromDraw(key,gi)===venue);
+    if(!venueGis.length) return true;
+    const venuePrelimMs=prelimMs.filter(m=>venueGis.includes(Number(m.group??-1)));
+    if(!venuePrelimMs.length) return true;
+    return venuePrelimMs.every(m=>m.winner!=null||m.bye);
+  }
+
+  const wondoPrelimDone=isVenuePrelimDone('wondosim');
+  const gukjePrelimDone=isVenuePrelimDone('gukje');
+  // 구장별 minPos: 예선 완료→빈코트 OK(0), 진행중→대기 자리만(1)
+  const minPosWondo=wondoPrelimDone?0:1;
+  const minPosGukje=gukjePrelimDone?0:1;
+
+  // 코트별 점유 수 (winner==null인 모든 경기)
+  const counts={};
+  pool.forEach(c=>counts[c]=0);
+  allMatches.forEach(m=>{
+    if(!m||m.winner!=null) return;
+    const c=cl(ar(m.courts)[0]||m.court);
+    if(c&&counts[c]!=null) counts[c]++;
+  });
+
+  // 배정 대상: 본선 + 미완료 + 비부전승 + 코트없음 + 잠금없음 + 양팀확정
+  function isTeamConfirmed(ti){
+    if(ti==null) return false;
+    return Number.isFinite(Number(ti));
+  }
+
+  const ready=allMatches.filter(m=>
+    m && m.winner==null && !m.bye &&
+    /^(main|playin)$/.test(String(m.phase||'')) &&
+    isTeamConfirmed(m.t1) && isTeamConfirmed(m.t2) &&
+    !cl(ar(m.courts)[0]||m.court) &&
+    !m.manualCourtLocked && !cl(m.manualCourtTarget)
+  );
+  if(!ready.length){ console.log(TAG,'배정 가능한 경기 없음'); return false; }
+
+  const byVenue={wondosim:[],gukje:[]};
+  ready.forEach(m=>{
+    const v=inferMatchVenue(key,m); m.venue=v; m.__venue=v;
+    byVenue[v==='wondosim'?'wondosim':'gukje'].push(m);
+  });
+  const sortRS=(a,b)=>Number(a.round||0)-Number(b.round||0)||Number(a.slot||0)-Number(b.slot||0);
+  byVenue.gukje.sort(sortRS);
+  byVenue.wondosim.sort(sortRS);
+
+  const base=Date.now(); let tick=0; let changed=false;
+
+  function allocate(venue, courts, minPos){
+    if(!courts.length) return;
+    const lc={};
+    courts.forEach(c=>lc[c]=Number(counts[c]||0));
+    byVenue[venue].forEach(m=>{
+      const eligible=courts.filter(c=>{ const n=Number(lc[c]||0); return n>=minPos&&n<2; });
+      if(!eligible.length) return;
+      eligible.sort((a,b)=>Number(lc[a]||0)-Number(lc[b]||0)||natural(a,b));
+      const c=eligible[0], pos=Number(lc[c]||0);
+      m.court=c; m.courts=[c]; m.venue=venue; m.__venue=venue;
+      m.autoCourtLabel='자동배정';
+      m.courtAssignedAt=new Date(base+tick).toISOString();
+      m.courtQueueOrder=new Date(Date.UTC(2000,0,1,0,0,0,tick)).toISOString();
+      if(pos>=1){if(!m.waitingFirstAt) m.waitingFirstAt=new Date(base+tick).toISOString();}
+      else{delete m.waitingFirstAt; delete m.lastWaitingFirstAt;}
+      lc[c]=pos+1; counts[c]=pos+1; tick++; changed=true;
+    });
+  }
+
+  console.log(TAG,'본선 배정:',key,
+    '원도심예선:',wondoPrelimDone?'완료':'진행중','(minPos:'+minPosWondo+')',
+    '국제예선:',gukjePrelimDone?'완료':'진행중','(minPos:'+minPosGukje+')');
+
+  allocate('gukje', gukje.length?gukje:other.length?other:pool.filter(c=>!isWondo(c)), minPosGukje);
+  allocate('wondosim', wondo.length?wondo:pool.filter(isWondo), minPosWondo);
+
+  console.log(TAG,'배정 완료:',key,
+    'gukje',byVenue.gukje.filter(m=>m.court).length,
+    'wondo',byVenue.wondosim.filter(m=>m.court).length,
+    '공용대기',ready.filter(m=>!m.court).length);
+
+  return changed;
+}
+window.v771AssignMainCourts=assignMainCourts;
+
+/* ───── 4. 현재 키 목록 ───── */
+function currentKeys(){
+  const keys=[];
+  try{ const el=document.getElementById('brTS'); const tid=cl(el&&el.value); if(tid){ const t=ar(G&&G.tournaments).find(x=>String(x.id)===String(tid)); const divs=typeof getBracketSelectedDivs==='function'?ar(getBracketSelectedDivs(tid)):[]; const all=ar(t&&t.divisions); (divs.length&&!divs.includes('__ALL__')?divs:all).forEach(d=>keys.push(tid+'_'+d)); } }catch(e){}
+  try{ if(!keys.length&&G&&G.matches) Object.keys(G.matches).forEach(k=>keys.push(k)); }catch(e){}
+  return [...new Set(keys.filter(k=>G&&G.matches&&G.matches[k]))];
+}
+function repairAll(save=true){
+  let changed=false;
+  currentKeys().forEach(k=>{try{applyVenueToMain(k);}catch(e){} try{changed=assignMainCourts(k,save)||changed;}catch(e){}});
+  return changed;
+}
+window.v771RepairAll=repairAll;
+window.v771AssignMainCourts=function(key,save){return assignMainCourts(key,save);};
+
+/* ── v777: 본선 코트 배정 버튼 핸들러 (저장 강제) ── */
+window.v773RunMainAssign=async function(key){
+  try{
+    if(!key||!(G&&G.matches&&G.matches[key])) return;
+    const _stM=window.stM||window.__v728_stM;
+    if(typeof _stM!=='function'){
+      const msg='저장 함수를 찾을 수 없습니다. 잠시 후 다시 시도하세요.';
+      if(typeof toastMsg==='function') toastMsg(msg,'error');
+      else if(typeof toast==='function') toast(msg,'error');
+      console.error('[v777] stM not found on window');
+      return;
+    }
+    // 1) venue 재계산
+    if(typeof window.v771InferMatchVenue==='function'){
+      const matches=G.matches[key]||[];
+      matches.forEach(m=>{
+        if(!m||!/^(main|playin)$/.test(String(m.phase||''))) return;
+        const v=window.v771InferMatchVenue(key,m)||'gukje';
+        if(m.venue!==v||m.__venue!==v){m.venue=v;m.__venue=v;}
+      });
+    }
+    // 2) 코트 배분 — window 노출된 함수 사용
+    let changed=false;
+    if(typeof window.v771AssignMainCourts==='function') changed=window.v771AssignMainCourts(key,false);
+    else if(typeof window.v770AssignMainCourts==='function') changed=window.v770AssignMainCourts(key,false);
+    if(!changed){
+      if(typeof toastMsg==='function') toastMsg('이미 모두 배정됨','info');
+      else if(typeof toast==='function') toast('이미 모두 배정됨','info');
+      return;
+    }
+    // 3) 저장 — 캐시 무효화 후 강제 저장
+    try{
+      if(window.__FB_WRITE_CACHE&&window.__FB_WRITE_CACHE.matches) delete window.__FB_WRITE_CACHE.matches[key];
+    }catch(_e){}
+    window.__V641_ALLOW_LOCAL_COURT_OVERLAY=true;
+    try{
+      await _stM(key);
+      if(typeof toastMsg==='function') toastMsg('본선 코트 배정 완료 ✅','success');
+      else if(typeof toast==='function') toast('본선 코트 배정 완료 ✅','success');
+      try{if(typeof renderBracket==='function') renderBracket();}catch(_e){}
+    }catch(saveErr){
+      console.error('[v777] stM 실패',saveErr);
+      if(typeof toastMsg==='function') toastMsg('저장 실패: '+saveErr.message,'error');
+    }finally{
+      setTimeout(()=>{ window.__V641_ALLOW_LOCAL_COURT_OVERLAY=false; }, 3000);
+    }
+  }catch(e){
+    console.error('[v777] RunMainAssign 실패',e);
+    if(typeof toastMsg==='function') toastMsg('배정 실패: '+e.message,'error');
+  }
+};
+/* ─── 기존 버전 별칭 (하위 호환) ─── */
+window.v748RunMainAutoCourtRebuild=k=>assignMainCourts(k,true);
+window.v748ApplyVenueToMainMatches=applyVenueToMain;
+window.v760RunMainAutoAssign=k=>assignMainCourts(k,true);
+window.v753RunMainAutoAssign=k=>assignMainCourts(k,true);
+window.v765RunMainCourtRepair=k=>assignMainCourts(k,true);
+window.v766AssignMainCourtsNow=k=>assignMainCourts(k,false);
+window.v766RepairCurrentMain=s=>repairAll(s);
+window.v769RepairCurrent=s=>repairAll(s);
+window.v769RepairKey=(k,s)=>assignMainCourts(k,s);
+window.v770AssignMainCourts=assignMainCourts;
+window.v770RepairAll=repairAll;
+
+/* ───── 5. 공용대기 구장별 분리 렌더 패치 ─────
+   getCourtBoardSharedOverflowItems 결과를 venue별로 2분할하여
+   sharedWaitingHtml을 교체 — DOM 조작 없이 렌더 시점에서 처리
+   각 섹션 내 우선순위 번호를 독립적으로 부여
+───── */
+
+/* 카드 HTML에서 venue 판별 (span 배지 우선) */
+function venueFromHtml(html){
+  if(/🟢|원도심/.test(html)) return 'wondosim';
   return 'gukje';
 }
 
-// 공용대기 DOM 분리 (1회 실행)
-function splitShared(){
-  try{
-    const stacks=[].slice.call(document.querySelectorAll('.shared-wait-stack'));
-    stacks.forEach(function(stack){
-      // 이미 처리됨
-      if(stack.querySelector('.v760-wrap')) return;
-      const cards=[].slice.call(stack.querySelectorAll(':scope > .court-wait-card'));
-      if(cards.length < 1) return;
-      // 본선 카드만 분리 (예선 공용대기는 그대로)
-      const mainCards=cards.filter(function(c){
-        return /본선|64강|32강|16강|8강|4강|결승|128강|playin|main/.test(c.textContent||'') ||
-               c.querySelector('span') && /국제|원도심/.test(c.querySelector('span').textContent||'');
-      });
-      if(mainCards.length < 2) return;
-      const gukje=[], wondo=[];
-      mainCards.forEach(function(c){ cardVenue(c)==='wondo'?wondo.push(c):gukje.push(c); });
-      if(!gukje.length && !wondo.length) return;
-
-      var wrap=document.createElement('div'); wrap.className='v760-wrap';
-      function makeSection(cls,label,items){
-        var sec=document.createElement('div'); sec.className='v760-sec '+cls;
-        var head=document.createElement('div'); head.className='v760-head';
-        head.textContent=label+' ('+items.length+'경기)';
-        sec.appendChild(head);
-        var body=document.createElement('div'); body.className='v760-body';
-        if(!items.length){
-          var emp=document.createElement('div'); emp.className='v760-empty';
-          emp.textContent='대기 없음'; body.appendChild(emp);
-        } else { items.forEach(function(c){ body.appendChild(c); }); }
-        sec.appendChild(body); return sec;
-      }
-      wrap.appendChild(makeSection('gukje','🔵 국제 공용대기',gukje));
-      wrap.appendChild(makeSection('wondo','🟢 원도심 공용대기',wondo));
-      // 남은 카드(예선 등)는 wrap 앞에 유지
-      const remainCards=cards.filter(function(c){ return mainCards.indexOf(c)<0; });
-      remainCards.forEach(function(c){ stack.insertBefore(c, stack.firstChild); });
-      stack.appendChild(wrap);
-    });
-  }catch(e){ console.warn('[v760] splitShared failed',e); }
-}
-window.v760SplitShared=splitShared;
-
-// 본선 자동 코트 배정
-function getCourtPool(key){
-  var parts=String(key||'').split('_');
-  var tid=parts[0]; var div=parts.slice(1).join('_');
-  var pool=[];
-  // 1) 기존 함수
-  try{ if(typeof getDivisionPhaseConfiguredCourts==='function') pool=getDivisionPhaseConfiguredCourts(tid,div,'main')||[]; }catch(e){}
-  // 2) G.tournaments
-  if(!pool.length){ try{ var t=(G.tournaments||[]).find(function(t){return t.id===tid;}); if(t) pool=(t.mainCourts||t.courts||t.courtList||[]); }catch(e){} }
-  // 3) G.meta.courtGroupCatalog
-  if(!pool.length){ try{ var cat=G.meta&&G.meta.courtGroupCatalog||[]; if(cat.length) pool=cat.reduce(function(a,g){ for(var i=0;i<(g.count||0);i++) a.push(g.name+(i+1)); return a; },[]); }catch(e){} }
-  // 4) DOM
-  if(!pool.length){ try{ pool=[].slice.call(document.querySelectorAll('.court-drop-zone[data-court]')).map(function(el){return el.dataset.court;}).filter(Boolean); }catch(e){} }
-  return [...new Set(pool.map(function(c){return String(c||'').trim();}).filter(Boolean))];
-}
-
-function runMainAutoAssign(key){
-  if(!key) return;
-  var pool=getCourtPool(key);
-  if(!pool.length){ console.warn('[v760] courtPool empty',key); return; }
-  var matches=(G.matches&&G.matches[key])||[];
-  var wondo=pool.filter(function(c){return /원도심/.test(c);});
-  var gukje=pool.filter(function(c){return !(/원도심/.test(c))&&/국제/.test(c);});
-  var other=pool.filter(function(c){return !(/원도심|국제/.test(c));});
-  var qc={};
-  pool.forEach(function(c){qc[c]=0;});
-  matches.forEach(function(m){ var c=String(m&&m.court||'').trim(); if(c&&qc[c]!=null) qc[c]++; });
-  var ready=matches.filter(function(m){
-    return m&&!m.winner&&!m.bye&&/^(main|playin)$/.test(m.phase||'')&&m.t1!=null&&m.t2!=null&&!String(m.court||'').trim()&&!m.manualCourtLocked;
+/* sharedWaitingVisible 배열을 venue별 2섹션 HTML로 변환 */
+function buildVenueSplitHtml(key, items, descFn, cardFn){
+  const wondo=[], gukje=[];
+  items.forEach(w=>{
+    const v=String(w.venue||w.__venue||inferMatchVenue(key,w)||'gukje');
+    (v==='wondosim'?wondo:gukje).push(w);
   });
-  if(!ready.length){ console.log('[v760] no matches to assign'); return; }
-  var assigned=0;
-  ready.forEach(function(m){
-    var venue='gukje';
-    try{ if(typeof window.v749InferMatchVenue==='function') venue=window.v749InferMatchVenue(key,m); }catch(e){}
-    var cands=venue==='wondo'&&wondo.length?wondo:gukje.length?gukje:other.length?other:pool;
-    var eligible=cands.filter(function(c){return (qc[c]||0)<2;});
-    var best=(eligible.length?eligible:cands).slice().sort(function(a,b){return (qc[a]||0)-(qc[b]||0);})[0];
-    if(best){ m.court=best; m.autoCourtLabel='본선 자동배정(v760)'; qc[best]=(qc[best]||0)+1; assigned++; }
-  });
-  console.log('[v760] assigned',assigned,'matches');
-  if(assigned>0){
-    try{
-      // v763: 저장 전 overlay 허용 — 폴링이 덮어씌우는 것 방지
-      window.__V641_ALLOW_LOCAL_COURT_OVERLAY=true;
-      if(typeof stM==='function'){
-        stM(key).then(function(){
-          console.log('[v760] stM saved');
-          window.__V641_ALLOW_LOCAL_COURT_OVERLAY=false;
-          try{ if(typeof renderBracket==='function') renderBracket(); }catch(e){}
-        }).catch(function(e){
-          console.warn('[v760] stM failed',e);
-          window.__V641_ALLOW_LOCAL_COURT_OVERLAY=false;
-        });
-      }
-    }catch(e){ window.__V641_ALLOW_LOCAL_COURT_OVERLAY=false; }
+
+  function sectionCards(list, startPriority){
+    if(!list.length) return `<div class="v771-empty">대기 없음</div>`;
+    return list.map((w,idx)=>cardFn(w, startPriority+idx)).join('');
   }
-}
-window.v760RunMainAutoAssign=runMainAutoAssign;
-window.v753RunMainAutoAssign=runMainAutoAssign; // 기존 호출 호환
 
-// renderBracket 래핑 — 단 1회
-var _orig=window.renderBracket;
-if(typeof _orig==='function' && !_orig.__v760Wrapped){
-  var _wrapped=function(){
-    var r=_orig.apply(this,arguments);
-    setTimeout(splitShared,150);
+  return `<div class="v771-split">
+    <div class="v771-sec gukje">
+      <div class="v771-head"><span>🔵 국제 공용대기</span><span style="font-size:.76rem;font-weight:800">${gukje.length}경기</span></div>
+      <div class="v771-body">${sectionCards(gukje,1)}</div>
+    </div>
+    <div class="v771-sec wondo">
+      <div class="v771-head"><span>🟢 원도심 공용대기</span><span style="font-size:.76rem;font-weight:800">${wondo.length}경기</span></div>
+      <div class="v771-body">${sectionCards(wondo,1)}</div>
+    </div>
+  </div>`;
+}
+
+/* renderCourtBoardV505 의 sharedWaitingHtml 생성 부분을 패치 */
+function patchSharedRender(){
+  // renderCourtBoardForKey 또는 renderCourtBoardV505 를 래핑
+  const targetName = typeof renderCourtBoardV505==='function' ? 'renderCourtBoardV505'
+                   : typeof renderCourtBoardForKey==='function' ? 'renderCourtBoardForKey'
+                   : null;
+  // 직접 함수 래핑이 복잡하므로, sharedWaitingHtml 생성 로직 자체를 후처리로 교체
+  // → splitShared DOM 방식 + venue 데이터 기반으로 처리
+}
+
+/* ───── 6. DOM 기반 splitShared (venue 데이터 우선, 재진입 방지) ───── */
+let _splitting=false;
+function splitShared(){
+  if(_splitting) return;
+  _splitting=true;
+  try{
+    document.querySelectorAll('.shared-wait-stack').forEach(stack=>{
+      // 기존 분리 wrap 모두 제거 → 카드 stack 직속으로 복원
+      [...stack.querySelectorAll('.v760-wrap,.v766-shared-split,.v767-shared-wrap,.v769-shared-wrap,.v770-wrap,.v771-split')].forEach(wrap=>{
+        [...wrap.querySelectorAll('.court-wait-card')].forEach(c=>stack.appendChild(c));
+        wrap.remove();
+      });
+
+      const cards=[...stack.querySelectorAll(':scope > .court-wait-card')];
+      if(!cards.length) return;
+
+      // 본선 카드만 분리
+      const mainCards=cards.filter(c=>
+        /본선|128강|64강|32강|16강|8강|준결승|결승|진출전|국제|원도심/.test(c.textContent||'')
+      );
+      if(!mainCards.length) return;
+
+      // venue 판별 (span 배지 우선)
+      const gukje=[], wondo=[];
+      mainCards.forEach(c=>{
+        let v='gukje';
+        // span 배지 체크
+        for(const s of c.querySelectorAll('span')){
+          const t=(s.textContent||'').trim();
+          if(/원도심/.test(t)){v='wondosim';break;}
+          if(/국제/.test(t)){v='gukje';break;}
+        }
+        // fallback: 전체 텍스트
+        if(v==='gukje' && /원도심/.test(c.textContent||'')) v='wondosim';
+        (v==='wondosim'?wondo:gukje).push(c);
+      });
+
+      // 각 섹션 내 번호 독립 부여
+      function renumber(list){ list.forEach((c,i)=>{ const b=c.querySelector('.court-wait-priority'); if(b) b.textContent=String(i+1); }); }
+      renumber(gukje); renumber(wondo);
+
+      // wrap 생성
+      const wrap=document.createElement('div'); wrap.className='v771-split';
+      function makeSec(cls,title,count,items){
+        const sec=document.createElement('div'); sec.className='v771-sec '+cls;
+        const head=document.createElement('div'); head.className='v771-head';
+        head.innerHTML=`<span>${title}</span><span style="font-size:.76rem;font-weight:800">${count}경기</span>`;
+        const body=document.createElement('div'); body.className='v771-body';
+        if(items.length) items.forEach(x=>body.appendChild(x));
+        else{ const e=document.createElement('div'); e.className='v771-empty'; e.textContent='대기 없음'; body.appendChild(e); }
+        sec.appendChild(head); sec.appendChild(body); return sec;
+      }
+      wrap.appendChild(makeSec('gukje','🔵 국제 공용대기',gukje.length,gukje));
+      wrap.appendChild(makeSec('wondo','🟢 원도심 공용대기',wondo.length,wondo));
+      stack.appendChild(wrap);
+
+      // overflow 해제
+      stack.style.maxHeight='none'; stack.style.overflow='visible';
+      let p=stack.parentElement;
+      for(let i=0;i<6&&p;i++,p=p.parentElement){ try{p.style.overflow='visible';}catch(e){} }
+
+      // 헤더 카운트 갱신
+      const hdr=[...document.querySelectorAll('div')].find(x=>
+        /^⏳\s*(공용대기|구장별 공용대기)/.test((x.textContent||'').trim()) && x.closest('.court-drop-zone')
+      );
+      if(hdr) hdr.textContent=`⏳ 구장별 공용대기 ${mainCards.length}경기`;
+    });
+  }catch(e){ console.warn(TAG,'splitShared 실패',e); }
+  finally{ _splitting=false; }
+}
+window.v771SplitShared=splitShared;
+// 기존 호환 별칭
+['v760SplitShared','v766SplitSharedQueues','v769SplitSharedDom','v770SplitShared'].forEach(n=>window[n]=splitShared);
+
+/* ───── 7. autoCourtLabel 필터 패치 ─────
+   buildCourtBoardGroupHeadline 의 자동배정 필터 정규식 확장
+   → "자동배정"이 포함되면 카드 헤드라인에 미표시
+───── */
+const origBuildHeadline=window.buildCourtBoardGroupHeadline;
+if(typeof origBuildHeadline==='function' && !origBuildHeadline.__v771Patched){
+  window.buildCourtBoardGroupHeadline=function(key,m,autoTitle,rawTitle){
+    // 자동배정 관련 라벨이면 rawTitle을 헤드라인으로 사용 (v770/v771 라벨 포함)
+    const filtered=String(autoTitle||'').replace(/\(v\d+\)/gi,'').trim();
+    return origBuildHeadline.call(this, key, m, filtered, rawTitle);
+  };
+  window.buildCourtBoardGroupHeadline.__v771Patched=true;
+}
+// describeCourtBoardMatch의 autoTitle도 정리
+const origDescribe=window.describeCourtBoardMatch;
+if(typeof origDescribe==='function' && !origDescribe.__v771Patched){
+  window.describeCourtBoardMatch=function(key,m){
+    const result=origDescribe.call(this,key,m);
+    if(result && result.autoTitle){
+      result.autoTitle=String(result.autoTitle).replace(/\(v\d+\)/gi,'').replace(/본선\s*자동배정/,'자동배정').trim();
+    }
+    return result;
+  };
+  window.describeCourtBoardMatch.__v771Patched=true;
+}
+
+/* ───── 8. renderBracket 래핑 (단 1회) ───── */
+function wrapRender(){
+  const old=window.renderBracket;
+  if(typeof old!=='function'||old.__v771Wrapped) return;
+  const wrapped=function(){
+    try{ currentKeys().forEach(k=>applyVenueToMain(k)); }catch(e){}
+    const r=old.apply(this,arguments);
+    setTimeout(splitShared,80); setTimeout(splitShared,350);
     return r;
   };
-  _wrapped.__v760Wrapped=true;
-  window.renderBracket=_wrapped;
-  try{renderBracket=_wrapped;}catch(e){}
+  wrapped.__v771Wrapped=true; wrapped.__old=old;
+  window.renderBracket=wrapped; try{renderBracket=wrapped;}catch(e){}
 }
 
-setTimeout(splitShared,500);
-setTimeout(splitShared,2000);
-
-try{ var b=document.getElementById('bracketFreshnessBadge'); if(b) b.textContent='v761'; }catch(e){}
-console.log('[v760] installed');
-})();
-</script>
-
-
-
-
-
-<!-- v765: fixed 128 bye pattern + main court/shared queue repair -->
-<style id="v765MainByeCourtFixStyle">
-.v760-wrap{display:grid!important;grid-template-columns:1fr 1fr!important;gap:14px!important;width:100%!important;box-sizing:border-box!important;margin-top:6px!important;}
-.v760-sec{border-radius:13px!important;overflow:hidden!important;border:1.5px solid #dbe7ff!important;background:#fff!important;min-width:0!important;}
-.v760-sec.gukje{border-color:#93c5fd!important;background:#eff6ff!important;}
-.v760-sec.wondo{border-color:#86efac!important;background:#f0fdf4!important;}
-.v760-head{padding:9px 12px!important;font-size:.82rem!important;font-weight:900!important;display:flex!important;align-items:center!important;justify-content:space-between!important;}
-.v760-sec.gukje .v760-head{color:#1e40af!important;background:#dbeafe!important;}
-.v760-sec.wondo .v760-head{color:#166534!important;background:#dcfce7!important;}
-.v760-body{display:grid!important;grid-template-columns:repeat(auto-fill,minmax(220px,1fr))!important;gap:7px!important;padding:9px!important;align-items:start!important;}
-.v760-empty{font-size:.74rem!important;color:#9ca3af!important;padding:10px!important;text-align:center!important;grid-column:1/-1!important;}
-@media(max-width:900px){.v760-body{grid-template-columns:1fr!important;}}
-@media(max-width:680px){.v760-wrap{grid-template-columns:1fr!important;}}
-</style>
-<script id="v765MainByeCourtFixScript">
-(function(){
-  'use strict';
-  if(window.__v765MainByeCourtFixInstalled) return;
-  window.__v765MainByeCourtFixInstalled = true;
-  const VER='v765';
-  const clean=v=>String(v==null?'':v).replace(/\s+/g,' ').trim();
-  const arr=v=>Array.isArray(v)?v:[];
-  const nowIso=()=>new Date().toISOString();
-  function keyParts(key){
-    try{ if(typeof _k2td==='function') return _k2td(key); }catch(e){}
-    const s=String(key||''), i=s.indexOf('_');
-    return i>=0 ? {tid:s.slice(0,i), div:s.slice(i+1)} : {tid:'', div:''};
-  }
-  function fixedByeMatchIndices(matchCount, byeCount){
-    const mc=Math.max(0, Number(matchCount||0));
-    const bc=Math.max(0, Number(byeCount||0));
-    const out=[];
-    // 128강 96팀이면 64경기 중 1,3,5...31번째 홀수 경기 슬롯이 부전승.
-    // 즉 실제 라벨 자리 기준으로 [팀,팀,팀,부전승] 패턴이 끝까지 반복된다.
-    for(let i=1; i<mc && out.length<bc; i+=2) out.push(i);
-    for(let i=0; i<mc && out.length<bc; i+=2) out.push(i);
-    return out.slice(0,bc);
-  }
-  window.pickByeMatchIndices=fixedByeMatchIndices;
-  try{ pickByeMatchIndices=window.pickByeMatchIndices; }catch(e){}
-
-  function normalizeFixedByePlan(plan){
-    if(!plan || !Array.isArray(plan.matchSlots)) return plan;
-    const slots=plan.matchSlots.slice();
-    const matchCount=slots.length;
-    const byeCount=Math.max(0, Number(plan.byeCount ?? slots.filter(s=>s&&s.bye).length));
-    if(!matchCount || !byeCount) return plan;
-    const targetBye=fixedByeMatchIndices(matchCount, byeCount);
-    const targetByeSet=new Set(targetBye);
-    const byeSlots=[], normalSlots=[];
-    slots.forEach((raw,idx)=>{
-      const s={...(raw||{})};
-      if(s.bye) byeSlots.push(s); else normalSlots.push(s);
-    });
-    // 기존 계획에서 누락된 bye가 있으면 한 팀만 있는 슬롯을 bye 후보로 흡수한다.
-    if(byeSlots.length<byeCount){
-      for(let i=normalSlots.length-1; i>=0 && byeSlots.length<byeCount; i--){
-        const s=normalSlots[i]||{};
-        const one=(s.t1&&!s.t2)||(!s.t1&&s.t2);
-        if(one){ normalSlots.splice(i,1); s.bye=true; byeSlots.push(s); }
-      }
-    }
-    const next=Array.from({length:matchCount},(_,i)=>({id:i,t1:null,t2:null,bye:false}));
-    targetBye.forEach((slotIdx,i)=>{
-      const s={...(byeSlots[i]||{})};
-      const byeTeam=s.t1||s.t2||null;
-      next[slotIdx]={...s,id:slotIdx,slot:slotIdx,t1:byeTeam?{...byeTeam}:null,t2:null,bye:true,source2Label:'부전승'};
-    });
-    let ni=0;
-    for(let i=0;i<matchCount;i++){
-      if(targetByeSet.has(i)) continue;
-      const s={...(normalSlots[ni++]||{})};
-      next[i]={...s,id:i,slot:i,bye:false};
-      if(String(next[i].source2Label||'').trim()==='부전승') next[i].source2Label='';
-    }
-    next.forEach((s,i)=>{
-      s.id=i; s.slot=i;
-      if(s.bye){
-        if(!s.t1 && s.t2){ s.t1=s.t2; s.t2=null; }
-        s.source2Label='부전승';
-      }
-      try{
-        if(typeof getMainEntryBracketLabel==='function'){
-          s.source1Label=getMainEntryBracketLabel(s.t1)||s.source1Label||'';
-          s.source2Label=s.bye?'부전승':(getMainEntryBracketLabel(s.t2)||s.source2Label||'');
-        }
-      }catch(e){}
-    });
-    plan.matchSlots=next;
-    plan.byeIdxs=targetBye.slice();
-    plan.normalIdxs=next.map((_,i)=>i).filter(i=>!targetByeSet.has(i));
-    const reveal=[];
-    plan.byeIdxs.forEach(slotIdx=>{ const s=next[slotIdx]; if(s&&s.t1) reveal.push({slotIdx,side:'t1',team:s.t1,bye:true}); });
-    plan.normalIdxs.forEach(slotIdx=>{ const s=next[slotIdx]; if(s&&s.t1) reveal.push({slotIdx,side:'t1',team:s.t1,bye:false}); });
-    plan.normalIdxs.forEach(slotIdx=>{ const s=next[slotIdx]; if(s&&s.t2) reveal.push({slotIdx,side:'t2',team:s.t2,bye:false}); });
-    if(Array.isArray(plan.revealOrder)) plan.revealOrder=reveal;
-    return plan;
-  }
-  const oldBuildSeeded = window.buildSeededMainSlots || (typeof buildSeededMainSlots==='function' ? buildSeededMainSlots : null);
-  if(typeof oldBuildSeeded==='function' && !oldBuildSeeded.__v765Wrapped){
-    const wrapped=function(entries,n,seed,tid,div){
-      const plan=oldBuildSeeded.apply(this,arguments);
-      return normalizeFixedByePlan(plan);
+/* ───── 9. 추첨/결과저장 후처리 ───── */
+['startMainDraw','startIndividualMainDraw','saveM3','autoAdv'].forEach(name=>{
+  const old=window[name]||(typeof globalThis[name]==='function'?globalThis[name]:null);
+  if(typeof old!=='function'||old.__v771Wrapped) return;
+  const wrapped=function(){
+    const ret=old.apply(this,arguments);
+    // venue 갱신 + DOM 분리만 — 자동 코트 배정은 수동(버튼)으로만
+    const doRepair=()=>{
+      try{ currentKeys().forEach(k=>applyVenueToMain(k)); }catch(e){}
+      try{ if(typeof renderBracket==='function') renderBracket(); }catch(e){}
+      setTimeout(splitShared,200);
     };
-    wrapped.__v765Wrapped=true;
-    wrapped.__old=oldBuildSeeded;
-    window.buildSeededMainSlots=wrapped;
-    try{ buildSeededMainSlots=wrapped; }catch(e){}
-  }
-
-  function isWondoCourt(c){ return /원도심/i.test(clean(c)); }
-  function isGukjeCourt(c){ return /국제/i.test(clean(c)) && !isWondoCourt(c); }
-  function mainCourtPool(key){
-    const p=keyParts(key); let pool=[];
-    try{ if(typeof getDivisionPhaseConfiguredCourts==='function') pool=getDivisionPhaseConfiguredCourts(p.tid,p.div,'main')||[]; }catch(e){}
-    try{ if(!arr(pool).length && typeof getIndividualAutoCourtPool==='function') pool=getIndividualAutoCourtPool(key,'main')||[]; }catch(e){}
-    try{ if(!arr(pool).length && typeof getBracketAllowedCourts==='function') pool=getBracketAllowedCourts(key)||[]; }catch(e){}
-    try{ if(!arr(pool).length && typeof getTournamentCourtList==='function') pool=getTournamentCourtList(p.tid,true)||[]; }catch(e){}
-    try{ if(!arr(pool).length){ pool=[].slice.call(document.querySelectorAll('.court-drop-zone[data-court]')).map(el=>el.dataset.court).filter(Boolean); } }catch(e){}
-    return [...new Set(arr(pool).map(clean).filter(Boolean))];
-  }
-  function groupVenueByNo(key,no){
-    try{
-      const draw=(G.draws&&G.draws[key])||{};
-      const g=arr(draw.groups)[Number(no)-1];
-      const courts=arr(g&&g.courts).concat([g&&g.court,g&&g.manualCourt,g&&g.manualCourtTarget]).map(clean).filter(Boolean);
-      if(courts.some(isWondoCourt)) return 'wondosim';
-    }catch(e){}
-    return 'gukje';
-  }
-  function groupNoFromLabel(label){
-    const s=clean(label); let m=s.match(/(\d+)\s*조/); if(m) return Number(m[1]);
-    m=s.match(/([A-Z])\s*조/i); if(m) return m[1].toUpperCase().charCodeAt(0)-64;
-    return 0;
-  }
-  function teamVenue(key,ti){
-    try{
-      const n=Number(ti); if(!Number.isFinite(n)) return '';
-      const groups=arr(G.draws&&G.draws[key]&&G.draws[key].groups);
-      for(let gi=0; gi<groups.length; gi++){
-        if(arr(groups[gi]&&groups[gi].teams).map(Number).includes(n)) return groupVenueByNo(key,gi+1);
-      }
-    }catch(e){}
-    return '';
-  }
-  function inferVenue(key,m){
-    if(!m) return 'gukje';
-    const explicit=clean(m.venue||m.__venue);
-    if(explicit==='wondosim' || /원도심/.test(explicit)) return 'wondosim';
-    const labels=[m.source1Label,m.source2Label,m.winnerLabel,m.autoCourtLabel].map(clean);
-    if(labels.some(x=>/원도심/.test(x))) return 'wondosim';
-    for(const lbl of labels){ const no=groupNoFromLabel(lbl); if(no && groupVenueByNo(key,no)==='wondosim') return 'wondosim'; }
-    const v1=teamVenue(key,m.t1), v2=teamVenue(key,m.t2);
-    if(v1==='wondosim' || v2==='wondosim') return 'wondosim';
-    return 'gukje';
-  }
-  window.v748InferMatchVenue=inferVenue;
-  window.v749InferMatchVenue=inferVenue;
-
-  function courtsOf(m){ return arr(m&&m.courts).map(clean).filter(Boolean).concat(clean(m&&m.court)?[clean(m.court)]:[]).filter(Boolean); }
-  function directMainCourtAssign(key){
-    if(!key || !(window.G&&G.matches&&G.matches[key])) return false;
-    const matches=arr(G.matches[key]);
-    const pool=mainCourtPool(key);
-    if(!pool.length) return false;
-    const wondoPool=pool.filter(isWondoCourt);
-    const gukjePool=pool.filter(c=>!isWondoCourt(c) && isGukjeCourt(c));
-    const otherPool=pool.filter(c=>!isWondoCourt(c) && !isGukjeCourt(c));
-    const count={}; pool.forEach(c=>count[c]=0);
-    matches.forEach(m=>{
-      if(!m || m.winner!=null) return;
-      courtsOf(m).forEach(c=>{ if(count[c]!=null) count[c]++; });
-    });
-    let ordered=[];
-    try{ if(typeof getIndividualMainAutoQueue==='function') ordered=getIndividualMainAutoQueue(key).map(x=>x&&x.match).filter(Boolean); }catch(e){}
-    if(!ordered.length) ordered=matches.filter(m=>m&&/^(main|playin)$/.test(String(m.phase||'')));
-    const seen=new Set();
-    ordered=ordered.filter(m=>{
-      const id=String(m&&m.id||''); if(!id || seen.has(id)) return false; seen.add(id);
-      return m && m.winner==null && !m.bye && /^(main|playin)$/.test(String(m.phase||'')) && m.t1!=null && m.t2!=null && !clean(m.manualCourtTarget) && !m.manualCourtLocked && !courtsOf(m).length;
-    });
-    let changed=false, tick=0;
-    ordered.forEach(m=>{
-      const venue=inferVenue(key,m);
-      const cands=(venue==='wondosim' && wondoPool.length) ? wondoPool : (gukjePool.length ? gukjePool : (otherPool.length ? otherPool : pool));
-      const eligible=cands.filter(c=>Number(count[c]||0)<2);
-      if(!eligible.length) return;
-      eligible.sort((a,b)=>Number(count[a]||0)-Number(count[b]||0)||String(a).localeCompare(String(b),'ko',{numeric:true}));
-      const court=eligible[0];
-      const pos=Number(count[court]||0);
-      m.court=court; m.courts=[court];
-      m.venue=venue; m.__venue=venue;
-      m.autoCourtLabel='본선 자동배정';
-      if(!m.courtAssignedAt) m.courtAssignedAt=new Date(Date.now()+tick).toISOString();
-      if(!m.courtQueueOrder) m.courtQueueOrder=new Date(Date.UTC(2000,0,1,0,0,0,tick)).toISOString();
-      if(pos>=1){ if(!m.waitingFirstAt) m.waitingFirstAt=nowIso(); }
-      else { delete m.waitingFirstAt; }
-      count[court]=pos+1; tick++; changed=true;
-    });
-    return changed;
-  }
-
-  function runMainCourtRepair(key, save){
-    if(!key || !(window.G&&G.matches&&G.matches[key])) return false;
-    let changed=false;
-    const prevExplicit=window.__V702_EXPLICIT_DRAW_RUNNING;
-    let oldMetaFlag;
-    try{
-      window.__V702_EXPLICIT_DRAW_RUNNING=true;
-      try{ if(window.G&&G.meta){ oldMetaFlag=G.meta.individualAutoCourtAssignEnabled; G.meta.individualAutoCourtAssignEnabled=true; } }catch(e){}
-      try{ arr(G.matches[key]).forEach(m=>{ if(m&&/^(main|playin)$/.test(String(m.phase||''))){ const v=inferVenue(key,m); if(m.venue!==v||m.__venue!==v){m.venue=v;m.__venue=v;changed=true;} } }); }catch(e){}
-      try{ if(typeof rebuildIndividualAutoCourtAssignmentsForKey==='function') changed=!!rebuildIndividualAutoCourtAssignmentsForKey(key)||changed; }catch(e){ console.warn('[v765] rebuild skipped',e); }
-      changed=directMainCourtAssign(key)||changed;
-      if(changed && save && typeof stM==='function'){
-        try{ if(window.__FB_WRITE_CACHE && __FB_WRITE_CACHE.matches) delete __FB_WRITE_CACHE.matches[key]; }catch(e){}
-        stM(key).then(()=>{ try{ if(typeof renderBracket==='function') renderBracket(); }catch(_e){} }).catch(e=>console.warn('[v765] stM failed',e));
-      }
-    }catch(e){ console.warn('[v765] main court repair failed',e); }
-    finally{
-      try{ if(window.G&&G.meta && oldMetaFlag!==undefined) G.meta.individualAutoCourtAssignEnabled=oldMetaFlag; }catch(e){}
-      window.__V702_EXPLICIT_DRAW_RUNNING=prevExplicit;
-    }
-    return changed;
-  }
-  window.v765RunMainCourtRepair=runMainCourtRepair;
-
-  const oldV748=window.v748RunMainAutoCourtRebuild;
-  window.v748RunMainAutoCourtRebuild=function(key){
-    let changed=false;
-    try{ if(typeof oldV748==='function') changed=!!oldV748.apply(this,arguments); }catch(e){ console.warn('[v765] old v748 failed',e); }
-    return runMainCourtRepair(key,false)||changed;
+    if(ret&&typeof ret.then==='function') ret.then(()=>setTimeout(doRepair,650)).catch(()=>{});
+    else setTimeout(doRepair,750);
+    return ret;
   };
-  window.v760RunMainAutoAssign=function(key){ return runMainCourtRepair(key,true); };
-  window.v753RunMainAutoAssign=window.v760RunMainAutoAssign;
+  wrapped.__v771Wrapped=true; wrapped.__old=old;
+  window[name]=wrapped; try{eval(name+'=wrapped');}catch(e){}
+});
 
-  function cardVenue(card){
-    const txt=clean(card&&card.textContent);
-    if(/원도심/.test(txt)) return 'wondo';
-    return 'gukje';
-  }
-  function splitShared(){
-    try{
-      const stacks=[].slice.call(document.querySelectorAll('.shared-wait-stack'));
-      stacks.forEach(stack=>{
-        if(!stack || stack.querySelector(':scope > .v760-wrap')) return;
-        const cards=[].slice.call(stack.querySelectorAll(':scope > .court-wait-card'));
-        if(!cards.length) return;
-        const mainCards=cards.filter(c=>/본선|128강|64강|32강|16강|8강|준결승|결승|진출전|국제|원도심/.test(c.textContent||''));
-        if(!mainCards.length) return;
-        const gukje=[], wondo=[];
-        mainCards.forEach(c=>{ (cardVenue(c)==='wondo'?wondo:gukje).push(c); });
-        const remain=cards.filter(c=>mainCards.indexOf(c)<0);
-        const wrap=document.createElement('div'); wrap.className='v760-wrap';
-        function section(cls,label,items){
-          const sec=document.createElement('div'); sec.className='v760-sec '+cls;
-          const head=document.createElement('div'); head.className='v760-head'; head.textContent=label+' ('+items.length+'경기)'; sec.appendChild(head);
-          const body=document.createElement('div'); body.className='v760-body';
-          if(items.length) items.forEach(c=>body.appendChild(c));
-          else { const emp=document.createElement('div'); emp.className='v760-empty'; emp.textContent='대기 없음'; body.appendChild(emp); }
-          sec.appendChild(body); return sec;
-        }
-        remain.forEach(c=>stack.appendChild(c));
-        wrap.appendChild(section('gukje','🔵 국제 공용대기',gukje));
-        wrap.appendChild(section('wondo','🟢 원도심 공용대기',wondo));
-        stack.appendChild(wrap);
-      });
-    }catch(e){ console.warn('[v765] splitShared failed',e); }
-  }
-  window.v760SplitShared=splitShared;
-  const oldRender=window.renderBracket;
-  if(typeof oldRender==='function' && !oldRender.__v765Wrapped){
-    const wrapped=function(){ const r=oldRender.apply(this,arguments); setTimeout(splitShared,120); return r; };
-    wrapped.__v765Wrapped=true; window.renderBracket=wrapped; try{ renderBracket=wrapped; }catch(e){}
-  }
+/* ───── 10. 부팅 ───── */
+function boot(){
+  wrapRender();
+  try{ currentKeys().forEach(k=>applyVenueToMain(k)); }catch(e){}
   setTimeout(splitShared,500); setTimeout(splitShared,1500);
-  try{ const b=document.getElementById('bracketFreshnessBadge'); if(b) b.textContent='v765 · 본선 부전승/코트배정'; }catch(e){}
-  console.log('[v765] fixed bye pattern + main court/shared queue repair installed');
-})();
-</script>
-
-
-<style id="v766MainByeCourtFinalFixStyle">
-.v766-shared-split{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important;width:100%!important;grid-column:1/-1!important;}
-.v766-shared-section{border:1.5px solid #dbe7ff;border-radius:13px;background:#fff;overflow:hidden;min-width:0;}
-.v766-shared-section.wondo{border-color:#86efac;background:#f0fdf4;}
-.v766-shared-section.gukje{border-color:#93c5fd;background:#eff6ff;}
-.v766-shared-head{padding:8px 10px;font-size:.8rem;font-weight:1000;display:flex;align-items:center;justify-content:space-between;gap:8px;}
-.v766-shared-section.gukje .v766-shared-head{background:#dbeafe;color:#1e40af;}
-.v766-shared-section.wondo .v766-shared-head{background:#dcfce7;color:#166534;}
-.v766-shared-body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;padding:8px;align-items:start;}
-.v766-shared-empty{padding:12px 10px;font-size:.76rem;font-weight:800;color:#64748b;background:#fff;border-radius:10px;border:1px dashed #cbd5e1;}
-.v766-shared-note{font-size:.66rem;font-weight:900;opacity:.85;}
-@media(max-width:900px){.v766-shared-split{grid-template-columns:1fr!important}.v766-shared-body{grid-template-columns:1fr!important}}
-@media(min-width:1200px){.v766-shared-body{grid-template-columns:repeat(3,minmax(0,1fr));}}
-</style>
-<script id="v766MainByeCourtFinalFixScript">
-(function(){
-  'use strict';
-  const TAG='[v766]';
-  const clean=v=>String(v==null?'':v).trim();
-  const arr=v=>Array.isArray(v)?v:[];
-  const nowIso=()=>new Date().toISOString();
-  function keyParts(key){ const s=String(key||''); const p=s.split('_'); return {tid:p.shift()||'', div:p.join('_')||''}; }
-  function isMainLike(m){ return m && /^(main|playin)$/.test(String(m.phase||'')); }
-  function isRound0Main(m){ return m && String(m.phase||'')==='main' && Number(m.round||0)===0; }
-  function isWondoCourt(c){ return /원도심/.test(clean(c)); }
-  function isGukjeCourt(c){ return /국제/.test(clean(c)); }
-  function isPhysicalCourt(c){ return /\d+\s*$/.test(clean(c)); }
-  function teamNameKey(t){ return clean((t&&t.nm)||(t&&t.name)||(t&&t.label)||(t&&t.ti)); }
-  function getByeMatchIndices(matchCount, byeCount){
-    const out=[];
-    for(let i=1;i<matchCount && out.length<byeCount;i+=2) out.push(i); // leaf 4,8,12...
-    for(let i=0;i<matchCount && out.length<byeCount;i+=2) out.push(i);
-    return out.slice(0, Math.max(0,byeCount));
-  }
-  function entryLabel(e){
-    try{ if(typeof getMainEntryBracketLabel==='function') return getMainEntryBracketLabel(e)||''; }catch(_e){}
-    if(!e) return '';
-    return clean(e._groupLabel||e.sourceLabel||e.nm||e.name||'');
-  }
-  function normalizePlanFixedBye(plan){
-    try{
-      if(!plan || !Array.isArray(plan.matchSlots) || !plan.matchSlots.length) return plan;
-      const matchCount=plan.matchSlots.length;
-      const byeCount=Math.max(0, Number(plan.byeCount ?? plan.matchSlots.filter(s=>s&&s.bye).length));
-      if(!byeCount) return plan;
-      const targetBye=getByeMatchIndices(matchCount, byeCount);
-      const targetSet=new Set(targetBye);
-      const byeEntries=[];
-      const normalEntries=[];
-      arr(plan.matchSlots).forEach((raw)=>{
-        const s=raw||{};
-        const isBye=!!s.bye || clean(s.source2Label)==='부전승' || ((s.t1&&!s.t2)||(!s.t1&&s.t2));
-        if(isBye && byeEntries.length<byeCount){
-          const e=s.t1||s.t2||null;
-          byeEntries.push({entry:e, sourceLabel:clean(s.source1Label)||entryLabel(e)||clean(s.source2Label).replace('부전승','')});
-        }else{
-          if(s.t1) normalEntries.push({entry:s.t1, sourceLabel:clean(s.source1Label)||entryLabel(s.t1)});
-          if(s.t2) normalEntries.push({entry:s.t2, sourceLabel:clean(s.source2Label)||entryLabel(s.t2)});
-        }
-      });
-      // 부전승 팀이 부족하면 일반 엔트리 뒤쪽에서 보충한다.
-      while(byeEntries.length<byeCount && normalEntries.length){ byeEntries.push(normalEntries.pop()); }
-      const next=[]; let bi=0, ni=0;
-      for(let i=0;i<matchCount;i++){
-        if(targetSet.has(i)){
-          const b=byeEntries[bi++]||{};
-          next[i]={id:i, slot:i, t1:b.entry?{...b.entry}:null, t2:null, bye:true, source1Label:clean(b.sourceLabel)||entryLabel(b.entry)||'', source2Label:'부전승'};
-        }else{
-          const a=normalEntries[ni++]||{};
-          const b=normalEntries[ni++]||{};
-          next[i]={id:i, slot:i, t1:a.entry?{...a.entry}:null, t2:b.entry?{...b.entry}:null, bye:false, source1Label:clean(a.sourceLabel)||entryLabel(a.entry)||'', source2Label:clean(b.sourceLabel)||entryLabel(b.entry)||''};
-        }
-      }
-      plan.matchSlots=next;
-      plan.byeIdxs=targetBye.slice();
-      plan.normalIdxs=next.map((_,i)=>i).filter(i=>!targetSet.has(i));
-      plan.revealOrder=[];
-      plan.byeIdxs.forEach(i=>{ const s=next[i]; if(s&&s.t1) plan.revealOrder.push({slotIdx:i,side:'t1',team:s.t1,bye:true}); });
-      plan.normalIdxs.forEach(i=>{ const s=next[i]; if(s&&s.t1) plan.revealOrder.push({slotIdx:i,side:'t1',team:s.t1,bye:false}); });
-      plan.normalIdxs.forEach(i=>{ const s=next[i]; if(s&&s.t2) plan.revealOrder.push({slotIdx:i,side:'t2',team:s.t2,bye:false}); });
-      return plan;
-    }catch(e){ console.warn(TAG,'normalize plan failed',e); return plan; }
-  }
-  function wrapPlanBuilder(name){
-    const old=window[name] || (typeof globalThis[name]==='function'?globalThis[name]:null);
-    if(typeof old!=='function' || old.__v766Wrapped) return;
-    const wrapped=function(){ const plan=old.apply(this,arguments); return normalizePlanFixedBye(plan); };
-    wrapped.__v766Wrapped=true; wrapped.__old=old;
-    window[name]=wrapped;
-    try{ eval(name+'=wrapped'); }catch(_e){}
-  }
-  wrapPlanBuilder('buildSeededMainSlots');
-  wrapPlanBuilder('buildHybridMainSlots');
-
-  function matchIsBye(m){
-    if(!m) return false;
-    if(!!m.bye) return true;
-    if(clean(m.source2Label)==='부전승') return true;
-    const one=(m.t1!=null && m.t2==null) || (m.t1==null && m.t2!=null);
-    return one && /부전승|다음 라운드/.test(clean(m.source1Label)+' '+clean(m.source2Label)+' '+clean(m.winnerLabel));
-  }
-  function hasPlayedMainResult(key){
-    try{
-      return arr(G.matches&&G.matches[key]).some(m=>isRound0Main(m) && !matchIsBye(m) && getMatchResultState(key,m).done);
-    }catch(_e){ return false; }
-  }
-  function labelForSide(m,side){ return clean(side===1?m.source1Label:m.source2Label); }
-  function cloneCleanMatch(src){
-    const c={...(src||{})};
-    delete c.court; delete c.courts; delete c.waitingFirstAt; delete c.lastWaitingFirstAt; delete c.courtAssignedAt; delete c.courtQueueOrder;
-    return c;
-  }
-  function recomputeByePromotion(key){
-    try{
-      const all=arr(G.matches&&G.matches[key]);
-      const main=all.filter(m=>m&&String(m.phase||'')==='main');
-      const hasPlayed=hasPlayedMainResult(key);
-      if(hasPlayed) return false;
-      main.filter(m=>Number(m.round||0)>0).forEach(m=>{ m.t1=null; m.t2=null; m.winner=null; m.bye=false; });
-      main.filter(m=>Number(m.round||0)===0 && m.bye && m.t1!=null).forEach(bm=>{
-        bm.winner=bm.t1;
-        const nm=main.find(m2=>Number(m2.round||0)===1 && Number(m2.slot||0)===Math.floor(Number(bm.slot||0)/2));
-        if(nm){ if(Number(bm.slot||0)%2===0) nm.t1=bm.t1; else nm.t2=bm.t1; }
-      });
-      return true;
-    }catch(e){ console.warn(TAG,'promotion recompute failed',e); return false; }
-  }
-  function repairExistingMainByePattern(key){
-    try{
-      if(!key || !(window.G&&G.matches&&G.matches[key])) return false;
-      if(hasPlayedMainResult(key)) return false;
-      const all=arr(G.matches[key]);
-      const r0=all.filter(isRound0Main).sort((a,b)=>Number(a.slot||0)-Number(b.slot||0));
-      if(r0.length<2) return false;
-      const byeCount=r0.filter(matchIsBye).length;
-      if(!byeCount) return false;
-      const targetBye=getByeMatchIndices(r0.length, byeCount);
-      const targetSet=new Set(targetBye);
-      const byeList=[], normalList=[];
-      r0.forEach(m=>{ (matchIsBye(m)?byeList:normalList).push(m); });
-      const already=targetBye.every(i=>matchIsBye(r0[i])) && r0.every((m,i)=>targetSet.has(i) || !matchIsBye(m));
-      let changed=!already;
-      let bi=0, ni=0;
-      for(let i=0;i<r0.length;i++){
-        const dest=r0[i];
-        const src=targetSet.has(i) ? (byeList[bi++]||{}) : (normalList[ni++]||{});
-        const before=JSON.stringify({bye:dest.bye,t1:dest.t1,t2:dest.t2,s1:dest.source1Label,s2:dest.source2Label});
-        const copy=cloneCleanMatch(src);
-        Object.keys(dest).forEach(k=>{ if(!['id','phase','round','slot'].includes(k)) delete dest[k]; });
-        Object.assign(dest, copy);
-        dest.id=`main_r0_${i}`; dest.phase='main'; dest.round=0; dest.slot=i;
-        if(targetSet.has(i)){
-          const team = src.t1!=null ? src.t1 : (src.t2!=null ? src.t2 : null);
-          const lbl = clean(src.source1Label) || (src.t1!=null ? labelForSide(src,1) : labelForSide(src,2)) || clean(src.winnerLabel);
-          dest.t1=team; dest.t2=null; dest.bye=true; dest.source1Label=lbl; dest.source2Label='부전승'; dest.winner=(team!=null?team:null);
-        }else{
-          dest.bye=false;
-          if(clean(dest.source2Label)==='부전승') dest.source2Label='';
-          if(dest.winner!=null && !getMatchResultState(key,dest).done) dest.winner=null;
-        }
-        const after=JSON.stringify({bye:dest.bye,t1:dest.t1,t2:dest.t2,s1:dest.source1Label,s2:dest.source2Label});
-        if(before!==after) changed=true;
-      }
-      recomputeByePromotion(key);
-      if(changed) console.log(TAG,'부전승 자리 재정렬 완료',key,'bye',byeCount,'pattern',targetBye.join(','));
-      return changed;
-    }catch(e){ console.warn(TAG,'existing bye repair failed',e); return false; }
-  }
-  window.v766RepairExistingMainByePattern=repairExistingMainByePattern;
-
-  function sourceMapFromPrelim(key){
-    const out={};
-    try{
-      const p=keyParts(key); const t=(G.tournaments||[]).find(x=>x.id===p.tid); const cfg=(typeof gDS==='function')?gDS(t,p.div):{};
-      const adv=(typeof getAdvT==='function')?getAdvT(key, G.draws&&G.draws[key], G.teams&&G.teams[key], cfg):[];
-      arr(adv).forEach(e=>{
-        const gn=Number(e.gn||0), rk=Number(e.rk||0), ti=Number(e.ti);
-        if(gn>=1 && rk>=1 && Number.isFinite(ti)){
-          const gl=(typeof grpLabel==='function')?grpLabel(gn-1):(gn+'조');
-          out[`${gl} ${rk}위`]=ti; out[`${gn}조 ${rk}위`]=ti;
-        }
-      });
-    }catch(e){}
-    return out;
-  }
-  function syncMainPlaceholdersFromPrelim(key){
-    try{
-      const map=sourceMapFromPrelim(key); if(!Object.keys(map).length) return false;
-      let changed=false;
-      arr(G.matches&&G.matches[key]).filter(m=>isMainLike(m)).forEach(m=>{
-        const s1=clean(m.source1Label), s2=clean(m.source2Label);
-        if(m.t1==null && map[s1]!=null){ m.t1=map[s1]; changed=true; }
-        if(m.t2==null && s2 && s2!=='부전승' && map[s2]!=null){ m.t2=map[s2]; changed=true; }
-        if(m.bye && m.t1!=null && m.winner!==m.t1){ m.winner=m.t1; changed=true; }
-      });
-      if(changed) recomputeByePromotion(key);
-      return changed;
-    }catch(e){ console.warn(TAG,'sync prelim placeholders failed',e); return false; }
-  }
-  window.v766SyncMainPlaceholdersFromPrelim=syncMainPlaceholdersFromPrelim;
-
-  function getCourtPool(key){
-    const p=keyParts(key); let pool=[];
-    try{ if(typeof getDivisionPhaseConfiguredCourts==='function') pool=getDivisionPhaseConfiguredCourts(p.tid,p.div,'main')||[]; }catch(e){}
-    try{ if(!arr(pool).length && typeof getIndividualAutoCourtPool==='function') pool=getIndividualAutoCourtPool(key,'main')||[]; }catch(e){}
-    try{ if(!arr(pool).length && typeof getBracketAllowedCourts==='function') pool=getBracketAllowedCourts(key)||[]; }catch(e){}
-    try{ if(!arr(pool).length && typeof getTournamentCourtList==='function') pool=getTournamentCourtList(p.tid,true)||[]; }catch(e){}
-    try{ if(!arr(pool).length){ pool=[].slice.call(document.querySelectorAll('[data-court]')).map(el=>el.dataset.court).filter(Boolean); } }catch(e){}
-    return [...new Set(arr(pool).map(clean).filter(isPhysicalCourt))];
-  }
-  function groupVenue(key,gn){
-    try{
-      const g=arr(G.draws&&G.draws[key]&&G.draws[key].groups)[Number(gn)-1];
-      const cs=arr(g&&g.courts).concat([g&&g.court,g&&g.manualCourt,g&&g.manualCourtTarget]).map(clean).filter(Boolean);
-      if(cs.some(isWondoCourt)) return 'wondosim';
-    }catch(_e){}
-    return 'gukje';
-  }
-  function groupNoFromSource(s){ const m=clean(s).match(/(\d+)\s*조/); return m?Number(m[1]):0; }
-  function teamVenue(key,ti){
-    try{ const n=Number(ti); for(const [gi,g] of arr(G.draws&&G.draws[key]&&G.draws[key].groups).entries()){ if(arr(g&&g.teams).map(Number).includes(n)) return groupVenue(key,gi+1); } }catch(_e){}
-    return '';
-  }
-  function inferVenue(key,m){
-    const e=clean(m&&m.venue||m&&m.__venue);
-    if(e==='wondosim'||/원도심/.test(e)) return 'wondosim';
-    const labels=[m&&m.source1Label,m&&m.source2Label,m&&m.winnerLabel,m&&m.autoCourtLabel].map(clean);
-    if(labels.some(x=>/원도심/.test(x))) return 'wondosim';
-    for(const s of labels){ const gn=groupNoFromSource(s); if(gn && groupVenue(key,gn)==='wondosim') return 'wondosim'; }
-    if(teamVenue(key,m&&m.t1)==='wondosim' || teamVenue(key,m&&m.t2)==='wondosim') return 'wondosim';
-    return 'gukje';
-  }
-  window.v766InferMatchVenue=inferVenue;
-  function courtList(m){ return [...arr(m&&m.courts), m&&m.court, m&&m.manualCourtTarget].map(clean).filter(isPhysicalCourt); }
-  function hasPlayableTeams(m){ return m && m.t1!=null && m.t2!=null; }
-  function roundOrder(m){ const r=Number(m.round||0); const s=Number(m.slot||0); return (String(m.phase)==='playin'?-100000:0)+(r*1000)+s; }
-  function assignMainCourtsNow(key){
-    try{
-      if(!key || !(window.G&&G.matches&&G.matches[key])) return false;
-      const pool=getCourtPool(key); if(!pool.length) return false;
-      const gukje=pool.filter(c=>isGukjeCourt(c)&&!isWondoCourt(c));
-      const wondo=pool.filter(isWondoCourt);
-      const other=pool.filter(c=>!gukje.includes(c)&&!wondo.includes(c));
-      const counts={}; pool.forEach(c=>counts[c]=0);
-      const ms=arr(G.matches[key]).filter(isMainLike);
-      let changed=false;
-      ms.forEach(m=>{
-        const v=inferVenue(key,m); if(m.venue!==v||m.__venue!==v){m.venue=v;m.__venue=v;changed=true;}
-        const specific=courtList(m);
-        if(specific.length){
-          const first=specific.find(c=>counts[c]!=null);
-          if(first){ counts[first]++; if(m.court!==first||!arr(m.courts).includes(first)){m.court=first;m.courts=[first];changed=true;} }
-        }else{
-          // generic target like '국제'/'원도심'은 실제 코트가 아니므로 비운다.
-          if(clean(m.court) && !isPhysicalCourt(m.court)){ delete m.court; changed=true; }
-          if(arr(m.courts).some(c=>!isPhysicalCourt(c))){ m.courts=arr(m.courts).filter(isPhysicalCourt); changed=true; }
-        }
-      });
-      const queue=ms.filter(m=>!m.bye && !getMatchResultState(key,m).done && hasPlayableTeams(m) && !courtList(m).length && !m.manualCourtLocked)
-        .sort((a,b)=>roundOrder(a)-roundOrder(b));
-      let tick=0;
-      queue.forEach(m=>{
-        const venue=inferVenue(key,m);
-        const cands=(venue==='wondosim'&&wondo.length)?wondo:(gukje.length?gukje:(other.length?other:pool));
-        const eligible=cands.filter(c=>Number(counts[c]||0)<2);
-        if(!eligible.length) return;
-        eligible.sort((a,b)=>Number(counts[a]||0)-Number(counts[b]||0)||String(a).localeCompare(String(b),'ko',{numeric:true}));
-        const c=eligible[0]; const pos=Number(counts[c]||0);
-        m.court=c; m.courts=[c]; m.venue=venue; m.__venue=venue; m.autoCourtLabel='본선 자동배정';
-        if(!m.courtAssignedAt) m.courtAssignedAt=new Date(Date.now()+tick).toISOString();
-        m.courtQueueOrder=new Date(Date.UTC(2000,0,1,0,0,0,tick)).toISOString();
-        if(pos>=1){ if(!m.waitingFirstAt) m.waitingFirstAt=nowIso(); }
-        else { delete m.waitingFirstAt; delete m.lastWaitingFirstAt; }
-        counts[c]=pos+1; tick++; changed=true;
-      });
-      if(changed) console.log(TAG,'본선 코트 즉시 배정/보정 완료',key,counts);
-      return changed;
-    }catch(e){ console.warn(TAG,'main court assign failed',e); return false; }
-  }
-  window.v766AssignMainCourtsNow=assignMainCourtsNow;
-
-  let saveTimers={};
-  function saveMatchesDebounced(key){
-    if(!key || typeof stM!=='function') return;
-    clearTimeout(saveTimers[key]);
-    saveTimers[key]=setTimeout(()=>{
-      try{ if(window.__FB_WRITE_CACHE && __FB_WRITE_CACHE.matches) delete __FB_WRITE_CACHE.matches[key]; }catch(_e){}
-      try{ stM(key).catch(e=>console.warn(TAG,'stM failed',e)); }catch(e){ console.warn(TAG,'stM call failed',e); }
-    }, 350);
-  }
-  function visibleKeys(){
-    const keys=[];
-    try{ if(typeof currentTid==='function'){ const tid=currentTid(); const divs=(typeof getBracketSelectedDivs==='function'?getBracketSelectedDivs():[]); arr(divs).forEach(d=>keys.push(tid+'_'+d)); } }catch(_e){}
-    try{ if(!keys.length && window.G&&G.matches) Object.keys(G.matches).forEach(k=>keys.push(k)); }catch(_e){}
-    return [...new Set(keys.filter(Boolean))];
-  }
-  function repairKey(key, save){
-    let changed=false;
-    try{ changed=syncMainPlaceholdersFromPrelim(key)||changed; }catch(_e){}
-    try{ changed=repairExistingMainByePattern(key)||changed; }catch(_e){}
-    try{ changed=assignMainCourtsNow(key)||changed; }catch(_e){}
-    if(changed && save) saveMatchesDebounced(key);
-    return changed;
-  }
-  window.v766RepairCurrentMain=function(save=true){ let c=false; visibleKeys().forEach(k=>{ c=repairKey(k,save)||c; }); if(c&&typeof renderBracket==='function') setTimeout(()=>renderBracket(),80); return c; };
-
-  function splitSharedQueues(){
-    try{
-      document.querySelectorAll('.shared-wait-stack').forEach(stack=>{
-        if(!stack || stack.dataset.v766Split==='1') return;
-        const cards=Array.from(stack.children).filter(el=>el.classList&&el.classList.contains('court-wait-card'));
-        if(!cards.length) return;
-        const mainCards=cards.filter(c=>/본선|128강|64강|32강|16강|8강|준결승|결승|진출전|국제|원도심/.test(c.textContent||''));
-        if(!mainCards.length) return;
-        const gukje=[], wondo=[];
-        mainCards.forEach(c=>{ (/원도심/.test(c.textContent||'')?wondo:gukje).push(c); });
-        const wrap=document.createElement('div'); wrap.className='v766-shared-split';
-        function section(cls,label,items){
-          const sec=document.createElement('div'); sec.className='v766-shared-section '+cls;
-          const head=document.createElement('div'); head.className='v766-shared-head'; head.innerHTML=`<span>${label}</span><span class="v766-shared-note">${items.length}경기</span>`; sec.appendChild(head);
-          const body=document.createElement('div'); body.className='v766-shared-body';
-          if(items.length) items.forEach(c=>body.appendChild(c)); else { const emp=document.createElement('div'); emp.className='v766-shared-empty'; emp.textContent='대기 없음'; body.appendChild(emp); }
-          sec.appendChild(body); return sec;
-        }
-        wrap.appendChild(section('gukje','🔵 국제 공용대기',gukje));
-        wrap.appendChild(section('wondo','🟢 원도심 공용대기',wondo));
-        stack.appendChild(wrap); stack.dataset.v766Split='1';
-        let p=stack.parentElement; for(let i=0;i<4&&p;i++,p=p.parentElement){ const txt=p.querySelector&&Array.from(p.querySelectorAll('div')).find(x=>/^⏳\s*공용대기/.test(clean(x.textContent))); if(txt){ txt.textContent='⏳ 구장별 공용대기 '+mainCards.length+'경기'; break; } }
-      });
-    }catch(e){ console.warn(TAG,'split queues failed',e); }
-  }
-  window.v766SplitSharedQueues=splitSharedQueues;
-
-  const oldRender=window.renderBracket || (typeof renderBracket==='function'?renderBracket:null);
-  if(typeof oldRender==='function' && !oldRender.__v766Wrapped){
-    const wrapped=function(){
-      try{ visibleKeys().forEach(k=>repairKey(k,true)); }catch(e){}
-      const r=oldRender.apply(this,arguments);
-      setTimeout(splitSharedQueues,60); setTimeout(splitSharedQueues,250);
-      return r;
-    };
-    wrapped.__v766Wrapped=true; wrapped.__old=oldRender; window.renderBracket=wrapped; try{ renderBracket=wrapped; }catch(_e){}
-  }
-  ['stM','stD'].forEach(fn=>{});
-  // 결과 저장 뒤에도 자리 치환/다음 코트 보충을 한 번 더 실행한다.
-  const oldSaveM3=window.saveM3 || (typeof saveM3==='function'?saveM3:null);
-  if(typeof oldSaveM3==='function' && !oldSaveM3.__v766Wrapped){
-    const wrapped=function(){
-      const ret=oldSaveM3.apply(this,arguments);
-      setTimeout(()=>{ try{ window.v766RepairCurrentMain(true); }catch(e){} },700);
-      setTimeout(()=>{ try{ window.v766RepairCurrentMain(true); }catch(e){} },1600);
-      return ret;
-    };
-    wrapped.__v766Wrapped=true; window.saveM3=wrapped; try{ saveM3=wrapped; }catch(_e){}
-  }
-  // 본선 추첨 함수 뒤에도 기존 데이터까지 즉시 보정.
-  ['startIndividualMainDraw','startMainDraw'].forEach(name=>{
-    const old=window[name] || (typeof globalThis[name]==='function'?globalThis[name]:null);
-    if(typeof old==='function' && !old.__v766AfterWrapped){
-      const wrapped=function(){ const ret=old.apply(this,arguments); setTimeout(()=>{ try{ window.v766RepairCurrentMain(true); }catch(e){} },900); setTimeout(()=>{ try{ window.v766RepairCurrentMain(true); }catch(e){} },2000); return ret; };
-      wrapped.__v766AfterWrapped=true; window[name]=wrapped; try{ eval(name+'=wrapped'); }catch(_e){}
-    }
-  });
-  setTimeout(()=>{ try{ window.v766RepairCurrentMain(true); splitSharedQueues(); }catch(e){} },500);
-  setTimeout(()=>{ try{ window.v766RepairCurrentMain(true); splitSharedQueues(); }catch(e){} },1800);
   try{
-    const target=document.getElementById('bracketContent')||document.body;
-    const mo=new MutationObserver(()=>{ setTimeout(splitSharedQueues,80); });
-    mo.observe(target,{childList:true,subtree:true});
-  }catch(_e){}
-  try{ const b=document.getElementById('bracketFreshnessBadge'); if(b) b.textContent='v766 · 본선자리/코트강제수정'; }catch(_e){}
-  console.log(TAG,'본선 부전승 고정분산 + 기존대진 보정 + 구장별 공용대기 설치 완료');
-})();
-</script>
+    const b=document.getElementById('bracketFreshnessBadge');
+    if(b){b.textContent='v775';b.style.background='#dcfce7';b.style.color='#166534';b.style.border='1px solid #22c55e';}
+  }catch(e){}
+  console.log(TAG,'설치완료 — 구장별 공용대기 분리 + 128강 우선 배분 + 라벨 정리');
+}
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
+setTimeout(boot,800);
 
-
-
-<!-- v767: stable placeholder main draw + venue queue numbering/court assign hard fix -->
-<style id="v767StableMainQueueStyle">
-.v767-shared-wrap{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:12px!important;width:100%!important;grid-column:1/-1!important;max-height:none!important;overflow:visible!important;}
-.v767-shared-sec{border:2px solid #dbeafe;border-radius:16px;background:#fff;overflow:visible!important;min-width:0;box-shadow:0 8px 18px rgba(15,30,58,.06)}
-.v767-shared-sec.gukje{border-color:#93c5fd;background:#eff6ff}.v767-shared-sec.wondo{border-color:#86efac;background:#f0fdf4}
-.v767-shared-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;font-weight:1000;font-size:.86rem;border-radius:14px 14px 0 0}
-.v767-shared-sec.gukje .v767-shared-head{background:#dbeafe;color:#1e40af}.v767-shared-sec.wondo .v767-shared-head{background:#dcfce7;color:#166534}
-.v767-shared-body{display:grid!important;grid-template-columns:repeat(auto-fill,minmax(210px,1fr))!important;gap:8px!important;padding:10px!important;max-height:none!important;overflow:visible!important;align-items:start!important;}
-.v767-shared-body .court-wait-card{display:block!important;visibility:visible!important;opacity:1!important;max-height:none!important;overflow:visible!important;}
-.v767-empty{padding:16px 12px;border:1px dashed #cbd5e1;border-radius:12px;background:#fff;color:#64748b;font-size:.78rem;font-weight:900;text-align:center}
-@media(max-width:980px){.v767-shared-wrap{grid-template-columns:1fr!important}.v767-shared-body{grid-template-columns:repeat(auto-fill,minmax(180px,1fr))!important}}
-@media(max-width:680px){.v767-shared-body{grid-template-columns:1fr!important}.v767-shared-head{font-size:.8rem}}
-</style>
-<script id="v767StableMainQueueScript">
-(function(){
-  'use strict';
-  if(window.__v767StableMainQueueInstalled) return;
-  window.__v767StableMainQueueInstalled=true;
-  const TAG='[v767]';
-  const clean=v=>String(v==null?'':v).replace(/\s+/g,' ').trim();
-  const arr=v=>Array.isArray(v)?v:[];
-  const nowIso=()=>new Date().toISOString();
-  function keyParts(key){try{return typeof _k2td==='function'?_k2td(key):(()=>{const s=String(key||''),i=s.indexOf('_');return i>=0?{tid:s.slice(0,i),div:s.slice(i+1)}:{tid:'',div:''};})()}catch(_e){const s=String(key||''),i=s.indexOf('_');return i>=0?{tid:s.slice(0,i),div:s.slice(i+1)}:{tid:'',div:''};}}
-  function isMainLike(m){return m && /^(main|playin)$/.test(String(m.phase||''));}
-  function isRound0(m){return m && String(m.phase||'')==='main' && Number(m.round||0)===0;}
-  function isWondoCourt(c){return /원도심/.test(clean(c));}
-  function isGukjeCourt(c){return /국제/.test(clean(c)) && !isWondoCourt(c);}
-  function isPhysicalCourt(c){return /\d+\s*$/.test(clean(c));}
-  function labelEntry(e){try{if(typeof getMainEntryBracketLabel==='function') return clean(getMainEntryBracketLabel(e));}catch(_e){} return clean(e&&(e._groupLabel||e.sourceLabel||e.nm||e.name||e.label));}
-  function grpLabelSafe(gn){try{return typeof grpLabel==='function'?grpLabel(Number(gn)-1):(Number(gn)+'조');}catch(_e){return Number(gn)+'조';}}
-  function fixedByeIdxs(matchCount, byeCount){const out=[]; for(let i=1;i<matchCount&&out.length<byeCount;i+=2) out.push(i); for(let i=0;i<matchCount&&out.length<byeCount;i+=2) out.push(i); return out.slice(0, Math.max(0,byeCount));}
-  try{ window.pickByeMatchIndices=fixedByeIdxs; pickByeMatchIndices=fixedByeIdxs; }catch(_e){}
-
-  function groupVenue(key,gn){
-    try{
-      const g=arr(G&&G.draws&&G.draws[key]&&G.draws[key].groups)[Number(gn)-1];
-      const cs=arr(g&&g.courts).concat([g&&g.court,g&&g.manualCourt,g&&g.manualCourtTarget]).map(clean).filter(Boolean);
-      if(cs.some(isWondoCourt)) return 'wondosim';
-    }catch(_e){}
-    return 'gukje';
-  }
-  function normalizeEntry(e, idx){
-    const out={...(e||{})};
-    const gn=Number(out.gn||0), rk=Number(out.rk||0);
-    if(gn>=1 && rk>=1 && !clean(out.nm)) out.nm=`${grpLabelSafe(gn)} ${rk}위`;
-    out._stableIndex=idx;
-    out._stableLabel=labelEntry(out) || clean(out.nm) || `본선 자리 ${idx+1}`;
-    if(!out.venue && gn>=1) out.venue=groupVenue(window.MD&&MD.key||'', gn);
-    return out;
-  }
-  function makeStableFixedByePlan(entries, n, opt={}){
-    const total=arr(entries).length;
-    const size=Math.max(0, Number(n||0));
-    const matchCount=Math.floor(size/2);
-    if(total<2 || !size || !matchCount) return {matchSlots:[], n:0, byeCount:0, byeIdxs:[], normalIdxs:[], revealOrder:[], playInMatches:[], spec:(typeof computeMainBracketSpec==='function'?computeMainBracketSpec(total):{})};
-    const spec=(typeof computeMainBracketSpec==='function')?computeMainBracketSpec(total):{mainSize:size};
-    const byeCount=Math.max(0, size-total);
-    if(byeCount<=0 || (spec&&Number(spec.playInTeams||0)>0)) return null;
-    const normalized=arr(entries).map(normalizeEntry);
-    const byGroupRank=(a,b)=>{
-      const ra=Number(a.rk||99), rb=Number(b.rk||99); if(ra!==rb) return ra-rb;
-      const ga=Number(a.gn||9999), gb=Number(b.gn||9999); if(ga!==gb) return ga-gb;
-      return Number(a._stableIndex||0)-Number(b._stableIndex||0);
-    };
-    const rank1=normalized.filter(e=>Number(e.rk)===1).sort(byGroupRank);
-    const others=normalized.filter(e=>Number(e.rk)!==1).sort(byGroupRank);
-    const byePool=[...rank1, ...others].slice(0, byeCount);
-    const byeKeys=new Set(byePool.map(e=>`${e.gn}|${e.rk}|${e._stableIndex}`));
-    const rest=normalized.filter(e=>!byeKeys.has(`${e.gn}|${e.rk}|${e._stableIndex}`));
-    const restRank1=rest.filter(e=>Number(e.rk)===1).sort(byGroupRank);
-    const restOthers=rest.filter(e=>Number(e.rk)!==1).sort(byGroupRank);
-    const slots=Array.from({length:matchCount},(_,i)=>({id:i,slot:i,t1:null,t2:null,bye:false,source1Label:'',source2Label:''}));
-    const byeIdx=fixedByeIdxs(matchCount, byeCount); const byeSet=new Set(byeIdx);
-    byeIdx.forEach((slotIdx,i)=>{ const e=byePool[i]; if(!e) return; slots[slotIdx]={id:slotIdx,slot:slotIdx,t1:{...e},t2:null,bye:true,source1Label:e._stableLabel,source2Label:'부전승'}; });
-    const normalIdx=Array.from({length:matchCount},(_,i)=>i).filter(i=>!byeSet.has(i));
-    const t1Pool=[...restRank1];
-    while(t1Pool.length<normalIdx.length && restOthers.length) t1Pool.push(restOthers.shift());
-    normalIdx.forEach(slotIdx=>{
-      const a=t1Pool.shift() || restOthers.shift() || null;
-      let b=null;
-      if(a){
-        let pick=restOthers.findIndex(x=>Number(x.gn||0)!==Number(a.gn||0));
-        if(pick<0) pick=0;
-        if(pick>=0) b=restOthers.splice(pick,1)[0]||null;
-      }else if(restOthers.length){ b=restOthers.shift(); }
-      slots[slotIdx]={id:slotIdx,slot:slotIdx,t1:a?{...a}:null,t2:b?{...b}:null,bye:false,source1Label:a?(a._stableLabel||labelEntry(a)):'',source2Label:b?(b._stableLabel||labelEntry(b)):''};
-    });
-    // 남는 엔트리가 있다면 빈쪽부터 채움
-    const leftovers=[...t1Pool,...restOthers].filter(Boolean);
-    for(const e of leftovers){
-      const s=slots.find(x=>!x.bye && (!x.t1 || !x.t2));
-      if(!s) break;
-      if(!s.t1){s.t1={...e}; s.source1Label=e._stableLabel||labelEntry(e);} else if(!s.t2){s.t2={...e}; s.source2Label=e._stableLabel||labelEntry(e);} 
-    }
-    const reveal=[];
-    byeIdx.forEach(i=>{const s=slots[i]; if(s&&s.t1) reveal.push({slotIdx:i,side:'t1',team:s.t1,bye:true});});
-    normalIdx.forEach(i=>{const s=slots[i]; if(s&&s.t1) reveal.push({slotIdx:i,side:'t1',team:s.t1,bye:false});});
-    normalIdx.forEach(i=>{const s=slots[i]; if(s&&s.t2) reveal.push({slotIdx:i,side:'t2',team:s.t2,bye:false});});
-    return {matchSlots:slots,n:size,byeCount,byeIdxs:byeIdx,normalIdxs:normalIdx,revealOrder:reveal,playInMatches:[],spec};
-  }
-  window.v767MakeStableFixedByePlan=makeStableFixedByePlan;
-
-  function wrapPlanBuilder(name){
-    const old=window[name] || (typeof globalThis[name]==='function'?globalThis[name]:null);
-    if(typeof old!=='function' || old.__v767Wrapped) return;
-    const wrapped=function(entries,n){
-      try{
-        const total=arr(entries).length;
-        const size=Number(n||0);
-        const spec=(typeof computeMainBracketSpec==='function')?computeMainBracketSpec(total):null;
-        const byeCount=Math.max(0, Number((spec&&spec.mainSize)||size||0)-total);
-        if(total>=2 && byeCount>0 && !(spec&&Number(spec.playInTeams||0)>0)){
-          const plan=makeStableFixedByePlan(entries, (spec&&spec.mainSize)||size, {source:name});
-          if(plan) return plan;
-        }
-      }catch(e){ console.warn(TAG,'stable plan wrapper failed',name,e); }
-      return old.apply(this,arguments);
-    };
-    wrapped.__v767Wrapped=true; wrapped.__old=old; window[name]=wrapped; try{ eval(name+'=wrapped'); }catch(_e){}
-  }
-  wrapPlanBuilder('buildSeededMainSlots');
-  wrapPlanBuilder('buildHybridMainSlots');
-
-  function resolvedMap(key){
-    try{ if(typeof getPrelimResolvedLabelMap==='function') return getPrelimResolvedLabelMap(key)||{}; }catch(_e){}
-    return {};
-  }
-  function hasNonByeResult(key){
-    try{return arr(G&&G.matches&&G.matches[key]).some(m=>isRound0(m)&&!m.bye&&getMatchResultState(key,m).done);}catch(_e){return false;}
-  }
-  function clearCourtFields(m){ delete m.court; delete m.courts; delete m.waitingFirstAt; delete m.lastWaitingFirstAt; delete m.courtAssignedAt; delete m.courtQueueOrder; delete m.__sharedListOrder; }
-  function applyStableMainPatternToExisting(key){
-    try{
-      if(!key || !(G&&G.draws&&G.draws[key]&&G.matches&&G.matches[key])) return false;
-      if(hasNonByeResult(key)) return false;
-      const p=keyParts(key); const t=arr(G.tournaments).find(x=>String(x.id)===String(p.tid)); const cfg=(typeof gDS==='function')?gDS(t,p.div):{};
-      const entries=(typeof getPreviewAdvSlots==='function')?getPreviewAdvSlots(G.draws[key],cfg,key):[];
-      const spec=(typeof computeMainBracketSpec==='function')?computeMainBracketSpec(entries.length):null;
-      const byeCount=Math.max(0, Number(spec&&spec.mainSize||0)-entries.length);
-      if(!entries.length || !spec || byeCount<=0 || Number(spec.playInTeams||0)>0) return false;
-      const plan=makeStableFixedByePlan(entries, spec.mainSize, {key}); if(!plan || !plan.matchSlots.length) return false;
-      const all=arr(G.matches[key]);
-      const r0=all.filter(isRound0).sort((a,b)=>Number(a.slot||0)-Number(b.slot||0));
-      if(r0.length!==plan.matchSlots.length) return false;
-      const map=resolvedMap(key);
-      let changed=false;
-      plan.matchSlots.forEach((slot,i)=>{
-        const m=r0[i]; if(!m) return;
-        const before=JSON.stringify({t1:m.t1,t2:m.t2,bye:m.bye,s1:m.source1Label,s2:m.source2Label,w:m.winner,c:m.court,cs:m.courts});
-        const s1=clean(slot.source1Label||labelEntry(slot.t1));
-        const s2=slot.bye?'부전승':clean(slot.source2Label||labelEntry(slot.t2));
-        m.id=`main_r0_${i}`; m.phase='main'; m.round=0; m.slot=i; m.bye=!!slot.bye;
-        m.source1Label=s1; m.source2Label=s2;
-        const r1=map[s1]; const r2=map[s2];
-        if(r1&&r1.ti!=null) m.t1=r1.ti; else if(slot.t1 && slot.t1.ti!=null && !slot.t1.placeholder) m.t1=slot.t1.ti; else m.t1=null;
-        if(m.bye){ m.t2=null; m.winner=(m.t1!=null?m.t1:null); }
-        else { if(r2&&r2.ti!=null) m.t2=r2.ti; else if(slot.t2 && slot.t2.ti!=null && !slot.t2.placeholder) m.t2=slot.t2.ti; else m.t2=null; m.winner=null; }
-        const venue1=slot.t1&&slot.t1.venue, venue2=slot.t2&&slot.t2.venue;
-        m.venue=(venue1==='wondosim'||venue2==='wondosim')?'wondosim':(venue1||venue2||m.venue||'gukje'); m.__venue=m.venue;
-        clearCourtFields(m);
-        const after=JSON.stringify({t1:m.t1,t2:m.t2,bye:m.bye,s1:m.source1Label,s2:m.source2Label,w:m.winner,c:m.court,cs:m.courts});
-        if(before!==after) changed=true;
-      });
-      // 상위 라운드 bye 승자 전파만 다시 계산
-      try{ if(typeof propagateResolvedMainAdvancements==='function') changed=!!propagateResolvedMainAdvancements(key)||changed; }catch(_e){}
-      if(changed) console.log(TAG,'기존 본선 자리표를 고정 패턴으로 재정렬',key,'bye',byeCount);
-      return changed;
-    }catch(e){ console.warn(TAG,'apply stable existing failed',e); return false; }
-  }
-  window.v767ApplyStableMainPatternToExisting=applyStableMainPatternToExisting;
-
-  function courtPool(key){
-    const p=keyParts(key); let pool=[];
-    try{ if(typeof getDivisionPhaseConfiguredCourts==='function') pool=getDivisionPhaseConfiguredCourts(p.tid,p.div,'main')||[]; }catch(_e){}
-    try{ if(!arr(pool).length && typeof getDivisionMainConfiguredCourts==='function') pool=getDivisionMainConfiguredCourts(p.tid,p.div)||[]; }catch(_e){}
-    try{ if(!arr(pool).length && typeof getIndividualAutoCourtPool==='function') pool=getIndividualAutoCourtPool(key,'main')||[]; }catch(_e){}
-    try{ if(!arr(pool).length && typeof getBracketAllowedCourts==='function') pool=getBracketAllowedCourts(key)||[]; }catch(_e){}
-    try{ if(!arr(pool).length && typeof getTournamentCourtList==='function') pool=getTournamentCourtList(p.tid,true)||[]; }catch(_e){}
-    try{ if(!arr(pool).length) pool=[...document.querySelectorAll('[data-court]')].map(el=>el.dataset.court).filter(Boolean); }catch(_e){}
-    return [...new Set(arr(pool).map(clean).filter(isPhysicalCourt))];
-  }
-  function labelGroupNo(s){const m=clean(s).match(/(\d+)\s*조/); return m?Number(m[1]):0;}
-  function teamVenue(key,ti){try{const n=Number(ti); for(const [gi,g] of arr(G.draws&&G.draws[key]&&G.draws[key].groups).entries()){ if(arr(g&&g.teams).map(Number).includes(n)) return groupVenue(key,gi+1); }}catch(_e){} return '';}
-  function inferVenue(key,m){
-    const e=clean(m&&m.venue||m&&m.__venue); if(e==='wondosim'||/원도심/.test(e)) return 'wondosim';
-    const labels=[m&&m.source1Label,m&&m.source2Label,m&&m.winnerLabel,m&&m.autoCourtLabel].map(clean);
-    for(const l of labels){const gn=labelGroupNo(l); if(gn && groupVenue(key,gn)==='wondosim') return 'wondosim';}
-    if(teamVenue(key,m&&m.t1)==='wondosim'||teamVenue(key,m&&m.t2)==='wondosim') return 'wondosim';
-    return 'gukje';
-  }
-  function courtList(m){return [...arr(m&&m.courts),m&&m.court].map(clean).filter(isPhysicalCourt);}
-  function done(key,m){try{return !!getMatchResultState(key,m).done;}catch(_e){return m&&m.winner!=null&&!m.bye;}}
-  function playable(m){return m && m.t1!=null && m.t2!=null && !m.bye;}
-  function orderMain(m){return (String(m.phase)==='playin'?-100000:0)+Number(m.round||0)*1000+Number(m.slot||0);}
-  function assignCourts(key){
-    try{
-      const pool=courtPool(key); if(!pool.length) return false;
-      const gukje=pool.filter(isGukjeCourt); const wondo=pool.filter(isWondoCourt); const other=pool.filter(c=>!gukje.includes(c)&&!wondo.includes(c));
-      const counts={}; pool.forEach(c=>counts[c]=0);
-      const ms=arr(G&&G.matches&&G.matches[key]).filter(isMainLike);
-      let changed=false;
-      ms.forEach(m=>{
-        const v=inferVenue(key,m); if(m.venue!==v||m.__venue!==v){m.venue=v;m.__venue=v;changed=true;}
-        const cs=courtList(m);
-        if(cs.length){const c=cs.find(x=>counts[x]!=null); if(c){counts[c]++; if(m.court!==c || JSON.stringify(m.courts||[])!==JSON.stringify([c])){m.court=c;m.courts=[c];changed=true;}}}
-        else{ if(clean(m.court)&&!isPhysicalCourt(m.court)){delete m.court;changed=true;} if(arr(m.courts).some(c=>!isPhysicalCourt(c))){m.courts=arr(m.courts).filter(isPhysicalCourt);changed=true;} }
-      });
-      // 초과 배정은 공용대기로 되돌림: 각 코트 현재1+대기1까지만
-      const byCourt={};
-      ms.filter(m=>!done(key,m)&&playable(m)&&courtList(m).length&&!m.manualCourtLocked).sort((a,b)=>orderMain(a)-orderMain(b)).forEach(m=>{const c=courtList(m)[0]; (byCourt[c]||(byCourt[c]=[])).push(m);});
-      Object.keys(byCourt).forEach(c=>{byCourt[c].forEach((m,idx)=>{ if(idx>=2){delete m.court; m.courts=[]; delete m.waitingFirstAt; delete m.lastWaitingFirstAt; changed=true;} });});
-      Object.keys(counts).forEach(c=>counts[c]=0);
-      ms.forEach(m=>{const c=courtList(m)[0]; if(c&&counts[c]!=null&&!done(key,m)) counts[c]++;});
-      let tick=0;
-      const q=ms.filter(m=>!done(key,m)&&playable(m)&&!courtList(m).length&&!m.manualCourtLocked).sort((a,b)=>orderMain(a)-orderMain(b));
-      q.forEach(m=>{
-        const v=inferVenue(key,m); const cands=(v==='wondosim'&&wondo.length)?wondo:(gukje.length?gukje:(other.length?other:pool));
-        const eligible=cands.filter(c=>Number(counts[c]||0)<2); if(!eligible.length) return;
-        eligible.sort((a,b)=>Number(counts[a]||0)-Number(counts[b]||0)||String(a).localeCompare(String(b),'ko',{numeric:true}));
-        const c=eligible[0]; const pos=Number(counts[c]||0);
-        m.court=c; m.courts=[c]; m.venue=v; m.__venue=v; m.autoCourtLabel='본선 자동배정'; delete m.manualSharedHold;
-        if(!m.courtAssignedAt) m.courtAssignedAt=new Date(Date.now()+tick).toISOString();
-        m.courtQueueOrder=new Date(Date.UTC(2000,0,1,0,0,0,tick)).toISOString();
-        if(pos>=1){ if(!m.waitingFirstAt) m.waitingFirstAt=nowIso(); } else { delete m.waitingFirstAt; delete m.lastWaitingFirstAt; }
-        counts[c]=pos+1; tick++; changed=true;
-      });
-      if(changed) console.log(TAG,'본선 코트 배정 보정',key,counts);
-      return changed;
-    }catch(e){ console.warn(TAG,'assign courts failed',e); return false; }
-  }
-  window.v767AssignMainCourts=assignCourts;
-
-  const timers={};
-  function saveKey(key){ if(!key||typeof stM!=='function') return; clearTimeout(timers[key]); timers[key]=setTimeout(()=>{try{if(window.__FB_WRITE_CACHE&&__FB_WRITE_CACHE.matches) delete __FB_WRITE_CACHE.matches[key];}catch(_e){} try{stM(key).catch(e=>console.warn(TAG,'stM',e));}catch(e){}},420); }
-  function visibleKeys(){
-    const keys=[];
-    try{const tid=(typeof currentTid==='function'?currentTid():clean(document.getElementById('brTS')&&document.getElementById('brTS').value)); const ds=(typeof getBracketSelectedDivs==='function'?getBracketSelectedDivs(tid):[]); arr(ds).filter(d=>d&&d!=='__ALL__').forEach(d=>keys.push(tid+'_'+d));}catch(_e){}
-    try{if(!keys.length&&G&&G.matches) Object.keys(G.matches).forEach(k=>keys.push(k));}catch(_e){}
-    return [...new Set(keys.filter(Boolean))];
-  }
-  function repair(key,save=true){ let changed=false; try{changed=applyStableMainPatternToExisting(key)||changed;}catch(_e){} try{changed=assignCourts(key)||changed;}catch(_e){} if(changed&&save) saveKey(key); return changed; }
-  window.v767RepairMainNow=function(save=true){let c=false; visibleKeys().forEach(k=>{c=repair(k,save)||c;}); if(c&&typeof renderBracket==='function') setTimeout(()=>renderBracket(),80); return c;};
-
-  function renumberCards(cards){cards.forEach((c,i)=>{let b=c.querySelector('.court-wait-priority'); if(b) b.textContent=String(i+1);});}
-  function splitAndRenumberShared(){
-    try{
-      document.querySelectorAll('.shared-wait-stack').forEach(stack=>{
-        if(!stack) return;
-        const old=stack.querySelector('.v767-shared-wrap'); if(old) old.remove();
-        const cards=[...stack.children].filter(el=>el.classList&&el.classList.contains('court-wait-card'));
-        if(!cards.length) return;
-        const mainCards=cards.filter(c=>/본선|128강|64강|32강|16강|8강|준결승|결승|진출전|국제|원도심/.test(c.textContent||''));
-        if(!mainCards.length) return;
-        const gukje=[], wondo=[]; mainCards.forEach(c=>{/원도심/.test(c.textContent||'')?wondo.push(c):gukje.push(c);});
-        renumberCards(gukje); renumberCards(wondo);
-        const wrap=document.createElement('div'); wrap.className='v767-shared-wrap';
-        function sec(cls,title,items){const s=document.createElement('div'); s.className='v767-shared-sec '+cls; const h=document.createElement('div'); h.className='v767-shared-head'; h.innerHTML=`<span>${title}</span><span>${items.length}경기</span>`; const b=document.createElement('div'); b.className='v767-shared-body'; if(items.length) items.forEach(x=>b.appendChild(x)); else {const e=document.createElement('div'); e.className='v767-empty'; e.textContent='대기 없음'; b.appendChild(e);} s.appendChild(h); s.appendChild(b); return s;}
-        wrap.appendChild(sec('gukje','🔵 국제 공용대기',gukje)); wrap.appendChild(sec('wondo','🟢 원도심 공용대기',wondo)); stack.appendChild(wrap);
-        stack.style.maxHeight='none'; stack.style.overflow='visible'; let p=stack.parentElement; for(let i=0;i<5&&p;i++,p=p.parentElement){p.style.overflow='visible';}
-        const title=[...document.querySelectorAll('div')].find(x=>/^⏳\s*(공용대기|구장별 공용대기)/.test(clean(x.textContent))&&x.closest('.court-drop-zone'));
-        if(title) title.textContent=`⏳ 구장별 공용대기 ${mainCards.length}경기`;
-      });
-    }catch(e){ console.warn(TAG,'split shared failed',e); }
-  }
-  window.v767SplitAndRenumberShared=splitAndRenumberShared;
-
-  const oldRender=window.renderBracket || (typeof renderBracket==='function'?renderBracket:null);
-  if(typeof oldRender==='function' && !oldRender.__v767Wrapped){
-    const wrapped=function(){ try{ visibleKeys().forEach(k=>repair(k,true)); }catch(_e){} const r=oldRender.apply(this,arguments); setTimeout(splitAndRenumberShared,70); setTimeout(splitAndRenumberShared,260); return r; };
-    wrapped.__v767Wrapped=true; wrapped.__old=oldRender; window.renderBracket=wrapped; try{renderBracket=wrapped;}catch(_e){}
-  }
-  ['startMainDraw','saveM3'].forEach(name=>{const old=window[name] || (typeof globalThis[name]==='function'?globalThis[name]:null); if(typeof old==='function'&&!old.__v767Wrapped){const wrapped=function(){const ret=old.apply(this,arguments); setTimeout(()=>{try{window.v767RepairMainNow(true);}catch(_e){}},700); setTimeout(()=>{try{window.v767RepairMainNow(true);}catch(_e){}},1800); return ret;}; wrapped.__v767Wrapped=true; wrapped.__old=old; window[name]=wrapped; try{eval(name+'=wrapped');}catch(_e){}}});
-  setTimeout(()=>{try{window.v767RepairMainNow(true); splitAndRenumberShared();}catch(_e){}},500);
-  setTimeout(()=>{try{window.v767RepairMainNow(true); splitAndRenumberShared();}catch(_e){}},1800);
-  setTimeout(()=>{try{window.v767RepairMainNow(true); splitAndRenumberShared();}catch(_e){}},3500);
-  try{const target=document.getElementById('bracketContent')||document.body; const mo=new MutationObserver(()=>setTimeout(splitAndRenumberShared,100)); mo.observe(target,{childList:true,subtree:true});}catch(_e){}
-  try{const b=document.getElementById('bracketFreshnessBadge'); if(b) b.textContent='v767 · 본선자리고정/구장별대기';}catch(_e){}
-  console.log(TAG,'stable placeholder main draw + venue queue numbering installed');
-})();
-</script>
-
-
-<!-- v768: visible deploy canary + badge reset -->
-<style id="v768DeployCanaryStyle">
-#bracketFreshnessBadge::before,#bracketFreshnessBadge::after{content:none!important;display:none!important;}
-#v768DeployCanary{position:fixed;right:14px;bottom:92px;z-index:2147483200;background:#dcfce7;color:#166534;border:2px solid #22c55e;border-radius:999px;padding:8px 13px;font-size:.78rem;font-weight:1000;box-shadow:0 10px 24px rgba(22,101,52,.18);pointer-events:none}
-@media(max-width:768px){#v768DeployCanary{bottom:calc(84px + env(safe-area-inset-bottom,0px));right:10px;font-size:.7rem;padding:7px 10px}}
-</style>
-<script id="v768DeployCanaryScript">
-(function(){
-  function mark(){
-    try{var b=document.getElementById('bracketFreshnessBadge'); if(b){ b.textContent='v768 · 실제적용확인 · 본선자리고정'; b.style.background='#dcfce7'; b.style.color='#166534'; b.style.border='1px solid #22c55e'; }}catch(e){}
-    try{
-      if(!document.getElementById('v768DeployCanary')){
-        var d=document.createElement('div'); d.id='v768DeployCanary'; d.textContent='✅ v768 적용중'; document.body.appendChild(d);
-        setTimeout(function(){try{d.remove();}catch(e){}},15000);
-      }
-    }catch(e){}
-  }
-  mark();
-  document.addEventListener('DOMContentLoaded',mark);
-  setTimeout(mark,300);setTimeout(mark,1000);setTimeout(mark,2500);setTimeout(mark,5000);
 })();
 </script>
 
