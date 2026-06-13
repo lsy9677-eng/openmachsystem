@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-13-v806";
+  const APP_VERSION = "2026-06-13-v812";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -6047,32 +6047,130 @@ button:disabled{opacity:.55!important;cursor:not-allowed!important;filter:graysc
 </style>
 
 <script id="v805GlobalFunctions">
-// v805: 전역 함수 — 반드시 모든 스크립트보다 먼저 정의
-window.v799LockBracket = async function(key, lock){
+// v810: 전역 함수 — 모든 스크립트보다 먼저 정의
+
+// ── 잠금 상태 확인 ──
+window.v799IsLocked=function(key){
   try{
-    if(!key){ key=String((document.getElementById('brTS')||{}).value||'').trim(); }
-    if(!key) return;
-    if(!(window.G&&G.draws&&G.draws[key])) return;
+    if(!key) key=String((document.getElementById('brTS')||{}).value||'').trim();
+    return !!(window.G&&G.draws&&G.draws[key]&&G.draws[key].mainBracketLocked);
+  }catch(e){return false;}
+};
+
+// ── 관리자 여부 ──
+window.v799CanView=function(){
+  return !!(window.AD||window.OP||window.TM||(typeof canManageBracket==='function'&&canManageBracket()));
+};
+
+// ── 가림막 HTML ──
+window.v810MaskHTML='<div style="padding:80px 20px;text-align:center;"><div style="font-size:3.5rem;margin-bottom:16px">\uD83D\uDD12</div><div style="font-size:1.15rem;font-weight:900;color:#1e293b;margin-bottom:10px">본선 대진표 준비중</div><div style="font-size:.9rem;color:#64748b;">추첨이 완료되면 운영진이 공개합니다.</div></div>';
+
+// ── renderBracket 래핑 (잠금 시 가림막으로 교체) ──
+window.v810WrapRenderBracket=function(){
+  // renderBracketTree 래핑 — 잠금 시 접힘 상태로 반환
+  const origTree=window.renderBracketTree;
+  if(typeof origTree==='function'&&!origTree.__v810Wrapped){
+    const wrappedTree=function(key,mMs,teams){
+      const html=origTree.apply(this,arguments);
+      const locked=window.v799IsLocked();
+      const canView=window.v799CanView();
+      if(locked&&!canView){
+        // 잠금 상태: 가림막만
+        return '<div style="padding:60px 20px;text-align:center;background:#f8fafc;border:2px dashed #cbd5e1;border-radius:18px;margin:16px 0"><div style="font-size:3rem;margin-bottom:12px">\uD83D\uDD12</div><div style="font-size:1.1rem;font-weight:900;color:#1e293b;margin-bottom:8px">본선 대진표 준비중</div><div style="font-size:.85rem;color:#64748b">운영진이 공개하면 볼 수 있습니다</div></div>';
+      }
+      if(locked&&canView){
+        // 관리자: 접힘 상태 + 펼치기 버튼
+        const uid='bTree_'+Date.now();
+        return '<div><button type="button" onclick="var d=document.getElementById(\''+uid+'\');d.style.display=d.style.display===\'none\'?\'block\':\'none\';this.textContent=d.style.display===\'none\'?\'🌳 본선 대진표 펼치기 (관리자전용)\':' + "'" + '🌳 본선 대진표 접기' + "'" + '" style="width:100%;padding:12px;border-radius:10px;border:2px dashed #dc2626;background:#fff5f5;color:#dc2626;font-size:.85rem;font-weight:900;cursor:pointer;margin:8px 0">\uD83C\uDF33 본선 대진표 펼치기 (관리자전용)</button><div id="'+uid+'" style="display:none">'+html+'</div></div>';
+      }
+      return html;
+    };
+    wrappedTree.__v810Wrapped=true;
+    window.renderBracketTree=wrappedTree;
+    try{renderBracketTree=wrappedTree;}catch(e){}
+  }
+  
+  const orig=window.renderBracket;
+  if(typeof orig!=='function'||orig.__v810Wrapped) return;
+  const wrapped=function(){
+    const key=String((document.getElementById('brTS')||{}).value||'').trim();
+    if(window.v799IsLocked(key)&&!window.v799CanView()){
+      // 가림막만 표시 — 원본 renderBracket 실행 안 함
+      const cont=document.getElementById('bracketContent');
+      if(cont) cont.innerHTML=window.v810MaskHTML;
+      return;
+    }
+    return orig.apply(this,arguments);
+  };
+  wrapped.__v810Wrapped=true;
+  wrapped.__orig=orig;
+  window.renderBracket=wrapped;
+  try{renderBracket=wrapped;}catch(e){}
+  console.log('[v810] renderBracket 래핑 완료');
+};
+
+// ── 잠금/공개 실행 ──
+window.v799LockBracket=async function(key,lock){
+  try{
+    if(!key) key=String((document.getElementById('brTS')||{}).value||'').trim();
+    if(!key||!(window.G&&G.draws&&G.draws[key])){alert('대회를 먼저 선택하세요.');return;}
     G.draws[key].mainBracketLocked=!!lock;
     // Firebase 저장
     const _stD=window.stD;
     if(typeof _stD==='function'){
-      try{ if(window.__FB_WRITE_CACHE&&window.__FB_WRITE_CACHE.draws) delete window.__FB_WRITE_CACHE.draws[key]; }catch(e){}
+      try{if(window.__FB_WRITE_CACHE&&window.__FB_WRITE_CACHE.draws)delete window.__FB_WRITE_CACHE.draws[key];}catch(e){}
       await _stD(key);
     }
-    // 렌더 갱신
-    try{ if(typeof renderBracket==='function') renderBracket(); }catch(e){}
-    // 가림막 적용
-    try{ if(typeof v799ApplyBracketLock==='function') v799ApplyBracketLock(); }catch(e){}
-    const msg=lock?'🔒 본선 대진표 잠금됨 (참가자에게 숨김)':'🔓 본선 대진표 공개됨';
-    try{ if(typeof toastMsg==='function') toastMsg(msg,'success'); else if(typeof toast==='function') toast(msg,'success'); }catch(e){}
-    console.log('[v805] bracketLocked:',lock,key);
-  }catch(e){ console.error('[v805] LockBracket 실패',e); alert('오류: '+e.message); }
+    // 버튼 UI 업데이트
+    try{window.v809UpdateLockBtn();}catch(e){}
+    // 렌더 갱신 (래핑된 renderBracket 호출 → 잠금이면 가림막, 아니면 정상)
+    try{if(typeof renderBracket==='function')renderBracket();}catch(e){}
+    const msg=lock?'\uD83D\uDD12 본선 대진표 잠금됨':'\uD83D\uDD13 본선 대진표 공개됨';
+    try{if(typeof toastMsg==='function')toastMsg(msg,'success');else if(typeof toast==='function')toast(msg,'success');}catch(e){}
+    console.log('[v810] bracketLocked:',lock,key);
+  }catch(e){console.error('[v810]',e);alert('오류: '+e.message);}
 };
 
-window.v793FixedDraw = window.v793FixedDraw || async function(key){
-  alert('본선 대진표 확정 함수 로딩 중입니다. 잠시 후 다시 시도해주세요.');
+// ── 토글 ──
+window.v809ToggleBracketLock=async function(){
+  const key=String((document.getElementById('brTS')||{}).value||'').trim();
+  const locked=window.v799IsLocked(key);
+  await window.v799LockBracket(key,!locked);
 };
+
+// ── 버튼 UI 업데이트 ──
+window.v809UpdateLockBtn=function(){
+  try{
+    ['v809BracketLockBtn','v809LockBtnCourtBoard'].forEach(function(id){
+      const btn=document.getElementById(id);
+      if(!btn) return;
+      const canSee=window.v799CanView();
+      btn.style.display=canSee?'':'none';
+      if(!canSee) return;
+      const key=String((document.getElementById('brTS')||{}).value||'').trim();
+      const locked=window.v799IsLocked(key);
+      btn.textContent=locked?'\uD83D\uDD13 본선 공개':'\uD83D\uDD12 본선 잠금';
+      btn.style.background=locked?'#16a34a':'#dc2626';
+      btn.style.borderColor=locked?'#16a34a':'#dc2626';
+    });
+  }catch(e){}
+};
+
+// 페이지 로드 후 래핑 실행
+(function init(){
+  function tryWrap(){
+    if(typeof window.renderBracket==='function'&&!window.renderBracket.__v810Wrapped){
+      window.v810WrapRenderBracket();
+    }
+  }
+  tryWrap();
+  setTimeout(tryWrap,500);
+  setTimeout(tryWrap,1500);
+  setTimeout(tryWrap,3000);
+  // 버튼 업데이트
+  setTimeout(window.v809UpdateLockBtn,2000);
+  setTimeout(window.v809UpdateLockBtn,4000);
+})();
 </script>
 </head>
 <body>
@@ -6411,6 +6509,7 @@ window.v793FixedDraw = window.v793FixedDraw || async function(key){
 <div class="login-menu-wrap js-mini-menu" id="bracketSaveMenuWrap">
 <button class="btn btn-outline" onclick="window.v570OpenA4GroupSheet ? window.v570OpenA4GroupSheet() : window.v566OpenA4GroupPreview()" style="font-size:.78rem;padding:5px 12px">🖨️ 조편성 저장/출력(A4)</button>
 </div>
+<button id="v809BracketLockBtn" type="button" style="font-size:.78rem;padding:5px 12px;border-radius:8px;border:1px solid #6b7280;background:#6b7280;color:#fff;cursor:pointer;display:none" onclick="v809ToggleBracketLock()">🔒 본선 잠금</button>
 </div>
 <div class="sec-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
   <span>대진표 · 경기 현황 <span style="font-size:.72rem;font-weight:400;color:var(--text2)">— 전체 대진표는 수동 최신화 · 코트/진행경기만 자동 최소 갱신</span> <span id="bracketFreshnessBadge" style="display:inline-flex;margin-left:6px;padding:3px 8px;border-radius:999px;background:#eef2ff;color:#1d4ed8;font-size:.66rem;font-weight:900;vertical-align:middle">v730</span></span>
@@ -14609,7 +14708,7 @@ function renderCourtStartControlHtml(key){
         <button class="btn btn-outline" type="button" style="min-height:30px;height:30px;padding:4px 9px;border-radius:10px;font-size:.68rem;font-weight:1000" onclick="saveCourtStartTimeV546('${escFn(key)}')"${disabled}>💾 저장</button>
         <button class="btn btn-accent" type="button" style="min-height:30px;height:30px;padding:4px 9px;border-radius:10px;font-size:.68rem;font-weight:1000" onclick="startCourtNowV546('${escFn(key)}')"${disabled}>▶ 지금 시작</button>
         <button class="btn btn-gray" type="button" style="min-height:30px;height:30px;padding:4px 9px;border-radius:10px;font-size:.68rem;font-weight:1000" onclick="useCourtScheduledV546('${escFn(key)}')"${disabled}>예약시간 사용</button>
-        ${canManageBracket()?`<button type="button" style="min-height:30px;height:30px;padding:4px 11px;border-radius:10px;font-size:.68rem;font-weight:1000;background:#dc2626;color:#fff;border:none;cursor:pointer" onclick="v793FixedDraw('${escFn(key)}')" title="128강 대진표 확정">🏆 본선확정</button> <button type="button" style="min-height:30px;height:30px;padding:4px 11px;border-radius:10px;font-size:.68rem;font-weight:1000;background:${(G&&G.draws&&G.draws[key]&&G.draws[key].mainBracketLocked)?'#16a34a':'#6b7280'};color:#fff;border:none;cursor:pointer" onclick="v799LockBracket('${escFn(key)}',${!(G&&G.draws&&G.draws[key]&&G.draws[key].mainBracketLocked)})" title="본선 대진표 잠금/공개">${(G&&G.draws&&G.draws[key]&&G.draws[key].mainBracketLocked)?'🔓 본선공개':'🔒 본선잠금'}</button>`:''} <button class="btn btn-primary" type="button" style="min-height:30px;height:30px;padding:4px 11px;border-radius:10px;font-size:.68rem;font-weight:1000;background:#7c3aed;border-color:#7c3aed" onclick="v773RunMainAssign('${escFn(key)}')" title="빈 코트에 본선 경기를 구장별 자동 배분합니다">🎯 본선 코트 배정</button>
+        ${canManageBracket()?`<button type="button" style="min-height:30px;height:30px;padding:4px 11px;border-radius:10px;font-size:.68rem;font-weight:1000;background:#dc2626;color:#fff;border:none;cursor:pointer" onclick="v793FixedDraw('${escFn(key)}')" title="128강 대진표 확정">🏆 본선확정</button> <button type="button" style="min-height:30px;height:30px;padding:4px 11px;border-radius:10px;font-size:.68rem;font-weight:1000;background:${(G&&G.draws&&G.draws[key]&&G.draws[key].mainBracketLocked)?'#16a34a':'#6b7280'};color:#fff;border:none;cursor:pointer" id="v809LockBtnCourtBoard" onclick="v809ToggleBracketLock()" title="본선 대진표 잠금/공개">${(G&&G.draws&&G.draws[key]&&G.draws[key].mainBracketLocked)?'🔓 본선공개':'🔒 본선잠금'}</button>`:''} <button class="btn btn-primary" type="button" style="min-height:30px;height:30px;padding:4px 11px;border-radius:10px;font-size:.68rem;font-weight:1000;background:#7c3aed;border-color:#7c3aed" onclick="v773RunMainAssign('${escFn(key)}')" title="빈 코트에 본선 경기를 구장별 자동 배분합니다">🎯 본선 코트 배정</button>
       </div>
     </div>`;
   }catch(e){ return ''; }
@@ -53881,20 +53980,37 @@ window.buildIndivMainMatchesFixed=buildIndivMainMatchesFixed;
     window.v702BuildA4=window.v731BuildA4;
     window.v714BuildA4=window.v731BuildA4;
     window.v715BuildA4=window.v731BuildA4;
-    // openA4 고정 (v734 래핑 전 원본)
+    // openA4: v731 원본(v734 래핑 포함) 사용
     if(typeof window.v731OpenA4==='function'){
-      const openFn=window.v731OpenA4.__v734HQWrapped
-        ? window.v731OpenA4  // 이미 래핑됨 → 그대로 사용 (저장버튼 고화질 유지)
-        : window.v731OpenA4;
-      window.v702OpenA4=openFn;
-      window.v714OpenA4=openFn;
-      window.v715OpenA4=openFn;
+      window.v702OpenA4=window.v731OpenA4;
+      window.v714OpenA4=window.v731OpenA4;
+      window.v715OpenA4=window.v731OpenA4;
     }
-    console.log('[v799] A4 v731 고정 완료');
+    console.log('[v809] A4 v731 고정 완료');
   }
   doPin();
   setTimeout(doPin,500);
   setTimeout(doPin,1500);
+
+  // A4 버튼 클릭 시 v731OpenA4 강제 호출 (capture phase 최우선)
+  function interceptA4Click(ev){
+    const btn=ev.target&&ev.target.closest&&ev.target.closest('button,a');
+    if(!btn) return;
+    const id=btn.id||'';
+    const txt=(btn.textContent||'').trim();
+    // A4 버튼인지 확인
+    if(id==='v702A4Btn'||/A4|대진표 출력|조편성 출력|고화질/.test(txt)){
+      const openFn=window.v731OpenA4;
+      if(typeof openFn==='function'){
+        ev.preventDefault();
+        ev.stopImmediatePropagation();
+        openFn();
+        return false;
+      }
+    }
+  }
+  // 기존 capture 리스너보다 먼저 실행되도록 useCapture=true
+  document.addEventListener('click', interceptA4Click, true);
 })();
 
 // autoAdv 완료 후 자동 대기 올리기 (시합 완료 → 다음 대기 경기 코트 배정)
@@ -54047,50 +54163,65 @@ function v799ApplyBracketLock(){
     const locked=v799IsLocked(key);
     const canView=v799CanView();
 
-    // 기존 가림막 제거
-    document.querySelectorAll('#v799-bracket-mask').forEach(el=>el.remove());
+    let lockStyle=document.getElementById('v799-lock-style');
+    if(!lockStyle){
+      lockStyle=document.createElement('style');
+      lockStyle.id='v799-lock-style';
+      document.head.appendChild(lockStyle);
+    }
 
-    // 잠금 버튼 업데이트
-    document.querySelectorAll('.v799-lock-btn').forEach(btn=>{
-      btn.textContent=locked?'🔓 본선 공개':'🔒 본선 잠금';
-      btn.style.background=locked?'#16a34a':'#dc2626';
-      btn.style.borderColor=locked?'#16a34a':'#dc2626';
-      btn.setAttribute('onclick',`v799LockBracket('${key}',${!locked})`);
-    });
-
-    // 비관리자 + 잠금 상태 → 브래킷 가림
-    const bracketContent=document.getElementById('bracketContent');
-    if(!bracketContent) return;
     if(locked && !canView){
-      const mask=document.createElement('div');
-      mask.id='v799-bracket-mask';
-      mask.style.cssText='position:relative;z-index:10;background:#f8fafc;border:2px dashed #cbd5e1;border-radius:18px;padding:60px 20px;text-align:center;margin:16px 0;';
-      mask.innerHTML=`
-        <div style="font-size:2.5rem;margin-bottom:16px">🔒</div>
-        <div style="font-size:1.1rem;font-weight:900;color:#334155;margin-bottom:8px">본선 대진표 준비중</div>
-        <div style="font-size:.85rem;color:#64748b">추첨이 완료되면 운영진이 공개합니다.</div>
+      // page-bracket 전체 숨김 — 가장 단순하고 확실한 방법
+      lockStyle.textContent=`
+        #page-bracket { display:none !important; }
+        #v799-bracket-mask { display:block !important; }
       `;
-      bracketContent.style.display='none';
-      bracketContent.parentNode.insertBefore(mask, bracketContent);
+      // 가림막이 없으면 page-bracket 형제로 삽입
+      if(!document.getElementById('v799-bracket-mask')){
+        const mask=document.createElement('div');
+        mask.id='v799-bracket-mask';
+        mask.style.cssText='padding:60px 20px;text-align:center;background:#f8fafc;border:2px dashed #cbd5e1;border-radius:18px;margin:20px 0;';
+        mask.innerHTML='<div style="font-size:3rem;margin-bottom:12px">🔒</div><div style="font-size:1.1rem;font-weight:900;color:#334155;margin-bottom:8px">본선 대진표 준비중</div><div style="font-size:.85rem;color:#64748b">추첨이 완료되면 운영진이 공개합니다.</div>';
+        const page=document.getElementById('page-bracket');
+        if(page && page.parentNode) page.parentNode.insertBefore(mask, page);
+      }
     } else {
-      bracketContent.style.display='';
+      lockStyle.textContent='';
+      document.querySelectorAll('#v799-bracket-mask').forEach(el=>el.remove());
     }
   }catch(e){ console.warn('[v799] applyLock 실패',e); }
 }
 window.v799ApplyBracketLock=v799ApplyBracketLock;
 
-// renderBracket 래핑 — 렌더 후 잠금 적용
-(function(){
+// renderBracket 래핑 — 렌더 후 잠금 적용 (늦게 래핑해서 모든 패치 이후 실행)
+function wrapRenderForLock(){
   const oldRender=window.renderBracket;
   if(typeof oldRender!=='function'||oldRender.__v799LockWrapped) return;
   const wrapped=function(){
     const r=oldRender.apply(this,arguments);
-    setTimeout(v799ApplyBracketLock,100);
+    setTimeout(v799ApplyBracketLock,50);
+    setTimeout(v799ApplyBracketLock,300);
     return r;
   };
   wrapped.__v799LockWrapped=true;
   window.renderBracket=wrapped;
   try{renderBracket=wrapped;}catch(e){}
+}
+wrapRenderForLock();
+setTimeout(wrapRenderForLock,1000);
+setTimeout(wrapRenderForLock,3000);
+
+// MutationObserver — bracketContent가 바뀔 때마다 잠금 재적용
+(function(){
+  let _obs=null;
+  function startObs(){
+    const bc=document.getElementById('bracketContent');
+    if(!bc||_obs) return;
+    _obs=new MutationObserver(()=>{ setTimeout(v799ApplyBracketLock,50); });
+    _obs.observe(bc,{childList:true,subtree:false});
+  }
+  setTimeout(startObs,1500);
+  setTimeout(startObs,3000);
 })();
 
 // 잠금 버튼 삽입 (관리자만) — 코트현황판 + 대진표 export bar 두 곳에
