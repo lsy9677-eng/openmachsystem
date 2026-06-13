@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-14-v828";
+  const APP_VERSION = "2026-06-14-v833";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -6391,6 +6391,7 @@ button:disabled{opacity:.55!important;cursor:not-allowed!important;filter:graysc
 <div class="login-menu-wrap js-mini-menu" id="bracketSaveMenuWrap">
 <button class="btn btn-outline" onclick="window.v570OpenA4GroupSheet ? window.v570OpenA4GroupSheet() : window.v566OpenA4GroupPreview()" style="font-size:.78rem;padding:5px 12px">🖨️ 조편성 저장/출력(A4)</button>
 </div>
+<button id="v830MainPrivacyBtn" class="v830-main-privacy-btn locked" type="button" onclick="window.v830ToggleMainPrivacy ? window.v830ToggleMainPrivacy() : (window.v830SetMainPublic&&window.v830SetMainPublic(true))" style="display:none">🔓 본선 공개</button>
 <button id="v809BracketLockBtn" type="button" style="font-size:.78rem;padding:5px 12px;border-radius:8px;border:1px solid #6b7280;background:#6b7280;color:#fff;cursor:pointer;display:none" onclick="v809ToggleBracketLock()">🔒 본선 잠금</button>
 </div>
 <div class="sec-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
@@ -13870,7 +13871,7 @@ function buildCourtBoardGroupHeadline(key, m, autoTitle, rawTitle){
   const detail=`예선 ${grpLabel(m.group||0)}`;
   // v495: 코트 현황 카드에서 일반 라벨이 팀명 대신 표시되는 문제 방지
   // v614b: '수동 고정', '수동 공용대기' 등 수동 라벨도 팀명 대신 표시되지 않도록 필터
-  if(!label || /자동\s*배정|경기\s*대기|대기중|대기\s*중|수동|조건\s*코트|확정\s*고정|\(v\d+\)/.test(label)) return {headline: rawTitle, detail};
+  if(!label || /자동\s*배정|경기\s*대기|대기중|대기\s*중|수동|조건\s*코트|확정\s*고정|이번대회128고정|\(v\d+\)/.test(label)) return {headline: rawTitle, detail};
   if(label==='1번 vs 2번') return {headline: `${s1} vs ${s2}`, detail};
   if(label==='1번 vs 3번') return {headline: `${s1} vs ${s3}`, detail};
   if(label==='2번 vs 3번') return {headline: `${s2} vs ${s3}`, detail};
@@ -14611,7 +14612,7 @@ function renderCourtStartControlHtml(key){
         <button class="btn btn-outline" type="button" style="min-height:30px;height:30px;padding:4px 9px;border-radius:10px;font-size:.68rem;font-weight:1000" onclick="saveCourtStartTimeV546('${escFn(key)}')"${disabled}>💾 저장</button>
         <button class="btn btn-accent" type="button" style="min-height:30px;height:30px;padding:4px 9px;border-radius:10px;font-size:.68rem;font-weight:1000" onclick="startCourtNowV546('${escFn(key)}')"${disabled}>▶ 지금 시작</button>
         <button class="btn btn-gray" type="button" style="min-height:30px;height:30px;padding:4px 9px;border-radius:10px;font-size:.68rem;font-weight:1000" onclick="useCourtScheduledV546('${escFn(key)}')"${disabled}>예약시간 사용</button>
-        ${canManageBracket()?`<button type="button" style="min-height:30px;height:30px;padding:4px 11px;border-radius:10px;font-size:.68rem;font-weight:1000;background:#dc2626;color:#fff;border:none;cursor:pointer" onclick="v793FixedDraw('${escFn(key)}')" title="128강 대진표 확정">🏆 본선확정</button> <button type="button" style="min-height:30px;height:30px;padding:4px 11px;border-radius:10px;font-size:.68rem;font-weight:1000;background:${(G&&G.draws&&G.draws[key]&&G.draws[key].mainBracketLocked)?'#16a34a':'#6b7280'};color:#fff;border:none;cursor:pointer" id="v809LockBtnCourtBoard" onclick="v799LockBracket('${escFn(key)}',${!(G&&G.draws&&G.draws[key]&&G.draws[key].mainBracketLocked)})" title="본선 대진표 잠금/공개">${(G&&G.draws&&G.draws[key]&&G.draws[key].mainBracketLocked)?'🔓 본선공개':'🔒 본선잠금'}</button>`:''} <button class="btn btn-primary" type="button" style="min-height:30px;height:30px;padding:4px 11px;border-radius:10px;font-size:.68rem;font-weight:1000;background:#7c3aed;border-color:#7c3aed" onclick="v773RunMainAssign('${escFn(key)}')" title="빈 코트에 본선 경기를 구장별 자동 배분합니다">🎯 본선 코트 배정</button>
+        ${canManageBracket()?`<button type="button" style="min-height:30px;height:30px;padding:4px 11px;border-radius:10px;font-size:.68rem;font-weight:1000;background:#dc2626;color:#fff;border:none;cursor:pointer" onclick="v793FixedDraw('${escFn(key)}')" title="128강 대진표 확정">🏆 본선확정</button> <button type="button" style="min-height:30px;height:30px;padding:4px 11px;border-radius:10px;font-size:.68rem;font-weight:1000;background:${(G&&G.draws&&G.draws[key]&&G.draws[key].mainBracketLocked)?'#16a34a':'#dc2626'};color:#fff;border:none;cursor:pointer" id="v809LockBtnCourtBoard" onclick="v799LockBracket('${escFn(key)}',${!(G&&G.draws&&G.draws[key]&&G.draws[key].mainBracketLocked)})" title="본선 대진표 잠금/공개">${(G&&G.draws&&G.draws[key]&&G.draws[key].mainBracketLocked)?'🔓 본선 공개':'🔒 본선 잠금'}</button>`:''} <button class="btn btn-primary" type="button" style="min-height:30px;height:30px;padding:4px 11px;border-radius:10px;font-size:.68rem;font-weight:1000;background:#7c3aed;border-color:#7c3aed" onclick="v773RunMainAssign('${escFn(key)}')" title="빈 코트에 본선 경기를 구장별 자동 배분합니다">🎯 본선 코트 배정</button>
       </div>
     </div>`;
   }catch(e){ return ''; }
@@ -25800,7 +25801,7 @@ function renderBracketHTMLForDiv(tid,div,isAll){
           </div>`;
           const isFixedPreview=((draw.mainMode||'fixed')==='fixed');
           const redrawPreview=buildIndivRedrawPreviewData(draw.groups||[], draw.grpSize||2);
-          html+=`<div class="card" id="mainPreviewCard_${tid}_${div}" style="background:linear-gradient(135deg,#fffdf5,#eef5ff);border:1.5px dashed var(--accent)">
+          if(canManageBracket()){html+=`<div class="card" id="mainPreviewCard_${tid}_${div}" style="background:linear-gradient(135deg,#fffdf5,#eef5ff);border:1.5px dashed var(--accent)">
             <div style="font-weight:800;color:var(--primary-dark);margin-bottom:6px">${isFixedPreview?'📌 본선은 지금부터 계속 보입니다':'📌 본선은 예선 후 재추첨됩니다'}</div>
             <div style="font-size:.78rem;color:var(--text2);margin-bottom:10px;line-height:1.7">
               ${isFixedPreview
@@ -25809,7 +25810,7 @@ function renderBracketHTMLForDiv(tid,div,isAll){
             </div>
             ${isFixedPreview ? renderMainPreviewHTML(pv.matchSlots,pv.n,true,pv.playInMatches||[]) : renderMainPreviewHTML(redrawPreview.matchSlots,redrawPreview.spec.mainSize||pv.n,true,redrawPreview.playInMatches||[])}
             ${isFixedPreview ? slotAssignHtml : ''}
-          </div>`;
+          </div>`;} // end canManageBracket
         } else if(pv.n>=2 && mMs.length){
           html+=`<div style="margin-top:8px">
             <button class="btn btn-outline" style="font-size:.72rem;padding:4px 12px" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.textContent=this.nextElementSibling.style.display==='none'?'🌳 조별 본선 연결구조 보기':'🌳 조별 본선 연결구조 접기'">🌳 조별 본선 연결구조 보기</button>
@@ -54210,14 +54211,17 @@ window.v793FixedDraw=async function(key){
     if(!matches||!matches.length){alert('대진 생성 실패');return;}
     G.matches[key]=matches;
     G.draws[key].mainBracketFixed=true; // 슬롯 고정 플래그
+    G.draws[key].mainBracketLocked=true; // ★ 확정 즉시 자동 잠금 (기본 비공개)
     window.__v799DrawDone=true; // v787 자동 재보정 차단
     try{if(window.__FB_WRITE_CACHE&&window.__FB_WRITE_CACHE.matches)delete window.__FB_WRITE_CACHE.matches[key];}catch(e){}
+    try{if(window.__FB_WRITE_CACHE&&window.__FB_WRITE_CACHE.draws)delete window.__FB_WRITE_CACHE.draws[key];}catch(e){}
     window.__V641_ALLOW_LOCAL_COURT_OVERLAY=true;
     await _stM(key);
+    if(typeof stD==='function') await stD(key);
     setTimeout(()=>{window.__V641_ALLOW_LOCAL_COURT_OVERLAY=false;},3000);
     try{if(typeof renderBracket==='function')renderBracket();}catch(e){}
     const bye=matches.filter(m=>m.round===0&&m.bye);
-    alert(`✅ 본선 128강 확정!\n원도심 ${wN}팀 / 국제 ${gN}팀\n부전승 ${bye.length}개`);
+    alert(`✅ 본선 128강 확정! (자동 잠금됨)\n원도심 ${wN}팀 / 국제 ${gN}팀\n부전승 ${bye.length}개\n\n🔒 참가자에게 비공개 상태입니다.\n공개하려면 "본선공개" 버튼을 누르세요.`);
   }catch(e){console.error('[v798]',e);alert('오류: '+e.message);}
 };
 
@@ -54255,11 +54259,34 @@ window.v799LockBracket=async function(key, lock){
       await _stD(key);
     }
     v799ApplyBracketLock();
-    const msg=lock?'🔒 본선 대진표가 잠겼습니다. 참가자에게 보이지 않습니다.':'🔓 본선 대진표가 공개되었습니다.';
+    // ★ v823 잠금 캐시 초기화 후 강제 갱신
+    try{
+      if(typeof window.__v823LastMaskSig !== 'undefined') window.__v823LastMaskSig='';
+      // v823 내부 lastMaskSig 초기화
+      document.querySelectorAll('.v823-main-hidden').forEach(el=>{
+        try{el.style.display=el.dataset.v823PrevDisplay||'';el.classList.remove('v823-main-hidden');}catch(e){}
+      });
+      document.querySelectorAll('.v823-main-lock-mask').forEach(el=>el.remove());
+    }catch(e){}
+    // ★ 공개 시 코트 배정 자동 실행
+    if(!lock){
+      try{
+        if(typeof applyVenueToMain==='function') applyVenueToMain(key);
+        const changed=typeof window.v771AssignMainCourts==='function'
+          ? window.v771AssignMainCourts(key,false) : false;
+        if(changed && typeof stM==='function'){
+          try{if(window.__FB_WRITE_CACHE?.matches)delete window.__FB_WRITE_CACHE.matches[key];}catch(e){}
+          window.__V641_ALLOW_LOCAL_COURT_OVERLAY=true;
+          await stM(key);
+          setTimeout(()=>{window.__V641_ALLOW_LOCAL_COURT_OVERLAY=false;},3000);
+        }
+      }catch(e){console.warn('[v832] 코트배정 실패',e);}
+    }
+    const msg=lock?'🔒 본선 대진표가 잠겼습니다. 참가자에게 보이지 않습니다.':'🔓 본선 대진표가 공개되었습니다. 코트 배정 중...';
     if(typeof toastMsg==='function') toastMsg(msg,'success');
     else if(typeof toast==='function') toast(msg,'success');
-    console.log('[v799] bracketLocked:',lock,key);
-  }catch(e){ console.error('[v799] lock failed',e); }
+    console.log('[v832] bracketLocked:',lock,key);
+  }catch(e){ console.error('[v832] lock failed',e); }
 };
 
 function v799IsLocked(key){
@@ -54981,8 +55008,9 @@ setTimeout(v799ApplyBracketLock,3000);
       const masked=existingMaskedKeys();
       const hiddenCount=document.querySelectorAll('.v823-main-hidden').length;
 
+      // 잠금 해제 시 강제 갱신 (캐시 무시)
+      if(!keys.length && masked==='') { clearMainMasks(); lastMaskSig=sig; return; }
       // 이미 같은 키가 본선만 가려진 상태면 DOM을 건드리지 않는다.
-      // MutationObserver 반복 호출로 버튼 입력이 씹히던 핵심 원인 제거.
       if(sig===lastMaskSig && masked===keys.join('|') && (keys.length===0 || hiddenCount>0)) return;
 
       clearMainMasks();
@@ -55402,6 +55430,270 @@ setTimeout(v799ApplyBracketLock,3000);
   [300,900,1800,3500].forEach(ms=>setTimeout(boot,ms));
   document.addEventListener('change',ev=>{if(ev.target&&/^(brTS|brDS)$/.test(ev.target.id||'')) setTimeout(boot,120);},true);
   console.log('[v828] emergency layout/result fix installed');
+})();
+</script>
+
+
+
+
+<!-- v829 official one-lock block removed in v830: existing functions restored; v830 adds only public/private control. -->
+
+
+
+
+<style id="v830MainPrivateOpenStyle">
+/* v830: 기존 본선 기능은 유지하고, 공개/비공개 버튼 하나만 추가 */
+.v830-main-privacy-btn{
+  display:inline-flex!important;align-items:center!important;justify-content:center!important;
+  min-height:36px!important;border-radius:10px!important;font-size:.78rem!important;font-weight:1000!important;
+  padding:6px 12px!important;white-space:nowrap!important;cursor:pointer!important;color:#fff!important;border:1px solid transparent!important;
+}
+.v830-main-privacy-btn.locked{background:#16a34a!important;border-color:#16a34a!important;}
+.v830-main-privacy-btn.opened{background:#dc2626!important;border-color:#dc2626!important;}
+.v830-main-private-mask{
+  display:block!important;padding:28px 16px!important;margin:12px 0!important;text-align:center!important;
+  border:1.5px dashed #cbd5e1!important;border-radius:16px!important;background:linear-gradient(135deg,#f8fafc,#eef4ff)!important;
+  color:#334155!important;font-size:.86rem!important;font-weight:900!important;line-height:1.65!important;
+}
+.v830-main-hidden{display:none!important;}
+@media(max-width:900px){
+  /* 공용대기 모바일/태블릿 폭 깨짐 방지 */
+  .shared-wait-stack,.court-wait-stack{width:100%!important;max-width:100%!important;overflow:visible!important;}
+  .shared-wait-stack .v771-split,.court-drop-zone .shared-wait-stack .v771-split,.v771-split{
+    display:flex!important;flex-direction:column!important;grid-template-columns:1fr!important;width:100%!important;max-width:100%!important;gap:10px!important;
+  }
+  .v771-sec,.v771-sec.gukje,.v771-sec.wondo{width:100%!important;max-width:100%!important;min-width:0!important;box-sizing:border-box!important;}
+  .v771-body{display:flex!important;flex-direction:column!important;gap:8px!important;width:100%!important;max-width:100%!important;}
+  .v771-body .court-wait-card,.shared-wait-stack .court-wait-card,.court-wait-card{
+    width:100%!important;max-width:100%!important;min-width:0!important;box-sizing:border-box!important;overflow:hidden!important;
+  }
+  .court-wait-card div,.court-wait-card span{max-width:100%!important;}
+  #bracketExportBar .v830-main-privacy-btn{width:100%!important;font-size:.68rem!important;padding:6px 5px!important;}
+}
+</style>
+<script id="v830MainPrivateOpenScript">
+(function(){
+  'use strict';
+  if(window.__v830MainPrivateOpenInstalled) return;
+  window.__v830MainPrivateOpenInstalled=true;
+  const TAG='[v830]';
+  const clean=v=>String(v==null?'':v).replace(/\s+/g,' ').trim();
+  let applying=false;
+
+  function isManager(){
+    try{ if(window.AD===true||window.OP===true||window.TM===true) return true; }catch(e){}
+    try{ if(typeof window.canManageBracket==='function' && window.canManageBracket()) return true; }catch(e){}
+    try{ return document.body.classList.contains('admin-mode')||document.body.classList.contains('operator-mode')||document.body.classList.contains('tm-mode'); }catch(e){}
+    return false;
+  }
+  function tid(){return clean((document.getElementById('brTS')||{}).value||'');}
+  function tournamentById(id){try{return (window.G&&G.tournaments||[]).find(t=>String(t.id)===String(id))||null;}catch(e){return null;}}
+  function selectedDivs(id){
+    try{
+      if(typeof window.getBracketSelectedDivs==='function'){
+        const ds=(window.getBracketSelectedDivs(id)||[]).filter(Boolean);
+        if(ds.length && !ds.includes('__ALL__')) return ds;
+      }
+    }catch(e){}
+    const v=clean((document.getElementById('brDS')||{}).value||'');
+    if(v && v!=='__ALL__') return [v];
+    const t=tournamentById(id);
+    return (t&&Array.isArray(t.divisions)?t.divisions:[]).filter(Boolean);
+  }
+  function selectedKeys(){
+    const id=tid(); if(!id) return [];
+    return selectedDivs(id).map(d=>id+'_'+d).filter(k=>window.G&&G.draws&&G.draws[k]);
+  }
+  function currentKey(){return selectedKeys()[0]||'';}
+  function hasMain(key){try{return (G.matches[key]||[]).some(m=>m&&String(m.phase||'')==='main');}catch(e){return false;}}
+  function draw(key){try{return key&&G&&G.draws&&G.draws[key]||null;}catch(e){return null;}}
+  function isOpen(key){
+    const d=draw(key);
+    if(!d) return false;
+    // v830부터는 공개 플래그가 있어야 공개. 기존 mainBracketLocked=false만으로는 기본 공개 처리하지 않는다.
+    return d.mainBracketPublic===true && d.mainBracketLocked!==true;
+  }
+  function shouldHideMain(key){return !!key && !isOpen(key);}
+  function saveDraw(key){
+    return new Promise(async (resolve,reject)=>{
+      try{
+        if(!key||!draw(key)) return resolve();
+        try{ if(window.__FB_WRITE_CACHE&&window.__FB_WRITE_CACHE.draws) delete window.__FB_WRITE_CACHE.draws[key]; }catch(e){}
+        if(typeof window.stD==='function') await window.stD(key);
+        else if(typeof window.__v728_stD==='function') await window.__v728_stD(key);
+        resolve();
+      }catch(e){reject(e);}
+    });
+  }
+  function topChild(el){
+    const bc=document.getElementById('bracketContent'); if(!bc||!el) return null;
+    let n=el; while(n&&n.parentElement&&n.parentElement!==bc) n=n.parentElement;
+    return n&&n.parentElement===bc?n:el;
+  }
+  function mainRoots(key){
+    const roots=[]; const bc=document.getElementById('bracketContent'); if(!bc) return roots;
+    try{
+      const parts=String(key||'').split('_'); const id=parts[0], div=parts.slice(1).join('_');
+      const t=document.getElementById(`mainStageTitle_${id}_${div}`); const r=topChild(t); if(r&&!roots.includes(r)) roots.push(r);
+    }catch(e){}
+    try{
+      document.querySelectorAll('.js-main-tree-scroll').forEach(el=>{
+        const k=clean(el.dataset.key||''); if(key&&k&&k!==key) return;
+        const r=el.closest('.main-tree-card')||topChild(el)||el; if(r&&!roots.includes(r)) roots.push(r);
+      });
+    }catch(e){}
+    try{
+      [...bc.children].forEach(ch=>{
+        const tx=clean(ch.textContent||'');
+        if(!tx) return;
+        if(/본선\s*(토너먼트\s*)?대진표|본선 대진표 구조|본선 진출 예정/.test(tx) && !/코트 현황|공용대기|대기배치|참가 팀/.test(tx)){
+          if(!roots.includes(ch)) roots.push(ch);
+        }
+      });
+    }catch(e){}
+    return roots;
+  }
+  function hidePreviewBlocks(){
+    try{
+      const bc=document.getElementById('bracketContent'); if(!bc) return;
+      [...bc.querySelectorAll('div,.card')].forEach(el=>{
+        if(el.classList&&el.classList.contains('v830-main-private-mask')) return;
+        const tx=clean(el.textContent||'');
+        if(!tx) return;
+        const isPreview=/본선은 지금부터 계속 보입니다|본선은 예선 후 재추첨|본선 구조 미리보기|예선이 끝나기 전에는 본선 구조|조\s*[12]위|승자 진출/.test(tx) && /128강|64강|본선/.test(tx);
+        if(isPreview){
+          const root=topChild(el)||el;
+          if(root&&root.parentElement){ root.classList.add('v830-preview-hidden','v830-main-hidden'); }
+        }
+      });
+    }catch(e){}
+  }
+  function clearHidden(){
+    try{
+      document.querySelectorAll('.v830-main-private-mask').forEach(el=>el.remove());
+      document.querySelectorAll('[data-v830-hidden="1"],.v830-preview-hidden').forEach(el=>{
+        el.classList.remove('v830-main-hidden','v830-preview-hidden');
+        if(el.dataset){ delete el.dataset.v830Hidden; delete el.dataset.v830Key; }
+      });
+    }catch(e){}
+  }
+  function maskMainForKey(key){
+    const roots=mainRoots(key); if(!roots.length) return;
+    const first=roots[0];
+    if(first&&first.parentElement&&!first.previousElementSibling?.classList?.contains('v830-main-private-mask')){
+      const mask=document.createElement('div');
+      mask.className='v830-main-private-mask';
+      mask.dataset.v830Key=key;
+      mask.innerHTML='🔒 본선 대진은 아직 비공개입니다.<br>운영진이 본선을 공개하면 확정 대진과 코트 배정이 함께 표시됩니다.';
+      first.parentElement.insertBefore(mask,first);
+    }
+    roots.forEach(r=>{ r.dataset.v830Hidden='1'; r.dataset.v830Key=key; r.classList.add('v830-main-hidden'); });
+  }
+  function hideMainCourtCardsIfPrivate(){
+    if(isManager()) return;
+    const privateAny=selectedKeys().some(k=>shouldHideMain(k));
+    if(!privateAny) return;
+    try{
+      document.querySelectorAll('.court-wait-card,.m3card').forEach(card=>{
+        const tx=clean(card.textContent||'');
+        if(/128강|64강|32강|16강|8강|준결승|결승|본선/.test(tx)) card.classList.add('v830-main-hidden');
+      });
+    }catch(e){}
+  }
+  function applyPrivacy(){
+    if(applying) return; applying=true;
+    try{
+      clearHidden();
+      // 미리보기는 공개 전에는 관리자/일반 모두 숨긴다. 공개 후에는 실제 본선만 표시된다.
+      selectedKeys().forEach(k=>{ if(shouldHideMain(k)) maskMainForKey(k); });
+      if(!selectedKeys().some(k=>isOpen(k))) hidePreviewBlocks();
+      hideMainCourtCardsIfPrivate();
+      updateButton();
+    }catch(e){console.warn(TAG,'apply failed',e);} finally{applying=false;}
+  }
+  async function setPublic(open){
+    const keys=selectedKeys(); if(!keys.length){alert('대회와 부서를 먼저 선택하세요.');return;}
+    if(!isManager()){try{toast('운영자만 본선 공개/비공개를 변경할 수 있습니다.','error');}catch(e){} return;}
+    try{
+      if(open){
+        const noMain=keys.filter(k=>!hasMain(k));
+        if(noMain.length){
+          alert('먼저 기존 본선확정 또는 본선추첨 기능으로 본선 대진을 만든 뒤 공개하세요.\n\n기존 기능은 그대로 사용할 수 있습니다.');
+          return;
+        }
+      }
+      for(const k of keys){
+        const d=draw(k); if(!d) continue;
+        d.mainBracketPublic=!!open;
+        d.mainBracketLocked=!open;
+        d.mainBracketPublicAt=open?new Date().toISOString():(d.mainBracketPublicAt||'');
+        d.mainBracketLockedAt=!open?new Date().toISOString():(d.mainBracketLockedAt||'');
+        d.v830MainPrivacyMode=true;
+        await saveDraw(k);
+      }
+      if(open){
+        // 공개하는 순간 기존 본선 코트 자동배정 버튼과 같은 로직을 실행한다.
+        for(const k of keys){
+          try{
+            if(typeof window.v773RunMainAssign==='function') await window.v773RunMainAssign(k);
+            else if(typeof window.v770AssignMainCourts==='function'){
+              const changed=window.v770AssignMainCourts(k,false);
+              if(changed && typeof window.stM==='function') await window.stM(k);
+            }
+          }catch(e){console.warn(TAG,'main assign on open failed',k,e);}
+        }
+      }
+      try{ if(typeof window.renderBracket==='function') window.renderBracket(); }catch(e){}
+      setTimeout(applyPrivacy,80); setTimeout(applyPrivacy,300); setTimeout(applyPrivacy,900);
+      try{toast(open?'🔓 본선을 공개하고 코트 배정을 실행했습니다.':'🔒 본선을 비공개로 전환했습니다.','success');}catch(e){}
+    }catch(e){console.error(TAG,'public toggle failed',e);alert('본선 공개/비공개 저장 실패: '+(e&&e.message?e.message:e));}
+  }
+  function addButton(){
+    try{
+      const bar=document.getElementById('bracketExportBar'); if(!bar||!isManager()) return;
+      let btn=document.getElementById('v830MainPrivacyBtn');
+      if(!btn){
+        btn=document.createElement('button'); btn.id='v830MainPrivacyBtn'; btn.type='button'; btn.className='v830-main-privacy-btn locked';
+        bar.appendChild(btn);
+      }
+      btn.onclick=function(){ const open=!selectedKeys().every(k=>isOpen(k)); setPublic(open); };
+    }catch(e){}
+  }
+  function updateButton(){
+    try{
+      addButton();
+      const btn=document.getElementById('v830MainPrivacyBtn'); if(!btn) return;
+      btn.style.display=isManager()?'inline-flex':'none';
+      const keys=selectedKeys(); const open=keys.length&&keys.every(k=>isOpen(k));
+      btn.textContent=open?'🔒 본선 비공개':'🔓 본선 공개';
+      btn.classList.toggle('opened',!!open); btn.classList.toggle('locked',!open);
+      const badge=document.getElementById('bracketFreshnessBadge');
+      if(badge){ badge.textContent='v830 · 본선기본비공개'; badge.style.background=open?'#dcfce7':'#fef3c7'; badge.style.color=open?'#166534':'#92400e'; badge.style.border=open?'1px solid #86efac':'1px solid #f59e0b'; }
+    }catch(e){}
+  }
+  function wrapRender(){
+    const old=window.renderBracket; if(typeof old!=='function'||old.__v830Wrapped) return;
+    const w=function(){ const r=old.apply(this,arguments); [40,120,260,600,1100].forEach(ms=>setTimeout(applyPrivacy,ms)); return r; };
+    w.__v830Wrapped=true; w.__old=old; window.renderBracket=w; try{renderBracket=w;}catch(e){}
+  }
+  function boot(){
+    wrapRender(); addButton(); updateButton(); applyPrivacy();
+    window.v830SetMainPublic=setPublic;
+    window.v830ToggleMainPrivacy=function(){ const open=!selectedKeys().every(k=>isOpen(k)); return setPublic(open); };
+    window.v830ApplyMainPrivacy=applyPrivacy;
+    // 기존 본선잠금 버튼이 눌려도 v830 공개/비공개 의미로 동작시킨다. 기존 기능은 숨기지 않는다.
+    window.v799LockBracket=async function(key,lock){
+      if(key){ const was=selectedKeys; }
+      return setPublic(!lock);
+    };
+    window.v809ToggleBracketLock=function(){ const open=selectedKeys().every(k=>isOpen(k)); return setPublic(!open); };
+    window.v809UpdateLockBtn=updateButton;
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
+  [200,700,1400,2600,5000].forEach(ms=>setTimeout(boot,ms));
+  document.addEventListener('change',ev=>{ if(ev.target&&/^(brTS|brDS)$/.test(ev.target.id||'')) setTimeout(boot,120); },true);
+  try{ const bc=document.getElementById('bracketContent'); if(bc) new MutationObserver(()=>setTimeout(applyPrivacy,100)).observe(bc,{childList:true,subtree:true}); }catch(e){}
+  console.log(TAG,'installed: existing functions kept + one public/private button');
 })();
 </script>
 
