@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-14-v821";
+  const APP_VERSION = "2026-06-14-v822";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -40629,7 +40629,19 @@ Object.assign(window,{ openHomeRegisterWithTournament, openHomeRegisterWithTourn
   saveLastOrderFromPicker,applyLastOrderIfEmpty,clearLastOrderFill,
   openReorderPopup,reorderTap,reorderReset,applyReorder,closeReorderPopup,
   updateMainManualSeeds,
-  toggleIndividualGroupMatches});
+  toggleIndividualGroupMatches, buildIndivMainMatchesFixed, calcGS, stM, stD, applyAutoAdvanceInMemory, autoAdv});
+
+
+// v822: 본선 고정 슬롯은 예선 결과 저장 후 자동으로 실제 팀명 보정
+try{
+  const __v822ModuleAutoAdv = autoAdv;
+  autoAdv = async function(key, mid){
+    const r = await __v822ModuleAutoAdv.apply(this, arguments);
+    try{ if(window.v822FillFixedSlots) await window.v822FillFixedSlots(key, true); }catch(e){ console.warn('[v822] fixed slot fill after autoAdv failed', e); }
+    return r;
+  };
+  try{ window.autoAdv = autoAdv; }catch(e){}
+}catch(e){ console.warn('[v822] autoAdv module wrapper failed', e); }
 
 document.addEventListener('DOMContentLoaded',()=>{
   // 연도 레이블 초기화 (REG_YEAR는 모듈 스코프라 직접 접근 불가 → 현재 연도 직접 계산)
@@ -54084,7 +54096,7 @@ setTimeout(boot,800);
 <script id="v798FinalScript">
 (function(){
 // v799: window 노출
-window.buildIndivMainMatchesFixed=buildIndivMainMatchesFixed;
+try{ if(typeof buildIndivMainMatchesFixed==='function') window.buildIndivMainMatchesFixed=buildIndivMainMatchesFixed; }catch(e){}
 
 // v817: 고정 슬롯에 실제팀 채우기
 function v817FillFixedSlots(key){
@@ -54435,5 +54447,440 @@ setTimeout(v799ApplyBracketLock,3000);
 
 })();
 </script>
+
+
+<script id="v822ModernCupFixedWondoLock">
+(function(){
+  'use strict';
+  const TAG='[v822]';
+  const WONDO_GNS=new Set([33,34,35,36,37,38,39,40,41,42,43,44]);
+  const WONDO_BYE=[[33,1],[34,1],[35,1],[36,1],[37,1],[38,1],[39,1],[40,1]];
+  const WONDO_GAME=[
+    [41,1],[37,2],
+    [42,1],[38,2],
+    [43,1],[39,2],
+    [44,1],[40,2],
+    [33,2],[41,2],
+    [34,2],[42,2],
+    [35,2],[43,2],
+    [36,2],[44,2]
+  ];
+  const BYE={__bye:true,nm:'부전승',label:'부전승'};
+
+  const ar=v=>Array.isArray(v)?v:[];
+  const S=v=>String(v==null?'':v).trim();
+  const N=v=>{const n=Number(v); return Number.isFinite(n)?n:null;};
+  const nowIso=()=>new Date().toISOString();
+  function toastMsgSafe(msg,type){try{ if(typeof window.toastMsg==='function') window.toastMsg(msg,type||'info'); else if(typeof window.toast==='function') window.toast(msg,type||'info'); else console.log(TAG,msg); }catch(e){ console.log(TAG,msg); }}
+  function canManage(){
+    try{
+      if(window.AD===true||window.OP===true||window.TM===true) return true;
+      if(document.body&&document.body.classList.contains('admin-mode')) return true;
+      if(typeof window.canManageBracket==='function'&&window.canManageBracket()) return true;
+    }catch(e){}
+    return false;
+  }
+  function tidDivFromKey(key){
+    const s=S(key); const i=s.lastIndexOf('_');
+    return i>0?{tid:s.slice(0,i),div:s.slice(i+1)}:{tid:s,div:''};
+  }
+  function resolveKey(key){
+    try{
+      key=S(key);
+      if(key&&window.G&&G.draws&&G.draws[key]) return key;
+      const brKey=S(window.__CURRENT_RENDER_KEY||window.IDW?.key||'');
+      if(brKey&&G?.draws?.[brKey]) return brKey;
+      const tid=S(document.getElementById('brTS')?.value||document.getElementById('regTS')?.value||'');
+      let div='';
+      try{
+        if(tid&&typeof window.getBracketSelectedDivs==='function'){
+          const ds=ar(window.getBracketSelectedDivs(tid)).filter(d=>d&&d!=='__ALL__');
+          if(ds.length===1) div=ds[0];
+        }
+      }catch(e){}
+      if(!div) div=S(document.getElementById('brDS')?.value||document.getElementById('regDS')?.value||'');
+      if(tid&&div&&div!=='__ALL__'&&G?.draws?.[tid+'_'+div]) return tid+'_'+div;
+      if(tid&&G?.draws){
+        const ks=Object.keys(G.draws).filter(k=>String(k).startsWith(tid+'_'));
+        if(ks.length===1) return ks[0];
+        const mainReady=ks.filter(k=>ar(G.matches?.[k]).some(m=>m&&String(m.phase||'')==='main'));
+        if(mainReady.length===1) return mainReady[0];
+      }
+      if(G?.draws){
+        const ks=Object.keys(G.draws);
+        if(ks.length===1) return ks[0];
+      }
+    }catch(e){}
+    return '';
+  }
+  function selectedKeys(){
+    try{
+      const tid=S(document.getElementById('brTS')?.value||'');
+      if(!tid||!G?.draws) return [];
+      let ds=[];
+      try{ if(typeof window.getBracketSelectedDivs==='function') ds=ar(window.getBracketSelectedDivs(tid)).filter(d=>d&&d!=='__ALL__'); }catch(e){}
+      if(!ds.length){ const d=S(document.getElementById('brDS')?.value||''); if(d&&d!=='__ALL__') ds=[d]; }
+      const out=ds.map(d=>tid+'_'+d).filter(k=>G.draws[k]);
+      if(out.length) return out;
+      return Object.keys(G.draws).filter(k=>String(k).startsWith(tid+'_'));
+    }catch(e){ return []; }
+  }
+  function groupNo(draw,g,gi){
+    try{
+      const map=draw&&draw.manualGroupNoMap&&typeof draw.manualGroupNoMap==='object'?draw.manualGroupNoMap:{};
+      const vals=[g?.manualGroupNo,g?.confirmedGroupNo,g?.finalGroupNo,g?.displayGroupNo,g?.v728GroupNo,g?.v702GroupNo,g?.lockedGroupNo,g?.groupNo,g?.no,map[String(gi)],Number(gi)+1];
+      for(const v of vals){const n=N(v); if(n&&n>0) return n;}
+    }catch(e){}
+    return Number(gi)+1;
+  }
+  function groupMatches(key,gi){
+    return ar(G?.matches?.[key]).filter(m=>m&&String(m.phase||'')==='group'&&Number(m.group)===Number(gi)&&!m.bye);
+  }
+  function hasScore(m){
+    try{
+      if(m.winner!=null) return true;
+      return ar(m.rubbers).some(rb=>rb&&((rb.score1!=null&&rb.score1!=='')||(rb.score2!=null&&rb.score2!=='')));
+    }catch(e){ return false; }
+  }
+  function groupDone(key,gi,g){
+    try{
+      if(g&&(g.done||g.completed||g.finalized||g.resultConfirmed||g.resultsFinalized)) return true;
+      const ms=groupMatches(key,gi);
+      if(!ms.length) return false;
+      return ms.every(m=>m.winner!=null||m.bye||m.done||m.completed||m.status==='done');
+    }catch(e){ return false; }
+  }
+  function teamName(teams,ti){
+    try{
+      const t=teams?.[Number(ti)]||{};
+      if(t.pairLabel) return S(t.pairLabel);
+      if(t.entryLabel) return S(t.entryLabel);
+      if(Array.isArray(t.individualPlayers)&&t.individualPlayers.length){
+        return t.individualPlayers.slice(0,2).map(p=>S(p?.name||p)).filter(Boolean).join(' / ');
+      }
+      if(Array.isArray(t.players)&&t.players.length) return t.players.slice(0,2).map(S).filter(Boolean).join(' / ');
+      return S(t.club||t.name||t.nm||('T'+ti));
+    }catch(e){ return 'T'+ti; }
+  }
+  function standingsForGroup(key,gi,g,teams){
+    const tids=ar(g?.teams).map(Number).filter(Number.isFinite);
+    try{
+      if(typeof window.calcGS==='function'&&tids.length){
+        const rows=ar(window.calcGS(key,gi,tids,teams));
+        const calc=rows.map(r=>N(r?.ti ?? r?.teamIdx)).filter(v=>v!=null);
+        if(calc.length) return calc;
+      }
+    }catch(e){}
+    const fields=['standings','ranking','rankings','rankOrder','order','teams'];
+    for(const f of fields){
+      const vals=ar(g?.[f]).map(x=>N((x&&typeof x==='object')?(x.ti??x.teamIdx??x.idx??x.team):x)).filter(v=>v!=null);
+      if(vals.length) return vals;
+    }
+    return tids;
+  }
+  function collectAdvEntries(key){
+    const draw=G?.draws?.[key]||{};
+    const teams=ar(G?.teams?.[key]);
+    const groups=ar(draw.groups);
+    const entries=[];
+    groups.forEach((g,gi)=>{
+      const gn=groupNo(draw,g,gi);
+      const done=groupDone(key,gi,g);
+      const st=standingsForGroup(key,gi,g,teams);
+      const venue=WONDO_GNS.has(Number(gn))?'wondosim':'gukje';
+      for(let rk=1;rk<=2;rk++){
+        const tiRaw=done?N(st[rk-1]):null;
+        const ti=tiRaw!=null?tiRaw:null;
+        const label=`${gn}조${rk}위`;
+        entries.push({ti,gn:Number(gn),rk,gi:Number(gi),venue,__venue:venue,nm:ti!=null?teamName(teams,ti):label,label,placeholder:ti==null});
+      }
+    });
+    return entries;
+  }
+  function entryLabel(e){
+    if(!e) return '';
+    if(e.__bye) return '부전승';
+    return S(e.label||`${e.gn||'?'}조${e.rk||'?'}위`);
+  }
+  function entryDisplay(e){
+    if(!e) return '';
+    if(e.__bye) return '부전승';
+    return S(e.nm||e.label||`${e.gn||'?'}조${e.rk||'?'}위`);
+  }
+  function entryTargetProps(prefix,e){
+    const out={};
+    if(!e||e.__bye) return out;
+    out[prefix+'GroupNo']=Number(e.gn||0)||null;
+    out[prefix+'Rank']=Number(e.rk||0)||null;
+    out[prefix+'GroupIndex']=Number.isFinite(Number(e.gi))?Number(e.gi):null;
+    return out;
+  }
+  function fixedEntry(map,gn,rk){
+    return map.get(`${gn}_${rk}`)||{gn,rk,gi:null,ti:null,venue:WONDO_GNS.has(Number(gn))?'wondosim':'gukje',__venue:WONDO_GNS.has(Number(gn))?'wondosim':'gukje',label:`${gn}조${rk}위`,nm:`${gn}조${rk}위`,placeholder:true};
+  }
+  function shuffle(a){
+    const arr=[...a];
+    if(window.crypto&&crypto.getRandomValues){
+      for(let i=arr.length-1;i>0;i--){const r=new Uint32Array(1); crypto.getRandomValues(r); const j=r[0]%(i+1); [arr[i],arr[j]]=[arr[j],arr[i]];}
+    }else{
+      for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]];}
+    }
+    return arr;
+  }
+  function localRoundLabel(venue,round,start,end){
+    if(venue==='wondosim'&&start>=97&&end<=128){const size=Math.max(2,32/Math.pow(2,Number(round||0))); if(size<=2)return'원도심 결승'; if(size<=4)return'원도심 준결승'; return `원도심 ${Math.round(size)}강`;}
+    if(venue==='gukje'&&end<=96){const size=Math.max(2,Math.ceil(96/Math.pow(2,Number(round||0)))); return round===0?'국제 96강':`국제 ${size}강`;}
+    return '';
+  }
+  function makeFirstRound(slot,eA,eB){
+    const leaf1=slot*2+1, leaf2=slot*2+2;
+    const isBye=!!(eA?.__bye||eB?.__bye);
+    const real1=isBye?(eA?.__bye?eB:eA):eA;
+    const real2=isBye?null:eB;
+    const venue=leaf1>=97?'wondosim':'gukje';
+    const t1=(real1&&!real1.__bye&&real1.ti!=null)?Number(real1.ti):null;
+    const t2=(real2&&!real2.__bye&&real2.ti!=null)?Number(real2.ti):null;
+    const m={
+      id:`main_r0_${slot}`,phase:'main',round:0,slot,t1,t2,winner:(isBye&&t1!=null)?t1:null,rubbers:[],bye:isBye,court:'',courts:[],manualCourtTarget:'',
+      venue,__venue:venue,venueLocked:true,mainBlock:venue,bracketN:128,localDrawSize:venue==='wondosim'?32:96,localRoundSize:venue==='wondosim'?32:96,localRoundLabel:localRoundLabel(venue,0,leaf1,leaf2),
+      source1Label:entryLabel(real1),source2Label:isBye?'부전승':entryLabel(real2),source1FixedLabel:entryLabel(real1),source2FixedLabel:isBye?'부전승':entryLabel(real2),
+      fixedDisplay1:entryDisplay(real1),fixedDisplay2:isBye?'부전승':entryDisplay(real2),
+      fixedLeaf1:leaf1,fixedLeaf2:leaf2,v822ModernCupFixed:true,v791FourSlotFixed:true,v790PdfFixed:true,v788FixedTable:true,pdfSlotPattern:'normal-normal_then_normal-bye'
+    };
+    Object.assign(m,{
+      gnTarget:real1&&!real1.__bye?Number(real1.gn):null,
+      rkTarget:real1&&!real1.__bye?Number(real1.rk):null,
+      gnTarget2:real2&&!real2.__bye?Number(real2.gn):null,
+      rkTarget2:real2&&!real2.__bye?Number(real2.rk):null,
+      sourceGroup1:real1&&!real1.__bye&&real1.gn!=null?Number(real1.gn)-1:null,
+      sourceRank1:real1&&!real1.__bye?Number(real1.rk):null,
+      sourceGroup2:real2&&!real2.__bye&&real2.gn!=null?Number(real2.gn)-1:null,
+      sourceRank2:real2&&!real2.__bye?Number(real2.rk):null,
+      source1GroupNo:real1&&!real1.__bye?Number(real1.gn):null,
+      source2GroupNo:real2&&!real2.__bye?Number(real2.gn):null
+    });
+    return m;
+  }
+  function buildFixedMatches(key,entries){
+    const map=new Map(entries.map(e=>[`${Number(e.gn)}_${Number(e.rk)}`,e]));
+    const leaves=Array.from({length:128},()=>null);
+    const gukje=entries.filter(e=>!WONDO_GNS.has(Number(e.gn)));
+    const r1=shuffle(gukje.filter(e=>Number(e.rk)===1));
+    const r2=shuffle(gukje.filter(e=>Number(e.rk)!==1));
+    const pool=[...r1,...r2];
+    const byeT=pool.slice(0,24);
+    const gameT=pool.slice(24);
+    for(let b=0;b<24;b++){
+      const gameSlot=b*2, byeSlot=b*2+1;
+      leaves[gameSlot*2]=gameT[b*2]||{label:'국제 진출팀',nm:'국제 진출팀',placeholder:true,venue:'gukje'};
+      leaves[gameSlot*2+1]=gameT[b*2+1]||{label:'국제 진출팀',nm:'국제 진출팀',placeholder:true,venue:'gukje'};
+      leaves[byeSlot*2]=byeT[b]||{label:'국제 진출팀',nm:'국제 진출팀',placeholder:true,venue:'gukje'};
+      leaves[byeSlot*2+1]=BYE;
+    }
+    for(let p=0;p<8;p++){
+      const gameSlot=48+p*2, byeSlot=gameSlot+1;
+      const [g1,rk1]=WONDO_GAME[p*2], [g2,rk2]=WONDO_GAME[p*2+1], [bg,br]=WONDO_BYE[p];
+      leaves[gameSlot*2]=fixedEntry(map,g1,rk1);
+      leaves[gameSlot*2+1]=fixedEntry(map,g2,rk2);
+      leaves[byeSlot*2]=fixedEntry(map,bg,br);
+      leaves[byeSlot*2+1]=BYE;
+    }
+    const out=[];
+    for(let i=0;i<64;i++) out.push(makeFirstRound(i,leaves[i*2],leaves[i*2+1]));
+    let prev=64;
+    for(let round=1;prev>1;round++){
+      const next=Math.ceil(prev/2), span=Math.pow(2,round+1);
+      for(let i=0;i<next;i++){
+        const start=i*span+1, end=Math.min(128,(i+1)*span);
+        const venue=(start>=97&&end<=128)?'wondosim':(end<=96?'gukje':'gukje');
+        const locked=(start>=97&&end<=128)||(end<=96);
+        out.push({id:`main_r${round}_${i}`,phase:'main',round,slot:i,t1:null,t2:null,winner:null,rubbers:[],bye:false,court:'',courts:[],manualCourtTarget:'',venue,__venue:venue,venueLocked:locked,mainBlock:locked?venue:'merged',bracketN:128,localDrawSize:venue==='wondosim'?32:96,localRoundSize:locked?Math.max(2,Math.ceil((venue==='wondosim'?32:96)/Math.pow(2,round))):0,localRoundLabel:locked?localRoundLabel(venue,round,start,end):'',source1Label:'',source2Label:'',v822ModernCupFixed:true,v791FourSlotFixed:true,v790PdfFixed:true,v788FixedTable:true,fixedLeafStart:start,fixedLeafEnd:end});
+      }
+      out.filter(m=>m.phase==='main'&&Number(m.round)===round-1&&m.winner!=null).forEach(child=>{
+        const p=out.find(x=>x.phase==='main'&&Number(x.round)===round&&Number(x.slot)===Math.floor(Number(child.slot)/2));
+        if(!p) return;
+        if(Number(child.slot)%2===0){ if(p.t1==null) p.t1=child.winner; }
+        else { if(p.t2==null) p.t2=child.winner; }
+      });
+      prev=next;
+    }
+    return out;
+  }
+  async function saveMatchesAndDraw(key){
+    const stM=window.stM||window.__v728_stM;
+    const stD=window.stD||window.__v728_stD;
+    try{ if(window.__FB_WRITE_CACHE?.matches) delete window.__FB_WRITE_CACHE.matches[key]; if(window.__FB_WRITE_CACHE?.draws) delete window.__FB_WRITE_CACHE.draws[key]; }catch(e){}
+    const jobs=[];
+    if(typeof stM==='function') jobs.push(stM(key));
+    if(typeof stD==='function') jobs.push(stD(key));
+    if(!jobs.length) throw new Error('저장 함수를 찾을 수 없습니다. 새로고침 후 다시 시도해 주세요.');
+    await Promise.all(jobs);
+  }
+  function propagateKnownWinners(key){
+    const list=ar(G?.matches?.[key]).filter(m=>m&&String(m.phase||'')==='main');
+    list.sort((a,b)=>Number(a.round||0)-Number(b.round||0)||Number(a.slot||0)-Number(b.slot||0));
+    let changed=false;
+    list.forEach(m=>{
+      if(m.winner==null) return;
+      const p=list.find(x=>Number(x.round||0)===Number(m.round||0)+1&&Number(x.slot||0)===Math.floor(Number(m.slot||0)/2));
+      if(!p) return;
+      const side=Number(m.slot||0)%2===0?'t1':'t2';
+      if(p[side]!==m.winner){p[side]=m.winner;changed=true;}
+      if(p.winner!=null){p.winner=null;changed=true;}
+      if(p.bye){p.bye=false;changed=true;}
+    });
+    return changed;
+  }
+  window.v822FillFixedSlots=async function(key,save){
+    try{
+      key=resolveKey(key); if(!key||!G?.draws?.[key]||!G.draws[key].v822ModernCupFixed) return false;
+      const entries=collectAdvEntries(key);
+      const map=new Map(entries.filter(e=>e.ti!=null).map(e=>[`${Number(e.gn)}_${Number(e.rk)}`,e]));
+      const teams=ar(G?.teams?.[key]);
+      let changed=false;
+      ar(G?.matches?.[key]).forEach(m=>{
+        if(!m||String(m.phase||'')!=='main'||Number(m.round||0)!==0) return;
+        function apply(side,gn,rk){
+          if(!gn||!rk) return;
+          const e=map.get(`${Number(gn)}_${Number(rk)}`); if(!e||e.ti==null) return;
+          const prop=side===1?'t1':'t2';
+          if(m[prop]!==Number(e.ti)){m[prop]=Number(e.ti); changed=true;}
+          const disp=teamName(teams,e.ti);
+          if(side===1&&m.fixedDisplay1!==disp){m.fixedDisplay1=disp; changed=true;}
+          if(side===2&&m.fixedDisplay2!==disp){m.fixedDisplay2=disp; changed=true;}
+        }
+        apply(1,m.gnTarget||m.source1GroupNo,m.rkTarget||m.sourceRank1);
+        apply(2,m.gnTarget2||m.source2GroupNo,m.rkTarget2||m.sourceRank2);
+        if(m.bye){const win=m.t1!=null?m.t1:m.t2; if(win!=null&&m.winner!==win){m.winner=win; changed=true;}}
+      });
+      if(propagateKnownWinners(key)) changed=true;
+      if(changed&&save) await saveMatchesAndDraw(key);
+      return changed;
+    }catch(e){console.warn(TAG,'fill failed',e);return false;}
+  };
+  window.v793FixedDraw=async function(key){
+    try{
+      if(!canManage()){toastMsgSafe('관리자/운영자만 본선 확정이 가능합니다.','error');return;}
+      key=resolveKey(key);
+      if(!key||!G?.draws?.[key]){alert('대회와 부서를 먼저 선택하세요.');return;}
+      const msg='이번대회 전용 본선 대진을 확정합니다.\n\n원도심 33~44조는 지정 순서로 고정되고, 저장 즉시 본선은 잠금 상태가 됩니다.\n공개 전까지 참가자에게 보이지 않습니다.\n\n진행할까요?';
+      if(!confirm(msg)) return;
+      if(typeof window.sl==='function') window.sl(true);
+      const entries=collectAdvEntries(key);
+      const wondoN=entries.filter(e=>WONDO_GNS.has(Number(e.gn))).length;
+      const gukjeN=entries.filter(e=>!WONDO_GNS.has(Number(e.gn))).length;
+      const fixed=buildFixedMatches(key,entries);
+      const groupMs=ar(G.matches?.[key]).filter(m=>m&&String(m.phase||'')==='group');
+      G.matches[key]=[...groupMs,...fixed];
+      const d=G.draws[key];
+      Object.assign(d,{mainBracketFixed:true,mainBracketLocked:true,mainBracketLockedAt:nowIso(),v822ModernCupFixed:true,v822ModernCupFixedAt:nowIso(),v822WondoRule:'33~44조 원도심 고정 · 1위vs2위 교차 · 33~40조 1위 부전승',v791FourSlotFixedTable:true,v790PdfFixedTable:true,v788FixedModernCupTable:true,mainUpdatedAt:nowIso()});
+      window.__v799DrawDone=true;
+      window.__V641_ALLOW_LOCAL_COURT_OVERLAY=true;
+      await saveMatchesAndDraw(key);
+      setTimeout(()=>{window.__V641_ALLOW_LOCAL_COURT_OVERLAY=false;},3000);
+      try{ if(typeof window.renderBracket==='function') window.renderBracket(); }catch(e){}
+      setTimeout(()=>{try{window.v822ApplyLock();window.v809UpdateLockBtn();}catch(e){}},80);
+      const bye=fixed.filter(m=>m.round===0&&m.bye).length;
+      toastMsgSafe(`본선 확정 및 잠금 완료 ✅ 원도심 ${wondoN}자리 / 국제 ${gukjeN}자리 / 부전승 ${bye}개`,'success');
+      alert(`✅ 본선 대진 확정 + 잠금 완료\n\n원도심: ${wondoN}자리\n국제: ${gukjeN}자리\n부전승: ${bye}개\n\n참가자는 '본선 대진표 준비중' 화면만 보며, 운영자가 '본선 공개'를 누르면 열립니다.`);
+    }catch(e){console.error(TAG,e);alert('본선 확정 실패: '+(e&&e.message?e.message:e));}
+    finally{try{ if(typeof window.sl==='function') window.sl(false); }catch(e){}}
+  };
+
+  window.v799IsLocked=function(key){try{key=resolveKey(key); return !!(key&&G?.draws?.[key]?.mainBracketLocked);}catch(e){return false;}};
+  window.v799CanView=canManage;
+  window.v822ApplyLock=function(){
+    try{
+      const oldStyle=document.getElementById('v799-lock-style'); if(oldStyle) oldStyle.textContent='';
+      document.querySelectorAll('#v799-bracket-mask').forEach(el=>el.remove());
+      const key=resolveKey();
+      const locked=!!(key&&G?.draws?.[key]?.mainBracketLocked);
+      const bc=document.getElementById('bracketContent'); if(!bc) return;
+      if(locked&&!canManage()){
+        if(!bc.querySelector('#v822MainLockMask')){
+          bc.innerHTML='<div id="v822MainLockMask" style="padding:78px 20px;text-align:center;background:#f8fafc;border:2px dashed #cbd5e1;border-radius:18px;margin:16px 0"><div style="font-size:3rem;margin-bottom:12px">🔒</div><div style="font-size:1.12rem;font-weight:1000;color:#1e293b;margin-bottom:8px">본선 대진표 준비중</div><div style="font-size:.86rem;color:#64748b;line-height:1.6">운영진이 공개하면 볼 수 있습니다.</div></div>';
+        }
+      }else if(bc.querySelector('#v822MainLockMask')){
+        bc.innerHTML='';
+        try{if(typeof window.renderBracket==='function') window.renderBracket();}catch(e){}
+      }
+    }catch(e){console.warn(TAG,'apply lock failed',e);}
+  };
+  window.v815ApplyLock=window.v822ApplyLock;
+  window.v799ApplyBracketLock=window.v822ApplyLock;
+  window.v799LockBracket=async function(key,lock){
+    try{
+      if(!canManage()){toastMsgSafe('관리자/운영자만 본선 공개·잠금이 가능합니다.','error');return;}
+      key=resolveKey(key);
+      if(!key||!G?.draws?.[key]){alert('대회와 부서를 먼저 선택하세요.');return;}
+      G.draws[key].mainBracketLocked=!!lock;
+      G.draws[key].mainBracketLockedAt=lock?nowIso():(G.draws[key].mainBracketLockedAt||'');
+      G.draws[key].mainBracketOpenedAt=!lock?nowIso():(G.draws[key].mainBracketOpenedAt||'');
+      await saveMatchesAndDraw(key);
+      try{ if(typeof window.renderBracket==='function') window.renderBracket(); }catch(e){}
+      setTimeout(()=>{try{window.v822ApplyLock();window.v809UpdateLockBtn();}catch(e){}},80);
+      toastMsgSafe(lock?'🔒 본선 대진표 잠금 완료':'🔓 본선 대진표 공개 완료','success');
+    }catch(e){console.error(TAG,'lock failed',e);alert('저장 실패: '+(e&&e.message?e.message:e));}
+  };
+  window.v809ToggleBracketLock=async function(){
+    const key=resolveKey();
+    if(!key){alert('대회와 부서를 먼저 선택하세요.');return;}
+    const locked=!!G?.draws?.[key]?.mainBracketLocked;
+    await window.v799LockBracket(key,!locked);
+  };
+  window.v809UpdateLockBtn=function(){
+    try{
+      const key=resolveKey(); const locked=!!(key&&G?.draws?.[key]?.mainBracketLocked);
+      ['v809BracketLockBtn','v809LockBtnCourtBoard'].forEach(id=>{
+        const btn=document.getElementById(id); if(!btn) return;
+        btn.style.display=canManage()?'inline-flex':'none';
+        btn.textContent=locked?'🔓 본선 공개':'🔒 본선 잠금';
+        btn.style.background=locked?'#16a34a':'#dc2626'; btn.style.borderColor=locked?'#16a34a':'#dc2626'; btn.style.color='#fff';
+      });
+      document.querySelectorAll('.v799-lock-btn,.v799-lock-btn-court,.v799-lock-btn-bracket').forEach(btn=>{
+        btn.textContent=locked?'🔓 본선 공개':'🔒 본선 잠금'; btn.onclick=()=>window.v799LockBracket(key,!locked); btn.style.background=locked?'#16a34a':'#dc2626'; btn.style.borderColor=locked?'#16a34a':'#dc2626';
+      });
+    }catch(e){}
+  };
+  function patchRender(){
+    try{
+      const old=window.renderBracket;
+      if(typeof old!=='function'||old.__v822LockWrapped) return;
+      const wrapped=function(){const r=old.apply(this,arguments); setTimeout(window.v822ApplyLock,60); setTimeout(window.v809UpdateLockBtn,90); return r;};
+      wrapped.__v822LockWrapped=true; wrapped.__old=old; window.renderBracket=wrapped;
+    }catch(e){}
+  }
+  function insertFixedButtons(){
+    try{
+      if(!canManage()) return;
+      document.querySelectorAll('[onclick*="v773RunMainAssign"]').forEach(btn=>{
+        if(btn.parentNode&&btn.parentNode.querySelector('.v822-fixed-draw-btn')) return;
+        const key=(String(btn.getAttribute('onclick')||'').match(/'([^']+)'/)||[])[1]||resolveKey();
+        const nb=document.createElement('button');
+        nb.type='button'; nb.className='btn btn-primary v822-fixed-draw-btn';
+        nb.style.cssText='min-height:30px;height:30px;padding:4px 11px;border-radius:10px;font-size:.68rem;font-weight:1000;background:#7c2d12;border-color:#7c2d12;margin-right:4px;color:#fff';
+        nb.textContent='🏆 이번대회 본선확정'; nb.onclick=function(){window.v793FixedDraw(key);};
+        btn.parentNode.insertBefore(nb,btn);
+      });
+      const exportBar=document.getElementById('bracketExportBar');
+      if(exportBar&&!document.getElementById('v822FixedDrawTopBtn')){
+        const b=document.createElement('button'); b.id='v822FixedDrawTopBtn'; b.type='button'; b.className='btn btn-primary';
+        b.style.cssText='font-size:.78rem;padding:5px 12px;border-radius:8px;background:#7c2d12;border-color:#7c2d12;color:#fff';
+        b.textContent='🏆 이번대회 본선확정'; b.onclick=function(){window.v793FixedDraw(resolveKey());};
+        exportBar.appendChild(b);
+      }
+    }catch(e){console.warn(TAG,'button insert failed',e);}
+  }
+  function boot(){
+    try{ const badge=document.getElementById('bracketFreshnessBadge'); if(badge){badge.textContent='v822 · 원도심고정+본선잠금'; badge.style.background='#dcfce7'; badge.style.color='#166534'; badge.style.border='1px solid #86efac';} }catch(e){}
+    patchRender(); insertFixedButtons(); window.v809UpdateLockBtn(); window.v822ApplyLock();
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
+  [300,900,1600,3000,5200].forEach(ms=>setTimeout(boot,ms));
+  document.addEventListener('change',function(ev){ if(ev.target&&(/^(brTS|brDS)$/).test(ev.target.id||'')) setTimeout(boot,120); },true);
+  console.log(TAG,'installed: 원도심 33~44조 고정, 확정 후 자동 잠금');
+})();
+</script>
+
 </body>
 </html>
