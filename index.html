@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-14-v823";
+  const APP_VERSION = "2026-06-14-v828";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -6046,142 +6046,14 @@ button:disabled{opacity:.55!important;cursor:not-allowed!important;filter:graysc
 }
 </style>
 
-<script id="v805GlobalFunctions">
-// v815: 본선 잠금 — MutationObserver 방식 (renderBracket 래핑 불필요)
-
-window.v799IsLocked=function(key){
-  try{
-    if(!key){
-      const el=document.getElementById('brTS');
-      key=el?String(el.value||'').trim():'';
-      if(!key&&window.G&&G.draws) key=Object.keys(G.draws)[0]||'';
-    }
-    return !!(window.G&&G.draws&&G.draws[key]&&G.draws[key].mainBracketLocked);
-  }catch(e){return false;}
-};
-
-window.v799CanView=function(){
-  if(window.AD===true||window.OP===true||window.TM===true) return true;
-  try{if(typeof canManageBracket==='function'&&canManageBracket())return true;}catch(e){}
-  try{if(document.body.classList.contains('admin-mode'))return true;}catch(e){}
-  return false;
-};
-
-// 가림막 적용 함수
-window.v815ApplyLock=function(){
-  try{
-    const locked=window.v799IsLocked();
-    const canView=window.v799CanView();
-    const bc=document.getElementById('bracketContent');
-    if(!bc) return;
-    if(locked&&!canView){
-      // 이미 가림막이면 스킵
-      if(bc.querySelector('#v815mask')) return;
-      bc.innerHTML='<div id="v815mask" style="padding:80px 20px;text-align:center;background:#f8fafc;border-radius:18px;margin:16px 0"><div style="font-size:3rem;margin-bottom:12px">\uD83D\uDD12</div><div style="font-size:1.1rem;font-weight:900;color:#1e293b;margin-bottom:8px">본선 대진표 준비중</div><div style="font-size:.85rem;color:#64748b">운영진이 공개하면 볼 수 있습니다</div></div>';
-    } else {
-      // 가림막 제거하고 재렌더
-      if(bc.querySelector('#v815mask')){
-        bc.innerHTML='';
-        try{if(typeof renderBracket==='function')renderBracket();}catch(e){}
-      }
-    }
-  }catch(e){}
-};
-
-// MutationObserver로 bracketContent 변경 감시
-(function(){
-  function startObs(){
-    const bc=document.getElementById('bracketContent');
-    if(!bc) return;
-    const obs=new MutationObserver(function(){
-      setTimeout(window.v815ApplyLock,50);
-    });
-    obs.observe(bc,{childList:true});
-    console.log('[v815] MutationObserver 시작');
-  }
-  setTimeout(startObs,1000);
-  setTimeout(startObs,3000);
-  setTimeout(window.v815ApplyLock,2000);
-  setTimeout(window.v815ApplyLock,4000);
-})();
-
-window.v799LockBracket=async function(key,lock){
-  try{
-    if(!key){
-      const el=document.getElementById('brTS');
-      key=el?String(el.value||'').trim():'';
-      if(!key&&window.G&&G.draws) key=Object.keys(G.draws)[0]||'';
-    }
-    if(!key||!(window.G&&G.draws&&G.draws[key])){
-      alert('대회 키를 찾을 수 없습니다: '+key);return;
-    }
-    G.draws[key].mainBracketLocked=!!lock;
-    // Firebase 저장 시도
-    const _stD=window.stD;
-    if(typeof _stD==='function'){
-      try{if(window.__FB_WRITE_CACHE&&window.__FB_WRITE_CACHE.draws)delete window.__FB_WRITE_CACHE.draws[key];}catch(e){}
-      await _stD(key);
-    }
-    // 즉시 적용
-    window.v815ApplyLock();
-    try{window.v809UpdateLockBtn();}catch(e){}
-    const msg=lock?'\uD83D\uDD12 본선 대진표 잠금':'\uD83D\uDD13 본선 대진표 공개';
-    try{if(typeof toastMsg==='function')toastMsg(msg,'success');else if(typeof toast==='function')toast(msg,'success');}catch(e){}
-    console.log('[v815] bracketLocked:',lock,key);
-  }catch(e){console.error('[v815]',e);alert('오류: '+e.message);}
-};
-
-window.v809ToggleBracketLock=async function(){
-  let key=String((document.getElementById('brTS')||{}).value||'').trim();
-  if(!key&&window.G&&G.draws) key=Object.keys(G.draws)[0]||'';
-  if(!key){alert('대회를 먼저 선택하세요.');return;}
-  const locked=!!(window.G&&G.draws&&G.draws[key]&&G.draws[key].mainBracketLocked);
-  await window.v799LockBracket(key,!locked);
-};
-
-window.v809UpdateLockBtn=function(){
-  try{
-    ['v809BracketLockBtn','v809LockBtnCourtBoard'].forEach(function(id){
-      const btn=document.getElementById(id);
-      if(!btn) return;
-      const canSee=window.v799CanView();
-      btn.style.display=canSee?'':'none';
-      if(!canSee) return;
-      const key=String((document.getElementById('brTS')||{}).value||'').trim()||
-        (window.G&&G.draws?Object.keys(G.draws)[0]||'':'');
-      const locked=!!(window.G&&G.draws&&G.draws[key]&&G.draws[key].mainBracketLocked);
-      btn.textContent=locked?'\uD83D\uDD13 본선 공개':'\uD83D\uDD12 본선 잠금';
-      btn.style.background=locked?'#16a34a':'#dc2626';
-      btn.style.borderColor=locked?'#16a34a':'#dc2626';
-    });
-  }catch(e){}
-};
-
-window.v810WrapRenderBracket=function(){
-  const orig=window.renderBracket;
-  if(typeof orig!=='function'||orig.__v810Wrapped) return;
-  const wrapped=function(){
-    const key=String((document.getElementById('brTS')||{}).value||'').trim();
-    const locked=!!(window.G&&G.draws&&G.draws[key]&&G.draws[key].mainBracketLocked);
-    const isAdmin=!!(window.AD||window.OP||window.TM);
-    if(locked&&!isAdmin){
-      const cont=document.getElementById('bracketContent');
-      if(cont) cont.innerHTML='<div id="v815mask" style="padding:80px 20px;text-align:center;background:#f8fafc;border-radius:18px;margin:16px 0"><div style="font-size:3rem;margin-bottom:12px">\uD83D\uDD12</div><div style="font-size:1.1rem;font-weight:900;color:#1e293b;margin-bottom:8px">본선 대진표 준비중</div><div style="font-size:.85rem;color:#64748b">운영진이 공개하면 볼 수 있습니다</div></div>';
-      return;
-    }
-    return orig.apply(this,arguments);
-  };
-  wrapped.__v810Wrapped=true;
-  window.renderBracket=wrapped;
-  try{renderBracket=wrapped;}catch(e){}
-  console.log('[v815] renderBracket 래핑 완료');
-};
-(function tryWrap(){
-  if(typeof window.renderBracket==='function'&&!window.renderBracket.__v810Wrapped) window.v810WrapRenderBracket();
-  setTimeout(function(){if(typeof window.renderBracket==='function'&&!window.renderBracket.__v810Wrapped) window.v810WrapRenderBracket();},1500);
-  setTimeout(function(){if(typeof window.renderBracket==='function'&&!window.renderBracket.__v810Wrapped) window.v810WrapRenderBracket();},4000);
-})();
-</script>
+<style id="v826GuestResultAndSharedQueueFixStyle">
+/* v826: 모바일 공용대기 정리. 국제/원도심 박스는 좁은 화면에서 세로로 내려가고, 각 공용대기 카드는 1열로 표시 */
+@media(max-width:768px){
+  .v826-shared-venue-split{grid-template-columns:1fr!important;}
+  .v826-shared-venue-split .court-wait-card{min-height:auto!important;max-height:none!important;padding:9px 10px!important;}
+  .v826-shared-venue-split .v490-court-action-row{grid-template-columns:1fr!important;}
+}
+</style>
 </head>
 <body>
 <header class="app-header">
@@ -9185,6 +9057,18 @@ const _app=initializeApp(FB);
 const db=getFirestore(_app);
 const storage=getStorage(_app);
 const auth=getAuth(_app);
+// v826: 비회원(이름+전화번호 확인) 결과 저장도 Firebase 규칙의 auth != null 조건을 만족하도록 익명 인증을 자동 연결
+async function ensureAuthForPublicResultWrite(){
+  try{
+    if(auth.currentUser) return auth.currentUser;
+    const cred=await signInAnonymously(auth);
+    return cred.user || auth.currentUser;
+  }catch(e){
+    console.warn('[v826] anonymous auth failed for public result write', e);
+    throw new Error('비회원 결과 저장을 하려면 Firebase Authentication에서 Anonymous 로그인을 켜야 합니다.');
+  }
+}
+window.ensureAuthForPublicResultWrite=ensureAuthForPublicResultWrite;
 // v823: 후속 일반 스크립트에서 참가자 결과 저장 후 대기열 변경분을 개별 문서로 저장할 수 있게 노출
 Object.assign(window,{db,doc,updateDoc,setDoc,waitForPendingWrites});
 // ── 230MATCH 알림 준비 코드 ─────────────────────────────
@@ -12700,14 +12584,21 @@ function _showNamePhoneInputModal(key, m, resolve, reject){
   const msgEl=document.getElementById('v607VerifyMsg');
   if(nameEl) setTimeout(()=>nameEl.focus(),100);
   document.getElementById('v607VerifyCancel').onclick=()=>{ modal.classList.remove('open'); reject(new Error('취소됨')); };
-  document.getElementById('v607VerifyConfirm').onclick=()=>{
+  document.getElementById('v607VerifyConfirm').onclick=async()=>{
     const name=(nameEl?.value||'').trim();
     const phone=(phoneEl?.value||'').trim();
     if(!name||!phone){ if(msgEl) msgEl.textContent='이름과 전화번호를 모두 입력하세요.'; return; }
     const side=_checkNamePhoneSide(key, m, name, phone);
     if(!side){ if(msgEl) msgEl.textContent='등록된 정보와 일치하지 않습니다. 접수 시 입력한 이름/전화번호를 확인하세요.'; return; }
+    try{
+      if(typeof ensureParticipantAnonymousAuth==='function') await ensureParticipantAnonymousAuth({side,name,phone,matchId:String(m?.id||m?._id||''),key});
+      else if(typeof ensureAuthForPublicResultWrite==='function') await ensureAuthForPublicResultWrite();
+    }catch(e){
+      if(msgEl) msgEl.textContent=(e?.message||'비회원 저장 권한 연결에 실패했습니다.');
+      return;
+    }
     modal.classList.remove('open');
-    const verified={side, method:'name_phone', name, phone, at:Date.now()};
+    const verified={side, method:'name_phone', name, phone, uid:(auth?.currentUser?.uid||''), anonymous:!!auth?.currentUser?.isAnonymous, at:Date.now()};
     try{
       window.__v726IndividualResultAuth=window.__v726IndividualResultAuth||{};
       window.__v726IndividualResultAuth[String(key)+'|'+String(m?.id||m?._id||'')]=verified;
@@ -14813,7 +14704,7 @@ function renderCourtStatusBoard(key, div){
     const isManual=(!!w.manualSharedHold || !!String(w.manualCourtTarget||'').trim()) && !(w.initialPrelimAutoCourt && !canManageBracket());
     const assignedElapsed = buildElapsedMetaLine(w.courtAssignedAt||'', 'wait_placed');
     const metaEntries=[]; if(assignedElapsed.clock) metaEntries.push({...assignedElapsed, prefix:'대기배치'});
-    return `<div class="court-wait-card" draggable="${canManageBracket()?'true':'false'}" ondragstart="onCourtCardDragStart(event,'${key}','${String(w.id)}')" ondragend="onCourtCardDragEnd(event)" ondragover="onCourtCardDragOverCard(event,'${key}','${String(w.id)}')" ondragleave="onCourtCardDragLeaveCard(event)" ondrop="onCourtCardDropOnCard(event,'${key}','${String(w.id)}')" style="padding:8px 10px;border-radius:10px;background:${getCourtBoardPhaseColor(wi,w).bg};border:2px solid ${getCourtBoardPhaseColor(wi,w).bd}"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px"><div style="min-width:0;flex:1"><div style="font-size:.78rem;font-weight:900;color:${getCourtBoardPhaseColor(wi,w).fg};line-height:1.35;word-break:keep-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(headline)}</div><div style="font-size:.72rem;color:${getCourtBoardPhaseColor(wi,w).fg};margin-top:3px">${venueBadge}${esc(detailParts.join(' · '))}</div>${renderElapsedMetaBlocks(metaEntries, getCourtBoardPhaseColor(wi,w).fg)}<div class="v490-court-action-row" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin-top:6px;width:100%">${courtBoardStableResultButtonsHtml(key,w)}${canManageBracket()?`<button class="btn btn-outline" type="button" style="font-size:.6rem;padding:2px 2px;min-height:28px;white-space:nowrap;width:100%;justify-content:center" onclick="sendCourtCardSms('${key}','${String(w.id)}','${targetCourt?'court_changed':'queue_registered'}','${targetCourt}',${priority})">문자</button>`:''}<button class="btn btn-outline" type="button" style="font-size:.6rem;padding:2px 2px;min-height:28px;white-space:nowrap;width:100%;justify-content:center" onclick="showCourtMovePicker('${key}','${String(w.id)}')">코트</button></div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px"><span class="court-wait-priority">${priority}</span>${(isManual&&canManageBracket())?'<span class="badge bg-blue" style="font-size:.66rem;padding:3px 7px">수동</span>':''}</div></div></div>`;
+    return `<div class="court-wait-card" draggable="${canManageBracket()?'true':'false'}" ondragstart="onCourtCardDragStart(event,'${key}','${String(w.id)}')" ondragend="onCourtCardDragEnd(event)" ondragover="onCourtCardDragOverCard(event,'${key}','${String(w.id)}')" ondragleave="onCourtCardDragLeaveCard(event)" ondrop="onCourtCardDropOnCard(event,'${key}','${String(w.id)}')" style="padding:8px 10px;border-radius:10px;background:${getCourtBoardPhaseColor(wi,w).bg};border:2px solid ${getCourtBoardPhaseColor(wi,w).bd}"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px"><div style="min-width:0;flex:1"><div style="font-size:.78rem;font-weight:900;color:${getCourtBoardPhaseColor(wi,w).fg};line-height:1.35;word-break:keep-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(headline)}</div><div style="font-size:.72rem;color:${getCourtBoardPhaseColor(wi,w).fg};margin-top:3px">${venueBadge}${esc(detailParts.join(' · '))}</div>${renderElapsedMetaBlocks(metaEntries, getCourtBoardPhaseColor(wi,w).fg)}<div class="v490-court-action-row" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin-top:6px;width:100%">${courtBoardStableResultButtonsHtml(key,w)}${canManageBracket()?`<button class="btn btn-outline" type="button" style="font-size:.6rem;padding:2px 2px;min-height:28px;white-space:nowrap;width:100%;justify-content:center" onclick="sendCourtCardSms('${key}','${String(w.id)}','${targetCourt?'court_changed':'queue_registered'}','${targetCourt}',${priority})">문자</button><button class="btn btn-outline" type="button" style="font-size:.6rem;padding:2px 2px;min-height:28px;white-space:nowrap;width:100%;justify-content:center" onclick="showCourtMovePicker('${key}','${String(w.id)}')">코트</button>`:''}</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px"><span class="court-wait-priority">${priority}</span>${(isManual&&canManageBracket())?'<span class="badge bg-blue" style="font-size:.66rem;padding:3px 7px">수동</span>':''}</div></div></div>`;
   }
   // venue 판별 함수 (m.venue 없으면 v771InferMatchVenue 사용)
   function __v772venueOf(key, w){
@@ -14832,9 +14723,9 @@ function renderCourtStatusBoard(key, div){
     if(!list.length) return '<div style="padding:13px;text-align:center;color:#64748b;font-size:.75rem;font-weight:800;background:#fff;border:1px dashed #cbd5e1;border-radius:10px;grid-column:1/-1">대기 없음</div>';
     return list.map((w,idx)=>__v772makeCardHtml(key,w,idx+1)).join('');
   }
-  const __v772gridStyle='display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:7px;padding:9px;align-items:start;';
+  const __v772gridStyle='display:grid;grid-template-columns:1fr;gap:7px;padding:9px;align-items:start;';
   const __v772splitHtml = sharedWaitingVisible.length ? `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%;box-sizing:border-box;margin-top:2px;">
+    <div class="v826-shared-venue-split" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:12px;width:100%;box-sizing:border-box;margin-top:2px;">
       <div style="border-radius:14px;overflow:hidden;border:2px solid #93c5fd;background:#eff6ff;min-width:0;">
         <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 13px;font-weight:900;font-size:.84rem;background:#dbeafe;color:#1e40af;">
           <span>🔵 국제 공용대기</span><span style="font-size:.76rem;font-weight:800">${__v772gukje.length}경기</span>
@@ -14874,7 +14765,7 @@ function renderCourtStatusBoard(key, div){
     if(currentElapsed.clock) currentMetaEntries.push({...currentElapsed, prefix:'시합시작'});
     const currentMid=String(item.current?.id||'');
     const line = info
-      ? `<div ${canManageBracket()&&currentMid?`ondragover="onCourtCardDragOverCard(event,'${key}','__current__${currentMid}')" ondragleave="onCourtCardDragLeaveCard(event)" ondrop="onCourtCardDropOnCard(event,'${key}','__current__${currentMid}')"`:''} style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px"><div style="font-size:.84rem;font-weight:900;color:var(--primary-dark);line-height:1.35;flex:1;word-break:keep-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(info.title)}</div><div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;justify-content:flex-end">${(isCurrentManual&&canManageBracket())?'<span class="badge bg-blue" style="font-size:.66rem;padding:3px 7px">수동</span>':''}${currentElapsed.badge?`<span class="badge" style="font-size:.66rem;padding:3px 7px;background:${currentElapsed.badge.bg};color:${currentElapsed.badge.color};border:1px solid ${currentElapsed.badge.bd}">${currentElapsed.badge.text}</span>`:''}</div></div>${phaseChip}${renderElapsedMetaBlocks(currentMetaEntries, currentElapsed.badge?currentElapsed.badge.color:'var(--text2)')}<div class="v490-court-action-row" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin-top:6px;width:100%">${courtBoardStableResultButtonsHtml(key,item.current)}${canManageBracket()?`<button class="btn btn-outline" type="button" style="font-size:.6rem;padding:2px 2px;min-height:28px;white-space:nowrap;width:100%;justify-content:center" onclick="sendCourtCardSms('${key}','${String(item.current?.id||'')}','match_started','${String(item.court||'')}',0)">문자</button>`:''}<button class="btn btn-outline" type="button" style="font-size:.6rem;padding:2px 2px;min-height:28px;white-space:nowrap;width:100%;justify-content:center" onclick="showCourtMovePicker('${key}','${String(item.current?.id||'')}')">코트</button></div>`
+      ? `<div ${canManageBracket()&&currentMid?`ondragover="onCourtCardDragOverCard(event,'${key}','__current__${currentMid}')" ondragleave="onCourtCardDragLeaveCard(event)" ondrop="onCourtCardDropOnCard(event,'${key}','__current__${currentMid}')"`:''} style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px"><div style="font-size:.84rem;font-weight:900;color:var(--primary-dark);line-height:1.35;flex:1;word-break:keep-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(info.title)}</div><div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;justify-content:flex-end">${(isCurrentManual&&canManageBracket())?'<span class="badge bg-blue" style="font-size:.66rem;padding:3px 7px">수동</span>':''}${currentElapsed.badge?`<span class="badge" style="font-size:.66rem;padding:3px 7px;background:${currentElapsed.badge.bg};color:${currentElapsed.badge.color};border:1px solid ${currentElapsed.badge.bd}">${currentElapsed.badge.text}</span>`:''}</div></div>${phaseChip}${renderElapsedMetaBlocks(currentMetaEntries, currentElapsed.badge?currentElapsed.badge.color:'var(--text2)')}<div class="v490-court-action-row" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin-top:6px;width:100%">${courtBoardStableResultButtonsHtml(key,item.current)}${canManageBracket()?`<button class="btn btn-outline" type="button" style="font-size:.6rem;padding:2px 2px;min-height:28px;white-space:nowrap;width:100%;justify-content:center" onclick="sendCourtCardSms('${key}','${String(item.current?.id||'')}','match_started','${String(item.court||'')}',0)">문자</button><button class="btn btn-outline" type="button" style="font-size:.6rem;padding:2px 2px;min-height:28px;white-space:nowrap;width:100%;justify-content:center" onclick="showCourtMovePicker('${key}','${String(item.current?.id||'')}')">코트</button>`:''}</div>`
       : `<div style="font-size:.84rem;font-weight:800;color:#64748b;line-height:1.45">배정된 진행 경기 없음</div>
          <div style="font-size:.74rem;color:var(--text3);margin-top:4px">경기 코트 배정을 하면 이 코트에 표시됩니다.</div>`;
     const waitingList=[...(item.__visibleWaiting||[])];
@@ -14893,7 +14784,7 @@ function renderCourtStatusBoard(key, div){
               const estimatedTimeText = getCourtEstimatedTimeText(key, idx, !!item.current, item.current?.courtAssignedAt||item.current?.startedAt||item.current?.matchStartedAt||'', item.court||'');
               return `<div class="court-wait-card" draggable="${canManageBracket()?'true':'false'}" ondragstart="onCourtCardDragStart(event,'${key}','${String(w.id)}')" ondragend="onCourtCardDragEnd(event)" ondragover="onCourtCardDragOverCard(event,'${key}','${String(w.id)}')" ondragleave="onCourtCardDragLeaveCard(event)" ondrop="onCourtCardDropOnCard(event,'${key}','${String(w.id)}')" style="padding:8px 10px;border-radius:10px;background:${getCourtBoardPhaseColor(wi,w).bg};border:2px solid ${getCourtBoardPhaseColor(wi,w).bd}">
                 <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
-                  <div style="min-width:0;flex:1"><div style="font-size:.78rem;font-weight:900;color:${getCourtBoardPhaseColor(wi,w).fg};line-height:1.35;word-break:keep-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(wi.title)}</div><div style="font-size:.72rem;color:${getCourtBoardPhaseColor(wi,w).fg};margin-top:3px">${esc([wi.label, '대기중'].filter(Boolean).join(' · '))}</div>${renderElapsedMetaBlocks(metaEntries, getCourtBoardPhaseColor(wi,w).fg)}${estimatedTimeText?`<div class="v490-estimated-time" style="display:inline-flex;align-items:center;margin-top:4px;padding:3px 8px;border-radius:999px;background:#fff7ed;color:#9a3412;border:1px solid #fdba74;font-size:.64rem;font-weight:900;white-space:nowrap">${esc(estimatedTimeText)}</div>`:''}<div class="v490-court-action-row" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin-top:6px;width:100%">${courtBoardStableResultButtonsHtml(key,w)}${canManageBracket()?`<button class="btn btn-outline" type="button" style="font-size:.6rem;padding:2px 2px;min-height:28px;white-space:nowrap;width:100%;justify-content:center" onclick="sendCourtCardSms('${key}','${String(w.id)}','court_changed','${String(item.court||'')}',${priority})">문자</button>`:''}<button class="btn btn-outline" type="button" style="font-size:.6rem;padding:2px 2px;min-height:28px;white-space:nowrap;width:100%;justify-content:center" onclick="showCourtMovePicker('${key}','${String(w.id)}')">코트</button></div></div>
+                  <div style="min-width:0;flex:1"><div style="font-size:.78rem;font-weight:900;color:${getCourtBoardPhaseColor(wi,w).fg};line-height:1.35;word-break:keep-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(wi.title)}</div><div style="font-size:.72rem;color:${getCourtBoardPhaseColor(wi,w).fg};margin-top:3px">${esc([wi.label, '대기중'].filter(Boolean).join(' · '))}</div>${renderElapsedMetaBlocks(metaEntries, getCourtBoardPhaseColor(wi,w).fg)}${estimatedTimeText?`<div class="v490-estimated-time" style="display:inline-flex;align-items:center;margin-top:4px;padding:3px 8px;border-radius:999px;background:#fff7ed;color:#9a3412;border:1px solid #fdba74;font-size:.64rem;font-weight:900;white-space:nowrap">${esc(estimatedTimeText)}</div>`:''}<div class="v490-court-action-row" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin-top:6px;width:100%">${courtBoardStableResultButtonsHtml(key,w)}${canManageBracket()?`<button class="btn btn-outline" type="button" style="font-size:.6rem;padding:2px 2px;min-height:28px;white-space:nowrap;width:100%;justify-content:center" onclick="sendCourtCardSms('${key}','${String(w.id)}','court_changed','${String(item.court||'')}',${priority})">문자</button><button class="btn btn-outline" type="button" style="font-size:.6rem;padding:2px 2px;min-height:28px;white-space:nowrap;width:100%;justify-content:center" onclick="showCourtMovePicker('${key}','${String(w.id)}')">코트</button>`:''}</div></div>
                   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px"><span class="court-wait-priority">${priority}</span>${(isManual&&canManageBracket())?'<span class="badge bg-blue" style="font-size:.66rem;padding:3px 7px">수동</span>':''}</div>
                 </div>
               </div>`;
@@ -15703,22 +15594,40 @@ async function persistSingleMatchDoc(key, matchObj){
 async function persistSingleMatchDocPublic(key, matchObj){
   const {tid,div}=_k2td(key);
   if(!matchObj) return;
+  await ensureAuthForPublicResultWrite();
   const nowIso=new Date().toISOString();
+  const curUser=auth.currentUser;
   const publicPayload={
     winner:(matchObj.winner ?? null),
     sc1:Number(matchObj.sc1||0),
     sc2:Number(matchObj.sc2||0),
     rubbers:Array.isArray(matchObj.rubbers)?matchObj.rubbers:[],
     completedAt:matchObj.completedAt||nowIso,
-    completedBy: auth.currentUser && !auth.currentUser.isAnonymous ? 'participant_auth' : 'public_pin',
-    resultOwnerUid: auth.currentUser && !auth.currentUser.isAnonymous ? auth.currentUser.uid : '',
+    completedBy: curUser && !curUser.isAnonymous ? 'participant_auth' : 'public_pin_anon',
+    resultOwnerUid: curUser ? curUser.uid : '',
     publicResultSavedAt:nowIso
   };
   enrichMatchParticipantOwners(key, matchObj);
   if(matchObj.t1OwnerUid) publicPayload.t1OwnerUid=matchObj.t1OwnerUid;
   if(matchObj.t2OwnerUid) publicPayload.t2OwnerUid=matchObj.t2OwnerUid;
+  try{
+    const cached=(window.__v726IndividualResultAuth||{})[String(key)+'|'+String(matchObj?.id||matchObj?._id||'')]||{};
+    const verifiedSide=Number(cached.side||0);
+    if(curUser && curUser.uid && verifiedSide===1){ publicPayload.t1OwnerUid=curUser.uid; matchObj.t1OwnerUid=curUser.uid; }
+    if(curUser && curUser.uid && verifiedSide===2){ publicPayload.t2OwnerUid=curUser.uid; matchObj.t2OwnerUid=curUser.uid; }
+    publicPayload.namePhoneVerifiedSide=verifiedSide||null;
+    publicPayload.namePhoneVerifiedAt=nowIso;
+  }catch(_e){}
   if(matchObj._id){
-    await updateDoc(doc(db,'matches',matchObj._id), publicPayload);
+    try{
+      await updateDoc(doc(db,'matches',matchObj._id), publicPayload);
+    }catch(e){
+      const msg=String(e?.message||e||'');
+      if(/permission|insufficient/i.test(msg)){
+        throw new Error('Firebase 규칙이 비회원 결과 저장을 막고 있습니다. Authentication의 Anonymous를 켜고, matches 문서에서 이름+전화번호 확인 저장 필드를 허용해야 합니다.');
+      }
+      throw e;
+    }
     try{ await window.waitForPendingWrites(window.db); }catch(_e){}
   }else{
     throw new Error('기존 경기 문서 ID가 없어 참가자 결과 저장을 할 수 없습니다. 관리자 저장은 가능하지만, 참가자 저장 규칙은 기존 경기 문서 update만 허용하도록 맞춰야 합니다.');
@@ -54820,21 +54729,12 @@ setTimeout(v799ApplyBracketLock,3000);
   window.v799IsLocked=function(key){try{key=resolveKey(key); return !!(key&&G?.draws?.[key]?.mainBracketLocked);}catch(e){return false;}};
   window.v799CanView=canManage;
   window.v822ApplyLock=function(){
+    // v827: 예전 전체 가림막 로직은 버튼/대회선택 지연의 원인이므로 제거한다.
+    // 실제 본선만 잠금은 뒤쪽 v823/v827 안정화 스크립트가 처리한다.
     try{
       const oldStyle=document.getElementById('v799-lock-style'); if(oldStyle) oldStyle.textContent='';
-      document.querySelectorAll('#v799-bracket-mask').forEach(el=>el.remove());
-      const key=resolveKey();
-      const locked=!!(key&&G?.draws?.[key]?.mainBracketLocked);
-      const bc=document.getElementById('bracketContent'); if(!bc) return;
-      if(locked&&!canManage()){
-        if(!bc.querySelector('#v822MainLockMask')){
-          bc.innerHTML='<div id="v822MainLockMask" style="padding:78px 20px;text-align:center;background:#f8fafc;border:2px dashed #cbd5e1;border-radius:18px;margin:16px 0"><div style="font-size:3rem;margin-bottom:12px">🔒</div><div style="font-size:1.12rem;font-weight:1000;color:#1e293b;margin-bottom:8px">본선 대진표 준비중</div><div style="font-size:.86rem;color:#64748b;line-height:1.6">운영진이 공개하면 볼 수 있습니다.</div></div>';
-        }
-      }else if(bc.querySelector('#v822MainLockMask')){
-        bc.innerHTML='';
-        try{if(typeof window.renderBracket==='function') window.renderBracket();}catch(e){}
-      }
-    }catch(e){console.warn(TAG,'apply lock failed',e);}
+      document.querySelectorAll('#v799-bracket-mask,#v815mask,#v822MainLockMask').forEach(el=>el.remove());
+    }catch(e){}
   };
   window.v815ApplyLock=window.v822ApplyLock;
   window.v799ApplyBracketLock=window.v822ApplyLock;
@@ -54914,7 +54814,7 @@ setTimeout(v799ApplyBracketLock,3000);
 
 
 
-<script id="v823MainOnlyLockAndParticipantQueueFix">
+<script type="text/plain" id="v823MainOnlyLockAndParticipantQueueFix_disabled_v828">
 (function(){
   'use strict';
   if(window.__v823MainOnlyLockInstalled) return;
@@ -55046,18 +54946,49 @@ setTimeout(v799ApplyBracketLock,3000);
     }
   }
   let applying=false;
+  let lastMaskSig='';
+  function currentMaskSig(keys){
+    try{
+      const bc=document.getElementById('bracketContent');
+      const renderMark=bc ? String(bc.dataset.v827RenderMark||'') : '';
+      return (keys||[]).join('|')+'::'+renderMark+'::'+(canManage()?'M':'V');
+    }catch(e){ return String(Date.now()); }
+  }
+  function existingMaskedKeys(){
+    try{return [...document.querySelectorAll('.v823-main-lock-mask')].map(el=>String(el.dataset.v823Key||el.dataset.v823Key||'')).filter(Boolean).join('|');}catch(e){return '';}
+  }
   function applyMainOnlyLock(){
     if(applying) return;
     applying=true;
     try{
-      const needRender=clearOldWholeMasks();
-      clearMainMasks();
+      ensureOverrideStyle();
+      const bc=document.getElementById('bracketContent');
+      if(!bc) return;
+
+      // 예전 전체잠금 마스크만 제거. 이것 때문에 대회 선택/버튼 클릭이 멈췄다.
+      let needRender=false;
+      document.querySelectorAll('#v799-bracket-mask').forEach(el=>el.remove());
+      const whole=bc.querySelector(':scope > #v815mask, :scope > #v822MainLockMask');
+      if(whole){ whole.remove(); if(bc.children.length===0) needRender=true; }
+      bc.querySelectorAll('#v815mask,#v822MainLockMask').forEach(el=>el.remove());
       if(needRender){
-        setTimeout(()=>{ try{ if(typeof window.renderBracket==='function') window.renderBracket(); }catch(e){} },30);
+        setTimeout(()=>{ try{ if(typeof window.renderBracket==='function') window.renderBracket(); }catch(e){} },20);
         return;
       }
-      if(canManage()) return;
-      selectedKeys().forEach(k=>{ if(isLocked(k)) maskDomForKey(k); });
+
+      const keys=canManage()?[]:selectedKeys().filter(k=>isLocked(k));
+      const sig=currentMaskSig(keys);
+      const masked=existingMaskedKeys();
+      const hiddenCount=document.querySelectorAll('.v823-main-hidden').length;
+
+      // 이미 같은 키가 본선만 가려진 상태면 DOM을 건드리지 않는다.
+      // MutationObserver 반복 호출로 버튼 입력이 씹히던 핵심 원인 제거.
+      if(sig===lastMaskSig && masked===keys.join('|') && (keys.length===0 || hiddenCount>0)) return;
+
+      clearMainMasks();
+      lastMaskSig=sig;
+      if(!keys.length) return;
+      keys.forEach(k=>{ try{ maskDomForKey(k); }catch(e){} });
     }catch(e){ console.warn(TAG,'main-only lock apply failed',e); }
     finally{ applying=false; }
   }
@@ -55191,6 +55122,286 @@ setTimeout(v799ApplyBracketLock,3000);
   [250,800,1500,3000,5200].forEach(ms=>setTimeout(boot,ms));
   document.addEventListener('change',function(ev){ if(ev.target&&(/^(brTS|brDS)$/).test(ev.target.id||'')) setTimeout(boot,120); },true);
   try{ console.log(TAG,'installed: 본선만 잠금 + 참가자 결과 후 대기 자동 저장'); }catch(e){}
+})();
+</script>
+
+<style id="v827ResponsivenessAndQueueFixStyle">
+@media(max-width:768px){
+  .v827-shared-split-grid{display:grid!important;grid-template-columns:1fr!important;gap:10px!important;}
+  .v827-shared-zone .shared-wait-stack{display:flex!important;flex-direction:column!important;gap:7px!important;}
+  .v827-shared-zone .court-wait-card{min-height:auto!important;max-height:none!important;padding:9px 10px!important;overflow:visible!important;}
+  .v827-shared-zone .v490-court-action-row{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:6px!important;}
+  body:not(.admin-mode):not(.operator-mode):not(.tm-mode) .v827-viewer-hide-btn{display:none!important;}
+}
+</style>
+<script type="text/plain" id="v827ResponsivenessAndQueueFixScript_disabled_v828">
+(function(){
+  'use strict';
+  if(window.__v827ResponsivenessInstalled) return;
+  window.__v827ResponsivenessInstalled=true;
+  const TAG='[v827]';
+  const clean=v=>String(v==null?'':v).replace(/\s+/g,' ').trim();
+  let lockTimer=0, queueTimer=0;
+
+  function stripWholeMasks(){
+    try{
+      const bc=document.getElementById('bracketContent');
+      document.querySelectorAll('#v799-bracket-mask').forEach(el=>el.remove());
+      if(bc){
+        bc.querySelectorAll('#v815mask,#v822MainLockMask').forEach(el=>el.remove());
+        bc.dataset.v827RenderMark=String(Date.now());
+      }
+    }catch(e){}
+  }
+
+  function safeApplyLockSoon(delay){
+    clearTimeout(lockTimer);
+    lockTimer=setTimeout(function(){
+      try{ if(typeof window.v815ApplyLock==='function') window.v815ApplyLock(); }catch(e){}
+      try{ if(typeof window.v809UpdateLockBtn==='function') window.v809UpdateLockBtn(); }catch(e){}
+    }, delay==null?80:delay);
+  }
+
+  function markSharedQueue(){
+    try{
+      document.querySelectorAll('.court-drop-zone').forEach(function(zone){
+        const tx=clean(zone.textContent||'');
+        if(!/공용\s*대기/.test(tx)) return;
+        zone.classList.add('v827-shared-zone');
+        const p=zone.parentElement;
+        if(p){
+          const shared=[...p.children].filter(ch=>/공용\s*대기/.test(clean(ch.textContent||'')));
+          if(shared.length>=2) p.classList.add('v827-shared-split-grid');
+        }
+        zone.querySelectorAll('button').forEach(function(btn){
+          const t=clean(btn.textContent||'');
+          if(!/결과|입력|수정/.test(t)) btn.classList.add('v827-viewer-hide-btn');
+        });
+      });
+    }catch(e){ console.warn(TAG,'queue mark failed',e); }
+  }
+
+  function markSharedQueueSoon(delay){
+    clearTimeout(queueTimer);
+    queueTimer=setTimeout(markSharedQueue, delay==null?100:delay);
+  }
+
+  function wrapRender(){
+    const old=window.renderBracket;
+    if(typeof old!=='function' || old.__v827Wrapped) return;
+    const wrapped=function(){
+      stripWholeMasks();
+      const r=old.apply(this,arguments);
+      markSharedQueueSoon(80);
+      safeApplyLockSoon(120);
+      return r;
+    };
+    wrapped.__v827Wrapped=true;
+    wrapped.__old=old;
+    window.renderBracket=wrapped;
+    try{ renderBracket=wrapped; }catch(e){}
+  }
+
+  function wrapOpenM3(){
+    const old=window.openM3;
+    if(typeof old!=='function' || old.__v827Wrapped) return;
+    const wrapped=function(){
+      try{ stripWholeMasks(); }catch(e){}
+      return old.apply(this,arguments);
+    };
+    wrapped.__v827Wrapped=true;
+    wrapped.__old=old;
+    window.openM3=wrapped;
+  }
+
+  function wrapTournamentChange(){
+    const old=window.onBrTC;
+    if(typeof old!=='function' || old.__v827Wrapped) return;
+    const wrapped=function(){
+      stripWholeMasks();
+      try{
+        const multi=document.getElementById('brMultiDiv');
+        if(multi){ multi.innerHTML=''; multi.style.minHeight='0'; }
+      }catch(e){}
+      const r=old.apply(this,arguments);
+      markSharedQueueSoon(180);
+      safeApplyLockSoon(240);
+      return r;
+    };
+    wrapped.__v827Wrapped=true;
+    wrapped.__old=old;
+    window.onBrTC=wrapped;
+    try{ onBrTC=wrapped; }catch(e){}
+  }
+
+  function boot(){
+    wrapRender(); wrapOpenM3(); wrapTournamentChange();
+    stripWholeMasks(); markSharedQueueSoon(120); safeApplyLockSoon(180);
+    try{ const b=document.getElementById('bracketFreshnessBadge'); if(b){ b.textContent='v827 · 입력지연해소+공용대기정리'; b.style.background='#dcfce7'; b.style.color='#166534'; b.style.border='1px solid #86efac'; } }catch(e){}
+  }
+
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
+  [300,900,1800,3200].forEach(ms=>setTimeout(boot,ms));
+  document.addEventListener('change',function(ev){
+    if(ev.target && /^(brTS|brDS)$/.test(ev.target.id||'')){
+      stripWholeMasks(); markSharedQueueSoon(120); safeApplyLockSoon(180);
+    }
+  },true);
+  try{
+    const bc=document.getElementById('bracketContent');
+    if(bc){
+      new MutationObserver(function(){ markSharedQueueSoon(120); }).observe(bc,{childList:true,subtree:true});
+    }
+  }catch(e){}
+  console.log(TAG,'installed');
+})();
+</script>
+
+
+
+<style id="v828EmergencyLayoutStyle">
+/* v828: 화면 흐트러짐 방지 + 모바일 공용대기 정리 */
+#bracketContent{max-width:100%;overflow-x:hidden!important;}
+.v823-main-hidden{display:revert!important;}
+.v823-main-lock-mask,#v815mask,#v822MainLockMask,#v799-bracket-mask{display:none!important;}
+@media(max-width:768px){
+  #bracketContent .court-drop-zone{max-width:100%!important;overflow:hidden!important;}
+  #bracketContent .shared-wait-stack{display:flex!important;flex-direction:column!important;gap:8px!important;}
+  #bracketContent .shared-wait-stack .court-wait-card{width:100%!important;max-width:100%!important;min-height:auto!important;max-height:none!important;overflow:visible!important;padding:9px 10px!important;}
+  #bracketContent .shared-wait-stack .court-wait-card *{word-break:keep-all!important;overflow-wrap:anywhere!important;}
+  #bracketContent .v540-court-grid{grid-template-columns:1fr!important;}
+  body:not(.admin-mode):not(.operator-mode):not(.tm-mode) #bracketContent .court-wait-card button:not([onclick*="openM3"]):not([onclick*="saveM3"]){display:none!important;}
+}
+</style>
+<script id="v828EmergencyLayoutAndGuestResultFix">
+(function(){
+  'use strict';
+  if(window.__v828EmergencyInstalled) return;
+  window.__v828EmergencyInstalled=true;
+  const clean=v=>String(v==null?'':v).replace(/\s+/g,' ').trim();
+  function clearBrokenLayout(){
+    try{
+      document.querySelectorAll('#v799-bracket-mask,#v815mask,#v822MainLockMask,.v823-main-lock-mask').forEach(el=>el.remove());
+      document.querySelectorAll('.v823-main-hidden').forEach(el=>{
+        el.style.display=el.dataset.v823PrevDisplay||'';
+        el.classList.remove('v823-main-hidden');
+        delete el.dataset.v823PrevDisplay;
+      });
+      const old=document.getElementById('v799-lock-style'); if(old) old.textContent='';
+    }catch(e){}
+  }
+  function isManager(){
+    try{ if(window.AD||window.OP||window.TM) return true; }catch(e){}
+    try{ if(typeof window.canManageBracket==='function' && window.canManageBracket()) return true; }catch(e){}
+    try{ return document.body.classList.contains('admin-mode')||document.body.classList.contains('operator-mode')||document.body.classList.contains('tm-mode'); }catch(e){}
+    return false;
+  }
+  function keyParts(key){
+    try{ if(typeof window._k2td==='function') return window._k2td(key); }catch(e){}
+    const s=String(key||''), i=s.indexOf('_'); return i>=0?{tid:s.slice(0,i),div:s.slice(i+1)}:{tid:s,div:''};
+  }
+  function currentKey(){
+    try{
+      const tid=clean((document.getElementById('brTS')||{}).value||''); if(!tid) return '';
+      let div='';
+      if(typeof window.getBracketSelectedDivs==='function'){
+        const t=(window.G&&G.tournaments||[]).find(x=>String(x.id)===String(tid));
+        const ds=window.getBracketSelectedDivs(tid)||[];
+        div=(ds.includes('__ALL__')?(t?.divisions||[]):ds).filter(Boolean)[0]||'';
+      }
+      if(!div) div=clean((document.getElementById('brDS')||{}).value||'');
+      if(!div||div==='__ALL__'){ const t=(window.G&&G.tournaments||[]).find(x=>String(x.id)===String(tid)); div=(t?.divisions||[])[0]||''; }
+      return div?tid+'_'+div:'';
+    }catch(e){return '';}
+  }
+  function updateLockButtons(){
+    try{
+      const key=currentKey();
+      const locked=!!(key&&window.G&&G.draws&&G.draws[key]&&G.draws[key].mainBracketLocked);
+      ['v809BracketLockBtn','v809LockBtnCourtBoard'].forEach(id=>{
+        const btn=document.getElementById(id); if(!btn) return;
+        btn.style.display=isManager()?'inline-flex':'none';
+        btn.textContent=locked?'🔓 본선 공개':'🔒 본선 잠금';
+        btn.style.background=locked?'#16a34a':'#dc2626';
+        btn.style.borderColor=locked?'#16a34a':'#dc2626';
+        btn.style.color='#fff';
+      });
+    }catch(e){}
+  }
+  async function lockBracket(key,lock){
+    key=key||currentKey();
+    if(!key){alert('대회와 부서를 먼저 선택하세요.');return;}
+    if(!isManager()){try{toast('관리자/운영자만 본선 공개·잠금이 가능합니다.','error');}catch(e){} return;}
+    try{
+      if(window.G&&G.draws&&G.draws[key]){
+        G.draws[key].mainBracketLocked=!!lock;
+        G.draws[key].mainBracketLockedAt=lock?new Date().toISOString():(G.draws[key].mainBracketLockedAt||'');
+        G.draws[key].mainBracketOpenedAt=!lock?new Date().toISOString():(G.draws[key].mainBracketOpenedAt||'');
+        if(typeof window.stD==='function') await window.stD(key);
+      }
+      clearBrokenLayout();
+      updateLockButtons();
+      try{toast(lock?'🔒 본선 잠금 저장 완료':'🔓 본선 공개 저장 완료','success');}catch(e){}
+    }catch(e){alert('본선 잠금 저장 실패: '+(e?.message||e));}
+  }
+  function markSharedQueue(){
+    try{
+      document.querySelectorAll('#bracketContent .court-drop-zone').forEach(zone=>{
+        if(!/공용\s*대기/.test(clean(zone.textContent||''))) return;
+        zone.classList.add('v828-shared-zone');
+        zone.querySelectorAll('button').forEach(btn=>{
+          const t=clean(btn.textContent||'');
+          if(!/결과|입력|수정/.test(t) && !isManager()) btn.style.display='none';
+        });
+      });
+    }catch(e){}
+  }
+  function opFields(m){
+    const val=(v,d=null)=>v===undefined?d:v;
+    return {t1:val(m?.t1,null),t2:val(m?.t2,null),winner:val(m?.winner,null),sc1:val(m?.sc1,null),sc2:val(m?.sc2,null),scoreText:val(m?.scoreText,''),actualScoreText:val(m?.actualScoreText,''),completedAt:val(m?.completedAt,null),resultSavedAt:val(m?.resultSavedAt,null),rubbers:Array.isArray(m?.rubbers)?m.rubbers:[],court:val(m?.court,''),courts:Array.isArray(m?.courts)?m.courts:[],courtAssignedAt:val(m?.courtAssignedAt,null),courtQueueOrder:val(m?.courtQueueOrder,null),waitingFirstAt:val(m?.waitingFirstAt,null),lastWaitingFirstAt:val(m?.lastWaitingFirstAt,null),venue:val(m?.venue,''),__venue:val(m?.__venue,''),source1Label:val(m?.source1Label,''),source2Label:val(m?.source2Label,'')};
+  }
+  function stable(o){try{return JSON.stringify(o,Object.keys(o).sort());}catch(e){return String(o);}}
+  window.v823CaptureOperationalSnapshot=function(key){const out={};try{(G.matches[key]||[]).forEach(m=>{if(m)out[String(m.id||m._id||'')]=stable(opFields(m));});}catch(e){}return out;};
+  window.v823PersistOperationalMatchChanges=async function(key,before,excludeMid){
+    if(!key||!window.G||!G.matches||!G.matches[key]||!window.updateDoc||!window.doc||!window.db) return false;
+    const kp=keyParts(key); let ok=false;
+    for(const m of (G.matches[key]||[])){
+      const mid=String(m?.id||m?._id||''); if(!mid||mid===String(excludeMid||'')) continue;
+      if(before && before[mid]===stable(opFields(m))) continue;
+      if(!m._id) continue;
+      const payload={...opFields(m),tournamentId:kp.tid,division:kp.div,updatedAt:new Date().toISOString()};
+      try{await window.updateDoc(window.doc(window.db,'matches',m._id),payload); ok=true;}catch(e){console.warn('[v828] operational update denied',m._id,e);}
+    }
+    try{if(ok&&window.waitForPendingWrites) await window.waitForPendingWrites(window.db);}catch(e){}
+    return ok;
+  };
+  function wrapRender(){
+    const old=window.renderBracket; if(typeof old!=='function'||old.__v828Wrapped) return;
+    const wrapped=function(){clearBrokenLayout(); const r=old.apply(this,arguments); setTimeout(()=>{clearBrokenLayout();markSharedQueue();updateLockButtons();},80); return r;};
+    wrapped.__v828Wrapped=true; wrapped.__old=old; window.renderBracket=wrapped; try{renderBracket=wrapped;}catch(e){}
+  }
+  function wrapSave(){
+    const old=window.saveM3; if(typeof old!=='function'||old.__v828Wrapped) return;
+    const wrapped=async function(){
+      try{
+        // 이름+전화번호 확인 후 저장 버튼을 누르는 비회원은 저장 직전에 익명 인증을 보장한다.
+        if(typeof window.ensureAuthForPublicResultWrite==='function') await window.ensureAuthForPublicResultWrite();
+      }catch(e){ /* 실제 참가자 확인 팝업에서 다시 안내 */ }
+      return old.apply(this,arguments);
+    };
+    wrapped.__v828Wrapped=true; wrapped.__old=old; window.saveM3=wrapped; try{saveM3=wrapped;}catch(e){}
+  }
+  function boot(){
+    clearBrokenLayout(); wrapRender(); wrapSave(); markSharedQueue(); updateLockButtons();
+    window.v822ApplyLock=function(){clearBrokenLayout(); updateLockButtons();};
+    window.v815ApplyLock=window.v822ApplyLock; window.v799ApplyBracketLock=window.v822ApplyLock;
+    window.v799LockBracket=lockBracket; window.v809ToggleBracketLock=function(){const k=currentKey();const locked=!!(k&&G?.draws?.[k]?.mainBracketLocked);return lockBracket(k,!locked);}; window.v809UpdateLockBtn=updateLockButtons;
+    try{const b=document.getElementById('bracketFreshnessBadge'); if(b){b.textContent='v828 · 저장권한+화면안정';b.style.background='#dcfce7';b.style.color='#166534';b.style.border='1px solid #86efac';}}catch(e){}
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
+  [300,900,1800,3500].forEach(ms=>setTimeout(boot,ms));
+  document.addEventListener('change',ev=>{if(ev.target&&/^(brTS|brDS)$/.test(ev.target.id||'')) setTimeout(boot,120);},true);
+  console.log('[v828] emergency layout/result fix installed');
 })();
 </script>
 
