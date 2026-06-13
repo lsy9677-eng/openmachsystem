@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-13-v782";
+  const APP_VERSION = "2026-06-13-v797";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -14575,6 +14575,7 @@ function renderCourtStartControlHtml(key){
         <button class="btn btn-outline" type="button" style="min-height:30px;height:30px;padding:4px 9px;border-radius:10px;font-size:.68rem;font-weight:1000" onclick="saveCourtStartTimeV546('${escFn(key)}')"${disabled}>💾 저장</button>
         <button class="btn btn-accent" type="button" style="min-height:30px;height:30px;padding:4px 9px;border-radius:10px;font-size:.68rem;font-weight:1000" onclick="startCourtNowV546('${escFn(key)}')"${disabled}>▶ 지금 시작</button>
         <button class="btn btn-gray" type="button" style="min-height:30px;height:30px;padding:4px 9px;border-radius:10px;font-size:.68rem;font-weight:1000" onclick="useCourtScheduledV546('${escFn(key)}')"${disabled}>예약시간 사용</button>
+        <button class="btn btn-primary" type="button" style="min-height:30px;height:30px;padding:4px 11px;border-radius:10px;font-size:.68rem;font-weight:1000;background:#dc2626;border-color:#dc2626" onclick="v793FixedDraw('${escFn(key)}')" title="128강 대진표를 확정하고 저장합니다 (이번 대회 전용)">🏆 본선 대진표 확정</button>
         <button class="btn btn-primary" type="button" style="min-height:30px;height:30px;padding:4px 11px;border-radius:10px;font-size:.68rem;font-weight:1000;background:#7c3aed;border-color:#7c3aed" onclick="v773RunMainAssign('${escFn(key)}')" title="빈 코트에 본선 경기를 구장별 자동 배분합니다">🎯 본선 코트 배정</button>
       </div>
     </div>`;
@@ -30347,138 +30348,127 @@ async function startIndividualMainDraw(){
 // 개인전 본선 대진 생성 — play-in 포함
 // groupLabelOnly=true: 예선 미완료 시 ti 대신 null, source*Label에 "A조1위" 형태만 저장
 function buildIndivMainMatchesFixed(advT, key, teams, groupLabelOnly=false){
-  // v778: 단순 직접 배치
-  // 원도심팀 / 국제팀 분리 추첨, 각각 독립 브래킷
-  const all=(advT||[]).map(e=>({
-    ...e,
+  // v793: 고정 슬롯 테이블 — pair(짝수=경기, 홀수=부전승)
+  // 국제 슬롯 0~47 (경기24개+부전승24개=72팀)
+  // 원도심 슬롯 48~63 (경기8개+부전승8개=24팀)
+  const all=(advT||[]).map(e=>({...e,
     nm:e.nm||getMainEntryBracketLabel(e)||`T${e.ti??''}`,
     _groupLabel:`${grpLabel((e.gn||1)-1)} ${e.rk}위`
   }));
-
   const wondo=all.filter(e=>e.venue==='wondosim');
   const gukje=all.filter(e=>e.venue!=='wondosim');
-  const canSplit=wondo.length>=2 && gukje.length>=2;
 
-  let matches;
-  if(canSplit){
-    const wMs=_buildSimpleBracketMatches(wondo, 'wondosim', 0);
-    const wCount=nextPow2(Math.max(2,wondo.length))/2;
-    const gMs=_buildSimpleBracketMatches(gukje, 'gukje', wCount);
-    matches=[...wMs, ...gMs];
-  }else{
-    matches=_buildSimpleBracketMatches(all, all.some(e=>e.venue==='wondosim')?'wondosim':'gukje', 0);
+  function shuffle(arr){
+    const a=[...arr];
+    for(let i=a.length-1;i>0;i--){
+      const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];
+    }
+    return a;
   }
+
+  // 슬롯 채우기: 조1위는 부전승(홀수)슬롯, 나머지는 경기(짝수)슬롯
+  function makeMatches(entries, totalSlots, offset, venue){
+    const byeCount=totalSlots-entries.length; // 부전승 수
+    const gameCount=entries.length-byeCount;  // 경기 참여 팀 수 / 2 = 경기 수
+    // 실제: 경기슬롯=totalSlots/2-byeCount... 복잡
+    // 단순하게: 홀수슬롯=부전승, 짝수슬롯=경기
+    // 홀수슬롯 수 = totalSlots/2 = byeCount여야 함
+    const byeSlotCount=totalSlots/2;
+    const gameSlotCount=totalSlots/2;
+
+    // 조1위 셔플 → 부전승슬롯
+    // 나머지 셔플 → 경기슬롯
+    const r1=shuffle(entries.filter(e=>Number(e.rk||0)===1));
+    const r2=shuffle(entries.filter(e=>Number(e.rk||0)!==1));
+
+    // byeSlotCount만큼 조1위 먼저, 부족하면 r2에서 보충
+    const byePool=[...r1,...r2];
+    const byeTeams=byePool.splice(0, byeSlotCount);
+    const gameTeams=byePool; // 나머지
+
+    const out=[];
+    for(let i=0;i<totalSlots;i++){
+      const absSlot=offset+i;
+      if(i%2===1){
+        // 부전승 슬롯
+        const idx=Math.floor(i/2);
+        const team=byeTeams[idx]||null;
+        const ti=team&&team.ti!=null?Number(team.ti):null;
+        out.push({
+          id:`main_r0_${absSlot}`,phase:'main',round:0,slot:absSlot,
+          t1:ti,t2:null,winner:ti,rubbers:[],bye:true,court:'',
+          venue,__venue:venue,
+          source1Label:team?getMainEntryBracketLabel(team)||String(team.nm||''):'',
+          source2Label:'부전승'
+        });
+      }else{
+        // 경기 슬롯
+        const idx=Math.floor(i/2);
+        const tm1=gameTeams[idx*2]||null;
+        const tm2=gameTeams[idx*2+1]||null;
+        const ti1=tm1&&tm1.ti!=null?Number(tm1.ti):null;
+        const ti2=tm2&&tm2.ti!=null?Number(tm2.ti):null;
+        out.push({
+          id:`main_r0_${absSlot}`,phase:'main',round:0,slot:absSlot,
+          t1:ti1,t2:ti2,winner:null,rubbers:[],bye:false,court:'',
+          venue,__venue:venue,
+          source1Label:tm1?getMainEntryBracketLabel(tm1)||String(tm1.nm||''):'',
+          source2Label:tm2?getMainEntryBracketLabel(tm2)||String(tm2.nm||''):''
+        });
+      }
+    }
+    return out;
+  }
+
+  let matches=[];
+  if(gukje.length>=2&&wondo.length>=2){
+    matches=[...makeMatches(gukje,48,0,'gukje'), ...makeMatches(wondo,16,48,'wondosim')];
+  }else if(gukje.length>=2){
+    matches=makeMatches(gukje,48,0,'gukje');
+  }else{
+    matches=makeMatches(wondo,16,48,'wondosim');
+  }
+
+  // 상위 라운드
+  function addUpper(offset,count,venue){
+    const out=[];
+    let prev=count,round=1;
+    while(prev>1){
+      const hs=Math.ceil(prev/2);
+      for(let i=0;i<hs;i++){
+        out.push({id:`main_r${round}_${offset+i}`,phase:'main',round,
+          slot:offset+i,t1:null,t2:null,winner:null,rubbers:[],bye:false,court:'',venue,__venue:venue});
+      }
+      matches.filter(m=>m.round===round-1&&m.bye&&m.winner!=null&&m.slot>=offset&&m.slot<offset+prev)
+        .forEach(bm=>{
+          const li=bm.slot-offset,ni=Math.floor(li/2);
+          const nm=out.find(x=>x.round===round&&x.slot===offset+ni);
+          if(!nm)return;
+          if(li%2===0){if(nm.t1==null)nm.t1=bm.winner;}
+          else{if(nm.t2==null)nm.t2=bm.winner;}
+        });
+      prev=hs;round++;
+    }
+    return out;
+  }
+  matches.push(...addUpper(0,48,'gukje'));
+  matches.push(...addUpper(48,16,'wondosim'));
 
   if(groupLabelOnly){
     const lbl=new Map();
-    all.forEach(e=>{ if(e&&e.ti!=null) lbl.set(Number(e.ti), String(e._groupLabel||e.nm||'')); });
+    all.forEach(e=>{if(e&&e.ti!=null)lbl.set(Number(e.ti),String(e._groupLabel||e.nm||''));});
     matches=matches.map(m=>{
       const o={...m};
-      if(o.phase==='main'&&Number(o.round||0)===0){
-        if(o.t1!=null) o.source1Label=lbl.get(Number(o.t1))||o.source1Label||'';
-        if(o.t2!=null) o.source2Label=lbl.get(Number(o.t2))||o.source2Label||'';
-        o.t1=null; o.t2=null; o.winner=null;
+      if(o.round===0&&!o.bye){
+        if(o.t1!=null)o.source1Label=lbl.get(Number(o.t1))||o.source1Label||'';
+        if(o.t2!=null)o.source2Label=lbl.get(Number(o.t2))||o.source2Label||'';
+        o.t1=null;o.t2=null;o.winner=null;
       }
       return o;
     });
   }
   return matches;
 }
-
-// 단순 브래킷 생성:
-// 1위팀 전부 → 2위팀 전부 순으로 슬롯 배치
-// 홀수 슬롯(index 1,3,5...): t1=팀, t2=null(부전승)
-// 짝수 슬롯(index 0,2,4...): t1=팀, t2=팀 (정상경기)
-function _buildSimpleBracketMatches(entries, venue, slotOffset){
-  if(!entries||entries.length<2) return [];
-  const N=nextPow2(Math.max(2,entries.length));
-  const matchCount=N/2;
-  const byeCount=N-entries.length;
-
-  // 팀 순서: 1위 → 2위 → 나머지
-  const rank1=entries.filter(e=>Number(e.rk||0)===1);
-  const rank2=entries.filter(e=>Number(e.rk||0)===2);
-  const rest=entries.filter(e=>Number(e.rk||0)>2);
-  const ordered=[...rank1,...rank2,...rest];
-
-  // 슬롯 구성: pair단위 (2i=경기, 2i+1=부전승) 반복
-  // 부전승 슬롯 수 = byeCount, 이를 홀수 슬롯에 분산
-  const byeSlots=new Set();
-  for(let p=0;p<matchCount&&byeSlots.size<byeCount;p++) byeSlots.add(2*p+1);
-
-  // 팀 배치: byeSlots는 t1만, 일반슬롯은 t1+t2
-  const slots=Array.from({length:matchCount},(_,i)=>({t1:null,t2:null,bye:byeSlots.has(i)}));
-  let ptr=0;
-  for(let i=0;i<matchCount;i++){
-    if(slots[i].bye){
-      slots[i].t1=ordered[ptr++]||null;
-    }else{
-      slots[i].t1=ordered[ptr++]||null;
-      slots[i].t2=ordered[ptr++]||null;
-    }
-  }
-
-  // round 0 경기 생성
-  const out=[];
-  for(let i=0;i<matchCount;i++){
-    const s=slots[i];
-    const t1ti=s.t1&&s.t1.ti!=null?s.t1.ti:null;
-    const t2ti=s.t2&&s.t2.ti!=null?s.t2.ti:null;
-    const m={
-      id:`main_r0_${slotOffset+i}`,phase:'main',round:0,slot:slotOffset+i,
-      t1:t1ti,t2:t2ti,winner:null,rubbers:[],bye:s.bye,court:'',
-      venue,__venue:venue,
-      source1Label:s.t1?getMainEntryBracketLabel(s.t1)||String(s.t1.nm||''):'',
-      source2Label:s.bye?'부전승':(s.t2?getMainEntryBracketLabel(s.t2)||String(s.t2.nm||''):'')
-    };
-    if(s.bye&&t1ti!=null) m.winner=t1ti;
-    out.push(m);
-  }
-
-  // 상위 라운드 생성
-  let prevCount=matchCount, round=1;
-  while(prevCount>1){
-    const hs=Math.ceil(prevCount/2);
-    for(let i=0;i<hs;i++){
-      out.push({id:`main_r${round}_${slotOffset+i}`,phase:'main',round,slot:slotOffset+i,
-        t1:null,t2:null,winner:null,rubbers:[],bye:false,court:'',venue,__venue:venue});
-    }
-    // 부전승 자동 진출
-    const r0ms=out.filter(m=>Number(m.round||0)===round-1&&m.bye&&m.winner!=null&&m.slot>=slotOffset&&m.slot<slotOffset+prevCount);
-    r0ms.forEach(bm=>{
-      const localSlot=bm.slot-slotOffset;
-      const nextLocal=Math.floor(localSlot/2);
-      const nm=out.find(x=>x.phase==='main'&&Number(x.round||0)===round&&x.slot===slotOffset+nextLocal);
-      if(!nm) return;
-      if(localSlot%2===0){if(nm.t1==null)nm.t1=bm.winner;}
-      else{if(nm.t2==null)nm.t2=bm.winner;}
-    });
-    prevCount=hs; round++;
-  }
-  return out;
-}
-function _applyGroupLabelOnly(matches, seededEntries, groupLabelOnly){
-  if(!groupLabelOnly) return matches;
-  const labelByTeam=new Map();
-  seededEntries.forEach(e=>{ if(e&&e.ti!=null) labelByTeam.set(Number(e.ti), String(e._groupLabel||e.nm||'')); });
-  return matches.map(m=>{
-    const out={...m};
-    if(out.phase==='playin'){
-      if(out.t1!=null) out.source1Label=labelByTeam.get(Number(out.t1))||out.source1Label||'TBD';
-      if(out.t2!=null) out.source2Label=labelByTeam.get(Number(out.t2))||out.source2Label||'TBD';
-      out.t1=null; out.t2=null; out.winner=null;
-    }else if(out.phase==='main'&&Number(out.round||0)===0){
-      if(out.t1!=null) out.source1Label=labelByTeam.get(Number(out.t1))||out.source1Label||'';
-      if(out.t2!=null) out.source2Label=labelByTeam.get(Number(out.t2))||out.source2Label||'';
-      if(out.source1PlayInId) out.source1Label=`진출전 승자${out.source1PlayInId}`;
-      if(out.source2PlayInId) out.source2Label=out.bye?'부전승':`진출전 승자${out.source2PlayInId}`;
-      out.t1=null; out.t2=null; out.winner=null;
-    }
-    return out;
-  });
-}
-
-
 function buildTournamentTree(slots, matchCount){
   // 이미 round=0, slot=i 부여됨. 상위 라운드 매치 생성
   const result=[...slots];
@@ -51338,13 +51328,20 @@ function assignMainCourts(key, save){
   const minPosWondo=wondoPrelimDone?0:1;
   const minPosGukje=gukjePrelimDone?0:1;
 
-  // 코트별 점유 수 (winner==null인 모든 경기)
+  // 코트별 점유 수: pool 코트 기준으로 초기화 후 모든 진행중 경기(예선+본선) 합산
   const counts={};
   pool.forEach(c=>counts[c]=0);
+
+  // ★ 현재 진행중인 예선 경기가 있는 코트 목록 (이 코트에는 본선 현재경기 절대 불가)
+  const activePrelimCourts=new Set();
   allMatches.forEach(m=>{
     if(!m||m.winner!=null) return;
     const c=cl(ar(m.courts)[0]||m.court);
-    if(c&&counts[c]!=null) counts[c]++;
+    if(!c) return;
+    if(counts[c]==null) counts[c]=0;
+    counts[c]++;
+    // 예선 경기가 진행중(started or waiting)이면 해당 코트 마킹
+    if(String(m.phase||'')==='group') activePrelimCourts.add(c);
   });
 
   // 배정 대상: 본선 + 미완료 + 비부전승 + 코트없음 + 잠금없음 + 양팀확정
@@ -51378,7 +51375,12 @@ function assignMainCourts(key, save){
     const lc={};
     courts.forEach(c=>lc[c]=Number(counts[c]||0));
     byVenue[venue].forEach(m=>{
-      const eligible=courts.filter(c=>{ const n=Number(lc[c]||0); return n>=minPos&&n<2; });
+      const eligible=courts.filter(c=>{
+        const n=Number(lc[c]||0);
+        // 예선 진행중인 코트에는 pos=0(현재경기) 절대 불가
+        const effectiveMin=activePrelimCourts.has(c)?Math.max(minPos,1):minPos;
+        return n>=effectiveMin&&n<2;
+      });
       if(!eligible.length) return;
       eligible.sort((a,b)=>Number(lc[a]||0)-Number(lc[b]||0)||natural(a,b));
       const c=eligible[0], pos=Number(lc[c]||0);
@@ -51422,8 +51424,112 @@ function repairAll(save=true){
 }
 window.v771RepairAll=repairAll;
 window.v771AssignMainCourts=function(key,save){return assignMainCourts(key,save);};
+window.buildIndivMainMatchesFixed=buildIndivMainMatchesFixed;
 
 /* ── v777: 본선 코트 배정 버튼 핸들러 (저장 강제) ── */
+/* ── v793: 본선 대진표 확정 버튼 ── */
+window.v793FixedDraw=async function(key){
+  try{
+    if(!key){ key=cl((document.getElementById('brTS')||{}).value); }
+    if(!key||!(G&&G.draws&&G.draws[key])){ alert('대회를 먼저 선택해주세요.'); return; }
+    if(!confirm('본선 128강 대진표를 확정합니다.\n추첨 후 즉시 저장됩니다. 계속하시겠습니까?')) return;
+
+    const _stM=window.stM||window.__v728_stM;
+    if(typeof _stM!=='function'){ alert('저장 함수를 찾을 수 없습니다.'); return; }
+
+    const draw=G.draws[key];
+    const teams=G.teams&&G.teams[key]?G.teams[key]:[];
+    const cfg={};
+
+    // advT 수집 — 여러 소스 시도
+    let advT=[];
+
+    // 1) getAdvT
+    try{ if(typeof getAdvT==='function') advT=getAdvT(key,draw,teams,cfg)||[]; }catch(e){ console.warn('[v793] getAdvT 실패',e); }
+
+    // 2) getPreviewAdvSlots
+    try{ if(!advT.length&&typeof getPreviewAdvSlots==='function') advT=getPreviewAdvSlots(draw,cfg,key)||[]; }catch(e){ console.warn('[v793] getPreviewAdvSlots 실패',e); }
+
+    // 3) G.draws[key].groups에서 직접 추출
+    if(!advT.length){
+      try{
+        const groups=Array.isArray(draw.groups)?draw.groups:[];
+        const advCount=Number(draw.advCount||draw.grpAdv||2);
+        groups.forEach((grp,gi)=>{
+          if(!grp) return;
+          const grpTeams=Array.isArray(grp.teams)?grp.teams:[];
+          // 순위별 진출팀
+          for(let rk=1;rk<=advCount;rk++){
+            // grp.standings 또는 grp.teams 순서대로
+            const standings=Array.isArray(grp.standings)?grp.standings:grpTeams;
+            const ti=standings[rk-1];
+            if(ti==null) continue;
+            const teamData=teams[Number(ti)]||{};
+            advT.push({
+              ti:Number(ti),
+              gn:gi+1,
+              rk,
+              nm:teamData.name||teamData.nm||`T${ti}`,
+              venue:grp.venue||grp.__venue||null
+            });
+          }
+        });
+        console.log('[v793] groups에서 직접 추출:', advT.length,'팀');
+      }catch(e){ console.warn('[v793] groups 직접 추출 실패',e); }
+    }
+
+    // 4) G.matches에서 예선 완료 팀 역추적
+    if(!advT.length){
+      try{
+        const groupMs=(G.matches&&G.matches[key]||[]).filter(m=>m&&m.phase==='group'&&m.winner!=null);
+        const seen=new Set();
+        groupMs.forEach(m=>{
+          const w=m.winner;
+          if(w!=null&&!seen.has(w)){ seen.add(w); advT.push({ti:Number(w),gn:Number(m.group||0)+1,rk:1,nm:''}); }
+        });
+        console.log('[v793] matches에서 역추적:', advT.length,'팀');
+      }catch(e){}
+    }
+
+    if(!advT.length){ alert('진출팀 데이터를 찾을 수 없습니다.\n예선이 완료되지 않았거나 데이터가 없습니다.'); return; }
+
+    // venue 주입
+    advT=advT.map(e=>{
+      if(e.venue==='wondosim'||e.venue==='gukje') return e;
+      const gi=Number(e.gn||1)-1;
+      let v='gukje';
+      try{ if(typeof groupVenueFromDraw==='function') v=groupVenueFromDraw(key,gi)||'gukje'; }catch(er){}
+      return {...e,venue:v,__venue:v};
+    });
+
+    const wCount=advT.filter(e=>e.venue==='wondosim').length;
+    const gCount=advT.filter(e=>e.venue!=='wondosim').length;
+    console.log('[v793] venue — 원도심:',wCount,'국제:',gCount,'총:',advT.length);
+
+    if(wCount<2&&gCount<2){ alert(`팀 수 부족: 원도심${wCount}팀, 국제${gCount}팀`); return; }
+
+    // 추첨
+    const matches=buildIndivMainMatchesFixed(advT,key,teams,false);
+    if(!matches||!matches.length){ alert('대진 생성 실패'); return; }
+
+    G.matches[key]=matches;
+
+    // Firebase 저장
+    try{ if(window.__FB_WRITE_CACHE&&window.__FB_WRITE_CACHE.matches) delete window.__FB_WRITE_CACHE.matches[key]; }catch(e){}
+    window.__V641_ALLOW_LOCAL_COURT_OVERLAY=true;
+    await _stM(key);
+    setTimeout(()=>{ window.__V641_ALLOW_LOCAL_COURT_OVERLAY=false; },3000);
+
+    try{ if(typeof renderBracket==='function') renderBracket(); }catch(e){}
+
+    const bye=matches.filter(m=>m.round===0&&m.bye);
+    alert(`✅ 본선 128강 대진표 확정!\n원도심 ${wCount}팀 / 국제 ${gCount}팀\n부전승 ${bye.length}개 (원도심${bye.filter(m=>m.venue==='wondosim').length} / 국제${bye.filter(m=>m.venue==='gukje').length})`);
+  }catch(e){
+    console.error('[v793] 확정 실패',e);
+    alert('오류: '+e.message);
+  }
+};
+
 window.v773RunMainAssign=async function(key){
   try{
     if(!key||!(G&&G.matches&&G.matches[key])) return;
