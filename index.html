@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-13-v816";
+  const APP_VERSION = "2026-06-14-v820";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -30504,10 +30504,12 @@ function getV784ExpectedMainEntryCount(key, advT, teams){
 // 개인전 본선 대진 생성 — play-in 포함
 // groupLabelOnly=true: 예선 미완료 시 ti 대신 null, source*Label에 "A조1위" 형태만 저장
 function buildIndivMainMatchesFixed(advT, key, teams, groupLabelOnly=false){
-  // v799: 구장별 조 고정 배정
-  // 원도심(슬롯48~63): 33조~44조의 1위·2위만
-  // 국제+장유중(슬롯0~47): 나머지 조 팀들
-  // 홀수슬롯=부전승(조1위우선), 짝수슬롯=경기 — 절대고정
+  // v820: 원도심 [팀,팀,팀,부전승] × 8묶음 = 32슬롯
+  // pair구조: (48,49)→64강, (50,51)→64강, (52,53)→64강, (54,55)→64강...
+  // 묶음: [슬롯N=팀A, 슬롯N+1=팀B, 슬롯N+2=팀C, 슬롯N+3=부전승]
+  //   pair(N,N+1): 팀A vs 팀B → 64강
+  //   pair(N+2,N+3): 팀C vs 부전승 → 팀C 자동 64강 진출
+  // 팀A,B: 경기 / 팀C: 단독경기(상대=부전승) / 부전승: bye=true
 
   const all=(advT||[]).map(e=>({...e,
     nm:e.nm||getMainEntryBracketLabel(e)||`T${e.ti??''}`,
@@ -30516,70 +30518,128 @@ function buildIndivMainMatchesFixed(advT, key, teams, groupLabelOnly=false){
 
   function shuffle(arr){
     const a=[...arr];
-    for(let i=a.length-1;i>0;i--){
-      const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];
-    }
+    for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}
     return a;
   }
 
-  // 33조~44조 = 원도심, 나머지 = 국제
-  // gn은 1-based 조번호
   const WONDO_GNS=new Set([33,34,35,36,37,38,39,40,41,42,43,44]);
   const wondo=all.filter(e=>WONDO_GNS.has(Number(e.gn||0)));
   const gukje=all.filter(e=>!WONDO_GNS.has(Number(e.gn||0)));
 
-  console.log('[v799] 원도심(33~44조):', wondo.length, '팀, 국제:', gukje.length, '팀');
-
-  // 슬롯 채우기: 홀수=부전승(조1위우선), 짝수=경기
-  function makeMatches(entries, totalSlots, offset, venue){
-    const byeSlotCount=totalSlots/2;
-    const r1=shuffle(entries.filter(e=>Number(e.rk||0)===1));
-    const r2=shuffle(entries.filter(e=>Number(e.rk||0)!==1));
-    const pool=[...r1,...r2];
-    const byeTeams=pool.slice(0,byeSlotCount);
-    const gameTeams=pool.slice(byeSlotCount);
-    const out=[];
-    for(let i=0;i<totalSlots;i++){
-      const absSlot=offset+i;
-      if(i%2===1){
-        const idx=Math.floor(i/2);
-        const team=byeTeams[idx]||null;
-        const ti=team&&team.ti!=null?Number(team.ti):null;
-        out.push({
-          id:`main_r0_${absSlot}`,phase:'main',round:0,slot:absSlot,
-          t1:ti,t2:null,winner:ti,rubbers:[],bye:true,court:'',
-          venue,__venue:venue,
-          source1Label:team?getMainEntryBracketLabel(team)||String(team.nm||''):'',
-          source2Label:'부전승'
-        });
-      }else{
-        const idx=Math.floor(i/2);
-        const tm1=gameTeams[idx*2]||null;
-        const tm2=gameTeams[idx*2+1]||null;
-        const ti1=tm1&&tm1.ti!=null?Number(tm1.ti):null;
-        const ti2=tm2&&tm2.ti!=null?Number(tm2.ti):null;
-        out.push({
-          id:`main_r0_${absSlot}`,phase:'main',round:0,slot:absSlot,
-          t1:ti1,t2:ti2,winner:null,rubbers:[],bye:false,court:'',
-          venue,__venue:venue,
-          source1Label:tm1?getMainEntryBracketLabel(tm1)||String(tm1.nm||''):'',
-          source2Label:tm2?getMainEntryBracketLabel(tm2)||String(tm2.nm||''):''
-        });
-      }
-    }
-    return out;
+  function findEntry(entries,gn,rk){
+    return entries.find(e=>Number(e.gn||0)===gn&&Number(e.rk||0)===rk)||null;
   }
 
-  function addUpper(offset,count,venue,r0matches){
-    const out=[];
-    let prev=count,round=1;
+  function makeM(slot,entry,isBye,entry2=null){
+    const ti=entry&&entry.ti!=null?Number(entry.ti):null;
+    const ti2=(!isBye&&entry2&&entry2.ti!=null)?Number(entry2.ti):null;
+    return {
+      id:`main_r0_${slot}`,phase:'main',round:0,slot,
+      t1:ti,t2:isBye?null:ti2,winner:isBye?ti:null,
+      rubbers:[],bye:isBye,court:'',venue:'wondosim',__venue:'wondosim',
+      gnTarget:entry?Number(entry.gn):null,rkTarget:entry?Number(entry.rk):null,
+      gnTarget2:(!isBye&&entry2)?Number(entry2.gn):null,rkTarget2:(!isBye&&entry2)?Number(entry2.rk):null,
+      source1Label:entry?getMainEntryBracketLabel(entry)||String(entry.nm||entry._groupLabel||''):'',
+      source2Label:isBye?'부전승':(entry2?getMainEntryBracketLabel(entry2)||String(entry2.nm||entry2._groupLabel||''):'')
+    };
+  }
+
+  // 원도심 팀 순서 (조1위 우선 부전승, 나머지 경기)
+  // 부전승 8칸: 33~40조 1위
+  // 경기팀 16명: 41~44조1위, 33~44조2위 (12+4=16) → 8경기(2명씩)
+  // 단독팀 8명: 경기팀에서 묶음당 1명씩 → t2없이 부전승과 짝지음
+  // 실제로: 묶음당 [t1vsT2경기] + [t1vs부전승] = 팀3명+부전승1개
+  // 팀배치: 41조1위,42조1위,43조1위,44조1위,33조2위,...,44조2위 (16명) + 단독8명 필요
+  // → 경기슬롯(pair의 짝수)에 t1vsT2, 부전승슬롯 앞(pair의 짝수)에 단독팀
+  // 
+  // 최종 구조 (묶음 base=48,52,56,60,64,68,72,76):
+  // base+0: 팀A vs 팀B (경기, bye=false)
+  // base+1: 팀A/팀B pair → 이미 base+0에서 처리
+  // 
+  // 다시 정리: 슬롯은 개별 경기
+  // 슬롯48: t1=팀A, t2=팀B (경기)   → pair(48,49)에서 48이 하나
+  // 슬롯49: t1=팀C, t2=null (팀C vs 부전승팀) — bye=false지만 t2없음?
+  //
+  // 가장 단순: pair(N,N+1)에서
+  //   N = 경기(팀A vs 팀B)
+  //   N+1 = 부전승(팀C, bye=true)
+  // 이러면 [경기,부전승,경기,부전승] = 기존 방식
+  //
+  // [팀,팀,팀,부전승] = 실제로는
+  //   슬롯N: 팀A (단독, 64강 자동진출) — bye=true처럼
+  //   슬롯N+1: 팀B (단독)
+  //   슬롯N+2: 팀A vs 팀B 경기
+  //   슬롯N+3: 부전승
+  //
+  // 상영씨가 원하는 건 PDF 대진표와 같은 시각적 구조:
+  // [칸1: 팀] [칸2: 팀] → 64강 경기
+  // [칸3: 팀] → 64강 자동진출(vs 부전승)
+  // [칸4: 부전승팀]
+  // = pair(1,2)=경기 + pair(3,4)=팀vs부전승
+  // = 슬롯N=팀A(t1), 슬롯N+1=팀B(t1의 상대?) — pair는 상하로 연결
+  //
+  // 앱에서 pair(슬롯N, 슬롯N+1)은 "슬롯N의 t1 vs 슬롯N+1의 t1"이 아님!
+  // 앱에서 경기 1개 = matchSlot 1개 = {t1, t2}
+  // 슬롯N = {t1:팀A, t2:팀B} → 팀A vs 팀B
+  // 슬롯N+1 = {t1:팀C, bye:true} → 팀C 자동진출
+  // 이 두 슬롯의 승자가 64강에서 만남
+
+  // 결론: [경기(팀A vsB), 부전승(팀C)] 반복이 유일하게 올바른 구조
+  // 단 "팀3명+부전승" 느낌을 주려면 팀A,팀B를 경기에, 팀C를 부전승과 짝지으면 됨
+  // 시각적으로: 팀A / 팀B / (경기결과) / 팀C / (부전승) = PDF와 동일
+
+  // 부전승 8개, 경기 8개(팀A vsB 형태)
+  // 부전승팀: 33~40조1위 (8명)
+  // 경기팀: 나머지 16명을 pair로
+
+  const byeGnRk=[[33,1],[34,1],[35,1],[36,1],[37,1],[38,1],[39,1],[40,1]];
+  const gameGnRk=[
+    [41,1],[42,1],[43,1],[44,1],
+    [33,2],[34,2],[35,2],[36,2],[37,2],[38,2],[39,2],[40,2],[41,2],[42,2],[43,2],[44,2]
+  ];
+
+  const wMs=[];
+  for(let grp=0;grp<8;grp++){
+    const gameSlot=48+grp*2;
+    const byeSlot=48+grp*2+1;
+    const [gn1,rk1]=gameGnRk[grp*2]||[0,0];
+    const [gn2,rk2]=gameGnRk[grp*2+1]||[0,0];
+    const [bgn,brk]=byeGnRk[grp]||[0,0];
+    const e1=findEntry(wondo,gn1,rk1);
+    const e2=findEntry(wondo,gn2,rk2);
+    const be=findEntry(wondo,bgn,brk);
+    // 경기슬롯: t1=e1, t2=e2
+    wMs.push({
+      id:`main_r0_${gameSlot}`,phase:'main',round:0,slot:gameSlot,
+      t1:e1&&e1.ti!=null?Number(e1.ti):null,
+      t2:e2&&e2.ti!=null?Number(e2.ti):null,
+      winner:null,rubbers:[],bye:false,court:'',venue:'wondosim',__venue:'wondosim',
+      gnTarget:e1?Number(e1.gn):null,rkTarget:e1?Number(e1.rk):null,
+      gnTarget2:e2?Number(e2.gn):null,rkTarget2:e2?Number(e2.rk):null,
+      source1Label:e1?getMainEntryBracketLabel(e1)||String(e1.nm||e1._groupLabel||''):'',
+      source2Label:e2?getMainEntryBracketLabel(e2)||String(e2.nm||e2._groupLabel||''):''
+    });
+    // 부전승슬롯: t1=부전승팀, bye=true
+    const ti=be&&be.ti!=null?Number(be.ti):null;
+    wMs.push({
+      id:`main_r0_${byeSlot}`,phase:'main',round:0,slot:byeSlot,
+      t1:ti,t2:null,winner:ti,rubbers:[],bye:true,court:'',venue:'wondosim',__venue:'wondosim',
+      gnTarget:be?Number(be.gn):null,rkTarget:be?Number(be.rk):null,
+      source1Label:be?getMainEntryBracketLabel(be)||String(be.nm||be._groupLabel||''):'',
+      source2Label:'부전승'
+    });
+  }
+
+  // 상위 라운드
+  function addUpper(offset,count,venue,r0ms){
+    const out=[];let prev=count,round=1;
     while(prev>1){
       const hs=Math.ceil(prev/2);
       for(let i=0;i<hs;i++){
         out.push({id:`main_r${round}_${offset+i}`,phase:'main',round,
           slot:offset+i,t1:null,t2:null,winner:null,rubbers:[],bye:false,court:'',venue,__venue:venue});
       }
-      r0matches.filter(m=>m.round===round-1&&m.bye&&m.winner!=null&&m.slot>=offset&&m.slot<offset+prev)
+      r0ms.filter(m=>m.round===round-1&&m.bye&&m.winner!=null&&m.slot>=offset&&m.slot<offset+prev)
         .forEach(bm=>{
           const li=bm.slot-offset,ni=Math.floor(li/2);
           const nm=out.find(x=>x.round===round&&x.slot===offset+ni);
@@ -30592,11 +30652,42 @@ function buildIndivMainMatchesFixed(advT, key, teams, groupLabelOnly=false){
     return out;
   }
 
-  // 국제 48슬롯(0~47), 원도심 16슬롯(48~63)
-  let matches=[];
-  const gMs=makeMatches(gukje,48,0,'gukje');
-  const wMs=makeMatches(wondo,16,48,'wondosim');
-  matches=[...gMs,...wMs];
+  // 국제 (랜덤)
+  function makeGukjeMatches(entries){
+    const r1=shuffle(entries.filter(e=>Number(e.rk||0)===1));
+    const r2=shuffle(entries.filter(e=>Number(e.rk||0)!==1));
+    const pool=[...r1,...r2];
+    const byeTeams=pool.slice(0,24);
+    const gameTeams=pool.slice(24);
+    const out=[];
+    for(let i=0;i<48;i++){
+      const absSlot=i;
+      if(i%2===1){
+        const idx=Math.floor(i/2);
+        const team=byeTeams[idx]||null;
+        const ti=team&&team.ti!=null?Number(team.ti):null;
+        out.push({id:`main_r0_${absSlot}`,phase:'main',round:0,slot:absSlot,
+          t1:ti,t2:null,winner:ti,rubbers:[],bye:true,court:'',venue:'gukje',__venue:'gukje',
+          gnTarget:team?Number(team.gn):null,rkTarget:team?Number(team.rk):null,
+          source1Label:team?getMainEntryBracketLabel(team)||String(team.nm||''):'',source2Label:'부전승'});
+      }else{
+        const idx=Math.floor(i/2);
+        const tm1=gameTeams[idx*2]||null,tm2=gameTeams[idx*2+1]||null;
+        const ti1=tm1&&tm1.ti!=null?Number(tm1.ti):null;
+        const ti2=tm2&&tm2.ti!=null?Number(tm2.ti):null;
+        out.push({id:`main_r0_${absSlot}`,phase:'main',round:0,slot:absSlot,
+          t1:ti1,t2:ti2,winner:null,rubbers:[],bye:false,court:'',venue:'gukje',__venue:'gukje',
+          gnTarget:tm1?Number(tm1.gn):null,rkTarget:tm1?Number(tm1.rk):null,
+          gnTarget2:tm2?Number(tm2.gn):null,rkTarget2:tm2?Number(tm2.rk):null,
+          source1Label:tm1?getMainEntryBracketLabel(tm1)||String(tm1.nm||''):'',
+          source2Label:tm2?getMainEntryBracketLabel(tm2)||String(tm2.nm||''):''});
+      }
+    }
+    return out;
+  }
+
+  const gMs=makeGukjeMatches(gukje);
+  let matches=[...gMs,...wMs];
   matches.push(...addUpper(0,48,'gukje',gMs));
   matches.push(...addUpper(48,16,'wondosim',wMs));
 
@@ -51369,8 +51460,14 @@ function getMainCourtPool(key){
 /* ───── 2. venue 추론 ───── */
 function groupVenueFromDraw(key,gi){
   try{
+    // v817: 조번호(1-based) 33~44는 무조건 원도심
     const draw=(G&&G.draws&&G.draws[key])||{};
-    const g=ar(draw.groups)[Number(gi)];
+    const groups=ar(draw.groups);
+    const g=groups[Number(gi)];
+    // 확정된 조번호 확인
+    const gn=Number(g&&(g.confirmedGroupNo||g.finalGroupNo||g.displayGroupNo||g.manualGroupNo||g.v702GroupNo||0))||gi+1;
+    if(gn>=33&&gn<=44) return 'wondosim';
+    // 코트 이름으로 2차 판별
     const courts=ar(g&&g.courts).concat([g&&g.court,g&&g.manualCourt,g&&g.manualCourtTarget]).map(cl).filter(Boolean);
     ar(G&&G.matches&&G.matches[key]).forEach(m=>{
       if(!m||String(m.phase||'')!=='group'||Number(m.group)!==Number(gi)) return;
@@ -53980,6 +54077,54 @@ setTimeout(boot,800);
 // v799: window 노출
 window.buildIndivMainMatchesFixed=buildIndivMainMatchesFixed;
 
+// v817: 고정 슬롯에 실제팀 채우기
+function v817FillFixedSlots(key){
+  try{
+    const draw=G.draws&&G.draws[key];
+    if(!draw||!draw.mainBracketFixed) return;
+    const matches=G.matches&&G.matches[key];
+    if(!matches) return;
+    const teams=(G.teams&&G.teams[key])||[];
+    const groups=draw.groups||[];
+    const gnRkToTi={};
+    groups.forEach((grp,gi)=>{
+      const gn=gi+1;
+      const standings=Array.isArray(grp.standings)?grp.standings:(Array.isArray(grp.teams)?grp.teams:[]);
+      const grpMs=matches.filter(m=>m&&m.phase==='group'&&Number(m.group||0)===gi);
+      const done=grpMs.length>0&&grpMs.every(m=>m.winner!=null||m.bye);
+      if(!done) return;
+      standings.forEach((ti,idx)=>{if(ti!=null)gnRkToTi[`${gn}_${idx+1}`]=Number(ti);});
+    });
+    let changed=false;
+    matches.filter(m=>m&&m.phase==='main'&&m.round===0).forEach(m=>{
+      if(m.gnTarget&&m.rkTarget){
+        const ti=gnRkToTi[`${m.gnTarget}_${m.rkTarget}`];
+        if(ti!=null&&m.t1!==ti){
+          m.t1=ti; if(m.bye)m.winner=ti;
+          const nm=teams[ti]||{};
+          m.source1Label=nm.name||nm.nm||m.source1Label||'';
+          changed=true;
+        }
+      }
+      if(!m.bye&&m.gnTarget2&&m.rkTarget2){
+        const ti=gnRkToTi[`${m.gnTarget2}_${m.rkTarget2}`];
+        if(ti!=null&&m.t2!==ti){
+          m.t2=ti;
+          const nm=teams[ti]||{};
+          m.source2Label=nm.name||nm.nm||m.source2Label||'';
+          changed=true;
+        }
+      }
+    });
+    if(changed){
+      console.log('[v817] 고정슬롯 채우기:',key);
+      try{if(window.__FB_WRITE_CACHE&&window.__FB_WRITE_CACHE.matches)delete window.__FB_WRITE_CACHE.matches[key];}catch(e){}
+      if(typeof stM==='function') stM(key).catch(e=>console.warn('[v817]',e));
+    }
+  }catch(e){console.warn('[v817] fillFixedSlots 실패',e);}
+}
+window.v817FillFixedSlots=v817FillFixedSlots;
+
 // A4 대진표 — v731 버전(파란 헤더 카드형) 고정
 // v734 고화질 저장/출력은 유지하되, buildA4/openA4는 v731 버전 사용
 (function pinV731A4(){
@@ -54033,6 +54178,8 @@ window.buildIndivMainMatchesFixed=buildIndivMainMatchesFixed;
         const r=await old.apply(this,arguments);
         try{
           if(key){
+            // ★ 고정 슬롯에 실제팀 채우기 (mainBracketFixed=true일 때만)
+            try{ v817FillFixedSlots(key); }catch(e){}
             if(typeof applyVenueToMain==='function') applyVenueToMain(key);
             const changed=typeof window.v771AssignMainCourts==='function'
               ? window.v771AssignMainCourts(key,false)
@@ -54091,10 +54238,9 @@ window.v793FixedDraw=async function(key){
     if(!advT.length){alert('진출팀 데이터를 찾을 수 없습니다.');return;}
     // venue 주입
     advT=advT.map(e=>{
-      if(e.venue==='wondosim'||e.venue==='gukje')return e;
-      const gi=Number(e.gn||1)-1;
-      let v='gukje';
-      try{if(typeof groupVenueFromDraw==='function')v=groupVenueFromDraw(key,gi)||'gukje';}catch(er){}
+      // v817: 조번호 33~44 → 무조건 원도심, 나머지 → 국제
+      const gn=Number(e.gn||0);
+      const v=(gn>=33&&gn<=44)?'wondosim':'gukje';
       return {...e,venue:v,__venue:v};
     });
     const wN=advT.filter(e=>e.venue==='wondosim').length;
@@ -54103,6 +54249,7 @@ window.v793FixedDraw=async function(key){
     const matches=window.buildIndivMainMatchesFixed(advT,key,teams,false);
     if(!matches||!matches.length){alert('대진 생성 실패');return;}
     G.matches[key]=matches;
+    G.draws[key].mainBracketFixed=true; // 슬롯 고정 플래그
     window.__v799DrawDone=true; // v787 자동 재보정 차단
     try{if(window.__FB_WRITE_CACHE&&window.__FB_WRITE_CACHE.matches)delete window.__FB_WRITE_CACHE.matches[key];}catch(e){}
     window.__V641_ALLOW_LOCAL_COURT_OVERLAY=true;
