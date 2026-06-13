@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-13-v803";
+  const APP_VERSION = "2026-06-13-v806";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -6046,6 +6046,34 @@ button:disabled{opacity:.55!important;cursor:not-allowed!important;filter:graysc
 }
 </style>
 
+<script id="v805GlobalFunctions">
+// v805: 전역 함수 — 반드시 모든 스크립트보다 먼저 정의
+window.v799LockBracket = async function(key, lock){
+  try{
+    if(!key){ key=String((document.getElementById('brTS')||{}).value||'').trim(); }
+    if(!key) return;
+    if(!(window.G&&G.draws&&G.draws[key])) return;
+    G.draws[key].mainBracketLocked=!!lock;
+    // Firebase 저장
+    const _stD=window.stD;
+    if(typeof _stD==='function'){
+      try{ if(window.__FB_WRITE_CACHE&&window.__FB_WRITE_CACHE.draws) delete window.__FB_WRITE_CACHE.draws[key]; }catch(e){}
+      await _stD(key);
+    }
+    // 렌더 갱신
+    try{ if(typeof renderBracket==='function') renderBracket(); }catch(e){}
+    // 가림막 적용
+    try{ if(typeof v799ApplyBracketLock==='function') v799ApplyBracketLock(); }catch(e){}
+    const msg=lock?'🔒 본선 대진표 잠금됨 (참가자에게 숨김)':'🔓 본선 대진표 공개됨';
+    try{ if(typeof toastMsg==='function') toastMsg(msg,'success'); else if(typeof toast==='function') toast(msg,'success'); }catch(e){}
+    console.log('[v805] bracketLocked:',lock,key);
+  }catch(e){ console.error('[v805] LockBracket 실패',e); alert('오류: '+e.message); }
+};
+
+window.v793FixedDraw = window.v793FixedDraw || async function(key){
+  alert('본선 대진표 확정 함수 로딩 중입니다. 잠시 후 다시 시도해주세요.');
+};
+</script>
 </head>
 <body>
 <header class="app-header">
@@ -14581,7 +14609,7 @@ function renderCourtStartControlHtml(key){
         <button class="btn btn-outline" type="button" style="min-height:30px;height:30px;padding:4px 9px;border-radius:10px;font-size:.68rem;font-weight:1000" onclick="saveCourtStartTimeV546('${escFn(key)}')"${disabled}>💾 저장</button>
         <button class="btn btn-accent" type="button" style="min-height:30px;height:30px;padding:4px 9px;border-radius:10px;font-size:.68rem;font-weight:1000" onclick="startCourtNowV546('${escFn(key)}')"${disabled}>▶ 지금 시작</button>
         <button class="btn btn-gray" type="button" style="min-height:30px;height:30px;padding:4px 9px;border-radius:10px;font-size:.68rem;font-weight:1000" onclick="useCourtScheduledV546('${escFn(key)}')"${disabled}>예약시간 사용</button>
-        <button class="btn btn-primary" type="button" style="min-height:30px;height:30px;padding:4px 11px;border-radius:10px;font-size:.68rem;font-weight:1000;background:#7c3aed;border-color:#7c3aed" onclick="v773RunMainAssign('${escFn(key)}')" title="빈 코트에 본선 경기를 구장별 자동 배분합니다">🎯 본선 코트 배정</button>
+        ${canManageBracket()?`<button type="button" style="min-height:30px;height:30px;padding:4px 11px;border-radius:10px;font-size:.68rem;font-weight:1000;background:#dc2626;color:#fff;border:none;cursor:pointer" onclick="v793FixedDraw('${escFn(key)}')" title="128강 대진표 확정">🏆 본선확정</button> <button type="button" style="min-height:30px;height:30px;padding:4px 11px;border-radius:10px;font-size:.68rem;font-weight:1000;background:${(G&&G.draws&&G.draws[key]&&G.draws[key].mainBracketLocked)?'#16a34a':'#6b7280'};color:#fff;border:none;cursor:pointer" onclick="v799LockBracket('${escFn(key)}',${!(G&&G.draws&&G.draws[key]&&G.draws[key].mainBracketLocked)})" title="본선 대진표 잠금/공개">${(G&&G.draws&&G.draws[key]&&G.draws[key].mainBracketLocked)?'🔓 본선공개':'🔒 본선잠금'}</button>`:''} <button class="btn btn-primary" type="button" style="min-height:30px;height:30px;padding:4px 11px;border-radius:10px;font-size:.68rem;font-weight:1000;background:#7c3aed;border-color:#7c3aed" onclick="v773RunMainAssign('${escFn(key)}')" title="빈 코트에 본선 경기를 구장별 자동 배분합니다">🎯 본선 코트 배정</button>
       </div>
     </div>`;
   }catch(e){ return ''; }
@@ -52734,7 +52762,7 @@ setTimeout(boot,800);
       try{ if(typeof stM==='function') await stM(key); }catch(e){}
       try{ if(typeof stD==='function') await stD(key); }catch(e){}
       setTimeout(()=>{ try{ if(typeof v786RunMainAutoAssign==='function') v786RunMainAutoAssign(key,true); else if(typeof v748RunMainAutoCourtRebuild==='function') v748RunMainAutoCourtRebuild(key); }catch(e){} try{ if(typeof renderBracket==='function') renderBracket(); }catch(e){} },220);
-      try{ if(typeof toast==='function') toast('본선 구장 분리 재보정: 원도심 8경기 / 국제 24경기','success'); }catch(e){}
+      // v803: 자동 재보정 토스트 제거
       return true;
     }catch(e){ console.warn(TAG,'repair failed',e); return false; }
     finally{ setTimeout(()=>{ delete repairing[key]; },1200); }
@@ -52747,7 +52775,7 @@ setTimeout(boot,800);
   if(oldMCard && !oldMCard.__v787Wrapped){ const wrapped=function(m,key,dn1,dn2,done,sc1,sc2,label){ try{ if(m&&String(m.phase||'')==='main'&&cl(m.localRoundLabel)&&(/^(본선|\d+강|64강|128강)$/).test(cl(label||''))) label=cl(m.localRoundLabel); }catch(e){} return oldMCard.call(this,m,key,dn1,dn2,done,sc1,sc2,label); }; wrapped.__v787Wrapped=true; wrapped.__old=oldMCard; window.mCard=wrapped; try{ mCard=wrapped; }catch(e){} }
 
   const oldRender=(typeof renderBracket==='function')?renderBracket:null;
-  if(oldRender && !oldRender.__v787Wrapped){ const wrapped=function(){ const ret=oldRender.apply(this,arguments); setTimeout(()=>{ try{ const tid=(document.getElementById('brTS')||{}).value||''; const keys=[]; Object.keys(G?.matches||{}).forEach(k=>{ if(!tid || String(k).startsWith(String(tid)+'_')) keys.push(k); }); [...new Set(keys)].forEach(k=>repairVenueSplitV787(k)); }catch(e){} },180); return ret; }; wrapped.__v787Wrapped=true; wrapped.__old=oldRender; window.renderBracket=wrapped; try{ renderBracket=wrapped; }catch(e){} }
+  if(oldRender && !oldRender.__v787Wrapped){ const wrapped=function(){ const ret=oldRender.apply(this,arguments); setTimeout(()=>{ try{ const tid=(document.getElementById('brTS')||{}).value||''; const keys=[]; Object.keys(G?.matches||{}).forEach(k=>{ if(!tid || String(k).startsWith(String(tid)+'_')) keys.push(k); }); [...new Set(keys)].forEach(k=>{ if(!window.__v799DrawDone) repairVenueSplitV787(k); }); }catch(e){} },180); return ret; }; wrapped.__v787Wrapped=true; wrapped.__old=oldRender; window.renderBracket=wrapped; try{ renderBracket=wrapped; }catch(e){} }
   function boot(){ try{ const b=document.getElementById('bracketFreshnessBadge'); if(b){ b.textContent='v787 · 원도심8/국제24'; b.style.background='#dcfce7'; b.style.color='#166534'; b.style.border='1px solid #22c55e'; } }catch(e){} try{ Object.keys(G?.matches||{}).forEach(k=>repairVenueSplitV787(k)); }catch(e){} console.log(TAG,'installed'); }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
   setTimeout(boot,900); setTimeout(boot,2200);
@@ -53949,6 +53977,7 @@ window.v793FixedDraw=async function(key){
     const matches=window.buildIndivMainMatchesFixed(advT,key,teams,false);
     if(!matches||!matches.length){alert('대진 생성 실패');return;}
     G.matches[key]=matches;
+    window.__v799DrawDone=true; // v787 자동 재보정 차단
     try{if(window.__FB_WRITE_CACHE&&window.__FB_WRITE_CACHE.matches)delete window.__FB_WRITE_CACHE.matches[key];}catch(e){}
     window.__V641_ALLOW_LOCAL_COURT_OVERLAY=true;
     await _stM(key);
