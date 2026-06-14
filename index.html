@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-14-v839";
+  const APP_VERSION = "2026-06-14-v840";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -14649,12 +14649,6 @@ window.useCourtScheduledV546=function(key){
 
 function getCourtEstimatedTimeText(key, waitIdx, hasCurrentMatch, currentStartIso='', courtName=''){
   try{
-    // 한국 시간(KST = UTC+9) 기준
-    function nowKST(){
-      const now=new Date();
-      // KST = UTC + 9시간
-      return new Date(now.getTime() + (9*60*60*1000) - (now.getTimezoneOffset()*60*1000));
-    }
     let base;
     if(hasCurrentMatch && currentStartIso){
       const cur=new Date(currentStartIso);
@@ -14663,9 +14657,10 @@ function getCourtEstimatedTimeText(key, waitIdx, hasCurrentMatch, currentStartIs
       }
     }
     if(!base){
-      const kst=nowKST();
+      // 현재 로컬 시간 (한국 기기는 자동으로 KST)
+      const now=new Date();
       const cfg=parseCourtBaseDate(key, courtName);
-      base = cfg.getTime() > kst.getTime() ? cfg : kst;
+      base = cfg.getTime() > now.getTime() ? cfg : now;
       // 30분 단위 올림
       const interval=30*60*1000;
       base=new Date(Math.ceil(base.getTime()/interval)*interval);
