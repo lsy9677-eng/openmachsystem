@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-14-v905-name-search-fix";
+  const APP_VERSION = "2026-06-14-v905-window-scope-fix";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -31614,16 +31614,10 @@ function buildMainMatches(matchSlots,n,playInMatches=[]){
 }
 // ─── 수동 수정 ──────────────────────────────────────────
 let ME={key:null,tid:null,div:null};
-/* ── v904 검색 가능한 드롭다운 헬퍼 ── */
-window._meTeamList=[];   // [{idx,label}] — openManualEdit 에서 설정
+/* ── v905 검색 가능한 드롭다운 헬퍼 — window.에 명시적으로 등록 (module scope 탈출) ── */
+window._meTeamList=[];
 
-/** 검색 가능한 팀 선택 드롭다운 HTML 생성
- *  @param {string} fieldId   hidden value를 보관할 input id (me_t1_xxx / me_t2_xxx)
- *  @param {number|null} selIdx  현재 선택된 팀 인덱스 (null = 미정)
- *  @param {string} matchId   경기 id
- *  @param {string} slot      't1'|'t2'
- */
-function meSearchDropdownHTML(fieldId, selIdx, matchId, slot){
+window.meSearchDropdownHTML=function(fieldId, selIdx){
   const selLabel = selIdx!==null ? (window._meTeamList[selIdx]?.label||'') : '-- 미정 --';
   return `
   <div class="me-search-wrap" id="meWrap_${fieldId}">
@@ -31634,63 +31628,54 @@ function meSearchDropdownHTML(fieldId, selIdx, matchId, slot){
       placeholder="이름/클럽 검색…"
       value="${selLabel.replace(/"/g,'&quot;')}"
       autocomplete="off"
-      data-field="${fieldId}"
-      onfocus="meOpenDropdown('${fieldId}')"
-      oninput="meFilterDropdown('${fieldId}',this.value)"
-      onkeydown="meKeyNav(event,'${fieldId}')"
+      onfocus="window.meOpenDropdown('${fieldId}')"
+      oninput="window.meFilterDropdown('${fieldId}',this.value)"
+      onkeydown="window.meKeyNav(event,'${fieldId}')"
     >
     <input type="hidden" id="${fieldId}" value="${selIdx!==null?selIdx:''}">
     <div class="me-dropdown-list" id="meDrop_${fieldId}"></div>
   </div>`;
-}
+};
 
-/** 드롭다운 열기 (전체 목록 렌더) */
-function meOpenDropdown(fieldId){
-  const wrap=document.getElementById('meWrap_'+fieldId);
-  if(!wrap) return;
-  // 다른 드롭다운 모두 닫기
+window.meOpenDropdown=function(fieldId){
   document.querySelectorAll('.me-dropdown-list.open').forEach(d=>{
     if(d.id!=='meDrop_'+fieldId) d.classList.remove('open');
   });
   const input=document.getElementById('meInput_'+fieldId);
-  meFilterDropdown(fieldId, input?input.value:'');
+  window.meFilterDropdown(fieldId, input?input.value:'');
   document.getElementById('meDrop_'+fieldId).classList.add('open');
-}
+};
 
-/** 필터링 + 목록 렌더 — v904: searchText(선수명+클럽명 포함)로 검색 */
-function meFilterDropdown(fieldId, q){
+window.meFilterDropdown=function(fieldId, q){
   const drop=document.getElementById('meDrop_'+fieldId);
   if(!drop) return;
   const kw=(q||'').trim().toLowerCase();
   const items=window._meTeamList;
   const esc=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 
-  let html='<div class="me-dropdown-item none-item" data-val="" onclick="meSelectItem(\''+fieldId+'\',\'\',\'-- 미정 --\')">— 미정 —</div>';
+  let html='<div class="me-dropdown-item none-item" data-val="" onclick="window.meSelectItem(\''+fieldId+'\',\'\',\'-- 미정 --\')">— 미정 —</div>';
   let cnt=0;
   items.forEach(({idx,label,searchText})=>{
-    // searchText(선수명+클럽명 통합)로 검색, label에만 하이라이트
     if(kw && !searchText.includes(kw)) return;
     const hl = kw ? label.replace(new RegExp('('+esc(kw)+')','gi'),'<mark>$1</mark>') : label;
-    html+=`<div class="me-dropdown-item" data-val="${idx}" onclick="meSelectItem('${fieldId}','${idx}','${label.replace(/'/g,'\\\'')}')">${hl}</div>`;
+    html+=`<div class="me-dropdown-item" data-val="${idx}" onclick="window.meSelectItem('${fieldId}','${idx}','${label.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')"> ${hl}</div>`;
     cnt++;
   });
   if(cnt===0 && kw) html+='<div class="me-dropdown-item none-item" style="pointer-events:none">검색 결과 없음</div>';
   drop.innerHTML=html;
   if(!drop.classList.contains('open')) drop.classList.add('open');
-}
+};
 
-/** 아이템 선택 */
-function meSelectItem(fieldId, val, label){
+window.meSelectItem=function(fieldId, val, label){
   const hidden=document.getElementById(fieldId);
   const input=document.getElementById('meInput_'+fieldId);
   const drop=document.getElementById('meDrop_'+fieldId);
   if(hidden) hidden.value=val;
   if(input) input.value = val==='' ? '-- 미정 --' : label;
   if(drop) drop.classList.remove('open');
-}
+};
 
-/** 키보드 탐색 (↑↓ Enter Esc) */
-function meKeyNav(e,fieldId){
+window.meKeyNav=function(e,fieldId){
   const drop=document.getElementById('meDrop_'+fieldId);
   if(!drop||!drop.classList.contains('open')) return;
   const items=[...drop.querySelectorAll('.me-dropdown-item:not([style*="pointer-events:none"])')];
@@ -31701,17 +31686,13 @@ function meKeyNav(e,fieldId){
   else if(e.key==='Escape'){drop.classList.remove('open');return;}
   items.forEach((el,i)=>el.classList.toggle('active',i===idx));
   if(items[idx]) items[idx].scrollIntoView({block:'nearest'});
-}
+};
 
-/* 모달 바깥 클릭 시 드롭다운 닫기 */
 document.addEventListener('click',function(e){
   if(!e.target.closest('.me-search-wrap')){
     document.querySelectorAll('.me-dropdown-list.open').forEach(d=>d.classList.remove('open'));
   }
 },true);
-
-/* saveManualEdit 에서 hidden input 값을 읽도록 기존 함수 수정은 불필요
-   — hidden input id 가 기존과 동일하므로 saveManualEdit 코드 변경 없음 */
 
 function openManualEdit(tid,div){
   if(!canManageBracket()){ toast('본선 대진표 수동 수정 권한이 없습니다','error'); return; }
@@ -31764,14 +31745,14 @@ function openManualEdit(tid,div){
       <div style="display:grid;grid-template-columns:1fr 20px 1fr;gap:8px;align-items:start">
         <div>
           <div style="font-size:.65rem;color:var(--text2);margin-bottom:3px">팀1 (상위시드)</div>
-          ${meSearchDropdownHTML('me_t1_'+m.id, m.t1, m.id, 't1')}
+          ${window.meSearchDropdownHTML('me_t1_'+m.id, m.t1, m.id, 't1')}
         </div>
         <div style="text-align:center;font-weight:700;color:var(--text3);padding-top:26px">vs</div>
         <div>
           <div style="font-size:.65rem;color:var(--text2);margin-bottom:3px">${m.bye?'부전승 (자동 진출)':'팀2'}</div>
           ${m.bye
             ?`<div style="padding:7px 10px;background:var(--bg2);border-radius:var(--radius);font-size:.78rem;color:var(--text3);border:1px solid var(--border)">🎫 부전승 진출</div>`
-            :meSearchDropdownHTML('me_t2_'+m.id, m.t2, m.id, 't2')
+            :window.meSearchDropdownHTML('me_t2_'+m.id, m.t2, m.id, 't2')
           }
         </div>
       </div>
