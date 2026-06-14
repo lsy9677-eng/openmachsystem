@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-14-v842";
+  const APP_VERSION = "2026-06-14-v843";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -14612,7 +14612,7 @@ function renderCourtStartControlHtml(key){
         <button class="btn btn-outline" type="button" style="min-height:30px;height:30px;padding:4px 9px;border-radius:10px;font-size:.68rem;font-weight:1000" onclick="saveCourtStartTimeV546('${escFn(key)}')"${disabled}>💾 저장</button>
         <button class="btn btn-accent" type="button" style="min-height:30px;height:30px;padding:4px 9px;border-radius:10px;font-size:.68rem;font-weight:1000" onclick="startCourtNowV546('${escFn(key)}')"${disabled}>▶ 지금 시작</button>
         <button class="btn btn-gray" type="button" style="min-height:30px;height:30px;padding:4px 9px;border-radius:10px;font-size:.68rem;font-weight:1000" onclick="useCourtScheduledV546('${escFn(key)}')"${disabled}>예약시간 사용</button>
-        ${canManageBracket()?`<button type="button" style="min-height:30px;height:30px;padding:4px 11px;border-radius:10px;font-size:.68rem;font-weight:1000;background:#dc2626;color:#fff;border:none;cursor:pointer" onclick="v793FixedDraw('${escFn(key)}')" title="128강 대진표 확정">🏆 본선확정</button> <button type="button" style="min-height:30px;height:30px;padding:4px 11px;border-radius:10px;font-size:.68rem;font-weight:1000;background:${(G&&G.draws&&G.draws[key]&&G.draws[key].mainBracketLocked)?'#16a34a':'#dc2626'};color:#fff;border:none;cursor:pointer" id="v809LockBtnCourtBoard" onclick="v799LockBracket('${escFn(key)}',${!(G&&G.draws&&G.draws[key]&&G.draws[key].mainBracketLocked)})" title="본선 대진표 잠금/공개">${(G&&G.draws&&G.draws[key]&&G.draws[key].mainBracketLocked)?'🔓 본선 공개':'🔒 본선 잠금'}</button>`:''} <button class="btn btn-primary" type="button" style="min-height:30px;height:30px;padding:4px 11px;border-radius:10px;font-size:.68rem;font-weight:1000;background:#7c3aed;border-color:#7c3aed" onclick="v773RunMainAssign('${escFn(key)}')" title="빈 코트에 본선 경기를 구장별 자동 배분합니다">🎯 본선 코트 배정</button>
+        ${canManageBracket()?`<button type="button" style="min-height:30px;height:30px;padding:4px 11px;border-radius:10px;font-size:.68rem;font-weight:1000;background:#dc2626;color:#fff;border:none;cursor:pointer" onclick="v793FixedDraw('${escFn(key)}')" title="128강 대진표 확정">🏆 본선확정</button> <button type="button" style="min-height:30px;height:30px;padding:4px 11px;border-radius:10px;font-size:.68rem;font-weight:1000;background:${(G&&G.draws&&G.draws[key]&&(G.draws[key].mainBracketPublic===true&&G.draws[key].mainBracketLocked!==true))?'#dc2626':'#16a34a'};color:#fff;border:none;cursor:pointer" onclick="(function(){const k='${escFn(key)}';if(window.G&&G.draws&&G.draws[k]){const open=!(G.draws[k].mainBracketPublic===true&&G.draws[k].mainBracketLocked!==true);G.draws[k].mainBracketPublic=open;G.draws[k].mainBracketLocked=!open;stD(k).then(()=>renderBracket());}})()" title="본선 대진표 공개/잠금">${(G&&G.draws&&G.draws[key]&&(G.draws[key].mainBracketPublic===true&&G.draws[key].mainBracketLocked!==true))?'🔒 본선 잠금':'🔓 본선 공개'}</button>`:''} <button class="btn btn-primary" type="button" style="min-height:30px;height:30px;padding:4px 11px;border-radius:10px;font-size:.68rem;font-weight:1000;background:#7c3aed;border-color:#7c3aed" onclick="v773RunMainAssign('${escFn(key)}')" title="빈 코트에 본선 경기를 구장별 자동 배분합니다">🎯 본선 코트 배정</button>
       </div>
     </div>`;
   }catch(e){ return ''; }
@@ -53956,6 +53956,8 @@ function v817FillFixedSlots(key){
   try{
     const draw=G.draws&&G.draws[key];
     if(!draw||!draw.mainBracketFixed) return;
+    // ★ 본선 잠금 상태이면 팀 채우기 안 함
+    if(draw.mainBracketLocked) return;
     const matches=G.matches&&G.matches[key];
     if(!matches) return;
     const teams=(G.teams&&G.teams[key])||[];
