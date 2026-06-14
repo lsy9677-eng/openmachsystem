@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-14-v842";
+  const APP_VERSION = "2026-06-14-v904-searchable-dropdown";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -7482,7 +7482,7 @@ button:disabled{opacity:.55!important;cursor:not-allowed!important;filter:graysc
 <div class="modal-overlay" id="mManualEdit"><div class="modal-box" style="max-width:640px"><div class="modal-header"><h3>✏️ 본선 대진표 수동 수정</h3><button class="modal-close" onclick="cm('mManualEdit')">✕</button></div>
 <div class="modal-body" style="max-height:80vh;overflow-y:auto">
 <div style="font-size:.78rem;color:var(--text2);margin-bottom:12px;padding:8px 12px;background:var(--panel2);border-radius:var(--radius);border:1px solid var(--border)">
-    💡 각 경기의 팀을 드롭다운으로 변경할 수 있습니다. 부전승 경기의 진출팀도 수정 가능합니다.
+    💡 각 경기의 팀을 드롭다운으로 변경할 수 있습니다. 🔍 이름/클럽을 입력하면 자동으로 필터됩니다. 부전승 경기의 진출팀도 수정 가능합니다.
   </div>
 <div id="manualEditBody"></div>
 </div>
@@ -31614,6 +31614,103 @@ function buildMainMatches(matchSlots,n,playInMatches=[]){
 }
 // ─── 수동 수정 ──────────────────────────────────────────
 let ME={key:null,tid:null,div:null};
+/* ── v904 검색 가능한 드롭다운 헬퍼 ── */
+window._meTeamList=[];   // [{idx,label}] — openManualEdit 에서 설정
+
+/** 검색 가능한 팀 선택 드롭다운 HTML 생성
+ *  @param {string} fieldId   hidden value를 보관할 input id (me_t1_xxx / me_t2_xxx)
+ *  @param {number|null} selIdx  현재 선택된 팀 인덱스 (null = 미정)
+ *  @param {string} matchId   경기 id
+ *  @param {string} slot      't1'|'t2'
+ */
+function meSearchDropdownHTML(fieldId, selIdx, matchId, slot){
+  const selLabel = selIdx!==null ? (window._meTeamList[selIdx]?.label||'') : '-- 미정 --';
+  return `
+  <div class="me-search-wrap" id="meWrap_${fieldId}">
+    <span class="me-search-icon">🔍</span>
+    <input type="text"
+      class="me-search-input"
+      id="meInput_${fieldId}"
+      placeholder="이름/클럽 검색…"
+      value="${selLabel.replace(/"/g,'&quot;')}"
+      autocomplete="off"
+      data-field="${fieldId}"
+      onfocus="meOpenDropdown('${fieldId}')"
+      oninput="meFilterDropdown('${fieldId}',this.value)"
+      onkeydown="meKeyNav(event,'${fieldId}')"
+    >
+    <input type="hidden" id="${fieldId}" value="${selIdx!==null?selIdx:''}">
+    <div class="me-dropdown-list" id="meDrop_${fieldId}"></div>
+  </div>`;
+}
+
+/** 드롭다운 열기 (전체 목록 렌더) */
+function meOpenDropdown(fieldId){
+  const wrap=document.getElementById('meWrap_'+fieldId);
+  if(!wrap) return;
+  // 다른 드롭다운 모두 닫기
+  document.querySelectorAll('.me-dropdown-list.open').forEach(d=>{
+    if(d.id!=='meDrop_'+fieldId) d.classList.remove('open');
+  });
+  const input=document.getElementById('meInput_'+fieldId);
+  meFilterDropdown(fieldId, input?input.value:'');
+  document.getElementById('meDrop_'+fieldId).classList.add('open');
+}
+
+/** 필터링 + 목록 렌더 */
+function meFilterDropdown(fieldId, q){
+  const drop=document.getElementById('meDrop_'+fieldId);
+  if(!drop) return;
+  const kw=(q||'').trim().toLowerCase();
+  const items=window._meTeamList;
+
+  let html='<div class="me-dropdown-item none-item" data-val="" onclick="meSelectItem(\''+fieldId+'\',\'\',\'-- 미정 --\')">— 미정 —</div>';
+  let cnt=0;
+  items.forEach(({idx,label})=>{
+    if(kw && !label.toLowerCase().includes(kw)) return;
+    const hl = kw ? label.replace(new RegExp('('+kw.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi'),'<mark>$1</mark>') : label;
+    html+=`<div class="me-dropdown-item" data-val="${idx}" onclick="meSelectItem('${fieldId}','${idx}','${label.replace(/'/g,'\\\'')}')">${hl}</div>`;
+    cnt++;
+  });
+  if(cnt===0 && kw) html+='<div class="me-dropdown-item none-item" style="pointer-events:none">검색 결과 없음</div>';
+  drop.innerHTML=html;
+  if(!drop.classList.contains('open')) drop.classList.add('open');
+}
+
+/** 아이템 선택 */
+function meSelectItem(fieldId, val, label){
+  const hidden=document.getElementById(fieldId);
+  const input=document.getElementById('meInput_'+fieldId);
+  const drop=document.getElementById('meDrop_'+fieldId);
+  if(hidden) hidden.value=val;
+  if(input) input.value = val==='' ? '-- 미정 --' : label;
+  if(drop) drop.classList.remove('open');
+}
+
+/** 키보드 탐색 (↑↓ Enter Esc) */
+function meKeyNav(e,fieldId){
+  const drop=document.getElementById('meDrop_'+fieldId);
+  if(!drop||!drop.classList.contains('open')) return;
+  const items=[...drop.querySelectorAll('.me-dropdown-item:not([style*="pointer-events:none"])')];
+  let idx=items.findIndex(el=>el.classList.contains('active'));
+  if(e.key==='ArrowDown'){e.preventDefault();idx=Math.min(idx+1,items.length-1);}
+  else if(e.key==='ArrowUp'){e.preventDefault();idx=Math.max(idx-1,0);}
+  else if(e.key==='Enter'){e.preventDefault();if(idx>=0)items[idx].click();return;}
+  else if(e.key==='Escape'){drop.classList.remove('open');return;}
+  items.forEach((el,i)=>el.classList.toggle('active',i===idx));
+  if(items[idx]) items[idx].scrollIntoView({block:'nearest'});
+}
+
+/* 모달 바깥 클릭 시 드롭다운 닫기 */
+document.addEventListener('click',function(e){
+  if(!e.target.closest('.me-search-wrap')){
+    document.querySelectorAll('.me-dropdown-list.open').forEach(d=>d.classList.remove('open'));
+  }
+},true);
+
+/* saveManualEdit 에서 hidden input 값을 읽도록 기존 함수 수정은 불필요
+   — hidden input id 가 기존과 동일하므로 saveManualEdit 코드 변경 없음 */
+
 function openManualEdit(tid,div){
   if(!canManageBracket()){ toast('본선 대진표 수동 수정 권한이 없습니다','error'); return; }
   const key=tid+'_'+div;
@@ -31622,33 +31719,28 @@ function openManualEdit(tid,div){
   const mMs=(G.matches[key]||[]).filter(m=>m.phase==='main'&&m.round===0).sort((a,b)=>a.slot-b.slot);
   if(!mMs.length){toast('본선 대진표가 없습니다','error');return;}
 
-  const teamOpts=['<option value="">-- 미정 --</option>',...teams.map((t,i)=>`<option value="${i}">${tdn(t,key,i)}</option>`)].join('');
+  // v904: 팀 목록을 전역 캐시에 저장 (검색 드롭다운용)
+  window._meTeamList = teams.map((t,i)=>({idx:i, label:tdn(t,key,i)||`팀${i+1}`}));
 
   const rows=mMs.map((m,mi)=>{
-    const mt1=m.t1!==null?teams[m.t1]:null;
-    const mt2=m.t2!==null?teams[m.t2]:null;
     const lbl=m.bye?'🎫 부전승':'⚡ 경기';
     return`<div style="padding:12px;border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:8px;background:var(--panel)">
       <div style="font-size:.72rem;font-weight:700;color:var(--primary-dark);margin-bottom:8px">${lbl} — ${mi+1}번 매치</div>
-      <div style="display:grid;grid-template-columns:1fr 20px 1fr;gap:8px;align-items:center">
+      <div style="display:grid;grid-template-columns:1fr 20px 1fr;gap:8px;align-items:start">
         <div>
           <div style="font-size:.65rem;color:var(--text2);margin-bottom:3px">팀1 (상위시드)</div>
-          <select class="form-select" id="me_t1_${m.id}" style="font-size:.8rem">
-            ${teams.map((t,i)=>`<option value="${i}" ${m.t1===i?'selected':''}>${tdn(t,key,i)}</option>`).join('')}
-            <option value="" ${m.t1===null?'selected':''}>-- 미정 --</option>
-          </select>
+          ${meSearchDropdownHTML('me_t1_'+m.id, m.t1, m.id, 't1')}
         </div>
-        <div style="text-align:center;font-weight:700;color:var(--text3)">vs</div>
+        <div style="text-align:center;font-weight:700;color:var(--text3);padding-top:26px">vs</div>
         <div>
           <div style="font-size:.65rem;color:var(--text2);margin-bottom:3px">${m.bye?'부전승 (자동 진출)':'팀2'}</div>
-          ${m.bye?`<div style="padding:7px 10px;background:var(--bg2);border-radius:var(--radius);font-size:.78rem;color:var(--text3);border:1px solid var(--border)">🎫 부전승 진출</div>`
-          :`<select class="form-select" id="me_t2_${m.id}" style="font-size:.8rem">
-            ${teams.map((t,i)=>`<option value="${i}" ${m.t2===i?'selected':''}>${tdn(t,key,i)}</option>`).join('')}
-            <option value="" ${m.t2===null?'selected':''}>-- 미정 --</option>
-          </select>`}
+          ${m.bye
+            ?`<div style="padding:7px 10px;background:var(--bg2);border-radius:var(--radius);font-size:.78rem;color:var(--text3);border:1px solid var(--border)">🎫 부전승 진출</div>`
+            :meSearchDropdownHTML('me_t2_'+m.id, m.t2, m.id, 't2')
+          }
         </div>
       </div>
-      <div style="margin-top:6px">
+      <div style="margin-top:8px">
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:.72rem;color:var(--text2)">
           <input type="checkbox" id="me_bye_${m.id}" ${m.bye?'checked':''} onchange="toggleByeEdit('${m.id}')"> 부전승 처리 (팀1이 자동 다음 라운드 진출)
         </label>
@@ -31662,8 +31754,19 @@ function openManualEdit(tid,div){
 
 function toggleByeEdit(mid){
   const cb=ge(`me_bye_${mid}`);
-  const t2el=ge(`me_t2_${mid}`);
-  if(t2el) t2el.disabled=cb.checked;
+  const isBye=cb&&cb.checked;
+  const t2hidden=ge(`me_t2_${mid}`);
+  if(t2hidden) t2hidden.disabled=isBye;
+  const t2Input=ge(`meInput_me_t2_${mid}`);
+  if(t2Input){
+    t2Input.disabled=isBye;
+    t2Input.style.opacity=isBye?'0.4':'1';
+    t2Input.style.pointerEvents=isBye?'none':'';
+    if(isBye){
+      const drop=ge(`meDrop_me_t2_${mid}`);
+      if(drop) drop.classList.remove('open');
+    }
+  }
 }
 
 async function saveManualEdit(){
@@ -56027,7 +56130,7 @@ if(false) setTimeout(function(){
     const ki=keyInfo(key); const t=(window.G&&G.tournaments||[]).find(x=>String(x.id)===String(ki.tid));
     const label=(t?t.name:'선택 대회')+' — '+(typeof dl==='function'?dl(ki.div):ki.div);
     const body=ge2('v900ManualBody');
-    body.innerHTML=`<div class="v900-import-grid"><div><div style="font-weight:1000;color:#0f1e3a;margin-bottom:8px">${esc(label)}</div><textarea class="v900-import-area" id="v900ManualTextarea" spellcheck="false" placeholder="1번 슬롯부터 한 줄에 한 팀씩 붙여넣으세요. 이름 일부만 넣어도 자동찾기 버튼/저장 시 참가명단에서 찾아 전체 팀명으로 바꿉니다. 부전승은 '부전승' 또는 BYE.">${esc(d.rounds[0].join('\n'))}</textarea><div class="v901-search-note">이름만 입력해도 됩니다. 예: 한 선수 이름만 적은 뒤 <b>🔎 이름 자동찾기</b>를 누르면 참가명단의 복식 팀명으로 바꿉니다.</div></div><div><div class="v900-helpbox"><b>이번 시합 긴급 수동 운영용</b><br>• 예선 데이터가 없어도 128강 슬롯을 직접 입력합니다.<br>• 한 줄이 1슬롯입니다. 128줄보다 적으면 나머지는 빈칸입니다.<br>• 이름 일부/선수명만 입력해도 참가명단에서 자동검색합니다.<br>• ‘부전승’ 또는 ‘BYE’가 있는 경기는 자동반영 버튼으로 상대팀을 64강에 올릴 수 있습니다.<br>• 저장하면 현재 선택한 대회/부서에만 저장됩니다.</div><div class="v900-mini-stat"><div>128강 입력<b>${roundCount(key,0)}/128</b></div><div>64강 확정<b>${roundCount(key,1)}/64</b></div><div>32강 확정<b>${roundCount(key,2)}/32</b></div><div>우승<b>${esc(d.rounds[7][0]||'-')}</b></div></div><div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:12px"><button class="btn btn-outline" onclick="window.v900ClearManualCurrent()" style="font-size:.78rem">🧹 전체 비우기</button><button class="btn btn-outline" onclick="window.v900DisableManualCurrent()" style="font-size:.78rem;border-color:#64748b;color:#334155">수동본선 끄기</button></div></div></div>`;
+    body.innerHTML=`<div class="v900-import-grid"><div><div style="font-weight:1000;color:#0f1e3a;margin-bottom:8px">${esc(label)}</div><div id="v902QuickSearchPanel" class="v902-quick-search-panel v903-direct-search-panel"><div class="v902-quick-title">🔎 이름 검색해서 바로 넣기</div><div class="v902-quick-row"><input id="v902SlotNo" type="number" min="1" max="128" value="1" placeholder="슬롯"><input id="v902QuickSearch" type="text" autocomplete="off" placeholder="여기에 이름 일부를 입력하면 아래에 후보가 뜹니다" oninput="v902QuickSearchInput()" onkeydown="v902QuickSearchKeydown(event)"><button type="button" class="btn btn-primary" onclick="v902PutRaw()" style="background:#1d4ed8">입력값 넣기</button></div><div id="v902QuickResults" class="v902-result-box"></div><div class="v902-quick-help">사용법: 슬롯 번호 선택 → 이름 일부 입력 → 아래 후보 클릭. 후보가 안 뜨면 입력값 넣기로 그대로 넣습니다.</div></div><textarea class="v900-import-area" id="v900ManualTextarea" spellcheck="false" placeholder="1번 슬롯부터 한 줄에 한 팀씩 붙여넣으세요. 이름 일부만 넣어도 자동찾기 버튼/저장 시 참가명단에서 찾아 전체 팀명으로 바꿉니다. 부전승은 '부전승' 또는 BYE.">${esc(d.rounds[0].join('\n'))}</textarea><div class="v901-search-note">이름만 입력해도 됩니다. 예: 한 선수 이름만 적은 뒤 <b>🔎 이름 자동찾기</b>를 누르면 참가명단의 복식 팀명으로 바꿉니다.</div></div><div><div class="v900-helpbox"><b>이번 시합 긴급 수동 운영용</b><br>• 예선 데이터가 없어도 128강 슬롯을 직접 입력합니다.<br>• 한 줄이 1슬롯입니다. 128줄보다 적으면 나머지는 빈칸입니다.<br>• 이름 일부/선수명만 입력해도 참가명단에서 자동검색합니다.<br>• ‘부전승’ 또는 ‘BYE’가 있는 경기는 자동반영 버튼으로 상대팀을 64강에 올릴 수 있습니다.<br>• 저장하면 현재 선택한 대회/부서에만 저장됩니다.</div><div class="v900-mini-stat"><div>128강 입력<b>${roundCount(key,0)}/128</b></div><div>64강 확정<b>${roundCount(key,1)}/64</b></div><div>32강 확정<b>${roundCount(key,2)}/32</b></div><div>우승<b>${esc(d.rounds[7][0]||'-')}</b></div></div><div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:12px"><button class="btn btn-outline" onclick="window.v900ClearManualCurrent()" style="font-size:.78rem">🧹 전체 비우기</button><button class="btn btn-outline" onclick="window.v900DisableManualCurrent()" style="font-size:.78rem;border-color:#64748b;color:#334155">수동본선 끄기</button></div></div></div>`;
     ge2('v900ManualModal').classList.add('open');
   }
   function closeManual(){ const m=ge2('v900ManualModal'); if(m) m.classList.remove('open'); }
@@ -56274,5 +56377,55 @@ if(false) setTimeout(function(){
 })();
 </script>
 
+
+<style id="v903ManualSearchAlwaysVisibleStyle">
+/* v903: 128강 수동본선 검색창을 모달 안에 직접 고정 표시 */
+#v900ManualModal #v902QuickSearchPanel.v903-direct-search-panel{display:block!important;visibility:visible!important;opacity:1!important;margin:0 0 12px!important;border:3px solid #2563eb!important;background:linear-gradient(135deg,#dbeafe,#ffffff)!important;box-shadow:0 8px 20px rgba(37,99,235,.16)!important;}
+#v900ManualModal #v902QuickSearchPanel .v902-quick-title{font-size:1rem!important;color:#1e40af!important;}
+#v900ManualModal #v902QuickSearchPanel #v902QuickSearch{font-size:.95rem!important;min-height:42px!important;}
+#v900ManualModal #v902QuickResults.show{display:block!important;z-index:2147483000!important;}
+#v900ManualModal .v900-import-area{margin-top:8px!important;}
+#v900ManualModal .v900-import-area::placeholder{color:#64748b!important;}
+@media(max-width:680px){#v900ManualModal #v902QuickSearchPanel #v902QuickSearch{font-size:.86rem!important;}#v900ManualModal #v902QuickSearchPanel .v902-quick-title{font-size:.92rem!important;}}
+
+/* ===== v904 검색 가능한 드롭다운 (본선 수동수정 모달) ===== */
+.me-search-wrap{position:relative;width:100%}
+.me-search-input{
+  width:100%;box-sizing:border-box;
+  padding:7px 10px 7px 28px;
+  font-size:.8rem;border:1.5px solid var(--border);
+  border-radius:var(--radius);background:var(--bg);
+  color:var(--text);outline:none;cursor:pointer;
+  transition:border-color .15s;
+}
+.me-search-input:focus{border-color:var(--primary)}
+.me-search-icon{
+  position:absolute;left:8px;top:50%;transform:translateY(-50%);
+  font-size:.78rem;pointer-events:none;color:var(--text3);
+}
+.me-dropdown-list{
+  display:none;position:absolute;top:calc(100% + 3px);left:0;right:0;
+  background:var(--bg);border:1.5px solid var(--primary);
+  border-radius:var(--radius);z-index:9999;
+  max-height:200px;overflow-y:auto;
+  box-shadow:0 6px 20px rgba(0,0,0,.15);
+}
+.me-dropdown-list.open{display:block}
+.me-dropdown-item{
+  padding:8px 11px;font-size:.78rem;cursor:pointer;
+  border-bottom:1px solid var(--border);
+  transition:background .1s;
+}
+.me-dropdown-item:last-child{border-bottom:none}
+.me-dropdown-item:hover,.me-dropdown-item.active{
+  background:var(--primary);color:#fff;
+}
+.me-dropdown-item.none-item{color:var(--text3);font-style:italic}
+.me-dropdown-item mark{background:rgba(255,220,0,.5);color:inherit;border-radius:2px;padding:0 1px}
+@media(max-width:480px){
+  .me-search-input{font-size:.75rem;padding:6px 8px 6px 26px}
+  .me-dropdown-item{font-size:.75rem;padding:7px 9px}
+}
+</style>
 </body>
 </html>
