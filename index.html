@@ -56113,6 +56113,12 @@ if(false) setTimeout(function(){
   window.v900ShowRound=showRound;
   window.v900AutoAdvanceByes=autoAdvanceByes;
   window.v900AutoAdvanceByesCurrent=function(){ const key=currentKey(); if(key) autoAdvanceByes(key); };
+  window.v900GetCurrentKey=currentKey;
+  window.v900GetManualData=getData;
+  window.v900RenderManualBoard=renderBoard;
+  window.v900CacheManual=cache;
+  window.v901FindMatches=findMatches901;
+  window.v901ResolveName=resolveName901;
   window.v900ClearManualCurrent=clearCurrent;
   window.v900DisableManualCurrent=disableCurrent;
   window.v901ManualInputChanged=inputChanged901;
@@ -56123,6 +56129,148 @@ if(false) setTimeout(function(){
   document.addEventListener('mousedown',function(ev){ const box=ge2('v901SuggestBox'); if(box && !box.contains(ev.target) && !(ev.target&&ev.target.classList&&ev.target.classList.contains('v901-team-input'))) hideSuggest901(); });
   document.addEventListener('DOMContentLoaded',()=>setTimeout(init,300));
   setTimeout(init,900); setTimeout(init,2500);
+})();
+</script>
+
+
+
+<style id="v902Manual128SearchFixStyle">
+/* v902: 128강 수동본선 빠른 검색 입력 + 저장 후 즉시 표시 */
+.v902-quick-search-panel{margin:0 0 10px;padding:10px 12px;border:2px solid #1d4ed8;border-radius:14px;background:linear-gradient(135deg,#eff6ff,#ffffff)}
+.v902-quick-title{font-size:.86rem;font-weight:1000;color:#1d4ed8;margin-bottom:8px;line-height:1.35}
+.v902-quick-row{display:grid;grid-template-columns:86px minmax(0,1fr) auto;gap:7px;align-items:center}
+.v902-quick-row input{height:38px;border:1.5px solid #93c5fd;border-radius:10px;padding:6px 9px;font-size:.82rem;font-weight:900;outline:none;background:#fff;color:#0f172a}
+.v902-quick-row input:focus{border-color:#1d4ed8;box-shadow:0 0 0 3px rgba(29,78,216,.12)}
+.v902-quick-row .btn{height:38px;min-height:38px!important;padding:6px 11px!important;font-size:.76rem!important;border-radius:10px!important;font-weight:1000!important;white-space:nowrap!important}
+.v902-result-box{display:none;margin-top:8px;max-height:220px;overflow:auto;border:1px solid #bfdbfe;border-radius:12px;background:#fff;padding:5px}
+.v902-result-box.show{display:block}
+.v902-result-item{display:block;width:100%;border:0;background:#fff;text-align:left;border-radius:9px;padding:8px 9px;cursor:pointer}
+.v902-result-item:hover,.v902-result-item.active{background:#eff6ff}
+.v902-result-name{font-size:.84rem;font-weight:1000;color:#0f172a;line-height:1.35;word-break:keep-all}
+.v902-result-meta{font-size:.68rem;font-weight:800;color:#64748b;margin-top:2px;line-height:1.35;word-break:keep-all}
+.v902-quick-help{margin-top:7px;font-size:.7rem;font-weight:800;color:#475569;line-height:1.5}
+@media(max-width:680px){.v902-quick-row{grid-template-columns:64px minmax(0,1fr);}.v902-quick-row .btn{grid-column:1/-1}.v902-quick-row input{font-size:.78rem}}
+</style>
+<script id="v902Manual128SearchFixScript">
+(function(){
+  'use strict';
+  function ge(id){ return document.getElementById(id); }
+  function esc(s){ return String(s??'').replace(/[&<>"']/g,function(ch){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch];}); }
+  function toast2(msg,type){ try{ if(typeof toast==='function') toast(msg,type||'info'); else alert(msg); }catch(e){ alert(msg); } }
+  function currentKey(){ try{ return typeof window.v900GetCurrentKey==='function' ? window.v900GetCurrentKey() : ''; }catch(e){ return ''; } }
+  function getLines(){
+    const ta=ge('v900ManualTextarea');
+    const lines=String(ta?ta.value:'').replace(/\r/g,'').split('\n').slice(0,128);
+    while(lines.length<128) lines.push('');
+    return lines;
+  }
+  function setLines(lines){
+    const ta=ge('v900ManualTextarea');
+    if(ta) ta.value=lines.slice(0,128).join('\n');
+  }
+  function getSlotNo(){
+    const n=Math.max(1,Math.min(128,parseInt((ge('v902SlotNo')||{}).value||'1',10)||1));
+    if(ge('v902SlotNo')) ge('v902SlotNo').value=String(n);
+    return n;
+  }
+  function putLabel(label, rawAllowed){
+    const key=currentKey(); if(!key){ toast2('대회/부서를 먼저 선택하세요','info'); return; }
+    label=String(label||'').trim();
+    if(!label){ toast2('넣을 이름을 입력하세요','info'); return; }
+    if(rawAllowed && typeof window.v901ResolveName==='function') label=window.v901ResolveName(key,label) || label;
+    const n=getSlotNo();
+    const lines=getLines();
+    lines[n-1]=label;
+    setLines(lines);
+    try{ if(typeof window.v900SetSlot==='function') window.v900SetSlot(key,0,n-1,label); }catch(e){}
+    const next=Math.min(128,n+1);
+    if(ge('v902SlotNo')) ge('v902SlotNo').value=String(next);
+    if(ge('v902QuickSearch')){ ge('v902QuickSearch').value=''; ge('v902QuickSearch').focus(); }
+    if(ge('v902QuickResults')) ge('v902QuickResults').classList.remove('show');
+    toast2(n+'번 슬롯에 입력했습니다','success');
+  }
+  function renderResults(list){
+    const box=ge('v902QuickResults'); if(!box) return;
+    if(!list || !list.length){ box.innerHTML='<div style="padding:9px 10px;font-size:.76rem;font-weight:900;color:#64748b">검색 결과가 없습니다. 직접 입력 버튼으로 그대로 넣을 수 있습니다.</div>'; box.classList.add('show'); return; }
+    box.innerHTML=list.map((c,i)=>'<button type="button" class="v902-result-item '+(i===0?'active':'')+'" data-i="'+i+'"><div class="v902-result-name">'+esc(c.label)+'</div><div class="v902-result-meta">'+esc(c.meta||'참가명단')+' · 클릭하면 선택 슬롯에 입력</div></button>').join('');
+    box.classList.add('show');
+    Array.prototype.slice.call(box.querySelectorAll('.v902-result-item')).forEach(function(btn){
+      btn.onmousedown=function(ev){ ev.preventDefault(); const idx=Number(btn.getAttribute('data-i')||0); if(list[idx]) putLabel(list[idx].label,false); };
+    });
+    window.__v902Matches=list; window.__v902Active=0;
+  }
+  window.v902QuickSearchInput=function(){
+    const key=currentKey(); const inp=ge('v902QuickSearch'); const q=String(inp?inp.value:'').trim();
+    const box=ge('v902QuickResults');
+    if(!q){ if(box) box.classList.remove('show'); return; }
+    let list=[]; try{ if(typeof window.v901FindMatches==='function') list=window.v901FindMatches(key,q,12)||[]; }catch(e){}
+    renderResults(list);
+  };
+  window.v902QuickSearchKeydown=function(ev){
+    const list=window.__v902Matches||[]; const box=ge('v902QuickResults');
+    if(ev.key==='Enter'){
+      ev.preventDefault();
+      const q=String((ge('v902QuickSearch')||{}).value||'').trim();
+      if(list.length && box && box.classList.contains('show')) putLabel(list[window.__v902Active||0].label,false);
+      else putLabel(q,true);
+    }else if((ev.key==='ArrowDown'||ev.key==='ArrowUp') && list.length){
+      ev.preventDefault(); window.__v902Active=(window.__v902Active||0)+(ev.key==='ArrowDown'?1:-1);
+      if(window.__v902Active<0) window.__v902Active=list.length-1; if(window.__v902Active>=list.length) window.__v902Active=0;
+      if(box) Array.prototype.slice.call(box.querySelectorAll('.v902-result-item')).forEach(function(b,i){b.classList.toggle('active',i===window.__v902Active);});
+    }else if(ev.key==='Escape'){
+      if(box) box.classList.remove('show');
+    }
+  };
+  window.v902PutRaw=function(){ putLabel(String((ge('v902QuickSearch')||{}).value||''),true); };
+  function injectQuickSearch(){
+    const ta=ge('v900ManualTextarea'); if(!ta || ge('v902QuickSearchPanel')) return;
+    const panel=document.createElement('div'); panel.id='v902QuickSearchPanel'; panel.className='v902-quick-search-panel';
+    panel.innerHTML='<div class="v902-quick-title">🔎 검색 입력으로 슬롯에 바로 넣기</div>'+
+      '<div class="v902-quick-row"><input id="v902SlotNo" type="number" min="1" max="128" value="1" placeholder="슬롯">'+
+      '<input id="v902QuickSearch" type="text" autocomplete="off" placeholder="선수 이름 일부 입력 → 후보가 아래에 뜹니다" oninput="v902QuickSearchInput()" onkeydown="v902QuickSearchKeydown(event)">'+
+      '<button type="button" class="btn btn-primary" onclick="v902PutRaw()" style="background:#1d4ed8">입력값 넣기</button></div>'+
+      '<div id="v902QuickResults" class="v902-result-box"></div>'+
+      '<div class="v902-quick-help">예: 슬롯 1 선택 → 이름 일부 입력 → 후보 클릭. 후보가 없으면 입력값 넣기로 그대로 저장됩니다. 아래 128줄 목록도 같이 갱신됩니다.</div>';
+    ta.parentElement.insertBefore(panel, ta);
+  }
+  const oldOpen=window.v900OpenManual128;
+  if(typeof oldOpen==='function'){
+    window.v900OpenManual128=function(){ const r=oldOpen.apply(this,arguments); setTimeout(injectQuickSearch,20); return r; };
+  }
+  function hasActiveManual(key){
+    try{ const d=typeof window.v900GetManualData==='function' ? window.v900GetManualData(key) : null; return !!(d && d.active!==false); }catch(e){ return false; }
+  }
+  function forceManualVisible(){
+    try{
+      const key=currentKey(); const cont=ge('bracketContent');
+      if(!key || !cont || !hasActiveManual(key) || typeof window.v900RenderManualBoard!=='function') return;
+      const html=window.v900RenderManualBoard(key);
+      if(html && (!cont.querySelector('.v900-panel') || !cont.textContent.includes('128강 수동 본선 운영'))){
+        cont.innerHTML=html;
+      }
+    }catch(e){ console.warn('[v902] forceManualVisible failed',e); }
+  }
+  const oldSaveCurrent=window.v900SaveManualCurrent;
+  if(typeof oldSaveCurrent==='function'){
+    window.v900SaveManualCurrent=function(){
+      const r=oldSaveCurrent.apply(this,arguments);
+      setTimeout(function(){ try{ if(typeof window.v900CloseManual128==='function') window.v900CloseManual128(); }catch(e){} forceManualVisible(); },700);
+      setTimeout(forceManualVisible,1400);
+      return r;
+    };
+  }
+  const oldApply=window.v900ApplyManualTextarea;
+  if(typeof oldApply==='function'){
+    window.v900ApplyManualTextarea=function(){ const r=oldApply.apply(this,arguments); setTimeout(forceManualVisible,100); return r; };
+  }
+  const oldRender=window.renderBracket || (typeof renderBracket==='function'?renderBracket:null);
+  if(typeof oldRender==='function' && !window.__v902RenderBracketPatched){
+    window.__v902RenderBracketPatched=true;
+    const wrapped=function(){ const r=oldRender.apply(this,arguments); setTimeout(forceManualVisible,30); return r; };
+    window.renderBracket=wrapped; try{ renderBracket=wrapped; }catch(e){}
+  }
+  document.addEventListener('DOMContentLoaded',function(){ setTimeout(forceManualVisible,800); });
+  setTimeout(forceManualVisible,1800);
 })();
 </script>
 
