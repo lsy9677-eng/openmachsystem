@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-14-v904-name-search";
+  const APP_VERSION = "2026-06-14-v905-name-search-fix";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -31722,34 +31722,39 @@ function openManualEdit(tid,div){
   if(!mMs.length){toast('본선 대진표가 없습니다','error');return;}
 
   // v904: 팀 목록을 전역 캐시에 저장 (검색 드롭다운용)
-  // v904: 팀 목록 + 선수명 검색 키워드 빌드
+  // v904: 팀 목록 + 선수명/클럽명 검색 키워드 빌드
   window._meTeamList = teams.map((t,i)=>{
     const label = tdn(t,key,i) || `팀${i+1}`;
-    // 검색용 키워드: 표시명 + 실제 선수 이름 + 클럽명 통합
-    const keywords = new Set();
-    keywords.add(label.toLowerCase());
-    // 클럽명
-    if(t.club) keywords.add(String(t.club).toLowerCase());
-    // 개인전: individualPlayers 배열
+    // searchText: 검색에 사용할 모든 텍스트를 공백으로 연결
+    const parts = [];
+    const add = v => { if(v) parts.push(String(v).trim()); };
+
+    add(label);
+    add(t.club);
+    add(t.entryLabel);
+    add(t.pairLabel);
+    add(t.name);
+
+    // players: ["이종호", "김경준"] 형태 (문자열 배열)
+    if(Array.isArray(t.players)){
+      t.players.forEach(p=>{
+        if(!p) return;
+        if(typeof p === 'string') add(p);
+        else { add(p.name); add(p.club); add(p.clubsRaw); }
+      });
+    }
+    // individualPlayers 배열 (객체 배열)
     if(Array.isArray(t.individualPlayers)){
       t.individualPlayers.forEach(p=>{
-        if(p && p.name) keywords.add(String(p.name).toLowerCase());
-        if(p && p.clubsRaw) keywords.add(String(p.clubsRaw).toLowerCase());
-        if(Array.isArray(p && p.clubs)) p.clubs.forEach(c=>keywords.add(String(c).toLowerCase()));
-      });
-    }
-    // 단체전/복식: players 배열 (문자열 또는 객체)
-    if(Array.isArray(t.players)){
-      t.players.slice(0,4).forEach(p=>{
         if(!p) return;
-        if(typeof p === 'string') keywords.add(p.toLowerCase());
-        else if(p.name) keywords.add(String(p.name).toLowerCase());
+        add(p.name);
+        add(p.clubsRaw);
+        if(Array.isArray(p.clubs)) p.clubs.forEach(c=>add(c));
       });
     }
-    // entryLabel / pairLabel
-    if(t.entryLabel) keywords.add(String(t.entryLabel).toLowerCase());
-    if(t.pairLabel) keywords.add(String(t.pairLabel).toLowerCase());
-    return {idx:i, label, searchText: [...keywords].join(' ')};
+
+    const searchText = parts.join(' ').toLowerCase();
+    return {idx:i, label, searchText};
   });
 
   const rows=mMs.map((m,mi)=>{
