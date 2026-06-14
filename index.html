@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-14-v843";
+  const APP_VERSION = "2026-06-14-v842";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -14612,7 +14612,7 @@ function renderCourtStartControlHtml(key){
         <button class="btn btn-outline" type="button" style="min-height:30px;height:30px;padding:4px 9px;border-radius:10px;font-size:.68rem;font-weight:1000" onclick="saveCourtStartTimeV546('${escFn(key)}')"${disabled}>💾 저장</button>
         <button class="btn btn-accent" type="button" style="min-height:30px;height:30px;padding:4px 9px;border-radius:10px;font-size:.68rem;font-weight:1000" onclick="startCourtNowV546('${escFn(key)}')"${disabled}>▶ 지금 시작</button>
         <button class="btn btn-gray" type="button" style="min-height:30px;height:30px;padding:4px 9px;border-radius:10px;font-size:.68rem;font-weight:1000" onclick="useCourtScheduledV546('${escFn(key)}')"${disabled}>예약시간 사용</button>
-        ${canManageBracket()?`<button type="button" style="min-height:30px;height:30px;padding:4px 11px;border-radius:10px;font-size:.68rem;font-weight:1000;background:#dc2626;color:#fff;border:none;cursor:pointer" onclick="v793FixedDraw('${escFn(key)}')" title="128강 대진표 확정">🏆 본선확정</button> <button type="button" style="min-height:30px;height:30px;padding:4px 11px;border-radius:10px;font-size:.68rem;font-weight:1000;background:${(G&&G.draws&&G.draws[key]&&(G.draws[key].mainBracketPublic===true&&G.draws[key].mainBracketLocked!==true))?'#dc2626':'#16a34a'};color:#fff;border:none;cursor:pointer" onclick="(function(){const k='${escFn(key)}';if(window.G&&G.draws&&G.draws[k]){const open=!(G.draws[k].mainBracketPublic===true&&G.draws[k].mainBracketLocked!==true);G.draws[k].mainBracketPublic=open;G.draws[k].mainBracketLocked=!open;stD(k).then(()=>renderBracket());}})()" title="본선 대진표 공개/잠금">${(G&&G.draws&&G.draws[key]&&(G.draws[key].mainBracketPublic===true&&G.draws[key].mainBracketLocked!==true))?'🔒 본선 잠금':'🔓 본선 공개'}</button>`:''} <button class="btn btn-primary" type="button" style="min-height:30px;height:30px;padding:4px 11px;border-radius:10px;font-size:.68rem;font-weight:1000;background:#7c3aed;border-color:#7c3aed" onclick="v773RunMainAssign('${escFn(key)}')" title="빈 코트에 본선 경기를 구장별 자동 배분합니다">🎯 본선 코트 배정</button>
+        ${canManageBracket()?`<button type="button" style="min-height:30px;height:30px;padding:4px 11px;border-radius:10px;font-size:.68rem;font-weight:1000;background:#dc2626;color:#fff;border:none;cursor:pointer" onclick="v793FixedDraw('${escFn(key)}')" title="128강 대진표 확정">🏆 본선확정</button> <button type="button" style="min-height:30px;height:30px;padding:4px 11px;border-radius:10px;font-size:.68rem;font-weight:1000;background:${(G&&G.draws&&G.draws[key]&&G.draws[key].mainBracketLocked)?'#16a34a':'#dc2626'};color:#fff;border:none;cursor:pointer" id="v809LockBtnCourtBoard" onclick="v799LockBracket('${escFn(key)}',${!(G&&G.draws&&G.draws[key]&&G.draws[key].mainBracketLocked)})" title="본선 대진표 잠금/공개">${(G&&G.draws&&G.draws[key]&&G.draws[key].mainBracketLocked)?'🔓 본선 공개':'🔒 본선 잠금'}</button>`:''} <button class="btn btn-primary" type="button" style="min-height:30px;height:30px;padding:4px 11px;border-radius:10px;font-size:.68rem;font-weight:1000;background:#7c3aed;border-color:#7c3aed" onclick="v773RunMainAssign('${escFn(key)}')" title="빈 코트에 본선 경기를 구장별 자동 배분합니다">🎯 본선 코트 배정</button>
       </div>
     </div>`;
   }catch(e){ return ''; }
@@ -53956,8 +53956,6 @@ function v817FillFixedSlots(key){
   try{
     const draw=G.draws&&G.draws[key];
     if(!draw||!draw.mainBracketFixed) return;
-    // ★ 본선 잠금 상태이면 팀 채우기 안 함
-    if(draw.mainBracketLocked) return;
     const matches=G.matches&&G.matches[key];
     if(!matches) return;
     const teams=(G.teams&&G.teams[key])||[];
@@ -55745,8 +55743,8 @@ function buildAndSaveMainDraw(){
 }
 window.v841BuildAndSaveMainDraw=buildAndSaveMainDraw;
 
-// 페이지 로드 후 본선 데이터 없으면 자동 실행
-setTimeout(function(){
+// v900: 이번대회 수동 128강 운영을 위해 자동 본선 생성은 비활성화
+if(false) setTimeout(function(){
   try{
     const k=Object.keys(G&&G.draws||{})[0];
     if(!k) return;
@@ -55761,5 +55759,372 @@ setTimeout(function(){
 },5000);
 })();
 </script>
+
+
+<style id="v900Manual128BracketStyle">
+/* v900: 이번 시합 전용 128강 본선 완전 수동 운영 */
+.v900-manual-btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:34px;padding:5px 12px;border-radius:9px;border:1.5px solid #dc2626;background:#dc2626;color:#fff;font-size:.78rem;font-weight:1000;cursor:pointer;white-space:nowrap;box-shadow:0 2px 8px rgba(220,38,38,.18)}
+.v900-manual-btn:hover{background:#b91c1c;border-color:#b91c1c}
+.v900-panel{background:linear-gradient(135deg,#fff7ed,#fff,#eef4ff);border:2px solid #dc2626;border-radius:18px;padding:14px 14px;margin:10px 0 14px;box-shadow:0 12px 26px rgba(15,30,58,.10)}
+.v900-panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.v900-panel-title{font-size:1.02rem;font-weight:1000;color:#991b1b;line-height:1.35}
+.v900-panel-sub{font-size:.78rem;color:#475569;line-height:1.65;margin-top:4px;font-weight:800}
+.v900-action-row{display:flex;align-items:center;justify-content:flex-end;gap:7px;flex-wrap:wrap}
+.v900-action-row .btn{min-height:34px!important;padding:6px 11px!important;font-size:.74rem!important;border-radius:10px!important;font-weight:1000!important;white-space:nowrap!important}
+.v900-round-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 12px}
+.v900-round-tabs button{border:1.5px solid #cbd5e1;background:#fff;color:#334155;border-radius:999px;min-height:32px;padding:5px 10px;font-size:.72rem;font-weight:1000;cursor:pointer;white-space:nowrap}
+.v900-round-tabs button.active{background:#0f1e3a;color:#fff;border-color:#0f1e3a}
+.v900-bracket-scroll{overflow:auto;-webkit-overflow-scrolling:touch;border:1px solid #e2e8f0;border-radius:15px;background:#f8fafc;max-height:72vh}
+.v900-round{display:none;padding:10px;min-width:320px}
+.v900-round.active{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px;align-items:start}
+.v900-match{background:#fff;border:1.5px solid #dbeafe;border-radius:13px;overflow:hidden;box-shadow:0 5px 14px rgba(15,30,58,.05)}
+.v900-match-head{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#0f1e3a;color:#fff;padding:7px 10px;font-size:.74rem;font-weight:1000}
+.v900-match-body{padding:8px;display:flex;flex-direction:column;gap:6px}
+.v900-slot{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:6px;align-items:center}
+.v900-slot-no{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:999px;background:#eef2ff;color:#1d4ed8;font-size:.66rem;font-weight:1000}
+.v900-slot input{width:100%;min-width:0;height:34px;border:1.5px solid #cbd5e1;border-radius:9px;padding:5px 8px;font-size:.8rem;font-weight:900;color:#0f172a;outline:none;background:#fff}
+.v900-slot input:focus{border-color:#1d4ed8;box-shadow:0 0 0 3px rgba(29,78,216,.10)}
+.v900-win-btn{height:30px;min-width:38px;border:1px solid #86efac;background:#dcfce7;color:#166534;border-radius:8px;font-size:.66rem;font-weight:1000;cursor:pointer;white-space:nowrap}
+.v900-win-btn:hover{background:#bbf7d0}
+.v900-score{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:1px}
+.v900-score input{height:30px;border:1px solid #e2e8f0;border-radius:8px;padding:4px 7px;font-size:.72rem;font-weight:800}
+.v900-next{margin-top:5px;padding:6px 8px;border-radius:9px;background:#f8fafc;border:1px dashed #cbd5e1;color:#475569;font-size:.72rem;font-weight:900;line-height:1.45}
+.v900-next b{color:#0f1e3a}
+.v900-champ{background:linear-gradient(135deg,#fff7dd,#facc15);border:2px solid #d4a017;border-radius:16px;padding:14px;text-align:center;font-size:1.08rem;font-weight:1000;color:#7a5600;line-height:1.5}
+#v900ManualModal .modal-box{max-width:980px;width:96vw}
+#v900ManualModal .modal-body{max-height:76vh;overflow:auto;-webkit-overflow-scrolling:touch}
+.v900-import-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,360px);gap:12px;align-items:start}
+.v900-import-area{min-height:360px;width:100%;border:1.5px solid #cbd5e1;border-radius:12px;padding:10px;font-size:.82rem;line-height:1.6;font-weight:800;resize:vertical;font-family:'Noto Sans KR',sans-serif}
+.v900-helpbox{padding:12px 13px;border:1.5px solid #fdba74;background:#fff7ed;border-radius:13px;color:#9a3412;font-size:.78rem;line-height:1.7;font-weight:800}
+.v900-mini-stat{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
+.v900-mini-stat div{padding:9px 10px;border-radius:11px;background:#fff;border:1px solid #e2e8f0;font-size:.76rem;font-weight:900;color:#334155}
+.v900-mini-stat b{display:block;color:#0f1e3a;font-size:1rem;margin-top:2px}
+
+/* v901: 수동본선 슬롯 이름 자동검색 */
+.v901-suggest-box{position:fixed;z-index:2147482600;display:none;max-height:280px;overflow:auto;background:#fff;border:2px solid #1d4ed8;border-radius:13px;box-shadow:0 18px 44px rgba(15,30,58,.22);padding:6px;min-width:260px;max-width:min(520px,calc(100vw - 18px));}
+.v901-suggest-box.show{display:block;}
+.v901-suggest-item{width:100%;border:0;background:#fff;text-align:left;border-radius:10px;padding:8px 9px;cursor:pointer;display:block;}
+.v901-suggest-item:hover,.v901-suggest-item.active{background:#eff6ff;}
+.v901-suggest-name{font-size:.84rem;font-weight:1000;color:#0f172a;line-height:1.35;word-break:keep-all;}
+.v901-suggest-meta{font-size:.68rem;font-weight:800;color:#64748b;margin-top:2px;line-height:1.3;word-break:keep-all;}
+.v901-search-note{margin-top:7px;padding:7px 9px;border-radius:10px;background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;font-size:.72rem;font-weight:900;line-height:1.45;}
+@media(max-width:768px){
+  .v900-import-grid{grid-template-columns:1fr}.v900-import-area{min-height:280px}.v900-panel{padding:12px}.v900-round.active{grid-template-columns:1fr}.v900-action-row{justify-content:stretch}.v900-action-row .btn,.v900-manual-btn{flex:1 1 auto}.v900-slot{grid-template-columns:24px minmax(0,1fr) 34px}.v900-slot-no{width:24px;height:24px;font-size:.6rem}.v900-slot input{font-size:.76rem;padding:4px 6px}.v900-win-btn{font-size:.6rem;min-width:34px;padding:0 4px}
+}
+</style>
+<script id="v900Manual128BracketScript">
+(function(){
+  'use strict';
+  const SIZE=128;
+  const ROUND_SIZES=[128,64,32,16,8,4,2,1];
+  const ROUND_LABELS=['128강','64강','32강','16강','8강','4강','결승','우승'];
+  let activeRound=0;
+  function ge2(id){ return document.getElementById(id); }
+  function esc(s){ return String(s??'').replace(/[&<>"']/g,function(ch){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch];}); }
+  function escFn(s){ return String(s??'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,'\\n').replace(/\r/g,''); }
+  function toast2(msg,type){ try{ if(typeof toast==='function') toast(msg,type||'info'); else alert(msg); }catch(e){ alert(msg); } }
+  function canManage(){ try{ return typeof canManageBracket==='function' ? canManageBracket() : !!(window.AD||window.TM||window.OP); }catch(e){ return true; } }
+  function keyInfo(key){ const p=String(key||'').split('_'); return {tid:p[0]||'', div:p.slice(1).join('_')||''}; }
+  function currentKey(){
+    try{
+      const tid=(ge2('brTS')&&ge2('brTS').value)||'';
+      if(!tid) return '';
+      const t=(window.G&&G.tournaments||[]).find(x=>String(x.id)===String(tid));
+      let div='';
+      if(Array.isArray(window.BR_MULTI_DIVS) && window.BR_MULTI_DIVS.length && !window.BR_MULTI_DIVS.includes('__ALL__')) div=window.BR_MULTI_DIVS[0];
+      if(!div && ge2('brDS')){ const v=ge2('brDS').value; if(v && v!=='__ALL__') div=v; }
+      if(!div) div=(t&&Array.isArray(t.divisions)&&t.divisions[0])||'';
+      return tid && div ? tid+'_'+div : '';
+    }catch(e){ return ''; }
+  }
+  function storageKey(key){ return 'v900Manual128:'+key; }
+  function blankData(){
+    const rounds=ROUND_SIZES.map(n=>Array(n).fill(''));
+    const scores=ROUND_SIZES.slice(0,-1).map(n=>Array(Math.ceil(n/2)).fill('').map(()=>['','']));
+    return {active:true,size:SIZE,updatedAt:new Date().toISOString(),rounds,scores,title:'128강 수동 본선'};
+  }
+  function normalize(d){
+    d=d&&typeof d==='object'?d:blankData();
+    if(!Array.isArray(d.rounds)) d.rounds=[];
+    ROUND_SIZES.forEach((n,i)=>{ if(!Array.isArray(d.rounds[i])) d.rounds[i]=[]; d.rounds[i]=d.rounds[i].slice(0,n); while(d.rounds[i].length<n)d.rounds[i].push(''); });
+    if(!Array.isArray(d.scores)) d.scores=[];
+    ROUND_SIZES.slice(0,-1).forEach((n,i)=>{ const m=Math.ceil(n/2); if(!Array.isArray(d.scores[i])) d.scores[i]=[]; d.scores[i]=d.scores[i].slice(0,m); while(d.scores[i].length<m)d.scores[i].push(['','']); d.scores[i]=d.scores[i].map(x=>Array.isArray(x)?[String(x[0]||''),String(x[1]||'')]:['','']); });
+    d.active=d.active!==false; d.size=SIZE; d.updatedAt=d.updatedAt||new Date().toISOString(); d.title=d.title||'128강 수동 본선';
+    return d;
+  }
+  function ensureDraw(key){
+    if(!window.G) window.G={tournaments:[],teams:{},matches:{},draws:{}};
+    if(!G.draws) G.draws={};
+    if(!G.draws[key]) G.draws[key]={groups:[],createdAt:new Date().toISOString(),v900ManualOnly:true};
+    let local=null;
+    try{ local=JSON.parse(localStorage.getItem(storageKey(key))||'null'); }catch(e){}
+    if(!G.draws[key].manual128 && local) G.draws[key].manual128=local;
+    if(!G.draws[key].manual128) G.draws[key].manual128=blankData();
+    G.draws[key].manual128=normalize(G.draws[key].manual128);
+    G.draws[key].v900ManualOnly=true;
+    G.draws[key].mainBracketLocked=true;
+    G.draws[key].mainBracketFixed=true;
+    return G.draws[key].manual128;
+  }
+  function getData(key){ return ensureDraw(key); }
+  function cache(key){ try{ localStorage.setItem(storageKey(key), JSON.stringify(getData(key))); }catch(e){} }
+  async function save(key, quiet){
+    const d=getData(key); d.updatedAt=new Date().toISOString(); cache(key);
+    try{ if(window.__FB_WRITE_CACHE && window.__FB_WRITE_CACHE.draws) delete window.__FB_WRITE_CACHE.draws[key]; }catch(e){}
+    try{ if(typeof stD==='function') await stD(key); }catch(e){ console.warn('[v900] stD failed',e); if(!quiet) toast2('Firebase 저장 실패. 이 브라우저에는 저장했습니다.','error'); return false; }
+    try{ if(typeof cacheTournamentBundleFromMemory==='function'){ const ki=keyInfo(key); cacheTournamentBundleFromMemory(ki.tid); } }catch(e){}
+    if(!quiet) toast2('128강 수동 본선 저장 완료','success');
+    return true;
+  }
+  function roundCount(key,r){ return getData(key).rounds[r].filter(x=>String(x||'').trim()).length; }
+  function norm901(s){ return String(s||'').toLowerCase().replace(/[\s\u00a0\/\\|()\[\]{}<>·ㆍ.,:;~`'"\-–—_+*=!?@#$%^&]/g,''); }
+  function unique901(arr){ const seen=new Set(); return arr.filter(x=>{ const k=String(x.label||'').trim(); if(!k||seen.has(k)) return false; seen.add(k); return true; }); }
+  function teamLabel901(team,key,idx){
+    try{
+      const indiv=team?.tournamentType==='individual_pair' || Array.isArray(team?.individualPlayers);
+      if(indiv){
+        if(typeof getIndividualNameOnlyDisplayLine==='function'){
+          const v=String(getIndividualNameOnlyDisplayLine(team)||'').trim();
+          if(v && v!=='?') return v;
+        }
+        if(typeof getIndividualDisplayLine==='function'){
+          const v=String(getIndividualDisplayLine(team)||'').trim();
+          if(v && v!=='?') return v.replace(/\s*\([^)]*\)/g,'').trim();
+        }
+        const ps=(typeof getIndividualPlayers==='function'?getIndividualPlayers(team):(team?.individualPlayers||[])).slice(0,2).map(p=>String(p?.name||p||'').trim()).filter(Boolean);
+        if(ps.length) return ps.join(' / ');
+        return String(team?.entryLabel||team?.pairLabel||team?.club||'참가자').trim();
+      }
+      if(typeof tdn==='function') return String(tdn(team,key,idx)||'').trim();
+      return String(team?.club||team?.name||team?.entryLabel||team?.pairLabel||'팀').trim();
+    }catch(e){ return String(team?.entryLabel||team?.pairLabel||team?.club||team?.name||'팀').trim(); }
+  }
+  function teamTokens901(team,label){
+    const toks=[label, team?.club, team?.name, team?.entryLabel, team?.pairLabel, team?.phone, team?.ownerName, team?.ownerPhone];
+    try{
+      if(Array.isArray(team?.players)) toks.push(...team.players);
+      const ps=(typeof getIndividualPlayers==='function'?getIndividualPlayers(team):(team?.individualPlayers||[]));
+      (ps||[]).forEach(p=>{ toks.push(p?.name,p?.club,p?.clubsRaw,p?.phone,p?.mobile,p?.tel); if(Array.isArray(p?.clubs)) toks.push(...p.clubs); });
+    }catch(e){}
+    return toks.map(x=>String(x||'').trim()).filter(Boolean);
+  }
+  function candidates901(key){
+    try{
+      const ki=keyInfo(key);
+      const keys=Object.keys((window.G&&G.teams)||{}).filter(k=>k===key || (ki.tid && String(k).startsWith(ki.tid+'_')));
+      const out=[];
+      keys.forEach(k=>{
+        const div=keyInfo(k).div;
+        ((G.teams&&G.teams[k])||[]).forEach((team,idx)=>{
+          if(!team) return;
+          if(team.deleted || team.deleteRequested || team.registrationStatus==='deleted') return;
+          const label=teamLabel901(team,k,idx);
+          if(!label || label==='?') return;
+          const tokens=teamTokens901(team,label);
+          out.push({label, meta:(typeof dl==='function'?dl(div):div), tokens, search:norm901(tokens.join(' ')), key:k, idx});
+        });
+      });
+      return unique901(out);
+    }catch(e){ return []; }
+  }
+  function findMatches901(key,q,limit){
+    const nq=norm901(q); if(!nq) return [];
+    const list=candidates901(key);
+    const exact=[], starts=[], contains=[];
+    list.forEach(c=>{
+      const labelN=norm901(c.label);
+      const tokenNs=(c.tokens||[]).map(norm901).filter(Boolean);
+      if(labelN===nq || tokenNs.includes(nq)) exact.push(c);
+      else if(labelN.startsWith(nq) || tokenNs.some(t=>t.startsWith(nq))) starts.push(c);
+      else if(c.search.includes(nq) || nq.split('').every(ch=>c.search.includes(ch))) contains.push(c);
+    });
+    return unique901([...exact,...starts,...contains]).slice(0,limit||12);
+  }
+  function resolveName901(key,line){
+    const raw=String(line||'').trim();
+    if(!raw || isBye(raw)) return raw;
+    const nq=norm901(raw); if(nq.length<2) return raw;
+    const matches=findMatches901(key, raw, 8);
+    const exact=matches.filter(c=>norm901(c.label)===nq || (c.tokens||[]).map(norm901).includes(nq));
+    if(exact.length===1) return exact[0].label;
+    if(matches.length===1 && nq.length>=3) return matches[0].label;
+    return raw;
+  }
+  function hideSuggest901(){ const box=ge2('v901SuggestBox'); if(box) box.classList.remove('show'); window.__v901SuggestState=null; }
+  function ensureSuggest901(){
+    let box=ge2('v901SuggestBox');
+    if(!box){ box=document.createElement('div'); box.id='v901SuggestBox'; box.className='v901-suggest-box'; document.body.appendChild(box); }
+    return box;
+  }
+  function placeSuggest901(input,box){
+    const r=input.getBoundingClientRect();
+    const w=Math.max(260, Math.min(520, r.width+120));
+    box.style.width=w+'px';
+    let left=Math.max(6, Math.min(window.innerWidth-w-6, r.left));
+    let top=r.bottom+5;
+    if(top+260>window.innerHeight) top=Math.max(6, r.top-266);
+    box.style.left=left+'px'; box.style.top=top+'px';
+  }
+  function chooseSuggest901(input,key,r,i,label){
+    input.value=label; setSlot(key,r,i,label); hideSuggest901();
+    input.dispatchEvent(new Event('change',{bubbles:true}));
+    toast2('슬롯에 참가자를 넣었습니다','success');
+  }
+  function showSuggest901(input,key,r,i){
+    const q=String(input.value||'').trim();
+    const nq=norm901(q);
+    if(nq.length<1){ hideSuggest901(); return; }
+    const matches=findMatches901(key,q,10);
+    if(!matches.length){ hideSuggest901(); return; }
+    const box=ensureSuggest901();
+    box.innerHTML=matches.map((c,idx)=>`<button type="button" class="v901-suggest-item ${idx===0?'active':''}" data-v901-i="${idx}"><div class="v901-suggest-name">${esc(c.label)}</div><div class="v901-suggest-meta">${esc(c.meta||'참가명단')} · 이름 일부 입력 후 클릭/Enter</div></button>`).join('');
+    window.__v901SuggestState={input,key,r,i,matches,active:0};
+    [...box.querySelectorAll('.v901-suggest-item')].forEach((btn,idx)=>{ btn.onmousedown=function(ev){ ev.preventDefault(); chooseSuggest901(input,key,r,i,matches[idx].label); }; });
+    placeSuggest901(input,box); box.classList.add('show');
+  }
+  function inputChanged901(input,key,r,i){
+    const raw=String(input.value||'').trim();
+    setSlot(key,r,i,raw);
+    const resolved=resolveName901(key,raw);
+    if(resolved && resolved!==raw){ input.value=resolved; setSlot(key,r,i,resolved); hideSuggest901(); return; }
+    showSuggest901(input,key,r,i);
+  }
+  function keydown901(ev,input,key,r,i){
+    const st=window.__v901SuggestState; const box=ge2('v901SuggestBox');
+    if(!st || st.input!==input || !box || !box.classList.contains('show')) return;
+    if(ev.key==='Enter'){ ev.preventDefault(); const c=st.matches[st.active||0]; if(c) chooseSuggest901(input,key,r,i,c.label); }
+    else if(ev.key==='Escape'){ hideSuggest901(); }
+    else if(ev.key==='ArrowDown' || ev.key==='ArrowUp'){
+      ev.preventDefault();
+      st.active=(st.active||0)+(ev.key==='ArrowDown'?1:-1);
+      if(st.active<0) st.active=st.matches.length-1; if(st.active>=st.matches.length) st.active=0;
+      [...box.querySelectorAll('.v901-suggest-item')].forEach((b,idx)=>b.classList.toggle('active',idx===st.active));
+    }
+  }
+  function resolveTextarea901(){
+    const key=currentKey(); const ta=ge2('v900ManualTextarea'); if(!key||!ta) return;
+    const lines=String(ta.value||'').replace(/\r/g,'').split('\n').slice(0,SIZE);
+    let changed=0;
+    for(let i=0;i<lines.length;i++){ const before=lines[i]; const after=resolveName901(key,before); if(after!==String(before||'').trim()){ lines[i]=after; changed++; } }
+    ta.value=lines.join('\n');
+    toast2(changed?`이름 자동찾기 ${changed}건 반영`:'자동으로 바꿀 이름을 찾지 못했습니다','info');
+  }
+  function installButton(){
+    const bar=ge2('bracketExportBar'); if(!bar || ge2('v900Manual128Btn')) return;
+    const btn=document.createElement('button'); btn.id='v900Manual128Btn'; btn.type='button'; btn.className='v900-manual-btn'; btn.textContent='🛠 128강 수동본선'; btn.onclick=function(){ window.v900OpenManual128(); };
+    bar.insertBefore(btn, bar.firstChild);
+  }
+  function ensureModal(){
+    if(ge2('v900ManualModal')) return;
+    const el=document.createElement('div'); el.className='modal-overlay'; el.id='v900ManualModal';
+    el.innerHTML=`<div class="modal-box"><div class="modal-header" style="background:#991b1b"><h3>🛠 128강 수동 본선 운영</h3><button class="modal-close" onclick="window.v900CloseManual128()">✕</button></div><div class="modal-body" id="v900ManualBody"></div><div class="modal-footer" style="gap:8px;flex-wrap:wrap"><button class="btn btn-gray" onclick="window.v900CloseManual128()">닫기</button><button class="btn btn-outline" onclick="window.v901ResolveManualTextarea()">🔎 이름 자동찾기</button><button class="btn btn-outline" onclick="window.v900ApplyManualTextarea()">📥 붙여넣기 반영</button><button class="btn btn-outline" onclick="window.v900AutoAdvanceByesCurrent()">↗ 부전승 자동반영</button><button class="btn btn-primary" style="background:#dc2626" onclick="window.v900SaveManualCurrent()">💾 저장</button></div></div>`;
+    document.body.appendChild(el);
+  }
+  function openManual(){
+    if(!canManage()){ toast2('관리자/운영자/진행자만 128강 수동본선을 편집할 수 있습니다','error'); return; }
+    const key=currentKey(); if(!key){ toast2('대진표 화면에서 대회/부서를 먼저 선택하세요','info'); return; }
+    ensureModal(); const d=getData(key);
+    const ki=keyInfo(key); const t=(window.G&&G.tournaments||[]).find(x=>String(x.id)===String(ki.tid));
+    const label=(t?t.name:'선택 대회')+' — '+(typeof dl==='function'?dl(ki.div):ki.div);
+    const body=ge2('v900ManualBody');
+    body.innerHTML=`<div class="v900-import-grid"><div><div style="font-weight:1000;color:#0f1e3a;margin-bottom:8px">${esc(label)}</div><textarea class="v900-import-area" id="v900ManualTextarea" spellcheck="false" placeholder="1번 슬롯부터 한 줄에 한 팀씩 붙여넣으세요. 이름 일부만 넣어도 자동찾기 버튼/저장 시 참가명단에서 찾아 전체 팀명으로 바꿉니다. 부전승은 '부전승' 또는 BYE.">${esc(d.rounds[0].join('\n'))}</textarea><div class="v901-search-note">이름만 입력해도 됩니다. 예: 한 선수 이름만 적은 뒤 <b>🔎 이름 자동찾기</b>를 누르면 참가명단의 복식 팀명으로 바꿉니다.</div></div><div><div class="v900-helpbox"><b>이번 시합 긴급 수동 운영용</b><br>• 예선 데이터가 없어도 128강 슬롯을 직접 입력합니다.<br>• 한 줄이 1슬롯입니다. 128줄보다 적으면 나머지는 빈칸입니다.<br>• 이름 일부/선수명만 입력해도 참가명단에서 자동검색합니다.<br>• ‘부전승’ 또는 ‘BYE’가 있는 경기는 자동반영 버튼으로 상대팀을 64강에 올릴 수 있습니다.<br>• 저장하면 현재 선택한 대회/부서에만 저장됩니다.</div><div class="v900-mini-stat"><div>128강 입력<b>${roundCount(key,0)}/128</b></div><div>64강 확정<b>${roundCount(key,1)}/64</b></div><div>32강 확정<b>${roundCount(key,2)}/32</b></div><div>우승<b>${esc(d.rounds[7][0]||'-')}</b></div></div><div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:12px"><button class="btn btn-outline" onclick="window.v900ClearManualCurrent()" style="font-size:.78rem">🧹 전체 비우기</button><button class="btn btn-outline" onclick="window.v900DisableManualCurrent()" style="font-size:.78rem;border-color:#64748b;color:#334155">수동본선 끄기</button></div></div></div>`;
+    ge2('v900ManualModal').classList.add('open');
+  }
+  function closeManual(){ const m=ge2('v900ManualModal'); if(m) m.classList.remove('open'); }
+  function applyTextarea(){
+    const key=currentKey(); if(!key) return;
+    const txt=String(ge2('v900ManualTextarea')?.value||'').replace(/\r/g,'');
+    const lines=txt.split('\n').slice(0,SIZE).map(x=>resolveName901(key,x));
+    while(lines.length<SIZE) lines.push('');
+    const d=getData(key); d.rounds[0]=lines.map(x=>String(x||'').trim()); d.updatedAt=new Date().toISOString(); cache(key);
+    toast2('128강 슬롯 반영 완료. 저장 버튼을 누르면 서버에 저장됩니다.','success');
+    try{ renderBracket(); }catch(e){}
+    openManual();
+  }
+  function setSlot(key,r,i,val){ const d=getData(key); d.rounds[r][i]=String(val||'').trim(); d.updatedAt=new Date().toISOString(); cache(key); }
+  function setScore(key,r,m,side,val){ const d=getData(key); if(!d.scores[r]) return; if(!d.scores[r][m]) d.scores[r][m]=['','']; d.scores[r][m][side]=String(val||'').trim(); d.updatedAt=new Date().toISOString(); cache(key); }
+  function isBye(v){ return /^(부전승|bye|BYE)$/i.test(String(v||'').trim()); }
+  function pickWinner(key,r,m,side){
+    const d=getData(key); if(r>=ROUND_SIZES.length-1) return;
+    const src=d.rounds[r][m*2+side]||''; if(!String(src).trim() || isBye(src)){ toast2('올릴 팀명이 없습니다','info'); return; }
+    d.rounds[r+1][m]=String(src).trim(); d.updatedAt=new Date().toISOString(); cache(key);
+    try{ renderBracket(); }catch(e){}
+  }
+  function autoAdvanceByes(key){
+    const d=getData(key); let cnt=0;
+    for(let r=0;r<ROUND_SIZES.length-1;r++){
+      const matches=Math.ceil(ROUND_SIZES[r]/2);
+      for(let m=0;m<matches;m++){
+        const a=String(d.rounds[r][m*2]||'').trim(), b=String(d.rounds[r][m*2+1]||'').trim();
+        let w=''; if(a && b && isBye(a) && !isBye(b)) w=b; else if(a && b && isBye(b) && !isBye(a)) w=a;
+        if(w && d.rounds[r+1][m]!==w){ d.rounds[r+1][m]=w; cnt++; }
+      }
+    }
+    d.updatedAt=new Date().toISOString(); cache(key); toast2(`부전승 자동반영 ${cnt}건 완료`,'success'); try{ renderBracket(); }catch(e){}
+  }
+  function clearCurrent(){ const key=currentKey(); if(!key) return; if(!confirm('128강 수동본선 입력값을 모두 비울까요?')) return; G.draws[key].manual128=blankData(); cache(key); try{ renderBracket(); }catch(e){} openManual(); }
+  function disableCurrent(){ const key=currentKey(); if(!key) return; if(!confirm('수동 128강 본선 표시를 끌까요? 저장된 입력값은 유지됩니다.')) return; const d=getData(key); d.active=false; cache(key); save(key,true).then(()=>{ try{ renderBracket(); }catch(e){} closeManual(); toast2('수동본선 표시를 껐습니다','success'); }); }
+  function saveCurrent(){ const key=currentKey(); if(!key) return; const d=getData(key); const ta=ge2('v900ManualTextarea'); if(ta){ const lines=String(ta.value||'').replace(/\r/g,'').split('\n').slice(0,SIZE).map(x=>resolveName901(key,x)); while(lines.length<SIZE) lines.push(''); d.rounds[0]=lines.map(x=>String(x||'').trim()); } d.active=true; save(key,false).then(()=>{ try{ renderBracket(); }catch(e){} openManual(); }); }
+  function showRound(key,r){ activeRound=Number(r)||0; document.querySelectorAll('[data-v900-round]').forEach(el=>el.classList.toggle('active', Number(el.getAttribute('data-v900-round'))===activeRound)); document.querySelectorAll('[data-v900-tab]').forEach(el=>el.classList.toggle('active', Number(el.getAttribute('data-v900-tab'))===activeRound)); }
+  function renderBoard(key){
+    const d=getData(key); if(!d.active) return '';
+    const ki=keyInfo(key); const t=(window.G&&G.tournaments||[]).find(x=>String(x.id)===String(ki.tid));
+    const title=esc((t?t.name:'선택 대회')+' — '+(typeof dl==='function'?dl(ki.div):ki.div));
+    const tabs=ROUND_LABELS.map((lb,i)=>`<button type="button" data-v900-tab="${i}" class="${i===activeRound?'active':''}" onclick="v900ShowRound('${escFn(key)}',${i})">${lb} ${roundCount(key,i)}/${ROUND_SIZES[i]}</button>`).join('');
+    const rounds=ROUND_SIZES.map((n,r)=>{
+      if(r===ROUND_SIZES.length-1){
+        return `<div class="v900-round ${r===activeRound?'active':''}" data-v900-round="${r}"><div class="v900-champ">🏆 우승<br><input style="margin-top:10px;width:min(420px,100%);height:42px;border:1.5px solid #d4a017;border-radius:12px;padding:8px 12px;text-align:center;font-size:1rem;font-weight:1000" value="${esc(d.rounds[r][0]||'')}" onchange="v900SetSlot('${escFn(key)}',${r},0,this.value)"></div></div>`;
+      }
+      const matches=Math.ceil(n/2); let html='';
+      for(let m=0;m<matches;m++){
+        const i1=m*2, i2=m*2+1, v1=d.rounds[r][i1]||'', v2=d.rounds[r][i2]||'', s=(d.scores[r]&&d.scores[r][m])||['',''], next=(d.rounds[r+1]&&d.rounds[r+1][m])||'';
+        html+=`<div class="v900-match"><div class="v900-match-head"><span>${ROUND_LABELS[r]} ${m+1}경기</span><span>${i1+1}-${i2+1}</span></div><div class="v900-match-body"><div class="v900-slot"><span class="v900-slot-no">${i1+1}</span><input class="v901-team-input" autocomplete="off" value="${esc(v1)}" onfocus="v901ShowSuggest(this,'${escFn(key)}',${r},${i1})" oninput="v901ManualInputChanged(this,'${escFn(key)}',${r},${i1})" onkeydown="v901ManualInputKeydown(event,this,'${escFn(key)}',${r},${i1})" onblur="setTimeout(v901HideSuggest,180)" onchange="v900SetSlot('${escFn(key)}',${r},${i1},this.value)" placeholder="이름 검색/팀명/부전승"><button class="v900-win-btn" onclick="v900PickWinner('${escFn(key)}',${r},${m},0)">승</button></div><div class="v900-slot"><span class="v900-slot-no">${i2+1}</span><input class="v901-team-input" autocomplete="off" value="${esc(v2)}" onfocus="v901ShowSuggest(this,'${escFn(key)}',${r},${i2})" oninput="v901ManualInputChanged(this,'${escFn(key)}',${r},${i2})" onkeydown="v901ManualInputKeydown(event,this,'${escFn(key)}',${r},${i2})" onblur="setTimeout(v901HideSuggest,180)" onchange="v900SetSlot('${escFn(key)}',${r},${i2},this.value)" placeholder="이름 검색/팀명/부전승"><button class="v900-win-btn" onclick="v900PickWinner('${escFn(key)}',${r},${m},1)">승</button></div><div class="v900-score"><input value="${esc(s[0]||'')}" onchange="v900SetScore('${escFn(key)}',${r},${m},0,this.value)" placeholder="점수/메모 A"><input value="${esc(s[1]||'')}" onchange="v900SetScore('${escFn(key)}',${r},${m},1,this.value)" placeholder="점수/메모 B"></div><div class="v900-next">다음 라운드: <b>${esc(next||'-')}</b></div></div></div>`;
+      }
+      return `<div class="v900-round ${r===activeRound?'active':''}" data-v900-round="${r}">${html}</div>`;
+    }).join('');
+    return `<div class="v900-panel"><div class="v900-panel-head"><div><div class="v900-panel-title">🛠 128강 수동 본선 운영 중</div><div class="v900-panel-sub">${title}<br>예선/자동추첨 데이터와 별개로 이 화면에서 팀명·점수·승자를 직접 관리합니다. 입력 변경 후 꼭 저장하세요.</div></div><div class="v900-action-row"><button class="btn btn-outline" onclick="v900OpenManual128()">📥 128슬롯 붙여넣기</button><button class="btn btn-outline" onclick="v900AutoAdvanceByes('${escFn(key)}')">↗ 부전승 자동반영</button><button class="btn btn-primary" style="background:#dc2626" onclick="v900SaveManualKey('${escFn(key)}')">💾 수동본선 저장</button><button class="btn btn-gray" onclick="window.print()">🖨 인쇄</button></div></div><div class="v900-round-tabs">${tabs}</div><div class="v900-bracket-scroll">${rounds}</div></div>`;
+  }
+  function patchRenderer(){
+    if(window.__v900RendererPatched) return;
+    const old=window.renderBracketHTMLForDiv || (typeof renderBracketHTMLForDiv==='function'?renderBracketHTMLForDiv:null);
+    if(typeof old!=='function') return;
+    window.__v900RendererPatched=true;
+    const wrapped=function(tid,div,isAll){
+      const key=tid+'_'+div;
+      try{ const local=localStorage.getItem(storageKey(key)); if(local && window.G && G.draws && (!G.draws[key] || !G.draws[key].manual128)){ ensureDraw(key); } }catch(e){}
+      const manual=window.G&&G.draws&&G.draws[key]&&G.draws[key].manual128;
+      if(manual && manual.active!==false){
+        try{ return renderBoard(key); }catch(e){ console.error('[v900] render manual board failed',e); }
+      }
+      return old.apply(this,arguments);
+    };
+    window.renderBracketHTMLForDiv=wrapped;
+    try{ renderBracketHTMLForDiv=wrapped; }catch(e){}
+  }
+  function init(){ installButton(); patchRenderer(); }
+  window.v900OpenManual128=openManual;
+  window.v900CloseManual128=closeManual;
+  window.v900ApplyManualTextarea=applyTextarea;
+  window.v900SaveManualCurrent=saveCurrent;
+  window.v900SaveManualKey=function(key){ save(key,false).then(()=>{ try{ renderBracket(); }catch(e){} }); };
+  window.v900SetSlot=setSlot;
+  window.v900SetScore=setScore;
+  window.v900PickWinner=pickWinner;
+  window.v900ShowRound=showRound;
+  window.v900AutoAdvanceByes=autoAdvanceByes;
+  window.v900AutoAdvanceByesCurrent=function(){ const key=currentKey(); if(key) autoAdvanceByes(key); };
+  window.v900ClearManualCurrent=clearCurrent;
+  window.v900DisableManualCurrent=disableCurrent;
+  window.v901ManualInputChanged=inputChanged901;
+  window.v901ManualInputKeydown=keydown901;
+  window.v901ShowSuggest=showSuggest901;
+  window.v901HideSuggest=hideSuggest901;
+  window.v901ResolveManualTextarea=resolveTextarea901;
+  document.addEventListener('mousedown',function(ev){ const box=ge2('v901SuggestBox'); if(box && !box.contains(ev.target) && !(ev.target&&ev.target.classList&&ev.target.classList.contains('v901-team-input'))) hideSuggest901(); });
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(init,300));
+  setTimeout(init,900); setTimeout(init,2500);
+})();
+</script>
+
 </body>
 </html>
