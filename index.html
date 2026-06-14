@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-14-v838";
+  const APP_VERSION = "2026-06-14-v839";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -14649,29 +14649,28 @@ window.useCourtScheduledV546=function(key){
 
 function getCourtEstimatedTimeText(key, waitIdx, hasCurrentMatch, currentStartIso='', courtName=''){
   try{
+    // 한국 시간(KST = UTC+9) 기준
+    function nowKST(){
+      const now=new Date();
+      // KST = UTC + 9시간
+      return new Date(now.getTime() + (9*60*60*1000) - (now.getTimezoneOffset()*60*1000));
+    }
     let base;
     if(hasCurrentMatch && currentStartIso){
-      // 현재 진행중인 경기 시작시간 기준
       const cur=new Date(currentStartIso);
       if(Number.isFinite(cur.getTime())){
-        // 현재 경기가 시작된 시간 + 30분 = 다음경기 예상 시작
         base=addCourtMinutes(cur, 30);
       }
     }
     if(!base){
-      // 현재 시간 기준으로 계산 (예약 시작시간 아님)
-      const now=new Date();
-      // 코트별 예약 시작시간과 현재시간 중 더 늦은 것을 기준으로
+      const kst=nowKST();
       const cfg=parseCourtBaseDate(key, courtName);
-      base = cfg.getTime() > now.getTime() ? cfg : now;
-      // 현재 시간을 30분 단위로 올림
-      const ms=base.getTime();
+      base = cfg.getTime() > kst.getTime() ? cfg : kst;
+      // 30분 단위 올림
       const interval=30*60*1000;
-      base=new Date(Math.ceil(ms/interval)*interval);
+      base=new Date(Math.ceil(base.getTime()/interval)*interval);
     }
-    // 대기 순번만큼 30분씩 추가
-    const seq = hasCurrentMatch ? waitIdx : waitIdx;
-    const start=addCourtMinutes(base, 30 * seq);
+    const start=addCourtMinutes(base, 30 * waitIdx);
     const end=addCourtMinutes(start, 30);
     return `⏱ 예상 시합시간 ${formatCourtHHMM(start)}~${formatCourtHHMM(end)}`;
   }catch(e){ return ''; }
