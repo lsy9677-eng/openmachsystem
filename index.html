@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-14-v840";
+  const APP_VERSION = "2026-06-14-v841";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -55736,5 +55736,144 @@ setTimeout(v799ApplyBracketLock,3000);
 })();
 </script>
 
+
+<script id="v841AutoFixDraw">
+// v841: 본선 데이터 없으면 자동 확정 + 완전 고정
+(function(){
+function buildAndSaveMainDraw(){
+  try{
+    const k=Object.keys(G.draws||{})[0];
+    if(!k) return;
+    const draw=G.draws[k];
+    const teams=(G.teams&&G.teams[k])||[];
+    const groups=draw.groups||[];
+
+    // advT 수집
+    const advT=[];
+    groups.forEach(function(grp,gi){
+      if(!grp) return;
+      const st=Array.isArray(grp.standings)?grp.standings:(Array.isArray(grp.teams)?grp.teams:[]);
+      for(let rk=1;rk<=2;rk++){
+        const ti=st[rk-1]; if(ti==null) return;
+        const gn=Number(grp.confirmedGroupNo||grp.finalGroupNo||grp.displayGroupNo||gi+1);
+        const v=(gn>=33&&gn<=44)?'wondosim':'gukje';
+        advT.push({ti:Number(ti),gn,rk,venue:v});
+      }
+    });
+    if(advT.length<90){ console.log('[v841] advT 부족:',advT.length); return; }
+
+    const wondo=advT.filter(function(e){return e.venue==='wondosim';});
+    const gukje=advT.filter(function(e){return e.venue!=='wondosim';});
+    console.log('[v841] 원도심:',wondo.length,'국제:',gukje.length);
+
+    function shuffle(a){a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+    function fe(arr,gn,rk){return arr.find(function(e){return e.gn===gn&&e.rk===rk;})||null;}
+
+    // 원도심 하드코딩
+    const BYE_W=[[33,1],[34,1],[35,1],[36,1],[37,1],[38,1],[39,1],[40,1]];
+    const GAME_W=[[41,1],[37,2],[42,1],[38,2],[43,1],[39,2],[44,1],[40,2],
+                  [33,2],[41,2],[34,2],[42,2],[35,2],[43,2],[36,2],[44,2]];
+    const wMs=[];
+    for(let p=0;p<8;p++){
+      const gs=48+p*2,bs=48+p*2+1;
+      const e1=fe(wondo,GAME_W[p*2][0],GAME_W[p*2][1]);
+      const e2=fe(wondo,GAME_W[p*2+1][0],GAME_W[p*2+1][1]);
+      const be=fe(wondo,BYE_W[p][0],BYE_W[p][1]);
+      wMs.push({id:'main_r0_'+gs,phase:'main',round:0,slot:gs,
+        t1:e1?Number(e1.ti):null,t2:e2?Number(e2.ti):null,
+        winner:null,rubbers:[],bye:false,court:'',venue:'wondosim',__venue:'wondosim',
+        gnTarget:e1?e1.gn:null,rkTarget:e1?e1.rk:null,
+        gnTarget2:e2?e2.gn:null,rkTarget2:e2?e2.rk:null,
+        source1Label:e1?e1.gn+'\uc870'+e1.rk+'\uc704':'',
+        source2Label:e2?e2.gn+'\uc870'+e2.rk+'\uc704':''});
+      const bti=be?Number(be.ti):null;
+      wMs.push({id:'main_r0_'+bs,phase:'main',round:0,slot:bs,
+        t1:bti,t2:null,winner:bti,rubbers:[],bye:true,court:'',
+        venue:'wondosim',__venue:'wondosim',
+        gnTarget:be?be.gn:null,rkTarget:be?be.rk:null,
+        source1Label:be?be.gn+'\uc870'+be.rk+'\uc704':'',
+        source2Label:'\ubd80\uc804\uc2b9'});
+    }
+
+    // 국제 랜덤
+    const r1=shuffle(gukje.filter(function(e){return e.rk===1;}));
+    const r2=shuffle(gukje.filter(function(e){return e.rk!==1;}));
+    const pool=[...r1,...r2],byeT=pool.slice(0,24),gameT=pool.slice(24);
+    const gMs=[];
+    for(let i=0;i<48;i++){
+      if(i%2===1){
+        const t=byeT[Math.floor(i/2)]||null,ti=t?Number(t.ti):null;
+        gMs.push({id:'main_r0_'+i,phase:'main',round:0,slot:i,
+          t1:ti,t2:null,winner:ti,rubbers:[],bye:true,court:'',
+          venue:'gukje',__venue:'gukje',
+          gnTarget:t?t.gn:null,rkTarget:t?t.rk:null,
+          source1Label:t?t.gn+'\uc870'+t.rk+'\uc704':'',
+          source2Label:'\ubd80\uc804\uc2b9'});
+      }else{
+        const idx=Math.floor(i/2),t1=gameT[idx*2]||null,t2=gameT[idx*2+1]||null;
+        gMs.push({id:'main_r0_'+i,phase:'main',round:0,slot:i,
+          t1:t1?Number(t1.ti):null,t2:t2?Number(t2.ti):null,
+          winner:null,rubbers:[],bye:false,court:'',
+          venue:'gukje',__venue:'gukje',
+          gnTarget:t1?t1.gn:null,rkTarget:t1?t1.rk:null,
+          gnTarget2:t2?t2.gn:null,rkTarget2:t2?t2.rk:null,
+          source1Label:t1?t1.gn+'\uc870'+t1.rk+'\uc704':'',
+          source2Label:t2?t2.gn+'\uc870'+t2.rk+'\uc704':''});
+      }
+    }
+
+    // 상위라운드
+    function addU(ms,off,cnt,venue){
+      let prev=cnt,round=1;
+      while(prev>1){
+        const hs=Math.ceil(prev/2);
+        for(let i=0;i<hs;i++)ms.push({id:'main_r'+round+'_'+(off+i),phase:'main',round,slot:off+i,t1:null,t2:null,winner:null,rubbers:[],bye:false,court:'',venue,__venue:venue});
+        ms.filter(function(m){return m.round===round-1&&m.bye&&m.winner!=null&&m.slot>=off&&m.slot<off+prev;})
+          .forEach(function(bm){const li=bm.slot-off,ni=Math.floor(li/2),nm=ms.find(function(x){return x.round===round&&x.slot===off+ni;});if(!nm)return;if(li%2===0){if(nm.t1==null)nm.t1=bm.winner;}else{if(nm.t2==null)nm.t2=bm.winner;}});
+        prev=hs;round++;
+      }
+    }
+    addU(gMs,0,48,'gukje');
+    addU(wMs,48,16,'wondosim');
+
+    const matches=[...gMs,...wMs];
+    G.matches[k]=matches;
+    G.draws[k].mainBracketFixed=true;
+    G.draws[k].mainBracketLocked=true;
+    window.__v799DrawDone=true;
+
+    // Firebase 저장
+    Promise.resolve().then(async function(){
+      try{
+        if(window.__FB_WRITE_CACHE){
+          if(window.__FB_WRITE_CACHE.matches) delete window.__FB_WRITE_CACHE.matches[k];
+          if(window.__FB_WRITE_CACHE.draws) delete window.__FB_WRITE_CACHE.draws[k];
+        }
+        if(typeof stM==='function') await stM(k);
+        if(typeof stD==='function') await stD(k);
+        console.log('[v841] \uc644\ub8cc! \uc6d0\ub3c4\uc2ec:',wMs.filter(function(m){return m.round===0;}).length,'\uad6d\uc81c:',gMs.filter(function(m){return m.round===0;}).length,'\ubd80\uc804\uc2b9:',matches.filter(function(m){return m.bye&&m.round===0;}).length);
+        if(typeof renderBracket==='function') renderBracket();
+      }catch(e){console.error('[v841]',e);}
+    });
+  }catch(e){console.error('[v841] buildAndSaveMainDraw 실패',e);}
+}
+window.v841BuildAndSaveMainDraw=buildAndSaveMainDraw;
+
+// 페이지 로드 후 본선 데이터 없으면 자동 실행
+setTimeout(function(){
+  try{
+    const k=Object.keys(G&&G.draws||{})[0];
+    if(!k) return;
+    const cnt=(G.matches&&G.matches[k]||[]).filter(function(m){return m&&m.phase==='main'&&m.round===0;}).length;
+    if(cnt<10){
+      console.log('[v841] 본선 데이터 없음('+cnt+') → 자동 추첨 실행');
+      buildAndSaveMainDraw();
+    } else {
+      console.log('[v841] 본선 데이터 확인됨:',cnt,'경기');
+    }
+  }catch(e){}
+},5000);
+})();
+</script>
 </body>
 </html>
