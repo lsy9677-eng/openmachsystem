@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-15-v910-manual-modal-no-outside-close";
+  const APP_VERSION = "2026-06-15-v911-safe-preset-import-permission-fix";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -57663,6 +57663,226 @@ body.operator-mode .v830-main-private-mask{
     if(MANUAL_MODAL_IDS.includes(id)) setTimeout(()=>bindNoOutsideClose(id), 0);
     return ret;
   };
+})();
+</script>
+
+
+<!-- v911: 권한 보정 + 이번 본선대진 안전 프리셋. 자동 실행 없음. 버튼 클릭 시 1회 저장만 수행. -->
+<style id="v911SafePresetImportStyle">
+#v911PresetImportBtn,.v911-preset-import-btn{display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:5px!important;min-height:34px!important;padding:6px 11px!important;border-radius:10px!important;border:1.5px solid #7c3aed!important;background:#7c3aed!important;color:#fff!important;font-size:.74rem!important;font-weight:1000!important;white-space:nowrap!important;cursor:pointer!important;box-shadow:0 2px 8px rgba(124,58,237,.18)!important}
+#v911PresetImportBtn:hover,.v911-preset-import-btn:hover{background:#6d28d9!important;border-color:#6d28d9!important}
+#v911PresetNote{margin:8px 0 10px;padding:9px 11px;border-radius:12px;background:#f5f3ff;border:1.5px solid #c4b5fd;color:#5b21b6;font-size:.75rem;font-weight:900;line-height:1.55;word-break:keep-all}
+</style>
+<script id="v911SafePresetImportScript">
+(function(){
+  'use strict';
+  const VERSION='v911-safe-preset-import-permission-fix';
+  const PRESET_LINES=["조성호(동진주) / 한종우(동진주)", "김보수(금블던,두아스) / 김홍일(금블던,두아스)", "조덕용(개인) / 김대연(백운포)", "부전승", "강동완(송사리(SSR)) / 김윤호(송사리(SSR))", "김진우(하모니) / 박진성(개인)", "김원진(송사리) / 김정수(올리브)", "부전승", "황동환(개인) / 장인수(덕두)", "송재원(월요) / 김태현(월요)", "손범규(하모니) / 양우홍(하모니)", "부전승", "김희찬(능동) / 염철중(능동)", "우지현(SN,라이징,수정) / 이덕균(SN, 인사이드)", "황부근(티프렌즈) / 송강영(티프렌즈)", "부전승", "홍민호(무천/정우회) / 손명배(정우회)", "배훈(부산수정) / 배만식(개인)", "김명욱(부산덕두) / 이철우(부산덕두)", "부전승", "심희철(천자봉) / 강성은(천자봉)", "김기환(울산 한라) / 이현진(울산한라)", "김원진(테라, 연결) / 이봉신(대현, 연결)", "부전승", "하상봉(개인) / 공대환(청춘불패)", "오세철(창원 성주) / 진형달(창원 봉곡)", "김동준(UT) / 구혁(UT)", "부전승", "하형찬(개인) / 김남태(일송/부산)", "권세창(이기대 수예단) / 박명원(수예단 남대양)", "서성호(베스트) / 박용찬(베스트)", "부전승", "성낙훈(덕두, 테나) / 오세인(덕두, 히트)", "김유신(개인) / 김도형(백구)", "김성민(단디) / 진종현(단디)", "부전승", "이동규(유곡하와이) / 임광복(유곡하와이)", "채정용(룰루랄라) / 유태곤(룰루랄라)", "이진형(팀햄머/정우회) / 한송현(무천/정우회)", "부전승", "우동석(베스트) / 하태동(부산/베스트)", "송인준(신세계) / 이대은(신세계, 다대클럽)", "박재정(상정회/일밤) / 박이준(일밤/센)", "부전승", "박규찬(에오스) / 박재형(에오스)", "긴권", "배근무(대암,중앙,모닝스타) / 안성우(중앙,모닝스타)", "부전승", "홍주효", "하상호(부산단테매,하모니(부산)) / 강완근(하모니(부산))", "박상배(ssr) / 나세용(ssr)", "부전승", "이감재(금화) / 임준혁(무궁화)", "반지훈(TAIM, V.I.P., A1) / 김치영(TAIM, MTC, V.I.P.)", "김진우(하모니) / 박진성(개인)", "부전승", "홍성우(유곡하와이) / 박도건(유곡하와이)", "민양홍(용두산) / 정웅섭(용두산)", "문광준(창원 대원/더블폴트/더블지앤코) / 유승곤(창원 도계/Return Ace/더블지앤코)", "부전승", "최일현(개인) / 이경률(개인)", "최윤제(부산N_B) / 최지웅(부산N_B)", "이상봉(Ing/원샷/방토/장원/동심) / 김홍준(테릉촌/ing)", "부전승", "강태우(대암,하모니(부산),한새벌) / 김무경(대암)", "이재근(빕스클럽) / 박영욱(빕스클럽)", "장윤수(어울림) / 오세열(어울림)", "부전승", "이준식(영도/해송) / 강민수(영도 GF)", "전창현(여명) / 전승용(월촌테우회)", "이희영(창원성주/모닝스타/중앙/창단테) / 김동환(베이스라인/창단테)", "부전승", "김용수(덕두) / 외 1명(덕두)", "양현철(부산/금화,에브리원,양산/천성) / 서창우(부산/금화)", "김동기(늘푸른) / 문문식(늘푸른)", "부전승", "김겸탁(삼계) / 신창륜(하모니)", "정준식(위드) / 김두호(위드)", "이종호(모던) / 김경준(모던)", "부전승", "박원구(수정) / 정환석(수정)", "김남훈(개인) / 김연철(토요펠리스)", "엄재오(위아원) / 김성인(위아원/한결)", "부전승", "김경재(모던) / 강병수(모던)", "조정래(월성,용원,러브올) / 정규섭(UH)", "이영진(개인) / 조라온(효원)", "부전승", "기권", "맹도영(불나비/통제영/청춘불패) / 김해솔(통제영)", "김일용(제주남용) / 유재동(개인)", "부전승", "강민성(APEX) / 김영근(APEX)", "김성민(애드) / 송주호(애드)", "김윤환(장유클럽) / 이순보(테사모)", "부전승", "김병극(가음정클럽) / 박상경(가음정클럽)", "강홍섭(양정현대) / 정동식(신세계)", "김동언(부산하나) / 이미정(부산하나)", "부전승", "국지윤(수령) / 김동현(수령)", "박수조(나이스) / 김석환(나이스)", "이국원(하모니) / 조찬걸(하모니)", "부전승", "김남기(개인) / 김주열(수령)", "서장원(테오) / 김의상(테오)", "김태훈(창원남산/몬스터벤져스) / 고종배(두일,정관TNT)", "부전승", "김영우(울산/ags,둘리,반딧불클럽) / 윤종수(울산/온산클럽)", "김길온(김해불나비) / 김대훈(김해불나비)", "이원빈(팀테빌) / 박정식(팀테빌)", "부전승", "이한영(서브앤발리, 포인트) / 권정택(서브앤발리, 포인트)", "윤우진(개인) / 김판수(창원교육단지)", "박형준(개인) / 정윤영(나이스)", "부전승", "이병혁(가야) / 이재경(가야)", "김대환(ssr) / 조원혁(ssr)", "강민관(테스티니) / 허재원(테스티니)", "부전승", "곽태우(장복) / 고운(장복.라온)", "서득빈(도담) / 이준석(포인트/서브앤발리)", "송경민(신세계) / 엄수관(신세계)", "부전승", "김창준(부산/금화,에브리원) / 이인규(부산/금화)", "임태규(용원클럽) / 추양호(용원클럽)", "오경훈(창원어프로치,창단테,대원,러브올) / 주재헌(창원어프로치,천자봉)", "부전승"];
+  const ROUND_SIZES=[128,64,32,16,8,4,2,1];
+  function byId(id){return document.getElementById(id);}
+  function arr(v){return Array.isArray(v)?v:[];}
+  function clean(s){return String(s??'').replace(/\s+/g,' ').trim();}
+  function norm(s){return clean(s).toLowerCase().replace(/[\s \/\|()\[\]{}<>·ㆍ.,:;~`'"\-–—_+*=!?@#$%^&]/g,'');}
+  function namesOnly(s){
+    return clean(s).split('/').map(x=>clean(x).replace(/\([^)]*\)/g,'').replace(/외\s*1명/g,'').trim()).filter(Boolean).join(' / ');
+  }
+  function isBye(v){return /^(부전승|bye)$/i.test(clean(v));}
+  function isWithdraw(v){return /^(기권|긴권|withdraw|w\/o)$/i.test(clean(v));}
+  function toast2(msg,type){try{ if(typeof toast==='function') toast(msg,type||'info'); else alert(msg); }catch(e){alert(msg);}}
+  function roleOk(){
+    try{ if(typeof AD!=='undefined' && AD) return true; }catch(e){}
+    try{ if(typeof TM!=='undefined' && TM) return true; }catch(e){}
+    try{ if(typeof OP!=='undefined' && OP) return true; }catch(e){}
+    try{ if(window.AD||window.TM||window.OP||window.DEV_LOGIN||window.ADMIN_LOGIN||window.OPERATOR_MODE||window.DEVELOPER_MODE||window.IS_DEVELOPER||window.__developerMode) return true; }catch(e){}
+    try{ const b=document.body; if(b&&(b.classList.contains('admin-mode')||b.classList.contains('tm-mode')||b.classList.contains('operator-mode')||b.classList.contains('op-mode')||b.classList.contains('developer-mode')||b.classList.contains('dev-mode'))) return true; }catch(e){}
+    try{ return [...document.querySelectorAll('#adminBadge,.admin-badge,#loginMenuBtn,.btn-sm')].some(el=>/개발자|관리자|운영자|진행자/.test(clean(el.textContent)) && getComputedStyle(el).display!=='none'); }catch(e){return false;}
+  }
+  const oldCan=window.canManageBracket;
+  window.canManageBracket=function(){
+    if(roleOk()) return true;
+    try{ return typeof oldCan==='function' ? !!oldCan.apply(this,arguments) : false; }catch(e){ return false; }
+  };
+  try{ canManageBracket=window.canManageBracket; }catch(e){}
+
+  function currentKey(){
+    try{ if(window.__v907ManualEditKey) return window.__v907ManualEditKey; }catch(e){}
+    try{ if(typeof ME!=='undefined' && ME && ME.key) return ME.key; }catch(e){}
+    try{ if(typeof window.v900GetCurrentKey==='function'){ const k=window.v900GetCurrentKey(); if(k) return k; } }catch(e){}
+    try{
+      const tid=(byId('brTS')&&byId('brTS').value)||''; if(!tid) return '';
+      const t=arr(window.G&&G.tournaments).find(x=>String(x.id)===String(tid));
+      let div='';
+      if(Array.isArray(window.BR_MULTI_DIVS)&&window.BR_MULTI_DIVS.length&&!window.BR_MULTI_DIVS.includes('__ALL__')) div=window.BR_MULTI_DIVS[0];
+      if(!div && byId('brDS')){ const v=byId('brDS').value; if(v&&v!=='__ALL__') div=v; }
+      if(!div) div=arr(t&&t.divisions)[0]||'';
+      return tid&&div ? tid+'_'+div : '';
+    }catch(e){return '';}
+  }
+  function keyInfo(key){const p=String(key||'').split('_'); return {tid:p[0]||'',div:p.slice(1).join('_')||''};}
+  function teamLabel(team,key,idx){
+    try{
+      const indiv=team&&((team.tournamentType==='individual_pair')||Array.isArray(team.individualPlayers));
+      if(indiv){
+        if(typeof getIndividualNameOnlyDisplayLine==='function'){ const v=clean(getIndividualNameOnlyDisplayLine(team)); if(v&&v!=='?') return v; }
+        if(typeof getIndividualDisplayLine==='function'){ const v=clean(getIndividualDisplayLine(team)); if(v&&v!=='?') return v.replace(/\s*\([^)]*\)/g,'').trim(); }
+        const ps=(typeof getIndividualPlayers==='function'?getIndividualPlayers(team):arr(team.individualPlayers)).slice(0,2).map(p=>clean(p&&p.name?p.name:p)).filter(Boolean);
+        if(ps.length) return ps.join(' / ');
+      }
+      if(typeof tdn==='function'){ const v=clean(tdn(team,key,idx)); if(v) return v; }
+      return clean(team.entryLabel||team.pairLabel||team.club||team.name||('팀'+(idx+1)));
+    }catch(e){return clean((team&&team.entryLabel)||(team&&team.pairLabel)||(team&&team.club)||(team&&team.name)||('팀'+(idx+1)));}
+  }
+  function teamTokens(team,label){
+    const toks=[label,namesOnly(label),team&&team.club,team&&team.name,team&&team.entryLabel,team&&team.pairLabel,team&&team.phone,team&&team.ownerName,team&&team.ownerPhone];
+    try{ arr(team&&team.players).forEach(p=>{ if(typeof p==='string') toks.push(p); else if(p){toks.push(p.name,p.club,p.clubsRaw,p.phone,p.mobile,p.tel); if(Array.isArray(p.clubs)) toks.push(...p.clubs);} }); }catch(e){}
+    try{ const ps=typeof getIndividualPlayers==='function'?getIndividualPlayers(team):arr(team&&team.individualPlayers); arr(ps).forEach(p=>{ if(typeof p==='string') toks.push(p); else if(p){toks.push(p.name,p.club,p.clubsRaw,p.phone,p.mobile,p.tel); if(Array.isArray(p.clubs)) toks.push(...p.clubs);} }); }catch(e){}
+    return toks.map(clean).filter(Boolean);
+  }
+  function candidates(key){
+    const teams=arr(window.G&&G.teams&&G.teams[key]);
+    return teams.map((team,idx)=>{ const label=teamLabel(team,key,idx); const tokens=teamTokens(team,label); return {idx,label,tokens,search:tokens.map(norm).join('')}; }).filter(x=>x.label&&x.label!=='?');
+  }
+  function findIndex(key,label){
+    const raw=clean(label); if(!raw || isBye(raw) || isWithdraw(raw)) return null;
+    const nq=norm(raw); const nNames=norm(namesOnly(raw)); if(!nq&&!nNames) return null;
+    const exact=[],starts=[],contains=[];
+    candidates(key).forEach(c=>{
+      const labelN=norm(c.label), labelNames=norm(namesOnly(c.label));
+      const tokenNs=arr(c.tokens).map(norm).filter(Boolean);
+      if(labelN===nq || labelNames===nNames || tokenNs.includes(nq) || (nNames&&tokenNs.includes(nNames))) exact.push(c);
+      else if((nNames&&labelNames.startsWith(nNames)) || labelN.startsWith(nq) || tokenNs.some(t=>t.startsWith(nNames||nq))) starts.push(c);
+      else if((nNames&&c.search.includes(nNames)) || (nq&&c.search.includes(nq)) || (nNames&&nNames.split('').every(ch=>c.search.includes(ch)))) contains.push(c);
+    });
+    const c=exact[0]||starts[0]||contains[0]; return c?Number(c.idx):null;
+  }
+  function getMainRound0(key){return arr(window.G&&G.matches&&G.matches[key]).filter(m=>m&&String(m.phase)==='main'&&Number(m.round)===0).sort((a,b)=>(Number(a.slot)||0)-(Number(b.slot)||0));}
+  function ensureManual128Data(key){
+    if(!window.G) window.G={tournaments:[],teams:{},matches:{},draws:{}};
+    if(!G.draws) G.draws={}; if(!G.draws[key]) G.draws[key]={groups:[],createdAt:new Date().toISOString()};
+    if(typeof window.v900GetManualData==='function'){ try{ return window.v900GetManualData(key); }catch(e){} }
+    const rounds=ROUND_SIZES.map(n=>Array(n).fill(''));
+    const scores=ROUND_SIZES.slice(0,-1).map(n=>Array(Math.ceil(n/2)).fill('').map(()=>['','']));
+    G.draws[key].manual128={active:true,size:128,updatedAt:new Date().toISOString(),rounds,scores,title:'128강 수동 본선'};
+    return G.draws[key].manual128;
+  }
+  function fillManual128Text(key){
+    const d=ensureManual128Data(key); if(!d) return;
+    if(!Array.isArray(d.rounds)) d.rounds=[];
+    ROUND_SIZES.forEach((n,i)=>{ if(!Array.isArray(d.rounds[i])) d.rounds[i]=Array(n).fill(''); d.rounds[i]=Array(n).fill('').map((_,j)=>i===0?PRESET_LINES[j]||'':''); });
+    d.active=true; d.size=128; d.updatedAt=new Date().toISOString(); d.title='제1회 모던배 128강 본선 수동 입력'; d.v911PresetImported=true;
+    try{ localStorage.setItem('v900Manual128:'+key,JSON.stringify(d)); }catch(e){}
+  }
+  function propagateMainByes(key){
+    const all=arr(G.matches&&G.matches[key]); const main=all.filter(m=>m&&String(m.phase)==='main');
+    main.filter(m=>Number(m.round)>0).forEach(m=>{m.t1=null;m.t2=null;m.winner=null;m.bye=false;m.source1Label=m.source1Label||'';m.source2Label=m.source2Label||'';m.v911FromPresetBye=false;});
+    const maxR=Math.max(0,...main.map(m=>Number(m.round)||0));
+    for(let r=0;r<maxR;r++){
+      main.filter(m=>Number(m.round)===r && m.bye && (m.winner!=null || clean(m.source1Label||m.source2Label))).forEach(bm=>{
+        const nm=main.find(x=>Number(x.round)===r+1 && Number(x.slot)===Math.floor((Number(bm.slot)||0)/2)); if(!nm) return;
+        const side=(Number(bm.slot)||0)%2===0?'1':'2';
+        const lbl=clean(bm.winner!=null ? (bm.source1Label||bm.source2Label||'') : (bm.source1Label||bm.source2Label||''));
+        if(side==='1'){ nm.t1=(bm.winner!=null?bm.winner:null); nm.source1Label=lbl||nm.source1Label||''; }
+        else { nm.t2=(bm.winner!=null?bm.winner:null); nm.source2Label=lbl||nm.source2Label||''; }
+        nm.v911FromPresetBye=true;
+      });
+    }
+  }
+  async function persist(key){
+    try{ if(window.__FB_WRITE_CACHE){ if(__FB_WRITE_CACHE.matches) delete __FB_WRITE_CACHE.matches[key]; if(__FB_WRITE_CACHE.draws) delete __FB_WRITE_CACHE.draws[key]; } }catch(e){}
+    if(!G.draws) G.draws={}; if(!G.draws[key]) G.draws[key]={groups:[],createdAt:new Date().toISOString()};
+    Object.assign(G.draws[key],{v911PresetImported:true,v911PresetImportedAt:new Date().toISOString(),mainBracketLocked:true,mainBracketFixed:true,mainManualLocked:true,bracketPublic:true});
+    if(typeof stM==='function') await stM(key);
+    if(typeof stD==='function') await stD(key);
+    try{ if(typeof waitForPendingWrites==='function'&&window.db) await waitForPendingWrites(window.db); }catch(e){}
+    try{ if(typeof cacheTournamentBundleFromMemory==='function') cacheTournamentBundleFromMemory(keyInfo(key).tid); }catch(e){}
+  }
+  async function importPreset(){
+    if(!roleOk()){ toast2('개발자/관리자/운영자/진행자 권한이 필요합니다','error'); return; }
+    const key=currentKey(); if(!key){ toast2('대진표 화면에서 대회와 부서를 먼저 선택하세요','info'); return; }
+    const msg='이번 128강 본선 대진 64경기를 현재 선택한 대회/부서에 1회 입력합니다.\n\n이 기능은 자동 실행/하드코딩 고정이 아닙니다. 버튼을 누른 이번 한 번만 Firebase에 저장합니다. 이후 수동수정, 전체 비우기, 수동본선 끄기, 재추첨으로 변경/삭제 가능합니다.\n\n기존 본선 1라운드와 부전승 자동진출은 이 내용으로 덮어씁니다. 진행할까요?';
+    if(!confirm(msg)) return;
+    fillManual128Text(key);
+    const r0=getMainRound0(key);
+    const unresolved=[];
+    if(r0.length){
+      r0.forEach((m,i)=>{
+        const a=PRESET_LINES[i*2]||'', b=PRESET_LINES[i*2+1]||'';
+        const ia=findIndex(key,a), ib=findIndex(key,b);
+        const bye=isBye(b), wa=isWithdraw(a), wb=isWithdraw(b);
+        m.t1=ia; m.t2=(bye||wb)?null:ib;
+        m.source1Label=a; m.source2Label=bye?'부전승':b;
+        m.source1FixedLabel=a; m.source2FixedLabel=bye?'부전승':b;
+        m.bye=bye || wb || wa;
+        m.winner=(m.bye && ia!=null && !wa)?ia:null;
+        m.winnerLabel=(m.bye && !wa)?a:'';
+        m.rubbers=[];
+        m.v911PresetImported=true; m.v911PresetImportedAt=new Date().toISOString();
+        if(ia==null && a && !isWithdraw(a)) unresolved.push((i+1)+'경기 팀1: '+a);
+        if(!bye && !wb && ib==null && b) unresolved.push((i+1)+'경기 팀2: '+b);
+      });
+      propagateMainByes(key);
+    }
+    try{ if(typeof sl==='function') sl(true); }catch(e){}
+    try{
+      await persist(key);
+      try{ if(typeof sl==='function') sl(false); }catch(e){}
+      try{ if(typeof renderBracket==='function') renderBracket(); }catch(e){}
+      try{ if(byId('v900ManualTextarea')) byId('v900ManualTextarea').value=PRESET_LINES.join('\n'); }catch(e){}
+      setTimeout(()=>{try{ if(typeof renderBracket==='function') renderBracket(); }catch(e){}},250);
+      const extra=unresolved.length?'\n참가자 목록에서 바로 못 찾은 항목 '+unresolved.length+'건은 화면 표시명으로 보존했습니다. 필요 시 해당 칸만 후보 검색으로 한번 확인하세요.':'';
+      toast2('이번 본선 대진 입력/저장 완료 ✅'+extra,'success');
+      if(unresolved.length) console.warn('[v911] unresolved preset entries',unresolved);
+    }catch(e){
+      try{ if(typeof sl==='function') sl(false); }catch(_e){}
+      console.error('[v911] preset import failed',e);
+      toast2('이번 본선 대진 저장 실패: '+(e&&e.message?e.message:String(e)),'error');
+    }
+  }
+  window.v911ImportModernMainPreset=importPreset;
+  window.v911RoleOk=roleOk;
+  function installButtons(){
+    try{
+      const bar=byId('bracketExportBar');
+      if(bar && !byId('v911PresetImportBtn')){
+        const btn=document.createElement('button'); btn.id='v911PresetImportBtn'; btn.type='button'; btn.textContent='📌 이번 본선대진 불러오기'; btn.onclick=importPreset;
+        bar.insertBefore(btn, bar.firstChild);
+      }
+    }catch(e){}
+    try{
+      const body=byId('manualEditBody');
+      if(body && !byId('v911PresetNote')){
+        const note=document.createElement('div'); note.id='v911PresetNote'; note.innerHTML='📌 이번 본선대진은 <b>버튼을 누를 때만 1회 저장</b>됩니다. 코드가 매번 강제로 덮어쓰지 않으므로 저장 후에도 삭제/수정 가능합니다.';
+        const btn=document.createElement('button'); btn.type='button'; btn.className='v911-preset-import-btn'; btn.textContent='📌 이번 본선대진 64경기 입력/저장'; btn.onclick=importPreset;
+        const wrap=document.createElement('div'); wrap.style.cssText='display:flex;gap:7px;justify-content:flex-end;flex-wrap:wrap;margin:0 0 10px'; wrap.appendChild(btn);
+        body.prepend(wrap); body.prepend(note);
+      }
+    }catch(e){}
+    try{
+      const modal=byId('v900ManualModal'); const footer=modal&&modal.querySelector('.modal-footer');
+      if(footer && !byId('v911PresetImportModalBtn')){
+        const btn=document.createElement('button'); btn.id='v911PresetImportModalBtn'; btn.type='button'; btn.className='v911-preset-import-btn'; btn.textContent='📌 이번 대진 불러오기'; btn.onclick=importPreset;
+        footer.insertBefore(btn, footer.firstChild);
+      }
+    }catch(e){}
+  }
+  const oldOpenManualEdit=window.openManualEdit;
+  if(typeof oldOpenManualEdit==='function' && !oldOpenManualEdit.__v911Wrapped){
+    const wrapped=function(){ const r=oldOpenManualEdit.apply(this,arguments); setTimeout(installButtons,30); setTimeout(installButtons,250); return r; };
+    wrapped.__v911Wrapped=true; window.openManualEdit=wrapped; try{openManualEdit=wrapped;}catch(e){}
+  }
+  const oldOpen900=window.v900OpenManual128;
+  if(typeof oldOpen900==='function' && !oldOpen900.__v911Wrapped){
+    const wrapped=function(){ const r=oldOpen900.apply(this,arguments); setTimeout(installButtons,30); setTimeout(installButtons,250); return r; };
+    wrapped.__v911Wrapped=true; window.v900OpenManual128=wrapped;
+  }
+  function boot(){ installButtons(); }
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(boot,500));
+  setTimeout(boot,800); setTimeout(boot,1800);
+  if(!window.__v911PresetObserver){
+    window.__v911PresetObserver=new MutationObserver(()=>setTimeout(boot,50));
+    try{ window.__v911PresetObserver.observe(document.body,{childList:true,subtree:true}); }catch(e){}
+  }
+  console.log('[v911] loaded',VERSION,'preset lines',PRESET_LINES.length);
 })();
 </script>
 
