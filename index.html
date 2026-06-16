@@ -68,7 +68,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-16-v929-result-scroll-stay-hide-adv";
+  const APP_VERSION = "2026-06-16-v936-cleanup-recovery-tools";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -62085,5 +62085,1136 @@ body.v929-result-freeze *{scroll-behavior:auto!important;}
   console.log(TAG,'installed',VERSION);
 })();
 </script>
+
+
+<!-- v930: 128강 완료 후 64강 운영카드/다음라운드 복구 안정화 -->
+<style id="v930MainRoundRepairStyle">
+.v930-repair-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:8px 0 12px;padding:10px 12px;border:1.5px solid #93c5fd;background:linear-gradient(135deg,#eff6ff,#fff);border-radius:14px;color:#1e3a8a;font-size:.78rem;font-weight:900;line-height:1.5}.v930-repair-bar .btn{min-height:34px!important;padding:6px 12px!important;font-size:.76rem!important;border-radius:10px!important}.v930-repair-chip{display:inline-flex;align-items:center;justify-content:center;padding:3px 8px;border-radius:999px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;font-size:.68rem;font-weight:1000;white-space:nowrap}@media(max-width:680px){.v930-repair-bar{align-items:stretch}.v930-repair-bar>div:last-child{display:grid;grid-template-columns:1fr;gap:6px;width:100%}.v930-repair-bar .btn{width:100%!important}}
+</style>
+<script id="v930MainRoundCardRepairScript">
+(function(){
+  'use strict';
+  const V='v930';
+  function q(id){return document.getElementById(id)}
+  function msg(s,t){try{ if(typeof toast==='function') toast(s,t||'info'); else console.log('[v930]',s); }catch(e){console.log('[v930]',s)}}
+  function isBlank(v){
+    if(v===null||v===undefined) return true;
+    const s=String(v).trim();
+    return !s || s==='-' || s==='--' || /^TBD$/i.test(s) || /미정/.test(s) || /부전승/.test(s);
+  }
+  function isRealTeam(v){ return !isBlank(v) && !Number.isNaN(Number(v)); }
+  function getCurrentKey(){
+    try{
+      const tid=q('brTS')?.value||'';
+      let div=q('brDS')?.value||'';
+      if(!div || div==='__ALL__'){
+        const chips=[...document.querySelectorAll('#brMultiDiv .dpill.active,#brMultiDiv .active,[data-div].active')];
+        const found=chips.map(x=>x.dataset?.div||x.getAttribute('data-div')||'').find(Boolean);
+        if(found) div=found;
+      }
+      if(!tid||!div||div==='__ALL__') return '';
+      return tid+'_'+div;
+    }catch(e){return ''}
+  }
+  function roundList(key,r){
+    const list=(window.G&&G.matches&&G.matches[key])||[];
+    return list.filter(m=>m&&String(m.phase)==='main'&&Number(m.round)===Number(r)&&!m.thirdPlace&&!m.bronze).sort((a,b)=>(Number(a.slot)||0)-(Number(b.slot)||0));
+  }
+  function getBySlot(arr,slot){ return arr.find(m=>Number(m.slot)===Number(slot)); }
+  function ensureTargetRound(key,r,count){
+    const list=(G.matches[key]||(G.matches[key]=[]));
+    const made=[];
+    for(let i=0;i<count;i++){
+      let m=list.find(x=>x&&String(x.phase)==='main'&&Number(x.round)===Number(r)&&Number(x.slot)===i&&!x.thirdPlace&&!x.bronze);
+      if(!m){
+        m={id:`main_r${r}_${i}_v930`,phase:'main',round:r,slot:i,t1:null,t2:null,winner:null,rubbers:[],court:'',courts:[],bye:false,source:'v930_repair'};
+        list.push(m); made.push(m);
+      }else{
+        if(!Array.isArray(m.rubbers)) m.rubbers=[];
+        if(!Array.isArray(m.courts)) m.courts=m.court?[m.court]:[];
+        if(m.phase!=='main') m.phase='main';
+        m.round=Number(r); m.slot=Number(i);
+      }
+    }
+    return made;
+  }
+  function labelTeam(key,ti){
+    try{ if(typeof tdn==='function') return tdn((G.teams[key]||[])[ti],key,ti); }catch(e){}
+    try{ const t=(G.teams[key]||[])[ti]; return (t?.players||[]).join(' / ') || t?.club || String(ti); }catch(e){ return String(ti); }
+  }
+  function repairKey(key,opts={}){
+    if(!key || !G?.matches?.[key]) return {changed:false,msg:'대회/부서를 선택하세요'};
+    let changed=false, filled=0, made=0, byeFixed=0;
+    // 128강부터 결승까지 현재 승자 기준으로 다음 라운드 카드를 보강한다.
+    for(let r=0;r<8;r++){
+      const src=roundList(key,r);
+      if(!src.length) break;
+      const targetCount=Math.ceil(src.length/2);
+      if(targetCount<1) break;
+      const created=ensureTargetRound(key,r+1,targetCount); made+=created.length; if(created.length) changed=true;
+      const targets=roundList(key,r+1);
+      src.forEach((m,idx)=>{
+        const slot=Number.isFinite(Number(m.slot))?Number(m.slot):idx;
+        // 부전승인데 winner가 비어 있으면 팀1을 자동 승자로 확정한다.
+        if((m.bye||isBlank(m.t2)) && isRealTeam(m.t1) && isBlank(m.winner)){
+          m.winner=Number(m.t1); m.sc1=m.sc1??1; m.sc2=m.sc2??0; m.scoreText=m.scoreText||'승패만'; m.completedAt=m.completedAt||new Date().toISOString(); m.resultSavedAt=m.resultSavedAt||m.completedAt; byeFixed++; changed=true;
+        }
+        if(isBlank(m.winner)) return;
+        const ti=Number(m.winner);
+        if(Number.isNaN(ti)) return;
+        const target=getBySlot(targets,Math.floor(slot/2));
+        if(!target) return;
+        const side=(slot%2===0)?'t1':'t2';
+        const cur=target[side];
+        // 빈칸/미정/TBD/부전승 자리만 채운다. 이미 사람이 넣은 실제 팀은 덮지 않는다.
+        if(isBlank(cur) || String(cur)!==String(ti) && opts.forceBlanksOnly===false){
+          if(!isBlank(cur) && opts.forceBlanksOnly!==false) return;
+          target[side]=ti; target.bye=false; target.source='v930_repair'; target.updatedAt=new Date().toISOString(); filled++; changed=true;
+          if(!isBlank(target.winner) && String(target.winner)!==String(target.t1) && String(target.winner)!==String(target.t2)){
+            target.winner=null; delete target.completedAt; delete target.resultSavedAt;
+          }
+        }
+      });
+    }
+    return {changed,filled,made,byeFixed,msg:`다음 라운드 보강: 생성 ${made}, 채움 ${filled}, 부전승확정 ${byeFixed}`};
+  }
+  async function persistKey(key){
+    try{
+      if(typeof stM==='function') await stM(key);
+      try{ if(typeof stD==='function') await stD(key); }catch(e){}
+      return true;
+    }catch(e){ console.warn('[v930] persist failed',e); msg('저장 실패: '+(e.message||e),'error'); return false; }
+  }
+  window.v930RepairMainRoundCards=async function(key,opts={}){
+    key=key||getCurrentKey();
+    if(!key){ msg('대회와 부서를 먼저 선택하세요','error'); return false; }
+    const res=repairKey(key,opts);
+    if(res.changed){
+      await persistKey(key);
+      try{ if(typeof renderBracket==='function') renderBracket(); }catch(e){}
+      msg(res.msg+' ✅','success');
+    }else{
+      msg('복구할 다음 라운드 빈칸이 없습니다. '+res.msg,'info');
+    }
+    return !!res.changed;
+  };
+  function installBar(){
+    try{
+      if(q('v930RepairBar')) return;
+      const root=q('bracketExportBar') || document.querySelector('#page-bracket .sec-title') || q('bracketContent');
+      if(!root) return;
+      const bar=document.createElement('div');
+      bar.id='v930RepairBar';
+      bar.className='v930-repair-bar';
+      bar.innerHTML=`<div><span class="v930-repair-chip">v930 다음라운드 복구</span> 128강 결과가 완료됐는데 64강 카드 한쪽이 비면 이 버튼으로 128강 승자 기준 운영카드를 다시 채웁니다.</div><div><button type="button" class="btn btn-outline" onclick="v930RepairMainRoundCards()">🔁 64강/다음라운드 카드복구</button></div>`;
+      if(root.id==='bracketExportBar') root.insertAdjacentElement('afterend',bar); else root.parentNode.insertBefore(bar,root.nextSibling);
+    }catch(e){console.warn('[v930] install bar failed',e)}
+  }
+  // 결과 저장 직후 자동 보강. 저장 이벤트를 직접 래핑하지 않고 클릭 후 지연 실행만 한다.
+  let pendingTimer=null;
+  function scheduleRepair(){
+    clearTimeout(pendingTimer);
+    pendingTimer=setTimeout(()=>{try{ const key=getCurrentKey(); if(key) window.v930RepairMainRoundCards(key,{silent:true}); }catch(e){}},1200);
+  }
+  document.addEventListener('click',function(ev){
+    const el=ev.target && ev.target.closest && ev.target.closest('#mM3SaveResultBtn,.v922-qwin-btn,.v917-qwin-btn,.v916-qwin-btn,.v915-qwin-btn,[data-v922-qwin],[data-v930-watch-save]');
+    if(el) scheduleRepair();
+  },true);
+  document.addEventListener('pointerdown',function(ev){
+    const el=ev.target && ev.target.closest && ev.target.closest('.v922-qwin-btn,.v917-qwin-btn,.v916-qwin-btn,.v915-qwin-btn,[data-v922-qwin]');
+    if(el) scheduleRepair();
+  },true);
+  function updateBadge(){
+    try{ const b=q('bracketFreshnessBadge'); if(b){ b.textContent='v930 다음라운드'; b.style.minWidth='112px'; } }catch(e){}
+  }
+  function boot(){installBar();updateBadge();}
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
+  setTimeout(boot,800); setTimeout(boot,2200);
+})();
+</script>
+
+
+
+<!-- v931: 64강/다음라운드 카드복구 대회/부서 자동 인식 보정 -->
+<style id="v931RepairKeyResolverStyle">
+.v931-repair-key-note{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:999px;background:#dcfce7;color:#166534;border:1px solid #86efac;font-size:.68rem;font-weight:1000;white-space:nowrap}
+</style>
+<script id="v931RepairKeyResolverScript">
+(function(){
+  'use strict';
+  const V='v931';
+  const q=(id)=>document.getElementById(id);
+  function toastMsg(s,t){try{ if(typeof toast==='function') toast(s,t||'info'); else console.log('[v931]',s); }catch(e){console.log('[v931]',s)}}
+  function splitKey(k){try{ if(typeof _k2td==='function') return _k2td(k); }catch(e){} const i=String(k||'').lastIndexOf('_'); return {tid:String(k||'').slice(0,i),div:String(k||'').slice(i+1)};}
+  function getTid(){
+    let tid=(q('brTS')&&q('brTS').value)||'';
+    if(tid) return tid;
+    try{
+      const opts=[...(q('brTS')?.options||[])].filter(o=>o.value && !/선택/.test(o.textContent||''));
+      if(opts.length===1) return opts[0].value;
+    }catch(e){}
+    return '';
+  }
+  function candidateKeysForTid(tid){
+    const set=new Set();
+    try{ Object.keys((window.G&&G.matches)||{}).forEach(k=>{const x=splitKey(k); if(x.tid===tid) set.add(k);}); }catch(e){}
+    try{ Object.keys((window.G&&G.draws)||{}).forEach(k=>{const x=splitKey(k); if(x.tid===tid) set.add(k);}); }catch(e){}
+    try{ Object.keys((window.G&&G.teams)||{}).forEach(k=>{const x=splitKey(k); if(x.tid===tid) set.add(k);}); }catch(e){}
+    return [...set].filter(k=>{const d=splitKey(k).div; return d && d!=='__ALL__' && d!=='전체';});
+  }
+  function hasMain(key){
+    try{ return ((G.matches&&G.matches[key])||[]).some(m=>m&&String(m.phase)==='main'); }catch(e){return false;}
+  }
+  function getDivFromUi(){
+    let div=(q('brDS')&&q('brDS').value)||'';
+    if(div && div!=='__ALL__' && div!=='전체') return div;
+    const selectors=[
+      '#brMultiDiv .dpill.active[data-div]',
+      '#brMultiDiv .active[data-div]',
+      '#brMultiDiv [data-div].active',
+      '#brMultiDiv .dpill.active'
+    ];
+    for(const sel of selectors){
+      try{
+        const found=[...document.querySelectorAll(sel)].map(el=>el.dataset?.div||el.getAttribute('data-div')||'').find(v=>v&&v!=='__ALL__'&&v!=='전체');
+        if(found) return found;
+      }catch(e){}
+    }
+    try{
+      const pills=[...document.querySelectorAll('#brMultiDiv [data-div]')].map(el=>el.dataset?.div||el.getAttribute('data-div')||'').filter(v=>v&&v!=='__ALL__'&&v!=='전체');
+      const uniq=[...new Set(pills)];
+      if(uniq.length===1) return uniq[0];
+    }catch(e){}
+    try{
+      const opts=[...(q('brDS')?.options||[])].map(o=>o.value).filter(v=>v&&v!=='__ALL__'&&v!=='전체');
+      const uniq=[...new Set(opts)];
+      if(uniq.length===1) return uniq[0];
+    }catch(e){}
+    return '';
+  }
+  function resolveKey(){
+    const tid=getTid();
+    if(!tid) return '';
+    const div=getDivFromUi();
+    if(div) return tid+'_'+div;
+    const keys=candidateKeysForTid(tid);
+    if(keys.length===1) return keys[0];
+    const mainKeys=keys.filter(hasMain);
+    if(mainKeys.length===1) return mainKeys[0];
+    const teamKeys=keys.filter(k=>((G.teams&&G.teams[k])||[]).length>0);
+    if(teamKeys.length===1) return teamKeys[0];
+    return '';
+  }
+  window.v931ResolveBracketKey=resolveKey;
+
+  const oldRepair=window.v930RepairMainRoundCards;
+  window.v930RepairMainRoundCards=async function(key,opts){
+    key=key||resolveKey();
+    if(!key){
+      const tid=getTid();
+      const keys=tid?candidateKeysForTid(tid):[];
+      if(keys.length>1){ toastMsg('부서가 여러 개입니다. 부서 칩을 하나 선택한 뒤 다시 누르세요.','error'); }
+      else toastMsg('대회는 선택되어 있지만 부서 키를 찾지 못했습니다. 부서 칩을 한 번 눌러 선택 후 다시 실행하세요.','error');
+      return false;
+    }
+    try{ console.log('[v931] repair key resolved:', key); }catch(e){}
+    if(typeof oldRepair==='function') return oldRepair.call(this,key,opts||{});
+    toastMsg('복구 함수가 아직 준비되지 않았습니다. 새로고침 후 다시 시도하세요.','error');
+    return false;
+  };
+
+  function markBar(){
+    try{
+      const bar=q('v930RepairBar');
+      if(bar && !bar.querySelector('.v931-repair-key-note')){
+        const chip=document.createElement('span');
+        chip.className='v931-repair-key-note';
+        chip.textContent='v931 부서 자동인식';
+        const first=bar.querySelector('.v930-repair-chip');
+        if(first) first.insertAdjacentElement('afterend',chip);
+      }
+      const btn=bar&&bar.querySelector('button');
+      if(btn){ btn.setAttribute('onclick','v930RepairMainRoundCards()'); btn.textContent='🔁 64강/다음라운드 카드복구'; }
+      const b=q('bracketFreshnessBadge'); if(b){ b.textContent='v931 복구키'; b.style.minWidth='96px'; }
+    }catch(e){}
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',markBar); else markBar();
+  setTimeout(markBar,800); setTimeout(markBar,2200);
+})();
+</script>
+
+
+
+<!-- v932: 잘못 생성된 256/512 라운드 정리 + 다음라운드 복구 과생성 방지 -->
+<style id="v932RoundRepairNoOvercreateStyle">
+.v932-round-repair-note{display:inline-flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:8px 0 12px;padding:10px 12px;border:1.5px solid #f59e0b;background:linear-gradient(135deg,#fff7ed,#ffffff);border-radius:14px;color:#92400e;font-size:.78rem;font-weight:1000;line-height:1.5}.v932-round-repair-note .btn{min-height:34px!important;padding:6px 12px!important;font-size:.76rem!important;border-radius:10px!important}.v932-chip{display:inline-flex;align-items:center;justify-content:center;padding:3px 8px;border-radius:999px;background:#ffedd5;color:#c2410c;border:1px solid #fdba74;font-size:.68rem;font-weight:1000;white-space:nowrap}
+@media(max-width:680px){.v932-round-repair-note{align-items:stretch}.v932-round-repair-note>div:last-child{display:grid;grid-template-columns:1fr;gap:6px;width:100%}.v932-round-repair-note .btn{width:100%!important}}
+</style>
+<script id="v932RoundRepairNoOvercreateScript">
+(function(){
+  'use strict';
+  const V='v932';
+  const q=(id)=>document.getElementById(id);
+  function toastMsg(s,t){try{ if(typeof toast==='function') toast(s,t||'info'); else console.log('[v932]',s); }catch(e){console.log('[v932]',s)}}
+  function splitKey(k){try{ if(typeof _k2td==='function') return _k2td(k); }catch(e){} const i=String(k||'').lastIndexOf('_'); return {tid:String(k||'').slice(0,i),div:String(k||'').slice(i+1)};}
+  function resolveKey(){
+    try{ if(typeof window.v931ResolveBracketKey==='function'){ const k=window.v931ResolveBracketKey(); if(k) return k; } }catch(e){}
+    const tid=(q('brTS')&&q('brTS').value)||'';
+    let div=(q('brDS')&&q('brDS').value)||'';
+    if(div==='__ALL__'||div==='전체') div='';
+    if(!div){
+      try{ div=[...document.querySelectorAll('#brMultiDiv .dpill.active,#brMultiDiv [data-div].active')].map(el=>el.dataset?.div||el.getAttribute('data-div')||'').find(v=>v&&v!=='__ALL__'&&v!=='전체')||''; }catch(e){}
+    }
+    if(tid&&div) return tid+'_'+div;
+    try{
+      const keys=[...new Set([...
+        Object.keys((window.G&&G.matches)||{}),...Object.keys((window.G&&G.draws)||{}),...Object.keys((window.G&&G.teams)||{})
+      ])].filter(k=>splitKey(k).tid===tid && splitKey(k).div && splitKey(k).div!=='__ALL__' && splitKey(k).div!=='전체');
+      if(keys.length===1) return keys[0];
+      const main=keys.filter(k=>((G.matches&&G.matches[k])||[]).some(m=>m&&String(m.phase)==='main'));
+      if(main.length===1) return main[0];
+    }catch(e){}
+    return '';
+  }
+  function isBlank(v){
+    if(v===null||v===undefined) return true;
+    const s=String(v).trim();
+    return !s || s==='-' || s==='--' || /^TBD$/i.test(s) || /미정/.test(s) || /부전승/.test(s);
+  }
+  function isRealTeam(v){ return !isBlank(v) && !Number.isNaN(Number(v)); }
+  function mainList(key){ return ((window.G&&G.matches&&G.matches[key])||[]).filter(m=>m&&String(m.phase)==='main'&&!m.thirdPlace&&!m.bronze); }
+  function roundList(key,r){ return mainList(key).filter(m=>Number(m.round)===Number(r)).sort((a,b)=>(Number(a.slot)||0)-(Number(b.slot)||0)); }
+  function expectedMaxRound(key){
+    const mains=mainList(key);
+    const d=(window.G&&G.draws&&G.draws[key])||{};
+    let drawSize=Number(d.manualDrawSize||d.drawSize||d.mainDrawSize||d.bracketN||0);
+    if(!drawSize){
+      const r0=mains.filter(m=>Number(m.round)===0).length;
+      if(r0) drawSize=r0*2;
+    }
+    if(!drawSize){
+      const maxSlot=Math.max(-1,...mains.filter(m=>Number(m.round)===0).map(m=>Number(m.slot)||0));
+      if(maxSlot>=0) drawSize=(maxSlot+1)*2;
+    }
+    if(!drawSize) drawSize=128;
+    // 이 대회는 128드로 복기/수동본선이므로 round0 64경기면 최대 round6(결승)까지만 허용.
+    const pow=Math.ceil(Math.log2(Math.max(2,drawSize)));
+    return Math.max(0,pow-1);
+  }
+  function chooseBetter(a,b){
+    const score=(m)=>{
+      let s=0;
+      if(isRealTeam(m.t1)) s+=4; if(isRealTeam(m.t2)) s+=4; if(isRealTeam(m.winner)) s+=8;
+      if(m.completedAt||m.resultSavedAt) s+=4;
+      if(m.source && /v930|repair/.test(String(m.source))) s-=1;
+      if(m.id && /v930/.test(String(m.id))) s-=1;
+      return s;
+    };
+    return score(b)>score(a)?b:a;
+  }
+  function cleanupBogusRounds(key){
+    if(!key || !G?.matches?.[key]) return {removed:0,deduped:0,maxRound:0};
+    const maxR=expectedMaxRound(key);
+    const original=G.matches[key]||[];
+    let removed=0,deduped=0;
+    const nonMain=[]; const by={};
+    original.forEach(m=>{
+      if(!m || String(m.phase)!=='main' || m.thirdPlace || m.bronze){ nonMain.push(m); return; }
+      const r=Number(m.round);
+      if(!Number.isFinite(r) || r<0 || r>maxR){ removed++; return; }
+      const slot=Number.isFinite(Number(m.slot))?Number(m.slot):0;
+      const k=r+'|'+slot;
+      if(!by[k]) by[k]=m; else { by[k]=chooseBetter(by[k],m); deduped++; }
+    });
+    const mains=Object.values(by).sort((a,b)=>Number(a.round)-Number(b.round)||Number(a.slot)-Number(b.slot));
+    G.matches[key]=nonMain.concat(mains);
+    try{
+      const d=G.draws&&G.draws[key];
+      if(d){
+        d.manualDrawSize=d.manualDrawSize||((roundList(key,0).length||64)*2);
+        d.mainMode=d.mainMode||'manual';
+        d.mainLocked=true;
+        d.v932CleanedAt=new Date().toISOString();
+        delete d.v930Overcreated;
+      }
+    }catch(e){}
+    return {removed,deduped,maxRound:maxR};
+  }
+  function ensureRound(key,r,count){
+    const list=(G.matches[key]||(G.matches[key]=[]));
+    let made=0;
+    for(let i=0;i<count;i++){
+      let m=list.find(x=>x&&String(x.phase)==='main'&&Number(x.round)===Number(r)&&Number(x.slot)===i&&!x.thirdPlace&&!x.bronze);
+      if(!m){
+        list.push({id:`main_r${r}_${i}_v932`,phase:'main',round:r,slot:i,t1:null,t2:null,winner:null,rubbers:[],bye:false,court:'',courts:[],source:'v932_repair'});
+        made++;
+      }
+    }
+    return made;
+  }
+  function fillNextRounds(key, opts={}){
+    let changed=false, made=0, filled=0, byeFixed=0;
+    const maxR=expectedMaxRound(key);
+    for(let r=0;r<maxR;r++){
+      const src=roundList(key,r);
+      if(src.length<=1) break; // 핵심: 결승 이후 256/512 같은 가짜 다음 라운드를 만들지 않는다.
+      const targetCount=Math.ceil(src.length/2);
+      made += ensureRound(key,r+1,targetCount); if(made) changed=true;
+      const targets=roundList(key,r+1);
+      src.forEach((m,idx)=>{
+        const slot=Number.isFinite(Number(m.slot))?Number(m.slot):idx;
+        if((m.bye||isBlank(m.t2)) && isRealTeam(m.t1) && isBlank(m.winner)){
+          m.winner=Number(m.t1); m.sc1=m.sc1??1; m.sc2=m.sc2??0; m.scoreText=m.scoreText||'승패만'; m.completedAt=m.completedAt||new Date().toISOString(); m.resultSavedAt=m.resultSavedAt||m.completedAt; byeFixed++; changed=true;
+        }
+        if(isBlank(m.winner)) return;
+        const ti=Number(m.winner); if(Number.isNaN(ti)) return;
+        const target=targets.find(x=>Number(x.slot)===Math.floor(slot/2)); if(!target) return;
+        const side=(slot%2===0)?'t1':'t2';
+        const cur=target[side];
+        if(isBlank(cur)){
+          target[side]=ti; target.bye=false; target.source='v932_repair'; target.updatedAt=new Date().toISOString(); filled++; changed=true;
+        }
+        // 대상 매치 승자가 양쪽 팀과 맞지 않으면 이전 잘못된 winner는 초기화
+        if(!isBlank(target.winner) && String(target.winner)!==String(target.t1) && String(target.winner)!==String(target.t2)){
+          target.winner=null; delete target.completedAt; delete target.resultSavedAt; changed=true;
+        }
+      });
+    }
+    return {changed,made,filled,byeFixed,maxRound:maxR};
+  }
+  async function persist(key){
+    try{ if(typeof stM==='function') await stM(key); }catch(e){ console.warn('[v932] stM failed',e); }
+    try{ if(typeof stD==='function') await stD(key); }catch(e){ console.warn('[v932] stD failed',e); }
+  }
+  async function repair(key,opts={}){
+    key=key||resolveKey();
+    if(!key){ toastMsg('대회/부서 키를 찾지 못했습니다. 부서 칩을 한 번 선택한 뒤 다시 실행하세요.','error'); return false; }
+    const clean=cleanupBogusRounds(key);
+    const fill=fillNextRounds(key,opts);
+    const changed=clean.removed||clean.deduped||fill.changed;
+    if(changed){
+      await persist(key);
+      try{ if(typeof renderBracket==='function') renderBracket(); }catch(e){ console.warn('[v932] render failed',e); }
+      toastMsg(`가짜 라운드 정리 ${clean.removed}개, 중복정리 ${clean.deduped}개, 다음라운드 생성 ${fill.made}개, 채움 ${fill.filled}개, 부전승확정 ${fill.byeFixed}개 ✅`,'success');
+    }else{
+      toastMsg(`정리할 256/512 라운드나 빈 다음라운드가 없습니다. 최대 허용 round=${clean.maxRound}`,'info');
+    }
+    return !!changed;
+  }
+  window.v932CleanAndRepairMainRounds=repair;
+  // 기존 v930/v931 복구 버튼은 과생성 버그가 있으므로 같은 이름을 안전 함수로 대체한다.
+  window.v930RepairMainRoundCards=function(key,opts){ return repair(key,opts||{}); };
+  function installBar(){
+    try{
+      const old=q('v930RepairBar');
+      if(old){
+        old.className='v932-round-repair-note';
+        old.innerHTML=`<div><span class="v932-chip">v932 라운드정리</span> 잘못 생긴 256강/512강을 삭제하고, 128강 승자 기준으로 64강 이후 운영카드만 정상 복구합니다.</div><div><button type="button" class="btn btn-outline" onclick="v932CleanAndRepairMainRounds()">🧹 256/512 정리 + 다음라운드 복구</button></div>`;
+      }else{
+        const root=q('bracketExportBar')||document.querySelector('#page-bracket .sec-title')||q('bracketContent');
+        if(!root) return;
+        const bar=document.createElement('div'); bar.id='v932RoundRepairBar'; bar.className='v932-round-repair-note';
+        bar.innerHTML=`<div><span class="v932-chip">v932 라운드정리</span> 잘못 생긴 256강/512강을 삭제하고, 128강 승자 기준으로 64강 이후 운영카드만 정상 복구합니다.</div><div><button type="button" class="btn btn-outline" onclick="v932CleanAndRepairMainRounds()">🧹 256/512 정리 + 다음라운드 복구</button></div>`;
+        root.insertAdjacentElement('afterend',bar);
+      }
+      const b=q('bracketFreshnessBadge'); if(b){ b.textContent='v932 라운드정리'; b.style.minWidth='118px'; }
+    }catch(e){console.warn('[v932] install failed',e)}
+  }
+  // v930 자동 복구 예약이 호출되어도 안전 함수만 실행되므로 과생성은 막힌다.
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',installBar); else installBar();
+  setTimeout(installBar,800); setTimeout(installBar,2200);
+})();
+</script>
+
+
+
+<!-- v933: 128강 결과/수동기록 기준 64강 운영카드 빈칸 강제 채움 -->
+<style id="v933NextRoundFillStyle">
+.v933-next-round-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:8px 0 12px;padding:10px 12px;border:1.5px solid #2563eb;background:linear-gradient(135deg,#eff6ff,#ffffff);border-radius:14px;color:#1e3a8a;font-size:.78rem;font-weight:1000;line-height:1.5}.v933-next-round-bar .btn{min-height:34px!important;padding:6px 12px!important;font-size:.76rem!important;border-radius:10px!important}.v933-chip{display:inline-flex;align-items:center;justify-content:center;padding:3px 8px;border-radius:999px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;font-size:.68rem;font-weight:1000;white-space:nowrap}@media(max-width:680px){.v933-next-round-bar{align-items:stretch}.v933-next-round-bar>div:last-child{display:grid;grid-template-columns:1fr;gap:6px;width:100%}.v933-next-round-bar .btn{width:100%!important}}
+</style>
+<script id="v933NextRoundFillScript">
+(function(){
+  'use strict';
+  const V='v933';
+  const q=id=>document.getElementById(id);
+  const clean=s=>String(s??'').replace(/\s+/g,' ').trim();
+  const norm=s=>clean(s).toLowerCase().replace(/[\s\-_/\\.,()\[\]{}·ㆍ:：|]/g,'');
+  function toastMsg(s,t){try{ if(typeof toast==='function') toast(s,t||'info'); else console.log('[v933]',s); }catch(e){console.log('[v933]',s)}}
+  function splitKey(k){try{ if(typeof _k2td==='function') return _k2td(k); }catch(e){} const i=String(k||'').lastIndexOf('_'); return {tid:String(k||'').slice(0,i),div:String(k||'').slice(i+1)};}
+  function resolveKey(){
+    try{ if(typeof window.v931ResolveBracketKey==='function'){ const k=window.v931ResolveBracketKey(); if(k) return k; } }catch(e){}
+    const tid=(q('brTS')&&q('brTS').value)||''; let div=(q('brDS')&&q('brDS').value)||'';
+    if(div==='__ALL__'||div==='전체') div='';
+    if(!div){try{ div=[...document.querySelectorAll('#brMultiDiv .dpill.active,#brMultiDiv [data-div].active')].map(el=>el.dataset?.div||el.getAttribute('data-div')||'').find(v=>v&&v!=='__ALL__'&&v!=='전체')||'';}catch(e){}}
+    if(tid&&div) return tid+'_'+div;
+    try{ const keys=[...new Set([...Object.keys(G?.matches||{}),...Object.keys(G?.draws||{}),...Object.keys(G?.teams||{})])].filter(k=>splitKey(k).tid===tid && splitKey(k).div && splitKey(k).div!=='__ALL__' && splitKey(k).div!=='전체'); if(keys.length===1) return keys[0]; const main=keys.filter(k=>((G.matches&&G.matches[k])||[]).some(m=>m&&String(m.phase)==='main')); if(main.length===1) return main[0]; }catch(e){}
+    return '';
+  }
+  function isBlank(v){ if(v===null||v===undefined) return true; const s=clean(v); return !s||s==='-'||s==='--'||/^TBD$/i.test(s)||/미정/.test(s)||/부전승/.test(s); }
+  function isByeText(v){return /^(bye|by|부전승)$/i.test(clean(v));}
+  function mainList(key){return ((window.G&&G.matches&&G.matches[key])||[]).filter(m=>m&&String(m.phase)==='main'&&!m.thirdPlace&&!m.bronze).sort((a,b)=>Number(a.round)-Number(b.round)||Number(a.slot)-Number(b.slot));}
+  function roundList(key,r){return mainList(key).filter(m=>Number(m.round)===Number(r)).sort((a,b)=>(Number(a.slot)||0)-(Number(b.slot)||0));}
+  function teamLabel(key,idx){
+    try{ const t=(G.teams&&G.teams[key]||[])[Number(idx)]; if(!t) return ''; if(typeof getIndividualDisplayLine==='function'){const v=clean(getIndividualDisplayLine(t)); if(v&&v!=='?') return v;} if(typeof getIndividualNameOnlyDisplayLine==='function'){const v=clean(getIndividualNameOnlyDisplayLine(t)); if(v&&v!=='?') return v;} if(typeof tdn==='function'){const v=clean(tdn(t,key,Number(idx))); if(v&&v!=='?') return v;} const ps=(Array.isArray(t.individualPlayers)?t.individualPlayers:(t.players||[])).slice(0,2).map(p=>clean(p&&p.name?p.name:p)).filter(Boolean); return ps.length?ps.join(' / '):clean(t.entryLabel||t.pairLabel||t.club||t.name||('팀'+(Number(idx)+1))); }catch(e){return '';}
+  }
+  function teamSearchText(key,t,idx){
+    const arr=[teamLabel(key,idx),t?.club,t?.name,t?.entryLabel,t?.pairLabel,t?.phone,t?.ownerName,t?.ownerPhone];
+    try{(t?.individualPlayers||[]).forEach(p=>arr.push(p?.name,p?.club,p?.phone,p?.career));}catch(e){}
+    try{(t?.players||[]).forEach(p=>{ if(typeof p==='string') arr.push(p); else arr.push(p?.name,p?.club,p?.phone); });}catch(e){}
+    return arr.map(x=>String(x||'')).join(' ');
+  }
+  function resolveLabel(key,label){
+    const raw=clean(label); if(!raw||isByeText(raw)||/^(TBD|미정|-)$/.test(raw)) return {idx:null,label:'',found:false};
+    const teams=(G.teams&&G.teams[key]||[]).map((t,idx)=>({idx,t,label:teamLabel(key,idx),n: norm(teamLabel(key,idx)),s:norm(teamSearchText(key,t,idx))})).filter(x=>x.label && !x.t?.isWaitlist);
+    const n=norm(raw); if(!n) return {idx:null,label:raw,found:false};
+    let hit=teams.find(x=>x.n===n); if(!hit) hit=teams.find(x=>x.n.includes(n)||n.includes(x.n)); if(!hit) hit=teams.find(x=>x.s.includes(n));
+    if(hit) return {idx:hit.idx,label:hit.label,found:true};
+    return {idx:null,label:raw,found:false};
+  }
+  function getManualRounds(key){
+    try{ const d=G?.draws?.[key]||{}; if(d.manual128&&Array.isArray(d.manual128.rounds)) return d.manual128.rounds; if(typeof d.manual128Json==='string'&&d.manual128Json.trim()){ const p=JSON.parse(d.manual128Json); if(p&&Array.isArray(p.rounds)) return p.rounds; } if(d.v900Manual&&Array.isArray(d.v900Manual.rounds)) return d.v900Manual.rounds; if(d.manualMain&&Array.isArray(d.manualMain.rounds)) return d.manualMain.rounds; }catch(e){console.warn('[v933] manual rounds read failed',e)} return null;
+  }
+  function expectedMaxRound(key){ const r0=roundList(key,0).length||64; const drawSize=Math.max(2,r0*2); return Math.max(0,Math.ceil(Math.log2(drawSize))-1); }
+  function cleanupRoundsStrict(key){
+    if(!G?.matches?.[key]) return {removed:0,deduped:0}; const maxR=expectedMaxRound(key); const list=G.matches[key]||[]; const non=[]; const by={}; let removed=0,deduped=0;
+    list.forEach(m=>{ if(!m||String(m.phase)!=='main'||m.thirdPlace||m.bronze){non.push(m);return;} const r=Number(m.round); if(!Number.isFinite(r)||r<0||r>maxR){removed++;return;} const slot=Number.isFinite(Number(m.slot))?Number(m.slot):0; const k=r+'|'+slot; if(!by[k]) by[k]=m; else { const a=by[k],b=m; const score=x=>(x?.winner!=null?8:0)+(x?.t1!=null?4:0)+(x?.t2!=null?4:0)+(x?.completedAt?3:0)-(/repair|v930|v931|v932/.test(String(x?.source||''))?1:0); by[k]=score(b)>score(a)?b:a; deduped++; } });
+    G.matches[key]=non.concat(Object.values(by).sort((a,b)=>Number(a.round)-Number(b.round)||Number(a.slot)-Number(b.slot)));
+    return {removed,deduped};
+  }
+  function ensureRound(key,r,count){ const list=G.matches[key]||(G.matches[key]=[]); let made=0; for(let i=0;i<count;i++){ let m=list.find(x=>x&&String(x.phase)==='main'&&Number(x.round)===r&&Number(x.slot)===i&&!x.thirdPlace&&!x.bronze); if(!m){ m={id:`main_r${r}_${i}_v933`,phase:'main',round:r,slot:i,t1:null,t2:null,winner:null,rubbers:[],bye:false,court:'',courts:[],source:'v933_repair'}; list.push(m); made++; } } return made; }
+  function winnerFromMatch(key,m){
+    if(!m) return {idx:null,label:''};
+    if(m.winner!==null&&m.winner!==undefined&&!Number.isNaN(Number(m.winner))) return {idx:Number(m.winner),label:teamLabel(key,Number(m.winner))};
+    try{ if(typeof getMatchResultState==='function'){ const st=getMatchResultState(key,m); if(st&&st.done&&st.winner!==null&&st.winner!==undefined&&!Number.isNaN(Number(st.winner))) return {idx:Number(st.winner),label:teamLabel(key,Number(st.winner))}; } }catch(e){}
+    const sc1=Number(m.sc1??m.score1??m.disp1), sc2=Number(m.sc2??m.score2??m.disp2); if(Number.isFinite(sc1)&&Number.isFinite(sc2)&&sc1!==sc2){ const idx=sc1>sc2?m.t1:m.t2; if(idx!==null&&idx!==undefined&&!Number.isNaN(Number(idx))) return {idx:Number(idx),label:teamLabel(key,Number(idx))}; }
+    try{ if(Array.isArray(m.rubbers)&&m.rubbers.length){ let a=0,b=0; m.rubbers.forEach(r=>{ const w=r?.winner; if(w===0||w===1){ if(w===0)a++; else b++; } }); if(a!==b){ const idx=a>b?m.t1:m.t2; if(idx!==null&&idx!==undefined&&!Number.isNaN(Number(idx))) return {idx:Number(idx),label:teamLabel(key,Number(idx))}; } } }catch(e){}
+    if((m.bye||isBlank(m.t2)||isByeText(m.source2Label))&&m.t1!==null&&m.t1!==undefined&&!Number.isNaN(Number(m.t1))) return {idx:Number(m.t1),label:teamLabel(key,Number(m.t1))};
+    return {idx:null,label:''};
+  }
+  function setSide(target,sideKey,res,sourceLabel){
+    if(!target) return false; let changed=false; const lab=clean(sourceLabel||res?.label||'');
+    const sideNum=sideKey==='t1'?1:2; const sourceKey=sideNum===1?'source1Label':'source2Label';
+    if(res&&res.idx!==null&&res.idx!==undefined&&!Number.isNaN(Number(res.idx))){ if(String(target[sideKey])!==String(Number(res.idx))){ target[sideKey]=Number(res.idx); changed=true; } if(lab && clean(target[sourceKey])!==lab){ target[sourceKey]=lab; changed=true; } }
+    else if(lab&&!isByeText(lab)){ if(clean(target[sourceKey])!==lab){ target[sourceKey]=lab; changed=true; } }
+    if(target.bye){target.bye=false; changed=true;} return changed;
+  }
+  async function persist(key){ try{ if(window.__FB_WRITE_CACHE){ if(__FB_WRITE_CACHE.matches) delete __FB_WRITE_CACHE.matches[key]; if(__FB_WRITE_CACHE.draws) delete __FB_WRITE_CACHE.draws[key]; } }catch(e){} try{ if(typeof stM==='function') await stM(key); }catch(e){console.warn('[v933] stM failed',e)} try{ if(typeof stD==='function') await stD(key); }catch(e){console.warn('[v933] stD failed',e)} }
+  async function repair(key,opts={}){
+    key=key||resolveKey(); if(!key){toastMsg('대회/부서 키를 찾지 못했습니다. 부서 칩을 한 번 선택한 뒤 다시 실행하세요.','error');return false;}
+    const cleanRes=cleanupRoundsStrict(key); const manual=getManualRounds(key); const maxR=expectedMaxRound(key); let made=0,filled=0,winnerFixed=0,cleared=0;
+    for(let r=0;r<maxR;r++){
+      const src=roundList(key,r); if(src.length<=1) break; const targetCount=Math.ceil(src.length/2); made+=ensureRound(key,r+1,targetCount); const targets=roundList(key,r+1);
+      src.forEach((m,idx)=>{
+        const target=targets[Math.floor(idx/2)]; if(!target) return; const sideKey=(idx%2===0)?'t1':'t2'; const srcWin=winnerFromMatch(key,m);
+        let res=srcWin; let manualLabel='';
+        try{ manualLabel=clean(manual?.[r+1]?.[Math.floor(idx/2)*2+(idx%2)]||''); }catch(e){}
+        if((!res||res.idx==null) && manualLabel && !isByeText(manualLabel)){ res=resolveLabel(key,manualLabel); if(!res.label) res.label=manualLabel; }
+        if(res&&res.idx!=null){ if(m.winner==null){m.winner=Number(res.idx); m.sc1=m.sc1??(String(m.t1)===String(res.idx)?1:0); m.sc2=m.sc2??(String(m.t2)===String(res.idx)?1:0); m.scoreText=m.scoreText||'승패만'; m.completedAt=m.completedAt||new Date().toISOString(); m.resultSavedAt=m.resultSavedAt||m.completedAt; winnerFixed++; } }
+        const before=JSON.stringify([target[sideKey],target[sideKey==='t1'?'source1Label':'source2Label']]);
+        if(setSide(target,sideKey,res,manualLabel)){
+          const after=JSON.stringify([target[sideKey],target[sideKey==='t1'?'source1Label':'source2Label']]); if(before!==after) filled++;
+        }
+        if(target.winner!=null && String(target.winner)!==String(target.t1) && String(target.winner)!==String(target.t2)){ target.winner=null; delete target.completedAt; delete target.resultSavedAt; cleared++; }
+      });
+    }
+    try{ if(!G.draws) G.draws={}; if(!G.draws[key]) G.draws[key]={}; Object.assign(G.draws[key],{mainMode:'manual',mainManualLocked:true,manualMainOperational:true,v933RepairedAt:new Date().toISOString()}); }catch(e){}
+    const changed=cleanRes.removed||cleanRes.deduped||made||filled||winnerFixed||cleared;
+    if(changed){ await persist(key); try{ if(typeof renderBracket==='function') renderBracket(); }catch(e){} toastMsg(`64강/다음라운드 채움 완료 ✅ 생성 ${made}, 빈칸채움 ${filled}, 승자보정 ${winnerFixed}, 가짜라운드삭제 ${cleanRes.removed}`,'success'); }
+    else toastMsg('채울 빈칸이 없거나 128강 승자 정보를 찾지 못했습니다. 128강 결과 저장 상태를 확인하세요.','info');
+    return !!changed;
+  }
+  window.v933RepairNextRoundsFromResultState=repair;
+  window.v932CleanAndRepairMainRounds=function(key,opts){return repair(key,opts||{});};
+  window.v930RepairMainRoundCards=function(key,opts){return repair(key,opts||{});};
+  function install(){ try{ const old=q('v930RepairBar')||q('v932RoundRepairBar'); if(old){ old.className='v933-next-round-bar'; old.innerHTML=`<div><span class="v933-chip">v933 다음라운드 채움</span> 128강 결과/수동기록을 기준으로 64강 운영카드의 빈칸을 직접 채웁니다. 대진표 그림에만 보이고 본선 경기현황이 빈 경우 사용하세요.</div><div><button type="button" class="btn btn-outline" onclick="v933RepairNextRoundsFromResultState()">🧰 64강 빈칸 강제채움</button></div>`; } else { const root=q('bracketExportBar')||document.querySelector('#page-bracket .sec-title')||q('bracketContent'); if(root){ const bar=document.createElement('div'); bar.id='v933NextRoundBar'; bar.className='v933-next-round-bar'; bar.innerHTML=`<div><span class="v933-chip">v933 다음라운드 채움</span> 128강 결과/수동기록을 기준으로 64강 운영카드의 빈칸을 직접 채웁니다.</div><div><button type="button" class="btn btn-outline" onclick="v933RepairNextRoundsFromResultState()">🧰 64강 빈칸 강제채움</button></div>`; root.insertAdjacentElement('afterend',bar); } } const b=q('bracketFreshnessBadge'); if(b){ b.textContent='v933 카드채움'; b.style.minWidth='108px'; } }catch(e){console.warn('[v933] install failed',e)} }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',install); else install(); setTimeout(install,800); setTimeout(install,2200);
+})();
+</script>
+
+
+
+<!-- v934: 64강 빈칸 채움 버튼 강제 표시 + 수동기록/결과상태 기반 다음라운드 강제 복구 -->
+<style id="v934Round64RepairVisibleStyle">
+.v934-repair-bar{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:10px!important;flex-wrap:wrap!important;margin:10px 0 12px!important;padding:11px 13px!important;border:2px solid #1d4ed8!important;background:linear-gradient(135deg,#eff6ff,#ffffff)!important;border-radius:14px!important;color:#1e3a8a!important;font-size:.79rem!important;font-weight:1000!important;line-height:1.55!important;box-shadow:0 6px 16px rgba(29,78,216,.08)!important}
+.v934-repair-chip{display:inline-flex!important;align-items:center!important;justify-content:center!important;padding:3px 8px!important;border-radius:999px!important;background:#dbeafe!important;color:#1d4ed8!important;border:1px solid #93c5fd!important;font-size:.68rem!important;font-weight:1000!important;white-space:nowrap!important;margin-right:6px!important}
+.v934-repair-btn{display:inline-flex!important;align-items:center!important;justify-content:center!important;min-height:36px!important;padding:7px 13px!important;border-radius:10px!important;border:1.5px solid #1d4ed8!important;background:#1d4ed8!important;color:#fff!important;font-size:.76rem!important;font-weight:1000!important;cursor:pointer!important;white-space:nowrap!important;box-shadow:0 3px 10px rgba(29,78,216,.18)!important}
+.v934-repair-btn:hover{background:#1e40af!important;border-color:#1e40af!important}
+.v934-repair-btn.secondary{background:#fff!important;color:#1d4ed8!important}
+#v934FloatingRepairBtn{position:fixed;right:14px;bottom:calc(94px + env(safe-area-inset-bottom,0px));z-index:2147482600;display:none;min-height:38px;padding:8px 13px;border-radius:999px;border:2px solid #1d4ed8;background:#1d4ed8;color:#fff;font-size:.76rem;font-weight:1000;box-shadow:0 12px 28px rgba(29,78,216,.28);cursor:pointer}
+body.bracket-page #v934FloatingRepairBtn,#page-bracket.active ~ #v934FloatingRepairBtn{display:inline-flex}
+@media(max-width:680px){.v934-repair-bar{align-items:stretch!important}.v934-repair-bar>div:last-child{display:grid!important;grid-template-columns:1fr!important;gap:6px!important;width:100%!important}.v934-repair-btn{width:100%!important}#v934FloatingRepairBtn{right:10px;left:10px;justify-content:center}}
+</style>
+<script id="v934Round64RepairVisibleScript">
+(function(){
+  'use strict';
+  const TAG='[v934-round64-repair]';
+  function q(id){return document.getElementById(id);} 
+  function clean(s){return String(s??'').replace(/\s+/g,' ').trim();}
+  function norm(s){return clean(s).toLowerCase().replace(/[\s\u00a0\/\\|()\[\]{}<>·ㆍ.,:;~`'"\-–—_+*=!?@#$%^&]/g,'');}
+  function arr(x){return Array.isArray(x)?x:[];}
+  function toastMsg(s,t){try{ if(typeof toast==='function') toast(s,t||'info'); else alert(s); }catch(e){ console.log(TAG,s); }}
+  function esc(s){return String(s??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
+  function isByeText(v){return /^(부전승|bye|BYE|자동\s*진출)$/i.test(clean(v));}
+  function isBlankVal(v){return v===null||v===undefined||v===''||v<0||Number.isNaN(Number(v));}
+  function keyInfo(key){const p=String(key||'').split('_');return {tid:p[0]||'',div:p.slice(1).join('_')||''};}
+  function selectedTid(){return clean((q('brTS')&&q('brTS').value)||'');}
+  function resolveKey(){
+    try{
+      const tid=selectedTid();
+      let div='';
+      const ds=q('brDS');
+      if(ds&&ds.value&&ds.value!=='__ALL__') div=ds.value;
+      if(!div && Array.isArray(window.BR_MULTI_DIVS) && window.BR_MULTI_DIVS.length && !window.BR_MULTI_DIVS.includes('__ALL__')) div=window.BR_MULTI_DIVS[0];
+      if(!div){ const checked=document.querySelector('#brMultiDiv input[type="checkbox"]:checked'); if(checked) div=checked.value; }
+      const t=arr(window.G&&G.tournaments).find(x=>String(x.id)===String(tid));
+      if(!div && t && arr(t.divisions).length===1) div=t.divisions[0];
+      if(tid&&div) return tid+'_'+div;
+      if(tid){
+        const keys=Object.keys((G&&G.matches)||{}).concat(Object.keys((G&&G.draws)||{}),Object.keys((G&&G.teams)||{})).filter(k=>String(k).startsWith(tid+'_'));
+        const uniq=[...new Set(keys)];
+        if(uniq.length===1) return uniq[0];
+        const indiv=uniq.find(k=>/지역신인부|신인부|본선|개인/.test(k)); if(indiv) return indiv;
+        if(uniq.length) return uniq[0];
+      }
+    }catch(e){console.warn(TAG,'resolveKey failed',e)}
+    return '';
+  }
+  function teamLabel(key,idx){
+    try{
+      if(isBlankVal(idx)) return '';
+      const t=arr(G&&G.teams&&G.teams[key])[Number(idx)];
+      if(!t) return '';
+      if(typeof getIndividualNameOnlyDisplayLine==='function'){ const v=clean(getIndividualNameOnlyDisplayLine(t)); if(v&&v!=='?') return v; }
+      if(typeof tdn==='function'){ const v=clean(tdn(t,key,Number(idx))); if(v&&v!=='?') return v; }
+      const ps=[];
+      arr(t.individualPlayers).slice(0,2).forEach(p=>{ if(p&&p.name) ps.push(clean(p.name)+(p.clubsRaw?'('+clean(p.clubsRaw)+')':'')); });
+      if(!ps.length) arr(t.players).slice(0,2).forEach(p=>{ if(typeof p==='string') ps.push(clean(p)); else if(p&&p.name) ps.push(clean(p.name)+(p.club?'('+clean(p.club)+')':'')); });
+      return clean(t.entryLabel||t.pairLabel||ps.join(' / ')||t.club||t.name||('팀'+(Number(idx)+1)));
+    }catch(e){return '';}
+  }
+  function buildTeamIndex(key){
+    const list=arr(G&&G.teams&&G.teams[key]).map((t,idx)=>{
+      const label=teamLabel(key,idx); const toks=[label,t?.club,t?.name,t?.entryLabel,t?.pairLabel,t?.phone,t?.ownerName,t?.ownerPhone];
+      arr(t?.individualPlayers).forEach(p=>{toks.push(p?.name,p?.club,p?.clubsRaw,p?.phone);arr(p?.clubs).forEach(c=>toks.push(c));});
+      arr(t?.players).forEach(p=>{ if(typeof p==='string') toks.push(p); else toks.push(p?.name,p?.club,p?.clubsRaw,p?.phone); });
+      return {idx,label,n: norm(label),s:norm(toks.filter(Boolean).join(' '))};
+    }).filter(x=>x.label);
+    return list;
+  }
+  function resolveLabel(key,label){
+    const raw=clean(label); if(!raw||isByeText(raw)||/^(TBD|미정|-|자동\s*진출)$/i.test(raw)) return {idx:null,label:'',found:false};
+    const n=norm(raw); if(!n) return {idx:null,label:raw,found:false};
+    const teams=buildTeamIndex(key);
+    let hit=teams.find(x=>x.n===n);
+    if(!hit) hit=teams.find(x=>x.n.includes(n)||n.includes(x.n));
+    if(!hit) hit=teams.find(x=>x.s.includes(n));
+    // 이름 두 명만으로도 찾기
+    if(!hit){
+      const parts=raw.split('/').map(x=>norm(x.replace(/\([^)]*\)/g,''))).filter(Boolean);
+      if(parts.length) hit=teams.find(x=>parts.every(p=>x.s.includes(p)||x.n.includes(p)));
+    }
+    return hit?{idx:hit.idx,label:hit.label,found:true}:{idx:null,label:raw,found:false};
+  }
+  function roundList(key,r){return arr(G&&G.matches&&G.matches[key]).filter(m=>m&&String(m.phase)==='main'&&!m.thirdPlace&&!m.bronze&&Number(m.round)===Number(r)).sort((a,b)=>Number(a.slot||0)-Number(b.slot||0));}
+  function getManualRounds(key){
+    try{
+      const d=G?.draws?.[key]||{};
+      if(d.manual128&&Array.isArray(d.manual128.rounds)) return d.manual128.rounds;
+      if(typeof d.manual128Json==='string'&&d.manual128Json.trim()){ const p=JSON.parse(d.manual128Json); if(p&&Array.isArray(p.rounds)) return p.rounds; }
+      if(d.v900Manual&&Array.isArray(d.v900Manual.rounds)) return d.v900Manual.rounds;
+      if(d.manualMain&&Array.isArray(d.manualMain.rounds)) return d.manualMain.rounds;
+    }catch(e){console.warn(TAG,'manual rounds read failed',e)}
+    return null;
+  }
+  function maxRoundForKey(key){
+    const r0=roundList(key,0).length;
+    const first=(r0>=64?64:r0>=32?32:r0>=16?16:r0>=8?8:r0>=4?4:Math.max(1,r0));
+    return Math.max(0,Math.ceil(Math.log2(first)));
+  }
+  function cleanupOverRounds(key){
+    if(!G?.matches?.[key]) return {removed:0,deduped:0};
+    const maxR=maxRoundForKey(key); const non=[]; const map={}; let removed=0,deduped=0;
+    arr(G.matches[key]).forEach(m=>{
+      if(!m||String(m.phase)!=='main'||m.thirdPlace||m.bronze){non.push(m);return;}
+      const r=Number(m.round), slot=Number(m.slot)||0;
+      if(!Number.isFinite(r)||r<0||r>maxR){removed++;return;}
+      const k=r+'|'+slot;
+      if(!map[k]) map[k]=m;
+      else{
+        const score=x=>(!isBlankVal(x?.t1)?8:0)+(!isBlankVal(x?.t2)?8:0)+(!isBlankVal(x?.winner)?8:0)+(x?.completedAt?4:0)-(/v930|v931|v932|repair/.test(String(x?.source||''))?1:0);
+        if(score(m)>score(map[k])) map[k]=m; deduped++;
+      }
+    });
+    G.matches[key]=non.concat(Object.values(map).sort((a,b)=>Number(a.round)-Number(b.round)||Number(a.slot)-Number(b.slot)));
+    return {removed,deduped};
+  }
+  function ensureRound(key,r,count){
+    if(!G.matches) G.matches={}; if(!G.matches[key]) G.matches[key]=[];
+    const list=G.matches[key]; let made=0;
+    for(let i=0;i<count;i++){
+      let m=list.find(x=>x&&String(x.phase)==='main'&&Number(x.round)===Number(r)&&Number(x.slot)===i&&!x.thirdPlace&&!x.bronze);
+      if(!m){ m={id:`main_r${r}_${i}_v934`,phase:'main',round:r,slot:i,t1:null,t2:null,winner:null,rubbers:[],bye:false,court:'',courts:[],source:'v934_repair'}; list.push(m); made++; }
+    }
+    return made;
+  }
+  function getResultStateWinner(key,m){
+    try{ if(typeof getMatchResultState==='function'){ const st=getMatchResultState(key,m); if(st&&st.done){ if(!isBlankVal(st.winner)) return Number(st.winner); if(st.winnerSide===1||st.side===1) return m.t1; if(st.winnerSide===2||st.side===2) return m.t2; } } }catch(e){}
+    return null;
+  }
+  function winnerFromMatch(key,m,manualLabel){
+    if(!m) return {idx:null,label:''};
+    if(!isBlankVal(m.winner)) return {idx:Number(m.winner),label:teamLabel(key,Number(m.winner))};
+    const rs=getResultStateWinner(key,m); if(!isBlankVal(rs)) return {idx:Number(rs),label:teamLabel(key,Number(rs))};
+    const textWinner=clean(m.winnerLabel||m.resultWinnerLabel||m.winLabel||m.manualWinnerLabel||'');
+    if(textWinner){ const r=resolveLabel(key,textWinner); if(r.label) return r; }
+    const sc1=Number(m.sc1??m.score1??m.disp1), sc2=Number(m.sc2??m.score2??m.disp2);
+    if(Number.isFinite(sc1)&&Number.isFinite(sc2)&&sc1!==sc2){ const idx=sc1>sc2?m.t1:m.t2; if(!isBlankVal(idx)) return {idx:Number(idx),label:teamLabel(key,Number(idx))}; }
+    try{ if(Array.isArray(m.rubbers)&&m.rubbers.length){ let a=0,b=0; m.rubbers.forEach(r=>{ const w=r?.winner; if(w===0||w===1){ if(w===0)a++; else b++; } }); if(a!==b){ const idx=a>b?m.t1:m.t2; if(!isBlankVal(idx)) return {idx:Number(idx),label:teamLabel(key,Number(idx))}; } } }catch(e){}
+    if((m.bye||isBlankVal(m.t2)||isByeText(m.source2Label))&&!isBlankVal(m.t1)) return {idx:Number(m.t1),label:teamLabel(key,Number(m.t1))};
+    if(manualLabel&&!isByeText(manualLabel)){ const r=resolveLabel(key,manualLabel); if(r.label) return r; }
+    return {idx:null,label:''};
+  }
+  function setTargetSide(key,target,side,res,label){
+    if(!target) return 0;
+    const sideKey=side===1?'t1':'t2', srcKey=side===1?'source1Label':'source2Label';
+    const old=JSON.stringify([target[sideKey],target[srcKey],target['label'+side],target['display'+side]]); const lab=clean((res&&res.label)||label||'');
+    if(res&&!isBlankVal(res.idx)){ target[sideKey]=Number(res.idx); target[srcKey]=teamLabel(key,Number(res.idx))||lab; }
+    else if(lab&&!isByeText(lab)){ target[srcKey]=lab; target['label'+side]=lab; target['display'+side]=lab; }
+    target.bye=false; delete target.skip; delete target.hidden;
+    const now=JSON.stringify([target[sideKey],target[srcKey],target['label'+side],target['display'+side]]);
+    return old!==now?1:0;
+  }
+  async function persist(key){
+    try{ if(window.__FB_WRITE_CACHE){ if(__FB_WRITE_CACHE.matches) delete __FB_WRITE_CACHE.matches[key]; if(__FB_WRITE_CACHE.draws) delete __FB_WRITE_CACHE.draws[key]; } }catch(e){}
+    try{ if(typeof stM==='function') await stM(key); }catch(e){console.warn(TAG,'stM failed',e)}
+    try{ if(typeof stD==='function') await stD(key); }catch(e){console.warn(TAG,'stD failed',e)}
+  }
+  async function repair(key,opts={}){
+    key=key||resolveKey();
+    if(!key){ toastMsg('대회/부서 키를 찾지 못했습니다. 대회와 부서를 한 번 선택한 뒤 다시 누르세요.','error'); return false; }
+    const manual=getManualRounds(key); const cleanRes=cleanupOverRounds(key); const maxR=maxRoundForKey(key); let made=0,filled=0,wfix=0,cleared=0;
+    for(let r=0;r<maxR;r++){
+      const src=roundList(key,r); if(src.length<=1) break;
+      const targetCount=Math.ceil(src.length/2); made+=ensureRound(key,r+1,targetCount); const targets=roundList(key,r+1);
+      for(let i=0;i<src.length;i++){
+        const parent=src[i], target=targets[Math.floor(i/2)], side=(i%2)+1;
+        const manualLabel=clean(manual?.[r+1]?.[i]||'');
+        const res=winnerFromMatch(key,parent,manualLabel);
+        if(res&&res.idx!=null&&parent.winner==null){ parent.winner=Number(res.idx); parent.scoreText=parent.scoreText||'승패만'; parent.completedAt=parent.completedAt||new Date().toISOString(); parent.resultSavedAt=parent.resultSavedAt||parent.completedAt; wfix++; }
+        filled+=setTargetSide(key,target,side,res,manualLabel);
+        if(target&&target.winner!=null&&String(target.winner)!==String(target.t1)&&String(target.winner)!==String(target.t2)){ target.winner=null; delete target.completedAt; delete target.resultSavedAt; cleared++; }
+      }
+    }
+    try{ if(!G.draws) G.draws={}; if(!G.draws[key]) G.draws[key]={}; Object.assign(G.draws[key],{mainMode:'manual',mainManualLocked:true,manualMainOperational:true,v934RepairedAt:new Date().toISOString()}); }catch(e){}
+    const changed=cleanRes.removed||cleanRes.deduped||made||filled||wfix||cleared;
+    await persist(key);
+    try{ if(typeof renderBracket==='function') renderBracket(); }catch(e){}
+    toastMsg(`64강/다음라운드 강제채움 완료 ✅ 생성 ${made}, 빈칸채움 ${filled}, 승자보정 ${wfix}, 가짜라운드삭제 ${cleanRes.removed}`,'success');
+    setTimeout(()=>install(),350);
+    return !!changed;
+  }
+  function install(){
+    try{
+      let bar=q('v934RepairBar');
+      const anchor=q('bracketExportBar')||document.querySelector('#page-bracket .sec-title')||q('bracketContent');
+      if(anchor&&!bar){
+        bar=document.createElement('div'); bar.id='v934RepairBar'; bar.className='v934-repair-bar';
+        bar.innerHTML=`<div><span class="v934-repair-chip">v934 64강 강제복구</span> 128강 결과/수동기록을 기준으로 64강 운영카드 빈칸을 강제로 채웁니다. 버튼이 안 보이던 문제도 고정했습니다.</div><div><button type="button" class="v934-repair-btn" onclick="v934ForceFillNextRounds()">🧰 64강 빈칸 강제채움</button><button type="button" class="v934-repair-btn secondary" onclick="v934ShowRoundStatus()">🩺 상태</button></div>`;
+        anchor.insertAdjacentElement('afterend',bar);
+      }
+      // 기존 버튼이 있으면 v934로 교체
+      ['v930RepairBar','v932RoundRepairBar','v933NextRoundBar'].forEach(id=>{ const old=q(id); if(old&&old!==bar) old.style.display='none'; });
+      let f=q('v934FloatingRepairBtn');
+      if(!f){ f=document.createElement('button'); f.id='v934FloatingRepairBtn'; f.textContent='🧰 64강 채움'; f.onclick=function(){repair();}; document.body.appendChild(f); }
+      const b=q('bracketFreshnessBadge'); if(b){ b.textContent='v934 64강복구'; b.style.minWidth='112px'; }
+    }catch(e){console.warn(TAG,'install failed',e)}
+  }
+  function showStatus(){
+    const key=resolveKey(); if(!key){toastMsg('키 없음','error');return;}
+    const lines=[]; const maxR=maxRoundForKey(key); const manual=getManualRounds(key);
+    lines.push('key: '+key); lines.push('maxRound: '+maxR); lines.push('manual128: '+(manual?'있음':'없음'));
+    for(let r=0;r<=maxR;r++){ const ms=roundList(key,r); const filled=ms.filter(m=>!isBlankVal(m.t1)||!isBlankVal(m.t2)||clean(m.source1Label)||clean(m.source2Label)).length; const done=ms.filter(m=>!isBlankVal(m.winner)||m.completedAt).length; lines.push(`round ${r}: matches ${ms.length}, filled ${filled}, done ${done}`); }
+    alert(lines.join('\n'));
+  }
+  window.v934ForceFillNextRounds=repair;
+  window.v934ShowRoundStatus=showStatus;
+  window.v933RepairNextRoundsFromResultState=function(key,opts){return repair(key,opts||{});};
+  window.v932CleanAndRepairMainRounds=function(key,opts){return repair(key,opts||{});};
+  window.v930RepairMainRoundCards=function(key,opts){return repair(key,opts||{});};
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',install); else install();
+  [600,1600,3200,5200].forEach(t=>setTimeout(install,t));
+  console.log(TAG,'installed');
+})();
+</script>
+
+
+
+<!-- v935: quick-win button restore - final hard guard -->
+<style id="v935QuickWinRestoreStyle">
+#v935QuickWinBox{
+  display:block!important;margin:0 0 12px 0!important;padding:13px!important;border-radius:15px!important;
+  background:linear-gradient(135deg,#fff7ed,#fff1c4)!important;border:2px solid #f59e0b!important;
+  box-shadow:0 8px 18px rgba(245,158,11,.14)!important;position:relative!important;z-index:2147483000!important;
+  pointer-events:auto!important;visibility:visible!important;opacity:1!important;height:auto!important;overflow:visible!important;
+}
+#v935QuickWinBox .v935-title{font-size:.9rem!important;font-weight:1000!important;color:#92400e!important;line-height:1.45!important;margin-bottom:8px!important;}
+#v935QuickWinBox .v935-actions{display:grid!important;grid-template-columns:1fr 1fr!important;gap:8px!important;}
+#v935QuickWinBox .v935-btn{width:100%!important;min-height:46px!important;border-radius:12px!important;border:0!important;cursor:pointer!important;font-size:.86rem!important;font-weight:1000!important;color:#fff!important;background:linear-gradient(135deg,#0f1e3a,#1d4ed8)!important;padding:8px 10px!important;line-height:1.25!important;box-shadow:none!important;pointer-events:auto!important;touch-action:manipulation!important;-webkit-tap-highlight-color:transparent!important;}
+#v935QuickWinBox .v935-btn:nth-child(2){background:linear-gradient(135deg,#92400e,#d97706)!important;}
+#v935QuickWinBox .v935-note{margin-top:8px!important;font-size:.72rem!important;font-weight:800!important;color:#7c2d12!important;line-height:1.55!important;}
+#v908AdminQuickWinBox,#v913QuickWinBox,#v915QuickWinBox,#v916QuickWinBox,#v917QuickWinBox,#v922QuickWinBox{display:none!important;visibility:hidden!important;height:0!important;overflow:hidden!important;margin:0!important;padding:0!important;border:0!important;}
+@media(max-width:680px){#v935QuickWinBox{padding:10px!important;border-radius:12px!important}#v935QuickWinBox .v935-actions{gap:6px!important}#v935QuickWinBox .v935-btn{min-height:42px!important;font-size:.78rem!important;padding:7px 6px!important}#v935QuickWinBox .v935-note{font-size:.68rem!important}}
+</style>
+<script id="v935QuickWinRestoreScript">
+(function(){
+  'use strict';
+  if(window.__v935QuickWinRestoreInstalled) return;
+  window.__v935QuickWinRestoreInstalled=true;
+  const TAG='[v935-quickwin-restore]';
+  const $=id=>document.getElementById(id);
+  const cl=v=>String(v==null?'':v).replace(/\s+/g,' ').trim();
+  const norm=v=>cl(v).replace(/[\s\(\)\[\]\{\}·ㆍ,\/\\_-]+/g,'').toLowerCase();
+  const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const now=()=>new Date().toISOString();
+  function toastMsg(msg,type){try{ if(typeof window.toast==='function') window.toast(msg,type||'info'); else if(type==='error') alert(msg); else console.log(msg); }catch(e){}}
+  function bodyHas(c){try{return document.body&&document.body.classList.contains(c);}catch(e){return false;}}
+  function canStaff(){
+    try{ if(window.AD===true||window.TM===true||window.OP===true) return true; }catch(e){}
+    try{ if(typeof AD!=='undefined'&&AD) return true; }catch(e){}
+    try{ if(typeof TM!=='undefined'&&TM) return true; }catch(e){}
+    try{ if(typeof OP!=='undefined'&&OP) return true; }catch(e){}
+    try{ if(bodyHas('admin-mode')||bodyHas('tm-mode')||bodyHas('operator-mode')||bodyHas('v908-staff-view')) return true; }catch(e){}
+    try{ if(typeof window.canManageBracket==='function' && window.canManageBracket()) return true; }catch(e){}
+    return false;
+  }
+  function unstick(){
+    try{ if(typeof window.sl==='function') window.sl(false); }catch(e){}
+    try{ if(typeof sl==='function') sl(false); }catch(e){}
+    try{ window.__m3Saving=false; }catch(e){}
+    try{ if(typeof __m3Saving!=='undefined') __m3Saving=false; }catch(e){}
+    ['mM3SaveResultBtn','mM3SaveBtn','mM3SubmitBtn','mM3SubmitHomeBtn','mM3SubmitAwayBtn','mM3SubmitOperatorHomeBtn','mM3SubmitOperatorAwayBtn'].forEach(id=>{try{const b=$(id); if(b){b.disabled=false;b.style.pointerEvents='';b.style.opacity=''; if(id==='mM3SaveResultBtn'&&/저장\s*중|처리\s*중/.test(b.textContent||'')) b.textContent='💾 결과저장';}}catch(e){}});
+  }
+  function teamObj(key,idx){try{return (window.G&&G.teams&&G.teams[key]||[])[Number(idx)];}catch(e){return null;}}
+  function teamName(key,idx){
+    try{
+      const t=teamObj(key,idx); if(!t) return '-';
+      if(typeof window.tdn==='function') return cl(window.tdn(t,key,Number(idx)))||'-';
+      if(Array.isArray(t.individualPlayers)) return t.individualPlayers.slice(0,2).map(p=>cl(p&&p.name||p)).filter(Boolean).join(' / ')||'-';
+      if(Array.isArray(t.players)) return t.players.slice(0,2).map(cl).filter(Boolean).join(' / ')||'-';
+      return cl(t.club||t.name||t.teamName||'-')||'-';
+    }catch(e){return '-';}
+  }
+  function labelFor(key,m,side){
+    if(!m) return '-';
+    if(side===1){ if(m.t1!=null) return teamName(key,m.t1); return cl(m.label1||m.name1||m.team1||'-')||'-'; }
+    if(m.t2!=null) return teamName(key,m.t2); return cl(m.label2||m.name2||m.team2||(m.bye?'부전승':'-'))||'-';
+  }
+  function lookupCtx(key,mid){
+    try{
+      key=cl(key); mid=cl(mid);
+      if(!key||!mid||!window.G||!G.matches||!Array.isArray(G.matches[key])) return null;
+      const list=G.matches[key];
+      const idx=list.findIndex(m=>m&&(String(m.id)===String(mid)||String(m._id||'')===String(mid)));
+      if(idx>=0) return {key,mid:String(list[idx].id||mid),list,idx,m:list[idx]};
+    }catch(e){}
+    return null;
+  }
+  function lookupFromGlobals(){
+    let key='',mid='';
+    try{key=window.CM_key||'';mid=window.CM_id||'';}catch(e){}
+    try{if((!key||!mid)&&typeof CM_key!=='undefined'&&typeof CM_id!=='undefined'){key=key||CM_key;mid=mid||CM_id;}}catch(e){}
+    try{if((!key||!mid)&&window._m3Ctx){key=key||window._m3Ctx.key;mid=mid||window._m3Ctx.mid;}}catch(e){}
+    try{if((!key||!mid)&&window.__v935M3Context){key=key||window.__v935M3Context.key;mid=mid||window.__v935M3Context.mid;}}catch(e){}
+    try{if((!key||!mid)&&window.__v922M3Context){key=key||window.__v922M3Context.key;mid=mid||window.__v922M3Context.mid;}}catch(e){}
+    try{if((!key||!mid)&&window.__v917M3Context){key=key||window.__v917M3Context.key;mid=mid||window.__v917M3Context.mid;}}catch(e){}
+    return lookupCtx(key,mid);
+  }
+  function lookupFromTitle(){
+    try{
+      const title=cl(($('mM3T')||{}).textContent||'');
+      if(!title||!window.G||!G.matches) return null;
+      const parts=title.replace(/^.*?⚡\s*/,'').replace(/\s*[—-].*$/,'').split(/\s+vs\s+/i);
+      if(parts.length<2) return null;
+      const a=norm(parts[0]), b=norm(parts[1]); if(!a||!b) return null;
+      for(const key of Object.keys(G.matches||{})){
+        const list=G.matches[key]||[];
+        for(let idx=0;idx<list.length;idx++){
+          const m=list[idx]; if(!m||m.t1==null||m.t2==null) continue;
+          const n1=norm(labelFor(key,m,1)), n2=norm(labelFor(key,m,2));
+          if((a.includes(n1.slice(0,Math.min(6,n1.length)))&&b.includes(n2.slice(0,Math.min(6,n2.length))))||(n1&&n2&&n1.includes(a)&&n2.includes(b))){return {key,mid:String(m.id||''),list,idx,m};}
+        }
+      }
+    }catch(e){}
+    return null;
+  }
+  function currentCtx(){
+    return lookupFromGlobals() || (function(){try{const box=$('v935QuickWinBox'); return box&&lookupCtx(box.dataset.key,box.dataset.mid);}catch(e){return null;}})() || lookupFromTitle();
+  }
+  function quickable(ctx){return !!(canStaff()&&ctx&&ctx.m&&!ctx.m.bye&&ctx.m.t1!=null&&ctx.m.t2!=null);}
+  function removeOld(){try{document.querySelectorAll('#v908AdminQuickWinBox,#v913QuickWinBox,#v915QuickWinBox,#v916QuickWinBox,#v917QuickWinBox,#v922QuickWinBox').forEach(el=>{try{el.remove();}catch(_){el.style.display='none';}});}catch(e){}}
+  function isModalOpen(){try{const m=$('mM3'); return !!(m&&(m.classList.contains('open')||getComputedStyle(m).display!=='none'));}catch(e){return false;}}
+  function installBox(){
+    try{
+      removeOld(); unstick();
+      const body=$('mM3B'); let box=$('v935QuickWinBox');
+      if(!isModalOpen()||!body){if(box) box.remove(); return;}
+      const ctx=currentCtx();
+      if(!quickable(ctx)){if(box) box.remove(); return;}
+      window.__v935M3Context={key:ctx.key,mid:String(ctx.m.id||ctx.mid||''),at:Date.now()};
+      if(!box){box=document.createElement('div');box.id='v935QuickWinBox';}
+      box.dataset.key=ctx.key; box.dataset.mid=String(ctx.m.id||ctx.mid||'');
+      const n1=labelFor(ctx.key,ctx.m,1), n2=labelFor(ctx.key,ctx.m,2);
+      box.innerHTML='<div class="v935-title">⚡ 진행자/관리자 전용: 스코어 없이 승패만 바로 저장</div><div class="v935-actions"><button type="button" class="v935-btn" data-side="1" data-key="'+esc(ctx.key)+'" data-mid="'+esc(String(ctx.m.id||ctx.mid||''))+'">🏆 '+esc(n1)+' 승</button><button type="button" class="v935-btn" data-side="2" data-key="'+esc(ctx.key)+'" data-mid="'+esc(String(ctx.m.id||ctx.mid||''))+'">🏆 '+esc(n2)+' 승</button></div><div class="v935-note">점수 입력 없이 바로 승자를 확정합니다. 화면은 즉시 닫고 저장은 백그라운드로 처리합니다.</div>';
+      if(body.firstChild!==box) body.insertBefore(box,body.firstChild);
+    }catch(e){console.warn(TAG,'installBox failed',e);}
+  }
+  function setManualRoundWinner(key,m,winnerIdx){
+    try{
+      const d=G.draws&&G.draws[key]; if(!d) return;
+      const round=Number(m.round||0), slot=Number(m.slot||0), ni=Math.floor(slot/2), label=teamName(key,winnerIdx);
+      ['v900Manual','manualMain'].forEach(prop=>{try{if(d[prop]&&Array.isArray(d[prop].rounds)){d[prop].rounds[round+1]=d[prop].rounds[round+1]||[];d[prop].rounds[round+1][ni]=label;}}catch(e){}});
+      d.updatedAt=now(); d.resultUpdatedAt=now();
+    }catch(e){}
+  }
+  function advanceMain(key,m,winnerIdx){
+    try{
+      const phase=String(m.phase||''); if(!/^(main|playin|bronze|final)$/i.test(phase)) return false;
+      const round=Number(m.round||0), slot=Number(m.slot||0), nslot=Math.floor(slot/2);
+      const list=G.matches[key]||[];
+      let next=list.find(x=>x&&String(x.phase||'main')==='main'&&Number(x.round||0)===round+1&&Number(x.slot||0)===nslot);
+      if(!next) return false;
+      if(slot%2===0) next.t1=Number(winnerIdx); else next.t2=Number(winnerIdx);
+      delete next.bye; next.updatedByQuickWin=true; next.updatedByQuickWinAt=now();
+      setManualRoundWinner(key,m,winnerIdx);
+      return true;
+    }catch(e){return false;}
+  }
+  function markWin(ctx,side){
+    const s=Number(side)===2?2:1, m=ctx.m, w=s===1?Number(m.t1):Number(m.t2), l=s===1?Number(m.t2):Number(m.t1);
+    const prevWinner=m.winner;
+    m.winner=w; m.loser=l; m.sc1=s===1?1:0; m.sc2=s===1?0:1; m.scoreText='승패만'; m.actualScoreText='승패만'; m.scorelessWin=true; m.adminQuickWin=true; m.v935QuickWin=true; m.adminQuickWinAt=now();
+    m.status='completed'; m.done=true; m.completed=true; m.completedAt=m.completedAt||now(); m.resultSavedAt=now(); m.updatedAt=now();
+    m.rubbers=[{score1:s===1?1:0,score2:s===1?0:1,winner:s===1?0:1,scoreless:true,adminQuickWin:true,v935:true}];
+    if(String(m.phase||'')==='group'){
+      try{ if(typeof window.syncIndividualMainBracketFromPrelim==='function') window.syncIndividualMainBracketFromPrelim(ctx.key); }catch(e){}
+      try{ if(typeof window.syncMainBracketFromPrelim==='function') window.syncMainBracketFromPrelim(ctx.key); }catch(e){}
+    }else advanceMain(ctx.key,m,w);
+    return prevWinner;
+  }
+  function persistLater(ctx,prevWinner){
+    setTimeout(()=>{
+      const key=ctx.key,m=ctx.m,ps=[];
+      try{ if(typeof window.updPS==='function') Promise.resolve(window.updPS(key,m,prevWinner)).catch(e=>console.warn(TAG,'updPS skipped',e)); }catch(e){}
+      try{ if(window.__FB_WRITE_CACHE){ if(__FB_WRITE_CACHE.matches) delete __FB_WRITE_CACHE.matches[key]; if(__FB_WRITE_CACHE.draws) delete __FB_WRITE_CACHE.draws[key]; } }catch(e){}
+      try{ if(typeof window.stM==='function') ps.push(Promise.resolve(window.stM(key))); }catch(e){}
+      try{ if(typeof window.stD==='function') ps.push(Promise.resolve(window.stD(key))); }catch(e){}
+      try{ localStorage.setItem('v935_quickwin_backup_'+key, JSON.stringify({at:now(),matchId:m.id,match:m,draw:G.draws&&G.draws[key]||null})); }catch(e){}
+      Promise.allSettled(ps).then(res=>{const bad=res.filter(x=>x.status==='rejected'); if(bad.length){console.error(TAG,'persist failed',bad); toastMsg('백그라운드 저장 실패. 다시 저장 확인 필요','error');}else console.log(TAG,'persist done',key,m.id);});
+    },30);
+  }
+  function fastSave(side,key,mid){
+    try{
+      if(!canStaff()){toastMsg('관리자/운영자/진행자만 사용할 수 있습니다.','error'); return false;}
+      const ctx=lookupCtx(key,mid)||currentCtx();
+      if(!quickable(ctx)){toastMsg('현재 경기 정보를 찾지 못했습니다. 결과창을 닫았다가 다시 열어주세요.','error'); return false;}
+      const prev=markWin(ctx,side);
+      try{ if(typeof window.cm==='function') window.cm('mM3'); }catch(e){}
+      unstick(); toastMsg('승패 저장 완료 ✅','success');
+      try{ if(typeof window.renderBracket==='function') setTimeout(()=>window.renderBracket(),10); }catch(e){}
+      persistLater(ctx,prev);
+      return false;
+    }catch(e){console.error(TAG,'fastSave failed',e); unstick(); toastMsg('승패 저장 실패: '+(e&&e.message?e.message:e),'error'); return false;}
+  }
+  window.v935QuickWinSave=fastSave;
+  window.v922FastQuickWinSave=fastSave; window.v917FastQuickWinSave=fastSave;
+  window.v916QuickWinSave=function(side){const box=$('v935QuickWinBox');return fastSave(side,box&&box.dataset.key,box&&box.dataset.mid);};
+  window.v915QuickWinSave=window.v916QuickWinSave; window.v913QuickWinSave=window.v916QuickWinSave; window.v908AdminQuickWin=window.v916QuickWinSave;
+  document.addEventListener('pointerdown',function(ev){
+    const btn=ev.target&&ev.target.closest&&ev.target.closest('#v935QuickWinBox .v935-btn,#v922QuickWinBox .v922-btn,#v917QuickWinBox button,#v916QuickWinBox button,#v915QuickWinBox button,#v913QuickWinBox button,#v908AdminQuickWinBox button');
+    if(!btn) return;
+    ev.preventDefault(); ev.stopPropagation(); if(ev.stopImmediatePropagation) ev.stopImmediatePropagation();
+    if(btn.dataset.busy==='1') return false;
+    btn.dataset.busy='1'; btn.disabled=true;
+    fastSave(Number(btn.dataset.side||1),btn.dataset.key,btn.dataset.mid);
+    setTimeout(()=>{try{btn.dataset.busy='';btn.disabled=false;}catch(e){}},1200);
+    return false;
+  },true);
+  document.addEventListener('click',function(ev){const btn=ev.target&&ev.target.closest&&ev.target.closest('#v935QuickWinBox .v935-btn,#v922QuickWinBox .v922-btn,#v917QuickWinBox button,#v916QuickWinBox button,#v915QuickWinBox button,#v913QuickWinBox button,#v908AdminQuickWinBox button'); if(btn){ev.preventDefault();ev.stopPropagation();if(ev.stopImmediatePropagation)ev.stopImmediatePropagation();return false;}},true);
+  function wrapOpenM3(){
+    try{
+      const old=window.openM3; if(typeof old!=='function'||old.__v935Wrapped) return;
+      const w=function(key,mid){unstick(); try{window.__v935M3Context={key:String(key||''),mid:String(mid||''),at:Date.now()};}catch(e){} const r=old.apply(this,arguments); [0,20,60,120,260,520,900,1400].forEach(ms=>setTimeout(()=>{unstick();installBox();},ms)); return r;};
+      w.__v935Wrapped=true; w.__old=old; window.openM3=w; try{openM3=w;}catch(e){}
+    }catch(e){}
+  }
+  function badge(){try{const b=$('bracketFreshnessBadge'); if(b){b.textContent='v935 승버튼복구'; b.style.minWidth='112px';}}catch(e){}}
+  function boot(){wrapOpenM3();installBox();badge();}
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(boot,250)); else setTimeout(boot,30);
+  [300,900,1800,3500,6000].forEach(ms=>setTimeout(boot,ms));
+  const nativeInterval=window.__v928NativeSetInterval||window.setInterval;
+  try{nativeInterval(()=>{try{wrapOpenM3(); if(isModalOpen()) installBox(); else {const box=$('v935QuickWinBox'); if(box) box.remove(); unstick();} badge();}catch(e){}},800);}catch(e){}
+  console.log(TAG,'installed');
+})();
+</script>
+
+
+
+<!-- v936: 복구용 응급 기능 정리 / 다음대회 운영모드 정리 -->
+<style id="v936CleanupRecoveryToolsStyle">
+/* v936: 복구/응급 패널과 버튼은 운영 화면에서 숨김. 정식 안전장치(수동본선/복기/승패저장)는 유지. */
+[data-v936-recovery-hidden="1"],
+#v930RepairBar,
+#v932RoundRepairBar,
+#v933NextRoundBar,
+#v934RepairBar,
+#v934FloatingRepairBtn,
+#v927EmergencyStableNote,
+#v928LowLagPanel,
+#v923ProtectBtn,
+#v923DiagBtn,
+#v936HiddenLegacyPanels,
+.v930-repair-chip,
+.v932-chip,
+.v933-chip,
+.v934-repair-chip{
+  display:none !important;
+  visibility:hidden !important;
+  pointer-events:none !important;
+}
+#v936CleanModeNote{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+  margin:10px 0 12px;padding:10px 14px;border:1.5px solid #0f766e;border-radius:14px;
+  background:linear-gradient(135deg,#f0fdfa,#ffffff);color:#0f3f3a;font-size:.78rem;font-weight:900;line-height:1.55;
+}
+#v936CleanModeNote .v936-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:flex-end;}
+#v936CleanModeNote button{border:1px solid #99f6e4;background:#fff;color:#0f766e;border-radius:999px;padding:6px 10px;font-size:.72rem;font-weight:900;cursor:pointer;}
+#v936CleanModeNote button:hover{background:#ccfbf1;}
+#bracketFreshnessBadge{min-width:90px !important;text-align:center !important;white-space:nowrap !important;}
+</style>
+<script id="v936CleanupRecoveryToolsScript">
+(function(){
+  'use strict';
+  const TAG='[v936-cleanup]';
+  const q=id=>document.getElementById(id);
+  const norm=s=>String(s||'').replace(/\s+/g,' ').trim();
+  const RECOVERY_RE=/128슬롯\s*붙여넣기|부전승\s*자동반영|64강\s*빈칸\s*강제채움|64강\/다음라운드\s*카드복구|다음라운드\s*카드복구|256\/512\s*정리|수동기록\s*보기|본선보호\s*저장|상태점검|v930\s*다음라운드|v931\s*부서|v932\s*라운드정리|v933\s*다음라운드|v934\s*64강|v927\s*긴급|v928\s*저렉|이번대회\s*128\s*PDF|128\s*PDF고정|4칸\s*PDF고정|PDF\s*고정\s*테이블|원도심.*국제.*강제|국제.*원도심.*강제/;
+  const DANGEROUS_RE=/이번대회\s*128|128\s*PDF|4칸\s*PDF|PDF고정|원도심.*강제|국제.*강제|수동기록\s*자동|64강\s*채움|가짜라운드|256\/512/;
+  const KEEP_RE=/수동본선\s*운영모드|복기\s*기록모드|스코어\s*없이\s*승패|승패만\s*바로|결과저장|본선\s*공개|본선\s*비공개|수동수정|안정\s*수동수정|본선\s*코트\s*운영정리/;
+  window.__V936_CLEAN_MODE = true;
+
+  function markHide(el){
+    if(!el || el.id==='v936CleanModeNote') return;
+    if(el.closest && el.closest('#mM3')) return; // 결과 입력창의 정식 승패저장 영역은 건드리지 않음
+    el.setAttribute('data-v936-recovery-hidden','1');
+    el.style.display='none';
+    el.style.visibility='hidden';
+    el.style.pointerEvents='none';
+  }
+
+  function cleanupRecoveryUi(){
+    try{
+      const root=q('page-bracket')||document.body;
+      const directIds=['v930RepairBar','v932RoundRepairBar','v933NextRoundBar','v934RepairBar','v934FloatingRepairBtn','v927EmergencyStableNote','v928LowLagPanel','v923ProtectBtn','v923DiagBtn'];
+      directIds.forEach(id=>{ const el=q(id); if(el) markHide(el); });
+      root.querySelectorAll('button,.btn,a,[role="button"]').forEach(el=>{
+        const t=norm(el.textContent);
+        if(!t || KEEP_RE.test(t)) return;
+        if(RECOVERY_RE.test(t) || DANGEROUS_RE.test(t)) markHide(el);
+      });
+      root.querySelectorAll('.card,div,section').forEach(el=>{
+        if(el.id==='v936CleanModeNote') return;
+        const t=norm(el.textContent);
+        if(!t || t.length>800 || KEEP_RE.test(t)) return;
+        if(/v927|v928|v929|v930|v931|v932|v933|v934/.test(t) && /복구|응급|수동기록|카드|채움|라운드|보호|상태/.test(t)) markHide(el);
+        if(/이번대회\s*128\s*PDF고정|128\s*PDF고정|4칸\s*PDF고정|원도심.*국제.*강제|국제.*원도심.*강제/.test(t)) markHide(el);
+      });
+      const b=q('bracketFreshnessBadge');
+      if(b){ b.textContent='v936 정리'; b.title='복구용 응급 기능 정리판'; b.style.minWidth='90px'; }
+    }catch(e){ console.warn(TAG,'cleanup failed',e); }
+  }
+
+  function installCleanNote(){
+    try{
+      const page=q('page-bracket'); if(!page) return;
+      if(q('v936CleanModeNote')) return;
+      const anchor=q('bracketExportBar') || page.querySelector('.sec-title') || q('bracketContent');
+      if(!anchor) return;
+      const note=document.createElement('div');
+      note.id='v936CleanModeNote';
+      note.innerHTML='<div>🧹 <b>v936 운영정리</b> — 이번 복기용 복구 버튼은 숨기고, 정식 안전장치만 남겼습니다. 다음 대회 기본 흐름은 자동본선이며, 수동본선/복기모드는 관리자가 직접 켤 때만 작동합니다.</div><div class="v936-actions"><button type="button" onclick="window.v936CleanupRecoveryUi&&window.v936CleanupRecoveryUi()">정리 재적용</button></div>';
+      anchor.insertAdjacentElement('afterend', note);
+    }catch(e){ console.warn(TAG,'note install failed',e); }
+  }
+
+  function disableRecoveryFunction(name){
+    const old=window[name];
+    if(typeof old!=='function' || old.__v936Disabled) return;
+    const fn=function(){
+      try{ if(typeof toast==='function') toast('복구용 임시 기능은 v936에서 숨김 처리했습니다. 수동본선/복기모드는 정식 메뉴를 사용하세요.','info'); }
+      catch(_e){ alert('복구용 임시 기능은 v936에서 숨김 처리했습니다.'); }
+      return null;
+    };
+    fn.__v936Disabled=true;
+    fn.__old=old;
+    window[name]=fn;
+    try{ eval(name+'=window["'+name+'"]'); }catch(_e){}
+  }
+
+  function disableLegacyRecoveryFunctions(){
+    [
+      'v930RepairMainRoundCards','v931RepairMainRoundCards','v932CleanAndRepairMainRounds','v933RepairNextRoundsFromResultState','v934ForceFillNextRounds','v934ShowRoundStatus',
+      'v927OpenLegacyManualBoard','v927HardRefreshBracket','v928OpenManualRecordView','v928Status','v928ManualRefresh',
+      'v923ProtectCurrentManualMain','v923ShowDiagnostics',
+      'v900AutoAdvanceByes','v900OpenManual128',
+      'v788ModernCupFixedTable','v790PdfFixedTable','v791FourSlotPdfCourtFixed','v809CreateFixedMain','v830ForceMainPublic'
+    ].forEach(disableRecoveryFunction);
+  }
+
+  function officialModeGuard(){
+    try{
+      // 다음 대회 기본값은 auto. 단, 이미 관리자가 manual/replay로 저장한 key는 유지한다.
+      const key=(typeof currentKey==='function')?currentKey():'';
+      if(key && window.G && G.draws && G.draws[key]){
+        const d=G.draws[key];
+        if(!d.mainMode) d.mainMode='auto';
+        if(d.mainMode==='manual' || d.mainMode==='replay'){
+          d.mainManualGuard=true;
+          d.manualMainLocked=true;
+        }
+      }
+    }catch(e){}
+  }
+
+  window.v936CleanupRecoveryUi=function(){
+    installCleanNote();
+    disableLegacyRecoveryFunctions();
+    officialModeGuard();
+    cleanupRecoveryUi();
+  };
+
+  // render 후 한 번 정리하되, 과거처럼 빠른 감시 루프를 만들지 않는다.
+  const oldRender=window.renderBracket;
+  if(typeof oldRender==='function' && !oldRender.__v936CleanWrapped){
+    const wrapped=function(){
+      const r=oldRender.apply(this,arguments);
+      setTimeout(window.v936CleanupRecoveryUi, 80);
+      return r;
+    };
+    wrapped.__v936CleanWrapped=true;
+    wrapped.__old=oldRender;
+    window.renderBracket=wrapped;
+    try{ renderBracket=wrapped; }catch(_e){}
+  }
+
+  document.addEventListener('DOMContentLoaded',()=>{
+    setTimeout(window.v936CleanupRecoveryUi, 200);
+    setTimeout(window.v936CleanupRecoveryUi, 900);
+    setTimeout(window.v936CleanupRecoveryUi, 2500);
+  });
+  setTimeout(window.v936CleanupRecoveryUi, 300);
+  console.log(TAG,'installed');
+})();
+</script>
+
 </body>
 </html>
