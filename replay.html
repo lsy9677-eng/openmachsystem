@@ -106,7 +106,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-16-v945-stable-ui-rank8-replay";
+  const APP_VERSION = "2026-06-16-v946-mode-shell-replay";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -64452,6 +64452,91 @@ body.bracket-page #v934FloatingRepairBtn,#page-bracket.active ~ #v934FloatingRep
     }catch(e){}
   });
   setTimeout(v945Apply,3000);
+})();
+</script>
+
+
+<style id="v946ModeShellStyle">
+  .v946-mode-banner{display:none;position:sticky;top:0;z-index:2147482500;padding:8px 12px;text-align:center;font-size:.82rem;font-weight:900;letter-spacing:-.02em;border-bottom:1px solid rgba(15,30,58,.14);box-shadow:0 4px 12px rgba(15,30,58,.08);}
+  .v946-mode-live .v946-live-badge{display:inline-flex!important;}
+  .v946-mode-replay .v946-mode-banner{display:block;background:linear-gradient(135deg,#fff7ed,#fef3c7);color:#92400e;border-color:#f59e0b;}
+  .v946-mode-dev .v946-mode-banner{display:block;background:linear-gradient(135deg,#0f172a,#1e3a8a);color:#fff;border-color:#60a5fa;}
+  .v946-entry-switcher{display:none;position:fixed;right:12px;bottom:96px;z-index:2147482600;gap:6px;flex-wrap:wrap;align-items:center;justify-content:flex-end;max-width:min(420px,calc(100vw - 24px));pointer-events:none;}
+  body.admin-mode .v946-entry-switcher, body.tm-mode .v946-entry-switcher, body.developer-mode .v946-entry-switcher{display:flex;}
+  .v946-entry-switcher a,.v946-entry-switcher button{pointer-events:auto;text-decoration:none;border:1px solid rgba(15,30,58,.15);border-radius:999px;background:#fff;color:#0f1e3a;font-size:.72rem;font-weight:900;padding:7px 10px;box-shadow:0 8px 18px rgba(15,30,58,.14);cursor:pointer;}
+  .v946-entry-switcher a.active{background:#0f1e3a;color:#fff;}
+  .v946-live-badge{display:none;align-items:center;justify-content:center;margin-left:6px;padding:3px 8px;border-radius:999px;background:#dcfce7;color:#166534;font-size:.66rem;font-weight:1000;white-space:nowrap;}
+  .v946-mode-replay .v946-hide-in-replay{display:none!important;}
+  .v946-dev-debug-panel{display:none;position:fixed;left:12px;bottom:96px;z-index:2147482600;background:rgba(15,23,42,.94);color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:14px;padding:10px 12px;font-size:.74rem;line-height:1.55;box-shadow:0 12px 28px rgba(0,0,0,.24);max-width:min(360px,calc(100vw - 24px));}
+  .v946-mode-dev .v946-dev-debug-panel{display:block;}
+  @media(max-width:680px){.v946-mode-banner{font-size:.76rem;padding:7px 10px}.v946-entry-switcher{right:8px;left:8px;bottom:92px;justify-content:center}.v946-entry-switcher a,.v946-entry-switcher button{font-size:.66rem;padding:6px 8px}.v946-dev-debug-panel{left:8px;right:8px;bottom:150px;max-width:none;font-size:.68rem}}
+</style>
+
+<script id="v946ModeShellScript">
+(function(){
+  'use strict';
+  if(window.__v946ModeShellInstalled) return;
+  window.__v946ModeShellInstalled = true;
+  const MODE = 'replay';
+  const VERSION = '946';
+  window.APP_ENTRY_MODE = MODE;
+  window.APP_VERSION_LABEL = 'v946-' + MODE;
+  try{ document.documentElement.classList.add('v946-mode-' + MODE); document.body && document.body.classList.add('v946-mode-' + MODE); }catch(e){}
+  function byText(re){
+    try{return Array.from(document.querySelectorAll('button,a,div,span')).filter(el=>re.test((el.textContent||'').replace(/\s+/g,' ')));}catch(e){return []}
+  }
+  function addModeUi(){
+    try{
+      if(!document.body) return;
+      document.body.classList.add('v946-mode-' + MODE);
+      if(!document.getElementById('v946ModeBanner')){
+        const banner=document.createElement('div');
+        banner.id='v946ModeBanner';
+        banner.className='v946-mode-banner';
+        banner.textContent = MODE==='replay' ? '📜 복기 기록모드 — 지난 대회 결과 입력용입니다. 실제 현장 운영용이 아닙니다.' : (MODE==='dev' ? '🛠 개발/점검모드 — 새 기능과 오류 확인용입니다. 참가자 안내용 주소가 아닙니다.' : '');
+        document.body.insertBefore(banner, document.body.firstChild);
+      }
+      if(!document.getElementById('v946EntrySwitcher')){
+        const sw=document.createElement('div'); sw.id='v946EntrySwitcher'; sw.className='v946-entry-switcher';
+        sw.innerHTML = `
+          <a class="${MODE==='live'?'active':''}" href="./?v=${VERSION}">운영</a>
+          <a class="${MODE==='replay'?'active':''}" href="./replay.html?v=${VERSION}">복기</a>
+          <a class="${MODE==='dev'?'active':''}" href="./dev.html?v=${VERSION}">개발</a>
+        `;
+        document.body.appendChild(sw);
+      }
+      if(MODE==='dev' && !document.getElementById('v946DevPanel')){
+        const p=document.createElement('div'); p.id='v946DevPanel'; p.className='v946-dev-debug-panel';
+        p.innerHTML = '<b>🛠 v946 개발 점검</b><br>APP_ENTRY_MODE: dev<br>운영 적용 전 이 화면에서 먼저 테스트하세요.';
+        document.body.appendChild(p);
+      }
+      const badge=document.getElementById('bracketFreshnessBadge');
+      if(badge){ badge.textContent = MODE==='live'?'v946 운영':(MODE==='replay'?'v946 복기':'v946 개발'); }
+      if(MODE==='live'){
+        const title = document.querySelector('#page-bracket .sec-title span') || document.querySelector('#page-bracket .sec-title');
+        if(title && !title.querySelector('.v946-live-badge')){
+          const b=document.createElement('span'); b.className='v946-live-badge'; b.textContent='운영용'; title.appendChild(b);
+        }
+      }
+      if(MODE==='replay'){
+        // 복기용에서 현장 실시간 운영/문자/알림/코트 자동운영 계열 버튼 노출을 줄임. 결과 입력은 유지.
+        byText(/문자|알림|본선\s*코트\s*운영정리|코트\s*자동|공용대기\s*정리/).forEach(el=>{
+          if(el.closest('#mM3')) return;
+          if(/결과|승패|기록/.test(el.textContent||'')) return;
+          el.classList.add('v946-hide-in-replay');
+        });
+      }
+      if(MODE==='live'){
+        // 운영용에서는 복구/개발용 잔재를 계속 숨김.
+        byText(/강제채움|256|512|복구|수동기록 보기|레거시|디버그|상태점검|본선보호/).forEach(el=>{
+          if(/백업|복원|되돌리기/.test(el.textContent||'')) return;
+          el.style.display='none';
+        });
+      }
+    }catch(e){ console.warn('[v946 mode ui]', e); }
+  }
+  document.addEventListener('DOMContentLoaded',()=>{ setTimeout(addModeUi,0); setTimeout(addModeUi,500); setTimeout(addModeUi,1500); });
+  window.v946RefreshModeUi = addModeUi;
 })();
 </script>
 
