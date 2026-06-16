@@ -64462,7 +64462,7 @@ body.bracket-page #v934FloatingRepairBtn,#page-bracket.active ~ #v934FloatingRep
   var MODE = 'replay';
   var LABELS = {live:'운영용', replay:'복기용', dev:'개발용'};
   window.APP_DEPLOY_MODE = MODE;
-  window.APP_DEPLOY_VERSION = 'v950-visible-mode-badge';
+  window.APP_DEPLOY_VERSION = 'v951-sms-time-sync';
 
   function addStyle(){
     if(document.getElementById('v950SafeStyle')) return;
@@ -64568,7 +64568,7 @@ body.bracket-page #v934FloatingRepairBtn,#page-bracket.active ~ #v934FloatingRep
   var MODE = 'replay';
   var LABEL = '복기용';
   window.APP_DEPLOY_MODE = MODE;
-  window.APP_DEPLOY_VERSION = 'v950-visible-mode-badge';
+  window.APP_DEPLOY_VERSION = 'v951-sms-time-sync';
   function inject(){
     try{
       var old=document.getElementById('v949ModeBadge');
@@ -64593,7 +64593,7 @@ body.bracket-page #v934FloatingRepairBtn,#page-bracket.active ~ #v934FloatingRep
       }
       b.className=MODE;
       var icon = MODE==='live'?'🟢':MODE==='replay'?'📜':'🛠';
-      b.textContent=icon+' '+LABEL+' v950';
+      b.textContent=icon+' '+LABEL+' v951';
       b.style.display='inline-flex';
     }catch(e){}
   }
@@ -64603,5 +64603,168 @@ body.bracket-page #v934FloatingRepairBtn,#page-bracket.active ~ #v934FloatingRep
   setTimeout(inject,3000);
 })();
 </script>
+
+
+<script id="v951SmsTimeSyncFix">
+(function(){
+  'use strict';
+  window.APP_PATCH_VERSION = 'v951-sms-time-sync';
+
+  function pad2(n){ return String(n).padStart(2,'0'); }
+  function fmt(d){ try{return pad2(d.getHours())+':'+pad2(d.getMinutes());}catch(e){return '';} }
+  function addMin(d,n){ var x=new Date(d.getTime()); x.setMinutes(x.getMinutes()+Number(n||0)); return x; }
+  function validDate(v){ var d = v instanceof Date ? v : new Date(v); return Number.isFinite(d.getTime()) ? d : null; }
+  function matchId(m){ return String((m&&m.id)||(m&&m._id)||''); }
+  function sameId(a,b){ return String(a||'') && String(a||'')===String(b||''); }
+  function getCurrentStartIso(cur){
+    if(!cur) return '';
+    // 화면의 예상시합시간 계산 순서와 문자 계산 순서를 통일한다.
+    // 기존 일부 함수는 matchStartedAt을 우선해서, 카드 표시 시간과 문자 시간이 달라졌다.
+    return String(cur.courtAssignedAt || cur.startedAt || cur.matchStartedAt || cur.waitingFirstAt || '').trim();
+  }
+  function findCourtSnapshotForMatch(key, mid){
+    try{
+      var items=(typeof getCourtStatusSnapshot==='function') ? (getCourtStatusSnapshot(key)||[]) : [];
+      for(var i=0;i<items.length;i++){
+        var item=items[i]||{};
+        var court=String(item.court||'').trim();
+        if(item.current && sameId(matchId(item.current), mid)){
+          return {item:item, match:item.current, court:court, status:'current', queuePos:0, idx:-1, hasCurrent:true, currentStartIso:getCurrentStartIso(item.current)};
+        }
+        var wait=[].concat(item.__visibleWaiting||item.waiting||[]);
+        for(var j=0;j<wait.length;j++){
+          var w=wait[j]||{};
+          if(sameId(matchId(w), mid)){
+            return {item:item, match:w, court:court, status:'waiting', queuePos:j+1, idx:j, hasCurrent:!!item.current, currentStartIso:getCurrentStartIso(item.current)};
+          }
+        }
+      }
+    }catch(e){}
+    return null;
+  }
+  function estimateFromUnifiedRule(key, waitIdx, hasCurrentMatch, currentStartIso, courtName){
+    try{
+      var base=null;
+      if(hasCurrentMatch && currentStartIso){
+        var cur=validDate(currentStartIso);
+        if(cur) base=addMin(cur,30);
+      }
+      if(!base){
+        var now=new Date();
+        var cfg=(typeof parseCourtBaseDate==='function') ? parseCourtBaseDate(key, courtName||'') : null;
+        base=(cfg && cfg.getTime && cfg.getTime()>now.getTime()) ? cfg : now;
+        var interval=30*60*1000;
+        base=new Date(Math.ceil(base.getTime()/interval)*interval);
+      }
+      var start=addMin(base,30*(Number(waitIdx||0)||0));
+      var end=addMin(start,30);
+      return '⏱ 예상 시합시간 '+fmt(start)+'~'+fmt(end);
+    }catch(e){ return ''; }
+  }
+
+  var oldGetEstimated = window.getCourtEstimatedTimeText;
+  window.getCourtEstimatedTimeText = function(key, waitIdx, hasCurrentMatch, currentStartIso, courtName){
+    var s=estimateFromUnifiedRule(key, waitIdx, hasCurrentMatch, currentStartIso, courtName);
+    if(s) return s;
+    try{ return oldGetEstimated ? oldGetEstimated.apply(this, arguments) : ''; }catch(e){ return ''; }
+  };
+
+  var oldExpected = window.getCourtSmsExpectedTimeText;
+  window.getCourtSmsExpectedTimeText = function(kind,key,meta){
+    try{
+      meta=meta||{};
+      var smsKind=String(kind||'');
+      if(!(smsKind==='waiting_registered'||smsKind==='court_changed'||smsKind==='queue_registered'||smsKind==='court_waiting')) return '';
+      var direct=String(meta.expectedTimeText||meta.estimatedTimeText||'').trim();
+      if(direct) return direct;
+      var q=Number(meta.queuePos||0)||0;
+      if(!(q>0)) return '';
+      var court=String(meta.court||'').trim();
+      var hasCurrent=typeof meta.hasCurrent==='boolean' ? meta.hasCurrent : null;
+      var currentStartIso=String(meta.currentStartIso||meta.currentStartAt||'').trim();
+      if(hasCurrent===null || !currentStartIso){
+        var items=(typeof getCourtStatusSnapshot==='function') ? (getCourtStatusSnapshot(key)||[]) : [];
+        var item=items.find(function(x){return String(x&&x.court||'').trim()===court;});
+        if(item){
+          if(hasCurrent===null) hasCurrent=!!item.current;
+          if(!currentStartIso) currentStartIso=getCurrentStartIso(item.current);
+        }
+      }
+      return estimateFromUnifiedRule(key, Math.max(0,q-1), !!hasCurrent, currentStartIso, court);
+    }catch(e){ try{return oldExpected ? oldExpected.apply(this, arguments) : '';}catch(_e){return '';} }
+  };
+
+  var oldBuildMap = window.buildCourtNotificationStateMap;
+  window.buildCourtNotificationStateMap = function(matchesObj){
+    try{
+      var out={};
+      Object.keys(matchesObj||{}).forEach(function(key){
+        var td=(typeof _k2td==='function')?_k2td(String(key)):{tid:'',div:''};
+        var items=(typeof getCourtStatusSnapshot==='function') ? (getCourtStatusSnapshot(key)||[]) : [];
+        items.forEach(function(item){
+          var court=String(item&&item.court||'').trim();
+          if(item&&item.current){
+            var mid=matchId(item.current);
+            if(mid) out[mid]={key:key,tid:td.tid,div:td.div,status:'current',court:court,queuePos:0,match:item.current,hasCurrent:true,currentStartIso:getCurrentStartIso(item.current)};
+          }
+          var waiting=[].concat((item&&item.__visibleWaiting)||(item&&item.waiting)||[]);
+          waiting.forEach(function(m,idx){
+            var mid=matchId(m);
+            if(!mid) return;
+            var currentStartIso=getCurrentStartIso(item.current);
+            var estimatedTimeText=estimateFromUnifiedRule(key, idx, !!item.current, currentStartIso, court);
+            out[mid]={key:key,tid:td.tid,div:td.div,status:'waiting',court:court,queuePos:idx+1,match:m,hasCurrent:!!item.current,currentStartIso:currentStartIso,estimatedTimeText:estimatedTimeText};
+          });
+        });
+      });
+      return out;
+    }catch(e){ try{return oldBuildMap ? oldBuildMap.apply(this, arguments) : {}; }catch(_e){return {};} }
+  };
+
+  var oldSendCourtCardSms = window.sendCourtCardSms;
+  window.sendCourtCardSms = function(key, mid, statusKind, court, queuePos){
+    try{
+      if(typeof canManageBracket==='function' && !canManageBracket()){ if(typeof toast==='function') toast('관리자 또는 경기진행자만 문자 발송 가능','info'); return false; }
+      var found=findCourtSnapshotForMatch(key, mid);
+      var list=(window.G&&G.matches&&G.matches[key])||[];
+      var m=(found&&found.match) || list.find(function(x){return sameId(matchId(x), mid);});
+      if(!m){ if(typeof toast==='function') toast('경기를 찾을 수 없습니다','error'); return false; }
+      var recipients=(typeof getMatchNotificationRecipients==='function') ? getMatchNotificationRecipients(key,m) : [];
+      if(!recipients.length){ if(typeof toast==='function') toast('문자 받을 번호가 없습니다','error'); return false; }
+      var kind=String(statusKind||'').trim();
+      if(!kind || kind==='queue_registered') kind='waiting_registered';
+      var meta={
+        court:String((found&&found.court)||court||'').trim(),
+        queuePos:Number((found&&found.queuePos)||queuePos||0)||0,
+        hasCurrent: found ? !!found.hasCurrent : undefined,
+        currentStartIso: found ? (found.currentStartIso||'') : ''
+      };
+      if(meta.queuePos>0) meta.estimatedTimeText=estimateFromUnifiedRule(key, Math.max(0,meta.queuePos-1), !!meta.hasCurrent, meta.currentStartIso, meta.court);
+      var body=(typeof buildCourtNotificationMessage==='function') ? buildCourtNotificationMessage(kind,key,m,meta) : '';
+      var ok=(typeof _openSMSForRecipients==='function') ? _openSMSForRecipients(recipients, body) : false;
+      if(ok && typeof toast==='function') toast('문자 앱을 열었습니다','success');
+      return ok;
+    }catch(e){
+      try{ if(oldSendCourtCardSms) return oldSendCourtCardSms.apply(this, arguments); }catch(_e){}
+      if(typeof toast==='function') toast('문자 발송 실패: '+(e&&e.message||e),'error');
+      return false;
+    }
+  };
+
+  function addNotice(){
+    try{
+      if(document.getElementById('v951SmsTimeNotice')) return;
+      var host=document.querySelector('#page-bracket .section-title, .section-title, h2, h1')||document.body;
+      var box=document.createElement('div');
+      box.id='v951SmsTimeNotice';
+      box.style.cssText='margin:8px 0;padding:8px 12px;border:1.5px solid #93c5fd;border-radius:12px;background:#eff6ff;color:#1e3a8a;font-size:12px;font-weight:900;line-height:1.45';
+      box.textContent='v951 문자시간 보정: 코트 현황판 예상 시합시간과 알리고/문자 승인창의 {시간}을 같은 기준으로 계산합니다.';
+      if(host&&host.parentNode) host.parentNode.insertBefore(box, host.nextSibling);
+    }catch(e){}
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', function(){setTimeout(addNotice,800);}); else setTimeout(addNotice,800);
+})();
+</script>
+
 </body>
 </html>
