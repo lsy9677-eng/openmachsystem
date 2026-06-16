@@ -106,7 +106,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-16-v944-safe-inline-rollback-index";
+  const APP_VERSION = "2026-06-16-v945-stable-ui-rank8-index";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -64307,6 +64307,151 @@ body.bracket-page #v934FloatingRepairBtn,#page-bracket.active ~ #v934FloatingRep
   document.addEventListener('DOMContentLoaded',()=>{ applyModeUi(); setTimeout(applyModeUi,500); setTimeout(applyModeUi,1500); });
   ['showPage','renderBracket','renderRanking','renderTL','renderRL'].forEach(n=>wrapAfter(n,applyModeUi));
   setTimeout(applyModeUi,1000); setTimeout(applyModeUi,3000);
+})();
+</script>
+
+
+<script id="v945StableUiAndRank8Cleanup">
+(function(){
+  'use strict';
+  if(window.__v945StableUiInstalled) return;
+  window.__v945StableUiInstalled = true;
+  const MODE = window.APP_OPERATION_MODE || (location.pathname.includes('replay')?'replay':(location.pathname.includes('dev')?'dev':'live'));
+  const LABEL = MODE==='replay'?'복기 안정본':(MODE==='dev'?'개발 점검본':'운영 안정본');
+  const esc = s => String(s==null?'':s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const $ = id => document.getElementById(id);
+
+  function v945ModeClean(){
+    try{
+      const oldPanel=$('v942ModePanel');
+      if(oldPanel) oldPanel.style.display='none';
+      let pill=$('v945StableModePill');
+      if(!pill){
+        pill=document.createElement('div');
+        pill.id='v945StableModePill';
+        const target=document.querySelector('#page-bracket .sec-title') || document.querySelector('#page-bracket') || document.querySelector('.main-content');
+        if(target && target.parentNode) target.parentNode.insertBefore(pill, target.nextSibling);
+        else document.body.prepend(pill);
+      }
+      const color = MODE==='live' ? '#0f766e' : (MODE==='replay' ? '#7c3aed' : '#b45309');
+      pill.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin:8px 0 10px;padding:8px 12px;border:1px solid '+color+';border-radius:12px;background:#fff;color:'+color+';font-size:.78rem;font-weight:900"><span>✅ v945 '+LABEL+' · 운영/복기/개발 진입점은 유지하고, 복구 안내 박스는 숨김 처리했습니다.</span><span style="font-size:.7rem;color:#64748b">필요 기능만 표시</span></div>';
+      const badge=$('bracketFreshnessBadge');
+      if(badge){ badge.textContent='v945 안정'; badge.style.minWidth='92px'; badge.title='v945 안정 정리본'; }
+    }catch(e){}
+  }
+
+  function v945HideAdvListAfterMain(){
+    try{
+      const page=$('page-bracket');
+      if(!page || !page.classList.contains('active')) return;
+      const bc=$('bracketContent'); if(!bc) return;
+      const hasMain = /본선\s*경기\s*현황|128강|64강|32강|16강|8강|준결승|결승/.test(bc.textContent||'');
+      if(!hasMain) return;
+      bc.querySelectorAll('.card, .grp-card, div').forEach(el=>{
+        if(el.id==='v945StableModePill') return;
+        const tx=(el.textContent||'').replace(/\s+/g,' ');
+        if(/본선\s*진출팀/.test(tx) && /\d+팀|96팀|진출/.test(tx) && !/본선\s*경기\s*현황/.test(tx)){
+          el.style.display='none';
+          el.setAttribute('data-v945-hidden-adv','1');
+        }
+      });
+    }catch(e){}
+  }
+
+  function getCurrentRankKeys(){
+    try{
+      const tid=$('rankTS')?.value || $('brTS')?.value || '';
+      const div=$('rankDS')?.value || '';
+      if(!tid || !window.G) return [];
+      const keys=[];
+      const all=Object.keys((G.matches||{}));
+      all.forEach(k=>{try{const td=typeof _k2td==='function'?_k2td(k):null; if(td && td.tid===tid && (!div || div==='__ALL__' || td.div===div)) keys.push(k);}catch(e){}});
+      if(!keys.length && G.teams){
+        Object.keys(G.teams).forEach(k=>{try{const td=typeof _k2td==='function'?_k2td(k):null; if(td && td.tid===tid && (!div || div==='__ALL__' || td.div===div)) keys.push(k);}catch(e){}});
+      }
+      return [...new Set(keys)];
+    }catch(e){ return []; }
+  }
+  function teamName(key,idx){
+    try{
+      const i=Number(idx); const t=(G.teams&&G.teams[key]||[])[i];
+      if(!t) return '';
+      if(typeof tdn==='function') return String(tdn(t,key,i)||'').trim();
+      if(Array.isArray(t.individualPlayers)) return t.individualPlayers.map(p=>String(p&&p.name||p||'').trim()).filter(Boolean).join(' / ');
+      if(Array.isArray(t.players)) return t.players.map(x=>String(x||'').trim()).filter(Boolean).join(' / ');
+      return String(t.pairLabel||t.entryLabel||t.club||t.name||('팀 '+(i+1))).trim();
+    }catch(e){return '';}
+  }
+  function matchWinner(m){
+    try{ if(m.winner!==undefined && m.winner!==null && m.winner!=='') return Number(m.winner); }catch(e){}
+    try{
+      const s1=Number(m.sc1), s2=Number(m.sc2);
+      if(Number.isFinite(s1)&&Number.isFinite(s2)&&s1!==s2) return s1>s2?Number(m.t1):Number(m.t2);
+    }catch(e){}
+    try{ if(m.bye && m.t1!==undefined) return Number(m.t1); }catch(e){}
+    return NaN;
+  }
+  function collectEightFinalists(key){
+    try{
+      let ms=(G.matches&&G.matches[key]||[]).filter(m=>String(m.phase||'')==='main' && !m.bye);
+      if(!ms.length) return [];
+      let candidates=[];
+      const byLabel=ms.filter(m=>/8강|8\s*강|quarter/i.test(String(m.label||m.roundLabel||m.localRoundLabel||'')));
+      if(byLabel.length>=4) candidates=byLabel;
+      if(!candidates.length){
+        const groups={}; ms.forEach(m=>{const r=Number(m.round||m.r||0); (groups[r]=groups[r]||[]).push(m);});
+        const rounds=Object.keys(groups).map(Number).sort((a,b)=>a-b);
+        const r4=rounds.find(r=>groups[r].length===4);
+        if(r4!==undefined) candidates=groups[r4];
+        else{
+          const maxR=rounds[rounds.length-1];
+          if(maxR!==undefined && groups[maxR-2]) candidates=groups[maxR-2];
+        }
+      }
+      const losers=[];
+      candidates.slice(0,4).forEach(m=>{
+        const w=matchWinner(m);
+        const t1=Number(m.t1), t2=Number(m.t2);
+        let loser=NaN;
+        if(Number.isFinite(w)) loser=(w===t1?t2:t1);
+        if(Number.isFinite(loser)){
+          const nm=teamName(key,loser);
+          if(nm) losers.push(nm);
+        }
+      });
+      return [...new Set(losers)].slice(0,4);
+    }catch(e){return [];}
+  }
+  function v945EnsureRank8Card(){
+    try{
+      const page=$('page-ranking'); if(!page || !page.classList.contains('active')) return;
+      const cont=$('rankContent'); if(!cont) return;
+      if(cont.querySelector('#v945Rank8Card')) return;
+      const existing=(cont.textContent||'');
+      if(/8강/.test(existing)) return;
+      const keys=getCurrentRankKeys();
+      let items=[];
+      keys.forEach(k=>{ items=items.concat(collectEightFinalists(k)); });
+      items=[...new Set(items)].slice(0,8);
+      if(!items.length) return;
+      const card=document.createElement('div');
+      card.className='card fade-in';
+      card.id='v945Rank8Card';
+      card.innerHTML='<div class="card-title">🎾 8강</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px">'+items.map((n,i)=>'<div style="padding:10px 12px;border:1px solid #bfdbfe;border-radius:12px;background:#eff6ff;color:#1d4ed8;font-weight:900;font-size:.86rem">8강 '+(i+1)+'. '+esc(n)+'</div>').join('')+'</div>';
+      cont.appendChild(card);
+    }catch(e){}
+  }
+
+  function v945Apply(){ v945ModeClean(); v945HideAdvListAfterMain(); v945EnsureRank8Card(); }
+  document.addEventListener('DOMContentLoaded',()=>{ setTimeout(v945Apply,100); setTimeout(v945Apply,800); setTimeout(v945Apply,1800); });
+  ['showPage','renderBracket','renderRanking','onRankTC','onBrTC'].forEach(name=>{
+    try{
+      const old=window[name]; if(typeof old!=='function' || old.__v945Wrapped) return;
+      const nw=function(){ const r=old.apply(this,arguments); setTimeout(v945Apply,120); setTimeout(v945Apply,650); return r; };
+      nw.__v945Wrapped=true; nw.__old=old; window[name]=nw; try{ eval(name+'=window["'+name+'"]'); }catch(e){}
+    }catch(e){}
+  });
+  setTimeout(v945Apply,3000);
 })();
 </script>
 
