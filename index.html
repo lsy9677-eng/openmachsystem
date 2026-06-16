@@ -68,7 +68,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-16-v936-cleanup-recovery-tools";
+  const APP_VERSION = "2026-06-16-v938-rank8-undo-result";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -63212,6 +63212,410 @@ body.bracket-page #v934FloatingRepairBtn,#page-bracket.active ~ #v934FloatingRep
     setTimeout(window.v936CleanupRecoveryUi, 2500);
   });
   setTimeout(window.v936CleanupRecoveryUi, 300);
+  console.log(TAG,'installed');
+})();
+</script>
+
+
+
+<!-- v937: 백업/복원 안전모드 - 복원 전 자동백업 + 범위별 복원 -->
+<style id="v937SafeBackupRestoreStyle">
+#v937BackupRestorePanel{margin:0 0 14px 0;padding:14px 15px;border:2px solid #0f766e;border-radius:14px;background:linear-gradient(135deg,#f0fdfa,#ecfeff);box-shadow:0 6px 16px rgba(15,118,110,.08)}
+#v937BackupRestorePanel .v937-title{font-size:.92rem;font-weight:1000;color:#0f766e;margin-bottom:7px;display:flex;align-items:center;gap:7px}
+#v937BackupRestorePanel .v937-desc{font-size:.76rem;line-height:1.65;color:#334155;margin-bottom:10px;font-weight:800;word-break:keep-all}
+#v937BackupRestorePanel .v937-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+#v937BackupRestorePanel .v937-btn{min-height:38px;border-radius:11px;border:1.5px solid #99f6e4;background:#fff;color:#0f766e;font-size:.76rem;font-weight:1000;cursor:pointer;padding:7px 8px;line-height:1.25;box-shadow:none}
+#v937BackupRestorePanel .v937-btn.danger{border-color:#fca5a5;color:#b91c1c;background:#fff7f7}
+#v937BackupRestorePanel .v937-btn.primary{border-color:#0f766e;background:#0f766e;color:#fff}
+#v937BackupRestorePanel .v937-status{margin-top:9px;font-size:.72rem;color:#475569;line-height:1.55;font-weight:800}
+@media(max-width:680px){#v937BackupRestorePanel .v937-grid{grid-template-columns:1fr 1fr}#v937BackupRestorePanel .v937-btn{font-size:.7rem;padding:6px 5px}}
+</style>
+<script id="v937SafeBackupRestoreScript">
+(function(){
+  'use strict';
+  const TAG='[v937-safe-backup-restore]';
+  window.__V937_SAFE_BACKUP_RESTORE = true;
+  window.__v937RestoreScope = '';
+
+  function $(id){return document.getElementById(id);}
+  function toastMsg(msg,type){try{ if(typeof window.toast==='function') window.toast(msg,type||'info'); else alert(msg); }catch(e){alert(msg);}}
+  function safeStr(v){return String(v==null?'':v).trim();}
+  function currentTid(){
+    try{ const el=$('brTS')||$('regTS')||$('rankTS'); if(el && el.value) return el.value; }catch(e){}
+    try{ if(typeof window.currentKey==='function'){ const k=window.currentKey(); if(k && typeof window._k2td==='function') return window._k2td(k).tid; } }catch(e){}
+    return '';
+  }
+  function currentKeySmart(data){
+    try{ if(typeof window.currentKey==='function'){ const k=window.currentKey(); if(k && k!=='__ALL__') return k; } }catch(e){}
+    const tid=currentTid();
+    if(!tid) return '';
+    const divEl=$('brDS');
+    const divVal=divEl?safeStr(divEl.value):'';
+    if(divVal && divVal!=='__ALL__') return tid+'_'+divVal;
+    const pools=[window.G&&G.matches, window.G&&G.draws, window.G&&G.teams, data&&data.matches, data&&data.draws, data&&data.teams].filter(Boolean);
+    const keys=[];
+    pools.forEach(obj=>Object.keys(obj||{}).forEach(k=>{ if(String(k).startsWith(tid+'_') && !keys.includes(k)) keys.push(k); }));
+    if(keys.length===1) return keys[0];
+    const selected=[...document.querySelectorAll('#brMultiDiv .active,#brMultiDiv .sel,#brMultiDiv button[aria-pressed="true"]')].map(x=>safeStr(x.dataset.div||x.value||x.textContent)).filter(Boolean);
+    if(selected.length===1){
+      const hit=keys.find(k=>k.endsWith('_'+selected[0])); if(hit) return hit;
+    }
+    return keys[0]||'';
+  }
+  function isMainMatch(m){
+    if(!m) return false;
+    const p=safeStr(m.phase||m.stage||m.type).toLowerCase();
+    if(/main|knock|final|본선|토너먼트|bracket/.test(p)) return true;
+    if(m.round!=null || m.bracketRound!=null || m.mainRound!=null) return true;
+    if(m.r!=null && m.group==null) return true;
+    return false;
+  }
+  function isPrelimMatch(m){
+    if(!m) return false;
+    const p=safeStr(m.phase||m.stage||m.type).toLowerCase();
+    if(/group|prelim|예선|조별/.test(p)) return true;
+    if(m.group!=null || m.groupIndex!=null || m.gi!=null) return true;
+    return !isMainMatch(m);
+  }
+  function clone(x){return JSON.parse(JSON.stringify(x==null?null:x));}
+  function downloadJSON(obj, prefix){
+    const blob=new Blob([JSON.stringify(obj,null,2)],{type:'application/json;charset=utf-8'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    const stamp=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+    a.download=(prefix||'230MATCH_백업')+'_'+stamp+'.json';
+    document.body.appendChild(a); a.click();
+    setTimeout(()=>{try{URL.revokeObjectURL(a.href);a.remove();}catch(e){}},500);
+  }
+  function buildSnapshot(){
+    const GG=window.G||{};
+    return {
+      version:4,
+      exportDate:new Date().toISOString(),
+      exportBy:'v937-safe-backup-restore',
+      tournaments:clone(GG.tournaments||[]),
+      teams:clone(GG.teams||{}),
+      draws:clone(GG.draws||{}),
+      matches:clone(GG.matches||{}),
+      players:clone(GG.players||{}),
+      clubs:clone(GG.clubs||[]),
+      log:clone(GG.log||[]),
+      drawHistories:clone(GG.drawHistories||{}),
+      registry:clone(window.G_REGISTRY||{})
+    };
+  }
+  window.v937BackupNow=function(){
+    try{ downloadJSON(buildSnapshot(),'230MATCH_안전백업'); toastMsg('안전 백업 다운로드 완료','success'); }
+    catch(e){ console.error(TAG,e); toastMsg('백업 실패: '+(e.message||e),'error'); }
+  };
+  window.v937RestoreChoose=function(scope){
+    window.__v937RestoreScope=scope||'all';
+    const inp=$('v937RestoreFile');
+    if(inp){ inp.value=''; inp.click(); return; }
+    const old=$('restoreFile'); if(old){ old.value=''; old.click(); }
+  };
+  window.v937OpenBackupModal=function(){ try{ if(typeof window.om==='function') window.om('mBackup'); setTimeout(installPanel,80); }catch(e){} };
+
+  function splitDrawForScope(oldDraw, backupDraw, scope){
+    const out=clone(oldDraw||{}), b=clone(backupDraw||{});
+    if(scope==='main'){
+      Object.keys(b).forEach(k=>{ if(/main|manual|bracket|round|seed|bye|drawSize|locked|mode/i.test(k)) out[k]=b[k]; });
+      out.v937RestoredMainAt=new Date().toISOString();
+    }else if(scope==='prelim'){
+      ['groups','groupCount','groupSize','advance','advances','prelim','prelimDraw','draw','courts','courtGroups'].forEach(k=>{ if(b[k]!==undefined) out[k]=b[k]; });
+      out.v937RestoredPrelimAt=new Date().toISOString();
+    }else{
+      return b;
+    }
+    return out;
+  }
+  async function saveKeyData(key){
+    if(!key) return;
+    try{ if(window.__FB_WRITE_CACHE){ delete window.__FB_WRITE_CACHE.matches?.[key]; delete window.__FB_WRITE_CACHE.draws?.[key]; } }catch(e){}
+    if(typeof window.stM==='function') await window.stM(key);
+    if(typeof window.stD==='function') await window.stD(key);
+    try{ if(typeof window.renderBracket==='function') window.renderBracket(); }catch(e){}
+  }
+  async function restoreScoped(data, scope){
+    const key=currentKeySmart(data);
+    if(!key) throw new Error('현재 대회/부서를 찾지 못했습니다. 대진표에서 대회와 부서를 먼저 선택하세요.');
+    const GG=window.G||{};
+    GG.matches=GG.matches||{}; GG.draws=GG.draws||{}; GG.teams=GG.teams||{}; GG.players=GG.players||{};
+    const backupMatches=(data.matches&&data.matches[key])||[];
+    const backupDraw=data.draws&&data.draws[key];
+    const backupTeams=data.teams&&data.teams[key];
+    if(scope==='main' || scope==='prelim'){
+      const cur=Array.isArray(GG.matches[key])?GG.matches[key]:[];
+      const keep=cur.filter(m=> scope==='main' ? isPrelimMatch(m) : isMainMatch(m));
+      const add=(Array.isArray(backupMatches)?backupMatches:[]).filter(m=> scope==='main' ? isMainMatch(m) : isPrelimMatch(m));
+      if(!add.length && !backupDraw) throw new Error((scope==='main'?'본선':'예선')+' 복원 대상이 백업 파일에 없습니다.');
+      GG.matches[key]=clone([...keep, ...add]);
+      if(backupDraw) GG.draws[key]=splitDrawForScope(GG.draws[key], backupDraw, scope);
+      await saveKeyData(key);
+      return `${scope==='main'?'본선':'예선'} 복원 완료 (${add.length}경기)`;
+    }
+    if(scope==='matches'){
+      if(!Array.isArray(backupMatches)) throw new Error('백업 파일에 현재 부서 경기 데이터가 없습니다.');
+      GG.matches[key]=clone(backupMatches);
+      if(backupDraw) GG.draws[key]=clone(backupDraw);
+      await saveKeyData(key);
+      return `현재 부서 경기/대진 복원 완료 (${backupMatches.length}경기)`;
+    }
+    if(scope==='teams'){
+      if(!backupTeams) throw new Error('백업 파일에 현재 부서 참가팀 데이터가 없습니다.');
+      GG.teams[key]=clone(backupTeams);
+      if(typeof window.stT==='function') await window.stT(key);
+      else toastMsg('참가팀은 메모리에 반영했습니다. 저장 함수가 없으면 전체 복원을 사용하세요.','info');
+      try{ if(typeof window.renderRL==='function') window.renderRL(); }catch(e){}
+      return `현재 부서 참가팀 복원 완료 (${backupTeams.length||Object.keys(backupTeams).length}건)`;
+    }
+    if(scope==='players'){
+      if(!data.players) throw new Error('백업 파일에 선수 기록이 없습니다.');
+      GG.players=clone(data.players||{});
+      if(typeof window.restoreFromJSON==='function' && window.__v937UseOldPlayersRestore){ return '선수 기록은 기존 전체 복원 방식을 사용하세요'; }
+      toastMsg('선수 기록은 메모리에 반영했습니다. 완전 저장은 기존 선수기록 복원/전체 복원을 사용하세요.','info');
+      return `선수 기록 메모리 복원 완료 (${Object.keys(GG.players).length}명)`;
+    }
+    throw new Error('알 수 없는 복원 범위입니다: '+scope);
+  }
+  async function handleFile(input){
+    const file=input && input.files && input.files[0]; if(!file) return;
+    let data;
+    try{ data=JSON.parse(await file.text()); }catch(e){ toastMsg('JSON 백업 파일 형식이 아닙니다','error'); return; }
+    const scope=window.__v937RestoreScope||'all';
+    try{ window.v937BackupNow(); }catch(e){ console.warn(TAG,'auto backup failed',e); }
+    const label={all:'전체 복원',main:'현재 부서 본선만 복원',prelim:'현재 부서 예선만 복원',matches:'현재 부서 경기/대진만 복원',teams:'현재 부서 참가팀만 복원',players:'선수 기록만 복원'}[scope]||scope;
+    if(!confirm('복원 전 현재 데이터 안전백업을 다운로드했습니다.\n\n진행할 작업: '+label+'\n\n계속 진행할까요?')){ input.value=''; return; }
+    if(scope==='all'){
+      // 기존 전체 복원은 이미 검증된 경로를 사용하되, 자동백업은 v937에서 보장한다.
+      if(typeof oldRestore==='function') return oldRestore(input);
+      throw new Error('기존 전체 복원 함수를 찾지 못했습니다.');
+    }
+    try{
+      if(typeof window.sl==='function') window.sl(true);
+      const msg=await restoreScoped(data, scope);
+      if(typeof window.sl==='function') window.sl(false);
+      toastMsg(msg,'success');
+      const st=$('backupStatus'); if(st) st.textContent='✅ '+msg;
+    }catch(e){
+      if(typeof window.sl==='function') window.sl(false);
+      console.error(TAG,e);
+      toastMsg('복원 실패: '+(e.message||e),'error');
+    }finally{ input.value=''; window.__v937RestoreScope=''; }
+  }
+
+  const oldRestore=window.restoreFromJSON;
+  window.restoreFromJSON=async function(input){
+    if(window.__v937RestoreScope){ return handleFile(input); }
+    // 기존 복원 버튼을 눌러도 먼저 안전백업을 강제한다.
+    window.__v937RestoreScope='all';
+    return handleFile(input);
+  };
+
+  function installPanel(){
+    try{
+      const modal=$('mBackup'); if(!modal) return;
+      const body=modal.querySelector('.modal-body'); if(!body) return;
+      if($('v937BackupRestorePanel')) return;
+      const panel=document.createElement('div');
+      panel.id='v937BackupRestorePanel';
+      panel.innerHTML=`
+        <div class="v937-title">🛟 v937 안전 백업 / 범위별 복원</div>
+        <div class="v937-desc">복원 버튼을 누르면 먼저 <b>현재 상태 안전백업</b>을 자동 다운로드합니다. 지난번처럼 전체 복원으로 예선 기록이 날아가지 않도록, 필요한 범위만 복원하세요.</div>
+        <input id="v937RestoreFile" type="file" accept=".json,application/json" style="display:none" onchange="window.restoreFromJSON(this)">
+        <div class="v937-grid">
+          <button type="button" class="v937-btn primary" onclick="window.v937BackupNow()">💾 현재상태 안전백업</button>
+          <button type="button" class="v937-btn" onclick="window.v937RestoreChoose('main')">🏆 현재부서 본선만 복원</button>
+          <button type="button" class="v937-btn" onclick="window.v937RestoreChoose('prelim')">🎾 현재부서 예선만 복원</button>
+          <button type="button" class="v937-btn" onclick="window.v937RestoreChoose('matches')">📋 현재부서 경기/대진 복원</button>
+          <button type="button" class="v937-btn" onclick="window.v937RestoreChoose('teams')">👥 현재부서 참가팀 복원</button>
+          <button type="button" class="v937-btn danger" onclick="window.v937RestoreChoose('all')">⚠️ 전체 복원</button>
+        </div>
+        <div class="v937-status">권장 순서: 문제가 생기면 먼저 안전백업 → 필요한 범위만 복원 → 대진표에서 수동 갱신. 전체 복원은 마지막 수단입니다.</div>`;
+      body.insertBefore(panel, body.firstChild);
+    }catch(e){ console.warn(TAG,'panel install failed',e); }
+  }
+  const oldOm=window.om;
+  if(typeof oldOm==='function' && !oldOm.__v937Wrapped){
+    window.om=function(id){ const r=oldOm.apply(this,arguments); if(id==='mBackup') setTimeout(installPanel,40); return r; };
+    window.om.__v937Wrapped=true;
+    try{ om=window.om; }catch(e){}
+  }
+  const oldBackup=window.backupJSON;
+  window.backupJSON=function(){
+    try{ return oldBackup.apply(this,arguments); }catch(e){ console.warn(TAG,'old backup failed, using v937',e); return window.v937BackupNow(); }
+  };
+  function badge(){ try{ const b=$('bracketFreshnessBadge'); if(b){ b.textContent='v937 백업안전'; b.title='복원 전 자동백업 + 범위별 복원'; } }catch(e){} }
+  document.addEventListener('DOMContentLoaded',()=>{ setTimeout(installPanel,300); setTimeout(badge,500); });
+  setTimeout(()=>{installPanel(); badge();},800);
+  console.log(TAG,'installed');
+})();
+</script>
+
+
+
+<!-- v938: 결과 8강 표시 + 마지막 결과저장 되돌리기 -->
+<style id="v938Rank8UndoStyle">
+#v938UndoPanel{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin:8px 0 10px;padding:10px 12px;border-radius:14px;border:1.5px solid #c7d2fe;background:linear-gradient(135deg,#eef2ff,#f8fafc);color:#334155;font-size:.78rem;font-weight:900;line-height:1.45}
+#v938UndoPanel .v938-btn{border:0;border-radius:999px;background:#0f1e3a;color:#fff;font-size:.76rem;font-weight:1000;min-height:34px;padding:7px 12px;cursor:pointer;white-space:nowrap}
+#v938UndoPanel .v938-btn:disabled{opacity:.45;cursor:not-allowed}
+#v938Rank8Card{border:1.5px solid #bfdbfe;background:linear-gradient(135deg,#f8fbff,#fff);}
+.v938-rank8-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px}
+.v938-rank8-team{padding:10px 11px;border-radius:12px;border:1px solid #dbeafe;background:#fff;font-size:.86rem;font-weight:900;line-height:1.35;word-break:keep-all;overflow-wrap:anywhere;display:flex;align-items:center;gap:8px}
+.v938-rank8-team .idx{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:999px;background:#eff6ff;color:#1d4ed8;font-size:.72rem;font-weight:1000}
+#mM3B #v938UndoPanel{margin-bottom:12px}
+@media(max-width:680px){#v938UndoPanel{align-items:stretch}#v938UndoPanel .v938-btn{width:100%;}.v938-rank8-grid{grid-template-columns:1fr}}
+</style>
+<script id="v938Rank8UndoScript">
+(function(){
+  'use strict';
+  if(window.__v938Rank8UndoInstalled) return;
+  window.__v938Rank8UndoInstalled=true;
+  const TAG='[v938-rank8-undo]';
+  const $=id=>document.getElementById(id);
+  const now=()=>new Date().toISOString();
+  function toastMsg(msg,type){try{ if(typeof window.toast==='function') window.toast(msg,type||'info'); else alert(msg); }catch(e){}}
+  function clone(x){return JSON.parse(JSON.stringify(x==null?null:x));}
+  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+  function currentKeySmart(){
+    try{ if(typeof window.currentKey==='function'){const k=window.currentKey(); if(k&&k!=='__ALL__') return k;} }catch(e){}
+    try{const tid=($('brTS')||{}).value||($('rankTS')||{}).value||''; const div=($('brDS')||{}).value||($('rankDS')||{}).value||''; if(tid&&div&&div!=='__ALL__'&&div!=='__GUIDE__') return tid+'_'+div;}catch(e){}
+    return '';
+  }
+  function teamName(key,idx){
+    try{const teams=window.G&&G.teams&&G.teams[key]||[]; const t=teams[Number(idx)]; if(!t) return ''; if(typeof window.tdn==='function') return window.tdn(t,key,Number(idx)); if(Array.isArray(t.individualPlayers)) return t.individualPlayers.slice(0,2).map(p=>String(p&&p.name||p||'').trim()).filter(Boolean).join(' / '); return (t.players||[]).slice(0,2).join(' / ')||t.club||'';}catch(e){return '';}
+  }
+  function getMain(list){try{return (Array.isArray(list)?list:[]).filter(m=>m&&String(m.phase||'')==='main');}catch(e){return [];}}
+  function finalRound(main){const real=main.filter(m=>!m.bye); if(!real.length) return null; return Math.max(...real.map(m=>Number(m.round||0)));}
+  function loserOf(m){if(!m||m.winner==null) return null; if(Number(m.winner)===Number(m.t1)) return m.t2; if(Number(m.winner)===Number(m.t2)) return m.t1; return null;}
+  function v938QuarterLosers(key){
+    const list=getMain(window.G&&G.matches&&G.matches[key]||[]); const fr=finalRound(list); if(fr==null||fr<2) return [];
+    const qRound=fr-2; const seen=new Set(); const out=[];
+    list.filter(m=>Number(m.round||0)===qRound && !m.bye).sort((a,b)=>(Number(a.slot||0)-Number(b.slot||0))).forEach(m=>{
+      let idx=loserOf(m);
+      if(idx==null){
+        // 결과가 아직 없으면 8강 경기 참가팀을 임시 표시하지 않는다. 결과 페이지에서는 확정팀만 표시.
+        return;
+      }
+      const nm=teamName(key,idx); if(!nm||seen.has(String(idx))) return; seen.add(String(idx)); out.push({idx,nm});
+    });
+    return out.slice(0,4);
+  }
+  function selectedRankDivs(tid){
+    try{const d=($('rankDS')||{}).value||''; if(d&&d!=='__GUIDE__') return [d];}catch(e){}
+    try{const t=(G.tournaments||[]).find(x=>x.id===tid); return (t&&t.divisions)||[];}catch(e){return [];}
+  }
+  function injectRank8(){
+    try{
+      const cont=$('rankContent'); if(!cont||$('v938Rank8Wrap')) return;
+      const tid=($('rankTS')||{}).value||''; if(!tid||!(window.G&&G.tournaments&&G.tournaments.some(t=>t.id===tid))) return;
+      const wrap=document.createElement('div'); wrap.id='v938Rank8Wrap';
+      let html='';
+      selectedRankDivs(tid).forEach(div=>{
+        const key=tid+'_'+div; const rows=v938QuarterLosers(key); if(!rows.length) return;
+        const divLabel=(typeof window.dl==='function'?window.dl(div):div);
+        html+=`<div class="card" id="v938Rank8Card"><div class="card-title">🎾 ${esc(divLabel)} 8강</div><div class="v938-rank8-grid">${rows.map((r,i)=>`<div class="v938-rank8-team"><span class="idx">${i+1}</span><span>${esc(r.nm)}</span></div>`).join('')}</div><div style="margin-top:8px;font-size:.72rem;color:#64748b;font-weight:800;line-height:1.5">※ 8강 패자 4팀을 표시합니다. 우승·준우승·공동3위와 함께 8강까지 결과 확인용입니다.</div></div>`;
+      });
+      if(!html) return; wrap.innerHTML=html; cont.appendChild(wrap);
+    }catch(e){console.warn(TAG,'rank8 inject failed',e);}
+  }
+
+  function playerDiffKeys(before, after){
+    const keys=new Set([...Object.keys(before||{}),...Object.keys(after||{})]); const out=[];
+    keys.forEach(k=>{try{if(JSON.stringify(before&&before[k]||null)!==JSON.stringify(after&&after[k]||null)) out.push(k);}catch(e){out.push(k);}});
+    return out;
+  }
+  function makeSnapshot(reason,key,mid){
+    try{
+      key=key||currentKeySmart(); if(!key) return null;
+      const snap={version:938,at:now(),reason:reason||'result_save',key,mid:String(mid||''),matches:clone(G.matches&&G.matches[key]||[]),draw:clone(G.draws&&G.draws[key]||null),players:clone(G.players||{})};
+      window.__V938_LAST_UNDO=snap;
+      try{localStorage.setItem('v938_last_undo',JSON.stringify(snap));}catch(e){}
+      updateUndoUi();
+      return snap;
+    }catch(e){console.warn(TAG,'snapshot failed',e);return null;}
+  }
+  window.v938CaptureUndoSnapshot=makeSnapshot;
+  window.v938UndoLastResult=async function(){
+    let snap=window.__V938_LAST_UNDO;
+    if(!snap){try{snap=JSON.parse(localStorage.getItem('v938_last_undo')||'null');}catch(e){}}
+    if(!snap||!snap.key){toastMsg('되돌릴 최근 결과 저장 기록이 없습니다','info');return;}
+    if(!confirm('마지막 결과 저장 전 상태로 되돌립니다.\n\n대상: '+snap.key+'\n시간: '+(snap.at||'')+'\n\n계속할까요?')) return;
+    try{
+      if(typeof window.sl==='function') window.sl(true);
+      const beforePlayers=clone(G.players||{});
+      G.matches=G.matches||{}; G.draws=G.draws||{}; G.players=G.players||{};
+      G.matches[snap.key]=clone(snap.matches||[]);
+      if(snap.draw) G.draws[snap.key]=clone(snap.draw); else delete G.draws[snap.key];
+      G.players=clone(snap.players||{});
+      try{ if(window.__FB_WRITE_CACHE){ if(__FB_WRITE_CACHE.matches) delete __FB_WRITE_CACHE.matches[snap.key]; if(__FB_WRITE_CACHE.draws) delete __FB_WRITE_CACHE.draws[snap.key]; } }catch(e){}
+      const ps=[];
+      try{if(typeof window.stM==='function') ps.push(Promise.resolve(window.stM(snap.key)));}catch(e){}
+      try{if(typeof window.stD==='function') ps.push(Promise.resolve(window.stD(snap.key)));}catch(e){}
+      try{const keys=playerDiffKeys(beforePlayers,G.players); if(keys.length&&typeof window.enqueuePlayerPersist==='function') window.enqueuePlayerPersist(keys,100);}catch(e){}
+      await Promise.allSettled(ps);
+      if(typeof window.sl==='function') window.sl(false);
+      try{delete window.__V938_LAST_UNDO; localStorage.removeItem('v938_last_undo');}catch(e){}
+      try{if(typeof window.renderBracket==='function') window.renderBracket();}catch(e){}
+      try{if(typeof window.renderRanking==='function') setTimeout(()=>window.renderRanking(),80);}catch(e){}
+      updateUndoUi(); toastMsg('마지막 결과 저장을 되돌렸습니다','success');
+    }catch(e){try{if(typeof window.sl==='function') window.sl(false);}catch(_){} console.error(TAG,e); toastMsg('되돌리기 실패: '+(e.message||e),'error');}
+  };
+  function updateUndoUi(){
+    try{
+      const has=!!(window.__V938_LAST_UNDO||localStorage.getItem('v938_last_undo'));
+      document.querySelectorAll('[data-v938-undo-btn]').forEach(b=>{b.disabled=!has; b.textContent=has?'↩ 마지막 결과 되돌리기':'↩ 되돌릴 결과 없음';});
+    }catch(e){}
+  }
+  function installUndoPanel(){
+    try{
+      const bc=$('bracketContent'); if(bc&&!$('v938BracketUndoPanel')){
+        const p=document.createElement('div'); p.id='v938BracketUndoPanel'; p.innerHTML=`<div id="v938UndoPanel"><div>🛟 <b>실수 방지</b> · 결과 저장 직전 상태를 1회 보관합니다. 잘못 저장했으면 바로 되돌릴 수 있습니다.</div><button type="button" class="v938-btn" data-v938-undo-btn onclick="window.v938UndoLastResult()">↩ 마지막 결과 되돌리기</button></div>`;
+        bc.parentNode.insertBefore(p,bc);
+      }
+      const body=$('mM3B'); if(body&&!$('v938ModalUndoPanel')){
+        const p=document.createElement('div'); p.id='v938ModalUndoPanel'; p.innerHTML=`<div id="v938UndoPanel"><div>결과 저장 실수 시 사용</div><button type="button" class="v938-btn" data-v938-undo-btn onclick="window.v938UndoLastResult()">↩ 마지막 결과 되돌리기</button></div>`;
+        body.insertBefore(p,body.firstChild);
+      }
+      updateUndoUi();
+    }catch(e){}
+  }
+
+  // 일반 결과저장(saveM3) 전에 스냅샷 생성
+  function wrapSaveM3(){
+    try{
+      const old=window.saveM3; if(typeof old!=='function'||old.__v938Wrapped) return;
+      const w=function(){
+        try{const key=window.CM_key||(typeof CM_key!=='undefined'?CM_key:'')||((window.__v935M3Context||{}).key); const mid=window.CM_id||(typeof CM_id!=='undefined'?CM_id:'')||((window.__v935M3Context||{}).mid); makeSnapshot('saveM3',key,mid);}catch(e){}
+        return old.apply(this,arguments);
+      };
+      w.__v938Wrapped=true; w.__old=old; window.saveM3=w; try{saveM3=w;}catch(e){}
+    }catch(e){}
+  }
+  // 스코어 없이 승패저장 버튼은 v935가 document capture에서 바로 실행하므로 window capture에서 먼저 스냅샷 생성
+  window.addEventListener('pointerdown',function(ev){
+    try{const btn=ev.target&&ev.target.closest&&ev.target.closest('#v935QuickWinBox .v935-btn,#v922QuickWinBox .v922-btn,#v917QuickWinBox button,#v916QuickWinBox button,#v915QuickWinBox button,#v913QuickWinBox button,#v908AdminQuickWinBox button'); if(btn) makeSnapshot('quickwin',btn.dataset.key,btn.dataset.mid);}catch(e){}
+  },true);
+
+  const oldRenderRanking=window.renderRanking;
+  if(typeof oldRenderRanking==='function'&&!oldRenderRanking.__v938Wrapped){
+    const w=function(){const r=oldRenderRanking.apply(this,arguments); setTimeout(injectRank8,40); return r;};
+    w.__v938Wrapped=true; w.__old=oldRenderRanking; window.renderRanking=w; try{renderRanking=w;}catch(e){}
+  }
+  const oldRenderBracket=window.renderBracket;
+  if(typeof oldRenderBracket==='function'&&!oldRenderBracket.__v938UndoWrapped){
+    const w=function(){const r=oldRenderBracket.apply(this,arguments); setTimeout(installUndoPanel,80); return r;};
+    w.__v938UndoWrapped=true; w.__old=oldRenderBracket; window.renderBracket=w; try{renderBracket=w;}catch(e){}
+  }
+  const oldOpenM3=window.openM3;
+  if(typeof oldOpenM3==='function'&&!oldOpenM3.__v938UndoWrapped){
+    const w=function(){const r=oldOpenM3.apply(this,arguments); [60,160,360,800].forEach(ms=>setTimeout(installUndoPanel,ms)); return r;};
+    w.__v938UndoWrapped=true; w.__old=oldOpenM3; window.openM3=w; try{openM3=w;}catch(e){}
+  }
+  function badge(){try{const b=$('bracketFreshnessBadge'); if(b){b.textContent='v938 결과8강'; b.title='결과 8강 표시 + 마지막 결과 되돌리기'; b.style.minWidth='118px';}}catch(e){}}
+  document.addEventListener('DOMContentLoaded',()=>{setTimeout(()=>{wrapSaveM3(); installUndoPanel(); injectRank8(); badge();},300);});
+  setTimeout(()=>{wrapSaveM3(); installUndoPanel(); injectRank8(); badge();},800);
+  setInterval(()=>{try{wrapSaveM3(); if(($('page-bracket')||{}).classList?.contains('active')) installUndoPanel(); if(($('page-ranking')||{}).classList?.contains('active')) injectRank8(); badge();}catch(e){}},2500);
   console.log(TAG,'installed');
 })();
 </script>
