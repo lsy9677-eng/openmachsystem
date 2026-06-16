@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-16-v920-operational-mode-separation";
+  const APP_VERSION = "2026-06-16-v921-manual-main-court-operation";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -60243,6 +60243,346 @@ body.v920-replay-record-mode [onclick*="v791LockModernCupFourSlotFixedTable"]{di
   document.addEventListener('DOMContentLoaded',()=>setTimeout(boot,250));
   setTimeout(boot,400); setTimeout(boot,1200); setTimeout(boot,2500);
   try{ window.__v920Boot=boot; }catch(e){}
+  console.log(TAG,'installed',VERSION);
+})();
+</script>
+
+<style id="v921ManualMainCourtOperationStyle">
+.v921-court-op-btn{border:none;border-radius:999px;padding:8px 12px;min-height:34px;font-size:.76rem;font-weight:1000;cursor:pointer;white-space:nowrap;box-shadow:0 5px 12px rgba(15,30,58,.10)}
+.v921-court-op-btn.manual{background:#0f766e;color:#fff}
+.v921-court-op-btn.auto{background:#f8fafc;color:#334155;border:1.5px solid #cbd5e1}
+.v921-court-op-note{flex-basis:100%;margin-top:8px;padding:8px 10px;border-radius:12px;background:#ecfdf5;border:1px solid #99f6e4;color:#115e59;font-size:.72rem;font-weight:800;line-height:1.55;word-break:keep-all}
+body.v920-manual-main-mode .v921-court-op-note,body.v920-replay-record-mode .v921-court-op-note{display:block}
+@media(max-width:680px){.v921-court-op-btn{width:100%;justify-content:center}.v921-court-op-note{font-size:.68rem}}
+</style>
+<script id="v921ManualMainCourtOperationScript">
+(function(){
+  'use strict';
+  const TAG='[v921-manual-main-court-operation]';
+  const VERSION='2026-06-16-v921-manual-main-court-operation';
+  if(window.__v921ManualMainCourtOperationInstalled) return;
+  window.__v921ManualMainCourtOperationInstalled = true;
+
+  function $(id){return document.getElementById(id);} 
+  function arr(x){return Array.isArray(x)?x:[];}
+  function clean(s){return String(s??'').replace(/\s+/g,' ').trim();}
+  function toast2(msg,type){try{ if(typeof toast==='function') toast(msg,type||'info'); else console.log(TAG,msg);}catch(e){console.log(TAG,msg);} }
+  function roleOk(){
+    try{ if(!!(window.AD||window.TM||window.OP)) return true; }catch(e){}
+    try{ if(typeof canManageBracket==='function' && canManageBracket()) return true; }catch(e){}
+    try{ if(typeof window.v920IsManualMainLocked==='function' && (document.body&&/admin-mode|tm-mode|operator-mode/.test(document.body.className||''))) return true; }catch(e){}
+    return false;
+  }
+  function currentTidDiv(){
+    try{
+      const tid=($('brTS')&&$('brTS').value)||'';
+      let div='';
+      const ds=$('brDS');
+      if(ds&&ds.value&&ds.value!=='__ALL__') div=ds.value;
+      if(!div){ const c=document.querySelector('#brMultiDiv input[type="checkbox"]:checked'); if(c) div=c.value; }
+      return {tid,div,key:(tid&&div)?tid+'_'+div:''};
+    }catch(e){return {tid:'',div:'',key:''};}
+  }
+  function drawOf(key){try{return (window.G&&G.draws&&G.draws[key]) || null;}catch(e){return null;}}
+  function modeOf(key){
+    try{ if(typeof window.v920GetMainMode==='function') return window.v920GetMainMode(key); }catch(e){}
+    const d=drawOf(key); if(!d) return 'auto';
+    const m=clean(d.mainMode||d.mainSourceMode||d.operationMainMode||'');
+    if(/manual/.test(m)||d.mainManualLocked||d.manualMainOperational||d.v920ManualMainLocked) return 'manual';
+    if(/replay/.test(m)||d.replayRecordMode) return 'replay';
+    return 'auto';
+  }
+  function isManualLike(key){
+    try{ if(typeof window.v920IsManualMainLocked==='function' && window.v920IsManualMainLocked(key)) return true; }catch(e){}
+    const m=modeOf(key); return m==='manual'||m==='replay';
+  }
+  function td(key){try{return typeof _k2td==='function'?_k2td(key):{tid:String(key).split('_')[0],div:String(key).split('_').slice(1).join('_')};}catch(e){return {tid:'',div:''};}}
+  function uniq(a){return [...new Set(arr(a).map(x=>clean(x)).filter(Boolean))];}
+  function allKnownCourtsSafe(tid){try{return uniq(typeof getAllKnownCourts==='function'?getAllKnownCourts(tid):[]);}catch(e){return [];}}
+  function manualBoardCourts(key){
+    try{
+      const {tid,div}=td(key);
+      const t=arr(G&&G.tournaments).find(x=>String(x.id)===String(tid));
+      const ds=t && t.divSettings && t.divSettings[div];
+      let out=[];
+      if(ds){
+        out=uniq(ds.mainAllowedCourts||[]);
+        if(!out.length) out=uniq(ds.allowedCourts||[]);
+        if(!out.length) out=uniq(ds.courts||[]);
+      }
+      if(!out.length){
+        try{ out=uniq(typeof getDisplayCourtFilters==='function'?getDisplayCourtFilters(key):[]); }catch(e){}
+      }
+      if(!out.length){
+        try{ out=uniq(typeof getUsedCourtsForKey==='function'?getUsedCourtsForKey(key):[]); }catch(e){}
+      }
+      if(!out.length){
+        out=allKnownCourtsSafe(tid);
+      }
+      return out;
+    }catch(e){return [];}
+  }
+  function realMainMatches(key){
+    try{
+      return arr(G&&G.matches&&G.matches[key]).filter(m=>m && String(m.phase||'')==='main' && !m.bye);
+    }catch(e){return [];}
+  }
+  function hasBothTeams(m){return m && m.t1!==undefined && m.t1!==null && m.t2!==undefined && m.t2!==null;}
+  function unfinishedActiveMainMatches(key){
+    const list=realMainMatches(key).filter(m=>m.winner==null && hasBothTeams(m));
+    if(!list.length) return [];
+    const minRound=Math.min(...list.map(m=>Number(m.round||0)).filter(n=>Number.isFinite(n)));
+    return list.filter(m=>Number(m.round||0)===minRound).sort(sortMainMatch);
+  }
+  function sortMainMatch(a,b){
+    const ao=Number(a.__manualMainQueueOrder ?? a.v921QueueOrder ?? 999999);
+    const bo=Number(b.__manualMainQueueOrder ?? b.v921QueueOrder ?? 999999);
+    if(ao!==bo) return ao-bo;
+    const ra=Number(a.round||0), rb=Number(b.round||0); if(ra!==rb) return ra-rb;
+    const sa=Number(a.slot||0), sb=Number(b.slot||0); if(sa!==sb) return sa-sb;
+    return String(a.id||'').localeCompare(String(b.id||''),'ko');
+  }
+  function matchCourts(m){
+    const out=[];
+    const mc=clean(m&&m.manualCourtTarget); if(mc) out.push(mc);
+    const c=clean(m&&m.court); if(c) out.push(c);
+    arr(m&&m.courts).forEach(x=>{const v=clean(x); if(v) out.push(v);});
+    return uniq(out);
+  }
+  function clearCourtFields(m){
+    if(!m) return;
+    delete m.court;
+    m.courts=[];
+    delete m.manualCourtTarget;
+    delete m.manualCourtPinnedAt;
+    delete m.courtAssignedAt;
+    delete m.waitingFirstAt;
+    delete m.lastWaitingFirstAt;
+    delete m.startedAt;
+    delete m.matchStartedAt;
+    delete m.autoCourtLabel;
+    m.manualCourtLocked=false;
+  }
+  function setMatchToCourt(m,court,orderIso,isWaiting){
+    m.court=court;
+    m.courts=[court];
+    m.manualCourtTarget=court;
+    m.manualCourtLocked=true;
+    m.manualCourtLockedAt=m.manualCourtLockedAt||new Date().toISOString();
+    m.manualCourtPinnedAt=orderIso;
+    m.courtAssignedAt=orderIso;
+    m.courtQueueOrder=orderIso;
+    m.manualSharedHold=false;
+    m.__manualSharedHold=false;
+    m.autoCourtLabel=isWaiting?'수동본선 코트대기':'수동본선 현재경기';
+    if(isWaiting){ m.waitingFirstAt=m.waitingFirstAt||orderIso; }
+    else { delete m.waitingFirstAt; delete m.lastWaitingFirstAt; }
+    m.v921ManualMainCourtOperational=true;
+  }
+  function setMatchShared(m,order){
+    clearCourtFields(m);
+    m.manualSharedHold=true;
+    m.__manualSharedHold=true;
+    m.__mainQueueOrder=order;
+    m.v921QueueOrder=order;
+    m.courtQueueOrder=String(order).padStart(5,'0');
+    m.v921ManualMainCourtOperational=true;
+    m.autoCourtLabel='수동본선 공용대기';
+  }
+  function isoAt(baseMs,idx){return new Date(baseMs + idx*1000).toISOString();}
+
+  function manualSnapshot(key){
+    const courts=manualBoardCourts(key);
+    const active=unfinishedActiveMainMatches(key);
+    const allowed=new Set(courts.map(String));
+    const byCourt={}; courts.forEach(c=>byCourt[c]=[]);
+    const shared=[];
+    active.forEach(m=>{
+      const cs=matchCourts(m).filter(c=>!allowed.size || allowed.has(c));
+      if(cs.length && byCourt[cs[0]]) byCourt[cs[0]].push(m);
+      else shared.push({...m,__manualSharedHold:true,manualSharedHold:true,__sharedListOrder:Number(m.v921QueueOrder ?? 99999)});
+    });
+    const items=courts.map(c=>{
+      const related=arr(byCourt[c]).sort(sortMainMatch);
+      return {court:c,status:related.length?'live':'empty',current:related[0]||null,waiting:related.slice(1),related};
+    });
+    return {courts,items,shared:shared.sort(sortMainMatch),active};
+  }
+
+  window.v921GetManualMainBoardCourts=manualBoardCourts;
+  window.v921GetManualActiveMainMatches=unfinishedActiveMainMatches;
+  window.v921GetManualSharedWaitingItems=function(key){return manualSnapshot(key).shared||[];};
+
+  async function persistKeySafe(key){
+    let orig=null;
+    try{
+      const d=drawOf(key);
+      if(d && d.manual128 && Array.isArray(d.manual128.rounds)){
+        orig=d.manual128;
+        d.manual128Json=JSON.stringify(orig);
+        d.manual128Meta={active:orig.active!==false,size:Number(orig.size)||128,title:clean(orig.title||'128강 수동 본선'),updatedAt:clean(orig.updatedAt||new Date().toISOString()),v921Encoded:true};
+        delete d.manual128;
+      }
+      try{ if(window.__FB_WRITE_CACHE){ if(__FB_WRITE_CACHE.draws) delete __FB_WRITE_CACHE.draws[key]; if(__FB_WRITE_CACHE.matches) delete __FB_WRITE_CACHE.matches[key]; } }catch(e){}
+      if(typeof stM==='function') await stM(key);
+      if(typeof stD==='function') await stD(key);
+    }finally{
+      try{ if(orig && drawOf(key)) G.draws[key].manual128=orig; }catch(e){}
+      try{ if(typeof window.v912DecodeManual128==='function') window.v912DecodeManual128(); }catch(e){}
+    }
+  }
+
+  window.v921RebuildManualMainCourtOperation=async function(key){
+    key=key||currentTidDiv().key;
+    if(!key){toast2('대회/부서를 먼저 선택하세요.','error');return false;}
+    if(!roleOk()){toast2('관리자/운영자/진행자 권한이 필요합니다.','error');return false;}
+    const d=G.draws[key]=G.draws[key]||{};
+    const courts=manualBoardCourts(key);
+    if(!courts.length){toast2('본선 운영 코트가 없습니다. 대회관리에서 코트를 먼저 선택하세요.','error');return false;}
+    const active=unfinishedActiveMainMatches(key);
+    if(!active.length){toast2('코트 운영에 올릴 미완료 본선 경기가 없습니다.','info');return false;}
+    const mode=modeOf(key)==='replay'?'replay':'manual';
+    const base=Date.now();
+    active.forEach((m,idx)=>{
+      m.manualMain=true; m.mainMode=mode; m.v920ManualProtected=true; m.v921ManualMainOperational=true;
+      m.__manualMainQueueOrder=idx; m.v921QueueOrder=idx;
+      if(idx<courts.length){ setMatchToCourt(m,courts[idx],isoAt(base,idx),false); }
+      else if(idx<courts.length*2){ setMatchToCourt(m,courts[idx-courts.length],isoAt(base,idx),true); }
+      else { setMatchShared(m,idx); }
+    });
+    // 미래 라운드나 미완성 본선은 코트 현황판에서 빠지도록 코트 필드를 비운다.
+    realMainMatches(key).forEach(m=>{
+      if(active.indexOf(m)>=0) return;
+      if(m.winner==null){ clearCourtFields(m); m.manualSharedHold=false; m.__manualSharedHold=false; }
+      m.manualMain=true; m.mainMode=mode; m.v920ManualProtected=true;
+    });
+    Object.assign(d,{
+      mainMode:mode,
+      mainSourceMode:mode,
+      operationMainMode:mode==='replay'?'replay_record':'live_main_manual',
+      mainAutoBlocked:true,
+      mainModeLocked:true,
+      mainManualLocked:true,
+      mainManualFinal:true,
+      manualMainOperational:true,
+      mainBracketLocked:true,
+      v920ManualMainLocked:true,
+      v921ManualCourtOperational:true,
+      v921ManualCourtOperationalAt:new Date().toISOString(),
+      v921ManualCourtPolicy:'court-current-1-waiting-1-rest-shared',
+      v921ManualCourtCount:courts.length,
+      v921ManualActiveRound:Number(active[0]?.round||0),
+      v921ManualActiveCount:active.length
+    });
+    try{
+      toast2('수동본선 코트 운영 데이터 저장 중...', 'info');
+      await persistKeySafe(key);
+      try{ if(typeof renderBracket==='function') renderBracket(); }catch(e){}
+      toast2(`본선 운영정리 완료: 코트 ${courts.length}면 · 진행 ${Math.min(active.length,courts.length)} · 코트대기 ${Math.min(Math.max(active.length-courts.length,0),courts.length)} · 공용대기 ${Math.max(active.length-courts.length*2,0)}`,'success');
+      return true;
+    }catch(e){console.error(TAG,e); toast2('본선 코트 운영 저장 실패: '+(e.message||e),'error'); return false;}
+  };
+
+  // 수동/복기 모드에서는 코트 현황판의 기준을 본선 matches로만 제한한다.
+  function installManualAwareCourtBoard(){
+    try{
+      const oldSnap=window.getCourtStatusSnapshot;
+      if(typeof oldSnap==='function' && !oldSnap.__v921ManualAware){
+        const wrapped=function(key){
+          if(key && isManualLike(key)) return manualSnapshot(key).items;
+          return oldSnap.apply(this,arguments);
+        };
+        wrapped.__v921ManualAware=true; wrapped.__old=oldSnap;
+        window.getCourtStatusSnapshot=wrapped; try{getCourtStatusSnapshot=wrapped;}catch(e){}
+      }
+      const oldShared=window.getIndividualAutoSharedWaitingItems;
+      if(typeof oldShared==='function' && !oldShared.__v921ManualAware){
+        const wrapped=function(key){
+          if(key && isManualLike(key)) return manualSnapshot(key).shared;
+          return oldShared.apply(this,arguments);
+        };
+        wrapped.__v921ManualAware=true; wrapped.__old=oldShared;
+        window.getIndividualAutoSharedWaitingItems=wrapped; try{getIndividualAutoSharedWaitingItems=wrapped;}catch(e){}
+      }
+      const oldVisible=window.getVisibleSharedWaitingOrderForAssign;
+      if(typeof oldVisible==='function' && !oldVisible.__v921ManualAware){
+        const wrapped=function(key){
+          if(key && isManualLike(key)) return manualSnapshot(key).shared;
+          return oldVisible.apply(this,arguments);
+        };
+        wrapped.__v921ManualAware=true; wrapped.__old=oldVisible;
+        window.getVisibleSharedWaitingOrderForAssign=wrapped; try{getVisibleSharedWaitingOrderForAssign=wrapped;}catch(e){}
+      }
+    }catch(e){console.warn(TAG,'install manual court board failed',e);}
+  }
+
+  // 수동모드에서는 본선 자동 코트배정 계열이 본선 queue를 덮지 못하게 막는다.
+  function guardAutoCourtFns(){
+    ['v773RunMainAssign','v748RunMainAutoCourtRebuild','rebuildMainCourtAssignments','assignMainCourtsAutomatically','autoAssignMainCourts','rebuildIndividualAutoCourtAssignmentsForKey','scheduleAutoCourtAssignmentSave'].forEach(name=>{
+      try{
+        const old=window[name];
+        if(typeof old!=='function' || old.__v921Guarded) return;
+        const wrapped=function(){
+          const key=(Array.from(arguments).find(x=>typeof x==='string'&&x.includes('_')))||currentTidDiv().key;
+          if(key && isManualLike(key)){
+            toast2('현재 수동본선/복기모드입니다. 자동 코트배정은 차단되고 수동본선 운영정리만 사용합니다.','info');
+            return false;
+          }
+          return old.apply(this,arguments);
+        };
+        wrapped.__v921Guarded=true; wrapped.__old=old;
+        window[name]=wrapped; try{eval(name+'=wrapped');}catch(e){}
+      }catch(e){}
+    });
+  }
+
+  function panelButtonHtml(key){
+    if(!key) return '';
+    const mode=modeOf(key);
+    const cls=mode==='auto'?'auto':'manual';
+    return `<button id="v921CourtOperationBtn" type="button" class="v921-court-op-btn ${cls}" onclick="v921RebuildManualMainCourtOperation()" title="수동본선 matches만 코트 현황판 운영 데이터로 정리합니다">🎾 본선 코트 운영정리</button>`;
+  }
+  function installToolbarButton(){
+    try{
+      const {key}=currentTidDiv();
+      const panel=$('v920ModePanel');
+      if(!panel || !key) return;
+      let btn=$('v921CourtOperationBtn');
+      const actions=panel.querySelector('.v920-mode-actions') || panel;
+      if(!btn){ actions.insertAdjacentHTML('beforeend',panelButtonHtml(key)); }
+      else{
+        btn.classList.toggle('auto',modeOf(key)==='auto');
+        btn.classList.toggle('manual',modeOf(key)!=='auto');
+      }
+      let note=$('v921CourtOperationNote');
+      if(!note){
+        panel.insertAdjacentHTML('beforeend',`<div id="v921CourtOperationNote" class="v921-court-op-note">수동본선/복기모드에서는 코트 현황판이 예선 경기를 무시하고 본선 matches만 사용합니다. 코트별 현재 1경기 + 대기 1경기까지만 표시하고 나머지는 공용대기로 보냅니다.</div>`);
+      }
+    }catch(e){}
+  }
+  function updateFreshBadge(){
+    try{const b=$('bracketFreshnessBadge'); if(b){b.textContent='v921 수동본선 코트운영';}}catch(e){}
+  }
+  function boot(){installManualAwareCourtBoard(); guardAutoCourtFns(); installToolbarButton(); updateFreshBadge();}
+  function installRenderHook(){
+    try{
+      const old=window.renderBracket;
+      if(typeof old==='function' && !old.__v921PostHook){
+        let busy=false;
+        const wrapped=function(){
+          if(busy) return old.apply(this,arguments);
+          busy=true;
+          try{return old.apply(this,arguments);}finally{busy=false; setTimeout(boot,80);} 
+        };
+        wrapped.__v921PostHook=true; wrapped.__old=old;
+        window.renderBracket=wrapped; try{renderBracket=wrapped;}catch(e){}
+      }
+    }catch(e){}
+  }
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{boot();installRenderHook();},250));
+  setTimeout(()=>{boot();installRenderHook();},400);
+  setTimeout(boot,1200);
+  setTimeout(boot,2500);
   console.log(TAG,'installed',VERSION);
 })();
 </script>
