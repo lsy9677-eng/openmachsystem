@@ -106,7 +106,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-16-v940-rank8-integrated-result";
+  const APP_VERSION = "2026-06-16-v941-clean-console-hide-adv-rank8-force";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -63941,6 +63941,243 @@ body.bracket-page #v934FloatingRepairBtn,#page-bracket.active ~ #v934FloatingRep
   }
   document.addEventListener('DOMContentLoaded',()=>{setTimeout(()=>{installBadge(); refreshRankingIfActive();},600);});
   setTimeout(()=>{installBadge(); refreshRankingIfActive();},1000);
+})();
+</script>
+
+
+
+<!-- v941: 콘솔 반복로그 정리 + 본선진출팀 목록 숨김 + 시합결과 8강 강제 표시 -->
+<style id="v941CleanConsoleHideAdvRank8Style">
+  #v939CleanNote,
+  .v939-clean-note{
+    display:none!important;
+    visibility:hidden!important;
+    pointer-events:none!important;
+  }
+  .v941-hidden-adv-list{
+    display:none!important;
+    visibility:hidden!important;
+    pointer-events:none!important;
+  }
+  .v941-rank8-card{
+    border:1.5px solid #bfdbfe!important;
+    background:linear-gradient(135deg,#f8fbff,#ffffff)!important;
+  }
+  .v941-rank8-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:8px;
+  }
+  .v941-rank8-team{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:10px 12px;
+    border:1px solid #dbeafe;
+    border-radius:12px;
+    background:#fff;
+    font-size:.86rem;
+    font-weight:900;
+    line-height:1.35;
+    word-break:keep-all;
+    overflow-wrap:anywhere;
+  }
+  .v941-rank8-team .v941-rank8-no{
+    flex:0 0 auto;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:26px;
+    height:26px;
+    border-radius:999px;
+    background:#eff6ff;
+    color:#1d4ed8;
+    font-size:.72rem;
+    font-weight:1000;
+  }
+  .v941-quiet-note{
+    margin:8px 0 10px;
+    padding:9px 12px;
+    border:1px solid #dbeafe;
+    border-radius:12px;
+    background:#f8fbff;
+    color:#334155;
+    font-size:.76rem;
+    font-weight:900;
+    line-height:1.5;
+  }
+  @media(max-width:680px){.v941-rank8-grid{grid-template-columns:1fr}}
+</style>
+<script id="v941CleanConsoleHideAdvRank8Script">
+(function(){
+  'use strict';
+  if(window.__v941Installed) return;
+  window.__v941Installed=true;
+  const TAG='[v941-clean]';
+  const q=(id)=>document.getElementById(id);
+  const esc=(s)=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const quietPatterns=[
+    /\[v728\]/i,/venue split/i,/원도심\s*:\s*\d+\s*국제/i,
+    /v785/i,/v786/i,/v787/i,/v788/i,/v790/i,/v791/i,
+    /v927/i,/v928/i,/v929/i,/v930/i,/v931/i,/v932/i,/v933/i,/v934/i,/v935/i,/v939/i,
+    /MutationObserver blocked/i,/fast interval blocked/i,/persist done/i,/wrapped window/i,
+    /legacy v900/i,/installed$/i,/quarantine applied/i,/logs ON/i,/group badge removed/i
+  ];
+  function shouldQuiet(args){
+    try{
+      const s=args.map(a=>typeof a==='string'?a:(a&&a.message)||'').join(' ');
+      return quietPatterns.some(re=>re.test(s));
+    }catch(e){return false;}
+  }
+  ['log','info','debug','warn'].forEach(k=>{
+    try{
+      const old=console[k];
+      if(!old || old.__v941Quiet) return;
+      const fn=function(){ if(shouldQuiet([].slice.call(arguments))) return; return old.apply(console,arguments); };
+      fn.__v941Quiet=true; fn.__old=old; console[k]=fn;
+    }catch(e){}
+  });
+
+  function selectedTournamentId(){
+    try{return (q('rankTS')&&q('rankTS').value)||(q('brTS')&&q('brTS').value)||'';}catch(e){return '';}
+  }
+  function selectedRankDivs(tid){
+    try{
+      const ds=q('rankDS');
+      if(ds && ds.value) return [ds.value];
+      const keys=Object.keys((window.G&&G.matches)||{}).filter(k=>String(k).startsWith(String(tid)+'_'));
+      return keys.map(k=>{try{return (typeof _k2td==='function'?_k2td(k):{div:k.split('_').slice(1).join('_')}).div;}catch(e){return k.split('_').slice(1).join('_');}}).filter(Boolean);
+    }catch(e){return [];}
+  }
+  function keyOf(tid,div){
+    try{ if(typeof KD==='function') return KD(tid,div); }catch(e){}
+    return String(tid||'')+'_'+String(div||'');
+  }
+  function displayTeam(key,idx){
+    try{
+      const tm=(window.G&&G.teams&&G.teams[key]||[])[idx];
+      if(!tm) return '';
+      if(typeof window.tdn==='function') return window.tdn(tm,key,idx);
+      if(Array.isArray(tm.individualPlayers)) return tm.individualPlayers.slice(0,2).map(p=>p&&p.name).filter(Boolean).join(' / ');
+      if(Array.isArray(tm.players)) return tm.players.slice(0,2).join(' / ');
+      return tm.club||String(idx);
+    }catch(e){return String(idx);}
+  }
+  function matchWinner(key,m){
+    try{
+      if(!m) return null;
+      if(m.bye && m.t1!=null) return Number(m.t1);
+      if(m.winner!=null && m.winner!=='' && !Number.isNaN(Number(m.winner))) return Number(m.winner);
+      if(typeof window.getMatchResultState==='function'){
+        const st=window.getMatchResultState(key,m)||{};
+        if(st.done){
+          if(st.winner!=null && st.winner!=='' && !Number.isNaN(Number(st.winner))) return Number(st.winner);
+          const a=Number(st.sc1), b=Number(st.sc2);
+          if(Number.isFinite(a)&&Number.isFinite(b)&&a!==b) return a>b?Number(m.t1):Number(m.t2);
+        }
+      }
+      const a=Number(m.sc1), b=Number(m.sc2);
+      if(Number.isFinite(a)&&Number.isFinite(b)&&a!==b) return a>b?Number(m.t1):Number(m.t2);
+    }catch(e){}
+    return null;
+  }
+  function quarterLosers(key){
+    try{
+      const ms=((window.G&&G.matches&&G.matches[key])||[]).filter(m=>m&&String(m.phase||'')==='main'&&!m.bye);
+      if(!ms.length) return [];
+      const byRound={};
+      ms.forEach(m=>{const r=Number(m.round||0); (byRound[r]=byRound[r]||[]).push(m);});
+      let qRound=null;
+      Object.keys(byRound).map(Number).sort((a,b)=>a-b).forEach(r=>{ if(qRound==null && byRound[r].length===4) qRound=r; });
+      if(qRound==null){
+        const rounds=Object.keys(byRound).map(Number).sort((a,b)=>a-b);
+        qRound=rounds[Math.max(0,rounds.length-3)];
+      }
+      const out=[]; const seen=new Set();
+      (byRound[qRound]||[]).sort((a,b)=>Number(a.slot||0)-Number(b.slot||0)).forEach(m=>{
+        const w=matchWinner(key,m);
+        if(w==null) return;
+        const loser=Number(w)===Number(m.t1)?m.t2:m.t1;
+        if(loser==null || loser==='' || seen.has(String(loser))) return;
+        seen.add(String(loser));
+        out.push({idx:Number(loser), name:displayTeam(key,Number(loser))});
+      });
+      return out.slice(0,4);
+    }catch(e){return [];}
+  }
+  function forceRank8Card(){
+    try{
+      const page=q('page-ranking');
+      if(!page || !page.classList.contains('active')) return;
+      const root=q('rankContent');
+      if(!root) return;
+      const old=q('v941Rank8Card'); if(old) old.remove();
+      const tid=selectedTournamentId(); if(!tid) return;
+      const divs=selectedRankDivs(tid);
+      let all=[];
+      divs.forEach(div=>{
+        const key=keyOf(tid,div);
+        quarterLosers(key).forEach(x=>all.push(Object.assign({div,key},x)));
+      });
+      const seen=new Set();
+      all=all.filter(x=>x.name && !seen.has(x.name) && seen.add(x.name)).slice(0,8);
+      if(!all.length) return;
+      const card=document.createElement('div');
+      card.id='v941Rank8Card';
+      card.className='card v941-rank8-card';
+      card.innerHTML=`<div class="card-title">🎾 8강 진출/패자 기록</div><div class="v941-rank8-grid">${all.map((x,i)=>`<div class="v941-rank8-team"><span class="v941-rank8-no">${i+1}</span><span>${esc(x.name)}</span></div>`).join('')}</div><div class="v941-quiet-note">8강전에서 패한 팀을 기준으로 표시합니다. 우승·준우승·공동3위와 함께 결과 기록용입니다.</div>`;
+      const finalTitle=[...root.querySelectorAll('.sec-title,.card-title')].reverse().find(el=>/최종\s*결과/.test(el.textContent||''));
+      const finalCard=finalTitle && (finalTitle.closest('.card') || finalTitle.nextElementSibling);
+      if(finalCard && finalCard.parentNode) finalCard.insertAdjacentElement('afterend',card);
+      else root.appendChild(card);
+    }catch(e){console.error(TAG,'8강 표시 보정 실패',e);}
+  }
+  window.v941ForceRank8Card=forceRank8Card;
+
+  function shouldHideAdvNode(el){
+    if(!el || !el.textContent) return false;
+    if(el.closest('#mDraw,#drawCfgScreen,#drawRunScreen,#mMain,#mManualMainEdit,#mStableManualEdit')) return false;
+    const t=(el.textContent||'').replace(/\s+/g,' ');
+    return /본선\s*진출팀/.test(t) || /본선\s*진출\s*\(\d+팀\)/.test(t);
+  }
+  function hideAdvanceLists(){
+    try{
+      const roots=[q('bracketContent'),q('rankContent'),q('page-bracket'),q('page-ranking')].filter(Boolean);
+      roots.forEach(root=>{
+        [...root.querySelectorAll('div,section,article')].forEach(el=>{
+          if(!shouldHideAdvNode(el)) return;
+          const target=el.closest('.card,.grp-card') || el;
+          if(target.id==='rankContent' || target.id==='bracketContent') return;
+          target.classList.add('v941-hidden-adv-list');
+          target.setAttribute('data-v941-hidden-adv','1');
+        });
+      });
+    }catch(e){}
+  }
+  window.v941HideAdvanceLists=hideAdvanceLists;
+
+  function applyClean(){
+    try{ const n=q('v939CleanNote'); if(n) n.remove(); }catch(e){}
+    try{ const b=q('bracketFreshnessBadge'); if(b){ b.textContent='v941 정리'; b.title='콘솔 정리 / 본선진출팀 숨김 / 결과 8강 강제표시'; b.style.minWidth='92px'; } }catch(e){}
+    hideAdvanceLists();
+    forceRank8Card();
+  }
+  window.v941ApplyClean=applyClean;
+
+  function wrap(name, after){
+    try{
+      const old=window[name];
+      if(typeof old!=='function' || old.__v941Wrapped) return;
+      const fn=function(){ const r=old.apply(this,arguments); setTimeout(after,80); setTimeout(after,320); return r; };
+      fn.__v941Wrapped=true; fn.__old=old; window[name]=fn; try{ eval(name+'=window["'+name+'"]'); }catch(e){}
+    }catch(e){}
+  }
+  document.addEventListener('DOMContentLoaded',()=>{ applyClean(); setTimeout(applyClean,500); setTimeout(applyClean,1500); });
+  wrap('renderRanking',applyClean);
+  wrap('renderBracket',applyClean);
+  wrap('showPage',applyClean);
+  setTimeout(applyClean,1000);
+  setTimeout(applyClean,3000);
 })();
 </script>
 
