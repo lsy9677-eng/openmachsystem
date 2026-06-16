@@ -2,6 +2,44 @@
 
 <html lang="ko">
 <head>
+<script id="v939PreBootLegacyConsoleClean">
+(function(){
+  'use strict';
+  if(window.__v939PreBootInstalled) return;
+  window.__v939PreBootInstalled = true;
+  window.__V939_LEGACY_CLEAN_MODE = true;
+  window.__V939_DEBUG_LEGACY_LOGS = false;
+
+  const DROP_RE = /\[(?:v728|v739|v748|v771|v785|v786|v787|v788|v789|v790|v791|v798|v822|v900|v902|v906|v907|v908|v909|v910|v911|v912|v913|v914|v915|v916|v917|v918|v919|v920|v921|v922|v923|v925|v926|v927|v928|v929|v930|v931|v932|v933|v934|v935|v936|v937|v938)\b|venue split|MutationObserver blocked|fast interval blocked|persist done|wrapped window|blocked body|blocked #|설치완료|installed|fixed installed|installed|A4 v731|manual128-firestore-safe|quickwin-restore|round64-repair|result-scroll-stay|legacy v900|원도심:\s*\d+\s*국제:\s*\d+|공용대기 분리|부전승 32개 보정/i;
+  const KEEP_RE = /\[v939\]|v939|error|failed|실패|오류/i;
+  function stringifyArgs(args){
+    try{return Array.from(args).map(a=>{
+      if(typeof a==='string') return a;
+      if(a && a.message) return a.message;
+      if(a && a.id) return a.id;
+      return '';
+    }).join(' ');}catch(e){return '';}
+  }
+  ['log','info','warn','debug'].forEach(name=>{
+    const old = console[name];
+    if(typeof old !== 'function' || old.__v939Wrapped) return;
+    const wrapped = function(){
+      try{
+        const msg = stringifyArgs(arguments);
+        if(!window.__V939_DEBUG_LEGACY_LOGS && DROP_RE.test(msg) && !KEEP_RE.test(msg)) return;
+      }catch(e){}
+      return old.apply(console, arguments);
+    };
+    wrapped.__v939Wrapped = true;
+    wrapped.__old = old;
+    console[name] = wrapped;
+  });
+  window.v939SetDebugLegacyLogs=function(on){
+    window.__V939_DEBUG_LEGACY_LOGS=!!on;
+    try{console.log('[v939] legacy debug logs '+(on?'ON':'OFF'));}catch(e){}
+  };
+})();
+</script>
 <script id="v928PreBootLowLagGuard">
 (function(){
   'use strict';
@@ -68,7 +106,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-16-v938-rank8-undo-result";
+  const APP_VERSION = "2026-06-16-v940-rank8-integrated-result";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -63617,6 +63655,292 @@ body.bracket-page #v934FloatingRepairBtn,#page-bracket.active ~ #v934FloatingRep
   setTimeout(()=>{wrapSaveM3(); installUndoPanel(); injectRank8(); badge();},800);
   setInterval(()=>{try{wrapSaveM3(); if(($('page-bracket')||{}).classList?.contains('active')) installUndoPanel(); if(($('page-ranking')||{}).classList?.contains('active')) injectRank8(); badge();}catch(e){}},2500);
   console.log(TAG,'installed');
+})();
+</script>
+
+
+
+<!-- v939: 레거시 함수 격리 + 콘솔 정리 + 복구 잔재 자동 숨김 -->
+<style id="v939LegacyQuarantineStyle">
+.v939-clean-note{margin:10px 0 12px;padding:12px 14px;border:2px solid #64748b;border-radius:14px;background:linear-gradient(135deg,#f8fafc,#eef2f7);color:#334155;font-size:.78rem;font-weight:900;line-height:1.65;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.v939-clean-note .v939-actions{display:flex;gap:6px;flex-wrap:wrap}
+.v939-clean-note button{border:1.5px solid #94a3b8;background:#fff;color:#334155;border-radius:999px;min-height:32px;padding:6px 11px;font-size:.72rem;font-weight:1000;cursor:pointer}
+[data-v939-hidden="1"]{display:none!important;visibility:hidden!important;pointer-events:none!important}
+</style>
+<script id="v939LegacyQuarantineScript">
+(function(){
+  'use strict';
+  const TAG='[v939-legacy-quarantine]';
+  if(window.__v939Installed) return;
+  window.__v939Installed=true;
+  window.__V939_LEGACY_QUARANTINE=true;
+  const $=id=>document.getElementById(id);
+  const norm=s=>String(s||'').replace(/\s+/g,' ').trim();
+  const HIDE_RE=/128\s*PDF|PDF\s*고정|이번대회\s*128|4칸\s*PDF|원도심.*국제.*강제|국제.*원도심.*강제|64강\s*빈칸\s*강제채움|256\/512|다음라운드\s*카드복구|64강\/다음라운드|수동기록\s*보기|본선보호\s*저장|상태점검|가짜라운드|라운드\s*정리|v927\s*긴급|v928\s*저렉|v930|v931|v932|v933|v934|v935\s*복구|강제채움|복구용|응급/i;
+  const KEEP_RE=/수동본선\s*운영모드|복기\s*기록모드|스코어\s*없이\s*승패|승패만\s*바로|마지막\s*결과\s*되돌리기|결과\s*되돌리기|백업|범위별\s*복원|본선\s*공개|본선\s*비공개|수동수정|안정\s*수동수정|본선\s*코트\s*운영정리|결과\s*입력|결과저장/i;
+
+  function toastMsg(msg,type){try{ if(typeof window.toast==='function') window.toast(msg,type||'info'); else console.log(msg); }catch(e){}}
+  function hide(el){
+    if(!el || el.id==='v939CleanNote') return;
+    if(el.closest && (el.closest('#mM3') || el.closest('#mBackup'))) return;
+    el.setAttribute('data-v939-hidden','1');
+    el.style.display='none';
+    el.style.visibility='hidden';
+    el.style.pointerEvents='none';
+  }
+  function cleanupUi(){
+    try{
+      const root=$('page-bracket')||document.body;
+      const ids=['v927EmergencyStableNote','v928LowLagPanel','v930RepairBar','v931RepairBar','v932RoundRepairBar','v933NextRoundBar','v934RepairBar','v934FloatingRepairBtn','v923ProtectBtn','v923DiagBtn','v928StatusBtn','v928ManualRecordBtn'];
+      ids.forEach(id=>{const el=$(id); if(el) hide(el);});
+      root.querySelectorAll('button,.btn,a,[role="button"]').forEach(el=>{
+        const t=norm(el.textContent);
+        if(!t || KEEP_RE.test(t)) return;
+        if(HIDE_RE.test(t)) hide(el);
+      });
+      root.querySelectorAll('.card,div,section,aside').forEach(el=>{
+        if(el.id==='v939CleanNote') return;
+        const t=norm(el.textContent);
+        if(!t || t.length>900 || KEEP_RE.test(t)) return;
+        if(HIDE_RE.test(t) && /복구|응급|고정|강제|256|512|v927|v928|v930|v931|v932|v933|v934|v935/.test(t)) hide(el);
+      });
+      const b=$('bracketFreshnessBadge');
+      if(b){ b.textContent='v939 정리'; b.title='레거시 함수 격리 / 콘솔 정리'; b.style.minWidth='94px'; b.style.whiteSpace='nowrap'; }
+    }catch(e){ try{ console.warn(TAG,'cleanupUi failed',e); }catch(_){} }
+  }
+  function installNote(){
+    try{
+      const page=$('page-bracket'); if(!page || $('v939CleanNote')) return;
+      const anchor=$('bracketExportBar') || page.querySelector('.sec-title') || $('bracketContent');
+      if(!anchor) return;
+      const note=document.createElement('div');
+      note.id='v939CleanNote';
+      note.className='v939-clean-note';
+      note.innerHTML='<div>🧯 <b>v939 레거시 정리</b> — 원도심/국제 강제분리, 128 PDF고정, 복구용 버튼, 반복 콘솔 로그를 격리했습니다. 정식 기능은 수동본선/복기모드, 승패저장, 되돌리기, 백업/복원만 유지합니다.</div><div class="v939-actions"><button type="button" onclick="window.v939CleanNow&&window.v939CleanNow()">정리 재적용</button><button type="button" onclick="window.v939SetDebugLegacyLogs&&window.v939SetDebugLegacyLogs(!window.__V939_DEBUG_LEGACY_LOGS)">콘솔 디버그 토글</button></div>';
+      anchor.insertAdjacentElement('afterend',note);
+    }catch(e){}
+  }
+  function currentManualMode(){
+    try{
+      const key=(typeof window.currentKey==='function')?window.currentKey():'';
+      const d=key && window.G && G.draws ? G.draws[key] : null;
+      const mode=String(d?.mainMode||'').toLowerCase();
+      return mode==='manual'||mode==='replay'||d?.manualMainLocked===true||d?.mainManualGuard===true;
+    }catch(e){return false;}
+  }
+  function safeDisabled(name, modeAware){
+    const old=window[name];
+    if(typeof old!=='function' || old.__v939Disabled) return;
+    const fn=function(){
+      if(modeAware && !currentManualMode()){
+        try{return old.apply(this,arguments);}catch(e){throw e;}
+      }
+      try{ console.info(TAG,'blocked legacy function',name); }catch(e){}
+      return null;
+    };
+    fn.__v939Disabled=true;
+    fn.__old=old;
+    window[name]=fn;
+    try{ eval(name+'=window["'+name+'"]'); }catch(e){}
+  }
+  function quarantineFunctions(){
+    [
+      'v788LockModernCupFixedTable','v790LockModernCupPdfFixedTable','v790DirectAssignFixedCourts','v791LockModernCupFourSlotFixedTable','v791DirectAssignFixedCourts','v793FixedDraw','v817FillFixedSlots','v822ApplyLock','v822FillFixedSlots',
+      'v900AutoAdvanceByes','v900AutoAdvanceByesCurrent','v927OpenLegacyManualBoard','v928OpenManualRecordView','v930RepairMainRoundCards','v932CleanAndRepairMainRounds','v933RepairNextRoundsFromResultState','v934ForceFillNextRounds','v934ShowRoundStatus','v923ShowDiagnostics','v923ProtectCurrentManualMain'
+    ].forEach(n=>safeDisabled(n,false));
+    // 자동본선 모드에서는 기존 자동 배정이 필요할 수 있으므로, 수동/복기 모드에서만 차단
+    ['v748ApplyVenueToMainMatches','v786RepairVenueSplit','v787RepairVenueSplit','v786RunMainAutoAssign','v748RunMainAutoCourtRebuild','v753RunMainAutoAssign','v760RunMainAutoAssign','v765RunMainCourtRepair','v766AssignMainCourtsNow','v771RepairAll','v771SplitShared'].forEach(n=>safeDisabled(n,true));
+  }
+  function tameIntervalsAndObservers(){
+    try{
+      // v928 자체 차단 로그도 조용히만 동작하게 표시값 유지
+      window.__V928_QUIET = true;
+      window.__V939_QUIET_INTERVALS = true;
+    }catch(e){}
+  }
+  window.v939CleanNow=function(){
+    tameIntervalsAndObservers();
+    quarantineFunctions();
+    installNote();
+    cleanupUi();
+    try{ console.info(TAG,'applied'); }catch(e){}
+  };
+  // 렌더 래핑은 한 번만, 빠른 감시 루프는 만들지 않는다.
+  const oldRender=window.renderBracket;
+  if(typeof oldRender==='function' && !oldRender.__v939Wrapped){
+    const wrapped=function(){
+      const r=oldRender.apply(this,arguments);
+      setTimeout(window.v939CleanNow,120);
+      return r;
+    };
+    wrapped.__v939Wrapped=true;
+    wrapped.__old=oldRender;
+    window.renderBracket=wrapped;
+    try{ renderBracket=wrapped; }catch(e){}
+  }
+  document.addEventListener('DOMContentLoaded',()=>{
+    [100,600,1600,3200].forEach(t=>setTimeout(window.v939CleanNow,t));
+  });
+  setTimeout(window.v939CleanNow,200);
+  try{ console.info(TAG,'installed'); }catch(e){}
+})();
+</script>
+
+
+
+<!-- v940: 시합결과 8강을 최종 결과 목록에 직접 통합 표시 -->
+<style id="v940Rank8IntegratedStyle">
+.v940-rank8-row{background:linear-gradient(90deg,#f8fbff,#ffffff)!important;border-left:3px solid #60a5fa!important;}
+.v940-rank8-chip{display:inline-flex;align-items:center;justify-content:center;min-height:22px;padding:2px 8px;border-radius:999px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;font-size:.68rem;font-weight:1000;margin-left:6px;}
+.v940-rank8-note{margin:8px 0 0;padding:8px 10px;border:1px dashed #bfdbfe;border-radius:10px;background:#f8fbff;color:#475569;font-size:.72rem;font-weight:800;line-height:1.45;}
+</style>
+<script id="v940Rank8IntegratedScript">
+(function(){
+  'use strict';
+  if(window.__v940Rank8IntegratedInstalled) return;
+  window.__v940Rank8IntegratedInstalled=true;
+  const TAG='[v940-rank8-integrated]';
+  const $=id=>document.getElementById(id);
+  const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  function num(v){ const n=Number(v); return Number.isFinite(n)?n:null; }
+  function getTeams(key){ try{return (window.G&&G.teams&&G.teams[key])||[];}catch(e){return [];} }
+  function getTeamName(key,idx){
+    try{
+      idx=num(idx); if(idx===null) return '';
+      const teams=getTeams(key); const t=teams[idx]; if(!t) return '';
+      if(typeof window.tdn==='function') return window.tdn(t,key,idx);
+      if(Array.isArray(t.individualPlayers)){
+        const ps=t.individualPlayers.slice(0,2).map(p=>String((p&&p.name)||p||'').trim()).filter(Boolean);
+        if(ps.length) return ps.join(' / ');
+      }
+      if(Array.isArray(t.players)&&t.players.length) return t.players.slice(0,2).join(' / ');
+      return t.club||t.name||'';
+    }catch(e){return '';}
+  }
+  function mainMatches(key,mMs){
+    try{ return (Array.isArray(mMs)?mMs:((window.G&&G.matches&&G.matches[key])||[])).filter(m=>m&&String(m.phase||'')==='main'); }catch(e){return [];}
+  }
+  function isBye(m){ return !!(m&&m.bye); }
+  function matchLabel(m){ return String((m&&m.localRoundLabel)|| (m&&m.roundLabel)|| (m&&m.label)|| '').replace(/\s+/g,' ').trim(); }
+  function doneWinner(key,m){
+    try{
+      if(!m) return null;
+      const w=num(m.winner); if(w!==null) return w;
+      if(typeof window.getMatchResultState==='function'){
+        const st=window.getMatchResultState(key,m)||{};
+        const sw=num(st.winner); if(sw!==null) return sw;
+        if(st.done){
+          const sc1=num(st.sc1 ?? st.disp1), sc2=num(st.sc2 ?? st.disp2);
+          if(sc1!==null&&sc2!==null&&sc1!==sc2) return sc1>sc2?num(m.t1):num(m.t2);
+        }
+      }
+      const sc1=num(m.sc1 ?? m.score1), sc2=num(m.sc2 ?? m.score2);
+      if(sc1!==null&&sc2!==null&&sc1!==sc2) return sc1>sc2?num(m.t1):num(m.t2);
+      if(Array.isArray(m.rubbers)&&m.rubbers.length){
+        let a=0,b=0;
+        m.rubbers.forEach(r=>{ const rw=num(r&&r.winner); if(rw===1||rw===num(m.t1)) a++; else if(rw===2||rw===num(m.t2)) b++; });
+        if(a!==b) return a>b?num(m.t1):num(m.t2);
+      }
+      if(isBye(m)){ const t1=num(m.t1); if(t1!==null) return t1; }
+    }catch(e){}
+    return null;
+  }
+  function loserOf(key,m){
+    const w=doneWinner(key,m); if(w===null) return null;
+    const t1=num(m.t1), t2=num(m.t2);
+    if(t1===null||t2===null) return null;
+    if(w===t1) return t2;
+    if(w===t2) return t1;
+    return null;
+  }
+  function roundGroups(list){
+    const map=new Map();
+    list.forEach(m=>{ const r=num(m.round); if(r===null) return; if(!map.has(r)) map.set(r,[]); map.get(r).push(m); });
+    return [...map.entries()].sort((a,b)=>a[0]-b[0]);
+  }
+  function chooseQuarterRound(key,list){
+    const real=list.filter(m=>!isBye(m));
+    const labelHit=real.filter(m=>/8\s*강/.test(matchLabel(m)));
+    if(labelHit.length) return num(labelHit[0].round);
+    const groups=roundGroups(real);
+    let exact=groups.find(([r,ms])=>ms.length===4);
+    if(exact) return exact[0];
+    // 실전 데이터에서 부전승/미생성 때문에 4개가 아니면, 결승 기준 -2 라운드를 우선 사용
+    const doneRounds=groups.filter(([r,ms])=>ms.some(m=>doneWinner(key,m)!==null));
+    const last=(doneRounds.length?doneRounds:groups).map(x=>x[0]).pop();
+    if(last!=null){
+      const cand=last-2;
+      if(groups.some(([r])=>r===cand)) return cand;
+    }
+    // 최후 fallback: 전체 라운드 중 경기 수가 3~5개인 라운드
+    const near=groups.find(([r,ms])=>ms.length>=3&&ms.length<=5);
+    return near?near[0]:null;
+  }
+  function quarterLosers(key,mMs){
+    const list=mainMatches(key,mMs);
+    if(!list.length) return [];
+    const q=chooseQuarterRound(key,list);
+    if(q===null||q===undefined) return [];
+    const out=[]; const seen=new Set();
+    list.filter(m=>!isBye(m)&&num(m.round)===q).sort((a,b)=>(num(a.slot)||0)-(num(b.slot)||0)).forEach(m=>{
+      const idx=loserOf(key,m); if(idx===null||seen.has(String(idx))) return;
+      const nm=getTeamName(key,idx); if(!nm) return;
+      seen.add(String(idx)); out.push({teamIdx:idx,rank:8,label:'8강',club:nm});
+    });
+    return out.slice(0,4);
+  }
+  window.v940GetQuarterLosers=function(key,mMs){ return quarterLosers(key,mMs); };
+
+  // 최종 순위 계산에 8강 패자 4팀을 직접 추가한다.
+  const oldCalc=window.calcFinalRanks;
+  if(typeof oldCalc==='function'&&!oldCalc.__v940Wrapped){
+    const w=function(key,teams,mMs){
+      let ranks=[];
+      try{ ranks=oldCalc.apply(this,arguments)||[]; }catch(e){ ranks=[]; }
+      try{
+        const exists=new Set((ranks||[]).map(r=>String(r.teamIdx)));
+        quarterLosers(key,mMs).forEach(r=>{ if(!exists.has(String(r.teamIdx))){ ranks.push(r); exists.add(String(r.teamIdx)); } });
+        ranks.sort((a,b)=>(Number(a.rank||99)-Number(b.rank||99)) || String(a.club||'').localeCompare(String(b.club||''),'ko'));
+      }catch(e){ console.warn(TAG,'calc add rank8 failed',e); }
+      return ranks;
+    };
+    w.__v940Wrapped=true; w.__old=oldCalc; window.calcFinalRanks=w; try{calcFinalRanks=w;}catch(e){}
+  }
+
+  // 결과 카드 렌더링도 8강 표시를 지원한다. 기존 함수가 8강을 못 그리면 여기서 보정.
+  const oldCard=window.renderRankingCard;
+  if(typeof oldCard==='function'&&!oldCard.__v940Wrapped){
+    const w=function(key,ranks,teams){
+      try{
+        if(!Array.isArray(ranks)||!ranks.length) return oldCard.apply(this,arguments);
+        const medal={1:'🥇',2:'🥈',3:'🥉',4:'4️⃣',8:'🎾'};
+        const rows=ranks.map(r=>{
+          const tm=teams&&teams[r.teamIdx]||null;
+          const name=tm?(typeof window.tdn==='function'?window.tdn(tm,key,r.teamIdx):((tm.players||[]).slice(0,2).join(' / ')||tm.club||'')):(r.club||'-');
+          const is8=Number(r.rank)===8;
+          return `<div class="gs-row ${is8?'v940-rank8-row':(r.rank===1?'adv-1st':r.rank===2?'adv-2nd':'adv')}">
+            <div class="gs-rk">${medal[r.rank]||'🏅'}</div>
+            <div class="gs-nm">${esc(name)}${r.label?` <span class="${is8?'v940-rank8-chip':'adv-chip'}">${esc(r.label)}</span>`:''}</div>
+            <div class="gs-stats"><span>${esc(r.label||'')}</span></div>
+          </div>`;
+        }).join('');
+        const has8=ranks.some(r=>Number(r.rank)===8);
+        return `<div class="sec-title" style="margin-top:14px">🏅 최종 결과</div>
+          <div class="grp-card"><div class="grp-body">${rows}${has8?'<div class="v940-rank8-note">※ 8강은 8강전 패자 4팀입니다. 우승·준우승·공동3위와 함께 결과 확인용으로 표시됩니다.</div>':''}</div></div>`;
+      }catch(e){ return oldCard.apply(this,arguments); }
+    };
+    w.__v940Wrapped=true; w.__old=oldCard; window.renderRankingCard=w; try{renderRankingCard=w;}catch(e){}
+  }
+
+  // 혹시 최종 결과 카드가 이미 그려진 뒤라면 ranking을 다시 한 번 갱신한다.
+  function installBadge(){
+    try{ const b=$('bracketFreshnessBadge'); if(b){ b.textContent='v940 결과8강'; b.title='시합결과 8강 통합 표시'; b.style.minWidth='118px'; } }catch(e){}
+  }
+  function refreshRankingIfActive(){
+    try{ if(($('page-ranking')||{}).classList&&$('page-ranking').classList.contains('active')&&typeof window.renderRanking==='function') window.renderRanking(); }catch(e){}
+  }
+  document.addEventListener('DOMContentLoaded',()=>{setTimeout(()=>{installBadge(); refreshRankingIfActive();},600);});
+  setTimeout(()=>{installBadge(); refreshRankingIfActive();},1000);
 })();
 </script>
 
