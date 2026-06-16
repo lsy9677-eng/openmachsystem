@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-16-v926-fixed-title-badge-no-shift";
+  const APP_VERSION = "2026-06-16-v927-emergency-stable-main-view";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -61509,6 +61509,225 @@ body.slider-ready .page.active,
   [300,800,1500,3000,6000].forEach(ms=>setTimeout(boot,ms));
   window.addEventListener('resize',()=>setTimeout(lockTitleLayout,80));
   console.log(TAG,'installed');
+})();
+</script>
+
+
+
+<!-- v927: emergency stability - stop legacy manual panel auto-replacing bracket view, prevent stuck loader -->
+<style id="v927EmergencyStableMainViewStyle">
+#v927EmergencyStableNote{
+  margin:8px 0 10px;
+  padding:10px 12px;
+  border-radius:12px;
+  border:1.5px solid #38bdf8;
+  background:linear-gradient(135deg,#ecfeff,#f8fbff);
+  color:#075985;
+  font-size:.76rem;
+  font-weight:900;
+  line-height:1.55;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  flex-wrap:wrap;
+}
+#v927EmergencyStableNote button{
+  border:1.5px solid #0284c7;
+  background:#0284c7;
+  color:#fff;
+  border-radius:999px;
+  padding:6px 10px;
+  min-height:30px;
+  font-size:.72rem;
+  font-weight:1000;
+  cursor:pointer;
+}
+#v927LegacyManualModal{
+  position:fixed; inset:0; z-index:2147483300;
+  display:none; align-items:center; justify-content:center;
+  padding:16px; background:rgba(15,23,42,.58);
+}
+#v927LegacyManualModal.show{display:flex;}
+#v927LegacyManualModal .v927-box{
+  width:min(1120px,96vw); max-height:90vh; overflow:hidden;
+  background:#fff; border-radius:18px; box-shadow:0 24px 70px rgba(15,23,42,.35);
+  display:flex; flex-direction:column;
+}
+#v927LegacyManualModal .v927-head{
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:13px 16px; background:#0f1e3a; color:#fff; font-weight:1000;
+}
+#v927LegacyManualModal .v927-close{
+  border:0; width:34px; height:34px; border-radius:999px;
+  background:rgba(255,255,255,.14); color:#fff; font-weight:1000; cursor:pointer;
+}
+#v927LegacyManualModal .v927-body{padding:12px; overflow:auto; background:#f8fafc;}
+#v927LegacyManualModal .v900-panel{margin:0!important;}
+@media(max-width:680px){#v927EmergencyStableNote{font-size:.7rem}.v927-box{width:100vw!important;max-height:calc(100vh - 90px)!important;border-radius:16px 16px 0 0!important}}
+</style>
+<script id="v927EmergencyStableMainViewScript">
+(function(){
+  'use strict';
+  if(window.__v927EmergencyStableInstalled) return;
+  window.__v927EmergencyStableInstalled=true;
+  const TAG='[v927-emergency-stable-main-view]';
+  function $(id){return document.getElementById(id);} 
+  function q(sel,root){return (root||document).querySelector(sel);} 
+  function qa(sel,root){return Array.prototype.slice.call((root||document).querySelectorAll(sel));}
+  function currentKey(){
+    try{
+      const tid=($('brTS')&&$('brTS').value)||'';
+      let div='';
+      const ds=$('brDS');
+      if(ds && ds.value && ds.value!=='__ALL__') div=ds.value;
+      if(!div && Array.isArray(window.BR_MULTI_DIVS) && window.BR_MULTI_DIVS.length && !window.BR_MULTI_DIVS.includes('__ALL__')) div=window.BR_MULTI_DIVS[0];
+      if(!div){ const checked=q('#brMultiDiv input[type="checkbox"]:checked'); if(checked) div=checked.value; }
+      if(!div){
+        const t=(window.G&&G.tournaments||[]).find(x=>String(x.id)===String(tid));
+        div=(t&&Array.isArray(t.divisions)&&t.divisions[0])||'';
+      }
+      return tid&&div ? tid+'_'+div : '';
+    }catch(e){return '';}
+  }
+  function toast2(msg,type){ try{ if(typeof toast==='function') toast(msg,type||'info'); else console.log(TAG,msg); }catch(e){console.log(TAG,msg);} }
+
+  // 1) legacy v900 manual-board가 bracketContent를 통째로 덮어쓰던 경로 차단.
+  function disableLegacyManualAutoPanel(){
+    try{
+      if(typeof window.v900RenderManualBoard==='function' && !window.v900RenderManualBoard.__v927Disabled){
+        window.__v927OriginalV900RenderManualBoard=window.v900RenderManualBoard;
+        const disabled=function(key){
+          if(window.__v927AllowLegacyManualPanel===true){
+            try{return window.__v927OriginalV900RenderManualBoard.apply(this,arguments);}catch(e){console.warn(TAG,'legacy manual render failed',e); return '';}
+          }
+          return '';
+        };
+        disabled.__v927Disabled=true;
+        window.v900RenderManualBoard=disabled;
+        console.log(TAG,'legacy v900 bracket replacement disabled');
+      }
+    }catch(e){console.warn(TAG,'disable legacy panel failed',e);}
+  }
+
+  // 2) 수동 기록 화면은 대진표 본문을 덮지 않고 별도 모달로만 볼 수 있게 제공.
+  window.v927OpenLegacyManualBoard=function(){
+    try{
+      const key=currentKey();
+      if(!key){toast2('대회/부서를 먼저 선택하세요','info'); return;}
+      if(typeof window.__v927OriginalV900RenderManualBoard!=='function'){
+        toast2('수동 기록 화면 원본 함수를 찾지 못했습니다.','error'); return;
+      }
+      let modal=$('v927LegacyManualModal');
+      if(!modal){
+        modal=document.createElement('div'); modal.id='v927LegacyManualModal';
+        modal.innerHTML='<div class="v927-box"><div class="v927-head"><div>📋 수동 입력 기록 보기</div><button type="button" class="v927-close" onclick="v927CloseLegacyManualBoard()">×</button></div><div class="v927-body" id="v927LegacyManualBody"></div></div>';
+        document.body.appendChild(modal);
+        modal.addEventListener('click',function(ev){ if(ev.target===modal) ev.stopPropagation(); },true);
+      }
+      const body=$('v927LegacyManualBody');
+      window.__v927AllowLegacyManualPanel=true;
+      let html='';
+      try{ html=window.__v927OriginalV900RenderManualBoard(key)||''; }finally{ window.__v927AllowLegacyManualPanel=false; }
+      body.innerHTML=html || '<div style="padding:20px;text-align:center;font-weight:900;color:#64748b">표시할 수동 기록 화면이 없습니다.</div>';
+      modal.classList.add('show');
+    }catch(e){ console.error(TAG,e); toast2('수동 기록 화면 열기 실패: '+(e.message||e),'error'); }
+  };
+  window.v927CloseLegacyManualBoard=function(){ const m=$('v927LegacyManualModal'); if(m) m.classList.remove('show'); };
+
+  // 3) 이미 v900-panel이 본문을 덮은 경우 제거하고 실제 대진표를 다시 그림.
+  let cleanupBusy=false;
+  function cleanupLegacyPanelAndRender(){
+    if(cleanupBusy) return;
+    cleanupBusy=true;
+    setTimeout(function(){
+      try{
+        disableLegacyManualAutoPanel();
+        const cont=$('bracketContent');
+        const hasLegacy=!!(cont && q(':scope > .v900-panel',cont));
+        if(hasLegacy){
+          cont.innerHTML='<div class="card" style="padding:18px;font-weight:900;color:#075985;border:1.5px solid #38bdf8;background:#ecfeff;border-radius:14px">🧯 수동 기록 화면이 대진표 본문을 덮어쓰는 것을 차단했습니다. 실제 대진표를 다시 불러옵니다.</div>';
+          setTimeout(function(){ try{ if(typeof renderBracket==='function') renderBracket(); }catch(e){console.warn(TAG,'render after cleanup failed',e);} },80);
+        }
+      }catch(e){ console.warn(TAG,'cleanup failed',e); }
+      finally{ cleanupBusy=false; }
+    },40);
+  }
+
+  // 4) 로딩바/저장중 상태가 무한으로 남는 경우 자동 해제.
+  function installLoaderWatchdog(){
+    try{
+      const old=window.sl || (typeof sl==='function'?sl:null);
+      if(typeof old==='function' && !old.__v927Watchdog){
+        const wrapped=function(s){
+          let r;
+          try{ r=old.apply(this,arguments); }catch(e){ console.warn(TAG,'sl failed',e); }
+          if(s){
+            clearTimeout(window.__v927LoaderTimer);
+            window.__v927LoaderTimer=setTimeout(function(){
+              try{ old(false); }catch(e){}
+              try{ const el=$('gLd'); if(el) el.style.display='none'; }catch(e){}
+              try{ document.querySelectorAll('button:disabled').forEach(function(b){ if(!b.dataset.keepDisabled) b.disabled=false; }); }catch(e){}
+              console.warn(TAG,'stuck loader released');
+            },3800);
+          }else{
+            clearTimeout(window.__v927LoaderTimer);
+          }
+          return r;
+        };
+        wrapped.__v927Watchdog=true; wrapped.__old=old;
+        window.sl=wrapped; try{ sl=wrapped; }catch(e){}
+      }
+      setInterval(function(){
+        try{ const el=$('gLd'); if(el && el.style.display==='block' && Date.now()-(window.__v927LastLoaderSeen||Date.now())>6000) el.style.display='none'; if(el && el.style.display==='block') window.__v927LastLoaderSeen=window.__v927LastLoaderSeen||Date.now(); else window.__v927LastLoaderSeen=0; }catch(e){}
+      },2500);
+    }catch(e){console.warn(TAG,'loader watchdog failed',e);}
+  }
+
+  // 5) 자동 관찰자 중 수동본선 화면/버튼을 계속 주입하는 관찰자 일부 중지.
+  function disconnectAggressiveObservers(){
+    ['__v906ManualSearchObserver','__v911PresetObserver','__v912Manual128Observer','__v914Observer','__v918Observer'].forEach(function(name){
+      try{ const o=window[name]; if(o && typeof o.disconnect==='function'){ o.disconnect(); window[name]=null; console.log(TAG,'observer disconnected',name); } }catch(e){}
+    });
+  }
+
+  function injectNote(){
+    try{
+      const sec=q('#page-bracket .sec-title'); if(!sec || $('v927EmergencyStableNote')) return;
+      sec.insertAdjacentHTML('afterend','<div id="v927EmergencyStableNote"><span>🧯 v927 긴급 안정화: 수동 입력 기록 화면이 대진표 본문을 덮어쓰는 자동표시를 차단했습니다. 실제 본선 운영은 matches 기준으로 표시하고, 수동 기록은 별도 창에서만 확인합니다.</span><div><button type="button" onclick="v927OpenLegacyManualBoard()">📋 수동기록 보기</button><button type="button" onclick="v927HardRefreshBracket()">🔄 대진표 다시그리기</button></div></div>');
+    }catch(e){}
+  }
+  window.v927HardRefreshBracket=function(){
+    try{
+      disableLegacyManualAutoPanel();
+      const cont=$('bracketContent'); if(cont) cont.querySelectorAll(':scope > .v900-panel').forEach(x=>x.remove());
+      if(typeof renderBracket==='function') renderBracket();
+      setTimeout(cleanupLegacyPanelAndRender,120);
+      toast2('대진표를 다시 그렸습니다','success');
+    }catch(e){console.error(TAG,e); toast2('대진표 다시그리기 실패: '+(e.message||e),'error');}
+  };
+
+  function stabilize(){
+    disableLegacyManualAutoPanel();
+    disconnectAggressiveObservers();
+    installLoaderWatchdog();
+    injectNote();
+    cleanupLegacyPanelAndRender();
+    try{ const b=$('bracketFreshnessBadge'); if(b){ b.textContent='v927 안정'; b.style.minWidth='92px'; } }catch(e){}
+  }
+
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){ setTimeout(stabilize,60); });
+  else setTimeout(stabilize,30);
+  setTimeout(stabilize,500);
+  setTimeout(stabilize,1500);
+  // bracketContent가 v900-panel로 갈아끼워지면 즉시 차단.
+  try{
+    window.__v927BracketObserver=new MutationObserver(function(){
+      const cont=$('bracketContent');
+      if(cont && q(':scope > .v900-panel',cont)) cleanupLegacyPanelAndRender();
+    });
+    window.__v927BracketObserver.observe(document.body,{childList:true,subtree:true});
+  }catch(e){}
 })();
 </script>
 
