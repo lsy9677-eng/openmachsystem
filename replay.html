@@ -106,7 +106,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-16-v946-mode-shell-replay";
+  const APP_VERSION = "2026-06-16-v947-live-blank-fix-replay";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -64537,6 +64537,106 @@ body.bracket-page #v934FloatingRepairBtn,#page-bracket.active ~ #v934FloatingRep
   }
   document.addEventListener('DOMContentLoaded',()=>{ setTimeout(addModeUi,0); setTimeout(addModeUi,500); setTimeout(addModeUi,1500); });
   window.v946RefreshModeUi = addModeUi;
+})();
+</script>
+
+
+
+<!-- v947: live mode blank screen safeguard - prevent broad legacy cleanup from hiding page containers -->
+<style id="v947LiveRestoreStyle">
+  body.v946-mode-live .main-content,
+  body.v946-mode-live main.main-content{
+    display:block !important;
+    visibility:visible !important;
+    opacity:1 !important;
+  }
+  body.v946-mode-live .page.active{
+    display:block !important;
+    visibility:visible !important;
+    opacity:1 !important;
+  }
+  body.v946-mode-live #page-home.active .hero,
+  body.v946-mode-live #page-home.active .card,
+  body.v946-mode-live #page-home.active .home-quick-grid,
+  body.v946-mode-live #page-home.active .home-status-card,
+  body.v946-mode-live #page-home.active .stat-card{
+    visibility:visible !important;
+    opacity:1 !important;
+  }
+  body.v946-mode-live #page-home.active .hero,
+  body.v946-mode-live #page-home.active .card,
+  body.v946-mode-live #page-home.active .home-status-card,
+  body.v946-mode-live #page-home.active .stat-card{
+    display:block !important;
+  }
+  body.v946-mode-live #page-home.active .home-quick-grid{
+    display:grid !important;
+  }
+</style>
+<script id="v947LiveRestoreScript">
+(function(){
+  'use strict';
+  if(window.__v947LiveRestoreInstalled) return;
+  window.__v947LiveRestoreInstalled = true;
+  const MODE = window.APP_ENTRY_MODE || (location.pathname.includes('replay')?'replay':(location.pathname.includes('dev')?'dev':'live'));
+  window.APP_VERSION_LABEL = 'v947-' + MODE;
+
+  function textOf(el){ return (el && el.textContent || '').replace(/\s+/g,' ').trim(); }
+  function restoreActivePage(){
+    try{
+      if(MODE !== 'live') return;
+      document.body.classList.add('v946-mode-live');
+      const main=document.querySelector('main.main-content,.main-content');
+      if(main){
+        if(main.style.display==='none') main.style.display='';
+        main.style.visibility='visible';
+        main.style.opacity='1';
+      }
+      const active=document.querySelector('.page.active') || document.getElementById('page-home');
+      if(active){
+        if(active.style.display==='none') active.style.display='';
+        active.style.visibility='visible';
+        active.style.opacity='1';
+        active.querySelectorAll('.hero,.card,.home-status-card,.home-quick-grid,.g2,.g3,.g4,.stat-card,#homeTournInfo,#homeDivStatus,#myClubHomeCard,#homeRegViewerCard').forEach(el=>{
+          if(el.style.display==='none') el.style.display='';
+          el.style.visibility='visible';
+          el.style.opacity='1';
+        });
+      }
+      const badge=document.getElementById('bracketFreshnessBadge');
+      if(badge) badge.textContent='v947 운영';
+    }catch(e){}
+  }
+
+  function safeLiveCleanup(){
+    try{
+      if(MODE !== 'live') return;
+      // 기존 v946은 div/span까지 넓게 숨겨 홈/대진표 컨테이너가 사라질 수 있었다.
+      // v947부터는 버튼/링크만 숨기고, 컨테이너 div는 절대 숨기지 않는다.
+      const legacy=/강제채움|256|512|복구|수동기록 보기|레거시|디버그|상태점검|본선보호/;
+      Array.from(document.querySelectorAll('button,a')).forEach(el=>{
+        const t=textOf(el);
+        if(!legacy.test(t)) return;
+        if(/백업|복원|되돌리기/.test(t)) return;
+        el.style.display='none';
+      });
+    }catch(e){}
+  }
+
+  function run(){ restoreActivePage(); safeLiveCleanup(); }
+  document.addEventListener('DOMContentLoaded',()=>{ setTimeout(run,0); setTimeout(run,300); setTimeout(run,1200); setTimeout(run,2500); });
+  ['showPage','renderHome','renderBracket','onBrTC'].forEach(name=>{
+    try{
+      const old=window[name];
+      if(typeof old !== 'function' || old.__v947Wrapped) return;
+      const nw=function(){ const r=old.apply(this,arguments); setTimeout(run,50); setTimeout(run,400); return r; };
+      nw.__v947Wrapped=true;
+      window[name]=nw;
+      try{ eval(name+'=window["'+name+'"]'); }catch(_e){}
+    }catch(e){}
+  });
+  window.v947RestoreLiveScreen=run;
+  setTimeout(run,5000);
 })();
 </script>
 
