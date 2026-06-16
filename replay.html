@@ -106,7 +106,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-16-v948-rollback-v948-stable";
+  const APP_VERSION = "2026-06-16-v949-safe-runtime-guard";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -64452,6 +64452,112 @@ body.bracket-page #v934FloatingRepairBtn,#page-bracket.active ~ #v934FloatingRep
     }catch(e){}
   });
   setTimeout(v948Apply,3000);
+})();
+</script>
+
+
+<script id="v949SafeRuntimeGuard">
+(function(){
+  'use strict';
+  var MODE = 'replay';
+  var LABELS = {live:'운영용', replay:'복기용', dev:'개발용'};
+  window.APP_DEPLOY_MODE = MODE;
+  window.APP_DEPLOY_VERSION = 'v949-safe-runtime-guard';
+
+  function addStyle(){
+    if(document.getElementById('v949SafeStyle')) return;
+    var st=document.createElement('style');
+    st.id='v949SafeStyle';
+    st.textContent = ''+
+      '#v949ModeBadge{display:inline-flex;align-items:center;justify-content:center;min-height:26px;padding:4px 10px;border-radius:999px;background:#fff7dd;color:#8a6412;border:1px solid #d4a017;font-size:.72rem;font-weight:900;white-space:nowrap;margin-left:6px}' +
+      '#v949RecoveryBanner{position:fixed;left:14px;right:14px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:2147482000;max-width:760px;margin:0 auto;padding:12px 14px;border-radius:14px;background:#fff7ed;border:2px solid #f97316;color:#9a3412;box-shadow:0 14px 34px rgba(15,30,58,.22);font-size:.82rem;font-weight:900;line-height:1.6}' +
+      '#v949RecoveryBanner .v949-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}' +
+      '#v949RecoveryBanner button{border:none;border-radius:999px;padding:7px 12px;font-size:.76rem;font-weight:900;cursor:pointer;background:#0f1e3a;color:#fff}' +
+      '#v949RecoveryBanner button.secondary{background:#eef2f7;color:#334155;border:1px solid #cbd5e1}' +
+      '@media(max-width:680px){#v949ModeBadge{font-size:.62rem;padding:3px 7px;min-height:24px}#v949RecoveryBanner{font-size:.76rem;bottom:92px}}';
+    document.head.appendChild(st);
+  }
+
+  function installQuietConsole(){
+    if(MODE === 'dev') return;
+    if(window.__V949_CONSOLE_FILTER_INSTALLED) return;
+    window.__V949_CONSOLE_FILTER_INSTALLED = true;
+    var oldLog = console.log ? console.log.bind(console) : function(){};
+    var patterns = [
+      /\[v728\]/, /venue split/i, /원도심\s*:\s*\d+\s*국제\s*:/,
+      /\[v78[5-9]/, /\[v79[0-9]/, /\[v9(27|28|29|30|31|32|33|34|35|36|39|40|41)/,
+      /MutationObserver blocked/i, /fast interval blocked/i, /persist done/i,
+      /legacy.*installed/i, /fixed.*installed/i, /manual128.*firestore-safe/i
+    ];
+    console.log = function(){
+      try{
+        if(localStorage.getItem('SHOW_LEGACY_LOGS') === '1') return oldLog.apply(console, arguments);
+        var msg = Array.prototype.map.call(arguments, function(a){
+          if(typeof a === 'string') return a;
+          try{return JSON.stringify(a);}catch(_){return String(a);}
+        }).join(' ');
+        if(patterns.some(function(re){return re.test(msg);})){ return; }
+      }catch(_e){}
+      return oldLog.apply(console, arguments);
+    };
+  }
+
+  function addModeBadge(){
+    addStyle();
+    if(document.getElementById('v949ModeBadge')) return;
+    var host = document.querySelector('.header-actions') || document.querySelector('.logo') || document.body;
+    var badge = document.createElement('span');
+    badge.id = 'v949ModeBadge';
+    badge.textContent = (LABELS[MODE] || MODE) + ' v949';
+    if(host === document.body){
+      badge.style.position='fixed'; badge.style.right='12px'; badge.style.top='12px'; badge.style.zIndex='2147481000';
+      document.body.appendChild(badge);
+    }else{
+      host.appendChild(badge);
+    }
+  }
+
+  function isActuallyBlank(){
+    var main = document.querySelector('.main-content') || document.querySelector('main');
+    if(!main) return false;
+    var active = document.querySelector('.page.active');
+    var t = (main.innerText || '').replace(/\s+/g,'').trim();
+    // Header/footer만 살아 있고 본문이 비어 있는 경우만 회복 안내. 정상 빈 대회 화면은 건드리지 않는다.
+    return (!active || active.offsetHeight < 20) && t.length < 8;
+  }
+
+  function showRecoveryBanner(){
+    if(document.getElementById('v949RecoveryBanner')) return;
+    addStyle();
+    var box = document.createElement('div');
+    box.id='v949RecoveryBanner';
+    box.innerHTML = '<div>⚠️ 본문 화면이 비어 있습니다. 캐시 또는 이전 패치 충돌 가능성이 있습니다.</div>'+
+      '<div class="v949-actions">'+
+      '<button type="button" id="v949HardReloadBtn">캐시초기화 후 새로고침</button>'+
+      '<button type="button" class="secondary" id="v949NormalReloadBtn">일반 새로고침</button>'+
+      '<button type="button" class="secondary" id="v949HideRecoveryBtn">닫기</button>'+
+      '</div>';
+    document.body.appendChild(box);
+    var hard = document.getElementById('v949HardReloadBtn');
+    var normal = document.getElementById('v949NormalReloadBtn');
+    var hide = document.getElementById('v949HideRecoveryBtn');
+    if(hard) hard.onclick = function(){
+      if(window.__hardClearAppCacheAndReload) return window.__hardClearAppCacheAndReload();
+      try{ sessionStorage.clear(); }catch(_e){}
+      var url = new URL(location.href); url.searchParams.set('v','949'); url.searchParams.set('_hard', Date.now()); location.replace(url.toString());
+    };
+    if(normal) normal.onclick = function(){ location.reload(); };
+    if(hide) hide.onclick = function(){ box.remove(); };
+  }
+
+  function verifyScreenLater(){
+    setTimeout(function(){ try{ addModeBadge(); }catch(_e){} }, 500);
+    setTimeout(function(){ try{ addModeBadge(); if(isActuallyBlank()) showRecoveryBanner(); }catch(_e){} }, 3500);
+  }
+
+  installQuietConsole();
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', verifyScreenLater);
+  else verifyScreenLater();
 })();
 </script>
 
