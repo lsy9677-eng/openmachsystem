@@ -2,6 +2,63 @@
 
 <html lang="ko">
 <head>
+<script id="v928PreBootLowLagGuard">
+(function(){
+  'use strict';
+  if(window.__v928PreBootInstalled) return;
+  window.__v928PreBootInstalled = true;
+  window.__v928BlockedIntervals = [];
+  window.__v928ObserverCount = 0;
+  window.__v928FastIntervalBlocked = 0;
+
+  const NativeMO = window.MutationObserver;
+  if(NativeMO && !NativeMO.__v928Wrapped){
+    function QuietMutationObserver(cb){
+      this.__cb = cb;
+      this.__native = null;
+      this.__active = false;
+      this.__id = ++window.__v928ObserverCount;
+    }
+    QuietMutationObserver.prototype.observe = function(target, opts){
+      try{
+        const id = (target && target.id) ? '#'+target.id : (target===document.documentElement?'documentElement':(target===document.body?'body':''));
+        // 기존 패치들의 DOM 감시자가 렉/무한 렌더의 주 원인이므로 기본 차단.
+        if(window.__V928_ALLOW_MUTATION_OBSERVER === true){
+          this.__native = new NativeMO(this.__cb);
+          this.__active = true;
+          return this.__native.observe(target, opts || {});
+        }
+        if(console && console.info) console.info('[v928] MutationObserver blocked', id, opts||{});
+      }catch(e){}
+    };
+    QuietMutationObserver.prototype.disconnect = function(){ try{ if(this.__native) this.__native.disconnect(); }catch(e){} this.__active=false; };
+    QuietMutationObserver.prototype.takeRecords = function(){ try{ return this.__native ? this.__native.takeRecords() : []; }catch(e){ return []; } };
+    QuietMutationObserver.__v928Wrapped = true;
+    QuietMutationObserver.__native = NativeMO;
+    window.MutationObserver = QuietMutationObserver;
+  }
+
+  const nativeSetInterval = window.setInterval.bind(window);
+  const nativeClearInterval = window.clearInterval.bind(window);
+  window.__v928NativeSetInterval = nativeSetInterval;
+  window.__v928NativeClearInterval = nativeClearInterval;
+  window.setInterval = function(fn, delay){
+    const d = Number(delay || 0);
+    const src = String(fn || '');
+    // 빠른 반복 루프는 화면 흔들림/렉의 주원인. Firebase 실시간 DB는 setInterval 없이 동작하므로 차단.
+    if(d && d < 5000 && window.__V928_ALLOW_FAST_INTERVAL !== true){
+      window.__v928FastIntervalBlocked++;
+      const fakeId = 90000000 + window.__v928FastIntervalBlocked;
+      window.__v928BlockedIntervals.push({id:fakeId, delay:d, src:src.slice(0,160)});
+      try{ console.info('[v928] fast interval blocked', d, src.slice(0,80)); }catch(e){}
+      return fakeId;
+    }
+    return nativeSetInterval(fn, delay);
+  };
+  window.clearInterval = function(id){ try{return nativeClearInterval(id);}catch(e){} };
+})();
+</script>
+
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" name="viewport"/>
 <meta content="no-store, no-cache, must-revalidate, max-age=0" http-equiv="Cache-Control"/>
@@ -11,7 +68,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-16-v927-emergency-stable-main-view";
+  const APP_VERSION = "2026-06-16-v928-low-lag-emergency-safe-mode";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -61728,6 +61785,105 @@ body.slider-ready .page.active,
     });
     window.__v927BracketObserver.observe(document.body,{childList:true,subtree:true});
   }catch(e){}
+})();
+</script>
+
+
+
+<style id="v928LowLagEmergencyStyle">
+#v928LowLagBanner{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:10px 0 12px;padding:10px 14px;border:2px solid #0f766e;border-radius:14px;background:linear-gradient(135deg,#ecfdf5,#ffffff);color:#064e3b;font-size:.82rem;font-weight:900;line-height:1.55}
+#v928LowLagBanner .btn{min-height:32px!important;padding:5px 10px!important;font-size:.74rem!important;border-radius:999px!important}
+.v928-low-lag .page-slider{transition:none!important;transform:none!important;display:block!important;width:100%!important}
+.v928-low-lag .page{transition:none!important;animation:none!important}
+.v928-low-lag #bracketFreshnessBadge{min-width:92px!important;text-align:center!important}
+.v928-low-lag .v900-panel{display:none!important}
+@media(max-width:680px){#v928LowLagBanner{font-size:.76rem;padding:9px 11px}.v928-low-lag #v928LowLagBanner .btn{width:100%}}
+</style>
+<script id="v928LowLagEmergencyScript">
+(function(){
+  'use strict';
+  const TAG='[v928-low-lag]';
+  if(window.__v928LowLagInstalled) return;
+  window.__v928LowLagInstalled=true;
+
+  function $(id){return document.getElementById(id)}
+  function toast(msg,type){try{if(typeof window.toast==='function') return window.toast(msg,type||'info');}catch(e){} alert(msg)}
+  function currentKey(){try{const t=($('brTS')||{}).value||''; const d=($('brDS')||{}).value||''; if(!t||!d||d==='__ALL__') return ''; return t+'_'+d;}catch(e){return ''}}
+
+  function stopKnownLoops(){
+    // 이전 패치가 전역에 저장한 observer는 가능한 한 모두 중지
+    const names=['__v927BracketObserver','__v912Manual128Observer','__v909ManualPlaceholderObserver','__v914Observer','__v918Observer','__v911PresetObserver','__v906ManualSearchObserver'];
+    names.forEach(n=>{try{if(window[n]&&typeof window[n].disconnect==='function'){window[n].disconnect(); window[n]=null;}}catch(e){}});
+    // 혹시 생성된 빠른 interval이 남아 있으면 넓은 범위에서 해제. Firebase snapshot에는 영향 없음.
+    try{for(let i=1;i<12000;i++){ clearInterval(i); }}catch(e){}
+    try{window.__v927LoaderTimer&&clearTimeout(window.__v927LoaderTimer); window.__v927LoaderTimer=null;}catch(e){}
+  }
+
+  function disableAutoManualBoard(){
+    try{
+      if(typeof window.v900RenderManualBoard==='function' && !window.v900RenderManualBoard.__v928Wrapped){
+        const old=window.v900RenderManualBoard;
+        const wrapped=function(key){
+          if(window.__V928_ALLOW_MANUAL_RECORD_VIEW===true) return old.apply(this,arguments);
+          return '';
+        };
+        wrapped.__v928Wrapped=true; wrapped.__old=old;
+        window.v900RenderManualBoard=wrapped;
+      }
+    }catch(e){console.warn(TAG,'manual board disable failed',e)}
+  }
+
+  function neutralizeLegacyAutoFunctions(){
+    const noop=function(){return false};
+    ['v822FillFixedSlots','v790ApplyPdfFixedTable','v791ApplyFourSlotPdfCourtFixed','v788ApplyModernCupFixedTable','v787VenueSplitForceRepair','v786RunMainAutoAssign','v748RunMainAutoCourtRebuild','v765RunMainCourtRepair','v760RunMainAutoAssign','v753RunMainAutoAssign'].forEach(n=>{try{if(typeof window[n]==='function'&&!window[n].__v928Noop){const f=noop.bind(window); f.__v928Noop=true; window[n]=f;}}catch(e){}});
+  }
+
+  function addBanner(){
+    try{
+      const page=$('page-bracket'); if(!page||$('v928LowLagBanner')) return;
+      const box=document.createElement('div'); box.id='v928LowLagBanner';
+      box.innerHTML='<div>🧯 <b>v928 저렉 응급모드</b> — 자동 감시자/빠른 반복루프/수동기록 자동덮기를 정지했습니다. 대진표는 필요할 때만 수동 갱신하세요.</div><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-outline" type="button" onclick="v928ManualRefresh()">🔄 수동 갱신</button><button class="btn btn-outline" type="button" onclick="v928OpenManualRecordView()">📋 수동기록 보기</button><button class="btn btn-outline" type="button" onclick="v928Status()">🩺 상태</button></div>';
+      const title=page.querySelector('.sec-title')||page.firstElementChild; if(title&&title.parentNode) title.parentNode.insertBefore(box,title.nextSibling); else page.prepend(box);
+    }catch(e){}
+  }
+
+  function freezeBadge(){try{const b=$('bracketFreshnessBadge'); if(b){b.textContent='v928 저렉'; b.style.minWidth='92px'; b.style.display='inline-flex'; b.style.justifyContent='center';}}catch(e){}}
+
+  window.v928ManualRefresh=function(){
+    try{
+      const y=window.scrollY||0;
+      if(typeof window.renderBracket==='function') window.renderBracket();
+      setTimeout(()=>{try{window.scrollTo(window.scrollX||0,y)}catch(e){}; addBanner(); freezeBadge(); stopKnownLoops();},80);
+    }catch(e){toast('수동 갱신 실패: '+(e.message||e),'error')}
+  };
+
+  window.v928OpenManualRecordView=function(){
+    try{
+      const key=currentKey(); if(!key){toast('대회와 부서를 먼저 선택하세요','info');return;}
+      const old=window.v900RenderManualBoard && (window.v900RenderManualBoard.__old||window.v900RenderManualBoard);
+      if(typeof old!=='function'){toast('수동기록 화면 함수를 찾지 못했습니다','error');return;}
+      window.__V928_ALLOW_MANUAL_RECORD_VIEW=true;
+      const html=old(key);
+      window.__V928_ALLOW_MANUAL_RECORD_VIEW=false;
+      const ov=document.createElement('div'); ov.id='v928ManualRecordModal'; ov.style.cssText='position:fixed;inset:0;z-index:2147483000;background:rgba(15,23,42,.62);display:flex;align-items:center;justify-content:center;padding:14px';
+      ov.innerHTML='<div style="width:min(1120px,96vw);max-height:90vh;overflow:auto;background:#fff;border-radius:18px;padding:14px;box-shadow:0 20px 70px rgba(0,0,0,.32)"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px"><b>📋 수동 입력 기록 보기</b><button class="btn btn-gray" onclick="this.closest(\'#v928ManualRecordModal\').remove()">닫기</button></div>'+html+'</div>';
+      document.body.appendChild(ov);
+    }catch(e){window.__V928_ALLOW_MANUAL_RECORD_VIEW=false; toast('수동기록 보기 실패: '+(e.message||e),'error')}
+  };
+
+  window.v928Status=function(){
+    const msg='v928 저렉 응급모드\n- 차단된 빠른 interval: '+(window.__v928FastIntervalBlocked||0)+'개\n- 차단된 MutationObserver: '+(window.__v928ObserverCount||0)+'개\n- 수동기록 자동덮기: 차단\n- 자동 128/PDF/구장분리 보정: 차단';
+    alert(msg);
+  };
+
+  function stabilize(){
+    try{document.body.classList.add('v928-low-lag');}catch(e){}
+    stopKnownLoops(); disableAutoManualBoard(); neutralizeLegacyAutoFunctions(); addBanner(); freezeBadge();
+    try{ if(typeof window.sl==='function'){ const old=window.sl; if(!old.__v928Wrapped){ const w=function(on){ if(on===false) return old.apply(this,arguments); if(window.__V928_ALLOW_LOADING===true) return old.apply(this,arguments); return undefined;}; w.__v928Wrapped=true; window.sl=w; }} }catch(e){}
+  }
+
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(stabilize,80)); else setTimeout(stabilize,30);
+  setTimeout(stabilize,400); setTimeout(stabilize,1200); setTimeout(stabilize,3000);
 })();
 </script>
 
