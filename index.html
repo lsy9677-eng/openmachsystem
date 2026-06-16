@@ -11,7 +11,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-16-v918-manual-operational-exact128";
+  const APP_VERSION = "2026-06-16-v919-stable-manual-edit-clean";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -59643,6 +59643,324 @@ body.operator-mode .v830-main-private-mask{
   window.v918RoleOk=roleOk;
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(installButtons,700)); else setTimeout(installButtons,700);
   if(!window.__v918Observer){ window.__v918Observer=new MutationObserver(()=>setTimeout(installButtons,120)); try{window.__v918Observer.observe(document.body,{childList:true,subtree:true});}catch(e){} }
+  console.log(TAG,'installed',VERSION);
+})();
+</script>
+
+
+
+<!-- v919: 안정화 - 수동수정 재귀/관찰자 충돌 제거 + 독립 수동수정창/저장 -->
+<style id="v919StableManualEditStyle">
+.v919-manual-search-wrap{position:relative;width:100%;}
+.v919-manual-input{font-weight:800!important;background:#fff!important;}
+.v919-manual-drop{display:none;position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:2147482000;max-height:230px;overflow:auto;background:#fff;border:1.5px solid #bfdbfe;border-radius:12px;box-shadow:0 14px 32px rgba(15,30,58,.18);padding:5px;}
+.v919-manual-drop.open{display:block!important;}
+.v919-manual-item{padding:9px 10px;border-radius:9px;font-size:.82rem;font-weight:900;line-height:1.35;cursor:pointer;color:#0f172a;word-break:keep-all;}
+.v919-manual-item:hover,.v919-manual-item.active{background:#eff6ff;color:#1d4ed8;}
+.v919-manual-empty{padding:9px 10px;color:#64748b;font-size:.78rem;font-weight:800;}
+.v919-stable-note{margin:0 0 12px;padding:10px 12px;border-radius:12px;background:#fff7ed;border:1.5px solid #fdba74;color:#9a3412;font-size:.78rem;font-weight:900;line-height:1.6;}
+.v919-match-row{padding:12px;border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:8px;background:#fff;}
+.v919-match-row.is-bye{border-color:#f59e0b;background:#fffdf5;}
+.v919-stable-btn{display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:5px!important;min-height:34px!important;padding:6px 12px!important;border-radius:10px!important;border:1.5px solid #0f766e!important;background:#0f766e!important;color:#fff!important;font-size:.74rem!important;font-weight:1000!important;white-space:nowrap!important;cursor:pointer!important;box-shadow:0 2px 8px rgba(15,118,110,.18)!important;}
+.v919-stable-badge{display:inline-flex!important;align-items:center!important;justify-content:center!important;margin-left:6px;padding:3px 8px;border-radius:999px;background:#dcfce7;color:#166534;border:1px solid #86efac;font-size:.66rem;font-weight:1000;vertical-align:middle;}
+@media(max-width:680px){.v919-match-row{padding:10px}.v919-manual-item{font-size:.78rem}.v919-stable-note{font-size:.74rem}}
+</style>
+<script id="v919StableManualEditScript">
+(function(){
+  'use strict';
+  const TAG='[v919-stable-manual-edit-clean]';
+  const VERSION='2026-06-16-v919-stable-manual-edit-clean';
+  const WRAP_FLAGS=['__v799LockWrapped','__v822LockWrapped','__v823MainOnlyWrapped','__v827Wrapped','__v828Wrapped','__v830Wrapped','__v907RenderWrapped','__v912DecodeWrapped','__v918Wrapped'];
+  function $(id){return document.getElementById(id);} 
+  function esc(s){return String(s??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
+  function clean(s){return String(s??'').replace(/\s+/g,' ').trim();}
+  function norm(s){return clean(s).toLowerCase().replace(/[\s()\[\]{}·ㆍ,./\\_-]/g,'');}
+  function arr(x){return Array.isArray(x)?x:[];}
+  function toast2(msg,type){try{ if(typeof toast==='function') toast(msg,type||'info'); else console.log(TAG,msg);}catch(e){console.log(TAG,msg);} }
+  function roleOk(){
+    try{ if(!!(window.AD||window.TM||window.OP)) return true; }catch(e){}
+    try{ if(typeof canManageBracket==='function' && canManageBracket()) return true; }catch(e){}
+    try{ if(typeof window.v918RoleOk==='function' && window.v918RoleOk()) return true; }catch(e){}
+    try{ const cls=document.body&&document.body.className||''; if(/admin-mode|tm-mode|operator-mode/.test(cls)) return true; }catch(e){}
+    try{ const b=$('adminBadge'); if(b&&b.classList.contains('show')&&/(관리자|개발자|운영자)/.test(b.textContent||'')) return true; }catch(e){}
+    return false;
+  }
+  function disconnectNamedObservers(){
+    ['__v909ManualPlaceholderObserver','__v911PresetObserver','__v912Manual128Observer','__v914Observer','__v918Observer'].forEach(name=>{
+      try{ const o=window[name]; if(o&&typeof o.disconnect==='function'){o.disconnect(); window[name]=null; console.log(TAG,'observer disconnected',name);} }catch(e){}
+    });
+  }
+  function unwrap(fn){
+    const seen=new Set(); let cur=fn;
+    while(typeof cur==='function' && !seen.has(cur) && (cur.__old||cur.__v912Old)){
+      seen.add(cur); cur=cur.__old||cur.__v912Old;
+    }
+    return typeof cur==='function'?cur:fn;
+  }
+  function installStableRender(){
+    try{
+      const current=window.renderBracket || (typeof renderBracket==='function'?renderBracket:null);
+      if(typeof current!=='function') return;
+      if(current.__v919StableRender) return;
+      const base=unwrap(current);
+      let rendering=false, pending=false, lastArgs=null;
+      const stable=function(){
+        lastArgs=arguments;
+        if(rendering){ pending=true; return; }
+        rendering=true;
+        try{
+          return base.apply(this,arguments);
+        }catch(e){
+          console.error(TAG,'renderBracket blocked error',e);
+        }finally{
+          rendering=false;
+          if(pending){ pending=false; setTimeout(()=>{try{ stable.apply(window,lastArgs||[]); }catch(e){}},160); }
+          setTimeout(installToolbarButtons,80);
+        }
+      };
+      stable.__v919StableRender=true; stable.__old=base;
+      WRAP_FLAGS.forEach(f=>stable[f]=true);
+      window.renderBracket=stable; try{renderBracket=stable;}catch(e){}
+      console.log(TAG,'stable render installed');
+    }catch(e){console.warn(TAG,'stable render install failed',e);}
+  }
+  function currentKey(){
+    try{
+      const tid=($('brTS')&&$('brTS').value)||'';
+      let div='';
+      const ds=$('brDS');
+      if(ds&&ds.value&&ds.value!=='__ALL__') div=ds.value;
+      if(!div){
+        const checked=document.querySelector('#brMultiDiv input[type="checkbox"]:checked');
+        if(checked) div=checked.value;
+      }
+      if(!tid||!div) return '';
+      return tid+'_'+div;
+    }catch(e){return '';}
+  }
+  function teamLabel(key,idx){
+    try{
+      if(idx==null || idx==='' || Number(idx)<0) return '';
+      const t=arr(G&&G.teams&&G.teams[key])[Number(idx)];
+      if(!t) return '';
+      if(typeof tdn==='function'){
+        const v=tdn(t,key,Number(idx));
+        if(clean(v)) return clean(v);
+      }
+      const ps=[];
+      if(Array.isArray(t.individualPlayers)) t.individualPlayers.forEach(p=>{ if(p&&p.name) ps.push(clean(p.name)+(p.clubsRaw?'('+clean(p.clubsRaw)+')':'')); });
+      if(!ps.length && Array.isArray(t.players)) t.players.forEach(p=>{ if(typeof p==='string') ps.push(clean(p)); else if(p&&p.name) ps.push(clean(p.name)+(p.club?'('+clean(p.club)+')':'')); });
+      return clean(t.pairLabel||t.entryLabel||t.name||ps.join(' / ')||t.club||('팀'+(Number(idx)+1)));
+    }catch(e){return '';}
+  }
+  function buildTeamList(key){
+    const list=arr(G&&G.teams&&G.teams[key]).map((t,i)=>{
+      const label=teamLabel(key,i)||('팀'+(i+1));
+      const parts=[label,t&&t.club,t&&t.entryLabel,t&&t.pairLabel,t&&t.name];
+      arr(t&&t.players).forEach(p=>{ if(typeof p==='string') parts.push(p); else if(p){parts.push(p.name,p.club,p.clubsRaw); arr(p.clubs).forEach(c=>parts.push(c));} });
+      arr(t&&t.individualPlayers).forEach(p=>{ if(p){parts.push(p.name,p.club,p.clubsRaw); arr(p.clubs).forEach(c=>parts.push(c));} });
+      return {idx:i,label,search:norm(parts.filter(Boolean).join(' '))};
+    });
+    window.__v919TeamList=list;
+    return list;
+  }
+  function searchHtml(fieldId,val,key){
+    const label=(val!==null&&val!==undefined&&val!==''&&!Number.isNaN(Number(val)))?teamLabel(key,Number(val)):'';
+    return `<div class="v919-manual-search-wrap">
+      <input type="hidden" id="${esc(fieldId)}" value="${val!==null&&val!==undefined&&val!==''?esc(String(val)):''}">
+      <input class="form-input v919-manual-input" id="v919Input_${esc(fieldId)}" value="${esc(label)}" placeholder="🔍 이름/클럽 검색..." autocomplete="off"
+        onfocus="window.v919ManualShow('${esc(fieldId)}',this.value)" oninput="window.v919ManualShow('${esc(fieldId)}',this.value)" onkeydown="window.v919ManualKey(event,'${esc(fieldId)}')">
+      <div class="v919-manual-drop" id="v919Drop_${esc(fieldId)}"></div>
+    </div>`;
+  }
+  window.v919ManualShow=function(fieldId,q){
+    try{
+      const drop=$('v919Drop_'+fieldId); if(!drop) return;
+      const nq=norm(q); const list=arr(window.__v919TeamList);
+      let html='<div class="v919-manual-item" data-idx="" onclick="window.v919ManualSelect(\''+fieldId+'\',\'\')">— 비우기 —</div>';
+      let cnt=0;
+      list.forEach(it=>{
+        if(nq && !(norm(it.label).includes(nq)||it.search.includes(nq))) return;
+        if(cnt>=70) return;
+        html+='<div class="v919-manual-item" data-idx="'+it.idx+'" onclick="window.v919ManualSelect(\''+fieldId+'\',\''+it.idx+'\')">'+esc(it.label)+'</div>';
+        cnt++;
+      });
+      if(!cnt && nq) html+='<div class="v919-manual-empty">현재 대회 참가자 목록에 검색 결과가 없습니다.</div>';
+      drop.innerHTML=html; drop.classList.add('open');
+    }catch(e){console.warn(TAG,'show failed',e);}
+  };
+  window.v919ManualSelect=function(fieldId,idx){
+    try{
+      const hidden=$(fieldId), input=$('v919Input_'+fieldId), drop=$('v919Drop_'+fieldId);
+      if(hidden) hidden.value=idx===''?'':String(idx);
+      if(input) input.value=idx===''?'':teamLabel(window.__v919ManualKey,Number(idx));
+      if(drop) drop.classList.remove('open');
+    }catch(e){}
+  };
+  window.v919ManualKey=function(e,fieldId){
+    try{
+      const drop=$('v919Drop_'+fieldId); if(!drop||!drop.classList.contains('open')) return;
+      const items=[...drop.querySelectorAll('.v919-manual-item')];
+      if(!items.length) return;
+      let idx=items.findIndex(x=>x.classList.contains('active'));
+      if(e.key==='ArrowDown'){e.preventDefault();idx=Math.min(idx+1,items.length-1);}
+      else if(e.key==='ArrowUp'){e.preventDefault();idx=Math.max(idx-1,0);}
+      else if(e.key==='Enter'){e.preventDefault();(items[idx>=0?idx:0]||items[0]).click();return;}
+      else if(e.key==='Escape'){drop.classList.remove('open');return;}
+      else return;
+      items.forEach((el,i)=>el.classList.toggle('active',i===idx));
+    }catch(e){}
+  };
+  document.addEventListener('click',function(e){
+    try{ if(!e.target.closest('.v919-manual-search-wrap')) document.querySelectorAll('.v919-manual-drop.open').forEach(d=>d.classList.remove('open')); }catch(_e){}
+  },true);
+  function getMainR0(key){
+    return arr(G&&G.matches&&G.matches[key]).filter(m=>m&&String(m.phase)==='main'&&Number(m.round)===0).sort((a,b)=>Number(a.slot||0)-Number(b.slot||0));
+  }
+  function safeOpenManualEdit(tid,div){
+    try{
+      if(!roleOk()){ toast2('본선 대진표 수동 수정 권한이 없습니다. 개발자/운영자/진행자 로그인 상태를 확인하세요.','error'); return; }
+      const key=tid+'_'+div;
+      window.ME={key,tid,div}; try{ME=window.ME;}catch(e){}
+      window.__v919ManualKey=key;
+      buildTeamList(key);
+      const ms=getMainR0(key);
+      if(!ms.length){ toast2('본선 128강 경기 데이터가 없습니다. 먼저 본선 대진을 생성하거나 수동본선 불러오기를 실행하세요.','error'); return; }
+      const rows=ms.map((m,i)=>{
+        const isBye=!!m.bye;
+        return `<div class="v919-match-row ${isBye?'is-bye':''}" data-mid="${esc(m.id)}">
+          <div style="font-size:.76rem;font-weight:1000;color:#0f1e3a;margin-bottom:8px">${isBye?'🎫 부전승':'⚡ 경기'} — ${i+1}번 매치</div>
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) 22px minmax(0,1fr);gap:8px;align-items:start">
+            <div><div style="font-size:.66rem;color:#64748b;margin-bottom:4px;font-weight:800">팀1</div>${searchHtml('me_t1_'+m.id,m.t1,key)}</div>
+            <div style="text-align:center;font-weight:1000;color:#64748b;padding-top:30px">vs</div>
+            <div><div style="font-size:.66rem;color:#64748b;margin-bottom:4px;font-weight:800">팀2</div>${searchHtml('me_t2_'+m.id,isBye?'':m.t2,key)}</div>
+          </div>
+          <label style="display:flex;align-items:center;gap:7px;margin-top:8px;font-size:.74rem;color:#475569;font-weight:800;cursor:pointer">
+            <input type="checkbox" id="me_bye_${esc(m.id)}" ${isBye?'checked':''} onchange="window.v919ByeToggle('${esc(m.id)}')"> 부전승 처리 (팀1이 자동 다음 라운드 진출)
+          </label>
+        </div>`;
+      }).join('');
+      const body=$('manualEditBody');
+      if(!body){ toast2('수동수정 창 본문을 찾지 못했습니다.','error'); return; }
+      body.innerHTML='<div class="v919-stable-note">🧯 <b>안정 수동수정 모드</b> — 기존 중복 보정/자동감시를 끄고 이 창에서 입력한 값만 저장합니다. 바깥을 눌러도 창은 닫히지 않습니다.</div>'+rows;
+      // 바깥 클릭 닫힘 방지
+      const modal=$('mManualEdit');
+      if(modal){ modal.onclick=function(ev){ if(ev.target===modal){ ev.preventDefault(); ev.stopPropagation(); } }; }
+      if(typeof om==='function') om('mManualEdit'); else if(modal) modal.classList.add('open');
+      setTimeout(()=>ms.forEach(m=>window.v919ByeToggle(m.id)),30);
+    }catch(e){ console.error(TAG,'open manual failed',e); toast2('수동수정 창 열기 실패: '+(e.message||e),'error'); }
+  }
+  window.v919ByeToggle=function(mid){
+    try{
+      const cb=$('me_bye_'+mid); const on=!!(cb&&cb.checked);
+      const h=$('me_t2_'+mid), inp=$('v919Input_me_t2_'+mid);
+      if(h){ h.disabled=on; if(on) h.value=''; }
+      if(inp){ inp.disabled=on; inp.style.opacity=on?'.45':'1'; inp.style.pointerEvents=on?'none':''; if(on) inp.value='부전승'; else if(inp.value==='부전승') inp.value=''; }
+      const row=cb&&cb.closest('.v919-match-row'); if(row) row.classList.toggle('is-bye',on);
+    }catch(e){}
+  };
+  function restoreFromSanitize(key,orig){
+    try{ if(orig && G.draws && G.draws[key]) G.draws[key].manual128=orig; }catch(e){}
+  }
+  function sanitizeDrawForSave(key){
+    try{
+      const d=G&&G.draws&&G.draws[key]; if(!d||!d.manual128||!Array.isArray(d.manual128.rounds)) return null;
+      const orig=d.manual128;
+      d.manual128Json=JSON.stringify(orig);
+      d.manual128Meta={active:orig.active!==false,size:Number(orig.size)||128,title:clean(orig.title||'128강 수동 본선'),updatedAt:clean(orig.updatedAt||new Date().toISOString()),v919Encoded:true};
+      delete d.manual128;
+      return orig;
+    }catch(e){console.warn(TAG,'sanitize failed',e);return null;}
+  }
+  async function persist(key){
+    let orig=null;
+    try{
+      orig=sanitizeDrawForSave(key);
+      if(typeof stM==='function') await stM(key); else if(typeof window.__v728_stM==='function') await window.__v728_stM(key);
+      if(typeof stD==='function') await stD(key); else if(typeof window.__v728_stD==='function') await window.__v728_stD(key);
+      try{ if(typeof fbLog==='function'){ const parts=key.split('_'); await fbLog('본선 수동수정 안정저장: '+(parts[1]||''),'✏️'); } }catch(e){}
+    }finally{ restoreFromSanitize(key,orig); try{ if(typeof window.v912DecodeManual128==='function') window.v912DecodeManual128(); }catch(e){} }
+  }
+  async function safeSaveManualEdit(){
+    const key=(window.ME&&window.ME.key)||window.__v919ManualKey||currentKey();
+    if(!key){ toast2('대회/부서 선택값을 찾지 못했습니다.','error'); return; }
+    if(!roleOk()){ toast2('본선 대진표 수동 수정 권한이 없습니다.','error'); return; }
+    try{
+      const all=arr(G&&G.matches&&G.matches[key]);
+      const r0=getMainR0(key);
+      if(!r0.length){ toast2('저장할 128강 본선 경기가 없습니다.','error'); return; }
+      r0.forEach(m=>{
+        const t1v=$('me_t1_'+m.id)?.value ?? '';
+        const t2v=$('me_t2_'+m.id)?.value ?? '';
+        const bye=!!($('me_bye_'+m.id)?.checked);
+        m.t1=t1v===''?null:Number(t1v);
+        m.t2=bye?null:(t2v===''?null:Number(t2v));
+        m.bye=bye;
+        m.winner=(bye && m.t1!=null)?m.t1:null;
+        m.rubbers=arr(m.rubbers);
+        m.v919ManualSaved=true;
+        m.updatedAt=new Date().toISOString();
+      });
+      const main=all.filter(m=>m&&String(m.phase)==='main');
+      main.filter(m=>Number(m.round)>0).forEach(m=>{m.t1=null;m.t2=null;m.winner=null;m.bye=false;m.rubbers=[];m.v919ResetByManual=true;});
+      r0.filter(m=>m.bye&&m.winner!=null).forEach(bm=>{
+        const nm=main.find(x=>Number(x.round)===1 && Number(x.slot)===Math.floor(Number(bm.slot||0)/2));
+        if(nm){ if(Number(bm.slot||0)%2===0) nm.t1=bm.winner; else nm.t2=bm.winner; nm.v919ByeAdvanced=true; }
+      });
+      if(G.draws&&G.draws[key]) Object.assign(G.draws[key],{mainManualLocked:true,mainBracketFixed:true,mainBracketLocked:true,manualMainOperational:true,v919StableManualSaved:true,v919StableManualSavedAt:new Date().toISOString()});
+      try{ if(typeof sl==='function') sl(true); }catch(e){}
+      await persist(key);
+      try{ if(typeof sl==='function') sl(false); }catch(e){}
+      try{ if(typeof cm==='function') cm('mManualEdit'); }catch(e){}
+      try{ if(typeof renderBracket==='function') renderBracket(); }catch(e){}
+      toast2('본선 수동수정 저장 완료 ✅','success');
+    }catch(e){
+      try{ if(typeof sl==='function') sl(false); }catch(_e){}
+      console.error(TAG,'save failed',e);
+      toast2('수동수정 저장 실패: '+(e.message||e),'error');
+    }
+  }
+  function installManualOverrides(){
+    safeOpenManualEdit.__v919Stable=true;
+    ['__v906Wrapped','__v907Wrapped','__v909Wrapped','__v911Wrapped','__v914Wrapped','__v918Wrapped'].forEach(f=>safeOpenManualEdit[f]=true);
+    window.openManualEdit=safeOpenManualEdit; try{openManualEdit=safeOpenManualEdit;}catch(e){}
+    window.v919OpenManualEdit=safeOpenManualEdit;
+    safeSaveManualEdit.__v919Stable=true;
+    ['__v909Wrapped','__v907Wrapped'].forEach(f=>safeSaveManualEdit[f]=true);
+    window.saveManualEdit=safeSaveManualEdit; try{saveManualEdit=safeSaveManualEdit;}catch(e){}
+    window.v919SaveManualEdit=safeSaveManualEdit;
+    const modal=$('mManualEdit');
+    if(modal){ modal.onclick=function(ev){ if(ev.target===modal){ ev.preventDefault(); ev.stopPropagation(); } }; }
+  }
+  function installToolbarButtons(){
+    try{
+      const bar=$('bracketExportBar'); if(!bar) return;
+      const tid=$('brTS')&&$('brTS').value; let div=($('brDS')&&$('brDS').value&&$('brDS').value!=='__ALL__')?$('brDS').value:'';
+      if(!div){ const c=document.querySelector('#brMultiDiv input[type="checkbox"]:checked'); if(c) div=c.value; }
+      if(tid&&div&&!$('v919ManualEditBtn')){
+        const b=document.createElement('button'); b.id='v919ManualEditBtn'; b.type='button'; b.className='v919-stable-btn'; b.textContent='🧯 안정 수동수정'; b.onclick=function(e){e.preventDefault();e.stopPropagation();safeOpenManualEdit(tid,div);};
+        bar.appendChild(b);
+      }else if($('v919ManualEditBtn')){
+        $('v919ManualEditBtn').onclick=function(e){
+          e.preventDefault();e.stopPropagation();
+          const tid2=$('brTS')&&$('brTS').value; let div2=($('brDS')&&$('brDS').value&&$('brDS').value!=='__ALL__')?$('brDS').value:'';
+          if(!div2){ const c=document.querySelector('#brMultiDiv input[type="checkbox"]:checked'); if(c) div2=c.value; }
+          safeOpenManualEdit(tid2,div2);
+        };
+      }
+      const badge=$('bracketFreshnessBadge'); if(badge){ badge.textContent='v919 안정화'; badge.className='v919-stable-badge'; }
+    }catch(e){}
+  }
+  function boot(){
+    disconnectNamedObservers();
+    installStableRender();
+    installManualOverrides();
+    installToolbarButtons();
+  }
+  boot();
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(boot,300));
+  setTimeout(boot,900);
+  setTimeout(boot,1800);
   console.log(TAG,'installed',VERSION);
 })();
 </script>
