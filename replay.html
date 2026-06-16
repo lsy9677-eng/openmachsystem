@@ -106,7 +106,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-16-v949-safe-runtime-guard";
+  const APP_VERSION = "2026-06-16-v950-visible-mode-badge";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -64456,25 +64456,25 @@ body.bracket-page #v934FloatingRepairBtn,#page-bracket.active ~ #v934FloatingRep
 </script>
 
 
-<script id="v949SafeRuntimeGuard">
+<script id="v950SafeRuntimeGuard">
 (function(){
   'use strict';
   var MODE = 'replay';
   var LABELS = {live:'운영용', replay:'복기용', dev:'개발용'};
   window.APP_DEPLOY_MODE = MODE;
-  window.APP_DEPLOY_VERSION = 'v949-safe-runtime-guard';
+  window.APP_DEPLOY_VERSION = 'v950-visible-mode-badge';
 
   function addStyle(){
-    if(document.getElementById('v949SafeStyle')) return;
+    if(document.getElementById('v950SafeStyle')) return;
     var st=document.createElement('style');
-    st.id='v949SafeStyle';
+    st.id='v950SafeStyle';
     st.textContent = ''+
-      '#v949ModeBadge{display:inline-flex;align-items:center;justify-content:center;min-height:26px;padding:4px 10px;border-radius:999px;background:#fff7dd;color:#8a6412;border:1px solid #d4a017;font-size:.72rem;font-weight:900;white-space:nowrap;margin-left:6px}' +
-      '#v949RecoveryBanner{position:fixed;left:14px;right:14px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:2147482000;max-width:760px;margin:0 auto;padding:12px 14px;border-radius:14px;background:#fff7ed;border:2px solid #f97316;color:#9a3412;box-shadow:0 14px 34px rgba(15,30,58,.22);font-size:.82rem;font-weight:900;line-height:1.6}' +
-      '#v949RecoveryBanner .v949-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}' +
-      '#v949RecoveryBanner button{border:none;border-radius:999px;padding:7px 12px;font-size:.76rem;font-weight:900;cursor:pointer;background:#0f1e3a;color:#fff}' +
-      '#v949RecoveryBanner button.secondary{background:#eef2f7;color:#334155;border:1px solid #cbd5e1}' +
-      '@media(max-width:680px){#v949ModeBadge{font-size:.62rem;padding:3px 7px;min-height:24px}#v949RecoveryBanner{font-size:.76rem;bottom:92px}}';
+      '#v950ModeBadge{display:inline-flex;align-items:center;justify-content:center;min-height:26px;padding:4px 10px;border-radius:999px;background:#fff7dd;color:#8a6412;border:1px solid #d4a017;font-size:.72rem;font-weight:900;white-space:nowrap;margin-left:6px}' +
+      '#v950RecoveryBanner{position:fixed;left:14px;right:14px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:2147482000;max-width:760px;margin:0 auto;padding:12px 14px;border-radius:14px;background:#fff7ed;border:2px solid #f97316;color:#9a3412;box-shadow:0 14px 34px rgba(15,30,58,.22);font-size:.82rem;font-weight:900;line-height:1.6}' +
+      '#v950RecoveryBanner .v950-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}' +
+      '#v950RecoveryBanner button{border:none;border-radius:999px;padding:7px 12px;font-size:.76rem;font-weight:900;cursor:pointer;background:#0f1e3a;color:#fff}' +
+      '#v950RecoveryBanner button.secondary{background:#eef2f7;color:#334155;border:1px solid #cbd5e1}' +
+      '@media(max-width:680px){#v950ModeBadge{font-size:.62rem;padding:3px 7px;min-height:24px}#v950RecoveryBanner{font-size:.76rem;bottom:92px}}';
     document.head.appendChild(st);
   }
 
@@ -64504,11 +64504,11 @@ body.bracket-page #v934FloatingRepairBtn,#page-bracket.active ~ #v934FloatingRep
 
   function addModeBadge(){
     addStyle();
-    if(document.getElementById('v949ModeBadge')) return;
+    if(document.getElementById('v950ModeBadge')) return;
     var host = document.querySelector('.header-actions') || document.querySelector('.logo') || document.body;
     var badge = document.createElement('span');
-    badge.id = 'v949ModeBadge';
-    badge.textContent = (LABELS[MODE] || MODE) + ' v949';
+    badge.id = 'v950ModeBadge';
+    badge.textContent = (LABELS[MODE] || MODE) + ' v950';
     if(host === document.body){
       badge.style.position='fixed'; badge.style.right='12px'; badge.style.top='12px'; badge.style.zIndex='2147481000';
       document.body.appendChild(badge);
@@ -64527,20 +64527,20 @@ body.bracket-page #v934FloatingRepairBtn,#page-bracket.active ~ #v934FloatingRep
   }
 
   function showRecoveryBanner(){
-    if(document.getElementById('v949RecoveryBanner')) return;
+    if(document.getElementById('v950RecoveryBanner')) return;
     addStyle();
     var box = document.createElement('div');
-    box.id='v949RecoveryBanner';
+    box.id='v950RecoveryBanner';
     box.innerHTML = '<div>⚠️ 본문 화면이 비어 있습니다. 캐시 또는 이전 패치 충돌 가능성이 있습니다.</div>'+
-      '<div class="v949-actions">'+
-      '<button type="button" id="v949HardReloadBtn">캐시초기화 후 새로고침</button>'+
-      '<button type="button" class="secondary" id="v949NormalReloadBtn">일반 새로고침</button>'+
-      '<button type="button" class="secondary" id="v949HideRecoveryBtn">닫기</button>'+
+      '<div class="v950-actions">'+
+      '<button type="button" id="v950HardReloadBtn">캐시초기화 후 새로고침</button>'+
+      '<button type="button" class="secondary" id="v950NormalReloadBtn">일반 새로고침</button>'+
+      '<button type="button" class="secondary" id="v950HideRecoveryBtn">닫기</button>'+
       '</div>';
     document.body.appendChild(box);
-    var hard = document.getElementById('v949HardReloadBtn');
-    var normal = document.getElementById('v949NormalReloadBtn');
-    var hide = document.getElementById('v949HideRecoveryBtn');
+    var hard = document.getElementById('v950HardReloadBtn');
+    var normal = document.getElementById('v950NormalReloadBtn');
+    var hide = document.getElementById('v950HideRecoveryBtn');
     if(hard) hard.onclick = function(){
       if(window.__hardClearAppCacheAndReload) return window.__hardClearAppCacheAndReload();
       try{ sessionStorage.clear(); }catch(_e){}
@@ -64561,5 +64561,47 @@ body.bracket-page #v934FloatingRepairBtn,#page-bracket.active ~ #v934FloatingRep
 })();
 </script>
 
+
+<script id="v950VisibleModeBadge">
+(function(){
+  'use strict';
+  var MODE = 'replay';
+  var LABEL = '복기용';
+  window.APP_DEPLOY_MODE = MODE;
+  window.APP_DEPLOY_VERSION = 'v950-visible-mode-badge';
+  function inject(){
+    try{
+      var old=document.getElementById('v949ModeBadge');
+      if(old){ old.style.display='none'; old.setAttribute('aria-hidden','true'); }
+      var st=document.getElementById('v950ModeBadgeStyle');
+      if(!st){
+        st=document.createElement('style');
+        st.id='v950ModeBadgeStyle';
+        st.textContent = 
+          '#v950ModeBadge{position:fixed;right:14px;top:82px;z-index:2147482500;display:inline-flex!important;align-items:center;gap:6px;min-height:30px;padding:6px 12px;border-radius:999px;border:2px solid #d4a017;background:#fff7dd;color:#7a5600;font-size:12px;font-weight:1000;box-shadow:0 10px 24px rgba(15,30,58,.18);white-space:nowrap;pointer-events:none}' +
+          '#v950ModeBadge.live{background:#ecfdf5;color:#166534;border-color:#22c55e}' +
+          '#v950ModeBadge.replay{background:#fff7ed;color:#9a3412;border-color:#f97316}' +
+          '#v950ModeBadge.dev{background:#eef2ff;color:#1e40af;border-color:#3b82f6}' +
+          '@media(max-width:680px){#v950ModeBadge{top:74px;right:8px;font-size:10px;padding:5px 8px;min-height:26px}}';
+        document.head.appendChild(st);
+      }
+      var b=document.getElementById('v950ModeBadge');
+      if(!b){
+        b=document.createElement('div');
+        b.id='v950ModeBadge';
+        document.body.appendChild(b);
+      }
+      b.className=MODE;
+      var icon = MODE==='live'?'🟢':MODE==='replay'?'📜':'🛠';
+      b.textContent=icon+' '+LABEL+' v950';
+      b.style.display='inline-flex';
+    }catch(e){}
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', inject); else inject();
+  setTimeout(inject,300);
+  setTimeout(inject,1200);
+  setTimeout(inject,3000);
+})();
+</script>
 </body>
 </html>
