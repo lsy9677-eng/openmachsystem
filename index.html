@@ -68,7 +68,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-16-v928-low-lag-emergency-safe-mode";
+  const APP_VERSION = "2026-06-16-v929-result-scroll-stay-hide-adv";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -61887,5 +61887,203 @@ body.slider-ready .page.active,
 })();
 </script>
 
+
+
+<style id="v929ResultScrollStayHideAdvStyle">
+/* v929: 결과 저장 후 현재 위치 유지 + 본선 추첨 완료 뒤 진출팀 목록 숨김 */
+#v929StableNotice{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:8px 0 10px;padding:8px 12px;border-radius:12px;background:#f0fdfa;border:1.5px solid #5eead4;color:#0f766e;font-size:.74rem;font-weight:900;line-height:1.45}
+body.v929-main-drawn #mainAdvTeams{display:none!important;visibility:hidden!important;height:0!important;overflow:hidden!important;margin:0!important;padding:0!important;border:0!important;}
+.v929-hidden-adv-list{display:none!important;visibility:hidden!important;height:0!important;overflow:hidden!important;margin:0!important;padding:0!important;border:0!important;}
+body.v929-result-freeze *{scroll-behavior:auto!important;}
+#bracketFreshnessBadge{min-width:92px!important;text-align:center!important;}
+@media(max-width:680px){#v929StableNotice{font-size:.68rem;padding:7px 9px;align-items:flex-start;flex-direction:column}}
+</style>
+<script id="v929ResultScrollStayHideAdvScript">
+/* v929: keep scroll position after result save; hide advancing-team list after main draw exists */
+(function(){
+  'use strict';
+  if(window.__v929ResultScrollStayInstalled) return;
+  window.__v929ResultScrollStayInstalled=true;
+  const TAG='[v929-result-scroll-stay]';
+  const VERSION='2026-06-16-v929-result-scroll-stay-hide-adv';
+  const $=id=>document.getElementById(id);
+  const clean=v=>String(v==null?'':v).replace(/\s+/g,' ').trim();
+  const rawScrollTo=window.scrollTo.bind(window);
+  let restoreTimer=null;
+
+  function y(){
+    try{return window.pageYOffset||document.documentElement.scrollTop||document.body.scrollTop||0;}catch(e){return 0;}
+  }
+  function x(){
+    try{return window.pageXOffset||document.documentElement.scrollLeft||document.body.scrollLeft||0;}catch(e){return 0;}
+  }
+  function inBracket(){
+    try{return document.getElementById('page-bracket')?.classList.contains('active');}catch(e){return false;}
+  }
+  function setFreeze(ms){
+    try{
+      if(!inBracket()) return;
+      window.__v929FreezeUntil=Date.now()+(ms||4200);
+      window.__v929FreezeX=x();
+      window.__v929FreezeY=y();
+      document.body.classList.add('v929-result-freeze');
+      if(restoreTimer) clearInterval(restoreTimer);
+      restoreTimer=setInterval(()=>{
+        try{
+          if(Date.now()>Number(window.__v929FreezeUntil||0)){
+            clearInterval(restoreTimer); restoreTimer=null;
+            document.body.classList.remove('v929-result-freeze');
+            return;
+          }
+          const targetY=Number(window.__v929FreezeY||0), targetX=Number(window.__v929FreezeX||0);
+          if(Math.abs(y()-targetY)>3 || Math.abs(x()-targetX)>3) rawScrollTo({left:targetX,top:targetY,behavior:'auto'});
+        }catch(e){}
+      },80);
+    }catch(e){}
+  }
+  function shouldFreezeScroll(){
+    try{return inBracket() && Date.now()<Number(window.__v929FreezeUntil||0);}catch(e){return false;}
+  }
+  function restoreAfter(ms){
+    try{
+      const targetY=Number(window.__v929FreezeY||y()), targetX=Number(window.__v929FreezeX||x());
+      setTimeout(()=>{ if(inBracket()) rawScrollTo({left:targetX,top:targetY,behavior:'auto'}); }, ms||0);
+    }catch(e){}
+  }
+
+  // scrollTo / scrollIntoView 차단은 결과저장 직후 몇 초 동안만 적용한다.
+  if(!window.scrollTo.__v929Wrapped){
+    const w=function(){
+      try{
+        if(shouldFreezeScroll()){
+          const a=arguments[0];
+          const top=(typeof a==='object')?Number(a.top||0):(arguments.length>=2?Number(arguments[1]):0);
+          // 결과저장 후 자동으로 본선진출/상단으로 튀는 scroll만 차단. 같은 위치 복원은 허용.
+          const targetY=Number(window.__v929FreezeY||0);
+          if(Number.isFinite(top) && Math.abs(top-targetY)>8) return;
+        }
+      }catch(e){}
+      return rawScrollTo.apply(window,arguments);
+    };
+    w.__v929Wrapped=true;
+    window.scrollTo=w;
+  }
+  try{
+    if(!Element.prototype.scrollIntoView.__v929Wrapped){
+      const raw=Element.prototype.scrollIntoView;
+      const w=function(){
+        try{
+          if(shouldFreezeScroll()){
+            const t=clean(this && this.textContent || '');
+            const id=String(this && this.id || '');
+            if(t.includes('본선 진출팀') || id.includes('mainAdvTeams') || id.includes('mainStage') || id.includes('mainPreview')) return;
+          }
+        }catch(e){}
+        return raw.apply(this,arguments);
+      };
+      w.__v929Wrapped=true;
+      Element.prototype.scrollIntoView=w;
+    }
+  }catch(e){}
+
+  function getKey(){
+    try{
+      let tid=$('brTS')?.value||'';
+      let div=$('brDS')?.value||'';
+      if(!div || div==='__ALL__'){
+        const active=[...document.querySelectorAll('#brMultiDiv .active,[data-div].active,#brMultiDiv button')].find(el=>/영남|신인|부/.test(clean(el.textContent||'')) && !/전체/.test(clean(el.textContent||'')));
+        div=active?.dataset?.div || clean(active?.textContent||'').replace(/^.*?(영남.*부|.*부).*$/,'$1');
+      }
+      if(!tid){ try{ tid=typeof currentTid!=='undefined'?currentTid:''; }catch(e){} }
+      if(!div){ try{ div=typeof currentDiv!=='undefined'?currentDiv:''; }catch(e){} }
+      return tid&&div ? tid+'_'+div : '';
+    }catch(e){return '';}
+  }
+  function hasMain(key){
+    try{return !!(window.G&&G.matches&&Array.isArray(G.matches[key])&&G.matches[key].some(m=>m&&/^(main|playin|bronze|final)$/i.test(String(m.phase||''))));}catch(e){return false;}
+  }
+  function hideAdvanceListAfterMain(){
+    try{
+      const key=getKey();
+      const mainExists=key ? hasMain(key) : false;
+      document.body.classList.toggle('v929-main-drawn', !!mainExists);
+      const adv=$('mainAdvTeams');
+      if(adv){
+        if(mainExists){ adv.dataset.v929Hidden='1'; adv.style.display='none'; adv.style.height='0'; adv.style.overflow='hidden'; }
+        else if(adv.dataset.v929Hidden==='1'){ adv.style.display=''; adv.style.height=''; adv.style.overflow=''; delete adv.dataset.v929Hidden; }
+      }
+      // 대진표 본문에 오래된 진출팀 목록이 남으면 본선 생성 이후 숨긴다.
+      if(mainExists){
+        document.querySelectorAll('#bracketContent .card,#bracketContent [class*="adv"],#bracketContent [id*="Adv"],#bracketContent [id*="adv"]').forEach(el=>{
+          const t=clean(el.textContent||'');
+          if(t.includes('본선 진출팀')) el.classList.add('v929-hidden-adv-list');
+        });
+      }
+    }catch(e){}
+  }
+  function installNotice(){
+    try{
+      if($('v929StableNotice')) return;
+      const content=$('bracketContent');
+      const title=document.querySelector('#page-bracket .sec-title');
+      const n=document.createElement('div');
+      n.id='v929StableNotice';
+      n.innerHTML='<span>🧷 v929 안정화: 결과 저장 후 현재 위치를 유지하고, 본선 추첨 완료 뒤 본선 진출팀 목록은 숨깁니다.</span><button type="button" onclick="window.v929ManualRefresh&&window.v929ManualRefresh()" style="border:1px solid #0f766e;background:#fff;color:#0f766e;border-radius:999px;padding:5px 10px;font-size:.72rem;font-weight:1000;cursor:pointer">대진표 수동갱신</button>';
+      if(title && title.parentNode) title.parentNode.insertBefore(n,title.nextSibling); else if(content&&content.parentNode) content.parentNode.insertBefore(n,content);
+    }catch(e){}
+  }
+  function wrapResultFns(){
+    try{
+      ['saveM3','saveM3Core','v922FastQuickWinSave','v917FastQuickWinSave','v916QuickWinSave','v915QuickWinSave','v913QuickWinSave','v908AdminQuickWin'].forEach(name=>{
+        const fn=window[name];
+        if(typeof fn==='function' && !fn.__v929Wrapped){
+          const w=function(){
+            setFreeze(4800);
+            const r=fn.apply(this,arguments);
+            try{ Promise.resolve(r).finally(()=>{ restoreAfter(0); restoreAfter(120); restoreAfter(450); restoreAfter(1200); hideAdvanceListAfterMain(); }); }catch(e){ restoreAfter(80); }
+            return r;
+          };
+          w.__v929Wrapped=true; w.__old=fn; window[name]=w;
+          try{ if(name==='saveM3') saveM3=w; }catch(e){}
+          try{ if(name==='saveM3Core') saveM3Core=w; }catch(e){}
+        }
+      });
+    }catch(e){}
+  }
+  function wrapRender(){
+    try{
+      if(typeof window.renderBracket==='function' && !window.renderBracket.__v929Wrapped){
+        const old=window.renderBracket;
+        const w=function(){
+          const keep=shouldFreezeScroll();
+          const sx=x(), sy=y();
+          const r=old.apply(this,arguments);
+          try{ hideAdvanceListAfterMain(); }catch(e){}
+          if(keep){
+            window.__v929FreezeX=sx; window.__v929FreezeY=sy;
+            [0,60,180,420,900].forEach(ms=>setTimeout(()=>rawScrollTo({left:sx,top:sy,behavior:'auto'}),ms));
+          }
+          return r;
+        };
+        w.__v929Wrapped=true; w.__old=old; window.renderBracket=w; try{renderBracket=w;}catch(e){}
+      }
+    }catch(e){}
+  }
+  document.addEventListener('pointerdown',function(ev){
+    try{
+      if(ev.target.closest('#mM3SaveResultBtn,#v922QuickWinBox .v922-btn,#v917QuickWinBox button,#v916QuickWinBox button,#v915QuickWinBox button,#v913QuickWinBox button,#v908AdminQuickWinBox button')) setFreeze(5200);
+    }catch(e){}
+  },true);
+  window.v929ManualRefresh=function(){try{ hideAdvanceListAfterMain(); if(typeof window.renderBracket==='function') window.renderBracket(); }catch(e){}};
+  function boot(){
+    wrapResultFns(); wrapRender(); installNotice(); hideAdvanceListAfterMain();
+    try{const b=$('bracketFreshnessBadge'); if(b) b.textContent='v929 위치고정';}catch(e){}
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(boot,250)); else setTimeout(boot,50);
+  [300,900,1800,3500].forEach(ms=>setTimeout(boot,ms));
+  setInterval(()=>{try{wrapResultFns(); hideAdvanceListAfterMain();}catch(e){}},2500);
+  console.log(TAG,'installed',VERSION);
+})();
+</script>
 </body>
 </html>
