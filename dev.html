@@ -106,7 +106,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-16-v953-dev-safety-guard";
+  const APP_VERSION = "2026-06-17-v954-result-save-guard";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -64862,7 +64862,7 @@ body.bracket-page #v934FloatingRepairBtn,#page-bracket.active ~ #v934FloatingRep
 <script id="v953SafetyModeScript">
 (function(){
   'use strict';
-  var VERSION='v953';
+  var VERSION='v954';
   function getMode(){
     var p=(location.pathname||'').toLowerCase();
     if(p.indexOf('dev.html')>=0) return 'dev';
@@ -64876,7 +64876,7 @@ body.bracket-page #v934FloatingRepairBtn,#page-bracket.active ~ #v934FloatingRep
       u.searchParams.set('v','953');
       u.searchParams.set('__ts',String(Date.now()));
       location.href=u.toString();
-    }catch(e){ location.href=path+'?v=953&__ts='+Date.now(); }
+    }catch(e){ location.href=path+'?v=954&__ts='+Date.now(); }
   }
   function installSwitch(){
     try{
@@ -64960,9 +64960,9 @@ body.bracket-page #v934FloatingRepairBtn,#page-bracket.active ~ #v934FloatingRep
       if(mode==='live') return;
       var box=document.createElement('div'); box.id='v953ModeSafetyBanner'; box.className='show';
       if(mode==='dev'){
-        box.innerHTML='<b>⚠️ 개발/점검모드입니다.</b><br>이 화면에서 실제 대회를 수정하면 운영용에도 그대로 반영됩니다. 테스트 대회명은 <b>[TEST]</b> 또는 <b>테스트</b>를 포함해 주세요.<div class="v953-actions"><button class="ghost" type="button" onclick="this.closest(\'#v953ModeSafetyBanner\').style.display=\'none\'">잠시 숨김</button><button class="primary" type="button" onclick="location.href=\'/\'?v=953">운영용으로 이동</button></div>';
+        box.innerHTML='<b>⚠️ 개발/점검모드입니다.</b><br>이 화면에서 실제 대회를 수정하면 운영용에도 그대로 반영됩니다. 테스트 대회명은 <b>[TEST]</b> 또는 <b>테스트</b>를 포함해 주세요.<div class="v953-actions"><button class="ghost" type="button" onclick="this.closest(\'#v953ModeSafetyBanner\').style.display=\'none\'">잠시 숨김</button><button class="primary" type="button" onclick="location.href=\'/\'?v=954">운영용으로 이동</button></div>';
       }else{
-        box.innerHTML='<b>📜 복기/복구모드입니다.</b><br>지난 대회 기록을 수정하면 실제 시합결과와 선수기록에 반영됩니다. 실시간 운영은 운영용 화면을 사용하세요.<div class="v953-actions"><button class="ghost" type="button" onclick="this.closest(\'#v953ModeSafetyBanner\').style.display=\'none\'">잠시 숨김</button><button class="primary" type="button" onclick="location.href=\'/\'?v=953">운영용으로 이동</button></div>';
+        box.innerHTML='<b>📜 복기/복구모드입니다.</b><br>지난 대회 기록을 수정하면 실제 시합결과와 선수기록에 반영됩니다. 실시간 운영은 운영용 화면을 사용하세요.<div class="v953-actions"><button class="ghost" type="button" onclick="this.closest(\'#v953ModeSafetyBanner\').style.display=\'none\'">잠시 숨김</button><button class="primary" type="button" onclick="location.href=\'/\'?v=954">운영용으로 이동</button></div>';
       }
       document.body.appendChild(box);
     }catch(e){}
@@ -64976,6 +64976,125 @@ body.bracket-page #v934FloatingRepairBtn,#page-bracket.active ~ #v934FloatingRep
   function init(){ installSwitch(); installBanner(); installGuard(); updateVersionBadge(); }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', init); else init();
   setTimeout(init,600); setTimeout(init,1800); setTimeout(installSwitch,4000);
+})();
+</script>
+
+
+
+<!-- v954: 결과 저장 안전장치 / 중복저장 방지 / 최근 결과 되돌리기 보강 -->
+<style id="v954ResultGuardStyle">
+  #v954ResultGuardBar{position:fixed;right:14px;bottom:74px;z-index:2147482500;display:flex;gap:6px;align-items:center;background:rgba(255,255,255,.94);border:1px solid #dbeafe;border-radius:999px;padding:7px 9px;box-shadow:0 10px 24px rgba(15,30,58,.14);font-size:12px;font-weight:900;color:#0f1e3a;backdrop-filter:blur(8px) saturate(130%)}
+  #v954ResultGuardBar .v954-pill{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;padding:6px 9px;background:#eef4ff;color:#1d4ed8;border:1px solid #bfdbfe;line-height:1;white-space:nowrap}
+  #v954ResultGuardBar button{border:1px solid #cbd5e1;background:#fff;color:#0f1e3a;border-radius:999px;padding:7px 10px;font-size:12px;font-weight:1000;cursor:pointer;line-height:1;white-space:nowrap}
+  #v954ResultGuardBar button.danger{background:#fff7ed;color:#9a3412;border-color:#fdba74}
+  #v954SaveOverlay{position:fixed;left:50%;top:92px;transform:translateX(-50%);z-index:2147482600;display:none;align-items:center;gap:8px;padding:10px 14px;border-radius:999px;background:#0f1e3a;color:#fff;box-shadow:0 12px 28px rgba(15,30,58,.22);font-size:.82rem;font-weight:1000}
+  #v954SaveOverlay.show{display:flex}
+  #v954SaveOverlay .dot{width:8px;height:8px;border-radius:999px;background:#facc15;animation:v954Blink .85s infinite ease-in-out}
+  @keyframes v954Blink{0%,100%{opacity:.35;transform:scale(.85)}50%{opacity:1;transform:scale(1.18)}}
+  @media(max-width:680px){#v954ResultGuardBar{left:8px;right:8px;bottom:max(76px,calc(env(safe-area-inset-bottom,0px) + 64px));justify-content:center;flex-wrap:wrap;border-radius:16px}#v954ResultGuardBar button,#v954ResultGuardBar .v954-pill{font-size:11px;padding:7px 8px}#v954SaveOverlay{top:76px;font-size:.76rem;max-width:calc(100vw - 18px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
+</style>
+<script id="v954ResultGuardScript">
+(function(){
+  'use strict';
+  var VERSION='v954';
+  var SNAP_KEY='__230MATCH_V954_RESULT_HISTORY__';
+  var saveLock=false;
+  var saveLockTimer=null;
+  function mode(){try{var p=location.pathname.toLowerCase(); if(p.indexOf('dev')>=0) return 'dev'; if(p.indexOf('replay')>=0) return 'replay'; return 'live';}catch(e){return 'live';}}
+  function label(){var m=mode(); return m==='dev'?'개발':m==='replay'?'복기':'운영';}
+  function getKey(){try{return window.CM_key||(typeof CM_key!=='undefined'?CM_key:'')||((window.__v935M3Context||{}).key)||((window.__v922M3Context||{}).key)||'';}catch(e){return '';}}
+  function getMid(){try{return window.CM_id||(typeof CM_id!=='undefined'?CM_id:'')||((window.__v935M3Context||{}).mid)||((window.__v922M3Context||{}).mid)||'';}catch(e){return '';}}
+  function clone(v){try{return JSON.parse(JSON.stringify(v));}catch(e){return null;}}
+  function loadHist(){try{return JSON.parse(localStorage.getItem(SNAP_KEY)||'[]')||[];}catch(e){return [];}}
+  function saveHist(arr){try{localStorage.setItem(SNAP_KEY,JSON.stringify((arr||[]).slice(0,5)));}catch(e){}}
+  function showSaving(txt){try{var el=document.getElementById('v954SaveOverlay'); if(!el){el=document.createElement('div'); el.id='v954SaveOverlay'; el.innerHTML='<span class="dot"></span><span class="txt"></span>'; document.body.appendChild(el);} el.querySelector('.txt').textContent=txt||'결과 저장 중...'; el.classList.add('show');}catch(e){}}
+  function hideSaving(){try{var el=document.getElementById('v954SaveOverlay'); if(el) el.classList.remove('show');}catch(e){}}
+  function snapshot(reason){
+    try{
+      var key=getKey(); if(!key || !window.G) return false;
+      var snap={at:new Date().toISOString(),reason:reason||'result',key:key,mid:getMid(),matches:clone(G.matches&&G.matches[key]),draw:clone(G.draws&&G.draws[key]),players:clone(G.players),logLen:(G.log||[]).length};
+      var arr=loadHist(); arr.unshift(snap); saveHist(arr); updateBar();
+      return true;
+    }catch(e){return false;}
+  }
+  async function persistKey(key){
+    try{ if(typeof stM==='function') await stM(key); }catch(e){console.warn('[v954] stM failed',e);} 
+    try{ if(typeof stD==='function') await stD(key); }catch(e){console.warn('[v954] stD failed',e);} 
+    try{ if(typeof stP==='function') await stP(); }catch(e){}
+  }
+  window.v954UndoLastResult = async function(){
+    try{
+      var arr=loadHist(); if(!arr.length){ if(typeof toast==='function') toast('되돌릴 결과 기록이 없습니다','info'); else alert('되돌릴 결과 기록이 없습니다'); return; }
+      var snap=arr.shift();
+      if(!confirm('마지막 결과 저장 전 상태로 되돌릴까요?\n대상: '+(snap.key||'현재 부서')+'\n시각: '+(snap.at||''))) { arr.unshift(snap); saveHist(arr); return; }
+      if(!window.G){ alert('앱 데이터가 아직 준비되지 않았습니다.'); return; }
+      var key=snap.key;
+      if(snap.matches) G.matches[key]=clone(snap.matches);
+      if(snap.draw) G.draws[key]=clone(snap.draw);
+      if(snap.players) G.players=clone(snap.players);
+      saveHist(arr);
+      showSaving('되돌리는 중...');
+      await persistKey(key);
+      hideSaving();
+      try{ if(typeof renderBracket==='function') renderBracket(); }catch(e){}
+      try{ if(typeof renderRanking==='function') renderRanking(); }catch(e){}
+      try{ if(typeof toast==='function') toast('마지막 결과를 되돌렸습니다','success'); }catch(e){}
+      updateBar();
+    }catch(e){hideSaving(); console.error('[v954] undo failed',e); alert('되돌리기 실패: '+(e.message||e));}
+  };
+  function setLock(on){
+    saveLock=!!on;
+    try{document.querySelectorAll('#mM3Footer button, .v935QuickWinBox button, .v922QuickWinBox button, .v954-qw button').forEach(function(b){ if(!/닫기|취소/.test(b.textContent||'')) b.disabled=!!on; });}catch(e){}
+    clearTimeout(saveLockTimer);
+    if(on){ saveLockTimer=setTimeout(function(){saveLock=false; hideSaving(); try{document.querySelectorAll('#mM3Footer button, .v935QuickWinBox button, .v922QuickWinBox button, .v954-qw button').forEach(function(b){b.disabled=false;});}catch(e){}},9000); }
+  }
+  function wrapSaveM3(){
+    try{
+      var old=window.saveM3; if(typeof old!=='function'||old.__v954Wrapped) return;
+      var w=async function(){
+        if(saveLock){try{ if(typeof toast==='function') toast('이미 저장 중입니다. 잠시만 기다려 주세요.','info');}catch(e){} return;}
+        snapshot('saveM3'); setLock(true); showSaving('결과 저장 중...');
+        try{return await old.apply(this,arguments);} finally {setTimeout(function(){setLock(false); hideSaving(); updateBar();},450);}
+      };
+      w.__v954Wrapped=true; w.__old=old; window.saveM3=w; try{saveM3=w;}catch(e){}
+    }catch(e){}
+  }
+  function wrapQuickWins(){
+    ['v935QuickWinSave','v922FastQuickWinSave','v917FastQuickWinSave','v916QuickWinSave','v915QuickWinSave','v913QuickWinSave','v908AdminQuickWin'].forEach(function(name){
+      try{var old=window[name]; if(typeof old!=='function'||old.__v954Wrapped) return; var w=async function(){ if(saveLock){try{toast('이미 저장 중입니다','info');}catch(e){} return;} snapshot(name); setLock(true); showSaving('승패 저장 중...'); try{return await old.apply(this,arguments);} finally{setTimeout(function(){setLock(false); hideSaving(); updateBar();},350);} }; w.__v954Wrapped=true; w.__old=old; window[name]=w;}catch(e){}
+    });
+  }
+  function updateBar(){
+    try{
+      var bar=document.getElementById('v954ResultGuardBar'); if(!bar) return;
+      var cnt=loadHist().length;
+      bar.querySelector('.v954-pill').textContent='🛡 '+label()+' '+VERSION+' · 되돌리기 '+cnt+'개';
+    }catch(e){}
+  }
+  function installBar(){
+    try{
+      var bar=document.getElementById('v954ResultGuardBar');
+      if(!bar){
+        bar=document.createElement('div'); bar.id='v954ResultGuardBar';
+        var pill=document.createElement('span'); pill.className='v954-pill'; pill.textContent='🛡 '+label()+' '+VERSION; bar.appendChild(pill);
+        var undo=document.createElement('button'); undo.type='button'; undo.className='danger'; undo.textContent='↩ 결과 되돌리기'; undo.onclick=function(){window.v954UndoLastResult();}; bar.appendChild(undo);
+        var go=document.createElement('button'); go.type='button'; go.textContent=mode()==='live'?'복기':'운영'; go.onclick=function(){location.href=(mode()==='live'?'/replay.html':'/')+'?v=954';}; bar.appendChild(go);
+        document.body.appendChild(bar);
+      }
+      updateBar();
+    }catch(e){}
+  }
+  function installModalUndo(){
+    try{
+      var f=document.getElementById('mM3Footer'); if(!f||f.querySelector('.v954-modal-undo')) return;
+      var b=document.createElement('button'); b.type='button'; b.className='btn btn-outline v954-modal-undo'; b.textContent='↩ 되돌리기'; b.onclick=function(){window.v954UndoLastResult();};
+      f.insertBefore(b,f.firstChild);
+    }catch(e){}
+  }
+  function updateBadge(){try{var b=document.getElementById('bracketFreshnessBadge'); if(b) b.textContent='v954 결과안전';}catch(e){}}
+  function init(){wrapSaveM3(); wrapQuickWins(); installBar(); installModalUndo(); updateBadge();}
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init); else init();
+  setTimeout(init,600); setTimeout(init,1800); setInterval(function(){wrapSaveM3(); wrapQuickWins(); installModalUndo(); updateBar();},5000);
 })();
 </script>
 
