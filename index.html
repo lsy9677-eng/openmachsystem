@@ -106,7 +106,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-17-v958-notice-multi-images";
+  const APP_VERSION = "2026-06-17-v959-notice-buttons-multi-fix";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -65162,7 +65162,7 @@ function buildTidOptions(selected){const ts=tournaments(); return `<option value
 function installPage(){try{if(!$('page-board')){const main=document.querySelector('main.main-content')||document.querySelector('main')||document.body; const page=document.createElement('div'); page.className='page'; page.id='page-board'; page.innerHTML=`<div class="sec-title">공지사항 게시판</div><div class="v955-board-card"><div class="v955-board-head"><div class="v955-board-title">📢 시합 공지 / 사진 / 코트 배정</div><div class="v955-board-actions"><select id="v955BoardTidFilter" class="form-select" style="width:auto;min-width:220px" onchange="window.v955RefreshBoard()"></select><button type="button" onclick="window.v955RefreshBoard()">↻ 새로고침</button><button type="button" class="primary v955-admin-write" onclick="window.v955OpenNoticePostModal()">✍️ 글쓰기</button></div></div><div id="v955BoardList" class="v955-post-list"><div class="v955-board-empty">불러오는 중...</div></div></div>`; main.appendChild(page);} const sel=$('v955BoardTidFilter'); if(sel){const cur=sel.value||selectedTid(); sel.innerHTML=buildTidOptions(cur); sel.value=cur;} if(!isAdmin()) document.querySelectorAll('.v955-admin-write').forEach(b=>b.style.display='none'); else document.querySelectorAll('.v955-admin-write').forEach(b=>b.style.display='inline-flex');}catch(e){console.warn('[v955] install page failed',e)}}
 function installNav(){try{const nav=document.querySelector('.nav-tabs'); if(nav&&!document.querySelector('.nav-tab[data-page="board"]')){const d=document.createElement('div'); d.className='nav-tab'; d.dataset.page='board'; d.innerHTML='📢 공지'; d.onclick=()=>window.v955ShowBoardPage(); const rank=nav.querySelector('[data-page="ranking"]'); nav.insertBefore(d,rank||null);} const quick=document.querySelector('.home-quick-grid'); if(quick&&!quick.querySelector('.v955-home-board-btn')){const b=document.createElement('button'); b.className='home-quick-btn v955-home-board-btn'; b.innerHTML='📢<span>공지사항</span>'; b.onclick=()=>window.v955ShowBoardPage(); quick.appendChild(b);} }catch(e){}}
 function installHomeCard(){try{const home=$('page-home'); if(home&&!$('v955HomeBoardCard')){const ref=home.querySelector('.home-status-card')||home.querySelector('.card'); const card=document.createElement('div'); card.className='v955-board-card'; card.id='v955HomeBoardCard'; card.innerHTML=`<div class="v955-board-head"><div class="v955-board-title">📢 최근 공지사항</div><div class="v955-board-actions"><button type="button" onclick="window.v955ShowBoardPage()">전체 보기</button><button type="button" class="primary v955-admin-write" onclick="window.v955OpenNoticePostModal()">글쓰기</button></div></div><div id="v955HomeBoardList" class="v955-post-list"><div class="v955-board-empty">불러오는 중...</div></div>`; if(ref&&ref.parentNode) ref.parentNode.insertBefore(card,ref.nextSibling); else home.prepend(card);} }catch(e){}}
-function installModal(){try{if($('v955PostModal'))return; const modal=document.createElement('div'); modal.id='v955PostModal'; modal.innerHTML=`<div class="v955-modal-box"><div class="v955-modal-head"><div>✍️ 공지사항 작성</div><button class="v955-modal-close" type="button" onclick="window.v955CloseNoticePostModal()">×</button></div><div class="v955-modal-body"><div class="form-line"><label>대회/범위</label><select id="v955PostTid"></select></div><div class="form-line"><label>분류</label><select id="v955PostCategory"><option value="notice">공지</option><option value="court">코트배정</option><option value="result">시합결과</option><option value="photo">경기사진</option><option value="etc">기타</option></select></div><div class="form-line"><label>제목</label><input id="v955PostTitle" placeholder="예: 본선 코트 배정 안내"></div><div class="form-line"><label>내용</label><textarea id="v955PostBody" placeholder="공지 내용을 입력하세요"></textarea></div><div class="form-line"><label>사진 첨부</label><input id="v955PostImage" type="file" accept="image/*"><div style="font-size:.72rem;color:#64748b;margin-top:5px;line-height:1.5">경기 사진이나 코트 배정표 이미지를 첨부할 수 있습니다. 큰 이미지는 업로드 시간이 걸릴 수 있습니다.</div></div></div><div class="v955-modal-foot"><button type="button" onclick="window.v955CloseNoticePostModal()">취소</button><button class="primary" type="button" onclick="window.v955SaveNoticePost()">게시</button></div></div>`; document.body.appendChild(modal); modal.addEventListener('click',e=>{if(e.target===modal) e.stopPropagation();});}catch(e){}}
+function installModal(){try{if($('v955PostModal'))return; const modal=document.createElement('div'); modal.id='v955PostModal'; modal.innerHTML=`<div class="v955-modal-box"><div class="v955-modal-head"><div>✍️ 공지사항 작성</div><button class="v955-modal-close" type="button" onclick="window.v955CloseNoticePostModal()">×</button></div><div class="v955-modal-body"><div class="form-line"><label>대회/범위</label><select id="v955PostTid"></select></div><div class="form-line"><label>분류</label><select id="v955PostCategory"><option value="notice">공지</option><option value="court">코트배정</option><option value="result">시합결과</option><option value="photo">경기사진</option><option value="etc">기타</option></select></div><div class="form-line"><label>제목</label><input id="v955PostTitle" placeholder="예: 본선 코트 배정 안내"></div><div class="form-line"><label>내용</label><textarea id="v955PostBody" placeholder="공지 내용을 입력하세요"></textarea></div><div class="form-line"><label>사진 첨부</label><input id="v955PostImage" type="file" accept="image/*" multiple><div style="font-size:.72rem;color:#64748b;margin-top:5px;line-height:1.5">경기 사진이나 코트 배정표 이미지를 첨부할 수 있습니다. 큰 이미지는 업로드 시간이 걸릴 수 있습니다.</div></div></div><div class="v955-modal-foot"><button type="button" onclick="window.v955CloseNoticePostModal()">취소</button><button class="primary" type="button" onclick="window.v955SaveNoticePost()">게시</button></div></div>`; document.body.appendChild(modal); modal.addEventListener('click',e=>{if(e.target===modal) e.stopPropagation();});}catch(e){}}
 function installFab(){try{if($('v955BoardFab'))return; const f=document.createElement('div'); f.className='v955-board-fab'; f.id='v955BoardFab'; f.innerHTML='<button type="button" onclick="window.v955ShowBoardPage()">📢 공지</button>'; document.body.appendChild(f);}catch(e){}}
 window.v955ShowBoardPage=function(){try{installPage(); document.querySelectorAll('.page').forEach(p=>p.classList.remove('active')); $('page-board')?.classList.add('active'); document.querySelectorAll('.nav-tab').forEach(t=>t.classList.toggle('active',t.dataset.page==='board')); window.scrollTo({top:0,behavior:'smooth'}); refresh();}catch(e){console.error(e)}}
 window.v955RefreshBoard=refresh;
@@ -65491,6 +65491,76 @@ function install(){patchInput(); refreshV958(); try{const b=document.getElementB
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install); else install();
 setTimeout(install,800); setTimeout(patchInput,1800);
 })();
+</script>
+
+
+
+<!-- v959: 공지 버튼 중복 정리 + 사진 여러 장 선택 강제 보정 -->
+<style id="v959NoticeCleanMultiStyle">
+  /* 공지 게시판에서는 전역 공지 FAB와 글쓰기 FAB를 숨기고, 카드 상단 버튼 하나만 사용 */
+  body.v959-board-active #v955BoardFab,
+  body.v959-board-active #v956NoticeWriteFab,
+  #v956NoticeWriteFab{display:none!important;visibility:hidden!important;pointer-events:none!important;}
+
+  #page-board .v956-inline-write{display:none!important;}
+  #page-board .v955-board-actions .v955-admin-write{display:inline-flex!important;align-items:center!important;justify-content:center!important;}
+  #page-board .v955-board-actions .v955-admin-write.v959-hidden-dup{display:none!important;}
+
+  #v955PostModal input#v955PostImage{display:block!important;width:100%!important;}
+  #v959MultiImageSummary{margin-top:7px;padding:7px 9px;border-radius:10px;background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;font-size:.74rem;font-weight:900;line-height:1.45;}
+  #v959MultiImageHelp{margin-top:6px;color:#64748b;font-size:.72rem;line-height:1.55;}
+
+  @media(max-width:680px){
+    body.v959-board-active #page-board{padding-bottom:128px!important;}
+    #page-board .v955-board-actions{display:grid!important;grid-template-columns:1fr!important;gap:7px!important;width:100%!important;}
+    #page-board .v955-board-actions #v955BoardTidFilter{width:100%!important;min-width:0!important;}
+    #page-board .v955-board-actions button{width:100%!important;min-height:40px!important;}
+    #v955PostModal .v955-modal-box{max-height:calc(100vh - 105px - env(safe-area-inset-bottom,0px))!important;}
+  }
+</style>
+<script type="module" id="v959NoticeCleanMultiScript">
+import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+const FB={apiKey:"AIzaSyAbc17RiYyxCqgbMBkxkMoiRdNTmy2q65w",authDomain:"open-match-manager.firebaseapp.com",projectId:"open-match-manager",storageBucket:"open-match-manager.firebasestorage.app",messagingSenderId:"195671806262",appId:"1:195671806262:web:89691574839266cea1a397"};
+const app=getApps().length?getApps()[0]:initializeApp(FB);
+const db=getFirestore(app);
+const storage=getStorage(app);
+const MAX_IMAGE=8*1024*1024;
+function $(id){return document.getElementById(id)}
+function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+function toastSafe(msg,type='info'){try{ if(typeof window.toast==='function') window.toast(msg,type); else alert(msg); }catch(e){alert(msg)}}
+function adminLike(){try{return !!(window.AD||window.TM||document.body.classList.contains('admin-mode')||document.body.classList.contains('tm-mode'));}catch(e){return false}}
+function mode(){try{var p=location.pathname.toLowerCase(); if(p.includes('dev'))return 'dev'; if(p.includes('replay'))return 'replay'; return 'live';}catch(e){return 'live'}}
+function tournaments(){try{return Object.values(window.G?.tournaments||{}).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')))}catch(e){return []}}
+function selectedTid(){try{for(const id of ['brTS','regTS','rankTS']){const el=$(id); if(el&&el.value) return el.value;} const ts=tournaments(); const active=ts.find(t=>!['finished'].includes(t.status))||ts[0]; return active?.id||'global';}catch(e){return 'global'}}
+function tournamentName(tid){try{if(tid==='global')return '전체공지'; return window.G?.tournaments?.[tid]?.name||tid||'전체공지';}catch(e){return tid||'전체공지'}}
+function safeName(n){return String(n||'photo.jpg').replace(/[^a-zA-Z0-9가-힣._-]/g,'_')}
+function urlsOf(p){return Array.isArray(p.imageUrls)?p.imageUrls.filter(Boolean):(p.imageUrl?[p.imageUrl]:[])}
+function pathsOf(p){return Array.isArray(p.imagePaths)?p.imagePaths.filter(Boolean):(p.imagePath?[p.imagePath]:[])}
+function catLabel(c){return ({notice:'공지',court:'코트배정',result:'시합결과',photo:'경기사진',etc:'기타'}[c]||c||'공지')}
+function fmt(ts){try{if(!ts)return ''; const d=new Date(Number(ts)); if(isNaN(d))return ''; return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}catch(e){return ''}}
+function currentFilterTid(){try{const sel=$('v955BoardTidFilter'); if(sel&&sel.value)return sel.value; return selectedTid();}catch(e){return selectedTid()}}
+function makeGallery(urls){if(!urls.length)return ''; return `<div class="v958-notice-gallery">${urls.map((u,i)=>`<img src="${esc(u)}" alt="공지 이미지 ${i+1}" loading="lazy" onclick="window.v958OpenNoticeImage('${esc(u)}')">`).join('')}</div>`}
+async function readPosts(){try{const snap=await getDocs(query(collection(db,'noticePosts'),orderBy('createdAtMs','desc'),limit(80))); return snap.docs.map(d=>({id:d.id,...d.data()}));}catch(e){console.error('[v959 board] load failed',e); return []}}
+function renderPosts(posts,targetId,max=20){const el=$(targetId); if(!el)return; const tid=currentFilterTid(); const list=posts.filter(p=>p.scope==='global'||p.tid==='global'||!tid||tid==='global'||p.tid===tid).slice(0,max); if(!list.length){el.innerHTML='<div class="v955-board-empty">아직 등록된 공지사항이 없습니다.</div>';return;} el.innerHTML=list.map(p=>{const urls=urlsOf(p); return `<div class="v955-post" data-post-id="${esc(p.id)}"><div class="v955-post-top"><div><div class="v955-post-title">${esc(p.title||'(제목 없음)')}</div><div class="v955-post-meta"><span class="v955-post-cat">${esc(catLabel(p.category))}</span><span>${esc(p.tournamentName||'전체공지')}</span><span>${esc(fmt(p.createdAtMs))}</span>${urls.length>1?`<span>사진 ${urls.length}장</span>`:''}</div></div>${adminLike()?`<button class="v955-post-del" onclick="window.v955DeleteNoticePost('${esc(p.id)}')">삭제</button>`:''}</div>${p.body?`<div class="v955-post-body">${esc(p.body)}</div>`:''}${makeGallery(urls)}</div>`}).join('')}
+async function refresh(){const posts=await readPosts(); window.__v955NoticePosts=posts; window.__v958NoticePosts=posts; window.__v959NoticePosts=posts; renderPosts(posts,'v955HomeBoardList',3); renderPosts(posts,'v955BoardList',80); cleanupButtons();}
+async function uploadImages(files,tid){const imageUrls=[], imagePaths=[]; for(const file of files){if(!/^image\//i.test(file.type||'')) throw new Error('이미지 파일만 올릴 수 있습니다: '+file.name); if(file.size>MAX_IMAGE) throw new Error('사진은 1장당 8MB 이하로 올려주세요: '+file.name); const path=`noticePosts/${tid}/${Date.now()}_${Math.random().toString(36).slice(2,8)}_${safeName(file.name)}`; const r=ref(storage,path); await uploadBytes(r,file,{contentType:file.type||'image/jpeg'}); const url=await getDownloadURL(r); imageUrls.push(url); imagePaths.push(path);} return {imageUrls,imagePaths};}
+function boardActive(){try{return !!($('page-board')&&$('page-board').classList.contains('active'))}catch(e){return false}}
+function cleanupButtons(){try{document.body.classList.toggle('v959-board-active',boardActive()); const writeFab=$('v956NoticeWriteFab'); if(writeFab) writeFab.remove(); document.querySelectorAll('#page-board .v956-inline-write').forEach(el=>el.remove()); const actions=document.querySelector('#page-board .v955-board-actions'); if(actions){const writes=[...actions.querySelectorAll('.v955-admin-write')]; writes.forEach((b,i)=>{b.textContent='✍️ 공지 글쓰기'; b.classList.toggle('v959-hidden-dup',i>0); b.style.display=(adminLike()&&i===0)?'inline-flex':'none';});} if(boardActive()){const fab=$('v955BoardFab'); if(fab) fab.style.display='none';}else{const fab=$('v955BoardFab'); if(fab) fab.style.display='flex';}}catch(e){}}
+function forceMultiInput(){try{const input=$('v955PostImage'); if(!input)return; input.setAttribute('multiple','multiple'); input.multiple=true; input.accept='image/*'; if(!input.__v959Bound){input.__v959Bound=true; input.addEventListener('change',()=>{const n=input.files?.length||0; let s=$('v959MultiImageSummary'); if(!s){s=document.createElement('div'); s.id='v959MultiImageSummary'; input.insertAdjacentElement('afterend',s);} s.textContent=n?`선택된 사진 ${n}장 · 게시하면 모두 업로드됩니다.`:'사진을 선택하지 않았습니다.';});} let help=$('v959MultiImageHelp'); if(!help){help=document.createElement('div'); help.id='v959MultiImageHelp'; help.innerHTML='경기 입상자 사진, 결과표, 코트 배정표를 <b>여러 장</b> 선택할 수 있습니다. 최대 12장, 사진 1장당 8MB 이하.'; input.insertAdjacentElement('afterend',help);} }catch(e){}}
+const oldOpen=window.v955OpenNoticePostModal;
+window.v955OpenNoticePostModal=function(){try{const r=oldOpen?oldOpen.apply(this,arguments):undefined; setTimeout(forceMultiInput,0); setTimeout(forceMultiInput,180); setTimeout(forceMultiInput,600); cleanupButtons(); return r;}catch(e){console.error(e);}};
+window.v955SaveNoticePost=async function(){try{if(!adminLike()){toastSafe('관리자만 작성 가능합니다.','error');return;} forceMultiInput(); const tid=$('v955PostTid')?.value||'global'; const title=($('v955PostTitle')?.value||'').trim(); const body=($('v955PostBody')?.value||'').trim(); const category=$('v955PostCategory')?.value||'notice'; if(!title&&!body){toastSafe('제목이나 내용을 입력해 주세요.','error');return;} const files=Array.from($('v955PostImage')?.files||[]); if(files.length>12){toastSafe('사진은 한 게시글에 최대 12장까지 올려주세요.','error');return;} let imageUrls=[], imagePaths=[]; if(files.length){toastSafe(`사진 ${files.length}장 업로드 중입니다...`,'info'); const out=await uploadImages(files,tid); imageUrls=out.imageUrls; imagePaths=out.imagePaths;} await addDoc(collection(db,'noticePosts'),{scope:tid==='global'?'global':'tournament',tid,tournamentName:tournamentName(tid),category,title,body,imageUrl:imageUrls[0]||'',imagePath:imagePaths[0]||'',imageUrls,imagePaths,imageCount:imageUrls.length,createdAtMs:Date.now(),createdByMode:mode(),multiImageVersion:'v959'}); try{window.v955CloseNoticePostModal&&window.v955CloseNoticePostModal();}catch(e){} toastSafe('공지사항을 게시했습니다.','success'); refresh();}catch(e){console.error('[v959 board] save failed',e); toastSafe('공지 저장 실패: '+(e.message||e),'error')}};
+window.v955DeleteNoticePost=async function(id,imagePath){try{if(!adminLike()){toastSafe('관리자만 삭제 가능합니다.','error');return;} if(!confirm('이 공지사항을 삭제할까요? 첨부 사진도 함께 삭제됩니다.'))return; const posts=window.__v959NoticePosts||window.__v958NoticePosts||window.__v955NoticePosts||[]; const p=posts.find(x=>String(x.id)===String(id))||{}; const paths=[...pathsOf(p), ...(imagePath?[imagePath]:[])].filter(Boolean); await deleteDoc(doc(db,'noticePosts',id)); for(const path of [...new Set(paths)]){try{await deleteObject(ref(storage,path));}catch(e){}} toastSafe('삭제했습니다.','success'); refresh();}catch(e){console.error('[v959 board] delete failed',e); toastSafe('삭제 실패: '+(e.message||e),'error')}};
+window.v955RefreshBoard=refresh;
+window.v958RefreshNoticeBoard=refresh;
+window.v959RefreshNoticeBoard=refresh;
+function tick(){cleanupButtons();forceMultiInput();try{const b=document.getElementById('bracketFreshnessBadge'); if(b)b.textContent='v959 공지정리';}catch(e){}}
+const oldShowBoard=window.v955ShowBoardPage;
+if(typeof oldShowBoard==='function'&&!oldShowBoard.__v959Wrapped){window.v955ShowBoardPage=function(){const r=oldShowBoard.apply(this,arguments); setTimeout(tick,0); setTimeout(tick,250); setTimeout(refresh,450); return r;}; window.v955ShowBoardPage.__v959Wrapped=true;}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{tick();setTimeout(refresh,700)});else{tick();setTimeout(refresh,700)}
+setTimeout(tick,300); setTimeout(tick,1200); setTimeout(tick,2600);
 </script>
 
 </body>
