@@ -106,7 +106,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-17-v969-notice-restore-stable";
+  const APP_VERSION = "2026-06-17-v970-emergency-notice-rollback";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -64876,7 +64876,7 @@ body.bracket-page #v934FloatingRepairBtn,#page-bracket.active ~ #v934FloatingRep
       u.searchParams.set('v','953');
       u.searchParams.set('__ts',String(Date.now()));
       location.href=u.toString();
-    }catch(e){ location.href=path+'?v=967&__ts='+Date.now(); }
+    }catch(e){ location.href=path+'?v=954&__ts='+Date.now(); }
   }
   function installSwitch(){
     try{
@@ -64884,7 +64884,7 @@ body.bracket-page #v934FloatingRepairBtn,#page-bracket.active ~ #v934FloatingRep
       var panel=document.getElementById('v953ModeSwitch');
       if(!panel){
         panel=document.createElement('div'); panel.id='v953ModeSwitch';
-        var lab=document.createElement('span'); lab.className='v953-label'; lab.textContent='v969 '+modeName(getMode()); panel.appendChild(lab);
+        var lab=document.createElement('span'); lab.className='v953-label'; lab.textContent='v953 '+modeName(getMode()); panel.appendChild(lab);
         [['운영','live','/'],['복기/복구','replay','/replay.html'],['개발','dev','/dev.html']].forEach(function(x){
           var b=document.createElement('button'); b.type='button'; b.textContent=x[0]; b.setAttribute('data-mode',x[1]);
           b.onclick=function(ev){ ev.preventDefault(); ev.stopPropagation(); go(x[2]); };
@@ -64960,9 +64960,9 @@ body.bracket-page #v934FloatingRepairBtn,#page-bracket.active ~ #v934FloatingRep
       if(mode==='live') return;
       var box=document.createElement('div'); box.id='v953ModeSafetyBanner'; box.className='show';
       if(mode==='dev'){
-        box.innerHTML='<b>⚠️ 개발/점검모드입니다.</b><br>이 화면에서 실제 대회를 수정하면 운영용에도 그대로 반영됩니다. 테스트 대회명은 <b>[TEST]</b> 또는 <b>테스트</b>를 포함해 주세요.<div class="v953-actions"><button class="ghost" type="button" onclick="this.closest(\'#v953ModeSafetyBanner\').style.display=\'none\'">잠시 숨김</button><button class="primary" type="button" onclick="location.href=\'/\'?v=967">운영용으로 이동</button></div>';
+        box.innerHTML='<b>⚠️ 개발/점검모드입니다.</b><br>이 화면에서 실제 대회를 수정하면 운영용에도 그대로 반영됩니다. 테스트 대회명은 <b>[TEST]</b> 또는 <b>테스트</b>를 포함해 주세요.<div class="v953-actions"><button class="ghost" type="button" onclick="this.closest(\'#v953ModeSafetyBanner\').style.display=\'none\'">잠시 숨김</button><button class="primary" type="button" onclick="location.href=\'/\'?v=954">운영용으로 이동</button></div>';
       }else{
-        box.innerHTML='<b>📜 복기/복구모드입니다.</b><br>지난 대회 기록을 수정하면 실제 시합결과와 선수기록에 반영됩니다. 실시간 운영은 운영용 화면을 사용하세요.<div class="v953-actions"><button class="ghost" type="button" onclick="this.closest(\'#v953ModeSafetyBanner\').style.display=\'none\'">잠시 숨김</button><button class="primary" type="button" onclick="location.href=\'/\'?v=967">운영용으로 이동</button></div>';
+        box.innerHTML='<b>📜 복기/복구모드입니다.</b><br>지난 대회 기록을 수정하면 실제 시합결과와 선수기록에 반영됩니다. 실시간 운영은 운영용 화면을 사용하세요.<div class="v953-actions"><button class="ghost" type="button" onclick="this.closest(\'#v953ModeSafetyBanner\').style.display=\'none\'">잠시 숨김</button><button class="primary" type="button" onclick="location.href=\'/\'?v=954">운영용으로 이동</button></div>';
       }
       document.body.appendChild(box);
     }catch(e){}
@@ -64970,7 +64970,7 @@ body.bracket-page #v934FloatingRepairBtn,#page-bracket.active ~ #v934FloatingRep
   function updateVersionBadge(){
     try{
       var b=document.getElementById('bracketFreshnessBadge');
-      if(b) b.textContent='v969 '+modeName(getMode());
+      if(b) b.textContent='v953 '+modeName(getMode());
     }catch(e){}
   }
   function init(){ installSwitch(); installBanner(); installGuard(); updateVersionBadge(); }
@@ -65078,7 +65078,7 @@ body.bracket-page #v934FloatingRepairBtn,#page-bracket.active ~ #v934FloatingRep
         bar=document.createElement('div'); bar.id='v954ResultGuardBar';
         var pill=document.createElement('span'); pill.className='v954-pill'; pill.textContent='🛡 '+label()+' '+VERSION; bar.appendChild(pill);
         var undo=document.createElement('button'); undo.type='button'; undo.className='danger'; undo.textContent='↩ 결과 되돌리기'; undo.onclick=function(){window.v954UndoLastResult();}; bar.appendChild(undo);
-        var go=document.createElement('button'); go.type='button'; go.textContent=mode()==='live'?'복기':'운영'; go.onclick=function(){location.href=(mode()==='live'?'/replay.html':'/')+'?v=967';}; bar.appendChild(go);
+        var go=document.createElement('button'); go.type='button'; go.textContent=mode()==='live'?'복기':'운영'; go.onclick=function(){location.href=(mode()==='live'?'/replay.html':'/')+'?v=954';}; bar.appendChild(go);
         document.body.appendChild(bar);
       }
       updateBar();
@@ -65097,6 +65097,228 @@ body.bracket-page #v934FloatingRepairBtn,#page-bracket.active ~ #v934FloatingRep
   setTimeout(init,600); setTimeout(init,1800); setInterval(function(){wrapSaveM3(); wrapQuickWins(); installModalUndo(); updateBar();},5000);
 })();
 </script>
+
+
+<!-- v955: 관리자 공지게시판 / 사진 게시 기능 -->
+<style id="v955NoticeBoardStyle">
+.v955-board-fab{position:fixed;right:18px;bottom:142px;z-index:2147482500;display:flex;flex-direction:column;gap:7px;align-items:flex-end}
+.v955-board-fab button{border:0;border-radius:999px;padding:8px 13px;font-size:.76rem;font-weight:1000;box-shadow:0 8px 18px rgba(15,30,58,.18);cursor:pointer;background:#0f1e3a;color:#fff}
+.v955-board-card{border:1.5px solid #dbeafe;border-radius:18px;background:linear-gradient(180deg,#fff,#f8fbff);box-shadow:0 10px 24px rgba(15,30,58,.07);padding:14px 15px;margin:14px 0}
+.v955-board-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.v955-board-title{font-size:1rem;font-weight:1000;color:#0f1e3a;display:flex;align-items:center;gap:7px}
+.v955-board-actions{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}
+.v955-board-actions button{min-height:34px;border-radius:999px;border:1.5px solid #cbd5e1;background:#fff;color:#0f1e3a;font-size:.76rem;font-weight:1000;padding:6px 11px;cursor:pointer}
+.v955-board-actions button.primary{background:#0f1e3a;color:#fff;border-color:#0f1e3a}
+.v955-post-list{display:flex;flex-direction:column;gap:9px}
+.v955-post{border:1px solid #e2e8f0;border-radius:14px;background:#fff;padding:11px 12px;box-shadow:0 5px 14px rgba(15,30,58,.04)}
+.v955-post-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px}
+.v955-post-title{font-size:.94rem;font-weight:1000;color:#0f172a;line-height:1.35;word-break:keep-all;overflow-wrap:anywhere}
+.v955-post-meta{font-size:.68rem;color:#64748b;font-weight:800;margin-top:3px;display:flex;gap:6px;flex-wrap:wrap}
+.v955-post-cat{display:inline-flex;align-items:center;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;border-radius:999px;padding:2px 7px;font-size:.66rem;font-weight:1000;white-space:nowrap}
+.v955-post-body{font-size:.82rem;color:#334155;line-height:1.65;white-space:pre-wrap;word-break:keep-all;overflow-wrap:anywhere}
+.v955-post-img{margin-top:9px;border-radius:12px;max-width:100%;max-height:360px;object-fit:contain;border:1px solid #e2e8f0;background:#f8fafc;display:block}
+.v955-post-del{border:0;background:#fee2e2;color:#b91c1c;border-radius:999px;font-size:.66rem;font-weight:1000;padding:5px 8px;cursor:pointer;white-space:nowrap}
+.v955-board-empty{padding:18px;text-align:center;color:#64748b;font-size:.82rem;font-weight:800;border:1px dashed #cbd5e1;border-radius:14px;background:#f8fafc}
+#page-board .v955-board-card{margin-top:0}
+#v955PostModal{position:fixed;inset:0;z-index:2147483000;display:none;align-items:center;justify-content:center;background:rgba(15,23,42,.56);padding:14px}
+#v955PostModal.show{display:flex}
+#v955PostModal .v955-modal-box{width:min(620px,100%);max-height:92vh;overflow:hidden;background:#fff;border-radius:20px;box-shadow:0 24px 70px rgba(0,0,0,.28);display:flex;flex-direction:column}
+#v955PostModal .v955-modal-head{background:#0f1e3a;color:#fff;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;font-weight:1000}
+#v955PostModal .v955-modal-close{width:32px;height:32px;border-radius:999px;border:0;background:rgba(255,255,255,.14);color:#fff;font-weight:1000;cursor:pointer}
+#v955PostModal .v955-modal-body{padding:16px;overflow-y:auto}
+#v955PostModal .v955-modal-foot{padding:12px 16px;border-top:1px solid #e5e7eb;display:flex;gap:8px;justify-content:flex-end;background:#fff}
+#v955PostModal input,#v955PostModal textarea,#v955PostModal select{width:100%;border:1.5px solid #d5dbea;border-radius:12px;padding:10px 11px;font-family:'Noto Sans KR',sans-serif;font-size:.88rem;outline:none;background:#fff}
+#v955PostModal textarea{min-height:120px;resize:vertical;line-height:1.6}
+#v955PostModal label{display:block;font-size:.78rem;font-weight:900;color:#475569;margin:0 0 5px}
+#v955PostModal .form-line{margin-bottom:12px}
+#v955PostModal .v955-modal-foot button{min-height:40px;border-radius:12px;border:1.5px solid #cbd5e1;background:#fff;color:#0f1e3a;font-weight:1000;padding:8px 14px;cursor:pointer}
+#v955PostModal .v955-modal-foot button.primary{background:#0f1e3a;color:#fff;border-color:#0f1e3a}
+@media(max-width:680px){.v955-board-fab{right:10px;bottom:96px}.v955-board-fab button{font-size:.68rem;padding:7px 10px}.v955-board-card{border-radius:16px;padding:12px}.v955-post-title{font-size:.88rem}.v955-post-body{font-size:.78rem}#v955PostModal{align-items:flex-end;padding:8px 8px calc(78px + env(safe-area-inset-bottom,0px)) 8px}#v955PostModal .v955-modal-box{border-radius:18px 18px 0 0;max-height:calc(100vh - 92px - env(safe-area-inset-bottom,0px))}}
+</style>
+<script type="module" id="v955NoticeBoardScript">
+import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+const V='v955';
+const FB={apiKey:"AIzaSyAbc17RiYyxCqgbMBkxkMoiRdNTmy2q65w",authDomain:"open-match-manager.firebaseapp.com",projectId:"open-match-manager",storageBucket:"open-match-manager.firebasestorage.app",messagingSenderId:"195671806262",appId:"1:195671806262:web:89691574839266cea1a397"};
+const app=getApps().length?getApps()[0]:initializeApp(FB);
+const db=getFirestore(app);
+const storage=getStorage(app);
+function $(id){return document.getElementById(id)}
+function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+function toast(msg,type='info'){try{ if(typeof window.toast==='function') window.toast(msg,type); else alert(msg); }catch(e){alert(msg)}}
+function isAdmin(){try{return !!(window.AD||window.TM||document.body.classList.contains('admin-mode')||document.body.classList.contains('tm-mode'));}catch(e){return false}}
+function mode(){try{var p=location.pathname.toLowerCase(); if(p.includes('dev'))return 'dev'; if(p.includes('replay'))return 'replay'; return 'live';}catch(e){return 'live'}}
+function tournaments(){try{return Object.values(window.G?.tournaments||{}).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')))}catch(e){return []}}
+function selectedTid(){try{for(const id of ['brTS','regTS','rankTS']){const el=$(id); if(el&&el.value) return el.value;} const ts=tournaments(); const active=ts.find(t=>!['finished'].includes(t.status))||ts[0]; return active?.id||'global';}catch(e){return 'global'}}
+function tournamentName(tid){try{if(tid==='global')return '전체공지'; return window.G?.tournaments?.[tid]?.name||tid||'전체공지';}catch(e){return tid||'전체공지'}}
+function catLabel(c){return ({notice:'공지',court:'코트배정',result:'시합결과',photo:'경기사진',etc:'기타'}[c]||c||'공지')}
+function fmt(ts){try{if(!ts)return ''; const d=new Date(Number(ts)); if(isNaN(d))return ''; return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}catch(e){return ''}}
+async function readPosts(){try{const snap=await getDocs(query(collection(db,'noticePosts'),orderBy('createdAtMs','desc'),limit(80))); return snap.docs.map(d=>({id:d.id,...d.data()}));}catch(e){console.error('[v955 board] load failed',e); return []}}
+function currentFilterTid(){try{const sel=$('v955BoardTidFilter'); if(sel&&sel.value)return sel.value; return selectedTid();}catch(e){return selectedTid()}}
+function renderPosts(posts,targetId,max=20){const el=$(targetId); if(!el)return; const tid=currentFilterTid(); const list=posts.filter(p=>p.scope==='global'||p.tid==='global'||!tid||tid==='global'||p.tid===tid).slice(0,max); if(!list.length){el.innerHTML='<div class="v955-board-empty">아직 등록된 공지사항이 없습니다.</div>';return;} el.innerHTML=list.map(p=>`<div class="v955-post"><div class="v955-post-top"><div><div class="v955-post-title">${esc(p.title||'(제목 없음)')}</div><div class="v955-post-meta"><span class="v955-post-cat">${esc(catLabel(p.category))}</span><span>${esc(p.tournamentName||'전체공지')}</span><span>${esc(fmt(p.createdAtMs))}</span></div></div>${isAdmin()?`<button class="v955-post-del" onclick="window.v955DeleteNoticePost('${p.id}','${esc(p.imagePath||'')}')">삭제</button>`:''}</div>${p.body?`<div class="v955-post-body">${esc(p.body)}</div>`:''}${p.imageUrl?`<img class="v955-post-img" src="${esc(p.imageUrl)}" alt="공지 이미지" loading="lazy">`:''}</div>`).join('')}
+async function refresh(){const posts=await readPosts(); window.__v955NoticePosts=posts; renderPosts(posts,'v955BoardList',60); renderPosts(posts,'v955HomeBoardList',5)}
+function buildTidOptions(selected){const ts=tournaments(); return `<option value="global" ${selected==='global'?'selected':''}>전체공지</option>`+ts.map(t=>`<option value="${esc(t.id)}" ${selected===t.id?'selected':''}>${esc(t.name||t.id)}</option>`).join('')}
+function installPage(){try{if(!$('page-board')){const main=document.querySelector('main.main-content')||document.querySelector('main')||document.body; const page=document.createElement('div'); page.className='page'; page.id='page-board'; page.innerHTML=`<div class="sec-title">공지사항 게시판</div><div class="v955-board-card"><div class="v955-board-head"><div class="v955-board-title">📢 시합 공지 / 사진 / 코트 배정</div><div class="v955-board-actions"><select id="v955BoardTidFilter" class="form-select" style="width:auto;min-width:220px" onchange="window.v955RefreshBoard()"></select><button type="button" onclick="window.v955RefreshBoard()">↻ 새로고침</button><button type="button" class="primary v955-admin-write" onclick="window.v955OpenNoticePostModal()">✍️ 글쓰기</button></div></div><div id="v955BoardList" class="v955-post-list"><div class="v955-board-empty">불러오는 중...</div></div></div>`; main.appendChild(page);} const sel=$('v955BoardTidFilter'); if(sel){const cur=sel.value||selectedTid(); sel.innerHTML=buildTidOptions(cur); sel.value=cur;} if(!isAdmin()) document.querySelectorAll('.v955-admin-write').forEach(b=>b.style.display='none'); else document.querySelectorAll('.v955-admin-write').forEach(b=>b.style.display='inline-flex');}catch(e){console.warn('[v955] install page failed',e)}}
+function installNav(){try{const nav=document.querySelector('.nav-tabs'); if(nav&&!document.querySelector('.nav-tab[data-page="board"]')){const d=document.createElement('div'); d.className='nav-tab'; d.dataset.page='board'; d.innerHTML='📢 공지'; d.onclick=()=>window.v955ShowBoardPage(); const rank=nav.querySelector('[data-page="ranking"]'); nav.insertBefore(d,rank||null);} const quick=document.querySelector('.home-quick-grid'); if(quick&&!quick.querySelector('.v955-home-board-btn')){const b=document.createElement('button'); b.className='home-quick-btn v955-home-board-btn'; b.innerHTML='📢<span>공지사항</span>'; b.onclick=()=>window.v955ShowBoardPage(); quick.appendChild(b);} }catch(e){}}
+function installHomeCard(){try{const home=$('page-home'); if(home&&!$('v955HomeBoardCard')){const ref=home.querySelector('.home-status-card')||home.querySelector('.card'); const card=document.createElement('div'); card.className='v955-board-card'; card.id='v955HomeBoardCard'; card.innerHTML=`<div class="v955-board-head"><div class="v955-board-title">📢 최근 공지사항</div><div class="v955-board-actions"><button type="button" onclick="window.v955ShowBoardPage()">전체 보기</button><button type="button" class="primary v955-admin-write" onclick="window.v955OpenNoticePostModal()">글쓰기</button></div></div><div id="v955HomeBoardList" class="v955-post-list"><div class="v955-board-empty">불러오는 중...</div></div>`; if(ref&&ref.parentNode) ref.parentNode.insertBefore(card,ref.nextSibling); else home.prepend(card);} }catch(e){}}
+function installModal(){try{if($('v955PostModal'))return; const modal=document.createElement('div'); modal.id='v955PostModal'; modal.innerHTML=`<div class="v955-modal-box"><div class="v955-modal-head"><div>✍️ 공지사항 작성</div><button class="v955-modal-close" type="button" onclick="window.v955CloseNoticePostModal()">×</button></div><div class="v955-modal-body"><div class="form-line"><label>대회/범위</label><select id="v955PostTid"></select></div><div class="form-line"><label>분류</label><select id="v955PostCategory"><option value="notice">공지</option><option value="court">코트배정</option><option value="result">시합결과</option><option value="photo">경기사진</option><option value="etc">기타</option></select></div><div class="form-line"><label>제목</label><input id="v955PostTitle" placeholder="예: 본선 코트 배정 안내"></div><div class="form-line"><label>내용</label><textarea id="v955PostBody" placeholder="공지 내용을 입력하세요"></textarea></div><div class="form-line"><label>사진 첨부</label><input id="v955PostImage" type="file" accept="image/*" multiple><div style="font-size:.72rem;color:#64748b;margin-top:5px;line-height:1.5">경기 사진이나 코트 배정표 이미지를 첨부할 수 있습니다. 큰 이미지는 업로드 시간이 걸릴 수 있습니다.</div></div></div><div class="v955-modal-foot"><button type="button" onclick="window.v955CloseNoticePostModal()">취소</button><button class="primary" type="button" onclick="window.v955SaveNoticePost()">게시</button></div></div>`; document.body.appendChild(modal); modal.addEventListener('click',e=>{if(e.target===modal) e.stopPropagation();});}catch(e){}}
+function installFab(){try{if($('v955BoardFab'))return; const f=document.createElement('div'); f.className='v955-board-fab'; f.id='v955BoardFab'; f.innerHTML='<button type="button" onclick="window.v955ShowBoardPage()">📢 공지</button>'; document.body.appendChild(f);}catch(e){}}
+window.v955ShowBoardPage=function(){try{installPage(); document.querySelectorAll('.page').forEach(p=>p.classList.remove('active')); $('page-board')?.classList.add('active'); document.querySelectorAll('.nav-tab').forEach(t=>t.classList.toggle('active',t.dataset.page==='board')); window.scrollTo({top:0,behavior:'smooth'}); refresh();}catch(e){console.error(e)}}
+window.v955RefreshBoard=refresh;
+window.v955OpenNoticePostModal=function(){try{if(!isAdmin()){toast('관리자만 공지사항을 작성할 수 있습니다.','error');return;} installModal(); const tid=selectedTid(); $('v955PostTid').innerHTML=buildTidOptions(tid); $('v955PostTid').value=tid||'global'; $('v955PostTitle').value=''; $('v955PostBody').value=''; $('v955PostImage').value=''; $('v955PostCategory').value='notice'; $('v955PostModal').classList.add('show');}catch(e){console.error(e)}};
+window.v955CloseNoticePostModal=function(){try{$('v955PostModal')?.classList.remove('show')}catch(e){}};
+window.v955SaveNoticePost=async function(){try{if(!isAdmin()){toast('관리자만 작성 가능합니다.','error');return;} const tid=$('v955PostTid')?.value||'global'; const title=($('v955PostTitle')?.value||'').trim(); const body=($('v955PostBody')?.value||'').trim(); const category=$('v955PostCategory')?.value||'notice'; if(!title&&!body){toast('제목이나 내용을 입력해 주세요.','error');return;} let imageUrl='', imagePath=''; const file=$('v955PostImage')?.files?.[0]; if(file){ if(file.size>8*1024*1024){toast('사진은 8MB 이하로 올려주세요.','error');return;} const safeName=String(file.name||'photo.jpg').replace(/[^a-zA-Z0-9가-힣._-]/g,'_'); imagePath=`noticePosts/${tid}/${Date.now()}_${safeName}`; const r=ref(storage,imagePath); await uploadBytes(r,file,{contentType:file.type||'image/jpeg'}); imageUrl=await getDownloadURL(r);} await addDoc(collection(db,'noticePosts'),{scope:tid==='global'?'global':'tournament',tid,tournamentName:tournamentName(tid),category,title,body,imageUrl,imagePath,createdAtMs:Date.now(),createdByMode:mode()}); window.v955CloseNoticePostModal(); toast('공지사항을 게시했습니다.','success'); refresh();}catch(e){console.error('[v955 board] save failed',e); toast('공지 저장 실패: '+(e.message||e),'error')}};
+window.v955DeleteNoticePost=async function(id,imagePath){try{if(!isAdmin()){toast('관리자만 삭제 가능합니다.','error');return;} if(!confirm('이 공지사항을 삭제할까요?'))return; await deleteDoc(doc(db,'noticePosts',id)); if(imagePath){try{await deleteObject(ref(storage,imagePath));}catch(e){}} toast('삭제했습니다.','success'); refresh();}catch(e){console.error('[v955 board] delete failed',e); toast('삭제 실패: '+(e.message||e),'error')}};
+function init(){installNav();installHomeCard();installPage();installModal();installFab();refresh();try{const b=document.getElementById('bracketFreshnessBadge'); if(b)b.textContent='v956 공지모바일';}catch(e){}}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
+setTimeout(init,900); setTimeout(()=>{try{if(!isAdmin())document.querySelectorAll('.v955-admin-write').forEach(b=>b.style.display='none');else document.querySelectorAll('.v955-admin-write').forEach(b=>b.style.display='inline-flex')}catch(e){}},2500);
+</script>
+
+
+
+<!-- v956: 모바일 공지 글쓰기 버튼/하단 겹침 보정 -->
+<style id="v956NoticeMobileWriteFixStyle">
+  /* 공지 화면에서는 결과 되돌리기 바가 글쓰기 버튼을 가리지 않게 숨김 */
+  body.v956-board-active #v954ResultGuardBar{display:none!important;}
+
+  /* 기존 공지 이동 버튼을 하단 메뉴 위로 올림 */
+  #v955BoardFab{right:14px!important;bottom:150px!important;z-index:2147483300!important;}
+
+  /* 관리자 글쓰기 전용 플로팅 버튼 */
+  #v956NoticeWriteFab{
+    position:fixed;right:14px;bottom:196px;z-index:2147483400;
+    display:none;align-items:center;justify-content:center;gap:6px;
+    min-height:42px;padding:10px 15px;border:0;border-radius:999px;
+    background:linear-gradient(135deg,#0f1e3a,#1d4ed8);color:#fff;
+    font-size:.82rem;font-weight:1000;box-shadow:0 14px 30px rgba(15,30,58,.26);
+    cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;
+  }
+  #v956NoticeWriteFab.show{display:inline-flex!important;}
+
+  #page-board .v956-inline-write{
+    display:inline-flex!important;align-items:center!important;justify-content:center!important;
+    min-height:36px;border-radius:999px;border:1.5px solid #0f1e3a!important;
+    background:#0f1e3a!important;color:#fff!important;font-size:.78rem!important;font-weight:1000!important;
+    padding:7px 12px!important;cursor:pointer!important;white-space:nowrap!important;
+  }
+
+  @media(max-width:680px){
+    body.v956-board-active #page-board{padding-bottom:210px!important;}
+    body.v956-board-active .main-content{padding-bottom:220px!important;}
+
+    #v955BoardFab{right:12px!important;bottom:calc(118px + env(safe-area-inset-bottom,0px))!important;}
+    #v955BoardFab button{min-height:38px!important;padding:8px 12px!important;font-size:.72rem!important;}
+    #v956NoticeWriteFab{right:12px!important;bottom:calc(164px + env(safe-area-inset-bottom,0px))!important;min-height:40px!important;padding:9px 13px!important;font-size:.76rem!important;}
+
+    #page-board .v955-board-head{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:9px!important;}
+    #page-board .v955-board-title{font-size:.96rem!important;line-height:1.35!important;}
+    #page-board .v955-board-actions{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:7px!important;width:100%!important;justify-content:stretch!important;}
+    #page-board .v955-board-actions #v955BoardTidFilter{grid-column:1/-1!important;width:100%!important;min-width:0!important;}
+    #page-board .v955-board-actions button{width:100%!important;min-height:38px!important;font-size:.74rem!important;padding:7px 6px!important;}
+    #page-board .v955-board-actions .v955-admin-write,
+    #page-board .v956-inline-write{grid-column:1/-1!important;width:100%!important;min-height:40px!important;}
+
+    #v955PostModal{z-index:2147483600!important;}
+    #v955PostModal .v955-modal-box{max-height:calc(100vh - 118px - env(safe-area-inset-bottom,0px))!important;}
+  }
+</style>
+<script id="v956NoticeMobileWriteFixScript">
+(function(){
+  'use strict';
+  var VERSION='v956';
+  function $(id){return document.getElementById(id)}
+  function adminLike(){
+    try{
+      if(window.AD || window.TM) return true;
+      var b=document.body;
+      if(b && (b.classList.contains('admin-mode') || b.classList.contains('tm-mode'))) return true;
+      var badge=$('adminBadge');
+      if(badge){
+        var cs=getComputedStyle(badge);
+        if(cs.display!=='none' && cs.visibility!=='hidden' && badge.offsetParent!==null) return true;
+        if(badge.classList.contains('show')) return true;
+      }
+    }catch(e){}
+    return false;
+  }
+  function boardActive(){
+    try{return !!($('page-board') && $('page-board').classList.contains('active'));}catch(e){return false;}
+  }
+  function openWrite(){
+    try{
+      if(typeof window.v955OpenNoticePostModal==='function') return window.v955OpenNoticePostModal();
+      alert('공지 글쓰기 창을 아직 불러오지 못했습니다. 잠시 후 다시 눌러주세요.');
+    }catch(e){alert('공지 글쓰기 오류: '+(e.message||e));}
+  }
+  function ensureFloatingWrite(){
+    try{
+      var fab=$('v956NoticeWriteFab');
+      if(!fab){
+        fab=document.createElement('button');
+        fab.id='v956NoticeWriteFab';
+        fab.type='button';
+        fab.innerHTML='✍️ 공지 글쓰기';
+        fab.addEventListener('click',function(ev){ev.preventDefault();ev.stopPropagation();openWrite();});
+        document.body.appendChild(fab);
+      }
+      var show=boardActive() && adminLike();
+      fab.classList.toggle('show',show);
+      fab.style.display=show?'inline-flex':'none';
+    }catch(e){}
+  }
+  function ensureInlineWrite(){
+    try{
+      var actions=document.querySelector('#page-board .v955-board-actions');
+      if(!actions) return;
+      var admin=adminLike();
+      var old=actions.querySelector('.v956-inline-write');
+      if(admin && !old){
+        var btn=document.createElement('button');
+        btn.type='button';
+        btn.className='v956-inline-write';
+        btn.textContent='✍️ 공지 글쓰기';
+        btn.addEventListener('click',function(ev){ev.preventDefault();ev.stopPropagation();openWrite();});
+        actions.appendChild(btn);
+      }else if(!admin && old){
+        old.remove();
+      }
+      document.querySelectorAll('.v955-admin-write').forEach(function(b){
+        if(admin){
+          b.style.display='inline-flex';
+          b.style.visibility='visible';
+          b.style.opacity='1';
+        }else{
+          b.style.display='none';
+        }
+      });
+    }catch(e){}
+  }
+  function setBoardClass(){
+    try{document.body.classList.toggle('v956-board-active',boardActive());}catch(e){}
+  }
+  function fixVersionBadges(){
+    try{
+      var b=document.getElementById('bracketFreshnessBadge'); if(b && /v95/.test(b.textContent||'')) b.textContent='v956 공지모바일';
+      document.querySelectorAll('[id*="ModeBadge"], .v951-mode-badge, .v950-mode-badge').forEach(function(el){
+        var t=(el.textContent||'');
+        if(/v95\d/.test(t)) el.textContent=t.replace(/v95\d/g,'v956');
+      });
+    }catch(e){}
+  }
+  function tick(){setBoardClass();ensureInlineWrite();ensureFloatingWrite();fixVersionBadges();}
+  var oldShow=window.v955ShowBoardPage;
+  if(typeof oldShow==='function' && !oldShow.__v956Wrapped){
+    var wrapped=function(){var r=oldShow.apply(this,arguments); setTimeout(tick,0); setTimeout(tick,250); setTimeout(tick,800); return r;};
+    wrapped.__v956Wrapped=true; window.v955ShowBoardPage=wrapped;
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',tick); else tick();
+  setTimeout(tick,300); setTimeout(tick,1000); setTimeout(tick,2500);
+  window.addEventListener('resize',function(){setTimeout(tick,120);});
+  setInterval(tick,2500);
+})();
+</script>
+
 
 
 <!-- v957: Firebase Storage 업로드를 대회요강/첫화면 팝업 공지 이미지에 재사용 -->
@@ -65339,129 +65561,6 @@ const oldShowBoard=window.v955ShowBoardPage;
 if(typeof oldShowBoard==='function'&&!oldShowBoard.__v959Wrapped){window.v955ShowBoardPage=function(){const r=oldShowBoard.apply(this,arguments); setTimeout(tick,0); setTimeout(tick,250); setTimeout(refresh,450); return r;}; window.v955ShowBoardPage.__v959Wrapped=true;}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{tick();setTimeout(refresh,700)});else{tick();setTimeout(refresh,700)}
 setTimeout(tick,300); setTimeout(tick,1200); setTimeout(tick,2600);
-</script>
-
-
-<script id="v965CleanRebaseMarker">
-(function(){
-  try{
-    console.info('[v965-clean-rebase] loaded from v959 stable baseline; broken v960-v963 notice patches removed');
-    window.APP_STABLE_REBASE_VERSION='v965-clean-rebase';
-  }catch(e){}
-})();
-</script>
-
-<!-- v969: 공지게시판 재작성(목록/상세/수정) + 일반회원 관리자패널 숨김 안정화 -->
-<style id="v969CleanNoticeStyle">
-  #v969NoticeModal,#v969NoticeEditor,#v969ImageViewer{position:fixed;inset:0;display:none;z-index:2147483600;background:rgba(15,23,42,.64);align-items:center;justify-content:center;padding:14px}
-  #v969NoticeModal.show,#v969NoticeEditor.show,#v969ImageViewer.show{display:flex!important}
-  .v969-modal-box{width:min(760px,100%);max-height:min(92vh,860px);background:#fff;border-radius:20px;box-shadow:0 24px 70px rgba(0,0,0,.30);overflow:hidden;display:flex;flex-direction:column}
-  .v969-modal-head{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#0f1e3a;color:#fff;padding:14px 16px;font-weight:1000}
-  .v969-modal-close{width:34px;height:34px;border:0;border-radius:999px;background:rgba(255,255,255,.14);color:#fff;font-weight:1000;font-size:1rem;cursor:pointer;flex:0 0 auto}
-  .v969-modal-body{padding:16px;overflow-y:auto;-webkit-overflow-scrolling:touch}
-  .v969-modal-foot{display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid #e5e7eb;background:#fff;flex-wrap:wrap}
-  .v969-modal-foot button,.v969-board-actions button,.v969-detail-actions button{min-height:38px;border-radius:12px;border:1.5px solid #cbd5e1;background:#fff;color:#0f1e3a;font-size:.82rem;font-weight:1000;padding:8px 12px;cursor:pointer}
-  .v969-modal-foot button.primary,.v969-board-actions button.primary,.v969-detail-actions button.primary{background:#0f1e3a;color:#fff;border-color:#0f1e3a}
-  .v969-modal-foot button.danger,.v969-detail-actions button.danger{background:#fee2e2;color:#b91c1c;border-color:#fecaca}
-  .v969-board-card{border:1.5px solid #dbeafe;border-radius:18px;background:linear-gradient(180deg,#fff,#f8fbff);box-shadow:0 10px 24px rgba(15,30,58,.07);padding:14px 15px;margin:14px 0}
-  .v969-board-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px}
-  .v969-board-title{font-size:1rem;font-weight:1000;color:#0f1e3a;display:flex;align-items:center;gap:7px}
-  .v969-board-actions{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end;align-items:center}
-  .v969-board-actions select{min-height:38px;border:1.5px solid #d5dbea;border-radius:12px;padding:8px 11px;background:#fff;font-weight:800;min-width:220px;max-width:100%}
-  .v969-list{display:flex;flex-direction:column;gap:8px}
-  .v969-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;border:1px solid #e2e8f0;border-radius:14px;background:#fff;padding:11px 12px;cursor:pointer;box-shadow:0 5px 14px rgba(15,30,58,.035)}
-  .v969-row:hover{background:#f8fbff;border-color:#bfdbfe}
-  .v969-row-title{font-size:.94rem;font-weight:1000;color:#0f172a;line-height:1.35;word-break:keep-all;overflow-wrap:anywhere}
-  .v969-row-meta{font-size:.70rem;color:#64748b;font-weight:800;margin-top:4px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
-  .v969-cat{display:inline-flex;align-items:center;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;border-radius:999px;padding:2px 7px;font-size:.66rem;font-weight:1000;white-space:nowrap}
-  .v969-row-chip{font-size:.70rem;font-weight:1000;color:#475569;border:1px solid #e2e8f0;background:#f8fafc;border-radius:999px;padding:4px 8px;white-space:nowrap}
-  .v969-empty{padding:18px;text-align:center;color:#64748b;font-size:.82rem;font-weight:800;border:1px dashed #cbd5e1;border-radius:14px;background:#f8fafc}
-  .v969-detail-title{font-size:1.08rem;font-weight:1000;color:#0f172a;line-height:1.45;margin-bottom:8px;word-break:keep-all;overflow-wrap:anywhere}
-  .v969-detail-meta{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;font-size:.74rem;color:#64748b;font-weight:800}
-  .v969-detail-body{font-size:.9rem;color:#334155;line-height:1.75;white-space:pre-wrap;word-break:keep-all;overflow-wrap:anywhere;margin:10px 0 14px}
-  .v969-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:10px;margin-top:12px}
-  .v969-photo{border:1px solid #e2e8f0;border-radius:14px;background:#fff;overflow:hidden;box-shadow:0 4px 12px rgba(15,30,58,.04)}
-  .v969-photo img{display:block;width:100%;height:145px;object-fit:cover;background:#f8fafc;cursor:pointer}
-  .v969-photo-caption{font-size:.74rem;color:#475569;line-height:1.5;padding:8px 9px;white-space:pre-wrap;word-break:keep-all;overflow-wrap:anywhere}
-  .v969-detail-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:16px;padding-top:12px;border-top:1px dashed #cbd5e1}
-  #v969ImageViewer .v969-image-box{position:relative;max-width:min(980px,96vw);max-height:92vh;background:#0b1224;border-radius:18px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.38)}
-  #v969ImageViewer img{display:block;max-width:100%;max-height:92vh;object-fit:contain;background:#0b1224}
-  #v969ImageViewer .v969-modal-close{position:absolute;right:10px;top:10px;z-index:2}
-  #v969NoticeEditor input,#v969NoticeEditor textarea,#v969NoticeEditor select{width:100%;border:1.5px solid #d5dbea;border-radius:12px;padding:10px 11px;font-family:'Noto Sans KR',sans-serif;font-size:.88rem;outline:none;background:#fff}
-  #v969NoticeEditor textarea{min-height:110px;resize:vertical;line-height:1.6}
-  #v969NoticeEditor label{display:block;font-size:.78rem;font-weight:900;color:#475569;margin:0 0 5px}
-  .v969-form-line{margin-bottom:12px}
-  .v969-edit-img-row{display:grid;grid-template-columns:72px minmax(0,1fr) auto;gap:8px;align-items:start;border:1px solid #e2e8f0;border-radius:12px;padding:8px;margin-bottom:8px;background:#f8fafc}
-  .v969-edit-img-row img{width:72px;height:72px;object-fit:cover;border-radius:10px;background:#fff;border:1px solid #e2e8f0}
-  .v969-edit-img-row textarea{min-height:72px!important;font-size:.78rem!important;padding:8px!important}
-  .v969-file-summary{margin-top:7px;padding:7px 9px;border-radius:10px;background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;font-size:.74rem;font-weight:900;line-height:1.45}
-  .v969-hidden-admin-panel{display:none!important;visibility:hidden!important;pointer-events:none!important}
-  #v955BoardFab,#v956NoticeWriteFab{display:none!important;visibility:hidden!important;pointer-events:none!important}
-  @media(max-width:680px){
-    #v969NoticeModal,#v969NoticeEditor,#v969ImageViewer{align-items:flex-end;padding:8px 8px calc(78px + env(safe-area-inset-bottom,0px)) 8px}
-    .v969-modal-box{border-radius:18px 18px 0 0;max-height:calc(100vh - 92px - env(safe-area-inset-bottom,0px))}
-    .v969-board-card{border-radius:16px;padding:12px}.v969-board-actions{display:grid;grid-template-columns:1fr;width:100%}.v969-board-actions select,.v969-board-actions button{width:100%;min-width:0}
-    .v969-row{grid-template-columns:1fr}.v969-row-chip{justify-self:start}.v969-gallery{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.v969-photo img{height:118px}
-    .v969-edit-img-row{grid-template-columns:58px minmax(0,1fr);}.v969-edit-img-row img{width:58px;height:58px}.v969-edit-img-row button{grid-column:1 / -1}
-  }
-</style>
-<script type="module" id="v969CleanNoticeScript">
-import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
-const FB={apiKey:"AIzaSyAbc17RiYyxCqgbMBkxkMoiRdNTmy2q65w",authDomain:"open-match-manager.firebaseapp.com",projectId:"open-match-manager",storageBucket:"open-match-manager.firebasestorage.app",messagingSenderId:"195671806262",appId:"1:195671806262:web:89691574839266cea1a397"};
-const app=getApps().length?getApps()[0]:initializeApp(FB);
-const db=getFirestore(app);
-const storage=getStorage(app);
-const $=id=>document.getElementById(id);
-function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
-function toastSafe(msg,type='info'){try{ if(typeof window.toast==='function') window.toast(msg,type); else alert(msg); }catch(e){alert(msg)}}
-function adminLike(){try{return !!(window.AD||window.TM||window.OP||document.body.classList.contains('admin-mode')||document.body.classList.contains('tm-mode')||document.body.classList.contains('operator-mode')||document.body.classList.contains('developer-mode'));}catch(e){return false}}
-function tournaments(){try{return Object.values(window.G?.tournaments||{}).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')))}catch(e){return []}}
-function selectedTid(){try{for(const id of ['brTS','regTS','rankTS']){const el=$(id); if(el&&el.value) return el.value;} const ts=tournaments(); const active=ts.find(t=>!['finished'].includes(t.status))||ts[0]; return active?.id||'global';}catch(e){return 'global'}}
-function tournamentName(tid){try{if(tid==='global')return '전체공지'; return window.G?.tournaments?.[tid]?.name||tid||'전체공지';}catch(e){return tid||'전체공지'}}
-function mode(){try{var p=location.pathname.toLowerCase(); if(p.includes('dev'))return 'dev'; if(p.includes('replay'))return 'replay'; return 'live';}catch(e){return 'live'}}
-function catLabel(c){return ({notice:'공지',court:'코트배정',result:'시합결과',photo:'경기사진',etc:'기타'}[c]||c||'공지')}
-function fmt(ts){try{if(!ts)return ''; const d=new Date(Number(ts)); if(isNaN(d))return ''; return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}catch(e){return ''}}
-function safeName(name){return String(name||'photo.jpg').replace(/[^a-zA-Z0-9가-힣._-]/g,'_').slice(0,90)}
-function urlsOf(p){const out=[]; if(Array.isArray(p.imageUrls)) out.push(...p.imageUrls); if(p.imageUrl) out.push(p.imageUrl); return [...new Set(out.filter(Boolean))]}
-function pathsOf(p){const out=[]; if(Array.isArray(p.imagePaths)) out.push(...p.imagePaths); if(p.imagePath) out.push(p.imagePath); return [...new Set(out.filter(Boolean))]}
-function captionsOf(p){return Array.isArray(p.imageCaptions)?p.imageCaptions:[]}
-async function readPosts(){try{const snap=await getDocs(query(collection(db,'noticePosts'),orderBy('createdAtMs','desc'),limit(100))); return snap.docs.map(d=>({id:d.id,...d.data()}));}catch(e){console.error('[v969 notice] load failed',e); return []}}
-function currentFilterTid(){try{const sel=$('v969BoardTidFilter'); if(sel&&sel.value)return sel.value; return selectedTid();}catch(e){return selectedTid()}}
-function buildTidOptions(selected){const ts=tournaments(); return `<option value="global" ${selected==='global'?'selected':''}>전체공지</option>`+ts.map(t=>`<option value="${esc(t.id)}" ${selected===t.id?'selected':''}>${esc(t.name||t.id)}</option>`).join('')}
-function filterPosts(posts,max=80){const tid=currentFilterTid(); return posts.filter(p=>p.scope==='global'||p.tid==='global'||!tid||tid==='global'||p.tid===tid).slice(0,max)}
-function renderList(posts,targetId,max=80,compact=false){const el=$(targetId); if(!el)return; const list=filterPosts(posts,max); if(!list.length){el.innerHTML='<div class="v969-empty">아직 등록된 공지사항이 없습니다.</div>';return;} el.innerHTML=list.map(p=>{const n=urlsOf(p).length; const body=String(p.body||'').replace(/\s+/g,' ').trim(); return `<div class="v969-row" data-post-id="${esc(p.id)}" onclick="window.v969OpenNoticeDetail('${esc(p.id)}')"><div><div class="v969-row-title">${esc(p.title||'(제목 없음)')}</div><div class="v969-row-meta"><span class="v969-cat">${esc(catLabel(p.category))}</span><span>${esc(p.tournamentName||'전체공지')}</span><span>${esc(fmt(p.createdAtMs))}</span>${body&&!compact?`<span>${esc(body.slice(0,28))}${body.length>28?'…':''}</span>`:''}</div></div><div class="v969-row-chip">${n?`사진 ${n}장`:'보기'}</div></div>`}).join('')}
-async function refresh(){const posts=await readPosts(); window.__v969NoticePosts=posts; renderList(posts,'v969BoardList',100,false); renderList(posts,'v969HomeBoardList',5,true);}
-function installPage(){try{if(!$('page-board')){const main=document.querySelector('main.main-content')||document.querySelector('main')||document.body; const page=document.createElement('div'); page.className='page'; page.id='page-board'; page.innerHTML=`<div class="sec-title">공지사항 게시판</div><div class="v969-board-card"><div class="v969-board-head"><div class="v969-board-title">📢 시합 공지 / 사진 / 코트 배정</div><div class="v969-board-actions"><select id="v969BoardTidFilter" onchange="window.v969RefreshNoticeBoard()"></select><button type="button" onclick="window.v969RefreshNoticeBoard()">↻ 새로고침</button><button type="button" class="primary v969-admin-only" onclick="window.v969OpenNoticeEditor()">✍️ 공지 글쓰기</button></div></div><div id="v969BoardList" class="v969-list"><div class="v969-empty">불러오는 중...</div></div></div>`; main.appendChild(page);} const sel=$('v969BoardTidFilter'); if(sel){const cur=sel.value||selectedTid(); sel.innerHTML=buildTidOptions(cur); sel.value=cur;} updateAdminVisibility();}catch(e){console.warn('[v969] install page failed',e)}}
-function installNav(){try{const nav=document.querySelector('.nav-tabs'); if(nav&&!document.querySelector('.nav-tab[data-page="board"]')){const d=document.createElement('div'); d.className='nav-tab'; d.dataset.page='board'; d.innerHTML='📢 공지'; d.onclick=()=>window.v969ShowBoardPage(); const rank=nav.querySelector('[data-page="ranking"]'); nav.insertBefore(d,rank||null);} const quick=document.querySelector('.home-quick-grid'); if(quick&&!quick.querySelector('.v969-home-board-btn')){const b=document.createElement('button'); b.className='home-quick-btn v969-home-board-btn'; b.innerHTML='📢<span>공지사항</span>'; b.onclick=()=>window.v969ShowBoardPage(); quick.appendChild(b);} }catch(e){}}
-function installHomeCard(){try{const home=$('page-home'); if(home&&!$('v969HomeBoardCard')){const ref=home.querySelector('.home-status-card')||home.querySelector('.card'); const card=document.createElement('div'); card.className='v969-board-card'; card.id='v969HomeBoardCard'; card.innerHTML=`<div class="v969-board-head"><div class="v969-board-title">📢 최근 공지사항</div><div class="v969-board-actions"><button type="button" onclick="window.v969ShowBoardPage()">전체 보기</button><button type="button" class="primary v969-admin-only" onclick="window.v969OpenNoticeEditor()">글쓰기</button></div></div><div id="v969HomeBoardList" class="v969-list"><div class="v969-empty">불러오는 중...</div></div>`; if(ref&&ref.parentNode) ref.parentNode.insertBefore(card,ref.nextSibling); else home.prepend(card);} updateAdminVisibility();}catch(e){}}
-function installModals(){try{if(!$('v969NoticeModal')){const m=document.createElement('div'); m.id='v969NoticeModal'; m.innerHTML='<div class="v969-modal-box"><div class="v969-modal-head"><div>공지 상세</div><button class="v969-modal-close" type="button" onclick="window.v969CloseNoticeDetail()">×</button></div><div class="v969-modal-body" id="v969NoticeDetailBody"></div></div>'; document.body.appendChild(m); m.addEventListener('click',e=>{if(e.target===m) window.v969CloseNoticeDetail();});}
-if(!$('v969ImageViewer')){const v=document.createElement('div'); v.id='v969ImageViewer'; v.innerHTML='<div class="v969-image-box"><button class="v969-modal-close" type="button" onclick="window.v969CloseImageViewer()">×</button><img id="v969ImageViewerImg" alt="공지 이미지 크게 보기"></div>'; document.body.appendChild(v); v.addEventListener('click',e=>{if(e.target===v) window.v969CloseImageViewer();});}
-if(!$('v969NoticeEditor')){const ed=document.createElement('div'); ed.id='v969NoticeEditor'; ed.innerHTML='<div class="v969-modal-box"><div class="v969-modal-head"><div id="v969EditorTitle">공지 작성</div><button class="v969-modal-close" type="button" onclick="window.v969CloseNoticeEditor()">×</button></div><div class="v969-modal-body" id="v969EditorBody"></div><div class="v969-modal-foot"><button type="button" onclick="window.v969CloseNoticeEditor()">취소</button><button class="primary" type="button" onclick="window.v969SaveNoticePost()">저장</button></div></div>'; document.body.appendChild(ed); ed.addEventListener('click',e=>{if(e.target===ed)e.stopPropagation();});}}
-catch(e){console.warn('[v969] modal install failed',e)}}
-function renderEditor(post){post=post||{}; const urls=urlsOf(post), paths=pathsOf(post), caps=captionsOf(post); const tid=post.tid||selectedTid()||'global'; const imgRows=urls.map((u,i)=>`<div class="v969-edit-img-row" data-img-index="${i}"><img src="${esc(u)}" alt="기존 사진 ${i+1}"><textarea data-caption-index="${i}" placeholder="사진 설명 ${i+1}">${esc(caps[i]||'')}</textarea><button type="button" class="danger" onclick="this.closest('.v969-edit-img-row').dataset.remove='1';this.closest('.v969-edit-img-row').style.opacity='.35'">삭제</button></div>`).join(''); return `<input type="hidden" id="v969EditPostId" value="${esc(post.id||'')}"><div class="v969-form-line"><label>대회/범위</label><select id="v969PostTid">${buildTidOptions(tid)}</select></div><div class="v969-form-line"><label>분류</label><select id="v969PostCategory"><option value="notice">공지</option><option value="court">코트배정</option><option value="result">시합결과</option><option value="photo">경기사진</option><option value="etc">기타</option></select></div><div class="v969-form-line"><label>제목</label><input id="v969PostTitle" value="${esc(post.title||'')}" placeholder="예: 입상자 사진 안내"></div><div class="v969-form-line"><label>내용</label><textarea id="v969PostBody" placeholder="공지 내용을 입력하세요">${esc(post.body||'')}</textarea></div>${urls.length?`<div class="v969-form-line"><label>기존 사진 / 설명</label>${imgRows}</div>`:''}<div class="v969-form-line"><label>새 사진 추가</label><input id="v969PostFiles" type="file" accept="image/*" multiple><div id="v969FileSummary" class="v969-file-summary">사진을 여러 장 선택할 수 있습니다. 최대 12장, 1장당 8MB 이하 권장.</div></div>`}
-window.v969OpenNoticeEditor=function(id){try{if(!adminLike()){toastSafe('관리자만 공지를 작성/수정할 수 있습니다.','error');return;} installModals(); const post=id?(window.__v969NoticePosts||[]).find(p=>String(p.id)===String(id)):null; $('v969EditorTitle').textContent=post?'공지 수정':'공지 작성'; $('v969EditorBody').innerHTML=renderEditor(post||{}); const cat=$('v969PostCategory'); if(cat)cat.value=(post&&post.category)||'notice'; const tidSel=$('v969PostTid'); if(tidSel)tidSel.value=(post&&post.tid)||selectedTid()||'global'; const file=$('v969PostFiles'); if(file){file.onchange=()=>{$('v969FileSummary').textContent=(file.files?.length||0)?`선택된 새 사진 ${file.files.length}장`: '사진을 선택하지 않았습니다.';};} $('v969NoticeEditor').classList.add('show');}catch(e){console.error(e)}};
-window.v969CloseNoticeEditor=function(){try{$('v969NoticeEditor')?.classList.remove('show')}catch(e){}};
-async function uploadImages(files,tid){const imageUrls=[], imagePaths=[]; for(const file of files){if(!/^image\//i.test(file.type||'')) throw new Error('이미지 파일만 올릴 수 있습니다: '+file.name); if(file.size>8*1024*1024) throw new Error('사진은 1장당 8MB 이하로 올려주세요: '+file.name); const path=`noticePosts/${tid}/${Date.now()}_${Math.random().toString(36).slice(2,8)}_${safeName(file.name)}`; const r=ref(storage,path); await uploadBytes(r,file,{contentType:file.type||'image/jpeg'}); imageUrls.push(await getDownloadURL(r)); imagePaths.push(path);} return {imageUrls,imagePaths}}
-window.v969SaveNoticePost=async function(){try{if(!adminLike()){toastSafe('관리자만 저장 가능합니다.','error');return;} const id=$('v969EditPostId')?.value||''; const old=id?(window.__v969NoticePosts||[]).find(p=>String(p.id)===String(id)):null; const tid=$('v969PostTid')?.value||'global'; const category=$('v969PostCategory')?.value||'notice'; const title=($('v969PostTitle')?.value||'').trim(); const body=($('v969PostBody')?.value||'').trim(); if(!title&&!body){toastSafe('제목이나 내용을 입력해 주세요.','error');return;} let imageUrls=old?urlsOf(old):[], imagePaths=old?pathsOf(old):[], imageCaptions=old?captionsOf(old).slice():[]; const removeIdx=[]; document.querySelectorAll('#v969EditorBody .v969-edit-img-row').forEach(row=>{const i=Number(row.dataset.imgIndex); const ta=row.querySelector('textarea[data-caption-index]'); imageCaptions[i]=ta?ta.value:''; if(row.dataset.remove==='1') removeIdx.push(i);}); if(removeIdx.length){const removeSet=new Set(removeIdx); for(const i of removeIdx){if(imagePaths[i]){try{await deleteObject(ref(storage,imagePaths[i]));}catch(e){}}} imageUrls=imageUrls.filter((_,i)=>!removeSet.has(i)); imagePaths=imagePaths.filter((_,i)=>!removeSet.has(i)); imageCaptions=imageCaptions.filter((_,i)=>!removeSet.has(i));}
-const files=Array.from($('v969PostFiles')?.files||[]); if(imageUrls.length+files.length>12){toastSafe('사진은 한 게시글에 최대 12장까지입니다.','error');return;} if(files.length){toastSafe(`새 사진 ${files.length}장 업로드 중입니다...`,'info'); const out=await uploadImages(files,tid); imageUrls.push(...out.imageUrls); imagePaths.push(...out.imagePaths); imageCaptions.push(...files.map(()=>''));}
-const data={scope:tid==='global'?'global':'tournament',tid,tournamentName:tournamentName(tid),category,title,body,imageUrl:imageUrls[0]||'',imagePath:imagePaths[0]||'',imageUrls,imagePaths,imageCaptions,imageCount:imageUrls.length,updatedAtMs:Date.now(),noticeVersion:'v969'}; if(id){await updateDoc(doc(db,'noticePosts',id),data); toastSafe('공지사항을 수정했습니다.','success');}else{await addDoc(collection(db,'noticePosts'),{...data,createdAtMs:Date.now(),createdByMode:mode()}); toastSafe('공지사항을 게시했습니다.','success');} window.v969CloseNoticeEditor(); refresh();}catch(e){console.error('[v969 notice] save failed',e); toastSafe('공지 저장 실패: '+(e.message||e),'error')}};
-window.v969DeleteNoticePost=async function(id){try{if(!adminLike()){toastSafe('관리자만 삭제 가능합니다.','error');return;} const p=(window.__v969NoticePosts||[]).find(x=>String(x.id)===String(id)); if(!p){toastSafe('공지 데이터를 찾을 수 없습니다.','error');return;} if(!confirm('이 공지를 삭제할까요? 첨부 사진도 함께 삭제됩니다.'))return; await deleteDoc(doc(db,'noticePosts',id)); for(const path of pathsOf(p)){try{await deleteObject(ref(storage,path));}catch(e){}} window.v969CloseNoticeDetail(); toastSafe('삭제했습니다.','success'); refresh();}catch(e){console.error('[v969 notice] delete failed',e); toastSafe('삭제 실패: '+(e.message||e),'error')}};
-window.v969OpenNoticeDetail=function(id){try{installModals(); const p=(window.__v969NoticePosts||[]).find(x=>String(x.id)===String(id)); if(!p){toastSafe('공지글을 찾을 수 없습니다.','error');return;} const urls=urlsOf(p), caps=captionsOf(p); const gallery=urls.length?`<div class="v969-gallery">${urls.map((u,i)=>`<div class="v969-photo"><img src="${esc(u)}" alt="공지 이미지 ${i+1}" loading="lazy" onclick="window.v969OpenImageViewer('${esc(u)}')">${caps[i]?`<div class="v969-photo-caption">${esc(caps[i])}</div>`:''}</div>`).join('')}</div>`:''; $('v969NoticeDetailBody').innerHTML=`<div class="v969-detail-title">${esc(p.title||'(제목 없음)')}</div><div class="v969-detail-meta"><span class="v969-cat">${esc(catLabel(p.category))}</span><span>${esc(p.tournamentName||'전체공지')}</span><span>${esc(fmt(p.createdAtMs))}</span>${urls.length?`<span>사진 ${urls.length}장</span>`:''}</div>${p.body?`<div class="v969-detail-body">${esc(p.body)}</div>`:''}${gallery}${adminLike()?`<div class="v969-detail-actions"><button class="primary" type="button" onclick="window.v969OpenNoticeEditor('${esc(p.id)}')">수정하기</button><button class="danger" type="button" onclick="window.v969DeleteNoticePost('${esc(p.id)}')">삭제</button></div>`:''}`; $('v969NoticeModal').classList.add('show');}catch(e){console.error(e)}};
-window.v969CloseNoticeDetail=function(){try{$('v969NoticeModal')?.classList.remove('show')}catch(e){}};
-window.v969OpenImageViewer=function(url){try{$('v969ImageViewerImg').src=url; $('v969ImageViewer').classList.add('show')}catch(e){window.open(url,'_blank')}};
-window.v969CloseImageViewer=function(){try{$('v969ImageViewer')?.classList.remove('show'); $('v969ImageViewerImg').src='';}catch(e){}};
-window.v969ShowBoardPage=function(){try{installPage(); document.querySelectorAll('.page').forEach(p=>p.classList.remove('active')); $('page-board')?.classList.add('active'); document.querySelectorAll('.nav-tab').forEach(t=>t.classList.toggle('active',t.dataset.page==='board')); window.scrollTo({top:0,behavior:'smooth'}); refresh();}catch(e){console.error(e)}};
-window.v955ShowBoardPage=window.v969ShowBoardPage;
-window.v955OpenNoticePostModal=()=>window.v969OpenNoticeEditor();
-window.v955RefreshBoard=refresh; window.v969RefreshNoticeBoard=refresh;
-function updateAdminVisibility(){try{document.querySelectorAll('.v969-admin-only').forEach(el=>{el.style.display=adminLike()?'inline-flex':'none';});}catch(e){}}
-function hideLegacyAndAdminPanels(){try{const admin=adminLike(); const phrases=['v928 저렉','v929 안정화','v936 운영정리']; document.querySelectorAll('div,section').forEach(el=>{if(el.closest('#v969NoticeModal,#v969NoticeEditor,#v969ImageViewer'))return; const t=(el.innerText||'').slice(0,260); if(phrases.some(p=>t.includes(p))){el.classList.add('v969-hidden-admin-panel');} if(!admin && (/코트 사용 현황판|예선 기준시각|지금 시작|예약시간 사용|본선 코트 배정|수동기록 보기|수동 갱신|\b상태\b/.test(t)) && el.offsetHeight<260){el.classList.add('v969-hidden-admin-panel');}});}catch(e){}}
-function init(){installNav();installHomeCard();installPage();installModals();updateAdminVisibility();hideLegacyAndAdminPanels();refresh();try{const b=document.getElementById('bracketFreshnessBadge'); if(b)b.textContent='v969 공지안정';}catch(e){}}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init); else init();
-setTimeout(init,800); setTimeout(()=>{updateAdminVisibility();hideLegacyAndAdminPanels();refresh();},2200); setTimeout(()=>{updateAdminVisibility();hideLegacyAndAdminPanels();},5000);
-})();
 </script>
 
 </body>
