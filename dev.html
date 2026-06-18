@@ -106,7 +106,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-18-v983-dev-notice-js-split";
+  const APP_VERSION = "2026-06-18-v984-tools-admin-restore";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -813,7 +813,7 @@ document.addEventListener('DOMContentLoaded',()=>setTimeout(v281ApplyRecommended
 // v299: removed repeated UI polling for popup compact layout.
 
 </script>
-<link rel="stylesheet" href="./assets/css/app-v983.css?v=983"/>
+<link rel="stylesheet" href="./assets/css/app-v984.css?v=984"/>
 <!-- PWA -->
 <script>
 (function initPwaHeadForDeployedOnly(){
@@ -57997,7 +57997,7 @@ if(false) setTimeout(function(){
     }catch(e){}
     hideAdminPanels();
     applyFloatingControls();
-    try{const b=$('bracketFreshnessBadge'); if(b) b.textContent='v983 공지JS분리 DEV';}catch(e){}
+    try{const b=$('bracketFreshnessBadge'); if(b) b.textContent='v984 도구표시복구 DEV';}catch(e){}
   }
   window.v979ApplyDevSafety=applyAll;
   document.addEventListener('click',()=>setTimeout(applyAll,60),true);
@@ -58005,6 +58005,74 @@ if(false) setTimeout(function(){
   [0,250,800,1600,3000,6000].forEach(t=>setTimeout(applyAll,t));
   function loop(){applyAll(); setTimeout(loop,1800)}
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(loop,500)); else setTimeout(loop,500);
+})();
+</script>
+
+
+
+<!-- v984: developer/admin tool gate restore -->
+<script id="v984ToolGateRestoreScript">
+(function(){
+  'use strict';
+  if(window.__v984ToolGateRestoreInstalled) return;
+  window.__v984ToolGateRestoreInstalled=true;
+  function $(id){return document.getElementById(id);}
+  function clean(s){return String(s||'').replace(/\s+/g,' ').trim();}
+  function visible(el){
+    try{
+      if(!el) return false;
+      var cs=getComputedStyle(el);
+      return cs.display!=='none' && cs.visibility!=='hidden' && el.offsetParent!==null;
+    }catch(e){return false;}
+  }
+  function isPrivileged(){
+    try{
+      var b=document.body;
+      if(b && /admin-mode|tm-mode|operator-mode|op-mode|developer-mode|dev-mode/.test(b.className||'')) return true;
+    }catch(e){}
+    try{
+      var settings=$('adminSettingsBtn');
+      if(visible(settings)) return true;
+    }catch(e){}
+    try{
+      var badge=$('adminBadge');
+      if(badge && badge.classList.contains('show') && /개발자|관리자|운영자|진행자/.test(clean(badge.textContent))) return true;
+    }catch(e){}
+    try{
+      var header=clean(document.querySelector('.header-actions')?.innerText||'');
+      if(/개발자|관리자|운영자|진행자/.test(header) && /로그아웃|님/.test(header)) return true;
+    }catch(e){}
+    return false;
+  }
+  function reveal(el, display){
+    if(!el) return;
+    el.style.visibility='visible';
+    el.style.pointerEvents='auto';
+    if(!document.body.classList.contains('v979-floating-hidden') && !document.body.classList.contains('v979-modal-open') && !document.body.classList.contains('v977-notice-modal-open')){
+      el.style.display=display;
+    }
+  }
+  function apply(){
+    var ok=isPrivileged();
+    document.documentElement.classList.toggle('v982-is-priv', ok);
+    document.documentElement.classList.toggle('v979-is-admin', ok);
+    document.body.classList.toggle('v984-privileged-tools', ok);
+    if(ok){
+      reveal($('v979ToolToggle'),'inline-flex');
+      reveal($('v953ModeSwitch'),'flex');
+      reveal($('v954ResultGuardBar'),'flex');
+      try{var bd=$('bracketFreshnessBadge'); if(bd) bd.textContent='v984 도구표시복구 DEV';}catch(e){}
+    }else{
+      ['v979ToolToggle','v953ModeSwitch','v952ModeSwitch','v954ResultGuardBar','v950ModeBadge','v951SmsTimeNotice','v953ModeSafetyBanner'].forEach(function(id){
+        var el=$(id); if(el){el.style.display='none'; el.style.visibility='hidden'; el.style.pointerEvents='none';}
+      });
+    }
+  }
+  window.v984ApplyToolGateRestore=apply;
+  document.addEventListener('click',function(){setTimeout(apply,80);},true);
+  document.addEventListener('input',function(){setTimeout(apply,80);},true);
+  [0,150,500,1000,2200,4200].forEach(function(t){setTimeout(apply,t);});
+  setInterval(apply,900);
 })();
 </script>
 
