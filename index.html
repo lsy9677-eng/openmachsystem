@@ -106,7 +106,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-18-v976-clean-notice-rebase";
+  const APP_VERSION = "2026-06-18-v979-dev-access-floating-controls";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -61841,6 +61841,303 @@ body.slider-ready .page.active,
 
 
 
+<style id="v928LowLagEmergencyStyle">
+#v928LowLagBanner{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:10px 0 12px;padding:10px 14px;border:2px solid #0f766e;border-radius:14px;background:linear-gradient(135deg,#ecfdf5,#ffffff);color:#064e3b;font-size:.82rem;font-weight:900;line-height:1.55}
+#v928LowLagBanner .btn{min-height:32px!important;padding:5px 10px!important;font-size:.74rem!important;border-radius:999px!important}
+.v928-low-lag .page-slider{transition:none!important;transform:none!important;display:block!important;width:100%!important}
+.v928-low-lag .page{transition:none!important;animation:none!important}
+.v928-low-lag #bracketFreshnessBadge{min-width:92px!important;text-align:center!important}
+.v928-low-lag .v900-panel{display:none!important}
+@media(max-width:680px){#v928LowLagBanner{font-size:.76rem;padding:9px 11px}.v928-low-lag #v928LowLagBanner .btn{width:100%}}
+</style>
+<script id="v928LowLagEmergencyScript">
+(function(){
+  'use strict';
+  const TAG='[v928-low-lag]';
+  if(window.__v928LowLagInstalled) return;
+  window.__v928LowLagInstalled=true;
+
+  function $(id){return document.getElementById(id)}
+  function toast(msg,type){try{if(typeof window.toast==='function') return window.toast(msg,type||'info');}catch(e){} alert(msg)}
+  function currentKey(){try{const t=($('brTS')||{}).value||''; const d=($('brDS')||{}).value||''; if(!t||!d||d==='__ALL__') return ''; return t+'_'+d;}catch(e){return ''}}
+
+  function stopKnownLoops(){
+    // 이전 패치가 전역에 저장한 observer는 가능한 한 모두 중지
+    const names=['__v927BracketObserver','__v912Manual128Observer','__v909ManualPlaceholderObserver','__v914Observer','__v918Observer','__v911PresetObserver','__v906ManualSearchObserver'];
+    names.forEach(n=>{try{if(window[n]&&typeof window[n].disconnect==='function'){window[n].disconnect(); window[n]=null;}}catch(e){}});
+    // 혹시 생성된 빠른 interval이 남아 있으면 넓은 범위에서 해제. Firebase snapshot에는 영향 없음.
+    try{for(let i=1;i<12000;i++){ clearInterval(i); }}catch(e){}
+    try{window.__v927LoaderTimer&&clearTimeout(window.__v927LoaderTimer); window.__v927LoaderTimer=null;}catch(e){}
+  }
+
+  function disableAutoManualBoard(){
+    try{
+      if(typeof window.v900RenderManualBoard==='function' && !window.v900RenderManualBoard.__v928Wrapped){
+        const old=window.v900RenderManualBoard;
+        const wrapped=function(key){
+          if(window.__V928_ALLOW_MANUAL_RECORD_VIEW===true) return old.apply(this,arguments);
+          return '';
+        };
+        wrapped.__v928Wrapped=true; wrapped.__old=old;
+        window.v900RenderManualBoard=wrapped;
+      }
+    }catch(e){console.warn(TAG,'manual board disable failed',e)}
+  }
+
+  function neutralizeLegacyAutoFunctions(){
+    const noop=function(){return false};
+    ['v822FillFixedSlots','v790ApplyPdfFixedTable','v791ApplyFourSlotPdfCourtFixed','v788ApplyModernCupFixedTable','v787VenueSplitForceRepair','v786RunMainAutoAssign','v748RunMainAutoCourtRebuild','v765RunMainCourtRepair','v760RunMainAutoAssign','v753RunMainAutoAssign'].forEach(n=>{try{if(typeof window[n]==='function'&&!window[n].__v928Noop){const f=noop.bind(window); f.__v928Noop=true; window[n]=f;}}catch(e){}});
+  }
+
+  function addBanner(){
+    try{
+      const page=$('page-bracket'); if(!page||$('v928LowLagBanner')) return;
+      const box=document.createElement('div'); box.id='v928LowLagBanner';
+      box.innerHTML='<div>🧯 <b>v928 저렉 응급모드</b> — 자동 감시자/빠른 반복루프/수동기록 자동덮기를 정지했습니다. 대진표는 필요할 때만 수동 갱신하세요.</div><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-outline" type="button" onclick="v928ManualRefresh()">🔄 수동 갱신</button><button class="btn btn-outline" type="button" onclick="v928OpenManualRecordView()">📋 수동기록 보기</button><button class="btn btn-outline" type="button" onclick="v928Status()">🩺 상태</button></div>';
+      const title=page.querySelector('.sec-title')||page.firstElementChild; if(title&&title.parentNode) title.parentNode.insertBefore(box,title.nextSibling); else page.prepend(box);
+    }catch(e){}
+  }
+
+  function freezeBadge(){try{const b=$('bracketFreshnessBadge'); if(b){b.textContent='v928 저렉'; b.style.minWidth='92px'; b.style.display='inline-flex'; b.style.justifyContent='center';}}catch(e){}}
+
+  window.v928ManualRefresh=function(){
+    try{
+      const y=window.scrollY||0;
+      if(typeof window.renderBracket==='function') window.renderBracket();
+      setTimeout(()=>{try{window.scrollTo(window.scrollX||0,y)}catch(e){}; addBanner(); freezeBadge(); stopKnownLoops();},80);
+    }catch(e){toast('수동 갱신 실패: '+(e.message||e),'error')}
+  };
+
+  window.v928OpenManualRecordView=function(){
+    try{
+      const key=currentKey(); if(!key){toast('대회와 부서를 먼저 선택하세요','info');return;}
+      const old=window.v900RenderManualBoard && (window.v900RenderManualBoard.__old||window.v900RenderManualBoard);
+      if(typeof old!=='function'){toast('수동기록 화면 함수를 찾지 못했습니다','error');return;}
+      window.__V928_ALLOW_MANUAL_RECORD_VIEW=true;
+      const html=old(key);
+      window.__V928_ALLOW_MANUAL_RECORD_VIEW=false;
+      const ov=document.createElement('div'); ov.id='v928ManualRecordModal'; ov.style.cssText='position:fixed;inset:0;z-index:2147483000;background:rgba(15,23,42,.62);display:flex;align-items:center;justify-content:center;padding:14px';
+      ov.innerHTML='<div style="width:min(1120px,96vw);max-height:90vh;overflow:auto;background:#fff;border-radius:18px;padding:14px;box-shadow:0 20px 70px rgba(0,0,0,.32)"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px"><b>📋 수동 입력 기록 보기</b><button class="btn btn-gray" onclick="this.closest(\'#v928ManualRecordModal\').remove()">닫기</button></div>'+html+'</div>';
+      document.body.appendChild(ov);
+    }catch(e){window.__V928_ALLOW_MANUAL_RECORD_VIEW=false; toast('수동기록 보기 실패: '+(e.message||e),'error')}
+  };
+
+  window.v928Status=function(){
+    const msg='v928 저렉 응급모드\n- 차단된 빠른 interval: '+(window.__v928FastIntervalBlocked||0)+'개\n- 차단된 MutationObserver: '+(window.__v928ObserverCount||0)+'개\n- 수동기록 자동덮기: 차단\n- 자동 128/PDF/구장분리 보정: 차단';
+    alert(msg);
+  };
+
+  function stabilize(){
+    try{document.body.classList.add('v928-low-lag');}catch(e){}
+    stopKnownLoops(); disableAutoManualBoard(); neutralizeLegacyAutoFunctions(); addBanner(); freezeBadge();
+    try{ if(typeof window.sl==='function'){ const old=window.sl; if(!old.__v928Wrapped){ const w=function(on){ if(on===false) return old.apply(this,arguments); if(window.__V928_ALLOW_LOADING===true) return old.apply(this,arguments); return undefined;}; w.__v928Wrapped=true; window.sl=w; }} }catch(e){}
+  }
+
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(stabilize,80)); else setTimeout(stabilize,30);
+  setTimeout(stabilize,400); setTimeout(stabilize,1200); setTimeout(stabilize,3000);
+})();
+</script>
+
+
+
+<style id="v929ResultScrollStayHideAdvStyle">
+/* v929: 결과 저장 후 현재 위치 유지 + 본선 추첨 완료 뒤 진출팀 목록 숨김 */
+#v929StableNotice{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:8px 0 10px;padding:8px 12px;border-radius:12px;background:#f0fdfa;border:1.5px solid #5eead4;color:#0f766e;font-size:.74rem;font-weight:900;line-height:1.45}
+body.v929-main-drawn #mainAdvTeams{display:none!important;visibility:hidden!important;height:0!important;overflow:hidden!important;margin:0!important;padding:0!important;border:0!important;}
+.v929-hidden-adv-list{display:none!important;visibility:hidden!important;height:0!important;overflow:hidden!important;margin:0!important;padding:0!important;border:0!important;}
+body.v929-result-freeze *{scroll-behavior:auto!important;}
+#bracketFreshnessBadge{min-width:92px!important;text-align:center!important;}
+@media(max-width:680px){#v929StableNotice{font-size:.68rem;padding:7px 9px;align-items:flex-start;flex-direction:column}}
+</style>
+<script id="v929ResultScrollStayHideAdvScript">
+/* v929: keep scroll position after result save; hide advancing-team list after main draw exists */
+(function(){
+  'use strict';
+  if(window.__v929ResultScrollStayInstalled) return;
+  window.__v929ResultScrollStayInstalled=true;
+  const TAG='[v929-result-scroll-stay]';
+  const VERSION='2026-06-16-v929-result-scroll-stay-hide-adv';
+  const $=id=>document.getElementById(id);
+  const clean=v=>String(v==null?'':v).replace(/\s+/g,' ').trim();
+  const rawScrollTo=window.scrollTo.bind(window);
+  let restoreTimer=null;
+
+  function y(){
+    try{return window.pageYOffset||document.documentElement.scrollTop||document.body.scrollTop||0;}catch(e){return 0;}
+  }
+  function x(){
+    try{return window.pageXOffset||document.documentElement.scrollLeft||document.body.scrollLeft||0;}catch(e){return 0;}
+  }
+  function inBracket(){
+    try{return document.getElementById('page-bracket')?.classList.contains('active');}catch(e){return false;}
+  }
+  function setFreeze(ms){
+    try{
+      if(!inBracket()) return;
+      window.__v929FreezeUntil=Date.now()+(ms||4200);
+      window.__v929FreezeX=x();
+      window.__v929FreezeY=y();
+      document.body.classList.add('v929-result-freeze');
+      if(restoreTimer) clearInterval(restoreTimer);
+      restoreTimer=setInterval(()=>{
+        try{
+          if(Date.now()>Number(window.__v929FreezeUntil||0)){
+            clearInterval(restoreTimer); restoreTimer=null;
+            document.body.classList.remove('v929-result-freeze');
+            return;
+          }
+          const targetY=Number(window.__v929FreezeY||0), targetX=Number(window.__v929FreezeX||0);
+          if(Math.abs(y()-targetY)>3 || Math.abs(x()-targetX)>3) rawScrollTo({left:targetX,top:targetY,behavior:'auto'});
+        }catch(e){}
+      },80);
+    }catch(e){}
+  }
+  function shouldFreezeScroll(){
+    try{return inBracket() && Date.now()<Number(window.__v929FreezeUntil||0);}catch(e){return false;}
+  }
+  function restoreAfter(ms){
+    try{
+      const targetY=Number(window.__v929FreezeY||y()), targetX=Number(window.__v929FreezeX||x());
+      setTimeout(()=>{ if(inBracket()) rawScrollTo({left:targetX,top:targetY,behavior:'auto'}); }, ms||0);
+    }catch(e){}
+  }
+
+  // scrollTo / scrollIntoView 차단은 결과저장 직후 몇 초 동안만 적용한다.
+  if(!window.scrollTo.__v929Wrapped){
+    const w=function(){
+      try{
+        if(shouldFreezeScroll()){
+          const a=arguments[0];
+          const top=(typeof a==='object')?Number(a.top||0):(arguments.length>=2?Number(arguments[1]):0);
+          // 결과저장 후 자동으로 본선진출/상단으로 튀는 scroll만 차단. 같은 위치 복원은 허용.
+          const targetY=Number(window.__v929FreezeY||0);
+          if(Number.isFinite(top) && Math.abs(top-targetY)>8) return;
+        }
+      }catch(e){}
+      return rawScrollTo.apply(window,arguments);
+    };
+    w.__v929Wrapped=true;
+    window.scrollTo=w;
+  }
+  try{
+    if(!Element.prototype.scrollIntoView.__v929Wrapped){
+      const raw=Element.prototype.scrollIntoView;
+      const w=function(){
+        try{
+          if(shouldFreezeScroll()){
+            const t=clean(this && this.textContent || '');
+            const id=String(this && this.id || '');
+            if(t.includes('본선 진출팀') || id.includes('mainAdvTeams') || id.includes('mainStage') || id.includes('mainPreview')) return;
+          }
+        }catch(e){}
+        return raw.apply(this,arguments);
+      };
+      w.__v929Wrapped=true;
+      Element.prototype.scrollIntoView=w;
+    }
+  }catch(e){}
+
+  function getKey(){
+    try{
+      let tid=$('brTS')?.value||'';
+      let div=$('brDS')?.value||'';
+      if(!div || div==='__ALL__'){
+        const active=[...document.querySelectorAll('#brMultiDiv .active,[data-div].active,#brMultiDiv button')].find(el=>/영남|신인|부/.test(clean(el.textContent||'')) && !/전체/.test(clean(el.textContent||'')));
+        div=active?.dataset?.div || clean(active?.textContent||'').replace(/^.*?(영남.*부|.*부).*$/,'$1');
+      }
+      if(!tid){ try{ tid=typeof currentTid!=='undefined'?currentTid:''; }catch(e){} }
+      if(!div){ try{ div=typeof currentDiv!=='undefined'?currentDiv:''; }catch(e){} }
+      return tid&&div ? tid+'_'+div : '';
+    }catch(e){return '';}
+  }
+  function hasMain(key){
+    try{return !!(window.G&&G.matches&&Array.isArray(G.matches[key])&&G.matches[key].some(m=>m&&/^(main|playin|bronze|final)$/i.test(String(m.phase||''))));}catch(e){return false;}
+  }
+  function hideAdvanceListAfterMain(){
+    try{
+      const key=getKey();
+      const mainExists=key ? hasMain(key) : false;
+      document.body.classList.toggle('v929-main-drawn', !!mainExists);
+      const adv=$('mainAdvTeams');
+      if(adv){
+        if(mainExists){ adv.dataset.v929Hidden='1'; adv.style.display='none'; adv.style.height='0'; adv.style.overflow='hidden'; }
+        else if(adv.dataset.v929Hidden==='1'){ adv.style.display=''; adv.style.height=''; adv.style.overflow=''; delete adv.dataset.v929Hidden; }
+      }
+      // 대진표 본문에 오래된 진출팀 목록이 남으면 본선 생성 이후 숨긴다.
+      if(mainExists){
+        document.querySelectorAll('#bracketContent .card,#bracketContent [class*="adv"],#bracketContent [id*="Adv"],#bracketContent [id*="adv"]').forEach(el=>{
+          const t=clean(el.textContent||'');
+          if(t.includes('본선 진출팀')) el.classList.add('v929-hidden-adv-list');
+        });
+      }
+    }catch(e){}
+  }
+  function installNotice(){
+    try{
+      if($('v929StableNotice')) return;
+      const content=$('bracketContent');
+      const title=document.querySelector('#page-bracket .sec-title');
+      const n=document.createElement('div');
+      n.id='v929StableNotice';
+      n.innerHTML='<span>🧷 v929 안정화: 결과 저장 후 현재 위치를 유지하고, 본선 추첨 완료 뒤 본선 진출팀 목록은 숨깁니다.</span><button type="button" onclick="window.v929ManualRefresh&&window.v929ManualRefresh()" style="border:1px solid #0f766e;background:#fff;color:#0f766e;border-radius:999px;padding:5px 10px;font-size:.72rem;font-weight:1000;cursor:pointer">대진표 수동갱신</button>';
+      if(title && title.parentNode) title.parentNode.insertBefore(n,title.nextSibling); else if(content&&content.parentNode) content.parentNode.insertBefore(n,content);
+    }catch(e){}
+  }
+  function wrapResultFns(){
+    try{
+      ['saveM3','saveM3Core','v922FastQuickWinSave','v917FastQuickWinSave','v916QuickWinSave','v915QuickWinSave','v913QuickWinSave','v908AdminQuickWin'].forEach(name=>{
+        const fn=window[name];
+        if(typeof fn==='function' && !fn.__v929Wrapped){
+          const w=function(){
+            setFreeze(4800);
+            const r=fn.apply(this,arguments);
+            try{ Promise.resolve(r).finally(()=>{ restoreAfter(0); restoreAfter(120); restoreAfter(450); restoreAfter(1200); hideAdvanceListAfterMain(); }); }catch(e){ restoreAfter(80); }
+            return r;
+          };
+          w.__v929Wrapped=true; w.__old=fn; window[name]=w;
+          try{ if(name==='saveM3') saveM3=w; }catch(e){}
+          try{ if(name==='saveM3Core') saveM3Core=w; }catch(e){}
+        }
+      });
+    }catch(e){}
+  }
+  function wrapRender(){
+    try{
+      if(typeof window.renderBracket==='function' && !window.renderBracket.__v929Wrapped){
+        const old=window.renderBracket;
+        const w=function(){
+          const keep=shouldFreezeScroll();
+          const sx=x(), sy=y();
+          const r=old.apply(this,arguments);
+          try{ hideAdvanceListAfterMain(); }catch(e){}
+          if(keep){
+            window.__v929FreezeX=sx; window.__v929FreezeY=sy;
+            [0,60,180,420,900].forEach(ms=>setTimeout(()=>rawScrollTo({left:sx,top:sy,behavior:'auto'}),ms));
+          }
+          return r;
+        };
+        w.__v929Wrapped=true; w.__old=old; window.renderBracket=w; try{renderBracket=w;}catch(e){}
+      }
+    }catch(e){}
+  }
+  document.addEventListener('pointerdown',function(ev){
+    try{
+      if(ev.target.closest('#mM3SaveResultBtn,#v922QuickWinBox .v922-btn,#v917QuickWinBox button,#v916QuickWinBox button,#v915QuickWinBox button,#v913QuickWinBox button,#v908AdminQuickWinBox button')) setFreeze(5200);
+    }catch(e){}
+  },true);
+  window.v929ManualRefresh=function(){try{ hideAdvanceListAfterMain(); if(typeof window.renderBracket==='function') window.renderBracket(); }catch(e){}};
+  function boot(){
+    wrapResultFns(); wrapRender(); installNotice(); hideAdvanceListAfterMain();
+    try{const b=$('bracketFreshnessBadge'); if(b) b.textContent='v929 위치고정';}catch(e){}
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(boot,250)); else setTimeout(boot,50);
+  [300,900,1800,3500].forEach(ms=>setTimeout(boot,ms));
+  setInterval(()=>{try{wrapResultFns(); hideAdvanceListAfterMain();}catch(e){}},2500);
+  console.log(TAG,'installed',VERSION);
+})();
+</script>
+
+
 <!-- v930: 128강 완료 후 64강 운영카드/다음라운드 복구 안정화 -->
 <style id="v930MainRoundRepairStyle">
 .v930-repair-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:8px 0 12px;padding:10px 12px;border:1.5px solid #93c5fd;background:linear-gradient(135deg,#eff6ff,#fff);border-radius:14px;color:#1e3a8a;font-size:.78rem;font-weight:900;line-height:1.5}.v930-repair-bar .btn{min-height:34px!important;padding:6px 12px!important;font-size:.76rem!important;border-radius:10px!important}.v930-repair-chip{display:inline-flex;align-items:center;justify-content:center;padding:3px 8px;border-radius:999px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;font-size:.68rem;font-weight:1000;white-space:nowrap}@media(max-width:680px){.v930-repair-bar{align-items:stretch}.v930-repair-bar>div:last-child{display:grid;grid-template-columns:1fr;gap:6px;width:100%}.v930-repair-bar .btn{width:100%!important}}
@@ -62814,6 +63111,164 @@ body.bracket-page #v934FloatingRepairBtn,#page-bracket.active ~ #v934FloatingRep
 
 
 <!-- v936: 복구용 응급 기능 정리 / 다음대회 운영모드 정리 -->
+<style id="v936CleanupRecoveryToolsStyle">
+/* v936: 복구/응급 패널과 버튼은 운영 화면에서 숨김. 정식 안전장치(수동본선/복기/승패저장)는 유지. */
+[data-v936-recovery-hidden="1"],
+#v930RepairBar,
+#v932RoundRepairBar,
+#v933NextRoundBar,
+#v934RepairBar,
+#v934FloatingRepairBtn,
+#v927EmergencyStableNote,
+#v928LowLagPanel,
+#v923ProtectBtn,
+#v923DiagBtn,
+#v936HiddenLegacyPanels,
+.v930-repair-chip,
+.v932-chip,
+.v933-chip,
+.v934-repair-chip{
+  display:none !important;
+  visibility:hidden !important;
+  pointer-events:none !important;
+}
+#v936CleanModeNote{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+  margin:10px 0 12px;padding:10px 14px;border:1.5px solid #0f766e;border-radius:14px;
+  background:linear-gradient(135deg,#f0fdfa,#ffffff);color:#0f3f3a;font-size:.78rem;font-weight:900;line-height:1.55;
+}
+#v936CleanModeNote .v936-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:flex-end;}
+#v936CleanModeNote button{border:1px solid #99f6e4;background:#fff;color:#0f766e;border-radius:999px;padding:6px 10px;font-size:.72rem;font-weight:900;cursor:pointer;}
+#v936CleanModeNote button:hover{background:#ccfbf1;}
+#bracketFreshnessBadge{min-width:90px !important;text-align:center !important;white-space:nowrap !important;}
+</style>
+<script id="v936CleanupRecoveryToolsScript">
+(function(){
+  'use strict';
+  const TAG='[v936-cleanup]';
+  const q=id=>document.getElementById(id);
+  const norm=s=>String(s||'').replace(/\s+/g,' ').trim();
+  const RECOVERY_RE=/128슬롯\s*붙여넣기|부전승\s*자동반영|64강\s*빈칸\s*강제채움|64강\/다음라운드\s*카드복구|다음라운드\s*카드복구|256\/512\s*정리|수동기록\s*보기|본선보호\s*저장|상태점검|v930\s*다음라운드|v931\s*부서|v932\s*라운드정리|v933\s*다음라운드|v934\s*64강|v927\s*긴급|v928\s*저렉|이번대회\s*128\s*PDF|128\s*PDF고정|4칸\s*PDF고정|PDF\s*고정\s*테이블|원도심.*국제.*강제|국제.*원도심.*강제/;
+  const DANGEROUS_RE=/이번대회\s*128|128\s*PDF|4칸\s*PDF|PDF고정|원도심.*강제|국제.*강제|수동기록\s*자동|64강\s*채움|가짜라운드|256\/512/;
+  const KEEP_RE=/수동본선\s*운영모드|복기\s*기록모드|스코어\s*없이\s*승패|승패만\s*바로|결과저장|본선\s*공개|본선\s*비공개|수동수정|안정\s*수동수정|본선\s*코트\s*운영정리/;
+  window.__V936_CLEAN_MODE = true;
+
+  function markHide(el){
+    if(!el || el.id==='v936CleanModeNote') return;
+    if(el.closest && el.closest('#mM3')) return; // 결과 입력창의 정식 승패저장 영역은 건드리지 않음
+    el.setAttribute('data-v936-recovery-hidden','1');
+    el.style.display='none';
+    el.style.visibility='hidden';
+    el.style.pointerEvents='none';
+  }
+
+  function cleanupRecoveryUi(){
+    try{
+      const root=q('page-bracket')||document.body;
+      const directIds=['v930RepairBar','v932RoundRepairBar','v933NextRoundBar','v934RepairBar','v934FloatingRepairBtn','v927EmergencyStableNote','v928LowLagPanel','v923ProtectBtn','v923DiagBtn'];
+      directIds.forEach(id=>{ const el=q(id); if(el) markHide(el); });
+      root.querySelectorAll('button,.btn,a,[role="button"]').forEach(el=>{
+        const t=norm(el.textContent);
+        if(!t || KEEP_RE.test(t)) return;
+        if(RECOVERY_RE.test(t) || DANGEROUS_RE.test(t)) markHide(el);
+      });
+      root.querySelectorAll('.card,div,section').forEach(el=>{
+        if(el.id==='v936CleanModeNote') return;
+        const t=norm(el.textContent);
+        if(!t || t.length>800 || KEEP_RE.test(t)) return;
+        if(/v927|v928|v929|v930|v931|v932|v933|v934/.test(t) && /복구|응급|수동기록|카드|채움|라운드|보호|상태/.test(t)) markHide(el);
+        if(/이번대회\s*128\s*PDF고정|128\s*PDF고정|4칸\s*PDF고정|원도심.*국제.*강제|국제.*원도심.*강제/.test(t)) markHide(el);
+      });
+      const b=q('bracketFreshnessBadge');
+      if(b){ b.textContent='v936 정리'; b.title='복구용 응급 기능 정리판'; b.style.minWidth='90px'; }
+    }catch(e){ console.warn(TAG,'cleanup failed',e); }
+  }
+
+  function installCleanNote(){
+    try{
+      const page=q('page-bracket'); if(!page) return;
+      if(q('v936CleanModeNote')) return;
+      const anchor=q('bracketExportBar') || page.querySelector('.sec-title') || q('bracketContent');
+      if(!anchor) return;
+      const note=document.createElement('div');
+      note.id='v936CleanModeNote';
+      note.innerHTML='<div>🧹 <b>v936 운영정리</b> — 이번 복기용 복구 버튼은 숨기고, 정식 안전장치만 남겼습니다. 다음 대회 기본 흐름은 자동본선이며, 수동본선/복기모드는 관리자가 직접 켤 때만 작동합니다.</div><div class="v936-actions"><button type="button" onclick="window.v936CleanupRecoveryUi&&window.v936CleanupRecoveryUi()">정리 재적용</button></div>';
+      anchor.insertAdjacentElement('afterend', note);
+    }catch(e){ console.warn(TAG,'note install failed',e); }
+  }
+
+  function disableRecoveryFunction(name){
+    const old=window[name];
+    if(typeof old!=='function' || old.__v936Disabled) return;
+    const fn=function(){
+      try{ if(typeof toast==='function') toast('복구용 임시 기능은 v936에서 숨김 처리했습니다. 수동본선/복기모드는 정식 메뉴를 사용하세요.','info'); }
+      catch(_e){ alert('복구용 임시 기능은 v936에서 숨김 처리했습니다.'); }
+      return null;
+    };
+    fn.__v936Disabled=true;
+    fn.__old=old;
+    window[name]=fn;
+    try{ eval(name+'=window["'+name+'"]'); }catch(_e){}
+  }
+
+  function disableLegacyRecoveryFunctions(){
+    [
+      'v930RepairMainRoundCards','v931RepairMainRoundCards','v932CleanAndRepairMainRounds','v933RepairNextRoundsFromResultState','v934ForceFillNextRounds','v934ShowRoundStatus',
+      'v927OpenLegacyManualBoard','v927HardRefreshBracket','v928OpenManualRecordView','v928Status','v928ManualRefresh',
+      'v923ProtectCurrentManualMain','v923ShowDiagnostics',
+      'v900AutoAdvanceByes','v900OpenManual128',
+      'v788ModernCupFixedTable','v790PdfFixedTable','v791FourSlotPdfCourtFixed','v809CreateFixedMain','v830ForceMainPublic'
+    ].forEach(disableRecoveryFunction);
+  }
+
+  function officialModeGuard(){
+    try{
+      // 다음 대회 기본값은 auto. 단, 이미 관리자가 manual/replay로 저장한 key는 유지한다.
+      const key=(typeof currentKey==='function')?currentKey():'';
+      if(key && window.G && G.draws && G.draws[key]){
+        const d=G.draws[key];
+        if(!d.mainMode) d.mainMode='auto';
+        if(d.mainMode==='manual' || d.mainMode==='replay'){
+          d.mainManualGuard=true;
+          d.manualMainLocked=true;
+        }
+      }
+    }catch(e){}
+  }
+
+  window.v936CleanupRecoveryUi=function(){
+    installCleanNote();
+    disableLegacyRecoveryFunctions();
+    officialModeGuard();
+    cleanupRecoveryUi();
+  };
+
+  // render 후 한 번 정리하되, 과거처럼 빠른 감시 루프를 만들지 않는다.
+  const oldRender=window.renderBracket;
+  if(typeof oldRender==='function' && !oldRender.__v936CleanWrapped){
+    const wrapped=function(){
+      const r=oldRender.apply(this,arguments);
+      setTimeout(window.v936CleanupRecoveryUi, 80);
+      return r;
+    };
+    wrapped.__v936CleanWrapped=true;
+    wrapped.__old=oldRender;
+    window.renderBracket=wrapped;
+    try{ renderBracket=wrapped; }catch(_e){}
+  }
+
+  document.addEventListener('DOMContentLoaded',()=>{
+    setTimeout(window.v936CleanupRecoveryUi, 200);
+    setTimeout(window.v936CleanupRecoveryUi, 900);
+    setTimeout(window.v936CleanupRecoveryUi, 2500);
+  });
+  setTimeout(window.v936CleanupRecoveryUi, 300);
+  console.log(TAG,'installed');
+})();
+</script>
+
+
+
 <!-- v937: 백업/복원 안전모드 - 복원 전 자동백업 + 범위별 복원 -->
 <style id="v937SafeBackupRestoreStyle">
 #v937BackupRestorePanel{margin:0 0 14px 0;padding:14px 15px;border:2px solid #0f766e;border-radius:14px;background:linear-gradient(135deg,#f0fdfa,#ecfeff);box-shadow:0 6px 16px rgba(15,118,110,.08)}
@@ -63743,9 +64198,9 @@ body.bracket-page #v934FloatingRepairBtn,#page-bracket.active ~ #v934FloatingRep
 <script id="v942SplitModesPatch">
 (function(){
   'use strict';
-  const MODE = 'live';
+  const MODE = 'dev';
   window.APP_OPERATION_PROFILE = MODE; // live | replay | dev
-  window.APP_OPERATION_LABEL = '운영용 안정본';
+  window.APP_OPERATION_LABEL = '개발/점검본';
   try { localStorage.setItem('APP_OPERATION_PROFILE', MODE); } catch(e){}
 
   const RECOVERY_TEXT_RE = /64강\s*빈칸|강제채움|256\/512|다음라운드\s*카드복구|수동기록\s*보기|본선보호\s*저장|상태점검|128슬롯|붙여넣기|부전승\s*자동반영|PDF고정|4칸|원도심|국제\s*강제|이번대회\s*128|레거시|콘솔\s*디버그|v92[0-9]|v93[0-9]|v94[0-1]/i;
@@ -64004,7 +64459,7 @@ body.bracket-page #v934FloatingRepairBtn,#page-bracket.active ~ #v934FloatingRep
 <script id="v950SafeRuntimeGuard">
 (function(){
   'use strict';
-  var MODE = 'live';
+  var MODE = 'dev';
   var LABELS = {live:'운영용', replay:'복기용', dev:'개발용'};
   window.APP_DEPLOY_MODE = MODE;
   window.APP_DEPLOY_VERSION = 'v951-sms-time-sync';
@@ -64110,8 +64565,8 @@ body.bracket-page #v934FloatingRepairBtn,#page-bracket.active ~ #v934FloatingRep
 <script id="v950VisibleModeBadge">
 (function(){
   'use strict';
-  var MODE = 'live';
-  var LABEL = '운영용';
+  var MODE = 'dev';
+  var LABEL = '개발용';
   window.APP_DEPLOY_MODE = MODE;
   window.APP_DEPLOY_VERSION = 'v951-sms-time-sync';
   function inject(){
@@ -64645,268 +65100,282 @@ body.bracket-page #v934FloatingRepairBtn,#page-bracket.active ~ #v934FloatingRep
 
 
 <!-- v955: 관리자 공지게시판 / 사진 게시 기능 -->
-<!-- v956: 모바일 공지 글쓰기 버튼/하단 겹침 보정 -->
-<!-- v957: Firebase Storage 업로드를 대회요강/첫화면 팝업 공지 이미지에 재사용 -->
-<style id="v957StorageAssetsStyle">
-.v957-storage-panel{margin-top:8px;padding:10px 12px;border:1.5px solid #bfdbfe;background:linear-gradient(135deg,#f8fbff,#fffdf5);border-radius:12px;font-size:.78rem;color:#334155;line-height:1.55}
-.v957-storage-panel .v957-title{font-weight:1000;color:#0f1e3a;margin-bottom:6px;display:flex;align-items:center;gap:6px}
-.v957-storage-panel .v957-actions{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-top:8px}
-.v957-storage-panel input[type=file]{font-size:.76rem;max-width:100%}
-.v957-storage-note{margin-top:6px;font-size:.72rem;color:#64748b;line-height:1.55}
-.v957-guide-hint{margin-top:6px;padding:8px 10px;border-radius:10px;background:#f0fdf4;border:1px solid #86efac;color:#166534;font-size:.72rem;line-height:1.55;font-weight:800}
-@media(max-width:680px){.v957-storage-panel{font-size:.74rem;padding:9px 10px}.v957-storage-panel .v957-actions{display:grid;grid-template-columns:1fr;gap:6px}.v957-storage-panel .btn{width:100%}}
+<style id="v977NoticeCleanStyle">
+/* v977: 공지게시판 단일 시스템(dev 전용) */
+.v977-board-card{border:1.5px solid #dbeafe;border-radius:18px;background:linear-gradient(180deg,#fff,#f8fbff);box-shadow:0 10px 24px rgba(15,30,58,.07);padding:14px 15px;margin:14px 0}
+.v977-board-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.v977-board-title{font-size:1rem;font-weight:1000;color:#0f1e3a;display:flex;align-items:center;gap:7px}
+.v977-board-actions{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end;align-items:center}
+.v977-board-actions button,.v977-board-actions select,.v977-board-actions input{min-height:36px;border-radius:999px;border:1.5px solid #cbd5e1;background:#fff;color:#0f1e3a;font-size:.78rem;font-weight:900;padding:7px 12px;outline:none}
+.v977-board-actions button{cursor:pointer}
+.v977-board-actions button.primary{background:#0f1e3a;color:#fff;border-color:#0f1e3a}
+.v977-list{display:flex;flex-direction:column;gap:9px}
+.v977-empty{padding:22px;text-align:center;color:#64748b;font-size:.84rem;font-weight:900;border:1px dashed #cbd5e1;border-radius:16px;background:#f8fafc}
+.v977-home-row{display:flex;gap:10px;align-items:center;padding:10px;border:1px solid #dbe7fb;border-radius:14px;background:#fff;cursor:pointer;margin:8px 0;transition:transform .12s ease,box-shadow .12s ease}
+.v977-home-row:hover{transform:translateY(-1px);box-shadow:0 8px 18px rgba(15,30,58,.10)}
+.v977-home-thumb{width:58px;height:58px;border-radius:12px;object-fit:cover;flex:0 0 auto;border:1px solid #dbe7fb;background:#f8fafc;display:flex;align-items:center;justify-content:center;color:#64748b;font-size:1.3rem}
+.v977-home-title{font-weight:950;color:#0f1e3a;font-size:.92rem;line-height:1.32;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.v977-home-meta{font-size:.73rem;color:#64748b;margin-top:3px;display:flex;gap:7px;flex-wrap:wrap}
+.v977-row{display:grid;grid-template-columns:52px 1fr auto;gap:10px;align-items:center;padding:12px 10px;border:1px solid #dbe7fb;border-radius:14px;background:#fff;margin:8px 0;cursor:pointer}
+.v977-row:hover{background:#f8fbff;box-shadow:0 8px 18px rgba(15,30,58,.08)}
+.v977-no{width:38px;height:38px;border-radius:12px;background:#eff6ff;color:#1d4ed8;display:flex;align-items:center;justify-content:center;font-weight:950;font-size:.9rem}
+.v977-title{font-weight:950;color:#0f1e3a;font-size:.94rem;line-height:1.35}
+.v977-meta{font-size:.73rem;color:#64748b;margin-top:4px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.v977-chip{display:inline-flex;align-items:center;border-radius:999px;padding:2px 7px;background:#eef2ff;color:#3730a3;font-weight:900;font-size:.7rem}
+.v977-photo-count{display:inline-flex;align-items:center;border-radius:999px;padding:5px 9px;background:#ecfdf5;color:#047857;font-size:.72rem;font-weight:950;white-space:nowrap}
+.v977-backdrop{position:fixed;inset:0;background:rgba(15,30,58,.66);z-index:2147483600;display:flex;align-items:center;justify-content:center;padding:18px}
+.v977-modal{width:min(880px,96vw);max-height:90vh;overflow:auto;background:#fff;border-radius:18px;box-shadow:0 24px 80px rgba(0,0,0,.30);border:1px solid #dbe7fb}
+.v977-modal-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:16px 18px;border-bottom:1px solid #e2e8f0;background:#0f1e3a;color:#fff;position:sticky;top:0;z-index:2}
+.v977-modal-title{font-size:1.05rem;font-weight:950;line-height:1.35}
+.v977-close{border:0;background:rgba(255,255,255,.16);color:#fff;border-radius:999px;width:36px;height:36px;font-size:1.15rem;font-weight:1000;cursor:pointer;flex:0 0 auto}
+.v977-modal-body{padding:18px;color:#0f1e3a;line-height:1.65}
+.v977-detail-meta{display:flex;gap:8px;flex-wrap:wrap;color:#64748b;font-size:.78rem;font-weight:800;margin-bottom:12px}
+.v977-body{white-space:pre-wrap;margin:12px 0 16px;font-size:.92rem}
+.v977-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:12px}
+.v977-photo-card{border:1px solid #dbe7fb;border-radius:14px;background:#f8fafc;overflow:hidden}
+.v977-photo-card img{width:100%;height:150px;object-fit:cover;display:block;cursor:zoom-in;background:#f8fafc}
+.v977-photo-caption{padding:8px 10px;font-size:.78rem;color:#475569;font-weight:800;line-height:1.45;white-space:pre-wrap}
+.v977-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;padding-top:12px;border-top:1px solid #e5e7eb}
+.v977-actions button,.v977-save{border:1.5px solid #cbd5e1;background:#fff;border-radius:12px;padding:9px 13px;font-weight:950;cursor:pointer;color:#0f1e3a}
+.v977-actions .danger{border-color:#fecaca;background:#fef2f2;color:#b91c1c}
+.v977-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.v977-label{display:block;font-size:.78rem;font-weight:950;color:#475569;margin:0 0 5px}
+.v977-input,.v977-textarea,.v977-select{width:100%;border:1.5px solid #d5dbea;border-radius:12px;padding:10px 11px;font-family:'Noto Sans KR',sans-serif;font-size:.88rem;outline:none;background:#fff;box-sizing:border-box}
+.v977-textarea{min-height:150px;resize:vertical;line-height:1.6}
+.v977-form-line{margin-bottom:12px}
+.v977-file-summary{margin-top:7px;padding:8px 10px;border-radius:10px;background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;font-size:.74rem;font-weight:900;line-height:1.45}
+.v977-caption-list{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.v977-existing-photo{display:grid;grid-template-columns:78px 1fr auto;gap:10px;align-items:center;border:1px solid #e2e8f0;border-radius:12px;padding:8px;background:#f8fafc}
+.v977-existing-photo img{width:78px;height:58px;object-fit:cover;border-radius:10px;border:1px solid #e2e8f0;cursor:zoom-in}
+.v977-image-viewer{position:fixed;inset:0;background:rgba(5,10,22,.86);z-index:2147483700;display:flex;align-items:center;justify-content:center;padding:18px}
+.v977-image-viewer img{max-width:96vw;max-height:88vh;object-fit:contain;border-radius:12px;box-shadow:0 18px 60px rgba(0,0,0,.35)}
+.v977-image-viewer .v977-close{position:absolute;right:18px;top:18px;background:rgba(255,255,255,.20)}
+body.v977-notice-modal-open #v954ResultGuardBar,
+body.v977-notice-modal-open #v953ModeNav,
+body.v977-notice-modal-open #v953ModeSwitch,
+body.v977-notice-modal-open .v953-mode-nav,
+body.v977-notice-modal-open .v954-result-guard,
+body.v977-notice-modal-open .v977-floating-dev-nav{display:none!important}
+body:not(.admin-mode):not(.tm-mode) .v977-admin-only{display:none!important}
+body:not(.admin-mode):not(.tm-mode) .v928-panel,body:not(.admin-mode):not(.tm-mode) .v929-panel,body:not(.admin-mode):not(.tm-mode) .v936-panel{display:none!important}
+@media(max-width:680px){.v977-board-actions{display:grid;grid-template-columns:1fr 1fr;width:100%}.v977-board-actions input,.v977-board-actions select{grid-column:1/-1;width:100%;min-width:0}.v977-row{grid-template-columns:42px 1fr}.v977-photo-count{grid-column:2}.v977-modal{width:100vw;max-height:calc(100vh - 12px);border-radius:18px 18px 0 0}.v977-backdrop{align-items:flex-end;padding:8px 8px calc(10px + env(safe-area-inset-bottom,0px))}.v977-form-grid{grid-template-columns:1fr}.v977-existing-photo{grid-template-columns:64px 1fr}.v977-existing-photo button{grid-column:1/-1}.v977-gallery{grid-template-columns:repeat(2,minmax(0,1fr))}.v977-photo-card img{height:122px}}
 </style>
-<script id="v957StorageAssetsScript">
-(function(){
-  'use strict';
-  const V='v957';
-  const MAX_IMAGE=10*1024*1024;
-  const IMG_RE=/^image\//i;
-  function ge(id){return document.getElementById(id)}
-  function toastSafe(msg,type){try{ if(typeof toast==='function') toast(msg,type||'info'); else console.log('[v957]',msg);}catch(e){console.log('[v957]',msg)}}
-  function isManager(){
-    try{return !!(window.AD||window.TM||document.body.classList.contains('admin-mode')||document.body.classList.contains('tm-mode'));}catch(e){return false;}
-  }
-  function safeName(name){return String(name||'image.jpg').replace(/[^a-zA-Z0-9가-힣._-]/g,'_').slice(0,120)}
-  async function uploadToStorage(file, folder){
-    if(!file) throw new Error('파일이 없습니다.');
-    if(!IMG_RE.test(file.type||'')) throw new Error('이미지 파일만 업로드할 수 있습니다.');
-    if(file.size>MAX_IMAGE) throw new Error('이미지는 10MB 이하만 업로드할 수 있습니다.');
-    const st=window._storage;
-    const rf=window._storageRef;
-    const ub=window._uploadBytes;
-    const gd=window._getDownloadURL;
-    if(!st||!rf||!ub||!gd) throw new Error('Firebase Storage가 아직 준비되지 않았습니다. 새로고침 후 다시 시도하세요.');
-    const path=`${folder}/${Date.now()}_${safeName(file.name)}`;
-    const r=rf(st,path);
-    await ub(r,file,{contentType:file.type||'image/jpeg'});
-    const url=await gd(r);
-    return {url,path};
-  }
-  window.v957UploadStartupPopupImage=async function(input){
-    try{
-      if(!isManager()){toastSafe('개발자 또는 운영자만 팝업 이미지를 업로드할 수 있습니다.','info'); return;}
-      const file=input && input.files && input.files[0];
-      if(!file){toastSafe('업로드할 이미지를 선택하세요.','info'); return;}
-      toastSafe('팝업 이미지를 저장소에 업로드 중입니다...','info');
-      const out=await uploadToStorage(file,'startupPopups');
-      const url=ge('adminStartupPopupUrl'); if(url) url.value=out.url;
-      const id=ge('adminStartupPopupId'); if(id) id.value='startup-popup-'+Date.now();
-      const en=ge('adminStartupPopupEnabled'); if(en) en.checked=true;
-      const title=ge('adminStartupPopupTitle'); if(title && !title.value.trim()) title.value='공지 안내';
-      let prev=ge('v957StartupPopupPreview');
-      if(prev) prev.innerHTML=`<div style="font-weight:900;color:#166534;margin-bottom:6px">✅ 업로드 완료</div><img src="${out.url}" style="width:100%;max-height:260px;object-fit:contain;border:1px solid #dbeafe;border-radius:10px;background:#fff"><div class="v957-storage-note">저장소 경로: ${out.path}<br>아래 <b>팝업 저장</b>을 눌러야 실제 앱에 반영됩니다.</div>`;
-      toastSafe('업로드 완료. 팝업 저장을 눌러 반영하세요.','success');
-      try{ if(typeof previewStartupImagePopup==='function') previewStartupImagePopup(); }catch(e){}
-    }catch(e){console.error('[v957] startup popup upload failed',e); toastSafe('업로드 실패: '+(e.message||e),'error');}
-    finally{try{if(input) input.value='';}catch(e){}}
-  };
-  function injectStartupUploader(){
-    const url=ge('adminStartupPopupUrl');
-    if(!url || ge('v957StartupUploadPanel')) return;
-    const box=document.createElement('div');
-    box.id='v957StartupUploadPanel';
-    box.className='v957-storage-panel';
-    box.innerHTML=`
-      <div class="v957-title">🖼️ 저장소에 팝업 이미지 바로 업로드</div>
-      <div>GitHub에 이미지를 올릴 필요 없이 여기서 사진을 선택하면 Firebase Storage에 저장되고, 이미지 주소가 자동으로 입력됩니다.</div>
-      <div class="v957-actions">
-        <input type="file" accept="image/*" id="v957StartupPopupFile" onchange="v957UploadStartupPopupImage(this)">
-        <button type="button" class="btn btn-outline" onclick="document.getElementById('v957StartupPopupFile')&&document.getElementById('v957StartupPopupFile').click()">📤 이미지 선택/업로드</button>
-      </div>
-      <div id="v957StartupPopupPreview" class="v957-storage-note">이미지는 10MB 이하만 권장합니다. 업로드 후 팝업 ID가 자동으로 새로 바뀝니다.</div>`;
-    const fg=url.closest('.form-group') || url.parentElement;
-    if(fg) fg.appendChild(box); else url.insertAdjacentElement('afterend',box);
-  }
-  function injectGuideHints(){
-    const pairs=[['tGuideFiles','create'],['etGuideFiles','edit']];
-    pairs.forEach(([id,mode])=>{
-      const input=ge(id); if(!input) return;
-      if(input.dataset.v957Hint==='1') return;
-      input.dataset.v957Hint='1';
-      const h=document.createElement('div');
-      h.className='v957-guide-hint';
-      h.innerHTML='✅ 대회요강 파일/사진은 선택 후 대회 저장을 누르면 Firebase Storage에 자동 업로드됩니다. 이제 GitHub에 따로 올릴 필요가 없습니다.';
-      input.insertAdjacentElement('afterend',h);
-    });
-  }
-  function injectQuickNotice(){
-    // 공지게시판 사진 업로드도 Storage를 사용한다는 안내만 보강
-    const modal=ge('v955NoticePostModal')||ge('mNoticePost')||ge('mNoticeWrite');
-    if(!modal) return;
-    const file=modal.querySelector('input[type="file"]');
-    if(file && !file.dataset.v957Hint){
-      file.dataset.v957Hint='1';
-      const h=document.createElement('div');
-      h.className='v957-guide-hint';
-      h.innerHTML='✅ 공지 사진도 Firebase Storage에 저장됩니다. GitHub 링크 없이 바로 올릴 수 있습니다.';
-      file.insertAdjacentElement('afterend',h);
-    }
-  }
-  function run(){injectStartupUploader();injectGuideHints();injectQuickNotice();}
-  const oldOpen=window.openAdminSettings;
-  if(typeof oldOpen==='function' && !oldOpen.__v957){
-    const wrapped=function(){const r=oldOpen.apply(this,arguments);setTimeout(run,80);setTimeout(run,400);return r;};
-    wrapped.__v957=true; window.openAdminSettings=wrapped;
-  }
-  const oldET=window.editTournament;
-  if(typeof oldET==='function' && !oldET.__v957){
-    const wrapped=function(){const r=oldET.apply(this,arguments);setTimeout(injectGuideHints,120);setTimeout(injectGuideHints,600);return r;};
-    wrapped.__v957=true; window.editTournament=wrapped;
-  }
-  document.addEventListener('DOMContentLoaded',()=>{setTimeout(run,800);setTimeout(run,2500);});
-  document.addEventListener('click',()=>setTimeout(run,80),true);
-  window.v957InjectStorageAssets=run;
-  console.log('[v957-storage-assets] installed');
-})();
-</script>
-
-
-
-<!-- v958: 공지게시판 사진 여러 장 첨부/표시 보정 -->
-<!-- v959: 공지 버튼 중복 정리 + 사진 여러 장 선택 강제 보정 -->
-<!-- v971: 공지 목록/검색 + 홈 미리보기 안정 패치 -->
-
-
-<!-- v976: 공지게시판 클린 리빌드 / 기존 공지 패치 제거 후 단일 모듈화 -->
-<style id="v976NoticeCleanStyle">
-  .v976-board-card{border:1.5px solid #dbeafe;border-radius:18px;background:linear-gradient(180deg,#fff,#f8fbff);box-shadow:0 10px 24px rgba(15,30,58,.07);padding:14px 15px;margin:14px 0;}
-  .v976-board-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
-  .v976-board-title{font-size:1rem;font-weight:1000;color:#0f1e3a;display:flex;align-items:center;gap:7px;}
-  .v976-board-actions{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end;align-items:center;}
-  .v976-board-actions button,.v976-board-actions input,.v976-board-actions select{min-height:36px;border-radius:999px;border:1.5px solid #cbd5e1;background:#fff;color:#0f1e3a;font-size:.76rem;font-weight:900;padding:6px 11px;box-sizing:border-box;}
-  .v976-board-actions button{cursor:pointer;font-weight:1000;}
-  .v976-board-actions button.primary{background:#0f1e3a;color:#fff;border-color:#0f1e3a;}
-  .v976-list{display:flex;flex-direction:column;gap:8px;}
-  .v976-row{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:10px;align-items:center;border:1px solid #e2e8f0;border-radius:14px;background:#fff;padding:11px 12px;box-shadow:0 5px 14px rgba(15,30,58,.04);cursor:pointer;}
-  .v976-row:hover{border-color:#93c5fd;background:#f8fbff;}
-  .v976-no{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:999px;background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;font-weight:1000;font-size:.8rem;}
-  .v976-row-title{font-size:.92rem;font-weight:1000;color:#0f172a;line-height:1.35;word-break:keep-all;overflow-wrap:anywhere;}
-  .v976-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;color:#64748b;font-size:.68rem;font-weight:800;}
-  .v976-chip{display:inline-flex;align-items:center;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;border-radius:999px;padding:2px 7px;font-size:.66rem;font-weight:1000;white-space:nowrap;}
-  .v976-photo-count{font-size:.72rem;color:#475569;font-weight:1000;border:1px solid #e2e8f0;background:#f8fafc;border-radius:999px;padding:5px 9px;white-space:nowrap;}
-  .v976-empty{padding:18px;text-align:center;color:#64748b;font-size:.82rem;font-weight:800;border:1px dashed #cbd5e1;border-radius:14px;background:#f8fafc;}
-  .v976-home-card{border:1.5px solid #dbeafe;border-radius:18px;background:linear-gradient(180deg,#fff,#f8fbff);box-shadow:0 10px 24px rgba(15,30,58,.07);padding:14px 15px;margin:14px 0;}
-  .v976-home-list{display:flex;flex-direction:column;gap:8px;}
-  .v976-home-item{display:flex;gap:10px;align-items:center;border:1px solid #e2e8f0;border-radius:14px;background:#fff;padding:10px 11px;cursor:pointer;}
-  .v976-home-item:hover{background:#f8fbff;border-color:#93c5fd;}
-  .v976-home-thumb{width:58px;height:58px;border-radius:12px;object-fit:cover;border:1px solid #dbeafe;background:#f8fafc;flex:0 0 auto;display:flex;align-items:center;justify-content:center;color:#64748b;font-weight:1000;}
-  .v976-home-title{font-weight:1000;color:#0f172a;font-size:.88rem;line-height:1.35;word-break:keep-all;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
-  .v976-home-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;color:#64748b;font-size:.67rem;font-weight:800;}
-  .v976-modal-backdrop{position:fixed;inset:0;z-index:2147483600;background:rgba(15,23,42,.62);display:flex;align-items:center;justify-content:center;padding:14px;}
-  .v976-modal{width:min(760px,96vw);max-height:90vh;overflow:hidden;background:#fff;border-radius:20px;box-shadow:0 24px 70px rgba(0,0,0,.28);display:flex;flex-direction:column;}
-  .v976-modal-head{background:#0f1e3a;color:#fff;padding:14px 16px;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;font-weight:1000;}
-  .v976-modal-title{font-size:1rem;line-height:1.35;word-break:keep-all;overflow-wrap:anywhere;}
-  .v976-modal-close{width:34px;height:34px;border-radius:999px;border:0;background:rgba(255,255,255,.16);color:#fff;font-weight:1000;font-size:1.2rem;cursor:pointer;flex:0 0 auto;}
-  .v976-modal-body{padding:16px;overflow-y:auto;color:#0f1e3a;line-height:1.62;}
-  .v976-detail-body{white-space:pre-wrap;margin:12px 0 16px;font-size:.9rem;color:#334155;}
-  .v976-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:11px;margin-top:12px;}
-  .v976-gallery-item{border:1px solid #e2e8f0;border-radius:14px;background:#f8fafc;padding:7px;}
-  .v976-gallery-item img{width:100%;height:145px;object-fit:cover;border-radius:11px;cursor:zoom-in;background:#eef2ff;display:block;}
-  .v976-caption{font-size:.75rem;color:#475569;line-height:1.45;font-weight:800;margin-top:6px;white-space:pre-wrap;word-break:keep-all;overflow-wrap:anywhere;}
-  .v976-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;padding-bottom:8px;}
-  .v976-actions button,.v976-edit-save{border:1px solid #cbd5e1;background:#fff;border-radius:12px;padding:9px 13px;font-weight:1000;cursor:pointer;color:#0f1e3a;}
-  .v976-actions .danger{border-color:#fecaca;background:#fef2f2;color:#b91c1c;}
-  .v976-edit-input,.v976-edit-textarea,.v976-edit-select{width:100%;border:1.5px solid #d5dbea;border-radius:12px;padding:10px 12px;font-weight:800;margin:6px 0 10px;box-sizing:border-box;background:#fff;}
-  .v976-edit-textarea{min-height:150px;line-height:1.55;}
-  .v976-file-caption{border:1px dashed #cbd5e1;border-radius:12px;background:#f8fafc;padding:9px;margin:7px 0;}
-  .v976-file-caption label{font-size:.72rem;font-weight:900;color:#475569;display:block;margin-bottom:5px;}
-  .v976-file-caption textarea{width:100%;min-height:58px;border:1px solid #cbd5e1;border-radius:10px;padding:8px;box-sizing:border-box;font-weight:800;}
-  .v976-image-viewer{z-index:2147483800;background:rgba(0,0,0,.84);}
-  .v976-image-viewer .v976-viewer-box{position:relative;max-width:96vw;max-height:92vh;display:flex;align-items:center;justify-content:center;}
-  .v976-image-viewer img{max-width:96vw;max-height:90vh;object-fit:contain;border-radius:12px;box-shadow:0 18px 60px rgba(0,0,0,.35);background:#fff;}
-  .v976-image-viewer .v976-modal-close{position:absolute;right:8px;top:8px;background:rgba(15,23,42,.72);}
-  body.v976-notice-modal-open #v954ResultGuardBar,
-  body.v976-notice-modal-open #v953ModeSwitch,
-  body.v976-notice-modal-open #v955BoardFab,
-  body.v976-notice-modal-open #v956NoticeWriteFab{display:none!important;}
-  body:not(.v976-admin-ok) #v928LowLagBanner,
-  body:not(.v976-admin-ok) #v929StableNotice,
-  body:not(.v976-admin-ok) #v936CleanModeNote{display:none!important;}
-  @media(max-width:680px){
-    .v976-board-card,.v976-home-card{border-radius:16px;padding:12px;}
-    .v976-board-head{flex-direction:column;align-items:stretch;}
-    .v976-board-actions{display:grid;grid-template-columns:1fr;gap:7px;width:100%;}
-    .v976-board-actions input,.v976-board-actions select,.v976-board-actions button{width:100%;min-width:0;}
-    .v976-row{grid-template-columns:38px 1fr;align-items:start;}
-    .v976-photo-count{grid-column:2;justify-self:start;margin-top:2px;}
-    .v976-home-thumb{width:52px;height:52px;}
-    .v976-modal-backdrop{align-items:flex-end;padding:8px 8px calc(82px + env(safe-area-inset-bottom,0px)) 8px;}
-    .v976-modal{max-height:calc(100vh - 96px - env(safe-area-inset-bottom,0px));border-radius:18px 18px 0 0;}
-    .v976-gallery{grid-template-columns:repeat(2,1fr);gap:8px;}
-    .v976-gallery-item img{height:122px;}
-    .v976-image-viewer{align-items:center;padding:10px;}
-    .v976-image-viewer .v976-viewer-box{max-height:88vh;}
-  }
-</style>
-<script type="module" id="v976NoticeCleanModule">
+<script type="module" id="v977NoticeCleanScript">
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, query, orderBy, limit, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 const FB={apiKey:"AIzaSyAbc17RiYyxCqgbMBkxkMoiRdNTmy2q65w",authDomain:"open-match-manager.firebaseapp.com",projectId:"open-match-manager",storageBucket:"open-match-manager.firebasestorage.app",messagingSenderId:"195671806262",appId:"1:195671806262:web:89691574839266cea1a397"};
 const app=getApps().length?getApps()[0]:initializeApp(FB);
-const db=getFirestore(app);
-const storage=getStorage(app);
-const MAX_IMAGES=12;
-const MAX_IMAGE=8*1024*1024;
-function $(id){return document.getElementById(id)}
-function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
-function cssEscape(s){try{return CSS.escape(String(s));}catch(e){return String(s).replace(/[^a-zA-Z0-9_-]/g,'_')}}
-function toastSafe(msg,type='info'){try{ if(typeof window.toast==='function') window.toast(msg,type); else alert(msg); }catch(e){alert(msg)}}
-function adminLike(){try{if(window.AD||window.TM)return true;const b=document.body;if(b&&(b.classList.contains('admin-mode')||b.classList.contains('tm-mode')||b.classList.contains('developer-mode')))return true;const badge=$('adminBadge'); if(badge&&getComputedStyle(badge).display!=='none'&&badge.offsetParent!==null)return true;const txt=document.body.innerText||''; if(/개발자\s*로그아웃|관리자\s*로그아웃|운영자\s*로그아웃/.test(txt))return true;}catch(e){}return false;}
-function applyAdminClass(){document.body.classList.toggle('v976-admin-ok', adminLike());}
-function tournaments(){try{const t=window.G?.tournaments||{};return (Array.isArray(t)?t:Object.values(t)).filter(Boolean).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));}catch(e){return []}}
-function selectedTid(){try{for(const id of ['brTS','regTS','rankTS','tournSel','tournamentSelect']){const el=$(id);if(el&&el.value)return el.value;}const ts=tournaments();return (ts.find(t=>!String(t.status||'').includes('마감'))||ts[0]||{}).id||'global';}catch(e){return 'global'}}
-function tournamentName(tid){try{if(!tid||tid==='global')return '전체공지';const t=(window.G?.tournaments||{})[tid]||tournaments().find(x=>String(x.id)===String(tid));return t?.name||t?.title||tid;}catch(e){return tid||'전체공지'}}
-function buildTidOptions(selected){const ts=tournaments();return `<option value="global" ${selected==='global'?'selected':''}>전체공지</option>`+ts.map(t=>`<option value="${esc(t.id)}" ${selected===t.id?'selected':''}>${esc(t.name||t.title||t.id)}</option>`).join('')}
-function catLabel(c){return ({notice:'공지',court:'코트배정',result:'시합결과',photo:'경기사진',etc:'기타'}[c]||c||'공지')}
-function fmt(ts){try{if(!ts)return '';const d=new Date(Number(ts));if(isNaN(d))return '';return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}catch(e){return ''}}
-function urlsOf(p){const arr=[]; if(Array.isArray(p.imageUrls))arr.push(...p.imageUrls); if(p.imageUrl)arr.push(p.imageUrl); return [...new Set(arr.filter(Boolean))];}
-function pathsOf(p){const arr=[]; if(Array.isArray(p.imagePaths))arr.push(...p.imagePaths); if(p.imagePath)arr.push(p.imagePath); return [...new Set(arr.filter(Boolean))];}
-function captionsOf(p){return Array.isArray(p.imageCaptions)?p.imageCaptions:[];}
-function currentFilterTid(){return $('v976BoardTidFilter')?.value||selectedTid()||'global'}
-function matchTid(p,tid){return p.scope==='global'||p.tid==='global'||tid==='global'||!tid||String(p.tid||'')===String(tid)}
-function searchText(p){return [p.title,p.body,p.category,catLabel(p.category),p.tournamentName,p.tid].join(' ').toLowerCase()}
-function searchFilter(posts){const tid=currentFilterTid();const q=String($('v976NoticeSearch')?.value||'').trim().toLowerCase();let list=posts.filter(p=>matchTid(p,tid));if(q)list=list.filter(p=>searchText(p).includes(q));return list;}
-async function readPosts(){try{const snap=await getDocs(query(collection(db,'noticePosts'),orderBy('createdAtMs','desc'),limit(150)));return snap.docs.map(d=>({id:d.id,...d.data()}));}catch(e){console.error('[v976 notice] load failed',e);return []}}
-function ensureHomeCard(){try{const home=$('page-home');if(!home)return;let card=$('v976HomeNoticeCard')||$('v955HomeBoardCard');if(card&&card.id!=='v976HomeNoticeCard'){card.id='v976HomeNoticeCard';card.className='v976-home-card';}if(!card){card=document.createElement('div');card.id='v976HomeNoticeCard';card.className='v976-home-card';const ref=home.querySelector('.home-status-card')||home.querySelector('.card')||home.firstElementChild;if(ref&&ref.parentNode)ref.parentNode.insertBefore(card,ref.nextSibling);else home.appendChild(card);}card.innerHTML=`<div class="v976-board-head"><div class="v976-board-title">📢 최근 공지사항</div><div class="v976-board-actions"><button type="button" onclick="window.v976ShowNoticeBoard()">전체 보기</button></div></div><div id="v976HomeNoticeList" class="v976-home-list"><div class="v976-empty">공지사항을 불러오는 중...</div></div>`;}catch(e){}}
-function ensurePage(){try{let page=$('page-board');if(!page){const main=document.querySelector('main.main-content')||document.querySelector('main')||document.body;page=document.createElement('div');page.className='page';page.id='page-board';main.appendChild(page);}page.innerHTML=`<div class="sec-title">공지사항 게시판</div><div class="v976-board-card"><div class="v976-board-head"><div class="v976-board-title">📢 시합 공지 / 사진 / 코트 배정</div><div class="v976-board-actions"><input id="v976NoticeSearch" placeholder="공지 검색" autocomplete="off"><select id="v976BoardTidFilter"></select><button type="button" onclick="window.v976RefreshNotice()">↻ 새로고침</button><button type="button" class="primary v976-write-btn" onclick="window.v976OpenWriteModal()">✍️ 글쓰기</button></div></div><div id="v976BoardList" class="v976-list"><div class="v976-empty">공지사항을 불러오는 중...</div></div></div>`;const sel=$('v976BoardTidFilter');if(sel){const cur=selectedTid();sel.innerHTML=buildTidOptions(cur);sel.value=cur;sel.onchange=()=>renderAll();}const search=$('v976NoticeSearch');if(search)search.oninput=()=>renderBoard(window.__v976NoticePosts||[]);updateWriteButtons();}catch(e){console.error(e)}}
-function installNav(){try{const nav=document.querySelector('.nav-tabs');if(nav&&!nav.querySelector('[data-page="board"]')){const d=document.createElement('div');d.className='nav-tab';d.dataset.page='board';d.innerHTML='📢 공지';d.onclick=()=>window.v976ShowNoticeBoard();const rank=nav.querySelector('[data-page="ranking"]');nav.insertBefore(d,rank||null);}document.querySelectorAll('.nav-tab[data-page="board"]').forEach(el=>{el.onclick=()=>window.v976ShowNoticeBoard();});const quick=document.querySelector('.home-quick-grid');if(quick&&!quick.querySelector('.v976-home-board-btn')){const b=document.createElement('button');b.className='home-quick-btn v976-home-board-btn';b.innerHTML='📢<span>공지사항</span>';b.onclick=()=>window.v976ShowNoticeBoard();quick.appendChild(b);}}catch(e){}}
-function renderHome(posts){ensureHomeCard();const el=$('v976HomeNoticeList');if(!el)return;const tid=selectedTid();const list=posts.filter(p=>matchTid(p,tid)).slice(0,5);if(!list.length){el.innerHTML='<div class="v976-empty">아직 등록된 공지사항이 없습니다.</div>';return;}el.innerHTML=list.map(p=>{const urls=urlsOf(p);const thumb=urls[0];return `<div class="v976-home-item" onclick="window.v976ShowNoticeBoard('${esc(p.id)}')">${thumb?`<img class="v976-home-thumb" src="${esc(thumb)}" loading="lazy" alt="공지 이미지">`:`<div class="v976-home-thumb">📢</div>`}<div style="min-width:0;flex:1"><div class="v976-home-title">${esc(p.title||'(제목 없음)')}</div><div class="v976-home-meta"><span>${esc(catLabel(p.category))}</span><span>${esc(fmt(p.createdAtMs))}</span>${urls.length?`<span>사진 ${urls.length}장</span>`:''}</div></div></div>`}).join('')}
-function renderBoard(posts){try{ensurePage();const el=$('v976BoardList');if(!el)return;const list=searchFilter(posts);if(!list.length){el.innerHTML='<div class="v976-empty">검색 결과 또는 등록된 공지사항이 없습니다.</div>';return;}el.innerHTML=list.map((p,i)=>{const cnt=urlsOf(p).length;return `<div class="v976-row" data-post-id="${esc(p.id)}" onclick="window.v976OpenDetail('${esc(p.id)}')"><div class="v976-no">${i+1}</div><div><div class="v976-row-title">${esc(p.title||'(제목 없음)')}</div><div class="v976-meta"><span class="v976-chip">${esc(catLabel(p.category))}</span><span>${esc(p.tournamentName||'전체공지')}</span><span>${esc(fmt(p.createdAtMs))}</span></div></div><div class="v976-photo-count">${cnt?`사진 ${cnt}장`:'사진 없음'}</div></div>`}).join('')}catch(e){console.error('[v976] renderBoard failed',e)}}
-function renderAll(){const posts=window.__v976NoticePosts||[];renderHome(posts);renderBoard(posts);}
-async function refresh(){const posts=await readPosts();window.__v976NoticePosts=posts;window.__v955NoticePosts=posts;window.__v959NoticePosts=posts;renderAll();updateWriteButtons();}
-function updateWriteButtons(){document.querySelectorAll('.v976-write-btn').forEach(b=>{b.style.display=adminLike()?'inline-flex':'none'});applyAdminClass();}
-function setModalOpen(on){document.body.classList.toggle('v976-notice-modal-open',!!on)}
-window.v976ShowNoticeBoard=function(postId){ensurePage();try{document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));$('page-board')?.classList.add('active');document.querySelectorAll('.nav-tab').forEach(t=>t.classList.toggle('active',t.dataset.page==='board'));window.scrollTo({top:0,behavior:'smooth'});renderBoard(window.__v976NoticePosts||[]);if(postId)setTimeout(()=>{const row=document.querySelector(`[data-post-id="${cssEscape(postId)}"]`);if(row){row.scrollIntoView({behavior:'smooth',block:'center'});row.style.outline='3px solid #f59e0b';setTimeout(()=>row.style.outline='',1600);}},300);}catch(e){console.error(e)}};
-window.v955ShowBoardPage=window.v976ShowNoticeBoard;
-window.v971GoNoticeBoard=window.v976ShowNoticeBoard;
-window.v955RefreshBoard=refresh;
-window.v958RefreshNoticeBoard=refresh;
-window.v959RefreshNoticeBoard=refresh;
-window.v976RefreshNotice=refresh;
-function fileCaptionInputs(files){return files.map((f,i)=>`<div class="v976-file-caption"><label>사진 ${i+1} 설명 — ${esc(f.name)}</label><textarea class="v976-new-caption" data-idx="${i}" placeholder="예: 우승팀 홍길동 / 김철수"></textarea></div>`).join('')}
-function buildWriteModal(post){const isEdit=!!post;const urls=post?urlsOf(post):[];const caps=post?captionsOf(post):[];const paths=post?pathsOf(post):[];const id=isEdit?'v976EditModal':'v976WriteModal';const old=$(id);if(old)old.remove();const div=document.createElement('div');div.id=id;div.className='v976-modal-backdrop';div.innerHTML=`<div class="v976-modal" onclick="event.stopPropagation()"><div class="v976-modal-head"><div class="v976-modal-title">${isEdit?'공지 수정':'공지 글쓰기'}</div><button class="v976-modal-close" onclick="document.getElementById('${id}')?.remove();document.body.classList.remove('v976-notice-modal-open')">×</button></div><div class="v976-modal-body"><label>대회/범위</label><select id="v976PostTid" class="v976-edit-select">${buildTidOptions(post?.tid||selectedTid())}</select><label>분류</label><select id="v976PostCategory" class="v976-edit-select"><option value="notice">공지</option><option value="court">코트배정</option><option value="result">시합결과</option><option value="photo">경기사진</option><option value="etc">기타</option></select><label>제목</label><input id="v976PostTitle" class="v976-edit-input" value="${esc(post?.title||'')}" placeholder="공지 제목"><label>본문</label><textarea id="v976PostBody" class="v976-edit-textarea" placeholder="공지 내용을 입력하세요">${esc(post?.body||'')}</textarea>${isEdit&&urls.length?`<label>기존 사진 / 설명</label><div>${urls.map((u,i)=>`<div class="v976-file-caption"><div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><img src="${esc(u)}" style="width:64px;height:48px;object-fit:cover;border-radius:8px;border:1px solid #dbeafe"><label style="margin:0;display:flex;align-items:center;gap:5px"><input type="checkbox" class="v976-del-old-img" data-idx="${i}"> 사진 삭제</label></div><textarea class="v976-old-caption" data-idx="${i}" placeholder="사진 설명">${esc(caps[i]||'')}</textarea><input type="hidden" class="v976-old-url" data-idx="${i}" value="${esc(u)}"><input type="hidden" class="v976-old-path" data-idx="${i}" value="${esc(paths[i]||'')}"></div>`).join('')}</div>`:''}<label>새 사진 추가</label><input id="v976PostImages" class="v976-edit-input" type="file" accept="image/*" multiple><div id="v976NewCaptionBox"></div><div class="v976-actions"><button class="v976-edit-save" onclick="window.v976SavePost('${isEdit?esc(post.id):''}')">💾 저장</button><button onclick="document.getElementById('${id}')?.remove();document.body.classList.remove('v976-notice-modal-open')">취소</button></div></div></div>`;div.addEventListener('click',()=>{div.remove();setModalOpen(false)});document.body.appendChild(div);setModalOpen(true);const cat=$('v976PostCategory');if(cat)cat.value=post?.category||'notice';const tid=$('v976PostTid');if(tid)tid.value=post?.tid||selectedTid();const file=$('v976PostImages');if(file){file.onchange=()=>{const files=Array.from(file.files||[]);$('v976NewCaptionBox').innerHTML=files.length?fileCaptionInputs(files):'';};}}
-window.v976OpenWriteModal=function(){if(!adminLike()){toastSafe('관리자만 작성할 수 있습니다.','error');return;}buildWriteModal(null)};
-window.v955OpenNoticePostModal=window.v976OpenWriteModal;
-window.v955CloseNoticePostModal=function(){['v976WriteModal','v976EditModal'].forEach(id=>$(id)?.remove());setModalOpen(false)};
-async function uploadFiles(files,tid){const imageUrls=[],imagePaths=[];for(const file of files){if(!/^image\//i.test(file.type||''))throw new Error('이미지 파일만 올릴 수 있습니다: '+file.name);if(file.size>MAX_IMAGE)throw new Error('사진은 1장당 8MB 이하로 올려주세요: '+file.name);const safe=String(file.name||'photo.jpg').replace(/[^a-zA-Z0-9가-힣._-]/g,'_').slice(0,120);const path=`noticePosts/${tid}/${Date.now()}_${Math.random().toString(36).slice(2,8)}_${safe}`;const r=ref(storage,path);await uploadBytes(r,file,{contentType:file.type||'image/jpeg'});imageUrls.push(await getDownloadURL(r));imagePaths.push(path);}return {imageUrls,imagePaths}}
-window.v976SavePost=async function(id){try{if(!adminLike()){toastSafe('관리자만 저장할 수 있습니다.','error');return;}const tid=$('v976PostTid')?.value||'global';const title=($('v976PostTitle')?.value||'').trim();const body=($('v976PostBody')?.value||'').trim();const category=$('v976PostCategory')?.value||'notice';if(!title&&!body){toastSafe('제목이나 내용을 입력해 주세요.','error');return;}const files=Array.from($('v976PostImages')?.files||[]);if(files.length>MAX_IMAGES)throw new Error('새 사진은 한 번에 최대 12장까지 올릴 수 있습니다.');let keptUrls=[],keptPaths=[],keptCaps=[];if(id){document.querySelectorAll('.v976-old-url').forEach(inp=>{const idx=Number(inp.dataset.idx||0);const del=document.querySelector(`.v976-del-old-img[data-idx="${idx}"]`)?.checked;const path=document.querySelector(`.v976-old-path[data-idx="${idx}"]`)?.value||'';if(del){if(path) deleteObject(ref(storage,path)).catch(()=>{});return;}keptUrls.push(inp.value);keptPaths.push(path);keptCaps.push(document.querySelector(`.v976-old-caption[data-idx="${idx}"]`)?.value||'');});}let newUrls=[],newPaths=[];if(files.length){toastSafe(`사진 ${files.length}장 업로드 중입니다...`,'info');const up=await uploadFiles(files,tid);newUrls=up.imageUrls;newPaths=up.imagePaths;}const newCaps=Array.from(document.querySelectorAll('.v976-new-caption')).map(x=>x.value||'');const imageUrls=[...keptUrls,...newUrls];const imagePaths=[...keptPaths,...newPaths];const imageCaptions=[...keptCaps,...newCaps];const data={scope:tid==='global'?'global':'tournament',tid,tournamentName:tournamentName(tid),category,title,body,imageUrls,imagePaths,imageCaptions,imageUrl:imageUrls[0]||'',imagePath:imagePaths[0]||'',imageCount:imageUrls.length,updatedAtMs:Date.now(),noticeVersion:'v976-clean'};if(id){await updateDoc(doc(db,'noticePosts',id),data);toastSafe('공지사항을 수정했습니다.','success');}else{data.createdAtMs=Date.now();data.createdByMode=(location.pathname.includes('dev')?'dev':location.pathname.includes('replay')?'replay':'live');await addDoc(collection(db,'noticePosts'),data);toastSafe('공지사항을 게시했습니다.','success');}window.v955CloseNoticePostModal();await refresh();}catch(e){console.error('[v976 notice] save failed',e);toastSafe('공지 저장 실패: '+(e.message||e),'error')}};
-window.v955SaveNoticePost=function(){return window.v976SavePost('')};
-window.v976OpenImage=function(url){const old=$('v976ImageViewer');if(old)old.remove();const div=document.createElement('div');div.id='v976ImageViewer';div.className='v976-modal-backdrop v976-image-viewer';div.innerHTML=`<div class="v976-viewer-box" onclick="event.stopPropagation()"><button class="v976-modal-close" onclick="document.getElementById('v976ImageViewer')?.remove();document.body.classList.remove('v976-notice-modal-open')">×</button><img src="${esc(url)}" alt="공지 이미지 크게 보기"></div>`;div.addEventListener('click',()=>{div.remove();setModalOpen(false)});document.body.appendChild(div);setModalOpen(true)};
-window.v971OpenImage=window.v976OpenImage;
-window.v976OpenDetail=function(id){const p=(window.__v976NoticePosts||[]).find(x=>String(x.id)===String(id));if(!p)return;const old=$('v976DetailModal');if(old)old.remove();const urls=urlsOf(p),caps=captionsOf(p);const div=document.createElement('div');div.id='v976DetailModal';div.className='v976-modal-backdrop';div.innerHTML=`<div class="v976-modal" onclick="event.stopPropagation()"><div class="v976-modal-head"><div><div class="v976-modal-title">${esc(p.title||'(제목 없음)')}</div></div><button class="v976-modal-close" onclick="document.getElementById('v976DetailModal')?.remove();document.body.classList.remove('v976-notice-modal-open')">×</button></div><div class="v976-modal-body"><div class="v976-meta"><span class="v976-chip">${esc(catLabel(p.category))}</span><span>${esc(p.tournamentName||'전체공지')}</span><span>${esc(fmt(p.createdAtMs))}</span>${urls.length?`<span>사진 ${urls.length}장</span>`:''}</div><div class="v976-detail-body">${esc(p.body||'')}</div>${urls.length?`<div class="v976-gallery">${urls.map((u,i)=>`<div class="v976-gallery-item"><img src="${esc(u)}" loading="lazy" alt="공지 이미지 ${i+1}" onclick="window.v976OpenImage('${esc(u)}')"><div class="v976-caption">${esc(caps[i]||'')}</div></div>`).join('')}</div>`:''}${adminLike()?`<div class="v976-actions"><button onclick="window.v976EditNotice('${esc(p.id)}')">수정</button><button class="danger" onclick="window.v976DeleteNotice('${esc(p.id)}')">삭제</button></div>`:''}</div></div>`;div.addEventListener('click',()=>{div.remove();setModalOpen(false)});document.body.appendChild(div);setModalOpen(true)};
-window.v971OpenNoticeDetail=window.v976OpenDetail;
-window.v976EditNotice=function(id){const p=(window.__v976NoticePosts||[]).find(x=>String(x.id)===String(id));if(!p||!adminLike())return;const d=$('v976DetailModal');if(d)d.remove();buildWriteModal(p)};
-window.v971EditNotice=window.v976EditNotice;
-window.v976DeleteNotice=async function(id){try{if(!adminLike()){toastSafe('관리자만 삭제할 수 있습니다.','error');return;}const p=(window.__v976NoticePosts||[]).find(x=>String(x.id)===String(id))||{};if(!confirm('이 공지사항을 삭제할까요? 첨부 사진도 함께 삭제됩니다.'))return;await deleteDoc(doc(db,'noticePosts',id));for(const path of pathsOf(p)){try{await deleteObject(ref(storage,path));}catch(e){}}$('v976DetailModal')?.remove();setModalOpen(false);toastSafe('삭제했습니다.','success');await refresh();}catch(e){console.error(e);toastSafe('삭제 실패: '+(e.message||e),'error')}};
-window.v971DeleteNotice=window.v976DeleteNotice;
-window.v955DeleteNoticePost=function(id){return window.v976DeleteNotice(id)};
-function hideLegacyAdminBlocks(){try{const bad=/v928 저렉|v929 안정화|v936 운영정리|수동\s*갱신|수동기록\s*보기|상태\s*$|코트 사용 현황판|예선 기준시각|예약시간 사용|본선 코트 배정|지금 시작/;document.querySelectorAll('div,section,article').forEach(el=>{if(el.dataset.v976Keep)return;const t=(el.innerText||'').replace(/\s+/g,' ').trim();if(!t||t.length>500)return;if(bad.test(t)&&!adminLike()){const box=el.closest('.card,.section-card,.v955-board-card,.v928-card,.v929-card')||el;if(box!==document.body)box.style.display='none';}});}catch(e){}}
-function makeDraggable(id){try{const el=$(id);if(!el||el.__v976Drag)return;el.__v976Drag=true;let sx=0,sy=0,ox=0,oy=0,drag=false;el.style.touchAction='none';el.addEventListener('pointerdown',ev=>{if(ev.target.closest('button,a,input,select,textarea'))return;drag=true;sx=ev.clientX;sy=ev.clientY;const r=el.getBoundingClientRect();ox=r.left;oy=r.top;el.setPointerCapture?.(ev.pointerId);});el.addEventListener('pointermove',ev=>{if(!drag)return;el.style.left=Math.max(4,Math.min(innerWidth-el.offsetWidth-4,ox+ev.clientX-sx))+'px';el.style.top=Math.max(4,Math.min(innerHeight-el.offsetHeight-4,oy+ev.clientY-sy))+'px';el.style.right='auto';el.style.bottom='auto';});el.addEventListener('pointerup',()=>{drag=false});}catch(e){}}
-function boot(){installNav();ensureHomeCard();ensurePage();refresh();hideLegacyAdminBlocks();updateWriteButtons();makeDraggable('v953ModeSwitch');makeDraggable('v954ResultGuardBar');try{const b=$('bracketFreshnessBadge');if(b)b.textContent='v976 공지정리';}catch(e){}}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
-setTimeout(boot,700);setTimeout(()=>{hideLegacyAdminBlocks();updateWriteButtons();},1600);setInterval(()=>{applyAdminClass();hideLegacyAdminBlocks();updateWriteButtons();},3500);
+const db=getFirestore(app); const storage=getStorage(app);
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const toast=(m,t='info')=>{try{window.toast?window.toast(m,t):alert(m)}catch(e){alert(m)}};
+const adminLike=()=>{try{return !!(window.AD||window.TM||document.body.classList.contains('admin-mode')||document.body.classList.contains('tm-mode'))}catch(e){return false}};
+const catLabel=c=>({notice:'공지',court:'코트배정',result:'시합결과',photo:'경기사진',etc:'기타'}[c]||c||'공지');
+const fmt=ts=>{try{if(!ts)return ''; const d=new Date(Number(ts)); if(isNaN(d))return ''; return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}catch(e){return ''}};
+const tournaments=()=>{try{return Object.values(window.G?.tournaments||{}).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')))}catch(e){return []}};
+const selectedTid=()=>{try{for(const id of ['brTS','regTS','rankTS']){const el=$(id); if(el&&el.value)return el.value;} const ts=tournaments(); return (ts.find(t=>!['finished'].includes(t.status))||ts[0])?.id||'global'}catch(e){return 'global'}};
+const tName=tid=>{try{return tid==='global'?'전체공지':(window.G?.tournaments?.[tid]?.name||tid||'전체공지')}catch(e){return tid||'전체공지'}};
+const urlsOf=p=>{const a=Array.isArray(p.imageUrls)?p.imageUrls.filter(Boolean):[]; if(p.imageUrl&&!a.includes(p.imageUrl))a.unshift(p.imageUrl); return a};
+const pathsOf=p=>{const a=Array.isArray(p.imagePaths)?p.imagePaths.filter(Boolean):[]; if(p.imagePath&&!a.includes(p.imagePath))a.unshift(p.imagePath); return a};
+const capsOf=p=>Array.isArray(p.imageCaptions)?p.imageCaptions:[];
+const matchFilter=(p,tid)=>p.scope==='global'||p.tid==='global'||!tid||tid==='global'||p.tid===tid;
+const searchText=p=>[p.title,p.body,p.category,catLabel(p.category),p.tournamentName,p.tid].map(x=>String(x||'').toLowerCase()).join(' ');
+let POSTS=[];
+async function readPosts(){try{const snap=await getDocs(query(collection(db,'noticePosts'),orderBy('createdAtMs','desc'),limit(120))); return snap.docs.map(d=>({id:d.id,...d.data()}));}catch(e){console.error('[v977 notice] load failed',e); return []}}
+function buildTidOptions(selected){return `<option value="global" ${selected==='global'?'selected':''}>전체공지</option>`+tournaments().map(t=>`<option value="${esc(t.id)}" ${selected===t.id?'selected':''}>${esc(t.name||t.id)}</option>`).join('')}
+function installBoardPage(){
+  let page=$('page-board');
+  if(!page){const main=document.querySelector('main.main-content')||document.querySelector('main')||document.body; page=document.createElement('div'); page.className='page'; page.id='page-board'; main.appendChild(page);}
+  page.innerHTML=`<div class="sec-title">공지사항 게시판</div><div class="v977-board-card"><div class="v977-board-head"><div class="v977-board-title">📢 시합 공지 / 사진 / 코트 배정</div><div class="v977-board-actions"><input id="v977NoticeSearch" placeholder="공지 검색" autocomplete="off"><select id="v977NoticeFilter">${buildTidOptions('global')}</select><button type="button" onclick="window.v977RefreshNotice()">↻ 새로고침</button><button type="button" class="primary v977-admin-only" onclick="window.v977OpenNoticeEditor()">✍️ 글쓰기</button></div></div><div id="v977NoticeList" class="v977-list"><div class="v977-empty">불러오는 중...</div></div></div>`;
+  $('v977NoticeSearch')?.addEventListener('input',()=>renderBoard());
+  $('v977NoticeFilter')?.addEventListener('change',()=>renderBoard());
+}
+function installNav(){
+  const nav=document.querySelector('.nav-tabs');
+  if(nav){let n=nav.querySelector('[data-page="board"]'); if(!n){n=document.createElement('div'); n.className='nav-tab'; n.dataset.page='board'; n.innerHTML='📢 공지'; n.onclick=()=>openBoard(); const rank=nav.querySelector('[data-page="ranking"]'); nav.insertBefore(n,rank||null);} else {n.onclick=()=>openBoard();}}
+  const quick=document.querySelector('.home-quick-grid');
+  if(quick&&!quick.querySelector('.v977-home-board-btn')){const b=document.createElement('button'); b.className='home-quick-btn v977-home-board-btn'; b.innerHTML='📢<span>공지사항</span>'; b.onclick=()=>openBoard(); quick.appendChild(b);}
+}
+function installHome(){const home=$('page-home'); if(!home)return; let card=$('v977HomeNoticeCard')||$('v955HomeBoardCard'); if(!card){card=document.createElement('div'); card.id='v977HomeNoticeCard'; const ref=home.querySelector('.home-status-card')||home.querySelector('.card')||home.firstElementChild; if(ref&&ref.parentNode)ref.parentNode.insertBefore(card,ref.nextSibling); else home.appendChild(card);} card.className='v977-board-card'; card.innerHTML=`<div class="v977-board-head"><div class="v977-board-title">📢 최근 공지사항</div><div class="v977-board-actions"><button type="button" onclick="window.v977OpenBoard()">전체 보기</button></div></div><div id="v977HomeNoticeList" class="v977-list"><div class="v977-empty">불러오는 중...</div></div>`;}
+function renderHome(){installHome(); const el=$('v977HomeNoticeList'); if(!el)return; const tid=selectedTid(); const list=POSTS.filter(p=>matchFilter(p,tid)).slice(0,5); if(!list.length){el.innerHTML='<div class="v977-empty">아직 등록된 공지사항이 없습니다.</div>';return;} el.innerHTML=list.map(p=>{const u=urlsOf(p)[0];const count=urlsOf(p).length;return `<div class="v977-home-row" onclick="window.v977OpenBoard('${esc(p.id)}')">${u?`<img class="v977-home-thumb" src="${esc(u)}" loading="lazy" alt="공지 이미지">`:`<div class="v977-home-thumb">📢</div>`}<div style="min-width:0;flex:1"><div class="v977-home-title">${esc(p.title||'(제목 없음)')}</div><div class="v977-home-meta"><span>${esc(catLabel(p.category))}</span><span>${esc(fmt(p.createdAtMs))}</span>${count?`<span>사진 ${count}장</span>`:''}</div></div></div>`}).join('')}
+function renderBoard(){const el=$('v977NoticeList'); if(!el)return; const tid=$('v977NoticeFilter')?.value||'global'; const q=String($('v977NoticeSearch')?.value||'').trim().toLowerCase(); let list=POSTS.filter(p=>matchFilter(p,tid)); if(q)list=list.filter(p=>searchText(p).includes(q)); if(!list.length){el.innerHTML='<div class="v977-empty">검색 결과 또는 등록된 공지사항이 없습니다.</div>';return;} el.innerHTML=list.map((p,i)=>{const count=urlsOf(p).length;return `<div class="v977-row" data-post-id="${esc(p.id)}" onclick="window.v977OpenNoticeDetail('${esc(p.id)}')"><div class="v977-no">${i+1}</div><div><div class="v977-title">${esc(p.title||'(제목 없음)')}</div><div class="v977-meta"><span class="v977-chip">${esc(catLabel(p.category))}</span><span>${esc(p.tournamentName||'전체공지')}</span><span>${esc(fmt(p.createdAtMs))}</span></div></div><div class="v977-photo-count">${count?`사진 ${count}장`:'사진 없음'}</div></div>`}).join('')}
+function openBoard(postId){installBoardPage(); document.querySelectorAll('.page').forEach(p=>p.classList.remove('active')); $('page-board')?.classList.add('active'); document.querySelectorAll('.nav-tab').forEach(t=>t.classList.toggle('active',t.dataset.page==='board')); window.scrollTo({top:0,behavior:'smooth'}); renderBoard(); if(postId)setTimeout(()=>{const row=document.querySelector(`[data-post-id="${CSS.escape(String(postId))}"]`); if(row){row.scrollIntoView({behavior:'smooth',block:'center'}); row.style.outline='3px solid #f59e0b'; setTimeout(()=>row.style.outline='',1600);}},200);}
+function setModalOpen(on){document.body.classList.toggle('v977-notice-modal-open',!!on)}
+function closeModal(id){$(id)?.remove(); if(!document.querySelector('.v977-backdrop,.v977-image-viewer'))setModalOpen(false)}
+function openImage(url){setModalOpen(true); const v=document.createElement('div'); v.className='v977-image-viewer'; v.id='v977ImageViewer'; v.innerHTML=`<button class="v977-close" type="button" onclick="document.getElementById('v977ImageViewer')?.remove();document.body.classList.remove('v977-notice-modal-open')">×</button><img src="${esc(url)}" alt="공지 이미지 크게 보기">`; v.addEventListener('click',e=>{if(e.target===v){v.remove();setModalOpen(false)}}); document.body.appendChild(v)}
+function openDetail(id){const p=POSTS.find(x=>String(x.id)===String(id)); if(!p)return; setModalOpen(true); const urls=urlsOf(p), caps=capsOf(p); const div=document.createElement('div'); div.className='v977-backdrop'; div.id='v977DetailModal'; div.innerHTML=`<div class="v977-modal"><div class="v977-modal-head"><div class="v977-modal-title">${esc(p.title||'(제목 없음)')}</div><button class="v977-close" type="button" onclick="window.v977CloseNoticeModal('v977DetailModal')">×</button></div><div class="v977-modal-body"><div class="v977-detail-meta"><span class="v977-chip">${esc(catLabel(p.category))}</span><span>${esc(p.tournamentName||'전체공지')}</span><span>${esc(fmt(p.createdAtMs))}</span></div><div class="v977-body">${esc(p.body||'')}</div>${urls.length?`<div class="v977-gallery">${urls.map((u,i)=>`<div class="v977-photo-card"><img src="${esc(u)}" loading="lazy" onclick="window.v977OpenNoticeImage('${esc(u)}')" alt="공지 이미지 ${i+1}">${caps[i]?`<div class="v977-photo-caption">${esc(caps[i])}</div>`:''}</div>`).join('')}</div>`:''}${adminLike()?`<div class="v977-actions"><button onclick="window.v977OpenNoticeEditor('${esc(p.id)}')">수정하기</button><button class="danger" onclick="window.v977DeleteNotice('${esc(p.id)}')">삭제</button></div>`:''}</div></div>`; div.addEventListener('click',e=>{if(e.target===div)closeModal('v977DetailModal')}); document.body.appendChild(div)}
+function buildEditor(p=null){const id=p?.id||''; const urls=urlsOf(p||{}), caps=capsOf(p||{}); setModalOpen(true); const div=document.createElement('div'); div.className='v977-backdrop'; div.id='v977EditModal'; div.innerHTML=`<div class="v977-modal"><div class="v977-modal-head"><div class="v977-modal-title">${id?'공지 수정':'공지 글쓰기'}</div><button class="v977-close" type="button" onclick="window.v977CloseNoticeModal('v977EditModal')">×</button></div><div class="v977-modal-body"><div class="v977-form-grid"><div class="v977-form-line"><label class="v977-label">대회/범위</label><select id="v977EditTid" class="v977-select">${buildTidOptions(p?.tid||selectedTid())}</select></div><div class="v977-form-line"><label class="v977-label">분류</label><select id="v977EditCategory" class="v977-select"><option value="notice">공지</option><option value="court">코트배정</option><option value="result">시합결과</option><option value="photo">경기사진</option><option value="etc">기타</option></select></div></div><div class="v977-form-line"><label class="v977-label">제목</label><input id="v977EditTitle" class="v977-input" value="${esc(p?.title||'')}" placeholder="제목"></div><div class="v977-form-line"><label class="v977-label">내용</label><textarea id="v977EditBody" class="v977-textarea" placeholder="공지 내용을 입력하세요">${esc(p?.body||'')}</textarea></div>${urls.length?`<div class="v977-form-line"><label class="v977-label">기존 사진 / 개별 설명</label><div class="v977-caption-list">${urls.map((u,i)=>`<div class="v977-existing-photo"><img src="${esc(u)}" onclick="window.v977OpenNoticeImage('${esc(u)}')" alt="기존 사진 ${i+1}"><textarea class="v977-input v977-existing-caption" data-idx="${i}" placeholder="사진 ${i+1} 설명">${esc(caps[i]||'')}</textarea><button type="button" class="danger" onclick="this.closest('.v977-existing-photo').dataset.remove='1';this.closest('.v977-existing-photo').style.opacity='.45'">삭제</button></div>`).join('')}</div></div>`:''}<div class="v977-form-line"><label class="v977-label">새 사진 추가</label><input id="v977EditImages" type="file" accept="image/*" multiple class="v977-input"><div id="v977FileSummary" class="v977-file-summary">사진을 여러 장 선택할 수 있습니다. 최대 12장, 1장당 8MB 이하.</div><div id="v977NewCaptionList" class="v977-caption-list"></div></div><div class="v977-actions"><button type="button" onclick="window.v977CloseNoticeModal('v977EditModal')">취소</button><button type="button" class="v977-save" onclick="window.v977SaveNotice('${esc(id)}')">저장</button></div></div></div>`; div.addEventListener('click',e=>{if(e.target===div)closeModal('v977EditModal')}); document.body.appendChild(div); if(p?.category)$('v977EditCategory').value=p.category; const file=$('v977EditImages'); file?.addEventListener('change',()=>renderNewCaptions(file));}
+function renderNewCaptions(input){const files=[...input.files||[]]; const box=$('v977NewCaptionList'); const sum=$('v977FileSummary'); if(sum)sum.textContent=files.length?`선택된 새 사진 ${files.length}장`:'사진을 선택하지 않았습니다.'; if(!box)return; box.innerHTML=files.map((f,i)=>`<input class="v977-input v977-new-caption" data-idx="${i}" placeholder="새 사진 ${i+1} 설명: ${esc(f.name)}">`).join('')}
+async function uploadFiles(files,tid){const imageUrls=[],imagePaths=[]; for(const file of files){if(!/^image\//i.test(file.type||''))throw new Error('이미지 파일만 올릴 수 있습니다: '+file.name); if(file.size>8*1024*1024)throw new Error('사진은 1장당 8MB 이하로 올려주세요: '+file.name); const safe=String(file.name||'photo.jpg').replace(/[^a-zA-Z0-9가-힣._-]/g,'_'); const path=`noticePosts/${tid}/${Date.now()}_${Math.random().toString(36).slice(2,8)}_${safe}`; const r=ref(storage,path); await uploadBytes(r,file,{contentType:file.type||'image/jpeg'}); imageUrls.push(await getDownloadURL(r)); imagePaths.push(path)} return {imageUrls,imagePaths}}
+async function saveNotice(id=''){try{if(!adminLike()){toast('관리자만 저장할 수 있습니다.','error');return;} const old=id?POSTS.find(x=>String(x.id)===String(id)):null; const tid=$('v977EditTid')?.value||'global'; const title=($('v977EditTitle')?.value||'').trim(); const body=($('v977EditBody')?.value||'').trim(); const category=$('v977EditCategory')?.value||'notice'; if(!title&&!body){toast('제목이나 내용을 입력해 주세요.','error');return;} let keepUrls=urlsOf(old||{}), keepPaths=pathsOf(old||{}), keepCaps=capsOf(old||{}); if(old){document.querySelectorAll('#v977EditModal .v977-existing-photo').forEach((row,idx)=>{if(row.dataset.remove==='1'){keepUrls[idx]=null; keepPaths[idx]=null; keepCaps[idx]=null}else{const ta=row.querySelector('.v977-existing-caption'); keepCaps[idx]=(ta?.value||'').trim();}}); keepUrls=keepUrls.filter(Boolean); keepPaths=keepPaths.filter(Boolean); keepCaps=keepCaps.filter(x=>x!==null&&x!==undefined)} const files=[...($('v977EditImages')?.files||[])]; if(files.length>12)throw new Error('새 사진은 최대 12장까지 추가할 수 있습니다.'); const newCaps=[...document.querySelectorAll('#v977EditModal .v977-new-caption')].map(x=>(x.value||'').trim()); let imageUrls=[...keepUrls], imagePaths=[...keepPaths], imageCaptions=[...keepCaps]; if(files.length){toast(`사진 ${files.length}장 업로드 중...`,'info'); const out=await uploadFiles(files,tid); imageUrls=imageUrls.concat(out.imageUrls); imagePaths=imagePaths.concat(out.imagePaths); imageCaptions=imageCaptions.concat(newCaps)} const data={scope:tid==='global'?'global':'tournament',tid,tournamentName:tName(tid),category,title,body,imageUrl:imageUrls[0]||'',imagePath:imagePaths[0]||'',imageUrls,imagePaths,imageCaptions,imageCount:imageUrls.length,updatedAtMs:Date.now(),noticeVersion:'v977'}; if(id){await updateDoc(doc(db,'noticePosts',id),data)}else{data.createdAtMs=Date.now(); data.createdByMode=location.pathname.includes('dev')?'dev':'live'; await addDoc(collection(db,'noticePosts'),data)} closeModal('v977EditModal'); toast(id?'공지사항을 수정했습니다.':'공지사항을 게시했습니다.','success'); await refresh(); if(id)openDetail(id)}catch(e){console.error('[v977 notice] save failed',e); toast('공지 저장 실패: '+(e.message||e),'error')}}
+async function deleteNotice(id){try{if(!adminLike()){toast('관리자만 삭제할 수 있습니다.','error');return;} const p=POSTS.find(x=>String(x.id)===String(id))||{}; if(!confirm('이 공지사항을 삭제할까요? 첨부 사진도 함께 삭제됩니다.'))return; await deleteDoc(doc(db,'noticePosts',id)); for(const path of pathsOf(p)){try{await deleteObject(ref(storage,path))}catch(e){}} closeModal('v977DetailModal'); toast('삭제했습니다.','success'); await refresh(); openBoard()}catch(e){console.error('[v977 notice] delete failed',e); toast('삭제 실패: '+(e.message||e),'error')}}
+async function refresh(){POSTS=await readPosts(); window.__v977NoticePosts=POSTS; renderHome(); renderBoard(); applyAdminPanelVisibility()}
+function applyAdminPanelVisibility(){try{const ok=adminLike(); const patterns=[/v928|저렉|응급모드|수동\s*갱신|수동기록|상태|v929|v936|운영정리|코트\s*사용\s*현황판|예선\s*기준시각|지금\s*시작|예약시간\s*사용|본선\s*코트\s*배정/]; document.querySelectorAll('div,section,article').forEach(el=>{if(ok)return; const txt=(el.innerText||'').replace(/\s+/g,' ').trim(); if(!txt||txt.length>260)return; if(patterns.some(re=>re.test(txt))){el.classList.add('v977-hidden-admin-panel'); el.style.display='none';}})}catch(e){}}
+function init(){installNav(); installBoardPage(); installHome(); refresh(); setTimeout(refresh,800); setTimeout(applyAdminPanelVisibility,1600); try{const b=document.getElementById('bracketFreshnessBadge'); if(b)b.textContent='v978 공지 기본전체 DEV';}catch(e){}}
+window.v977OpenBoard=openBoard; window.v977GoNoticeBoard=openBoard; window.v977RefreshNotice=refresh; window.v977OpenNoticeDetail=openDetail; window.v977OpenNoticeImage=openImage; window.v977CloseNoticeModal=closeModal; window.v977OpenNoticeEditor=function(id){if(!adminLike()){toast('관리자만 작성/수정할 수 있습니다.','error');return;} buildEditor(id?POSTS.find(x=>String(x.id)===String(id)):null)}; window.v977SaveNotice=saveNotice; window.v977DeleteNotice=deleteNotice;
+// 이전 v955 계열 호출이 남아 있어도 단일 v977 함수로 연결
+window.v955ShowBoardPage=openBoard; window.v955RefreshBoard=refresh; window.v955OpenNoticePostModal=()=>window.v977OpenNoticeEditor(); window.v955SaveNoticePost=()=>window.v977SaveNotice(''); window.v955DeleteNoticePost=deleteNotice;
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init); else init();
+</script>
+
+
+<!-- v979: dev-only admin-panel visibility + floating tools control -->
+<style id="v979DevAccessFloatingStyle">
+  #v979ToolToggle{
+    position:fixed;left:10px;bottom:max(10px,env(safe-area-inset-bottom,0px));z-index:2147483300;
+    border:1.5px solid #cbd5e1;background:rgba(255,255,255,.96);color:#0f1e3a;border-radius:999px;
+    padding:8px 12px;font-size:12px;font-weight:1000;box-shadow:0 10px 24px rgba(15,30,58,.16);
+    backdrop-filter:blur(8px) saturate(130%);cursor:pointer;line-height:1;touch-action:none;
+  }
+  body.v979-floating-hidden #v953ModeSwitch,
+  body.v979-floating-hidden #v954ResultGuardBar,
+  body.v979-modal-open #v953ModeSwitch,
+  body.v979-modal-open #v954ResultGuardBar{
+    display:none!important;
+  }
+  body.v979-modal-open #v979ToolToggle{display:none!important;}
+  .v979-admin-hidden{display:none!important;}
+  #v953ModeSwitch.v979-draggable,
+  #v954ResultGuardBar.v979-draggable{
+    touch-action:none;user-select:none;-webkit-user-select:none;
+  }
+  #v953ModeSwitch .v979-mini,
+  #v954ResultGuardBar .v979-mini{
+    display:inline-flex;align-items:center;justify-content:center;border-radius:999px;border:1px solid #cbd5e1;background:#f8fafc;color:#475569;
+    font-size:11px;font-weight:1000;padding:6px 8px;cursor:move;line-height:1;white-space:nowrap;
+  }
+  @media(max-width:680px){
+    #v979ToolToggle{font-size:11px;padding:8px 10px;}
+    #v953ModeSwitch.v979-positioned,#v954ResultGuardBar.v979-positioned{left:auto!important;right:auto!important;bottom:auto!important;}
+  }
+</style>
+<script id="v979DevAccessFloatingScript">
+(function(){
+  'use strict';
+  if(window.__v979DevAccessFloatingInstalled) return;
+  window.__v979DevAccessFloatingInstalled=true;
+  const VERSION='v979';
+  const ADMIN_TEXT_RE=/v928|저렉\s*응급모드|v929|v936|운영정리|수동\s*갱신|수동기록|상태점검|\b상태\b|코트\s*사용\s*현황판|예선\s*기준시각|지금\s*시작|예약시간\s*사용|본선\s*코트\s*배정|본선보호|64강\s*빈칸|강제채움|256\/512|PDF\s*고정|원도심\s*\/\s*국제|레거시\s*정리/i;
+  const DANGER_BTN_RE=/수동\s*갱신|수동기록|상태점검|\b상태\b|지금\s*시작|예약시간\s*사용|본선\s*코트\s*배정|본선보호|64강|강제채움|256|512|PDF\s*고정|원도심|국제\s*강제|레거시\s*정리/i;
+  function $(id){return document.getElementById(id)}
+  function txt(el){return (el&&el.innerText||el&&el.textContent||'').replace(/\s+/g,' ').trim()}
+  function hasClassAny(re){return re.test(document.body.className||'')}
+  function isPrivileged(){
+    try{
+      if(hasClassAny(/admin-mode|tm-mode|operator-mode|op-mode|developer-mode|dev-mode/i)) return true;
+      if(document.querySelector('.admin-badge.show,#adminBadge.show,#opLoginBadge.show,#regLoginBadge.show')) return true;
+      const menu=txt(document.querySelector('.login-menu-wrap,.header-actions'));
+      if(/개발자\s*로그인|관리자\s*로그인|운영자\s*로그인|진행자\s*로그인|로그아웃/.test(menu) && /개발자|관리자|운영자|진행자/.test(menu)) return true;
+    }catch(e){}
+    return false;
+  }
+  function hideAdminPanels(){
+    const ok=isPrivileged();
+    document.documentElement.classList.toggle('v979-is-admin', ok);
+    try{
+      document.querySelectorAll('.v979-admin-hidden').forEach(el=>{ if(ok){el.classList.remove('v979-admin-hidden'); el.style.display='';} });
+      if(ok) return;
+      document.querySelectorAll('button,a').forEach(el=>{
+        const t=txt(el);
+        if(DANGER_BTN_RE.test(t)){
+          el.classList.add('v979-admin-hidden');
+          el.style.display='none';
+        }
+      });
+      document.querySelectorAll('.card,section,article,div').forEach(el=>{
+        if(el.closest('.modal-overlay,.v977-backdrop,.v977-image-viewer,#v953ModeSwitch,#v954ResultGuardBar,#v979ToolToggle')) return;
+        const t=txt(el);
+        if(!t || t.length>420) return;
+        if(ADMIN_TEXT_RE.test(t)){
+          el.classList.add('v979-admin-hidden');
+          el.style.display='none';
+        }
+      });
+    }catch(e){console.warn('[v979] hideAdminPanels failed',e)}
+  }
+  function isModalOpen(){
+    try{
+      if(document.querySelector('.v977-backdrop,.v977-image-viewer')) return true;
+      if(document.querySelector('.modal-overlay.open')) return true;
+      if(document.querySelector('.modal-overlay[style*="display: flex"],.modal-overlay[style*="display:flex"],.modal-overlay[style*="display: block"],.modal-overlay[style*="display:block"]')) return true;
+    }catch(e){}
+    return false;
+  }
+  function ensureToolToggle(){
+    let btn=$('v979ToolToggle');
+    if(!btn){
+      btn=document.createElement('button');
+      btn.id='v979ToolToggle';
+      btn.type='button';
+      btn.title='하단 운영/복기/개발, 결과 되돌리기 도구를 숨기거나 다시 보입니다.';
+      btn.onclick=function(){
+        const on=!document.body.classList.contains('v979-floating-hidden');
+        document.body.classList.toggle('v979-floating-hidden',on);
+        try{localStorage.setItem('v979FloatingHidden',on?'1':'0')}catch(e){}
+        updateToolToggleText();
+      };
+      document.body.appendChild(btn);
+    }
+    updateToolToggleText();
+  }
+  function updateToolToggleText(){
+    const btn=$('v979ToolToggle'); if(!btn)return;
+    btn.textContent=document.body.classList.contains('v979-floating-hidden')?'도구 보이기':'도구 숨김';
+  }
+  function ensureModeButtons(){
+    try{
+      let panel=$('v953ModeSwitch');
+      if(!panel){
+        panel=document.createElement('div'); panel.id='v953ModeSwitch'; document.body.appendChild(panel);
+      }
+      const defs=[['운영','/?v=979'],['복기','/replay.html?v=979'],['개발','/dev.html?v=979']];
+      defs.forEach(([label,url])=>{
+        let exists=[...panel.querySelectorAll('button,a')].some(x=>txt(x).replace(/\s+/g,'').includes(label));
+        if(!exists){
+          const b=document.createElement('button'); b.type='button'; b.textContent=label; b.onclick=()=>{location.href=url}; panel.appendChild(b);
+        }
+      });
+      const lab=panel.querySelector('.v953-label'); if(lab) lab.textContent='v979 개발';
+    }catch(e){console.warn('[v979] ensureModeButtons failed',e)}
+  }
+  function makeDraggable(el,key){
+    if(!el || el.__v979Drag) return;
+    el.__v979Drag=true; el.classList.add('v979-draggable');
+    let handle=el.querySelector('.v979-mini');
+    if(!handle){handle=document.createElement('span');handle.className='v979-mini';handle.textContent='↕ 이동';el.insertBefore(handle,el.firstChild);}
+    try{const pos=JSON.parse(localStorage.getItem(key)||'null'); if(pos&&Number.isFinite(pos.x)&&Number.isFinite(pos.y)){el.style.left=pos.x+'px';el.style.top=pos.y+'px';el.style.right='auto';el.style.bottom='auto';el.classList.add('v979-positioned');}}catch(e){}
+    let sx=0,sy=0,ox=0,oy=0,drag=false;
+    function down(ev){drag=true; const p=ev.touches?ev.touches[0]:ev; sx=p.clientX;sy=p.clientY; const r=el.getBoundingClientRect(); ox=r.left;oy=r.top; ev.preventDefault();}
+    function move(ev){if(!drag)return; const p=ev.touches?ev.touches[0]:ev; let x=ox+p.clientX-sx, y=oy+p.clientY-sy; x=Math.max(4,Math.min(window.innerWidth-el.offsetWidth-4,x)); y=Math.max(4,Math.min(window.innerHeight-el.offsetHeight-4,y)); el.style.left=x+'px';el.style.top=y+'px';el.style.right='auto';el.style.bottom='auto';el.classList.add('v979-positioned');}
+    function up(){if(!drag)return; drag=false; try{const r=el.getBoundingClientRect();localStorage.setItem(key,JSON.stringify({x:Math.round(r.left),y:Math.round(r.top)}));}catch(e){}}
+    handle.addEventListener('mousedown',down); handle.addEventListener('touchstart',down,{passive:false});
+    document.addEventListener('mousemove',move); document.addEventListener('touchmove',move,{passive:false});
+    document.addEventListener('mouseup',up); document.addEventListener('touchend',up);
+  }
+  function applyFloatingControls(){
+    try{
+      ensureToolToggle(); ensureModeButtons();
+      document.body.classList.toggle('v979-modal-open', isModalOpen());
+      makeDraggable($('v953ModeSwitch'),'v979ModeSwitchPos');
+      makeDraggable($('v954ResultGuardBar'),'v979UndoBarPos');
+    }catch(e){}
+  }
+  function applyAll(){
+    try{
+      if(localStorage.getItem('v979FloatingHidden')==='1') document.body.classList.add('v979-floating-hidden');
+    }catch(e){}
+    hideAdminPanels();
+    applyFloatingControls();
+    try{const b=$('bracketFreshnessBadge'); if(b) b.textContent='v979 개발안정';}catch(e){}
+  }
+  window.v979ApplyDevSafety=applyAll;
+  document.addEventListener('click',()=>setTimeout(applyAll,60),true);
+  document.addEventListener('input',()=>setTimeout(applyAll,60),true);
+  [0,250,800,1600,3000,6000].forEach(t=>setTimeout(applyAll,t));
+  function loop(){applyAll(); setTimeout(loop,1800)}
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(loop,500)); else setTimeout(loop,500);
+})();
 </script>
 
 </body>
