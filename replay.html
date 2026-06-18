@@ -2,18 +2,18 @@
 
 <html lang="ko">
 <head>
-<script src="assets/js/preboot-v986.js"></script>
+<script src="assets/js/preboot.js?v=987"></script>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" name="viewport"/>
 <meta content="no-store, no-cache, must-revalidate, max-age=0" http-equiv="Cache-Control"/>
 <meta content="no-cache" http-equiv="Pragma"/>
 <meta content="0" http-equiv="Expires"/>
 <title>시합관리 시스템</title>
-<!-- v986 three-mode split: replay.html / replay -->
+<!-- v987 fixed asset names: replay.html / replay -->
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-18-v986-three-mode-split";
+  const APP_VERSION = "2026-06-18-v987-fixed-asset-names";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -720,7 +720,7 @@ document.addEventListener('DOMContentLoaded',()=>setTimeout(v281ApplyRecommended
 // v299: removed repeated UI polling for popup compact layout.
 
 </script>
-<link rel="stylesheet" href="./assets/css/app-v986.css?v=985"/>
+<link rel="stylesheet" href="./assets/css/app.css?v=987"/>
 <!-- PWA -->
 <script>
 (function initPwaHeadForDeployedOnly(){
@@ -57758,7 +57758,7 @@ if(false) setTimeout(function(){
 
 
 <!-- v983: 공지게시판 JS 외부 분리 -->
-<script type="module" id="v983NoticeModule" src="./assets/js/notice-v983.js?v=983"></script>
+<script type="module" id="noticeModule" src="./assets/js/notice.js?v=987"></script>
 
 
 <!-- v979: dev-only admin-panel visibility + floating tools control -->
@@ -57904,7 +57904,7 @@ if(false) setTimeout(function(){
     }catch(e){}
     hideAdminPanels();
     applyFloatingControls();
-    try{const b=$('bracketFreshnessBadge'); if(b) b.textContent='v986 도구권한정리 DEV';}catch(e){}
+    try{const b=$('bracketFreshnessBadge'); if(b) b.textContent='v987 고정파일명';}catch(e){}
   }
   window.v979ApplyDevSafety=applyAll;
   document.addEventListener('click',()=>setTimeout(applyAll,60),true);
@@ -57968,7 +57968,7 @@ if(false) setTimeout(function(){
       reveal($('v979ToolToggle'),'inline-flex');
       reveal($('v953ModeSwitch'),'flex');
       reveal($('v954ResultGuardBar'),'flex');
-      try{var bd=$('bracketFreshnessBadge'); if(bd) bd.textContent='v986 도구권한정리 DEV';}catch(e){}
+      try{var bd=$('bracketFreshnessBadge'); if(bd) bd.textContent='v987 고정파일명';}catch(e){}
     }else{
       ['v979ToolToggle','v953ModeSwitch','v952ModeSwitch','v954ResultGuardBar','v950ModeBadge','v951SmsTimeNotice','v953ModeSafetyBanner'].forEach(function(id){
         var el=$(id); if(el){el.style.display='none'; el.style.visibility='hidden'; el.style.pointerEvents='none';}
@@ -57984,8 +57984,8 @@ if(false) setTimeout(function(){
 </script>
 
 
-<!-- v986: strict public/private floating tool gate -->
-<script id="v986ToolsGateModule" src="./assets/js/tools-gate-v986.js?v=985"></script>
+<!-- v987: fixed filename tools gate -->
+<script id="toolsGateModule" src="./assets/js/tools-gate.js?v=987"></script>
 
 </body>
 </html>
