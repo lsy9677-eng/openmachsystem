@@ -106,7 +106,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-17-v973-from-v971-stable-fix";
+  const APP_VERSION = "2026-06-17-v974-admin-panel-visibility";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -65857,12 +65857,157 @@ import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "http
       el.addEventListener('pointerup',()=>{if(!drag)return; drag=false; localStorage.setItem(key,JSON.stringify({left:el.style.left,top:el.style.top}));});
     }catch(e){}
   }
-  function makeUndoDraggable(){try{const b=$('v954ResultGuardBar'); if(b){b.classList.add('v973-draggable'); makeDraggable(b,'v973UndoBarPos'); const go=[...b.querySelectorAll('button')].find(x=>/복기|운영/.test(x.textContent||'')); if(go){go.onclick=()=>{location.href=(currentMode()==='live'?'/replay.html':'/')+'?v=973';};} if(!b.querySelector('[data-v973-dev]')){const dev=document.createElement('button'); dev.type='button'; dev.dataset.v973Dev='1'; dev.textContent='개발'; dev.onclick=()=>location.href='/dev.html?v=973'; b.appendChild(dev);}}}catch(e){}
+  function makeUndoDraggable(){try{const b=$('v954ResultGuardBar'); if(b){b.classList.add('v973-draggable'); makeDraggable(b,'v973UndoBarPos'); const go=[...b.querySelectorAll('button')].find(x=>/복기|운영/.test(x.textContent||'')); if(go && !b.querySelector('[data-v973-dev]')){const dev=document.createElement('button'); dev.type='button'; dev.dataset.v973Dev='1'; dev.textContent='개발'; dev.onclick=()=>location.href='/dev.html?v=973'; b.appendChild(dev);}}}catch(e){}
   }
   function boot(){hideLegacyAndMemberOnly(); patchNewPostInput(); installModeDock(); makeUndoDraggable(); try{const badge=$('v950ModeBadge'); if(badge) badge.textContent=(currentMode()==='dev'?'개발용':currentMode()==='replay'?'복기용':'운영용')+' v973';}catch(e){}}
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
   [400,1000,2200,4200].forEach(ms=>setTimeout(boot,ms));
   setInterval(()=>{try{hideLegacyAndMemberOnly(); installModeDock(); makeUndoDraggable(); patchNewPostInput();}catch(e){}},3000);
+})();
+</script>
+
+
+
+<!-- v974: 관리자/운영자/개발자 전용 패널 일반회원 숨김 보강 -->
+<script>
+(function(){
+  'use strict';
+  const VERSION='v974-admin-panel-visibility';
+  const ADMIN_TEXTS=[
+    'v928 저렉 응급모드',
+    'v929 안정화',
+    'v936 운영정리',
+    '자동 감시자/빠른 반복루프',
+    '수동기록 자동덮기',
+    '정식 안전장치만 남겼습니다',
+    '대진표는 필요할 때만 수동 갱신하세요'
+  ];
+  const COURT_TEXTS=[
+    '코트 사용 현황판',
+    '예선 기준시각',
+    '예약 09:00 기준',
+    '예약시간 사용',
+    '본선 코트 배정',
+    '공용대기',
+    '빈코트'
+  ];
+  const ADMIN_BUTTON_TEXTS=[
+    '수동 갱신',
+    '수동기록 보기',
+    '상태',
+    '대진표 수동갱신',
+    '정리 재적용',
+    '지금 시작',
+    '예약시간 사용',
+    '본선 코트 배정'
+  ];
+  function safeText(el){
+    try{return String(el && el.innerText || el && el.textContent || '').replace(/\s+/g,' ').trim();}catch(e){return '';}
+  }
+  function isPrivileged(){
+    try{
+      if(window.AD || window.TM || window.OP || window.DEV || window.IS_DEV) return true;
+      const body=document.body;
+      if(body && (body.classList.contains('admin-mode') || body.classList.contains('tm-mode') || body.classList.contains('operator-mode') || body.classList.contains('developer-mode') || body.classList.contains('dev-mode'))) return true;
+      const p=window.CURRENT_APP_PROFILE || window.CURRENT_APP_USER || {};
+      const role=String(p.role || p.userRole || p.level || '').toLowerCase();
+      const approved=(p.approved===true || p.isApproved===true || p.status==='approved');
+      if(['admin','developer','manager','tournament_admin','tournament_manager','operator'].includes(role) && (approved || role==='admin' || role==='developer' || role==='manager')) return true;
+    }catch(e){}
+    return false;
+  }
+  function markHidden(el, reason){
+    if(!el || el===document.body || el===document.documentElement) return;
+    el.classList.add('v974-admin-hidden');
+    el.setAttribute('data-v974-hidden', reason||'admin-only');
+  }
+  function unhideAll(){
+    document.querySelectorAll('.v974-admin-hidden').forEach(el=>{
+      el.classList.remove('v974-admin-hidden');
+      el.removeAttribute('data-v974-hidden');
+    });
+  }
+  function candidateBox(el){
+    if(!el) return null;
+    let cur=el;
+    for(let i=0;i<5 && cur && cur.parentElement && cur!==document.body;i++,cur=cur.parentElement){
+      const t=safeText(cur);
+      const rect=cur.getBoundingClientRect ? cur.getBoundingClientRect() : {height:0,width:0};
+      const cls=String(cur.className||'');
+      const looksBox=/card|panel|box|alert|notice|section|toolbar|admin|control|court|bracket|status/i.test(cls) || cur.style.border || cur.style.background;
+      if(looksBox && t.length<1600 && rect.height<420) return cur;
+    }
+    return el;
+  }
+  function hidePublicAdminPanels(){
+    try{
+      if(isPrivileged()){
+        document.body.classList.add('v974-privileged');
+        unhideAll();
+        return;
+      }
+      document.body.classList.remove('v974-privileged');
+      document.body.classList.add('v974-public');
+      // 레거시 안내/운영 패널 숨김
+      const nodes=Array.from(document.querySelectorAll('div,section,article,aside'));
+      nodes.forEach(el=>{
+        const txt=safeText(el);
+        if(!txt) return;
+        if(ADMIN_TEXTS.some(k=>txt.includes(k))){
+          const box=candidateBox(el);
+          if(box) markHidden(box,'legacy-admin-panel');
+          return;
+        }
+        // 코트 운영 현황판: 제목과 운영 버튼이 같이 있는 경우만 숨김
+        if(txt.includes('코트 사용 현황판') || (txt.includes('예선 기준시각') && txt.includes('본선 코트 배정'))){
+          const box=candidateBox(el);
+          if(box) markHidden(box,'court-admin-panel');
+          return;
+        }
+      });
+      // 개별 관리자용 버튼 숨김
+      Array.from(document.querySelectorAll('button,a')).forEach(el=>{
+        const txt=safeText(el);
+        if(!txt) return;
+        if(ADMIN_BUTTON_TEXTS.some(k=>txt===k || txt.includes(k))){
+          markHidden(el,'admin-action-button');
+        }
+      });
+      // 코트 운영 관련 입력 박스 숨김: 날짜/시간/저장/시작/본선코트배정 묶음
+      Array.from(document.querySelectorAll('div,section')).forEach(el=>{
+        const txt=safeText(el);
+        if(txt.includes('예선 기준시각') && txt.includes('저장') && txt.includes('지금 시작')){
+          const box=candidateBox(el);
+          if(box) markHidden(box,'court-time-control');
+        }
+      });
+    }catch(e){console.warn('[v974] public admin hide failed',e);}
+  }
+  function installStyle(){
+    if(document.getElementById('v974AdminVisibilityStyle')) return;
+    const st=document.createElement('style');
+    st.id='v974AdminVisibilityStyle';
+    st.textContent=`
+      .v974-admin-hidden{display:none!important;visibility:hidden!important;pointer-events:none!important;}
+      body.v974-public [data-admin-only],
+      body.v974-public .admin-only:not(.notice-admin-allowed),
+      body.v974-public .developer-only,
+      body.v974-public .operator-only{display:none!important;}
+    `;
+    document.head.appendChild(st);
+  }
+  function boot(){
+    installStyle();
+    hidePublicAdminPanels();
+    [250,800,1800,3500,6000].forEach(ms=>setTimeout(hidePublicAdminPanels,ms));
+    if(!window.__v974AdminVisibilityTimer){
+      window.__v974AdminVisibilityTimer=setInterval(hidePublicAdminPanels,2200);
+    }
+    document.addEventListener('click',()=>setTimeout(hidePublicAdminPanels,80),true);
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
+  window.v974ApplyAdminPanelVisibility=hidePublicAdminPanels;
+  console.log('[v974] admin panel visibility guard installed');
 })();
 </script>
 
