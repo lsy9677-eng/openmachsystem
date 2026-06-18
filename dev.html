@@ -2,7 +2,7 @@
 
 <html lang="ko">
 <head>
-<script src="assets/js/preboot.js?v=989"></script>
+<script src="assets/js/preboot.js?v=990"></script>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" name="viewport"/>
 <meta content="no-store, no-cache, must-revalidate, max-age=0" http-equiv="Cache-Control"/>
@@ -720,7 +720,7 @@ document.addEventListener('DOMContentLoaded',()=>setTimeout(v281ApplyRecommended
 // v299: removed repeated UI polling for popup compact layout.
 
 </script>
-<link rel="stylesheet" href="./assets/css/app.css?v=989"/>
+<link rel="stylesheet" href="./assets/css/app.css?v=990"/>
 <!-- PWA -->
 <script>
 (function initPwaHeadForDeployedOnly(){
@@ -797,46 +797,7 @@ document.addEventListener('DOMContentLoaded',()=>setTimeout(v281ApplyRecommended
 
 
 
-<script id="v287CleanMatchTitleNoDivisionScript">
-(function(){
-  const DIVISION_NOISE_RE = /영남권\s*지역신인부|[가-힣A-Za-z0-9\s·ㆍ-]*(?:신인부|지역신인부|오픈부|금배부|은배부|동배부|테린이부|개인전|단체전)/g;
-  function cleanDivisionNoiseText(s){
-    return String(s||'').replace(DIVISION_NOISE_RE,'').replace(/\s+/g,' ').trim();
-  }
-  function cleanM3AndMatchPopupNoise(){
-    try{
-      const title=document.getElementById('mM3T');
-      if(title){
-        title.textContent=cleanDivisionNoiseText(title.textContent)
-          .replace(/^⚡\s*·\s*/,'⚡ ')
-          .replace(/^📝\s*·\s*/,'📝 ')
-          .replace(/\s+vs\s+/i,' vs ')
-          .trim();
-      }
-      document.querySelectorAll('#mM3 .m3badge, #matchListPopup .mlp-chip').forEach(el=>{
-        const before=(el.textContent||'').trim();
-        const after=cleanDivisionNoiseText(before);
-        if(before && !after && /신인부|금배부|은배부|동배부|테린이부|오픈부|개인전|단체전/.test(before)){
-          el.style.display='none';
-        }else if(after && after!==before){
-          el.textContent=after;
-        }
-      });
-      document.querySelectorAll('#matchListPopup .mlp-team').forEach(el=>{
-        const after=cleanDivisionNoiseText(el.textContent);
-        if(after && after!==el.textContent.trim()) el.textContent=after;
-      });
-      const popTitle=document.getElementById('matchListPopupTitle');
-      if(popTitle){
-        const cleaned=cleanDivisionNoiseText(popTitle.textContent).replace(/\s+/g,' ').trim();
-        if(cleaned) popTitle.textContent=cleaned;
-      }
-    }catch(e){}
-  }
-  window.cleanM3AndMatchPopupNoise=cleanM3AndMatchPopupNoise;
-  document.addEventListener('DOMContentLoaded',()=>{ setTimeout(cleanM3AndMatchPopupNoise,0); });
-})();
-</script>
+<!-- v990: v287CleanMatchTitleNoDivisionScript moved to assets/js/tournament.js -->
 
 
 
@@ -37930,7 +37891,7 @@ try{
 
 <!-- v352: 참가자 목록 권한/백업복구 버튼 안정화 패치 -->
 
-<script src="./assets/js/register.js?v=989"></script>
+<script src="./assets/js/register.js?v=990"></script>
 
 
 
@@ -42685,42 +42646,7 @@ window.openParticipantFindPopupForTournament = function(tid){
 
 
 
-<script id="v729GuideVisibleForAllTournaments">
-(function(){
-  'use strict';
-  function getSelectedRegisterTournamentId(){
-    try{
-      const el=document.getElementById('regTS');
-      return el && el.value ? String(el.value) : '';
-    }catch(e){ return ''; }
-  }
-  window.openSelectedRegisterGuide=function(){
-    const tid=getSelectedRegisterTournamentId();
-    if(!tid){
-      if(typeof toast==='function') toast('먼저 대회를 선택해 주세요','info');
-      else alert('먼저 대회를 선택해 주세요');
-      return;
-    }
-    if(typeof openGuide==='function') openGuide(tid);
-    else if(typeof toast==='function') toast('요강 보기 기능을 불러오지 못했습니다','error');
-  };
-  window.openSelectedRegisterDetail=function(){
-    const tid=getSelectedRegisterTournamentId();
-    if(!tid){
-      if(typeof toast==='function') toast('먼저 대회를 선택해 주세요','info');
-      else alert('먼저 대회를 선택해 주세요');
-      return;
-    }
-    if(typeof openTD==='function') openTD(tid);
-    else if(typeof openGuide==='function') openGuide(tid);
-  };
-  // 홈 현재 대회 목록이 여러 개일 때, 각 대회별 요강 버튼을 안정적으로 유지
-  window.v729OpenGuideByTournament=function(tid){
-    if(!tid) return;
-    if(typeof openGuide==='function') openGuide(tid);
-  };
-})();
-</script>
+<!-- v990: v729GuideVisibleForAllTournaments moved to assets/js/tournament.js -->
 
 
 
@@ -42981,42 +42907,7 @@ window.openParticipantFindPopupForTournament = function(tid){
 
 
 
-<script id="v732HomeTournamentButtonsCompactScript">
-(function(){
-  'use strict';
-  if(window.__v732HomeTournamentButtonsCompactInstalled) return;
-  window.__v732HomeTournamentButtonsCompactInstalled=true;
-  function compactHomeTournamentButtons(){
-    try{
-      document.querySelectorAll('.home-current-tournament-row').forEach(row=>{
-        const actions=row.lastElementChild;
-        if(!actions) return;
-        actions.querySelectorAll('button.home-panel-badge').forEach(btn=>{
-          const t=(btn.textContent||'').trim();
-          if(/요강/.test(t)) btn.textContent='📌 요강';
-          else if(/신청/.test(t)) btn.textContent='📝 신청';
-        });
-      });
-    }catch(e){}
-  }
-  const oldRenderHome=window.renderHome;
-  if(typeof oldRenderHome==='function' && !oldRenderHome.__v732CompactButtons){
-    const wrapped=function(){
-      const r=oldRenderHome.apply(this, arguments);
-      setTimeout(compactHomeTournamentButtons,0);
-      setTimeout(compactHomeTournamentButtons,120);
-      return r;
-    };
-    wrapped.__v732CompactButtons=true;
-    window.renderHome=wrapped;
-  }
-  document.addEventListener('DOMContentLoaded',()=>{
-    setTimeout(compactHomeTournamentButtons,300);
-    setTimeout(compactHomeTournamentButtons,1200);
-  });
-  console.log('[v732] home tournament guide/apply buttons compact layout installed');
-})();
-</script>
+<!-- v990: v732HomeTournamentButtonsCompactScript moved to assets/js/tournament.js -->
 
 
 <!-- v733: A4 저장 완료 후 미리보기 창 자동 닫기 -->
@@ -56346,7 +56237,7 @@ if(false) setTimeout(function(){
 
 
 <!-- v983: 공지게시판 JS 외부 분리 -->
-<script type="module" id="noticeModule" src="./assets/js/notice.js?v=989"></script>
+<script type="module" id="noticeModule" src="./assets/js/notice.js?v=990"></script>
 
 
 <!-- v979: dev-only admin-panel visibility + floating tools control -->
@@ -56573,7 +56464,7 @@ if(false) setTimeout(function(){
 
 
 <!-- v987: fixed filename tools gate -->
-<script id="toolsGateModule" src="./assets/js/tools-gate.js?v=989"></script>
+<script id="toolsGateModule" src="./assets/js/tools-gate.js?v=990"></script>
 
 </body>
 </html>
