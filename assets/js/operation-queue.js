@@ -475,3 +475,269 @@
   setTimeout(installPrelimPriorityGuard, 1200);
   try{ console.log('[v994] prelim priority guard loaded'); }catch(e){}
 })();
+
+
+/* v995 venue-aware shared queue + stronger prelim priority guard
+   Fixes:
+   1) Shared waiting items are split by the actual venue of their source prelim group/team,
+      not by the first active venue.
+   2) A main/playin match must never be displayed as the current/live card while any unfinished
+      prelim/group match is still assigned/waiting on that same court.
+*/
+(function(){
+  'use strict';
+  if(window.__operationQueueV995VenuePrelimFixInstalled) return;
+  window.__operationQueueV995VenuePrelimFixInstalled = true;
+  const VERSION = 'v995-venue-source-prelim-priority';
+
+  function clean(v){ return String(v == null ? '' : v).trim(); }
+  function arr(v){ return Array.isArray(v) ? v : []; }
+  function keySafe(){
+    try{ if(window.OperationQueueV993 && typeof OperationQueueV993.keyOf==='function') return OperationQueueV993.keyOf(); }catch(e){}
+    try{ if(typeof currentTid==='function' && typeof currentDiv==='function' && typeof kd==='function') return kd(currentTid(), currentDiv()); }catch(e){}
+    return '';
+  }
+  function venueOfCourt(court){
+    try{ if(window.OperationQueueV993 && typeof OperationQueueV993.venueOfCourt==='function') return OperationQueueV993.venueOfCourt(court); }catch(e){}
+    const c=clean(court);
+    if(/원도심|원도|인조/.test(c)) return '원도심';
+    if(/국제|장유국제/.test(c)) return '국제';
+    if(/능동/.test(c)) return '능동';
+    if(/장유중|클레이/.test(c)) return '장유중';
+    if(/금병/.test(c)) return '금병';
+    if(/삼계/.test(c)) return '삼계';
+    if(/동부/.test(c)) return '동부';
+    return c ? '기타' : '';
+  }
+  function activeVenueLabels(key){
+    try{
+      if(window.OperationQueueV993 && typeof OperationQueueV993.getActiveVenueLabelsForKey==='function'){
+        const info=OperationQueueV993.getActiveVenueLabelsForKey(key)||{};
+        return arr(info.labels).map(clean).filter(Boolean);
+      }
+    }catch(e){}
+    return [];
+  }
+  function drawGroups(key){
+    try{ return arr(window.G && G.draws && G.draws[key] && G.draws[key].groups); }catch(e){ return []; }
+  }
+  function matchesForKey(key){
+    try{ return arr(window.G && G.matches && G.matches[key]); }catch(e){ return []; }
+  }
+  function courtFromObj(o){
+    if(!o) return '';
+    const vals=[];
+    ['manualCourtTarget','court','manualCourt','assignedCourt','courtName','currentCourt','__sharedCourtLabel'].forEach(k=>{ if(clean(o[k])) vals.push(clean(o[k])); });
+    arr(o.courts).forEach(c=>{ if(clean(c)) vals.push(clean(c)); });
+    return vals.find(Boolean) || '';
+  }
+  function groupVenue(key, gi){
+    gi=Number(gi);
+    if(!Number.isFinite(gi)) return '';
+    const groups=drawGroups(key);
+    const candidates=[];
+    [gi, gi-1].forEach(idx=>{
+      if(idx>=0 && idx<groups.length){
+        const c=courtFromObj(groups[idx]);
+        const v=venueOfCourt(c); if(v) candidates.push(v);
+      }
+    });
+    matchesForKey(key).forEach(m=>{
+      if(!m) return;
+      const p=clean(m.phase).toLowerCase();
+      if(!(p==='group'||p==='prelim'||p==='preliminary'||p==='qual'||p==='qualifying')) return;
+      const mg=Number(m.group);
+      if(mg===gi || mg===gi-1){ const v=venueOfCourt(courtFromObj(m)); if(v) candidates.push(v); }
+    });
+    return candidates[0] || '';
+  }
+  function groupOfTeam(key, teamIndex){
+    const ti=Number(teamIndex);
+    if(!Number.isFinite(ti)) return null;
+    const groups=drawGroups(key);
+    for(let gi=0; gi<groups.length; gi++){
+      const teams=arr(groups[gi] && groups[gi].teams).map(x=>Number(x));
+      if(teams.some(x=>x===ti)) return gi;
+    }
+    return null;
+  }
+  function sourceGroupCandidates(key, m){
+    const out=[];
+    ['sourceGroup1','sourceGroup2','sourceGroup','group'].forEach(k=>{
+      if(m && m[k] !== undefined && m[k] !== null && m[k] !== '') out.push(Number(m[k]));
+    });
+    ['t1','t2','winner'].forEach(k=>{
+      const gi=groupOfTeam(key, m && m[k]);
+      if(gi !== null) out.push(gi);
+    });
+    return [...new Set(out.filter(x=>Number.isFinite(x)))];
+  }
+  function mostFrequentVenue(vs){
+    const counts={};
+    vs.map(clean).filter(Boolean).forEach(v=>counts[v]=(counts[v]||0)+1);
+    let best=''; let bestN=0;
+    Object.keys(counts).forEach(v=>{ if(counts[v]>bestN){ best=v; bestN=counts[v]; } });
+    return best;
+  }
+  function sourceVenueForMatch(key, m){
+    const labels=activeVenueLabels(key);
+    const target=clean(m && (m.__sharedCourtLabel || m.manualCourtTarget || m.court || m.currentCourt));
+    const byTarget=venueOfCourt(target);
+    if(byTarget && (!labels.length || labels.includes(byTarget))) return byTarget;
+
+    const raw=clean(m && (m.venue || m.__venue || m.mainBlock));
+    const rawMap={wondosim:'원도심',gukje:'국제',neungdong:'능동',jangyu_jung:'장유중',geumbyeong:'금병',samgye:'삼계',dongbu:'동부'};
+    const rawLabel=rawMap[raw] || raw;
+    // If raw is a precise active venue, keep it. If raw is old generic 'gukje' while multiple
+    // non-wondo venues are active, prefer the source prelim group below.
+    const rawIsOldGeneric = raw === 'gukje' && labels.length > 1 && labels.some(v=>v!=='국제' && v!=='원도심');
+
+    const groupVenues=sourceGroupCandidates(key,m).map(gi=>groupVenue(key,gi)).filter(Boolean).filter(v=>!labels.length || labels.includes(v));
+    if(groupVenues.length){
+      const chosen=mostFrequentVenue(groupVenues) || groupVenues[0];
+      if(chosen) return chosen;
+    }
+    if(rawLabel && labels.includes(rawLabel) && !rawIsOldGeneric) return rawLabel;
+    if(labels.length===1) return labels[0];
+    return (rawLabel && labels.includes(rawLabel)) ? rawLabel : (labels[0] || byTarget || '국제');
+  }
+  function normalizeVenueForShared(key,m){
+    try{
+      if(!m) return m;
+      const label=sourceVenueForMatch(key,m);
+      if(label){
+        m.venue=label;
+        m.__venue=label;
+        // Do not invent a concrete court here; only classify the shared waiting bucket.
+      }
+    }catch(e){}
+    return m;
+  }
+
+  function winnerSet(m){ return m && m.winner !== undefined && m.winner !== null && clean(m.winner) !== ''; }
+  function isUnfinished(m){ return !!m && !winnerSet(m); }
+  function phase(m){ return clean(m && m.phase).toLowerCase(); }
+  function isMainV995(m){
+    const p=phase(m);
+    const id=clean(m && m.id);
+    if(p==='main'||p==='playin'||p==='final'||p==='draw') return true;
+    if(/^main[_-]/i.test(id)) return true;
+    if(m && (m.bracketN || m.localRoundSize || m.fixedLeafStart || m.fixedLeaf1)) return true;
+    return false;
+  }
+  function isPrelimV995(m){
+    const p=phase(m);
+    const id=clean(m && m.id);
+    if(p==='group'||p==='prelim'||p==='preliminary'||p==='qual'||p==='qualifying') return true;
+    if(/^g[_-]/i.test(id)) return true;
+    if(m && m.group !== undefined && m.group !== null && !isMainV995(m)) return true;
+    return false;
+  }
+  function orderToken(m){
+    return clean(m && (m.courtQueueOrder || m.courtAssignedAt || m.manualCourtPinnedAt || m.waitingFirstAt || m.createdAt || m.id || ''));
+  }
+  function cmpOrder(a,b){
+    const aa=orderToken(a), bb=orderToken(b);
+    if(aa!==bb) return aa.localeCompare(bb);
+    const ga=Number(a && a.group!=null?a.group:9999), gb=Number(b && b.group!=null?b.group:9999);
+    if(ga!==gb) return ga-gb;
+    const ra=Number(a&&a.round||0), rb=Number(b&&b.round||0);
+    if(ra!==rb) return ra-rb;
+    const sa=Number(a&&a.slot||0), sb=Number(b&&b.slot||0);
+    if(sa!==sb) return sa-sb;
+    return clean(a&&a.id).localeCompare(clean(b&&b.id),'ko');
+  }
+  function sortCourtRelatedV995(list){
+    const related=arr(list).filter(Boolean).slice();
+    const hasPrelim=related.some(m=>isUnfinished(m) && isPrelimV995(m));
+    related.sort((a,b)=>{
+      if(hasPrelim){
+        const ap=isPrelimV995(a)?0:(isMainV995(a)?1:2);
+        const bp=isPrelimV995(b)?0:(isMainV995(b)?1:2);
+        if(ap!==bp) return ap-bp;
+      }
+      return cmpOrder(a,b);
+    });
+    return related;
+  }
+  function applySnapshotGuardV995(snapshot){
+    return arr(snapshot).map(item=>{
+      try{
+        const base=(arr(item && item.related).length ? arr(item.related) : [item && item.current].concat(arr(item && item.waiting))).filter(Boolean);
+        const related=sortCourtRelatedV995(base);
+        const current=related[0] || null;
+        return Object.assign({}, item, {
+          related,
+          current,
+          waiting: related.slice(1),
+          status: current ? 'live' : 'empty',
+          __v995PrelimPriority: related.some(m=>isPrelimV995(m))
+        });
+      }catch(e){ return item; }
+    });
+  }
+  function installV995(){
+    try{
+      if(window.OperationQueueV993){
+        OperationQueueV993.inferMatchVenueLabelForKey=function(key,m){ return sourceVenueForMatch(key,m); };
+        OperationQueueV993.normalizeSharedMatchVenueLabelForActiveCourts=function(key,m){ return normalizeVenueForShared(key,m); };
+        OperationQueueV993.sourceVenueForMatch=sourceVenueForMatch;
+        OperationQueueV993.groupVenue=groupVenue;
+      }
+    }catch(e){}
+    try{
+      if(typeof window.getCourtBoardSharedOverflowItems==='function' && !window.getCourtBoardSharedOverflowItems.__v995VenueSource){
+        const old=window.getCourtBoardSharedOverflowItems;
+        const wrapped=function(key){
+          const list=old.apply(this, arguments) || [];
+          try{ list.forEach(x=>normalizeVenueForShared(key,x)); }catch(e){}
+          return list;
+        };
+        wrapped.__v995VenueSource=true;
+        wrapped.__old=old;
+        window.getCourtBoardSharedOverflowItems=wrapped;
+      }
+    }catch(e){}
+    try{
+      if(typeof window.getCourtStatusSnapshot==='function' && !window.getCourtStatusSnapshot.__v995PrelimPriority){
+        const old=window.getCourtStatusSnapshot;
+        const wrapped=function(key){ return applySnapshotGuardV995(old.apply(this, arguments)); };
+        wrapped.__v995PrelimPriority=true;
+        wrapped.__old=old;
+        window.getCourtStatusSnapshot=wrapped;
+        try{ getCourtStatusSnapshot=wrapped; }catch(e){}
+      }
+    }catch(e){}
+    try{
+      if(typeof window.renderCourtStatusBoard==='function' && !window.renderCourtStatusBoard.__v995Note){
+        const old=window.renderCourtStatusBoard;
+        const wrapped=function(key,div){
+          let html=old.apply(this, arguments);
+          try{
+            if(typeof html==='string' && !html.includes('v995-queue-note')){
+              html=html.replace('v994-prelim-priority-note', 'v994-prelim-priority-note v995-queue-note');
+            }
+          }catch(e){}
+          return html;
+        };
+        wrapped.__v995Note=true;
+        wrapped.__old=old;
+        window.renderCourtStatusBoard=wrapped;
+      }
+    }catch(e){}
+  }
+
+  window.OperationQueueV995={
+    version:VERSION,
+    sourceVenueForMatch,
+    groupVenue,
+    isPrelim:isPrelimV995,
+    isMain:isMainV995,
+    sortCourtRelated:sortCourtRelatedV995,
+    applySnapshotGuard:applySnapshotGuardV995,
+    install:installV995
+  };
+  installV995();
+  [0,150,500,1200,2600,5000].forEach(t=>setTimeout(installV995,t));
+  try{ console.log('[v995] venue source + prelim priority guard loaded'); }catch(e){}
+})();
