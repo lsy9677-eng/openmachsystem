@@ -228,3 +228,29 @@
   [0,120,350,800,1400,2400,4200,7000].forEach(t => setTimeout(apply, t));
   setInterval(apply, 500);
 })();
+
+/* v1003: persist safety banner temporary hide */
+(function(){
+  'use strict';
+  if(window.__V1003_SAFETY_BANNER_HIDE_INSTALLED) return;
+  window.__V1003_SAFETY_BANNER_HIDE_INSTALLED = true;
+  const KEY='v1003SafetyBannerHidden:'+String(location.pathname||'');
+  function hideBanner(){
+    try{
+      const b=document.getElementById('v953ModeSafetyBanner');
+      if(b && sessionStorage.getItem(KEY)==='1'){
+        b.style.setProperty('display','none','important');
+        b.style.setProperty('visibility','hidden','important');
+        b.style.setProperty('pointer-events','none','important');
+      }
+    }catch(e){}
+  }
+  document.addEventListener('click', function(ev){
+    try{
+      const btn=ev.target && ev.target.closest && ev.target.closest('#v953ModeSafetyBanner button.ghost');
+      if(btn){ sessionStorage.setItem(KEY,'1'); setTimeout(hideBanner,0); setTimeout(hideBanner,80); }
+    }catch(e){}
+  }, true);
+  [0,120,400,900,1600,2600,5000].forEach(t=>setTimeout(hideBanner,t));
+  setInterval(hideBanner,1000);
+})();
