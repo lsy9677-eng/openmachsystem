@@ -1,12 +1,12 @@
-/* v996 clean operation engine
+/* v998 clean operation engine + clean main draw engine
    Purpose: replace the scattered main-court assignment patches with one data-first engine.
    Base: v993 successful general venue split. v994/v995 display-reorder patches are intentionally not used.
 */
 (function(){
   'use strict';
-  if(window.__operationQueueV996Installed) return;
-  window.__operationQueueV996Installed = true;
-  const VERSION = 'v996-clean-operation-engine';
+  if(window.__operationQueueV998Installed) return;
+  window.__operationQueueV998Installed = true;
+  const VERSION = 'v998-clean-main-draw-engine';
 
   function arr(v){ return Array.isArray(v) ? v : []; }
   function clean(v){ return String(v == null ? '' : v).trim(); }
@@ -14,7 +14,14 @@
   function log(){ try{ if(window.__OPQ_DEBUG__) console.log.apply(console, ['[operation-queue]', ...arguments]); }catch(e){} }
   function isWinner(m){ return m && m.winner != null; }
   function isBye(m){ return !!(m && m.bye); }
-  function isReadyPair(m){ return m && m.t1 != null && m.t2 != null; }
+  function isReadyPair(m){
+    if(!m) return false;
+    if(m.t1 != null && m.t2 != null) return true;
+    const a=clean(m.source1Label || m.label1 || '');
+    const b=clean(m.source2Label || m.label2 || '');
+    if(a && b && !/^부전승$/i.test(b) && !/^TBD$/i.test(a) && !/^TBD$/i.test(b)) return true;
+    return false;
+  }
   function natural(a,b){ return String(a||'').localeCompare(String(b||''),'ko',{numeric:true,sensitivity:'base'}); }
 
   function currentTidSafe(){
@@ -153,21 +160,91 @@
     if(raw==='dongbu' && activeLabels.includes('동부')) return '동부';
     return '';
   }
-  function inferMatchVenueLabelForKey(key, m){
+
+  const VENUE_MODE_KEY_PREFIX='OPQ_MAIN_VENUE_MODE:';
+  function venueModeStorageKey(key){ return VENUE_MODE_KEY_PREFIX + clean(key||keyOf()); }
+  function normalizeMainVenueMode(v){
+    v=clean(v).toLowerCase();
+    if(['preserve','keep','prelim','prelim_venue','keep_prelim','venue_keep'].includes(v)) return 'preserve';
+    if(['rebalance','overall','all','mixed','redistribute','reset'].includes(v)) return 'rebalance';
+    return '';
+  }
+  function setMainVenueModeForKey(key,mode){
+    key=clean(key||keyOf()); mode=normalizeMainVenueMode(mode)||'rebalance';
+    try{ localStorage.setItem(venueModeStorageKey(key), mode); }catch(e){}
+    try{
+      if(window.G){
+        G.draws=G.draws||{}; G.draws[key]=G.draws[key]||{};
+        G.draws[key].mainVenueMode=mode;
+        G.draws[key].mainCourtVenueMode=mode;
+        G.draws[key].mainVenueModeUpdatedAt=nowIso();
+      }
+    }catch(e){}
+    return mode;
+  }
+  function getMainVenueModeForKey(key){
+    key=clean(key||keyOf());
+    let mode='';
+    try{ const d=window.G && G.draws && G.draws[key]; mode=normalizeMainVenueMode(d && (d.mainVenueMode || d.mainCourtVenueMode || d.venueMode)); }catch(e){}
+    if(!mode){ try{ const d=window.G && G.draws && G.draws[key]; if(d && d.v606KeepCourtGroup && d.v606KeepCourtGroup.enabled) mode='preserve'; }catch(e){} }
+    if(!mode){ try{ mode=normalizeMainVenueMode(localStorage.getItem(venueModeStorageKey(key))); }catch(e){} }
+    return mode || 'rebalance';
+  }
+  function venueWeightListForKey(key){
     const info=getActiveVenueLabelsForKey(key);
-    const labels=info.labels||[];
-    if(labels.length===1) return labels[0];
-    const fromRaw=normalizeRawVenue(m && (m.venue || m.__venue), labels);
-    if(fromRaw) return fromRaw;
-    const target=courtOfMatch(m) || clean(m && m.__sharedCourtLabel);
-    const byTarget=venueOfCourt(target);
-    if(byTarget && (!labels.length || labels.includes(byTarget))) return byTarget;
+    const groups=info.groups||{};
+    const labels=(info.labels&&info.labels.length)?info.labels:Object.keys(groups);
+    const weighted=[];
+    labels.forEach(v=>{
+      const n=Math.max(1, arr(groups[v]).length || 1);
+      for(let i=0;i<n;i++) weighted.push(v);
+    });
+    return weighted.length?weighted:labels;
+  }
+  function rebalanceVenueForMatch(key,m){
+    const weighted=venueWeightListForKey(key);
+    if(!weighted.length) return '';
+    const slot = Number(m && (m.slot ?? m.mainSlot ?? 0));
+    const round = Number(m && (m.round ?? 0));
+    const idx = Math.abs((Number.isFinite(slot)?slot:0) + (Number.isFinite(round)?round*997:0)) % weighted.length;
+    return weighted[idx] || weighted[0];
+  }
+  function getPrelimVenueForMatchByTeams(key,m,labels){
     const teamVenue=teamPrelimVenueMap(key);
     const a=(m&&m.t1!=null) ? teamVenue.get(String(m.t1)) : '';
     const b=(m&&m.t2!=null) ? teamVenue.get(String(m.t2)) : '';
     if(a && labels.includes(a)) return a;
     if(b && labels.includes(b)) return b;
-    return labels[0] || a || b || byTarget || '국제';
+    return a||b||'';
+  }
+  function inferMatchVenueLabelForKey(key, m){
+    const info=getActiveVenueLabelsForKey(key);
+    const labels=info.labels||[];
+    if(labels.length===1) return labels[0];
+
+    // v997: 본선/진출전의 구장 배정 방식은 관리자가 본선 추첨 시 선택한다.
+    // - rebalance: 전체 재배정(기본값). 사용 코트 수 비율에 맞춰 구장을 다시 분산한다.
+    // - preserve : 예선 구장 유지. 예선 출신 구장 기준으로 본선 구간/공용대기를 나눈다.
+    if(m && isMainMatch(m)){
+      const mode=getMainVenueModeForKey(key);
+      if(mode==='rebalance'){
+        const v=rebalanceVenueForMatch(key,m);
+        if(v && (!labels.length || labels.includes(v))) return v;
+      }
+      if(mode==='preserve'){
+        const pv=getPrelimVenueForMatchByTeams(key,m,labels);
+        if(pv && (!labels.length || labels.includes(pv))) return pv;
+      }
+    }
+
+    const fromRaw=normalizeRawVenue(m && (m.venue || m.__venue), labels);
+    if(fromRaw) return fromRaw;
+    const target=courtOfMatch(m) || clean(m && m.__sharedCourtLabel);
+    const byTarget=venueOfCourt(target);
+    if(byTarget && (!labels.length || labels.includes(byTarget))) return byTarget;
+    const pv=getPrelimVenueForMatchByTeams(key,m,labels);
+    if(pv && (!labels.length || labels.includes(pv))) return pv;
+    return labels[0] || byTarget || '국제';
   }
   function firstCourtForVenue(key, venue){
     const info=getActiveVenueLabelsForKey(key);
@@ -289,7 +366,7 @@
       });
     });
 
-    try{ console.log('[v996] clean main court engine', key, labels.map(v=>v+':'+(queues[v]||[]).length).join(' / ')); }catch(e){}
+    try{ console.log('[v998] clean main court engine', key, labels.map(v=>v+':'+(queues[v]||[]).length).join(' / ')); }catch(e){}
     return changed;
   }
 
@@ -300,7 +377,7 @@
         const hasUnassignedGroup=G.matches[key].some(m=>m && !isWinner(m) && isPrelimMatch(m) && !courtOfMatch(m) && !(Array.isArray(m.courts)&&m.courts.length));
         if(hasUnassignedGroup && typeof window.assignPrelimCourtsEvenly==='function') window.assignPrelimCourtsEvenly(key);
       }
-    }catch(e){ console.warn('[v996] prelim helper failed', e); }
+    }catch(e){ console.warn('[v997] prelim helper failed', e); }
     return false;
   }
 
@@ -322,7 +399,7 @@
       else if(typeof toast==='function') toast('본선 코트 배정 완료 ✅','success');
       return true;
     }catch(e){
-      console.error('[v996] clean main assign failed', e);
+      console.error('[v998] clean main assign failed', e);
       if(typeof toastMsg==='function') toastMsg('본선 코트 배정 실패: '+(e&&e.message?e.message:e),'error');
       return false;
     }
@@ -333,6 +410,105 @@
     try{ if(m){ const v=inferMatchVenueLabelForKey(key,m); if(v){m.venue=v;m.__venue=v;if(!clean(m.__sharedCourtLabel)) m.__sharedCourtLabel=firstCourtForVenue(key,v);} } }catch(e){}
     return m;
   }
+
+  function ensureMainVenueModeStyle(){
+    if(document.getElementById('opqVenueModeStyle')) return;
+    const st=document.createElement('style');
+    st.id='opqVenueModeStyle';
+    st.textContent=`
+      .opq-main-venue-mode{margin-top:14px;padding:13px 14px;border:1.5px solid #d4a017;border-radius:16px;background:linear-gradient(135deg,#fffdf5,#f8fbff);}
+      .opq-main-venue-mode-title{font-weight:1000;color:#0f1e3a;font-size:.9rem;margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+      .opq-main-venue-options{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+      .opq-main-venue-option{display:flex;gap:8px;align-items:flex-start;padding:11px 12px;border:2px solid #dbe3f0;border-radius:14px;background:#fff;cursor:pointer;line-height:1.45;}
+      .opq-main-venue-option b{display:block;font-size:.84rem;color:#0f1e3a;}
+      .opq-main-venue-option span{display:block;font-size:.72rem;color:#64748b;margin-top:2px;}
+      .opq-main-venue-option input{margin-top:2px;accent-color:#d4a017;}
+      .opq-main-venue-option:has(input:checked){border-color:#d4a017;background:#fff7dd;box-shadow:0 8px 18px rgba(212,160,23,.13);}
+      .opq-main-venue-note{font-size:.72rem;color:#64748b;margin-top:9px;line-height:1.55;}
+      #v606KeepCourtGroupSection{display:none !important;}
+      @media(max-width:680px){.opq-main-venue-options{grid-template-columns:1fr}.opq-main-venue-mode{padding:12px}}
+    `;
+    document.head.appendChild(st);
+  }
+  function injectMainVenueModeUi(key){
+    try{
+      ensureMainVenueModeStyle();
+      const modal=document.getElementById('mIndividualMainDraw');
+      if(!modal) return;
+      const body=modal.querySelector('.modal-body');
+      if(!body) return;
+      let box=document.getElementById('opqMainVenueModeBox');
+      if(!box){
+        box=document.createElement('div');
+        box.id='opqMainVenueModeBox';
+        box.className='opq-main-venue-mode';
+        box.innerHTML=`
+          <div class="opq-main-venue-mode-title">🧭 본선 구장 운영 방식</div>
+          <div class="opq-main-venue-options">
+            <label class="opq-main-venue-option">
+              <input type="radio" name="opqMainVenueMode" value="rebalance">
+              <div><b>전체 재배정</b><span>본선 진출팀을 전체 사용 코트에 다시 고르게 배정합니다. 기본값입니다.</span></div>
+            </label>
+            <label class="opq-main-venue-option">
+              <input type="radio" name="opqMainVenueMode" value="preserve">
+              <div><b>예선 구장 유지</b><span>국제 출신은 국제, 능동 출신은 능동처럼 이동 없이 구장별 본선을 우선 운영합니다.</span></div>
+            </label>
+          </div>
+          <div class="opq-main-venue-note">※ 본선 추첨은 대진표/구장 구간만 확정하고, 실제 코트 투입은 <b>본선 코트배정</b> 버튼을 눌렀을 때 적용됩니다.</div>`;
+        const testRow=document.getElementById('individualMainDrawIsTestInput');
+        const testLabel=testRow ? testRow.closest('label') : null;
+        if(testLabel && testLabel.parentElement===body) body.insertBefore(box, testLabel);
+        else body.appendChild(box);
+      }
+      const mode=getMainVenueModeForKey(key||keyOf());
+      const radio=box.querySelector(`input[name="opqMainVenueMode"][value="${mode}"]`) || box.querySelector('input[value="rebalance"]');
+      if(radio) radio.checked=true;
+    }catch(e){ console.warn('[v998] main venue mode UI inject failed',e); }
+  }
+  function readMainVenueModeFromUi(){
+    const el=document.querySelector('input[name="opqMainVenueMode"]:checked');
+    return normalizeMainVenueMode(el && el.value) || 'rebalance';
+  }
+  function installMainDrawVenueModeHooks(){
+    if(window.__opqMainVenueModeHooksV997) return;
+    window.__opqMainVenueModeHooksV997=true;
+    ensureMainVenueModeStyle();
+    try{
+      const oldOpen=window.openIndividualMainDraw;
+      if(typeof oldOpen==='function' && !oldOpen.__opqVenueModeWrapped){
+        const wrapped=function(tid,div){
+          const r=oldOpen.apply(this,arguments);
+          setTimeout(()=>injectMainVenueModeUi(keyOf(tid,div)),0);
+          setTimeout(()=>injectMainVenueModeUi(keyOf(tid,div)),160);
+          return r;
+        };
+        wrapped.__opqVenueModeWrapped=true; wrapped.__old=oldOpen; window.openIndividualMainDraw=wrapped;
+      }
+    }catch(e){}
+    try{
+      const oldStart=window.startIndividualMainDraw;
+      if(typeof oldStart==='function' && !oldStart.__opqVenueModeWrapped){
+        const wrapped=async function(){
+          const key=keyOf();
+          const mode=setMainVenueModeForKey(key, readMainVenueModeFromUi());
+          try{
+            const oldV606=document.getElementById('v606KeepCourtGroupEnabled');
+            if(oldV606) oldV606.checked=(mode==='preserve');
+          }catch(e){}
+          const r=await oldStart.apply(this,arguments);
+          setTimeout(()=>{
+            try{
+              setMainVenueModeForKey(key, mode);
+              if(window.G && G.draws && G.draws[key] && typeof window.stD==='function') window.stD(key);
+            }catch(e){}
+          },700);
+          return r;
+        };
+        wrapped.__opqVenueModeWrapped=true; wrapped.__old=oldStart; window.startIndividualMainDraw=wrapped;
+      }
+    }catch(e){}
+  }
+
   function installSharedVenueGuard(){
     try{
       if(typeof window.getCourtBoardSharedOverflowItems === 'function' && !window.getCourtBoardSharedOverflowItems.__v996VenueGuard){
@@ -343,6 +519,284 @@
           return list;
         };
         wrapped.__v996VenueGuard=true; wrapped.__old=oldShared; window.getCourtBoardSharedOverflowItems=wrapped;
+      }
+    }catch(e){}
+  }
+
+
+
+  /* ─────────────────────────────────────────────────────────────
+     v998 Clean main draw builder
+     - Removes the hard-coded 128 draw / 국제+원도심 fixed table logic.
+     - Draw size is derived only from actual advEntries count.
+     - Venue mode is selected by admin at main-draw time:
+       rebalance = redistribute across all active venues by court count
+       preserve  = keep preliminary venue sections and draw inside each section
+  ───────────────────────────────────────────────────────────── */
+  function safeGrpLabel(gi){
+    try{ if(typeof grpLabel==='function') return grpLabel(Number(gi)||0); }catch(e){}
+    const n=(Number(gi)||0)+1;
+    const letters='ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    return n<=26 ? (letters[n-1]+'조') : (n+'조');
+  }
+  function safeNextPow2(n){
+    n=Math.max(1, Number(n||0));
+    try{ if(typeof nextPow2==='function') return Number(nextPow2(n))||n; }catch(e){}
+    let p=1; while(p<n) p*=2; return p;
+  }
+  function safeMainSpec(total){
+    try{ if(typeof computeMainBracketSpec==='function'){ const sp=computeMainBracketSpec(total); if(sp&&sp.mainSize) return sp; } }catch(e){}
+    const mainSize=safeNextPow2(total);
+    return {mainSize, playInTeams:0, playInMatches:0, winnersNeeded:0, directCount:total, exact:mainSize===total};
+  }
+  function cleanEntryLabel(e){
+    try{ if(typeof getMainEntryBracketLabel==='function'){ const x=getMainEntryBracketLabel(e); if(clean(x)) return clean(x); } }catch(_e){}
+    if(e && e.gn && e.rk) return safeGrpLabel(Number(e.gn)-1)+' '+Number(e.rk)+'위';
+    return clean(e && (e.nm || e.name || e.label)) || 'TBD';
+  }
+  function pickByeIndicesClean(matchCount, byeCount){
+    matchCount=Number(matchCount||0); byeCount=Math.max(0, Math.min(Number(byeCount||0), matchCount));
+    if(!byeCount) return [];
+    try{
+      if(typeof pickByeMatchIndices==='function'){
+        const a=arr(pickByeMatchIndices(matchCount,byeCount)).map(Number).filter(i=>Number.isFinite(i)&&i>=0&&i<matchCount);
+        if(a.length===byeCount) return [...new Set(a)].slice(0,byeCount);
+      }
+    }catch(e){}
+    const out=[];
+    for(let i=0;i<byeCount;i++){
+      let idx=Math.floor((i+1)*matchCount/(byeCount+1));
+      while(out.includes(idx) && idx<matchCount-1) idx++;
+      while(out.includes(idx) && idx>0) idx--;
+      out.push(idx);
+    }
+    return [...new Set(out)].slice(0,byeCount).sort((a,b)=>a-b);
+  }
+  function entrySourceVenue(key,e,activeLabels){
+    const labels=arr(activeLabels);
+    const raw=normalizeRawVenue(e && (e.venue || e.__venue || e.prelimVenue || e.venueLabel), labels);
+    if(raw) return raw;
+    try{
+      const gi=Number(e&&e.gn)-1;
+      const d=window.G && G.draws && G.draws[key];
+      const g=d && d.groups && d.groups[gi];
+      const courts=[];
+      if(g){
+        if(Array.isArray(g.courts)) g.courts.forEach(c=>courts.push(c));
+        if(g.court) courts.push(g.court);
+        if(g.assignedCourt) courts.push(g.assignedCourt);
+      }
+      for(const c of courts){ const v=venueOfCourt(c); if(v && (!labels.length || labels.includes(v))) return v; }
+    }catch(e){}
+    try{
+      const teamVenue=teamPrelimVenueMap(key);
+      if(e && e.ti!=null){ const v=teamVenue.get(String(e.ti)); if(v && (!labels.length || labels.includes(v))) return v; }
+    }catch(e){}
+    return labels[0] || '국제';
+  }
+  function venueTheme(label){
+    label=clean(label)||'통합';
+    const table={
+      '국제':{label:'국제', icon:'🔵', bg:'#eaf3ff', bd:'#2563eb', fg:'#1d4ed8', head:'#dbeafe'},
+      '능동':{label:'능동', icon:'🟣', bg:'#f3edff', bd:'#8b5cf6', fg:'#6d28d9', head:'#ede9fe'},
+      '원도심':{label:'원도심', icon:'🟢', bg:'#ecfdf5', bd:'#22c55e', fg:'#15803d', head:'#dcfce7'},
+      '장유중':{label:'장유중', icon:'🟤', bg:'#fff7ed', bd:'#f97316', fg:'#c2410c', head:'#ffedd5'},
+      '금병':{label:'금병', icon:'🟡', bg:'#fefce8', bd:'#eab308', fg:'#854d0e', head:'#fef3c7'},
+      '삼계':{label:'삼계', icon:'🔴', bg:'#fff1f2', bd:'#f43f5e', fg:'#be123c', head:'#ffe4e6'},
+      '동부':{label:'동부', icon:'🟦', bg:'#eef2ff', bd:'#6366f1', fg:'#3730a3', head:'#e0e7ff'},
+      '통합':{label:'통합', icon:'⚪', bg:'#f8fafc', bd:'#94a3b8', fg:'#475569', head:'#e2e8f0'},
+      '기타':{label:'기타', icon:'⚪', bg:'#f8fafc', bd:'#94a3b8', fg:'#475569', head:'#e2e8f0'}
+    };
+    return table[label] || {label, icon:'⚪', bg:'#f8fafc', bd:'#94a3b8', fg:'#475569', head:'#e2e8f0'};
+  }
+  function orderedActiveVenueLabels(key){
+    const info=getActiveVenueLabelsForKey(key);
+    const labels=arr(info.labels);
+    const pref=['국제','능동','원도심','장유중','금병','삼계','동부','기타'];
+    return labels.sort((a,b)=>{
+      const ia=pref.indexOf(a), ib=pref.indexOf(b);
+      if(ia!==ib) return (ia<0?99:ia)-(ib<0?99:ib);
+      return natural(a,b);
+    });
+  }
+  function buildVenueSlotPlan(key, entries, matchCount, mode){
+    const labels=orderedActiveVenueLabels(key);
+    if(!labels.length) return Array.from({length:matchCount},()=> '국제');
+    if(labels.length===1) return Array.from({length:matchCount},()=>labels[0]);
+    if(normalizeMainVenueMode(mode)==='preserve'){
+      const counts={}; labels.forEach(v=>counts[v]=0);
+      entries.forEach(e=>{ const v=entrySourceVenue(key,e,labels); counts[v]=(counts[v]||0)+1; });
+      let needed={}; labels.forEach(v=>{ needed[v]=counts[v]>0?Math.max(1, Math.ceil(counts[v]/2)):0; });
+      let sum=labels.reduce((a,v)=>a+needed[v],0);
+      while(sum>matchCount){
+        const cand=labels.filter(v=>needed[v]>1).sort((a,b)=>(needed[b]-Math.ceil((counts[b]||0)/2))-(needed[a]-Math.ceil((counts[a]||0)/2)) || needed[b]-needed[a])[0];
+        if(!cand) break; needed[cand]--; sum--;
+      }
+      while(sum<matchCount){
+        const weighted=venueWeightListForKey(key);
+        const v=weighted[sum % Math.max(1, weighted.length)] || labels[sum%labels.length];
+        needed[v]=(needed[v]||0)+1; sum++;
+      }
+      const out=[]; labels.forEach(v=>{ for(let i=0;i<(needed[v]||0);i++) out.push(v); });
+      return out.slice(0,matchCount);
+    }
+    const weighted=venueWeightListForKey(key).filter(v=>labels.includes(v));
+    const src=weighted.length?weighted:labels;
+    return Array.from({length:matchCount},(_,i)=>src[i%src.length]||labels[0]);
+  }
+  function chooseNonSameGroup(list, gn){
+    let idx=list.findIndex(e=>e && e.gn!==gn);
+    if(idx<0) idx=0;
+    if(idx<0) return null;
+    return list.splice(idx,1)[0]||null;
+  }
+  function assignEntryToSide(slot, side, entry, groupLabelOnly){
+    if(!entry) return;
+    const lbl=cleanEntryLabel(entry);
+    if(side==='t1'){
+      slot.source1Label=lbl;
+      if(!groupLabelOnly && entry.ti!=null) slot.t1=Number(entry.ti);
+      slot.gnTarget=entry.gn||null; slot.rkTarget=entry.rk||null;
+    }else{
+      slot.source2Label=lbl;
+      if(!groupLabelOnly && entry.ti!=null) slot.t2=Number(entry.ti);
+      slot.gnTarget2=entry.gn||null; slot.rkTarget2=entry.rk||null;
+    }
+  }
+  function fillSlotsClean(slots, entries, groupLabelOnly){
+    const normal=slots.filter(s=>!s.bye);
+    const byes=slots.filter(s=>s.bye);
+    const r1=entries.filter(e=>Number(e.rk||0)===1 || e.playInPlaceholder);
+    const r2=entries.filter(e=>!(Number(e.rk||0)===1 || e.playInPlaceholder));
+    byes.forEach(s=>{ const e=r1.shift()||r2.shift(); if(e){ assignEntryToSide(s,'t1',e,groupLabelOnly); if(!groupLabelOnly && e.ti!=null){ s.winner=Number(e.ti); } } s.source2Label='부전승'; });
+    normal.forEach(s=>{ const e=r1.shift(); if(e) assignEntryToSide(s,'t1',e,groupLabelOnly); });
+    normal.forEach(s=>{
+      if(!s.source1Label) return;
+      const e1gn=s.gnTarget;
+      const e2=chooseNonSameGroup(r2,e1gn);
+      if(e2) assignEntryToSide(s,'t2',e2,groupLabelOnly);
+    });
+    const leftovers=[...r1,...r2];
+    normal.forEach(s=>{
+      if(!s.source1Label){ const e=leftovers.shift(); if(e) assignEntryToSide(s,'t1',e,groupLabelOnly); }
+      if(!s.source2Label){ const e=chooseNonSameGroup(leftovers,s.gnTarget); if(e) assignEntryToSide(s,'t2',e,groupLabelOnly); }
+    });
+  }
+  function makeRound0Slots(key, entries, bracketN, mode, groupLabelOnly){
+    const matchCount=bracketN/2;
+    const byeCount=Math.max(0, bracketN-entries.length);
+    const byeSet=new Set(pickByeIndicesClean(matchCount, byeCount));
+    const slotVenues=buildVenueSlotPlan(key, entries, matchCount, mode);
+    const slots=Array.from({length:matchCount},(_,i)=>({
+      id:`main_r0_${i}`, phase:'main', round:0, slot:i, bracketN,
+      t1:null,t2:null,winner:null,rubbers:[],court:'',courts:[],bye:byeSet.has(i),
+      source1Label:'', source2Label:byeSet.has(i)?'부전승':'',
+      venue:slotVenues[i]||slotVenues[0]||'국제', __venue:slotVenues[i]||slotVenues[0]||'국제'
+    }));
+    const labels=orderedActiveVenueLabels(key);
+    if(normalizeMainVenueMode(mode)==='preserve' && labels.length>1){
+      const byV={}; labels.forEach(v=>byV[v]=[]);
+      entries.forEach(e=>{ const v=entrySourceVenue(key,e,labels); (byV[v]||(byV[v]=[])).push(e); });
+      labels.forEach(v=>fillSlotsClean(slots.filter(s=>s.venue===v), byV[v]||[], groupLabelOnly));
+      const assigned=new Set(slots.flatMap(s=>[s.source1Label,s.source2Label]).filter(Boolean));
+      const leftovers=entries.filter(e=>!assigned.has(cleanEntryLabel(e)));
+      if(leftovers.length) fillSlotsClean(slots.filter(s=>!s.source1Label || (!s.bye&&!s.source2Label)), leftovers, groupLabelOnly);
+    }else{
+      fillSlotsClean(slots, entries, groupLabelOnly);
+    }
+    return slots;
+  }
+  function buildUpperRoundsClean(round0){
+    const result=[...round0];
+    let prev=round0;
+    let round=1;
+    while(prev.length>1){
+      const next=[];
+      for(let i=0;i<prev.length;i+=2){
+        const a=prev[i], b=prev[i+1];
+        const venue=(a&&b&&a.venue===b.venue)?a.venue:'통합';
+        const m={id:`main_r${round}_${Math.floor(i/2)}`, phase:'main', round, slot:Math.floor(i/2), bracketN:Math.max(2, prev.length),
+          t1:null,t2:null,winner:null,rubbers:[],court:'',courts:[],bye:false,venue,__venue:venue};
+        [a,b].forEach((child,ci)=>{
+          if(child && child.bye && child.winner!=null){ if(ci===0) m.t1=child.winner; else m.t2=child.winner; }
+        });
+        next.push(m); result.push(m);
+      }
+      prev=next; round++;
+    }
+    return result;
+  }
+  function buildCleanMainMatches(advT,key,teams,groupLabelOnly){
+    key=clean(key||keyOf());
+    const entries=arr(advT).map(e=>({...(e||{}), nm:e&&e.nm?e.nm:cleanEntryLabel(e), _groupLabel:cleanEntryLabel(e)}));
+    const total=entries.length;
+    if(total<2) return [];
+    const mode=getMainVenueModeForKey(key);
+    const spec=safeMainSpec(total);
+    let mainEntries=entries;
+    const playIn=[];
+    if(spec.playInMatches>0){
+      const rank2=entries.filter(e=>Number(e.rk||0)!==1);
+      const playInEntries=rank2.slice(0, spec.playInTeams||0);
+      const playSet=new Set(playInEntries.map(e=>cleanEntryLabel(e)+'|'+e.ti+'|'+e.gn+'|'+e.rk));
+      const direct=entries.filter(e=>!playSet.has(cleanEntryLabel(e)+'|'+e.ti+'|'+e.gn+'|'+e.rk));
+      const placeholders=Array.from({length:spec.winnersNeeded||0},(_,i)=>({nm:`진출전 승자${i+1}`,rk:1,gn:null,ti:null,placeholder:true,playInPlaceholder:true,playInId:i+1,venue:''}));
+      mainEntries=[...direct,...placeholders];
+      for(let i=0;i<(spec.playInMatches||0);i++){
+        const a=playInEntries[i*2]||null, b=playInEntries[i*2+1]||null;
+        const v=(normalizeMainVenueMode(mode)==='preserve') ? (entrySourceVenue(key,a,orderedActiveVenueLabels(key)) || entrySourceVenue(key,b,orderedActiveVenueLabels(key))) : (buildVenueSlotPlan(key, entries, spec.playInMatches, mode)[i]||'국제');
+        playIn.push({id:`playin_${i}`,phase:'playin',round:0,slot:i,t1:(!groupLabelOnly&&a&&a.ti!=null)?Number(a.ti):null,t2:(!groupLabelOnly&&b&&b.ti!=null)?Number(b.ti):null,winner:null,rubbers:[],court:'',courts:[],bye:false,playInId:i+1,winnerLabel:`진출전 승자${i+1}`,source1Label:a?cleanEntryLabel(a):'TBD',source2Label:b?cleanEntryLabel(b):'TBD',venue:v,__venue:v});
+      }
+    }
+    const bracketN=Number(spec.mainSize)||safeNextPow2(mainEntries.length);
+    const r0=makeRound0Slots(key, mainEntries, bracketN, mode, groupLabelOnly);
+    return [...playIn, ...buildUpperRoundsClean(r0)];
+  }
+  function installCleanMainDrawBuilder(){
+    try{
+      const fn=function(advT,key,teams,groupLabelOnly){ return buildCleanMainMatches(advT,key,teams,!!groupLabelOnly); };
+      window.buildIndivMainMatchesFixed=fn;
+      try{ buildIndivMainMatchesFixed=fn; }catch(e){}
+    }catch(e){ console.warn('[v998] clean builder install failed',e); }
+    try{
+      // Old v748 venue post-process rewrote venue into hard-coded gukje/wondosim. Replace it with a safe normalizer.
+      window.v748ApplyVenueToMainMatches=function(key){
+        try{
+          key=clean(key||keyOf());
+          arr(window.G&&G.matches&&G.matches[key]).forEach(m=>{ if(m&&isMainMatch(m)){ const v=inferMatchVenueLabelForKey(key,m); m.venue=v; m.__venue=v; } });
+          return true;
+        }catch(e){return false;}
+      };
+    }catch(e){}
+  }
+  function styleMainTreeVenueBadges(key){
+    try{
+      key=clean(key||keyOf());
+      const all=arr(window.G&&G.matches&&G.matches[key]).filter(m=>m&&isMainMatch(m)).map(m=>({...m,round:Number(m.round||0),slot:Number(m.slot||0)}));
+      if(!all.length) return;
+      const ordered=all.sort((a,b)=>Number(a.round||0)-Number(b.round||0)||Number(a.slot||0)-Number(b.slot||0));
+      document.querySelectorAll('.main-tree-card .js-main-tree-scroll div[style*="position:absolute"][style*="width:168px"][style*="border"]').forEach((el,idx)=>{
+        const m=ordered[idx]; if(!m) return;
+        const th=venueTheme(clean(m.venue||m.__venue)||inferMatchVenueLabelForKey(key,m));
+        el.style.borderColor=th.bd;
+        el.style.borderLeftColor=th.bd;
+        el.style.background=th.bg;
+        if(!el.querySelector('.opq-tree-venue-badge')){
+          const b=document.createElement('div');
+          b.className='opq-tree-venue-badge';
+          b.textContent=th.icon+' '+th.label;
+          b.style.cssText='position:absolute;right:4px;top:4px;z-index:4;font-size:10px;font-weight:900;padding:2px 6px;border-radius:999px;background:'+th.head+';color:'+th.fg+';border:1px solid '+th.bd+';line-height:1.15;pointer-events:none;';
+          el.appendChild(b);
+        }
+      });
+    }catch(e){}
+  }
+  function installTreeVenueDecorator(){
+    try{
+      if(typeof window.renderBracket==='function' && !window.renderBracket.__opqTreeVenueWrapped){
+        const old=window.renderBracket;
+        const wrapped=function(){ const r=old.apply(this,arguments); setTimeout(()=>styleMainTreeVenueBadges(keyOf()),120); setTimeout(()=>styleMainTreeVenueBadges(keyOf()),600); return r; };
+        wrapped.__opqTreeVenueWrapped=true; wrapped.__old=old; window.renderBracket=wrapped;
       }
     }catch(e){}
   }
@@ -366,8 +820,17 @@
     runCleanMainCourtAssignment,
     runMainAssignButton,
     installSharedVenueGuard,
+    getMainVenueModeForKey,
+    setMainVenueModeForKey,
+    installMainDrawVenueModeHooks,
+    buildCleanMainMatches,
+    installCleanMainDrawBuilder,
+    styleMainTreeVenueBadges,
+    installTreeVenueDecorator,
     debug(on){ window.__OPQ_DEBUG__=!!on; log('debug',!!on); }
   };
+  window.OperationQueueV998=API;
+  window.OperationQueueV997=API;
   window.OperationQueueV996=API;
   window.OperationQueueV993=API; // renderCourtStatusBoard already asks OperationQueueV993.
 
@@ -380,11 +843,20 @@
   window.v766AssignMainCourtsNow = window.v771AssignMainCourts;
   // Post-draw/auto repair aliases must not assign main cards automatically. Admin button does that explicitly.
   ['v748RunMainAutoCourtRebuild','v753RunMainAutoAssign','v760RunMainAutoAssign','v765RunMainCourtRepair','v769RepairKey'].forEach(name=>{
-    window[name]=function(key){ try{ console.log('[v996] '+name+' skipped: main court assignment requires admin button'); }catch(e){} return false; };
+    window[name]=function(key){ try{ console.log('[v998] '+name+' skipped: main court assignment requires admin button'); }catch(e){} return false; };
   });
 
   installSharedVenueGuard();
+  installMainDrawVenueModeHooks();
+  installCleanMainDrawBuilder();
+  installTreeVenueDecorator();
   setTimeout(installSharedVenueGuard,300);
+  setTimeout(installMainDrawVenueModeHooks,300);
+  setTimeout(installCleanMainDrawBuilder,300);
+  setTimeout(installTreeVenueDecorator,300);
   setTimeout(installSharedVenueGuard,1200);
-  try{ console.log('[v996] clean operation engine loaded'); }catch(e){}
+  setTimeout(installMainDrawVenueModeHooks,1200);
+  setTimeout(installCleanMainDrawBuilder,1200);
+  setTimeout(installTreeVenueDecorator,1200);
+  try{ console.log('[v998] clean operation engine + clean main draw engine loaded'); }catch(e){}
 })();
