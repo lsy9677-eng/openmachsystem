@@ -356,3 +356,122 @@
 
   try{ console.log('[v993] general venue split guard loaded'); }catch(e){}
 })();
+
+
+/* v994 prelim priority guard
+   Rule: while a prelim/group match is still assigned to a court, main-draw/playin matches
+   on that same court must not become the current/live card ahead of prelims. This is a
+   display/queue-order guard only; it does not rewrite match data or manual placements.
+*/
+(function(){
+  'use strict';
+  if(window.__operationQueueV994PrelimPriorityInstalled) return;
+  window.__operationQueueV994PrelimPriorityInstalled = true;
+  const VERSION = 'v994-prelim-main-priority';
+
+  function clean(v){ return String(v == null ? '' : v).trim(); }
+  function arr(v){ return Array.isArray(v) ? v : []; }
+  function phaseOf(m){ return clean(m && m.phase).toLowerCase(); }
+  function isOpen(m){ return !!(m && m.winner == null); }
+  function isPrelim(m){ const p = phaseOf(m); return p === 'group' || p === 'prelim'; }
+  function isMain(m){ const p = phaseOf(m); return p === 'main' || p === 'playin'; }
+  function orderToken(m){
+    return clean(m && (m.courtQueueOrder || m.courtAssignedAt || m.manualCourtPinnedAt || m.waitingFirstAt || m.createdAt || ''));
+  }
+  function fallbackCompare(a,b){
+    const aa = orderToken(a), bb = orderToken(b);
+    if(aa !== bb) return aa.localeCompare(bb);
+    const ga = Number(a && a.group != null ? a.group : 9999);
+    const gb = Number(b && b.group != null ? b.group : 9999);
+    if(ga !== gb) return ga - gb;
+    const ra = Number(a && a.round || 0), rb = Number(b && b.round || 0);
+    if(ra !== rb) return ra - rb;
+    const sa = Number(a && a.slot || 0), sb = Number(b && b.slot || 0);
+    if(sa !== sb) return sa - sb;
+    return clean(a && a.id).localeCompare(clean(b && b.id),'ko');
+  }
+  function hasPrelimOnCourt(related){
+    return arr(related).some(m => isOpen(m) && isPrelim(m));
+  }
+  function sortRelatedWithPrelimPriority(related){
+    const list = arr(related).slice();
+    const forcePrelimFirst = hasPrelimOnCourt(list);
+    list.sort((a,b)=>{
+      if(forcePrelimFirst){
+        const ap = isPrelim(a) ? 0 : (isMain(a) ? 1 : 2);
+        const bp = isPrelim(b) ? 0 : (isMain(b) ? 1 : 2);
+        if(ap !== bp) return ap - bp;
+      }
+      return fallbackCompare(a,b);
+    });
+    return list;
+  }
+  function applySnapshotPrelimPriority(snapshot){
+    return arr(snapshot).map(item=>{
+      try{
+        const related = sortRelatedWithPrelimPriority(item && item.related ? item.related : []);
+        if(!related.length) return item;
+        const current = related[0] || null;
+        const waiting = related.slice(1);
+        return Object.assign({}, item, {
+          related,
+          current,
+          waiting,
+          status: current ? 'live' : 'empty',
+          __v994PrelimPriority: hasPrelimOnCourt(related)
+        });
+      }catch(e){ return item; }
+    });
+  }
+
+  function installPrelimPriorityGuard(){
+    try{
+      if(typeof window.getCourtStatusSnapshot === 'function' && !window.getCourtStatusSnapshot.__v994PrelimPriority){
+        const oldSnapshot = window.getCourtStatusSnapshot;
+        const wrappedSnapshot = function(key){
+          const result = oldSnapshot.apply(this, arguments);
+          return applySnapshotPrelimPriority(result);
+        };
+        wrappedSnapshot.__v994PrelimPriority = true;
+        wrappedSnapshot.__old = oldSnapshot;
+        window.getCourtStatusSnapshot = wrappedSnapshot;
+      }
+    }catch(e){ try{ console.warn('[v994] getCourtStatusSnapshot wrap failed', e); }catch(_e){} }
+
+    try{
+      if(typeof window.renderCourtStatusBoard === 'function' && !window.renderCourtStatusBoard.__v994PrelimPriorityBadge){
+        const oldRender = window.renderCourtStatusBoard;
+        const wrappedRender = function(key, div){
+          let html = oldRender.apply(this, arguments);
+          try{
+            if(typeof html === 'string'){
+              // 안내 문구만 추가. 실제 로직은 snapshot guard가 처리한다.
+              const marker = 'v994-prelim-priority-note';
+              if(!html.includes(marker) && /코트 현황판|코트 사용 현황|court-drop-zone/.test(html)){
+                const note = `<div class="${marker}" style="margin:0 0 10px;padding:9px 12px;border-radius:12px;background:#eef2ff;border:1px solid #c7d2fe;color:#3730a3;font-size:.76rem;font-weight:900;line-height:1.45">🛡️ 예선 진행 코트 보호: 같은 코트에 예선 경기가 남아 있으면 본선/진출전은 예선 뒤 대기로 표시됩니다.</div>`;
+                html = note + html;
+              }
+            }
+          }catch(e){}
+          return html;
+        };
+        wrappedRender.__v994PrelimPriorityBadge = true;
+        wrappedRender.__old = oldRender;
+        window.renderCourtStatusBoard = wrappedRender;
+      }
+    }catch(e){ try{ console.warn('[v994] renderCourtStatusBoard wrap failed', e); }catch(_e){} }
+  }
+
+  window.OperationQueueV994 = Object.assign({}, window.OperationQueueV993 || {}, {
+    version: VERSION,
+    isPrelim,
+    isMain,
+    sortRelatedWithPrelimPriority,
+    applySnapshotPrelimPriority,
+    installPrelimPriorityGuard
+  });
+  installPrelimPriorityGuard();
+  setTimeout(installPrelimPriorityGuard, 300);
+  setTimeout(installPrelimPriorityGuard, 1200);
+  try{ console.log('[v994] prelim priority guard loaded'); }catch(e){}
+})();
