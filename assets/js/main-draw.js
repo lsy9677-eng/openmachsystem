@@ -287,16 +287,50 @@
   'use strict';
   if(window.__v1005MainDrawButtonRestoreInstalled) return;
   window.__v1005MainDrawButtonRestoreInstalled = true;
-  var VERSION='v1005-button-restore';
+  var VERSION='v1006-button-privacy-fix';
   function $(id){return document.getElementById(id);}
   function S(v){return String(v||'').replace(/\s+/g,' ').trim();}
   function safeToast(msg,type){try{ if(typeof toast==='function') toast(msg,type||'info'); else console.log(msg); }catch(e){}}
   function visible(el){try{if(!el) return false; var cs=getComputedStyle(el); return cs.display!=='none'&&cs.visibility!=='hidden'&&el.offsetParent!==null;}catch(e){return false;}}
+  function isBracketPageActive(){
+    try{
+      var p=$('page-bracket');
+      if(p && p.classList && p.classList.contains('active')) return true;
+      var active=document.querySelector('.nav-tab.active,.tab.active,.page-tab.active');
+      var t=S(active&&active.textContent);
+      return /대진표|본선/.test(t);
+    }catch(e){return false;}
+  }
+  function isPublicLoginState(){
+    try{
+      var h=S(document.querySelector('.header-actions')?.innerText||'');
+      if(/로그인/.test(h) && !/로그아웃|개발자|관리자|운영자|진행자/.test(h)) return true;
+    }catch(e){}
+    try{
+      var btns=[].slice.call(document.querySelectorAll('button,.btn,.btn-sm'));
+      var loginVisible=btns.some(function(b){return visible(b)&&/^\s*(🔐\s*)?로그인\s*$/.test(S(b.textContent));});
+      var logoutVisible=btns.some(function(b){return visible(b)&&/로그아웃/.test(S(b.textContent));});
+      if(loginVisible && !logoutVisible) return true;
+    }catch(e){}
+    return false;
+  }
   function isPrivileged(){
-    try{var b=document.body; if(b && /admin-mode|tm-mode|operator-mode|op-mode|developer-mode|dev-mode/.test(b.className||'')) return true;}catch(e){}
-    try{var st=$('adminSettingsBtn'); if(visible(st)) return true;}catch(e){}
-    try{var ab=$('adminBadge'); if(ab && /개발자|관리자|운영자|진행자/.test(S(ab.textContent)) && (ab.classList.contains('show')||visible(ab))) return true;}catch(e){}
-    try{var h=S(document.querySelector('.header-actions')?.innerText||''); if(/이상영님|개발자|관리자|운영자|진행자/.test(h) && /님|로그아웃|개발자|관리자|운영자/.test(h)) return true;}catch(e){}
+    // 비로그인 화면에서는 개발용 페이지라도 새 본선 도구를 절대 노출하지 않는다.
+    if(isPublicLoginState()) return false;
+    try{ if(typeof window.canManageBracket==='function' && window.canManageBracket()) return true; }catch(e){}
+    try{ if(typeof window.isManager==='function' && window.isManager()) return true; }catch(e){}
+    try{ if(typeof window.isAdmin==='function' && window.isAdmin()) return true; }catch(e){}
+    try{ if(typeof window.isDeveloper==='function' && window.isDeveloper()) return true; }catch(e){}
+    try{
+      var ab=$('adminBadge');
+      var txt=S(ab&&ab.textContent);
+      if(ab && /개발자|관리자|운영자|진행자/.test(txt) && (ab.classList.contains('show')||visible(ab))) return true;
+    }catch(e){}
+    try{
+      var h=S(document.querySelector('.header-actions')?.innerText||'');
+      // 이름만으로 권한 부여하지 않는다. 반드시 역할 배지가 있어야 한다.
+      if(/개발자|관리자|운영자|진행자/.test(h) && !/로그인/.test(h)) return true;
+    }catch(e){}
     return false;
   }
   function api(){return window.MainDrawCleanV1004 || window.MainDrawCleanV1003 || window.MainDrawCleanV1002 || null;}
@@ -354,7 +388,7 @@
       if(anchor && anchor.parentNode) anchor.parentNode.insertBefore(bar, anchor.nextSibling); else page.prepend(bar);
       $('v1005DrawBtn').onclick=callDraw; $('v1005AssignBtn').onclick=callAssign; $('v1005PanelBtn').onclick=function(){var a=api(); try{a&&a.ensurePanel&&a.ensurePanel();}catch(e){} scrollToPanel();};
     }
-    var ok=isPrivileged();
+    var ok=isBracketPageActive() && isPrivileged();
     bar.classList.toggle('show', ok);
     var fl=$('v1005MainDrawFloat');
     if(!fl){
@@ -371,5 +405,5 @@
   document.addEventListener('input',function(){setTimeout(apply,100);},true);
   [0,150,500,1200,2500,5000].forEach(function(t){setTimeout(apply,t);});
   setInterval(apply,1500);
-  try{console.log('[v1005] main draw visible buttons restored');}catch(e){}
+  try{console.log('[v1006] main draw buttons privacy fixed');}catch(e){}
 })();
