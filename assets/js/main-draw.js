@@ -280,3 +280,96 @@
   function loop(){try{apply();}catch(e){} setTimeout(loop,2500)} if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(loop,500)); else setTimeout(loop,500);
   try{console.log('[v1004] clean 64 bracket renderer loaded');}catch(e){}
 })();
+
+
+/* v1005: visible main draw controls restore - keep clean main draw engine as source of truth */
+(function(){
+  'use strict';
+  if(window.__v1005MainDrawButtonRestoreInstalled) return;
+  window.__v1005MainDrawButtonRestoreInstalled = true;
+  var VERSION='v1005-button-restore';
+  function $(id){return document.getElementById(id);}
+  function S(v){return String(v||'').replace(/\s+/g,' ').trim();}
+  function safeToast(msg,type){try{ if(typeof toast==='function') toast(msg,type||'info'); else console.log(msg); }catch(e){}}
+  function visible(el){try{if(!el) return false; var cs=getComputedStyle(el); return cs.display!=='none'&&cs.visibility!=='hidden'&&el.offsetParent!==null;}catch(e){return false;}}
+  function isPrivileged(){
+    try{var b=document.body; if(b && /admin-mode|tm-mode|operator-mode|op-mode|developer-mode|dev-mode/.test(b.className||'')) return true;}catch(e){}
+    try{var st=$('adminSettingsBtn'); if(visible(st)) return true;}catch(e){}
+    try{var ab=$('adminBadge'); if(ab && /개발자|관리자|운영자|진행자/.test(S(ab.textContent)) && (ab.classList.contains('show')||visible(ab))) return true;}catch(e){}
+    try{var h=S(document.querySelector('.header-actions')?.innerText||''); if(/이상영님|개발자|관리자|운영자|진행자/.test(h) && /님|로그아웃|개발자|관리자|운영자/.test(h)) return true;}catch(e){}
+    return false;
+  }
+  function api(){return window.MainDrawCleanV1004 || window.MainDrawCleanV1003 || window.MainDrawCleanV1002 || null;}
+  function scrollToPanel(){try{var p=$('v1003MainPanel'); if(p){p.classList.remove('v1003-legacy-hidden'); p.style.display='block'; p.style.visibility='visible'; p.scrollIntoView({behavior:'smooth',block:'start'});}}catch(e){}}
+  function callDraw(){
+    var a=api();
+    if(!a){safeToast('새 본선 엔진이 아직 로드되지 않았습니다. 새로고침 후 다시 시도하세요.','error'); return;}
+    try{a.ensurePanel && a.ensurePanel();}catch(e){}
+    setTimeout(function(){
+      var mode=$('v1003MainMode')?.value || 'redistribute';
+      try{
+        if(typeof a.generateDraw==='function') a.generateDraw(a.selectedKey ? a.selectedKey() : undefined, mode);
+        else $('v1003DrawBtn')?.click();
+      }catch(e){console.error('[v1005] draw failed',e); safeToast('새 본선 추첨 실행 중 오류가 발생했습니다.','error');}
+      scrollToPanel();
+    },30);
+  }
+  function callAssign(){
+    var a=api();
+    if(!a){safeToast('새 본선 엔진이 아직 로드되지 않았습니다. 새로고침 후 다시 시도하세요.','error'); return;}
+    try{a.ensurePanel && a.ensurePanel();}catch(e){}
+    setTimeout(function(){
+      try{
+        if(typeof a.assignCourts==='function') a.assignCourts(a.selectedKey ? a.selectedKey() : undefined);
+        else $('v1003AssignBtn')?.click();
+      }catch(e){console.error('[v1005] assign failed',e); safeToast('새 본선 코트배정 실행 중 오류가 발생했습니다.','error');}
+      scrollToPanel();
+    },30);
+  }
+  function ensureStyle(){
+    if($('v1005MainDrawButtonStyle')) return;
+    var st=document.createElement('style'); st.id='v1005MainDrawButtonStyle'; st.textContent=`
+      #v1005MainDrawQuickBar{display:none;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0 14px;padding:12px 14px;border:2px solid #bfdbfe;border-radius:16px;background:linear-gradient(135deg,#eff6ff,#fff);box-shadow:0 8px 22px rgba(15,30,58,.08);position:relative;z-index:80}
+      #v1005MainDrawQuickBar.show{display:flex!important}
+      #v1005MainDrawQuickBar .v1005-title{font-weight:1000;color:#0f1e3a;margin-right:auto;font-size:.95rem}
+      #v1005MainDrawQuickBar .v1005-sub{font-size:.72rem;color:#64748b;font-weight:800;flex-basis:100%;line-height:1.35}
+      .v1005-main-btn{border:0;border-radius:999px;min-height:38px;padding:8px 13px;font-weight:1000;cursor:pointer;font-family:inherit;box-shadow:0 6px 14px rgba(15,30,58,.10)}
+      .v1005-main-btn.draw{background:#2563eb;color:#fff}.v1005-main-btn.assign{background:#7c3aed;color:#fff}.v1005-main-btn.panel{background:#fff;color:#0f1e3a;border:1.5px solid #cbd5e1}
+      #v1005MainDrawFloat{display:none;position:fixed;right:14px;bottom:max(96px,calc(env(safe-area-inset-bottom,0px) + 88px));z-index:3600;gap:6px;align-items:center;padding:7px;border-radius:999px;background:rgba(15,30,58,.96);box-shadow:0 14px 32px rgba(15,30,58,.28)}
+      #v1005MainDrawFloat.show{display:flex!important}
+      #v1005MainDrawFloat button{border:0;border-radius:999px;padding:8px 10px;font-size:.75rem;font-weight:1000;cursor:pointer;background:#fff;color:#0f1e3a}
+      #v1005MainDrawFloat button.primary{background:#2563eb;color:white}
+      .v1005-force-visible{display:block!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important}
+      @media(max-width:680px){#v1005MainDrawQuickBar{padding:11px 12px}#v1005MainDrawQuickBar .v1005-title{flex-basis:100%}.v1005-main-btn{flex:1 1 30%;font-size:.8rem;padding:8px 8px}#v1005MainDrawFloat{right:8px;left:8px;justify-content:center;bottom:max(86px,calc(env(safe-area-inset-bottom,0px) + 76px))}}
+    `; document.head.appendChild(st);
+  }
+  function ensureQuickBar(){
+    ensureStyle();
+    var page=$('page-bracket') || document.querySelector('.page.active') || document.body;
+    var bar=$('v1005MainDrawQuickBar');
+    if(!bar){
+      bar=document.createElement('div'); bar.id='v1005MainDrawQuickBar';
+      bar.innerHTML='<div class="v1005-title">🏆 새 본선 운영</div><button type="button" class="v1005-main-btn draw" id="v1005DrawBtn">🎲 새 본선 추첨</button><button type="button" class="v1005-main-btn assign" id="v1005AssignBtn">🎯 본선 코트배정</button><button type="button" class="v1005-main-btn panel" id="v1005PanelBtn">⬇ 패널 보기</button><div class="v1005-sub">기존 본선 고정/확정/128고정 버튼은 사용하지 않고, 새 본선 엔진만 사용합니다.</div>';
+      var anchor=page.querySelector('.sec-title') || page.querySelector('.card-title') || page.firstElementChild;
+      if(anchor && anchor.parentNode) anchor.parentNode.insertBefore(bar, anchor.nextSibling); else page.prepend(bar);
+      $('v1005DrawBtn').onclick=callDraw; $('v1005AssignBtn').onclick=callAssign; $('v1005PanelBtn').onclick=function(){var a=api(); try{a&&a.ensurePanel&&a.ensurePanel();}catch(e){} scrollToPanel();};
+    }
+    var ok=isPrivileged();
+    bar.classList.toggle('show', ok);
+    var fl=$('v1005MainDrawFloat');
+    if(!fl){
+      fl=document.createElement('div'); fl.id='v1005MainDrawFloat';
+      fl.innerHTML='<button type="button" class="primary" id="v1005FloatDraw">본선추첨</button><button type="button" id="v1005FloatAssign">코트배정</button><button type="button" id="v1005FloatPanel">패널</button>';
+      document.body.appendChild(fl);
+      $('v1005FloatDraw').onclick=callDraw; $('v1005FloatAssign').onclick=callAssign; $('v1005FloatPanel').onclick=function(){var a=api(); try{a&&a.ensurePanel&&a.ensurePanel();}catch(e){} scrollToPanel();};
+    }
+    fl.classList.toggle('show', ok);
+    try{var p=$('v1003MainPanel'); if(p && ok){p.classList.add('v1005-force-visible'); p.classList.remove('v1003-legacy-hidden');}}catch(e){}
+  }
+  function apply(){ensureQuickBar();}
+  document.addEventListener('click',function(){setTimeout(apply,100);},true);
+  document.addEventListener('input',function(){setTimeout(apply,100);},true);
+  [0,150,500,1200,2500,5000].forEach(function(t){setTimeout(apply,t);});
+  setInterval(apply,1500);
+  try{console.log('[v1005] main draw visible buttons restored');}catch(e){}
+})();
