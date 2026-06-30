@@ -1,13 +1,14 @@
-/* v1004 clean 64 bracket renderer - legacy bracket replaced
-   - old main draw UI is hidden, not patched
-   - no provisional draw before prelim results are complete
+/* v1007 clean main draw slot mode
+   - legacy main draw UI is not used
+   - main draw may be created during prelims using group-rank slots
+   - actual team names are resolved automatically as prelim results are entered
    - 64 teams => 64 draw, no byes, rank1 vs rank2, no same group
 */
 (function(){
   'use strict';
   if(window.__V1004_MAIN_DRAW_CLEAN_INSTALLED) return;
   window.__V1004_MAIN_DRAW_CLEAN_INSTALLED = true;
-  const VERSION = 'v1004-clean-64-bracket-renderer';
+  const VERSION = 'v1007-slot-main-draw';
   const VENUE_ORDER = ['국제','능동','원도심','삼계','금병','동부','장유중','기타'];
   const VENUE_COLOR = {국제:'#2563eb',능동:'#7c3aed',원도심:'#16a34a',삼계:'#0891b2',금병:'#d97706',동부:'#be123c',장유중:'#475569',기타:'#64748b'};
   const VENUE_BG = {국제:'#eff6ff',능동:'#f5f3ff',원도심:'#ecfdf5',삼계:'#ecfeff',금병:'#fff7ed',동부:'#fff1f2',장유중:'#f8fafc',기타:'#f8fafc'};
@@ -76,15 +77,22 @@
     if(!groups.length) return false;
     return groups.every((g,gi)=>groupComplete(key,gi));
   }
-  function groupSignature(key){
+  function groupStructureSignature(key){
     try{
       const draw=(G&&G.draws&&G.draws[key])||{};
       const parts=ar(draw.groups).map((g,gi)=>{
         const teams=ar(g&&g.teams).map(x=>N(x)).join(',');
-        const ms=groupMatches(key,gi).map(m=>[m.id,m.t1,m.t2,m.winner,m.score1,m.score2,m.court,m.manualCourtTarget].map(S).join(':')).join('|');
-        return `${groupNo(g,gi)}[${teams}]<${ms}>`;
+        const v=groupVenue(key,g,gi);
+        return `${groupNo(g,gi)}[${teams}]@${v}`;
       });
       return parts.join('||');
+    }catch(e){return ''}
+  }
+  // Results may change during prelims; this signature is informational only and must not invalidate the draw.
+  function groupResultSignature(key){
+    try{
+      const draw=(G&&G.draws&&G.draws[key])||{};
+      return ar(draw.groups).map((g,gi)=>groupMatches(key,gi).map(m=>[m.id,m.winner,m.score1,m.score2].map(S).join(':')).join('|')).join('||');
     }catch(e){return ''}
   }
   function groupVenue(key,g,gi){
@@ -115,10 +123,43 @@
       const gn=groupNo(g,gi); const st=standings(key,gi,g); const venue=groupVenue(key,g,gi);
       [1,2].forEach(rk=>{
         const ti=N(st[rk-1]);
-        if(ti!=null) out.push({ti, rk, gi, gn, venue, label:`${gn}조${rk}위`, nm:teamName(key,ti)});
+        const label=`${gn}조 ${rk}위`;
+        out.push({ti:ti!=null?ti:null, rk, gi, gn, venue, label, nm:ti!=null?teamName(key,ti):label, provisional:ti==null});
       });
     });
     return out;
+  }
+  function resolveEntry(key, entry){
+    if(!entry) return null;
+    const groups=ar(G&&G.draws&&G.draws[key]&&G.draws[key].groups);
+    const gi=N(entry.gi); const rk=N(entry.rk);
+    if(gi!=null && rk!=null && groups[gi]){
+      const st=standings(key,gi,groups[gi]);
+      const ti=N(st[rk-1]);
+      if(ti!=null) return Object.assign({},entry,{ti,nm:teamName(key,ti),provisional:false});
+    }
+    if(entry.ti!=null) return Object.assign({},entry,{nm:teamName(key,entry.ti),provisional:false});
+    return Object.assign({},entry,{ti:null,nm:entry.label||'TBD',provisional:true});
+  }
+  function resolveMatchSide(key,m,side){
+    const suffix=side===1?'1':'2';
+    const entry={
+      ti:N(m['t'+suffix]), gi:N(m['sourceGi'+suffix]), gn:N(m['sourceGroup'+suffix]), rk:N(m['sourceRank'+suffix]),
+      venue:S(m.venue||m.venueLabel||m.__venue)||'기타', label:S(m['source'+suffix+'Label']||'')
+    };
+    if(!entry.label && entry.gn && entry.rk) entry.label=`${entry.gn}조 ${entry.rk}위`;
+    const r=resolveEntry(key,entry);
+    if(r && r.ti!=null){m['t'+suffix]=r.ti; m['display'+suffix]=r.nm; m['source'+suffix+'Resolved']=true;}
+    else {m['source'+suffix+'Resolved']=false;}
+    return r;
+  }
+  function resolveCleanMatches(key, persistNames){
+    const mains=ar(G&&G.matches&&G.matches[key]).filter(m=>String(m.phase||'')==='main'&&m.cleanMainDraw);
+    mains.forEach(m=>{
+      const a=resolveMatchSide(key,m,1); const b=resolveMatchSide(key,m,2);
+      if(persistNames){m.display1=a?.nm||m.display1||m.source1Label||'TBD'; m.display2=b?.nm||m.display2||m.source2Label||'TBD';}
+    });
+    return mains;
   }
   function nextPow2(n){let p=1; while(p<n)p*=2; return p;}
   function pairRank1Rank2(entries){
@@ -152,11 +193,12 @@
     return arr.slice(0,count);
   }
   function makeMatch(key, slot, e1, e2, venue, size){
-    const id=`v1003_main_${slot}_${Date.now()}`;
+    const id=`v1007_main_${slot}_${Date.now()}`;
     return {id,phase:'main',round:0,slot,bracketN:size,winner:null,rubbers:[],court:'',courts:[],manualCourtTarget:'',
       t1:e1?.ti??null,t2:e2?.ti??null,display1:e1?.nm||e1?.label||'',display2:e2?.nm||e2?.label||'부전승',
-      source1Label:e1?.label||'',source2Label:e2?.label||'부전승',sourceGroup1:e1?.gn??null,sourceGroup2:e2?.gn??null,sourceRank1:e1?.rk??null,sourceRank2:e2?.rk??null,
-      venue,venueLabel:venue,__venue:venue,mainBlock:venue,cleanMainDraw:true,v1003CleanMain:true,createdAt:now(),updatedAt:now()};
+      source1Label:e1?.label||'',source2Label:e2?.label||'부전승',sourceGi1:e1?.gi??null,sourceGi2:e2?.gi??null,sourceGroup1:e1?.gn??null,sourceGroup2:e2?.gn??null,sourceRank1:e1?.rk??null,sourceRank2:e2?.rk??null,
+      source1Resolved:e1?.ti!=null,source2Resolved:e2?.ti!=null,
+      venue,venueLabel:venue,__venue:venue,mainBlock:venue,cleanMainDraw:true,v1007CleanMain:true,v1003CleanMain:true,createdAt:now(),updatedAt:now()};
   }
   async function persist(key){
     try{ if(window.__FB_WRITE_CACHE){ if(__FB_WRITE_CACHE.draws) delete __FB_WRITE_CACHE.draws[key]; if(__FB_WRITE_CACHE.matches) delete __FB_WRITE_CACHE.matches[key]; } }catch(e){}
@@ -166,30 +208,37 @@
   }
   async function generateDraw(key, mode){
     key=key||selectedKey(); if(!key){toast('대회와 부서를 먼저 선택하세요','error');return false;}
-    if(!prelimComplete(key)){renderInfo(key); toast('예선 결과가 확정되지 않았습니다. 예선 완료 후 본선 추첨을 실행하세요.','info'); return false;}
-    const entries=collectEntries(key); if(entries.length<2){toast('본선 진출팀을 찾을 수 없습니다','error');return false;}
+    const groups=ar(G&&G.draws&&G.draws[key]&&G.draws[key].groups);
+    if(!groups.length){toast('예선 조편성 후 본선 슬롯 추첨을 실행하세요.','info'); renderInfo(key); return false;}
+    const entries=collectEntries(key); if(entries.length<2){toast('본선 슬롯을 만들 수 없습니다. 조편성을 먼저 확인하세요.','error');return false;}
     const size=nextPow2(entries.length); const matchCount=size/2;
     let pairs=[];
-    if(entries.length===64 || entries.filter(e=>e.rk===1).length===entries.filter(e=>e.rk===2).length){ pairs=pairRank1Rank2(entries); }
+    if(entries.filter(e=>e.rk===1).length===entries.filter(e=>e.rk===2).length){ pairs=pairRank1Rank2(entries); }
     if(!pairs.length){ const q=entries.slice(); while(q.length){pairs.push([q.shift(),q.shift()||null]);} }
-    while(pairs.length<matchCount) pairs.push([entries.find(e=>e.rk===1&&!pairs.flat().includes(e))||null,null]);
+    while(pairs.length<matchCount) pairs.push([null,null]);
     const venues=venueForSlots(key,matchCount,mode,pairs);
     const old=ar(G.matches&&G.matches[key]).filter(m=>String(m.phase||'')!=='main' && String(m.phase||'')!=='playin');
     const mains=pairs.slice(0,matchCount).map((p,i)=>makeMatch(key,i,p[0],p[1],venues[i],size));
     G.matches[key]=old.concat(mains);
-    const sig=groupSignature(key);
-    G.draws[key]=Object.assign({},G.draws[key]||{}, {cleanMainDraw:true,cleanMainDrawVersion:VERSION,mainDrawMode:mode,mainDrawSize:size,mainDrawAt:now(),mainDrawGroupSignature:sig,mainDrawVenueSegments:segments(venues)});
+    const sig=groupStructureSignature(key);
+    G.draws[key]=Object.assign({},G.draws[key]||{}, {cleanMainDraw:true,cleanMainDrawVersion:VERSION,mainDrawMode:mode,mainDrawSize:size,mainDrawAt:now(),mainDrawGroupStructureSignature:sig,mainDrawResultSignature:groupResultSignature(key),mainDrawVenueSegments:segments(venues)});
+    resolveCleanMatches(key,true);
     await persist(key);
     try{ if(typeof window.renderBracket==='function') window.renderBracket(); }catch(e){}
     setTimeout(()=>{ensurePanel(); hideLegacyMainUi(); renderClean(key);},150);
-    toast(`새 본선 추첨 완료: ${size}강 · ${mains.length}경기`,'success');
+    const unresolved=mains.filter(m=>!m.source1Resolved||!m.source2Resolved).length;
+    toast(`새 본선 슬롯 추첨 완료: ${size}강 · ${mains.length}경기${unresolved?' · 일부는 예선 결과 입력 후 실명 자동 대체':''}`,'success');
     return true;
   }
   function segments(venues){const out=[]; venues.forEach((v,i)=>{let last=out[out.length-1]; if(!last||last.venue!==v) out.push({venue:v,start:i,end:i,count:1}); else{last.end=i;last.count++;}}); return out;}
   async function assignCourts(key){
     key=key||selectedKey(); if(!key){toast('대회와 부서를 먼저 선택하세요','error');return false;}
-    const mains=ar(G.matches&&G.matches[key]).filter(m=>String(m.phase||'')==='main'&&m.cleanMainDraw&&!m.winner);
+    resolveCleanMatches(key,true);
+    let mains=ar(G.matches&&G.matches[key]).filter(m=>String(m.phase||'')==='main'&&m.cleanMainDraw&&!m.winner);
     if(!mains.length){toast('배정할 새 본선 경기가 없습니다. 먼저 새 본선 추첨을 실행하세요.','info');return false;}
+    const unresolved=mains.filter(m=>(m.t1==null || m.t2==null) && S(m.display2||m.source2Label)!=='부전승');
+    mains=mains.filter(m=>(m.t1!=null && (m.t2!=null || S(m.display2||m.source2Label)==='부전승')));
+    if(!mains.length){toast('본선 슬롯은 있지만 아직 실명 확정된 경기가 없습니다. 예선 결과가 들어오면 자동 대체 후 배정하세요.','info'); renderClean(key); return false;}
     const vg=venueGroups(key); const byVenue={}; vg.forEach(v=>byVenue[v.venue]=v.courts.slice());
     const allCourts=Object.values(byVenue).flat(); if(!allCourts.length){toast('사용 코트를 찾을 수 없습니다','error');return false;}
     const occ={}; allCourts.forEach(c=>occ[c]={cur:0,wait:0});
@@ -209,15 +258,15 @@
     });
     await persist(key); try{if(typeof window.renderBracket==='function') window.renderBracket();}catch(e){}
     setTimeout(()=>{ensurePanel(); hideLegacyMainUi(); renderClean(key);},150);
-    toast(`새 본선 코트배정 완료: 배정 ${assigned}경기 · 공용대기 ${queued}경기`,'success'); return true;
+    toast(`새 본선 코트배정 완료: 배정 ${assigned}경기 · 공용대기 ${queued}경기${unresolved.length?' · 미확정 '+unresolved.length+'경기 보류':''}`,'success'); return true;
   }
-  function renderInfo(key){ const box=$('v1003CleanBracket'); if(!box)return; box.innerHTML='<div class="v1003-empty">예선 결과가 확정되면 새 본선 추첨을 실행할 수 있습니다. 예선 재추첨 후에는 기존 본선 대진을 사용하지 않습니다.</div>'; }
+  function renderInfo(key){ const box=$('v1003CleanBracket'); if(!box)return; box.innerHTML='<div class="v1003-empty">예선 조편성이 끝나면 조 순위 슬롯으로 새 본선 추첨을 미리 할 수 있습니다. 결과가 입력되면 1조 1위 같은 슬롯이 실제 팀명으로 자동 대체됩니다.</div>'; }
   function renderClean(key){
     key=key||selectedKey(); const box=$('v1003CleanBracket'); if(!box)return;
     if(!key){box.innerHTML='<div class="v1003-empty">대회와 부서를 선택하세요.</div>';return;}
-    if(!prelimComplete(key)){renderInfo(key);return;}
     const draw=(G.draws&&G.draws[key])||{};
-    if(draw.mainDrawGroupSignature && draw.mainDrawGroupSignature!==groupSignature(key)){box.innerHTML='<div class="v1003-empty">예선 조/결과가 변경되어 기존 본선 대진은 무효입니다. 새 본선 추첨을 다시 실행하세요.</div>';return;}
+    if(draw.mainDrawGroupStructureSignature && draw.mainDrawGroupStructureSignature!==groupStructureSignature(key)){box.innerHTML='<div class="v1003-empty">예선 조편성이 변경되어 기존 본선 슬롯 대진은 무효입니다. 새 본선 추첨을 다시 실행하세요.</div>';return;}
+    resolveCleanMatches(key,true);
     const mains=ar(G.matches&&G.matches[key]).filter(m=>String(m.phase||'')==='main'&&m.cleanMainDraw).sort((a,b)=>Number(a.slot||0)-Number(b.slot||0));
     if(!mains.length){box.innerHTML='<div class="v1003-empty">새 본선 대진이 없습니다. 위 버튼으로 새 본선 추첨을 실행하세요.</div>';return;}
     const size=Number(draw.mainDrawSize||mains[0]?.bracketN||mains.length*2)||mains.length*2;
@@ -257,7 +306,7 @@
   `; document.head.appendChild(st); }
   function ensurePanel(){
     ensureStyle(); let panel=$('v1003MainPanel'); const page=$('page-bracket')||document.body;
-    if(!panel){panel=document.createElement('div'); panel.id='v1003MainPanel'; panel.innerHTML=`<div class="v1003-title"><div>🏆 새 본선 운영 패널 <small>${VERSION}</small></div><small>기존 본선 고정/확정/128고정 사용 안 함</small></div><div class="v1003-controls"><select id="v1003MainMode" class="v1003-select"><option value="redistribute">전체 재배정 · 코트 수 많은 구장부터 위쪽 배정</option><option value="keep">예선 구장 유지 · 예선 출신 구장별 운영</option></select><button id="v1003DrawBtn" class="v1003-btn primary">🎲 새 본선 추첨</button><button id="v1003AssignBtn" class="v1003-btn purple">🎯 새 본선 코트배정</button></div><div class="v1003-note">예선 결과가 확정되기 전에는 본선 대진을 만들지 않습니다. 64팀 본선은 64드로, 부전승 없음, 1회전은 조1위 vs 조2위입니다.</div><div id="v1003CleanBracket"></div>`; const a=page.querySelector('.sec-title')||page.firstElementChild; if(a&&a.parentNode)a.parentNode.insertBefore(panel,a.nextSibling); else page.prepend(panel); $('v1003DrawBtn').onclick=()=>generateDraw(selectedKey(),$('v1003MainMode')?.value||'redistribute'); $('v1003AssignBtn').onclick=()=>assignCourts(selectedKey());}
+    if(!panel){panel=document.createElement('div'); panel.id='v1003MainPanel'; panel.innerHTML=`<div class="v1003-title"><div>🏆 새 본선 운영 패널 <small>${VERSION}</small></div><small>기존 본선 고정/확정/128고정 사용 안 함</small></div><div class="v1003-controls"><select id="v1003MainMode" class="v1003-select"><option value="redistribute">전체 재배정 · 코트 수 많은 구장부터 위쪽 배정</option><option value="keep">예선 구장 유지 · 예선 출신 구장별 운영</option></select><button id="v1003DrawBtn" class="v1003-btn primary">🎲 새 본선 추첨</button><button id="v1003AssignBtn" class="v1003-btn purple">🎯 새 본선 코트배정</button></div><div class="v1003-note">예선 진행 중에도 조 순위 슬롯으로 본선 추첨이 가능합니다. 64팀 본선은 64드로, 부전승 없음, 1회전은 조1위 vs 조2위입니다. 결과 입력 시 슬롯은 실제 팀명으로 자동 대체됩니다.</div><div id="v1003CleanBracket"></div>`; const a=page.querySelector('.sec-title')||page.firstElementChild; if(a&&a.parentNode)a.parentNode.insertBefore(panel,a.nextSibling); else page.prepend(panel); $('v1003DrawBtn').onclick=()=>generateDraw(selectedKey(),$('v1003MainMode')?.value||'redistribute'); $('v1003AssignBtn').onclick=()=>assignCourts(selectedKey());}
     renderClean(selectedKey());
   }
   function hideLegacyMainUi(){try{
@@ -272,13 +321,13 @@
     window.v773RunMainAssign=()=>assignCourts(selectedKey());
     ['v793FixedDraw','v799LockBracket','v809ToggleBracketLock','v900OpenManual','v900OpenManualCurrent'].forEach(n=>{try{window[n]=block;}catch(e){}});
   }
-  window.MainDrawCleanV1004={version:VERSION,ensurePanel,generateDraw,assignCourts,hideLegacyMainUi,selectedKey,prelimComplete}; window.MainDrawCleanV1003=window.MainDrawCleanV1004;
+  window.MainDrawCleanV1007={version:VERSION,ensurePanel,generateDraw,assignCourts,hideLegacyMainUi,selectedKey,prelimComplete,resolveCleanMatches}; window.MainDrawCleanV1004=window.MainDrawCleanV1007; window.MainDrawCleanV1003=window.MainDrawCleanV1007;
   install();
   function apply(){ensurePanel();hideLegacyMainUi();}
   document.addEventListener('click',()=>setTimeout(apply,90),true); document.addEventListener('input',()=>setTimeout(apply,90),true);
   [0,300,800,1800,3500,6500].forEach(t=>setTimeout(apply,t));
   function loop(){try{apply();}catch(e){} setTimeout(loop,2500)} if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(loop,500)); else setTimeout(loop,500);
-  try{console.log('[v1004] clean 64 bracket renderer loaded');}catch(e){}
+  try{console.log('[v1007] slot main draw loaded');}catch(e){}
 })();
 
 
@@ -333,7 +382,7 @@
     }catch(e){}
     return false;
   }
-  function api(){return window.MainDrawCleanV1004 || window.MainDrawCleanV1003 || window.MainDrawCleanV1002 || null;}
+  function api(){return window.MainDrawCleanV1007 || window.MainDrawCleanV1004 || window.MainDrawCleanV1003 || window.MainDrawCleanV1002 || null;}
   function scrollToPanel(){try{var p=$('v1003MainPanel'); if(p){p.classList.remove('v1003-legacy-hidden'); p.style.display='block'; p.style.visibility='visible'; p.scrollIntoView({behavior:'smooth',block:'start'});}}catch(e){}}
   function callDraw(){
     var a=api();
