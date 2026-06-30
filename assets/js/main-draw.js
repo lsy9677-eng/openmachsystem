@@ -1,4 +1,4 @@
-/* v1007 clean main draw slot mode
+/* v1008 clean main draw slot mode
    - legacy main draw UI is not used
    - main draw may be created during prelims using group-rank slots
    - actual team names are resolved automatically as prelim results are entered
@@ -8,7 +8,7 @@
   'use strict';
   if(window.__V1004_MAIN_DRAW_CLEAN_INSTALLED) return;
   window.__V1004_MAIN_DRAW_CLEAN_INSTALLED = true;
-  const VERSION = 'v1007-slot-main-draw';
+  const VERSION = 'v1008-panel-button-rebuild';
   const VENUE_ORDER = ['국제','능동','원도심','삼계','금병','동부','장유중','기타'];
   const VENUE_COLOR = {국제:'#2563eb',능동:'#7c3aed',원도심:'#16a34a',삼계:'#0891b2',금병:'#d97706',동부:'#be123c',장유중:'#475569',기타:'#64748b'};
   const VENUE_BG = {국제:'#eff6ff',능동:'#f5f3ff',원도심:'#ecfdf5',삼계:'#ecfeff',금병:'#fff7ed',동부:'#fff1f2',장유중:'#f8fafc',기타:'#f8fafc'};
@@ -305,8 +305,29 @@
     @media(max-width:680px){.v1003-controls{grid-template-columns:1fr}.v1003-grid{grid-template-columns:1fr}.v1003-btn{width:100%}}
   `; document.head.appendChild(st); }
   function ensurePanel(){
-    ensureStyle(); let panel=$('v1003MainPanel'); const page=$('page-bracket')||document.body;
-    if(!panel){panel=document.createElement('div'); panel.id='v1003MainPanel'; panel.innerHTML=`<div class="v1003-title"><div>🏆 새 본선 운영 패널 <small>${VERSION}</small></div><small>기존 본선 고정/확정/128고정 사용 안 함</small></div><div class="v1003-controls"><select id="v1003MainMode" class="v1003-select"><option value="redistribute">전체 재배정 · 코트 수 많은 구장부터 위쪽 배정</option><option value="keep">예선 구장 유지 · 예선 출신 구장별 운영</option></select><button id="v1003DrawBtn" class="v1003-btn primary">🎲 새 본선 추첨</button><button id="v1003AssignBtn" class="v1003-btn purple">🎯 새 본선 코트배정</button></div><div class="v1003-note">예선 진행 중에도 조 순위 슬롯으로 본선 추첨이 가능합니다. 64팀 본선은 64드로, 부전승 없음, 1회전은 조1위 vs 조2위입니다. 결과 입력 시 슬롯은 실제 팀명으로 자동 대체됩니다.</div><div id="v1003CleanBracket"></div>`; const a=page.querySelector('.sec-title')||page.firstElementChild; if(a&&a.parentNode)a.parentNode.insertBefore(panel,a.nextSibling); else page.prepend(panel); $('v1003DrawBtn').onclick=()=>generateDraw(selectedKey(),$('v1003MainMode')?.value||'redistribute'); $('v1003AssignBtn').onclick=()=>assignCourts(selectedKey());}
+    ensureStyle();
+    let panel=$('v1003MainPanel');
+    const page=$('page-bracket')||document.body;
+    const html=`<div class="v1003-title"><div>🏆 새 본선 운영 패널 <small>${VERSION}</small></div><small>기존 본선 고정/확정/128고정 사용 안 함</small></div><div class="v1003-controls"><select id="v1003MainMode" class="v1003-select"><option value="redistribute">전체 재배정 · 코트 수 많은 구장부터 위쪽 배정</option><option value="keep">예선 구장 유지 · 예선 출신 구장별 운영</option></select><button type="button" id="v1003DrawBtn" class="v1003-btn primary">🎲 새 본선 추첨</button><button type="button" id="v1003AssignBtn" class="v1003-btn purple">🎯 새 본선 코트배정</button></div><div class="v1003-note">예선 진행 중에도 조 순위 슬롯으로 본선 추첨이 가능합니다. 64팀 본선은 64드로, 부전승 없음, 1회전은 조1위 vs 조2위입니다. 결과 입력 시 슬롯은 실제 팀명으로 자동 대체됩니다.</div><div id="v1003CleanBracket"></div>`;
+    if(!panel){
+      panel=document.createElement('div');
+      panel.id='v1003MainPanel';
+      panel.innerHTML=html;
+      const a=page.querySelector('.sec-title')||page.firstElementChild;
+      if(a&&a.parentNode)a.parentNode.insertBefore(panel,a.nextSibling); else page.prepend(panel);
+    }else if(panel.dataset.cleanVersion!==VERSION || !panel.querySelector('#v1003DrawBtn') || !panel.querySelector('#v1003AssignBtn') || !panel.querySelector('#v1003MainMode')){
+      // 기존 v1002~v1007 패널 찌꺼기가 남아 있으면 버튼까지 포함한 새 패널로 강제 재구성한다.
+      panel.innerHTML=html;
+    }
+    panel.dataset.cleanVersion=VERSION;
+    panel.classList.remove('v1003-legacy-hidden');
+    panel.style.display='block';
+    panel.style.visibility='visible';
+    panel.style.pointerEvents='auto';
+    const drawBtn=$('v1003DrawBtn');
+    const assignBtn=$('v1003AssignBtn');
+    if(drawBtn) drawBtn.onclick=()=>generateDraw(selectedKey(),$('v1003MainMode')?.value||'redistribute');
+    if(assignBtn) assignBtn.onclick=()=>assignCourts(selectedKey());
     renderClean(selectedKey());
   }
   function hideLegacyMainUi(){try{
@@ -327,7 +348,7 @@
   document.addEventListener('click',()=>setTimeout(apply,90),true); document.addEventListener('input',()=>setTimeout(apply,90),true);
   [0,300,800,1800,3500,6500].forEach(t=>setTimeout(apply,t));
   function loop(){try{apply();}catch(e){} setTimeout(loop,2500)} if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(loop,500)); else setTimeout(loop,500);
-  try{console.log('[v1007] slot main draw loaded');}catch(e){}
+  try{console.log('[v1008] slot main draw loaded');}catch(e){}
 })();
 
 
