@@ -6,10 +6,10 @@
 */
 (function(){
   'use strict';
-  if(window.__V1014_MAIN_DRAW_CLEAN_INSTALLED) return;
-  window.__V1014_MAIN_DRAW_CLEAN_INSTALLED = true;
-  // v1015 uses its own guard and filename so cached v1008~v1013 scripts cannot block this patch.
-  const VERSION = 'v1015-venue-autoqueue-fix';
+  if(window.__V1015_MAIN_DRAW_CLEAN_INSTALLED) return;
+  window.__V1015_MAIN_DRAW_CLEAN_INSTALLED = true;
+  // v1015 uses its own guard and filename so cached v1008~v1014 scripts cannot block this patch.
+  const VERSION = 'v1015-venue-segment-enforce-fix';
   const VENUE_ORDER = ['국제','능동','원도심','삼계','금병','동부','장유중','기타'];
   const VENUE_COLOR = {국제:'#2563eb',능동:'#7c3aed',원도심:'#16a34a',삼계:'#0891b2',금병:'#d97706',동부:'#be123c',장유중:'#475569',기타:'#64748b'};
   const VENUE_BG = {국제:'#eff6ff',능동:'#f5f3ff',원도심:'#ecfdf5',삼계:'#ecfeff',금병:'#fff7ed',동부:'#fff1f2',장유중:'#f8fafc',기타:'#f8fafc'};
@@ -299,7 +299,7 @@
       const arr=uniq(list||[]);
       if(arr.length) buckets.push({tag, list:arr});
     }
-    // v1015: 본선 구장은 한 소스에서 "있으면 즉시 반환"하지 않고, 실제 코트현황판/대회설정/본선설정을 병합한다.
+    // v1014: 본선 구장은 한 소스에서 "있으면 즉시 반환"하지 않고, 실제 코트현황판/대회설정/본선설정을 병합한다.
     // 기존 방식은 mainAllowedCourts가 일부만 저장된 경우 능동 같은 실제 운영 구장이 본선 패널에서 빠질 수 있었다.
     try{ if(typeof window.getDivisionPhaseConfiguredCourts==='function') add(window.getDivisionPhaseConfiguredCourts(tid,div,'main'),'phaseMain'); }catch(e){}
     try{ if(typeof window.getDivisionMainConfiguredCourts==='function') add(window.getDivisionMainConfiguredCourts(tid,div),'divisionMain'); }catch(e){}
@@ -360,13 +360,13 @@
     return arr.slice(0,count);
   }
   function makeMatch(key, slot, e1, e2, venue, size){
-    const id=`v1013_main_${slot}_${Date.now()}`;
+    const id=`v1015_main_${slot}_${Date.now()}`;
     const v=venueKo(venue||'기타');
     const m={id,phase:'main',round:0,slot,bracketN:size,localDrawSize:size,localRoundSize:size,localRoundLabel:mainRoundLabel(size,0),roundLabel:mainRoundLabel(size,0),winner:null,rubbers:[],court:'',courts:[],manualCourtTarget:'',
       t1:e1?.ti??null,t2:e2?.ti??null,display1:nameOnlyFromLabel(e1?.nm||e1?.label||''),display2:nameOnlyFromLabel(e2?.nm||e2?.label||'부전승'),
       source1Label:e1?.label||'',source2Label:e2?.label||'부전승',sourceGi1:e1?.gi??null,sourceGi2:e2?.gi??null,sourceGroup1:e1?.gn??null,sourceGroup2:e2?.gn??null,sourceRank1:e1?.rk??null,sourceRank2:e2?.rk??null,
       source1Resolved:e1?.ti!=null,source2Resolved:e2?.ti!=null,
-      venue:v,venueLabel:v,__venue:v,mainBlock:v,cleanMainDraw:true,v1015CleanMain:true,v1013CleanMain:true,v1012CleanMain:true,v1007CleanMain:true,v1003CleanMain:true,createdAt:now(),updatedAt:now()};
+      venue:v,venueLabel:v,__venue:v,mainBlock:v,cleanMainDraw:true,v1014CleanMain:true,v1013CleanMain:true,v1012CleanMain:true,v1007CleanMain:true,v1003CleanMain:true,createdAt:now(),updatedAt:now()};
     m.autoCourtLabel=(m.display1||m.source1Label||'TBD')+' vs '+(m.display2||m.source2Label||'TBD');
     return m;
   }
@@ -393,6 +393,7 @@
     const sig=groupStructureSignature(key);
     G.draws[key]=Object.assign({},G.draws[key]||{}, {cleanMainDraw:true,cleanMainDrawVersion:VERSION,mainDrawMode:mode,mainDrawSize:size,mainDrawAt:now(),mainDrawGroupStructureSignature:sig,mainDrawResultSignature:groupResultSignature(key),mainDrawVenueSegments:segments(venues)});
     resolveCleanMatches(key,true);
+    repairSegmentVenues(key,false);
     await persist(key);
     try{ if(typeof window.renderBracket==='function') window.renderBracket(); }catch(e){}
     setTimeout(()=>{ensurePanel(); hideLegacyMainUi(); renderClean(key);},150);
@@ -401,6 +402,46 @@
     return true;
   }
   function segments(venues){const out=[]; venues.forEach((v,i)=>{let last=out[out.length-1]; if(!last||last.venue!==v) out.push({venue:v,start:i,end:i,count:1}); else{last.end=i;last.count++;}}); return out;}
+  function expandSegmentsToVenues(draw,count){
+    const arr=Array(Number(count)||0).fill('');
+    let ok=false;
+    ar(draw&&draw.mainDrawVenueSegments).forEach(s=>{
+      const v=venueKo(s&&s.venue);
+      const a=Number(s&&s.start), b=Number(s&&s.end);
+      if(!v || !Number.isFinite(a) || !Number.isFinite(b)) return;
+      for(let i=Math.max(0,a); i<=Math.min(arr.length-1,b); i++){ arr[i]=v; ok=true; }
+    });
+    return ok && arr.every(Boolean) ? arr : [];
+  }
+  function repairSegmentVenues(key, forceRecompute){
+    try{
+      const draw=(G&&G.draws&&G.draws[key])||{};
+      const mains=ar(G&&G.matches&&G.matches[key]).filter(m=>String(m.phase||'')==='main'&&m.cleanMainDraw).sort((a,b)=>Number(a.slot||0)-Number(b.slot||0));
+      if(!mains.length) return {changed:false, venues:[]};
+      const count=mains.length;
+      let venues=expandSegmentsToVenues(draw,count);
+      const available=venueGroups(key).map(v=>v.venue).filter(Boolean);
+      const mustRecompute = !!forceRecompute || !venues.length || (available.includes('능동') && !venues.includes('능동'));
+      if(mustRecompute){
+        venues=venueForSlots(key,count,'redistribute',mains.map(m=>[null,null]));
+      }
+      if(!venues.length) return {changed:false, venues:[]};
+      let changed=false;
+      mains.forEach((m,i)=>{
+        const slot=Number(m.slot||i);
+        const v=venueKo(venues[slot] || venues[i] || venues[0] || '국제');
+        if(venueKo(m.venue||m.venueLabel||m.__venue)!==v){ changed=true; }
+        m.venue=v; m.venueLabel=v; m.__venue=v; m.mainBlock=v;
+        normalizeCleanMatchDisplay(key,m);
+      });
+      const nextSeg=segments(venues.map(venueKo));
+      const oldSig=JSON.stringify(ar(draw.mainDrawVenueSegments));
+      const newSig=JSON.stringify(nextSeg);
+      if(oldSig!==newSig){ draw.mainDrawVenueSegments=nextSeg; changed=true; }
+      draw.v1015VenueSegmentEnforcedAt=now();
+      return {changed, venues};
+    }catch(e){ console.warn('[v1015] venue repair failed', e); return {changed:false, venues:[]}; }
+  }
   function readyForCourt(m){
     if(!m || m.winner!=null) return false;
     const bye=isByeLabel(m.display2||m.source2Label||'');
@@ -434,7 +475,7 @@
     m.manualCourtLocked=true; m.manualCourtLockedAt=m.manualCourtLockedAt||now();
   }
   function hasMainCourtAssignment(key){
-    try{ const d=G&&G.draws&&G.draws[key]; return !!(d&&(d.v1011MainCourtAssignment||d.v1015MainCourtAssignment||d.v1011MainCourtAssignedAt||d.v1015MainCourtAssignedAt)); }catch(e){ return false; }
+    try{ const d=G&&G.draws&&G.draws[key]; return !!(d&&(d.v1011MainCourtAssignment||d.v1014MainCourtAssignment||d.v1011MainCourtAssignedAt||d.v1014MainCourtAssignedAt)); }catch(e){ return false; }
   }
   function isCleanAssigned(m){
     return !!(S(m&&m.court)||S(m&&m.manualCourtTarget)||ar(m&&m.courts).length||S(m&&m.__sharedCourtLabel)||m?.manualSharedHold||m?.__manualSharedHold||m?.v1011SharedWait);
@@ -483,7 +524,7 @@
     if(!targets.length) return false;
     const res=placeCleanMatches(key,targets,{auto:true});
     if(res.noCourts) return false;
-    try{ if(G.draws&&G.draws[key]){ G.draws[key].v1015MainCourtAssignedAt=now(); G.draws[key].v1015AutoQueuedAt=now(); } }catch(e){}
+    try{ if(G.draws&&G.draws[key]){ G.draws[key].v1014MainCourtAssignedAt=now(); G.draws[key].v1014AutoQueuedAt=now(); } }catch(e){}
     await persist(key);
     try{ if(typeof window.renderBracket==='function') window.renderBracket(); }catch(e){}
     setTimeout(()=>{installSharedQueueBridge(); ensurePanel(); hideLegacyMainUi(); renderClean(key);},120);
@@ -493,6 +534,7 @@
   async function assignCourts(key){
     key=key||selectedKey(); if(!key){toast('대회와 부서를 먼저 선택하세요','error');return false;}
     resolveCleanMatches(key,true);
+    repairSegmentVenues(key,false);
     let mains=ar(G.matches&&G.matches[key]).filter(m=>String(m.phase||'')==='main'&&m.cleanMainDraw&&!m.winner).sort((a,b)=>Number(a.slot||0)-Number(b.slot||0));
     if(!mains.length){toast('배정할 새 본선 경기가 없습니다. 먼저 새 본선 추첨을 실행하세요.','info');return false;}
     const unresolved=mains.filter(m=>!readyForCourt(m));
@@ -501,7 +543,7 @@
     ar(G.matches&&G.matches[key]).filter(m=>String(m.phase||'')==='main'&&m.cleanMainDraw).forEach(clearCleanCourtFields);
     const res=placeCleanMatches(key,mains,{manual:true});
     if(res.noCourts){toast('본선 사용 코트를 찾을 수 없습니다. 대회 부서의 본선 사용 코트를 확인하세요.','error');return false;}
-    try{ if(G.draws&&G.draws[key]){ G.draws[key].v1011MainCourtAssignedAt=now(); G.draws[key].v1011MainCourtAssignment='current_wait1_shared'; G.draws[key].v1015MainCourtAssignedAt=now(); G.draws[key].v1015MainCourtAssignment='current_wait1_shared_auto_follow'; } }catch(e){}
+    try{ if(G.draws&&G.draws[key]){ G.draws[key].v1011MainCourtAssignedAt=now(); G.draws[key].v1011MainCourtAssignment='current_wait1_shared'; G.draws[key].v1014MainCourtAssignedAt=now(); G.draws[key].v1014MainCourtAssignment='current_wait1_shared_auto_follow'; } }catch(e){}
     await persist(key); try{if(typeof window.renderBracket==='function') window.renderBracket();}catch(e){}
     setTimeout(()=>{installSharedQueueBridge(); ensurePanel(); hideLegacyMainUi(); renderClean(key);},150);
     toast(`새 본선 코트배정 완료: 현재경기 ${res.currentCnt} · 코트대기1 ${res.waitCnt} · 공용대기 ${res.sharedCnt}${unresolved.length?' · 미확정 '+unresolved.length+'경기 보류':''}`,'success'); return true;
@@ -514,6 +556,7 @@
     const draw=(G.draws&&G.draws[key])||{};
     if(draw.mainDrawGroupStructureSignature && draw.mainDrawGroupStructureSignature!==groupStructureSignature(key)){box.innerHTML='<div class="v1003-empty">예선 조편성이 변경되어 기존 본선 슬롯 대진은 무효입니다. 새 본선 추첨을 다시 실행하세요.</div>';return;}
     resolveCleanMatches(key,true);
+    repairSegmentVenues(key,false);
     const mains=ar(G.matches&&G.matches[key]).filter(m=>String(m.phase||'')==='main'&&m.cleanMainDraw).sort((a,b)=>Number(a.slot||0)-Number(b.slot||0));
     if(!mains.length){box.innerHTML='<div class="v1003-empty">새 본선 대진이 없습니다. 위 버튼으로 새 본선 추첨을 실행하세요.</div>';return;}
     const size=Number(draw.mainDrawSize||mains[0]?.bracketN||mains.length*2)||mains.length*2;
@@ -723,7 +766,7 @@
   'use strict';
   if(window.__v1005MainDrawButtonRestoreInstalled) return;
   window.__v1005MainDrawButtonRestoreInstalled = true;
-  var VERSION='v1015-button-venue-autoqueue-fix';
+  var VERSION='v1015-button-venue-segment-enforce-fix';
   function $(id){return document.getElementById(id);}
   function S(v){return String(v||'').replace(/\s+/g,' ').trim();}
   function safeToast(msg,type){try{ if(typeof toast==='function') toast(msg,type||'info'); else console.log(msg); }catch(e){}}
