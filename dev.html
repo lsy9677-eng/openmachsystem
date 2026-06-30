@@ -9,11 +9,11 @@
 <meta content="no-cache" http-equiv="Pragma"/>
 <meta content="0" http-equiv="Expires"/>
 <title>시합관리 시스템</title>
-<!-- v1009 main-draw authority/panel button fix: dev / development -->
+<!-- v1010 cache-proof main-draw: dev / development -->
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-30-v1009-main-draw-authority-panel";
+  const APP_VERSION = "2026-06-30-v1010-main-draw-cache-proof";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -56514,7 +56514,31 @@ if(false) setTimeout(function(){
 
 <!-- v987: fixed filename tools gate -->
 <script id="operationQueueModule" src="./assets/js/operation-queue.js?v=1009"></script>
-<script id="mainDrawCleanModule" src="./assets/js/main-draw.js?v=1009"></script>
+<script id="mainDrawCleanModule" src="./assets/js/main-draw-v1010.js?v=1010"></script>
+<script id="v1010MainDrawCacheProofFallback">
+(function(){
+  'use strict';
+  function hasV1010(){
+    try{ var a=window.MainDrawCleanV1010||window.MainDrawCleanV1007||window.MainDrawCleanV1004; return !!(a && /v1010/i.test(String(a.version||''))); }catch(e){ return false; }
+  }
+  function loadV1010(){
+    if(hasV1010()){
+      try{ (window.MainDrawCleanV1010||window.MainDrawCleanV1007).ensurePanel&& (window.MainDrawCleanV1010||window.MainDrawCleanV1007).ensurePanel(); }catch(e){}
+      return;
+    }
+    try{
+      var old=document.getElementById('v1010DynamicMainDraw');
+      if(old) old.remove();
+      var s=document.createElement('script');
+      s.id='v1010DynamicMainDraw';
+      s.src='./assets/js/main-draw-v1010.js?v=1010&__ts='+Date.now();
+      s.onload=function(){try{(window.MainDrawCleanV1010||window.MainDrawCleanV1007).ensurePanel();}catch(e){}};
+      document.body.appendChild(s);
+    }catch(e){console.warn('[v1010] dynamic main draw load failed',e);}
+  }
+  [250,900,1800,3600].forEach(function(t){setTimeout(loadV1010,t);});
+})();
+</script>
 <script id="toolsGateModule" src="./assets/js/tools-gate.js?v=1009"></script>
 
 </body>
