@@ -9,11 +9,11 @@
 <meta content="no-cache" http-equiv="Pragma"/>
 <meta content="0" http-equiv="Expires"/>
 <title>시합관리 시스템</title>
-<!-- v1012 korean round/name-only main-draw: dev / development -->
+<!-- v1013 single-panel round/name-only main-draw: dev / development -->
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-30-v1012-main-draw-korean-round-nameonly";
+  const APP_VERSION = "2026-06-30-v1013-main-draw-single-panel-round-fix";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -1004,6 +1004,11 @@ document.addEventListener('DOMContentLoaded',()=>setTimeout(v281ApplyRecommended
   });
 })();
 </script>
+
+<style id="v1013SingleMainPanelStyle">
+  #bracketContent [id^="mainStage_"]{display:none!important;visibility:hidden!important;pointer-events:none!important}
+  #bracketContent .v1013-legacy-main-tree-hidden{display:none!important;visibility:hidden!important;pointer-events:none!important}
+</style>
 </head>
 <body>
 <header class="app-header">
@@ -8825,6 +8830,23 @@ function buildCourtBoardGroupHeadline(key, m, autoTitle, rawTitle){
   if(label==='1,2번 패자 vs 3번') return {headline: `${lose12} vs ${s3}`, detail};
   return {headline: label, detail};
 }
+
+function v1013MainRoundLabelFromSize(size, round){
+  const n=Math.max(2, Math.floor(Number(size||2)/Math.pow(2,Number(round||0))));
+  if(n<=2) return '결승';
+  if(n<=4) return '준결승';
+  return n+'강';
+}
+function v1013NameOnlyCourtBoard(value){
+  const raw=String(value==null?'':value).replace(/\s+/g,' ').trim();
+  if(!raw) return '';
+  if(/^(TBD|부전승|\d+조\s*[12]위)$/i.test(raw)) return raw;
+  return raw.split(/\s*\/\s*/).map(part=>String(part||'')
+    .replace(/\s*\([^)]*\)/g,'')
+    .replace(/\s*\[[^\]]*\]/g,'')
+    .replace(/\s+/g,' ')
+    .trim()).filter(Boolean).join(' / ');
+}
 function describeCourtBoardMatch(key,m){
   const base=(m&&m.__autoItem&&m.__autoItem.match)?m.__autoItem.match:m;
   const autoTitle=(m&&m.__autoItem&&m.__autoItem.autoLabel) || (m&&m.autoCourtLabel) || '';
@@ -8833,6 +8855,21 @@ function describeCourtBoardMatch(key,m){
   const dn2=t2?getCourtBoardTeamName(t2,key,(base||m).t2):'TBD';
   const rawTitle=`${dn1} vs ${dn2}`;
   const st=getMatchResultState(key,base||m);
+
+  // v1013: 새 본선(cleanMainDraw)은 기존 라운드 계산을 타지 않는다.
+  // 기존 계산은 첫 라운드 데이터만 있으면 64강도 결승으로 오판했다.
+  if(base && base.cleanMainDraw){
+    const draw=G?.draws?.[key]||{};
+    const size=Number(draw.mainDrawSize||base.bracketN||base.localDrawSize||64)||64;
+    const round=Number(base.round||0)||0;
+    const label=base.localRoundLabel && !/결승/.test(String(base.localRoundLabel)) ? String(base.localRoundLabel) : v1013MainRoundLabelFromSize(size,round);
+    const left=v1013NameOnlyCourtBoard(base.nameOnly1||base.display1||base.source1Label||dn1||'TBD')||'TBD';
+    const right=v1013NameOnlyCourtBoard(base.nameOnly2||base.display2||base.source2Label||dn2||'TBD')||'TBD';
+    const title=`${left} vs ${right}`;
+    const score=(st.started || st.done) ? (isIndividualByKey(key) && typeof getIndividualActualScoreText==='function' ? (getIndividualActualScoreText(base||m) || `${st.disp1??st.sc1??0}:${st.disp2??st.sc2??0}`) : `${st.disp1??st.sc1??0}:${st.disp2??st.sc2??0}`) : '';
+    return {label, title, rawTitle:title, autoTitle:title, detail:'', score, started:!!st.started, done:!!st.done};
+  }
+
   let label='경기';
   if((base||m).phase==='group') label=`예선 ${grpLabel((base||m).group||0)}`;
   else if((base||m).phase==='playin') label='진출전';
@@ -8844,12 +8881,9 @@ function describeCourtBoardMatch(key,m){
   if(String((base||m)?.phase||'')==='group'){
     const built=buildCourtBoardGroupHeadline(key,base||m,autoTitle,rawTitle);
     title=built.headline || title;
-    // v495: 일반 자동배정 문구가 팀명보다 우선 노출되지 않도록 보정
-    // v614b: 수동 고정 라벨도 팀명으로 대체
     if(/자동\s*배정|경기\s*대기|대기중|대기\s*중|수동\s*고정|수동\s*공용|수동\s*대기|조건\s*코트/.test(String(title||'')) && rawTitle && rawTitle!=='TBD vs TBD') title=rawTitle;
     detail=built.detail || '';
   }else if(autoTitle && rawTitle && rawTitle!=='TBD vs TBD'){
-    // 본선 경기: autoTitle이 '자동배정' 류이면 title을 rawTitle(팀명)으로 교체
     if(/자동\s*배정|자동배정|\(v\d+\)/.test(autoTitle)){
       title=rawTitle;
       detail='';
@@ -10256,6 +10290,12 @@ function _k2td(key){const i=key.lastIndexOf('_');return {tid:key.slice(0,i), div
 function getMainRoundLabelByRoundIndex(round, key){
   try{
     const mains=(G.matches?.[key]||[]).filter(m=>String(m?.phase||'')==='main');
+    const cleanMains=mains.filter(m=>m&&m.cleanMainDraw);
+    if(cleanMains.length){
+      const draw=G?.draws?.[key]||{};
+      const size=Number(draw.mainDrawSize||cleanMains[0].bracketN||cleanMains[0].localDrawSize||cleanMains.length*2)||64;
+      return v1013MainRoundLabelFromSize(size, Number(round||0));
+    }
     if(!mains.length){
       const r=Number(round||0);
       return r===0 ? '결승' : '본선';
@@ -56515,29 +56555,30 @@ if(false) setTimeout(function(){
 
 <!-- v987: fixed filename tools gate -->
 <script id="operationQueueModule" src="./assets/js/operation-queue.js?v=1009"></script>
-<script id="mainDrawCleanModule" src="./assets/js/main-draw-v1012.js?v=1012"></script>
-<script id="v1010MainDrawCacheProofFallback">
+<script id="mainDrawCleanModule" src="./assets/js/main-draw-v1013.js?v=1013"></script>
+<script id="v1013MainDrawCacheProofFallback">
 (function(){
   'use strict';
-  function hasV1010(){
-    try{ var a=window.MainDrawCleanV1010||window.MainDrawCleanV1007||window.MainDrawCleanV1004; return !!(a && /v1010/i.test(String(a.version||''))); }catch(e){ return false; }
+  function hasV1013(){
+    try{ var a=window.MainDrawCleanV1013||window.MainDrawCleanV1012||window.MainDrawCleanV1010||window.MainDrawCleanV1007||window.MainDrawCleanV1004; return !!(a && /v1013/i.test(String(a.version||''))); }catch(e){ return false; }
   }
-  function loadV1010(){
-    if(hasV1010()){
-      try{ (window.MainDrawCleanV1010||window.MainDrawCleanV1007).ensurePanel&& (window.MainDrawCleanV1010||window.MainDrawCleanV1007).ensurePanel(); }catch(e){}
+  function loadV1013(){
+    if(hasV1013()){
+      try{ (window.MainDrawCleanV1013||window.MainDrawCleanV1012||window.MainDrawCleanV1010||window.MainDrawCleanV1007).ensurePanel&& (window.MainDrawCleanV1013||window.MainDrawCleanV1012||window.MainDrawCleanV1010||window.MainDrawCleanV1007).ensurePanel(); }catch(e){}
+      try{ (window.MainDrawCleanV1013||window.MainDrawCleanV1012||window.MainDrawCleanV1010||window.MainDrawCleanV1007).hideLegacyTreeOnly&& (window.MainDrawCleanV1013||window.MainDrawCleanV1012||window.MainDrawCleanV1010||window.MainDrawCleanV1007).hideLegacyTreeOnly(); }catch(e){}
       return;
     }
     try{
-      var old=document.getElementById('v1010DynamicMainDraw');
+      var old=document.getElementById('v1013DynamicMainDraw');
       if(old) old.remove();
       var s=document.createElement('script');
-      s.id='v1010DynamicMainDraw';
-      s.src='./assets/js/main-draw-v1012.js?v=1012&__ts='+Date.now();
-      s.onload=function(){try{(window.MainDrawCleanV1010||window.MainDrawCleanV1007).ensurePanel();}catch(e){}};
+      s.id='v1013DynamicMainDraw';
+      s.src='./assets/js/main-draw-v1013.js?v=1013&__ts='+Date.now();
+      s.onload=function(){try{(window.MainDrawCleanV1013||window.MainDrawCleanV1012||window.MainDrawCleanV1010||window.MainDrawCleanV1007).ensurePanel();}catch(e){} try{(window.MainDrawCleanV1013||window.MainDrawCleanV1012||window.MainDrawCleanV1010||window.MainDrawCleanV1007).hideLegacyTreeOnly&& (window.MainDrawCleanV1013||window.MainDrawCleanV1012||window.MainDrawCleanV1010||window.MainDrawCleanV1007).hideLegacyTreeOnly();}catch(e){}};
       document.body.appendChild(s);
-    }catch(e){console.warn('[v1010] dynamic main draw load failed',e);}
+    }catch(e){console.warn('[v1013] dynamic main draw load failed',e);}
   }
-  [250,900,1800,3600].forEach(function(t){setTimeout(loadV1010,t);});
+  [250,900,1800,3600].forEach(function(t){setTimeout(loadV1013,t);});
 })();
 </script>
 <script id="toolsGateModule" src="./assets/js/tools-gate.js?v=1009"></script>
