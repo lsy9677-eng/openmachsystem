@@ -9,11 +9,11 @@
 <meta content="no-cache" http-equiv="Pragma"/>
 <meta content="0" http-equiv="Expires"/>
 <title>시합관리 시스템</title>
-<!-- v1015 venue segment enforce main-draw: dev / development -->
+<!-- v1016 live queue status main-draw: dev / development -->
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-30-v1015-main-draw-venue-segment-enforce-fix";
+  const APP_VERSION = "2026-06-30-v1016-main-draw-live-queue-status-fix";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -56555,28 +56555,28 @@ if(false) setTimeout(function(){
 
 <!-- v987: fixed filename tools gate -->
 <script id="operationQueueModule" src="./assets/js/operation-queue.js?v=1009"></script>
-<script id="mainDrawCleanModule" src="./assets/js/main-draw-v1015.js?v=1015"></script>
+<script id="mainDrawCleanModule" src="./assets/js/main-draw-v1016.js?v=1016"></script>
 <script id="v1013MainDrawCacheProofFallback">
 (function(){
   'use strict';
   function hasV1013(){
-    try{ var a=window.MainDrawCleanV1013||window.MainDrawCleanV1012||window.MainDrawCleanV1010||window.MainDrawCleanV1007||window.MainDrawCleanV1004; return !!(a && /v1013/i.test(String(a.version||''))); }catch(e){ return false; }
+    try{ var a=window.MainDrawCleanV1016||window.MainDrawCleanV1015||window.MainDrawCleanV1014||window.MainDrawCleanV1016||window.MainDrawCleanV1015||window.MainDrawCleanV1014||window.MainDrawCleanV1013||window.MainDrawCleanV1012||window.MainDrawCleanV1010||window.MainDrawCleanV1007||window.MainDrawCleanV1004; return !!(a && /v1016/i.test(String(a.version||''))); }catch(e){ return false; }
   }
   function loadV1013(){
     if(hasV1013()){
-      try{ (window.MainDrawCleanV1013||window.MainDrawCleanV1012||window.MainDrawCleanV1010||window.MainDrawCleanV1007).ensurePanel&& (window.MainDrawCleanV1013||window.MainDrawCleanV1012||window.MainDrawCleanV1010||window.MainDrawCleanV1007).ensurePanel(); }catch(e){}
-      try{ (window.MainDrawCleanV1013||window.MainDrawCleanV1012||window.MainDrawCleanV1010||window.MainDrawCleanV1007).hideLegacyTreeOnly&& (window.MainDrawCleanV1013||window.MainDrawCleanV1012||window.MainDrawCleanV1010||window.MainDrawCleanV1007).hideLegacyTreeOnly(); }catch(e){}
+      try{ (window.MainDrawCleanV1016||window.MainDrawCleanV1015||window.MainDrawCleanV1014||window.MainDrawCleanV1013||window.MainDrawCleanV1012||window.MainDrawCleanV1010||window.MainDrawCleanV1007).ensurePanel&& (window.MainDrawCleanV1016||window.MainDrawCleanV1015||window.MainDrawCleanV1014||window.MainDrawCleanV1013||window.MainDrawCleanV1012||window.MainDrawCleanV1010||window.MainDrawCleanV1007).ensurePanel(); }catch(e){}
+      try{ (window.MainDrawCleanV1016||window.MainDrawCleanV1015||window.MainDrawCleanV1014||window.MainDrawCleanV1013||window.MainDrawCleanV1012||window.MainDrawCleanV1010||window.MainDrawCleanV1007).hideLegacyTreeOnly&& (window.MainDrawCleanV1016||window.MainDrawCleanV1015||window.MainDrawCleanV1014||window.MainDrawCleanV1013||window.MainDrawCleanV1012||window.MainDrawCleanV1010||window.MainDrawCleanV1007).hideLegacyTreeOnly(); }catch(e){}
       return;
     }
     try{
-      var old=document.getElementById('v1013DynamicMainDraw');
+      var old=document.getElementById('v1016DynamicMainDraw');
       if(old) old.remove();
       var s=document.createElement('script');
-      s.id='v1013DynamicMainDraw';
-      s.src='./assets/js/main-draw-v1015.js?v=1015&__ts='+Date.now();
-      s.onload=function(){try{(window.MainDrawCleanV1013||window.MainDrawCleanV1012||window.MainDrawCleanV1010||window.MainDrawCleanV1007).ensurePanel();}catch(e){} try{(window.MainDrawCleanV1013||window.MainDrawCleanV1012||window.MainDrawCleanV1010||window.MainDrawCleanV1007).hideLegacyTreeOnly&& (window.MainDrawCleanV1013||window.MainDrawCleanV1012||window.MainDrawCleanV1010||window.MainDrawCleanV1007).hideLegacyTreeOnly();}catch(e){}};
+      s.id='v1016DynamicMainDraw';
+      s.src='./assets/js/main-draw-v1016.js?v=1016&__ts='+Date.now();
+      s.onload=function(){try{(window.MainDrawCleanV1016||window.MainDrawCleanV1015||window.MainDrawCleanV1014||window.MainDrawCleanV1013||window.MainDrawCleanV1012||window.MainDrawCleanV1010||window.MainDrawCleanV1007).ensurePanel();}catch(e){} try{(window.MainDrawCleanV1016||window.MainDrawCleanV1015||window.MainDrawCleanV1014||window.MainDrawCleanV1013||window.MainDrawCleanV1012||window.MainDrawCleanV1010||window.MainDrawCleanV1007).hideLegacyTreeOnly&& (window.MainDrawCleanV1016||window.MainDrawCleanV1015||window.MainDrawCleanV1014||window.MainDrawCleanV1013||window.MainDrawCleanV1012||window.MainDrawCleanV1010||window.MainDrawCleanV1007).hideLegacyTreeOnly();}catch(e){}};
       document.body.appendChild(s);
-    }catch(e){console.warn('[v1013] dynamic main draw load failed',e);}
+    }catch(e){console.warn('[v1016] dynamic main draw load failed',e);}
   }
   [250,900,1800,3600].forEach(function(t){setTimeout(loadV1013,t);});
 })();
