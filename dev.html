@@ -13,7 +13,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-30-v1029-dev-stable-reset-no-blank-fix";
+  const APP_VERSION = "2026-06-30-v1030-active-venue-wait1-queue-fix";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -56556,7 +56556,7 @@ if(false) setTimeout(function(){
 <script id="v1029EarlyStableFlags">window.__V1029_DEV_STABLE_RESET=true; window.__V1023_FORCE_PRELIM_VISIBLE=false;</script>
 <!-- v987: fixed filename tools gate -->
 <script id="operationQueueModule" src="./assets/js/operation-queue.js?v=1009"></script>
-<script id="mainDrawCleanModule" src="./assets/js/main-draw-v1029.js?v=1029"></script>
+<script id="mainDrawCleanModule" src="./assets/js/main-draw-v1030.js?v=1030"></script>
 <script id="v1029MainDrawStableFallback">
 (function(){
   'use strict';
@@ -56567,7 +56567,7 @@ if(false) setTimeout(function(){
       if(document.getElementById('v1029DynamicMainDraw')) return;
       var s=document.createElement('script');
       s.id='v1029DynamicMainDraw';
-      s.src='./assets/js/main-draw-v1029.js?v=1029&__ts='+Date.now();
+      s.src='./assets/js/main-draw-v1030.js?v=1030&__ts='+Date.now();
       document.body.appendChild(s);
     }catch(e){ console.warn('[v1029] dynamic main draw load failed', e); }
   }
