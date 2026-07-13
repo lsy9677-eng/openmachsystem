@@ -9,11 +9,11 @@
 <meta content="no-cache" http-equiv="Pragma"/>
 <meta content="0" http-equiv="Expires"/>
 <title>시합관리 시스템</title>
-<!-- v1022 balanced court distribution main-draw: dev / development -->
+<!-- v1023 dev clean main view: dev / development -->
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-30-v1022-balanced-court-distribution-fix";
+  const APP_VERSION = "2026-06-30-v1022-final-live-replay-dev-unified";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -56555,19 +56555,19 @@ if(false) setTimeout(function(){
 
 <!-- v987: fixed filename tools gate -->
 <script id="operationQueueModule" src="./assets/js/operation-queue.js?v=1009"></script>
-<script id="mainDrawCleanModule" src="./assets/js/main-draw-v1022.js?v=1022"></script>
-<script id="v1018MainDrawCacheProofFallback">
+<script id="mainDrawCleanModule" src="./assets/js/main-draw-v1024.js?v=1024"></script>
+<script id="v1023MainDrawCleanViewFallback">
 (function(){
   'use strict';
   function api(){ return window.MainDrawCleanV1018||window.MainDrawCleanV1017||window.MainDrawCleanV1016||window.MainDrawCleanV1015||window.MainDrawCleanV1014||window.MainDrawCleanV1013||window.MainDrawCleanV1012||window.MainDrawCleanV1010||window.MainDrawCleanV1007||null; }
-  function ok(){ try{ var a=api(); return !!(a && /v1018/i.test(String(a.version||''))); }catch(e){ return false; } }
+  function ok(){ try{ var a=api(); return !!(a && /v1023|v1022/i.test(String(a.version||''))); }catch(e){ return false; } }
   function load(){
     if(ok()){ try{ api().ensurePanel&&api().ensurePanel(); }catch(e){} try{ api().hideLegacyTreeOnly&&api().hideLegacyTreeOnly(); }catch(e){} return; }
     try{
-      var old=document.getElementById('v1018DynamicMainDraw'); if(old) old.remove();
+      var old=document.getElementById('v1023DynamicMainDraw'); if(old) old.remove();
       var s=document.createElement('script');
-      s.id='v1018DynamicMainDraw';
-      s.src='./assets/js/main-draw-v1022.js?v=1022&__ts='+Date.now();
+      s.id='v1023DynamicMainDraw';
+      s.src='./assets/js/main-draw-v1024.js?v=1024&__ts='+Date.now();
       s.onload=function(){ try{ api().ensurePanel&&api().ensurePanel(); }catch(e){} try{ api().hideLegacyTreeOnly&&api().hideLegacyTreeOnly(); }catch(e){} };
       document.body.appendChild(s);
     }catch(e){ console.warn('[v1018] dynamic main draw load failed', e); }
