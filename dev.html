@@ -9,11 +9,12 @@
 <meta content="no-cache" http-equiv="Pragma"/>
 <meta content="0" http-equiv="Expires"/>
 <title>시합관리 시스템</title>
-<!-- v1022 final unified main-draw: dev / development -->
+<!-- v1035 clean-main-only balanced assignment: dev / development -->
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-06-30-v1034-legacy-final-off-no-blank";
+  const APP_VERSION = "2026-06-30-v1035-clean-main-only-balanced-fix";
+  window.__CLEAN_MAIN_ONLY_MODE__ = true;
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -20774,7 +20775,7 @@ function renderBracketHTMLForDiv(tid,div,isAll){
       html+=`</div></div>`;
     });
 
-    if(isGroupKO && showMainSection){
+    if(isGroupKO && showMainSection && !window.__CLEAN_MAIN_ONLY_MODE__){
       const advT = s3 ? getAdvT(key,draw,teams,cfg) : [];
       html+=`<div class="card" style="background:linear-gradient(135deg,#eef2ff,#dce8fb);border:1.5px solid var(--success)">
         <div class="card-title" style="color:var(--success)">🏆 본선 ${s3?`진출팀 (${advT.length}팀)`:'진출 예정'}</div>
@@ -20861,7 +20862,7 @@ function renderBracketHTMLForDiv(tid,div,isAll){
     html+=`</div>`;
   }
 
-  if(mMs.length && showMainSection){
+  if(mMs.length && showMainSection && !window.__CLEAN_MAIN_ONLY_MODE__){
     const rounds=[...new Set(mMs.map(m=>Number(m.round||0)))].sort((a,b)=>a-b);
     const totalR=rounds.length;
 
@@ -21580,7 +21581,7 @@ function renderCombinedBracketSection(tid, div){
   const _isGroupKO = cfg.format==='group_knockout' || (_isIndivKey && _hasDrawGroups);
 
   let mainHTML = '';
-  if(_isGroupKO){
+  if(_isGroupKO && !window.__CLEAN_MAIN_ONLY_MODE__){
     const pvCfg = cfg.format==='group_knockout' ? cfg : {...cfg, format:'group_knockout'};
     const pv = buildPreviewMainSlots(draw, pvCfg);
     if(pv.n>=2){
@@ -21627,7 +21628,7 @@ function renderCombinedBracketSection(tid, div){
       if(mMs.length) mainHTML = renderBracketTree(key,mMs,teams);
       else mainHTML = `<div class="card" style="margin:0"><div class="empty-state" style="padding:28px"><p>본선 대진표 데이터가 없습니다</p></div></div>`;
     }
-  } else if(mMs.length){
+  } else if(mMs.length && !window.__CLEAN_MAIN_ONLY_MODE__){
     mainHTML = renderBracketTree(key,mMs,teams);
     if(bronzeMode==='match' && bronzeMatch){ const bst=getMatchResultState(key,bronzeMatch); const b1=bronzeMatch.t1!==null?teams[bronzeMatch.t1]:null; const b2=bronzeMatch.t2!==null?teams[bronzeMatch.t2]:null; mainHTML += `<div class="card" style="margin-top:10px"><div class="card-title">🥉 3·4위전</div>${mCard(bronzeMatch,key,b1?tdn(b1,key,bronzeMatch.t1):(bronzeMatch.t1===null?'TBD':'?'),b2?tdn(b2,key,bronzeMatch.t2):(bronzeMatch.t2===null?'TBD':'?'),bst.done,bst.sc1,bst.sc2,'3·4위전')}</div>`; }
   }
@@ -56555,7 +56556,7 @@ if(false) setTimeout(function(){
 
 <!-- v987: fixed filename tools gate -->
 <script id="operationQueueModule" src="./assets/js/operation-queue.js?v=1009"></script>
-<script id="mainDrawCleanModule" src="./assets/js/main-draw-v1034.js?v=1034"></script>
+<script id="mainDrawCleanModule" src="./assets/js/main-draw-v1035.js?v=1035"></script>
 <script id="v1018MainDrawCacheProofFallback">
 (function(){
   'use strict';
@@ -56567,7 +56568,7 @@ if(false) setTimeout(function(){
       var old=document.getElementById('v1018DynamicMainDraw'); if(old) old.remove();
       var s=document.createElement('script');
       s.id='v1018DynamicMainDraw';
-      s.src='./assets/js/main-draw-v1034.js?v=1034&__ts='+Date.now();
+      s.src='./assets/js/main-draw-v1035.js?v=1035&__ts='+Date.now();
       s.onload=function(){ try{ api().ensurePanel&&api().ensurePanel(); }catch(e){} try{ api().hideLegacyTreeOnly&&api().hideLegacyTreeOnly(); }catch(e){} };
       document.body.appendChild(s);
     }catch(e){ console.warn('[v1018] dynamic main draw load failed', e); }
