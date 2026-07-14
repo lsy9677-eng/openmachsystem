@@ -8,9 +8,9 @@
   if(window.__V1037_AUTHORITATIVE_MAIN_DRAW_INSTALLED) return;
   window.__V1037_AUTHORITATIVE_MAIN_DRAW_INSTALLED = true;
   window.__CLEAN_MAIN_ONLY_MODE__ = true;
-  window.__MAIN_DRAW_AUTHORITY_VERSION__ = 'v1037-authoritative-main-engine-controls-fix';
+  window.__MAIN_DRAW_AUTHORITY_VERSION__ = 'v1037-safe-controls-no-blank';
 
-  const VERSION = 'v1037-authoritative-main-engine-controls-fix';
+  const VERSION = 'v1037-safe-controls-no-blank';
   const PANEL_ID = 'v1037MainPanel';
   const BRACKET_ID = 'v1037MainBracket';
   const VENUE_ORDER = ['국제','능동','원도심','삼계','금병','동부','장유중','기타'];
@@ -444,33 +444,37 @@
     if($('v1037Style')) return;
     const st=document.createElement('style'); st.id='v1037Style'; st.textContent=`
       #${PANEL_ID}{margin:12px 0 16px;padding:16px;border:2px solid #bfdbfe;border-radius:18px;background:linear-gradient(180deg,#f8fbff,#fff);box-shadow:0 12px 28px rgba(15,30,58,.08)}
-      .v1037-title{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px;font-weight:1000;color:#0f1e3a}.v1037-title small{font-size:.72rem;color:#64748b;font-weight:800}.v1037-controls{display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;margin-bottom:10px}.v1037-select{min-height:40px;border:1.5px solid #cbd5e1;border-radius:12px;padding:8px 10px;font-weight:900}.v1037-btn{border:0;border-radius:12px;min-height:40px;padding:8px 13px;font-weight:1000;cursor:pointer}.v1037-btn.primary{background:#2563eb;color:#fff}.v1037-btn.purple{background:#7c3aed;color:#fff}.v1037-btn.green{background:#0f766e;color:#fff}.v1037-note{font-size:.78rem;color:#475569;line-height:1.55;margin-bottom:12px}.v1037-empty{padding:18px;border:1px dashed #cbd5e1;border-radius:14px;text-align:center;color:#64748b;font-weight:900;background:#f8fafc}.v1037-bracket-title{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin:12px 0 10px}.v1037-seg{display:inline-flex;padding:4px 8px;border:1.5px solid;border-radius:999px;font-size:.72rem;font-weight:1000;margin:2px}.v1037-bracket-wrap{overflow-x:auto;padding:6px 2px 10px;-webkit-overflow-scrolling:touch}.v1037-bracket{display:flex;align-items:stretch;gap:18px;min-width:max-content}.v1037-round{display:flex;flex-direction:column;min-width:230px}.v1037-round-title{background:#0f1e3a;color:#fff;text-align:center;font-weight:1000;border-radius:8px 8px 0 0;padding:7px 10px;font-size:.86rem}.v1037-round-body{display:flex;flex-direction:column;gap:10px;justify-content:space-around;flex:1;padding-top:10px}.v1037-match{position:relative;border:1.5px solid #cbd5e1;border-left:7px solid var(--v,#2563eb);border-radius:12px;background:linear-gradient(90deg,var(--vb,#eff6ff),#fff);box-shadow:0 3px 12px rgba(15,30,58,.08);overflow:hidden}.v1037-match:after{content:'';position:absolute;right:-19px;top:50%;width:18px;height:2px;background:#bfdbfe}.v1037-round:last-child .v1037-match:after{display:none}.v1037-match-top{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:6px 8px;font-size:.72rem;color:#334155}.v1037-match-top span{display:inline-flex;align-items:center;border-radius:999px;background:var(--v,#2563eb);color:#fff;padding:2px 7px;font-size:.68rem;font-weight:1000}.v1037-side{display:flex;align-items:center;justify-content:space-between;gap:8px;border-top:1px solid #e2e8f0;padding:7px 8px;font-size:.8rem;font-weight:900;line-height:1.3;min-height:34px}.v1037-side.win{background:#ecfdf5;color:#166534}.v1037-side small{font-family:Oswald,sans-serif;color:#94a3b8;font-size:.86rem}.v1037-status{text-align:center;border-top:1px dashed #e2e8f0;padding:5px 8px;font-size:.66rem;color:#64748b;font-weight:900}.v1037-result-btn{display:block;width:calc(100% - 16px);margin:0 8px 8px;padding:6px 8px;border:0;border-radius:9px;background:#d4a017;color:#111827;font-weight:1000;cursor:pointer}.v1037-placeholder{background:#f8fafc;border-left-color:#cbd5e1}.v1037-legacy-hidden{display:none!important;visibility:hidden!important;pointer-events:none!important}
+      .v1037-title{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px;font-weight:1000;color:#0f1e3a}.v1037-title small{font-size:.72rem;color:#64748b;font-weight:800}.v1037-controls{display:grid;grid-template-columns:1fr auto auto auto auto;gap:8px;align-items:center;margin-bottom:10px}.v1037-select{min-height:40px;border:1.5px solid #cbd5e1;border-radius:12px;padding:8px 10px;font-weight:900}.v1037-btn{border:0;border-radius:12px;min-height:40px;padding:8px 13px;font-weight:1000;cursor:pointer}.v1037-btn.primary{background:#2563eb;color:#fff}.v1037-btn.purple{background:#7c3aed;color:#fff}.v1037-btn.green{background:#0f766e;color:#fff}.v1037-btn.auto-on{background:#d4a017;color:#111827}.v1037-btn.auto-off{background:#e2e8f0;color:#334155}.v1037-note{font-size:.78rem;color:#475569;line-height:1.55;margin-bottom:12px}.v1037-empty{padding:18px;border:1px dashed #cbd5e1;border-radius:14px;text-align:center;color:#64748b;font-weight:900;background:#f8fafc}.v1037-bracket-title{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin:12px 0 10px}.v1037-seg{display:inline-flex;padding:4px 8px;border:1.5px solid;border-radius:999px;font-size:.72rem;font-weight:1000;margin:2px}.v1037-bracket-wrap{overflow-x:auto;padding:6px 2px 10px;-webkit-overflow-scrolling:touch}.v1037-bracket{display:flex;align-items:stretch;gap:18px;min-width:max-content}.v1037-round{display:flex;flex-direction:column;min-width:230px}.v1037-round-title{background:#0f1e3a;color:#fff;text-align:center;font-weight:1000;border-radius:8px 8px 0 0;padding:7px 10px;font-size:.86rem}.v1037-round-body{display:flex;flex-direction:column;gap:10px;justify-content:space-around;flex:1;padding-top:10px}.v1037-match{position:relative;border:1.5px solid #cbd5e1;border-left:7px solid var(--v,#2563eb);border-radius:12px;background:linear-gradient(90deg,var(--vb,#eff6ff),#fff);box-shadow:0 3px 12px rgba(15,30,58,.08);overflow:hidden}.v1037-match:after{content:'';position:absolute;right:-19px;top:50%;width:18px;height:2px;background:#bfdbfe}.v1037-round:last-child .v1037-match:after{display:none}.v1037-match-top{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:6px 8px;font-size:.72rem;color:#334155}.v1037-match-top span{display:inline-flex;align-items:center;border-radius:999px;background:var(--v,#2563eb);color:#fff;padding:2px 7px;font-size:.68rem;font-weight:1000}.v1037-side{display:flex;align-items:center;justify-content:space-between;gap:8px;border-top:1px solid #e2e8f0;padding:7px 8px;font-size:.8rem;font-weight:900;line-height:1.3;min-height:34px}.v1037-side.win{background:#ecfdf5;color:#166534}.v1037-side small{font-family:Oswald,sans-serif;color:#94a3b8;font-size:.86rem}.v1037-status{text-align:center;border-top:1px dashed #e2e8f0;padding:5px 8px;font-size:.66rem;color:#64748b;font-weight:900}.v1037-result-btn{display:block;width:calc(100% - 16px);margin:0 8px 8px;padding:6px 8px;border:0;border-radius:9px;background:#d4a017;color:#111827;font-weight:1000;cursor:pointer}.v1037-placeholder{background:#f8fafc;border-left-color:#cbd5e1}.v1037-legacy-hidden{display:none!important;visibility:hidden!important;pointer-events:none!important}
       @media(max-width:680px){.v1037-controls{grid-template-columns:1fr}.v1037-btn{width:100%}}
     `; document.head.appendChild(st);
   }
   function ensurePanel(){
     ensureStyle();
     let p=$(PANEL_ID);
-    const page=$('page-bracket')||document.body;
+    const page=$('page-bracket');
+    if(!page) return null;
     if(!p){
       p=document.createElement('div'); p.id=PANEL_ID;
       const anchor=page.querySelector('.sec-title')||page.firstElementChild;
       if(anchor&&anchor.parentNode) anchor.parentNode.insertBefore(p,anchor.nextSibling); else page.prepend(p);
     }
-    p.style.display='block'; p.classList.remove('v1037-legacy-hidden');
-    const controlsMissing=!p.querySelector('#v1037MainMode')||!p.querySelector('#v1037DrawBtn')||!p.querySelector('#v1037AssignBtn')||!p.querySelector('#v1037RefreshBtn')||!p.querySelector('#'+BRACKET_ID);
+    p.style.display='block'; p.style.visibility='visible'; p.classList.remove('v1037-legacy-hidden');
+    const controlsMissing=!p.querySelector('#v1037MainMode')||!p.querySelector('#v1037DrawBtn')||!p.querySelector('#v1037AssignBtn')||!p.querySelector('#v1037RefreshBtn')||!p.querySelector('#v1037AutoBtn')||!p.querySelector('#'+BRACKET_ID);
     if(!p.dataset.built || controlsMissing){
-      p.innerHTML=`<div class="v1037-title"><div>🏆 새 본선 운영 패널 <small>${VERSION}-controls-fix</small></div><small>기존 본선 렌더러 미사용 · 새 엔진 단독</small></div>
-        <div class="v1037-controls"><select id="v1037MainMode" class="v1037-select"><option value="redistribute">전체 재배정 · 선택 코트 기준 균등 배정</option><option value="keep">예선 구장 유지</option></select><button type="button" id="v1037DrawBtn" class="v1037-btn primary">🎲 새 본선 추첨</button><button type="button" id="v1037AssignBtn" class="v1037-btn purple">🎯 본선 코트배정</button><button type="button" id="v1037RefreshBtn" class="v1037-btn green">🔁 본선 큐 갱신</button></div>
+      p.innerHTML=`<div class="v1037-title"><div>🏆 새 본선 운영 패널 <small>${VERSION}</small></div><small>기존 본선 렌더러 미사용 · 새 엔진 단독</small></div>
+        <div class="v1037-controls"><select id="v1037MainMode" class="v1037-select"><option value="redistribute">전체 재배정 · 선택 코트 기준 균등 배정</option><option value="keep">예선 구장 유지</option></select><button type="button" id="v1037DrawBtn" class="v1037-btn primary">🎲 새 본선 추첨</button><button type="button" id="v1037AssignBtn" class="v1037-btn purple">🎯 본선 코트배정</button><button type="button" id="v1037RefreshBtn" class="v1037-btn green">🔁 본선 큐 갱신</button><button type="button" id="v1037AutoBtn" class="v1037-btn auto-off">⏸ 자동배정 OFF</button></div>
         <div class="v1037-note">본선은 이 패널만 사용합니다. 예선 결과가 확정된 경기부터 실제 팀명으로 바뀌며, 결과 입력 시 다음 라운드로 승자가 올라갑니다. 공용대기는 바로 시합중으로 가지 않고 각 코트의 대기1로만 이동합니다.</div>
         <div id="${BRACKET_ID}"></div>`;
       p.dataset.built='1';
     }
-    const draw=$('v1037DrawBtn'), assign=$('v1037AssignBtn'), ref=$('v1037RefreshBtn');
+    const draw=$('v1037DrawBtn'), assign=$('v1037AssignBtn'), ref=$('v1037RefreshBtn'), auto=$('v1037AutoBtn');
     if(draw) draw.onclick=()=>generateDraw(selectedKey(),$('v1037MainMode')?.value||'redistribute');
-    if(assign) assign.onclick=()=>assignInitial(selectedKey());
+    if(assign) assign.onclick=async()=>{ const ok=await assignInitial(selectedKey()); if(ok) setAutoState(true); };
     if(ref) ref.onclick=()=>refreshQueue(selectedKey(),true);
+    if(auto) auto.onclick=()=>setAutoState(!autoEnabled());
+    updateAutoButton();
     renderPanel(selectedKey());
+    return p;
   }
   function renderPanel(key){
     key=key||selectedKey();
@@ -483,29 +487,29 @@
     try{
       document.querySelectorAll('button').forEach(btn=>{
         const t=S(btn.textContent).replace(/\s+/g,'');
-        if(/가지형대진표|조별본선연결구조|본선시드보/.test(t)) btn.classList.add('v1037-legacy-hidden');
-      });
-      const content=$('bracketContent')||document.body;
-      const nodes=[...content.querySelectorAll('.sec-title,.card-title,h2,h3,div')];
-      nodes.forEach(el=>{
-        if(el.closest('#'+PANEL_ID)) return;
-        const tx=S(el.textContent).replace(/\s+/g,' ');
-        if(tx==='🏆 본선 토너먼트 대진표' || tx==='⚡ 본선 경기 현황' || tx==='🏅 최종 결과' || /^최종 결과$/.test(tx)){
-          const block=el.closest('.card,section,article')||el;
-          block.classList.add('v1037-legacy-hidden');
-          let n=block.nextElementSibling;
-          if(n && !n.closest('#'+PANEL_ID) && /우승|준우승|본선|결승/.test(S(n.textContent))) n.classList.add('v1037-legacy-hidden');
-        }
-        if(/우승|준우승/.test(tx) && tx.length<120 && !el.closest('#'+PANEL_ID)){
-          const block=el.closest('.card,section,article')||el;
-          block.classList.add('v1037-legacy-hidden');
-        }
+        if(/가지형대진표|조별본선연결구조/.test(t)) btn.style.display='none';
       });
     }catch(e){}
   }
 
+  const AUTO_KEY='V1037_MAIN_AUTO_ENABLED';
+  function autoEnabled(){ try{return localStorage.getItem(AUTO_KEY)==='1';}catch(e){return false;} }
+  function updateAutoButton(){
+    const b=$('v1037AutoBtn'); if(!b) return;
+    const on=autoEnabled();
+    b.textContent=on?'▶ 자동배정 ON':'⏸ 자동배정 OFF';
+    b.classList.toggle('auto-on',on); b.classList.toggle('auto-off',!on);
+  }
+  function setAutoState(on){
+    try{localStorage.setItem(AUTO_KEY,on?'1':'0');}catch(e){}
+    updateAutoButton();
+    if(on){ refreshQueue(selectedKey(),true); toast('본선 자동배정 ON','success'); }
+    else toast('본선 자동배정 OFF','info');
+  }
+
+
   function install(){
-    window.MainDrawCleanV1037={version:VERSION,ensurePanel,renderPanel,generateDraw,assignCourts:assignInitial,refreshQueue,selectedKey};
+    window.MainDrawCleanV1037={version:VERSION,ensurePanel,renderPanel,generateDraw,assignCourts:assignInitial,refreshQueue,selectedKey,setAutoState,autoEnabled};
     window.MainDrawCleanV1036=window.MainDrawCleanV1037;
     window.startMainDraw=()=>generateDraw(selectedKey(),$('v1037MainMode')?.value||'redistribute');
     window.buildMain=window.startMainDraw;
@@ -521,12 +525,28 @@
       };
       wrapped.__v1037Wrapped=true; wrapped.__old=oldSave; window.saveM3=wrapped;
     }
-    if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{ensurePanel();hideLegacy();},300)); else setTimeout(()=>{ensurePanel();hideLegacy();},100);
-    document.addEventListener('click',()=>setTimeout(()=>{ensurePanel();renderPanel(selectedKey());hideLegacy();},120),true);
-    document.addEventListener('input',()=>setTimeout(()=>{renderPanel(selectedKey());hideLegacy();},120),true);
-    [400,1200,2600,5200].forEach(t=>setTimeout(()=>{ensurePanel();hideLegacy();},t));
-    setInterval(()=>{try{refreshQueue(selectedKey(),false);renderPanel(selectedKey());hideLegacy();}catch(e){}},3500);
-    try{console.log('[v1037-controls-fix] authoritative clean main engine loaded');}catch(e){}
+    const boot=()=>{
+      let tries=0;
+      const timer=setInterval(()=>{
+        tries++;
+        const panel=ensurePanel();
+        if(panel || tries>30) clearInterval(timer);
+      },250);
+    };
+    if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot,{once:true}); else boot();
+    const pageObserver=new MutationObserver(()=>{
+      if(!$('v1037MainPanel')) ensurePanel();
+      else updateAutoButton();
+    });
+    const observeTarget=$('page-bracket');
+    if(observeTarget) pageObserver.observe(observeTarget,{childList:true,subtree:false});
+    setInterval(()=>{
+      try{
+        if(autoEnabled()) refreshQueue(selectedKey(),false);
+        if($('v1037MainPanel')) renderPanel(selectedKey());
+      }catch(e){}
+    },3500);
+    try{console.log('[v1037-safe] controls/no-blank engine loaded');}catch(e){}
   }
   install();
 })();
