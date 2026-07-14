@@ -209,29 +209,77 @@ function createBracket(size,teams){
 }
 
 function autoAdvanceByes(draw){
-  let changed=true, guard=0;
-  while(changed&&guard++<20){
-    changed=false;
-    const sizes=Object.keys(draw.rounds).map(Number).sort((a,b)=>b-a);
-    for(const size of sizes){
-      for(const m of draw.rounds[size]){
-        if(m.status===STATUS.COMPLETED) continue;
-        const a=!!m.teamA,b=!!m.teamB;
-        if(a===b) continue;
-        const winner=m.teamA||m.teamB;
-        m.winnerId=winner.id;
-        m.bye=true;
-        m.status=STATUS.COMPLETED;
-        m.completedAt=nowIso();
-        if(m.nextMatchId){
-          const next=getMatch(draw,m.nextMatchId);
-          if(m.nextSlot==='A') next.teamA=winner; else next.teamB=winner;
-          if(next.teamA&&next.teamB&&next.status===STATUS.WAITING_SLOTS) next.status=STATUS.UNASSIGNED;
-        }
-        changed=true;
-      }
+  // 부전승 자동진출은 최초 라운드에서만 실행한다.
+  // 이후 라운드의 한쪽 슬롯만 채워진 상태는 '상대 경기 결과 대기'이지 부전승이 아니다.
+  const firstRound=draw.rounds?.[draw.size]||[];
+  for(const m of firstRound){
+    if(m.status===STATUS.COMPLETED) continue;
+    const a=!!m.teamA,b=!!m.teamB;
+    if(a===b) continue;
+    const winner=m.teamA||m.teamB;
+    m.winnerId=winner.id;
+    m.bye=true;
+    m.status=STATUS.COMPLETED;
+    m.completedAt=nowIso();
+    if(m.nextMatchId){
+      const next=getMatch(draw,m.nextMatchId);
+      if(m.nextSlot==='A') next.teamA=winner; else next.teamB=winner;
+      if(next.teamA&&next.teamB&&next.status===STATUS.WAITING_SLOTS) next.status=STATUS.UNASSIGNED;
     }
   }
+}
+
+function repairInvalidByePropagation(draw){
+  if(!draw?.rounds)return 0;
+  let repaired=0;
+  const sizes=Object.keys(draw.rounds).map(Number).filter(size=>size<draw.size).sort((a,b)=>a-b);
+
+  // 결승 쪽부터 거꾸로 정리하여 잘못 전파된 팀을 안전하게 제거한다.
+  for(const size of sizes){
+    for(const m of draw.rounds[size]){
+      const hasOneTeam=!!m.teamA!==!!m.teamB;
+      const noRealScore=(m.scoreA==null&&m.scoreB==null);
+      const fakeBye=(m.bye===true&&m.status===STATUS.COMPLETED&&hasOneTeam&&noRealScore);
+      if(!fakeBye)continue;
+
+      const fakeWinnerId=m.winnerId;
+      if(m.nextMatchId&&fakeWinnerId){
+        const next=getMatch(draw,m.nextMatchId);
+        if(next){
+          if(next.teamA?.id===fakeWinnerId)next.teamA=null;
+          if(next.teamB?.id===fakeWinnerId)next.teamB=null;
+          if(next.winnerId===fakeWinnerId){
+            next.winnerId=null;
+            next.scoreA=null;
+            next.scoreB=null;
+            next.completedAt=null;
+            next.bye=false;
+            next.status=(next.teamA&&next.teamB)?STATUS.UNASSIGNED:STATUS.WAITING_SLOTS;
+          }
+        }
+      }
+
+      m.winnerId=null;
+      m.scoreA=null;
+      m.scoreB=null;
+      m.completedAt=null;
+      m.bye=false;
+      m.status=(m.teamA&&m.teamB)?STATUS.UNASSIGNED:STATUS.WAITING_SLOTS;
+      repaired++;
+    }
+  }
+  return repaired;
+}
+
+function repairLoadedStateIfNeeded(){
+  const state=store.get();
+  if(!state?.draw)return 0;
+  const repaired=repairInvalidByePropagation(state.draw);
+  if(repaired>0){
+    store.set(state);
+    ui.msg(`잘못 자동진출된 후속 라운드 ${repaired}경기를 복구했습니다.`,'success');
+  }
+  return repaired;
 }
 
 function allMatches(draw){
@@ -960,6 +1008,12 @@ function validateDrawStructure(draw){
     }
   }
 
+  const invalidLaterByes=Object.keys(draw.rounds).map(Number)
+    .filter(size=>size<draw.size)
+    .flatMap(size=>draw.rounds[size])
+    .filter(m=>m.bye===true&&m.status===STATUS.COMPLETED&&(!!m.teamA!==!!m.teamB)&&m.scoreA==null&&m.scoreB==null);
+  if(invalidLaterByes.length)issues.push(`후속 라운드 잘못된 자동진출 ${invalidLaterByes.length}경기`);
+
   const firstRoundPlayable=first.filter(m=>m.teamA&&m.teamB).length;
   const completeByes=first.filter(m=>m.bye&&m.status===STATUS.COMPLETED).length;
   const metrics={
@@ -972,6 +1026,7 @@ function validateDrawStructure(draw){
     sameGroupMatches,
     duplicates:duplicates.length,
     byeSectionCount:byeSections.size,
+    invalidLaterByes:invalidLaterByes.length,
     policy:draw.byePolicy||'unknown'
   };
   return {ok:issues.length===0,issues,warnings,metrics,duplicates};
@@ -994,6 +1049,7 @@ function renderDrawValidation(result){
     ['재대결 검사',`${m.sameGroupMatches??0}경기`,`같은 조 1위·2위`],
     ['중복 배치',`${m.duplicates??0}건`,`동일 팀 중복 여부`],
     ['부전승 분포',`${m.byeSectionCount??0}개 구간`,`8경기 단위 구간`],
+    ['후속 자동진출',`${m.invalidLaterByes??0}경기`,`0경기가 정상`],
   ];
   let html=cards.map(c=>`<div class="validation-card"><strong>${c[0]}: ${c[1]}</strong><small>${c[2]}</small></div>`).join('');
   if(result.issues.length)html+=`<div class="validation-card"><strong>오류</strong><ul class="validation-list">${result.issues.map(v=>`<li>${safeText(v)}</li>`).join('')}</ul></div>`;
@@ -1145,6 +1201,10 @@ document.getElementById('buildRankedTeamsBtn').onclick=()=>copyCandidateToText(t
 document.getElementById('copyCandidateTextBtn').onclick=()=>copyCandidateToText(false);
 store.subscribe(state=>ui.render(state));
 if(!store.load()) store.emit();
-setTimeout(()=>{syncDrawLockUI();if(currentDraw())validateCurrentDraw(false);},0);
-console.info(`[MAIN-V2] engine 1.6.0 draw validation and lock loaded`);
+setTimeout(()=>{
+  repairLoadedStateIfNeeded();
+  syncDrawLockUI();
+  if(currentDraw())validateCurrentDraw(false);
+},0);
+console.info(`[MAIN-V2] engine 1.6.1 bye propagation fix loaded`);
 
