@@ -56565,7 +56565,6 @@ if(false) setTimeout(function(){
 <script id="operationQueueModule" src="./assets/js/operation-queue.js?v=1009"></script>
 <!-- v1037: single main-draw entry. No legacy dynamic fallback. -->
 <script id="mainDrawCleanModule" src="./assets/js/main-draw.js?v=1052-persistent-boot"></script>
-<script id="mainDrawCoreV2ReadOnly" src="./assets/js/main-draw-core-v2-readonly.js?v=1181"></script>
 <script id="toolsGateModule" src="./assets/js/tools-gate.js?v=1009"></script>
 
 
@@ -56573,7 +56572,37 @@ if(false) setTimeout(function(){
 (function(){
   'use strict';
   document.documentElement.classList.add('operation-stage1-stable');
-  console.log('[230MATCH] v1.18.1 detailed queue diagnostics stage loaded');
+  console.log('[230MATCH] v1.18.2 stable lazy diagnostics base loaded');
+})();
+</script>
+
+
+<script id="mainDrawCoreV2LazyLoader">
+(function(){
+  'use strict';
+  window.loadMainDrawCoreV2Diagnostics = function(){
+    if(window.MainDrawCoreV2ReadOnly){
+      console.log('[MAIN-DRAW-CORE-V2] diagnostics already loaded');
+      return Promise.resolve(window.MainDrawCoreV2ReadOnly);
+    }
+    return new Promise(function(resolve,reject){
+      var old=document.getElementById('mainDrawCoreV2DiagnosticsRuntime');
+      if(old) old.remove();
+      var s=document.createElement('script');
+      s.id='mainDrawCoreV2DiagnosticsRuntime';
+      s.src='./assets/js/main-draw-core-v2-readonly.js?v=1182';
+      s.async=true;
+      s.onload=function(){
+        console.log('[230MATCH] v1.18.2 lazy diagnostics loaded on demand');
+        resolve(window.MainDrawCoreV2ReadOnly);
+      };
+      s.onerror=function(){
+        reject(new Error('본선 진단 모듈을 불러오지 못했습니다.'));
+      };
+      document.head.appendChild(s);
+    });
+  };
+  console.log('[230MATCH] v1.18.2 stable lazy diagnostics ready');
 })();
 </script>
 
