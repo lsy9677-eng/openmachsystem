@@ -2369,6 +2369,7 @@ function simpleGoToTarget(id){
 }
 function simpleBoot(){
   document.getElementById('toggleAdvancedToolsBtn').onclick=simpleToggleAdvanced;
+  document.getElementById('oneButtonHandoffBtn').onclick=oneButtonHandoff;
   document.querySelectorAll('.simple-step').forEach(btn=>{
     btn.addEventListener('click',()=>{
       const clickId=btn.dataset.clickId;
@@ -2384,6 +2385,115 @@ function simpleBoot(){
   });
   setInterval(simpleRender,1200);
   simpleRender();
+}
+
+
+
+/* ===== v1.14 one-button handoff ===== */
+const OneButtonHandoff={
+  running:false,
+  lastPackage:null
+};
+function handoffStatus(message,type=''){
+  const el=document.getElementById('oneButtonHandoffStatus');
+  if(!el)return;
+  el.textContent=message;
+  el.className=`handoff-progress${type?` ${type}`:''}`;
+}
+function handoffCurrentReady(){
+  const state=store.get();
+  const teams=Array.isArray(state.importedTeams)?state.importedTeams.length:0;
+  const matches=Array.isArray(state.draw?.matches)?state.draw.matches:[];
+  return {
+    teams,
+    matches:matches.length,
+    locked:!!state.drawLocked,
+    source:syncGetCurrentSource()
+  };
+}
+async function oneButtonHandoff(){
+  if(OneButtonHandoff.running)return;
+  OneButtonHandoff.running=true;
+  const btn=document.getElementById('oneButtonHandoffBtn');
+  if(btn){btn.disabled=true;btn.textContent='검사 중...';}
+  try{
+    const ready=handoffCurrentReady();
+
+    if(!ready.teams){
+      throw new Error('명단이 없습니다. 먼저 기존 앱 명단을 적용하세요.');
+    }
+    if(!ready.matches){
+      throw new Error('대진이 없습니다. 새 본선 추첨을 먼저 실행하세요.');
+    }
+    if(!ready.locked){
+      throw new Error('대진 잠금이 필요합니다. 대진을 확정·잠금한 뒤 다시 실행하세요.');
+    }
+    if(!ready.source.tournamentId && !ready.source.tournamentName){
+      throw new Error('기존 앱의 대회·부서 연결 정보가 없습니다.');
+    }
+
+    handoffStatus('1/4 반영 대상을 확인하고 있습니다.','warn');
+    syncCaptureTarget();
+    if(!SyncStaging.target){
+      throw new Error('반영 대상을 고정하지 못했습니다.');
+    }
+
+    handoffStatus('2/4 대진과 경기 상태를 검사하고 있습니다.','warn');
+    const plan=syncBuildPlan();
+    const validation=syncValidatePlan(false);
+    if(!plan || !validation?.ok){
+      const detail=(validation?.errors||[]).join(' · ') || '안전성 검사 실패';
+      throw new Error(detail);
+    }
+
+    handoffStatus('3/4 반영 직전 복구점을 저장하고 있습니다.','warn');
+    await recoverySave('before-one-button-handoff',false);
+
+    handoffStatus('4/4 운영 반영 패키지를 만들고 있습니다.','warn');
+    const state=JSON.parse(JSON.stringify(store.get()));
+    const pkg={
+      packageVersion:'230match-main-v2-operation-package-v2',
+      generatedAt:new Date().toISOString(),
+      mode:'approved-handoff',
+      directWriteEnabled:false,
+      target:plan.target,
+      stateChecksum:plan.stateChecksum,
+      validation,
+      plan,
+      state
+    };
+    OneButtonHandoff.lastPackage=pkg;
+
+    // Same-origin handoff staging. This does not modify legacy operational data.
+    localStorage.setItem('230match-main-v2-approved-handoff-v1',JSON.stringify(pkg));
+    try{
+      const channel=new BroadcastChannel('230match-main-v2-handoff');
+      channel.postMessage({
+        type:'MAIN_V2_APPROVED_HANDOFF_READY',
+        target:pkg.target,
+        checksum:pkg.stateChecksum,
+        generatedAt:pkg.generatedAt
+      });
+      channel.close();
+    }catch{}
+
+    downloadJson(
+      `230match-approved-handoff-${shadowSafeName(plan.target.key||plan.target.division)}-${Date.now()}.json`,
+      pkg
+    );
+
+    handoffStatus(
+      `준비 완료 · ${plan.draw.size}강 ${plan.draw.matchCount}경기 · 체크섬 ${plan.stateChecksum} · 기존 앱 데이터는 아직 변경하지 않았습니다.`,
+      'ok'
+    );
+    ui.msg('운영 반영 준비 패키지를 생성했습니다.','success');
+  }catch(e){
+    handoffStatus(e.message,'error');
+    ui.msg(e.message,'error');
+  }finally{
+    OneButtonHandoff.running=false;
+    if(btn){btn.disabled=false;btn.textContent='운영 반영 준비 실행';}
+  }
 }
 
 
@@ -3051,7 +3161,7 @@ setTimeout(()=>{
   }
   if(currentDraw())validateCurrentDraw(false);
 },0);
-console.info(`[MAIN-V2] engine 1.13.0 simple operator mode loaded`);
+console.info(`[MAIN-V2] engine 1.14.0 one button handoff loaded`);
 
 
 setTimeout(()=>{

@@ -30,7 +30,7 @@
           <h2>본선 운영 제어</h2>
           <p>64강 전체 구조와 코트 큐를 하나의 데이터 원본으로 운영합니다.</p>
         </div>
-        <span id="engineBadge" class="version-badge">MAIN V2 · 1.13.0 SIMPLE OPERATOR MODE</span>
+        <span id="engineBadge" class="version-badge">MAIN V2 · 1.14.0 ONE BUTTON HANDOFF</span>
       </div>
 
       <div class="controls-grid">
@@ -235,7 +235,19 @@
           </button>
         </div>
 
-        <div class="simple-status-grid">
+        
+        <div class="simple-handoff-box">
+          <div>
+            <strong>운영 반영 준비</strong>
+            <p>대상 고정 → 대진 검사 → 복구점 저장 → 반영 패키지 생성까지 한 번에 처리합니다.</p>
+          </div>
+          <button id="oneButtonHandoffBtn" class="btn primary handoff-main-btn">운영 반영 준비 실행</button>
+        </div>
+        <div id="oneButtonHandoffStatus" class="handoff-progress">
+          아직 실행하지 않았습니다.
+        </div>
+
+<div class="simple-status-grid">
           <div><span>명단</span><strong id="simpleRosterStat">0팀</strong></div>
           <div><span>대진</span><strong id="simpleDrawStat">없음</strong></div>
           <div><span>자동배정</span><strong id="simpleAutoStat">OFF</strong></div>
@@ -551,6 +563,6 @@
 
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
-  <script src="./assets/js/main-v2.bundle.js?v=20"></script>
+  <script src="./assets/js/main-v2.bundle.js?v=21"></script>
 </body>
 </html>
