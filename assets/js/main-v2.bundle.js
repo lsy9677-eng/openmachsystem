@@ -2187,8 +2187,12 @@ function syncValidatePlan(showToast=true){
   if(!plan.target?.division)errors.push('부서 대상 없음');
   if(plan.sourceMismatch)errors.push('고정 대상과 현재 연결 대상 불일치');
   if(!plan.draw.size)errors.push('대진 규모 없음');
-  if(!plan.draw.matchCount)warnings.push('대진 경기 없음');
-  if(!plan.draw.locked)warnings.push('대진 잠금 해제 상태');
+  const expectedFirstRound=Math.max(0,Math.floor(Number(plan.draw.size||0)/2));
+  if(plan.draw.matchCount && plan.draw.matchCount < expectedFirstRound){
+    errors.push(`대진 경기 수 부족: ${plan.draw.matchCount}/${expectedFirstRound}`);
+  }
+  if(!plan.draw.matchCount)errors.push('대진 경기 없음');
+  if(!plan.draw.locked)errors.push('대진 잠금 해제 상태');
   const ids=new Set();
   for(const m of [...plan.changes.completed,...plan.changes.live,...plan.changes.queue]){
     if(!m.matchId){warnings.push('경기 ID 없는 항목 존재');continue;}
@@ -2262,7 +2266,11 @@ function syncDownloadOperationPackage(){
   const plan=SyncStaging.plan||syncBuildPlan();
   const validation=SyncStaging.validation||syncValidatePlan(false);
   if(!plan||!validation?.ok){
-    ui.msg('안전성 검사를 통과한 계획이 필요합니다.','error');
+    ui.msg('대진 생성·잠금 후 안전성 검사를 통과해야 합니다.','error');
+    return;
+  }
+  if(!plan.draw.matchCount||!plan.draw.locked){
+    ui.msg('대진 경기와 대진 잠금이 확인되지 않아 패키지를 만들 수 없습니다.','error');
     return;
   }
   const state=JSON.parse(JSON.stringify(store.get()));
@@ -2976,7 +2984,7 @@ setTimeout(()=>{
   }
   if(currentDraw())validateCurrentDraw(false);
 },0);
-console.info(`[MAIN-V2] engine 1.12.0 legacy sync staging loaded`);
+console.info(`[MAIN-V2] engine 1.12.1 strict sync validation loaded`);
 
 
 setTimeout(()=>{
