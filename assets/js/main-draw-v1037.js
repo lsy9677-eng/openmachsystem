@@ -8,9 +8,9 @@
   if(window.__V1037_AUTHORITATIVE_MAIN_DRAW_INSTALLED) return;
   window.__V1037_AUTHORITATIVE_MAIN_DRAW_INSTALLED = true;
   window.__CLEAN_MAIN_ONLY_MODE__ = true;
-  window.__MAIN_DRAW_AUTHORITY_VERSION__ = 'v1037-authoritative-main-engine';
+  window.__MAIN_DRAW_AUTHORITY_VERSION__ = 'v1037-authoritative-main-engine-controls-fix';
 
-  const VERSION = 'v1037-authoritative-main-engine';
+  const VERSION = 'v1037-authoritative-main-engine-controls-fix';
   const PANEL_ID = 'v1037MainPanel';
   const BRACKET_ID = 'v1037MainBracket';
   const VENUE_ORDER = ['국제','능동','원도심','삼계','금병','동부','장유중','기타'];
@@ -458,8 +458,9 @@
       if(anchor&&anchor.parentNode) anchor.parentNode.insertBefore(p,anchor.nextSibling); else page.prepend(p);
     }
     p.style.display='block'; p.classList.remove('v1037-legacy-hidden');
-    if(!p.dataset.built){
-      p.innerHTML=`<div class="v1037-title"><div>🏆 새 본선 운영 패널 <small>${VERSION}</small></div><small>기존 본선 렌더러 미사용 · 새 엔진 단독</small></div>
+    const controlsMissing=!p.querySelector('#v1037MainMode')||!p.querySelector('#v1037DrawBtn')||!p.querySelector('#v1037AssignBtn')||!p.querySelector('#v1037RefreshBtn')||!p.querySelector('#'+BRACKET_ID);
+    if(!p.dataset.built || controlsMissing){
+      p.innerHTML=`<div class="v1037-title"><div>🏆 새 본선 운영 패널 <small>${VERSION}-controls-fix</small></div><small>기존 본선 렌더러 미사용 · 새 엔진 단독</small></div>
         <div class="v1037-controls"><select id="v1037MainMode" class="v1037-select"><option value="redistribute">전체 재배정 · 선택 코트 기준 균등 배정</option><option value="keep">예선 구장 유지</option></select><button type="button" id="v1037DrawBtn" class="v1037-btn primary">🎲 새 본선 추첨</button><button type="button" id="v1037AssignBtn" class="v1037-btn purple">🎯 본선 코트배정</button><button type="button" id="v1037RefreshBtn" class="v1037-btn green">🔁 본선 큐 갱신</button></div>
         <div class="v1037-note">본선은 이 패널만 사용합니다. 예선 결과가 확정된 경기부터 실제 팀명으로 바뀌며, 결과 입력 시 다음 라운드로 승자가 올라갑니다. 공용대기는 바로 시합중으로 가지 않고 각 코트의 대기1로만 이동합니다.</div>
         <div id="${BRACKET_ID}"></div>`;
@@ -525,7 +526,7 @@
     document.addEventListener('input',()=>setTimeout(()=>{renderPanel(selectedKey());hideLegacy();},120),true);
     [400,1200,2600,5200].forEach(t=>setTimeout(()=>{ensurePanel();hideLegacy();},t));
     setInterval(()=>{try{refreshQueue(selectedKey(),false);renderPanel(selectedKey());hideLegacy();}catch(e){}},3500);
-    try{console.log('[v1037] authoritative clean main engine loaded');}catch(e){}
+    try{console.log('[v1037-controls-fix] authoritative clean main engine loaded');}catch(e){}
   }
   install();
 })();
