@@ -670,7 +670,7 @@ class UI{
 
 
 /* ===== read-only legacy bridge v1.2 ===== */
-const BridgeState={legacyWindow:null,candidates:[],diagnostic:null};
+const BridgeState={legacyWindow:null,candidates:[],diagnostic:null,direct:null,directReport:null};
 
 function bridgeLog(message){
   const el=document.getElementById('bridgeLog');
@@ -969,6 +969,269 @@ function useExactLegacyDraw(){
 function exportBridgeDiagnostic(){
   if(!BridgeState.diagnostic){ui.msg('먼저 데이터 검사를 실행하세요.','error');return;}
   downloadJson(`230match-bridge-diagnostic-${Date.now()}.json`,BridgeState.diagnostic);
+}
+
+
+
+/* ===== v1.9 deterministic legacy read-only bridge ===== */
+function getLegacyWindowOrThrow(){
+  const w=BridgeState.legacyWindow;
+  if(!w||w.closed)throw new Error('기존 앱 창이 열려 있지 않습니다.');
+  if(w.location.origin!==location.origin)throw new Error('기존 앱과 V2가 동일한 도메인이 아닙니다.');
+  if(!w.G||!Array.isArray(w.G.tournaments))throw new Error('기존 앱 데이터(window.G)가 아직 준비되지 않았습니다.');
+  return w;
+}
+function legacyTeamName(w,key,teamIndex){
+  try{
+    const team=w.G?.teams?.[key]?.[teamIndex];
+    if(!team)return '';
+    if(Array.isArray(team.individualPlayers)&&team.individualPlayers.length){
+      return team.individualPlayers.slice(0,2).map(p=>String(p?.name||'').trim()).filter(Boolean).join(' / ');
+    }
+    if(Array.isArray(team.players)&&team.players.length){
+      return team.players.slice(0,2).map(p=>typeof p==='string'?p:String(p?.name||'')).map(v=>v.trim()).filter(Boolean).join(' / ');
+    }
+    if(typeof w.tdn==='function')return String(w.tdn(team,key,teamIndex)||'').trim();
+    return String(team.pairLabel||team.entryLabel||team.name||team.club||'').trim();
+  }catch{return '';}
+}
+function legacyTeamAffiliation(w,key,teamIndex){
+  try{
+    const team=w.G?.teams?.[key]?.[teamIndex]||{};
+    return String(team.club||team.affiliation||team.organization||'').trim();
+  }catch{return '';}
+}
+function legacyGroupVenue(w,key,draw,gi){
+  try{
+    const grp=draw?.groups?.[gi];
+    const court=String(
+      (Array.isArray(grp?.courts)&&grp.courts[0])||
+      grp?.court||grp?.manualCourt||grp?.manualCourtTarget||''
+    ).trim();
+    if(court)return court;
+    const ms=(w.G?.matches?.[key]||[]).filter(m=>m&&m.phase==='group'&&Number(m.group)===Number(gi));
+    for(const m of ms){
+      const value=String((Array.isArray(m.courts)&&m.courts[0])||m.court||m.manualCourtTarget||'').trim();
+      if(value)return value;
+    }
+  }catch{}
+  return '';
+}
+function legacyMatchDone(w,key,m){
+  try{
+    if(typeof w.getMatchResultState==='function')return !!w.getMatchResultState(key,m)?.done;
+  }catch{}
+  return m?.winner!=null || (Number.isFinite(Number(m?.s1))&&Number.isFinite(Number(m?.s2)));
+}
+function legacyDivisionSnapshot(w,tid,div){
+  const key=`${tid}_${div}`;
+  const tournament=(w.G.tournaments||[]).find(t=>String(t.id)===String(tid));
+  const draw=w.G.draws?.[key]||{};
+  const teams=w.G.teams?.[key]||[];
+  const matches=w.G.matches?.[key]||[];
+  const groups=Array.isArray(draw.groups)?draw.groups:[];
+  let cfg={};
+  try{if(typeof w.gDS==='function')cfg=w.gDS(tournament,div)||{};}catch{}
+  const defaultAdvance=Math.max(1,Number(draw.advance||cfg.advance||2));
+  const qualifiers=[];
+  const groupRows=[];
+  const courtSet=new Set();
+
+  groups.forEach((grp,gi)=>{
+    const teamIds=Array.isArray(grp?.teams)?grp.teams:[];
+    const groupMatches=matches.filter(m=>m&&m.phase==='group'&&Number(m.group)===Number(gi));
+    const done=groupMatches.length>0 && groupMatches.every(m=>legacyMatchDone(w,key,m));
+    const venue=legacyGroupVenue(w,key,draw,gi);
+    if(venue)courtSet.add(venue);
+    const advCount=teamIds.length<=2?teamIds.length:defaultAdvance;
+    let standings=[];
+    try{
+      if(typeof w.calcGS==='function')standings=w.calcGS(key,gi,teamIds,teams)||[];
+    }catch{}
+    const top=done?standings.slice(0,advCount):[];
+    const confirmed=top.map((row,idx)=>{
+      const ti=row?.ti;
+      const name=String(row?.nm||legacyTeamName(w,key,ti)||'').trim();
+      return {
+        id:`legacy_${key}_g${gi+1}_r${idx+1}`,
+        seed:qualifiers.length+idx+1,
+        name,
+        affiliation:legacyTeamAffiliation(w,key,ti),
+        groupNo:gi+1,
+        groupRank:idx+1,
+        venue,
+        teamIndex:ti,
+        sourceKey:key
+      };
+    }).filter(x=>x.name);
+    qualifiers.push(...confirmed);
+    groupRows.push({
+      groupNo:gi+1,
+      teamCount:teamIds.length,
+      matchCount:groupMatches.length,
+      completedMatches:groupMatches.filter(m=>legacyMatchDone(w,key,m)).length,
+      done,
+      venue,
+      qualifiers:confirmed
+    });
+  });
+
+  const allGroupsDone=groups.length>0&&groupRows.every(g=>g.done);
+  return {
+    readOnly:true,
+    scannedAt:new Date().toISOString(),
+    tournamentId:tid,
+    tournamentName:tournament?.name||tid,
+    division:div,
+    key,
+    groupCount:groups.length,
+    completedGroupCount:groupRows.filter(g=>g.done).length,
+    teamCount:teams.length,
+    groupMatchCount:matches.filter(m=>m&&m.phase==='group').length,
+    allGroupsDone,
+    qualifiers,
+    courts:[...courtSet],
+    groups:groupRows
+  };
+}
+function loadLegacyTournamentStructure(){
+  try{
+    const w=getLegacyWindowOrThrow();
+    const tournaments=(w.G.tournaments||[]).map(t=>({
+      id:String(t.id),
+      name:String(t.name||t.title||t.id),
+      divisions:Array.isArray(t.divisions)?t.divisions.map(String):[]
+    }));
+    BridgeState.direct={tournaments};
+    const ts=document.getElementById('legacyTournamentSelect');
+    ts.innerHTML=tournaments.length
+      ?tournaments.map(t=>`<option value="${safeText(t.id)}">${safeText(t.name)}</option>`).join('')
+      :'<option value="">대회 없음</option>';
+    populateLegacyDivisions();
+    setBridgeChip('legacyDirectModeBadge','읽기 전용 연결됨',true);
+    bridgeLog(`구조 직접 읽기 완료: 대회 ${tournaments.length}개`);
+    ui.msg(`기존 앱 대회 ${tournaments.length}개를 읽었습니다.`,'success');
+  }catch(e){
+    setBridgeChip('legacyDirectModeBadge','연결 실패',false);
+    ui.msg(e.message,'error');
+    bridgeLog(`구조 직접 읽기 실패: ${e.message}`);
+  }
+}
+function populateLegacyDivisions(){
+  const ts=document.getElementById('legacyTournamentSelect');
+  const ds=document.getElementById('legacyDivisionSelect');
+  const t=BridgeState.direct?.tournaments?.find(x=>x.id===ts.value);
+  const divs=t?.divisions||[];
+  ds.innerHTML=divs.length
+    ?divs.map(d=>`<option value="${safeText(d)}">${safeText(d)}</option>`).join('')
+    :'<option value="">부서 없음</option>';
+}
+function setLegacyStat(id,value){
+  const el=document.getElementById(id);if(el)el.textContent=String(value);
+}
+function renderLegacyDirectReport(report){
+  setLegacyStat('legacyGroupCount',report.groupCount);
+  setLegacyStat('legacyCompletedGroupCount',report.completedGroupCount);
+  setLegacyStat('legacyQualifierCount',report.qualifiers.length);
+  setLegacyStat('legacyCourtCount',report.courts.length);
+  setLegacyStat('legacyPrelimStatus',report.allGroupsDone?'전체 완료':'진행 중');
+
+  const summary=document.getElementById('legacyDirectSummary');
+  summary.textContent=
+    `${report.tournamentName} · ${report.division} · 조 ${report.completedGroupCount}/${report.groupCount} 완료 · `+
+    `확정 진출 ${report.qualifiers.length}팀 · 코트 ${report.courts.join(', ')||'미확인'}`;
+
+  const preview=document.getElementById('legacyDirectPreview');
+  const pending=report.groups.filter(g=>!g.done);
+  const note=pending.length
+    ?`<div class="legacy-direct-preview-note">미완료 조 ${pending.length}개는 명단에 포함하지 않았습니다. 기존 앱에서 결과가 확정된 뒤 새로고침하세요.</div>`
+    :'';
+  const rows=report.groups.map(g=>{
+    const q1=g.qualifiers[0]?.name||'-';
+    const q2=g.qualifiers[1]?.name||'-';
+    return `<tr class="${g.done?'':'legacy-direct-row-pending'}">
+      <td>${g.groupNo}조</td>
+      <td>${g.done?'완료':'진행 중'}</td>
+      <td>${g.completedMatches}/${g.matchCount}</td>
+      <td>${safeText(g.venue||'')}</td>
+      <td>${safeText(q1)}</td>
+      <td>${safeText(q2)}</td>
+    </tr>`;
+  }).join('');
+  preview.innerHTML=note+`<table><thead><tr><th>조</th><th>상태</th><th>경기</th><th>코트</th><th>1위</th><th>2위</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+function inspectLegacySelectedDivision(showToast=true){
+  try{
+    const w=getLegacyWindowOrThrow();
+    const tid=document.getElementById('legacyTournamentSelect').value;
+    const div=document.getElementById('legacyDivisionSelect').value;
+    if(!tid||!div)throw new Error('대회와 부서를 선택하세요.');
+    const report=legacyDivisionSnapshot(w,tid,div);
+    BridgeState.directReport=report;
+    renderLegacyDirectReport(report);
+    setBridgeChip('legacyDirectModeBadge','읽기 전용 정상',true);
+    bridgeLog(`직접 진단: ${report.key} / 완료 조 ${report.completedGroupCount}/${report.groupCount} / 진출 ${report.qualifiers.length}팀`);
+    if(showToast)ui.msg(`확정 진출팀 ${report.qualifiers.length}팀을 읽었습니다.`,'success');
+    return report;
+  }catch(e){
+    if(showToast)ui.msg(e.message,'error');
+    bridgeLog(`선택 부서 진단 실패: ${e.message}`);
+    return null;
+  }
+}
+function copyLegacyQualifiers(){
+  const report=inspectLegacySelectedDivision(false)||BridgeState.directReport;
+  if(!report||!report.qualifiers.length){ui.msg('복사할 확정 진출팀이 없습니다.','error');return;}
+  const text=report.qualifiers
+    .sort((a,b)=>a.groupNo-b.groupNo||a.groupRank-b.groupRank)
+    .map(t=>t.name+(t.affiliation?` | ${t.affiliation}`:''))
+    .join('\n');
+  document.getElementById('teamImportText').value=text;
+  setTeamImportSummary(`${report.key}에서 결과가 확정된 ${report.qualifiers.length}팀을 읽기 전용으로 복사했습니다.`);
+  ui.msg(`${report.qualifiers.length}팀을 명단 입력창에 복사했습니다.`,'success');
+}
+function applyLegacyQualifiers(){
+  if(!guardDrawMutation('기존 앱 진출팀 적용'))return;
+  const report=inspectLegacySelectedDivision(false)||BridgeState.directReport;
+  if(!report||!report.qualifiers.length){ui.msg('적용할 확정 진출팀이 없습니다.','error');return;}
+  if(!report.allGroupsDone){
+    ui.msg(`예선 미완료 조가 ${report.groupCount-report.completedGroupCount}개 있습니다. 전체 완료 후 적용하세요.`,'error');
+    return;
+  }
+  const teams=report.qualifiers
+    .sort((a,b)=>a.groupNo-b.groupNo||a.groupRank-b.groupRank)
+    .map((t,i)=>({...t,seed:i+1}));
+  const size=chooseBestDrawSize(teams.length);
+  if(!size){ui.msg(`${teams.length}팀은 지원 대진 범위가 아닙니다.`,'error');return;}
+  const count=Number(document.getElementById('courtCount').value);
+  const prefix=document.getElementById('courtPrefix').value.trim()||'국제';
+  const next=initialState(size,count,prefix);
+  next.draw=createBracket(size,teams);
+  next.importedTeams=teams.map(t=>({...t}));
+  next.importedSource='legacy-readonly-direct';
+  next.bridgeSource={
+    mode:'readonly',
+    key:report.key,
+    tournamentId:report.tournamentId,
+    tournamentName:report.tournamentName,
+    division:report.division,
+    scannedAt:report.scannedAt,
+    groupCount:report.groupCount,
+    qualifierCount:teams.length,
+    courts:report.courts
+  };
+  next.drawLocked=false;
+  store.set(next);
+  document.getElementById('drawSize').value=String(size);
+  document.getElementById('teamImportText').value=teams.map(t=>t.name+(t.affiliation?` | ${t.affiliation}`:'')).join('\n');
+  setTeamImportSummary(`${report.tournamentName} · ${report.division}의 실제 진출 ${teams.length}팀을 V2에 적용했습니다.`);
+  setTimeout(()=>{validateCurrentDraw(false);syncDrawLockUI();},0);
+  ui.msg(`기존 앱 실제 진출팀 ${teams.length}팀을 V2에 적용했습니다.`,'success');
+}
+function exportLegacyDirectReport(){
+  const report=inspectLegacySelectedDivision(false)||BridgeState.directReport;
+  if(!report){ui.msg('저장할 읽기 전용 진단 결과가 없습니다.','error');return;}
+  downloadJson(`230match-legacy-readonly-${report.key}-${Date.now()}.json`,report);
 }
 
 
@@ -1560,6 +1823,15 @@ document.getElementById('openLegacyBtn').onclick=openLegacyApp;
 document.getElementById('scanLegacyWindowBtn').onclick=scanLegacyWindow;
 document.getElementById('scanCurrentPageBtn').onclick=scanCurrentPageStorage;
 document.getElementById('exportDiagnosticBtn').onclick=exportBridgeDiagnostic;
+
+document.getElementById('loadLegacyStructureBtn').onclick=loadLegacyTournamentStructure;
+document.getElementById('legacyTournamentSelect').onchange=populateLegacyDivisions;
+document.getElementById('inspectLegacyDivisionBtn').onclick=()=>inspectLegacySelectedDivision(true);
+document.getElementById('refreshLegacyQualifiersBtn').onclick=()=>inspectLegacySelectedDivision(true);
+document.getElementById('copyLegacyQualifiersBtn').onclick=copyLegacyQualifiers;
+document.getElementById('applyLegacyQualifiersBtn').onclick=applyLegacyQualifiers;
+document.getElementById('exportLegacyBridgeReportBtn').onclick=exportLegacyDirectReport;
+
 document.getElementById('bridgeCandidateSelect').onchange=renderCandidatePreview;
 document.getElementById('useBridgeCandidateBtn').onclick=()=>useCandidate(false);
 document.getElementById('useExactLegacyDrawBtn').onclick=useExactLegacyDraw;
@@ -1595,5 +1867,5 @@ setTimeout(()=>{
   }
   if(currentDraw())validateCurrentDraw(false);
 },0);
-console.info(`[MAIN-V2] engine 1.8.0 operation simulator loaded`);
+console.info(`[MAIN-V2] engine 1.9.0 legacy read-only bridge loaded`);
 
