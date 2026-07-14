@@ -1,13 +1,13 @@
-/* 230MATCH main draw single-entry loader: v1040 */
+/* 230MATCH single-entry loader: v1050 */
 (function(){
   'use strict';
-  if (window.__V1039_MAIN_DRAW_LOADER__) return;
-  window.__V1039_MAIN_DRAW_LOADER__ = true;
-  var s=document.createElement('script');
-  s.id='mainDrawV1039Engine';
-  s.src='./assets/js/main-draw-v1040.js?v=1039-queue/status/balanced';
+  if(window.__V1050_MAIN_LOADER__) return;
+  window.__V1050_MAIN_LOADER__=true;
+  const s=document.createElement('script');
+  s.id='mainDrawV1050Engine';
+  s.src='./assets/js/main-draw-v1050.js?v=1050-clean';
   s.async=false;
-  s.onload=function(){console.info('[main-draw] v1040 queue/status/balanced engine loaded');};
-  s.onerror=function(){console.error('[main-draw] failed to load main-draw-v1040.js');};
+  s.onload=()=>console.info('[main-draw] v1050 clean main engine loaded');
+  s.onerror=()=>console.error('[main-draw] failed to load main-draw-v1050.js');
   (document.head||document.documentElement).appendChild(s);
 })();
