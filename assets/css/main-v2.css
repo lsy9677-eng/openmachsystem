@@ -65,3 +65,5 @@ input,select{width:100%;border:1px solid #b7c6dc;border-radius:10px;padding:10px
 .validation-card small{color:#64748b}
 .validation-list{margin:6px 0 0;padding-left:18px;font-size:.78rem;line-height:1.5}
 .draw-locked .btn[data-mutates="draw"]{opacity:.48;pointer-events:none}
+
+.result-warning{margin:10px 0;padding:10px 12px;border:1px solid #f59e0b;border-radius:10px;background:#fff7ed;color:#9a3412;font-weight:800;line-height:1.45}

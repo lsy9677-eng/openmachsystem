@@ -6,6 +6,8 @@
 /* ===== constants.js ===== */
 const VERSION = '1.0.0';
 const STORAGE_KEY = '230MATCH_MAIN_V2_STATE';
+const HISTORY_KEY = '230MATCH_MAIN_V2_HISTORY';
+const HISTORY_LIMIT = 20;
 const STATUS = Object.freeze({
   WAITING_SLOTS: 'waiting_slots',
   UNASSIGNED: 'unassigned',
@@ -49,6 +51,25 @@ function downloadJson(filename,data){
   a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
 }
 function safeText(v){return String(v??'');}
+function readHistory(){
+  try{return JSON.parse(localStorage.getItem(HISTORY_KEY)||'[]');}catch{return [];}
+}
+function writeHistory(items){
+  localStorage.setItem(HISTORY_KEY,JSON.stringify(items.slice(-HISTORY_LIMIT)));
+}
+function pushHistory(label,state){
+  const items=readHistory();
+  items.push({id:uid('hist'),label,createdAt:nowIso(),state:clone(state)});
+  writeHistory(items);
+}
+function popHistory(){
+  const items=readHistory();
+  const item=items.pop()||null;
+  writeHistory(items);
+  return item;
+}
+function clearHistory(){localStorage.removeItem(HISTORY_KEY);}
+function historyCount(){return readHistory().length;}
 
 
 
@@ -294,6 +315,92 @@ function getMatch(draw,id){
 function isReady(match){return !!(match&&match.teamA&&match.teamB);}
 function isCompleted(match){return match?.status===STATUS.COMPLETED&&!!match.winnerId;}
 
+
+function detachMatchFromOperations(state,match){
+  if(!match)return;
+  state.sharedQueue=(state.sharedQueue||[]).filter(id=>id!==match.id);
+  for(const court of state.courts||[]){
+    if(court.playing===match.id)court.playing=null;
+    if(court.wait1===match.id)court.wait1=null;
+  }
+  match.venue='';
+  match.court='';
+  match.queueOrder=null;
+  match.startedAt=null;
+}
+function clearDownstreamChain(state,sourceMatch){
+  let current=sourceMatch;
+  let cleared=0;
+  while(current?.nextMatchId){
+    const next=getMatch(state.draw,current.nextMatchId);
+    if(!next)break;
+
+    detachMatchFromOperations(state,next);
+
+    const propagatedId=current.winnerId;
+    if(current.nextSlot==='A'){
+      if(!propagatedId || next.teamA?.id===propagatedId)next.teamA=null;
+    }else{
+      if(!propagatedId || next.teamB?.id===propagatedId)next.teamB=null;
+    }
+
+    const hadProgress=
+      next.winnerId!=null ||
+      next.scoreA!=null ||
+      next.scoreB!=null ||
+      next.status===STATUS.COMPLETED ||
+      next.status===STATUS.PLAYING ||
+      next.status===STATUS.WAIT1 ||
+      next.status===STATUS.SHARED;
+
+    if(hadProgress){
+      next.winnerId=null;
+      next.scoreA=null;
+      next.scoreB=null;
+      next.completedAt=null;
+      next.bye=false;
+      next.status=(next.teamA&&next.teamB)?STATUS.UNASSIGNED:STATUS.WAITING_SLOTS;
+      cleared++;
+    }else{
+      next.status=(next.teamA&&next.teamB)?STATUS.UNASSIGNED:STATUS.WAITING_SLOTS;
+    }
+
+    current=next;
+  }
+  normalizeQueueOrders(state);
+  return cleared;
+}
+function downstreamProgressCount(state,match){
+  let count=0,current=match;
+  while(current?.nextMatchId){
+    const next=getMatch(state.draw,current.nextMatchId);
+    if(!next)break;
+    if(next.winnerId!=null || next.scoreA!=null || next.scoreB!=null ||
+       [STATUS.PLAYING,STATUS.WAIT1,STATUS.SHARED,STATUS.COMPLETED].includes(next.status)) count++;
+    current=next;
+  }
+  return count;
+}
+function applyResultSafely(state,matchId,scoreA,scoreB){
+  const m=getMatch(state.draw,matchId);
+  if(!m)throw new Error('경기를 찾지 못했습니다.');
+
+  const editingExisting=m.status===STATUS.COMPLETED && m.winnerId;
+  let cleared=0;
+  if(editingExisting){
+    cleared=clearDownstreamChain(state,m);
+    m.status=STATUS.UNASSIGNED;
+    m.completedAt=null;
+    m.winnerId=null;
+    m.scoreA=null;
+    m.scoreB=null;
+  }
+
+  const result=applyResult(state.draw,matchId,scoreA,scoreB);
+  completeAndAdvanceQueue(state,matchId);
+  return {...result,cleared};
+}
+
 function applyResult(draw,matchId,scoreA,scoreB){
   const m=getMatch(draw,matchId);
   if(!m) throw new Error('경기를 찾지 못했습니다.');
@@ -470,6 +577,8 @@ class UI{
     this.$('assignBtn').onclick=()=>this.actions.assign();
     this.$('refreshQueueBtn').onclick=()=>this.actions.refreshQueue();
     this.$('autoBtn').onclick=()=>this.actions.toggleAuto();
+    this.$('snapshotBtn').onclick=()=>this.actions.snapshot();
+    this.$('undoBtn').onclick=()=>this.actions.undo();
     this.$('resetDemoBtn').onclick=()=>this.actions.resetDemo();
     this.$('exportBtn').onclick=()=>this.actions.export();
     this.$('importInput').onchange=e=>this.actions.import(e.target.files?.[0]);
@@ -541,7 +650,18 @@ class UI{
     this.activeMatchId=matchId;this.$('resultTitle').textContent=`${ROUND_NAMES[m.roundSize]} ${m.matchNo}경기 결과`;
     this.$('resultMeta').textContent=m.court||({shared_queue:'공용대기',court_wait1:'대기1',playing:'시합중'}[m.status]||'');
     this.$('teamALabel').textContent=m.teamA?.name||'1번 팀';this.$('teamBLabel').textContent=m.teamB?.name||'2번 팀';
-    this.$('scoreA').value=m.scoreA??'';this.$('scoreB').value=m.scoreB??'';this.$('resultDialog').showModal();
+    this.$('scoreA').value=m.scoreA??'';this.$('scoreB').value=m.scoreB??'';
+    const warning=this.$('resultWarning');
+    const downstream=downstreamProgressCount(this.actions.getState(),m);
+    if(m.status===STATUS.COMPLETED){
+      warning.hidden=false;
+      warning.textContent=downstream
+        ?`결과를 수정하면 이후 라운드 ${downstream}경기의 결과·배정이 자동 취소됩니다.`
+        :'저장된 결과를 수정합니다. 승자가 바뀌면 다음 라운드 슬롯도 함께 변경됩니다.';
+    }else{
+      warning.hidden=true;warning.textContent='';
+    }
+    this.$('resultDialog').showModal();
   }
   closeResult(){this.$('resultDialog').close();this.activeMatchId=null;}
 }
@@ -1125,6 +1245,7 @@ const actions={
   getState:()=>store.get(),
   newDraw(){
     if(!guardDrawMutation('새 본선 추첨'))return;
+    pushHistory('새 본선 추첨 전',store.get());
     try{
       const size=Number(document.getElementById('drawSize').value);
       const count=Number(document.getElementById('courtCount').value);
@@ -1166,11 +1287,29 @@ const actions={
       ui.msg(e.message,'error');
     }
   },
-  assign(){store.update(s=>initialAssign(s));ui.msg('코트별 시합중 1경기, 대기1 1경기까지 균등 배정했습니다.','success');},
+  assign(){pushHistory('코트배정 전',store.get());store.update(s=>initialAssign(s));ui.msg('코트별 시합중 1경기, 대기1 1경기까지 균등 배정했습니다.','success');},
   refreshQueue(){
-    if(!guardDrawMutation('본선 큐 갱신'))return;store.update(s=>{enqueueNewReadyMatches(s);refreshQueue(s);});ui.msg('본선 큐를 갱신했습니다.','success');},
+    if(!guardDrawMutation('본선 큐 갱신'))return;pushHistory('본선 큐 갱신 전',store.get());store.update(s=>{enqueueNewReadyMatches(s);refreshQueue(s);});ui.msg('본선 큐를 갱신했습니다.','success');},
   toggleAuto(){store.update(s=>{s.autoAssign=!s.autoAssign;});},
-  resetDemo(){store.clear();store.set(initialState());ui.msg('데모 데이터를 초기화했습니다.','info');},
+  snapshot(){
+    pushHistory('수동 스냅샷',store.get());
+    ui.msg(`스냅샷을 저장했습니다. 보관 ${historyCount()}개`,'success');
+  },
+  undo(){
+    const item=popHistory();
+    if(!item){ui.msg('되돌릴 작업 기록이 없습니다.','error');return;}
+    store.set(item.state);
+    const teams=Array.isArray(item.state.importedTeams)?item.state.importedTeams:[];
+    if(teams.length){
+      document.getElementById('teamImportText').value=
+        teams.map(t=>t.name+(t.affiliation?` | ${t.affiliation}`:'')).join('\n');
+    }
+    ui.msg(`되돌리기 완료: ${item.label}`,'success');
+  },
+  resetDemo(){
+    pushHistory('데모 초기화 전',store.get());
+    store.clear();store.set(initialState());ui.msg('데모 데이터를 초기화했습니다.','info');
+  },
   export(){downloadJson(`230match-main-v2-${Date.now()}.json`,store.get());},
   async import(file){
     if(!file)return;
@@ -1189,12 +1328,24 @@ const actions={
   },
   saveResult(matchId,a,b){
     try{
-      store.update(s=>{applyResult(s.draw,matchId,a,b);completeAndAdvanceQueue(s,matchId);});
-      ui.closeResult();ui.msg(`결과 ${a}:${b} 저장 및 다음 라운드/큐 반영 완료`,'success');
+      const before=clone(store.get());
+      const match=getMatch(before.draw,matchId);
+      const label=match?.status===STATUS.COMPLETED
+        ?`${ROUND_NAMES[match.roundSize]} ${match.matchNo}경기 결과 수정 전`
+        :`${ROUND_NAMES[match?.roundSize]||''} ${match?.matchNo||''}경기 결과 입력 전`;
+      pushHistory(label,before);
+
+      let outcome=null;
+      store.update(s=>{outcome=applyResultSafely(s,matchId,a,b);});
+      ui.closeResult();
+      const suffix=outcome?.cleared
+        ?` · 이후 라운드 ${outcome.cleared}경기 자동 취소`
+        :'';
+      ui.msg(`결과 ${a}:${b} 저장 및 다음 라운드/큐 반영 완료${suffix}`,'success');
     }catch(e){ui.msg(e.message,'error');}
   },
   importTeamText(){
-    if(!guardDrawMutation('실제 명단 적용'))return;
+    if(!guardDrawMutation('실제 명단 적용'))return;pushHistory('실제 명단 적용 전',store.get());
     try{
       const size=Number(document.getElementById('drawSize').value);
       const teams=parseTeamLines(document.getElementById('teamImportText').value);
@@ -1263,5 +1414,5 @@ setTimeout(()=>{
   }
   if(currentDraw())validateCurrentDraw(false);
 },0);
-console.info(`[MAIN-V2] engine 1.6.2 imported roster redraw fix loaded`);
+console.info(`[MAIN-V2] engine 1.7.0 safe result correction and undo loaded`);
 

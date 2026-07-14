@@ -17,6 +17,8 @@
     </div>
     <div class="header-actions">
       <span id="saveStateBadge" class="status-badge">로컬 저장</span>
+      <button id="snapshotBtn" class="btn secondary">스냅샷 저장</button>
+      <button id="undoBtn" class="btn secondary">최근 작업 되돌리기</button>
       <button id="resetDemoBtn" class="btn secondary">데모 초기화</button>
     </div>
   </header>
@@ -28,7 +30,7 @@
           <h2>본선 운영 제어</h2>
           <p>64강 전체 구조와 코트 큐를 하나의 데이터 원본으로 운영합니다.</p>
         </div>
-        <span id="engineBadge" class="version-badge">MAIN V2 · 1.6.2 IMPORTED ROSTER REDRAW FIX</span>
+        <span id="engineBadge" class="version-badge">MAIN V2 · 1.7.0 SAFE RESULT + UNDO</span>
       </div>
 
       <div class="controls-grid">
@@ -214,6 +216,7 @@
         </div>
         <button value="cancel" class="icon-btn" aria-label="닫기">×</button>
       </div>
+      <div id="resultWarning" class="result-warning" hidden></div>
       <div class="result-teams">
         <label><span id="teamALabel">1번 팀</span><input id="scoreA" type="number" min="0" max="99" required></label>
         <strong>:</strong>
@@ -226,6 +229,6 @@
     </form>
   </dialog>
 
-  <script src="./assets/js/main-v2.bundle.js?v=10"></script>
+  <script src="./assets/js/main-v2.bundle.js?v=11"></script>
 </body>
 </html>
