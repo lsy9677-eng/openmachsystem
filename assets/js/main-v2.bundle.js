@@ -1238,8 +1238,19 @@ function exportLegacyDirectReport(){
 
 /* ===== v1.10 Firebase shadow test store ===== */
 const ShadowStore={
-  config:{projectId:'',apiKey:'',collection:'mainV2ShadowTests'},
+  config:{
+    apiKey:'AIzaSyAbc17RiYyxCqgbMBkxkMoiRdNTmy2q65w',
+    authDomain:'open-match-manager.firebaseapp.com',
+    projectId:'open-match-manager',
+    storageBucket:'open-match-manager.firebasestorage.app',
+    messagingSenderId:'195671806262',
+    appId:'1:195671806262:web:89691574839266cea1a397',
+    collection:'mainV2ShadowTests'
+  },
   token:'',
+  auth:null,
+  authUser:null,
+  authReady:false,
   mode:'disconnected',
   snapshots:[],
   selected:null,
@@ -1311,31 +1322,37 @@ function shadowUpdateStats(payload){
 async function shadowDiscoverConfig(){
   try{
     const w=BridgeState.legacyWindow;
-    if(!w||w.closed)throw new Error('먼저 기존 앱 새 창을 열어 연결하세요.');
     let cfg=null;
-    try{
-      if(w.firebase?.apps?.length)cfg=w.firebase.app().options;
-    }catch{}
-    if(!cfg){
-      const candidates=[w.firebaseConfig,w.FIREBASE_CONFIG,w.__firebase_config,w.appConfig?.firebase,w.G?.firebaseConfig];
-      cfg=candidates.find(v=>v&&typeof v==='object'&&v.projectId);
+    if(w&&!w.closed){
+      try{
+        if(w.firebase?.apps?.length)cfg=w.firebase.app().options;
+      }catch{}
+      if(!cfg){
+        const candidates=[
+          w.FB,w.firebaseConfig,w.FIREBASE_CONFIG,w.__firebase_config,
+          w.appConfig?.firebase,w.G?.firebaseConfig
+        ];
+        cfg=candidates.find(v=>v&&typeof v==='object'&&v.projectId);
+      }
     }
-    if(!cfg?.projectId)throw new Error('기존 앱에서 Firebase projectId를 자동으로 찾지 못했습니다.');
+    cfg={
+      apiKey:cfg?.apiKey||ShadowStore.config.apiKey,
+      authDomain:cfg?.authDomain||ShadowStore.config.authDomain,
+      projectId:cfg?.projectId||ShadowStore.config.projectId,
+      storageBucket:cfg?.storageBucket||ShadowStore.config.storageBucket,
+      messagingSenderId:cfg?.messagingSenderId||ShadowStore.config.messagingSenderId,
+      appId:cfg?.appId||ShadowStore.config.appId
+    };
+    ShadowStore.config={...ShadowStore.config,...cfg};
     shadowSetValue('shadowProjectId',cfg.projectId);
-    shadowSetValue('shadowApiKey',cfg.apiKey||'');
-    ShadowStore.config.projectId=cfg.projectId;
-    ShadowStore.config.apiKey=cfg.apiKey||'';
-    try{
-      const currentUser=w.firebase?.auth?.()?.currentUser;
-      if(currentUser?.getIdToken)ShadowStore.token=await currentUser.getIdToken();
-    }catch{}
-    shadowSetBadge(ShadowStore.token?'설정+로그인 탐색':'설정 탐색','warn');
-    shadowSetStatus(
-      `프로젝트 ${cfg.projectId}를 찾았습니다. ${ShadowStore.token?'로그인 토큰도 확보했습니다.':'로그인 토큰은 찾지 못했습니다.'}`
-    );
+    shadowSetValue('shadowApiKey',cfg.apiKey);
+    shadowSetBadge('Firebase 설정 준비','warn');
+    shadowSetStatus(`프로젝트 ${cfg.projectId} 설정을 준비했습니다. 이제 로그인 세션 연결을 누르세요.`);
+    return cfg;
   }catch(e){
     shadowSetBadge('탐색 실패','error');
     shadowSetStatus(e.message,'error');
+    throw e;
   }
 }
 function shadowReadConfig(){
@@ -1344,9 +1361,100 @@ function shadowReadConfig(){
   const collection=shadowSafeName(shadowValue('shadowCollection')||'mainV2ShadowTests');
   if(!projectId)throw new Error('Firebase Project ID가 필요합니다.');
   if(!collection)throw new Error('전용 컬렉션 이름이 필요합니다.');
-  ShadowStore.config={projectId,apiKey,collection};
+  ShadowStore.config={...ShadowStore.config,projectId,apiKey,collection};
   return ShadowStore.config;
 }
+
+function shadowAuthUI(user,message=''){
+  const userEl=document.getElementById('shadowAuthUser');
+  const badge=document.getElementById('shadowAuthBadge');
+  if(userEl)userEl.textContent=user?(user.email||user.uid):'미연결';
+  if(badge){
+    badge.textContent=user?'인증됨':'토큰 없음';
+    badge.classList.toggle('ok',!!user);
+    badge.classList.toggle('warn',!user);
+  }
+  if(message)shadowSetStatus(message,user?'success':'');
+}
+function shadowWaitForAuth(auth,timeoutMs=8000){
+  return new Promise((resolve,reject)=>{
+    let settled=false;
+    const timer=setTimeout(()=>{
+      if(settled)return;
+      settled=true;
+      reject(new Error('Firebase 로그인 세션 확인 시간이 초과되었습니다.'));
+    },timeoutMs);
+    const off=auth.onAuthStateChanged(user=>{
+      if(settled)return;
+      settled=true;
+      clearTimeout(timer);
+      off();
+      resolve(user||null);
+    },err=>{
+      if(settled)return;
+      settled=true;
+      clearTimeout(timer);
+      off();
+      reject(err);
+    });
+  });
+}
+async function shadowConnectAuth(){
+  try{
+    shadowSetBadge('인증 연결 중','warn');
+    if(!window.firebase?.initializeApp)throw new Error('Firebase Auth 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인하세요.');
+    const cfg=await shadowDiscoverConfig();
+    let app;
+    try{
+      app=window.firebase.apps?.length?window.firebase.app():window.firebase.initializeApp(cfg);
+    }catch(e){
+      if(String(e?.code||'').includes('duplicate-app'))app=window.firebase.app();
+      else throw e;
+    }
+    const auth=app.auth();
+    ShadowStore.auth=auth;
+    try{await auth.setPersistence(window.firebase.auth.Auth.Persistence.LOCAL);}catch{}
+    let user=auth.currentUser;
+    if(!user)user=await shadowWaitForAuth(auth);
+    if(!user){
+      ShadowStore.token='';
+      ShadowStore.authUser=null;
+      ShadowStore.authReady=true;
+      shadowAuthUI(null,'같은 브라우저의 기존 앱 로그인 세션을 찾지 못했습니다. 기존 앱에서 다시 로그인한 뒤 재시도하세요.');
+      shadowSetBadge('로그인 필요','warn');
+      return false;
+    }
+    const token=await user.getIdToken(true);
+    if(!token)throw new Error('Firebase ID 토큰을 발급받지 못했습니다.');
+    ShadowStore.token=token;
+    ShadowStore.authUser={uid:user.uid,email:user.email||'',displayName:user.displayName||''};
+    ShadowStore.authReady=true;
+    shadowAuthUI(user,`로그인 세션 연결 완료: ${user.email||user.uid}`);
+    shadowSetBadge('인증 세션 연결','ok');
+    return true;
+  }catch(e){
+    ShadowStore.token='';
+    ShadowStore.authUser=null;
+    ShadowStore.authReady=true;
+    shadowAuthUI(null,e.message);
+    shadowSetBadge('인증 실패','error');
+    return false;
+  }
+}
+async function shadowEnsureToken(forceRefresh=false){
+  if(!ShadowStore.auth||!ShadowStore.auth.currentUser){
+    const ok=await shadowConnectAuth();
+    if(!ok)throw new Error('Firebase 로그인 세션이 연결되지 않았습니다.');
+  }
+  const user=ShadowStore.auth.currentUser;
+  const token=await user.getIdToken(!!forceRefresh);
+  if(!token)throw new Error('Firebase 인증 토큰이 없습니다.');
+  ShadowStore.token=token;
+  ShadowStore.authUser={uid:user.uid,email:user.email||'',displayName:user.displayName||''};
+  shadowAuthUI(user);
+  return token;
+}
+
 function shadowFirestoreBase(){
   const {projectId,apiKey,collection}=shadowReadConfig();
   const query=apiKey?`?key=${encodeURIComponent(apiKey)}`:'';
@@ -1404,27 +1512,38 @@ function shadowDocToObject(doc){
 }
 async function shadowTestConnection(){
   try{
+    await shadowEnsureToken(true);
     const urls=shadowFirestoreBase();
-    shadowSetBadge('검사 중','warn');
-    const res=await fetch(`${urls.list}${urls.list.includes('?')?'&':'?'}pageSize=1`,{headers:shadowHeaders(false)});
+    shadowSetBadge('권한 검사 중','warn');
+    const res=await fetch(`${urls.list}${urls.list.includes('?')?'&':'?'}pageSize=1`,{
+      headers:shadowHeaders(false)
+    });
     if(res.ok){
-      ShadowStore.mode='firebase';
-      shadowSetBadge('Firebase 테스트 연결','ok');
-      shadowSetStatus('전용 컬렉션 읽기 연결이 정상입니다. 운영 컬렉션에는 접근하지 않습니다.','success');
+      ShadowStore.mode='firebase-authenticated';
+      shadowSetBadge('Firebase 인증 연결','ok');
+      shadowSetStatus(`로그인 사용자 ${ShadowStore.authUser?.email||ShadowStore.authUser?.uid}의 전용 컬렉션 접근이 정상입니다.`,'success');
+      await shadowListSnapshots();
       return true;
     }
     const text=await res.text();
-    if(res.status===403||res.status===401){
-      ShadowStore.mode='local-fallback';
-      shadowSetBadge('권한 제한 · 로컬 사용','warn');
-      shadowSetStatus('Firebase 규칙이 전용 컬렉션 접근을 막았습니다. 브라우저 백업은 계속 사용할 수 있습니다.');
+    if(res.status===403){
+      ShadowStore.mode='authenticated-forbidden';
+      shadowSetBadge('운영자 권한 확인 필요','error');
+      shadowSetStatus(
+        `로그인은 확인됐지만 mainV2ShadowTests 접근이 거부됐습니다. users/${ShadowStore.authUser?.uid}의 approved 또는 admins 문서를 확인하세요.`,
+        'error'
+      );
       return false;
     }
-    throw new Error(`연결 실패 HTTP ${res.status}: ${text.slice(0,180)}`);
+    if(res.status===401){
+      ShadowStore.token='';
+      throw new Error('인증 토큰이 거부되었습니다. 로그인 세션 연결을 다시 누르세요.');
+    }
+    throw new Error(`연결 실패 HTTP ${res.status}: ${text.slice(0,220)}`);
   }catch(e){
     ShadowStore.mode='local-fallback';
-    shadowSetBadge('연결 실패 · 로컬 사용','error');
-    shadowSetStatus(e.message,'error');
+    shadowSetBadge('브라우저 백업 사용','warn');
+    shadowSetStatus(`${e.message} 브라우저 백업은 계속 사용할 수 있습니다.`,'error');
     return false;
   }
 }
@@ -1450,6 +1569,7 @@ async function shadowSaveLocal(){
 async function shadowSaveFirebase(){
   try{
     if(!guardDrawMutation('Firebase 테스트 스냅샷 저장'))return;
+    await shadowEnsureToken(true);
     const payload=shadowCurrentPayload();
     const name=shadowSafeName(shadowValue('shadowDocumentName'))||shadowNowName();
     shadowSetValue('shadowDocumentName',name);
@@ -1489,8 +1609,10 @@ async function shadowListSnapshots(){
   const local=shadowLocalList();
   local.forEach(x=>entries.push({...x,sourceMode:'browser'}));
   try{
-    const urls=shadowFirestoreBase();
-    const res=await fetch(`${urls.list}${urls.list.includes('?')?'&':'?'}pageSize=30`,{headers:shadowHeaders(false)});
+    if(ShadowStore.auth?.currentUser){
+      await shadowEnsureToken(false);
+      const urls=shadowFirestoreBase();
+      const res=await fetch(`${urls.list}${urls.list.includes('?')?'&':'?'}pageSize=30`,{headers:shadowHeaders(false)});
     if(res.ok){
       const json=await res.json();
       (json.documents||[]).forEach(doc=>{
@@ -1500,7 +1622,8 @@ async function shadowListSnapshots(){
         if(payload)entries.push({name:obj.__name,payload,savedAt:payload.savedAt,sourceMode:'firebase'});
       });
     }
-  }catch{}
+    }
+  }catch(e){console.warn('[MAIN-V2] shadow list firebase skipped',e);}
   const unique=new Map();
   entries.sort((a,b)=>String(b.savedAt||'').localeCompare(String(a.savedAt||''))).forEach(x=>{
     const key=`${x.sourceMode}:${x.name}`;
@@ -2134,6 +2257,7 @@ document.getElementById('exportDiagnosticBtn').onclick=exportBridgeDiagnostic;
 
 
 document.getElementById('discoverShadowConfigBtn').onclick=shadowDiscoverConfig;
+document.getElementById('connectShadowAuthBtn').onclick=shadowConnectAuth;
 document.getElementById('testShadowConnectionBtn').onclick=shadowTestConnection;
 document.getElementById('saveShadowSnapshotBtn').onclick=shadowSaveFirebase;
 document.getElementById('saveShadowLocalBtn').onclick=shadowSaveLocal;
@@ -2185,13 +2309,16 @@ setTimeout(()=>{
   }
   if(currentDraw())validateCurrentDraw(false);
 },0);
-console.info(`[MAIN-V2] engine 1.10.0 firebase shadow store loaded`);
+console.info(`[MAIN-V2] engine 1.10.1 firebase auth session loaded`);
 
 
 setTimeout(()=>{
   try{
+    shadowSetValue('shadowProjectId',ShadowStore.config.projectId);
+    shadowSetValue('shadowApiKey',ShadowStore.config.apiKey);
     shadowSetValue('shadowCollection','mainV2ShadowTests');
-    shadowListSnapshots();
+    shadowAuthUI(null);
+    shadowListSnapshots(); // 브라우저 저장 목록만 우선 표시
     shadowUpdateStats(shadowCurrentPayload());
   }catch(e){console.warn('[MAIN-V2] shadow store init',e);}
 },300);
