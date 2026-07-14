@@ -69,13 +69,87 @@ function shuffle(items,rng=Math.random){
   return a;
 }
 
+function evenlySpacedIndexes(total,count){
+  if(count<=0)return [];
+  const out=[],used=new Set();
+  for(let i=0;i<count;i++){
+    let idx=Math.floor((i+0.5)*total/count);
+    while(used.has(idx)&&idx<total-1)idx++;
+    while(used.has(idx)&&idx>0)idx--;
+    used.add(idx);out.push(idx);
+  }
+  return out.sort((a,b)=>a-b);
+}
+function parseGroupRankTeams(teams){
+  return teams.map((team,i)=>({
+    ...team,
+    groupNo:Math.floor(i/2)+1,
+    groupRank:(i%2)+1
+  }));
+}
+function rotateUntilDifferentGroup(list,avoidGroup){
+  const idx=list.findIndex(t=>t.groupNo!==avoidGroup);
+  if(idx<0)return list.shift();
+  return list.splice(idx,1)[0];
+}
+function buildGroupRankBalancedSlots(size,teams){
+  const ranked=parseGroupRankTeams(teams);
+  const winners=ranked.filter(t=>t.groupRank===1);
+  const runners=ranked.filter(t=>t.groupRank===2);
+  const byeCount=size-ranked.length;
+
+  // 부전승은 조 1위에게 우선 부여. 조 번호 전 구간에서 균등 선정.
+  const byeWinnerIndexes=evenlySpacedIndexes(winners.length,Math.min(byeCount,winners.length));
+  const byeWinnerIndexSet=new Set(byeWinnerIndexes);
+  const byeTeams=winners.filter((_,i)=>byeWinnerIndexSet.has(i));
+  const activeWinners=winners.filter((_,i)=>!byeWinnerIndexSet.has(i));
+
+  // 실경기 구성: 남은 1위 vs 다른 조 2위를 먼저 배치.
+  const runnerPool=[...runners];
+  const pairs=[];
+  for(const w of activeWinners){
+    if(!runnerPool.length)break;
+    const r=rotateUntilDifferentGroup(runnerPool,w.groupNo);
+    pairs.push([w,r]);
+  }
+  // 남은 2위끼리도 동일 조 재대결을 피해서 구성.
+  while(runnerPool.length>=2){
+    const a=runnerPool.shift();
+    const b=rotateUntilDifferentGroup(runnerPool,a.groupNo);
+    pairs.push([a,b]);
+  }
+
+  const matchCount=size/2;
+  const slots=Array(size).fill(null);
+  const byeMatchIndexes=evenlySpacedIndexes(matchCount,byeTeams.length);
+  const byeSet=new Set(byeMatchIndexes);
+
+  // 부전승 팀은 각 섹션에 고르게 놓고, 좌우 슬롯도 번갈아 배치.
+  byeMatchIndexes.forEach((matchIdx,i)=>{
+    const slotBase=matchIdx*2;
+    if(i%2===0)slots[slotBase]=byeTeams[i];
+    else slots[slotBase+1]=byeTeams[i];
+  });
+
+  // 남은 경기 역시 빈 경기 번호 전 구간에 균등하게 채움.
+  const openMatches=Array.from({length:matchCount},(_,i)=>i).filter(i=>!byeSet.has(i));
+  const pairOrder=balancedOrder(openMatches.length).map(n=>n-1);
+  pairs.forEach((pair,i)=>{
+    const matchIdx=openMatches[pairOrder[i]];
+    const slotBase=matchIdx*2;
+    // 상하 방향도 교차시켜 특정 구역 편향을 줄임.
+    if(i%2===0){slots[slotBase]=pair[0];slots[slotBase+1]=pair[1];}
+    else{slots[slotBase]=pair[1];slots[slotBase+1]=pair[0];}
+  });
+
+  return {slots,byeCount,byeTeams,pairs,ranked};
+}
 function createBracket(size,teams){
   if(![32,64,128].includes(size)) throw new Error('지원 대진 규모는 32, 64 또는 128입니다.');
   if(!Array.isArray(teams)||teams.length<2) throw new Error('최소 2팀이 필요합니다.');
   if(teams.length>size) throw new Error(`선택한 ${size}강보다 팀 수가 많습니다.`);
   if(teams.length<=size/2) throw new Error(`${size}강은 ${size/2+1}팀 이상일 때 사용하세요. 더 작은 대진 규모를 선택하세요.`);
 
-  const shuffled=shuffle(teams);
   const rounds={};
   let current=size;
   while(current>=2){
@@ -98,16 +172,38 @@ function createBracket(size,teams){
     current/=2;
   }
 
-  // Spread BYE slots so they are not clustered in one section.
-  const slotOrder=balancedOrder(size).map(n=>n-1);
-  const slots=Array(size).fill(null);
-  shuffled.forEach((team,i)=>{slots[slotOrder[i]]=team;});
+  const policy=document.getElementById('byePolicy')?.value||'group_rank_balanced';
+  let slots,byeMeta={};
+  if(policy==='group_rank_balanced'&&teams.length%2===0){
+    const built=buildGroupRankBalancedSlots(size,teams);
+    slots=built.slots;
+    byeMeta={
+      policy,
+      byeTeams:built.byeTeams.map(t=>({id:t.id,name:t.name,groupNo:t.groupNo,groupRank:t.groupRank}))
+    };
+  }else{
+    const shuffled=shuffle(teams);
+    const slotOrder=balancedOrder(size).map(n=>n-1);
+    slots=Array(size).fill(null);
+    shuffled.forEach((team,i)=>{slots[slotOrder[i]]=team;});
+    byeMeta={policy:'balanced_random',byeTeams:[]};
+  }
+
   rounds[size].forEach((m,i)=>{
     m.teamA=slots[i*2];
     m.teamB=slots[i*2+1];
   });
 
-  const draw={id:uid('draw'),size,teamCount:teams.length,byeCount:size-teams.length,createdAt:nowIso(),rounds};
+  const draw={
+    id:uid('draw'),
+    size,
+    teamCount:teams.length,
+    byeCount:size-teams.length,
+    createdAt:nowIso(),
+    rounds,
+    byePolicy:byeMeta.policy,
+    byeTeams:byeMeta.byeTeams
+  };
   autoAdvanceByes(draw);
   return draw;
 }
@@ -847,7 +943,8 @@ const actions={
       const next=initialState(size,count,prefix);
       next.draw=createBracket(size,teams);
       store.set(next);
-      setTeamImportSummary(`${teams.length}팀 명단으로 ${size}강 대진을 생성했습니다. 부전승 ${size-teams.length}자리.`);
+      const policy=document.getElementById('byePolicy')?.value||'group_rank_balanced';
+      setTeamImportSummary(`${teams.length}팀 명단으로 ${size}강 대진 생성 · 부전승 ${size-teams.length}자리 · ${policy==='group_rank_balanced'?'조 1위 우선 균등 배치':'전체 균등 무작위'}`);
       ui.msg('실제 팀 명단을 적용했습니다.','success');
     }catch(e){ui.msg(e.message,'error');}
   },
@@ -887,5 +984,5 @@ document.getElementById('buildRankedTeamsBtn').onclick=()=>copyCandidateToText(t
 document.getElementById('copyCandidateTextBtn').onclick=()=>copyCandidateToText(false);
 store.subscribe(state=>ui.render(state));
 if(!store.load()) store.emit();
-console.info(`[MAIN-V2] engine 1.4.0 128 draw and file import loaded`);
+console.info(`[MAIN-V2] engine 1.5.0 balanced group-winner bye loaded`);
 
