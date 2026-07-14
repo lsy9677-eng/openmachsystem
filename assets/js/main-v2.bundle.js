@@ -2008,6 +2008,310 @@ function recoveryBoot(){
 }
 
 
+
+/* ===== v1.12 legacy sync staging ===== */
+const SyncStaging={
+  target:null,
+  plan:null,
+  validation:null,
+  targetKey:'230match-main-v2-sync-target-v1'
+};
+function syncBadge(text,type='idle'){
+  const el=document.getElementById('syncStagingBadge');
+  if(!el)return;
+  el.textContent=text;
+  el.classList.remove('sync-idle','sync-ready','sync-warn','sync-error');
+  el.classList.add(`sync-${type}`);
+}
+function syncText(id,value){
+  const el=document.getElementById(id);
+  if(el)el.textContent=value==null||value===''?'-':String(value);
+}
+function syncGetCurrentSource(){
+  const state=store.get();
+  const source=state.bridgeSource||{};
+  const report=BridgeState.directReport||{};
+  return {
+    tournamentId:source.tournamentId||report.tournamentId||'',
+    tournamentName:source.tournamentName||report.tournamentName||'',
+    division:source.division||report.division||'',
+    key:source.key||report.key||state.importedSource||'',
+    qualifierCount:Number(source.qualifierCount||report.qualifiers?.length||state.importedTeams?.length||0),
+    scannedAt:source.scannedAt||report.scannedAt||''
+  };
+}
+function syncCaptureTarget(){
+  const source=syncGetCurrentSource();
+  const state=store.get();
+  if(!source.tournamentId&&!source.tournamentName){
+    ui.msg('기존 앱 대회·부서를 먼저 읽고 V2에 적용하세요.','error');
+    return;
+  }
+  if(!source.division){
+    ui.msg('반영할 부서가 확인되지 않습니다.','error');
+    return;
+  }
+  SyncStaging.target={
+    ...source,
+    drawSize:Number(state.draw?.size||0),
+    importedCount:Number(state.importedTeams?.length||0),
+    capturedAt:new Date().toISOString(),
+    sourceChecksum:recoveryHash(recoveryStableStringify({
+      source,
+      teams:state.importedTeams||[]
+    }))
+  };
+  localStorage.setItem(SyncStaging.targetKey,JSON.stringify(SyncStaging.target));
+  syncRenderTarget();
+  syncBadge('대상 고정','warn');
+  document.getElementById('syncTargetStatus').textContent=
+    `${SyncStaging.target.tournamentName} · ${SyncStaging.target.division}을 반영 대상으로 고정했습니다.`;
+  document.getElementById('syncTargetStatus').className='import-summary success';
+}
+function syncClearTarget(){
+  SyncStaging.target=null;
+  SyncStaging.plan=null;
+  SyncStaging.validation=null;
+  localStorage.removeItem(SyncStaging.targetKey);
+  syncRenderTarget();
+  syncRenderPlan();
+  syncBadge('대기','idle');
+}
+function syncRenderTarget(){
+  const t=SyncStaging.target;
+  syncText('syncTournamentStat',t?.tournamentName);
+  syncText('syncDivisionStat',t?.division);
+  syncText('syncSourceKeyStat',t?.key);
+  syncText('syncDrawSizeStat',t?.drawSize?`${t.drawSize}강`:'-');
+  syncText('syncReadyTarget',t?'예':'아니오');
+}
+function syncNormalizeScore(match){
+  const score=match?.score||match?.result||null;
+  if(score&&typeof score==='object'){
+    return {
+      a:Number(score.a??score.team1??score.home??score.left??0),
+      b:Number(score.b??score.team2??score.away??score.right??0)
+    };
+  }
+  return {
+    a:Number(match?.scoreA??match?.team1Score??match?.homeScore??0),
+    b:Number(match?.scoreB??match?.team2Score??match?.awayScore??0)
+  };
+}
+function syncTeamSummary(team){
+  if(!team)return null;
+  if(typeof team==='string')return {name:team};
+  return {
+    id:team.id||team.teamId||'',
+    name:team.name||team.teamName||team.label||'',
+    affiliation:team.affiliation||team.club||team.org||'',
+    seed:Number(team.seed||0),
+    groupNo:Number(team.groupNo||0),
+    groupRank:Number(team.groupRank||0)
+  };
+}
+function syncBuildPlan(){
+  const state=store.get();
+  if(!SyncStaging.target){
+    ui.msg('먼저 반영 대상을 고정하세요.','error');
+    return null;
+  }
+  const currentSource=syncGetCurrentSource();
+  const sourceMismatch=
+    String(currentSource.tournamentId||currentSource.tournamentName)!==
+    String(SyncStaging.target.tournamentId||SyncStaging.target.tournamentName) ||
+    String(currentSource.division)!==String(SyncStaging.target.division);
+  const matches=Array.isArray(state.draw?.matches)?state.draw.matches:[];
+  const completed=[];
+  const live=[];
+  const queue=[];
+  const advances=[];
+  matches.forEach(m=>{
+    const item={
+      matchId:m.id||'',
+      round:Number(m.round||0),
+      roundLabel:m.roundLabel||m.label||'',
+      matchNo:Number(m.matchNo||m.number||0),
+      status:m.status||'',
+      court:m.court||m.courtName||'',
+      team1:syncTeamSummary(m.team1||m.a||m.home),
+      team2:syncTeamSummary(m.team2||m.b||m.away),
+      winner:syncTeamSummary(m.winner),
+      score:syncNormalizeScore(m),
+      nextMatchId:m.nextMatchId||m.nextId||''
+    };
+    if(m.status==='completed')completed.push(item);
+    if(m.status==='playing')live.push(item);
+    if(m.status==='court_wait1'||m.status==='shared_queue'||m.status==='waiting_slots')queue.push(item);
+    if(m.winner&&m.nextMatchId)advances.push({
+      fromMatchId:item.matchId,
+      toMatchId:m.nextMatchId,
+      winner:item.winner
+    });
+  });
+  const serialized=recoveryStableStringify(state);
+  SyncStaging.plan={
+    schemaVersion:'230match-main-v2-sync-plan-v1',
+    dryRun:true,
+    directWriteEnabled:false,
+    createdAt:new Date().toISOString(),
+    target:SyncStaging.target,
+    sourceNow:currentSource,
+    sourceMismatch,
+    stateChecksum:recoveryHash(serialized),
+    draw:{
+      size:Number(state.draw?.size||0),
+      locked:!!state.drawLocked,
+      matchCount:matches.length
+    },
+    summary:{
+      completed:completed.length,
+      playing:live.length,
+      courtWait1:matches.filter(m=>m.status==='court_wait1').length,
+      sharedQueue:matches.filter(m=>m.status==='shared_queue').length,
+      waitingSlots:matches.filter(m=>m.status==='waiting_slots').length,
+      advances:advances.length
+    },
+    changes:{completed,live,queue,advances}
+  };
+  syncRenderPlan();
+  syncValidatePlan(false);
+  return SyncStaging.plan;
+}
+function syncValidatePlan(showToast=true){
+  const plan=SyncStaging.plan||syncBuildPlan();
+  if(!plan)return null;
+  const errors=[];
+  const warnings=[];
+  if(!plan.target?.tournamentId&&!plan.target?.tournamentName)errors.push('대회 대상 없음');
+  if(!plan.target?.division)errors.push('부서 대상 없음');
+  if(plan.sourceMismatch)errors.push('고정 대상과 현재 연결 대상 불일치');
+  if(!plan.draw.size)errors.push('대진 규모 없음');
+  if(!plan.draw.matchCount)warnings.push('대진 경기 없음');
+  if(!plan.draw.locked)warnings.push('대진 잠금 해제 상태');
+  const ids=new Set();
+  for(const m of [...plan.changes.completed,...plan.changes.live,...plan.changes.queue]){
+    if(!m.matchId){warnings.push('경기 ID 없는 항목 존재');continue;}
+    if(ids.has(m.matchId))errors.push(`중복 경기 ID ${m.matchId}`);
+    ids.add(m.matchId);
+  }
+  for(const m of plan.changes.completed){
+    if(!m.winner?.name)errors.push(`완료 경기 ${m.matchId} 승자 없음`);
+    if(m.score.a===m.score.b)warnings.push(`완료 경기 ${m.matchId} 동점 점수`);
+  }
+  SyncStaging.validation={
+    checkedAt:new Date().toISOString(),
+    ok:errors.length===0,
+    errors:[...new Set(errors)],
+    warnings:[...new Set(warnings)]
+  };
+  const el=document.getElementById('syncValidationStatus');
+  if(SyncStaging.validation.ok){
+    el.textContent=`사전검사 통과 · 오류 0건 · 경고 ${SyncStaging.validation.warnings.length}건`;
+    el.className='import-summary success';
+    syncBadge('패키지 생성 가능','ready');
+  }else{
+    el.textContent=`사전검사 실패 · ${SyncStaging.validation.errors.join(' · ')}`;
+    el.className='import-summary error';
+    syncBadge('검사 오류','error');
+  }
+  syncText('syncReadyValidation',SyncStaging.validation.ok?'통과':'실패');
+  if(showToast)ui.msg(
+    SyncStaging.validation.ok?'동기화 계획 안전성 검사를 통과했습니다.':'동기화 계획에 오류가 있습니다.',
+    SyncStaging.validation.ok?'success':'error'
+  );
+  syncRenderPlan();
+  return SyncStaging.validation;
+}
+function syncRenderPlan(){
+  const p=SyncStaging.plan;
+  syncText('syncCompletedStat',p?.summary?.completed||0);
+  syncText('syncPlayingStat',p?.summary?.playing||0);
+  syncText('syncCourtWaitStat',p?.summary?.courtWait1||0);
+  syncText('syncSharedQueueStat',p?.summary?.sharedQueue||0);
+  syncText('syncAdvancedStat',p?.summary?.advances||0);
+  syncText('syncReadyLock',p?.draw?.locked?'예':'아니오');
+  syncText('syncReadyChecksum',p?.stateChecksum||'-');
+  const preview=document.getElementById('syncPlanPreview');
+  if(!p){
+    preview.textContent='계획이 없습니다.';
+    return;
+  }
+  preview.textContent=JSON.stringify({
+    createdAt:p.createdAt,
+    target:p.target,
+    sourceMismatch:p.sourceMismatch,
+    stateChecksum:p.stateChecksum,
+    draw:p.draw,
+    summary:p.summary,
+    validation:SyncStaging.validation
+  },null,2);
+}
+function syncDownloadPlan(){
+  const plan=SyncStaging.plan||syncBuildPlan();
+  if(!plan)return;
+  downloadJson(`230match-sync-plan-${shadowSafeName(plan.target.key||plan.target.division)}-${Date.now()}.json`,{
+    ...plan,
+    validation:SyncStaging.validation
+  });
+}
+async function syncSaveCheckpoint(){
+  await recoverySave('before-legacy-sync',true);
+}
+function syncDownloadOperationPackage(){
+  const plan=SyncStaging.plan||syncBuildPlan();
+  const validation=SyncStaging.validation||syncValidatePlan(false);
+  if(!plan||!validation?.ok){
+    ui.msg('안전성 검사를 통과한 계획이 필요합니다.','error');
+    return;
+  }
+  const state=JSON.parse(JSON.stringify(store.get()));
+  const pkg={
+    packageVersion:'230match-main-v2-operation-package-v1',
+    generatedAt:new Date().toISOString(),
+    mode:'staging-only',
+    directWriteEnabled:false,
+    target:plan.target,
+    stateChecksum:plan.stateChecksum,
+    validation,
+    plan,
+    state
+  };
+  downloadJson(`230match-operation-${shadowSafeName(plan.target.key||plan.target.division)}-${Date.now()}.json`,pkg);
+  ui.msg('운영 반영 패키지를 저장했습니다. 기존 앱에는 쓰지 않았습니다.','success');
+}
+async function syncCopySummary(){
+  const plan=SyncStaging.plan||syncBuildPlan();
+  const validation=SyncStaging.validation||syncValidatePlan(false);
+  if(!plan)return;
+  const lines=[
+    `[230MATCH V2 운영 반영 사전검사]`,
+    `대회: ${plan.target.tournamentName||'-'}`,
+    `부서: ${plan.target.division||'-'}`,
+    `대진: ${plan.draw.size}강 / ${plan.draw.matchCount}경기`,
+    `완료 ${plan.summary.completed} · 시합중 ${plan.summary.playing} · 대기1 ${plan.summary.courtWait1} · 공용대기 ${plan.summary.sharedQueue}`,
+    `다음 라운드 확정 ${plan.summary.advances}`,
+    `체크섬: ${plan.stateChecksum}`,
+    `검사: ${validation?.ok?'통과':'실패'}`,
+    `직접 쓰기: 비활성`
+  ];
+  try{
+    await navigator.clipboard.writeText(lines.join('\n'));
+    ui.msg('검증 요약을 복사했습니다.','success');
+  }catch{
+    ui.msg('클립보드 복사에 실패했습니다.','error');
+  }
+}
+function syncBoot(){
+  try{
+    const saved=JSON.parse(localStorage.getItem(SyncStaging.targetKey)||'null');
+    if(saved)SyncStaging.target=saved;
+  }catch{}
+  syncRenderTarget();
+  syncRenderPlan();
+}
+
+
 /* ===== app.js ===== */
 
 
@@ -2599,6 +2903,16 @@ document.getElementById('exportDiagnosticBtn').onclick=exportBridgeDiagnostic;
 
 
 
+
+document.getElementById('captureSyncTargetBtn').onclick=syncCaptureTarget;
+document.getElementById('clearSyncTargetBtn').onclick=syncClearTarget;
+document.getElementById('buildSyncPlanBtn').onclick=syncBuildPlan;
+document.getElementById('validateSyncPlanBtn').onclick=()=>syncValidatePlan(true);
+document.getElementById('downloadSyncPlanBtn').onclick=syncDownloadPlan;
+document.getElementById('saveSyncCheckpointBtn').onclick=syncSaveCheckpoint;
+document.getElementById('downloadOperationPackageBtn').onclick=syncDownloadOperationPackage;
+document.getElementById('copySyncSummaryBtn').onclick=syncCopySummary;
+
 document.getElementById('toggleAutosaveBtn').onclick=recoveryToggle;
 document.getElementById('saveRecoveryNowBtn').onclick=()=>recoverySave('manual',true);
 document.getElementById('refreshRecoveryListBtn').onclick=recoveryList;
@@ -2662,7 +2976,7 @@ setTimeout(()=>{
   }
   if(currentDraw())validateCurrentDraw(false);
 },0);
-console.info(`[MAIN-V2] engine 1.11.1 recovery rules fix loaded`);
+console.info(`[MAIN-V2] engine 1.12.0 legacy sync staging loaded`);
 
 
 setTimeout(()=>{
@@ -2680,3 +2994,8 @@ setTimeout(()=>{
   try{recoveryBoot();}
   catch(e){console.warn('[MAIN-V2] recovery boot failed',e);}
 },500);
+
+setTimeout(()=>{
+  try{syncBoot();}
+  catch(e){console.warn('[MAIN-V2] sync staging boot failed',e);}
+},650);
