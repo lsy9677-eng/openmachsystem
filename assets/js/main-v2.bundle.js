@@ -363,6 +363,229 @@ class UI{
 
 
 
+
+/* ===== read-only legacy bridge v1.2 ===== */
+const BridgeState={legacyWindow:null,candidates:[],diagnostic:null};
+
+function bridgeLog(message){
+  const el=document.getElementById('bridgeLog');
+  if(!el)return;
+  const stamp=new Date().toLocaleTimeString('ko-KR',{hour12:false});
+  el.textContent+=`\n[${stamp}] ${message}`;
+  el.scrollTop=el.scrollHeight;
+}
+
+function setBridgeChip(id,text,ok=false){
+  const el=document.getElementById(id);if(!el)return;
+  el.textContent=text;el.className=`bridge-chip ${ok?'ok':'warn'}`;
+}
+
+function safeKeys(obj,limit=300){
+  try{return Object.keys(obj).slice(0,limit);}catch{return [];}
+}
+function plainClone(value,depth=0,seen=new WeakSet()){
+  if(depth>4)return '[depth-limit]';
+  if(value===null||['string','number','boolean'].includes(typeof value))return value;
+  if(typeof value==='function'||typeof value==='undefined')return undefined;
+  if(typeof value!=='object')return String(value);
+  if(seen.has(value))return '[circular]';
+  seen.add(value);
+  if(Array.isArray(value))return value.slice(0,200).map(v=>plainClone(v,depth+1,seen));
+  const out={};for(const k of safeKeys(value,80)){try{out[k]=plainClone(value[k],depth+1,seen);}catch{}}
+  return out;
+}
+function nameFromAny(item){
+  if(item==null)return '';
+  if(typeof item==='string')return item.trim();
+  const direct=item.teamName||item.displayName||item.name||item.title||item.pairName||item.label;
+  if(direct&&typeof direct==='string')return direct.trim();
+  const a=item.player1?.name||item.player1||item.p1||item.name1||item.member1||item.firstPlayer||item.aName;
+  const b=item.player2?.name||item.player2||item.p2||item.name2||item.member2||item.secondPlayer||item.bName;
+  const joined=[a,b].filter(v=>typeof v==='string'&&v.trim()).map(v=>v.trim()).join(' / ');
+  return joined;
+}
+function affiliationFromAny(item){
+  if(!item||typeof item!=='object')return '';
+  return String(item.club||item.affiliation||item.team||item.organization||item.org||item.groupName||'').trim();
+}
+function rankFromAny(item,index){
+  if(!item||typeof item!=='object')return null;
+  const v=item.rank??item.place??item.position??item.order??item.standing??item.groupRank;
+  const n=Number(v);return Number.isFinite(n)?n:null;
+}
+function groupFromAny(item){
+  if(!item||typeof item!=='object')return '';
+  return String(item.groupNo??item.group??item.pool??item.prelimGroup??item.groupName??'').trim();
+}
+function looksTeamArray(arr){
+  if(!Array.isArray(arr)||arr.length<2)return false;
+  const sample=arr.slice(0,Math.min(arr.length,20));
+  const named=sample.filter(v=>!!nameFromAny(v)).length;
+  return named>=Math.max(2,Math.ceil(sample.length*.55));
+}
+function candidateKind(arr){
+  const sample=arr.slice(0,30);
+  const ranked=sample.filter(v=>rankFromAny(v)!=null||groupFromAny(v)).length;
+  return ranked>=Math.max(2,Math.ceil(sample.length*.35))?'ranked':'teams';
+}
+function normalizeCandidate(arr,path,source){
+  const teams=arr.map((item,i)=>({
+    rawIndex:i,
+    name:nameFromAny(item),
+    affiliation:affiliationFromAny(item),
+    rank:rankFromAny(item,i),
+    group:groupFromAny(item),
+    raw:plainClone(item)
+  })).filter(x=>x.name);
+  return {id:`cand_${source}_${BridgeState.candidates.length}_${Date.now()}`,source,path,kind:candidateKind(arr),count:teams.length,teams};
+}
+function walkCandidates(root,source,basePath,maxDepth=4){
+  const results=[],seen=new WeakSet();
+  function walk(value,path,depth){
+    if(depth>maxDepth||value==null)return;
+    if(typeof value!=='object')return;
+    if(seen.has(value))return;seen.add(value);
+    if(Array.isArray(value)){
+      if(looksTeamArray(value))results.push(normalizeCandidate(value,path,source));
+      const inspect=value.slice(0,12);
+      inspect.forEach((v,i)=>walk(v,`${path}[${i}]`,depth+1));
+      return;
+    }
+    for(const key of safeKeys(value,120)){
+      if(/^(document|window|parent|top|frames|self|opener|ownerDocument)$/i.test(key))continue;
+      let child;try{child=value[key];}catch{continue;}
+      if(typeof child==='function')continue;
+      walk(child,path?`${path}.${key}`:key,depth+1);
+    }
+  }
+  walk(root,basePath,0);
+  return results;
+}
+function scanStorage(storage,source){
+  const results=[];
+  try{
+    for(let i=0;i<storage.length;i++){
+      const key=storage.key(i),raw=storage.getItem(key);
+      if(!raw||raw.length>2000000)continue;
+      try{
+        const val=JSON.parse(raw);
+        results.push(...walkCandidates(val,source,`storage.${key}`,4));
+      }catch{}
+    }
+  }catch(e){bridgeLog(`${source} 저장소 검사 실패: ${e.message}`);}
+  return results;
+}
+function dedupeCandidates(list){
+  const map=new Map();
+  for(const c of list){
+    const sig=`${c.count}|${c.teams.slice(0,5).map(t=>t.name).join('|')}`;
+    if(!map.has(sig))map.set(sig,c);
+  }
+  return [...map.values()].sort((a,b)=>{
+    const rank=(x)=>(x.kind==='ranked'?0:1);
+    return rank(a)-rank(b)||b.count-a.count||a.path.localeCompare(b.path);
+  });
+}
+function refreshCandidateUI(){
+  const select=document.getElementById('bridgeCandidateSelect');
+  const list=BridgeState.candidates;
+  select.innerHTML=list.length?list.map((c,i)=>`<option value="${i}">${c.kind==='ranked'?'[순위형]':'[팀목록]'} ${c.count}팀 · ${c.source} · ${c.path}</option>`).join(''):'<option value="">탐지된 후보 없음</option>';
+  setBridgeChip('candidateCountChip',`후보 ${list.length}개`,list.length>0);
+  const ranked=list.filter(c=>c.kind==='ranked').length;
+  setBridgeChip('rankedCountChip',`순위형 ${ranked}개`,ranked>0);
+  renderCandidatePreview();
+}
+function selectedCandidate(){
+  const i=Number(document.getElementById('bridgeCandidateSelect').value);
+  return Number.isInteger(i)?BridgeState.candidates[i]:null;
+}
+function renderCandidatePreview(){
+  const box=document.getElementById('bridgePreview'),c=selectedCandidate();
+  if(!c){box.innerHTML='<div class="bridge-empty">검사 후 후보를 선택하세요.</div>';return;}
+  const rows=c.teams.slice(0,80).map((t,i)=>`<tr><td>${i+1}</td><td>${safeText(t.group||'')}</td><td>${t.rank??''}</td><td>${safeText(t.name)}</td><td>${safeText(t.affiliation)}</td></tr>`).join('');
+  box.innerHTML=`<table><thead><tr><th>#</th><th>조</th><th>순위</th><th>팀</th><th>소속</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+function openLegacyApp(){
+  const url=new URL('./dev.html',location.href);
+  url.searchParams.set('__bridge','main-v2-readonly');
+  url.searchParams.set('__ts',Date.now());
+  BridgeState.legacyWindow=window.open(url.href,'230match_legacy_bridge');
+  if(BridgeState.legacyWindow){setBridgeChip('legacyWindowChip','기존 앱 창 열림',true);bridgeLog('기존 앱 새 창을 열었습니다. 로그인과 대회/부서 선택 후 검사하세요.');}
+  else{bridgeLog('팝업이 차단되었습니다. 브라우저에서 팝업을 허용하세요.');}
+}
+function scanLegacyWindow(){
+  const w=BridgeState.legacyWindow;
+  if(!w||w.closed){setBridgeChip('legacyWindowChip','기존 앱 미연결',false);bridgeLog('열린 기존 앱 창이 없습니다.');return;}
+  try{
+    if(w.location.origin!==location.origin)throw new Error('동일 출처가 아닙니다.');
+    const roots=[];
+    const priority=['G','STATE','APP_STATE','store','currentTournament','tournaments','participants','teams','groups','standings','prelimResults','windowData'];
+    for(const key of priority){try{if(w[key]!=null)roots.push([key,w[key]]);}catch{}}
+    let found=[];
+    for(const [key,value] of roots)found.push(...walkCandidates(value,'legacy-window',`window.${key}`,5));
+    found.push(...scanStorage(w.localStorage,'legacy-window-localStorage'));
+    try{found.push(...scanStorage(w.sessionStorage,'legacy-window-sessionStorage'));}catch{}
+    BridgeState.candidates=dedupeCandidates(found);
+    BridgeState.diagnostic={scannedAt:new Date().toISOString(),origin:w.location.origin,path:w.location.pathname,rootKeys:priority.filter(k=>{try{return w[k]!=null}catch{return false}}),candidates:BridgeState.candidates.map(c=>({...c,teams:c.teams.slice(0,100)}))};
+    setBridgeChip('legacyWindowChip','기존 앱 연결됨',true);
+    bridgeLog(`기존 앱 검사 완료: 후보 ${BridgeState.candidates.length}개`);
+    refreshCandidateUI();
+  }catch(e){bridgeLog(`기존 앱 검사 실패: ${e.message}`);}
+}
+function scanCurrentPageStorage(){
+  const found=dedupeCandidates([...scanStorage(localStorage,'current-localStorage'),...scanStorage(sessionStorage,'current-sessionStorage')]);
+  BridgeState.candidates=found;
+  BridgeState.diagnostic={scannedAt:new Date().toISOString(),origin:location.origin,path:location.pathname,candidates:found};
+  bridgeLog(`현재 페이지 저장소 검사 완료: 후보 ${found.length}개`);
+  refreshCandidateUI();
+}
+function teamsFromCandidate(c,rankOnly=false){
+  let rows=[...c.teams];
+  if(rankOnly){
+    const grouped=new Map();
+    for(const t of rows){
+      const g=t.group||'unknown';
+      if(!grouped.has(g))grouped.set(g,[]);
+      grouped.get(g).push(t);
+    }
+    rows=[...grouped.values()].flatMap(group=>{
+      const ranked=group.filter(x=>x.rank!=null).sort((a,b)=>a.rank-b.rank);
+      if(ranked.length>=2)return ranked.filter(x=>x.rank===1||x.rank===2).slice(0,2);
+      return group.slice(0,2);
+    });
+  }
+  return rows.map((t,i)=>({id:`bridge_team_${i+1}`,seed:i+1,name:t.name,affiliation:t.affiliation||''}));
+}
+function copyCandidateToText(rankOnly=false){
+  const c=selectedCandidate();if(!c){ui.msg('데이터 후보를 먼저 선택하세요.','error');return;}
+  const teams=teamsFromCandidate(c,rankOnly);
+  document.getElementById('teamImportText').value=teams.map(t=>t.name+(t.affiliation?` | ${t.affiliation}`:'')).join('\n');
+  setTeamImportSummary(`${c.path}에서 ${teams.length}팀을 명단 입력창으로 복사했습니다.`);
+  ui.msg(`${teams.length}팀을 명단 입력창으로 복사했습니다.`,'success');
+}
+function useCandidate(rankOnly=false){
+  const c=selectedCandidate();if(!c){ui.msg('데이터 후보를 먼저 선택하세요.','error');return;}
+  const teams=teamsFromCandidate(c,rankOnly);
+  const size=Number(document.getElementById('drawSize').value);
+  if(teams.length!==size){
+    copyCandidateToText(rankOnly);
+    ui.msg(`${size}팀이 필요하지만 후보는 ${teams.length}팀입니다. 명단 입력창에서 검토·수정하세요.`,'error');
+    return;
+  }
+  const count=Number(document.getElementById('courtCount').value);
+  const prefix=document.getElementById('courtPrefix').value.trim()||'국제';
+  const next=initialState(size,count,prefix);
+  next.draw=createBracket(size,teams);
+  next.bridgeSource={source:c.source,path:c.path,kind:c.kind,count:c.count,importedAt:new Date().toISOString()};
+  store.set(next);
+  ui.msg(`${teams.length}팀을 기존 앱에서 읽어 본선 대진에 적용했습니다.`,'success');
+}
+function exportBridgeDiagnostic(){
+  if(!BridgeState.diagnostic){ui.msg('먼저 데이터 검사를 실행하세요.','error');return;}
+  downloadJson(`230match-bridge-diagnostic-${Date.now()}.json`,BridgeState.diagnostic);
+}
+
+
 /* ===== app.js ===== */
 
 
@@ -474,7 +697,15 @@ const ui=new UI(actions);
 document.getElementById('applyTeamTextBtn').onclick=()=>actions.importTeamText();
 document.getElementById('scanLegacyBtn').onclick=()=>actions.scanLegacy();
 document.getElementById('sampleTeamsBtn').onclick=()=>actions.loadSampleTeams();
+document.getElementById('openLegacyBtn').onclick=openLegacyApp;
+document.getElementById('scanLegacyWindowBtn').onclick=scanLegacyWindow;
+document.getElementById('scanCurrentPageBtn').onclick=scanCurrentPageStorage;
+document.getElementById('exportDiagnosticBtn').onclick=exportBridgeDiagnostic;
+document.getElementById('bridgeCandidateSelect').onchange=renderCandidatePreview;
+document.getElementById('useBridgeCandidateBtn').onclick=()=>useCandidate(false);
+document.getElementById('buildRankedTeamsBtn').onclick=()=>copyCandidateToText(true);
+document.getElementById('copyCandidateTextBtn').onclick=()=>copyCandidateToText(false);
 store.subscribe(state=>ui.render(state));
 if(!store.load()) store.emit();
-console.info(`[MAIN-V2] engine 1.1.0 team-import stage loaded`);
+console.info(`[MAIN-V2] engine 1.2.0 read-only bridge loaded`);
 

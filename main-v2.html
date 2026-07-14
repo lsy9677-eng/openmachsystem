@@ -28,7 +28,7 @@
           <h2>본선 운영 제어</h2>
           <p>64강 전체 구조와 코트 큐를 하나의 데이터 원본으로 운영합니다.</p>
         </div>
-        <span id="engineBadge" class="version-badge">MAIN V2 · 1.1.0 TEAM IMPORT</span>
+        <span id="engineBadge" class="version-badge">MAIN V2 · 1.2.0 READ-ONLY BRIDGE</span>
       </div>
 
       <div class="controls-grid">
@@ -62,6 +62,50 @@
         <label class="btn secondary file-button">⬆ JSON 가져오기<input id="importInput" type="file" accept=".json,application/json"></label>
       </div>
       <div id="messageBox" class="message-box" aria-live="polite"></div>
+
+
+      <div class="bridge-box">
+        <h3>기존 앱 읽기 전용 연결</h3>
+        <p>기존 <code>dev.html</code>을 같은 도메인에서 열고, 대회·부서·팀 후보를 읽기만 합니다. 기존 데이터는 수정하지 않습니다.</p>
+        <div class="bridge-grid">
+          <div class="bridge-card">
+            <h4>1. 기존 앱 연결 및 진단</h4>
+            <div class="button-row">
+              <button id="openLegacyBtn" class="btn teal">기존 앱 새 창 열기</button>
+              <button id="scanLegacyWindowBtn" class="btn primary">열린 앱 데이터 검사</button>
+              <button id="scanCurrentPageBtn" class="btn secondary">현재 페이지 저장소 검사</button>
+              <button id="exportDiagnosticBtn" class="btn secondary">진단 JSON 저장</button>
+            </div>
+            <div class="bridge-status">
+              <span id="legacyWindowChip" class="bridge-chip warn">기존 앱 미연결</span>
+              <span id="candidateCountChip" class="bridge-chip">후보 0개</span>
+              <span id="rankedCountChip" class="bridge-chip">순위형 0개</span>
+            </div>
+            <div id="bridgeLog" class="bridge-log">[대기] 기존 앱 새 창 열기 → 로그인/대회 선택 → 열린 앱 데이터 검사 순서로 진행하세요.</div>
+          </div>
+
+          <div class="bridge-card">
+            <h4>2. 데이터 후보 선택</h4>
+            <div class="bridge-select">
+              <label>
+                <span>탐지된 데이터</span>
+                <select id="bridgeCandidateSelect">
+                  <option value="">탐지된 후보 없음</option>
+                </select>
+              </label>
+              <button id="useBridgeCandidateBtn" class="btn primary">명단으로 사용</button>
+            </div>
+            <div class="button-row">
+              <button id="buildRankedTeamsBtn" class="btn purple">조별 1·2위 명단 만들기</button>
+              <button id="copyCandidateTextBtn" class="btn secondary">명단 입력창으로 복사</button>
+            </div>
+            <div id="bridgePreview" class="bridge-preview"><div class="bridge-empty">검사 후 후보를 선택하세요.</div></div>
+            <div class="bridge-note">
+              자동 탐지는 완벽하지 않을 수 있습니다. 화면에 표시된 샘플과 팀 수를 반드시 확인한 뒤 적용하세요.
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div class="team-import-box">
         <h3>실제 팀 명단 연결</h3>
@@ -163,6 +207,6 @@
     </form>
   </dialog>
 
-  <script src="./assets/js/main-v2.bundle.js?v=3"></script>
+  <script src="./assets/js/main-v2.bundle.js?v=4"></script>
 </body>
 </html>
