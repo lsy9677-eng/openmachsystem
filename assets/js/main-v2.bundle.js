@@ -762,6 +762,8 @@ function useCandidate(rankOnly=false){
   const prefix=document.getElementById('courtPrefix').value.trim()||'국제';
   const next=initialState(size,count,prefix);
   next.draw=createBracket(size,teams);
+  next.importedTeams=teams.map(t=>({...t}));
+  next.importedSource='legacyExactAdapter';
   next.bridgeSource={source:c.source,path:c.path,kind:c.kind,count:c.count,importedAt:new Date().toISOString()};
   store.set(next);
   ui.msg(`${teams.length}팀을 기존 앱에서 읽어 본선 대진에 적용했습니다.`,'success');
@@ -1123,10 +1125,46 @@ const actions={
   getState:()=>store.get(),
   newDraw(){
     if(!guardDrawMutation('새 본선 추첨'))return;
-    const size=Number(document.getElementById('drawSize').value);
-    const count=Number(document.getElementById('courtCount').value);
-    const prefix=document.getElementById('courtPrefix').value.trim()||'국제';
-    store.set(initialState(size,count,prefix));ui.msg(`${size}팀 본선 대진을 새로 생성했습니다.`,'success');
+    try{
+      const size=Number(document.getElementById('drawSize').value);
+      const count=Number(document.getElementById('courtCount').value);
+      const prefix=document.getElementById('courtPrefix').value.trim()||'국제';
+
+      const text=document.getElementById('teamImportText')?.value?.trim()||'';
+      let teams=text?parseTeamLines(text):[];
+
+      if(!teams.length){
+        const saved=store.get().importedTeams;
+        if(Array.isArray(saved)&&saved.length) teams=saved.map(t=>({...t}));
+      }
+
+      if(!teams.length){
+        throw new Error('불러온 명단이 없습니다. 명단 파일을 불러오거나 명단 입력창에 붙여넣으세요.');
+      }
+      if(teams.length>size){
+        throw new Error(`선택한 ${size}강보다 명단 ${teams.length}팀이 많습니다.`);
+      }
+      if(teams.length<=size/2){
+        throw new Error(`${size}강에는 최소 ${size/2+1}팀이 필요합니다.`);
+      }
+
+      const next=initialState(size,count,prefix);
+      next.draw=createBracket(size,teams);
+      next.importedTeams=teams.map(t=>({...t}));
+      next.importedSource='redraw';
+      next.drawLocked=false;
+      store.set(next);
+
+      document.getElementById('teamImportText').value=
+        teams.map(t=>t.name+(t.affiliation?` | ${t.affiliation}`:'')).join('\n');
+
+      const byeCount=size-teams.length;
+      setTeamImportSummary(`${teams.length}팀 명단을 유지한 채 새로 추첨했습니다. ${size}강 · 부전승 ${byeCount}자리.`);
+      setTimeout(()=>{validateCurrentDraw(false);syncDrawLockUI();},0);
+      ui.msg(`${teams.length}팀 명단으로 새 본선 추첨을 완료했습니다.`,'success');
+    }catch(e){
+      ui.msg(e.message,'error');
+    }
   },
   assign(){store.update(s=>initialAssign(s));ui.msg('코트별 시합중 1경기, 대기1 1경기까지 균등 배정했습니다.','success');},
   refreshQueue(){
@@ -1136,7 +1174,17 @@ const actions={
   export(){downloadJson(`230match-main-v2-${Date.now()}.json`,store.get());},
   async import(file){
     if(!file)return;
-    try{const data=JSON.parse(await file.text());store.set(data);ui.msg('JSON 데이터를 불러왔습니다.','success');}
+    try{
+      const data=JSON.parse(await file.text());
+      store.set(data);
+      const teams=Array.isArray(data.importedTeams)?data.importedTeams:[];
+      if(teams.length){
+        document.getElementById('teamImportText').value=
+          teams.map(t=>t.name+(t.affiliation?` | ${t.affiliation}`:'')).join('\n');
+        setTeamImportSummary(`JSON에서 ${teams.length}팀 명단을 복원했습니다.`);
+      }
+      ui.msg('JSON 데이터를 불러왔습니다.','success');
+    }
     catch(e){ui.msg(`가져오기 실패: ${e.message}`,'error');}
   },
   saveResult(matchId,a,b){
@@ -1156,6 +1204,9 @@ const actions={
       const prefix=document.getElementById('courtPrefix').value.trim()||'국제';
       const next=initialState(size,count,prefix);
       next.draw=createBracket(size,teams);
+      next.importedTeams=teams.map(t=>({...t}));
+      next.importedSource='teamImportText';
+      next.drawLocked=false;
       store.set(next);
       const policy=document.getElementById('byePolicy')?.value||'group_rank_balanced';
       setTeamImportSummary(`${teams.length}팀 명단으로 ${size}강 대진 생성 · 부전승 ${size-teams.length}자리 · ${policy==='group_rank_balanced'?'조 1위 우선 균등 배치':'전체 균등 무작위'}`);
@@ -1204,7 +1255,13 @@ if(!store.load()) store.emit();
 setTimeout(()=>{
   repairLoadedStateIfNeeded();
   syncDrawLockUI();
+  const savedTeams=store.get()?.importedTeams;
+  const input=document.getElementById('teamImportText');
+  if(input&&Array.isArray(savedTeams)&&savedTeams.length&&!input.value.trim()){
+    input.value=savedTeams.map(t=>t.name+(t.affiliation?` | ${t.affiliation}`:'')).join('\n');
+    setTeamImportSummary(`저장된 명단 ${savedTeams.length}팀을 복원했습니다.`);
+  }
   if(currentDraw())validateCurrentDraw(false);
 },0);
-console.info(`[MAIN-V2] engine 1.6.1 bye propagation fix loaded`);
+console.info(`[MAIN-V2] engine 1.6.2 imported roster redraw fix loaded`);
 
