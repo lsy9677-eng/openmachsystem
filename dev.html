@@ -20861,7 +20861,7 @@ function renderBracketHTMLForDiv(tid,div,isAll){
     html+=`</div>`;
   }
 
-  if(mMs.length && showMainSection){
+  if(!window.__CLEAN_MAIN_ONLY_MODE__ && mMs.length && showMainSection){
     const rounds=[...new Set(mMs.map(m=>Number(m.round||0)))].sort((a,b)=>a-b);
     const totalR=rounds.length;
 
@@ -56556,7 +56556,7 @@ if(false) setTimeout(function(){
 <!-- v987: fixed filename tools gate -->
 <script id="operationQueueModule" src="./assets/js/operation-queue.js?v=1009"></script>
 <!-- v1037: single main-draw entry. No legacy dynamic fallback. -->
-<script id="mainDrawCleanModule" src="./assets/js/main-draw.js?v=1037-clean"></script>
+<script id="mainDrawCleanModule" src="./assets/js/main-draw.js?v=1039-source-isolated"></script>
 <script id="toolsGateModule" src="./assets/js/tools-gate.js?v=1009"></script>
 
 </body>
