@@ -1378,26 +1378,6 @@ window.v1052ManualRefreshCurrentTournament=function(){
 </div>
 
 <div id="mainV2EmbeddedRoot" style="display:none">
-
-<div id="mainV2OperationToolbar" class="main-v2-operation-toolbar">
-  <div class="main-v2-operation-title">
-    <strong>🏆 본선 운영</strong>
-    <span>예선 결과와 같은 코트 운영 원본을 사용하기 위한 통합 준비 단계입니다.</span>
-  </div>
-  <div class="main-v2-operation-actions">
-    <button type="button" id="opNewDrawBtn">본선 추첨</button>
-    <button type="button" id="opAssignBtn">본선 코트배정</button>
-    <button type="button" id="opAutoBtn">자동배정 ON/OFF</button>
-    <button type="button" id="opValidateBtn">대진 검증</button>
-    <button type="button" id="opLockBtn">대진 잠금</button>
-    <button type="button" id="opRecoveryBtn">복구점 저장</button>
-    <button type="button" id="opDeveloperToolsBtn" class="developer-only-action">개발도구</button>
-  </div>
-</div>
-<div id="mainV2OperationNotice" class="main-v2-operation-notice">
-  예선 진출팀이 확정되면 본선 추첨을 실행하세요.
-</div>
-
   <div class="main-v2-legacy-toolbar">
     <div>
       <strong>🏆 새 본선 운영</strong>
@@ -57267,96 +57247,15 @@ window.__MAIN_V2_EMBEDDED__=true;
     });
     setInterval(watchdog,900);
 
-    
-    function proxyClick(sourceId){
-      var source=ge(sourceId);
-      if(!source){
-        var notice=ge('mainV2OperationNotice');
-        if(notice){
-          notice.textContent='필요한 본선 기능을 찾지 못했습니다: '+sourceId;
-          notice.classList.add('error');
-        }
-        return;
-      }
-      source.click();
-      setTimeout(updateOperationNotice,120);
-    }
-
-    function updateOperationNotice(){
-      var notice=ge('mainV2OperationNotice');
-      if(!notice)return;
-      var total=Number(ge('totalMatches')?.textContent||0);
-      var completed=Number(ge('completedMatches')?.textContent||0);
-      var playing=Number(ge('playingMatches')?.textContent||0);
-      var wait1=Number(ge('wait1Matches')?.textContent||0);
-      var shared=Number(ge('sharedMatches')?.textContent||0);
-
-      notice.classList.remove('error','success');
-      if(!total){
-        notice.textContent='예선 진출팀이 확정되면 본선 추첨을 실행하세요.';
-      }else{
-        notice.textContent='본선 '+completed+'/'+total+' 완료 · 시합중 '+playing+' · 코트대기1 '+wait1+' · 공용대기 '+shared;
-        notice.classList.add('success');
-      }
-
-      var autoSource=ge('autoBtn');
-      var autoProxy=ge('opAutoBtn');
-      if(autoSource&&autoProxy){
-        autoProxy.textContent=String(autoSource.textContent||'').includes('OFF')?'자동배정 OFF':'자동배정 ON';
-        autoProxy.classList.toggle('on',!String(autoSource.textContent||'').includes('OFF'));
-      }
-      var lockSource=ge('toggleDrawLockBtn');
-      var lockProxy=ge('opLockBtn');
-      if(lockSource&&lockProxy){
-        lockProxy.textContent=lockSource.textContent||'대진 잠금';
-      }
-    }
-
-    function bindOperationToolbar(){
-      var map={
-        opNewDrawBtn:'newDrawBtn',
-        opAssignBtn:'assignBtn',
-        opAutoBtn:'autoBtn',
-        opValidateBtn:'validateDrawBtn',
-        opLockBtn:'toggleDrawLockBtn',
-        opRecoveryBtn:'saveRecoveryNowBtn'
-      };
-      Object.keys(map).forEach(function(proxyId){
-        var proxy=ge(proxyId);
-        if(proxy&&!proxy.dataset.stage1Bound){
-          proxy.dataset.stage1Bound='1';
-          proxy.addEventListener('click',function(){proxyClick(map[proxyId]);});
-        }
-      });
-
-      var devBtn=ge('opDeveloperToolsBtn');
-      if(devBtn&&!devBtn.dataset.stage1Bound){
-        devBtn.dataset.stage1Bound='1';
-        devBtn.addEventListener('click',function(){
-          document.body.classList.toggle('main-v2-show-developer-tools');
-          devBtn.textContent=document.body.classList.contains('main-v2-show-developer-tools')
-            ?'개발도구 숨기기':'개발도구';
-        });
-      }
-    }
-
-    setInterval(function(){
-      if(lastMode==='final'){
-        bindOperationToolbar();
-        updateOperationNotice();
-      }
-    },900);
-
-
-    console.log('[MAIN-V2-INTEGRATION] v1.17.0 stable mount fix loaded');
+    console.log('[MAIN-V2-INTEGRATION] v1.16.1 stable mount fix loaded');
   }
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});
   else boot();
 })();
 </script>
-<link rel="stylesheet" href="./assets/css/main-v2-embedded.css?v=117">
-<script src="./assets/js/main-v2.bundle.js?v=117"></script>
+<link rel="stylesheet" href="./assets/css/main-v2-embedded.css?v=1161">
+<script src="./assets/js/main-v2.bundle.js?v=1161"></script>
 
 </body>
 </html>
