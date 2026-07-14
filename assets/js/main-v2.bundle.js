@@ -1659,7 +1659,7 @@ function shadowRestoreSelected(){
   const item=ShadowStore.selected;
   if(!item?.payload?.state){ui.msg('복원할 V2 상태가 없습니다.','error');return;}
   if(!confirm('선택한 테스트 스냅샷을 현재 V2 화면에 복원할까요? 기존 앱 데이터는 변경되지 않습니다.'))return;
-  pushUndoSnapshot('Firebase/브라우저 테스트 스냅샷 복원 전');
+  recoveryPushUndoSafe('Firebase/브라우저 테스트 스냅샷 복원 전');
   store.set(JSON.parse(JSON.stringify(item.payload.state)));
   ui.msg('선택한 테스트 스냅샷을 V2 화면에 복원했습니다.','success');
   shadowUpdateStats(item.payload);
@@ -1942,13 +1942,36 @@ function recoveryValidate(){
     recoveryBadge(RecoveryStore.enabled?'감시 중':'검증 통과',RecoveryStore.enabled?'running':'running');
   }
 }
+
+function recoveryPushUndoSafe(label){
+  try{
+    if(typeof pushUndoSnapshot==='function'){
+      pushUndoSnapshot(label);
+      return true;
+    }
+    const current=JSON.parse(JSON.stringify(store.get()));
+    const key='230match-main-v2-recovery-undo-fallback-v1';
+    const list=JSON.parse(localStorage.getItem(key)||'[]');
+    list.unshift({
+      label:String(label||'복구 전 상태'),
+      savedAt:new Date().toISOString(),
+      state:current
+    });
+    localStorage.setItem(key,JSON.stringify(list.slice(0,10)));
+    return true;
+  }catch(e){
+    console.warn('[MAIN-V2] undo fallback skipped',e);
+    return false;
+  }
+}
+
 function recoveryRestore(){
   const item=RecoveryStore.selected;
   if(!item?.payload?.state){ui.msg('복구할 상태가 없습니다.','error');return;}
   if(!confirm(`선택한 ${new Date(item.savedAt).toLocaleString()} 복구점으로 V2 화면을 되돌릴까요?`))return;
   try{
     RecoveryStore.suppress=true;
-    pushUndoSnapshot('복구점 적용 전');
+    recoveryPushUndoSafe('복구점 적용 전');
     store.set(JSON.parse(JSON.stringify(item.payload.state)));
     RecoveryStore.lastChecksum=item.checksum||recoveryHash(recoveryStableStringify(item.payload.state));
     RecoveryStore.lastSerialized=recoveryStableStringify(item.payload.state);
@@ -2639,7 +2662,7 @@ setTimeout(()=>{
   }
   if(currentDraw())validateCurrentDraw(false);
 },0);
-console.info(`[MAIN-V2] engine 1.11.0 autosave recovery loaded`);
+console.info(`[MAIN-V2] engine 1.11.1 recovery rules fix loaded`);
 
 
 setTimeout(()=>{
