@@ -580,6 +580,81 @@ function useCandidate(rankOnly=false){
   store.set(next);
   ui.msg(`${teams.length}팀을 기존 앱에서 읽어 본선 대진에 적용했습니다.`,'success');
 }
+
+function isByeName(name){
+  const v=String(name||'').trim().toUpperCase();
+  return !v || v==='BYE' || v.includes('부전승');
+}
+function findExactLegacyDrawCandidate(){
+  const exact=BridgeState.candidates.filter(c=>
+    /\.draw\.manual128\.rounds\[0\]$/.test(c.path||'') &&
+    Array.isArray(c.teams) &&
+    c.teams.some(t=>!isByeName(t.name))
+  );
+  if(!exact.length)return null;
+  exact.sort((a,b)=>{
+    const aReal=a.teams.filter(t=>!isByeName(t.name)).length;
+    const bReal=b.teams.filter(t=>!isByeName(t.name)).length;
+    return bReal-aReal;
+  });
+  return exact[0];
+}
+function nextPowerOfTwo(n){
+  let p=1; while(p<n)p*=2; return p;
+}
+function useExactLegacyDraw(){
+  const c=findExactLegacyDrawCandidate();
+  if(!c){
+    ui.msg('기존 본선 슬롯 데이터(manual128.rounds[0])를 찾지 못했습니다. 먼저 기존 앱 데이터 검사를 실행하세요.','error');
+    return;
+  }
+  const rawTeams=c.teams.filter(t=>!isByeName(t.name));
+  const seen=new Set();
+  const teams=[];
+  for(const t of rawTeams){
+    const key=String(t.name||'').trim();
+    if(!key || seen.has(key)) continue;
+    seen.add(key);
+    teams.push({
+      id:`legacy_exact_${teams.length+1}`,
+      seed:teams.length+1,
+      name:key,
+      affiliation:t.affiliation||''
+    });
+  }
+  const suggested=nextPowerOfTwo(teams.length);
+  const supported=[32,64,128];
+  const size=supported.includes(suggested)?suggested:null;
+  if(!size){
+    document.getElementById('teamImportText').value=teams.map(t=>t.name).join('\n');
+    setTeamImportSummary(`정확한 기존 본선 슬롯에서 ${teams.length}팀을 찾았습니다. 지원 대진 규모와 맞지 않아 명단 입력창에만 복사했습니다.`);
+    ui.msg(`${teams.length}팀을 찾았습니다. 대진 규모를 확인하세요.`,'error');
+    return;
+  }
+
+  const drawSizeEl=document.getElementById('drawSize');
+  const hasOption=[...drawSizeEl.options].some(o=>Number(o.value)===size);
+  if(hasOption) drawSizeEl.value=String(size);
+
+  const count=Number(document.getElementById('courtCount').value);
+  const prefix=document.getElementById('courtPrefix').value.trim()||'국제';
+  const next=initialState(size,count,prefix);
+  next.draw=createBracket(size,teams);
+  next.bridgeSource={
+    source:c.source,
+    path:c.path,
+    kind:'exact-manual128-round0',
+    rawSlotCount:c.teams.length,
+    actualTeamCount:teams.length,
+    importedAt:new Date().toISOString()
+  };
+  store.set(next);
+  document.getElementById('teamImportText').value=teams.map(t=>t.name).join('\n');
+  setTeamImportSummary(`기존 본선 슬롯 ${c.teams.length}칸에서 부전승을 제외한 실제 ${teams.length}팀을 적용했습니다.`);
+  bridgeLog(`정확 어댑터 적용: ${c.path} / 전체 슬롯 ${c.teams.length} / 실제 팀 ${teams.length} / 대진 ${size}강`);
+  ui.msg(`기존 본선 슬롯에서 실제 ${teams.length}팀을 정확히 적용했습니다.`,'success');
+}
+
 function exportBridgeDiagnostic(){
   if(!BridgeState.diagnostic){ui.msg('먼저 데이터 검사를 실행하세요.','error');return;}
   downloadJson(`230match-bridge-diagnostic-${Date.now()}.json`,BridgeState.diagnostic);
@@ -703,9 +778,10 @@ document.getElementById('scanCurrentPageBtn').onclick=scanCurrentPageStorage;
 document.getElementById('exportDiagnosticBtn').onclick=exportBridgeDiagnostic;
 document.getElementById('bridgeCandidateSelect').onchange=renderCandidatePreview;
 document.getElementById('useBridgeCandidateBtn').onclick=()=>useCandidate(false);
+document.getElementById('useExactLegacyDrawBtn').onclick=useExactLegacyDraw;
 document.getElementById('buildRankedTeamsBtn').onclick=()=>copyCandidateToText(true);
 document.getElementById('copyCandidateTextBtn').onclick=()=>copyCandidateToText(false);
 store.subscribe(state=>ui.render(state));
 if(!store.load()) store.emit();
-console.info(`[MAIN-V2] engine 1.2.0 read-only bridge loaded`);
+console.info(`[MAIN-V2] engine 1.3.0 exact legacy adapter loaded`);
 
