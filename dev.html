@@ -57141,7 +57141,9 @@ window.__MAIN_V2_EMBEDDED__=true;
 
   function setMode(mode){
     ensureStableMount();
-    var isFinal=mode==='final';
+    var page=ge('page-bracket');
+    var bracketActive=!!(page&&page.classList.contains('active'));
+    var isFinal=mode==='final' && bracketActive;
     var root=stableRoot||ge('mainV2EmbeddedRoot');
     var legacy=ge('bracketContent');
     var legacyHost=ge('v1051MainPanelHost');
@@ -57155,7 +57157,7 @@ window.__MAIN_V2_EMBEDDED__=true;
 
     if(root)root.style.setProperty('display',isFinal?'block':'none','important');
     if(legacy)legacy.style.setProperty('display',isFinal?'none':'block','important');
-    if(legacyHost)legacyHost.style.setProperty('display',isFinal?'none':'block','important');
+    if(legacyHost)legacyHost.style.setProperty('display','block','important');
     if(exportBar)exportBar.style.setProperty('display',isFinal?'none':'flex','important');
 
     var prelimBtn=stableModeBar?.querySelector('#mainV2PrelimModeBtn')||ge('mainV2PrelimModeBtn');
@@ -57216,7 +57218,15 @@ window.__MAIN_V2_EMBEDDED__=true;
     bindStableButtons();
 
     var page=ge('page-bracket');
-    if(!page || !page.classList.contains('active'))return;
+    if(!page || !page.classList.contains('active')){
+      var rootAway=stableRoot||ge('mainV2EmbeddedRoot');
+      var legacyAway=ge('bracketContent');
+      var hostAway=ge('v1051MainPanelHost');
+      if(rootAway)rootAway.style.setProperty('display','none','important');
+      if(legacyAway)legacyAway.style.setProperty('display','block','important');
+      if(hostAway)hostAway.style.setProperty('display','block','important');
+      return;
+    }
 
     var root=stableRoot;
     var legacy=ge('bracketContent');
@@ -57238,11 +57248,10 @@ window.__MAIN_V2_EMBEDDED__=true;
     ensureStableMount();
     bindStableButtons();
 
-    var saved='prelim';
-    try{saved=localStorage.getItem('230match-bracket-mode')||'prelim';}catch(e){}
-    lastMode=saved==='final'?'final':'prelim';
-
-    // 첫 진입은 안전하게 예선 화면을 먼저 표시
+    // 새로고침·다른 메뉴 진입 때 본선 모드를 자동 복원하지 않습니다.
+    // 기존 앱 전체 화면이 사라지는 것을 막기 위해 항상 예선 모드로 시작합니다.
+    lastMode='prelim';
+    try{localStorage.setItem('230match-bracket-mode','prelim');}catch(e){}
     setMode('prelim');
 
     var brTS=ge('brTS');
@@ -57262,7 +57271,8 @@ window.__MAIN_V2_EMBEDDED__=true;
       setTimeout(function(){
         ensureStableMount();
         bindStableButtons();
-        setMode(lastMode);
+        var page=ge('page-bracket');
+        if(page&&page.classList.contains('active')) setMode(lastMode);
       },ms);
     });
     setInterval(watchdog,900);
@@ -57348,15 +57358,15 @@ window.__MAIN_V2_EMBEDDED__=true;
     },900);
 
 
-    console.log('[MAIN-V2-INTEGRATION] v1.17.0 stable mount fix loaded');
+    console.log('[MAIN-V2-INTEGRATION] v1.17.1 home screen recovery loaded');
   }
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});
   else boot();
 })();
 </script>
-<link rel="stylesheet" href="./assets/css/main-v2-embedded.css?v=117">
-<script src="./assets/js/main-v2.bundle.js?v=117"></script>
+<link rel="stylesheet" href="./assets/css/main-v2-embedded.css?v=1171">
+<script src="./assets/js/main-v2.bundle.js?v=1171"></script>
 
 </body>
 </html>
