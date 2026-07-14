@@ -1,0 +1,16 @@
+{
+  "name": "230MATCH Main V2",
+  "version": "1.0.0",
+  "entry": "main-v2.html",
+  "mode": "standalone-development",
+  "created": "2026-07-14T02:19:16.927759",
+  "features": [
+    "64/32 team bracket",
+    "score propagation",
+    "court playing + wait1",
+    "shared queue",
+    "balanced assignment",
+    "local persistence",
+    "JSON backup/restore"
+  ]
+}

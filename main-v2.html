@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5">
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+  <meta http-equiv="Pragma" content="no-cache">
+  <title>230MATCH 본선 V2 개발본</title>
+  <link rel="stylesheet" href="./assets/css/main-v2.css?v=1">
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <div class="brand">230MATCH</div>
+      <h1>본선 운영 V2</h1>
+      <p>기존 본선 패치와 분리된 독립 개발본</p>
+    </div>
+    <div class="header-actions">
+      <span id="saveStateBadge" class="status-badge">로컬 저장</span>
+      <button id="resetDemoBtn" class="btn secondary">데모 초기화</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="panel controls-panel">
+      <div class="panel-head">
+        <div>
+          <h2>본선 운영 제어</h2>
+          <p>64강 전체 구조와 코트 큐를 하나의 데이터 원본으로 운영합니다.</p>
+        </div>
+        <span id="engineBadge" class="version-badge">MAIN V2 · 1.0.0</span>
+      </div>
+
+      <div class="controls-grid">
+        <label>
+          <span>대진 규모</span>
+          <select id="drawSize">
+            <option value="64">64팀 · 64강</option>
+            <option value="32">32팀 · 32강</option>
+          </select>
+        </label>
+        <label>
+          <span>코트 수</span>
+          <input id="courtCount" type="number" min="1" max="32" value="8">
+        </label>
+        <label>
+          <span>코트 접두어</span>
+          <input id="courtPrefix" value="국제">
+        </label>
+        <label>
+          <span>경기 예상시간</span>
+          <input id="estimatedMinutes" type="number" min="10" max="180" value="30">
+        </label>
+      </div>
+
+      <div class="button-row">
+        <button id="newDrawBtn" class="btn primary">🎲 새 본선 추첨</button>
+        <button id="assignBtn" class="btn purple">🎯 본선 코트배정</button>
+        <button id="refreshQueueBtn" class="btn teal">🔁 본선 큐 갱신</button>
+        <button id="autoBtn" class="btn warning">▶ 자동배정 ON</button>
+        <button id="exportBtn" class="btn secondary">⬇ JSON 내보내기</button>
+        <label class="btn secondary file-button">⬆ JSON 가져오기<input id="importInput" type="file" accept=".json,application/json"></label>
+      </div>
+      <div id="messageBox" class="message-box" aria-live="polite"></div>
+    </section>
+
+    <section class="panel summary-panel">
+      <div class="summary-grid">
+        <div><span>현재 라운드</span><strong id="currentRound">-</strong></div>
+        <div><span>전체 경기</span><strong id="totalMatches">0</strong></div>
+        <div><span>완료</span><strong id="completedMatches">0</strong></div>
+        <div><span>시합중</span><strong id="playingMatches">0</strong></div>
+        <div><span>대기1</span><strong id="wait1Matches">0</strong></div>
+        <div><span>공용대기</span><strong id="sharedMatches">0</strong></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>코트 사용 현황</h2>
+          <p>각 코트는 시합중 1경기와 대기1 1경기까지만 보유합니다.</p>
+        </div>
+      </div>
+      <div id="courtBoard" class="court-board"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>공용대기</h2>
+          <p>대기 순서대로 각 코트의 대기1에만 이동합니다.</p>
+        </div>
+        <strong id="sharedCount">0경기</strong>
+      </div>
+      <div id="sharedQueue" class="shared-queue"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>본선 경기 현황</h2>
+          <p>현재 라운드의 모든 경기 상태와 실제 스코어를 표시합니다.</p>
+        </div>
+      </div>
+      <div id="statusBoard" class="status-board"></div>
+    </section>
+
+    <section class="panel bracket-panel">
+      <div class="panel-head">
+        <div>
+          <h2>본선 가지형 대진표</h2>
+          <p>64강 → 32강 → 16강 → 8강 → 준결승 → 결승</p>
+        </div>
+      </div>
+      <div id="bracketViewport" class="bracket-viewport">
+        <div id="bracketBoard" class="bracket-board"></div>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="resultDialog" class="result-dialog">
+    <form method="dialog" id="resultForm">
+      <div class="dialog-head">
+        <div>
+          <h3 id="resultTitle">경기 결과 입력</h3>
+          <p id="resultMeta"></p>
+        </div>
+        <button value="cancel" class="icon-btn" aria-label="닫기">×</button>
+      </div>
+      <div class="result-teams">
+        <label><span id="teamALabel">1번 팀</span><input id="scoreA" type="number" min="0" max="99" required></label>
+        <strong>:</strong>
+        <label><span id="teamBLabel">2번 팀</span><input id="scoreB" type="number" min="0" max="99" required></label>
+      </div>
+      <div class="dialog-actions">
+        <button value="cancel" class="btn secondary">취소</button>
+        <button id="saveResultBtn" value="default" class="btn primary">결과 저장</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="./assets/js/main-v2/app.js?v=1"></script>
+</body>
+</html>
