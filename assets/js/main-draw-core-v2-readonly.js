@@ -2,7 +2,7 @@
   'use strict';
   if(window.MainDrawCoreV2ReadOnly) return;
 
-  const VERSION='1.18.1';
+  const VERSION='1.18.3';
   const SUPPORTED=[32,64,128];
   const arr=v=>Array.isArray(v)?v:[];
   const num=v=>Number.isFinite(Number(v))?Number(v):0;
@@ -245,6 +245,139 @@
     return d;
   }
 
+
+  function cleanupPriority(row){
+    const source=mainMatches(selectedKey()).find(m=>text(m?.id||m?.matchId||m?.key||'')===row.id) || {};
+    const started=Date.parse(source?.startedAt||source?.courtAssignedAt||source?.updatedAt||'')||0;
+    const order=num(source?.courtQueueOrder||source?.order||source?.slot||row.slot||0);
+    return {started,order,index:row.index};
+  }
+
+  function choosePlayingKeeper(rows){
+    return rows.slice().sort((a,b)=>{
+      const pa=cleanupPriority(a), pb=cleanupPriority(b);
+      // 실제 시작 시간이 있는 경기를 우선 유지. 같으면 먼저 배정된 경기 우선.
+      if(Boolean(pb.started)!==Boolean(pa.started)) return Number(Boolean(pb.started))-Number(Boolean(pa.started));
+      if(pa.started!==pb.started) return pa.started-pb.started;
+      if(pa.order!==pb.order) return pa.order-pb.order;
+      return pa.index-pb.index;
+    })[0]||null;
+  }
+
+  function buildCleanupPlan(key=selectedKey()){
+    const diagnostics=detailedDiagnostics(key);
+    const actions=[];
+    const kept=[];
+
+    Object.values(diagnostics.byCourt).forEach(group=>{
+      const playing=group.playing||[];
+      const wait1=group.court_wait1||[];
+      if(playing.length<=1) return;
+
+      const keeper=choosePlayingKeeper(playing);
+      if(keeper) kept.push({court:group.court,match:keeper,reason:'코트별 시합중 1경기 유지'});
+
+      const extras=playing.filter(row=>!keeper||row.id!==keeper.id||row.index!==keeper.index);
+      let waitOccupied=wait1.length>0;
+      extras.forEach((row,idx)=>{
+        const target=!waitOccupied?'court_wait1':'shared_queue';
+        if(target==='court_wait1') waitOccupied=true;
+        actions.push({
+          court:group.court,
+          match:row,
+          from:'playing',
+          to:target,
+          reason:target==='court_wait1'
+            ?'해당 코트 대기1이 비어 있어 대기1로 이동'
+            :'해당 코트 대기1이 이미 차 있어 공용대기로 이동',
+          proposedPatch:target==='court_wait1'
+            ?{
+                delete:['court','currentCourt','manualSharedHold','__sharedCourtLabel'],
+                set:{courts:[group.court],manualCourtTarget:group.court,waitingFirstAt:'<apply-time>',__queueStatus:'wait1'}
+              }
+            :{
+                delete:['court','currentCourt','manualCourtTarget','waitingFirstAt','lastWaitingFirstAt'],
+                set:{courts:[],manualSharedHold:true,__sharedCourtLabel:group.court,__queueStatus:'shared'}
+              }
+        });
+      });
+    });
+
+    return {
+      version:VERSION,
+      createdAt:new Date().toISOString(),
+      key,
+      mode:'preview-only',
+      readOnly:true,
+      sourceUnchanged:true,
+      policy:{
+        playingPerCourt:1,
+        wait1PerCourt:1,
+        overflow:'shared_queue',
+        completedMatches:'unchanged',
+        scores:'unchanged',
+        winners:'unchanged'
+      },
+      before:diagnostics.totals,
+      kept,
+      actions,
+      summary:{
+        conflictCourts:diagnostics.conflicts.filter(x=>x.type==='multiple_playing').length,
+        playingKept:kept.length,
+        moveToWait1:actions.filter(x=>x.to==='court_wait1').length,
+        moveToShared:actions.filter(x=>x.to==='shared_queue').length,
+        totalChanges:actions.length
+      }
+    };
+  }
+
+  function printCleanupPlan(key=selectedKey()){
+    const plan=buildCleanupPlan(key);
+    console.group(`[MAIN-DRAW-CORE-V2] cleanup preview · ${plan.key||'선택 없음'}`);
+    console.info('정리 규칙',plan.policy);
+    console.info('요약',plan.summary);
+    if(!plan.actions.length){
+      console.info('변경 예정 없음');
+    }else{
+      console.table(plan.actions.map(a=>({
+        코트:a.court,
+        경기:a.match.label,
+        '1번팀':a.match.team1,
+        '2번팀':a.match.team2,
+        기존:a.from,
+        예정:a.to,
+        이유:a.reason,
+        경기ID:a.match.id
+      })));
+    }
+    console.groupEnd();
+    window.__MAIN_DRAW_CORE_V2_CLEANUP_PLAN__=plan;
+    return plan;
+  }
+
+  function downloadCleanupPlan(key=selectedKey()){
+    const plan=buildCleanupPlan(key);
+    const safe=(key||'main-draw').replace(/[^\w가-힣-]+/g,'_');
+    const blob=new Blob([JSON.stringify(plan,null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download=`230match-cleanup-preview-${safe}-${Date.now()}.json`;
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+    return plan;
+  }
+
+  function explainV2Port(){
+    return {
+      conclusion:'V2 전체 번들을 그대로 넣고 CSS만 교체하는 방식은 안전하지 않음',
+      reusable:['대진 생성 알고리즘','부전승 배치','승자 다음 라운드 연결','큐 승계 규칙'],
+      mustAdapt:['window.G 기존 데이터 스키마','기존 Firebase 저장 경로','기존 버튼 이벤트','기존 코트 현황 렌더러','기존 결과 입력/복구 로직'],
+      reason:'CSS는 표시만 바꾸며 데이터 모델·상태 전이·이벤트 소유권·저장 구조 충돌을 해결하지 못함',
+      recommended:'V2 순수 엔진 함수만 추출해 기존 main-draw/operation-queue 어댑터를 통해 호출'
+    };
+  }
+
   function downloadDiagnostics(key=selectedKey()){
     const payload={
       inspection:compareSnapshot(key),
@@ -376,10 +509,14 @@
     detailedDiagnostics,
     printDiagnostics,
     downloadDiagnostics,
+    buildCleanupPlan,
+    printCleanupPlan,
+    downloadCleanupPlan,
+    explainV2Port,
     logReport
   };
 
   // No DOM rendering, no event interception, no mutation.
-  console.log('[MAIN-DRAW-CORE-V2] v1.18.1 detailed queue diagnostics loaded');
+  console.log('[MAIN-DRAW-CORE-V2] v1.18.3 cleanup plan preview loaded');
   [1000,3000,7000].forEach(ms=>setTimeout(()=>{try{if(window.G)logReport();}catch(e){console.warn('[MAIN-DRAW-CORE-V2]',e);}},ms));
 })();
