@@ -1666,6 +1666,325 @@ function shadowRestoreSelected(){
 }
 
 
+
+/* ===== v1.11 autosave and recovery ===== */
+const RecoveryStore={
+  enabled:false,
+  localKey:'230match-main-v2-recovery-v1',
+  settingsKey:'230match-main-v2-recovery-settings-v1',
+  debounceMs:2500,
+  maxLocal:20,
+  timer:null,
+  lastSerialized:'',
+  lastChecksum:'',
+  lastChangedAt:'',
+  lastLocalAt:'',
+  lastFirebaseAt:'',
+  entries:[],
+  selected:null,
+  suppress:false
+};
+function recoveryStableStringify(value){
+  const seen=new WeakSet();
+  const normalize=v=>{
+    if(v===null||typeof v!=='object')return v;
+    if(seen.has(v))return '[Circular]';
+    seen.add(v);
+    if(Array.isArray(v))return v.map(normalize);
+    const out={};
+    Object.keys(v).sort().forEach(k=>out[k]=normalize(v[k]));
+    return out;
+  };
+  return JSON.stringify(normalize(value));
+}
+function recoveryHash(text){
+  let h1=0x811c9dc5;
+  for(let i=0;i<text.length;i++){
+    h1^=text.charCodeAt(i);
+    h1=Math.imul(h1,0x01000193);
+  }
+  return (`00000000${(h1>>>0).toString(16)}`).slice(-8);
+}
+function recoveryPayload(reason='autosave'){
+  const state=JSON.parse(JSON.stringify(store.get()));
+  const serialized=recoveryStableStringify(state);
+  const checksum=recoveryHash(serialized);
+  return {
+    schemaVersion:'230match-main-v2-recovery-v1',
+    recoveryOnly:true,
+    shadowOnly:true,
+    reason,
+    savedAt:new Date().toISOString(),
+    checksum,
+    source:state.bridgeSource||null,
+    summary:{
+      round:currentRoundLabel(state),
+      drawSize:Number(state.draw?.size||0),
+      matches:Array.isArray(state.draw?.matches)?state.draw.matches.length:0,
+      completed:Array.isArray(state.draw?.matches)?state.draw.matches.filter(m=>m?.status==='completed').length:0,
+      playing:Array.isArray(state.draw?.matches)?state.draw.matches.filter(m=>m?.status==='playing').length:0,
+      courtWait1:Array.isArray(state.draw?.matches)?state.draw.matches.filter(m=>m?.status==='court_wait1').length:0,
+      sharedQueue:Array.isArray(state.draw?.matches)?state.draw.matches.filter(m=>m?.status==='shared_queue').length:0
+    },
+    state
+  };
+}
+function recoveryBadge(text,type='paused'){
+  const el=document.getElementById('autosaveBadge');
+  if(!el)return;
+  el.textContent=text;
+  el.classList.remove('autosave-paused','autosave-running','autosave-saving','autosave-error');
+  el.classList.add(`autosave-${type}`);
+}
+function recoverySetStat(id,value){
+  const el=document.getElementById(id);if(el)el.textContent=value||'-';
+}
+function recoveryRenderStatus(){
+  recoverySetStat('autosaveModeStat',RecoveryStore.enabled?'ON':'OFF');
+  recoverySetStat('autosaveChangedAtStat',RecoveryStore.lastChangedAt?new Date(RecoveryStore.lastChangedAt).toLocaleString():'-');
+  recoverySetStat('autosaveLocalAtStat',RecoveryStore.lastLocalAt?new Date(RecoveryStore.lastLocalAt).toLocaleString():'-');
+  recoverySetStat('autosaveFirebaseAtStat',RecoveryStore.lastFirebaseAt?new Date(RecoveryStore.lastFirebaseAt).toLocaleString():'-');
+  recoverySetStat('autosaveChecksumStat',RecoveryStore.lastChecksum||'-');
+  const btn=document.getElementById('toggleAutosaveBtn');
+  if(btn)btn.textContent=RecoveryStore.enabled?'자동저장 OFF':'자동저장 ON';
+  recoveryBadge(RecoveryStore.enabled?'감시 중':'대기',RecoveryStore.enabled?'running':'paused');
+}
+function recoveryReadLocal(){
+  try{return JSON.parse(localStorage.getItem(RecoveryStore.localKey)||'[]');}catch{return [];}
+}
+function recoveryWriteLocal(payload){
+  const list=recoveryReadLocal();
+  const entry={
+    id:`local-${payload.savedAt}`,
+    mode:'browser',
+    savedAt:payload.savedAt,
+    checksum:payload.checksum,
+    reason:payload.reason,
+    payload
+  };
+  const filtered=list.filter(x=>x.checksum!==payload.checksum);
+  filtered.unshift(entry);
+  localStorage.setItem(RecoveryStore.localKey,JSON.stringify(filtered.slice(0,RecoveryStore.maxLocal)));
+  RecoveryStore.lastLocalAt=payload.savedAt;
+}
+function recoveryFirebaseName(payload){
+  const key=payload.source?.key||payload.source?.division||'manual';
+  return shadowSafeName(`recovery-${key}-${payload.savedAt.replace(/[:.]/g,'-')}`);
+}
+async function recoveryWriteFirebase(payload){
+  if(!ShadowStore.auth?.currentUser)return false;
+  await shadowEnsureToken(false);
+  const cfg=shadowFirestoreBase();
+  const name=recoveryFirebaseName(payload);
+  const body={fields:{
+    schemaVersion:{stringValue:payload.schemaVersion},
+    recoveryOnly:{booleanValue:true},
+    shadowOnly:{booleanValue:true},
+    savedAt:{timestampValue:payload.savedAt},
+    checksum:{stringValue:payload.checksum},
+    reason:{stringValue:payload.reason},
+    sourceKey:{stringValue:payload.source?.key||payload.source?.division||''},
+    drawSize:{integerValue:String(payload.summary.drawSize||0)},
+    payloadJson:{stringValue:JSON.stringify(payload)}
+  }};
+  const res=await fetch(cfg.document(name),{
+    method:'PATCH',
+    headers:shadowHeaders(true),
+    body:JSON.stringify(body)
+  });
+  if(!res.ok){
+    const text=await res.text();
+    throw new Error(`Firebase 복구점 저장 실패 HTTP ${res.status}: ${text.slice(0,160)}`);
+  }
+  RecoveryStore.lastFirebaseAt=payload.savedAt;
+  return true;
+}
+async function recoverySave(reason='autosave',showToast=false){
+  try{
+    const payload=recoveryPayload(reason);
+    if(reason==='autosave'&&payload.checksum===RecoveryStore.lastChecksum)return;
+    recoveryBadge('저장 중','saving');
+    recoveryWriteLocal(payload);
+    let firebaseSaved=false;
+    try{firebaseSaved=await recoveryWriteFirebase(payload);}catch(e){
+      console.warn('[MAIN-V2] firebase recovery skipped',e);
+    }
+    RecoveryStore.lastChecksum=payload.checksum;
+    RecoveryStore.lastSerialized=recoveryStableStringify(payload.state);
+    recoveryRenderStatus();
+    const validation=document.getElementById('autosaveValidation');
+    if(validation){
+      validation.textContent=
+        `${reason==='manual'?'수동':'자동'} 복구점 저장 완료 · 체크섬 ${payload.checksum} · `+
+        `브라우저 저장 ${firebaseSaved?'및 Firebase 저장':'완료, Firebase 미저장'}`;
+      validation.className='import-summary success';
+    }
+    if(showToast)ui.msg('현재 상태 복구점을 저장했습니다.','success');
+    await recoveryList();
+  }catch(e){
+    recoveryBadge('저장 오류','error');
+    const validation=document.getElementById('autosaveValidation');
+    if(validation){validation.textContent=e.message;validation.className='import-summary error';}
+    if(showToast)ui.msg(e.message,'error');
+  }
+}
+function recoverySchedule(){
+  if(!RecoveryStore.enabled||RecoveryStore.suppress)return;
+  const current=recoveryStableStringify(store.get());
+  const checksum=recoveryHash(current);
+  if(checksum===RecoveryStore.lastChecksum)return;
+  RecoveryStore.lastChangedAt=new Date().toISOString();
+  recoveryRenderStatus();
+  clearTimeout(RecoveryStore.timer);
+  RecoveryStore.timer=setTimeout(()=>recoverySave('autosave',false),RecoveryStore.debounceMs);
+}
+function recoveryToggle(){
+  RecoveryStore.enabled=!RecoveryStore.enabled;
+  localStorage.setItem(RecoveryStore.settingsKey,JSON.stringify({enabled:RecoveryStore.enabled}));
+  recoveryRenderStatus();
+  if(RecoveryStore.enabled){
+    recoverySchedule();
+    ui.msg('운영 자동저장을 시작했습니다.','success');
+  }else{
+    clearTimeout(RecoveryStore.timer);
+    ui.msg('운영 자동저장을 중지했습니다.','info');
+  }
+}
+async function recoveryList(){
+  const entries=[];
+  recoveryReadLocal().forEach(x=>entries.push(x));
+  try{
+    if(ShadowStore.auth?.currentUser){
+      await shadowEnsureToken(false);
+      const urls=shadowFirestoreBase();
+      const res=await fetch(`${urls.list}${urls.list.includes('?')?'&':'?'}pageSize=50`,{headers:shadowHeaders(false)});
+      if(res.ok){
+        const json=await res.json();
+        (json.documents||[]).forEach(doc=>{
+          const obj=shadowDocToObject(doc);
+          if(obj.schemaVersion!=='230match-main-v2-recovery-v1'||!obj.payloadJson)return;
+          let payload=null;
+          try{payload=JSON.parse(obj.payloadJson);}catch{}
+          if(payload)entries.push({
+            id:`firebase-${obj.__name}`,
+            mode:'firebase',
+            name:obj.__name,
+            savedAt:payload.savedAt,
+            checksum:payload.checksum,
+            reason:payload.reason,
+            payload
+          });
+        });
+      }
+    }
+  }catch(e){console.warn('[MAIN-V2] recovery firebase list skipped',e);}
+  const unique=new Map();
+  entries.sort((a,b)=>String(b.savedAt||'').localeCompare(String(a.savedAt||''))).forEach(entry=>{
+    const key=`${entry.mode}:${entry.checksum}:${entry.savedAt}`;
+    if(!unique.has(key))unique.set(key,entry);
+  });
+  RecoveryStore.entries=[...unique.values()];
+  const select=document.getElementById('recoverySnapshotSelect');
+  if(!RecoveryStore.entries.length){
+    select.innerHTML='<option value="">저장된 복구점 없음</option>';
+    document.getElementById('recoveryPreview').textContent='선택된 복구점이 없습니다.';
+    RecoveryStore.selected=null;
+    return;
+  }
+  select.innerHTML=RecoveryStore.entries.map((x,i)=>
+    `<option value="${i}">[${x.mode==='firebase'?'Firebase':'브라우저'}] ${new Date(x.savedAt).toLocaleString()} · ${safeText(x.reason||'')} · ${safeText(x.checksum||'')}</option>`
+  ).join('');
+  recoverySelect();
+}
+function recoverySelect(){
+  const idx=Number(document.getElementById('recoverySnapshotSelect').value);
+  RecoveryStore.selected=RecoveryStore.entries[idx]||null;
+  recoveryPreviewSelected();
+}
+function recoveryPreviewSelected(){
+  const item=RecoveryStore.selected;
+  const el=document.getElementById('recoveryPreview');
+  if(!item){el.textContent='선택된 복구점이 없습니다.';return;}
+  el.textContent=JSON.stringify({
+    mode:item.mode,
+    savedAt:item.savedAt,
+    checksum:item.checksum,
+    reason:item.reason,
+    source:item.payload?.source,
+    summary:item.payload?.summary
+  },null,2);
+}
+function recoveryValidate(){
+  const payload=recoveryPayload('validation');
+  const matches=payload.state?.draw?.matches||[];
+  const ids=new Set();
+  const duplicateIds=[];
+  matches.forEach(m=>{
+    if(!m?.id)return;
+    if(ids.has(m.id))duplicateIds.push(m.id);
+    ids.add(m.id);
+  });
+  const invalidStatus=matches.filter(m=>![
+    'waiting_slots','shared_queue','court_wait1','playing','completed'
+  ].includes(m?.status)).map(m=>m?.id);
+  const errors=[];
+  if(duplicateIds.length)errors.push(`중복 경기 ID ${duplicateIds.length}건`);
+  if(invalidStatus.length)errors.push(`알 수 없는 상태 ${invalidStatus.length}건`);
+  if(payload.summary.completed>payload.summary.matches)errors.push('완료 경기 수가 전체 경기 수보다 큼');
+  const el=document.getElementById('autosaveValidation');
+  if(errors.length){
+    el.textContent=`검증 실패 · ${errors.join(' · ')}`;
+    el.className='import-summary error';
+    recoveryBadge('검증 오류','error');
+  }else{
+    el.textContent=`검증 통과 · ${payload.summary.drawSize}강 · ${payload.summary.matches}경기 · 체크섬 ${payload.checksum}`;
+    el.className='import-summary success';
+    recoveryBadge(RecoveryStore.enabled?'감시 중':'검증 통과',RecoveryStore.enabled?'running':'running');
+  }
+}
+function recoveryRestore(){
+  const item=RecoveryStore.selected;
+  if(!item?.payload?.state){ui.msg('복구할 상태가 없습니다.','error');return;}
+  if(!confirm(`선택한 ${new Date(item.savedAt).toLocaleString()} 복구점으로 V2 화면을 되돌릴까요?`))return;
+  try{
+    RecoveryStore.suppress=true;
+    pushUndoSnapshot('복구점 적용 전');
+    store.set(JSON.parse(JSON.stringify(item.payload.state)));
+    RecoveryStore.lastChecksum=item.checksum||recoveryHash(recoveryStableStringify(item.payload.state));
+    RecoveryStore.lastSerialized=recoveryStableStringify(item.payload.state);
+    const el=document.getElementById('autosaveValidation');
+    el.textContent=`복구 완료 · ${new Date(item.savedAt).toLocaleString()} · 체크섬 ${RecoveryStore.lastChecksum}`;
+    el.className='import-summary success';
+    ui.msg('선택한 복구점으로 V2 상태를 복원했습니다.','success');
+  }finally{
+    setTimeout(()=>{RecoveryStore.suppress=false;recoveryRenderStatus();},300);
+  }
+}
+function recoveryDownload(){
+  const item=RecoveryStore.selected;
+  if(!item){ui.msg('선택된 복구점이 없습니다.','error');return;}
+  downloadJson(`230match-recovery-${item.checksum}-${Date.now()}.json`,item.payload);
+}
+function recoveryClearLocal(){
+  if(!confirm('브라우저에 저장된 V2 복구점을 모두 지울까요? Firebase 복구점은 삭제되지 않습니다.'))return;
+  localStorage.removeItem(RecoveryStore.localKey);
+  recoveryList();
+  ui.msg('브라우저 복구점을 정리했습니다.','success');
+}
+function recoveryBoot(){
+  try{
+    const settings=JSON.parse(localStorage.getItem(RecoveryStore.settingsKey)||'{}');
+    RecoveryStore.enabled=!!settings.enabled;
+  }catch{}
+  const initial=recoveryPayload('boot');
+  RecoveryStore.lastChecksum=initial.checksum;
+  RecoveryStore.lastSerialized=recoveryStableStringify(initial.state);
+  recoveryRenderStatus();
+  recoveryList();
+  setInterval(recoverySchedule,1200);
+}
+
+
 /* ===== app.js ===== */
 
 
@@ -2256,6 +2575,17 @@ document.getElementById('scanCurrentPageBtn').onclick=scanCurrentPageStorage;
 document.getElementById('exportDiagnosticBtn').onclick=exportBridgeDiagnostic;
 
 
+
+document.getElementById('toggleAutosaveBtn').onclick=recoveryToggle;
+document.getElementById('saveRecoveryNowBtn').onclick=()=>recoverySave('manual',true);
+document.getElementById('refreshRecoveryListBtn').onclick=recoveryList;
+document.getElementById('verifyRecoveryBtn').onclick=recoveryValidate;
+document.getElementById('clearLocalRecoveryBtn').onclick=recoveryClearLocal;
+document.getElementById('recoverySnapshotSelect').onchange=recoverySelect;
+document.getElementById('previewRecoveryBtn').onclick=recoveryPreviewSelected;
+document.getElementById('restoreRecoveryBtn').onclick=recoveryRestore;
+document.getElementById('downloadRecoveryBtn').onclick=recoveryDownload;
+
 document.getElementById('discoverShadowConfigBtn').onclick=shadowDiscoverConfig;
 document.getElementById('connectShadowAuthBtn').onclick=shadowConnectAuth;
 document.getElementById('testShadowConnectionBtn').onclick=shadowTestConnection;
@@ -2309,7 +2639,7 @@ setTimeout(()=>{
   }
   if(currentDraw())validateCurrentDraw(false);
 },0);
-console.info(`[MAIN-V2] engine 1.10.1 firebase auth session loaded`);
+console.info(`[MAIN-V2] engine 1.11.0 autosave recovery loaded`);
 
 
 setTimeout(()=>{
@@ -2322,3 +2652,8 @@ setTimeout(()=>{
     shadowUpdateStats(shadowCurrentPayload());
   }catch(e){console.warn('[MAIN-V2] shadow store init',e);}
 },300);
+
+setTimeout(()=>{
+  try{recoveryBoot();}
+  catch(e){console.warn('[MAIN-V2] recovery boot failed',e);}
+},500);

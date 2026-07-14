@@ -30,7 +30,7 @@
           <h2>본선 운영 제어</h2>
           <p>64강 전체 구조와 코트 큐를 하나의 데이터 원본으로 운영합니다.</p>
         </div>
-        <span id="engineBadge" class="version-badge">MAIN V2 · 1.10.1 FIREBASE AUTH SESSION</span>
+        <span id="engineBadge" class="version-badge">MAIN V2 · 1.11.0 AUTOSAVE RECOVERY</span>
       </div>
 
       <div class="controls-grid">
@@ -271,6 +271,59 @@
         </div>
       </section>
 
+      <section class="panel autosave-panel">
+        <div class="panel-heading">
+          <div>
+            <h2>운영 자동저장·복구</h2>
+            <p>V2 상태가 바뀌면 브라우저에 즉시 백업하고, Firebase 인증 연결 시 전용 저장소에도 지연 저장합니다.</p>
+          </div>
+          <span id="autosaveBadge" class="version-badge autosave-paused">대기</span>
+        </div>
+
+        <div class="autosave-toolbar">
+          <button id="toggleAutosaveBtn" class="btn primary">자동저장 ON</button>
+          <button id="saveRecoveryNowBtn" class="btn teal">지금 복구점 저장</button>
+          <button id="refreshRecoveryListBtn" class="btn secondary">복구점 새로고침</button>
+          <button id="verifyRecoveryBtn" class="btn secondary">현재 상태 검증</button>
+          <button id="clearLocalRecoveryBtn" class="btn danger-outline">로컬 복구점 정리</button>
+        </div>
+
+        <div class="autosave-status-grid">
+          <div><span>자동저장</span><strong id="autosaveModeStat">OFF</strong></div>
+          <div><span>마지막 변경</span><strong id="autosaveChangedAtStat">-</strong></div>
+          <div><span>브라우저 저장</span><strong id="autosaveLocalAtStat">-</strong></div>
+          <div><span>Firebase 저장</span><strong id="autosaveFirebaseAtStat">-</strong></div>
+          <div><span>현재 체크섬</span><strong id="autosaveChecksumStat">-</strong></div>
+        </div>
+
+        <div class="autosave-grid">
+          <div class="autosave-card">
+            <h3>복구점 목록</h3>
+            <select id="recoverySnapshotSelect" class="shadow-snapshot-select">
+              <option value="">저장된 복구점 없음</option>
+            </select>
+            <div class="button-row">
+              <button id="previewRecoveryBtn" class="btn secondary">선택 미리보기</button>
+              <button id="restoreRecoveryBtn" class="btn primary">선택 복구</button>
+              <button id="downloadRecoveryBtn" class="btn secondary">선택 JSON 저장</button>
+            </div>
+            <div class="autosave-note">
+              복구는 현재 V2 화면에만 적용됩니다. 기존 앱 운영 데이터는 변경하지 않습니다.
+            </div>
+          </div>
+
+          <div class="autosave-card">
+            <h3>복구점 상세</h3>
+            <pre id="recoveryPreview" class="shadow-preview">선택된 복구점이 없습니다.</pre>
+          </div>
+        </div>
+
+        <div id="autosaveValidation" class="import-summary">
+          자동저장은 기본적으로 OFF입니다. 기능 확인 후 ON으로 전환하세요.
+        </div>
+      </section>
+
+
 <section class="panel simulation-panel">
       <div class="panel-head">
         <div>
@@ -377,6 +430,6 @@
 
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
-  <script src="./assets/js/main-v2.bundle.js?v=15"></script>
+  <script src="./assets/js/main-v2.bundle.js?v=16"></script>
 </body>
 </html>
