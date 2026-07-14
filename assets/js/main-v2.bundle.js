@@ -1241,6 +1241,181 @@ function guardDrawMutation(actionName){
   return true;
 }
 
+
+/* ===== operation simulator v1.8 ===== */
+let LastSimulationReport=null;
+
+function simulationPositionMap(state){
+  const map=new Map();
+  for(const court of state.courts||[]){
+    if(court.playing)map.set(court.playing,`playing:${court.name}`);
+    if(court.wait1)map.set(court.wait1,`wait1:${court.name}`);
+  }
+  (state.sharedQueue||[]).forEach((id,i)=>map.set(id,`shared:${i+1}`));
+  return map;
+}
+function validateOperationalState(state){
+  const errors=[],warnings=[];
+  if(!state?.draw){errors.push('대진표 없음');return {errors,warnings};}
+  const ids=[];
+  for(const court of state.courts||[]){
+    if(court.playing)ids.push(court.playing);
+    if(court.wait1)ids.push(court.wait1);
+    if(court.playing&&court.playing===court.wait1)errors.push(`${court.name}: 같은 경기가 시합중과 대기1에 중복`);
+    const p=court.playing?getMatch(state.draw,court.playing):null;
+    const w=court.wait1?getMatch(state.draw,court.wait1):null;
+    if(court.playing&&!p)errors.push(`${court.name}: 존재하지 않는 시합중 경기`);
+    if(court.wait1&&!w)errors.push(`${court.name}: 존재하지 않는 대기1 경기`);
+    if(p&&p.status!==STATUS.PLAYING)errors.push(`${court.name}: 시합중 카드 상태 불일치(${p.status})`);
+    if(w&&w.status!==STATUS.WAIT1)errors.push(`${court.name}: 대기1 카드 상태 불일치(${w.status})`);
+    if(p&&!isReady(p))errors.push(`${court.name}: 미확정 경기가 시합중 배정`);
+    if(w&&!isReady(w))errors.push(`${court.name}: 미확정 경기가 대기1 배정`);
+  }
+  for(const id of state.sharedQueue||[]){
+    ids.push(id);
+    const m=getMatch(state.draw,id);
+    if(!m)errors.push('공용대기: 존재하지 않는 경기');
+    else{
+      if(m.status!==STATUS.SHARED)errors.push(`${m.id}: 공용대기 상태 불일치(${m.status})`);
+      if(!isReady(m))errors.push(`${m.id}: 미확정 경기가 공용대기 배정`);
+    }
+  }
+  const seen=new Set();
+  for(const id of ids){if(seen.has(id))errors.push(`${id}: 운영 위치 중복 배정`);seen.add(id);}
+  for(const m of allMatches(state.draw)){
+    if(m.status===STATUS.COMPLETED&&seen.has(m.id))errors.push(`${m.id}: 완료 경기가 운영 큐에 남음`);
+    if(m.roundSize<state.draw.size && m.bye===true)errors.push(`${m.id}: 후속 라운드 부전승 자동처리 오류`);
+    if(m.winnerId && m.status!==STATUS.COMPLETED)errors.push(`${m.id}: 미완료 경기 승자 존재`);
+    if(m.status===STATUS.COMPLETED && !m.winnerId)errors.push(`${m.id}: 완료 경기 승자 없음`);
+  }
+  const duplicateErrors=[...new Set(errors)];
+  return {errors:duplicateErrors,warnings};
+}
+function deterministicScore(step){
+  const loser=step%3===0?4:(step%3===1?2:1);
+  return step%2===0?[6,loser]:[loser,6];
+}
+function simulationRoundProgress(state){
+  const sizes=Object.keys(state.draw.rounds).map(Number).sort((a,b)=>b-a);
+  return sizes.map(size=>{
+    const ms=state.draw.rounds[size];
+    return {round:ROUND_NAMES[size],completed:ms.filter(m=>m.status===STATUS.COMPLETED).length,total:ms.length};
+  });
+}
+function runOperationSimulation(limit=1){
+  const live=store.get();
+  if(!live?.draw)throw new Error('먼저 본선 대진을 생성하세요.');
+  const state=clone(live);
+  state.autoAssign=true;
+  const logs=[],errors=[],warnings=[];
+  let processed=0,promotions=0,advances=0,guard=0;
+  const initialCheck=validateOperationalState(state);
+  errors.push(...initialCheck.errors.map(v=>`시작 상태: ${v}`));
+  warnings.push(...initialCheck.warnings);
+  if(!(state.courts||[]).some(c=>c.playing||c.wait1) && !(state.sharedQueue||[]).length){
+    initialAssign(state);
+    logs.push('초기 코트배정 실행: 시합중/대기1/공용대기 구성');
+  }
+  while(processed<limit && guard++<1000){
+    enqueueNewReadyMatches(state);
+    refreshQueue(state);
+    const playing=(state.courts||[]).map(c=>c.playing?getMatch(state.draw,c.playing):null).filter(Boolean);
+    if(!playing.length){
+      const final=state.draw.rounds[2]?.[0];
+      if(final?.status===STATUS.COMPLETED)break;
+      const pendingReady=allMatches(state.draw).filter(m=>isReady(m)&&m.status!==STATUS.COMPLETED);
+      if(!pendingReady.length){warnings.push('진행 가능한 경기가 없지만 결승이 완료되지 않음');break;}
+      refreshQueue(state);
+      continue;
+    }
+    const match=playing[processed%playing.length];
+    const court=state.courts.find(c=>c.playing===match.id);
+    const beforePos=simulationPositionMap(state);
+    const nextBefore=match.nextMatchId?getMatch(state.draw,match.nextMatchId):null;
+    const nextHadBoth=!!(nextBefore?.teamA&&nextBefore?.teamB);
+    const [a,b]=deterministicScore(processed);
+    const round=ROUND_NAMES[match.roundSize];
+    const teamA=match.teamA?.name||'TBD',teamB=match.teamB?.name||'TBD';
+    applyResultSafely(state,match.id,a,b);
+    processed++;
+    const nextAfter=match.nextMatchId?getMatch(state.draw,match.nextMatchId):null;
+    if(nextAfter && !nextHadBoth && nextAfter.teamA&&nextAfter.teamB)advances++;
+    const afterPos=simulationPositionMap(state);
+    if(court){
+      const newPlaying=court.playing?getMatch(state.draw,court.playing):null;
+      const newWait=court.wait1?getMatch(state.draw,court.wait1):null;
+      if(newPlaying)promotions++;
+      logs.push(`${processed}. ${court.name} · ${round} ${match.matchNo}경기 · ${teamA} ${a}:${b} ${teamB}`);
+      logs.push(`   → 시합중: ${newPlaying?`${ROUND_NAMES[newPlaying.roundSize]} ${newPlaying.matchNo}경기`:'없음'} / 대기1: ${newWait?`${ROUND_NAMES[newWait.roundSize]} ${newWait.matchNo}경기`:'없음'} / 공용대기 ${state.sharedQueue.length}경기`);
+    }
+    const check=validateOperationalState(state);
+    if(check.errors.length){
+      errors.push(...check.errors.map(v=>`${processed}번째 결과 후: ${v}`));
+      break;
+    }
+  }
+  const final=state.draw.rounds[2]?.[0];
+  const champion=final?.status===STATUS.COMPLETED
+    ?(final.teamA?.id===final.winnerId?final.teamA?.name:final.teamB?.name)
+    :null;
+  const report={
+    version:'1.8.0',generatedAt:new Date().toISOString(),requestedLimit:limit,
+    processed,errors:[...new Set(errors)],warnings:[...new Set(warnings)],promotions,advances,
+    champion,completed:allMatches(state.draw).filter(m=>m.status===STATUS.COMPLETED).length,
+    total:allMatches(state.draw).length,sharedQueue:state.sharedQueue.length,
+    roundProgress:simulationRoundProgress(state),logs,finalState:state
+  };
+  LastSimulationReport=report;
+  renderSimulationReport(report);
+  return report;
+}
+function runFullOperationSimulation(){
+  const live=store.get();
+  if(!live?.draw)throw new Error('먼저 본선 대진을 생성하세요.');
+  const unfinished=allMatches(live.draw).filter(m=>m.status!==STATUS.COMPLETED).length;
+  return runOperationSimulation(Math.max(unfinished+10,200));
+}
+function renderSimulationReport(report){
+  const badge=document.getElementById('simulationBadge');
+  const result=document.getElementById('simulationResult');
+  document.getElementById('simProcessed').textContent=report.processed;
+  document.getElementById('simErrors').textContent=report.errors.length;
+  document.getElementById('simWarnings').textContent=report.warnings.length;
+  document.getElementById('simPromotions').textContent=report.promotions;
+  document.getElementById('simAdvances').textContent=report.advances;
+  document.getElementById('simFinalState').textContent=report.champion?'결승 완료':`${report.completed}/${report.total}`;
+  const ok=!report.errors.length;
+  badge.textContent=ok?(report.champion?'전체 통과':'부분 통과'):'오류 발견';
+  result.className=`simulation-result ${ok?(report.warnings.length?'warn':'ok'):'bad'}`;
+  result.textContent=ok
+    ?(report.champion?`전체 대회 시뮬레이션 통과 · 우승 ${report.champion}`:`${report.processed}경기 처리 통과 · 실제 데이터 변경 없음`)
+    :`운영 시뮬레이션 실패 · 오류 ${report.errors.length}건`;
+  const lines=[
+    `[${new Date(report.generatedAt).toLocaleString('ko-KR')}] 처리 ${report.processed}경기`,
+    `완료 ${report.completed}/${report.total} · 큐 승계 ${report.promotions} · 라운드 진출 ${report.advances}`,
+    ...report.roundProgress.map(r=>`${r.round}: ${r.completed}/${r.total}`),
+    ...(report.errors.length?['[오류]',...report.errors]:[]),
+    ...(report.warnings.length?['[경고]',...report.warnings]:[]),
+    '[운영 로그]',...report.logs.slice(-250)
+  ];
+  document.getElementById('simulationLog').textContent=lines.join('\n');
+}
+function clearSimulationReport(){
+  LastSimulationReport=null;
+  document.getElementById('simulationBadge').textContent='대기';
+  document.getElementById('simulationResult').className='simulation-result';
+  document.getElementById('simulationResult').textContent='아직 시뮬레이션을 실행하지 않았습니다.';
+  ['simProcessed','simErrors','simWarnings','simPromotions','simAdvances'].forEach(id=>document.getElementById(id).textContent='0');
+  document.getElementById('simFinalState').textContent='-';
+  document.getElementById('simulationLog').textContent='[대기] 현재 대진을 만든 뒤 검사를 실행하세요.';
+}
+function exportSimulationReport(){
+  if(!LastSimulationReport){ui.msg('먼저 시뮬레이션을 실행하세요.','error');return;}
+  const report={...LastSimulationReport};
+  delete report.finalState;
+  downloadJson(`230match-operation-simulation-${Date.now()}.json`,report);
+}
+
 const actions={
   getState:()=>store.get(),
   newDraw(){
@@ -1396,6 +1571,12 @@ document.getElementById('teamFileInput').onchange=async(e)=>{
 document.getElementById('validateDrawBtn').onclick=()=>validateCurrentDraw(true);
 document.getElementById('toggleDrawLockBtn').onclick=toggleDrawLock;
 document.getElementById('exportDrawAuditBtn').onclick=exportDrawAudit;
+document.getElementById('simulateOneBtn').onclick=()=>{try{runOperationSimulation(1);}catch(e){ui.msg(e.message,'error');}};
+document.getElementById('simulateTenBtn').onclick=()=>{try{runOperationSimulation(10);}catch(e){ui.msg(e.message,'error');}};
+document.getElementById('simulateFullBtn').onclick=()=>{try{runFullOperationSimulation();}catch(e){ui.msg(e.message,'error');}};
+document.getElementById('exportSimulationBtn').onclick=exportSimulationReport;
+document.getElementById('clearSimulationBtn').onclick=clearSimulationReport;
+
 document.getElementById('load100TestTeamsBtn').onclick=async()=>{
   try{await load100TestTeams();}catch(err){ui.msg(err.message,'error');}
 };
@@ -1414,5 +1595,5 @@ setTimeout(()=>{
   }
   if(currentDraw())validateCurrentDraw(false);
 },0);
-console.info(`[MAIN-V2] engine 1.7.0 safe result correction and undo loaded`);
+console.info(`[MAIN-V2] engine 1.8.0 operation simulator loaded`);
 

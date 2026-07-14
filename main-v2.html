@@ -30,7 +30,7 @@
           <h2>본선 운영 제어</h2>
           <p>64강 전체 구조와 코트 큐를 하나의 데이터 원본으로 운영합니다.</p>
         </div>
-        <span id="engineBadge" class="version-badge">MAIN V2 · 1.7.0 SAFE RESULT + UNDO</span>
+        <span id="engineBadge" class="version-badge">MAIN V2 · 1.8.0 OPERATION SIMULATOR</span>
       </div>
 
       <div class="controls-grid">
@@ -152,6 +152,33 @@
       </div>
     </section>
 
+    <section class="panel simulation-panel">
+      <div class="panel-head">
+        <div>
+          <h2>운영 자동 시뮬레이션</h2>
+          <p>현재 대진을 복제해 결과 입력·코트 승계·대기1·공용대기·다음 라운드 진출을 검사합니다. 실제 운영 데이터는 변경하지 않습니다.</p>
+        </div>
+        <span id="simulationBadge" class="version-badge">대기</span>
+      </div>
+      <div class="button-row">
+        <button id="simulateOneBtn" class="btn primary">1경기 검사</button>
+        <button id="simulateTenBtn" class="btn purple">10경기 검사</button>
+        <button id="simulateFullBtn" class="btn teal">전체 대회 자동검사</button>
+        <button id="exportSimulationBtn" class="btn secondary">시뮬레이션 보고서 저장</button>
+        <button id="clearSimulationBtn" class="btn secondary">검사 결과 지우기</button>
+      </div>
+      <div class="simulation-summary-grid">
+        <div><span>처리 경기</span><strong id="simProcessed">0</strong></div>
+        <div><span>오류</span><strong id="simErrors">0</strong></div>
+        <div><span>경고</span><strong id="simWarnings">0</strong></div>
+        <div><span>큐 승계</span><strong id="simPromotions">0</strong></div>
+        <div><span>라운드 진출</span><strong id="simAdvances">0</strong></div>
+        <div><span>최종 상태</span><strong id="simFinalState">-</strong></div>
+      </div>
+      <div id="simulationResult" class="simulation-result">아직 시뮬레이션을 실행하지 않았습니다.</div>
+      <pre id="simulationLog" class="simulation-log">[대기] 현재 대진을 만든 뒤 검사를 실행하세요.</pre>
+    </section>
+
     <section class="panel">
       <div class="panel-head">
         <div>
@@ -229,6 +256,6 @@
     </form>
   </dialog>
 
-  <script src="./assets/js/main-v2.bundle.js?v=11"></script>
+  <script src="./assets/js/main-v2.bundle.js?v=12"></script>
 </body>
 </html>
