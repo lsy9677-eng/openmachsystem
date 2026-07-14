@@ -15,7 +15,7 @@ const STATUS = Object.freeze({
   COMPLETED: 'completed'
 });
 const ROUND_NAMES = Object.freeze({
-  64:'64강',32:'32강',16:'16강',8:'8강',4:'준결승',2:'결승'
+  128:'128강',64:'64강',32:'32강',16:'16강',8:'8강',4:'준결승',2:'결승'
 });
 
 
@@ -70,8 +70,11 @@ function shuffle(items,rng=Math.random){
 }
 
 function createBracket(size,teams){
-  if(![32,64].includes(size)) throw new Error('지원 대진 규모는 32 또는 64입니다.');
-  if(teams.length!==size) throw new Error(`팀 수가 ${size}팀이어야 합니다.`);
+  if(![32,64,128].includes(size)) throw new Error('지원 대진 규모는 32, 64 또는 128입니다.');
+  if(!Array.isArray(teams)||teams.length<2) throw new Error('최소 2팀이 필요합니다.');
+  if(teams.length>size) throw new Error(`선택한 ${size}강보다 팀 수가 많습니다.`);
+  if(teams.length<=size/2) throw new Error(`${size}강은 ${size/2+1}팀 이상일 때 사용하세요. 더 작은 대진 규모를 선택하세요.`);
+
   const shuffled=shuffle(teams);
   const rounds={};
   let current=size;
@@ -85,6 +88,7 @@ function createBracket(size,teams){
       sourceA:null,sourceB:null,
       scoreA:null,scoreB:null,
       winnerId:null,
+      bye:false,
       status:current===size?STATUS.UNASSIGNED:STATUS.WAITING_SLOTS,
       venue:'',court:'',queueOrder:null,
       startedAt:null,completedAt:null,
@@ -93,8 +97,45 @@ function createBracket(size,teams){
     }));
     current/=2;
   }
-  rounds[size].forEach((m,i)=>{m.teamA=shuffled[i*2];m.teamB=shuffled[i*2+1];});
-  return {id:uid('draw'),size,createdAt:nowIso(),rounds};
+
+  // Spread BYE slots so they are not clustered in one section.
+  const slotOrder=balancedOrder(size).map(n=>n-1);
+  const slots=Array(size).fill(null);
+  shuffled.forEach((team,i)=>{slots[slotOrder[i]]=team;});
+  rounds[size].forEach((m,i)=>{
+    m.teamA=slots[i*2];
+    m.teamB=slots[i*2+1];
+  });
+
+  const draw={id:uid('draw'),size,teamCount:teams.length,byeCount:size-teams.length,createdAt:nowIso(),rounds};
+  autoAdvanceByes(draw);
+  return draw;
+}
+
+function autoAdvanceByes(draw){
+  let changed=true, guard=0;
+  while(changed&&guard++<20){
+    changed=false;
+    const sizes=Object.keys(draw.rounds).map(Number).sort((a,b)=>b-a);
+    for(const size of sizes){
+      for(const m of draw.rounds[size]){
+        if(m.status===STATUS.COMPLETED) continue;
+        const a=!!m.teamA,b=!!m.teamB;
+        if(a===b) continue;
+        const winner=m.teamA||m.teamB;
+        m.winnerId=winner.id;
+        m.bye=true;
+        m.status=STATUS.COMPLETED;
+        m.completedAt=nowIso();
+        if(m.nextMatchId){
+          const next=getMatch(draw,m.nextMatchId);
+          if(m.nextSlot==='A') next.teamA=winner; else next.teamB=winner;
+          if(next.teamA&&next.teamB&&next.status===STATUS.WAITING_SLOTS) next.status=STATUS.UNASSIGNED;
+        }
+        changed=true;
+      }
+    }
+  }
 }
 
 function allMatches(draw){
@@ -717,6 +758,60 @@ function initialState(size=64,courts=8,prefix='국제'){
   return {version:VERSION,draw:createBracket(size,createTeams(size)),courts:makeCourts(courts,prefix),sharedQueue:[],autoAssign:true,settings:{estimatedMinutes:30}};
 }
 const store=new Store(initialState());
+
+function parseImportedFileText(text,filename=''){
+  const lower=filename.toLowerCase();
+  if(lower.endsWith('.json')){
+    const data=JSON.parse(text);
+    const arr=Array.isArray(data)?data:(Array.isArray(data.teams)?data.teams:[]);
+    return arr.map((v,i)=>({
+      id:`file_team_${i+1}`,
+      seed:Number(v.seed)||i+1,
+      name:typeof v==='string'?v:String(v.name||v.teamName||'').trim(),
+      affiliation:String(v.affiliation||v.club||'').trim()
+    })).filter(t=>t.name);
+  }
+  const lines=String(text||'').split(/\r?\n/).map(v=>v.trim()).filter(Boolean);
+  if(lower.endsWith('.csv')){
+    // Supports: team, affiliation OR player1, player2, affiliation
+    return lines.map((line,i)=>{
+      const cols=line.split(',').map(v=>v.trim().replace(/^"|"$/g,''));
+      if(i===0&&cols.some(v=>/team|팀|선수|name/i.test(v))) return null;
+      const name=cols.length>=2&& !cols[0].includes('/') ? `${cols[0]} / ${cols[1]}` : cols[0];
+      const affiliation=cols.length>=3?cols[2]:'';
+      return {id:`file_team_${i+1}`,seed:i+1,name,affiliation};
+    }).filter(t=>t&&t.name);
+  }
+  return parseTeamLines(text);
+}
+function chooseBestDrawSize(teamCount){
+  if(teamCount<=32&&teamCount>16)return 32;
+  if(teamCount<=64&&teamCount>32)return 64;
+  if(teamCount<=128&&teamCount>64)return 128;
+  return null;
+}
+function applyTeamsToInput(teams,sourceLabel){
+  const size=chooseBestDrawSize(teams.length);
+  if(!size) throw new Error(`${teams.length}팀은 지원 범위가 아닙니다. 17~128팀을 사용하세요.`);
+  document.getElementById('drawSize').value=String(size);
+  document.getElementById('teamImportText').value=teams.map(t=>t.name+(t.affiliation?` | ${t.affiliation}`:'')).join('\n');
+  setTeamImportSummary(`${sourceLabel}: ${teams.length}팀 탐지 · 자동 선택 ${size}강 · 부전승 ${size-teams.length}자리`);
+}
+async function loadTeamFile(file){
+  const text=await file.text();
+  const teams=parseImportedFileText(text,file.name);
+  applyTeamsToInput(teams,file.name);
+  ui.msg(`${file.name}에서 ${teams.length}팀을 불러왔습니다. 실제 명단 적용을 누르세요.`,'success');
+}
+async function load100TestTeams(){
+  const res=await fetch('./data/test-teams-100.json?v=1',{cache:'no-store'});
+  if(!res.ok) throw new Error('100팀 테스트 명단 파일을 불러오지 못했습니다.');
+  const data=await res.json();
+  const teams=data.teams.map((v,i)=>({id:`test100_${i+1}`,seed:v.seed||i+1,name:v.name,affiliation:v.affiliation||''}));
+  applyTeamsToInput(teams,'부경신인부 100팀 테스트 명단');
+  ui.msg('100팀 테스트 명단을 불러왔습니다. 128강과 부전승 28자리가 자동 선택됩니다.','success');
+}
+
 const actions={
   getState:()=>store.get(),
   newDraw(){
@@ -745,13 +840,14 @@ const actions={
     try{
       const size=Number(document.getElementById('drawSize').value);
       const teams=parseTeamLines(document.getElementById('teamImportText').value);
-      if(teams.length!==size) throw new Error(`${size}팀이 필요하지만 ${teams.length}팀이 입력되었습니다.`);
+      if(teams.length>size) throw new Error(`선택한 ${size}강보다 입력 팀 수 ${teams.length}팀이 많습니다.`);
+      if(teams.length<=size/2) throw new Error(`${size}강에는 최소 ${size/2+1}팀이 필요합니다. 더 작은 대진 규모를 선택하세요.`);
       const count=Number(document.getElementById('courtCount').value);
       const prefix=document.getElementById('courtPrefix').value.trim()||'국제';
       const next=initialState(size,count,prefix);
       next.draw=createBracket(size,teams);
       store.set(next);
-      setTeamImportSummary(`${teams.length}팀 명단으로 본선 대진을 생성했습니다.`);
+      setTeamImportSummary(`${teams.length}팀 명단으로 ${size}강 대진을 생성했습니다. 부전승 ${size-teams.length}자리.`);
       ui.msg('실제 팀 명단을 적용했습니다.','success');
     }catch(e){ui.msg(e.message,'error');}
   },
@@ -779,9 +875,17 @@ document.getElementById('exportDiagnosticBtn').onclick=exportBridgeDiagnostic;
 document.getElementById('bridgeCandidateSelect').onchange=renderCandidatePreview;
 document.getElementById('useBridgeCandidateBtn').onclick=()=>useCandidate(false);
 document.getElementById('useExactLegacyDrawBtn').onclick=useExactLegacyDraw;
+document.getElementById('teamFileInput').onchange=async(e)=>{
+  const file=e.target.files?.[0]; if(!file)return;
+  try{await loadTeamFile(file);}catch(err){ui.msg(err.message,'error');}
+  e.target.value='';
+};
+document.getElementById('load100TestTeamsBtn').onclick=async()=>{
+  try{await load100TestTeams();}catch(err){ui.msg(err.message,'error');}
+};
 document.getElementById('buildRankedTeamsBtn').onclick=()=>copyCandidateToText(true);
 document.getElementById('copyCandidateTextBtn').onclick=()=>copyCandidateToText(false);
 store.subscribe(state=>ui.render(state));
 if(!store.load()) store.emit();
-console.info(`[MAIN-V2] engine 1.3.0 exact legacy adapter loaded`);
+console.info(`[MAIN-V2] engine 1.4.0 128 draw and file import loaded`);
 
