@@ -25,3 +25,11 @@ input,select{width:100%;border:1px solid #b7c6dc;border-radius:10px;padding:10px
 .result-dialog{border:0;border-radius:16px;padding:0;width:min(520px,calc(100% - 24px));box-shadow:0 22px 60px rgba(0,0,0,.3)}.result-dialog::backdrop{background:rgba(15,30,58,.58)}.result-dialog form{padding:18px}.dialog-head{display:flex;justify-content:space-between}.dialog-head h3{margin:0}.dialog-head p{margin:5px 0;color:var(--muted)}.icon-btn{border:0;background:none;font-size:1.6rem;cursor:pointer}.result-teams{display:grid;grid-template-columns:1fr 28px 1fr;gap:10px;align-items:end;margin:18px 0}.result-teams label{display:grid;gap:7px;font-weight:900}.result-teams input{text-align:center;font-size:1.5rem}.result-teams strong{text-align:center;padding-bottom:12px}.dialog-actions{display:flex;justify-content:flex-end;gap:8px}
 @media(max-width:1000px){.controls-grid{grid-template-columns:repeat(2,1fr)}.court-board,.status-board{grid-template-columns:repeat(2,1fr)}.summary-grid{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:600px){.app-header{align-items:flex-start}.controls-grid,.court-board,.status-board,.summary-grid{grid-template-columns:1fr}.queue-card{grid-template-columns:38px 1fr}.queue-card .btn{grid-column:1/-1}.panel{padding:12px}}
+
+.team-import-box{margin-top:14px;border:1px solid #c9d7ea;border-radius:12px;padding:12px;background:#f8fbff}
+.team-import-box h3{margin:0 0 8px;font-size:.95rem}
+.team-import-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.team-import-box textarea{width:100%;min-height:150px;border:1px solid #b7c6dc;border-radius:10px;padding:10px;resize:vertical;font:inherit}
+.team-import-help{font-size:.76rem;color:#64748b;line-height:1.5}
+.import-summary{margin-top:8px;font-size:.8rem;font-weight:800;color:#1d4ed8}
+@media(max-width:800px){.team-import-grid{grid-template-columns:1fr}}
