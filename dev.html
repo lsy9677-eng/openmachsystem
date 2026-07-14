@@ -13,7 +13,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-07-14-v1051-static-host-main-engine";
+  const APP_VERSION = "2026-07-14-v1052-persistent-boot-main-engine";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -1352,10 +1352,16 @@ document.addEventListener('DOMContentLoaded',()=>setTimeout(v281ApplyRecommended
 <div class="sec-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
   <span>대진표 · 경기 현황 <span style="font-size:.72rem;font-weight:400;color:var(--text2)">— 전체 대진표는 수동 최신화 · 코트/진행경기만 자동 최소 갱신</span> <span id="bracketFreshnessBadge" style="display:inline-flex;margin-left:6px;padding:3px 8px;border-radius:999px;background:#eef2ff;color:#1d4ed8;font-size:.66rem;font-weight:900;vertical-align:middle">v730</span></span>
   <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
-    <button onclick="manualRefreshCurrentTournament()" style="padding:7px 14px;border-radius:999px;border:none;background:#0f766e;color:#fff;font-size:.84rem;font-weight:900;cursor:pointer;display:inline-flex;align-items:center;gap:5px;box-shadow:0 2px 8px rgba(15,118,110,.25)">🔄 최신 대진표</button>
+    <button onclick="window.v1052ManualRefreshCurrentTournament&&window.v1052ManualRefreshCurrentTournament()" style="padding:7px 14px;border-radius:999px;border:none;background:#0f766e;color:#fff;font-size:.84rem;font-weight:900;cursor:pointer;display:inline-flex;align-items:center;gap:5px;box-shadow:0 2px 8px rgba(15,118,110,.25)">🔄 최신 대진표</button>
     <button onclick="window.__hardClearAppCacheAndReload&&window.__hardClearAppCacheAndReload()" style="padding:7px 12px;border-radius:999px;border:1px solid #cbd5e1;background:#fff;color:#334155;font-size:.78rem;font-weight:900;cursor:pointer;display:inline-flex;align-items:center;gap:5px">🧹 캐시초기화</button>
   </div>
 </div>
+<script>
+window.v1052ManualRefreshCurrentTournament=function(){
+  try{ if(typeof window.renderBracket==='function') window.renderBracket(); }catch(e){}
+  try{ if(window.MainDrawV1052&&typeof window.MainDrawV1052.render==='function') window.MainDrawV1052.render(); }catch(e){}
+};
+</script>
 <div id="v1051MainPanelHost" style="display:block;visibility:visible;min-height:1px;margin:10px 0 14px"></div>
 <div class="card">
 <div class="frow">
@@ -56557,7 +56563,7 @@ if(false) setTimeout(function(){
 <!-- v987: fixed filename tools gate -->
 <script id="operationQueueModule" src="./assets/js/operation-queue.js?v=1009"></script>
 <!-- v1037: single main-draw entry. No legacy dynamic fallback. -->
-<script id="mainDrawCleanModule" src="./assets/js/main-draw.js?v=1051-static-host"></script>
+<script id="mainDrawCleanModule" src="./assets/js/main-draw.js?v=1052-persistent-boot"></script>
 <script id="toolsGateModule" src="./assets/js/tools-gate.js?v=1009"></script>
 
 </body>
