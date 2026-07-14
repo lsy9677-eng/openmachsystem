@@ -30,7 +30,7 @@
           <h2>본선 운영 제어</h2>
           <p>64강 전체 구조와 코트 큐를 하나의 데이터 원본으로 운영합니다.</p>
         </div>
-        <span id="engineBadge" class="version-badge">MAIN V2 · 1.12.1 STRICT SYNC VALIDATION</span>
+        <span id="engineBadge" class="version-badge">MAIN V2 · 1.13.0 SIMPLE OPERATOR MODE</span>
       </div>
 
       <div class="controls-grid">
@@ -201,7 +201,55 @@
     </section>
 
     
-      <section class="panel shadow-store-panel">
+      
+      <section class="panel simple-operator-panel">
+        <div class="panel-heading">
+          <div>
+            <h2>간편 운영 모드</h2>
+            <p>실전 운영에 필요한 핵심 순서만 표시합니다. 저장·복구·동기화 점검 도구는 고급 도구에서 확인합니다.</p>
+          </div>
+          <div class="simple-mode-actions">
+            <button id="toggleAdvancedToolsBtn" class="btn secondary">고급 도구 보기</button>
+            <span id="simpleModeBadge" class="version-badge simple-ready">간편 모드</span>
+          </div>
+        </div>
+
+        <div class="simple-flow-grid">
+          <button class="simple-step" data-target-id="legacyBridgeSection">
+            <span>1</span><strong>기존 앱 명단 읽기</strong><small>대회·부서 선택 후 진출팀 적용</small>
+          </button>
+          <button class="simple-step" data-click-id="newDrawBtn">
+            <span>2</span><strong>새 본선 추첨</strong><small>현재 명단으로 대진 생성</small>
+          </button>
+          <button class="simple-step" data-click-id="assignBtn">
+            <span>3</span><strong>본선 코트배정</strong><small>시합중·대기1·공용대기 배치</small>
+          </button>
+          <button class="simple-step" data-target-id="courtSection">
+            <span>4</span><strong>경기 운영</strong><small>결과 입력과 자동 승급 확인</small>
+          </button>
+          <button class="simple-step" data-click-id="saveRecoveryNowBtn">
+            <span>5</span><strong>복구점 저장</strong><small>현재 상태 수동 백업</small>
+          </button>
+          <button class="simple-step" data-click-id="validateDrawBtn">
+            <span>6</span><strong>마감 검증</strong><small>대진·결과·진출 상태 검사</small>
+          </button>
+        </div>
+
+        <div class="simple-status-grid">
+          <div><span>명단</span><strong id="simpleRosterStat">0팀</strong></div>
+          <div><span>대진</span><strong id="simpleDrawStat">없음</strong></div>
+          <div><span>자동배정</span><strong id="simpleAutoStat">OFF</strong></div>
+          <div><span>진행</span><strong id="simpleProgressStat">0/0</strong></div>
+          <div><span>마지막 복구점</span><strong id="simpleRecoveryStat">-</strong></div>
+        </div>
+
+        <div id="simpleModeNotice" class="import-summary">
+          다음 단계: 기존 앱 명단을 읽고 V2 명단으로 적용하세요.
+        </div>
+      </section>
+
+      <div id="advancedToolsWrap" class="advanced-tools-wrap advanced-hidden">
+<section class="panel shadow-store-panel">
         <div class="panel-heading">
           <div>
             <h2>Firebase 별도 테스트 저장소</h2>
@@ -393,6 +441,7 @@
           <div><span>직접 쓰기</span><strong>비활성</strong></div>
         </div>
       </section>
+      </div>
 
 
 
@@ -502,6 +551,6 @@
 
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
-  <script src="./assets/js/main-v2.bundle.js?v=19"></script>
+  <script src="./assets/js/main-v2.bundle.js?v=20"></script>
 </body>
 </html>

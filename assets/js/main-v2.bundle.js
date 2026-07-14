@@ -2320,6 +2320,73 @@ function syncBoot(){
 }
 
 
+
+/* ===== v1.13 simple operator mode ===== */
+const SimpleOperator={
+  advanced:false
+};
+function simpleText(id,value){
+  const el=document.getElementById(id);
+  if(el)el.textContent=value;
+}
+function simpleRender(){
+  const state=store.get();
+  const teams=Array.isArray(state.importedTeams)?state.importedTeams.length:0;
+  const matches=Array.isArray(state.draw?.matches)?state.draw.matches:[];
+  const completed=matches.filter(m=>m?.status==='completed').length;
+  simpleText('simpleRosterStat',`${teams}팀`);
+  simpleText('simpleDrawStat',matches.length?`${state.draw?.size||'-'}강 · ${matches.length}경기`:'없음');
+  simpleText('simpleAutoStat',state.autoAssign?'ON':'OFF');
+  simpleText('simpleProgressStat',`${completed}/${matches.length}`);
+  simpleText('simpleRecoveryStat',RecoveryStore.lastLocalAt?new Date(RecoveryStore.lastLocalAt).toLocaleTimeString():'-');
+
+  const notice=document.getElementById('simpleModeNotice');
+  if(!notice)return;
+  if(!teams){
+    notice.textContent='다음 단계: 기존 앱 명단을 읽고 V2 명단으로 적용하세요.';
+  }else if(!matches.length){
+    notice.textContent='다음 단계: 새 본선 추첨을 실행하세요.';
+  }else if(!matches.some(m=>['playing','court_wait1','shared_queue'].includes(m?.status))){
+    notice.textContent='다음 단계: 본선 코트배정을 실행하세요.';
+  }else{
+    notice.textContent=`운영 중 · 완료 ${completed}경기 / 전체 ${matches.length}경기`;
+  }
+}
+function simpleToggleAdvanced(){
+  SimpleOperator.advanced=!SimpleOperator.advanced;
+  const wrap=document.getElementById('advancedToolsWrap');
+  const btn=document.getElementById('toggleAdvancedToolsBtn');
+  if(wrap)wrap.classList.toggle('advanced-hidden',!SimpleOperator.advanced);
+  if(btn)btn.textContent=SimpleOperator.advanced?'고급 도구 숨기기':'고급 도구 보기';
+}
+function simpleGoToTarget(id){
+  const el=document.getElementById(id);
+  if(el){
+    el.scrollIntoView({behavior:'smooth',block:'start'});
+    return true;
+  }
+  return false;
+}
+function simpleBoot(){
+  document.getElementById('toggleAdvancedToolsBtn').onclick=simpleToggleAdvanced;
+  document.querySelectorAll('.simple-step').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const clickId=btn.dataset.clickId;
+      const targetId=btn.dataset.targetId;
+      if(clickId){
+        const target=document.getElementById(clickId);
+        if(target)target.click();
+      }else if(targetId){
+        simpleGoToTarget(targetId);
+      }
+      setTimeout(simpleRender,250);
+    });
+  });
+  setInterval(simpleRender,1200);
+  simpleRender();
+}
+
+
 /* ===== app.js ===== */
 
 
@@ -2984,7 +3051,7 @@ setTimeout(()=>{
   }
   if(currentDraw())validateCurrentDraw(false);
 },0);
-console.info(`[MAIN-V2] engine 1.12.1 strict sync validation loaded`);
+console.info(`[MAIN-V2] engine 1.13.0 simple operator mode loaded`);
 
 
 setTimeout(()=>{
@@ -3007,3 +3074,8 @@ setTimeout(()=>{
   try{syncBoot();}
   catch(e){console.warn('[MAIN-V2] sync staging boot failed',e);}
 },650);
+
+setTimeout(()=>{
+  try{simpleBoot();}
+  catch(e){console.warn('[MAIN-V2] simple operator boot failed',e);}
+},800);
