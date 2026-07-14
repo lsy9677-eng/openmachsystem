@@ -57090,25 +57090,69 @@ window.__MAIN_V2_EMBEDDED__=true;
 (function(){
   'use strict';
   function ge(id){return document.getElementById(id);}
+
+  var stableRoot=null;
+  var stableModeBar=null;
+  var lastMode='prelim';
+
+  function captureStableNodes(){
+    stableRoot=stableRoot||ge('mainV2EmbeddedRoot');
+    stableModeBar=stableModeBar||ge('mainV2ModeBar');
+  }
+
+  function ensureStableMount(){
+    captureStableNodes();
+    var page=ge('page-bracket');
+    if(!page)return false;
+
+    if(stableModeBar && !stableModeBar.isConnected){
+      var sec=page.querySelector('.sec-title');
+      if(sec && sec.nextSibling) page.insertBefore(stableModeBar,sec.nextSibling);
+      else page.insertBefore(stableModeBar,page.firstChild);
+    }
+
+    if(stableRoot && !stableRoot.isConnected){
+      var anchor=ge('bracketContent');
+      if(anchor) page.insertBefore(stableRoot,anchor);
+      else page.appendChild(stableRoot);
+    }
+    return !!(stableRoot&&stableRoot.isConnected&&stableModeBar&&stableModeBar.isConnected);
+  }
+
   function setMode(mode){
+    ensureStableMount();
     var isFinal=mode==='final';
-    var root=ge('mainV2EmbeddedRoot');
+    var root=stableRoot||ge('mainV2EmbeddedRoot');
     var legacy=ge('bracketContent');
     var legacyHost=ge('v1051MainPanelHost');
     var exportBar=ge('bracketExportBar');
-    if(root)root.style.display=isFinal?'block':'none';
-    if(legacy)legacy.style.display=isFinal?'none':'block';
-    if(legacyHost)legacyHost.style.display=isFinal?'none':'block';
-    if(exportBar)exportBar.style.display=isFinal?'none':'flex';
-    ge('mainV2PrelimModeBtn')?.classList.toggle('active',!isFinal);
-    ge('mainV2FinalModeBtn')?.classList.toggle('active',isFinal);
-    try{localStorage.setItem('230match-bracket-mode',mode);}catch(e){}
+
+    // 절대 빈 화면이 되지 않도록 V2 루트가 없으면 예선 화면으로 강제 복귀
+    if(isFinal && (!root || !root.isConnected)){
+      isFinal=false;
+      mode='prelim';
+    }
+
+    if(root)root.style.setProperty('display',isFinal?'block':'none','important');
+    if(legacy)legacy.style.setProperty('display',isFinal?'none':'block','important');
+    if(legacyHost)legacyHost.style.setProperty('display',isFinal?'none':'block','important');
+    if(exportBar)exportBar.style.setProperty('display',isFinal?'none':'flex','important');
+
+    var prelimBtn=stableModeBar?.querySelector('#mainV2PrelimModeBtn')||ge('mainV2PrelimModeBtn');
+    var finalBtn=stableModeBar?.querySelector('#mainV2FinalModeBtn')||ge('mainV2FinalModeBtn');
+    prelimBtn?.classList.toggle('active',!isFinal);
+    finalBtn?.classList.toggle('active',isFinal);
+
+    lastMode=isFinal?'final':'prelim';
+    try{localStorage.setItem('230match-bracket-mode',lastMode);}catch(e){}
+
     if(isFinal){
       setTimeout(function(){
         try{window.mainV2SyncLegacySelection&&window.mainV2SyncLegacySelection();}catch(e){}
-      },180);
+      },220);
     }
   }
+
   window.mainV2ShowPrelim=function(){setMode('prelim');};
   window.mainV2ShowFinal=function(){setMode('final');};
 
@@ -57118,40 +57162,100 @@ window.__MAIN_V2_EMBEDDED__=true;
       setTimeout(function(){
         var btn=ge('applyLegacyQualifiersBtn');
         if(btn)btn.click();
-      },120);
+      },160);
     }catch(e){console.error(e);}
   }
 
+  function bindStableButtons(){
+    ensureStableMount();
+    var prelimBtn=stableModeBar?.querySelector('#mainV2PrelimModeBtn')||ge('mainV2PrelimModeBtn');
+    var finalBtn=stableModeBar?.querySelector('#mainV2FinalModeBtn')||ge('mainV2FinalModeBtn');
+    var backBtn=stableRoot?.querySelector('#mainV2BackToPrelimBtn')||ge('mainV2BackToPrelimBtn');
+    var loadBtn=stableRoot?.querySelector('#mainV2LoadCurrentQualifiersBtn')||ge('mainV2LoadCurrentQualifiersBtn');
+
+    if(prelimBtn && !prelimBtn.dataset.v1161Bound){
+      prelimBtn.dataset.v1161Bound='1';
+      prelimBtn.addEventListener('click',function(){setMode('prelim');});
+    }
+    if(finalBtn && !finalBtn.dataset.v1161Bound){
+      finalBtn.dataset.v1161Bound='1';
+      finalBtn.addEventListener('click',function(){setMode('final');});
+    }
+    if(backBtn && !backBtn.dataset.v1161Bound){
+      backBtn.dataset.v1161Bound='1';
+      backBtn.addEventListener('click',function(){setMode('prelim');});
+    }
+    if(loadBtn && !loadBtn.dataset.v1161Bound){
+      loadBtn.dataset.v1161Bound='1';
+      loadBtn.addEventListener('click',loadCurrentQualifiers);
+    }
+  }
+
+  function watchdog(){
+    var mounted=ensureStableMount();
+    bindStableButtons();
+
+    var page=ge('page-bracket');
+    if(!page || !page.classList.contains('active'))return;
+
+    var root=stableRoot;
+    var legacy=ge('bracketContent');
+    var host=ge('v1051MainPanelHost');
+    var allHidden=
+      (!root || getComputedStyle(root).display==='none') &&
+      (!legacy || getComputedStyle(legacy).display==='none') &&
+      (!host || getComputedStyle(host).display==='none');
+
+    if(allHidden){
+      setMode('prelim');
+    }else if(mounted){
+      setMode(lastMode);
+    }
+  }
+
   function boot(){
-    ge('mainV2PrelimModeBtn')?.addEventListener('click',function(){setMode('prelim');});
-    ge('mainV2FinalModeBtn')?.addEventListener('click',function(){setMode('final');});
-    ge('mainV2BackToPrelimBtn')?.addEventListener('click',function(){setMode('prelim');});
-    ge('mainV2LoadCurrentQualifiersBtn')?.addEventListener('click',loadCurrentQualifiers);
+    captureStableNodes();
+    ensureStableMount();
+    bindStableButtons();
 
     var saved='prelim';
     try{saved=localStorage.getItem('230match-bracket-mode')||'prelim';}catch(e){}
-    setMode(saved==='final'?'final':'prelim');
+    lastMode=saved==='final'?'final':'prelim';
+
+    // 첫 진입은 안전하게 예선 화면을 먼저 표시
+    setMode('prelim');
 
     var brTS=ge('brTS');
     if(brTS)brTS.addEventListener('change',function(){
-      if(ge('mainV2EmbeddedRoot')?.style.display!=='none'){
-        setTimeout(function(){window.mainV2SyncLegacySelection&&window.mainV2SyncLegacySelection();},150);
+      if(lastMode==='final'){
+        setTimeout(function(){window.mainV2SyncLegacySelection&&window.mainV2SyncLegacySelection();},180);
       }
     });
     var divBox=ge('brMultiDiv');
     if(divBox)divBox.addEventListener('click',function(){
-      if(ge('mainV2EmbeddedRoot')?.style.display!=='none'){
-        setTimeout(function(){window.mainV2SyncLegacySelection&&window.mainV2SyncLegacySelection();},180);
+      if(lastMode==='final'){
+        setTimeout(function(){window.mainV2SyncLegacySelection&&window.mainV2SyncLegacySelection();},200);
       }
     });
-    console.log('[MAIN-V2-INTEGRATION] v1.16 single-page transplant loaded');
+
+    [300,700,1300,2200,4000].forEach(function(ms){
+      setTimeout(function(){
+        ensureStableMount();
+        bindStableButtons();
+        setMode(lastMode);
+      },ms);
+    });
+    setInterval(watchdog,900);
+
+    console.log('[MAIN-V2-INTEGRATION] v1.16.1 stable mount fix loaded');
   }
+
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});
   else boot();
 })();
 </script>
-<link rel="stylesheet" href="./assets/css/main-v2-embedded.css?v=116">
-<script src="./assets/js/main-v2.bundle.js?v=116"></script>
+<link rel="stylesheet" href="./assets/css/main-v2-embedded.css?v=1161">
+<script src="./assets/js/main-v2.bundle.js?v=1161"></script>
 
 </body>
 </html>
