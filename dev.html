@@ -13,7 +13,7 @@
 <script>
   // ✅ 배포할 때마다 아래 버전 문자열만 바꾸면, 사용자가 앱을 열 때 자동으로 새 버전을 적용합니다.
   // 예) "2026-02-27-02" 처럼 숫자만 올려도 됩니다.
-  const APP_VERSION = "2026-07-14-v1038-new-main-engine";
+  const APP_VERSION = "2026-07-14-v1037-clean-single-entry";
 
   (function forceUpdateOnNewVersion() {
     if (location.protocol === 'file:') return;
@@ -20568,7 +20568,7 @@ function renderBracketHTMLForDiv(tid,div,isAll){
       <div class="sf-step v308-flow-step" title="예선 진행 경기로 이동" onclick="jumpToPrelimActiveMatch('${key}')"><div class="sf-dot ${s3?'sf-done':s2?'sf-active':'sf-pend'}">${s3?'✓':3}</div><div class="sf-lbl">예선<br>${gMs.length?gDone+'/'+gMs.length:'미시작'}</div></div>
       ${isGroupKO?`<div class="sf-step v308-flow-step" title="본선 진행 경기/대진표로 이동" onclick="jumpToMainActiveMatch('${key}')"><div class="sf-dot ${s4?'sf-done':s3?'sf-active':'sf-pend'}">${s4?'🏆':4}</div><div class="sf-lbl">본선<br>${shownMainTotal?shownMainDone+'/'+shownMainTotal:'미시작'}</div></div>`:''}
     </div>
-    ${window.__CLEAN_MAIN_ONLY_MODE__?'':renderMainRoundShortcutChips(key,mMs,tid,div)}
+    ${renderMainRoundShortcutChips(key,mMs,tid,div)}
   </div>`;
 
   html += renderMatchProgressSummary(key);
@@ -20774,7 +20774,7 @@ function renderBracketHTMLForDiv(tid,div,isAll){
       html+=`</div></div>`;
     });
 
-    if(isGroupKO && showMainSection && !window.__CLEAN_MAIN_ONLY_MODE__){
+    if(isGroupKO && showMainSection){
       const advT = s3 ? getAdvT(key,draw,teams,cfg) : [];
       html+=`<div class="card" style="background:linear-gradient(135deg,#eef2ff,#dce8fb);border:1.5px solid var(--success)">
         <div class="card-title" style="color:var(--success)">🏆 본선 ${s3?`진출팀 (${advT.length}팀)`:'진출 예정'}</div>
@@ -20861,7 +20861,7 @@ function renderBracketHTMLForDiv(tid,div,isAll){
     html+=`</div>`;
   }
 
-  if(mMs.length && showMainSection && !window.__CLEAN_MAIN_ONLY_MODE__){
+  if(mMs.length && showMainSection){
     const rounds=[...new Set(mMs.map(m=>Number(m.round||0)))].sort((a,b)=>a-b);
     const totalR=rounds.length;
 
@@ -56555,7 +56555,8 @@ if(false) setTimeout(function(){
 
 <!-- v987: fixed filename tools gate -->
 <script id="operationQueueModule" src="./assets/js/operation-queue.js?v=1009"></script>
-<script id="mainDrawCleanModule" src="./assets/js/main-draw.js?v=1038-new"></script>
+<!-- v1037: single main-draw entry. No legacy dynamic fallback. -->
+<script id="mainDrawCleanModule" src="./assets/js/main-draw.js?v=1037-clean"></script>
 <script id="toolsGateModule" src="./assets/js/tools-gate.js?v=1009"></script>
 
 </body>
