@@ -1287,11 +1287,11 @@ function shadowCurrentPayload(){
   const summary={
     round:currentRoundLabel(state),
     drawSize:Number(state.draw?.size||0),
-    matchCount:Array.isArray(state.draw?.matches)?state.draw.matches.length:0,
-    completed:Array.isArray(state.draw?.matches)?state.draw.matches.filter(m=>m?.status==='completed').length:0,
-    playing:Array.isArray(state.draw?.matches)?state.draw.matches.filter(m=>m?.status==='playing').length:0,
-    courtWait:Array.isArray(state.draw?.matches)?state.draw.matches.filter(m=>m?.status==='court_wait1').length:0,
-    sharedQueue:Array.isArray(state.draw?.matches)?state.draw.matches.filter(m=>m?.status==='shared_queue').length:0
+    matchCount:state.draw?allMatches(state.draw).length:0,
+    completed:state.draw?allMatches(state.draw).filter(m=>m?.status===STATUS.COMPLETED).length:0,
+    playing:state.draw?allMatches(state.draw).filter(m=>m?.status===STATUS.PLAYING).length:0,
+    courtWait:state.draw?allMatches(state.draw).filter(m=>m?.status===STATUS.COURT_WAIT1).length:0,
+    sharedQueue:state.draw?allMatches(state.draw).filter(m=>m?.status===STATUS.SHARED_QUEUE).length:0
   };
   return {
     schemaVersion:'230match-main-v2-shadow-v1',
@@ -1720,11 +1720,11 @@ function recoveryPayload(reason='autosave'){
     summary:{
       round:currentRoundLabel(state),
       drawSize:Number(state.draw?.size||0),
-      matches:Array.isArray(state.draw?.matches)?state.draw.matches.length:0,
-      completed:Array.isArray(state.draw?.matches)?state.draw.matches.filter(m=>m?.status==='completed').length:0,
-      playing:Array.isArray(state.draw?.matches)?state.draw.matches.filter(m=>m?.status==='playing').length:0,
-      courtWait1:Array.isArray(state.draw?.matches)?state.draw.matches.filter(m=>m?.status==='court_wait1').length:0,
-      sharedQueue:Array.isArray(state.draw?.matches)?state.draw.matches.filter(m=>m?.status==='shared_queue').length:0
+      matches:state.draw?allMatches(state.draw).length:0,
+      completed:state.draw?allMatches(state.draw).filter(m=>m?.status===STATUS.COMPLETED).length:0,
+      playing:state.draw?allMatches(state.draw).filter(m=>m?.status===STATUS.PLAYING).length:0,
+      courtWait1:state.draw?allMatches(state.draw).filter(m=>m?.status===STATUS.COURT_WAIT1).length:0,
+      sharedQueue:state.draw?allMatches(state.draw).filter(m=>m?.status===STATUS.SHARED_QUEUE).length:0
     },
     state
   };
@@ -2121,7 +2121,7 @@ function syncBuildPlan(){
     String(currentSource.tournamentId||currentSource.tournamentName)!==
     String(SyncStaging.target.tournamentId||SyncStaging.target.tournamentName) ||
     String(currentSource.division)!==String(SyncStaging.target.division);
-  const matches=Array.isArray(state.draw?.matches)?state.draw.matches:[];
+  const matches=state.draw?allMatches(state.draw):[];
   const completed=[];
   const live=[];
   const queue=[];
@@ -2140,9 +2140,9 @@ function syncBuildPlan(){
       score:syncNormalizeScore(m),
       nextMatchId:m.nextMatchId||m.nextId||''
     };
-    if(m.status==='completed')completed.push(item);
-    if(m.status==='playing')live.push(item);
-    if(m.status==='court_wait1'||m.status==='shared_queue'||m.status==='waiting_slots')queue.push(item);
+    if(m.status===STATUS.COMPLETED)completed.push(item);
+    if(m.status===STATUS.PLAYING)live.push(item);
+    if(m.status===STATUS.COURT_WAIT1||m.status===STATUS.SHARED_QUEUE||m.status===STATUS.WAITING_SLOTS)queue.push(item);
     if(m.winner&&m.nextMatchId)advances.push({
       fromMatchId:item.matchId,
       toMatchId:m.nextMatchId,
@@ -2167,9 +2167,9 @@ function syncBuildPlan(){
     summary:{
       completed:completed.length,
       playing:live.length,
-      courtWait1:matches.filter(m=>m.status==='court_wait1').length,
-      sharedQueue:matches.filter(m=>m.status==='shared_queue').length,
-      waitingSlots:matches.filter(m=>m.status==='waiting_slots').length,
+      courtWait1:matches.filter(m=>m.status===STATUS.COURT_WAIT1).length,
+      sharedQueue:matches.filter(m=>m.status===STATUS.SHARED_QUEUE).length,
+      waitingSlots:matches.filter(m=>m.status===STATUS.WAITING_SLOTS).length,
       advances:advances.length
     },
     changes:{completed,live,queue,advances}
@@ -2332,8 +2332,8 @@ function simpleText(id,value){
 function simpleRender(){
   const state=store.get();
   const teams=Array.isArray(state.importedTeams)?state.importedTeams.length:0;
-  const matches=Array.isArray(state.draw?.matches)?state.draw.matches:[];
-  const completed=matches.filter(m=>m?.status==='completed').length;
+  const matches=state.draw?allMatches(state.draw):[];
+  const completed=matches.filter(m=>m?.status===STATUS.COMPLETED).length;
   simpleText('simpleRosterStat',`${teams}팀`);
   simpleText('simpleDrawStat',matches.length?`${state.draw?.size||'-'}강 · ${matches.length}경기`:'없음');
   simpleText('simpleAutoStat',state.autoAssign?'ON':'OFF');
@@ -2403,7 +2403,7 @@ function handoffStatus(message,type=''){
 function handoffCurrentReady(){
   const state=store.get();
   const teams=Array.isArray(state.importedTeams)?state.importedTeams.length:0;
-  const matches=Array.isArray(state.draw?.matches)?state.draw.matches:[];
+  const matches=state.draw?allMatches(state.draw):[];
   return {
     teams,
     matches:matches.length,
@@ -3161,7 +3161,7 @@ setTimeout(()=>{
   }
   if(currentDraw())validateCurrentDraw(false);
 },0);
-console.info(`[MAIN-V2] engine 1.14.0 one button handoff loaded`);
+console.info(`[MAIN-V2] engine 1.14.1 draw model adapter fix loaded`);
 
 
 setTimeout(()=>{
