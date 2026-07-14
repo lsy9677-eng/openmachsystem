@@ -1235,6 +1235,314 @@ function exportLegacyDirectReport(){
 }
 
 
+
+/* ===== v1.10 Firebase shadow test store ===== */
+const ShadowStore={
+  config:{projectId:'',apiKey:'',collection:'mainV2ShadowTests'},
+  token:'',
+  mode:'disconnected',
+  snapshots:[],
+  selected:null,
+  localKey:'230match-main-v2-shadow-snapshots-v1'
+};
+function shadowSetBadge(text,type='off'){
+  const el=document.getElementById('shadowStoreBadge');
+  if(!el)return;
+  el.textContent=text;
+  el.classList.remove('shadow-off','shadow-ok','shadow-warn','shadow-error');
+  el.classList.add(`shadow-${type}`);
+}
+function shadowSetStatus(text,type=''){
+  const el=document.getElementById('shadowStoreStatus');
+  if(!el)return;
+  el.textContent=text;
+  el.className='import-summary'+(type?` ${type}`:'');
+}
+function shadowValue(id){return String(document.getElementById(id)?.value||'').trim();}
+function shadowSetValue(id,value){const el=document.getElementById(id);if(el)el.value=value||'';}
+function shadowSafeName(value){
+  return String(value||'').trim().replace(/[^a-zA-Z0-9가-힣_-]+/g,'-').replace(/^-+|-+$/g,'').slice(0,120);
+}
+function shadowNowName(){
+  const state=store.get();
+  const source=state.bridgeSource;
+  const key=source?.key||source?.division||'manual';
+  const stamp=new Date().toISOString().replace(/[:.]/g,'-');
+  return shadowSafeName(`${key}-${stamp}`);
+}
+function shadowCurrentPayload(){
+  const state=JSON.parse(JSON.stringify(store.get()));
+  const source=state.bridgeSource||null;
+  const summary={
+    round:currentRoundLabel(state),
+    drawSize:Number(state.draw?.size||0),
+    matchCount:Array.isArray(state.draw?.matches)?state.draw.matches.length:0,
+    completed:Array.isArray(state.draw?.matches)?state.draw.matches.filter(m=>m?.status==='completed').length:0,
+    playing:Array.isArray(state.draw?.matches)?state.draw.matches.filter(m=>m?.status==='playing').length:0,
+    courtWait:Array.isArray(state.draw?.matches)?state.draw.matches.filter(m=>m?.status==='court_wait1').length:0,
+    sharedQueue:Array.isArray(state.draw?.matches)?state.draw.matches.filter(m=>m?.status==='shared_queue').length:0
+  };
+  return {
+    schemaVersion:'230match-main-v2-shadow-v1',
+    readOnlySource:true,
+    shadowOnly:true,
+    savedAt:new Date().toISOString(),
+    source,
+    summary,
+    state
+  };
+}
+function currentRoundLabel(state){
+  try{
+    if(typeof getCurrentRoundLabel==='function')return getCurrentRoundLabel(state);
+  }catch{}
+  const size=Number(state?.draw?.size||0);
+  return size?`${size}강`:'-';
+}
+function shadowUpdateStats(payload){
+  document.getElementById('shadowModeStat').textContent=ShadowStore.mode||'-';
+  document.getElementById('shadowSourceStat').textContent=
+    payload?.source?.key||payload?.source?.division||payload?.state?.importedSource||'-';
+  document.getElementById('shadowDrawStat').textContent=
+    payload?.summary?.drawSize?`${payload.summary.drawSize}강 · ${payload.summary.matchCount}경기`:'-';
+  document.getElementById('shadowSavedAtStat').textContent=
+    payload?.savedAt?new Date(payload.savedAt).toLocaleString():'-';
+}
+async function shadowDiscoverConfig(){
+  try{
+    const w=BridgeState.legacyWindow;
+    if(!w||w.closed)throw new Error('먼저 기존 앱 새 창을 열어 연결하세요.');
+    let cfg=null;
+    try{
+      if(w.firebase?.apps?.length)cfg=w.firebase.app().options;
+    }catch{}
+    if(!cfg){
+      const candidates=[w.firebaseConfig,w.FIREBASE_CONFIG,w.__firebase_config,w.appConfig?.firebase,w.G?.firebaseConfig];
+      cfg=candidates.find(v=>v&&typeof v==='object'&&v.projectId);
+    }
+    if(!cfg?.projectId)throw new Error('기존 앱에서 Firebase projectId를 자동으로 찾지 못했습니다.');
+    shadowSetValue('shadowProjectId',cfg.projectId);
+    shadowSetValue('shadowApiKey',cfg.apiKey||'');
+    ShadowStore.config.projectId=cfg.projectId;
+    ShadowStore.config.apiKey=cfg.apiKey||'';
+    try{
+      const currentUser=w.firebase?.auth?.()?.currentUser;
+      if(currentUser?.getIdToken)ShadowStore.token=await currentUser.getIdToken();
+    }catch{}
+    shadowSetBadge(ShadowStore.token?'설정+로그인 탐색':'설정 탐색','warn');
+    shadowSetStatus(
+      `프로젝트 ${cfg.projectId}를 찾았습니다. ${ShadowStore.token?'로그인 토큰도 확보했습니다.':'로그인 토큰은 찾지 못했습니다.'}`
+    );
+  }catch(e){
+    shadowSetBadge('탐색 실패','error');
+    shadowSetStatus(e.message,'error');
+  }
+}
+function shadowReadConfig(){
+  const projectId=shadowValue('shadowProjectId');
+  const apiKey=shadowValue('shadowApiKey');
+  const collection=shadowSafeName(shadowValue('shadowCollection')||'mainV2ShadowTests');
+  if(!projectId)throw new Error('Firebase Project ID가 필요합니다.');
+  if(!collection)throw new Error('전용 컬렉션 이름이 필요합니다.');
+  ShadowStore.config={projectId,apiKey,collection};
+  return ShadowStore.config;
+}
+function shadowFirestoreBase(){
+  const {projectId,apiKey,collection}=shadowReadConfig();
+  const query=apiKey?`?key=${encodeURIComponent(apiKey)}`:'';
+  return {
+    list:`https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents/${encodeURIComponent(collection)}${query}`,
+    document(name){
+      return `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents/${encodeURIComponent(collection)}/${encodeURIComponent(name)}${query}`;
+    }
+  };
+}
+function shadowHeaders(json=true){
+  const headers={};
+  if(json)headers['Content-Type']='application/json';
+  if(ShadowStore.token)headers.Authorization=`Bearer ${ShadowStore.token}`;
+  return headers;
+}
+function shadowToFirestoreFields(value){
+  if(value===null||value===undefined)return {nullValue:null};
+  if(typeof value==='string')return {stringValue:value};
+  if(typeof value==='boolean')return {booleanValue:value};
+  if(typeof value==='number'){
+    return Number.isInteger(value)?{integerValue:String(value)}:{doubleValue:value};
+  }
+  if(Array.isArray(value))return {arrayValue:{values:value.map(shadowToFirestoreFields)}};
+  if(typeof value==='object'){
+    const fields={};
+    Object.entries(value).forEach(([k,v])=>{fields[k]=shadowToFirestoreFields(v);});
+    return {mapValue:{fields}};
+  }
+  return {stringValue:String(value)};
+}
+function shadowFromFirestoreValue(value){
+  if(!value)return null;
+  if('nullValue'in value)return null;
+  if('stringValue'in value)return value.stringValue;
+  if('booleanValue'in value)return value.booleanValue;
+  if('integerValue'in value)return Number(value.integerValue);
+  if('doubleValue'in value)return Number(value.doubleValue);
+  if('timestampValue'in value)return value.timestampValue;
+  if(value.arrayValue)return (value.arrayValue.values||[]).map(shadowFromFirestoreValue);
+  if(value.mapValue){
+    const out={};
+    Object.entries(value.mapValue.fields||{}).forEach(([k,v])=>out[k]=shadowFromFirestoreValue(v));
+    return out;
+  }
+  return null;
+}
+function shadowDocToObject(doc){
+  const out={};
+  Object.entries(doc.fields||{}).forEach(([k,v])=>out[k]=shadowFromFirestoreValue(v));
+  out.__name=String(doc.name||'').split('/').pop();
+  out.__createTime=doc.createTime||'';
+  out.__updateTime=doc.updateTime||'';
+  return out;
+}
+async function shadowTestConnection(){
+  try{
+    const urls=shadowFirestoreBase();
+    shadowSetBadge('검사 중','warn');
+    const res=await fetch(`${urls.list}${urls.list.includes('?')?'&':'?'}pageSize=1`,{headers:shadowHeaders(false)});
+    if(res.ok){
+      ShadowStore.mode='firebase';
+      shadowSetBadge('Firebase 테스트 연결','ok');
+      shadowSetStatus('전용 컬렉션 읽기 연결이 정상입니다. 운영 컬렉션에는 접근하지 않습니다.','success');
+      return true;
+    }
+    const text=await res.text();
+    if(res.status===403||res.status===401){
+      ShadowStore.mode='local-fallback';
+      shadowSetBadge('권한 제한 · 로컬 사용','warn');
+      shadowSetStatus('Firebase 규칙이 전용 컬렉션 접근을 막았습니다. 브라우저 백업은 계속 사용할 수 있습니다.');
+      return false;
+    }
+    throw new Error(`연결 실패 HTTP ${res.status}: ${text.slice(0,180)}`);
+  }catch(e){
+    ShadowStore.mode='local-fallback';
+    shadowSetBadge('연결 실패 · 로컬 사용','error');
+    shadowSetStatus(e.message,'error');
+    return false;
+  }
+}
+function shadowLocalList(){
+  try{return JSON.parse(localStorage.getItem(ShadowStore.localKey)||'[]');}catch{return [];}
+}
+function shadowLocalWrite(payload,name){
+  const list=shadowLocalList().filter(x=>x.name!==name);
+  list.unshift({name,payload,savedAt:payload.savedAt,mode:'browser'});
+  localStorage.setItem(ShadowStore.localKey,JSON.stringify(list.slice(0,30)));
+}
+async function shadowSaveLocal(){
+  const payload=shadowCurrentPayload();
+  const name=shadowSafeName(shadowValue('shadowDocumentName'))||shadowNowName();
+  shadowSetValue('shadowDocumentName',name);
+  shadowLocalWrite(payload,name);
+  ShadowStore.mode='browser';
+  shadowSetBadge('브라우저 테스트 저장','ok');
+  shadowSetStatus(`브라우저 전용 스냅샷 ${name}을 저장했습니다.`,'success');
+  shadowUpdateStats(payload);
+  await shadowListSnapshots();
+}
+async function shadowSaveFirebase(){
+  try{
+    if(!guardDrawMutation('Firebase 테스트 스냅샷 저장'))return;
+    const payload=shadowCurrentPayload();
+    const name=shadowSafeName(shadowValue('shadowDocumentName'))||shadowNowName();
+    shadowSetValue('shadowDocumentName',name);
+    const urls=shadowFirestoreBase();
+    const body={fields:{
+      schemaVersion:{stringValue:payload.schemaVersion},
+      shadowOnly:{booleanValue:true},
+      savedAt:{timestampValue:payload.savedAt},
+      sourceKey:{stringValue:payload.source?.key||payload.source?.division||payload.state?.importedSource||''},
+      drawSize:{integerValue:String(payload.summary.drawSize||0)},
+      summary:shadowToFirestoreFields(payload.summary),
+      source:shadowToFirestoreFields(payload.source),
+      payloadJson:{stringValue:JSON.stringify(payload)}
+    }};
+    shadowSetBadge('저장 중','warn');
+    const res=await fetch(urls.document(name),{
+      method:'PATCH',
+      headers:shadowHeaders(true),
+      body:JSON.stringify(body)
+    });
+    if(!res.ok){
+      const text=await res.text();
+      throw new Error(`Firebase 테스트 저장 실패 HTTP ${res.status}: ${text.slice(0,220)}`);
+    }
+    ShadowStore.mode='firebase';
+    shadowSetBadge('Firebase 테스트 저장됨','ok');
+    shadowSetStatus(`전용 컬렉션 ${ShadowStore.config.collection}/${name}에 저장했습니다.`,'success');
+    shadowUpdateStats(payload);
+    await shadowListSnapshots();
+  }catch(e){
+    shadowSetBadge('저장 실패','error');
+    shadowSetStatus(`${e.message} 브라우저 백업 저장을 사용할 수 있습니다.`,'error');
+  }
+}
+async function shadowListSnapshots(){
+  const entries=[];
+  const local=shadowLocalList();
+  local.forEach(x=>entries.push({...x,sourceMode:'browser'}));
+  try{
+    const urls=shadowFirestoreBase();
+    const res=await fetch(`${urls.list}${urls.list.includes('?')?'&':'?'}pageSize=30`,{headers:shadowHeaders(false)});
+    if(res.ok){
+      const json=await res.json();
+      (json.documents||[]).forEach(doc=>{
+        const obj=shadowDocToObject(doc);
+        let payload=null;
+        try{payload=JSON.parse(obj.payloadJson||'null');}catch{}
+        if(payload)entries.push({name:obj.__name,payload,savedAt:payload.savedAt,sourceMode:'firebase'});
+      });
+    }
+  }catch{}
+  const unique=new Map();
+  entries.sort((a,b)=>String(b.savedAt||'').localeCompare(String(a.savedAt||''))).forEach(x=>{
+    const key=`${x.sourceMode}:${x.name}`;
+    if(!unique.has(key))unique.set(key,x);
+  });
+  ShadowStore.snapshots=[...unique.values()];
+  const select=document.getElementById('shadowSnapshotSelect');
+  if(!ShadowStore.snapshots.length){
+    select.innerHTML='<option value="">저장된 스냅샷 없음</option>';
+    document.getElementById('shadowSnapshotPreview').textContent='선택된 스냅샷이 없습니다.';
+    return;
+  }
+  select.innerHTML=ShadowStore.snapshots.map((x,i)=>
+    `<option value="${i}">[${x.sourceMode==='firebase'?'Firebase':'브라우저'}] ${safeText(x.name)} · ${new Date(x.savedAt).toLocaleString()}</option>`
+  ).join('');
+  shadowSelectSnapshot();
+}
+function shadowSelectSnapshot(){
+  const idx=Number(document.getElementById('shadowSnapshotSelect').value);
+  const item=ShadowStore.snapshots[idx];
+  ShadowStore.selected=item||null;
+  document.getElementById('shadowSnapshotPreview').textContent=item
+    ?JSON.stringify({name:item.name,mode:item.sourceMode,savedAt:item.savedAt,source:item.payload?.source,summary:item.payload?.summary},null,2)
+    :'선택된 스냅샷이 없습니다.';
+  if(item)shadowUpdateStats(item.payload);
+}
+function shadowDownloadSelected(){
+  const item=ShadowStore.selected;
+  if(!item){ui.msg('선택된 스냅샷이 없습니다.','error');return;}
+  downloadJson(`230match-shadow-${item.name}.json`,item.payload);
+}
+function shadowRestoreSelected(){
+  const item=ShadowStore.selected;
+  if(!item?.payload?.state){ui.msg('복원할 V2 상태가 없습니다.','error');return;}
+  if(!confirm('선택한 테스트 스냅샷을 현재 V2 화면에 복원할까요? 기존 앱 데이터는 변경되지 않습니다.'))return;
+  pushUndoSnapshot('Firebase/브라우저 테스트 스냅샷 복원 전');
+  store.set(JSON.parse(JSON.stringify(item.payload.state)));
+  ui.msg('선택한 테스트 스냅샷을 V2 화면에 복원했습니다.','success');
+  shadowUpdateStats(item.payload);
+}
+
+
 /* ===== app.js ===== */
 
 
@@ -1824,6 +2132,16 @@ document.getElementById('scanLegacyWindowBtn').onclick=scanLegacyWindow;
 document.getElementById('scanCurrentPageBtn').onclick=scanCurrentPageStorage;
 document.getElementById('exportDiagnosticBtn').onclick=exportBridgeDiagnostic;
 
+
+document.getElementById('discoverShadowConfigBtn').onclick=shadowDiscoverConfig;
+document.getElementById('testShadowConnectionBtn').onclick=shadowTestConnection;
+document.getElementById('saveShadowSnapshotBtn').onclick=shadowSaveFirebase;
+document.getElementById('saveShadowLocalBtn').onclick=shadowSaveLocal;
+document.getElementById('listShadowSnapshotsBtn').onclick=shadowListSnapshots;
+document.getElementById('shadowSnapshotSelect').onchange=shadowSelectSnapshot;
+document.getElementById('downloadShadowSnapshotBtn').onclick=shadowDownloadSelected;
+document.getElementById('restoreShadowSnapshotBtn').onclick=shadowRestoreSelected;
+
 document.getElementById('loadLegacyStructureBtn').onclick=loadLegacyTournamentStructure;
 document.getElementById('legacyTournamentSelect').onchange=populateLegacyDivisions;
 document.getElementById('inspectLegacyDivisionBtn').onclick=()=>inspectLegacySelectedDivision(true);
@@ -1867,5 +2185,13 @@ setTimeout(()=>{
   }
   if(currentDraw())validateCurrentDraw(false);
 },0);
-console.info(`[MAIN-V2] engine 1.9.0 legacy read-only bridge loaded`);
+console.info(`[MAIN-V2] engine 1.10.0 firebase shadow store loaded`);
 
+
+setTimeout(()=>{
+  try{
+    shadowSetValue('shadowCollection','mainV2ShadowTests');
+    shadowListSnapshots();
+    shadowUpdateStats(shadowCurrentPayload());
+  }catch(e){console.warn('[MAIN-V2] shadow store init',e);}
+},300);
