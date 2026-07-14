@@ -28,7 +28,7 @@
           <h2>본선 운영 제어</h2>
           <p>64강 전체 구조와 코트 큐를 하나의 데이터 원본으로 운영합니다.</p>
         </div>
-        <span id="engineBadge" class="version-badge">MAIN V2 · 1.5.0 BALANCED BYE</span>
+        <span id="engineBadge" class="version-badge">MAIN V2 · 1.6.0 DRAW VALIDATE + LOCK</span>
       </div>
 
       <div class="controls-grid">
@@ -131,6 +131,9 @@
           <label class="btn teal" for="teamFileInput">명단 파일 선택</label>
           <input id="teamFileInput" type="file" accept=".txt,.csv,.json" hidden>
           <button id="load100TestTeamsBtn" class="btn purple">100팀 테스트 명단 불러오기</button>
+          <button id="validateDrawBtn" class="btn teal">대진 검증</button>
+          <button id="toggleDrawLockBtn" class="btn secondary">대진 잠금</button>
+          <button id="exportDrawAuditBtn" class="btn secondary">검증 보고서 저장</button>
         </div>
         <div id="teamImportSummary" class="import-summary">아직 실제 명단을 연결하지 않았습니다.</div>
       </div>
@@ -187,6 +190,17 @@
       </div>
       <div id="bracketViewport" class="bracket-viewport">
         <div id="bracketBoard" class="bracket-board"></div>
+
+      <div class="draw-validation-box">
+        <div class="draw-validation-head">
+          <h3>대진 검증 결과</h3>
+          <span id="drawLockBadge" class="bridge-chip warn">잠금 해제</span>
+        </div>
+        <div id="drawValidationSummary" class="draw-validation-summary">
+          새 본선 추첨 후 ‘대진 검증’을 실행하세요.
+        </div>
+        <div id="drawValidationDetails" class="draw-validation-details"></div>
+      </div>
       </div>
     </section>
   </main>
@@ -212,6 +226,6 @@
     </form>
   </dialog>
 
-  <script src="./assets/js/main-v2.bundle.js?v=7"></script>
+  <script src="./assets/js/main-v2.bundle.js?v=8"></script>
 </body>
 </html>

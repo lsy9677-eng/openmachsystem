@@ -701,6 +701,7 @@ function copyCandidateToText(rankOnly=false){
   ui.msg(`${teams.length}팀을 명단 입력창으로 복사했습니다.`,'success');
 }
 function useCandidate(rankOnly=false){
+  if(!guardDrawMutation('기존 데이터 적용'))return;
   const c=selectedCandidate();if(!c){ui.msg('데이터 후보를 먼저 선택하세요.','error');return;}
   const teams=teamsFromCandidate(c,rankOnly);
   const size=Number(document.getElementById('drawSize').value);
@@ -740,6 +741,7 @@ function nextPowerOfTwo(n){
   let p=1; while(p<n)p*=2; return p;
 }
 function useExactLegacyDraw(){
+  if(!guardDrawMutation('기존 본선 슬롯 적용'))return;
   const c=findExactLegacyDrawCandidate();
   if(!c){
     ui.msg('기존 본선 슬롯 데이터(manual128.rounds[0])를 찾지 못했습니다. 먼저 기존 앱 데이터 검사를 실행하세요.','error');
@@ -785,7 +787,9 @@ function useExactLegacyDraw(){
     actualTeamCount:teams.length,
     importedAt:new Date().toISOString()
   };
+  next.drawLocked=false;
   store.set(next);
+  setTimeout(()=>{validateCurrentDraw(false);syncDrawLockUI();},0);
   document.getElementById('teamImportText').value=teams.map(t=>t.name).join('\n');
   setTeamImportSummary(`기존 본선 슬롯 ${c.teams.length}칸에서 부전승을 제외한 실제 ${teams.length}팀을 적용했습니다.`);
   bridgeLog(`정확 어댑터 적용: ${c.path} / 전체 슬롯 ${c.teams.length} / 실제 팀 ${teams.length} / 대진 ${size}강`);
@@ -908,16 +912,169 @@ async function load100TestTeams(){
   ui.msg('100팀 테스트 명단을 불러왔습니다. 128강과 부전승 28자리가 자동 선택됩니다.','success');
 }
 
+
+function currentDraw(){
+  try{return store.get().draw||null;}catch{return null;}
+}
+function getFirstRoundMatches(draw){
+  if(!draw)return [];
+  return draw.rounds?.[draw.size]||[];
+}
+function validateDrawStructure(draw){
+  const issues=[],warnings=[];
+  if(!draw){issues.push('대진표가 없습니다.');return {ok:false,issues,warnings,metrics:{}};}
+  const first=getFirstRoundMatches(draw);
+  const expectedMatches=draw.size/2;
+  if(first.length!==expectedMatches)issues.push(`1회전 경기 수가 ${expectedMatches}경기가 아닙니다.`);
+  const allTeams=[];
+  let byeMatches=0, sameGroupMatches=0, emptyMatches=0, doubleEmpty=0;
+  const byeSections=new Set();
+  first.forEach((m,i)=>{
+    const a=m.teamA,b=m.teamB;
+    if(!a&&!b){doubleEmpty++;emptyMatches++;return;}
+    if(!a||!b){
+      byeMatches++;
+      byeSections.add(Math.floor(i/8)+1);
+    }
+    if(a)allTeams.push(a);
+    if(b)allTeams.push(b);
+    if(a?.groupNo&&b?.groupNo&&a.groupNo===b.groupNo)sameGroupMatches++;
+  });
+
+  const seen=new Map(),duplicates=[];
+  for(const t of allTeams){
+    const key=String(t.id||t.name);
+    seen.set(key,(seen.get(key)||0)+1);
+  }
+  for(const [key,count] of seen)if(count>1)duplicates.push(`${key} × ${count}`);
+
+  if(duplicates.length)issues.push(`중복 배치 팀 ${duplicates.length}건`);
+  if(sameGroupMatches)issues.push(`같은 조 1회전 재대결 ${sameGroupMatches}경기`);
+  if(byeMatches!==draw.byeCount)issues.push(`부전승 수 불일치: 예상 ${draw.byeCount}, 실제 ${byeMatches}`);
+  if(doubleEmpty)warnings.push(`양쪽 모두 빈 경기 ${doubleEmpty}경기`);
+  if(draw.byeCount>0){
+    const sectionCount=Math.ceil(expectedMatches/8);
+    const minSections=Math.min(sectionCount,draw.byeCount);
+    if(byeSections.size<Math.max(1,Math.floor(minSections*.6))){
+      warnings.push('부전승이 특정 구간에 몰려 있습니다.');
+    }
+  }
+
+  const firstRoundPlayable=first.filter(m=>m.teamA&&m.teamB).length;
+  const completeByes=first.filter(m=>m.bye&&m.status===STATUS.COMPLETED).length;
+  const metrics={
+    drawSize:draw.size,
+    teamCount:draw.teamCount,
+    byeCount:draw.byeCount,
+    actualByeMatches:byeMatches,
+    playableMatches:firstRoundPlayable,
+    autoAdvancedByes:completeByes,
+    sameGroupMatches,
+    duplicates:duplicates.length,
+    byeSectionCount:byeSections.size,
+    policy:draw.byePolicy||'unknown'
+  };
+  return {ok:issues.length===0,issues,warnings,metrics,duplicates};
+}
+function renderDrawValidation(result){
+  const summary=document.getElementById('drawValidationSummary');
+  const details=document.getElementById('drawValidationDetails');
+  if(!summary||!details)return;
+  const cls=result.ok?(result.warnings.length?'warn':'ok'):'bad';
+  summary.className=`draw-validation-summary ${cls}`;
+  summary.textContent=result.ok
+    ?(result.warnings.length?`검증 통과 · 주의 ${result.warnings.length}건`:'검증 통과 · 주요 오류 없음')
+    :`검증 실패 · 오류 ${result.issues.length}건`;
+
+  const m=result.metrics||{};
+  const cards=[
+    ['대진 규모',`${m.drawSize||'-'}강`,`참가 ${m.teamCount||0}팀`],
+    ['부전승',`${m.actualByeMatches??0}경기`,`예상 ${m.byeCount??0}경기`],
+    ['실제 1회전',`${m.playableMatches??0}경기`,`부전승 자동진출 ${m.autoAdvancedByes??0}`],
+    ['재대결 검사',`${m.sameGroupMatches??0}경기`,`같은 조 1위·2위`],
+    ['중복 배치',`${m.duplicates??0}건`,`동일 팀 중복 여부`],
+    ['부전승 분포',`${m.byeSectionCount??0}개 구간`,`8경기 단위 구간`],
+  ];
+  let html=cards.map(c=>`<div class="validation-card"><strong>${c[0]}: ${c[1]}</strong><small>${c[2]}</small></div>`).join('');
+  if(result.issues.length)html+=`<div class="validation-card"><strong>오류</strong><ul class="validation-list">${result.issues.map(v=>`<li>${safeText(v)}</li>`).join('')}</ul></div>`;
+  if(result.warnings.length)html+=`<div class="validation-card"><strong>주의</strong><ul class="validation-list">${result.warnings.map(v=>`<li>${safeText(v)}</li>`).join('')}</ul></div>`;
+  details.innerHTML=html;
+}
+function validateCurrentDraw(showToast=true){
+  const result=validateDrawStructure(currentDraw());
+  renderDrawValidation(result);
+  if(showToast)ui.msg(result.ok?'대진 검증을 완료했습니다.':'대진 검증에서 오류가 발견됐습니다.',result.ok?'success':'error');
+  return result;
+}
+function isDrawLocked(){
+  try{return !!store.get().drawLocked;}catch{return false;}
+}
+function syncDrawLockUI(){
+  const locked=isDrawLocked();
+  document.body.classList.toggle('draw-locked',locked);
+  const badge=document.getElementById('drawLockBadge');
+  const btn=document.getElementById('toggleDrawLockBtn');
+  if(badge){
+    badge.textContent=locked?'대진 잠금됨':'잠금 해제';
+    badge.className=`bridge-chip ${locked?'ok':'warn'}`;
+  }
+  if(btn)btn.textContent=locked?'대진 잠금 해제':'대진 잠금';
+}
+function toggleDrawLock(){
+  const locked=isDrawLocked();
+  if(!locked){
+    const result=validateCurrentDraw(false);
+    if(!result.ok){ui.msg('검증 오류가 있어 잠글 수 없습니다.','error');return;}
+  }
+  store.update(s=>{s.drawLocked=!locked;});
+  syncDrawLockUI();
+  ui.msg(!locked?'대진을 잠갔습니다.':'대진 잠금을 해제했습니다.','success');
+}
+function exportDrawAudit(){
+  const draw=currentDraw();
+  if(!draw){ui.msg('저장할 대진표가 없습니다.','error');return;}
+  const validation=validateDrawStructure(draw);
+  const report={
+    generatedAt:new Date().toISOString(),
+    version:'1.6.0',
+    validation,
+    drawSummary:{
+      id:draw.id,size:draw.size,teamCount:draw.teamCount,byeCount:draw.byeCount,
+      byePolicy:draw.byePolicy,createdAt:draw.createdAt,locked:isDrawLocked()
+    },
+    byeTeams:draw.byeTeams||[],
+    firstRound:getFirstRoundMatches(draw).map(m=>({
+      matchNo:m.matchNo,
+      teamA:m.teamA?.name||null,
+      teamB:m.teamB?.name||null,
+      teamAGroup:m.teamA?.groupNo||null,
+      teamBGroup:m.teamB?.groupNo||null,
+      bye:!!m.bye,
+      status:m.status
+    }))
+  };
+  downloadJson(`230match-draw-audit-${Date.now()}.json`,report);
+}
+function guardDrawMutation(actionName){
+  if(isDrawLocked()){
+    ui.msg(`대진이 잠겨 있어 ${actionName}을 실행할 수 없습니다.`,'error');
+    return false;
+  }
+  return true;
+}
+
 const actions={
   getState:()=>store.get(),
   newDraw(){
+    if(!guardDrawMutation('새 본선 추첨'))return;
     const size=Number(document.getElementById('drawSize').value);
     const count=Number(document.getElementById('courtCount').value);
     const prefix=document.getElementById('courtPrefix').value.trim()||'국제';
     store.set(initialState(size,count,prefix));ui.msg(`${size}팀 본선 대진을 새로 생성했습니다.`,'success');
   },
   assign(){store.update(s=>initialAssign(s));ui.msg('코트별 시합중 1경기, 대기1 1경기까지 균등 배정했습니다.','success');},
-  refreshQueue(){store.update(s=>{enqueueNewReadyMatches(s);refreshQueue(s);});ui.msg('본선 큐를 갱신했습니다.','success');},
+  refreshQueue(){
+    if(!guardDrawMutation('본선 큐 갱신'))return;store.update(s=>{enqueueNewReadyMatches(s);refreshQueue(s);});ui.msg('본선 큐를 갱신했습니다.','success');},
   toggleAuto(){store.update(s=>{s.autoAssign=!s.autoAssign;});},
   resetDemo(){store.clear();store.set(initialState());ui.msg('데모 데이터를 초기화했습니다.','info');},
   export(){downloadJson(`230match-main-v2-${Date.now()}.json`,store.get());},
@@ -933,6 +1090,7 @@ const actions={
     }catch(e){ui.msg(e.message,'error');}
   },
   importTeamText(){
+    if(!guardDrawMutation('실제 명단 적용'))return;
     try{
       const size=Number(document.getElementById('drawSize').value);
       const teams=parseTeamLines(document.getElementById('teamImportText').value);
@@ -977,6 +1135,9 @@ document.getElementById('teamFileInput').onchange=async(e)=>{
   try{await loadTeamFile(file);}catch(err){ui.msg(err.message,'error');}
   e.target.value='';
 };
+document.getElementById('validateDrawBtn').onclick=()=>validateCurrentDraw(true);
+document.getElementById('toggleDrawLockBtn').onclick=toggleDrawLock;
+document.getElementById('exportDrawAuditBtn').onclick=exportDrawAudit;
 document.getElementById('load100TestTeamsBtn').onclick=async()=>{
   try{await load100TestTeams();}catch(err){ui.msg(err.message,'error');}
 };
@@ -984,5 +1145,6 @@ document.getElementById('buildRankedTeamsBtn').onclick=()=>copyCandidateToText(t
 document.getElementById('copyCandidateTextBtn').onclick=()=>copyCandidateToText(false);
 store.subscribe(state=>ui.render(state));
 if(!store.load()) store.emit();
-console.info(`[MAIN-V2] engine 1.5.0 balanced group-winner bye loaded`);
+setTimeout(()=>{syncDrawLockUI();if(currentDraw())validateCurrentDraw(false);},0);
+console.info(`[MAIN-V2] engine 1.6.0 draw validation and lock loaded`);
 
