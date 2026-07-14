@@ -57109,403 +57109,142 @@ if(false) setTimeout(function(){
 window.__MAIN_V2_EMBEDDED__=true;
 (function(){
   'use strict';
-  function ge(id){return document.getElementById(id);}
 
-  var stableRoot=null;
-  var stableModeBar=null;
-  var lastMode='prelim';
+  function ge(id){ return document.getElementById(id); }
 
-  function captureStableNodes(){
-    stableRoot=stableRoot||ge('mainV2EmbeddedRoot');
-    stableModeBar=stableModeBar||ge('mainV2ModeBar');
+  function getBracketPage(){
+    return ge('page-bracket');
   }
 
-  function ensureStableMount(){
-    captureStableNodes();
-    var page=ge('page-bracket');
-    if(!page)return false;
+  function setFinalMode(enabled){
+    var page=getBracketPage();
+    if(!page || !page.classList.contains('active')) enabled=false;
 
-    if(stableModeBar && !stableModeBar.isConnected){
-      var sec=page.querySelector('.sec-title');
-      if(sec && sec.nextSibling) page.insertBefore(stableModeBar,sec.nextSibling);
-      else page.insertBefore(stableModeBar,page.firstChild);
-    }
-
-    if(stableRoot && !stableRoot.isConnected){
-      var anchor=ge('bracketContent');
-      if(anchor) page.insertBefore(stableRoot,anchor);
-      else page.appendChild(stableRoot);
-    }
-    return !!(stableRoot&&stableRoot.isConnected&&stableModeBar&&stableModeBar.isConnected);
-  }
-
-  function setMode(mode){
-    ensureStableMount();
-    var page=ge('page-bracket');
-    var bracketActive=!!(page&&page.classList.contains('active'));
-    var isFinal=mode==='final' && bracketActive;
-    var root=stableRoot||ge('mainV2EmbeddedRoot');
+    var root=ge('mainV2EmbeddedRoot');
     var legacy=ge('bracketContent');
-    var legacyHost=ge('v1051MainPanelHost');
+    var host=ge('v1051MainPanelHost');
     var exportBar=ge('bracketExportBar');
 
-    // 절대 빈 화면이 되지 않도록 V2 루트가 없으면 예선 화면으로 강제 복귀
-    if(isFinal && (!root || !root.isConnected)){
-      isFinal=false;
-      mode='prelim';
-    }
+    if(root) root.style.setProperty('display',enabled?'block':'none','important');
+    if(legacy) legacy.style.setProperty('display',enabled?'none':'block','important');
 
-    if(root)root.style.setProperty('display',isFinal?'block':'none','important');
-    if(legacy)legacy.style.setProperty('display',isFinal?'none':'block','important');
-    if(legacyHost)legacyHost.style.setProperty('display','block','important');
-    if(exportBar)exportBar.style.setProperty('display',isFinal?'none':'flex','important');
+    // 기존 앱 공용 호스트는 절대 숨기지 않습니다.
+    if(host) host.style.setProperty('display','block','important');
+    if(exportBar) exportBar.style.setProperty('display',enabled?'none':'flex','important');
 
-    var prelimBtn=stableModeBar?.querySelector('#mainV2PrelimModeBtn')||ge('mainV2PrelimModeBtn');
-    var finalBtn=stableModeBar?.querySelector('#mainV2FinalModeBtn')||ge('mainV2FinalModeBtn');
-    prelimBtn?.classList.toggle('active',!isFinal);
-    finalBtn?.classList.toggle('active',isFinal);
+    ge('mainV2PrelimModeBtn')?.classList.toggle('active',!enabled);
+    ge('mainV2FinalModeBtn')?.classList.toggle('active',enabled);
 
-    lastMode=isFinal?'final':'prelim';
-    try{localStorage.setItem('230match-bracket-mode',lastMode);}catch(e){}
-
-    if(isFinal){
+    if(enabled){
       setTimeout(function(){
-        try{window.mainV2SyncLegacySelection&&window.mainV2SyncLegacySelection();}catch(e){}
-      },220);
+        try{
+          window.mainV2SyncLegacySelection && window.mainV2SyncLegacySelection();
+        }catch(e){
+          console.warn('[MAIN-V2-INTEGRATION] selection sync failed',e);
+        }
+      },150);
     }
   }
-
-  window.mainV2ShowPrelim=function(){setMode('prelim');};
-  window.mainV2ShowFinal=function(){setMode('final');};
 
   function loadCurrentQualifiers(){
     try{
-      window.mainV2SyncLegacySelection&&window.mainV2SyncLegacySelection();
+      window.mainV2SyncLegacySelection && window.mainV2SyncLegacySelection();
       setTimeout(function(){
-        var btn=ge('applyLegacyQualifiersBtn');
-        if(btn)btn.click();
-      },160);
-    }catch(e){console.error(e);}
-  }
-
-  function bindStableButtons(){
-    ensureStableMount();
-    var prelimBtn=stableModeBar?.querySelector('#mainV2PrelimModeBtn')||ge('mainV2PrelimModeBtn');
-    var finalBtn=stableModeBar?.querySelector('#mainV2FinalModeBtn')||ge('mainV2FinalModeBtn');
-    var backBtn=stableRoot?.querySelector('#mainV2BackToPrelimBtn')||ge('mainV2BackToPrelimBtn');
-    var loadBtn=stableRoot?.querySelector('#mainV2LoadCurrentQualifiersBtn')||ge('mainV2LoadCurrentQualifiersBtn');
-
-    if(prelimBtn && !prelimBtn.dataset.v1161Bound){
-      prelimBtn.dataset.v1161Bound='1';
-      prelimBtn.addEventListener('click',function(){setMode('prelim');});
-    }
-    if(finalBtn && !finalBtn.dataset.v1161Bound){
-      finalBtn.dataset.v1161Bound='1';
-      finalBtn.addEventListener('click',function(){setMode('final');});
-    }
-    if(backBtn && !backBtn.dataset.v1161Bound){
-      backBtn.dataset.v1161Bound='1';
-      backBtn.addEventListener('click',function(){setMode('prelim');});
-    }
-    if(loadBtn && !loadBtn.dataset.v1161Bound){
-      loadBtn.dataset.v1161Bound='1';
-      loadBtn.addEventListener('click',loadCurrentQualifiers);
+        ge('applyLegacyQualifiersBtn')?.click();
+      },120);
+    }catch(e){
+      console.error(e);
     }
   }
 
-  function watchdog(){
-    var mounted=ensureStableMount();
-    bindStableButtons();
-
-    var page=ge('page-bracket');
-    if(!page || !page.classList.contains('active')){
-      var rootAway=stableRoot||ge('mainV2EmbeddedRoot');
-      var legacyAway=ge('bracketContent');
-      var hostAway=ge('v1051MainPanelHost');
-      if(rootAway)rootAway.style.setProperty('display','none','important');
-      if(legacyAway)legacyAway.style.setProperty('display','block','important');
-      if(hostAway)hostAway.style.setProperty('display','block','important');
+  function proxyClick(sourceId){
+    var source=ge(sourceId);
+    if(!source){
+      var notice=ge('mainV2OperationNotice');
+      if(notice){
+        notice.textContent='기능을 찾지 못했습니다: '+sourceId;
+        notice.classList.add('error');
+      }
       return;
     }
-
-    var root=stableRoot;
-    var legacy=ge('bracketContent');
-    var host=ge('v1051MainPanelHost');
-    var allHidden=
-      (!root || getComputedStyle(root).display==='none') &&
-      (!legacy || getComputedStyle(legacy).display==='none') &&
-      (!host || getComputedStyle(host).display==='none');
-
-    if(allHidden){
-      setMode('prelim');
-    }else if(mounted){
-      setMode(lastMode);
-    }
+    source.click();
   }
 
-  function boot(){
-    captureStableNodes();
-    ensureStableMount();
-    bindStableButtons();
+  function bindOnce(id,handler){
+    var el=ge(id);
+    if(!el || el.dataset.v1173Bound==='1') return;
+    el.dataset.v1173Bound='1';
+    el.addEventListener('click',handler);
+  }
 
-    // 새로고침·다른 메뉴 진입 때 본선 모드를 자동 복원하지 않습니다.
-    // 기존 앱 전체 화면이 사라지는 것을 막기 위해 항상 예선 모드로 시작합니다.
-    lastMode='prelim';
-    try{localStorage.setItem('230match-bracket-mode','prelim');}catch(e){}
-    setMode('prelim');
+  function bindButtons(){
+    bindOnce('mainV2PrelimModeBtn',function(){ setFinalMode(false); });
+    bindOnce('mainV2FinalModeBtn',function(){ setFinalMode(true); });
+    bindOnce('mainV2BackToPrelimBtn',function(){ setFinalMode(false); });
+    bindOnce('mainV2LoadCurrentQualifiersBtn',loadCurrentQualifiers);
 
-    var brTS=ge('brTS');
-    if(brTS)brTS.addEventListener('change',function(){
-      if(lastMode==='final'){
-        setTimeout(function(){window.mainV2SyncLegacySelection&&window.mainV2SyncLegacySelection();},180);
+    var proxies={
+      opNewDrawBtn:'newDrawBtn',
+      opAssignBtn:'assignBtn',
+      opAutoBtn:'autoBtn',
+      opValidateBtn:'validateDrawBtn',
+      opLockBtn:'toggleDrawLockBtn',
+      opRecoveryBtn:'saveRecoveryNowBtn'
+    };
+    Object.keys(proxies).forEach(function(proxyId){
+      bindOnce(proxyId,function(){ proxyClick(proxies[proxyId]); });
+    });
+
+    bindOnce('opDeveloperToolsBtn',function(){
+      document.body.classList.toggle('main-v2-show-developer-tools');
+      var btn=ge('opDeveloperToolsBtn');
+      if(btn){
+        btn.textContent=document.body.classList.contains('main-v2-show-developer-tools')
+          ?'개발도구 숨기기':'개발도구';
       }
     });
-    var divBox=ge('brMultiDiv');
-    if(divBox)divBox.addEventListener('click',function(){
-      if(lastMode==='final'){
-        setTimeout(function(){window.mainV2SyncLegacySelection&&window.mainV2SyncLegacySelection();},200);
-      }
-    });
+  }
 
-    [300,700,1300,2200,4000].forEach(function(ms){
-      setTimeout(function(){
-        ensureStableMount();
-        bindStableButtons();
-        var page=ge('page-bracket');
-        if(page&&page.classList.contains('active')) setMode(lastMode);
-      },ms);
-    });
-    setInterval(watchdog,900);
+  function onTopNavClick(event){
+    var tab=event.target.closest('.nav-tab[data-page]');
+    if(!tab) return;
 
-    
-    function proxyClick(sourceId){
-      var source=ge(sourceId);
-      if(!source){
-        var notice=ge('mainV2OperationNotice');
-        if(notice){
-          notice.textContent='필요한 본선 기능을 찾지 못했습니다: '+sourceId;
-          notice.classList.add('error');
-        }
-        return;
-      }
-      source.click();
-      setTimeout(updateOperationNotice,120);
-    }
-
-    function updateOperationNotice(){
-      var notice=ge('mainV2OperationNotice');
-      if(!notice)return;
-      var total=Number(ge('totalMatches')?.textContent||0);
-      var completed=Number(ge('completedMatches')?.textContent||0);
-      var playing=Number(ge('playingMatches')?.textContent||0);
-      var wait1=Number(ge('wait1Matches')?.textContent||0);
-      var shared=Number(ge('sharedMatches')?.textContent||0);
-
-      notice.classList.remove('error','success');
-      if(!total){
-        notice.textContent='예선 진출팀이 확정되면 본선 추첨을 실행하세요.';
+    // 기존 앱 메뉴 처리 후 본선 임베디드 화면만 정리합니다.
+    setTimeout(function(){
+      if(tab.dataset.page!=='bracket'){
+        setFinalMode(false);
       }else{
-        notice.textContent='본선 '+completed+'/'+total+' 완료 · 시합중 '+playing+' · 코트대기1 '+wait1+' · 공용대기 '+shared;
-        notice.classList.add('success');
+        bindButtons();
       }
-
-      var autoSource=ge('autoBtn');
-      var autoProxy=ge('opAutoBtn');
-      if(autoSource&&autoProxy){
-        autoProxy.textContent=String(autoSource.textContent||'').includes('OFF')?'자동배정 OFF':'자동배정 ON';
-        autoProxy.classList.toggle('on',!String(autoSource.textContent||'').includes('OFF'));
-      }
-      var lockSource=ge('toggleDrawLockBtn');
-      var lockProxy=ge('opLockBtn');
-      if(lockSource&&lockProxy){
-        lockProxy.textContent=lockSource.textContent||'대진 잠금';
-      }
-    }
-
-    function bindOperationToolbar(){
-      var map={
-        opNewDrawBtn:'newDrawBtn',
-        opAssignBtn:'assignBtn',
-        opAutoBtn:'autoBtn',
-        opValidateBtn:'validateDrawBtn',
-        opLockBtn:'toggleDrawLockBtn',
-        opRecoveryBtn:'saveRecoveryNowBtn'
-      };
-      Object.keys(map).forEach(function(proxyId){
-        var proxy=ge(proxyId);
-        if(proxy&&!proxy.dataset.stage1Bound){
-          proxy.dataset.stage1Bound='1';
-          proxy.addEventListener('click',function(){proxyClick(map[proxyId]);});
-        }
-      });
-
-      var devBtn=ge('opDeveloperToolsBtn');
-      if(devBtn&&!devBtn.dataset.stage1Bound){
-        devBtn.dataset.stage1Bound='1';
-        devBtn.addEventListener('click',function(){
-          document.body.classList.toggle('main-v2-show-developer-tools');
-          devBtn.textContent=document.body.classList.contains('main-v2-show-developer-tools')
-            ?'개발도구 숨기기':'개발도구';
-        });
-      }
-    }
-
-    setInterval(function(){
-      if(lastMode==='final'){
-        bindOperationToolbar();
-        updateOperationNotice();
-      }
-    },900);
-
-
-    console.log('[MAIN-V2-INTEGRATION] v1.17.2 page visibility guard loaded');
-  }
-
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});
-  else boot();
-})();
-</script>
-<link rel="stylesheet" href="./assets/css/main-v2-embedded.css?v=1172">
-<script src="./assets/js/main-v2.bundle.js?v=1172"></script>
-
-
-<style id="v1172PageVisibilityGuardStyle">
-/* V1.17.2: 기존 페이지 슬라이더/렌더 패치 충돌 방지 */
-main.main-content{
-  display:block!important;
-  visibility:visible!important;
-  opacity:1!important;
-  min-height:420px!important;
-  overflow:visible!important;
-}
-main.main-content .page-viewport,
-main.main-content .page-slider{
-  display:block!important;
-  width:100%!important;
-  max-width:100%!important;
-  min-width:0!important;
-  height:auto!important;
-  min-height:0!important;
-  overflow:visible!important;
-  transform:none!important;
-  transition:none!important;
-  visibility:visible!important;
-  opacity:1!important;
-}
-main.main-content .page{
-  display:none!important;
-  position:relative!important;
-  inset:auto!important;
-  width:100%!important;
-  max-width:100%!important;
-  min-width:0!important;
-  height:auto!important;
-  min-height:0!important;
-  transform:none!important;
-  visibility:visible!important;
-  opacity:1!important;
-}
-main.main-content .page.active{
-  display:block!important;
-}
-#page-home.active,
-#page-tournament.active,
-#page-register.active,
-#page-bracket.active,
-#page-players.active,
-#page-ranking.active{
-  display:block!important;
-  visibility:visible!important;
-  opacity:1!important;
-}
-</style>
-<script id="v1172PageVisibilityGuardScript">
-(function(){
-  'use strict';
-
-  function activeName(){
-    var active=document.querySelector('.nav-tab.active[data-page]');
-    return active?.dataset?.page || document.querySelector('.page.active')?.id?.replace('page-','') || 'home';
-  }
-
-  function forcePage(name){
-    var page=document.getElementById('page-'+name);
-    if(!page) return false;
-
-    document.querySelectorAll('main.main-content .page').forEach(function(p){
-      var on=p===page;
-      p.classList.toggle('active',on);
-      p.style.setProperty('display',on?'block':'none','important');
-      p.style.setProperty('visibility','visible','important');
-      p.style.setProperty('opacity','1','important');
-      p.style.setProperty('transform','none','important');
-      p.style.setProperty('position','relative','important');
-      p.style.setProperty('width','100%','important');
-      p.style.setProperty('height','auto','important');
-    });
-
-    var main=document.querySelector('main.main-content');
-    var viewport=document.getElementById('pageViewport');
-    var slider=document.getElementById('pageSlider');
-    [main,viewport,slider].forEach(function(el){
-      if(!el)return;
-      el.style.setProperty('display','block','important');
-      el.style.setProperty('visibility','visible','important');
-      el.style.setProperty('opacity','1','important');
-      el.style.setProperty('transform','none','important');
-      el.style.setProperty('height','auto','important');
-      el.style.setProperty('min-height','0','important');
-      el.style.setProperty('overflow','visible','important');
-      el.style.setProperty('width','100%','important');
-    });
-
-    document.querySelectorAll('.nav-tab[data-page]').forEach(function(tab){
-      tab.classList.toggle('active',tab.dataset.page===name);
-    });
-    document.querySelectorAll('.swipe-dot[data-page]').forEach(function(dot){
-      dot.classList.toggle('active',dot.dataset.page===name);
-    });
-    return true;
-  }
-
-  function guard(){
-    var name=activeName();
-    if(!forcePage(name)) forcePage('home');
-
-    var active=document.getElementById('page-'+name);
-    if(active && active.getBoundingClientRect().height<40){
-      active.style.setProperty('min-height','420px','important');
-      Array.from(active.children).forEach(function(child){
-        if(child.id!=='mainV2EmbeddedRoot'){
-          child.style.removeProperty('display');
-          child.style.setProperty('visibility','visible','important');
-          child.style.setProperty('opacity','1','important');
-        }
-      });
-    }
+    },0);
   }
 
   function boot(){
-    // 저장된 본선 화면 복원값을 제거하여 항상 기존 앱 화면부터 시작
-    try{localStorage.setItem('230match-bracket-mode','prelim');}catch(e){}
-    forcePage(activeName());
+    // 자동 복원과 반복 감시는 사용하지 않습니다.
+    try{ localStorage.setItem('230match-bracket-mode','prelim'); }catch(e){}
 
-    document.querySelectorAll('.nav-tab[data-page]').forEach(function(tab){
-      if(tab.dataset.v1172Bound==='1')return;
-      tab.dataset.v1172Bound='1';
-      tab.addEventListener('click',function(){
-        setTimeout(function(){forcePage(tab.dataset.page);},0);
-        setTimeout(function(){forcePage(tab.dataset.page);},120);
-        setTimeout(function(){forcePage(tab.dataset.page);},500);
-      },true);
+    bindButtons();
+    setFinalMode(false);
+
+    document.addEventListener('click',onTopNavClick,false);
+
+    ge('brTS')?.addEventListener('change',function(){
+      if(ge('mainV2EmbeddedRoot')?.style.display==='block'){
+        setTimeout(function(){
+          window.mainV2SyncLegacySelection && window.mainV2SyncLegacySelection();
+        },120);
+      }
     });
 
-    [0,100,300,700,1400,2500,4500].forEach(function(ms){
-      setTimeout(guard,ms);
+    ge('brMultiDiv')?.addEventListener('click',function(){
+      if(ge('mainV2EmbeddedRoot')?.style.display==='block'){
+        setTimeout(function(){
+          window.mainV2SyncLegacySelection && window.mainV2SyncLegacySelection();
+        },150);
+      }
     });
-    setInterval(guard,1200);
 
-    console.log('[PAGE-GUARD] v1.17.2 active page visibility guard loaded');
+    console.log('[MAIN-V2-INTEGRATION] v1.17.3 event-safe UI loaded');
   }
 
   if(document.readyState==='loading'){
@@ -57515,6 +57254,8 @@ main.main-content .page.active{
   }
 })();
 </script>
+<link rel="stylesheet" href="./assets/css/main-v2-embedded.css?v=1173">
+<script src="./assets/js/main-v2.bundle.js?v=1173"></script>
 
 </body>
 </html>

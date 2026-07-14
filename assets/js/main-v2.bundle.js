@@ -3161,7 +3161,7 @@ setTimeout(()=>{
   }
   if(currentDraw())validateCurrentDraw(false);
 },0);
-console.info(`[MAIN-V2] engine 1.17.2 embedded operation cleanup loaded`);
+console.info(`[MAIN-V2] engine 1.17.3 event-safe embedded operation loaded`);
 
 
 setTimeout(()=>{
