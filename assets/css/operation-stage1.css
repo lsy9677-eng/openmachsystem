@@ -1,0 +1,30 @@
+
+/*
+  V1.17.4 Stage 1
+  기존 안정본의 화면/버튼/렌더러에는 개입하지 않습니다.
+  실제 운영에서 불필요한 중복 V2 임베디드 UI가 없는 안정본 기준입니다.
+*/
+html.operation-stage1-stable body {
+  --operation-stage1-version: "1.17.4";
+}
+
+/* 기존 앱의 운영 UI는 그대로 유지 */
+#page-bracket,
+#page-home,
+#page-tournament,
+#page-register,
+#page-players,
+#page-ranking {
+  visibility: visible;
+}
+
+/* 과거 통합본 잔재가 브라우저 캐시에 남아 있어도 숨김 */
+#mainV2EmbeddedRoot,
+#mainV2ModeBar,
+#mainV2OperationToolbar,
+#mainV2OperationNotice,
+#mainV2IntegratedLauncher {
+  display: none !important;
+}
+
+/* 기존 페이지 슬라이더와 클릭 이벤트는 원본 동작 그대로 사용 */
