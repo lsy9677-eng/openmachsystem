@@ -2,7 +2,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '1.21.0';
+  const VERSION = '1.21.2';
 
   const $ = (id) => document.getElementById(id);
   const clone = (v) => JSON.parse(JSON.stringify(v));
@@ -22,10 +22,26 @@
     const map = new Map();
     asArray(state.importedTeams).forEach((team, index) => {
       const id = text(team.id || team.teamId || `team_${index + 1}`);
+      const nestedPlayers = [
+        team.player1,
+        team.player2,
+        team.p1,
+        team.p2
+      ].filter(Boolean).map((p) => typeof p === 'string' ? p : (p.name || p.playerName || p.label || '')).filter(Boolean);
+
       map.set(id, {
         id,
-        name: text(team.name || team.teamName || team.label || `팀 ${index + 1}`),
-        affiliation: text(team.affiliation || team.club || team.org || ''),
+        name: text(
+          team.name ||
+          team.teamName ||
+          team.label ||
+          team.displayName ||
+          team.playersText ||
+          team.nm ||
+          nestedPlayers.join(' / ') ||
+          `팀 ${index + 1}`
+        ),
+        affiliation: text(team.affiliation || team.club || team.org || team.teamClub || ''),
         seed: Number(team.seed || 0),
         groupNo: Number(team.groupNo || 0),
         groupRank: Number(team.groupRank || 0)
@@ -34,9 +50,45 @@
     return map;
   }
 
-  function teamSummary(id, teams) {
-    if (!id) return null;
-    return teams.get(String(id)) || { id: String(id), name: String(id), affiliation: '' };
+  function teamSummary(value, teams) {
+    if (!value) return null;
+
+    if (typeof value === 'object') {
+      const rawId = value.id || value.teamId || value.key || value.uid || '';
+      const mapped = rawId ? teams.get(String(rawId)) : null;
+      if (mapped) return mapped;
+
+      const players = [
+        value.player1,
+        value.player2,
+        value.p1,
+        value.p2
+      ].filter(Boolean);
+
+      const playerText = players.map((p) => {
+        if (typeof p === 'string') return p;
+        return p.name || p.playerName || p.label || '';
+      }).filter(Boolean).join(' / ');
+
+      const name =
+        value.name ||
+        value.teamName ||
+        value.label ||
+        value.displayName ||
+        value.playersText ||
+        value.nm ||
+        playerText ||
+        (rawId ? String(rawId) : '팀명 없음');
+
+      return {
+        id: rawId ? String(rawId) : '',
+        name: String(name),
+        affiliation: String(value.affiliation || value.club || value.org || value.teamClub || '')
+      };
+    }
+
+    const key = String(value);
+    return teams.get(key) || { id: key, name: key, affiliation: '' };
   }
 
   function validatePackage(pkg) {
