@@ -9,7 +9,7 @@ export function render(state,handlers){
   setText('summaryTeams',`${state.teams.length}팀`);setText('summaryRound',currentRound(state));setText('summaryPlaying',playing);
   setText('summaryWait1',state.courts.filter(c=>c.wait1).length);setText('summaryShared',state.sharedQueue.length);
   setText('sharedQueueCount',`${state.sharedQueue.length}경기`);
-  renderCourts(state,handlers);renderQueue(state);renderBracket(state);renderLogs(state);
+  renderCourts(state,handlers);renderQueue(state);renderPrelim(state,handlers);renderBracket(state);renderLogs(state);
 }
 function setText(id,value){const el=document.getElementById(id);if(el)el.textContent=value;}
 function currentRound(state){
@@ -47,4 +47,37 @@ function statusText(s){return({waiting_slots:'대진 대기',ready:'배정 대�
 function renderLogs(state){
   const root=document.getElementById('logList');
   root.innerHTML=state.logs.length?state.logs.map(x=>`<article class="log-item"><time>${new Date(x.at).toLocaleString('ko-KR')}</time><p>${x.message}</p></article>`).join(''):'<div class="empty-state"><p>운영 로그가 없습니다.</p></div>';
+}
+
+function renderPrelim(state,handlers){
+  const prelim=state.prelim||{groups:[],matches:[],qualifiers:[]};
+  setText('prelimSummaryGroups',`${prelim.groups.length}조`);
+  setText('prelimSummaryMatches',prelim.matches.length);
+  setText('prelimSummaryCompleted',prelim.matches.filter(m=>m.status==='completed').length);
+  setText('prelimSummaryFirst',prelim.qualifiers.filter(t=>t.groupRank===1).length);
+  setText('prelimSummarySecond',prelim.qualifiers.filter(t=>t.groupRank===2).length);
+  setText('prelimSummaryQualifiers',`${prelim.qualifiers.length}팀`);
+  const root=document.getElementById('prelimGroupGrid');
+  if(!root)return;
+  if(!prelim.groups.length){
+    root.className='prelim-group-grid empty-state';
+    root.innerHTML='<p>예선 조편성을 생성하면 조별 카드가 표시됩니다.</p>';
+    return;
+  }
+  root.className='prelim-group-grid';
+  root.innerHTML=prelim.groups.map(group=>{
+    const matches=prelim.matches.filter(m=>m.groupId===group.id);
+    return `<article class="prelim-group-card">
+      <header><strong>${group.groupNo}조</strong><span>${group.court||'코트 미배정'}</span></header>
+      <table class="prelim-team-table"><thead><tr><th>순위</th><th>팀</th><th>승</th><th>패</th><th>득실</th></tr></thead><tbody>
+      ${group.standings.map(s=>`<tr class="${s.qualified?'qualifier':''}"><td>${s.rank}</td><td>${teamText(s.team)}</td><td>${s.wins}</td><td>${s.losses}</td><td>${s.diff>0?'+':''}${s.diff}</td></tr>`).join('')}
+      </tbody></table>
+      <div class="prelim-match-list">
+      ${matches.map(m=>`<div class="prelim-match"><div class="prelim-match-top"><span>${m.matchNo}경기</span><span>${m.court||'-'} · ${m.status==='completed'?'완료':'대기'}</span></div>
+      <b>${teamText(m.teamA)} vs ${teamText(m.teamB)}</b>
+      <em>${m.status==='completed'?`${m.scoreA}:${m.scoreB} · 승리 ${teamText(m.winner)}`:'결과 미입력'}</em>
+      <button class="btn btn-secondary" data-prelim-result="${m.id}">${m.status==='completed'?'결과 수정':'결과 입력'}</button></div>`).join('')}
+      </div></article>`;
+  }).join('');
+  root.querySelectorAll('[data-prelim-result]').forEach(b=>b.addEventListener('click',()=>handlers.openPrelimResult(b.dataset.prelimResult)));
 }

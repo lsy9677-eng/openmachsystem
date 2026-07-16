@@ -7,7 +7,12 @@ export function initialState(){
     schemaVersion:'230match-v3-stage1',
     tournament:{name:'230스포츠미디어배 테스트',division:'부경신인부'},
     settings:{drawSize:64,courtCount:8,courtPrefix:'국제',matchMinutes:30},
-    teams:[],draw:{size:0,rounds:{}},courts:[],sharedQueue:[],
+    teams:[],
+    prelim:{
+      settings:{threeTeamGroups:32,twoTeamGroups:2,courtCount:8,courtPrefix:'국제',qualifiersPerGroup:2},
+      groups:[],matches:[],courts:[],qualifiers:[]
+    },
+    draw:{size:0,rounds:{}},courts:[],sharedQueue:[],
     logs:[],updatedAt:null
   };
 }

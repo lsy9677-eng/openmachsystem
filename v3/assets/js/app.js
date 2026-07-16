@@ -3,14 +3,15 @@ import{loadState,saveState,clearState,saveRecovery,getRecoveries,deleteRecovery,
 import{prepareTeams,generateDraw,allMatches,findMatch}from'./bracket-engine.js';
 import{buildCourts,assignInitial,queueReadyMatches}from'./court-engine.js';
 import{submitResult}from'./result-engine.js';
+import{ensurePrelimState,generatePrelim,assignPrelimCourts,findPrelimMatch,submitPrelimResult,resetPrelim}from'./prelim-engine.js';
 import{downloadJson}from'./recovery.js';
 import{render,teamText}from'./ui.js';
 
-let state=loadState();
+let state=loadState();ensurePrelimState(state);
 const $=id=>document.getElementById(id);
 function log(message){state.logs.unshift({at:new Date().toISOString(),message});state.logs=state.logs.slice(0,300);}
 function commit(message){
-  if(message)log(message);syncInputs();saveState(state);render(state,{openResult});flashSaved();
+  if(message)log(message);syncInputs();saveState(state);render(state,{openResult,openPrelimResult});flashSaved();
 }
 function syncInputs(){
   $('tournamentName').value=state.tournament.name;$('divisionName').value=state.tournament.division;
@@ -58,6 +59,64 @@ function confirmResult(event){
 function refreshQueue(){
   queueReadyMatches(state,id=>findMatch(state.draw,id));commit('준비 경기 큐 재정렬');notice('준비 경기 큐를 재정렬했습니다.','success');
 }
+
+function prelimNotice(message,type='info'){$('prelimNoticeBar').className=`notice ${type}`;$('prelimNoticeBar').textContent=message;}
+function pullPrelimSettings(){
+  ensurePrelimState(state);
+  state.prelim.settings.threeTeamGroups=Number($('threeTeamGroupCount').value);
+  state.prelim.settings.twoTeamGroups=Number($('twoTeamGroupCount').value);
+  state.prelim.settings.courtCount=Number($('prelimCourtCount').value);
+  state.prelim.settings.courtPrefix=$('prelimCourtPrefix').value.trim()||'코트';
+  state.prelim.settings.qualifiersPerGroup=Number($('qualifiersPerGroup').value);
+}
+function syncPrelimInputs(){
+  ensurePrelimState(state);
+  $('threeTeamGroupCount').value=state.prelim.settings.threeTeamGroups;
+  $('twoTeamGroupCount').value=state.prelim.settings.twoTeamGroups;
+  $('prelimCourtCount').value=state.prelim.settings.courtCount;
+  $('prelimCourtPrefix').value=state.prelim.settings.courtPrefix;
+  $('qualifiersPerGroup').value=String(state.prelim.settings.qualifiersPerGroup);
+}
+function createPrelim(){
+  pullPrelimSettings();
+  const result=generatePrelim(state,state.prelim.settings);
+  commit(`예선 조편성 생성 · ${result.groups}조 · ${result.matches}경기 · ${result.teams}팀`);
+  prelimNotice(`${result.groups}개 조와 ${result.matches}경기를 생성했습니다.`,'success');
+}
+function assignPrelim(){
+  pullPrelimSettings();
+  const courts=assignPrelimCourts(state);
+  commit(`예선 코트 ${courts.length}면 배정`);
+  prelimNotice(`예선 조를 ${courts.length}개 코트에 배정했습니다.`,'success');
+}
+function openPrelimResult(matchId){
+  const m=findPrelimMatch(state,matchId);if(!m)return;
+  $('prelimResultMatchId').value=matchId;
+  $('prelimResultMatchLabel').textContent=`${teamText(m.teamA)} vs ${teamText(m.teamB)}`;
+  $('prelimWinnerSelect').innerHTML=`<option value="${m.teamA.id}">${teamText(m.teamA)}</option><option value="${m.teamB.id}">${teamText(m.teamB)}</option>`;
+  $('prelimScoreA').value=m.scoreA??6;$('prelimScoreB').value=m.scoreB??3;
+  $('prelimResultDialog').showModal();
+}
+function confirmPrelimResult(event){
+  event.preventDefault();
+  const m=submitPrelimResult(state,{matchId:$('prelimResultMatchId').value,winnerId:$('prelimWinnerSelect').value,scoreA:$('prelimScoreA').value,scoreB:$('prelimScoreB').value});
+  commit(`예선 결과 확정 · ${m.id} · 승리 ${teamText(m.winner)} · ${m.scoreA}:${m.scoreB}`);
+  $('prelimResultDialog').close();
+  prelimNotice('예선 순위와 진출팀을 다시 계산했습니다.','success');
+}
+function resetPrelimOnly(){
+  if(!confirm('예선 조편성·결과·순위를 모두 초기화할까요?'))return;
+  resetPrelim(state);commit('예선만 초기화');prelimNotice('예선 데이터를 초기화했습니다.','info');
+}
+function useQualifiersForDraw(){
+  ensurePrelimState(state);
+  if(!state.prelim.qualifiers.length)throw new Error('확정된 예선 진출팀이 없습니다.');
+  state.teams=structuredClone(state.prelim.qualifiers);
+  commit(`예선 진출팀 ${state.teams.length}팀을 본선 명단으로 전환`);
+  notice(`예선 진출팀 ${state.teams.length}팀을 본선 명단으로 사용합니다.`,'success');
+  document.querySelector('[data-view="operation"]').click();
+}
+
 function hardReset(){
   if(!confirm('V3의 현재 명단·대진·결과를 모두 초기화할까요?'))return;
   clearState();state=initialState();commit('전체 초기화');notice('초기화했습니다.','info');
@@ -76,12 +135,17 @@ function bind(){
   $('assignCourtsBtn').onclick=()=>{try{assign();}catch(e){notice(e.message,'error');}};
   $('refreshQueueBtn').onclick=refreshQueue;$('resetBtn').onclick=hardReset;
   $('confirmResultBtn').onclick=confirmResult;
+  $('generatePrelimBtn').onclick=()=>{try{createPrelim();}catch(e){prelimNotice(e.message,'error');}};
+  $('assignPrelimCourtsBtn').onclick=()=>{try{assignPrelim();}catch(e){prelimNotice(e.message,'error');}};
+  $('confirmPrelimResultBtn').onclick=confirmPrelimResult;
+  $('resetPrelimBtn').onclick=resetPrelimOnly;
+  $('useQualifiersForDrawBtn').onclick=()=>{try{useQualifiersForDraw();}catch(e){prelimNotice(e.message,'error');}};
   $('exportJsonBtn').onclick=()=>downloadJson(`230match-v3-${Date.now()}.json`,state);
-  $('saveRecoveryBtn').onclick=()=>{const item=saveRecovery(state,`${state.tournament.name} · ${state.tournament.division}`);log(`복구점 저장 · ${item.label}`);saveState(state);render(state,{openResult});notice('복구점을 저장했습니다.','success');};
+  $('saveRecoveryBtn').onclick=()=>{const item=saveRecovery(state,`${state.tournament.name} · ${state.tournament.division}`);log(`복구점 저장 · ${item.label}`);saveState(state);render(state,{openResult,openPrelimResult});notice('복구점을 저장했습니다.','success');};
   $('openRecoveryBtn').onclick=showRecoveries;$('closeRecoveryBtn').onclick=()=>$('recoveryDialog').close();
   $('clearLogsBtn').onclick=()=>{state.logs=[];commit();};
   document.querySelectorAll('.tab').forEach(tab=>tab.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));tab.classList.add('active');$(`view-${tab.dataset.view}`).classList.add('active');});
   ['tournamentName','divisionName','drawSize','courtCount','courtPrefix','matchMinutes'].forEach(id=>$(id).addEventListener('change',()=>{pullSettings();commit('대회 설정 변경');}));
 }
-syncInputs();bind();render(state,{openResult});
-console.log('[230MATCH V3] stage1 clean core loaded · no legacy code · no Firebase writes');
+syncInputs();syncPrelimInputs();bind();render(state,{openResult,openPrelimResult});
+console.log('[230MATCH V3] stage2 prelim core loaded · no legacy code · no Firebase writes');
