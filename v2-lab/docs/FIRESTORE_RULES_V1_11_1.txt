@@ -1,0 +1,195 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function isUserApproved() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.approved == true;
+    }
+
+    function isStaff() {
+      return isAdmin() || isUserApproved();
+    }
+
+    function isOwner() {
+      return isSignedIn() &&
+        resource.data.ownerUid == request.auth.uid;
+    }
+
+    match /matches/{matchId} {
+      allow read: if true;
+      allow create, delete: if isStaff();
+      allow update: if isStaff() || (
+        isSignedIn() &&
+        resource.data.winner == null &&
+        request.resource.data.winner != null &&
+        (
+          request.auth.uid == resource.data.t1OwnerUid ||
+          request.auth.uid == resource.data.t2OwnerUid
+        )
+      );
+    }
+
+    match /registrations/{regId} {
+      allow read: if true;
+      allow create: if isSignedIn() &&
+        request.resource.data.ownerUid == request.auth.uid;
+      allow update, delete: if isOwner();
+      allow create, update, delete: if isStaff();
+    }
+
+    match /users/{uid} {
+      allow read: if isSignedIn() && (
+        request.auth.uid == uid || isStaff()
+      );
+      allow create: if isSignedIn() && request.auth.uid == uid;
+      allow update: if isSignedIn() &&
+        request.auth.uid == uid &&
+        !request.resource.data.diff(resource.data).changedKeys()
+          .hasAny(['approved', 'role', 'isAdmin']);
+      allow write: if isAdmin();
+    }
+
+    match /pushTokens/{docId} {
+      allow read: if isSignedIn() &&
+        resource.data.uid == request.auth.uid;
+      allow create: if isSignedIn() &&
+        request.resource.data.uid == request.auth.uid;
+      allow update, delete: if isSignedIn() &&
+        resource.data.uid == request.auth.uid;
+      allow read, write: if isStaff();
+    }
+
+    match /notificationInbox/{docId} {
+      allow read: if isSignedIn() && (
+        isStaff() || resource.data.uid == request.auth.uid
+      );
+      allow create: if isStaff();
+      allow update: if isSignedIn() && (
+        isStaff() || (
+          resource.data.uid == request.auth.uid &&
+          request.resource.data.uid == resource.data.uid &&
+          request.resource.data.diff(resource.data).changedKeys()
+            .hasOnly(['read', 'readAt', 'readAtText'])
+        )
+      );
+      allow delete: if isSignedIn() && (
+        isStaff() || resource.data.uid == request.auth.uid
+      );
+    }
+
+    match /tournaments/{docId} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+
+    match /draws/{docId} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+
+    match /players/{docId} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+
+    match /meta/{docId} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+
+    match /adminRegistrationNotifications/{docId} {
+      allow read: if isStaff();
+      allow create: if isSignedIn();
+      allow update, delete: if isStaff();
+    }
+
+    match /admins/{docId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /drawHistory/{docId} {
+      allow read: if isStaff();
+      allow create, update: if isStaff();
+      allow delete: if isAdmin();
+    }
+
+    match /drawDeleteLog/{docId} {
+      allow read: if isAdmin();
+      allow create: if isStaff();
+    }
+
+    match /memberRegistries/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isStaff();
+    }
+
+    match /tourGuides/{docId} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+
+    match /teams/{docId} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+
+    match /pushNotifications/{docId} {
+      allow read: if isStaff();
+      allow write: if isStaff();
+    }
+
+    match /noticePosts/{docId} {
+      allow read: if true;
+      allow create, update, delete: if isStaff();
+    }
+
+    // MAIN V2 전용 테스트/복구 저장소
+    match /mainV2ShadowTests/{documentId} {
+      allow read: if isStaff();
+
+      allow create: if isStaff() &&
+        request.resource.data.shadowOnly == true &&
+        (
+          (
+            request.resource.data.schemaVersion ==
+              '230match-main-v2-shadow-v1'
+          ) ||
+          (
+            request.resource.data.schemaVersion ==
+              '230match-main-v2-recovery-v1' &&
+            request.resource.data.recoveryOnly == true
+          )
+        );
+
+      allow update: if isStaff() &&
+        resource.data.shadowOnly == true &&
+        request.resource.data.shadowOnly == true &&
+        (
+          (
+            request.resource.data.schemaVersion ==
+              '230match-main-v2-shadow-v1'
+          ) ||
+          (
+            request.resource.data.schemaVersion ==
+              '230match-main-v2-recovery-v1' &&
+            request.resource.data.recoveryOnly == true
+          )
+        );
+
+      allow delete: if isAdmin();
+    }
+  }
+}
