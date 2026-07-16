@@ -1,0 +1,1 @@
+(function(){'use strict';window.loadV2MainEngineShadow=async function(){if(window.V2MainEngineShadow)return window.V2MainEngineShadow;await import('./v2-main-engine-shadow-v119.js?v=119');return window.V2MainEngineShadow};console.log('[230MATCH] V2 shadow engine loader available')})();
