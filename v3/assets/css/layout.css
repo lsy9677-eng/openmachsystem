@@ -33,3 +33,6 @@
 .prelim-match-top{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted)}
 .prelim-match b{display:block;line-height:1.4;margin:5px 0}
 .prelim-match .btn{width:100%;padding:8px;margin-top:4px}
+
+.linked-status-grid{display:grid;grid-template-columns:repeat(4,minmax(210px,1fr));gap:10px}
+.linked-draw-panel{border-color:#d7c27b;background:linear-gradient(180deg,#fffdf6,#fff)}

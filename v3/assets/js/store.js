@@ -10,7 +10,8 @@ export function initialState(){
     teams:[],
     prelim:{
       settings:{threeTeamGroups:32,twoTeamGroups:2,courtCount:8,courtPrefix:'국제',qualifiersPerGroup:2},
-      groups:[],matches:[],courts:[],qualifiers:[]
+      groups:[],matches:[],courts:[],qualifiers:[],
+      linkedDraw:{active:false,drawSize:0,slots:[],createdAt:null,lastSyncedAt:null}
     },
     draw:{size:0,rounds:{}},courts:[],sharedQueue:[],
     logs:[],updatedAt:null

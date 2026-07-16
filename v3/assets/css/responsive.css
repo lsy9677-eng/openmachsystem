@@ -4,3 +4,6 @@
 
 @media(max-width:1200px){.prelim-group-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:700px){.prelim-group-grid,.prelim-controls{grid-template-columns:1fr}}
+
+@media(max-width:1200px){.linked-status-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:700px){.linked-status-grid{grid-template-columns:1fr}}

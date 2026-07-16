@@ -8,7 +8,10 @@ function normalizeTeam(team,index){
     name:String(team.name||team.teamName||team.label||team.displayName||team.playersText||players.join(' / ')||`팀 ${index+1}`),
     affiliation:String(team.affiliation||team.club||team.org||''),
     groupNo:Number(team.groupNo||team.group||0),
-    groupRank:Number(team.groupRank||team.rank||0)
+    groupRank:Number(team.groupRank||team.rank||0),
+    placeholder:Boolean(team.placeholder),
+    placeholderKey:String(team.placeholderKey||''),
+    locked:Boolean(team.locked)
   };
 }
 function seedOrder(size){
@@ -23,6 +26,30 @@ export function prepareTeams(rawTeams,limit){
   const input=Array.isArray(rawTeams)?rawTeams:(rawTeams.teams||rawTeams.data||rawTeams.qualifiers||[]);
   return input.map(normalizeTeam).slice(0,limit);
 }
+
+export function makePrelimPlaceholder(groupNo,groupRank){
+  return {
+    id:`prelim-slot-g${groupNo}-r${groupRank}`,
+    name:`${groupNo}조 ${groupRank}위`,
+    affiliation:'예선 결과 대기',
+    groupNo:Number(groupNo),
+    groupRank:Number(groupRank),
+    placeholder:true,
+    placeholderKey:`g${groupNo}-r${groupRank}`,
+    locked:false
+  };
+}
+export function generateLinkedDrawSlots(groups,qualifiersPerGroup,drawSize){
+  const slots=[];
+  groups.forEach(group=>{
+    for(let rank=1;rank<=qualifiersPerGroup;rank++){
+      slots.push(makePrelimPlaceholder(group.groupNo,rank));
+    }
+  });
+  if(slots.length>drawSize)throw new Error(`본선 슬롯 ${slots.length}개가 대진 규모 ${drawSize}강을 초과합니다.`);
+  return slots;
+}
+
 export function generateDraw(teams,requestedSize){
   const size=Number(requestedSize)||nextPower(teams.length);
   if(![32,64,128].includes(size))throw new Error('지원 대진 규모는 32·64·128강입니다.');
@@ -70,6 +97,39 @@ export function propagateByes(rounds,size){
     });
   }
 }
+
+export function syncLinkedDrawQualifiers(draw,qualifiers,{protectStarted=true}={}){
+  const qualifierMap=new Map(
+    qualifiers.map(team=>[`g${team.groupNo}-r${team.groupRank}`,team])
+  );
+  const changes=[];
+  const locked=[];
+  const firstRound=draw.rounds?.[draw.size]||[];
+
+  firstRound.forEach(match=>{
+    ['teamA','teamB'].forEach(slot=>{
+      const current=match[slot];
+      if(!current?.placeholder||!current.placeholderKey)return;
+      const resolved=qualifierMap.get(current.placeholderKey);
+      if(!resolved)return;
+
+      const started=['playing','completed'].includes(match.status);
+      if(protectStarted&&started){
+        locked.push({matchId:match.id,slot,placeholderKey:current.placeholderKey});
+        return;
+      }
+
+      match[slot]={...resolved,placeholder:false,placeholderKey:'',locked:false};
+      changes.push({matchId:match.id,slot,placeholderKey:current.placeholderKey,teamId:resolved.id});
+      if(match.teamA&&match.teamB&&match.status!=='completed'){
+        match.status='ready';
+      }
+    });
+  });
+
+  return {changes,locked};
+}
+
 export function allMatches(draw){
   return Object.keys(draw.rounds||{}).sort((a,b)=>Number(b)-Number(a)).flatMap(k=>draw.rounds[k]);
 }

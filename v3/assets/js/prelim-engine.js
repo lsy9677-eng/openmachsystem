@@ -2,7 +2,10 @@
 function clone(v){return structuredClone(v);}
 export function ensurePrelimState(state){
   if(!state.prelim){
-    state.prelim={settings:{threeTeamGroups:32,twoTeamGroups:2,courtCount:8,courtPrefix:'국제',qualifiersPerGroup:2},groups:[],matches:[],courts:[],qualifiers:[]};
+    state.prelim={settings:{threeTeamGroups:32,twoTeamGroups:2,courtCount:8,courtPrefix:'국제',qualifiersPerGroup:2},groups:[],matches:[],courts:[],qualifiers:[],linkedDraw:{active:false,drawSize:0,slots:[],createdAt:null,lastSyncedAt:null}};
+  }
+  if(!state.prelim.linkedDraw){
+    state.prelim.linkedDraw={active:false,drawSize:0,slots:[],createdAt:null,lastSyncedAt:null};
   }
 }
 export function generatePrelim(state,settings){
@@ -36,6 +39,7 @@ export function generatePrelim(state,settings){
   state.prelim.matches=matches;
   state.prelim.courts=[];
   state.prelim.qualifiers=[];
+  state.prelim.linkedDraw={active:false,drawSize:0,slots:[],createdAt:null,lastSyncedAt:null};
   recalculateStandings(state);
   return {groups:groups.length,matches:matches.length,teams:needed};
 }
@@ -90,4 +94,5 @@ export function recalculateStandings(state){
 export function resetPrelim(state){
   ensurePrelimState(state);
   state.prelim.groups=[];state.prelim.matches=[];state.prelim.courts=[];state.prelim.qualifiers=[];
+  state.prelim.linkedDraw={active:false,drawSize:0,slots:[],createdAt:null,lastSyncedAt:null};
 }

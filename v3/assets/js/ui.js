@@ -1,6 +1,10 @@
 
 import{allMatches,roundLabel,findMatch}from'./bracket-engine.js';
-export function teamText(team){return team?`${team.name}${team.affiliation?`(${team.affiliation})`:''}`:'TBD';}
+export function teamText(team){
+  if(!team)return'TBD';
+  if(team.placeholder)return`${team.name}`;
+  return `${team.name}${team.affiliation?`(${team.affiliation})`:''}`;
+}
 export function render(state,handlers){
   const matches=allMatches(state.draw);
   const completed=matches.filter(m=>m.status==='completed').length;
@@ -24,9 +28,9 @@ function renderCourts(state,handlers){
   root.innerHTML=state.courts.map(c=>{
     const p=c.playing?findMatch(state.draw,c.playing):null,w=c.wait1?findMatch(state.draw,c.wait1):null;
     return `<article class="court-card"><header><strong>🚀 ${c.name}</strong><span>${p?'시합중':'빈코트'}</span></header>
-      <div class="court-slot"><small>시합중</small><b>${p?`${teamText(p.teamA)} vs ${teamText(p.teamB)}`:'진행 경기 없음'}</b><em>${p?`${roundLabel(p.roundSize)} · ${p.id}`:'-'}</em>
+      <div class="court-slot"><small>시합중</small><b>${p?`${teamHtml(p.teamA)} vs ${teamHtml(p.teamB)}`:'진행 경기 없음'}</b><em>${p?`${roundLabel(p.roundSize)} · ${p.id}`:'-'}</em>
       <button class="btn" data-result="${p?.id||''}" ${p?'':'disabled'}>결과 입력</button></div>
-      <div class="court-slot wait"><small>대기 1번</small><b>${w?`${teamText(w.teamA)} vs ${teamText(w.teamB)}`:'대기 경기 없음'}</b><em>${w?`${roundLabel(w.roundSize)} · ${w.id}`:'-'}</em></div></article>`;
+      <div class="court-slot wait"><small>대기 1번</small><b>${w?`${teamHtml(w.teamA)} vs ${teamHtml(w.teamB)}`:'대기 경기 없음'}</b><em>${w?`${roundLabel(w.roundSize)} · ${w.id}`:'-'}</em></div></article>`;
   }).join('');
   root.querySelectorAll('[data-result]').forEach(b=>b.addEventListener('click',()=>handlers.openResult(b.dataset.result)));
 }
@@ -34,14 +38,14 @@ function renderQueue(state){
   const root=document.getElementById('sharedQueue');
   if(!state.sharedQueue.length){root.className='shared-queue empty-state';root.innerHTML='<p>공용대기 경기가 없습니다.</p>';return;}
   root.className='shared-queue';
-  root.innerHTML=state.sharedQueue.map((id,i)=>{const m=findMatch(state.draw,id);return`<article class="queue-card"><span class="num">${i+1}</span><b>${m?`${teamText(m.teamA)} vs ${teamText(m.teamB)}`:id}</b><em>${m?`${roundLabel(m.roundSize)} · ${id}`:'경기 없음'}</em></article>`}).join('');
+  root.innerHTML=state.sharedQueue.map((id,i)=>{const m=findMatch(state.draw,id);return`<article class="queue-card"><span class="num">${i+1}</span><b>${m?`${teamHtml(m.teamA)} vs ${teamHtml(m.teamB)}`:id}</b><em>${m?`${roundLabel(m.roundSize)} · ${id}`:'경기 없음'}</em></article>`}).join('');
 }
 function renderBracket(state){
   const root=document.getElementById('bracketBoard');
   const sizes=Object.keys(state.draw.rounds||{}).map(Number).sort((a,b)=>b-a);
   if(!sizes.length){root.className='bracket-board empty-state';root.innerHTML='<p>생성된 대진이 없습니다.</p>';return;}
   root.className='bracket-board';
-  root.innerHTML=sizes.map(size=>`<section class="round-column"><h3>${roundLabel(size)}</h3>${state.draw.rounds[size].map(m=>`<article class="match-card ${m.status==='completed'?'completed':''}"><header><span>${m.matchNo}경기</span><span>${statusText(m.status)}</span></header><div class="match-team ${m.winner?.id===m.teamA?.id?'winner':''}">${teamText(m.teamA)}</div><div class="match-team ${m.winner?.id===m.teamB?.id?'winner':''}">${teamText(m.teamB)}</div><div class="match-meta">${m.scoreA!=null?`${m.scoreA}:${m.scoreB}`:`${m.id}${m.bye?' · 부전승':''}`}</div></article>`).join('')}</section>`).join('');
+  root.innerHTML=sizes.map(size=>`<section class="round-column"><h3>${roundLabel(size)}</h3>${state.draw.rounds[size].map(m=>`<article class="match-card ${m.status==='completed'?'completed':''}"><header><span>${m.matchNo}경기</span><span>${statusText(m.status)}</span></header><div class="match-team ${m.winner?.id===m.teamA?.id?'winner':''}">${teamHtml(m.teamA)}</div><div class="match-team ${m.winner?.id===m.teamB?.id?'winner':''}">${teamHtml(m.teamB)}</div><div class="match-meta">${m.scoreA!=null?`${m.scoreA}:${m.scoreB}`:`${m.id}${m.bye?' · 부전승':''}`}</div></article>`).join('')}</section>`).join('');
 }
 function statusText(s){return({waiting_slots:'대진 대기',ready:'배정 대기',playing:'시합중',court_wait1:'대기1',shared_queue:'공용대기',completed:'완료'})[s]||s;}
 function renderLogs(state){
@@ -57,6 +61,9 @@ function renderPrelim(state,handlers){
   setText('prelimSummaryFirst',prelim.qualifiers.filter(t=>t.groupRank===1).length);
   setText('prelimSummarySecond',prelim.qualifiers.filter(t=>t.groupRank===2).length);
   setText('prelimSummaryQualifiers',`${prelim.qualifiers.length}팀`);
+  const linked=prelim.linkedDraw||{active:false,slots:[]};
+  setText('prelimSummaryLinkedSlots',linked.active?linked.slots.length:0);
+  renderLinkedDrawStatus(state);
   const root=document.getElementById('prelimGroupGrid');
   if(!root)return;
   if(!prelim.groups.length){
@@ -80,4 +87,42 @@ function renderPrelim(state,handlers){
       </div></article>`;
   }).join('');
   root.querySelectorAll('[data-prelim-result]').forEach(b=>b.addEventListener('click',()=>handlers.openPrelimResult(b.dataset.prelimResult)));
+}
+
+function teamHtml(team){
+  if(!team)return'TBD';
+  if(team.placeholder)return`<span class="placeholder-team">${team.name}</span> <span class="placeholder-chip">예선 대기</span>`;
+  return teamText(team);
+}
+function renderLinkedDrawStatus(state){
+  const root=document.getElementById('linkedDrawStatus');
+  const badge=document.getElementById('linkedDrawBadge');
+  if(!root||!badge)return;
+  const linked=state.prelim?.linkedDraw;
+  if(!linked?.active){
+    badge.textContent='연결 대진 없음';
+    badge.className='badge badge-muted-dark';
+    root.className='linked-status-grid empty-state';
+    root.innerHTML='<p>예선 슬롯으로 본선 선추첨을 실행하면 연결 상태가 표시됩니다.</p>';
+    return;
+  }
+  const firstRound=state.draw.rounds?.[state.draw.size]||[];
+  const entries=[];
+  firstRound.forEach(match=>{
+    ['teamA','teamB'].forEach(slot=>{
+      const team=match[slot];
+      const ref=linked.slots.find(x=>x.placeholderKey===team?.placeholderKey || x.resolvedTeamId===team?.id);
+      if(!ref)return;
+      entries.push({...ref,matchId:match.id,slot,currentTeam:team});
+    });
+  });
+  const resolved=entries.filter(x=>!x.currentTeam?.placeholder).length;
+  const locked=entries.filter(x=>x.locked).length;
+  badge.textContent=`${resolved}/${entries.length}팀 반영`;
+  badge.className='badge badge-safe';
+  root.className='linked-status-grid';
+  root.innerHTML=entries.map(x=>`<article class="linked-status-card ${x.locked?'locked':(!x.currentTeam?.placeholder?'done':'')}">
+    <strong>${x.label}</strong>
+    <span>${x.locked?'진행 경기라 자동 변경 차단':(x.currentTeam?.placeholder?'예선 결과 대기':`반영: ${teamText(x.currentTeam)}`)}</span>
+  </article>`).join('');
 }

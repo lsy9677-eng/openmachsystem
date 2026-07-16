@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#10264a">
   <title>230MATCH V3</title>
-  <link rel="stylesheet" href="./assets/css/tokens.css?v=3002">
-  <link rel="stylesheet" href="./assets/css/layout.css?v=3002">
-  <link rel="stylesheet" href="./assets/css/components.css?v=3002">
-  <link rel="stylesheet" href="./assets/css/responsive.css?v=3002">
+  <link rel="stylesheet" href="./assets/css/tokens.css?v=3003">
+  <link rel="stylesheet" href="./assets/css/layout.css?v=3003">
+  <link rel="stylesheet" href="./assets/css/components.css?v=3003">
+  <link rel="stylesheet" href="./assets/css/responsive.css?v=3003">
 </head>
 <body>
   <header class="topbar">
@@ -29,9 +29,9 @@
   <main class="app-shell">
     <section class="hero panel">
       <div>
-        <p class="eyebrow">STAGE 2 · PRELIM CORE</p>
-        <h1>예선과 본선을 하나의 V3 상태에서 운영</h1>
-        <p>본선 대진, 코트 배정, 공용대기, 결과 입력, 다음 라운드 승계를 하나의 상태 저장소에서 관리합니다.</p>
+        <p class="eyebrow">STAGE 3 · PRELIM → DRAW</p>
+        <h1>예선 진행 중 본선 선추첨과 자동 슬롯 치환</h1>
+        <p>예선 미확정 슬롯을 조 순위 자리로 먼저 추첨하고, 순위 확정 시 실제 팀명으로 안전하게 치환합니다.</p>
       </div>
       <div class="hero-stats">
         <div><span>대진</span><strong id="heroDrawSize">-</strong></div>
@@ -181,6 +181,8 @@
         <div class="button-row">
           <button id="generatePrelimBtn" class="btn btn-primary">예선 조편성 생성</button>
           <button id="assignPrelimCourtsBtn" class="btn btn-purple">예선 코트배정</button>
+          <button id="generateLinkedDrawBtn" class="btn btn-gold">예선 슬롯으로 본선 선추첨</button>
+          <button id="syncLinkedDrawBtn" class="btn btn-secondary">확정팀 본선 자동 반영</button>
           <button id="resetPrelimBtn" class="btn btn-danger-outline">예선만 초기화</button>
         </div>
 
@@ -194,6 +196,21 @@
         <article class="summary-card"><span>확정 1위</span><strong id="prelimSummaryFirst">0</strong></article>
         <article class="summary-card"><span>확정 2위</span><strong id="prelimSummarySecond">0</strong></article>
         <article class="summary-card"><span>본선 진출</span><strong id="prelimSummaryQualifiers">0팀</strong></article>
+        <article class="summary-card"><span>연결 본선 슬롯</span><strong id="prelimSummaryLinkedSlots">0</strong></article>
+      </section>
+
+
+      <section class="panel linked-draw-panel">
+        <div class="section-head">
+          <div>
+            <h2>예선 → 본선 연결 상태</h2>
+            <p>미확정 슬롯은 ‘1조 1위’, ‘1조 2위’처럼 유지되며 조 순위 확정 시 실제 팀명으로 자동 치환됩니다.</p>
+          </div>
+          <span id="linkedDrawBadge" class="badge badge-muted-dark">연결 대진 없음</span>
+        </div>
+        <div id="linkedDrawStatus" class="linked-status-grid empty-state">
+          <p>예선 슬롯으로 본선 선추첨을 실행하면 연결 상태가 표시됩니다.</p>
+        </div>
       </section>
 
       <section class="panel">
@@ -202,7 +219,7 @@
             <h2>예선 조별 현황</h2>
             <p>결과를 입력하면 승수·득실·득점 기준으로 순위를 다시 계산합니다.</p>
           </div>
-          <button id="useQualifiersForDrawBtn" class="btn btn-secondary">확정 진출팀을 본선 명단으로 사용</button>
+          <button id="useQualifiersForDrawBtn" class="btn btn-light">확정팀만 본선 명단으로 복사</button>
         </div>
         <div id="prelimGroupGrid" class="prelim-group-grid empty-state">
           <p>예선 조편성을 생성하면 조별 카드가 표시됩니다.</p>
@@ -276,6 +293,6 @@
     <div id="recoveryList" class="recovery-list"></div>
   </dialog>
 
-  <script type="module" src="./assets/js/app.js?v=3002"></script>
+  <script type="module" src="./assets/js/app.js?v=3003"></script>
 </body>
 </html>

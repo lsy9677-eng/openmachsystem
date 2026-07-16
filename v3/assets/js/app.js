@@ -1,6 +1,6 @@
 
 import{loadState,saveState,clearState,saveRecovery,getRecoveries,deleteRecovery,initialState}from'./store.js';
-import{prepareTeams,generateDraw,allMatches,findMatch}from'./bracket-engine.js';
+import{prepareTeams,generateDraw,allMatches,findMatch,generateLinkedDrawSlots,syncLinkedDrawQualifiers}from'./bracket-engine.js';
 import{buildCourts,assignInitial,queueReadyMatches}from'./court-engine.js';
 import{submitResult}from'./result-engine.js';
 import{ensurePrelimState,generatePrelim,assignPrelimCourts,findPrelimMatch,submitPrelimResult,resetPrelim}from'./prelim-engine.js';
@@ -100,7 +100,8 @@ function openPrelimResult(matchId){
 function confirmPrelimResult(event){
   event.preventDefault();
   const m=submitPrelimResult(state,{matchId:$('prelimResultMatchId').value,winnerId:$('prelimWinnerSelect').value,scoreA:$('prelimScoreA').value,scoreB:$('prelimScoreB').value});
-  commit(`예선 결과 확정 · ${m.id} · 승리 ${teamText(m.winner)} · ${m.scoreA}:${m.scoreB}`);
+  const syncResult=syncLinkedDraw({silent:true});
+  commit(`예선 결과 확정 · ${m.id} · 승리 ${teamText(m.winner)} · ${m.scoreA}:${m.scoreB}${syncResult.changes.length?` · 본선 자동반영 ${syncResult.changes.length}팀`:''}`);
   $('prelimResultDialog').close();
   prelimNotice('예선 순위와 진출팀을 다시 계산했습니다.','success');
 }
@@ -115,6 +116,66 @@ function useQualifiersForDraw(){
   commit(`예선 진출팀 ${state.teams.length}팀을 본선 명단으로 전환`);
   notice(`예선 진출팀 ${state.teams.length}팀을 본선 명단으로 사용합니다.`,'success');
   document.querySelector('[data-view="operation"]').click();
+}
+
+
+function createLinkedDraw(){
+  pullPrelimSettings();
+  ensurePrelimState(state);
+  if(!state.prelim.groups.length)throw new Error('먼저 예선 조편성을 생성하세요.');
+  const slots=generateLinkedDrawSlots(
+    state.prelim.groups,
+    state.prelim.settings.qualifiersPerGroup,
+    Number($('drawSize').value)
+  );
+  state.settings.drawSize=Number($('drawSize').value);
+  state.draw=generateDraw(slots,state.settings.drawSize);
+  state.courts=[];
+  state.sharedQueue=[];
+  state.prelim.linkedDraw={
+    active:true,
+    drawSize:state.settings.drawSize,
+    slots:slots.map(s=>({
+      placeholderKey:s.placeholderKey,
+      label:s.name,
+      groupNo:s.groupNo,
+      groupRank:s.groupRank,
+      resolvedTeamId:null,
+      locked:false
+    })),
+    createdAt:new Date().toISOString(),
+    lastSyncedAt:null
+  };
+  const result=syncLinkedDrawQualifiers(state.draw,state.prelim.qualifiers,{protectStarted:true});
+  applyLinkedSyncResult(result);
+  commit(`예선 슬롯 본선 선추첨 · ${slots.length}슬롯 · ${state.settings.drawSize}강`);
+  prelimNotice('예선 조 순위 슬롯으로 본선 대진을 먼저 생성했습니다.','success');
+}
+function applyLinkedSyncResult(result){
+  if(!state.prelim?.linkedDraw?.active)return;
+  result.changes.forEach(change=>{
+    const ref=state.prelim.linkedDraw.slots.find(x=>x.placeholderKey===change.placeholderKey);
+    if(ref){ref.resolvedTeamId=change.teamId;ref.locked=false;}
+  });
+  result.locked.forEach(item=>{
+    const ref=state.prelim.linkedDraw.slots.find(x=>x.placeholderKey===item.placeholderKey);
+    if(ref)ref.locked=true;
+  });
+  state.prelim.linkedDraw.lastSyncedAt=new Date().toISOString();
+}
+function syncLinkedDraw({silent=false}={}){
+  ensurePrelimState(state);
+  if(!state.prelim.linkedDraw.active){
+    if(!silent)throw new Error('예선 슬롯으로 생성된 연결 본선 대진이 없습니다.');
+    return {changes:[],locked:[]};
+  }
+  const result=syncLinkedDrawQualifiers(state.draw,state.prelim.qualifiers,{protectStarted:true});
+  applyLinkedSyncResult(result);
+  if(!silent){
+    commit(`예선 확정팀 본선 반영 · ${result.changes.length}팀 · 잠금 ${result.locked.length}팀`);
+    prelimNotice(`확정팀 ${result.changes.length}팀을 본선 슬롯에 반영했습니다.${result.locked.length?` 진행 경기 ${result.locked.length}건은 변경하지 않았습니다.`:''}`,'success');
+  }
+  return result;
 }
 
 function hardReset(){
@@ -137,6 +198,8 @@ function bind(){
   $('confirmResultBtn').onclick=confirmResult;
   $('generatePrelimBtn').onclick=()=>{try{createPrelim();}catch(e){prelimNotice(e.message,'error');}};
   $('assignPrelimCourtsBtn').onclick=()=>{try{assignPrelim();}catch(e){prelimNotice(e.message,'error');}};
+  $('generateLinkedDrawBtn').onclick=()=>{try{createLinkedDraw();}catch(e){prelimNotice(e.message,'error');}};
+  $('syncLinkedDrawBtn').onclick=()=>{try{syncLinkedDraw();}catch(e){prelimNotice(e.message,'error');}};
   $('confirmPrelimResultBtn').onclick=confirmPrelimResult;
   $('resetPrelimBtn').onclick=resetPrelimOnly;
   $('useQualifiersForDrawBtn').onclick=()=>{try{useQualifiersForDraw();}catch(e){prelimNotice(e.message,'error');}};
@@ -148,4 +211,4 @@ function bind(){
   ['tournamentName','divisionName','drawSize','courtCount','courtPrefix','matchMinutes'].forEach(id=>$(id).addEventListener('change',()=>{pullSettings();commit('대회 설정 변경');}));
 }
 syncInputs();syncPrelimInputs();bind();render(state,{openResult,openPrelimResult});
-console.log('[230MATCH V3] stage2 prelim core loaded · no legacy code · no Firebase writes');
+console.log('[230MATCH V3] stage3 prelim-to-draw loaded · no legacy code · no Firebase writes');
