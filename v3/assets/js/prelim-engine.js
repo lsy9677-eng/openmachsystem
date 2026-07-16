@@ -2,23 +2,29 @@
 function clone(v){return structuredClone(v);}
 export function ensurePrelimState(state){
   if(!state.prelim){
-    state.prelim={settings:{threeTeamGroups:32,twoTeamGroups:2,courtCount:8,courtPrefix:'국제',qualifiersPerGroup:2},groups:[],matches:[],courts:[],qualifiers:[],linkedDraw:{active:false,drawSize:0,slots:[],createdAt:null,lastSyncedAt:null}};
+    state.prelim={settings:{activeTeamCount:96,threeTeamGroups:32,twoTeamGroups:0,courtCount:8,courtPrefix:'국제',qualifiersPerGroup:2},activeTeams:[],reserveTeams:[],groups:[],matches:[],courts:[],qualifiers:[],linkedDraw:{active:false,drawSize:0,slots:[],createdAt:null,lastSyncedAt:null}};
   }
   if(!state.prelim.linkedDraw){
     state.prelim.linkedDraw={active:false,drawSize:0,slots:[],createdAt:null,lastSyncedAt:null};
   }
+  if(!Array.isArray(state.prelim.activeTeams))state.prelim.activeTeams=[];
+  if(!Array.isArray(state.prelim.reserveTeams))state.prelim.reserveTeams=[];
+  if(!('activeTeamCount' in state.prelim.settings))state.prelim.settings.activeTeamCount=96;
 }
 export function generatePrelim(state,settings){
   ensurePrelimState(state);
+  const activeCount=Math.max(2,Number(settings.activeTeamCount)||state.teams.length);
   const three=Math.max(0,Number(settings.threeTeamGroups)||0);
   const two=Math.max(0,Number(settings.twoTeamGroups)||0);
   const needed=three*3+two*2;
-  if(needed<2)throw new Error('예선 참가팀 수가 최소 2팀 이상이어야 합니다.');
-  if(state.teams.length<needed)throw new Error(`예선 조편성에 ${needed}팀이 필요하지만 현재 명단은 ${state.teams.length}팀입니다.`);
+  if(activeCount>state.teams.length)throw new Error(`예선 사용팀 ${activeCount}팀이 현재 명단 ${state.teams.length}팀보다 많습니다.`);
+  if(needed!==activeCount)throw new Error(`조편성 합계 ${needed}팀과 예선 사용팀 ${activeCount}팀이 일치하지 않습니다.`);
+  state.prelim.activeTeams=state.teams.slice(0,activeCount).map(clone);
+  state.prelim.reserveTeams=state.teams.slice(activeCount).map(clone);
   const groups=[],matches=[];
   let cursor=0,groupNo=1;
   const createGroup=(size)=>{
-    const teams=state.teams.slice(cursor,cursor+size).map((t,i)=>({...clone(t),seed:i+1}));
+    const teams=state.prelim.activeTeams.slice(cursor,cursor+size).map((t,i)=>({...clone(t),seed:i+1}));
     cursor+=size;
     const id=`g${groupNo}`;
     groups.push({id,groupNo,size,teams,standings:[],court:null});
@@ -91,8 +97,29 @@ export function recalculateStandings(state){
   });
   state.prelim.qualifiers=qualifiers;
 }
+
+export function autoFitPrelimGroups(activeTeamCount){
+  const total=Math.max(2,Number(activeTeamCount)||0);
+  const two=total%3===0?0:(total%3===1?2:1);
+  const three=(total-two*2)/3;
+  if(three<0||!Number.isInteger(three))throw new Error('해당 팀 수로 2팀조·3팀조 조합을 만들 수 없습니다.');
+  return {threeTeamGroups:three,twoTeamGroups:two};
+}
+export function swapActiveReserveTeam(state,activeTeamId,reserveTeamId){
+  ensurePrelimState(state);
+  const ai=state.prelim.activeTeams.findIndex(t=>t.id===activeTeamId);
+  const ri=state.prelim.reserveTeams.findIndex(t=>t.id===reserveTeamId);
+  if(ai<0||ri<0)throw new Error('교체할 참가팀 또는 후보팀을 찾지 못했습니다.');
+  const active=state.prelim.activeTeams[ai];
+  const reserve=state.prelim.reserveTeams[ri];
+  state.prelim.activeTeams[ai]=reserve;
+  state.prelim.reserveTeams[ri]=active;
+  return {activeOut:active,reserveIn:reserve};
+}
+
 export function resetPrelim(state){
   ensurePrelimState(state);
+  state.prelim.activeTeams=[];state.prelim.reserveTeams=[];
   state.prelim.groups=[];state.prelim.matches=[];state.prelim.courts=[];state.prelim.qualifiers=[];
   state.prelim.linkedDraw={active:false,drawSize:0,slots:[],createdAt:null,lastSyncedAt:null};
 }

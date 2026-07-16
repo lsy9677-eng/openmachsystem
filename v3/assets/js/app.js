@@ -3,7 +3,7 @@ import{loadState,saveState,clearState,saveRecovery,getRecoveries,deleteRecovery,
 import{prepareTeams,generateDraw,allMatches,findMatch,generateLinkedDrawSlots,syncLinkedDrawQualifiers}from'./bracket-engine.js';
 import{buildCourts,assignInitial,queueReadyMatches}from'./court-engine.js';
 import{submitResult}from'./result-engine.js';
-import{ensurePrelimState,generatePrelim,assignPrelimCourts,findPrelimMatch,submitPrelimResult,resetPrelim}from'./prelim-engine.js';
+import{ensurePrelimState,generatePrelim,assignPrelimCourts,findPrelimMatch,submitPrelimResult,resetPrelim,autoFitPrelimGroups,swapActiveReserveTeam}from'./prelim-engine.js';
 import{downloadJson}from'./recovery.js';
 import{render,teamText}from'./ui.js';
 
@@ -11,7 +11,7 @@ let state=loadState();ensurePrelimState(state);
 const $=id=>document.getElementById(id);
 function log(message){state.logs.unshift({at:new Date().toISOString(),message});state.logs=state.logs.slice(0,300);}
 function commit(message){
-  if(message)log(message);syncInputs();saveState(state);render(state,{openResult,openPrelimResult});flashSaved();
+  if(message)log(message);syncInputs();saveState(state);render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap});flashSaved();
 }
 function syncInputs(){
   $('tournamentName').value=state.tournament.name;$('divisionName').value=state.tournament.division;
@@ -63,6 +63,7 @@ function refreshQueue(){
 function prelimNotice(message,type='info'){$('prelimNoticeBar').className=`notice ${type}`;$('prelimNoticeBar').textContent=message;}
 function pullPrelimSettings(){
   ensurePrelimState(state);
+  state.prelim.settings.activeTeamCount=Number($('prelimActiveTeamCount').value);
   state.prelim.settings.threeTeamGroups=Number($('threeTeamGroupCount').value);
   state.prelim.settings.twoTeamGroups=Number($('twoTeamGroupCount').value);
   state.prelim.settings.courtCount=Number($('prelimCourtCount').value);
@@ -71,12 +72,38 @@ function pullPrelimSettings(){
 }
 function syncPrelimInputs(){
   ensurePrelimState(state);
+  $('prelimActiveTeamCount').value=state.prelim.settings.activeTeamCount;
   $('threeTeamGroupCount').value=state.prelim.settings.threeTeamGroups;
   $('twoTeamGroupCount').value=state.prelim.settings.twoTeamGroups;
   $('prelimCourtCount').value=state.prelim.settings.courtCount;
   $('prelimCourtPrefix').value=state.prelim.settings.courtPrefix;
   $('qualifiersPerGroup').value=String(state.prelim.settings.qualifiersPerGroup);
 }
+
+function autoFitPrelim(){
+  const total=Number($('prelimActiveTeamCount').value);
+  const fit=autoFitPrelimGroups(total);
+  $('threeTeamGroupCount').value=fit.threeTeamGroups;
+  $('twoTeamGroupCount').value=fit.twoTeamGroups;
+  pullPrelimSettings();
+  commit(`예선 사용팀 ${total}팀 기준 조 자동계산 · 3팀조 ${fit.threeTeamGroups} · 2팀조 ${fit.twoTeamGroups}`);
+  prelimNotice(`3팀조 ${fit.threeTeamGroups}개, 2팀조 ${fit.twoTeamGroups}개로 계산했습니다.`,'success');
+}
+let pendingActiveSwapId=null;
+function selectActiveSwap(teamId){
+  pendingActiveSwapId=teamId;
+  prelimNotice('교체할 후보팀의 선택 버튼을 누르세요.','info');
+}
+function selectReserveSwap(teamId){
+  if(!pendingActiveSwapId){prelimNotice('먼저 예선 참가팀에서 교체 버튼을 누르세요.','error');return;}
+  try{
+    const result=swapActiveReserveTeam(state,pendingActiveSwapId,teamId);
+    pendingActiveSwapId=null;
+    commit(`예선 참가팀 교체 · 제외 ${teamText(result.activeOut)} · 투입 ${teamText(result.reserveIn)}`);
+    prelimNotice('참가팀과 후보팀을 교체했습니다. 조편성을 다시 생성하세요.','success');
+  }catch(e){prelimNotice(e.message,'error');}
+}
+
 function createPrelim(){
   pullPrelimSettings();
   const result=generatePrelim(state,state.prelim.settings);
@@ -196,6 +223,7 @@ function bind(){
   $('assignCourtsBtn').onclick=()=>{try{assign();}catch(e){notice(e.message,'error');}};
   $('refreshQueueBtn').onclick=refreshQueue;$('resetBtn').onclick=hardReset;
   $('confirmResultBtn').onclick=confirmResult;
+  $('autoFitPrelimBtn').onclick=()=>{try{autoFitPrelim();}catch(e){prelimNotice(e.message,'error');}};
   $('generatePrelimBtn').onclick=()=>{try{createPrelim();}catch(e){prelimNotice(e.message,'error');}};
   $('assignPrelimCourtsBtn').onclick=()=>{try{assignPrelim();}catch(e){prelimNotice(e.message,'error');}};
   $('generateLinkedDrawBtn').onclick=()=>{try{createLinkedDraw();}catch(e){prelimNotice(e.message,'error');}};
@@ -204,11 +232,11 @@ function bind(){
   $('resetPrelimBtn').onclick=resetPrelimOnly;
   $('useQualifiersForDrawBtn').onclick=()=>{try{useQualifiersForDraw();}catch(e){prelimNotice(e.message,'error');}};
   $('exportJsonBtn').onclick=()=>downloadJson(`230match-v3-${Date.now()}.json`,state);
-  $('saveRecoveryBtn').onclick=()=>{const item=saveRecovery(state,`${state.tournament.name} · ${state.tournament.division}`);log(`복구점 저장 · ${item.label}`);saveState(state);render(state,{openResult,openPrelimResult});notice('복구점을 저장했습니다.','success');};
+  $('saveRecoveryBtn').onclick=()=>{const item=saveRecovery(state,`${state.tournament.name} · ${state.tournament.division}`);log(`복구점 저장 · ${item.label}`);saveState(state);render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap});notice('복구점을 저장했습니다.','success');};
   $('openRecoveryBtn').onclick=showRecoveries;$('closeRecoveryBtn').onclick=()=>$('recoveryDialog').close();
   $('clearLogsBtn').onclick=()=>{state.logs=[];commit();};
   document.querySelectorAll('.tab').forEach(tab=>tab.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));tab.classList.add('active');$(`view-${tab.dataset.view}`).classList.add('active');});
   ['tournamentName','divisionName','drawSize','courtCount','courtPrefix','matchMinutes'].forEach(id=>$(id).addEventListener('change',()=>{pullSettings();commit('대회 설정 변경');}));
 }
-syncInputs();syncPrelimInputs();bind();render(state,{openResult,openPrelimResult});
-console.log('[230MATCH V3] stage3 prelim-to-draw loaded · no legacy code · no Firebase writes');
+syncInputs();syncPrelimInputs();bind();render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap});
+console.log('[230MATCH V3] stage4 prelim-team-pool loaded · no legacy code · no Firebase writes');

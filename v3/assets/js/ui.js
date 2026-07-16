@@ -55,6 +55,8 @@ function renderLogs(state){
 
 function renderPrelim(state,handlers){
   const prelim=state.prelim||{groups:[],matches:[],qualifiers:[]};
+  setText('prelimSummaryActiveTeams',`${prelim.activeTeams?.length||0}팀`);
+  setText('prelimSummaryReserveTeams',`${prelim.reserveTeams?.length||0}팀`);
   setText('prelimSummaryGroups',`${prelim.groups.length}조`);
   setText('prelimSummaryMatches',prelim.matches.length);
   setText('prelimSummaryCompleted',prelim.matches.filter(m=>m.status==='completed').length);
@@ -64,6 +66,7 @@ function renderPrelim(state,handlers){
   const linked=prelim.linkedDraw||{active:false,slots:[]};
   setText('prelimSummaryLinkedSlots',linked.active?linked.slots.length:0);
   renderLinkedDrawStatus(state);
+  renderTeamPools(state,handlers);
   const root=document.getElementById('prelimGroupGrid');
   if(!root)return;
   if(!prelim.groups.length){
@@ -125,4 +128,23 @@ function renderLinkedDrawStatus(state){
     <strong>${x.label}</strong>
     <span>${x.locked?'진행 경기라 자동 변경 차단':(x.currentTeam?.placeholder?'예선 결과 대기':`반영: ${teamText(x.currentTeam)}`)}</span>
   </article>`).join('');
+}
+
+function renderTeamPools(state,handlers){
+  const active=state.prelim?.activeTeams||[];
+  const reserve=state.prelim?.reserveTeams||[];
+  setText('activePoolCount',`${active.length}팀`);
+  setText('reservePoolCount',`${reserve.length}팀`);
+  const activeRoot=document.getElementById('activeTeamPool');
+  const reserveRoot=document.getElementById('reserveTeamPool');
+  if(!activeRoot||!reserveRoot)return;
+
+  activeRoot.className=active.length?'team-pool':'team-pool empty-state';
+  activeRoot.innerHTML=active.length?active.map(t=>`<article class="team-chip"><div><b>${teamText(t)}</b><small>예선 참가</small></div>${reserve.length?`<button data-active-swap="${t.id}">교체</button>`:''}</article>`).join(''):'<p>예선 조편성을 생성하면 표시됩니다.</p>';
+
+  reserveRoot.className=reserve.length?'team-pool':'team-pool empty-state';
+  reserveRoot.innerHTML=reserve.length?reserve.map(t=>`<article class="team-chip"><div><b>${teamText(t)}</b><small>후보</small></div><button data-reserve-pick="${t.id}">선택</button></article>`).join(''):'<p>후보팀이 없습니다.</p>';
+
+  activeRoot.querySelectorAll('[data-active-swap]').forEach(btn=>btn.addEventListener('click',()=>handlers.selectActiveSwap(btn.dataset.activeSwap)));
+  reserveRoot.querySelectorAll('[data-reserve-pick]').forEach(btn=>btn.addEventListener('click',()=>handlers.selectReserveSwap(btn.dataset.reservePick)));
 }

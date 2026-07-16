@@ -9,7 +9,8 @@ export function initialState(){
     settings:{drawSize:64,courtCount:8,courtPrefix:'국제',matchMinutes:30},
     teams:[],
     prelim:{
-      settings:{threeTeamGroups:32,twoTeamGroups:2,courtCount:8,courtPrefix:'국제',qualifiersPerGroup:2},
+      settings:{activeTeamCount:96,threeTeamGroups:32,twoTeamGroups:0,courtCount:8,courtPrefix:'국제',qualifiersPerGroup:2},
+      activeTeams:[],reserveTeams:[],
       groups:[],matches:[],courts:[],qualifiers:[],
       linkedDraw:{active:false,drawSize:0,slots:[],createdAt:null,lastSyncedAt:null}
     },

@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#10264a">
   <title>230MATCH V3</title>
-  <link rel="stylesheet" href="./assets/css/tokens.css?v=3003">
-  <link rel="stylesheet" href="./assets/css/layout.css?v=3003">
-  <link rel="stylesheet" href="./assets/css/components.css?v=3003">
-  <link rel="stylesheet" href="./assets/css/responsive.css?v=3003">
+  <link rel="stylesheet" href="./assets/css/tokens.css?v=3004">
+  <link rel="stylesheet" href="./assets/css/layout.css?v=3004">
+  <link rel="stylesheet" href="./assets/css/components.css?v=3004">
+  <link rel="stylesheet" href="./assets/css/responsive.css?v=3004">
 </head>
 <body>
   <header class="topbar">
@@ -29,9 +29,9 @@
   <main class="app-shell">
     <section class="hero panel">
       <div>
-        <p class="eyebrow">STAGE 3 · PRELIM → DRAW</p>
-        <h1>예선 진행 중 본선 선추첨과 자동 슬롯 치환</h1>
-        <p>예선 미확정 슬롯을 조 순위 자리로 먼저 추첨하고, 순위 확정 시 실제 팀명으로 안전하게 치환합니다.</p>
+        <p class="eyebrow">STAGE 4 · PRELIM TEAM POOL</p>
+        <h1>예선 참가팀·후보팀 분리와 안전한 본선 연결</h1>
+        <p>전체 신청팀 중 예선 사용팀만 선택하고 나머지는 후보팀으로 분리한 뒤, 예선과 본선을 안전하게 연결합니다.</p>
       </div>
       <div class="hero-stats">
         <div><span>대진</span><strong id="heroDrawSize">-</strong></div>
@@ -148,6 +148,10 @@
 
         <div class="control-grid prelim-controls">
           <label>
+            <span>예선 사용팀 수</span>
+            <input id="prelimActiveTeamCount" type="number" min="2" value="96">
+          </label>
+          <label>
             <span>3팀조 수</span>
             <input id="threeTeamGroupCount" type="number" min="0" value="32">
           </label>
@@ -179,6 +183,7 @@
         </div>
 
         <div class="button-row">
+          <button id="autoFitPrelimBtn" class="btn btn-secondary">사용팀 수에 맞춰 조 자동계산</button>
           <button id="generatePrelimBtn" class="btn btn-primary">예선 조편성 생성</button>
           <button id="assignPrelimCourtsBtn" class="btn btn-purple">예선 코트배정</button>
           <button id="generateLinkedDrawBtn" class="btn btn-gold">예선 슬롯으로 본선 선추첨</button>
@@ -190,6 +195,8 @@
       </section>
 
       <section class="summary-grid">
+        <article class="summary-card"><span>예선 사용팀</span><strong id="prelimSummaryActiveTeams">0팀</strong></article>
+        <article class="summary-card"><span>후보팀</span><strong id="prelimSummaryReserveTeams">0팀</strong></article>
         <article class="summary-card"><span>예선 조</span><strong id="prelimSummaryGroups">0조</strong></article>
         <article class="summary-card"><span>예선 경기</span><strong id="prelimSummaryMatches">0</strong></article>
         <article class="summary-card"><span>완료 경기</span><strong id="prelimSummaryCompleted">0</strong></article>
@@ -199,6 +206,27 @@
         <article class="summary-card"><span>연결 본선 슬롯</span><strong id="prelimSummaryLinkedSlots">0</strong></article>
       </section>
 
+
+
+      <section class="panel reserve-panel">
+        <div class="section-head">
+          <div>
+            <h2>예선 참가팀 · 후보팀</h2>
+            <p>명단 앞에서부터 예선 사용팀으로 배정하고, 초과 인원은 후보팀으로 별도 보관합니다.</p>
+          </div>
+          <button id="swapReserveBtn" class="btn btn-light">후보 교체 모드</button>
+        </div>
+        <div class="team-pool-grid">
+          <section>
+            <h3>예선 참가팀 <span id="activePoolCount">0팀</span></h3>
+            <div id="activeTeamPool" class="team-pool empty-state"><p>예선 조편성을 생성하면 표시됩니다.</p></div>
+          </section>
+          <section>
+            <h3>후보팀 <span id="reservePoolCount">0팀</span></h3>
+            <div id="reserveTeamPool" class="team-pool empty-state"><p>후보팀이 없습니다.</p></div>
+          </section>
+        </div>
+      </section>
 
       <section class="panel linked-draw-panel">
         <div class="section-head">
@@ -293,6 +321,6 @@
     <div id="recoveryList" class="recovery-list"></div>
   </dialog>
 
-  <script type="module" src="./assets/js/app.js?v=3003"></script>
+  <script type="module" src="./assets/js/app.js?v=3004"></script>
 </body>
 </html>
