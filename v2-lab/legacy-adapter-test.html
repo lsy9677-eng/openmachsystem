@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>230MATCH V2 → 기존 앱 어댑터 검증</title>
+  <link rel="stylesheet" href="./assets/css/legacy-adapter-v121.css?v=121">
+</head>
+<body>
+  <main class="wrap">
+    <section class="panel">
+      <div class="summary">
+        <div>
+          <h1>V2 → 기존 앱 데이터 어댑터 검증</h1>
+          <p class="subtitle">V2를 단일 데이터 원본으로 유지하면서 기존 코트 현황 카드가 읽을 모델만 생성합니다. 기존 앱에는 쓰지 않습니다.</p>
+        </div>
+        <span id="statusBadge" class="badge">패키지 대기</span>
+      </div>
+      <strong id="targetText">V2 승인 패키지를 불러오세요.</strong>
+      <p id="summaryText" class="subtitle"></p>
+      <div class="toolbar">
+        <button id="loadStoredBtn" class="primary">V2 승인 패키지 불러오기</button>
+        <label class="file-label" for="fileInput">승인 JSON 선택</label>
+        <input id="fileInput" type="file" accept=".json,application/json">
+        <button id="downloadBtn" disabled>기존 앱 호환 모델 JSON 저장</button>
+      </div>
+      <div id="validationBox"></div>
+    </section>
+
+    <section class="panel">
+      <h2>기존 앱 스타일 코트 현황 미리보기</h2>
+      <div id="courtGrid" class="court-grid"></div>
+    </section>
+
+    <section class="panel">
+      <h2>공용대기</h2>
+      <div id="sharedQueue" class="queue-list"></div>
+    </section>
+  </main>
+  <script src="./assets/js/legacy-adapter-v121.js?v=121"></script>
+</body>
+</html>
