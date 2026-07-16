@@ -1,0 +1,87 @@
+
+import{loadState,saveState,clearState,saveRecovery,getRecoveries,deleteRecovery,initialState}from'./store.js';
+import{prepareTeams,generateDraw,allMatches,findMatch}from'./bracket-engine.js';
+import{buildCourts,assignInitial,queueReadyMatches}from'./court-engine.js';
+import{submitResult}from'./result-engine.js';
+import{downloadJson}from'./recovery.js';
+import{render,teamText}from'./ui.js';
+
+let state=loadState();
+const $=id=>document.getElementById(id);
+function log(message){state.logs.unshift({at:new Date().toISOString(),message});state.logs=state.logs.slice(0,300);}
+function commit(message){
+  if(message)log(message);syncInputs();saveState(state);render(state,{openResult});flashSaved();
+}
+function syncInputs(){
+  $('tournamentName').value=state.tournament.name;$('divisionName').value=state.tournament.division;
+  $('drawSize').value=String(state.settings.drawSize);$('courtCount').value=state.settings.courtCount;
+  $('courtPrefix').value=state.settings.courtPrefix;$('matchMinutes').value=state.settings.matchMinutes;
+}
+function pullSettings(){
+  state.tournament.name=$('tournamentName').value.trim()||'대회명 없음';
+  state.tournament.division=$('divisionName').value.trim()||'부서 없음';
+  state.settings.drawSize=Number($('drawSize').value);state.settings.courtCount=Number($('courtCount').value);
+  state.settings.courtPrefix=$('courtPrefix').value.trim()||'코트';state.settings.matchMinutes=Number($('matchMinutes').value);
+}
+function notice(message,type='info'){$('noticeBar').className=`notice ${type}`;$('noticeBar').textContent=message;}
+function flashSaved(){$('saveStateBadge').textContent='자동 저장됨';setTimeout(()=>$('saveStateBadge').textContent='자동 저장 ON',1200);}
+async function loadSample(){
+  const res=await fetch('./data/test-teams-100.json?v=3001');if(!res.ok)throw new Error('테스트 명단을 불러오지 못했습니다.');
+  const data=await res.json();state.teams=prepareTeams(data,128);commit(`테스트 명단 ${state.teams.length}팀 불러오기`);notice(`${state.teams.length}팀을 불러왔습니다. 새 본선 추첨을 실행하세요.`,'success');
+}
+async function readTeamFile(file){
+  const data=JSON.parse(await file.text());state.teams=prepareTeams(data,128);commit(`JSON 명단 ${state.teams.length}팀 불러오기`);notice(`${state.teams.length}팀을 불러왔습니다.`,'success');
+}
+function generate(){
+  pullSettings();state.draw=generateDraw(state.teams,state.settings.drawSize);state.courts=[];state.sharedQueue=[];
+  commit(`${state.draw.size}강 새 본선 추첨 · ${allMatches(state.draw).length}경기`);notice(`${state.draw.size}강 대진을 생성했습니다. 코트배정을 실행하세요.`,'success');
+}
+function assign(){
+  pullSettings();if(!state.draw.size)throw new Error('먼저 대진을 생성하세요.');
+  state.courts=buildCourts(state.settings.courtCount,state.settings.courtPrefix);
+  state.sharedQueue=assignInitial(state.draw,state.courts);
+  commit(`코트 ${state.courts.length}면 배정 · 공용대기 ${state.sharedQueue.length}경기`);notice('코트배정이 완료되었습니다.','success');
+}
+function openResult(matchId){
+  const m=findMatch(state.draw,matchId);if(!m)return;
+  $('resultMatchId').value=matchId;$('resultMatchLabel').textContent=`${teamText(m.teamA)} vs ${teamText(m.teamB)}`;
+  $('winnerSelect').innerHTML=`<option value="${m.teamA.id}">${teamText(m.teamA)}</option><option value="${m.teamB.id}">${teamText(m.teamB)}</option>`;
+  $('scoreA').value=6;$('scoreB').value=3;$('resultDialog').showModal();
+}
+function confirmResult(event){
+  event.preventDefault();
+  const id=$('resultMatchId').value;
+  const m=submitResult(state,{matchId:id,winnerId:$('winnerSelect').value,scoreA:$('scoreA').value,scoreB:$('scoreB').value});
+  commit(`결과 확정 · ${m.id} · 승리 ${teamText(m.winner)} · ${m.scoreA}:${m.scoreB}`);
+  $('resultDialog').close();notice('결과와 다음 라운드·코트 큐를 반영했습니다.','success');
+}
+function refreshQueue(){
+  queueReadyMatches(state,id=>findMatch(state.draw,id));commit('준비 경기 큐 재정렬');notice('준비 경기 큐를 재정렬했습니다.','success');
+}
+function hardReset(){
+  if(!confirm('V3의 현재 명단·대진·결과를 모두 초기화할까요?'))return;
+  clearState();state=initialState();commit('전체 초기화');notice('초기화했습니다.','info');
+}
+function showRecoveries(){
+  const root=$('recoveryList'),list=getRecoveries();
+  root.innerHTML=list.length?list.map(x=>`<article class="recovery-item"><div><b>${x.label}</b><small>${new Date(x.createdAt).toLocaleString('ko-KR')}</small></div><button class="btn btn-primary" data-restore="${x.id}">복구</button><button class="btn btn-danger-outline" data-delete="${x.id}">삭제</button></article>`).join(''):'<div class="empty-state"><p>저장된 복구점이 없습니다.</p></div>';
+  root.querySelectorAll('[data-restore]').forEach(b=>b.onclick=()=>{const item=getRecoveries().find(x=>x.id===b.dataset.restore);if(item){state=structuredClone(item.state);commit(`복구점 복원 · ${item.label}`);$('recoveryDialog').close();}});
+  root.querySelectorAll('[data-delete]').forEach(b=>b.onclick=()=>{deleteRecovery(b.dataset.delete);showRecoveries();});
+  $('recoveryDialog').showModal();
+}
+function bind(){
+  $('loadSampleBtn').onclick=()=>loadSample().catch(e=>notice(e.message,'error'));
+  $('teamFileInput').onchange=e=>{const f=e.target.files[0];if(f)readTeamFile(f).catch(err=>notice(err.message,'error'));};
+  $('generateDrawBtn').onclick=()=>{try{generate();}catch(e){notice(e.message,'error');}};
+  $('assignCourtsBtn').onclick=()=>{try{assign();}catch(e){notice(e.message,'error');}};
+  $('refreshQueueBtn').onclick=refreshQueue;$('resetBtn').onclick=hardReset;
+  $('confirmResultBtn').onclick=confirmResult;
+  $('exportJsonBtn').onclick=()=>downloadJson(`230match-v3-${Date.now()}.json`,state);
+  $('saveRecoveryBtn').onclick=()=>{const item=saveRecovery(state,`${state.tournament.name} · ${state.tournament.division}`);log(`복구점 저장 · ${item.label}`);saveState(state);render(state,{openResult});notice('복구점을 저장했습니다.','success');};
+  $('openRecoveryBtn').onclick=showRecoveries;$('closeRecoveryBtn').onclick=()=>$('recoveryDialog').close();
+  $('clearLogsBtn').onclick=()=>{state.logs=[];commit();};
+  document.querySelectorAll('.tab').forEach(tab=>tab.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));tab.classList.add('active');$(`view-${tab.dataset.view}`).classList.add('active');});
+  ['tournamentName','divisionName','drawSize','courtCount','courtPrefix','matchMinutes'].forEach(id=>$(id).addEventListener('change',()=>{pullSettings();commit('대회 설정 변경');}));
+}
+syncInputs();bind();render(state,{openResult});
+console.log('[230MATCH V3] stage1 clean core loaded · no legacy code · no Firebase writes');

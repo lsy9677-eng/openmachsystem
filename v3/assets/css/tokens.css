@@ -1,0 +1,15 @@
+
+:root{
+  --navy-950:#08162d;--navy-900:#10264a;--navy-800:#183765;
+  --blue-600:#2f68e8;--blue-500:#4179f2;--blue-100:#eaf1ff;
+  --gold-500:#e5aa00;--gold-100:#fff6d8;
+  --purple-600:#7541df;--green-600:#15936f;--red-600:#d43d4f;
+  --ink:#14213b;--muted:#68758b;--line:#cbd8ee;--surface:#fff;--canvas:#eef3fa;
+  --radius-sm:9px;--radius-md:14px;--radius-lg:20px;
+  --shadow:0 12px 32px rgba(14,39,80,.09);
+}
+*{box-sizing:border-box}
+html{color-scheme:light}
+body{margin:0;font-family:Inter,"Noto Sans KR","Apple SD Gothic Neo",Arial,sans-serif;background:var(--canvas);color:var(--ink)}
+button,input,select{font:inherit}
+button{cursor:pointer}
