@@ -811,7 +811,7 @@ function renderCandidatePreview(){
   box.innerHTML=`<table><thead><tr><th>#</th><th>조</th><th>순위</th><th>팀</th><th>소속</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 function openLegacyApp(){
-  const url=new URL('./dev.html',location.href);
+  const url=new URL('../dev.html',location.href);
   url.searchParams.set('__bridge','main-v2-readonly');
   url.searchParams.set('__ts',Date.now());
   BridgeState.legacyWindow=window.open(url.href,'230match_legacy_bridge');
