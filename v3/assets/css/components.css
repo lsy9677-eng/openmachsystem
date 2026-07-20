@@ -39,3 +39,8 @@ input,select{width:100%;border:1px solid #b9cae5;border-radius:10px;padding:11px
 .roulette-result-list div{border:1px solid var(--line);border-radius:8px;padding:8px;background:#f8fbff;font-size:12px}
 @keyframes rouletteSpin{to{transform:rotate(360deg)}}
 .draw-lock-badge{display:inline-flex;padding:4px 8px;border-radius:999px;background:#ffe4b8;color:#7a4f00;font-size:11px;font-weight:900}
+
+#instantDrawBtn,#rouletteDrawBtn,#seededDrawBtn{min-width:150px}
+#instantDrawBtn{box-shadow:0 0 0 2px rgba(16,38,74,.08)}
+#rouletteDrawBtn{background:linear-gradient(135deg,#f5c126,#df9d00)}
+#seededDrawBtn{background:linear-gradient(135deg,#7a4be8,#5931be)}

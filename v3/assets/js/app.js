@@ -39,6 +39,13 @@ async function loadSample(){
 async function readTeamFile(file){
   const data=JSON.parse(await file.text());state.teams=prepareTeams(data,128);commit(`JSON 명단 ${state.teams.length}팀 불러오기`);notice(`${state.teams.length}팀을 불러왔습니다.`,'success');
 }
+
+function runDrawMethod(method){
+  $('drawMethod').value=method;
+  state.settings.drawMethod=method;
+  generate();
+}
+
 function generate(){
   pullSettings();
   const check=canModifyDraw(state);if(!check.ok&&state.draw.size)throw new Error(check.reason);
@@ -292,7 +299,9 @@ function updateClock(){const el=$('currentClock');if(el)el.textContent=new Date(
 function bind(){
   $('loadSampleBtn').onclick=()=>loadSample().catch(e=>notice(e.message,'error'));
   $('teamFileInput').onchange=e=>{const f=e.target.files[0];if(f)readTeamFile(f).catch(err=>notice(err.message,'error'));};
-  $('generateDrawBtn').onclick=()=>{try{generate();}catch(e){notice(e.message,'error');}};
+  $('instantDrawBtn').onclick=()=>{try{runDrawMethod('instant');}catch(e){notice(e.message,'error');}};
+  $('rouletteDrawBtn').onclick=()=>{try{runDrawMethod('roulette');}catch(e){notice(e.message,'error');}};
+  $('seededDrawBtn').onclick=()=>{try{runDrawMethod('seeded');}catch(e){notice(e.message,'error');}};
   $('reshuffleDrawBtn').onclick=()=>{try{reshuffle();}catch(e){notice(e.message,'error');}};
   $('lockDrawBtn').onclick=()=>{try{setDrawLock();}catch(e){notice(e.message,'error');}};
   $('startRouletteBtn').onclick=startRoulette;$('skipRouletteBtn').onclick=finishRoulette;
@@ -320,4 +329,4 @@ function bind(){
   ['tournamentName','divisionName','drawSize','courtCount','courtPrefix','matchMinutes','drawMethod','byePriority'].forEach(id=>$(id).addEventListener('change',()=>{pullSettings();commit('대회 설정 변경');}));
 }
 syncInputs();syncPrelimInputs();bind();calculateTimeMetrics(state);render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap});restartTimeTimer();updateClock();setInterval(updateClock,1000);
-console.log('[230MATCH V3] stage6 draw-methods loaded · no legacy code · no Firebase writes');
+console.log('[230MATCH V3] stage6.1 explicit-draw-buttons loaded · no legacy code · no Firebase writes');

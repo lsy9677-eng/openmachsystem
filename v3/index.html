@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#10264a">
   <title>230MATCH V3</title>
-  <link rel="stylesheet" href="./assets/css/tokens.css?v=3006">
-  <link rel="stylesheet" href="./assets/css/layout.css?v=3006">
-  <link rel="stylesheet" href="./assets/css/components.css?v=3006">
-  <link rel="stylesheet" href="./assets/css/responsive.css?v=3006">
+  <link rel="stylesheet" href="./assets/css/tokens.css?v=30061">
+  <link rel="stylesheet" href="./assets/css/layout.css?v=30061">
+  <link rel="stylesheet" href="./assets/css/components.css?v=30061">
+  <link rel="stylesheet" href="./assets/css/responsive.css?v=30061">
 </head>
 <body>
   <header class="topbar">
@@ -29,8 +29,8 @@
   <main class="app-shell">
     <section class="hero panel">
       <div>
-        <p class="eyebrow">STAGE 6 · DRAW METHODS</p>
-        <h1>즉시추첨·룰렛추첨·시드분산 추첨</h1>
+        <p class="eyebrow">STAGE 6.1 · EXPLICIT DRAW BUTTONS</p>
+        <h1>추첨 방식을 버튼으로 바로 실행</h1>
         <p>기존 운영 방식의 즉시추첨과 룰렛추첨을 V3 독립 엔진으로 구현하고, 조 1위와 부전승을 안전하게 분산합니다.</p>
       </div>
       <div class="hero-stats">
@@ -77,7 +77,7 @@
             </select>
           </label>
           <label>
-            <span>추첨 방식</span>
+            <span>기본 추첨 방식(고급)</span>
             <select id="drawMethod">
               <option value="instant">즉시 추첨</option>
               <option value="roulette">룰렛 추첨</option>
@@ -114,14 +114,16 @@
         <div class="button-row">
           <button id="loadSampleBtn" class="btn btn-secondary">100팀 테스트 명단</button>
           <label class="btn btn-secondary file-button">명단 JSON 선택<input id="teamFileInput" type="file" accept=".json,application/json"></label>
-          <button id="generateDrawBtn" class="btn btn-primary">새 본선 추첨</button>
-          <button id="reshuffleDrawBtn" class="btn btn-secondary">본선 재추첨</button>
+          <button id="instantDrawBtn" class="btn btn-primary">즉시 추첨 실행</button>
+          <button id="rouletteDrawBtn" class="btn btn-gold">룰렛 추첨 실행</button>
+          <button id="seededDrawBtn" class="btn btn-purple">시드 분산 추첨 실행</button>
+          <button id="reshuffleDrawBtn" class="btn btn-secondary">현재 방식으로 재추첨</button>
           <button id="lockDrawBtn" class="btn btn-gold">본선 대진 잠금</button>
           <button id="assignCourtsBtn" class="btn btn-purple">본선 코트배정</button>
           <button id="resetBtn" class="btn btn-danger-outline">전체 초기화</button>
         </div>
 
-        <div id="noticeBar" class="notice info">명단을 불러온 뒤 새 본선 추첨을 실행하세요.</div>
+        <div id="noticeBar" class="notice info">명단을 불러온 뒤 원하는 추첨 버튼을 직접 누르세요.</div>
       </section>
 
       <section class="summary-grid">
@@ -378,6 +380,6 @@
     <div id="recoveryList" class="recovery-list"></div>
   </dialog>
 
-  <script type="module" src="./assets/js/app.js?v=3006"></script>
+  <script type="module" src="./assets/js/app.js?v=30061"></script>
 </body>
 </html>
