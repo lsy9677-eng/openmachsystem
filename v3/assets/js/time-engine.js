@@ -5,14 +5,24 @@ const fmt=iso=>iso?new Date(iso).toLocaleTimeString('ko-KR',{hour:'2-digit',minu
 export function ensureTimeState(state){
   if(!('autoTimeEnabled'in state.settings))state.settings.autoTimeEnabled=true;
   if(!('timeRefreshSeconds'in state.settings))state.settings.timeRefreshSeconds=30;
+  if(!('minimumMatchMinutes'in state.settings))state.settings.minimumMatchMinutes=30;
+  // 이전 단계의 기본값 30분은 새 기준 40분으로 자동 이전합니다.
+  if(!state.settings.matchMinutes || Number(state.settings.matchMinutes)===30)state.settings.matchMinutes=40;
+  if(Number(state.settings.minimumMatchMinutes)<20)state.settings.minimumMatchMinutes=30;
   if(!state.timeMetrics)state.timeMetrics={lastCalculatedAt:null,averageMinutes:0,longestWaitMinutes:0};
 }
 export function calculateTimeMetrics(state){
   ensureTimeState(state);
-  const base=Math.max(1,Number(state.settings.matchMinutes)||30);
+  const minimum=Math.max(20,Number(state.settings.minimumMatchMinutes)||30);
+  const base=Math.max(minimum,Number(state.settings.matchMinutes)||40);
   const matches=allMatches(state.draw);
-  const durations=matches.filter(m=>m.startedAt&&m.completedAt).map(m=>(new Date(m.completedAt)-new Date(m.startedAt))/60000).filter(v=>v>0&&v<300);
-  const avg=clamp(durations.length?durations.reduce((a,b)=>a+b,0)/durations.length:base,10,180);
+  // 테스트 중 몇 초 만에 결과를 입력한 경기는 실제 경기 평균에서 제외합니다.
+  const durations=matches.filter(m=>m.startedAt&&m.completedAt)
+    .map(m=>(new Date(m.completedAt)-new Date(m.startedAt))/60000)
+    .filter(v=>v>=minimum&&v<300);
+  // 실제 완료 경기와 기준시간을 함께 반영해 급격한 시간 변동을 막습니다.
+  const measured=durations.length?durations.reduce((a,b)=>a+b,0)/durations.length:base;
+  const avg=clamp(durations.length?((measured*durations.length+base*2)/(durations.length+2)):base,minimum,180);
   const now=Date.now();let longest=0;
   state.courts.forEach(c=>{
     let cursor=now;

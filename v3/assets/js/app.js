@@ -19,6 +19,7 @@ function syncInputs(){
   $('tournamentName').value=state.tournament.name;$('divisionName').value=state.tournament.division;
   $('drawSize').value=String(state.settings.drawSize);$('courtCount').value=state.settings.courtCount;
   $('courtPrefix').value=state.settings.courtPrefix;$('matchMinutes').value=state.settings.matchMinutes;
+  $('minimumMatchMinutes').value=state.settings.minimumMatchMinutes||30;
   $('autoTimeEnabled').checked=state.settings.autoTimeEnabled!==false;$('timeRefreshSeconds').value=String(state.settings.timeRefreshSeconds||30);
   $('drawMethod').value=state.settings.drawMethod||'instant';$('byePriority').value=state.settings.byePriority||'group-first';
 }
@@ -26,7 +27,9 @@ function pullSettings(){
   state.tournament.name=$('tournamentName').value.trim()||'대회명 없음';
   state.tournament.division=$('divisionName').value.trim()||'부서 없음';
   state.settings.drawSize=Number($('drawSize').value);state.settings.courtCount=Number($('courtCount').value);
-  state.settings.courtPrefix=$('courtPrefix').value.trim()||'코트';state.settings.matchMinutes=Number($('matchMinutes').value);
+  state.settings.courtPrefix=$('courtPrefix').value.trim()||'코트';
+  state.settings.minimumMatchMinutes=Math.max(20,Number($('minimumMatchMinutes').value)||30);
+  state.settings.matchMinutes=Math.max(state.settings.minimumMatchMinutes,Number($('matchMinutes').value)||40);
   state.settings.autoTimeEnabled=$('autoTimeEnabled').checked;state.settings.timeRefreshSeconds=Number($('timeRefreshSeconds').value)||30;
   state.settings.drawMethod=$('drawMethod').value;state.settings.byePriority=$('byePriority').value;
 }
@@ -360,7 +363,7 @@ function bind(){
   $('openRecoveryBtn').onclick=showRecoveries;$('closeRecoveryBtn').onclick=()=>$('recoveryDialog').close();
   $('clearLogsBtn').onclick=()=>{state.logs=[];commit();};
   document.querySelectorAll('.tab').forEach(tab=>tab.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));tab.classList.add('active');$(`view-${tab.dataset.view}`).classList.add('active');});
-  ['tournamentName','divisionName','drawSize','courtCount','courtPrefix','matchMinutes','drawMethod','byePriority'].forEach(id=>$(id).addEventListener('change',()=>{pullSettings();commit('대회 설정 변경');}));
+  ['tournamentName','divisionName','drawSize','courtCount','courtPrefix','matchMinutes','minimumMatchMinutes','drawMethod','byePriority'].forEach(id=>$(id).addEventListener('change',()=>{pullSettings();commit('대회 설정 변경');}));
 }
 syncInputs();syncPrelimInputs();bind();calculateTimeMetrics(state);render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap});restartTimeTimer();updateClock();setInterval(updateClock,1000);
-console.log('[230MATCH V3] stage6.2 draw-lock-safety loaded · no legacy code · no Firebase writes');
+console.log('[230MATCH V3] stage6.3 time-policy-40min loaded · no legacy code · no Firebase writes');
