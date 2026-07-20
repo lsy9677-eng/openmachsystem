@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#10264a">
   <title>230MATCH V3</title>
-  <link rel="stylesheet" href="./assets/css/tokens.css?v=3004">
-  <link rel="stylesheet" href="./assets/css/layout.css?v=3004">
-  <link rel="stylesheet" href="./assets/css/components.css?v=3004">
-  <link rel="stylesheet" href="./assets/css/responsive.css?v=3004">
+  <link rel="stylesheet" href="./assets/css/tokens.css?v=3005">
+  <link rel="stylesheet" href="./assets/css/layout.css?v=3005">
+  <link rel="stylesheet" href="./assets/css/components.css?v=3005">
+  <link rel="stylesheet" href="./assets/css/responsive.css?v=3005">
 </head>
 <body>
   <header class="topbar">
@@ -29,9 +29,9 @@
   <main class="app-shell">
     <section class="hero panel">
       <div>
-        <p class="eyebrow">STAGE 4 · PRELIM TEAM POOL</p>
-        <h1>예선 참가팀·후보팀 분리와 안전한 본선 연결</h1>
-        <p>전체 신청팀 중 예선 사용팀만 선택하고 나머지는 후보팀으로 분리한 뒤, 예선과 본선을 안전하게 연결합니다.</p>
+        <p class="eyebrow">STAGE 5 · TIME ENGINE</p>
+        <h1>대기시간 자동계산과 경기 진행시간 추적</h1>
+        <p>코트별 경기 시작시간과 대기 순서를 기준으로 예상 대기시간과 예상 입장시간을 자동 계산합니다.</p>
       </div>
       <div class="hero-stats">
         <div><span>대진</span><strong id="heroDrawSize">-</strong></div>
@@ -90,6 +90,12 @@
           </label>
         </div>
 
+        <div class="time-settings">
+          <label><span>진행시간 갱신</span><select id="timeRefreshSeconds"><option value="15">15초</option><option value="30" selected>30초</option><option value="60">60초</option></select></label>
+          <label class="toggle-label"><span>대기시간 자동계산</span><input id="autoTimeEnabled" type="checkbox" checked></label>
+          <button id="recalculateTimeBtn" class="btn btn-light">예상시간 즉시 계산</button>
+        </div>
+
         <div class="button-row">
           <button id="loadSampleBtn" class="btn btn-secondary">100팀 테스트 명단</button>
           <label class="btn btn-secondary file-button">명단 JSON 선택<input id="teamFileInput" type="file" accept=".json,application/json"></label>
@@ -108,6 +114,8 @@
         <article class="summary-card"><span>코트 대기1</span><strong id="summaryWait1">0</strong></article>
         <article class="summary-card"><span>공용대기</span><strong id="summaryShared">0</strong></article>
         <article class="summary-card"><span>자동 저장</span><strong id="summaryAutosave">ON</strong></article>
+        <article class="summary-card"><span>평균 진행시간</span><strong id="summaryAverageMinutes">0분</strong></article>
+        <article class="summary-card"><span>최장 예상대기</span><strong id="summaryLongestWait">0분</strong></article>
       </section>
 
       <section class="panel">
@@ -117,6 +125,12 @@
             <p>각 코트는 시합중 1경기와 대기1 1경기만 보유합니다.</p>
           </div>
           <button id="refreshQueueBtn" class="btn btn-light">큐 재정렬</button>
+        </div>
+        <div class="time-strip">
+          <div><span>현재 시각</span><strong id="currentClock">--:--:--</strong></div>
+          <div><span>마지막 계산</span><strong id="lastTimeCalculated">-</strong></div>
+          <div><span>기준 경기시간</span><strong id="baseMatchMinutes">30분</strong></div>
+          <div><span>자동계산</span><strong id="autoTimeStatus">ON</strong></div>
         </div>
         <div id="courtGrid" class="court-grid empty-state">
           <p>대진 생성과 코트배정을 실행하면 코트 카드가 표시됩니다.</p>
@@ -321,6 +335,6 @@
     <div id="recoveryList" class="recovery-list"></div>
   </dialog>
 
-  <script type="module" src="./assets/js/app.js?v=3004"></script>
+  <script type="module" src="./assets/js/app.js?v=3005"></script>
 </body>
 </html>

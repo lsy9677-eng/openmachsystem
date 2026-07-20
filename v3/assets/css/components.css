@@ -21,3 +21,8 @@ input,select{width:100%;border:1px solid #b9cae5;border-radius:10px;padding:11px
 .linked-status-card span{font-size:12px;color:var(--muted)}
 .linked-status-card.done{background:#edfbf2;border-color:#9dd8b2}
 .linked-status-card.locked{background:#fff1f2;border-color:#e5a2aa}
+
+.time-badge{display:inline-flex;align-items:center;padding:4px 7px;border-radius:999px;background:#eaf1ff;color:#2959a6;font-size:11px;font-weight:850}
+.time-badge.warn{background:#fff0cf;color:#8b5c00}.time-badge.danger{background:#ffe3e6;color:#a12838}
+.progress-track{height:6px;border-radius:999px;background:#dfe7f4;overflow:hidden;margin-top:6px}
+.progress-fill{height:100%;background:linear-gradient(90deg,#2f68e8,#e5aa00);width:0}

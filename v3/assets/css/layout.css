@@ -45,3 +45,10 @@
 .team-chip small{display:block;color:var(--muted);margin-top:2px}
 .team-chip button{border:0;background:#eef3fb;color:#29456f;border-radius:7px;padding:5px 7px;font-weight:800}
 .reserve-panel{border-color:#c8d6ea}
+
+.time-settings{display:grid;grid-template-columns:180px 220px auto;gap:10px;align-items:end;margin-top:14px;padding:12px;border:1px solid #d3deed;border-radius:12px;background:#f8fbff}
+.time-settings label{display:grid;gap:6px}.time-settings label>span{font-size:12px;font-weight:800;color:#526079}
+.toggle-label{grid-template-columns:1fr auto!important;align-items:center}.toggle-label input{width:22px;height:22px}
+.time-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.time-strip div{border:1px solid #d3deed;border-radius:11px;padding:10px 12px;background:#f8fbff}
+.time-strip span{display:block;font-size:11px;color:var(--muted)}.time-strip strong{display:block;margin-top:4px;font-size:16px}

@@ -9,7 +9,7 @@ export function assignInitial(draw,courts){
   const shared=[];
   let index=0;
   courts.forEach(c=>{
-    if(ready[index]){c.playing=ready[index].id;ready[index].status='playing';ready[index].court=c.name;index++;}
+    if(ready[index]){c.playing=ready[index].id;ready[index].status='playing';ready[index].court=c.name;ready[index].startedAt=new Date().toISOString();index++;}
   });
   courts.forEach(c=>{
     if(ready[index]){c.wait1=ready[index].id;ready[index].status='court_wait1';ready[index].court=c.name;index++;}
