@@ -14,7 +14,7 @@ export function render(state,handlers){
   setText('summaryTeams',`${state.teams.length}팀`);setText('summaryRound',currentRound(state));setText('summaryPlaying',playing);
   setText('summaryWait1',state.courts.filter(c=>c.wait1).length);setText('summaryShared',state.sharedQueue.length);
   setText('summaryAverageMinutes',`${state.timeMetrics?.averageMinutes||0}분`);setText('summaryLongestWait',`${state.timeMetrics?.longestWaitMinutes||0}분`);
-  setText('summaryDrawMethod',drawMethodLabel(state.drawMeta?.method));setText('summaryDrawLock',state.drawMeta?.locked?'잠금':'해제');
+  setText('summaryDrawMethod',drawMethodLabel(state.drawMeta?.method));setText('summaryDrawLock',state.drawMeta?.locked?'잠금':'해제');updateDrawLockInfo(state);
   setText('baseMatchMinutes',`${state.settings.matchMinutes||30}분`);setText('autoTimeStatus',state.settings.autoTimeEnabled?'ON':'OFF');
   setText('lastTimeCalculated',state.timeMetrics?.lastCalculatedAt?new Date(state.timeMetrics.lastCalculatedAt).toLocaleTimeString('ko-KR'):'-');
   setText('sharedQueueCount',`${state.sharedQueue.length}경기`);
@@ -168,4 +168,15 @@ function renderDrawHistory(state){
   if(!list.length){root.className='draw-history-list empty-state';root.innerHTML='<p>추첨 기록이 없습니다.</p>';return;}
   root.className='draw-history-list';
   root.innerHTML=list.map(x=>`<article class="draw-history-item"><time>${new Date(x.at).toLocaleString('ko-KR')}</time><div><b>${drawMethodLabel(x.method)} 추첨 · ${x.drawSize}강 · ${x.teamCount}팀</b><small>부전승 ${x.byePriority==='group-first'?'조 1위 우선':'전체 랜덤'} · 체크섬 ${x.checksum}</small></div><span class="draw-lock-badge">${x.checksum}</span></article>`).join('');
+}
+
+function updateDrawLockInfo(state){
+  const el=document.getElementById('drawLockInfo');if(!el)return;
+  if(state.drawMeta?.locked){
+    el.className='draw-lock-info locked';
+    el.innerHTML=`<strong>🔒 본선 대진 잠금 완료</strong><span>재추첨은 차단되었습니다. 코트배정·결과 입력·다음 라운드 진행은 계속할 수 있습니다.</span>`;
+  }else{
+    el.className='draw-lock-info unlocked';
+    el.innerHTML=`<strong>본선 대진 잠금 해제 상태</strong><span>추첨과 재추첨이 가능합니다. 대진 검토가 끝난 뒤 잠그세요.</span>`;
+  }
 }

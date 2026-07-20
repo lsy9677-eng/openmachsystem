@@ -1,7 +1,7 @@
 
 import{loadState,saveState,clearState,saveRecovery,getRecoveries,deleteRecovery,initialState}from'./store.js';
 import{prepareTeams,generateDraw,allMatches,findMatch,generateLinkedDrawSlots,syncLinkedDrawQualifiers}from'./bracket-engine.js';
-import{ensureDrawMeta,canModifyDraw,createDrawWithMethod,lockDraw,clearDrawHistory}from'./draw-method-engine.js';
+import{ensureDrawMeta,canModifyDraw,createDrawWithMethod,lockDraw,unlockDrawForDevelopment,clearDrawHistory}from'./draw-method-engine.js';
 import{buildCourts,assignInitial,queueReadyMatches}from'./court-engine.js';
 import{submitResult}from'./result-engine.js';
 import{ensurePrelimState,generatePrelim,assignPrelimCourts,findPrelimMatch,submitPrelimResult,resetPrelim,autoFitPrelimGroups,swapActiveReserveTeam}from'./prelim-engine.js';
@@ -99,8 +99,37 @@ function reshuffle(){
   commit(`본선 재추첨 · ${state.settings.drawMethod} · 체크섬 ${state.drawMeta.checksum}`);
   notice('본선 대진을 다시 추첨했습니다.','success');
 }
-function setDrawLock(){
-  lockDraw(state);commit(`본선 대진 잠금 · 체크섬 ${state.drawMeta.checksum}`);notice('본선 대진을 잠갔습니다.','success');
+function openDrawLockDialog(){
+  if(!state.draw?.size)throw new Error('잠글 본선 대진이 없습니다.');
+  if(state.drawMeta.locked)throw new Error('이미 본선 대진이 잠겨 있습니다.');
+  $('drawLockConfirmCheck').checked=false;
+  $('confirmDrawLockBtn').disabled=true;
+  $('lockDialogDrawSize').textContent=`${state.draw.size}강`;
+  $('lockDialogMethod').textContent=({instant:'즉시 추첨',roulette:'룰렛 추첨',seeded:'시드 분산'})[state.drawMeta.method]||'-';
+  $('lockDialogChecksum').textContent=state.drawMeta.checksum||'-';
+  $('drawLockDialog').showModal();
+}
+function confirmDrawLock(event){
+  event.preventDefault();
+  if(!$('drawLockConfirmCheck').checked)return;
+  lockDraw(state);
+  commit(`본선 대진 잠금 · 체크섬 ${state.drawMeta.checksum}`);
+  $('drawLockDialog').close();
+  notice('본선 대진을 잠갔습니다. 재추첨은 차단되고 경기 운영은 계속할 수 있습니다.','success');
+}
+function openDrawUnlockDialog(){
+  if(!state.drawMeta.locked)throw new Error('현재 본선 대진은 잠겨 있지 않습니다.');
+  $('unlockConfirmText').value='';
+  $('confirmDrawUnlockBtn').disabled=true;
+  $('drawUnlockDialog').showModal();
+}
+function confirmDrawUnlock(event){
+  event.preventDefault();
+  if($('unlockConfirmText').value.trim()!=='잠금해제')return;
+  unlockDrawForDevelopment(state);
+  commit('관리자 본선 대진 잠금 해제');
+  $('drawUnlockDialog').close();
+  notice('본선 대진 잠금을 해제했습니다. 경기가 시작되기 전에만 재추첨하세요.','success');
 }
 
 function assign(){
@@ -303,7 +332,12 @@ function bind(){
   $('rouletteDrawBtn').onclick=()=>{try{runDrawMethod('roulette');}catch(e){notice(e.message,'error');}};
   $('seededDrawBtn').onclick=()=>{try{runDrawMethod('seeded');}catch(e){notice(e.message,'error');}};
   $('reshuffleDrawBtn').onclick=()=>{try{reshuffle();}catch(e){notice(e.message,'error');}};
-  $('lockDrawBtn').onclick=()=>{try{setDrawLock();}catch(e){notice(e.message,'error');}};
+  $('lockDrawBtn').onclick=()=>{try{openDrawLockDialog();}catch(e){notice(e.message,'error');}};
+  $('unlockDrawBtn').onclick=()=>{try{openDrawUnlockDialog();}catch(e){notice(e.message,'error');}};
+  $('drawLockConfirmCheck').onchange=()=>{$('confirmDrawLockBtn').disabled=!$('drawLockConfirmCheck').checked;};
+  $('confirmDrawLockBtn').onclick=confirmDrawLock;
+  $('unlockConfirmText').oninput=()=>{$('confirmDrawUnlockBtn').disabled=$('unlockConfirmText').value.trim()!=='잠금해제';};
+  $('confirmDrawUnlockBtn').onclick=confirmDrawUnlock;
   $('startRouletteBtn').onclick=startRoulette;$('skipRouletteBtn').onclick=finishRoulette;
   $('cancelRouletteBtn').onclick=()=>{clearInterval(rouletteTimer);$('rouletteDialog').close();};
   $('clearDrawHistoryBtn').onclick=()=>{clearDrawHistory(state);commit('본선 추첨 기록 삭제');};
@@ -329,4 +363,4 @@ function bind(){
   ['tournamentName','divisionName','drawSize','courtCount','courtPrefix','matchMinutes','drawMethod','byePriority'].forEach(id=>$(id).addEventListener('change',()=>{pullSettings();commit('대회 설정 변경');}));
 }
 syncInputs();syncPrelimInputs();bind();calculateTimeMetrics(state);render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap});restartTimeTimer();updateClock();setInterval(updateClock,1000);
-console.log('[230MATCH V3] stage6.1 explicit-draw-buttons loaded · no legacy code · no Firebase writes');
+console.log('[230MATCH V3] stage6.2 draw-lock-safety loaded · no legacy code · no Firebase writes');
