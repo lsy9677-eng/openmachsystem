@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#10264a">
   <title>230MATCH V3</title>
-  <link rel="stylesheet" href="./assets/css/tokens.css?v=30062">
-  <link rel="stylesheet" href="./assets/css/layout.css?v=30062">
-  <link rel="stylesheet" href="./assets/css/components.css?v=30062">
-  <link rel="stylesheet" href="./assets/css/responsive.css?v=30062">
+  <link rel="stylesheet" href="./assets/css/tokens.css?v=30631">
+  <link rel="stylesheet" href="./assets/css/layout.css?v=30631">
+  <link rel="stylesheet" href="./assets/css/components.css?v=30631">
+  <link rel="stylesheet" href="./assets/css/responsive.css?v=30631">
 </head>
 <body>
   <header class="topbar">
@@ -29,9 +29,9 @@
   <main class="app-shell">
     <section class="hero panel">
       <div>
-        <p class="eyebrow">STAGE 6.2 · DRAW LOCK SAFETY</p>
-        <h1>본선 대진 잠금 안내와 안전한 해제</h1>
-        <p>대진 확정 전 확인사항을 안내하고, 실수로 재추첨되지 않도록 잠금과 제한적 해제를 안전하게 관리합니다.</p>
+        <p class="eyebrow">STAGE 6.3.1 · STARTUP FIX</p>
+        <h1>40분 경기시간 기준 · 시작 오류 수정</h1>
+        <p>경기 평균시간은 40분, 최소 예상시간은 30분으로 계산해 지나치게 짧은 대기시간이 표시되지 않도록 합니다.</p>
       </div>
       <div class="hero-stats">
         <div><span>대진</span><strong id="heroDrawSize">-</strong></div>
@@ -101,7 +101,11 @@
           </label>
           <label>
             <span>예상 경기시간</span>
-            <div class="input-suffix"><input id="matchMinutes" type="number" min="10" max="180" value="30"><b>분</b></div>
+            <div class="input-suffix"><input id="matchMinutes" type="number" min="30" max="180" value="40"><b>분</b></div>
+          </label>
+          <label>
+            <span>최소 예상시간</span>
+            <div class="input-suffix"><input id="minimumMatchMinutes" type="number" min="20" max="120" value="30"><b>분</b></div>
           </label>
         </div>
 
@@ -155,7 +159,7 @@
         <div class="time-strip">
           <div><span>현재 시각</span><strong id="currentClock">--:--:--</strong></div>
           <div><span>마지막 계산</span><strong id="lastTimeCalculated">-</strong></div>
-          <div><span>기준 경기시간</span><strong id="baseMatchMinutes">30분</strong></div>
+          <div><span>기준 경기시간</span><strong id="baseMatchMinutes">40분</strong></div>
           <div><span>자동계산</span><strong id="autoTimeStatus">ON</strong></div>
         </div>
         <div id="courtGrid" class="court-grid empty-state">
@@ -436,6 +440,6 @@
     <div id="recoveryList" class="recovery-list"></div>
   </dialog>
 
-  <script type="module" src="./assets/js/app.js?v=30062"></script>
+  <script type="module" src="./assets/js/app-v30631.js?v=30631"></script>
 </body>
 </html>
