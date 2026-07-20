@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#10264a">
   <title>230MATCH V3</title>
-  <link rel="stylesheet" href="./assets/css/tokens.css?v=3005">
-  <link rel="stylesheet" href="./assets/css/layout.css?v=3005">
-  <link rel="stylesheet" href="./assets/css/components.css?v=3005">
-  <link rel="stylesheet" href="./assets/css/responsive.css?v=3005">
+  <link rel="stylesheet" href="./assets/css/tokens.css?v=3006">
+  <link rel="stylesheet" href="./assets/css/layout.css?v=3006">
+  <link rel="stylesheet" href="./assets/css/components.css?v=3006">
+  <link rel="stylesheet" href="./assets/css/responsive.css?v=3006">
 </head>
 <body>
   <header class="topbar">
@@ -29,9 +29,9 @@
   <main class="app-shell">
     <section class="hero panel">
       <div>
-        <p class="eyebrow">STAGE 5 · TIME ENGINE</p>
-        <h1>대기시간 자동계산과 경기 진행시간 추적</h1>
-        <p>코트별 경기 시작시간과 대기 순서를 기준으로 예상 대기시간과 예상 입장시간을 자동 계산합니다.</p>
+        <p class="eyebrow">STAGE 6 · DRAW METHODS</p>
+        <h1>즉시추첨·룰렛추첨·시드분산 추첨</h1>
+        <p>기존 운영 방식의 즉시추첨과 룰렛추첨을 V3 독립 엔진으로 구현하고, 조 1위와 부전승을 안전하게 분산합니다.</p>
       </div>
       <div class="hero-stats">
         <div><span>대진</span><strong id="heroDrawSize">-</strong></div>
@@ -77,6 +77,21 @@
             </select>
           </label>
           <label>
+            <span>추첨 방식</span>
+            <select id="drawMethod">
+              <option value="instant">즉시 추첨</option>
+              <option value="roulette">룰렛 추첨</option>
+              <option value="seeded">시드 분산 추첨</option>
+            </select>
+          </label>
+          <label>
+            <span>부전승 우선</span>
+            <select id="byePriority">
+              <option value="group-first" selected>조 1위 우선</option>
+              <option value="random">전체 랜덤</option>
+            </select>
+          </label>
+          <label>
             <span>코트 수</span>
             <input id="courtCount" type="number" min="1" max="32" value="8">
           </label>
@@ -100,6 +115,8 @@
           <button id="loadSampleBtn" class="btn btn-secondary">100팀 테스트 명단</button>
           <label class="btn btn-secondary file-button">명단 JSON 선택<input id="teamFileInput" type="file" accept=".json,application/json"></label>
           <button id="generateDrawBtn" class="btn btn-primary">새 본선 추첨</button>
+          <button id="reshuffleDrawBtn" class="btn btn-secondary">본선 재추첨</button>
+          <button id="lockDrawBtn" class="btn btn-gold">본선 대진 잠금</button>
           <button id="assignCourtsBtn" class="btn btn-purple">본선 코트배정</button>
           <button id="resetBtn" class="btn btn-danger-outline">전체 초기화</button>
         </div>
@@ -116,6 +133,8 @@
         <article class="summary-card"><span>자동 저장</span><strong id="summaryAutosave">ON</strong></article>
         <article class="summary-card"><span>평균 진행시간</span><strong id="summaryAverageMinutes">0분</strong></article>
         <article class="summary-card"><span>최장 예상대기</span><strong id="summaryLongestWait">0분</strong></article>
+        <article class="summary-card"><span>추첨 방식</span><strong id="summaryDrawMethod">-</strong></article>
+        <article class="summary-card"><span>대진 잠금</span><strong id="summaryDrawLock">해제</strong></article>
       </section>
 
       <section class="panel">
@@ -282,6 +301,13 @@
     <section id="view-settings" class="view">
       <section class="panel">
         <div class="section-head"><div><h2>1단계 설정</h2><p>다음 단계 기능은 구조만 예약하고 아직 활성화하지 않습니다.</p></div></div>
+        <section class="draw-history-section">
+          <div class="section-head">
+            <div><h3>본선 추첨 기록</h3><p>추첨 시각·방식·대진 체크섬을 저장합니다.</p></div>
+            <button id="clearDrawHistoryBtn" class="btn btn-light">추첨 기록 지우기</button>
+          </div>
+          <div id="drawHistoryList" class="draw-history-list empty-state"><p>추첨 기록이 없습니다.</p></div>
+        </section>
         <div class="feature-roadmap">
           <article class="feature enabled"><b>현재 활성</b><h3>V3 단일 상태 저장소</h3><p>대진·코트·큐·결과를 한 객체에서 관리합니다.</p></article>
           <article class="feature enabled"><b>현재 활성</b><h3>브라우저 자동 저장</h3><p>변경 때마다 로컬에 저장하고 새로고침 후 복원합니다.</p></article>
@@ -300,6 +326,23 @@
       </section>
     </section>
   </main>
+
+
+  <dialog id="rouletteDialog" class="modal roulette-modal">
+    <div class="modal-head"><h2>본선 룰렛 추첨</h2><button id="cancelRouletteBtn" class="icon-button">×</button></div>
+    <div class="roulette-body">
+      <div class="roulette-stage">
+        <div class="roulette-ring"></div>
+        <div id="rouletteTeamName" class="roulette-team-name">추첨 준비</div>
+        <div id="rouletteProgress" class="roulette-progress">0 / 0</div>
+      </div>
+      <div class="roulette-actions">
+        <button id="startRouletteBtn" class="btn btn-primary">룰렛 시작</button>
+        <button id="skipRouletteBtn" class="btn btn-light">애니메이션 건너뛰기</button>
+      </div>
+      <div id="rouletteResultList" class="roulette-result-list"></div>
+    </div>
+  </dialog>
 
   <dialog id="resultDialog" class="modal">
     <form method="dialog" id="resultForm">
@@ -335,6 +378,6 @@
     <div id="recoveryList" class="recovery-list"></div>
   </dialog>
 
-  <script type="module" src="./assets/js/app.js?v=3005"></script>
+  <script type="module" src="./assets/js/app.js?v=3006"></script>
 </body>
 </html>

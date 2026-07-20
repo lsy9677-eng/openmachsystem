@@ -26,3 +26,16 @@ input,select{width:100%;border:1px solid #b9cae5;border-radius:10px;padding:11px
 .time-badge.warn{background:#fff0cf;color:#8b5c00}.time-badge.danger{background:#ffe3e6;color:#a12838}
 .progress-track{height:6px;border-radius:999px;background:#dfe7f4;overflow:hidden;margin-top:6px}
 .progress-fill{height:100%;background:linear-gradient(90deg,#2f68e8,#e5aa00);width:0}
+
+.roulette-modal{min-width:min(620px,94vw)}
+.roulette-body{padding:20px}
+.roulette-stage{position:relative;display:grid;place-items:center;min-height:250px;border-radius:18px;background:radial-gradient(circle at center,#19396b,#091831);overflow:hidden}
+.roulette-ring{position:absolute;width:190px;height:190px;border:12px solid rgba(255,255,255,.15);border-top-color:#f0b400;border-right-color:#2f68e8;border-radius:50%}
+.roulette-ring.spinning{animation:rouletteSpin .55s linear infinite}
+.roulette-team-name{position:relative;z-index:2;max-width:78%;text-align:center;color:#fff;font-size:22px;font-weight:900;line-height:1.35}
+.roulette-progress{position:absolute;bottom:18px;color:#c8d7f2;font-weight:800}
+.roulette-actions{display:flex;gap:8px;justify-content:center;margin-top:14px}
+.roulette-result-list{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;max-height:220px;overflow:auto;margin-top:14px}
+.roulette-result-list div{border:1px solid var(--line);border-radius:8px;padding:8px;background:#f8fbff;font-size:12px}
+@keyframes rouletteSpin{to{transform:rotate(360deg)}}
+.draw-lock-badge{display:inline-flex;padding:4px 8px;border-radius:999px;background:#ffe4b8;color:#7a4f00;font-size:11px;font-weight:900}

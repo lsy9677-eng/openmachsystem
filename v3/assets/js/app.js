@@ -1,6 +1,7 @@
 
 import{loadState,saveState,clearState,saveRecovery,getRecoveries,deleteRecovery,initialState}from'./store.js';
 import{prepareTeams,generateDraw,allMatches,findMatch,generateLinkedDrawSlots,syncLinkedDrawQualifiers}from'./bracket-engine.js';
+import{ensureDrawMeta,canModifyDraw,createDrawWithMethod,lockDraw,clearDrawHistory}from'./draw-method-engine.js';
 import{buildCourts,assignInitial,queueReadyMatches}from'./court-engine.js';
 import{submitResult}from'./result-engine.js';
 import{ensurePrelimState,generatePrelim,assignPrelimCourts,findPrelimMatch,submitPrelimResult,resetPrelim,autoFitPrelimGroups,swapActiveReserveTeam}from'./prelim-engine.js';
@@ -8,7 +9,7 @@ import{downloadJson}from'./recovery.js';
 import{ensureTimeState,calculateTimeMetrics}from'./time-engine.js';
 import{render,teamText}from'./ui.js';
 
-let state=loadState();ensurePrelimState(state);ensureTimeState(state);
+let state=loadState();ensurePrelimState(state);ensureTimeState(state);ensureDrawMeta(state);
 const $=id=>document.getElementById(id);
 function log(message){state.logs.unshift({at:new Date().toISOString(),message});state.logs=state.logs.slice(0,300);}
 function commit(message){
@@ -19,6 +20,7 @@ function syncInputs(){
   $('drawSize').value=String(state.settings.drawSize);$('courtCount').value=state.settings.courtCount;
   $('courtPrefix').value=state.settings.courtPrefix;$('matchMinutes').value=state.settings.matchMinutes;
   $('autoTimeEnabled').checked=state.settings.autoTimeEnabled!==false;$('timeRefreshSeconds').value=String(state.settings.timeRefreshSeconds||30);
+  $('drawMethod').value=state.settings.drawMethod||'instant';$('byePriority').value=state.settings.byePriority||'group-first';
 }
 function pullSettings(){
   state.tournament.name=$('tournamentName').value.trim()||'대회명 없음';
@@ -26,6 +28,7 @@ function pullSettings(){
   state.settings.drawSize=Number($('drawSize').value);state.settings.courtCount=Number($('courtCount').value);
   state.settings.courtPrefix=$('courtPrefix').value.trim()||'코트';state.settings.matchMinutes=Number($('matchMinutes').value);
   state.settings.autoTimeEnabled=$('autoTimeEnabled').checked;state.settings.timeRefreshSeconds=Number($('timeRefreshSeconds').value)||30;
+  state.settings.drawMethod=$('drawMethod').value;state.settings.byePriority=$('byePriority').value;
 }
 function notice(message,type='info'){$('noticeBar').className=`notice ${type}`;$('noticeBar').textContent=message;}
 function flashSaved(){$('saveStateBadge').textContent='자동 저장됨';setTimeout(()=>$('saveStateBadge').textContent='자동 저장 ON',1200);}
@@ -37,9 +40,62 @@ async function readTeamFile(file){
   const data=JSON.parse(await file.text());state.teams=prepareTeams(data,128);commit(`JSON 명단 ${state.teams.length}팀 불러오기`);notice(`${state.teams.length}팀을 불러왔습니다.`,'success');
 }
 function generate(){
-  pullSettings();state.draw=generateDraw(state.teams,state.settings.drawSize);state.courts=[];state.sharedQueue=[];
-  commit(`${state.draw.size}강 새 본선 추첨 · ${allMatches(state.draw).length}경기`);notice(`${state.draw.size}강 대진을 생성했습니다. 코트배정을 실행하세요.`,'success');
+  pullSettings();
+  const check=canModifyDraw(state);if(!check.ok&&state.draw.size)throw new Error(check.reason);
+  if(state.settings.drawMethod==='roulette'){openRoulette();return;}
+  state.draw=createDrawWithMethod(state,state.teams,state.settings.drawSize,{method:state.settings.drawMethod,byePriority:state.settings.byePriority});
+  state.courts=[];state.sharedQueue=[];
+  commit(`${state.draw.size}강 ${state.settings.drawMethod==='seeded'?'시드 분산':'즉시'} 추첨 · ${allMatches(state.draw).length}경기`);
+  notice(`${state.draw.size}강 대진을 생성했습니다. 코트배정을 실행하세요.`,'success');
 }
+
+let rouletteTimer=null,roulettePreparedTeams=[];
+function openRoulette(){
+  if(state.teams.length<2)throw new Error('최소 2팀이 필요합니다.');
+  roulettePreparedTeams=[...state.teams];
+  $('rouletteTeamName').textContent='추첨 준비';
+  $('rouletteProgress').textContent=`0 / ${roulettePreparedTeams.length}`;
+  $('rouletteResultList').innerHTML='';
+  $('rouletteDialog').showModal();
+}
+function startRoulette(){
+  clearInterval(rouletteTimer);
+  const ring=$('rouletteDialog').querySelector('.roulette-ring');ring.classList.add('spinning');
+  let ticks=0;
+  rouletteTimer=setInterval(()=>{
+    const team=roulettePreparedTeams[Math.floor(Math.random()*roulettePreparedTeams.length)];
+    $('rouletteTeamName').textContent=teamText(team);
+    ticks++;
+    $('rouletteProgress').textContent=`${Math.min(ticks,roulettePreparedTeams.length)} / ${roulettePreparedTeams.length}`;
+    if(ticks>=Math.min(roulettePreparedTeams.length,36)){
+      clearInterval(rouletteTimer);ring.classList.remove('spinning');finishRoulette();
+    }
+  },90);
+}
+function finishRoulette(){
+  state.draw=createDrawWithMethod(state,state.teams,state.settings.drawSize,{method:'roulette',byePriority:state.settings.byePriority});
+  state.courts=[];state.sharedQueue=[];
+  const first=state.draw.rounds[state.draw.size]||[];
+  $('rouletteResultList').innerHTML=first.slice(0,12).map((m,i)=>`<div>${i+1}. ${teamText(m.teamA)} vs ${teamText(m.teamB)}</div>`).join('');
+  $('rouletteTeamName').textContent='추첨 완료';
+  $('rouletteProgress').textContent=`${state.teams.length}팀 배치 완료`;
+  commit(`${state.draw.size}강 룰렛 추첨 · ${allMatches(state.draw).length}경기`);
+  notice('룰렛 추첨을 완료했습니다.','success');
+  setTimeout(()=>$('rouletteDialog').close(),900);
+}
+function reshuffle(){
+  pullSettings();const check=canModifyDraw(state);if(!check.ok)throw new Error(check.reason);
+  if(!state.draw.size)throw new Error('재추첨할 본선 대진이 없습니다.');
+  if(state.settings.drawMethod==='roulette'){openRoulette();return;}
+  state.draw=createDrawWithMethod(state,state.teams,state.settings.drawSize,{method:state.settings.drawMethod,byePriority:state.settings.byePriority});
+  state.courts=[];state.sharedQueue=[];
+  commit(`본선 재추첨 · ${state.settings.drawMethod} · 체크섬 ${state.drawMeta.checksum}`);
+  notice('본선 대진을 다시 추첨했습니다.','success');
+}
+function setDrawLock(){
+  lockDraw(state);commit(`본선 대진 잠금 · 체크섬 ${state.drawMeta.checksum}`);notice('본선 대진을 잠갔습니다.','success');
+}
+
 function assign(){
   pullSettings();if(!state.draw.size)throw new Error('먼저 대진을 생성하세요.');
   state.courts=buildCourts(state.settings.courtCount,state.settings.courtPrefix);
@@ -159,7 +215,7 @@ function createLinkedDraw(){
     Number($('drawSize').value)
   );
   state.settings.drawSize=Number($('drawSize').value);
-  state.draw=generateDraw(slots,state.settings.drawSize);
+  state.draw=createDrawWithMethod(state,slots,state.settings.drawSize,{method:state.settings.drawMethod||'instant',byePriority:state.settings.byePriority||'group-first'});
   state.courts=[];
   state.sharedQueue=[];
   state.prelim.linkedDraw={
@@ -237,6 +293,11 @@ function bind(){
   $('loadSampleBtn').onclick=()=>loadSample().catch(e=>notice(e.message,'error'));
   $('teamFileInput').onchange=e=>{const f=e.target.files[0];if(f)readTeamFile(f).catch(err=>notice(err.message,'error'));};
   $('generateDrawBtn').onclick=()=>{try{generate();}catch(e){notice(e.message,'error');}};
+  $('reshuffleDrawBtn').onclick=()=>{try{reshuffle();}catch(e){notice(e.message,'error');}};
+  $('lockDrawBtn').onclick=()=>{try{setDrawLock();}catch(e){notice(e.message,'error');}};
+  $('startRouletteBtn').onclick=startRoulette;$('skipRouletteBtn').onclick=finishRoulette;
+  $('cancelRouletteBtn').onclick=()=>{clearInterval(rouletteTimer);$('rouletteDialog').close();};
+  $('clearDrawHistoryBtn').onclick=()=>{clearDrawHistory(state);commit('본선 추첨 기록 삭제');};
   $('assignCourtsBtn').onclick=()=>{try{assign();}catch(e){notice(e.message,'error');}};
   $('refreshQueueBtn').onclick=refreshQueue;$('resetBtn').onclick=hardReset;
   $('recalculateTimeBtn').onclick=()=>{pullSettings();calculateTimeMetrics(state);commit('예상 대기시간 즉시 계산');notice('예상시간을 다시 계산했습니다.','success');};
@@ -256,7 +317,7 @@ function bind(){
   $('openRecoveryBtn').onclick=showRecoveries;$('closeRecoveryBtn').onclick=()=>$('recoveryDialog').close();
   $('clearLogsBtn').onclick=()=>{state.logs=[];commit();};
   document.querySelectorAll('.tab').forEach(tab=>tab.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));tab.classList.add('active');$(`view-${tab.dataset.view}`).classList.add('active');});
-  ['tournamentName','divisionName','drawSize','courtCount','courtPrefix','matchMinutes'].forEach(id=>$(id).addEventListener('change',()=>{pullSettings();commit('대회 설정 변경');}));
+  ['tournamentName','divisionName','drawSize','courtCount','courtPrefix','matchMinutes','drawMethod','byePriority'].forEach(id=>$(id).addEventListener('change',()=>{pullSettings();commit('대회 설정 변경');}));
 }
 syncInputs();syncPrelimInputs();bind();calculateTimeMetrics(state);render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap});restartTimeTimer();updateClock();setInterval(updateClock,1000);
-console.log('[230MATCH V3] stage5 time-engine loaded · no legacy code · no Firebase writes');
+console.log('[230MATCH V3] stage6 draw-methods loaded · no legacy code · no Firebase writes');
