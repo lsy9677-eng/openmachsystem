@@ -35,3 +35,59 @@ export function ensureMessagingState(state){
 
 export function mergePendingDuplicates(state){ensureMessagingState(state);const seen=new Map(),removeIds=new Set();let removed=0;[...state.messaging.queue].sort((a,b)=>new Date(b.updatedAt||b.createdAt)-new Date(a.updatedAt||a.createdAt)).forEach(item=>{if(item.status==='sent')return;const key=item.identityKey||[item.type,item.matchId,item.teamId||item.teamName].join('|');if(!seen.has(key)){seen.set(key,item);return}const keep=seen.get(key);keep.history=Array.isArray(keep.history)?keep.history:[];keep.history.push({at:item.updatedAt||item.createdAt,body:item.body},...(item.history||[]));keep.history=keep.history.slice(0,20);removeIds.add(item.id);removed++});state.messaging.queue=state.messaging.queue.filter(x=>!removeIds.has(x.id));return{removed}}
 export function getMessageHistory(state,id){const item=state.messaging.queue.find(x=>x.id===id);return item?[{at:item.updatedAt||item.createdAt,body:item.body,current:true},...(item.history||[])]:[]}
+
+
+export function generatePlayingMessages(state,id,court){
+  const m=findMatch(state.draw,id);
+  return m?both(m,(t,o)=>add(state,{type:'playing',match:m,team:t,opponent:o,court,suffix:m.startedAt||''})):[];
+}
+
+
+export function generateWait1Messages(state,id,court){
+  const m=findMatch(state.draw,id);
+  return m?both(m,(t,o)=>add(state,{type:'wait1',match:m,team:t,opponent:o,court,wait:m.estimatedWaitMinutes||0,start:fmt(m.estimatedStartAt),suffix:m.estimatedStartAt||''})):[];
+}
+
+
+export function refreshMessageContacts(state){
+  ensureMessagingState(state);
+  let converted=0,updated=0;
+  state.messaging.queue.forEach(item=>{
+    const team=state.teams.find(t=>t.id===item.teamId||t.name===item.teamName);
+    const phone=teamPhone(state,team);
+    if(phone&&item.phone!==phone){item.phone=phone;updated++;}
+    if(phone&&item.status==='no-phone'){item.status='pending';converted++;}
+    if(!phone&&item.status==='pending')item.status='no-phone';
+  });
+  return{converted,updated};
+}
+
+
+export function generateCurrentCourtMessages(state){
+  const added=[];state.courts.forEach(c=>{if(c.playing)added.push(...generatePlayingMessages(state,c.playing,c.name));if(c.wait1)added.push(...generateWait1Messages(state,c.wait1,c.name));});return added;
+}
+
+
+export function generateCurrentWaitMessages(state){
+  const added=[];state.courts.forEach(c=>{if(c.wait1)added.push(...generateWait1Messages(state,c.wait1,c.name));});return added;
+}
+
+
+export function generateAllTimeMessages(state){
+  const added=generateCurrentWaitMessages(state);state.sharedQueue.forEach((id,index)=>added.push(...generateSharedMessages(state,id,index+1)));return added;
+}
+
+
+export function markMessageSent(state,id){ensureMessagingState(state);const item=state.messaging.queue.find(x=>x.id===id);if(!item)return;item.status='sent';item.sentAt=new Date().toISOString();}
+
+
+export function deleteMessage(state,id){ensureMessagingState(state);state.messaging.queue=state.messaging.queue.filter(x=>x.id!==id);}
+
+
+export function clearSentMessages(state){ensureMessagingState(state);state.messaging.queue=state.messaging.queue.filter(x=>x.status!=='sent');}
+
+
+export function markAllSent(state){ensureMessagingState(state);const now=new Date().toISOString();state.messaging.queue.forEach(x=>{if(x.status==='pending'){x.status='sent';x.sentAt=now;}});}
+
+
+export function smsUri(item){if(!item?.phone)return'';return `sms:${encodeURIComponent(item.phone)}?body=${encodeURIComponent(item.body||'')}`;}
