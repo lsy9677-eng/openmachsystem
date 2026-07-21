@@ -29,9 +29,9 @@
   <main class="app-shell">
     <section class="hero panel">
       <div>
-        <p class="eyebrow">STAGE 9.1.2 · MESSAGE ENGINE REBUILD</p>
-        <h1>코트배정 중 문자 엔진 오류 수정</h1>
-        <p>같은 경기·같은 팀의 미발송 문자는 새로 쌓지 않고 예상시간과 대기순서를 최신 내용으로 자동 갱신합니다.</p>
+        <p class="eyebrow">STAGE 10 · OPERATION AUDIT</p>
+        <h1>운영 전 자동점검과 복제 모의대회</h1>
+        <p>실제 운영 데이터를 건드리지 않고 복제 상태에서 전체 대회를 완주해 대진·코트·큐·승자 진출 오류를 사전에 점검합니다.</p>
       </div>
       <div class="hero-stats">
         <div><span>대진</span><strong id="heroDrawSize">-</strong></div>
@@ -48,6 +48,7 @@
       <button class="tab" data-view="settings">대회 설정</button>
       <button class="tab" data-view="roster">참가팀 연락처</button>
       <button class="tab" data-view="messages">문자 센터</button>
+      <button class="tab" data-view="audit">운영 점검</button>
       <button class="tab" data-view="logs">운영 로그</button>
     </nav>
 
@@ -129,6 +130,7 @@
           <button id="lockDrawBtn" class="btn btn-gold">본선 대진 잠금</button>
           <button id="unlockDrawBtn" class="btn btn-danger-outline">관리자 잠금 해제</button>
           <button id="assignCourtsBtn" class="btn btn-purple">본선 코트배정</button>
+          <button id="quickAuditBtn" class="btn btn-secondary">운영 상태 점검</button>
           <button id="resetBtn" class="btn btn-danger-outline">전체 초기화</button>
         </div>
 
@@ -152,6 +154,7 @@
         <article class="summary-card"><span>대진 잠금</span><strong id="summaryDrawLock">해제</strong></article>
         <article class="summary-card"><span>발송 대기 문자</span><strong id="summaryPendingMessages">0건</strong></article>
         <article class="summary-card"><span>연락처 등록</span><strong id="summaryPhoneTeams">0팀</strong></article>
+        <article class="summary-card"><span>운영 점검</span><strong id="summaryAuditStatus">미실행</strong></article>
       </section>
 
       <section class="panel">
@@ -409,6 +412,48 @@
       </section>
     </section>
 
+
+    <section id="view-audit" class="view">
+      <section class="panel">
+        <div class="section-head">
+          <div>
+            <h2>운영 전 자동점검</h2>
+            <p>현재 상태를 검사하고, 별도의 복제 상태에서 본선 전체를 자동 완주합니다. 실제 대진·결과·문자는 변경하지 않습니다.</p>
+          </div>
+          <span class="badge badge-safe">원본 데이터 미변경</span>
+        </div>
+
+        <div class="audit-action-row">
+          <button id="runStateAuditBtn" class="btn btn-primary">현재 상태 점검</button>
+          <button id="runFullSimulationBtn" class="btn btn-purple">복제 모의대회 완주</button>
+          <button id="runAllAuditBtn" class="btn btn-gold">전체 점검 실행</button>
+          <button id="downloadAuditBtn" class="btn btn-light">점검 결과 JSON 저장</button>
+          <button id="clearAuditBtn" class="btn btn-danger-outline">점검 결과 지우기</button>
+        </div>
+
+        <div class="audit-explain">
+          <strong>검사항목</strong>
+          <span>대진 경기 수 · 중복 코트배정 · 큐 중복 · 누락 경기 · 미확정 슬롯 · 승자 진출 · 결승 완료 · 문자 중복 · 연락처 상태</span>
+        </div>
+      </section>
+
+      <section class="summary-grid">
+        <article class="summary-card"><span>통과</span><strong id="auditPassCount">0</strong></article>
+        <article class="summary-card"><span>주의</span><strong id="auditWarnCount">0</strong></article>
+        <article class="summary-card"><span>오류</span><strong id="auditFailCount">0</strong></article>
+        <article class="summary-card"><span>모의 완료 경기</span><strong id="auditSimCompleted">0</strong></article>
+        <article class="summary-card"><span>모의 우승팀</span><strong id="auditSimWinner">-</strong></article>
+      </section>
+
+      <section class="panel">
+        <div class="section-head">
+          <div><h2>점검 결과</h2><p id="auditLastRunText">아직 실행하지 않았습니다.</p></div>
+          <span id="auditOverallBadge" class="badge badge-muted-dark">미실행</span>
+        </div>
+        <div id="auditResultList" class="audit-result-list empty-state"><p>점검을 실행하면 결과가 표시됩니다.</p></div>
+      </section>
+    </section>
+
     <section id="view-logs" class="view">
       <section class="panel">
         <div class="section-head"><div><h2>운영 로그</h2><p>중요 상태 변경을 시간순으로 기록합니다.</p></div><button id="clearLogsBtn" class="btn btn-light">로그 지우기</button></div>
@@ -539,6 +584,6 @@
     <div id="recoveryList" class="recovery-list"></div>
   </dialog>
 
-  <script type="module" src="./assets/js/app-v309012.js?v=3090121"></script>
+  <script type="module" src="./assets/js/app-v31000.js?v=31000"></script>
 </body>
 </html>

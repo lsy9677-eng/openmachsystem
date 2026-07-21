@@ -17,7 +17,7 @@ export function initialState(){
       linkedDraw:{active:false,drawSize:0,slots:[],createdAt:null,lastSyncedAt:null}
     },
     draw:{size:0,rounds:{}},courts:[],sharedQueue:[],
-    logs:[],updatedAt:null
+    audit:{lastRunAt:null,overall:'not-run',results:[],simulation:null},logs:[],updatedAt:null
   };
 }
 export function loadState(){

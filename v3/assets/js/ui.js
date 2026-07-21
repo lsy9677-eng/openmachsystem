@@ -15,11 +15,11 @@ export function render(state,handlers){
   setText('summaryTeams',`${state.teams.length}팀`);setText('summaryRound',currentRound(state));setText('summaryPlaying',playing);
   setText('summaryWait1',state.courts.filter(c=>c.wait1).length);setText('summaryShared',state.sharedQueue.length);
   setText('summaryAverageMinutes',`${state.timeMetrics?.averageMinutes||0}분`);setText('summaryLongestWait',`${state.timeMetrics?.longestWaitMinutes||0}분`);
-  setText('summaryDrawMethod',drawMethodLabel(state.drawMeta?.method));setText('summaryDrawLock',state.drawMeta?.locked?'잠금':'해제');setText('summaryPendingMessages',`${state.messaging?.queue?.filter(x=>x.status==='pending'||x.status==='no-phone').length||0}건`);setText('summaryPhoneTeams',`${contactStats(state).withPhone}팀`);renderContactRoster(state,handlers);updateDrawLockInfo(state);renderMessageCenter(state,handlers);
+  setText('summaryDrawMethod',drawMethodLabel(state.drawMeta?.method));setText('summaryDrawLock',state.drawMeta?.locked?'잠금':'해제');setText('summaryPendingMessages',`${state.messaging?.queue?.filter(x=>x.status==='pending'||x.status==='no-phone').length||0}건`);setText('summaryPhoneTeams',`${contactStats(state).withPhone}팀`);setText('summaryAuditStatus',auditLabel(state.audit?.overall));renderContactRoster(state,handlers);updateDrawLockInfo(state);renderMessageCenter(state,handlers);
   setText('baseMatchMinutes',`${state.settings.matchMinutes||30}분`);setText('autoTimeStatus',state.settings.autoTimeEnabled?'ON':'OFF');
   setText('lastTimeCalculated',state.timeMetrics?.lastCalculatedAt?new Date(state.timeMetrics.lastCalculatedAt).toLocaleTimeString('ko-KR'):'-');
   setText('sharedQueueCount',`${state.sharedQueue.length}경기`);
-  renderCourts(state,handlers);renderQueue(state);renderPrelim(state,handlers);renderBracket(state);renderDrawHistory(state);renderLogs(state);
+  renderCourts(state,handlers);renderQueue(state);renderPrelim(state,handlers);renderBracket(state);renderDrawHistory(state);renderAudit(state);renderLogs(state);
 }
 function setText(id,value){const el=document.getElementById(id);if(el)el.textContent=value;}
 function currentRound(state){
@@ -208,4 +208,28 @@ function renderContactRoster(state,handlers){
     <div class="contact-card-actions"><button class="btn btn-primary" data-contact-edit="${team.id}">연락처 수정</button></div></article>`;
   }).join('');
   root.querySelectorAll('[data-contact-edit]').forEach(b=>b.onclick=()=>handlers.openContactEdit(b.dataset.contactEdit));
+}
+
+function auditLabel(value){return({pass:'통과',warn:'주의',fail:'오류','not-run':'미실행'})[value]||'미실행';}
+function renderAudit(state){
+  const audit=state.audit||{overall:'not-run',results:[],simulation:null};
+  setText('auditPassCount',audit.results.filter(x=>x.level==='pass').length);
+  setText('auditWarnCount',audit.results.filter(x=>x.level==='warn').length);
+  setText('auditFailCount',audit.results.filter(x=>x.level==='fail').length);
+  setText('auditSimCompleted',audit.simulation?.completedMatches||0);
+  setText('auditSimWinner',audit.simulation?.winner?.name||'-');
+  setText('auditLastRunText',audit.lastRunAt?`마지막 실행 ${new Date(audit.lastRunAt).toLocaleString('ko-KR')}`:'아직 실행하지 않았습니다.');
+  const badge=document.getElementById('auditOverallBadge');
+  if(badge){
+    badge.textContent=auditLabel(audit.overall);
+    badge.className=`badge ${audit.overall==='pass'?'badge-safe':audit.overall==='fail'?'badge-danger':'badge-muted-dark'}`;
+  }
+  const root=document.getElementById('auditResultList');if(!root)return;
+  if(!audit.results.length){root.className='audit-result-list empty-state';root.innerHTML='<p>점검을 실행하면 결과가 표시됩니다.</p>';return;}
+  root.className='audit-result-list';
+  root.innerHTML=audit.results.map(x=>`<article class="audit-item ${x.level}">
+    <strong>${x.level==='pass'?'통과':x.level==='warn'?'주의':'오류'}</strong>
+    <div><b>${x.title}</b><p>${x.detail}</p></div>
+    <span class="audit-code">${x.code}</span>
+  </article>`).join('');
 }
