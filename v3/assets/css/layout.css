@@ -89,3 +89,13 @@
 .audit-item strong{font-size:13px}
 .audit-item p{margin:3px 0 0;color:var(--muted);font-size:12px}
 .audit-code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:11px;color:#526079}
+
+.venue-settings-section{margin-bottom:18px;padding-bottom:18px;border-bottom:1px solid var(--line)}
+.venue-settings-list{display:grid;gap:9px;margin-top:12px}
+.venue-row{display:grid;grid-template-columns:1.4fr 120px 1.2fr auto;gap:9px;align-items:end;padding:11px;border:1px solid #d3deed;border-radius:11px;background:#f8fbff}
+.venue-row label{display:grid;gap:6px}
+.venue-row label>span{font-size:11px;font-weight:800;color:#526079}
+.venue-group{grid-column:1/-1;margin-top:16px}
+.venue-group:first-child{margin-top:0}
+.venue-group-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding:10px 12px;border-radius:11px;background:#eaf1ff}
+.venue-group-head h3{margin:0;font-size:16px}.venue-group-head span{font-size:12px;color:#46618d;font-weight:800}

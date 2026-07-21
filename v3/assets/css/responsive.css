@@ -24,3 +24,6 @@
 @media(max-width:700px){.roster-tools,.contact-roster-list{grid-template-columns:1fr}.contact-help{flex-direction:column}}
 
 @media(max-width:700px){.audit-item{grid-template-columns:1fr}.audit-explain{flex-direction:column}}
+
+@media(max-width:850px){.venue-row{grid-template-columns:1fr 100px}.venue-row .venue-prefix{grid-column:1/-1}}
+@media(max-width:600px){.venue-row{grid-template-columns:1fr}}

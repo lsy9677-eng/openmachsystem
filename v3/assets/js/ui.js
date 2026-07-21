@@ -2,6 +2,7 @@
 import{allMatches,roundLabel,findMatch}from'./bracket-engine.js';
 import{timeInfo}from'./time-engine.js';
 import{contactStats,getTeamContact}from'./contact-engine.js';
+import{venueStats}from'./venue-engine.js';
 export function teamText(team){
   if(!team)return'TBD';
   if(team.placeholder)return`${team.name}`;
@@ -15,7 +16,7 @@ export function render(state,handlers){
   setText('summaryTeams',`${state.teams.length}팀`);setText('summaryRound',currentRound(state));setText('summaryPlaying',playing);
   setText('summaryWait1',state.courts.filter(c=>c.wait1).length);setText('summaryShared',state.sharedQueue.length);
   setText('summaryAverageMinutes',`${state.timeMetrics?.averageMinutes||0}분`);setText('summaryLongestWait',`${state.timeMetrics?.longestWaitMinutes||0}분`);
-  setText('summaryDrawMethod',drawMethodLabel(state.drawMeta?.method));setText('summaryDrawLock',state.drawMeta?.locked?'잠금':'해제');setText('summaryPendingMessages',`${state.messaging?.queue?.filter(x=>x.status==='pending'||x.status==='no-phone').length||0}건`);setText('summaryPhoneTeams',`${contactStats(state).withPhone}팀`);setText('summaryAuditStatus',auditLabel(state.audit?.overall));renderContactRoster(state,handlers);updateDrawLockInfo(state);renderMessageCenter(state,handlers);
+  setText('summaryDrawMethod',drawMethodLabel(state.drawMeta?.method));setText('summaryDrawLock',state.drawMeta?.locked?'잠금':'해제');setText('summaryPendingMessages',`${state.messaging?.queue?.filter(x=>x.status==='pending'||x.status==='no-phone').length||0}건`);setText('summaryPhoneTeams',`${contactStats(state).withPhone}팀`);setText('summaryAuditStatus',auditLabel(state.audit?.overall));setText('summaryVenueCount',`${venueStats(state).venueCount}곳`);renderContactRoster(state,handlers);updateDrawLockInfo(state);renderMessageCenter(state,handlers);
   setText('baseMatchMinutes',`${state.settings.matchMinutes||30}분`);setText('autoTimeStatus',state.settings.autoTimeEnabled?'ON':'OFF');
   setText('lastTimeCalculated',state.timeMetrics?.lastCalculatedAt?new Date(state.timeMetrics.lastCalculatedAt).toLocaleTimeString('ko-KR'):'-');
   setText('sharedQueueCount',`${state.sharedQueue.length}경기`);
@@ -30,14 +31,23 @@ function currentRound(state){
 function renderCourts(state,handlers){
   const root=document.getElementById('courtGrid');
   if(!state.courts.length){root.className='court-grid empty-state';root.innerHTML='<p>대진 생성과 코트배정을 실행하면 코트 카드가 표시됩니다.</p>';return;}
-  root.className='court-grid';
-  root.innerHTML=state.courts.map(c=>{
-    const p=c.playing?findMatch(state.draw,c.playing):null,w=c.wait1?findMatch(state.draw,c.wait1):null;
-    return `<article class="court-card"><header><strong>🚀 ${c.name}</strong><span>${p?'시합중':'빈코트'}</span></header>
-      <div class="court-slot"><small>시합중</small><b>${p?`${teamHtml(p.teamA)} vs ${teamHtml(p.teamB)}`:'진행 경기 없음'}</b><em>${p?`${roundLabel(p.roundSize)} · ${p.id}`:'-'}</em>${p?timeBadgeHtml(p):''}
-      <button class="btn" data-result="${p?.id||''}" ${p?'':'disabled'}>결과 입력</button></div>
-      <div class="court-slot wait"><small>대기 1번</small><b>${w?`${teamHtml(w.teamA)} vs ${teamHtml(w.teamB)}`:'대기 경기 없음'}</b><em>${w?`${roundLabel(w.roundSize)} · ${w.id}`:'-'}</em>${w?timeBadgeHtml(w):''}</div></article>`;
-  }).join('');
+  root.className='court-grid venue-court-grid';
+  const groups=new Map();
+  state.courts.forEach(c=>{
+    const key=c.venueId||'venue-default';
+    if(!groups.has(key))groups.set(key,{name:c.venueName||state.settings.courtPrefix||'구장',courts:[]});
+    groups.get(key).courts.push(c);
+  });
+  root.innerHTML=[...groups.values()].map(group=>`<section class="venue-group">
+    <div class="venue-group-head"><h3>📍 ${group.name}</h3><span>${group.courts.length}면</span></div>
+    <div class="court-grid">${group.courts.map(c=>{
+      const p=c.playing?findMatch(state.draw,c.playing):null,w=c.wait1?findMatch(state.draw,c.wait1):null;
+      return `<article class="court-card"><header><strong>🚀 ${c.name}</strong><span>${p?'시합중':'빈코트'}</span></header>
+        <div class="court-slot"><small>시합중</small><b>${p?`${teamHtml(p.teamA)} vs ${teamHtml(p.teamB)}`:'진행 경기 없음'}</b><em>${p?`${roundLabel(p.roundSize)} · ${p.id}`:'-'}</em>${p?timeBadgeHtml(p):''}
+        <button class="btn" data-result="${p?.id||''}" ${p?'':'disabled'}>결과 입력</button></div>
+        <div class="court-slot wait"><small>대기 1번</small><b>${w?`${teamHtml(w.teamA)} vs ${teamHtml(w.teamB)}`:'대기 경기 없음'}</b><em>${w?`${roundLabel(w.roundSize)} · ${w.id}`:'-'}</em>${w?timeBadgeHtml(w):''}</div></article>`;
+    }).join('')}</div>
+  </section>`).join('');
   root.querySelectorAll('[data-result]').forEach(b=>b.addEventListener('click',()=>handlers.openResult(b.dataset.result)));
 }
 function renderQueue(state){
