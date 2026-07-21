@@ -34,7 +34,10 @@ export function buildVenueCourts(venues){
         venueName:venue.name,
         courtNo:i,
         playing:null,
-        wait1:null
+        wait1:null,
+        isPaused:false,
+        pauseReason:'',
+        pausedAt:null
       });
     }
   });

@@ -47,6 +47,13 @@ function auditDraw(state,out){
     ?result('pass','PLACEHOLDER_NONE','미확정 본선 슬롯 없음','현재 본선 팀이 모두 확정됐습니다.')
     :result('warn','PLACEHOLDER_NONE','미확정 본선 슬롯 존재',`${placeholders.length}개 슬롯이 예선 결과 대기 상태입니다.`));
 }
+function auditCourtStatus(state,out){
+  const paused=(state.courts||[]).filter(c=>c.isPaused);
+  const pausedWithPlaying=paused.filter(c=>c.playing).length;
+  out.push(paused.length
+    ?result('warn','COURT_PAUSED','사용중지 코트 존재',`${paused.length}면 사용중지 · 시합중 유지 ${pausedWithPlaying}면`)
+    :result('pass','COURT_PAUSED','모든 코트 사용 가능','사용중지된 코트가 없습니다.'));
+}
 function auditQueues(state,out){
   const queueIds=currentQueueIds(state);
   const duplicates=duplicateValues(queueIds);
@@ -103,7 +110,7 @@ function auditMessages(state,out){
 export function runStateAudit(state){
   ensureAuditState(state);
   const out=[];
-  auditDraw(state,out);auditQueues(state,out);auditAdvancement(state,out);auditMessages(state,out);
+  auditDraw(state,out);auditCourtStatus(state,out);auditQueues(state,out);auditAdvancement(state,out);auditMessages(state,out);
   const fails=out.filter(x=>x.level==='fail').length,warns=out.filter(x=>x.level==='warn').length;
   return{
     at:new Date().toISOString(),

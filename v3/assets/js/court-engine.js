@@ -15,14 +15,14 @@ export function buildCourts(count,prefix){
 }
 export function assignInitial(draw,courts,state=null){
   const ready=allMatches(draw).filter(m=>m.status==='ready');
-  courts.forEach(c=>{c.playing=null;c.wait1=null;});
+  courts.forEach(c=>{c.playing=null;c.wait1=null;if(!('isPaused'in c))c.isPaused=false;});
   let index=0;
-  courts.forEach(c=>{
+  courts.filter(c=>!c.isPaused).forEach(c=>{
     if(ready[index]){
       c.playing=ready[index].id;ready[index].status='playing';ready[index].court=c.name;ready[index].venueId=c.venueId;ready[index].startedAt=new Date().toISOString();index++;
     }
   });
-  courts.forEach(c=>{
+  courts.filter(c=>!c.isPaused).forEach(c=>{
     if(ready[index]){
       c.wait1=ready[index].id;ready[index].status='court_wait1';ready[index].court=c.name;ready[index].venueId=c.venueId;index++;
     }
@@ -57,7 +57,7 @@ export function removeFromQueues(state,matchId){
   return sourceCourt;
 }
 export function refillCourt(state,court,findMatch){
-  if(!court)return;
+  if(!court||court.isPaused)return;
   if(!court.playing&&court.wait1){
     court.playing=court.wait1;court.wait1=null;
     const m=findMatch(court.playing);if(m){m.status='playing';m.court=court.name;m.venueId=court.venueId;m.startedAt=new Date().toISOString();}
@@ -86,7 +86,7 @@ export function queueReadyMatches(state,findMatch){
     const venueId=m.venueId&&ids.includes(m.venueId)?m.venueId:ids[cursor%ids.length];
     m.status='venue_shared_queue';m.venueId=venueId;queueFor(state,venueId).push(m.id);cursor++;
   });
-  state.courts.forEach(c=>refillCourt(state,c,findMatch));
+  state.courts.filter(c=>!c.isPaused).forEach(c=>refillCourt(state,c,findMatch));
 }
 export function venueQueueSnapshot(state){
   ensureQueues(state);

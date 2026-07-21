@@ -29,9 +29,9 @@
   <main class="app-shell">
     <section class="hero panel">
       <div>
-        <p class="eyebrow">STAGE 15 · COURT TRANSFER</p>
-        <h1>시합중·대기1 경기 코트 간 이동</h1>
-        <p>이미 코트에 배정된 시합중·대기1 경기를 같은 구장의 다른 빈 자리로 이동하고, 필요하면 두 자리의 경기를 서로 교환할 수 있습니다.</p>
+        <p class="eyebrow">STAGE 16 · COURT STATUS CONTROL</p>
+        <h1>코트 사용중지·재개와 경기 대피</h1>
+        <p>조명·시설 문제 등으로 코트를 일시 중지하고, 해당 코트의 대기1 또는 전체 경기를 구장 공용대기로 안전하게 되돌릴 수 있습니다.</p>
       </div>
       <div class="hero-stats">
         <div><span>대진</span><strong id="heroDrawSize">-</strong></div>
@@ -499,6 +499,28 @@
 
 
 
+
+  <dialog id="courtStatusDialog" class="modal">
+    <form method="dialog" id="courtStatusForm">
+      <div class="modal-head"><h2>코트 사용 상태 변경</h2><button value="cancel" class="icon-button">×</button></div>
+      <div class="contact-edit-body">
+        <input id="courtStatusCourtId" type="hidden">
+        <p id="courtStatusCourtLabel" class="modal-match"></p>
+        <label><span>변경 작업</span>
+          <select id="courtStatusAction">
+            <option value="pause-keep">사용중지 · 현재 경기 유지</option>
+            <option value="pause-return-wait1">사용중지 · 대기1만 공용대기로</option>
+            <option value="pause-return-all">사용중지 · 시합중·대기1 모두 공용대기로</option>
+            <option value="resume">코트 사용 재개</option>
+          </select>
+        </label>
+        <label><span>중지 사유</span><input id="courtStatusReason" type="text" placeholder="예: 조명 점검, 바닥 정비"></label>
+        <div id="courtStatusInfo" class="notice info">사용중지된 코트는 자동배정과 자동승계에서 제외됩니다.</div>
+      </div>
+      <menu><button value="cancel" class="btn btn-light">취소</button><button id="confirmCourtStatusBtn" value="default" class="btn btn-primary">적용</button></menu>
+    </form>
+  </dialog>
+
   <dialog id="courtTransferDialog" class="modal">
     <form method="dialog" id="courtTransferForm">
       <div class="modal-head"><h2>코트 경기 이동·교환</h2><button value="cancel" class="icon-button">×</button></div>
@@ -662,6 +684,6 @@
     <div id="recoveryList" class="recovery-list"></div>
   </dialog>
 
-  <script type="module" src="./assets/js/app-v31500.js?v=31500"></script>
+  <script type="module" src="./assets/js/app-v31600.js?v=31600"></script>
 </body>
 </html>

@@ -223,3 +223,9 @@
 
 .court-transfer-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 .court-transfer-actions .btn{padding:6px 9px;font-size:11px}
+
+.court-card.paused{border-color:#d49a2a;background:#fff9eb}
+.court-card.paused header{background:#8a5d00;color:#fff}
+.court-status-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.court-status-actions .btn{padding:6px 9px;font-size:11px}
+.court-pause-reason{margin-top:7px;padding:7px 9px;border-radius:8px;background:#fff0c7;color:#765000;font-size:11px;font-weight:800}
