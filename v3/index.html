@@ -29,9 +29,9 @@
   <main class="app-shell">
     <section class="hero panel">
       <div>
-        <p class="eyebrow">STAGE 20.3 · PRELIM DYNAMIC ORDER</p>
-        <h1>예선 동적 경기순서·코트 교차운영</h1>
-        <p>예선 구장 설정을 정확히 반영하고, 3팀조는 1번-2번 경기 후 승자와 3번, 마지막으로 첫 경기 패자와 3번이 경기하도록 동적으로 운영합니다.</p>
+        <p class="eyebrow">STAGE 21 · VENUE SETTINGS UNIFIED</p>
+        <h1>구장 설정 단일화·운영화면 정리</h1>
+        <p>통합 운영의 중복 코트 접두어 입력을 제거하고, 예선·본선 코트 수와 코트명은 대회 설정의 구장 구성만 사용하도록 통일했습니다.</p>
       </div>
       <div class="hero-stats">
         <div><span>대진</span><strong id="heroDrawSize">-</strong></div>
@@ -95,12 +95,12 @@
             </select>
           </label>
           <label>
-            <span>코트 수</span>
-            <input id="courtCount" type="number" min="1" max="32" value="8">
+            <span>본선 코트 합계</span>
+            <input id="courtCount" type="text" value="0면" readonly>
           </label>
-          <label>
-            <span>코트 접두어</span>
-            <input id="courtPrefix" type="text" value="국제">
+          <label class="venue-summary-control">
+            <span>예선·본선 구장</span>
+            <input id="operationVenueSummary" type="text" value="대회 설정의 구장 구성을 사용합니다." readonly>
           </label>
           <label>
             <span>예상 경기시간</span>
@@ -110,6 +110,10 @@
             <span>최소 예상시간</span>
             <div class="input-suffix"><input id="minimumMatchMinutes" type="number" min="20" max="120" value="30"><b>분</b></div>
           </label>
+        </div>
+
+        <div class="notice info operation-venue-note">
+          코트명과 코트 수는 <b>대회 설정 → 예선·본선 구장·코트 구성</b>에서만 변경합니다.
         </div>
 
         <div class="time-settings">
@@ -738,6 +742,6 @@
     <div id="recoveryList" class="recovery-list"></div>
   </dialog>
 
-  <script type="module" src="./assets/js/app-v32003.js?v=32003"></script>
+  <script type="module" src="./assets/js/app-v32100.js?v=32100"></script>
 </body>
 </html>

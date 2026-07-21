@@ -32,8 +32,10 @@ function syncInputs(){
   setValue('tournamentName',state.tournament.name);
   setValue('divisionName',state.tournament.division);
   setValue('drawSize',String(state.settings.drawSize));
-  setValue('courtCount',state.settings.courtCount);
-  setValue('courtPrefix',state.settings.courtPrefix);
+  const prelimSummary=prelimVenues(state).map(v=>`${v.name} ${v.courtCount}면`).join(' + ');
+  const mainSummary=mainVenues(state).map(v=>`${v.name} ${v.courtCount}면`).join(' + ');
+  setValue('courtCount',`${mainVenues(state).reduce((sum,v)=>sum+v.courtCount,0)}면`);
+  setValue('operationVenueSummary',`예선 ${prelimSummary} / 본선 ${mainSummary}`);
   setValue('matchMinutes',state.settings.matchMinutes||40);
   setValue('minimumMatchMinutes',state.settings.minimumMatchMinutes||30);
   setChecked('autoTimeEnabled',state.settings.autoTimeEnabled!==false);
@@ -45,8 +47,9 @@ function pullSettings(){
   state.tournament.name=String(getValue('tournamentName',state.tournament.name)||'').trim()||'대회명 없음';
   state.tournament.division=String(getValue('divisionName',state.tournament.division)||'').trim()||'부서 없음';
   state.settings.drawSize=Number(getValue('drawSize',state.settings.drawSize||64));
-  state.settings.courtCount=Number(getValue('courtCount',state.settings.courtCount||8));
-  state.settings.courtPrefix=String(getValue('courtPrefix',state.settings.courtPrefix||'코트')).trim()||'코트';
+  const selectedMainVenues=mainVenues(state);
+  state.settings.courtCount=selectedMainVenues.reduce((sum,v)=>sum+v.courtCount,0);
+  state.settings.courtPrefix=selectedMainVenues[0]?.courtPrefix||'코트';
   state.settings.minimumMatchMinutes=Math.max(20,Number(getValue('minimumMatchMinutes',state.settings.minimumMatchMinutes||30))||30);
   state.settings.matchMinutes=Math.max(state.settings.minimumMatchMinutes,Number(getValue('matchMinutes',state.settings.matchMinutes||40))||40);
   state.settings.autoTimeEnabled=getChecked('autoTimeEnabled',state.settings.autoTimeEnabled!==false);
@@ -499,7 +502,7 @@ function saveVenueSettings(){
   const prelimSummary=prelimVenues(state).map(v=>`${v.name} ${v.courtCount}면`).join(' + ');
   const mainSummary=mainVenues(state).map(v=>`${v.name} ${v.courtCount}면`).join(' + ');
   commit(`구장 설정 저장 · 예선 ${prelimSummary} · 본선 ${mainSummary}`);
-  syncPrelimInputs();
+  syncPrelimInputs();syncInputs();
   notice(`예선: ${prelimSummary} / 본선: ${mainSummary}로 저장했습니다.`,'success');
 }
 
@@ -769,7 +772,7 @@ function bind(){
   if($('contactFileInput'))$('contactFileInput').onchange=e=>{const f=e.target.files[0];if(f)importContactsFile(f).catch(err=>notice(err.message,'error'));};
   ['autoMessageEnabled','messageSenderName','messageDeliveryMode','messageOnCourtAssign','messageOnQueueMove','smartMessageUpdate','messageRepeatPolicy','templatePlaying','templateWait1','templateShared'].forEach(id=>{const el=$(id);if(el)el.addEventListener('change',()=>{pullSettings();commit('문자 설정 변경');});});
   document.querySelectorAll('.tab').forEach(tab=>tab.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));tab.classList.add('active');$(`view-${tab.dataset.view}`).classList.add('active');});
-  ['tournamentName','divisionName','drawSize','courtCount','courtPrefix','matchMinutes','minimumMatchMinutes','drawMethod','byePriority','venueAssignmentPolicy','separateVenueQueues','autoVenuePromotion'].forEach(id=>{
+  ['tournamentName','divisionName','drawSize','matchMinutes','minimumMatchMinutes','drawMethod','byePriority','venueAssignmentPolicy','separateVenueQueues','autoVenuePromotion'].forEach(id=>{
     const el=$(id);if(el)el.addEventListener('change',()=>{pullSettings();commit('대회 설정 변경');});
   });
 }
@@ -808,4 +811,4 @@ document.addEventListener('click',event=>{
 },{capture:true});
 
 syncInputs();syncPrelimInputs();bind();renderVenueSettingsEditor();calculateTimeMetrics(state);render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue});restartTimeTimer();updateClock();setInterval(updateClock,1000);
-console.log('[230MATCH V3] stage20.3 prelim-dynamic-order loaded · no legacy code · no Firebase writes');
+console.log('[230MATCH V3] stage21 venue-settings-unified loaded · no legacy code · no Firebase writes');
