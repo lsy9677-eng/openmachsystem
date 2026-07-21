@@ -217,3 +217,6 @@
   position:static;
   flex:0 0 auto;
 }
+
+.manual-court-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.manual-court-actions .btn{padding:6px 9px;font-size:11px}

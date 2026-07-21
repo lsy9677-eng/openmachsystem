@@ -29,9 +29,9 @@
   <main class="app-shell">
     <section class="hero panel">
       <div>
-        <p class="eyebrow">STAGE 13.1 · QUEUE TIME UI FIX</p>
-        <h1>공용대기 시간과 조작버튼 겹침 수정</h1>
-        <p>공용대기 예상시간을 가로형으로 정리하고, 운영자가 구장별 대기 순서와 경기 이동을 직접 조정할 수 있습니다.</p>
+        <p class="eyebrow">STAGE 14 · MANUAL COURT ASSIGN</p>
+        <h1>공용대기 경기 수동 코트배정</h1>
+        <p>공용대기 경기를 같은 구장의 빈 코트 또는 대기1로 직접 배정하고, 대기1 경기를 공용대기로 되돌릴 수 있습니다.</p>
       </div>
       <div class="hero-stats">
         <div><span>대진</span><strong id="heroDrawSize">-</strong></div>
@@ -497,6 +497,21 @@
 
 
 
+
+  <dialog id="manualCourtAssignDialog" class="modal">
+    <form method="dialog" id="manualCourtAssignForm">
+      <div class="modal-head"><h2>공용대기 경기 코트배정</h2><button value="cancel" class="icon-button">×</button></div>
+      <div class="contact-edit-body">
+        <input id="manualAssignMatchId" type="hidden">
+        <input id="manualAssignVenueId" type="hidden">
+        <p id="manualAssignMatchLabel" class="modal-match"></p>
+        <label><span>배정 가능한 코트</span><select id="manualAssignCourtSelect"></select></label>
+        <div id="manualAssignInfo" class="notice info">빈 시합중 자리 또는 빈 대기1 자리만 표시됩니다.</div>
+      </div>
+      <menu><button value="cancel" class="btn btn-light">취소</button><button id="confirmManualAssignBtn" value="default" class="btn btn-primary">코트배정</button></menu>
+    </form>
+  </dialog>
+
   <dialog id="queueMoveDialog" class="modal">
     <form method="dialog" id="queueMoveForm">
       <div class="modal-head"><h2>공용대기 경기 이동</h2><button value="cancel" class="icon-button" aria-label="닫기">×</button></div>
@@ -631,6 +646,6 @@
     <div id="recoveryList" class="recovery-list"></div>
   </dialog>
 
-  <script type="module" src="./assets/js/app-v31301.js?v=31301"></script>
+  <script type="module" src="./assets/js/app-v31400.js?v=31400"></script>
 </body>
 </html>
