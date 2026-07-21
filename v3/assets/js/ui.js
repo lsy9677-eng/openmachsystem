@@ -108,7 +108,7 @@ function renderBracket(state){
       <div class="match-meta">${m.scoreA!=null?`${m.scoreA}:${m.scoreB}`:`${m.id}${m.bye?' · 부전승':''}`}</div>
     </article>`}).join('')}</section>`).join('');
 }
-function statusTextfunction statusText(s){return({waiting_slots:'대진 대기',ready:'배정 대기',playing:'시합중',court_wait1:'대기1',court_manual_queue:'관리자 대기',venue_shared_queue:'구장 공용대기',shared_queue:'공용대기',completed:'완료'})[s]||s;}
+function statusText(s){return({waiting_slots:'대진 대기',ready:'배정 대기',playing:'시합중',court_wait1:'대기1',court_manual_queue:'관리자 대기',venue_shared_queue:'구장 공용대기',shared_queue:'공용대기',completed:'완료'})[s]||s;}
 function renderLogs(state){
   const root=document.getElementById('logList');
   root.innerHTML=state.logs.length?state.logs.map(x=>`<article class="log-item"><time>${new Date(x.at).toLocaleString('ko-KR')}</time><p>${x.message}</p></article>`).join(''):'<div class="empty-state"><p>운영 로그가 없습니다.</p></div>';
