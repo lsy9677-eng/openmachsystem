@@ -29,9 +29,9 @@
   <main class="app-shell">
     <section class="hero panel">
       <div>
-        <p class="eyebrow">STAGE 20 · MAIN DRAW BALANCED ASSIGNMENT</p>
-        <h1>본선 상하중간 균등 코트배정</h1>
-        <p>예선 코트배정은 조 번호 순서대로 유지하고, 본선은 추첨된 경기들을 상단·하단·중앙 순서로 섞어 구장과 코트에 균등 배정합니다.</p>
+        <p class="eyebrow">STAGE 20.1 · PRELIM OPERATION + MAIN REBALANCE</p>
+        <h1>예선 코트운영·본선 균등 재배정 수정</h1>
+        <p>예선은 조 번호 순서대로 코트에 배정하고 각 코트의 시합중·대기1·추가대기를 운영합니다. 본선은 재배정 전 상태를 초기화한 뒤 상단·하단·중앙 순서로 균등 배정합니다.</p>
       </div>
       <div class="hero-stats">
         <div><span>대진</span><strong id="heroDrawSize">-</strong></div>
@@ -294,6 +294,19 @@
         </div>
         <div id="linkedDrawStatus" class="linked-status-grid empty-state">
           <p>예선 슬롯으로 본선 선추첨을 실행하면 연결 상태가 표시됩니다.</p>
+        </div>
+      </section>
+
+      <section class="panel prelim-court-operation-panel">
+        <div class="section-head">
+          <div>
+            <h2>예선 코트 운영</h2>
+            <p>각 코트별 시합중 1경기, 대기1 1경기, 추가 대기경기를 순서대로 운영합니다.</p>
+          </div>
+          <span id="prelimCourtOperationCount" class="badge badge-safe">0면</span>
+        </div>
+        <div id="prelimCourtOperationGrid" class="prelim-court-operation-grid empty-state">
+          <p>예선 코트배정을 실행하면 코트 운영 카드가 표시됩니다.</p>
         </div>
       </section>
 
@@ -721,6 +734,6 @@
     <div id="recoveryList" class="recovery-list"></div>
   </dialog>
 
-  <script type="module" src="./assets/js/app-v32000.js?v=32000"></script>
+  <script type="module" src="./assets/js/app-v32001.js?v=32001"></script>
 </body>
 </html>

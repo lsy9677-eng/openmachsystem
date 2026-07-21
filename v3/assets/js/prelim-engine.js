@@ -55,15 +55,44 @@ export function assignPrelimCourts(state){
   if(!state.prelim.groups.length)throw new Error('먼저 예선 조편성을 생성하세요.');
   const count=Math.max(1,Number(state.prelim.settings.courtCount)||1);
   const prefix=state.prelim.settings.courtPrefix||'코트';
-  const courts=Array.from({length:count},(_,i)=>({id:`prelim-court-${i+1}`,name:`${prefix}${i+1}`,groups:[]}));
-  state.prelim.groups.forEach((group,index)=>{
+  const courts=Array.from({length:count},(_,i)=>({
+    id:`prelim-court-${i+1}`,name:`${prefix}${i+1}`,groups:[],
+    playing:null,wait1:null,queue:[]
+  }));
+  state.prelim.groups.slice().sort((a,b)=>a.groupNo-b.groupNo).forEach((group,index)=>{
     const court=courts[index%count];
-    group.court=court.name;
+    group.court=court.name;group.prelimCourtId=court.id;
     court.groups.push(group.id);
-    state.prelim.matches.filter(m=>m.groupId===group.id).forEach(m=>m.court=court.name);
+    state.prelim.matches.filter(m=>m.groupId===group.id).sort((a,b)=>a.matchNo-b.matchNo).forEach(m=>{
+      m.court=court.name;m.prelimCourtId=court.id;m.status='queued';court.queue.push(m.id);
+    });
+  });
+  courts.forEach(court=>{
+    if(court.queue.length){
+      court.playing=court.queue.shift();
+      const m=state.prelim.matches.find(x=>x.id===court.playing);if(m)m.status='playing';
+    }
+    if(court.queue.length){
+      court.wait1=court.queue.shift();
+      const m=state.prelim.matches.find(x=>x.id===court.wait1);if(m)m.status='court_wait1';
+    }
   });
   state.prelim.courts=courts;
   return courts;
+}
+export function advancePrelimCourt(state,courtId){
+  const court=state.prelim?.courts?.find(c=>c.id===courtId);
+  if(!court)return null;
+  court.playing=null;
+  if(court.wait1){
+    court.playing=court.wait1;court.wait1=null;
+    const m=state.prelim.matches.find(x=>x.id===court.playing);if(m)m.status='playing';
+  }
+  if(!court.wait1&&court.queue.length){
+    court.wait1=court.queue.shift();
+    const m=state.prelim.matches.find(x=>x.id===court.wait1);if(m)m.status='court_wait1';
+  }
+  return court;
 }
 export function findPrelimMatch(state,id){return state.prelim?.matches?.find(m=>m.id===id)||null;}
 export function submitPrelimResult(state,{matchId,winnerId,scoreA,scoreB}){
@@ -73,6 +102,7 @@ export function submitPrelimResult(state,{matchId,winnerId,scoreA,scoreB}){
   if(!winner)throw new Error('승리팀 선택이 올바르지 않습니다.');
   match.winner=clone(winner);match.scoreA=Number(scoreA);match.scoreB=Number(scoreB);
   match.status='completed';match.completedAt=new Date().toISOString();
+  if(match.prelimCourtId)advancePrelimCourt(state,match.prelimCourtId);
   recalculateStandings(state);
   return match;
 }

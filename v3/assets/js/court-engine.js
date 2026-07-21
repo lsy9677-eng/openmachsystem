@@ -13,21 +13,28 @@ function queueFor(state,venueId){
 }
 
 export function topBottomMiddleOrder(items){
-  const source=[...items];
-  const result=[];
-  let top=0,bottom=source.length-1;
-  while(top<=bottom){
-    if(top<=bottom)result.push(source[top++]);
-    if(top<=bottom)result.push(source[bottom--]);
-    if(top<=bottom){
-      const middle=Math.floor((top+bottom)/2);
-      result.push(source[middle]);
-      source.splice(middle,1);
-      bottom--;
-    }
+  const source=[...items],result=[],used=new Set();
+  const n=source.length;
+  let top=0,bottom=n-1,leftCenter=Math.floor((n-1)/2),rightCenter=Math.ceil((n-1)/2),toggle=0;
+  const take=i=>{if(i>=0&&i<n&&!used.has(i)){used.add(i);result.push(source[i]);}};
+  while(result.length<n){
+    take(top++);take(bottom--);
+    if(result.length>=n)break;
+    if(toggle%2===0)take(rightCenter++);
+    else take(leftCenter--);
+    toggle++;
   }
   return result;
 }
+function resetAssignableMatches(draw){
+  allMatches(draw).forEach(m=>{
+    if(m.status==='completed'||m.bye)return;
+    if(m.teamA&&m.teamB){
+      m.status='ready';m.court=null;m.venueId=null;m.startedAt=null;
+    }
+  });
+}
+
 function balancedReadyMatches(draw){
   const ready=allMatches(draw).filter(m=>m.status==='ready');
   const byRound=new Map();
@@ -70,8 +77,9 @@ export function buildCourts(count,prefix){
   return Array.from({length:count},(_,i)=>({id:`court-${i+1}`,name:`${prefix}${i+1}`,venueId:'venue-default',venueName:prefix,playing:null,wait1:null}));
 }
 export function assignInitial(draw,courts,state=null){
+  resetAssignableMatches(draw);
   const ready=balancedReadyMatches(draw);
-  courts.forEach(c=>{c.playing=null;c.wait1=null;if(!('isPaused'in c))c.isPaused=false;});
+  courts.forEach(c=>{c.playing=null;c.wait1=null;c.manualQueue=[];if(!('isPaused'in c))c.isPaused=false;});
   if(!state){
     let index=0;
     courts.filter(c=>!c.isPaused).forEach(c=>{

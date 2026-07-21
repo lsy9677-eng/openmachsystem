@@ -195,6 +195,31 @@ function renderLogs(state){
   root.innerHTML=state.logs.length?state.logs.map(x=>`<article class="log-item"><time>${new Date(x.at).toLocaleString('ko-KR')}</time><p>${x.message}</p></article>`).join(''):'<div class="empty-state"><p>운영 로그가 없습니다.</p></div>';
 }
 
+function renderPrelimCourtOperation(state,handlers){
+  const root=document.getElementById('prelimCourtOperationGrid');
+  const count=document.getElementById('prelimCourtOperationCount');
+  if(!root||!count)return;
+  const courts=state.prelim?.courts||[];
+  count.textContent=`${courts.length}면`;
+  if(!courts.length){
+    root.className='prelim-court-operation-grid empty-state';
+    root.innerHTML='<p>예선 코트배정을 실행하면 코트 운영 카드가 표시됩니다.</p>';
+    return;
+  }
+  root.className='prelim-court-operation-grid';
+  root.innerHTML=courts.map(c=>{
+    const playing=state.prelim.matches.find(m=>m.id===c.playing);
+    const wait1=state.prelim.matches.find(m=>m.id===c.wait1);
+    return`<article class="prelim-court-card">
+      <header><strong>🚀 ${c.name}</strong><span>${playing?'시합중':'빈코트'} · ${c.groups.length}개 조</span></header>
+      <div class="prelim-court-slot playing"><small>시합중</small><b>${playing?`${teamText(playing.teamA)} vs ${teamText(playing.teamB)}`:'진행 경기 없음'}</b>${playing?`<button class="btn btn-secondary" data-prelim-result="${playing.id}">결과 입력</button>`:''}</div>
+      <div class="prelim-court-slot wait1"><small>대기1</small><b>${wait1?`${teamText(wait1.teamA)} vs ${teamText(wait1.teamB)}`:'대기 경기 없음'}</b></div>
+      <div class="prelim-extra-queue"><strong>추가 대기 ${c.queue.length}경기</strong>${c.queue.length?c.queue.map((id,i)=>{const m=state.prelim.matches.find(x=>x.id===id);return`<div class="prelim-extra-item"><span class="no">${i+2}</span><span>${m?`${teamText(m.teamA)} vs ${teamText(m.teamB)}`:id}</span></div>`}).join(''):'<p>추가 대기 없음</p>'}</div>
+    </article>`;
+  }).join('');
+  root.querySelectorAll('[data-prelim-result]').forEach(b=>b.onclick=()=>handlers.openPrelimResult(b.dataset.prelimResult));
+}
+
 function renderPrelim(state,handlers){
   const prelim=state.prelim||{groups:[],matches:[],qualifiers:[]};
   setText('prelimSummaryActiveTeams',`${prelim.activeTeams?.length||0}팀`);
@@ -207,7 +232,7 @@ function renderPrelim(state,handlers){
   setText('prelimSummaryQualifiers',`${prelim.qualifiers.length}팀`);
   const linked=prelim.linkedDraw||{active:false,slots:[]};
   setText('prelimSummaryLinkedSlots',linked.active?linked.slots.length:0);
-  renderLinkedDrawStatus(state);
+  renderLinkedDrawStatus(state);renderPrelimCourtOperation(state,handlers);
   renderTeamPools(state,handlers);
   const root=document.getElementById('prelimGroupGrid');
   if(!root)return;

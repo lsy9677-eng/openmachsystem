@@ -235,8 +235,8 @@ function createPrelim(){
 function assignPrelim(){
   pullPrelimSettings();
   const courts=assignPrelimCourts(state);
-  commit(`예선 코트 ${courts.length}면 배정`);
-  prelimNotice(`예선 조를 ${courts.length}개 코트에 배정했습니다.`,'success');
+  commit(`예선 조번호 순차 코트배정 · ${courts.length}면`);
+  prelimNotice(`예선 조를 1조부터 순서대로 ${courts.length}개 코트에 배정하고 시합중·대기1·추가대기를 구성했습니다.`,'success');
 }
 function openPrelimResult(matchId){
   const m=findPrelimMatch(state,matchId);if(!m)return;
@@ -774,4 +774,4 @@ document.addEventListener('click',event=>{
 },{capture:true});
 
 syncInputs();syncPrelimInputs();bind();renderVenueSettingsEditor();calculateTimeMetrics(state);render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue});restartTimeTimer();updateClock();setInterval(updateClock,1000);
-console.log('[230MATCH V3] stage20 main-draw-balanced-assignment loaded · no legacy code · no Firebase writes');
+console.log('[230MATCH V3] stage20.1 prelim-operation-main-rebalance-fix loaded · no legacy code · no Firebase writes');
