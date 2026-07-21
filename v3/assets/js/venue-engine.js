@@ -12,15 +12,17 @@ export function ensureVenueSettings(state){
     id:String(v.id||`venue-${i+1}`),
     name:String(v.name||v.courtPrefix||`구장${i+1}`).trim()||`구장${i+1}`,
     courtCount:Math.max(1,Number(v.courtCount)||1),
-    courtPrefix:String(v.courtPrefix||v.name||`코트`).trim()||'코트'
+    courtPrefix:String(v.courtPrefix||v.name||`코트`).trim()||'코트',
+    usePrelim:v.usePrelim!==false,
+    useMain:v.useMain!==false
   }));
   state.settings.courtCount=state.settings.venues.reduce((sum,v)=>sum+v.courtCount,0);
   state.settings.courtPrefix=state.settings.venues[0]?.courtPrefix||'코트';
 }
 export function venuePreset(){
   return[
-    {id:'venue-international',name:'국제',courtCount:8,courtPrefix:'국제'},
-    {id:'venue-downtown',name:'원도심',courtCount:4,courtPrefix:'원도심'}
+    {id:'venue-international',name:'국제',courtCount:8,courtPrefix:'국제',usePrelim:true,useMain:true},
+    {id:'venue-downtown',name:'원도심',courtCount:4,courtPrefix:'원도심',usePrelim:true,useMain:true}
   ];
 }
 export function buildVenueCourts(venues){
@@ -67,4 +69,15 @@ export function venueForCourt(state,court){
 export function totalVenueQueueCount(state){
   ensureVenueQueues(state);
   return Object.values(state.venueQueues).reduce((sum,q)=>sum+q.length,0);
+}
+
+export function prelimVenues(state){
+  ensureVenueSettings(state);
+  const list=state.settings.venues.filter(v=>v.usePrelim!==false);
+  return list.length?list:[state.settings.venues[0]];
+}
+export function mainVenues(state){
+  ensureVenueSettings(state);
+  const list=state.settings.venues.filter(v=>v.useMain!==false);
+  return list.length?list:[state.settings.venues[0]];
 }

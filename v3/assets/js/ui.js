@@ -208,13 +208,15 @@ function renderPrelimCourtOperation(state,handlers){
   }
   root.className='prelim-court-operation-grid';
   root.innerHTML=courts.map(c=>{
+    const groups=Array.isArray(c.groups)?c.groups:[];
+    const queue=Array.isArray(c.queue)?c.queue:[];
     const playing=state.prelim.matches.find(m=>m.id===c.playing);
     const wait1=state.prelim.matches.find(m=>m.id===c.wait1);
     return`<article class="prelim-court-card">
-      <header><strong>🚀 ${c.name}</strong><span>${playing?'시합중':'빈코트'} · ${c.groups.length}개 조</span></header>
+      <header><strong>🚀 ${c.name}</strong><span>${c.venueName?`${c.venueName} · `:''}${playing?'시합중':'빈코트'} · ${groups.length}개 조</span></header>
       <div class="prelim-court-slot playing"><small>시합중</small><b>${playing?`${teamText(playing.teamA)} vs ${teamText(playing.teamB)}`:'진행 경기 없음'}</b>${playing?`<button class="btn btn-secondary" data-prelim-result="${playing.id}">결과 입력</button>`:''}</div>
       <div class="prelim-court-slot wait1"><small>대기1</small><b>${wait1?`${teamText(wait1.teamA)} vs ${teamText(wait1.teamB)}`:'대기 경기 없음'}</b></div>
-      <div class="prelim-extra-queue"><strong>추가 대기 ${c.queue.length}경기</strong>${c.queue.length?c.queue.map((id,i)=>{const m=state.prelim.matches.find(x=>x.id===id);return`<div class="prelim-extra-item"><span class="no">${i+2}</span><span>${m?`${teamText(m.teamA)} vs ${teamText(m.teamB)}`:id}</span></div>`}).join(''):'<p>추가 대기 없음</p>'}</div>
+      <div class="prelim-extra-queue"><strong>추가 대기 ${queue.length}경기</strong>${queue.length?queue.map((id,i)=>{const m=state.prelim.matches.find(x=>x.id===id);return`<div class="prelim-extra-item"><span class="no">${i+2}</span><span>${m?`${teamText(m.teamA)} vs ${teamText(m.teamB)}`:id}</span></div>`}).join(''):'<p>추가 대기 없음</p>'}</div>
     </article>`;
   }).join('');
   root.querySelectorAll('[data-prelim-result]').forEach(b=>b.onclick=()=>handlers.openPrelimResult(b.dataset.prelimResult));
@@ -307,7 +309,7 @@ function renderTeamPools(state,handlers){
   if(!activeRoot||!reserveRoot)return;
 
   activeRoot.className=active.length?'team-pool':'team-pool empty-state';
-  activeRoot.innerHTML=active.length?active.map(t=>`<article class="team-chip"><div><b>${teamText(t)}</b><small>예선 참가</small></div>${reserve.length?`<button data-active-swap="${t.id}">교체</button>`:''}</article>`).join(''):'<p>예선 조편성을 생성하면 표시됩니다.</p>';
+  activeRoot.innerHTML=active.length?active.map(t=>`<article class="team-chip ${state.prelim?.swapSelection?.activeTeamId===t.id?'swap-selected':''}"><div><b>${teamText(t)}</b><small>예선 참가</small></div>${reserve.length?`<button data-active-swap="${t.id}">교체</button>`:''}</article>`).join(''):'<p>예선 조편성을 생성하면 표시됩니다.</p>';
 
   reserveRoot.className=reserve.length?'team-pool':'team-pool empty-state';
   reserveRoot.innerHTML=reserve.length?reserve.map(t=>`<article class="team-chip"><div><b>${teamText(t)}</b><small>후보</small></div><button data-reserve-pick="${t.id}">선택</button></article>`).join(''):'<p>후보팀이 없습니다.</p>';

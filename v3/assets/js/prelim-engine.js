@@ -1,3 +1,4 @@
+import{prelimVenues}from'./venue-engine.js';
 
 function clone(v){return structuredClone(v);}
 export function ensurePrelimState(state){
@@ -49,22 +50,30 @@ export function generatePrelim(state,settings){
   recalculateStandings(state);
   return {groups:groups.length,matches:matches.length,teams:needed};
 }
-/* 예선은 조 번호 순서대로 코트에 순환 배정합니다. */
+/* 예선은 조 번호 순서대로 선택된 예선 구장의 전체 코트에 순환 배정합니다. */
 export function assignPrelimCourts(state){
   ensurePrelimState(state);
   if(!state.prelim.groups.length)throw new Error('먼저 예선 조편성을 생성하세요.');
-  const count=Math.max(1,Number(state.prelim.settings.courtCount)||1);
-  const prefix=state.prelim.settings.courtPrefix||'코트';
-  const courts=Array.from({length:count},(_,i)=>({
-    id:`prelim-court-${i+1}`,name:`${prefix}${i+1}`,groups:[],
-    playing:null,wait1:null,queue:[]
-  }));
+  const venues=prelimVenues(state);
+  const courts=[];
+  venues.forEach(venue=>{
+    for(let i=1;i<=venue.courtCount;i++){
+      courts.push({
+        id:`prelim-${venue.id}-court-${i}`,
+        name:`${venue.courtPrefix}${i}`,
+        venueId:venue.id,venueName:venue.name,
+        groups:[],playing:null,wait1:null,queue:[]
+      });
+    }
+  });
+  if(!courts.length)throw new Error('예선 사용 구장이 없습니다.');
   state.prelim.groups.slice().sort((a,b)=>a.groupNo-b.groupNo).forEach((group,index)=>{
-    const court=courts[index%count];
-    group.court=court.name;group.prelimCourtId=court.id;
+    const court=courts[index%courts.length];
+    group.court=court.name;group.prelimCourtId=court.id;group.venueId=court.venueId;group.venueName=court.venueName;
     court.groups.push(group.id);
     state.prelim.matches.filter(m=>m.groupId===group.id).sort((a,b)=>a.matchNo-b.matchNo).forEach(m=>{
-      m.court=court.name;m.prelimCourtId=court.id;m.status='queued';court.queue.push(m.id);
+      m.court=court.name;m.prelimCourtId=court.id;m.venueId=court.venueId;m.venueName=court.venueName;
+      m.status='queued';court.queue.push(m.id);
     });
   });
   courts.forEach(court=>{

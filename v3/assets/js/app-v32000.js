@@ -11,7 +11,7 @@ import{ensureMessagingState,generatePlayingMessages,generateWait1Messages,genera
 import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactData,importContactData}from'./contact-engine.js';
 import{render,teamText}from'./ui.js';
 import{ensureAuditState,runStateAudit,runFullSimulation,applyAuditResult}from'./audit-engine.js';
-import{ensureVenueSettings,ensureVenueQueues,venuePreset,buildVenueCourts}from'./venue-engine.js';
+import{ensureVenueSettings,ensureVenueQueues,venuePreset,buildVenueCourts,prelimVenues,mainVenues}from'./venue-engine.js';
 import{moveQueueItem,reorderQueueItem}from'./queue-control-engine.js';
 import{availableCourtSlots,assignQueueMatchToCourt,returnWait1ToVenueQueue}from'./manual-court-engine.js';
 
@@ -158,7 +158,7 @@ function confirmDrawUnlock(event){
 
 function assign(){
   pullSettings();if(!state.draw.size)throw new Error('먼저 대진을 생성하세요.');
-  ensureVenueSettings(state);state.courts=buildVenueCourts(state.settings.venues);
+  ensureVenueSettings(state);state.courts=buildVenueCourts(mainVenues(state));
   state.sharedQueue=assignInitial(state.draw,state.courts,state);if(state.messaging.settings.autoMessageEnabled&&state.messaging.settings.onCourtAssign)generateCurrentCourtMessages(state);
   const venueSummary=(state.settings.venues||[]).map(v=>`${v.name} ${state.courts.filter(c=>c.venueId===v.id).length}면`).join(' · ');
   commit(`본선 상하중간 균등 코트배정 · ${venueSummary}`);notice('본선 경기를 상단·하단·중앙 순서로 균등 배정했습니다.','success');
@@ -212,15 +212,21 @@ function autoFitPrelim(){
   prelimNotice(`3팀조 ${fit.threeTeamGroups}개, 2팀조 ${fit.twoTeamGroups}개로 계산했습니다.`,'success');
 }
 let pendingActiveSwapId=null;
+let reserveSwapMode=false;
 function selectActiveSwap(teamId){
+  reserveSwapMode=true;
   pendingActiveSwapId=teamId;
+  state.prelim.swapSelection={activeTeamId:teamId};
+  const btn=$('swapReserveBtn');if(btn){btn.classList.add('swap-mode-active');btn.textContent='후보팀을 선택하세요';}
   prelimNotice('교체할 후보팀의 선택 버튼을 누르세요.','info');
+  commit();
 }
 function selectReserveSwap(teamId){
   if(!pendingActiveSwapId){prelimNotice('먼저 예선 참가팀에서 교체 버튼을 누르세요.','error');return;}
   try{
     const result=swapActiveReserveTeam(state,pendingActiveSwapId,teamId);
-    pendingActiveSwapId=null;
+    pendingActiveSwapId=null;reserveSwapMode=false;state.prelim.swapSelection=null;
+    const swapBtn=$('swapReserveBtn');if(swapBtn){swapBtn.classList.remove('swap-mode-active');swapBtn.textContent='후보 교체 모드';}
     commit(`예선 참가팀 교체 · 제외 ${teamText(result.activeOut)} · 투입 ${teamText(result.reserveIn)}`);
     prelimNotice('참가팀과 후보팀을 교체했습니다. 조편성을 다시 생성하세요.','success');
   }catch(e){prelimNotice(e.message,'error');}
@@ -235,8 +241,9 @@ function createPrelim(){
 function assignPrelim(){
   pullPrelimSettings();
   const courts=assignPrelimCourts(state);
-  commit(`예선 조번호 순차 코트배정 · ${courts.length}면`);
-  prelimNotice(`예선 조를 1조부터 순서대로 ${courts.length}개 코트에 배정하고 시합중·대기1·추가대기를 구성했습니다.`,'success');
+  const venueSummary=prelimVenues(state).map(v=>`${v.name} ${v.courtCount}면`).join(' + ');
+  commit(`예선 조번호 순차 코트배정 · ${venueSummary}`);
+  prelimNotice(`예선 구장 ${venueSummary}에 1조부터 순서대로 배정하고 시합중·대기1·추가대기를 구성했습니다.`,'success');
 }
 function openPrelimResult(matchId){
   const m=findPrelimMatch(state,matchId);if(!m)return;
@@ -454,6 +461,10 @@ function renderVenueSettingsEditor(){
     <label><span>구장명</span><input data-field="name" value="${v.name}"></label>
     <label><span>코트 수</span><input data-field="courtCount" type="number" min="1" max="32" value="${v.courtCount}"></label>
     <label class="venue-prefix"><span>코트명 접두어</span><input data-field="courtPrefix" value="${v.courtPrefix}"></label>
+    <div class="venue-scope-options">
+      <label><input data-field="usePrelim" type="checkbox" ${v.usePrelim!==false?'checked':''}><span>예선 사용</span></label>
+      <label><input data-field="useMain" type="checkbox" ${v.useMain!==false?'checked':''}><span>본선 사용</span></label>
+    </div>
     <button class="btn btn-danger-outline" data-remove-venue="${i}" ${state.settings.venues.length===1?'disabled':''}>삭제</button>
   </article>`).join('');
   root.querySelectorAll('[data-remove-venue]').forEach(btn=>btn.onclick=()=>{
@@ -466,7 +477,9 @@ function readVenueSettingsEditor(){
     id:state.settings.venues[i]?.id||`venue-${Date.now()}-${i}`,
     name:row.querySelector('[data-field="name"]').value.trim()||`구장${i+1}`,
     courtCount:Math.max(1,Number(row.querySelector('[data-field="courtCount"]').value)||1),
-    courtPrefix:row.querySelector('[data-field="courtPrefix"]').value.trim()||'코트'
+    courtPrefix:row.querySelector('[data-field="courtPrefix"]').value.trim()||'코트',
+    usePrelim:row.querySelector('[data-field="usePrelim"]').checked,
+    useMain:row.querySelector('[data-field="useMain"]').checked
   }));
   ensureVenueSettings(state);ensureVenueQueues(state);
 }
@@ -477,12 +490,15 @@ function applyVenuePreset(){
 }
 function addVenue(){
   readVenueSettingsEditor();
-  state.settings.venues.push({id:`venue-${Date.now()}`,name:`구장${state.settings.venues.length+1}`,courtCount:1,courtPrefix:'코트'});
+  state.settings.venues.push({id:`venue-${Date.now()}`,name:`구장${state.settings.venues.length+1}`,courtCount:1,courtPrefix:'코트',usePrelim:true,useMain:true});
   renderVenueSettingsEditor();
 }
 function saveVenueSettings(){
-  readVenueSettingsEditor();commit(`본선 구장 설정 저장 · ${state.settings.venues.length}곳 · ${state.settings.courtCount}면`);
-  notice('구장 설정을 저장했습니다. 다음 코트배정부터 적용됩니다.','success');
+  readVenueSettingsEditor();
+  const prelimSummary=prelimVenues(state).map(v=>`${v.name} ${v.courtCount}면`).join(' + ');
+  const mainSummary=mainVenues(state).map(v=>`${v.name} ${v.courtCount}면`).join(' + ');
+  commit(`구장 설정 저장 · 예선 ${prelimSummary} · 본선 ${mainSummary}`);
+  notice(`예선: ${prelimSummary} / 본선: ${mainSummary}로 저장했습니다.`,'success');
 }
 
 
@@ -702,6 +718,14 @@ function bind(){
   $('autoFitPrelimBtn').onclick=()=>{try{autoFitPrelim();}catch(e){prelimNotice(e.message,'error');}};
   $('generatePrelimBtn').onclick=()=>{try{createPrelim();}catch(e){prelimNotice(e.message,'error');}};
   $('assignPrelimCourtsBtn').onclick=()=>{try{assignPrelim();}catch(e){prelimNotice(e.message,'error');}};
+  if($('swapReserveBtn'))$('swapReserveBtn').onclick=()=>{
+    reserveSwapMode=!reserveSwapMode;
+    if(!reserveSwapMode){pendingActiveSwapId=null;state.prelim.swapSelection=null;}
+    $('swapReserveBtn').classList.toggle('swap-mode-active',reserveSwapMode);
+    $('swapReserveBtn').textContent=reserveSwapMode?'교체할 참가팀 선택':'후보 교체 모드';
+    prelimNotice(reserveSwapMode?'교체할 예선 참가팀의 교체 버튼을 누르세요.':'후보 교체 모드를 종료했습니다.','info');
+    commit();
+  };
   $('generateLinkedDrawBtn').onclick=()=>{try{createLinkedDraw();}catch(e){prelimNotice(e.message,'error');}};
   $('syncLinkedDrawBtn').onclick=()=>{try{syncLinkedDraw();}catch(e){prelimNotice(e.message,'error');}};
   $('confirmPrelimResultBtn').onclick=confirmPrelimResult;
@@ -773,5 +797,13 @@ document.addEventListener('click',event=>{
   openManualAssign(button.dataset.venueId,button.dataset.manualAssign);
 },{capture:true});
 
+
+document.addEventListener('click',event=>{
+  const active=event.target.closest?.('[data-active-swap]');
+  if(active){event.preventDefault();event.stopPropagation();selectActiveSwap(active.dataset.activeSwap);return;}
+  const reserve=event.target.closest?.('[data-reserve-pick]');
+  if(reserve){event.preventDefault();event.stopPropagation();selectReserveSwap(reserve.dataset.reservePick);}
+},{capture:true});
+
 syncInputs();syncPrelimInputs();bind();renderVenueSettingsEditor();calculateTimeMetrics(state);render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue});restartTimeTimer();updateClock();setInterval(updateClock,1000);
-console.log('[230MATCH V3] stage20.1 prelim-operation-main-rebalance-fix loaded · no legacy code · no Firebase writes');
+console.log('[230MATCH V3] stage20.2 venue-scope-swap-fix loaded · no legacy code · no Firebase writes');
