@@ -140,3 +140,26 @@
   overflow-wrap:anywhere;
   word-break:keep-all;
 }
+
+.queue-control-guide{display:flex;gap:10px;align-items:center;margin:0 0 12px;padding:10px 12px;border:1px solid #d5dfed;border-radius:10px;background:#f8fbff}
+.queue-control-guide span{color:var(--muted);font-size:13px}
+.queue-card-actions{display:flex;gap:5px;flex-wrap:wrap;margin-top:10px}
+.queue-card-actions .btn{padding:6px 9px;font-size:11px}
+#sharedQueue.venue-queue-board .time-badge{
+  display:inline-flex;
+  flex-direction:row;
+  align-items:center;
+  gap:4px;
+  width:auto;
+  max-width:100%;
+  white-space:nowrap;
+  writing-mode:horizontal-tb;
+  line-height:1.2;
+  padding:6px 9px;
+  border-radius:999px;
+}
+#sharedQueue.venue-queue-board .time-badge strong,
+#sharedQueue.venue-queue-board .time-badge span{
+  display:inline;
+  white-space:nowrap;
+}

@@ -20,7 +20,7 @@ export function render(state,handlers){
   setText('baseMatchMinutes',`${state.settings.matchMinutes||30}분`);setText('autoTimeStatus',state.settings.autoTimeEnabled?'ON':'OFF');
   setText('lastTimeCalculated',state.timeMetrics?.lastCalculatedAt?new Date(state.timeMetrics.lastCalculatedAt).toLocaleTimeString('ko-KR'):'-');
   setText('sharedQueueCount',`${totalVenueQueueCount(state)+(state.sharedQueue?.length||0)}경기`);
-  renderCourts(state,handlers);renderQueue(state);renderPrelim(state,handlers);renderBracket(state);renderDrawHistory(state);renderAudit(state);renderLogs(state);
+  renderCourts(state,handlers);renderQueue(state,handlers);renderPrelim(state,handlers);renderBracket(state);renderDrawHistory(state);renderAudit(state);renderLogs(state);
 }
 function setText(id,value){const el=document.getElementById(id);if(el)el.textContent=value;}
 function currentRound(state){
@@ -50,7 +50,7 @@ function renderCourts(state,handlers){
   </section>`).join('');
   root.querySelectorAll('[data-result]').forEach(b=>b.addEventListener('click',()=>handlers.openResult(b.dataset.result)));
 }
-function renderQueue(state){
+function renderQueue(state,handlers){
   const root=document.getElementById('sharedQueue');
   const venues=state.settings.venues||[];
   const queues=state.venueQueues||{};
@@ -61,10 +61,14 @@ function renderQueue(state){
   root.innerHTML=venues.map(v=>{
     const queue=queues[v.id]||[];
     return`<section class="venue-queue-section"><header><h3>📍 ${v.name} 공용대기</h3><span>${queue.length}경기</span></header>
-      <div class="venue-queue-cards">${queue.length?queue.map((id,i)=>{const m=findMatch(state.draw,id);return`<article class="queue-card"><span class="num">${i+1}</span><b>${m?`${teamHtml(m.teamA)} vs ${teamHtml(m.teamB)}`:id}</b><em>${m?`${roundLabel(m.roundSize)} · ${id}`:'경기 없음'}</em>${m?timeBadgeHtml(m):''}</article>`}).join(''):'<div class="empty-state"><p>대기 경기 없음</p></div>'}</div>
+      <div class="venue-queue-cards">${queue.length?queue.map((id,i)=>{const m=findMatch(state.draw,id);return`<article class="queue-card"><span class="num">${i+1}</span><b>${m?`${teamHtml(m.teamA)} vs ${teamHtml(m.teamB)}`:id}</b><em>${m?`${roundLabel(m.roundSize)} · ${id}`:'경기 없음'}</em>${m?timeBadgeHtml(m):''}<div class="queue-card-actions"><button class="btn btn-light" data-queue-up="${id}" data-venue-id="${v.id}" ${i===0?'disabled':''}>▲</button><button class="btn btn-light" data-queue-down="${id}" data-venue-id="${v.id}" ${i===queue.length-1?'disabled':''}>▼</button><button class="btn btn-secondary" data-queue-move="${id}" data-venue-id="${v.id}">구장 이동</button></div></article>`}).join(''):'<div class="empty-state"><p>대기 경기 없음</p></div>'}</div>
     </section>`;
   }).join('');
+  root.querySelectorAll('[data-queue-up]').forEach(b=>b.onclick=()=>handlers.reorderQueue(b.dataset.venueId,b.dataset.queueUp,'up'));
+  root.querySelectorAll('[data-queue-down]').forEach(b=>b.onclick=()=>handlers.reorderQueue(b.dataset.venueId,b.dataset.queueDown,'down'));
+  root.querySelectorAll('[data-queue-move]').forEach(b=>b.onclick=()=>handlers.openQueueMove(b.dataset.venueId,b.dataset.queueMove));
 }
+
 function renderBracket(state){
   const root=document.getElementById('bracketBoard');
   const sizes=Object.keys(state.draw.rounds||{}).map(Number).sort((a,b)=>b-a);

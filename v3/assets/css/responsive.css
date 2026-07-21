@@ -37,3 +37,5 @@
 @media(max-width:620px){
   #sharedQueue.venue-queue-board .venue-queue-cards{grid-template-columns:1fr}
 }
+
+@media(max-width:620px){.queue-control-guide{align-items:flex-start;flex-direction:column}}
