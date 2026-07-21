@@ -58,3 +58,84 @@ input,select{width:100%;border:1px solid #b9cae5;border-radius:10px;padding:11px
 .lock-summary div{padding:10px;border-radius:9px;background:#eef3fa}.lock-summary span{display:block;font-size:11px;color:var(--muted)}.lock-summary strong{display:block;margin-top:4px;word-break:break-all}
 
 .message-updated-badge{display:inline-flex;margin-left:6px;padding:4px 7px;border-radius:999px;background:#e7efff;color:#315da5;font-size:11px;font-weight:850}
+
+/* Stage 18: 대진표 실시간 상태 및 라운드별 색상 */
+.bracket-live-board .round-column{
+  --round-accent:#46688f;
+  --round-soft:#eef4fb;
+}
+.bracket-live-board .round-column>h3{
+  position:sticky;
+  top:0;
+  z-index:2;
+  margin:0 0 10px;
+  padding:10px 12px;
+  border-radius:10px;
+  background:var(--round-accent);
+  color:#fff;
+  box-shadow:0 3px 9px rgba(20,40,70,.16);
+}
+.bracket-live-board .round-128{--round-accent:#637083;--round-soft:#f1f4f7}
+.bracket-live-board .round-64{--round-accent:#316dca;--round-soft:#edf4ff}
+.bracket-live-board .round-32{--round-accent:#6357c7;--round-soft:#f1efff}
+.bracket-live-board .round-16{--round-accent:#9b4bb6;--round-soft:#faf0ff}
+.bracket-live-board .round-8{--round-accent:#d06a24;--round-soft:#fff2e8}
+.bracket-live-board .round-4{--round-accent:#bd303e;--round-soft:#fff0f2}
+.bracket-live-board .round-2{--round-accent:#a77b00;--round-soft:#fff8dc}
+.bracket-live-board .round-1{--round-accent:#18835c;--round-soft:#eafaf4}
+.bracket-live-board .match-card{
+  border-left-color:var(--round-accent);
+  background:var(--round-soft);
+  transition:transform .18s ease,box-shadow .18s ease;
+}
+.bracket-live-board .match-card:hover{transform:translateY(-1px);box-shadow:0 5px 13px rgba(30,50,80,.14)}
+.bracket-live-board .match-card header{background:color-mix(in srgb,var(--round-accent) 12%,#fff)}
+.bracket-court-label{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-height:27px;
+  padding:5px 8px;
+  border-bottom:1px solid #dbe4ef;
+  font-size:12px;
+  font-weight:900;
+  letter-spacing:.01em;
+}
+.match-card.is-playing{
+  border-color:#db3b3b;
+  border-left-width:6px;
+  background:#fff5f5;
+  box-shadow:0 0 0 2px rgba(219,59,59,.14);
+  animation:playingPulse 1.35s ease-in-out infinite;
+}
+.match-card.is-playing header{background:#d93636;color:#fff}
+.match-card.is-playing .bracket-court-label{background:#ffe0e0;color:#a20f0f}
+.match-card.is-wait1{
+  border-color:#e09b18;
+  border-left-width:6px;
+  background:#fff9e8;
+}
+.match-card.is-wait1 header{background:#f0a827;color:#3e2b00}
+.match-card.is-wait1 .bracket-court-label{background:#fff0bd;color:#795100}
+.match-card.is-manual-wait{
+  border-color:#7654d9;
+  border-left-width:6px;
+  background:#f7f3ff;
+}
+.match-card.is-manual-wait header{background:#7654d9;color:#fff}
+.match-card.is-manual-wait .bracket-court-label{background:#e9e0ff;color:#4b2ca6}
+.match-card.is-shared-wait{
+  border-color:#4088b5;
+  background:#f0f8fd;
+}
+.match-card.is-shared-wait header{background:#dceef9;color:#245f84}
+.match-card.is-ready{border-color:#5685d8;background:#f3f7ff}
+.match-card.is-placeholder{opacity:.72;filter:saturate(.7)}
+.match-card.completed{animation:none;border-left-color:#1f9b68;background:#f0fff7}
+.match-card.completed header{background:#d7f5e5;color:#135f42}
+.match-status-label{font-weight:900}
+@keyframes playingPulse{
+  0%,100%{box-shadow:0 0 0 2px rgba(219,59,59,.12)}
+  50%{box-shadow:0 0 0 5px rgba(219,59,59,.3)}
+}
+@media(prefers-reduced-motion:reduce){.match-card.is-playing{animation:none}}

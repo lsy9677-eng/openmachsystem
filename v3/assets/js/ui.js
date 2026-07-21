@@ -70,14 +70,45 @@ function renderQueue(state,handlers){
   root.querySelectorAll('[data-queue-move]').forEach(b=>b.onclick=()=>handlers.openQueueMove(b.dataset.venueId,b.dataset.queueMove));root.querySelectorAll('[data-manual-assign]').forEach(b=>b.onclick=()=>handlers.openManualAssign(b.dataset.venueId,b.dataset.manualAssign));root.querySelectorAll('[data-admin-queue]').forEach(b=>b.onclick=()=>handlers.openManualQueueAssign(b.dataset.venueId,b.dataset.adminQueue));
 }
 
+function bracketCourtLabel(match){
+  if(match.status==='playing')return match.court?`시합중 · ${match.court}`:'시합중 · 코트 확인중';
+  if(match.status==='court_wait1')return match.court?`대기1 · ${match.court}`:'대기1 · 코트 확인중';
+  if(match.status==='court_manual_queue')return match.court?`관리자 대기 · ${match.court}`:'관리자 대기';
+  if(match.status==='venue_shared_queue'||match.status==='shared_queue')return match.venueId?'구장 공용대기':'공용대기';
+  return'';
+}
+function bracketStatusClass(status){
+  return({
+    playing:'is-playing',
+    court_wait1:'is-wait1',
+    court_manual_queue:'is-manual-wait',
+    venue_shared_queue:'is-shared-wait',
+    shared_queue:'is-shared-wait',
+    ready:'is-ready',
+    waiting_slots:'is-placeholder',
+    completed:'completed'
+  })[status]||'';
+}
+function roundThemeClass(size){
+  const map={128:'round-128',64:'round-64',32:'round-32',16:'round-16',8:'round-8',4:'round-4',2:'round-2',1:'round-1'};
+  return map[size]||'round-default';
+}
 function renderBracket(state){
   const root=document.getElementById('bracketBoard');
   const sizes=Object.keys(state.draw.rounds||{}).map(Number).sort((a,b)=>b-a);
   if(!sizes.length){root.className='bracket-board empty-state';root.innerHTML='<p>생성된 대진이 없습니다.</p>';return;}
-  root.className='bracket-board';
-  root.innerHTML=sizes.map(size=>`<section class="round-column"><h3>${roundLabel(size)}</h3>${state.draw.rounds[size].map(m=>`<article class="match-card ${m.status==='completed'?'completed':''}"><header><span>${m.matchNo}경기</span><span>${statusText(m.status)}</span></header><div class="match-team ${m.winner?.id===m.teamA?.id?'winner':''}">${teamHtml(m.teamA)}</div><div class="match-team ${m.winner?.id===m.teamB?.id?'winner':''}">${teamHtml(m.teamB)}</div><div class="match-meta">${m.scoreA!=null?`${m.scoreA}:${m.scoreB}`:`${m.id}${m.bye?' · 부전승':''}`}</div></article>`).join('')}</section>`).join('');
+  root.className='bracket-board bracket-live-board';
+  root.innerHTML=sizes.map(size=>`<section class="round-column ${roundThemeClass(size)}"><h3>${roundLabel(size)}</h3>${state.draw.rounds[size].map(m=>{
+    const courtLabel=bracketCourtLabel(m);
+    return`<article class="match-card ${bracketStatusClass(m.status)}">
+      <header><span>${m.matchNo}경기</span><span class="match-status-label">${statusText(m.status)}</span></header>
+      ${courtLabel?`<div class="bracket-court-label">${courtLabel}</div>`:''}
+      <div class="match-team ${m.winner?.id===m.teamA?.id?'winner':''}">${teamHtml(m.teamA)}</div>
+      <div class="match-team ${m.winner?.id===m.teamB?.id?'winner':''}">${teamHtml(m.teamB)}</div>
+      <div class="match-meta">${m.scoreA!=null?`${m.scoreA}:${m.scoreB}`:`${m.id}${m.bye?' · 부전승':''}`}</div>
+    </article>`}).join('')}</section>`).join('');
 }
-function statusText(s){return({waiting_slots:'대진 대기',ready:'배정 대기',playing:'시합중',court_wait1:'대기1',shared_queue:'공용대기',completed:'완료'})[s]||s;}
+function statusTextfunction statusText(s){return({waiting_slots:'대진 대기',ready:'배정 대기',playing:'시합중',court_wait1:'대기1',court_manual_queue:'관리자 대기',venue_shared_queue:'구장 공용대기',shared_queue:'공용대기',completed:'완료'})[s]||s;}
 function renderLogs(state){
   const root=document.getElementById('logList');
   root.innerHTML=state.logs.length?state.logs.map(x=>`<article class="log-item"><time>${new Date(x.at).toLocaleString('ko-KR')}</time><p>${x.message}</p></article>`).join(''):'<div class="empty-state"><p>운영 로그가 없습니다.</p></div>';
