@@ -220,3 +220,6 @@
 
 .manual-court-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 .manual-court-actions .btn{padding:6px 9px;font-size:11px}
+
+.court-transfer-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.court-transfer-actions .btn{padding:6px 9px;font-size:11px}

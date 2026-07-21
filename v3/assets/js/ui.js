@@ -45,11 +45,11 @@ function renderCourts(state,handlers){
       const p=c.playing?findMatch(state.draw,c.playing):null,w=c.wait1?findMatch(state.draw,c.wait1):null;
       return `<article class="court-card"><header><strong>🚀 ${c.name}</strong><span>${p?'시합중':'빈코트'}</span></header>
         <div class="court-slot"><small>시합중</small><b>${p?`${teamHtml(p.teamA)} vs ${teamHtml(p.teamB)}`:'진행 경기 없음'}</b><em>${p?`${roundLabel(p.roundSize)} · ${p.id}`:'-'}</em>${p?timeBadgeHtml(p):''}
-        <button class="btn" data-result="${p?.id||''}" ${p?'':'disabled'}>결과 입력</button></div>
-        <div class="court-slot wait"><small>대기 1번</small><b>${w?`${teamHtml(w.teamA)} vs ${teamHtml(w.teamB)}`:'대기 경기 없음'}</b><em>${w?`${roundLabel(w.roundSize)} · ${w.id}`:'-'}</em>${w?timeBadgeHtml(w):''}${w?`<div class="manual-court-actions"><button class="btn btn-light" data-return-wait1="${c.id}">공용대기로 돌리기</button></div>`:''}</div></article>`;
+        <button class="btn" data-result="${p?.id||''}" ${p?'':'disabled'}>결과 입력</button>${p?`<div class="court-transfer-actions"><button class="btn btn-light" data-court-transfer="${c.id}" data-slot="playing">다른 코트로 이동</button></div>`:''}</div>
+        <div class="court-slot wait"><small>대기 1번</small><b>${w?`${teamHtml(w.teamA)} vs ${teamHtml(w.teamB)}`:'대기 경기 없음'}</b><em>${w?`${roundLabel(w.roundSize)} · ${w.id}`:'-'}</em>${w?timeBadgeHtml(w):''}${w?`<div class="manual-court-actions"><button class="btn btn-light" data-court-transfer="${c.id}" data-slot="wait1">다른 코트로 이동</button><button class="btn btn-light" data-return-wait1="${c.id}">공용대기로 돌리기</button></div>`:''}</div></article>`;
     }).join('')}</div>
   </section>`).join('');
-  root.querySelectorAll('[data-result]').forEach(b=>b.addEventListener('click',()=>handlers.openResult(b.dataset.result)));root.querySelectorAll('[data-return-wait1]').forEach(b=>b.onclick=()=>handlers.returnWait1(b.dataset.returnWait1));
+  root.querySelectorAll('[data-result]').forEach(b=>b.addEventListener('click',()=>handlers.openResult(b.dataset.result)));root.querySelectorAll('[data-return-wait1]').forEach(b=>b.onclick=()=>handlers.returnWait1(b.dataset.returnWait1));root.querySelectorAll('[data-court-transfer]').forEach(b=>b.onclick=()=>handlers.openCourtTransfer(b.dataset.courtTransfer,b.dataset.slot));
 }
 function renderQueue(state,handlers){
   const root=document.getElementById('sharedQueue');

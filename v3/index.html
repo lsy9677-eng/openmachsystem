@@ -29,9 +29,9 @@
   <main class="app-shell">
     <section class="hero panel">
       <div>
-        <p class="eyebrow">STAGE 14.1 · MANUAL ASSIGN FEEDBACK</p>
-        <h1>수동 코트배정 반응·안내 개선</h1>
-        <p>공용대기 경기를 같은 구장의 빈 코트 또는 대기1로 직접 배정하고, 대기1 경기를 공용대기로 되돌릴 수 있습니다.</p>
+        <p class="eyebrow">STAGE 15 · COURT TRANSFER</p>
+        <h1>시합중·대기1 경기 코트 간 이동</h1>
+        <p>이미 코트에 배정된 시합중·대기1 경기를 같은 구장의 다른 빈 자리로 이동하고, 필요하면 두 자리의 경기를 서로 교환할 수 있습니다.</p>
       </div>
       <div class="hero-stats">
         <div><span>대진</span><strong id="heroDrawSize">-</strong></div>
@@ -498,6 +498,22 @@
 
 
 
+
+  <dialog id="courtTransferDialog" class="modal">
+    <form method="dialog" id="courtTransferForm">
+      <div class="modal-head"><h2>코트 경기 이동·교환</h2><button value="cancel" class="icon-button">×</button></div>
+      <div class="contact-edit-body">
+        <input id="courtTransferSourceCourtId" type="hidden">
+        <input id="courtTransferSourceSlot" type="hidden">
+        <p id="courtTransferMatchLabel" class="modal-match"></p>
+        <label><span>이동 또는 교환할 자리</span><select id="courtTransferTargetSelect"></select></label>
+        <label class="toggle-label"><span>대상 자리에 경기가 있으면 서로 교환</span><input id="courtTransferAllowSwap" type="checkbox" checked></label>
+        <div id="courtTransferInfo" class="notice info">같은 구장의 시합중·대기1 자리만 표시됩니다.</div>
+      </div>
+      <menu><button value="cancel" class="btn btn-light">취소</button><button id="confirmCourtTransferBtn" value="default" class="btn btn-primary">이동·교환</button></menu>
+    </form>
+  </dialog>
+
   <dialog id="manualCourtAssignDialog" class="modal">
     <form method="dialog" id="manualCourtAssignForm">
       <div class="modal-head"><h2>공용대기 경기 코트배정</h2><button value="cancel" class="icon-button">×</button></div>
@@ -646,6 +662,6 @@
     <div id="recoveryList" class="recovery-list"></div>
   </dialog>
 
-  <script type="module" src="./assets/js/app-v31401.js?v=31401"></script>
+  <script type="module" src="./assets/js/app-v31500.js?v=31500"></script>
 </body>
 </html>
