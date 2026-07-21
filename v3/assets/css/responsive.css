@@ -17,3 +17,5 @@
 @media(max-width:700px){.draw-history-item{grid-template-columns:1fr}.roulette-result-list{grid-template-columns:1fr}}
 
 @media(max-width:700px){.draw-lock-info{align-items:flex-start;flex-direction:column}.lock-summary{grid-template-columns:1fr}}
+
+@media(max-width:1100px){.message-settings-grid,.message-template-grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:700px){.message-settings-grid,.message-template-grid{grid-template-columns:1fr}.message-card-head{flex-direction:column}}

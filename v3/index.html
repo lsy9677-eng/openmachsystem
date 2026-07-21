@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#10264a">
   <title>230MATCH V3</title>
-  <link rel="stylesheet" href="./assets/css/tokens.css?v=30631">
-  <link rel="stylesheet" href="./assets/css/layout.css?v=30631">
-  <link rel="stylesheet" href="./assets/css/components.css?v=30631">
-  <link rel="stylesheet" href="./assets/css/responsive.css?v=30631">
+  <link rel="stylesheet" href="./assets/css/tokens.css?v=30700">
+  <link rel="stylesheet" href="./assets/css/layout.css?v=30700">
+  <link rel="stylesheet" href="./assets/css/components.css?v=30700">
+  <link rel="stylesheet" href="./assets/css/responsive.css?v=30700">
 </head>
 <body>
   <header class="topbar">
@@ -29,9 +29,9 @@
   <main class="app-shell">
     <section class="hero panel">
       <div>
-        <p class="eyebrow">STAGE 6.3.1 · STARTUP FIX</p>
-        <h1>40분 경기시간 기준 · 시작 오류 수정</h1>
-        <p>경기 평균시간은 40분, 최소 예상시간은 30분으로 계산해 지나치게 짧은 대기시간이 표시되지 않도록 합니다.</p>
+        <p class="eyebrow">STAGE 7 · MESSAGE CENTER</p>
+        <h1>경기 호출·대기·예상시간 문자 준비</h1>
+        <p>코트배정과 큐 승계 시 경기 호출·대기 안내 문자를 자동 생성하고, 발송 전 검토·복사·SMS 앱 열기를 제공합니다.</p>
       </div>
       <div class="hero-stats">
         <div><span>대진</span><strong id="heroDrawSize">-</strong></div>
@@ -46,6 +46,7 @@
       <button class="tab" data-view="prelim">예선 운영</button>
       <button class="tab" data-view="bracket">본선 대진표</button>
       <button class="tab" data-view="settings">대회 설정</button>
+      <button class="tab" data-view="messages">문자 센터</button>
       <button class="tab" data-view="logs">운영 로그</button>
     </nav>
 
@@ -113,6 +114,8 @@
           <label><span>진행시간 갱신</span><select id="timeRefreshSeconds"><option value="15">15초</option><option value="30" selected>30초</option><option value="60">60초</option></select></label>
           <label class="toggle-label"><span>대기시간 자동계산</span><input id="autoTimeEnabled" type="checkbox" checked></label>
           <button id="recalculateTimeBtn" class="btn btn-light">예상시간 즉시 계산</button>
+          <label class="toggle-label"><span>운영 문자 자동 생성</span><input id="autoMessageEnabled" type="checkbox" checked></label>
+          <button id="generateTimeMessagesBtn" class="btn btn-light">예상시간 문자 생성</button>
         </div>
 
         <div class="button-row">
@@ -146,6 +149,7 @@
         <article class="summary-card"><span>최장 예상대기</span><strong id="summaryLongestWait">0분</strong></article>
         <article class="summary-card"><span>추첨 방식</span><strong id="summaryDrawMethod">-</strong></article>
         <article class="summary-card"><span>대진 잠금</span><strong id="summaryDrawLock">해제</strong></article>
+        <article class="summary-card"><span>발송 대기 문자</span><strong id="summaryPendingMessages">0건</strong></article>
       </section>
 
       <section class="panel">
@@ -330,6 +334,41 @@
       </section>
     </section>
 
+
+    <section id="view-messages" class="view">
+      <section class="panel">
+        <div class="section-head"><div><h2>운영 문자 센터</h2><p>문자를 자동 생성하되 실제 발송 전에는 반드시 운영자가 내용을 확인합니다.</p></div><span class="badge badge-safe">외부 API 미연결</span></div>
+        <div class="message-settings-grid">
+          <label><span>발신 표시명</span><input id="messageSenderName" type="text" value="230MATCH"></label>
+          <label><span>발송 방식</span><select id="messageDeliveryMode"><option value="sms-uri">휴대폰 문자 앱 열기</option><option value="copy-only">내용 복사만</option></select></label>
+          <label class="toggle-label"><span>코트배정 문자 자동 생성</span><input id="messageOnCourtAssign" type="checkbox" checked></label>
+          <label class="toggle-label"><span>대기1 승계 문자 자동 생성</span><input id="messageOnQueueMove" type="checkbox" checked></label>
+        </div>
+        <div class="button-row">
+          <button id="generateCurrentCourtMessagesBtn" class="btn btn-primary">현재 코트 호출 문자 생성</button>
+          <button id="generateCurrentWaitMessagesBtn" class="btn btn-secondary">현재 대기1 문자 생성</button>
+          <button id="generateAllTimeMessagesBtn" class="btn btn-purple">전체 예상시간 문자 생성</button>
+          <button id="markAllMessagesSentBtn" class="btn btn-light">전체 발송완료 표시</button>
+          <button id="clearSentMessagesBtn" class="btn btn-danger-outline">발송완료 문자 정리</button>
+        </div>
+        <div class="message-template-grid">
+          <label><span>시합중 호출 문구</span><textarea id="templatePlaying" rows="4"></textarea></label>
+          <label><span>대기1 안내 문구</span><textarea id="templateWait1" rows="4"></textarea></label>
+          <label><span>공용대기 예상시간 문구</span><textarea id="templateShared" rows="4"></textarea></label>
+        </div>
+      </section>
+      <section class="summary-grid message-summary-grid">
+        <article class="summary-card"><span>전체 문자</span><strong id="messageTotalCount">0건</strong></article>
+        <article class="summary-card"><span>발송 대기</span><strong id="messagePendingCount">0건</strong></article>
+        <article class="summary-card"><span>발송 완료</span><strong id="messageSentCount">0건</strong></article>
+        <article class="summary-card"><span>전화번호 없음</span><strong id="messageNoPhoneCount">0건</strong></article>
+      </section>
+      <section class="panel">
+        <div class="section-head"><div><h2>문자 발송 대기열</h2><p>중복 문자는 자동 차단되며 발송 상태를 기록합니다.</p></div><select id="messageStatusFilter"><option value="all">전체</option><option value="pending" selected>발송 대기</option><option value="sent">발송 완료</option><option value="no-phone">전화번호 없음</option></select></div>
+        <div id="messageQueueList" class="message-queue-list empty-state"><p>생성된 문자가 없습니다.</p></div>
+      </section>
+    </section>
+
     <section id="view-logs" class="view">
       <section class="panel">
         <div class="section-head"><div><h2>운영 로그</h2><p>중요 상태 변경을 시간순으로 기록합니다.</p></div><button id="clearLogsBtn" class="btn btn-light">로그 지우기</button></div>
@@ -440,6 +479,6 @@
     <div id="recoveryList" class="recovery-list"></div>
   </dialog>
 
-  <script type="module" src="./assets/js/app-v30631.js?v=30631"></script>
+  <script type="module" src="./assets/js/app-v30700.js?v=30700"></script>
 </body>
 </html>

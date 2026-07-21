@@ -1,8 +1,3 @@
-# 230MATCH V3 6.3.1
+# 230MATCH V3 — Stage 7 Message Center
 
-이전 HTML과 새 JavaScript가 캐시에서 섞이며 `minimumMatchMinutes` 요소가 null이 되어 앱 시작이 중단되던 문제를 수정했습니다.
-
-- 새 JavaScript 파일명 `app-v30631.js`
-- 설정 DOM 접근 null-safe 처리
-- 버튼 이벤트 초기화 중단 방지
-- 40분 기본 / 30분 최소 정책 유지
+코트 호출·대기1·공용대기 예상시간 문자를 자동 생성하고 검토·복사·SMS 앱 열기·발송완료 관리를 제공합니다. 외부 문자 API는 아직 연결하지 않습니다.
