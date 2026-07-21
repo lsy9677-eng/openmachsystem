@@ -29,9 +29,9 @@
   <main class="app-shell">
     <section class="hero panel">
       <div>
-        <p class="eyebrow">STAGE 18.1 · UI SYNTAX FIX</p>
-        <h1>대진표 실시간 코트·상태 시각화</h1>
-        <p>대진표 카드에 시합중·대기중 코트명을 표시하고, 라운드와 경기 상태별 색상 및 움직이는 강조 표시를 적용합니다.</p>
+        <p class="eyebrow">STAGE 19 · BRACKET VIEW CONTROLS</p>
+        <h1>대진표 라운드·상태·구장 보기 제어</h1>
+        <p>대진표를 라운드·경기상태·구장별로 빠르게 필터링하고, 활성 경기만 집중 표시하거나 전체화면으로 운영할 수 있습니다.</p>
       </div>
       <div class="hero-stats">
         <div><span>대진</span><strong id="heroDrawSize">-</strong></div>
@@ -317,6 +317,27 @@
           <div><h2>본선 대진표</h2><p>결과 확정 전에는 다음 라운드가 TBD로 유지됩니다.</p></div>
           <button id="exportJsonBtn" class="btn btn-light">운영 JSON 저장</button>
         </div>
+        <div class="bracket-view-toolbar">
+          <label><span>라운드</span><select id="bracketRoundFilter"><option value="all">전체 라운드</option></select></label>
+          <label><span>경기 상태</span>
+            <select id="bracketStatusFilter">
+              <option value="all">전체 상태</option>
+              <option value="active">시합중·대기만</option>
+              <option value="playing">시합중</option>
+              <option value="court_wait1">대기1</option>
+              <option value="court_manual_queue">관리자 대기</option>
+              <option value="venue_shared_queue">구장 공용대기</option>
+              <option value="ready">배정 대기</option>
+              <option value="completed">완료</option>
+            </select>
+          </label>
+          <label><span>구장</span><select id="bracketVenueFilter"><option value="all">전체 구장</option></select></label>
+          <label><span>표시 크기</span><select id="bracketDensity"><option value="comfortable">기본</option><option value="compact">간략</option></select></label>
+          <button id="bracketActiveOnlyBtn" class="btn btn-secondary" type="button">활성 경기 집중</button>
+          <button id="bracketResetViewBtn" class="btn btn-light" type="button">필터 초기화</button>
+          <button id="bracketFullscreenBtn" class="btn btn-primary" type="button">대진표 전체화면</button>
+        </div>
+        <div id="bracketViewSummary" class="bracket-view-summary">전체 경기를 표시합니다.</div>
         <div id="bracketBoard" class="bracket-board empty-state"><p>생성된 대진이 없습니다.</p></div>
       </section>
     </section>
@@ -700,6 +721,6 @@
     <div id="recoveryList" class="recovery-list"></div>
   </dialog>
 
-  <script type="module" src="./assets/js/app-v31801.js?v=31801"></script>
+  <script type="module" src="./assets/js/app-v31900.js?v=31900"></script>
 </body>
 </html>

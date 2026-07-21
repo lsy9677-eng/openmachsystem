@@ -39,3 +39,7 @@
 }
 
 @media(max-width:620px){.queue-control-guide{align-items:flex-start;flex-direction:column}}
+
+@media(max-width:1100px){.bracket-view-toolbar{grid-template-columns:repeat(3,minmax(150px,1fr))}}
+@media(max-width:720px){.bracket-view-toolbar{grid-template-columns:1fr 1fr}}
+@media(max-width:520px){.bracket-view-toolbar{grid-template-columns:1fr}}

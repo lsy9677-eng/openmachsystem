@@ -93,22 +93,80 @@ function roundThemeClass(size){
   const map={128:'round-128',64:'round-64',32:'round-32',16:'round-16',8:'round-8',4:'round-4',2:'round-2',1:'round-1'};
   return map[size]||'round-default';
 }
+
+function ensureBracketViewState(state){
+  if(!state.ui)state.ui={};
+  if(!state.ui.bracketView)state.ui.bracketView={round:'all',status:'all',venue:'all',density:'comfortable',activeOnly:false};
+  return state.ui.bracketView;
+}
+function bracketMatchVisible(match,view){
+  if(view.status==='active'&&!['playing','court_wait1','court_manual_queue','venue_shared_queue','shared_queue','ready'].includes(match.status))return false;
+  if(view.status!=='all'&&view.status!=='active'){
+    if(view.status==='venue_shared_queue'){
+      if(!['venue_shared_queue','shared_queue'].includes(match.status))return false;
+    }else if(match.status!==view.status)return false;
+  }
+  if(view.venue!=='all'&&match.venueId!==view.venue)return false;
+  if(view.activeOnly&&!['playing','court_wait1','court_manual_queue','venue_shared_queue','shared_queue','ready'].includes(match.status))return false;
+  return true;
+}
+function syncBracketViewControls(state){
+  const view=ensureBracketViewState(state);
+  const sizes=Object.keys(state.draw.rounds||{}).map(Number).sort((a,b)=>b-a);
+  const round=document.getElementById('bracketRoundFilter');
+  if(round){
+    round.innerHTML='<option value="all">전체 라운드</option>'+sizes.map(size=>`<option value="${size}">${roundLabel(size)}</option>`).join('');
+    round.value=String(view.round);
+  }
+  const venue=document.getElementById('bracketVenueFilter');
+  if(venue){
+    venue.innerHTML='<option value="all">전체 구장</option>'+((state.settings.venues||[]).map(v=>`<option value="${v.id}">${v.name}</option>`).join(''));
+    venue.value=view.venue;
+  }
+  const status=document.getElementById('bracketStatusFilter');if(status)status.value=view.status;
+  const density=document.getElementById('bracketDensity');if(density)density.value=view.density;
+  const active=document.getElementById('bracketActiveOnlyBtn');if(active)active.className=`btn ${view.activeOnly?'btn-primary':'btn-secondary'}`;
+}
+
 function renderBracket(state){
   const root=document.getElementById('bracketBoard');
   const sizes=Object.keys(state.draw.rounds||{}).map(Number).sort((a,b)=>b-a);
+  syncBracketViewControls(state);
+  const view=ensureBracketViewState(state);
   if(!sizes.length){root.className='bracket-board empty-state';root.innerHTML='<p>생성된 대진이 없습니다.</p>';return;}
-  root.className='bracket-board bracket-live-board';
-  root.innerHTML=sizes.map(size=>`<section class="round-column ${roundThemeClass(size)}"><h3>${roundLabel(size)}</h3>${state.draw.rounds[size].map(m=>{
-    const courtLabel=bracketCourtLabel(m);
-    return`<article class="match-card ${bracketStatusClass(m.status)}">
-      <header><span>${m.matchNo}경기</span><span class="match-status-label">${statusText(m.status)}</span></header>
-      ${courtLabel?`<div class="bracket-court-label">${courtLabel}</div>`:''}
-      <div class="match-team ${m.winner?.id===m.teamA?.id?'winner':''}">${teamHtml(m.teamA)}</div>
-      <div class="match-team ${m.winner?.id===m.teamB?.id?'winner':''}">${teamHtml(m.teamB)}</div>
-      <div class="match-meta">${m.scoreA!=null?`${m.scoreA}:${m.scoreB}`:`${m.id}${m.bye?' · 부전승':''}`}</div>
-    </article>`}).join('')}</section>`).join('');
+  const densityClass=view.density==='compact'?' bracket-compact':'';
+  const focusClass=view.activeOnly?' bracket-focus-mode':'';
+  root.className=`bracket-board bracket-live-board${densityClass}${focusClass}`;
+  let visibleCount=0,totalCount=0;
+  root.innerHTML=sizes.map(size=>{
+    const roundVisible=view.round==='all'||String(view.round)===String(size);
+    const cards=state.draw.rounds[size].map(m=>{
+      totalCount++;
+      const visible=roundVisible&&bracketMatchVisible(m,view);
+      if(visible)visibleCount++;
+      const courtLabel=bracketCourtLabel(m);
+      return`<article class="match-card ${bracketStatusClass(m.status)} ${visible?'':'is-filtered-out'}">
+        <header><span>${m.matchNo}경기</span><span class="match-status-label">${statusText(m.status)}</span></header>
+        ${courtLabel?`<div class="bracket-court-label">${courtLabel}</div>`:''}
+        <div class="match-team ${m.winner?.id===m.teamA?.id?'winner':''}">${teamHtml(m.teamA)}</div>
+        <div class="match-team ${m.winner?.id===m.teamB?.id?'winner':''}">${teamHtml(m.teamB)}</div>
+        <div class="match-meta">${m.scoreA!=null?`${m.scoreA}:${m.scoreB}`:`${m.id}${m.bye?' · 부전승':''}`}</div>
+      </article>`;
+    }).join('');
+    const hasVisible=state.draw.rounds[size].some(m=>roundVisible&&bracketMatchVisible(m,view));
+    return`<section class="round-column ${roundThemeClass(size)} ${roundVisible?'':'is-round-filtered-out'} ${hasVisible?'has-visible-match':''}"><h3>${roundLabel(size)}</h3>${cards}</section>`;
+  }).join('');
+  const summary=document.getElementById('bracketViewSummary');
+  if(summary){
+    const parts=[`${visibleCount}/${totalCount}경기 표시`];
+    if(view.round!=='all')parts.push(roundLabel(Number(view.round)));
+    if(view.status!=='all')parts.push(document.getElementById('bracketStatusFilter')?.selectedOptions?.[0]?.textContent||view.status);
+    if(view.venue!=='all')parts.push(document.getElementById('bracketVenueFilter')?.selectedOptions?.[0]?.textContent||view.venue);
+    if(view.activeOnly)parts.push('활성 경기 집중');
+    summary.textContent=parts.join(' · ');
+  }
 }
-function statusText(s){return({waiting_slots:'대진 대기',ready:'배정 대기',playing:'시합중',court_wait1:'대기1',court_manual_queue:'관리자 대기',venue_shared_queue:'구장 공용대기',shared_queue:'공용대기',completed:'완료'})[s]||s;}
+function statusTextfunction statusText(s){return({waiting_slots:'대진 대기',ready:'배정 대기',playing:'시합중',court_wait1:'대기1',court_manual_queue:'관리자 대기',venue_shared_queue:'구장 공용대기',shared_queue:'공용대기',completed:'완료'})[s]||s;}
 function renderLogs(state){
   const root=document.getElementById('logList');
   root.innerHTML=state.logs.length?state.logs.map(x=>`<article class="log-item"><time>${new Date(x.at).toLocaleString('ko-KR')}</time><p>${x.message}</p></article>`).join(''):'<div class="empty-state"><p>운영 로그가 없습니다.</p></div>';
