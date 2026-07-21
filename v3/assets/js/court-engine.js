@@ -1,5 +1,6 @@
 
 import{allMatches}from'./bracket-engine.js';
+import{promoteCourtManualQueue}from'./court-manual-queue-engine.js';
 
 function venueIds(courts){return[...new Set(courts.map(c=>c.venueId||'venue-default'))];}
 function ensureQueues(state){
@@ -58,11 +59,12 @@ export function removeFromQueues(state,matchId){
 }
 export function refillCourt(state,court,findMatch){
   if(!court||court.isPaused)return;
+  if(promoteCourtManualQueue(state,court,findMatch)){}
   if(!court.playing&&court.wait1){
     court.playing=court.wait1;court.wait1=null;
     const m=findMatch(court.playing);if(m){m.status='playing';m.court=court.name;m.venueId=court.venueId;m.startedAt=new Date().toISOString();}
   }
-  if(!court.wait1){
+  if(!court.wait1&&(!court.manualQueue||!court.manualQueue.length)){
     ensureQueues(state);
     const q=queueFor(state,court.venueId||'venue-default');
     if(q.length){

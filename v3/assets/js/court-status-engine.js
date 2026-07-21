@@ -20,6 +20,7 @@ export function pauseCourt(state,{courtId,reason='',returnWait1=false,returnPlay
   const venueId=court.venueId||'venue-default';
   if(returnWait1&&court.wait1){queueFront(state,venueId,court.wait1,findMatch);court.wait1=null;}
   if(returnPlaying&&court.playing){queueFront(state,venueId,court.playing,findMatch);court.playing=null;}
+  if(returnPlaying&&Array.isArray(court.manualQueue)){[...court.manualQueue].reverse().forEach(id=>queueFront(state,venueId,id,findMatch));court.manualQueue=[];}
   court.isPaused=true;court.pauseReason=String(reason||'').trim();court.pausedAt=new Date().toISOString();
   return court;
 }

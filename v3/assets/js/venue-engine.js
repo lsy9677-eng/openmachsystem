@@ -37,7 +37,8 @@ export function buildVenueCourts(venues){
         wait1:null,
         isPaused:false,
         pauseReason:'',
-        pausedAt:null
+        pausedAt:null,
+        manualQueue:[]
       });
     }
   });

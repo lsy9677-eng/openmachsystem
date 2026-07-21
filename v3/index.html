@@ -29,9 +29,9 @@
   <main class="app-shell">
     <section class="hero panel">
       <div>
-        <p class="eyebrow">STAGE 16 · COURT STATUS CONTROL</p>
-        <h1>코트 사용중지·재개와 경기 대피</h1>
-        <p>조명·시설 문제 등으로 코트를 일시 중지하고, 해당 코트의 대기1 또는 전체 경기를 구장 공용대기로 안전하게 되돌릴 수 있습니다.</p>
+        <p class="eyebrow">STAGE 17 · COURT MANUAL QUEUE</p>
+        <h1>코트별 관리자 수동 대기열</h1>
+        <p>관리자가 특정 코트에 대기2·대기3 이상을 직접 지정하고, 수동 대기열을 구장 공용대기보다 우선 승계할 수 있습니다.</p>
       </div>
       <div class="hero-stats">
         <div><span>대진</span><strong id="heroDrawSize">-</strong></div>
@@ -500,6 +500,22 @@
 
 
 
+
+  <dialog id="manualQueueAssignDialog" class="modal">
+    <form method="dialog" id="manualQueueAssignForm">
+      <div class="modal-head"><h2>관리자 지정 코트 대기열</h2><button value="cancel" class="icon-button">×</button></div>
+      <div class="contact-edit-body">
+        <input id="manualQueueAssignMatchId" type="hidden">
+        <input id="manualQueueAssignVenueId" type="hidden">
+        <p id="manualQueueAssignMatchLabel" class="modal-match"></p>
+        <label><span>지정할 코트</span><select id="manualQueueAssignCourt"></select></label>
+        <label><span>배치 위치</span><select id="manualQueueAssignPosition"><option value="top">수동 대기열 맨 앞</option><option value="bottom" selected>수동 대기열 맨 뒤</option></select></label>
+        <div class="notice info">시합중·대기1이 모두 차 있어도 대기2 이후로 등록할 수 있습니다.</div>
+      </div>
+      <menu><button value="cancel" class="btn btn-light">취소</button><button id="confirmManualQueueAssignBtn" value="default" class="btn btn-primary">관리자 지정</button></menu>
+    </form>
+  </dialog>
+
   <dialog id="courtStatusDialog" class="modal">
     <form method="dialog" id="courtStatusForm">
       <div class="modal-head"><h2>코트 사용 상태 변경</h2><button value="cancel" class="icon-button">×</button></div>
@@ -523,16 +539,16 @@
 
   <dialog id="courtTransferDialog" class="modal">
     <form method="dialog" id="courtTransferForm">
-      <div class="modal-head"><h2>코트 경기 이동·교환</h2><button value="cancel" class="icon-button">×</button></div>
+      <div class="modal-head"><h2>경기 코트 이동</h2><button value="cancel" class="icon-button">×</button></div>
       <div class="contact-edit-body">
         <input id="courtTransferSourceCourtId" type="hidden">
         <input id="courtTransferSourceSlot" type="hidden">
         <p id="courtTransferMatchLabel" class="modal-match"></p>
-        <label><span>이동 또는 교환할 자리</span><select id="courtTransferTargetSelect"></select></label>
-        <label class="toggle-label"><span>대상 자리에 경기가 있으면 서로 교환</span><input id="courtTransferAllowSwap" type="checkbox" checked></label>
-        <div id="courtTransferInfo" class="notice info">같은 구장의 시합중·대기1 자리만 표시됩니다.</div>
+        <label><span>이동할 코트</span><select id="courtTransferTargetSelect"></select></label>
+        <label><span>배치 방식</span><select id="courtTransferMode"><option value="auto" selected>빈 자리 우선, 없으면 수동 대기열 맨 뒤</option><option value="manual-top">수동 대기열 맨 앞</option><option value="manual-bottom">수동 대기열 맨 뒤</option></select></label>
+        <div id="courtTransferInfo" class="notice info">같은 구장의 어느 코트든 선택할 수 있습니다. 자리가 없으면 대기2 이후로 등록됩니다.</div>
       </div>
-      <menu><button value="cancel" class="btn btn-light">취소</button><button id="confirmCourtTransferBtn" value="default" class="btn btn-primary">이동·교환</button></menu>
+      <menu><button value="cancel" class="btn btn-light">취소</button><button id="confirmCourtTransferBtn" value="default" class="btn btn-primary">이동</button></menu>
     </form>
   </dialog>
 
@@ -684,6 +700,6 @@
     <div id="recoveryList" class="recovery-list"></div>
   </dialog>
 
-  <script type="module" src="./assets/js/app-v31600.js?v=31600"></script>
+  <script type="module" src="./assets/js/app-v31700.js?v=31700"></script>
 </body>
 </html>
