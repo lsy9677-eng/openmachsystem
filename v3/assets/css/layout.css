@@ -163,3 +163,57 @@
   display:inline;
   white-space:nowrap;
 }
+
+/* Stage 13.1: 공용대기 시간/버튼 겹침 방지 */
+#sharedQueue.venue-queue-board .queue-card{
+  grid-template-columns:30px minmax(0,1fr);
+  grid-template-rows:auto auto auto auto;
+  align-content:start;
+  overflow:visible;
+  min-height:170px;
+}
+#sharedQueue.venue-queue-board .queue-card>.num{
+  grid-column:1;
+  grid-row:1 / span 2;
+}
+#sharedQueue.venue-queue-board .queue-card>b{
+  grid-column:2;
+  grid-row:1;
+  min-width:0;
+}
+#sharedQueue.venue-queue-board .queue-card>em{
+  grid-column:2;
+  grid-row:2;
+}
+#sharedQueue.venue-queue-board .queue-card>.time-wrap{
+  grid-column:1 / -1;
+  grid-row:3;
+  display:block;
+  margin-top:8px;
+  min-width:0;
+  overflow:visible;
+}
+#sharedQueue.venue-queue-board .queue-card>.time-wrap .time-badge{
+  display:inline-flex;
+  position:static;
+  width:auto;
+  max-width:100%;
+  white-space:normal;
+  overflow-wrap:anywhere;
+  word-break:keep-all;
+  line-height:1.35;
+  padding:6px 10px;
+}
+#sharedQueue.venue-queue-board .queue-card>.queue-card-actions{
+  grid-column:1 / -1;
+  grid-row:4;
+  position:static;
+  margin-top:8px;
+  padding-top:7px;
+  border-top:1px dashed #d6dfec;
+  align-items:center;
+}
+#sharedQueue.venue-queue-board .queue-card>.queue-card-actions .btn{
+  position:static;
+  flex:0 0 auto;
+}
