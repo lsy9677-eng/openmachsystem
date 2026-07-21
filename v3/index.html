@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#10264a">
   <title>230MATCH V3</title>
-  <link rel="stylesheet" href="./assets/css/tokens.css?v=30700">
-  <link rel="stylesheet" href="./assets/css/layout.css?v=30700">
-  <link rel="stylesheet" href="./assets/css/components.css?v=30700">
-  <link rel="stylesheet" href="./assets/css/responsive.css?v=30700">
+  <link rel="stylesheet" href="./assets/css/tokens.css?v=30800">
+  <link rel="stylesheet" href="./assets/css/layout.css?v=30800">
+  <link rel="stylesheet" href="./assets/css/components.css?v=30800">
+  <link rel="stylesheet" href="./assets/css/responsive.css?v=30800">
 </head>
 <body>
   <header class="topbar">
@@ -29,9 +29,9 @@
   <main class="app-shell">
     <section class="hero panel">
       <div>
-        <p class="eyebrow">STAGE 7 · MESSAGE CENTER</p>
-        <h1>경기 호출·대기·예상시간 문자 준비</h1>
-        <p>코트배정과 큐 승계 시 경기 호출·대기 안내 문자를 자동 생성하고, 발송 전 검토·복사·SMS 앱 열기를 제공합니다.</p>
+        <p class="eyebrow">STAGE 8 · CONTACT ROSTER</p>
+        <h1>참가팀 연락처 관리와 문자 발송 준비</h1>
+        <p>참가팀 연락처를 직접 입력·수정하고, 전화번호가 없는 문자 초안을 발송 대기 상태로 자동 전환합니다.</p>
       </div>
       <div class="hero-stats">
         <div><span>대진</span><strong id="heroDrawSize">-</strong></div>
@@ -46,6 +46,7 @@
       <button class="tab" data-view="prelim">예선 운영</button>
       <button class="tab" data-view="bracket">본선 대진표</button>
       <button class="tab" data-view="settings">대회 설정</button>
+      <button class="tab" data-view="roster">참가팀 연락처</button>
       <button class="tab" data-view="messages">문자 센터</button>
       <button class="tab" data-view="logs">운영 로그</button>
     </nav>
@@ -150,6 +151,7 @@
         <article class="summary-card"><span>추첨 방식</span><strong id="summaryDrawMethod">-</strong></article>
         <article class="summary-card"><span>대진 잠금</span><strong id="summaryDrawLock">해제</strong></article>
         <article class="summary-card"><span>발송 대기 문자</span><strong id="summaryPendingMessages">0건</strong></article>
+        <article class="summary-card"><span>연락처 등록</span><strong id="summaryPhoneTeams">0팀</strong></article>
       </section>
 
       <section class="panel">
@@ -335,6 +337,40 @@
     </section>
 
 
+
+    <section id="view-roster" class="view">
+      <section class="panel">
+        <div class="section-head">
+          <div><h2>참가팀 연락처 관리</h2><p>팀 대표 연락처를 저장하면 기존 ‘전화번호 없음’ 문자도 자동으로 발송 대기로 전환됩니다.</p></div>
+          <span class="badge badge-safe">브라우저 자동 저장</span>
+        </div>
+        <div class="roster-tools">
+          <input id="rosterSearch" type="search" placeholder="팀명·소속·전화번호 검색">
+          <select id="rosterPhoneFilter">
+            <option value="all">전체 팀</option>
+            <option value="has-phone">연락처 있음</option>
+            <option value="no-phone" selected>연락처 없음</option>
+          </select>
+          <button id="refreshMessagePhonesBtn" class="btn btn-primary">문자 연락처 다시 연결</button>
+          <button id="exportContactsBtn" class="btn btn-light">연락처 JSON 저장</button>
+          <label class="btn btn-secondary file-button">연락처 JSON 불러오기<input id="contactFileInput" type="file" accept=".json,application/json"></label>
+        </div>
+        <div class="contact-help"><strong>전화번호 형식</strong><span>010-1234-5678 또는 01012345678 모두 사용할 수 있습니다.</span></div>
+      </section>
+
+      <section class="summary-grid">
+        <article class="summary-card"><span>전체 팀</span><strong id="rosterTotalTeams">0팀</strong></article>
+        <article class="summary-card"><span>연락처 등록</span><strong id="rosterPhoneCount">0팀</strong></article>
+        <article class="summary-card"><span>연락처 없음</span><strong id="rosterNoPhoneCount">0팀</strong></article>
+        <article class="summary-card"><span>발송 전환 가능</span><strong id="rosterConvertibleMessages">0건</strong></article>
+      </section>
+
+      <section class="panel">
+        <div class="section-head"><div><h2>참가팀 명단</h2><p>수정 버튼을 눌러 팀 대표 연락처를 입력하세요.</p></div><strong id="rosterVisibleCount">0팀 표시</strong></div>
+        <div id="contactRosterList" class="contact-roster-list empty-state"><p>명단을 먼저 불러오세요.</p></div>
+      </section>
+    </section>
+
     <section id="view-messages" class="view">
       <section class="panel">
         <div class="section-head"><div><h2>운영 문자 센터</h2><p>문자를 자동 생성하되 실제 발송 전에는 반드시 운영자가 내용을 확인합니다.</p></div><span class="badge badge-safe">외부 API 미연결</span></div>
@@ -378,6 +414,21 @@
   </main>
 
 
+
+
+  <dialog id="contactEditDialog" class="modal">
+    <form method="dialog" id="contactEditForm">
+      <div class="modal-head"><h2>팀 연락처 수정</h2><button value="cancel" class="icon-button" aria-label="닫기">×</button></div>
+      <div class="contact-edit-body">
+        <input id="contactEditTeamId" type="hidden">
+        <p id="contactEditTeamName" class="modal-match"></p>
+        <label><span>팀 대표 전화번호</span><input id="contactEditPhone" type="tel" placeholder="010-1234-5678"></label>
+        <label><span>대표자 이름</span><input id="contactEditManager" type="text" placeholder="선택 입력"></label>
+        <div id="contactPhoneValidation" class="notice info">전화번호를 입력하세요.</div>
+      </div>
+      <menu><button value="cancel" class="btn btn-light">취소</button><button id="saveContactBtn" value="default" class="btn btn-primary">저장</button></menu>
+    </form>
+  </dialog>
 
   <dialog id="drawLockDialog" class="modal lock-confirm-modal">
     <form method="dialog" id="drawLockForm">
@@ -479,6 +530,6 @@
     <div id="recoveryList" class="recovery-list"></div>
   </dialog>
 
-  <script type="module" src="./assets/js/app-v30700.js?v=30700"></script>
+  <script type="module" src="./assets/js/app-v30800.js?v=30800"></script>
 </body>
 </html>

@@ -1,6 +1,7 @@
 
 import{allMatches,roundLabel,findMatch}from'./bracket-engine.js';
 import{timeInfo}from'./time-engine.js';
+import{contactStats,getTeamContact}from'./contact-engine.js';
 export function teamText(team){
   if(!team)return'TBD';
   if(team.placeholder)return`${team.name}`;
@@ -14,7 +15,7 @@ export function render(state,handlers){
   setText('summaryTeams',`${state.teams.length}팀`);setText('summaryRound',currentRound(state));setText('summaryPlaying',playing);
   setText('summaryWait1',state.courts.filter(c=>c.wait1).length);setText('summaryShared',state.sharedQueue.length);
   setText('summaryAverageMinutes',`${state.timeMetrics?.averageMinutes||0}분`);setText('summaryLongestWait',`${state.timeMetrics?.longestWaitMinutes||0}분`);
-  setText('summaryDrawMethod',drawMethodLabel(state.drawMeta?.method));setText('summaryDrawLock',state.drawMeta?.locked?'잠금':'해제');setText('summaryPendingMessages',`${state.messaging?.queue?.filter(x=>x.status==='pending'||x.status==='no-phone').length||0}건`);updateDrawLockInfo(state);renderMessageCenter(state,handlers);
+  setText('summaryDrawMethod',drawMethodLabel(state.drawMeta?.method));setText('summaryDrawLock',state.drawMeta?.locked?'잠금':'해제');setText('summaryPendingMessages',`${state.messaging?.queue?.filter(x=>x.status==='pending'||x.status==='no-phone').length||0}건`);setText('summaryPhoneTeams',`${contactStats(state).withPhone}팀`);renderContactRoster(state,handlers);updateDrawLockInfo(state);renderMessageCenter(state,handlers);
   setText('baseMatchMinutes',`${state.settings.matchMinutes||30}분`);setText('autoTimeStatus',state.settings.autoTimeEnabled?'ON':'OFF');
   setText('lastTimeCalculated',state.timeMetrics?.lastCalculatedAt?new Date(state.timeMetrics.lastCalculatedAt).toLocaleTimeString('ko-KR'):'-');
   setText('sharedQueueCount',`${state.sharedQueue.length}경기`);
@@ -183,3 +184,28 @@ function updateDrawLockInfo(state){
 
 function renderMessageCenter(state,handlers){const q=state.messaging?.queue||[];setText('messageTotalCount',`${q.length}건`);setText('messagePendingCount',`${q.filter(x=>x.status==='pending').length}건`);setText('messageSentCount',`${q.filter(x=>x.status==='sent').length}건`);setText('messageNoPhoneCount',`${q.filter(x=>x.status==='no-phone').length}건`);const root=document.getElementById('messageQueueList');if(!root)return;const filter=document.getElementById('messageStatusFilter')?.value||'pending';const list=q.filter(x=>filter==='all'||x.status===filter);if(!list.length){root.className='message-queue-list empty-state';root.innerHTML='<p>조건에 맞는 문자가 없습니다.</p>';return}root.className='message-queue-list';root.innerHTML=list.map(x=>`<article class="message-card ${x.status}"><div class="message-card-head"><div><h3>${x.teamName}</h3><small>${({playing:'시합중 호출',wait1:'대기1 안내',shared:'공용대기 안내'})[x.type]||x.type} · ${new Date(x.createdAt).toLocaleString('ko-KR')}</small></div><div class="message-phone">${x.phone||'전화번호 없음'}</div></div><div class="message-body">${escapeHtml(x.body)}</div><div class="message-actions"><button class="btn btn-light" data-message-copy="${x.id}">내용 복사</button>${x.phone&&x.status!=='sent'?`<button class="btn btn-primary" data-message-send="${x.id}">문자 앱 열기</button>`:''}${x.status!=='sent'?`<button class="btn btn-secondary" data-message-sent="${x.id}">발송완료 표시</button>`:''}<button class="btn btn-danger-outline" data-message-delete="${x.id}">삭제</button></div></article>`).join('');root.querySelectorAll('[data-message-copy]').forEach(b=>b.onclick=()=>handlers.copyMessage(b.dataset.messageCopy));root.querySelectorAll('[data-message-send]').forEach(b=>b.onclick=()=>handlers.openSmsMessage(b.dataset.messageSend));root.querySelectorAll('[data-message-sent]').forEach(b=>b.onclick=()=>handlers.setMessageSent(b.dataset.messageSent));root.querySelectorAll('[data-message-delete]').forEach(b=>b.onclick=()=>handlers.removeMessage(b.dataset.messageDelete))}
 function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+
+function renderContactRoster(state,handlers){
+  const stats=contactStats(state);
+  setText('rosterTotalTeams',`${stats.total}팀`);setText('rosterPhoneCount',`${stats.withPhone}팀`);
+  setText('rosterNoPhoneCount',`${stats.withoutPhone}팀`);
+  setText('rosterConvertibleMessages',`${state.messaging?.queue?.filter(x=>x.status==='no-phone').length||0}건`);
+  const root=document.getElementById('contactRosterList');if(!root)return;
+  const query=(document.getElementById('rosterSearch')?.value||'').trim().toLowerCase();
+  const filter=document.getElementById('rosterPhoneFilter')?.value||'no-phone';
+  const teams=state.teams.filter(team=>{
+    const c=getTeamContact(state,team),has=Boolean(c.phone);
+    if(filter==='has-phone'&&!has)return false;if(filter==='no-phone'&&has)return false;
+    return !query||`${team.name} ${team.affiliation||''} ${c.phone} ${c.manager}`.toLowerCase().includes(query);
+  });
+  setText('rosterVisibleCount',`${teams.length}팀 표시`);
+  if(!teams.length){root.className='contact-roster-list empty-state';root.innerHTML='<p>조건에 맞는 팀이 없습니다.</p>';return;}
+  root.className='contact-roster-list';
+  root.innerHTML=teams.map(team=>{
+    const c=getTeamContact(state,team);
+    return`<article class="contact-card ${c.phone?'has-phone':''}"><h3>${escapeHtml(team.name)}</h3><small>${escapeHtml(team.affiliation||'소속 없음')}</small>
+    <div class="contact-card-phone ${c.phone?'':'missing'}">${c.phone||'전화번호 없음'}</div>${c.manager?`<small>대표자 ${escapeHtml(c.manager)}</small>`:''}
+    <div class="contact-card-actions"><button class="btn btn-primary" data-contact-edit="${team.id}">연락처 수정</button></div></article>`;
+  }).join('');
+  root.querySelectorAll('[data-contact-edit]').forEach(b=>b.onclick=()=>handlers.openContactEdit(b.dataset.contactEdit));
+}

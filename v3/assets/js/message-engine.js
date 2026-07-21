@@ -1,10 +1,11 @@
 import{findMatch}from'./bracket-engine.js';
+import{getTeamContact}from'./contact-engine.js';
 const cleanPhone=v=>String(v||'').replace(/[^\d+]/g,'');
-function teamPhone(team){if(!team)return'';const d=team.phone||team.mobile||team.contact||team.tel||'';if(d)return cleanPhone(d);for(const p of [team.player1,team.player2,team.p1,team.p2])if(p&&typeof p==='object'){const v=p.phone||p.mobile||p.contact||p.tel;if(v)return cleanPhone(v)}return''}
+function teamPhone(state,team){if(!team)return'';const d=team.phone||team.mobile||team.contact||team.tel||'';if(d)return cleanPhone(d);for(const p of [team.player1,team.player2,team.p1,team.p2])if(p&&typeof p==='object'){const v=p.phone||p.mobile||p.contact||p.tel;if(v)return cleanPhone(v)}return''}
 const fmt=iso=>iso?new Date(iso).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}):'-';
 const apply=(t,d)=>String(t||'').replace(/\{(\w+)\}/g,(_,k)=>String(d[k]??''));
 export function ensureMessagingState(state){if(!state.messaging)state.messaging={settings:{},queue:[]};if(!Array.isArray(state.messaging.queue))state.messaging.queue=[];const defaults={autoMessageEnabled:true,senderName:'230MATCH',deliveryMode:'sms-uri',onCourtAssign:true,onQueueMove:true,templates:{playing:'[{sender}] {team}님, 현재 {court} 코트 경기입니다. 상대팀: {opponent}. 즉시 코트로 이동해 주세요.',wait1:'[{sender}] {team}님, {court} 코트 대기 1번입니다. 상대팀: {opponent}. 예상 대기 {wait}분, 예상 시작 {start}.',shared:'[{sender}] {team}님, 본선 공용대기 {queueNo}번입니다. 상대팀: {opponent}. 예상 대기 {wait}분, 예상 시작 {start}.'}};state.messaging.settings={...defaults,...(state.messaging.settings||{}),templates:{...defaults.templates,...(state.messaging.settings?.templates||{})}}}
-function add(state,{type,match,team,opponent,court='',queueNo='',wait=0,start='-',suffix=''}){ensureMessagingState(state);const body=apply(state.messaging.settings.templates[type],{sender:state.messaging.settings.senderName,team:team?.name||'팀',opponent:opponent?.name||'상대팀',court,queueNo,wait,start});const phone=teamPhone(team);const dedupeKey=[type,match.id,team?.id||team?.name,court,queueNo,suffix].join('|');if(state.messaging.queue.some(x=>x.dedupeKey===dedupeKey))return null;const item={id:crypto.randomUUID(),dedupeKey,type,matchId:match.id,teamId:team?.id||'',teamName:team?.name||'팀',phone,body,status:phone?'pending':'no-phone',createdAt:new Date().toISOString(),sentAt:null};state.messaging.queue.unshift(item);return item}
+function add(state,{type,match,team,opponent,court='',queueNo='',wait=0,start='-',suffix=''}){ensureMessagingState(state);const body=apply(state.messaging.settings.templates[type],{sender:state.messaging.settings.senderName,team:team?.name||'팀',opponent:opponent?.name||'상대팀',court,queueNo,wait,start});const phone=teamPhone(state,team);const dedupeKey=[type,match.id,team?.id||team?.name,court,queueNo,suffix].join('|');if(state.messaging.queue.some(x=>x.dedupeKey===dedupeKey))return null;const item={id:crypto.randomUUID(),dedupeKey,type,matchId:match.id,teamId:team?.id||'',teamName:team?.name||'팀',phone,body,status:phone?'pending':'no-phone',createdAt:new Date().toISOString(),sentAt:null};state.messaging.queue.unshift(item);return item}
 function both(match,fn){return[match.teamA&&fn(match.teamA,match.teamB),match.teamB&&fn(match.teamB,match.teamA)].filter(Boolean)}
 export function generatePlayingMessages(state,id,court){const m=findMatch(state.draw,id);return m?both(m,(t,o)=>add(state,{type:'playing',match:m,team:t,opponent:o,court,suffix:m.startedAt||''})):[]}
 export function generateWait1Messages(state,id,court){const m=findMatch(state.draw,id);return m?both(m,(t,o)=>add(state,{type:'wait1',match:m,team:t,opponent:o,court,wait:m.estimatedWaitMinutes||0,start:fmt(m.estimatedStartAt),suffix:m.estimatedStartAt||''})):[]}
@@ -17,3 +18,16 @@ export function deleteMessage(state,id){state.messaging.queue=state.messaging.qu
 export function clearSentMessages(state){state.messaging.queue=state.messaging.queue.filter(x=>x.status!=='sent')}
 export function markAllSent(state){const now=new Date().toISOString();state.messaging.queue.forEach(x=>{if(x.status==='pending'){x.status='sent';x.sentAt=now}})}
 export function smsUri(item){return item.phone?`sms:${encodeURIComponent(item.phone)}?body=${encodeURIComponent(item.body)}`:''}
+
+export function refreshMessageContacts(state){
+  ensureMessagingState(state);
+  let converted=0,updated=0;
+  state.messaging.queue.forEach(item=>{
+    const team=state.teams.find(t=>t.id===item.teamId||t.name===item.teamName);
+    const phone=teamPhone(state,team);
+    if(phone&&item.phone!==phone){item.phone=phone;updated++;}
+    if(phone&&item.status==='no-phone'){item.status='pending';converted++;}
+    if(!phone&&item.status==='pending')item.status='no-phone';
+  });
+  return{converted,updated};
+}
