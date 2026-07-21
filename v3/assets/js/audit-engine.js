@@ -3,7 +3,7 @@ import{allMatches,findMatch}from'./bracket-engine.js';
 import{buildCourts,assignInitial}from'./court-engine.js';
 import{submitResult}from'./result-engine.js';
 
-const clone=v=>structuredClone(v);
+const clone=v=>typeof structuredClone==='function'?structuredClone(v):JSON.parse(JSON.stringify(v));
 const result=(level,code,title,detail,meta={})=>({level,code,title,detail,meta});
 
 export function ensureAuditState(state){

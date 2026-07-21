@@ -29,8 +29,8 @@
   <main class="app-shell">
     <section class="hero panel">
       <div>
-        <p class="eyebrow">STAGE 10 · OPERATION AUDIT</p>
-        <h1>운영 전 자동점검과 복제 모의대회</h1>
+        <p class="eyebrow">STAGE 10.1 · AUDIT BUTTON FIX</p>
+        <h1>운영 점검 버튼 실행상태 표시 및 안정화</h1>
         <p>실제 운영 데이터를 건드리지 않고 복제 상태에서 전체 대회를 완주해 대진·코트·큐·승자 진출 오류를 사전에 점검합니다.</p>
       </div>
       <div class="hero-stats">
@@ -423,6 +423,7 @@
           <span class="badge badge-safe">원본 데이터 미변경</span>
         </div>
 
+        <div id="auditActionNotice" class="notice info">점검 버튼을 누르면 진행 상태와 결과가 이 영역에 표시됩니다.</div>
         <div class="audit-action-row">
           <button id="runStateAuditBtn" class="btn btn-primary">현재 상태 점검</button>
           <button id="runFullSimulationBtn" class="btn btn-purple">복제 모의대회 완주</button>
@@ -584,6 +585,6 @@
     <div id="recoveryList" class="recovery-list"></div>
   </dialog>
 
-  <script type="module" src="./assets/js/app-v31000.js?v=31000"></script>
+  <script type="module" src="./assets/js/app-v31001.js?v=31001"></script>
 </body>
 </html>
