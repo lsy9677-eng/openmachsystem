@@ -1,6 +1,6 @@
 
 import{allMatches,findMatch}from'./bracket-engine.js';
-import{buildCourts,assignInitial}from'./court-engine.js';
+import{buildCourts,assignInitial,refillCourt,queueReadyMatches}from'./court-engine.js';
 import{submitResult}from'./result-engine.js';
 
 const clone=v=>typeof structuredClone==='function'?structuredClone(v):JSON.parse(JSON.stringify(v));
@@ -111,6 +111,21 @@ export function runStateAudit(state){
     counts:{pass:out.filter(x=>x.level==='pass').length,warn:warns,fail:fails}
   };
 }
+
+function settleSimulationCourts(sim){
+  let changed=true,guard=0;
+  while(changed&&guard<20){
+    changed=false;guard++;
+    queueReadyMatches(sim,id=>findMatch(sim.draw,id));
+    sim.courts.forEach(court=>{
+      const before=`${court.playing||''}|${court.wait1||''}|${sim.sharedQueue.length}`;
+      refillCourt(sim,court,id=>findMatch(sim.draw,id));
+      const after=`${court.playing||''}|${court.wait1||''}|${sim.sharedQueue.length}`;
+      if(before!==after)changed=true;
+    });
+  }
+}
+
 export function runFullSimulation(state){
   if(!state.draw?.size)throw new Error('모의대회를 실행할 본선 대진이 없습니다.');
   const sim=clone(state);
@@ -122,9 +137,17 @@ export function runFullSimulation(state){
   let iterations=0,completed=allMatches(sim.draw).filter(m=>m.status==='completed').length;
   const maxIterations=Math.max(1000,sim.draw.size*20);
   while(iterations<maxIterations){
+    settleSimulationCourts(sim);
     const playing=sim.courts.map(c=>c.playing).filter(Boolean);
-    if(!playing.length)break;
-    playing.forEach(id=>{
+    if(!playing.length){
+      const remainingReady=allMatches(sim.draw).some(m=>['ready','court_wait1','shared_queue'].includes(m.status));
+      if(remainingReady){
+        settleSimulationCourts(sim);
+      }
+    }
+    const active=sim.courts.map(c=>c.playing).filter(Boolean);
+    if(!active.length)break;
+    active.forEach(id=>{
       const m=findMatch(sim.draw,id);
       if(m&&m.teamA&&m.teamB&&m.status==='playing'){
         submitResult(sim,{matchId:id,winnerId:m.teamA.id,scoreA:6,scoreB:3});
