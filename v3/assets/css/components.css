@@ -139,3 +139,29 @@ input,select{width:100%;border:1px solid #b9cae5;border-radius:10px;padding:11px
   50%{box-shadow:0 0 0 5px rgba(219,59,59,.3)}
 }
 @media(prefers-reduced-motion:reduce){.match-card.is-playing{animation:none}}
+
+/* 가지형 연결선 */
+.bracket-live-board .round-column .match-card:nth-child(odd)::after{
+  border-top-color:#90a6c4;
+}
+.bracket-live-board .round-column .match-card:nth-child(even)::after{
+  border-top-color:#90a6c4;
+}
+.bracket-live-board .round-column:not(:last-child) .match-card:nth-child(odd) .match-meta::after{
+  content:"";
+  position:absolute;
+  right:-18px;
+  top:50%;
+  height:calc((var(--round-gap,14px) + var(--round-card-height,118px)) / 2);
+  border-right:2px solid #90a6c4;
+  pointer-events:none;
+}
+.bracket-live-board .round-column:not(:last-child) .match-card:nth-child(even) .match-meta::after{
+  content:"";
+  position:absolute;
+  right:-18px;
+  bottom:50%;
+  height:calc((var(--round-gap,14px) + var(--round-card-height,118px)) / 2);
+  border-right:2px solid #90a6c4;
+  pointer-events:none;
+}

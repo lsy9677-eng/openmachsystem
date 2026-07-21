@@ -128,6 +128,21 @@ function syncBracketViewControls(state){
   const active=document.getElementById('bracketActiveOnlyBtn');if(active)active.className=`btn ${view.activeOnly?'btn-primary':'btn-secondary'}`;
 }
 
+
+function bracketPlayerName(name=''){
+  return String(name)
+    .replace(/\([^)]*\)/g,'')
+    .replace(/\[[^\]]*\]/g,'')
+    .replace(/\s{2,}/g,' ')
+    .trim();
+}
+function bracketTeamHtml(team){
+  if(!team)return'TBD';
+  if(team.placeholder)return`<span class="placeholder-team">${team.name}</span>`;
+  const source=team.name||team.teamName||team.label||teamText(team);
+  return bracketPlayerName(source)||teamText(team);
+}
+
 function renderBracket(state){
   const root=document.getElementById('bracketBoard');
   const sizes=Object.keys(state.draw.rounds||{}).map(Number).sort((a,b)=>b-a);
@@ -140,13 +155,14 @@ function renderBracket(state){
   let visibleCount=0,totalCount=0;
   const maxSize=Math.max(...sizes);
   const compact=view.density==='compact';
-  const cardHeight=compact?54:168;
-  const basePitch=compact?64:184;
+  const cardHeight=compact?72:118;
+  const baseGap=compact?10:14;
+  const basePitch=cardHeight+baseGap;
   root.innerHTML=sizes.map(size=>{
     const roundVisible=view.round==='all'||String(view.round)===String(size);
     const ratio=Math.max(1,maxSize/size);
     const roundOffset=Math.round((ratio-1)*basePitch/2);
-    const roundGap=Math.max(10,Math.round(ratio*basePitch-cardHeight));
+    const roundGap=Math.round(ratio*basePitch-cardHeight);
     const cards=state.draw.rounds[size].map(m=>{
       totalCount++;
       const visible=roundVisible&&bracketMatchVisible(m,view);
@@ -155,13 +171,13 @@ function renderBracket(state){
       return`<article class="match-card ${bracketStatusClass(m.status)} ${visible?'':'is-filtered-out'}">
         <header><span>${m.matchNo}경기</span><span class="match-status-label">${statusText(m.status)}</span></header>
         ${courtLabel?`<div class="bracket-court-label">${courtLabel}</div>`:''}
-        <div class="match-team ${m.winner?.id===m.teamA?.id?'winner':''}">${teamHtml(m.teamA)}</div>
-        <div class="match-team ${m.winner?.id===m.teamB?.id?'winner':''}">${teamHtml(m.teamB)}</div>
+        <div class="match-team ${m.winner?.id===m.teamA?.id?'winner':''}">${bracketTeamHtml(m.teamA)}</div>
+        <div class="match-team ${m.winner?.id===m.teamB?.id?'winner':''}">${bracketTeamHtml(m.teamB)}</div>
         <div class="match-meta">${m.scoreA!=null?`${m.scoreA}:${m.scoreB}`:`${m.id}${m.bye?' · 부전승':''}`}</div>
       </article>`;
     }).join('');
     const hasVisible=state.draw.rounds[size].some(m=>roundVisible&&bracketMatchVisible(m,view));
-    return`<section class="round-column ${roundThemeClass(size)} ${roundVisible?'':'is-round-filtered-out'} ${hasVisible?'has-visible-match':''}" style="--round-offset:${roundOffset}px;--round-gap:${roundGap}px;--round-card-height:${cardHeight}px"><h3>${roundLabel(size)}</h3><div class="round-match-stack">${cards}</div></section>`;
+    return`<section class="round-column ${roundThemeClass(size)} ${size===maxSize?'first-round':''} ${roundVisible?'':'is-round-filtered-out'} ${hasVisible?'has-visible-match':''}" style="--round-offset:${roundOffset}px;--round-gap:${roundGap}px;--round-card-height:${cardHeight}px"><h3>${roundLabel(size)}</h3><div class="round-match-stack">${cards}</div></section>`;
   }).join('');
   const summary=document.getElementById('bracketViewSummary');
   if(summary){
