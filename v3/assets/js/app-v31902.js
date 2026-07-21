@@ -655,12 +655,16 @@ function resetBracketView(){
   saveState(state);
   render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue});
 }
-function toggleBracketFullscreen(){
-  const board=$('bracketBoard');
-  const open=!board.classList.contains('bracket-fullscreen');
+function setBracketFullscreen(open){
+  const board=$('bracketBoard'),button=$('bracketFullscreenBtn');
+  if(!board||!button)return;
   board.classList.toggle('bracket-fullscreen',open);
   document.body.classList.toggle('bracket-fullscreen-open',open);
-  $('bracketFullscreenBtn').textContent=open?'전체화면 종료':'대진표 전체화면';
+  button.textContent=open?'전체화면 종료':'대진표 전체화면';
+  button.setAttribute('aria-pressed',open?'true':'false');
+}
+function toggleBracketFullscreen(){
+  setBracketFullscreen(!$('bracketBoard')?.classList.contains('bracket-fullscreen'));
 }
 
 function bind(){
@@ -671,6 +675,7 @@ function bind(){
   if($('bracketActiveOnlyBtn'))$('bracketActiveOnlyBtn').onclick=()=>updateBracketView('activeOnly',!(state.ui?.bracketView?.activeOnly));
   if($('bracketResetViewBtn'))$('bracketResetViewBtn').onclick=resetBracketView;
   if($('bracketFullscreenBtn'))$('bracketFullscreenBtn').onclick=toggleBracketFullscreen;
+  document.addEventListener('keydown',event=>{if(event.key==='Escape'&&document.body.classList.contains('bracket-fullscreen-open'))setBracketFullscreen(false);});
 
   $('loadSampleBtn').onclick=()=>loadSample().catch(e=>notice(e.message,'error'));
   $('teamFileInput').onchange=e=>{const f=e.target.files[0];if(f)readTeamFile(f).catch(err=>notice(err.message,'error'));};
@@ -768,4 +773,4 @@ document.addEventListener('click',event=>{
 },{capture:true});
 
 syncInputs();syncPrelimInputs();bind();renderVenueSettingsEditor();calculateTimeMetrics(state);render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue});restartTimeTimer();updateClock();setInterval(updateClock,1000);
-console.log('[230MATCH V3] stage19.2 deploy-path-fix loaded · no legacy code · no Firebase writes');
+console.log('[230MATCH V3] stage19.3 fullscreen-alignment-fix loaded · no legacy code · no Firebase writes');

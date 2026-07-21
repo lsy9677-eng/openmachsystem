@@ -271,3 +271,34 @@
   background:#edf3fa;
 }
 body.bracket-fullscreen-open{overflow:hidden}
+
+/* Stage 19.3: 전체화면 복귀와 토너먼트 위치 정렬 */
+.bracket-live-board .round-column{
+  align-self:start;
+  min-width:270px;
+}
+.bracket-live-board .round-match-stack{
+  display:flex;
+  flex-direction:column;
+  gap:var(--round-gap,14px);
+  padding-top:var(--round-offset,0);
+}
+.bracket-live-board .round-match-stack>.match-card{
+  min-height:var(--round-card-height,168px);
+  box-sizing:border-box;
+}
+#bracketBoard.bracket-compact .round-match-stack>.match-card{
+  height:var(--round-card-height,54px);
+  min-height:var(--round-card-height,54px);
+  overflow:hidden;
+}
+body.bracket-fullscreen-open #bracketFullscreenBtn{
+  position:fixed;
+  top:14px;
+  right:18px;
+  z-index:10020;
+  box-shadow:0 4px 14px rgba(0,0,0,.25);
+}
+body.bracket-fullscreen-open #bracketBoard{
+  padding-top:64px;
+}

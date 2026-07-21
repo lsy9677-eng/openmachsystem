@@ -138,8 +138,15 @@ function renderBracket(state){
   const focusClass=view.activeOnly?' bracket-focus-mode':'';
   root.className=`bracket-board bracket-live-board${densityClass}${focusClass}`;
   let visibleCount=0,totalCount=0;
+  const maxSize=Math.max(...sizes);
+  const compact=view.density==='compact';
+  const cardHeight=compact?54:168;
+  const basePitch=compact?64:184;
   root.innerHTML=sizes.map(size=>{
     const roundVisible=view.round==='all'||String(view.round)===String(size);
+    const ratio=Math.max(1,maxSize/size);
+    const roundOffset=Math.round((ratio-1)*basePitch/2);
+    const roundGap=Math.max(10,Math.round(ratio*basePitch-cardHeight));
     const cards=state.draw.rounds[size].map(m=>{
       totalCount++;
       const visible=roundVisible&&bracketMatchVisible(m,view);
@@ -154,7 +161,7 @@ function renderBracket(state){
       </article>`;
     }).join('');
     const hasVisible=state.draw.rounds[size].some(m=>roundVisible&&bracketMatchVisible(m,view));
-    return`<section class="round-column ${roundThemeClass(size)} ${roundVisible?'':'is-round-filtered-out'} ${hasVisible?'has-visible-match':''}"><h3>${roundLabel(size)}</h3>${cards}</section>`;
+    return`<section class="round-column ${roundThemeClass(size)} ${roundVisible?'':'is-round-filtered-out'} ${hasVisible?'has-visible-match':''}" style="--round-offset:${roundOffset}px;--round-gap:${roundGap}px;--round-card-height:${cardHeight}px"><h3>${roundLabel(size)}</h3><div class="round-match-stack">${cards}</div></section>`;
   }).join('');
   const summary=document.getElementById('bracketViewSummary');
   if(summary){
