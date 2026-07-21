@@ -109,3 +109,34 @@
 .venue-queue-section header h3{margin:0;font-size:16px}
 .venue-queue-section header span{font-size:12px;color:#526079;font-weight:800}
 .venue-queue-cards{display:grid;grid-template-columns:repeat(4,minmax(220px,1fr));gap:9px}
+
+/* Stage 12.1: 구장별 공용대기 레이아웃 충돌 수정 */
+#sharedQueue.venue-queue-board{
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+  width:100%;
+}
+#sharedQueue.venue-queue-board .venue-queue-section{
+  width:100%;
+  min-width:0;
+  box-sizing:border-box;
+}
+#sharedQueue.venue-queue-board .venue-queue-cards{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+  gap:10px;
+  width:100%;
+  min-width:0;
+}
+#sharedQueue.venue-queue-board .queue-card{
+  min-width:0;
+  width:auto;
+  box-sizing:border-box;
+  overflow:hidden;
+}
+#sharedQueue.venue-queue-board .queue-card b,
+#sharedQueue.venue-queue-board .queue-card em{
+  overflow-wrap:anywhere;
+  word-break:keep-all;
+}

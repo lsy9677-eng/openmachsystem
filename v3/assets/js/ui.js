@@ -14,12 +14,12 @@ export function render(state,handlers){
   const playing=matches.filter(m=>m.status==='playing').length;
   setText('heroDrawSize',state.draw.size?`${state.draw.size}강`:'-');setText('heroMatchCount',matches.length);setText('heroCompleted',completed);setText('heroPlaying',playing);
   setText('summaryTeams',`${state.teams.length}팀`);setText('summaryRound',currentRound(state));setText('summaryPlaying',playing);
-  setText('summaryWait1',state.courts.filter(c=>c.wait1).length);setText('summaryShared',state.sharedQueue.length);
+  setText('summaryWait1',state.courts.filter(c=>c.wait1).length);setText('summaryShared',totalVenueQueueCount(state)+(state.sharedQueue?.length||0));
   setText('summaryAverageMinutes',`${state.timeMetrics?.averageMinutes||0}분`);setText('summaryLongestWait',`${state.timeMetrics?.longestWaitMinutes||0}분`);
   setText('summaryDrawMethod',drawMethodLabel(state.drawMeta?.method));setText('summaryDrawLock',state.drawMeta?.locked?'잠금':'해제');setText('summaryPendingMessages',`${state.messaging?.queue?.filter(x=>x.status==='pending'||x.status==='no-phone').length||0}건`);setText('summaryPhoneTeams',`${contactStats(state).withPhone}팀`);setText('summaryAuditStatus',auditLabel(state.audit?.overall));setText('summaryVenueCount',`${venueStats(state).venueCount}곳`);setText('summaryVenueQueueCount',`${totalVenueQueueCount(state)}경기`);renderContactRoster(state,handlers);updateDrawLockInfo(state);renderMessageCenter(state,handlers);
   setText('baseMatchMinutes',`${state.settings.matchMinutes||30}분`);setText('autoTimeStatus',state.settings.autoTimeEnabled?'ON':'OFF');
   setText('lastTimeCalculated',state.timeMetrics?.lastCalculatedAt?new Date(state.timeMetrics.lastCalculatedAt).toLocaleTimeString('ko-KR'):'-');
-  setText('sharedQueueCount',`${state.sharedQueue.length}경기`);
+  setText('sharedQueueCount',`${totalVenueQueueCount(state)+(state.sharedQueue?.length||0)}경기`);
   renderCourts(state,handlers);renderQueue(state);renderPrelim(state,handlers);renderBracket(state);renderDrawHistory(state);renderAudit(state);renderLogs(state);
 }
 function setText(id,value){const el=document.getElementById(id);if(el)el.textContent=value;}

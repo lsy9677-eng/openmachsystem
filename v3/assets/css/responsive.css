@@ -30,3 +30,10 @@
 
 @media(max-width:1000px){.venue-queue-policy{grid-template-columns:1fr 1fr}.venue-queue-cards{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:650px){.venue-queue-policy,.venue-queue-cards{grid-template-columns:1fr}}
+
+@media(max-width:900px){
+  #sharedQueue.venue-queue-board .venue-queue-cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:620px){
+  #sharedQueue.venue-queue-board .venue-queue-cards{grid-template-columns:1fr}
+}
