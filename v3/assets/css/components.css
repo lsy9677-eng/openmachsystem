@@ -56,3 +56,5 @@ input,select{width:100%;border:1px solid #b9cae5;border-radius:10px;padding:11px
 .lock-confirm-check input{width:21px;height:21px}
 .lock-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
 .lock-summary div{padding:10px;border-radius:9px;background:#eef3fa}.lock-summary span{display:block;font-size:11px;color:var(--muted)}.lock-summary strong{display:block;margin-top:4px;word-break:break-all}
+
+.message-updated-badge{display:inline-flex;margin-left:6px;padding:4px 7px;border-radius:999px;background:#e7efff;color:#315da5;font-size:11px;font-weight:850}
