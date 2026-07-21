@@ -47,3 +47,20 @@ export function venueStats(state){
     courtCount:state.settings.venues.reduce((sum,v)=>sum+v.courtCount,0)
   };
 }
+
+export function ensureVenueQueues(state){
+  ensureVenueSettings(state);
+  if(!state.venueQueues||typeof state.venueQueues!=='object')state.venueQueues={};
+  state.settings.venues.forEach(v=>{if(!Array.isArray(state.venueQueues[v.id]))state.venueQueues[v.id]=[];});
+  Object.keys(state.venueQueues).forEach(id=>{if(!state.settings.venues.some(v=>v.id===id))delete state.venueQueues[id];});
+  if(!('venueAssignmentPolicy'in state.settings))state.settings.venueAssignmentPolicy='round-robin';
+  if(!('separateVenueQueues'in state.settings))state.settings.separateVenueQueues=true;
+  if(!('autoVenuePromotion'in state.settings))state.settings.autoVenuePromotion=true;
+}
+export function venueForCourt(state,court){
+  return state.settings.venues.find(v=>v.id===court?.venueId)||state.settings.venues[0]||null;
+}
+export function totalVenueQueueCount(state){
+  ensureVenueQueues(state);
+  return Object.values(state.venueQueues).reduce((sum,q)=>sum+q.length,0);
+}

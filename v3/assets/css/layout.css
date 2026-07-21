@@ -99,3 +99,13 @@
 .venue-group:first-child{margin-top:0}
 .venue-group-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding:10px 12px;border-radius:11px;background:#eaf1ff}
 .venue-group-head h3{margin:0;font-size:16px}.venue-group-head span{font-size:12px;color:#46618d;font-weight:800}
+
+.venue-queue-policy{display:grid;grid-template-columns:220px 220px 220px;gap:10px;margin-top:12px}
+.venue-queue-policy label{display:grid;gap:6px}
+.venue-queue-policy label>span{font-size:11px;font-weight:800;color:#526079}
+.venue-queue-board{display:grid;gap:14px}
+.venue-queue-section{border:1px solid #cbd8eb;border-radius:13px;padding:12px;background:#f8fbff}
+.venue-queue-section header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.venue-queue-section header h3{margin:0;font-size:16px}
+.venue-queue-section header span{font-size:12px;color:#526079;font-weight:800}
+.venue-queue-cards{display:grid;grid-template-columns:repeat(4,minmax(220px,1fr));gap:9px}

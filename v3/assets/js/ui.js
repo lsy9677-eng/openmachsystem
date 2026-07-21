@@ -2,7 +2,7 @@
 import{allMatches,roundLabel,findMatch}from'./bracket-engine.js';
 import{timeInfo}from'./time-engine.js';
 import{contactStats,getTeamContact}from'./contact-engine.js';
-import{venueStats}from'./venue-engine.js';
+import{venueStats,totalVenueQueueCount}from'./venue-engine.js';
 export function teamText(team){
   if(!team)return'TBD';
   if(team.placeholder)return`${team.name}`;
@@ -16,7 +16,7 @@ export function render(state,handlers){
   setText('summaryTeams',`${state.teams.length}팀`);setText('summaryRound',currentRound(state));setText('summaryPlaying',playing);
   setText('summaryWait1',state.courts.filter(c=>c.wait1).length);setText('summaryShared',state.sharedQueue.length);
   setText('summaryAverageMinutes',`${state.timeMetrics?.averageMinutes||0}분`);setText('summaryLongestWait',`${state.timeMetrics?.longestWaitMinutes||0}분`);
-  setText('summaryDrawMethod',drawMethodLabel(state.drawMeta?.method));setText('summaryDrawLock',state.drawMeta?.locked?'잠금':'해제');setText('summaryPendingMessages',`${state.messaging?.queue?.filter(x=>x.status==='pending'||x.status==='no-phone').length||0}건`);setText('summaryPhoneTeams',`${contactStats(state).withPhone}팀`);setText('summaryAuditStatus',auditLabel(state.audit?.overall));setText('summaryVenueCount',`${venueStats(state).venueCount}곳`);renderContactRoster(state,handlers);updateDrawLockInfo(state);renderMessageCenter(state,handlers);
+  setText('summaryDrawMethod',drawMethodLabel(state.drawMeta?.method));setText('summaryDrawLock',state.drawMeta?.locked?'잠금':'해제');setText('summaryPendingMessages',`${state.messaging?.queue?.filter(x=>x.status==='pending'||x.status==='no-phone').length||0}건`);setText('summaryPhoneTeams',`${contactStats(state).withPhone}팀`);setText('summaryAuditStatus',auditLabel(state.audit?.overall));setText('summaryVenueCount',`${venueStats(state).venueCount}곳`);setText('summaryVenueQueueCount',`${totalVenueQueueCount(state)}경기`);renderContactRoster(state,handlers);updateDrawLockInfo(state);renderMessageCenter(state,handlers);
   setText('baseMatchMinutes',`${state.settings.matchMinutes||30}분`);setText('autoTimeStatus',state.settings.autoTimeEnabled?'ON':'OFF');
   setText('lastTimeCalculated',state.timeMetrics?.lastCalculatedAt?new Date(state.timeMetrics.lastCalculatedAt).toLocaleTimeString('ko-KR'):'-');
   setText('sharedQueueCount',`${state.sharedQueue.length}경기`);
@@ -52,9 +52,18 @@ function renderCourts(state,handlers){
 }
 function renderQueue(state){
   const root=document.getElementById('sharedQueue');
-  if(!state.sharedQueue.length){root.className='shared-queue empty-state';root.innerHTML='<p>공용대기 경기가 없습니다.</p>';return;}
-  root.className='shared-queue';
-  root.innerHTML=state.sharedQueue.map((id,i)=>{const m=findMatch(state.draw,id);return`<article class="queue-card"><span class="num">${i+1}</span><b>${m?`${teamHtml(m.teamA)} vs ${teamHtml(m.teamB)}`:id}</b><em>${m?`${roundLabel(m.roundSize)} · ${id}`:'경기 없음'}</em>${m?timeBadgeHtml(m):''}</article>`}).join('');
+  const venues=state.settings.venues||[];
+  const queues=state.venueQueues||{};
+  const total=Object.values(queues).reduce((sum,q)=>sum+q.length,0)+(state.sharedQueue?.length||0);
+  setText('sharedQueueCount',`${total}경기`);
+  if(!total){root.className='shared-queue venue-queue-board empty-state';root.innerHTML='<p>구장별 공용대기 경기가 없습니다.</p>';return;}
+  root.className='shared-queue venue-queue-board';
+  root.innerHTML=venues.map(v=>{
+    const queue=queues[v.id]||[];
+    return`<section class="venue-queue-section"><header><h3>📍 ${v.name} 공용대기</h3><span>${queue.length}경기</span></header>
+      <div class="venue-queue-cards">${queue.length?queue.map((id,i)=>{const m=findMatch(state.draw,id);return`<article class="queue-card"><span class="num">${i+1}</span><b>${m?`${teamHtml(m.teamA)} vs ${teamHtml(m.teamB)}`:id}</b><em>${m?`${roundLabel(m.roundSize)} · ${id}`:'경기 없음'}</em>${m?timeBadgeHtml(m):''}</article>`}).join(''):'<div class="empty-state"><p>대기 경기 없음</p></div>'}</div>
+    </section>`;
+  }).join('');
 }
 function renderBracket(state){
   const root=document.getElementById('bracketBoard');

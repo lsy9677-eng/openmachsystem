@@ -130,7 +130,11 @@ export function generateCurrentWaitMessages(state){
 
 export function generateAllTimeMessages(state){
   const added=generateCurrentWaitMessages(state);
-  state.sharedQueue.forEach((id,index)=>added.push(...generateSharedMessages(state,id,index+1)));
+  if(state.venueQueues&&Object.keys(state.venueQueues).length){
+    Object.entries(state.venueQueues).forEach(([venueId,queue])=>queue.forEach((id,index)=>added.push(...generateSharedMessages(state,id,index+1))));
+  }else{
+    state.sharedQueue.forEach((id,index)=>added.push(...generateSharedMessages(state,id,index+1)));
+  }
   return added;
 }
 

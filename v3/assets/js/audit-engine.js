@@ -21,7 +21,8 @@ function duplicateValues(values){
 function currentQueueIds(state){
   return[
     ...state.courts.flatMap(c=>[c.playing,c.wait1]).filter(Boolean),
-    ...(state.sharedQueue||[])
+    ...(state.sharedQueue||[]),
+    ...Object.values(state.venueQueues||{}).flat()
   ];
 }
 function auditDraw(state,out){

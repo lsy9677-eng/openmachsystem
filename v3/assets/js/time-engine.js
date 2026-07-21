@@ -39,12 +39,25 @@ export function calculateTimeMetrics(state){
       w.estimatedEndAt=new Date(cursor+avg*60000).toISOString();longest=Math.max(longest,w.estimatedWaitMinutes);
     }
   });
-  state.sharedQueue.forEach((id,index)=>{
-    const m=findMatch(state.draw,id);if(!m)return;
-    const wave=Math.floor(index/Math.max(1,state.courts.length))+2,wait=Math.round(avg*wave);
-    m.estimatedWaitMinutes=wait;m.estimatedStartAt=new Date(now+wait*60000).toISOString();m.estimatedEndAt=new Date(now+(wait+avg)*60000).toISOString();
-    longest=Math.max(longest,wait);
-  });
+  const venueQueues=state.venueQueues&&Object.keys(state.venueQueues).length?state.venueQueues:null;
+  if(venueQueues){
+    Object.entries(venueQueues).forEach(([venueId,queue])=>{
+      const courtCount=Math.max(1,state.courts.filter(c=>(c.venueId||'venue-default')===venueId).length);
+      queue.forEach((id,index)=>{
+        const m=findMatch(state.draw,id);if(!m)return;
+        const wave=Math.floor(index/courtCount)+2,wait=Math.round(avg*wave);
+        m.estimatedWaitMinutes=wait;m.estimatedStartAt=new Date(now+wait*60000).toISOString();m.estimatedEndAt=new Date(now+(wait+avg)*60000).toISOString();
+        longest=Math.max(longest,wait);
+      });
+    });
+  }else{
+    state.sharedQueue.forEach((id,index)=>{
+      const m=findMatch(state.draw,id);if(!m)return;
+      const wave=Math.floor(index/Math.max(1,state.courts.length))+2,wait=Math.round(avg*wave);
+      m.estimatedWaitMinutes=wait;m.estimatedStartAt=new Date(now+wait*60000).toISOString();m.estimatedEndAt=new Date(now+(wait+avg)*60000).toISOString();
+      longest=Math.max(longest,wait);
+    });
+  }
   state.timeMetrics={lastCalculatedAt:new Date(now).toISOString(),averageMinutes:Math.round(avg),longestWaitMinutes:Math.round(longest)};
   return state.timeMetrics;
 }

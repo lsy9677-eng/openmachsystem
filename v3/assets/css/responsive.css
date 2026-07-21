@@ -27,3 +27,6 @@
 
 @media(max-width:850px){.venue-row{grid-template-columns:1fr 100px}.venue-row .venue-prefix{grid-column:1/-1}}
 @media(max-width:600px){.venue-row{grid-template-columns:1fr}}
+
+@media(max-width:1000px){.venue-queue-policy{grid-template-columns:1fr 1fr}.venue-queue-cards{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:650px){.venue-queue-policy,.venue-queue-cards{grid-template-columns:1fr}}
