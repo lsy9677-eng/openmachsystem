@@ -188,8 +188,9 @@ function pullPrelimSettings(){
   state.prelim.settings.activeTeamCount=Number($('prelimActiveTeamCount').value);
   state.prelim.settings.threeTeamGroups=Number($('threeTeamGroupCount').value);
   state.prelim.settings.twoTeamGroups=Number($('twoTeamGroupCount').value);
-  state.prelim.settings.courtCount=Number($('prelimCourtCount').value);
-  state.prelim.settings.courtPrefix=$('prelimCourtPrefix').value.trim()||'코트';
+  const selectedPrelimVenues=prelimVenues(state);
+  state.prelim.settings.courtCount=selectedPrelimVenues.reduce((sum,v)=>sum+v.courtCount,0);
+  state.prelim.settings.courtPrefix=selectedPrelimVenues[0]?.courtPrefix||'코트';
   state.prelim.settings.qualifiersPerGroup=Number($('qualifiersPerGroup').value);
 }
 function syncPrelimInputs(){
@@ -197,8 +198,8 @@ function syncPrelimInputs(){
   $('prelimActiveTeamCount').value=state.prelim.settings.activeTeamCount;
   $('threeTeamGroupCount').value=state.prelim.settings.threeTeamGroups;
   $('twoTeamGroupCount').value=state.prelim.settings.twoTeamGroups;
-  $('prelimCourtCount').value=state.prelim.settings.courtCount;
-  $('prelimCourtPrefix').value=state.prelim.settings.courtPrefix;
+  $('prelimVenueSummary').value=prelimVenues(state).map(v=>`${v.name} ${v.courtCount}면`).join(' + ');
+  $('prelimCourtCountSummary').value=`${prelimVenues(state).reduce((sum,v)=>sum+v.courtCount,0)}면`;
   $('qualifiersPerGroup').value=String(state.prelim.settings.qualifiersPerGroup);
 }
 
@@ -498,6 +499,7 @@ function saveVenueSettings(){
   const prelimSummary=prelimVenues(state).map(v=>`${v.name} ${v.courtCount}면`).join(' + ');
   const mainSummary=mainVenues(state).map(v=>`${v.name} ${v.courtCount}면`).join(' + ');
   commit(`구장 설정 저장 · 예선 ${prelimSummary} · 본선 ${mainSummary}`);
+  syncPrelimInputs();
   notice(`예선: ${prelimSummary} / 본선: ${mainSummary}로 저장했습니다.`,'success');
 }
 
@@ -806,4 +808,4 @@ document.addEventListener('click',event=>{
 },{capture:true});
 
 syncInputs();syncPrelimInputs();bind();renderVenueSettingsEditor();calculateTimeMetrics(state);render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue});restartTimeTimer();updateClock();setInterval(updateClock,1000);
-console.log('[230MATCH V3] stage20.2 venue-scope-swap-fix loaded · no legacy code · no Firebase writes');
+console.log('[230MATCH V3] stage20.3 prelim-dynamic-order loaded · no legacy code · no Firebase writes');

@@ -214,9 +214,9 @@ function renderPrelimCourtOperation(state,handlers){
     const wait1=state.prelim.matches.find(m=>m.id===c.wait1);
     return`<article class="prelim-court-card">
       <header><strong>🚀 ${c.name}</strong><span>${c.venueName?`${c.venueName} · `:''}${playing?'시합중':'빈코트'} · ${groups.length}개 조</span></header>
-      <div class="prelim-court-slot playing"><small>시합중</small><b>${playing?`${teamText(playing.teamA)} vs ${teamText(playing.teamB)}`:'진행 경기 없음'}</b>${playing?`<button class="btn btn-secondary" data-prelim-result="${playing.id}">결과 입력</button>`:''}</div>
-      <div class="prelim-court-slot wait1"><small>대기1</small><b>${wait1?`${teamText(wait1.teamA)} vs ${teamText(wait1.teamB)}`:'대기 경기 없음'}</b></div>
-      <div class="prelim-extra-queue"><strong>추가 대기 ${queue.length}경기</strong>${queue.length?queue.map((id,i)=>{const m=state.prelim.matches.find(x=>x.id===id);return`<div class="prelim-extra-item"><span class="no">${i+2}</span><span>${m?`${teamText(m.teamA)} vs ${teamText(m.teamB)}`:id}</span></div>`}).join(''):'<p>추가 대기 없음</p>'}</div>
+      <div class="prelim-court-slot playing"><small>시합중</small>${playing?`<span class="group-label">${playing.groupNo}조 · ${playing.matchNo}경기</span>`:''}<b>${playing?`${teamText(playing.teamA)} vs ${teamText(playing.teamB)}`:'진행 경기 없음'}</b>${playing?`<button class="btn btn-secondary" data-prelim-result="${playing.id}">결과 입력</button>`:''}</div>
+      <div class="prelim-court-slot wait1"><small>대기1</small>${wait1?`<span class="group-label">${wait1.groupNo}조 · ${wait1.matchNo}경기</span>`:''}<b>${wait1?`${teamText(wait1.teamA)} vs ${teamText(wait1.teamB)}`:'대기 경기 없음'}</b></div>
+      <div class="prelim-extra-queue"><strong>추가 대기 ${queue.length}경기</strong>${queue.length?queue.map((id,i)=>{const m=state.prelim.matches.find(x=>x.id===id);return`<div class="prelim-extra-item"><span class="no">${i+2}</span>${m?`<span class="group-no">${m.groupNo}조</span><span>${teamText(m.teamA)} vs ${teamText(m.teamB)}</span>`:`<span>${id}</span>`}</div>`}).join(''):'<p>추가 대기 없음</p>'}</div>
     </article>`;
   }).join('');
   root.querySelectorAll('[data-prelim-result]').forEach(b=>b.onclick=()=>handlers.openPrelimResult(b.dataset.prelimResult));
@@ -247,15 +247,16 @@ function renderPrelim(state,handlers){
   root.innerHTML=prelim.groups.map(group=>{
     const matches=prelim.matches.filter(m=>m.groupId===group.id);
     return `<article class="prelim-group-card">
-      <header><strong>${group.groupNo}조</strong><span>${group.court||'코트 미배정'}</span></header>
+      <header><strong>${group.groupNo}조${group.venueName?`<span class="prelim-group-chip">${group.venueName}</span>`:''}</strong><span>${group.court||'코트 미배정'}</span></header>
       <table class="prelim-team-table"><thead><tr><th>순위</th><th>팀</th><th>승</th><th>패</th><th>득실</th></tr></thead><tbody>
       ${group.standings.map(s=>`<tr class="${s.qualified?'qualifier':''}"><td>${s.rank}</td><td>${teamText(s.team)}</td><td>${s.wins}</td><td>${s.losses}</td><td>${s.diff>0?'+':''}${s.diff}</td></tr>`).join('')}
       </tbody></table>
       <div class="prelim-match-list">
-      ${matches.map(m=>`<div class="prelim-match"><div class="prelim-match-top"><span>${m.matchNo}경기</span><span>${m.court||'-'} · ${m.status==='completed'?'완료':'대기'}</span></div>
+      ${matches.map(m=>{const statusLabel=({playing:'시합중',court_wait1:'대기1',queued:'추가대기',waiting_dependency:'첫 경기 결과 대기',waiting_previous:'이전 경기 완료 대기',completed:'완료'})[m.status]||'대기';const canInput=m.status==='playing'||m.status==='completed';return`<div class="prelim-match"><div class="prelim-match-top"><span>${m.matchNo}경기</span><span>${m.court||'-'} · ${statusLabel}</span></div>
       <b>${teamText(m.teamA)} vs ${teamText(m.teamB)}</b>
-      <em>${m.status==='completed'?`${m.scoreA}:${m.scoreB} · 승리 ${teamText(m.winner)}`:'결과 미입력'}</em>
-      <button class="btn btn-secondary" data-prelim-result="${m.id}">${m.status==='completed'?'결과 수정':'결과 입력'}</button></div>`).join('')}
+      <span class="prelim-match-dependency">${m.sequenceLabel||''}</span>
+      <em>${m.status==='completed'?`${m.scoreA}:${m.scoreB} · 승리 ${teamText(m.winner)}`:(m.status==='waiting_dependency'||m.status==='waiting_previous'?'상대팀 확정 대기':'결과 미입력')}</em>
+      ${canInput?`<button class="btn btn-secondary" data-prelim-result="${m.id}">${m.status==='completed'?'결과 수정':'결과 입력'}</button>`:''}</div>`}).join('')}
       </div></article>`;
   }).join('');
   root.querySelectorAll('[data-prelim-result]').forEach(b=>b.addEventListener('click',()=>handlers.openPrelimResult(b.dataset.prelimResult)));

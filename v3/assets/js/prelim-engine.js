@@ -24,19 +24,39 @@ export function generatePrelim(state,settings){
   state.prelim.reserveTeams=state.teams.slice(activeCount).map(clone);
   const groups=[],matches=[];
   let cursor=0,groupNo=1;
+  const pending=(label,key)=>({id:key,name:label,placeholder:true});
   const createGroup=(size)=>{
     const teams=state.prelim.activeTeams.slice(cursor,cursor+size).map((t,i)=>({...clone(t),seed:i+1}));
     cursor+=size;
     const id=`g${groupNo}`;
-    groups.push({id,groupNo,size,teams,standings:[],court:null});
-    const pairs=size===3?[[0,1],[1,2],[0,2]]:[[0,1]];
-    pairs.forEach((pair,index)=>{
+    groups.push({id,groupNo,size,teams,standings:[],court:null,nextMatchNo:1});
+    if(size===3){
       matches.push({
-        id:`${id}_m${index+1}`,groupId:id,groupNo,matchNo:index+1,
-        teamA:clone(teams[pair[0]]),teamB:clone(teams[pair[1]]),
-        winner:null,scoreA:null,scoreB:null,status:'ready',court:null
+        id:`${id}_m1`,groupId:id,groupNo,matchNo:1,
+        teamA:clone(teams[0]),teamB:clone(teams[1]),
+        winner:null,loser:null,scoreA:null,scoreB:null,status:'ready',court:null,
+        dependency:null,sequenceLabel:'1번팀 vs 2번팀'
       });
-    });
+      matches.push({
+        id:`${id}_m2`,groupId:id,groupNo,matchNo:2,
+        teamA:pending('첫 경기 승자',`${id}-winner-m1`),teamB:clone(teams[2]),
+        winner:null,loser:null,scoreA:null,scoreB:null,status:'waiting_dependency',court:null,
+        dependency:{afterMatchId:`${id}_m1`,teamAFrom:'winner'},sequenceLabel:'첫 경기 승자 vs 3번팀'
+      });
+      matches.push({
+        id:`${id}_m3`,groupId:id,groupNo,matchNo:3,
+        teamA:pending('첫 경기 패자',`${id}-loser-m1`),teamB:clone(teams[2]),
+        winner:null,loser:null,scoreA:null,scoreB:null,status:'waiting_previous',court:null,
+        dependency:{afterMatchId:`${id}_m2`,teamAFromMatchId:`${id}_m1`,teamAFrom:'loser'},sequenceLabel:'첫 경기 패자 vs 3번팀'
+      });
+    }else{
+      matches.push({
+        id:`${id}_m1`,groupId:id,groupNo,matchNo:1,
+        teamA:clone(teams[0]),teamB:clone(teams[1]),
+        winner:null,loser:null,scoreA:null,scoreB:null,status:'ready',court:null,
+        dependency:null,sequenceLabel:'1번팀 vs 2번팀'
+      });
+    }
     groupNo++;
   };
   for(let i=0;i<three;i++)createGroup(3);
@@ -67,34 +87,65 @@ export function assignPrelimCourts(state){
     }
   });
   if(!courts.length)throw new Error('예선 사용 구장이 없습니다.');
+
+  state.prelim.matches.forEach(m=>{
+    m.court=null;m.prelimCourtId=null;m.venueId=null;m.venueName=null;
+    if(m.matchNo===1)m.status='ready';
+    else if(m.matchNo===2)m.status='waiting_dependency';
+    else m.status='waiting_previous';
+  });
+
   state.prelim.groups.slice().sort((a,b)=>a.groupNo-b.groupNo).forEach((group,index)=>{
     const court=courts[index%courts.length];
     group.court=court.name;group.prelimCourtId=court.id;group.venueId=court.venueId;group.venueName=court.venueName;
     court.groups.push(group.id);
-    state.prelim.matches.filter(m=>m.groupId===group.id).sort((a,b)=>a.matchNo-b.matchNo).forEach(m=>{
+    state.prelim.matches.filter(m=>m.groupId===group.id).forEach(m=>{
       m.court=court.name;m.prelimCourtId=court.id;m.venueId=court.venueId;m.venueName=court.venueName;
-      m.status='queued';court.queue.push(m.id);
     });
   });
+
+  // 한 코트에 여러 조가 있으면 각 조의 첫 경기부터 번갈아 배치
   courts.forEach(court=>{
-    if(court.queue.length){
-      court.playing=court.queue.shift();
-      const m=state.prelim.matches.find(x=>x.id===court.playing);if(m)m.status='playing';
-    }
-    if(court.queue.length){
-      court.wait1=court.queue.shift();
-      const m=state.prelim.matches.find(x=>x.id===court.wait1);if(m)m.status='court_wait1';
-    }
+    court.groups
+      .map(groupId=>state.prelim.matches.find(m=>m.groupId===groupId&&m.matchNo===1))
+      .filter(Boolean)
+      .forEach(m=>{m.status='queued';court.queue.push(m.id);});
+    promotePrelimCourt(state,court);
   });
+
   state.prelim.courts=courts;
   return courts;
 }
-export function advancePrelimCourt(state,courtId){
-  const court=state.prelim?.courts?.find(c=>c.id===courtId);
-  if(!court)return null;
-  court.playing=null;
-  if(court.wait1){
+function enqueuePrelimMatch(state,match){
+  const court=state.prelim?.courts?.find(c=>c.id===match.prelimCourtId);
+  if(!court)return;
+  court.queue=court.queue||[];
+  if(court.playing!==match.id&&court.wait1!==match.id&&!court.queue.includes(match.id)){
+    match.status='queued';
+    court.queue.push(match.id);
+  }
+}
+function resolveNextPrelimMatch(state,completedMatch){
+  const groupMatches=state.prelim.matches.filter(m=>m.groupId===completedMatch.groupId).sort((a,b)=>a.matchNo-b.matchNo);
+  if(completedMatch.matchNo===1&&groupMatches.length===3){
+    const second=groupMatches.find(m=>m.matchNo===2);
+    const third=groupMatches.find(m=>m.matchNo===3);
+    second.teamA=clone(completedMatch.winner);
+    third.teamA=clone(completedMatch.loser);
+    enqueuePrelimMatch(state,second);
+  }else if(completedMatch.matchNo===2&&groupMatches.length===3){
+    const third=groupMatches.find(m=>m.matchNo===3);
+    enqueuePrelimMatch(state,third);
+  }
+}
+function promotePrelimCourt(state,court){
+  court.queue=court.queue||[];
+  if(!court.playing&&court.wait1){
     court.playing=court.wait1;court.wait1=null;
+    const m=state.prelim.matches.find(x=>x.id===court.playing);if(m)m.status='playing';
+  }
+  if(!court.playing&&court.queue.length){
+    court.playing=court.queue.shift();
     const m=state.prelim.matches.find(x=>x.id===court.playing);if(m)m.status='playing';
   }
   if(!court.wait1&&court.queue.length){
@@ -103,15 +154,25 @@ export function advancePrelimCourt(state,courtId){
   }
   return court;
 }
+export function advancePrelimCourt(state,courtId,completedMatch=null){
+  const court=state.prelim?.courts?.find(c=>c.id===courtId);
+  if(!court)return null;
+  if(completedMatch)resolveNextPrelimMatch(state,completedMatch);
+  if(court.playing===completedMatch?.id)court.playing=null;
+  promotePrelimCourt(state,court);
+  return court;
+}
 export function findPrelimMatch(state,id){return state.prelim?.matches?.find(m=>m.id===id)||null;}
 export function submitPrelimResult(state,{matchId,winnerId,scoreA,scoreB}){
   const match=findPrelimMatch(state,matchId);
   if(!match)throw new Error('예선 경기를 찾지 못했습니다.');
   const winner=[match.teamA,match.teamB].find(t=>t.id===winnerId);
   if(!winner)throw new Error('승리팀 선택이 올바르지 않습니다.');
-  match.winner=clone(winner);match.scoreA=Number(scoreA);match.scoreB=Number(scoreB);
+  const loser=match.teamA.id===winner.id?match.teamB:match.teamA;
+  const wasCompleted=match.status==='completed';
+  match.winner=clone(winner);match.loser=clone(loser);match.scoreA=Number(scoreA);match.scoreB=Number(scoreB);
   match.status='completed';match.completedAt=new Date().toISOString();
-  if(match.prelimCourtId)advancePrelimCourt(state,match.prelimCourtId);
+  if(!wasCompleted&&match.prelimCourtId)advancePrelimCourt(state,match.prelimCourtId,match);
   recalculateStandings(state);
   return match;
 }

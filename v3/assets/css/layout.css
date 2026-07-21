@@ -426,3 +426,11 @@ body.bracket-fullscreen-open #bracketBoard{
 .swap-mode-active{background:#e9f0ff!important;border-color:#4e73c8!important;color:#234d9b!important}
 .team-chip.swap-selected{outline:3px solid rgba(90,82,200,.35);background:#f3f0ff}
 .swap-guide{margin:8px 0 0;padding:8px 10px;border-radius:8px;background:#f4f7fc;color:#40536d;font-size:12px;font-weight:750}
+
+.prelim-order-rule{line-height:1.55}
+.prelim-order-rule strong{color:#183d70}
+.prelim-match-dependency{display:inline-flex;padding:3px 7px;border-radius:999px;background:#eef2f8;color:#526079;font-size:10px;font-weight:800}
+.prelim-group-chip{display:inline-flex;margin-left:5px;padding:3px 7px;border-radius:999px;background:#e8efff;color:#315b96;font-size:10px;font-weight:900}
+.prelim-court-slot .group-label{display:inline-flex;margin-bottom:5px;padding:3px 7px;border-radius:999px;background:#fff;color:#173d70;font-size:10px;font-weight:900}
+.prelim-extra-item .group-no{flex:0 0 auto;padding:3px 6px;border-radius:999px;background:#e7edf7;color:#315b96;font-size:10px;font-weight:900}
+.prelim-team-pending{color:#7b8798;font-style:italic}
