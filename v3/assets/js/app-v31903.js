@@ -160,7 +160,8 @@ function assign(){
   pullSettings();if(!state.draw.size)throw new Error('먼저 대진을 생성하세요.');
   ensureVenueSettings(state);state.courts=buildVenueCourts(state.settings.venues);
   state.sharedQueue=assignInitial(state.draw,state.courts,state);if(state.messaging.settings.autoMessageEnabled&&state.messaging.settings.onCourtAssign)generateCurrentCourtMessages(state);
-  commit(`코트 ${state.courts.length}면 배정 · 공용대기 ${state.sharedQueue.length}경기`);notice('코트배정이 완료되었습니다.','success');
+  const venueSummary=(state.settings.venues||[]).map(v=>`${v.name} ${state.courts.filter(c=>c.venueId===v.id).length}면`).join(' · ');
+  commit(`본선 상하중간 균등 코트배정 · ${venueSummary}`);notice('본선 경기를 상단·하단·중앙 순서로 균등 배정했습니다.','success');
 }
 function openResult(matchId){
   const m=findMatch(state.draw,matchId);if(!m)return;
@@ -773,4 +774,4 @@ document.addEventListener('click',event=>{
 },{capture:true});
 
 syncInputs();syncPrelimInputs();bind();renderVenueSettingsEditor();calculateTimeMetrics(state);render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue});restartTimeTimer();updateClock();setInterval(updateClock,1000);
-console.log('[230MATCH V3] stage19.4 branch-tree-compact loaded · no legacy code · no Firebase writes');
+console.log('[230MATCH V3] stage20 main-draw-balanced-assignment loaded · no legacy code · no Firebase writes');

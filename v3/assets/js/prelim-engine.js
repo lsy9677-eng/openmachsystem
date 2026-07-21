@@ -49,6 +49,7 @@ export function generatePrelim(state,settings){
   recalculateStandings(state);
   return {groups:groups.length,matches:matches.length,teams:needed};
 }
+/* 예선은 조 번호 순서대로 코트에 순환 배정합니다. */
 export function assignPrelimCourts(state){
   ensurePrelimState(state);
   if(!state.prelim.groups.length)throw new Error('먼저 예선 조편성을 생성하세요.');
