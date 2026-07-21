@@ -3,6 +3,7 @@ import{allMatches,roundLabel,findMatch}from'./bracket-engine.js';
 import{timeInfo}from'./time-engine.js';
 import{contactStats,getTeamContact}from'./contact-engine.js';
 import{venueStats,totalVenueQueueCount}from'./venue-engine.js';
+import{availableCourtSlots}from'./manual-court-engine.js';
 export function teamText(team){
   if(!team)return'TBD';
   if(team.placeholder)return`${team.name}`;
@@ -61,7 +62,7 @@ function renderQueue(state,handlers){
   root.innerHTML=venues.map(v=>{
     const queue=queues[v.id]||[];
     return`<section class="venue-queue-section"><header><h3>📍 ${v.name} 공용대기</h3><span>${queue.length}경기</span></header>
-      <div class="venue-queue-cards">${queue.length?queue.map((id,i)=>{const m=findMatch(state.draw,id);return`<article class="queue-card"><span class="num">${i+1}</span><b>${m?`${teamHtml(m.teamA)} vs ${teamHtml(m.teamB)}`:id}</b><em>${m?`${roundLabel(m.roundSize)} · ${id}`:'경기 없음'}</em>${m?timeBadgeHtml(m):''}<div class="queue-card-actions"><button class="btn btn-light" data-queue-up="${id}" data-venue-id="${v.id}" ${i===0?'disabled':''}>▲</button><button class="btn btn-light" data-queue-down="${id}" data-venue-id="${v.id}" ${i===queue.length-1?'disabled':''}>▼</button><button class="btn btn-primary" data-manual-assign="${id}" data-venue-id="${v.id}">코트배정</button><button class="btn btn-secondary" data-queue-move="${id}" data-venue-id="${v.id}">구장 이동</button></div></article>`}).join(''):'<div class="empty-state"><p>대기 경기 없음</p></div>'}</div>
+      <div class="venue-queue-cards">${queue.length?queue.map((id,i)=>{const m=findMatch(state.draw,id);return`<article class="queue-card"><span class="num">${i+1}</span><b>${m?`${teamHtml(m.teamA)} vs ${teamHtml(m.teamB)}`:id}</b><em>${m?`${roundLabel(m.roundSize)} · ${id}`:'경기 없음'}</em>${m?timeBadgeHtml(m):''}<div class="queue-card-actions"><button class="btn btn-light" data-queue-up="${id}" data-venue-id="${v.id}" ${i===0?'disabled':''}>▲</button><button class="btn btn-light" data-queue-down="${id}" data-venue-id="${v.id}" ${i===queue.length-1?'disabled':''}>▼</button><button class="btn btn-primary" data-manual-assign="${id}" data-venue-id="${v.id}">${availableCourtSlots(state,v.id).length?'코트배정':'배정 자리 없음'}</button><button class="btn btn-secondary" data-queue-move="${id}" data-venue-id="${v.id}">구장 이동</button></div></article>`}).join(''):'<div class="empty-state"><p>대기 경기 없음</p></div>'}</div>
     </section>`;
   }).join('');
   root.querySelectorAll('[data-queue-up]').forEach(b=>b.onclick=()=>handlers.reorderQueue(b.dataset.venueId,b.dataset.queueUp,'up'));
