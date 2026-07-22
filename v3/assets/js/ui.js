@@ -406,6 +406,8 @@ function renderAudit(state){
   setText('auditPassCount',audit.results.filter(x=>x.level==='pass').length);
   setText('auditWarnCount',audit.results.filter(x=>x.level==='warn').length);
   setText('auditFailCount',audit.results.filter(x=>x.level==='fail').length);
+  setText('auditPrelimSimCompleted',audit.prelimSimulation?.completedMatches||0);
+  setText('auditPrelimRanked',audit.prelimSimulation?.rankedGroups||0);
   setText('auditSimCompleted',audit.simulation?.completedMatches||0);
   setText('auditSimWinner',audit.simulation?.winner?.name||'-');
   setText('auditLastRunText',audit.lastRunAt?`마지막 실행 ${new Date(audit.lastRunAt).toLocaleString('ko-KR')}`:'아직 실행하지 않았습니다.');

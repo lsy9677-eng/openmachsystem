@@ -29,9 +29,9 @@
   <main class="app-shell">
     <section class="hero panel">
       <div>
-        <p class="eyebrow">STAGE 24.2 · STRICT NAMES ONLY</p>
-        <h1>운영화면 클럽명 완전 제거</h1>
-        <p>괄호 안에 여러 클럽명이 슬래시로 함께 적힌 경우까지 정리해 진행 화면에는 선수 이름만 표시합니다.</p>
+        <p class="eyebrow">STAGE 25 · PRELIM AUDIT SIMULATION</p>
+        <h1>예선 복제 모의운영·자동점검</h1>
+        <p>예선 3팀조 동적 경기순서와 코트 자동승계를 복제 상태에서 끝까지 실행해 실제 운영 전 오류를 점검합니다.</p>
       </div>
       <div class="hero-stats">
         <div><span>대진</span><strong id="heroDrawSize">-</strong></div>
@@ -490,7 +490,7 @@
         <div class="section-head">
           <div>
             <h2>운영 전 자동점검</h2>
-            <p>현재 상태를 검사하고, 별도의 복제 상태에서 본선 전체를 자동 완주합니다. 실제 대진·결과·문자는 변경하지 않습니다.</p>
+            <p>현재 상태를 검사하고, 별도의 복제 상태에서 예선과 본선을 각각 자동 완주합니다. 실제 대진·결과·문자는 변경하지 않습니다.</p>
           </div>
           <span class="badge badge-safe">원본 데이터 미변경</span>
         </div>
@@ -498,7 +498,8 @@
         <div id="auditActionNotice" class="notice info">점검 버튼을 누르면 진행 상태와 결과가 이 영역에 표시됩니다.</div>
         <div class="audit-action-row">
           <button id="runStateAuditBtn" class="btn btn-primary">현재 상태 점검</button>
-          <button id="runFullSimulationBtn" class="btn btn-purple">복제 모의대회 완주</button>
+          <button id="runPrelimSimulationBtn" class="btn btn-secondary">예선 복제 모의운영</button>
+          <button id="runFullSimulationBtn" class="btn btn-purple">본선 복제 모의대회</button>
           <button id="runAllAuditBtn" class="btn btn-gold">전체 점검 실행</button>
           <button id="downloadAuditBtn" class="btn btn-light">점검 결과 JSON 저장</button>
           <button id="clearAuditBtn" class="btn btn-danger-outline">점검 결과 지우기</button>
@@ -506,7 +507,7 @@
 
         <div class="audit-explain">
           <strong>검사항목</strong>
-          <span>대진 경기 수 · 중복 코트배정 · 큐 중복 · 누락 경기 · 미확정 슬롯 · 승자 진출 · 결승 완료 · 문자 중복 · 연락처 상태</span>
+          <span>예선 조·경기 수 · 3팀조 순서 · 예선 코트 큐 · 예선 완주 · 본선 경기 수 · 코트·큐 중복 · 승자 진출 · 결승 완료 · 문자 상태</span>
         </div>
       </section>
 
@@ -514,7 +515,9 @@
         <article class="summary-card"><span>통과</span><strong id="auditPassCount">0</strong></article>
         <article class="summary-card"><span>주의</span><strong id="auditWarnCount">0</strong></article>
         <article class="summary-card"><span>오류</span><strong id="auditFailCount">0</strong></article>
-        <article class="summary-card"><span>모의 완료 경기</span><strong id="auditSimCompleted">0</strong></article>
+        <article class="summary-card"><span>예선 모의 완료</span><strong id="auditPrelimSimCompleted">0</strong></article>
+        <article class="summary-card"><span>예선 확정 순위</span><strong id="auditPrelimRanked">0</strong></article>
+        <article class="summary-card"><span>본선 모의 완료</span><strong id="auditSimCompleted">0</strong></article>
         <article class="summary-card"><span>모의 우승팀</span><strong id="auditSimWinner">-</strong></article>
       </section>
 
@@ -783,6 +786,6 @@
     <div id="recoveryList" class="recovery-list"></div>
   </dialog>
 
-  <script type="module" src="./assets/js/app-v32402.js?v=32402"></script>
+  <script type="module" src="./assets/js/app-v32500.js?v=32500"></script>
 </body>
 </html>

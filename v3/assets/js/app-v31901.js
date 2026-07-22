@@ -10,7 +10,7 @@ import{ensureTimeState,calculateTimeMetrics}from'./time-engine.js';
 import{ensureMessagingState,generatePlayingMessages,generateWait1Messages,generateCurrentCourtMessages,generateCurrentWaitMessages,generateAllTimeMessages,markMessageSent,deleteMessage,clearSentMessages,markAllSent,smsUri,refreshMessageContacts,mergePendingDuplicates,getMessageHistory}from'./message-engine.js';
 import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactData,importContactData}from'./contact-engine.js';
 import{render,teamText}from'./ui.js';
-import{ensureAuditState,runStateAudit,runFullSimulation,applyAuditResult}from'./audit-engine.js';
+import{ensureAuditState,runStateAudit,runPrelimSimulation,runFullSimulation,applyAuditResult}from'./audit-engine.js';
 import{ensureVenueSettings,ensureVenueQueues,venuePreset,buildVenueCourts,prelimVenues,mainVenues}from'./venue-engine.js';
 import{moveQueueItem,reorderQueueItem}from'./queue-control-engine.js';
 import{availableCourtSlots,assignQueueMatchToCourt,returnWait1ToVenueQueue}from'./manual-court-engine.js';
@@ -422,14 +422,28 @@ function executeAuditAction(action,label){
 }
 function runCurrentAudit(){
   const audit=runStateAudit(state);
-  applyAuditResult(state,audit,null);
+  applyAuditResult(state,audit,null,null);
   commit(`운영 상태 점검 · 통과 ${audit.counts.pass} · 주의 ${audit.counts.warn} · 오류 ${audit.counts.fail}`);
   setAuditActionNotice(`현재 상태 점검 완료 · 통과 ${audit.counts.pass} · 주의 ${audit.counts.warn} · 오류 ${audit.counts.fail}`,audit.counts.fail?'error':audit.counts.warn?'info':'success');
 }
+
+function runPrelimSimulationAudit(){
+  const audit=runStateAudit(state);
+  const simulation=runPrelimSimulation(state);
+  applyAuditResult(state,audit,null,simulation);
+  commit(`예선 복제 모의운영 · ${simulation.completedMatches}/${simulation.totalMatches}경기 · ${simulation.success?'완주':'실패'}`);
+  setAuditActionNotice(
+    simulation.success
+      ?`예선 복제 모의운영 완주 · ${simulation.completedMatches}/${simulation.totalMatches}경기 · ${simulation.rankedGroups}/${simulation.totalGroups}조 순위 확정`
+      :`예선 복제 모의운영 실패 · 미완료 ${simulation.unfinished.length}경기`,
+    simulation.success?'success':'error'
+  );
+}
+
 function runSimulationAudit(){
   const audit=runStateAudit(state);
   const simulation=runFullSimulation(state);
-  applyAuditResult(state,audit,simulation);
+  applyAuditResult(state,audit,simulation,null);
   commit(`복제 모의대회 · ${simulation.completedMatches}/${simulation.totalMatches}경기 · ${simulation.success?'완주':'실패'}`);
   setAuditActionNotice(
     simulation.success
@@ -440,8 +454,9 @@ function runSimulationAudit(){
 }
 function runAllAudit(){
   const audit=runStateAudit(state);
+  const prelimSimulation=state.prelim?.groups?.length?runPrelimSimulation(state):null;
   const simulation=state.draw?.size?runFullSimulation(state):null;
-  applyAuditResult(state,audit,simulation);
+  applyAuditResult(state,audit,simulation,prelimSimulation);
   commit(`전체 운영 점검 · 상태 ${state.audit.overall}`);
   setAuditActionNotice(
     `전체 점검 완료 · 통과 ${state.audit.results.filter(x=>x.level==='pass').length} · 주의 ${state.audit.results.filter(x=>x.level==='warn').length} · 오류 ${state.audit.results.filter(x=>x.level==='fail').length}`,
@@ -453,7 +468,7 @@ function downloadAudit(){
   downloadJson(`230match-audit-${Date.now()}.json`,{tournament:state.tournament,drawMeta:state.drawMeta,audit:state.audit});
 }
 function clearAudit(){
-  state.audit={lastRunAt:null,overall:'not-run',results:[],simulation:null};
+  state.audit={lastRunAt:null,overall:'not-run',results:[],simulation:null,prelimSimulation:null};
   commit('운영 점검 결과 삭제');
   setAuditActionNotice('점검 결과를 지웠습니다.','info');
 }
@@ -795,7 +810,8 @@ function bind(){
   $('clearLogsBtn').onclick=()=>{state.logs=[];commit();};
   if($('quickAuditBtn'))$('quickAuditBtn').onclick=()=>executeAuditAction(runAllAudit,'전체 운영 점검');
   if($('runStateAuditBtn'))$('runStateAuditBtn').onclick=()=>executeAuditAction(runCurrentAudit,'현재 상태 점검');
-  if($('runFullSimulationBtn'))$('runFullSimulationBtn').onclick=()=>executeAuditAction(runSimulationAudit,'복제 모의대회');
+  if($('runPrelimSimulationBtn'))$('runPrelimSimulationBtn').onclick=()=>executeAuditAction(runPrelimSimulationAudit,'예선 복제 모의운영');
+  if($('runFullSimulationBtn'))$('runFullSimulationBtn').onclick=()=>executeAuditAction(runSimulationAudit,'본선 복제 모의대회');
   if($('runAllAuditBtn'))$('runAllAuditBtn').onclick=()=>executeAuditAction(runAllAudit,'전체 점검');
   if($('downloadAuditBtn'))$('downloadAuditBtn').onclick=()=>executeAuditAction(downloadAudit,'점검 결과 저장');
   if($('clearAuditBtn'))$('clearAuditBtn').onclick=clearAudit;
@@ -866,4 +882,4 @@ document.addEventListener('click',event=>{
 },{capture:true});
 
 syncInputs();syncPrelimInputs();bind();renderVenueSettingsEditor();calculateTimeMetrics(state);render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus});restartTimeTimer();updateClock();setInterval(updateClock,1000);
-console.log('[230MATCH V3] stage24.2 strict-names-only loaded · no legacy code · no Firebase writes');
+console.log('[230MATCH V3] stage25 prelim-audit-simulation loaded · no legacy code · no Firebase writes');
