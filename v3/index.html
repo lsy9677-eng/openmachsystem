@@ -29,9 +29,9 @@
   <main class="app-shell">
     <section class="hero panel">
       <div>
-        <p class="eyebrow">STAGE 21 · VENUE SETTINGS UNIFIED</p>
-        <h1>구장 설정 단일화·운영화면 정리</h1>
-        <p>통합 운영의 중복 코트 접두어 입력을 제거하고, 예선·본선 코트 수와 코트명은 대회 설정의 구장 구성만 사용하도록 통일했습니다.</p>
+        <p class="eyebrow">STAGE 23 · PRELIM COURT STATUS</p>
+        <h1>예선 코트 사용중지·재개와 경기 대피</h1>
+        <p>예선 코트를 일시 중지하거나 재개하고 대기경기를 다른 코트로 대피할 수 있습니다.</p>
       </div>
       <div class="hero-stats">
         <div><span>대진</span><strong id="heroDrawSize">-</strong></div>
@@ -558,6 +558,47 @@
     </form>
   </dialog>
 
+
+
+  <dialog id="prelimCourtStatusDialog" class="modal">
+    <form method="dialog">
+      <div class="modal-head"><h2>예선 코트 상태 변경</h2><button value="cancel" class="icon-button">×</button></div>
+      <div class="contact-edit-body">
+        <input id="prelimStatusCourtId" type="hidden">
+        <p id="prelimStatusCourtLabel" class="modal-match"></p>
+        <label><span>작업</span><select id="prelimStatusAction">
+          <option value="pause-keep">사용중지 · 현재 배정 유지</option>
+          <option value="pause-evacuate-wait">사용중지 · 대기경기 대피</option>
+          <option value="pause-evacuate-all">사용중지 · 전체 경기 대피</option>
+          <option value="resume">코트 사용 재개</option>
+        </select></label>
+        <label><span>중지 사유</span><input id="prelimStatusReason" type="text" placeholder="예: 조명 문제"></label>
+      </div>
+      <menu><button value="cancel" class="btn btn-light">취소</button><button id="confirmPrelimCourtStatusBtn" value="default" class="btn btn-primary">적용</button></menu>
+    </form>
+  </dialog>
+
+  <dialog id="prelimQueueMoveDialog" class="modal">
+    <form method="dialog" id="prelimQueueMoveForm">
+      <div class="modal-head"><h2>예선 경기 코트 이동</h2><button value="cancel" class="icon-button">×</button></div>
+      <div class="contact-edit-body">
+        <input id="prelimMoveMatchId" type="hidden">
+        <input id="prelimMoveSourceCourtId" type="hidden">
+        <p id="prelimMoveMatchLabel" class="modal-match"></p>
+        <label><span>이동할 코트</span><select id="prelimMoveTargetCourt"></select></label>
+        <label><span>배치 위치</span>
+          <select id="prelimMoveTargetPosition">
+            <option value="wait1-first" selected>대기1이 비면 대기1, 아니면 추가대기 맨 앞</option>
+            <option value="queue-top">추가대기 맨 앞</option>
+            <option value="queue-bottom">추가대기 맨 뒤</option>
+          </select>
+        </label>
+        <div class="notice info">시합중 경기는 결과 처리 후 이동하며, 대기1·추가대기 경기만 직접 이동할 수 있습니다.</div>
+      </div>
+      <menu><button value="cancel" class="btn btn-light">취소</button><button id="confirmPrelimMoveBtn" value="default" class="btn btn-primary">이동</button></menu>
+    </form>
+  </dialog>
+
   <dialog id="courtStatusDialog" class="modal">
     <form method="dialog" id="courtStatusForm">
       <div class="modal-head"><h2>코트 사용 상태 변경</h2><button value="cancel" class="icon-button">×</button></div>
@@ -742,6 +783,6 @@
     <div id="recoveryList" class="recovery-list"></div>
   </dialog>
 
-  <script type="module" src="./assets/js/app-v32100.js?v=32100"></script>
+  <script type="module" src="./assets/js/app-v32300.js?v=32300"></script>
 </body>
 </html>

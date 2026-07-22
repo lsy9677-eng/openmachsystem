@@ -82,7 +82,7 @@ export function assignPrelimCourts(state){
         id:`prelim-${venue.id}-court-${i}`,
         name:`${venue.courtPrefix}${i}`,
         venueId:venue.id,venueName:venue.name,
-        groups:[],playing:null,wait1:null,queue:[]
+        groups:[],playing:null,wait1:null,queue:[],isPaused:false,pauseReason:''
       });
     }
   });
@@ -140,6 +140,7 @@ function resolveNextPrelimMatch(state,completedMatch){
 }
 function promotePrelimCourt(state,court){
   court.queue=court.queue||[];
+  if(court.isPaused)return court;
   if(!court.playing&&court.wait1){
     court.playing=court.wait1;court.wait1=null;
     const m=state.prelim.matches.find(x=>x.id===court.playing);if(m)m.status='playing';

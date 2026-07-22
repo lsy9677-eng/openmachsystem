@@ -17,8 +17,10 @@ import{availableCourtSlots,assignQueueMatchToCourt,returnWait1ToVenueQueue}from'
 
 import{ensureCourtStatuses,pauseCourt,resumeCourt}from'./court-status-engine.js';
 import{ensureCourtManualQueues,assignToCourtManualQueue,moveCourtMatchFlexible,returnManualQueueItemToVenue,reorderCourtManualQueue}from'./court-manual-queue-engine.js';
+import{reorderPrelimQueue as reorderPrelimQueueItem,movePrelimQueuedMatch,returnPrelimWait1ToQueue}from'./prelim-queue-control-engine.js';
+import{ensurePrelimCourtStatuses,pausePrelimCourt,resumePrelimCourt}from'./prelim-court-status-engine.js';
 
-let state=loadState();ensurePrelimState(state);ensureTimeState(state);ensureDrawMeta(state);ensureMessagingState(state);ensureContacts(state);ensureAuditState(state);ensureVenueSettings(state);ensureVenueQueues(state);ensureCourtStatuses(state);ensureCourtManualQueues(state);
+let state=loadState();ensurePrelimState(state);ensureTimeState(state);ensureDrawMeta(state);ensureMessagingState(state);ensureContacts(state);ensureAuditState(state);ensureVenueSettings(state);ensureVenueQueues(state);ensureCourtStatuses(state);ensureCourtManualQueues(state);ensurePrelimCourtStatuses(state);
 const $=id=>document.getElementById(id);
 const setValue=(id,value)=>{const el=$(id);if(el)el.value=value;};
 const setChecked=(id,value)=>{const el=$(id);if(el)el.checked=Boolean(value);};
@@ -26,7 +28,7 @@ const getValue=(id,fallback='')=>{const el=$(id);return el?el.value:fallback;};
 const getChecked=(id,fallback=false)=>{const el=$(id);return el?el.checked:fallback;};
 function log(message){state.logs.unshift({at:new Date().toISOString(),message});state.logs=state.logs.slice(0,300);}
 function commit(message){
-  if(message)log(message);if(state.settings.autoTimeEnabled)calculateTimeMetrics(state);syncInputs();saveState(state);render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue});flashSaved();
+  if(message)log(message);if(state.settings.autoTimeEnabled)calculateTimeMetrics(state);syncInputs();saveState(state);render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus});flashSaved();
 }
 function syncInputs(){
   setValue('tournamentName',state.tournament.name);
@@ -354,7 +356,7 @@ let timeTimer=null;
 function refreshTimeEngine({save=false}={}){
   if(state.settings.autoTimeEnabled)calculateTimeMetrics(state);
   if(save)saveState(state);
-  render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue});
+  render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus});
 }
 function restartTimeTimer(){
   clearInterval(timeTimer);
@@ -669,13 +671,13 @@ function updateBracketView(key,value){
   if(!state.ui.bracketView)state.ui.bracketView={round:'all',status:'all',venue:'all',density:'comfortable',activeOnly:false};
   state.ui.bracketView[key]=value;
   saveState(state);
-  render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue});
+  render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus});
 }
 function resetBracketView(){
   state.ui=state.ui||{};
   state.ui.bracketView={round:'all',status:'all',venue:'all',density:'comfortable',activeOnly:false};
   saveState(state);
-  render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue});
+  render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus});
 }
 function setBracketFullscreen(open){
   const board=$('bracketBoard'),button=$('bracketFullscreenBtn');
@@ -687,6 +689,57 @@ function setBracketFullscreen(open){
 }
 function toggleBracketFullscreen(){
   setBracketFullscreen(!$('bracketBoard')?.classList.contains('bracket-fullscreen'));
+}
+
+
+function reorderPrelimQueue(courtId,matchId,direction){
+  if(!reorderPrelimQueueItem(state,{courtId,matchId,direction}))return;
+  commit(`예선 추가대기 순서 변경 · ${courtId} · ${direction}`);
+}
+function openPrelimMove(sourceCourtId,matchId){
+  const match=findPrelimMatch(state,matchId);if(!match)return;
+  const source=state.prelim.courts.find(c=>c.id===sourceCourtId);
+  const targets=state.prelim.courts.filter(c=>c.id!==sourceCourtId);
+  if(!targets.length){prelimNotice('이동할 다른 예선 코트가 없습니다.','error');return;}
+  $('prelimMoveSourceCourtId').value=sourceCourtId;
+  $('prelimMoveMatchId').value=matchId;
+  $('prelimMoveMatchLabel').textContent=`${match.groupNo}조 ${match.matchNo}경기 · ${teamText(match.teamA)} vs ${teamText(match.teamB)}`;
+  $('prelimMoveTargetCourt').innerHTML=targets.map(c=>`<option value="${c.id}">${c.venueName||''} ${c.name} · 대기1 ${c.wait1?'있음':'비어있음'} · 추가대기 ${(c.queue||[]).length}경기</option>`).join('');
+  $('prelimQueueMoveDialog').showModal();
+}
+function confirmPrelimMove(event){
+  event.preventDefault();
+  const result=movePrelimQueuedMatch(state,{
+    sourceCourtId:$('prelimMoveSourceCourtId').value,
+    targetCourtId:$('prelimMoveTargetCourt').value,
+    matchId:$('prelimMoveMatchId').value,
+    position:$('prelimMoveTargetPosition').value
+  });
+  commit(`예선 경기 코트 이동 · ${result.source.name} → ${result.target.name}`);
+  $('prelimQueueMoveDialog').close();
+  prelimNotice(`${result.match.groupNo}조 ${result.match.matchNo}경기를 ${result.target.name}으로 이동했습니다.`,'success');
+}
+function returnPrelimWait1(courtId){
+  const matchId=returnPrelimWait1ToQueue(state,{courtId});
+  commit(`예선 대기1 추가대기 복귀 · ${matchId}`);
+  prelimNotice('대기1 경기를 해당 코트 추가대기 맨 앞으로 이동했습니다.','success');
+}
+
+
+function openPrelimCourtStatus(courtId){
+  const c=state.prelim.courts.find(x=>x.id===courtId);if(!c)return;
+  $('prelimStatusCourtId').value=courtId;
+  $('prelimStatusCourtLabel').textContent=`${c.venueName||''} ${c.name} · 시합중 ${c.playing?'있음':'없음'} · 대기1 ${c.wait1?'있음':'없음'} · 추가대기 ${(c.queue||[]).length}경기`;
+  $('prelimStatusAction').value=c.isPaused?'resume':'pause-keep';
+  $('prelimStatusReason').value=c.pauseReason||'';
+  $('prelimCourtStatusDialog').showModal();
+}
+function confirmPrelimCourtStatus(event){
+  event.preventDefault();
+  const id=$('prelimStatusCourtId').value,action=$('prelimStatusAction').value;
+  if(action==='resume'){const c=resumePrelimCourt(state,id);commit(`예선 코트 사용 재개 · ${c.name}`);prelimNotice(`${c.name} 사용을 재개했습니다.`,'success');}
+  else{const r=pausePrelimCourt(state,{courtId:id,reason:$('prelimStatusReason').value,evacuateWait:action!=='pause-keep',evacuateAll:action==='pause-evacuate-all'});commit(`예선 코트 사용중지 · ${r.court.name}`);prelimNotice(`${r.court.name}을 사용중지하고 ${r.evacuated}경기를 대피했습니다.`,'success');}
+  $('prelimCourtStatusDialog').close();
 }
 
 function bind(){
@@ -737,7 +790,7 @@ function bind(){
   $('resetPrelimBtn').onclick=resetPrelimOnly;
   $('useQualifiersForDrawBtn').onclick=()=>{try{useQualifiersForDraw();}catch(e){prelimNotice(e.message,'error');}};
   $('exportJsonBtn').onclick=()=>downloadJson(`230match-v3-${Date.now()}.json`,state);
-  $('saveRecoveryBtn').onclick=()=>{const item=saveRecovery(state,`${state.tournament.name} · ${state.tournament.division}`);log(`복구점 저장 · ${item.label}`);saveState(state);render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue});notice('복구점을 저장했습니다.','success');};
+  $('saveRecoveryBtn').onclick=()=>{const item=saveRecovery(state,`${state.tournament.name} · ${state.tournament.division}`);log(`복구점 저장 · ${item.label}`);saveState(state);render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus});notice('복구점을 저장했습니다.','success');};
   $('openRecoveryBtn').onclick=showRecoveries;$('closeRecoveryBtn').onclick=()=>$('recoveryDialog').close();
   $('clearLogsBtn').onclick=()=>{state.logs=[];commit();};
   if($('quickAuditBtn'))$('quickAuditBtn').onclick=()=>executeAuditAction(runAllAudit,'전체 운영 점검');
@@ -754,6 +807,8 @@ function bind(){
   if($('confirmCourtTransferBtn'))$('confirmCourtTransferBtn').onclick=confirmCourtTransfer;
   if($('confirmCourtStatusBtn'))$('confirmCourtStatusBtn').onclick=confirmCourtStatus;
   if($('confirmManualQueueAssignBtn'))$('confirmManualQueueAssignBtn').onclick=confirmManualQueueAssign;
+  if($('confirmPrelimMoveBtn'))$('confirmPrelimMoveBtn').onclick=confirmPrelimMove;
+  if($('confirmPrelimCourtStatusBtn'))$('confirmPrelimCourtStatusBtn').onclick=confirmPrelimCourtStatus;
   if($('courtStatusAction'))$('courtStatusAction').onchange=()=>{$('courtStatusReason').disabled=$('courtStatusAction').value==='resume';};
   if($('generateTimeMessagesBtn'))$('generateTimeMessagesBtn').onclick=createAllTimeMessages;
   if($('generateCurrentCourtMessagesBtn'))$('generateCurrentCourtMessagesBtn').onclick=createCurrentCourtMessages;
@@ -761,10 +816,10 @@ function bind(){
   if($('generateAllTimeMessagesBtn'))$('generateAllTimeMessagesBtn').onclick=createAllTimeMessages;
   if($('markAllMessagesSentBtn'))$('markAllMessagesSentBtn').onclick=()=>{markAllSent(state);commit('모든 대기 문자를 발송완료로 표시');};
   if($('clearSentMessagesBtn'))$('clearSentMessagesBtn').onclick=()=>{clearSentMessages(state);commit('발송완료 문자 정리');};if($('mergeDuplicateMessagesBtn'))$('mergeDuplicateMessagesBtn').onclick=mergeDuplicates;if($('closeMessageHistoryBtn'))$('closeMessageHistoryBtn').onclick=()=>$('messageHistoryDialog').close();
-  if($('messageStatusFilter'))$('messageStatusFilter').onchange=()=>render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue});
+  if($('messageStatusFilter'))$('messageStatusFilter').onchange=()=>render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus});
 
-  if($('rosterSearch'))$('rosterSearch').oninput=()=>render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue});
-  if($('rosterPhoneFilter'))$('rosterPhoneFilter').onchange=()=>render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue});
+  if($('rosterSearch'))$('rosterSearch').oninput=()=>render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus});
+  if($('rosterPhoneFilter'))$('rosterPhoneFilter').onchange=()=>render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus});
   if($('contactEditPhone'))$('contactEditPhone').oninput=validateContactInput;
   if($('saveContactBtn'))$('saveContactBtn').onclick=saveContact;
   if($('refreshMessagePhonesBtn'))$('refreshMessagePhonesBtn').onclick=reconnectMessagePhones;
@@ -810,5 +865,5 @@ document.addEventListener('click',event=>{
   if(reserve){event.preventDefault();event.stopPropagation();selectReserveSwap(reserve.dataset.reservePick);}
 },{capture:true});
 
-syncInputs();syncPrelimInputs();bind();renderVenueSettingsEditor();calculateTimeMetrics(state);render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue});restartTimeTimer();updateClock();setInterval(updateClock,1000);
-console.log('[230MATCH V3] stage21 venue-settings-unified loaded · no legacy code · no Firebase writes');
+syncInputs();syncPrelimInputs();bind();renderVenueSettingsEditor();calculateTimeMetrics(state);render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus});restartTimeTimer();updateClock();setInterval(updateClock,1000);
+console.log('[230MATCH V3] stage23 prelim-court-status loaded · no legacy code · no Firebase writes');
