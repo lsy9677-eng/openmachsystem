@@ -38,40 +38,15 @@ function compactNameParts(raw=''){
     return{name,club:clubs[0]||''};
   }).filter(x=>x.name);
 }
-function duplicatePlayerNames(state){
-  const counts=new Map();
-  const seenTeams=new Set();
-  const teams=[];
-  const addTeam=t=>{
-    if(!t||t.placeholder)return;
-    const key=t.id||t.name||teamText(t);
-    if(seenTeams.has(key))return;
-    seenTeams.add(key);teams.push(t);
-  };
-  (state.teams||[]).forEach(addTeam);
-  (state.prelim?.activeTeams||[]).forEach(addTeam);
-  (state.prelim?.reserveTeams||[]).forEach(addTeam);
-  Object.values(state.draw?.rounds||{}).flat().forEach(m=>{addTeam(m.teamA);addTeam(m.teamB);});
-  teams.forEach(t=>compactNameParts(teamText(t)).forEach(x=>counts.set(x.name,(counts.get(x.name)||0)+1)));
-  return counts;
-}
 function operationalTeamHtml(team,state){
   if(!team)return'TBD';
   if(team.placeholder)return`<span class="placeholder-team">${team.name}</span>`;
-  const dup=duplicatePlayerNames(state);
-  return compactNameParts(teamText(team)).map(x=>{
-    const tag=(dup.get(x.name)||0)>1&&x.club?` <span class="compact-club-tag">${x.club.slice(0,2)}</span>`:'';
-    return`${x.name}${tag}`;
-  }).join(' / ')||teamText(team);
+  return compactNameParts(teamText(team)).map(x=>x.name).join(' / ')||teamText(team);
 }
 function operationalTeamText(team,state){
   if(!team)return'TBD';
   if(team.placeholder)return team.name;
-  const dup=duplicatePlayerNames(state);
-  return compactNameParts(teamText(team)).map(x=>{
-    const tag=(dup.get(x.name)||0)>1&&x.club?` [${x.club.slice(0,2)}]`:'';
-    return`${x.name}${tag}`;
-  }).join(' / ')||teamText(team);
+  return compactNameParts(teamText(team)).map(x=>x.name).join(' / ')||teamText(team);
 }
 
 function renderCourts(state,handlers){

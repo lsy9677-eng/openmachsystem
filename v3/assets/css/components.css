@@ -166,14 +166,3 @@ input,select{width:100%;border:1px solid #b9cae5;border-radius:10px;padding:11px
   pointer-events:none;
 }
 
-.compact-club-tag{
-  display:inline-flex;
-  margin-left:3px;
-  padding:1px 5px;
-  border-radius:999px;
-  background:#e8eef8;
-  color:#40536d;
-  font-size:9px;
-  font-weight:850;
-  vertical-align:middle;
-}
