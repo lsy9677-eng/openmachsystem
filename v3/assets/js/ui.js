@@ -31,12 +31,12 @@ function currentRound(state){
 }
 
 function compactNameParts(raw=''){
-  return String(raw).split('/').map(part=>{
-    const text=part.trim();
-    const clubs=[...text.matchAll(/\(([^)]*)\)/g)].map(m=>m[1].trim()).filter(Boolean);
-    const name=text.replace(/\([^)]*\)/g,'').replace(/\s{2,}/g,' ').trim();
-    return{name,club:clubs[0]||''};
-  }).filter(x=>x.name);
+  const cleaned=String(raw)
+    .replace(/\([^)]*\)/g,'')
+    .replace(/\[[^\]]*\]/g,'')
+    .replace(/\s{2,}/g,' ')
+    .trim();
+  return cleaned.split('/').map(part=>({name:part.trim(),club:''})).filter(x=>x.name);
 }
 function operationalTeamHtml(team,state){
   if(!team)return'TBD';
@@ -281,7 +281,7 @@ function renderPrelim(state,handlers){
       ${matches.map(m=>{const statusLabel=({playing:'시합중',court_wait1:'대기1',queued:'추가대기',waiting_dependency:'첫 경기 결과 대기',waiting_previous:'이전 경기 완료 대기',completed:'완료'})[m.status]||'대기';const canInput=m.status==='playing'||m.status==='completed';return`<div class="prelim-match"><div class="prelim-match-top"><span>${m.matchNo}경기</span><span>${m.court||'-'} · ${statusLabel}</span></div>
       <b>${operationalTeamText(m.teamA,state)} vs ${operationalTeamText(m.teamB,state)}</b>
       <span class="prelim-match-dependency">${m.sequenceLabel||''}</span>
-      <em>${m.status==='completed'?`${m.scoreA}:${m.scoreB} · 승리 ${teamText(m.winner)}`:(m.status==='waiting_dependency'||m.status==='waiting_previous'?'상대팀 확정 대기':'결과 미입력')}</em>
+      <em>${m.status==='completed'?`${m.scoreA}:${m.scoreB} · 승리 ${operationalTeamText(m.winner,state)}`:(m.status==='waiting_dependency'||m.status==='waiting_previous'?'상대팀 확정 대기':'결과 미입력')}</em>
       ${canInput?`<button class="btn btn-secondary" data-prelim-result="${m.id}">${m.status==='completed'?'결과 수정':'결과 입력'}</button>`:''}</div>`}).join('')}
       </div></article>`;
   }).join('');
