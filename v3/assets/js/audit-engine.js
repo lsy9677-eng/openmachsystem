@@ -3,6 +3,7 @@ import{allMatches,findMatch}from'./bracket-engine.js';
 import{buildCourts,assignInitial,refillCourt,queueReadyMatches}from'./court-engine.js';
 import{submitResult}from'./result-engine.js';
 import{assignPrelimCourts,submitPrelimResult}from'./prelim-engine.js';
+import{earlyMainStats}from'./early-main-engine.js';
 
 const clone=v=>typeof structuredClone==='function'?structuredClone(v):JSON.parse(JSON.stringify(v));
 const result=(level,code,title,detail,meta={})=>({level,code,title,detail,meta});
@@ -26,6 +27,17 @@ function currentQueueIds(state){
     ...Object.values(state.venueQueues||{}).flat()
   ];
 }
+
+function auditEarlyMain(state,out){
+  if(!state.draw?.size){
+    out.push(result('warn','EARLY_MAIN_NONE','조기 본선 대진 없음','예선 슬롯 본선 선추첨 전 상태입니다.'));
+    return;
+  }
+  const stats=earlyMainStats(state);
+  out.push(result('pass','EARLY_MAIN_STATUS','예선·본선 동시 운영 상태',
+    `확정 ${stats.resolved}경기 · 미확정 ${stats.pending}경기 · 신규 배정 가능 ${stats.assignable}경기`));
+}
+
 function auditDraw(state,out){
   const matches=allMatches(state.draw);
   if(!state.draw?.size){
@@ -147,12 +159,18 @@ function auditPrelim(state,out){
   out.push(!missing.length
     ?result('pass','PRELIM_QUEUE_MATCH_EXISTS','예선 큐 경기 참조 정상','모든 예선 큐 항목이 실제 경기를 가리킵니다.')
     :result('fail','PRELIM_QUEUE_MATCH_EXISTS','존재하지 않는 예선 큐 경기',missing.join(', ')));
+
+  const locked=state.prelim?.lock?.locked===true;
+  const allCompleted=state.prelim.matches.every(m=>m.status==='completed');
+  out.push(!locked||allCompleted
+    ?result(locked?'pass':'warn','PRELIM_LOCK','예선 잠금 상태',locked?'예선 결과가 최종확정되어 잠겨 있습니다.':'예선이 아직 잠기지 않았습니다.')
+    :result('fail','PRELIM_LOCK','예선 잠금 오류','미완료 경기가 있는데 예선이 잠겨 있습니다.'));
 }
 
 export function runStateAudit(state){
   ensureAuditState(state);
   const out=[];
-  auditPrelim(state,out);auditDraw(state,out);auditCourtStatus(state,out);auditQueues(state,out);auditAdvancement(state,out);auditMessages(state,out);
+  auditPrelim(state,out);auditEarlyMain(state,out);auditDraw(state,out);auditCourtStatus(state,out);auditQueues(state,out);auditAdvancement(state,out);auditMessages(state,out);
   const fails=out.filter(x=>x.level==='fail').length,warns=out.filter(x=>x.level==='warn').length;
   return{
     at:new Date().toISOString(),

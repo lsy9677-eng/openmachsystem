@@ -11,7 +11,40 @@ export function ensurePrelimState(state){
   if(!Array.isArray(state.prelim.activeTeams))state.prelim.activeTeams=[];
   if(!Array.isArray(state.prelim.reserveTeams))state.prelim.reserveTeams=[];
   if(!('activeTeamCount' in state.prelim.settings))state.prelim.settings.activeTeamCount=96;
+  if(!state.prelim.lock||typeof state.prelim.lock!=='object'){
+    state.prelim.lock={locked:false,lockedAt:null,lockedBy:'',snapshot:null};
+  }
 }
+
+export function isPrelimLocked(state){
+  ensurePrelimState(state);
+  return state.prelim.lock?.locked===true;
+}
+export function lockPrelim(state,{lockedBy='관리자'}={}){
+  ensurePrelimState(state);
+  if(!state.prelim.groups.length)throw new Error('예선 조편성이 없습니다.');
+  const incomplete=state.prelim.matches.filter(m=>m.status!=='completed');
+  if(incomplete.length)throw new Error(`미완료 예선 경기 ${incomplete.length}경기가 남아 있습니다.`);
+  const unranked=state.prelim.groups.filter(g=>!Array.isArray(g.standings)||g.standings.length!==g.size);
+  if(unranked.length)throw new Error(`순위가 확정되지 않은 조가 ${unranked.length}개 있습니다.`);
+  state.prelim.lock={
+    locked:true,
+    lockedAt:new Date().toISOString(),
+    lockedBy,
+    snapshot:{
+      qualifiers:clone(state.prelim.qualifiers),
+      standings:state.prelim.groups.map(g=>({groupNo:g.groupNo,standings:clone(g.standings)})),
+      completedMatches:state.prelim.matches.length
+    }
+  };
+  return state.prelim.lock;
+}
+export function unlockPrelim(state){
+  ensurePrelimState(state);
+  state.prelim.lock={locked:false,lockedAt:null,lockedBy:'',snapshot:null};
+  return state.prelim.lock;
+}
+
 export function generatePrelim(state,settings){
   ensurePrelimState(state);
   const activeCount=Math.max(2,Number(settings.activeTeamCount)||state.teams.length);
@@ -224,4 +257,5 @@ export function resetPrelim(state){
   state.prelim.activeTeams=[];state.prelim.reserveTeams=[];
   state.prelim.groups=[];state.prelim.matches=[];state.prelim.courts=[];state.prelim.qualifiers=[];
   state.prelim.linkedDraw={active:false,drawSize:0,slots:[],createdAt:null,lastSyncedAt:null};
+  state.prelim.lock={locked:false,lockedAt:null,lockedBy:'',snapshot:null};
 }

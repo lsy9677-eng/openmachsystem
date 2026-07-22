@@ -4,11 +4,20 @@ import{timeInfo}from'./time-engine.js';
 import{contactStats,getTeamContact}from'./contact-engine.js';
 import{venueStats,totalVenueQueueCount}from'./venue-engine.js';
 import{availableCourtSlots}from'./manual-court-engine.js';
+import{earlyMainStats}from'./early-main-engine.js';
 export function teamText(team){
   if(!team)return'TBD';
   if(team.placeholder)return`${team.name}`;
   return `${team.name}${team.affiliation?`(${team.affiliation})`:''}`;
 }
+
+function renderEarlyMainStatus(state){
+  const stats=earlyMainStats(state);
+  setText('earlyMainReadyCount',stats.resolved);
+  setText('earlyMainPendingCount',stats.pending);
+  setText('earlyMainAssignableCount',stats.assignable);
+}
+
 export function render(state,handlers){
   const matches=allMatches(state.draw);
   const completed=matches.filter(m=>m.status==='completed').length;
@@ -246,6 +255,24 @@ function renderPrelimCourtOperation(state,handlers){
   root.querySelectorAll('[data-prelim-move]').forEach(b=>b.onclick=()=>handlers.openPrelimMove(b.dataset.sourceCourt,b.dataset.prelimMove));
   root.querySelectorAll('[data-prelim-wait-return]').forEach(b=>b.onclick=()=>handlers.returnPrelimWait1(b.dataset.prelimWaitReturn));
   root.querySelectorAll('[data-prelim-court-status]').forEach(b=>b.onclick=()=>handlers.openPrelimCourtStatus(b.dataset.prelimCourtStatus));
+}
+
+
+function renderPrelimLockStatus(state){
+  const lock=state.prelim?.lock||{locked:false};
+  const root=document.getElementById('prelimLockStatus');
+  const lockBtn=document.getElementById('lockPrelimBtn');
+  const unlockBtn=document.getElementById('unlockPrelimBtn');
+  if(root){
+    root.className=`prelim-lock-status ${lock.locked?'locked':'unlocked'}`;
+    root.innerHTML=lock.locked
+      ?`<strong>🔒 예선 최종확정·잠금</strong><span>${lock.lockedAt?new Date(lock.lockedAt).toLocaleString('ko-KR'):''} · 결과·조편성·후보교체 보호중</span>`
+      :'<strong>🔓 예선 잠금 해제 상태</strong><span>결과 입력·조편성·후보교체가 가능합니다.</span>';
+  }
+  if(lockBtn)lockBtn.disabled=lock.locked;
+  if(unlockBtn)unlockBtn.disabled=!lock.locked;
+  const view=document.getElementById('view-prelim');
+  if(view)view.classList.toggle('prelim-locked-overlay',lock.locked);
 }
 
 function renderPrelim(state,handlers){

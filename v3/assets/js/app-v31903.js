@@ -11,6 +11,7 @@ import{ensureMessagingState,generatePlayingMessages,generateWait1Messages,genera
 import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactData,importContactData}from'./contact-engine.js';
 import{render,teamText}from'./ui.js';
 import{ensureAuditState,runStateAudit,runPrelimSimulation,runFullSimulation,applyAuditResult}from'./audit-engine.js';
+import{earlyMainStats,markResolvedMainMatchesReady,canAssignEarlyMain}from'./early-main-engine.js';
 import{ensureVenueSettings,ensureVenueQueues,venuePreset,buildVenueCourts,prelimVenues,mainVenues}from'./venue-engine.js';
 import{moveQueueItem,reorderQueueItem}from'./queue-control-engine.js';
 import{availableCourtSlots,assignQueueMatchToCourt,returnWait1ToVenueQueue}from'./manual-court-engine.js';
@@ -162,11 +163,27 @@ function confirmDrawUnlock(event){
 }
 
 function assign(){
-  pullSettings();if(!state.draw.size)throw new Error('먼저 대진을 생성하세요.');
-  ensureVenueSettings(state);state.courts=buildVenueCourts(mainVenues(state));
-  state.sharedQueue=assignInitial(state.draw,state.courts,state);if(state.messaging.settings.autoMessageEnabled&&state.messaging.settings.onCourtAssign)generateCurrentCourtMessages(state);
-  const venueSummary=(state.settings.venues||[]).map(v=>`${v.name} ${state.courts.filter(c=>c.venueId===v.id).length}면`).join(' · ');
-  commit(`본선 상하중간 균등 코트배정 · ${venueSummary}`);notice('본선 경기를 상단·하단·중앙 순서로 균등 배정했습니다.','success');
+  pullSettings();
+  if(!state.draw.size)throw new Error('먼저 예선 슬롯으로 본선 대진을 생성하세요.');
+  markResolvedMainMatchesReady(state);
+  const check=canAssignEarlyMain(state);
+  const hasExistingCourts=Array.isArray(state.courts)&&state.courts.length>0;
+  if(!hasExistingCourts){
+    if(!check.ok)throw new Error(check.reason);
+    ensureVenueSettings(state);
+    state.courts=buildVenueCourts(mainVenues(state));
+    state.sharedQueue=assignInitial(state.draw,state.courts,state);
+  }else{
+    const before=earlyMainStats(state);
+    queueReadyMatches(state,id=>findMatch(state.draw,id));
+    state.courts.forEach(c=>refillCourt(state,c,id=>findMatch(state.draw,id)));
+    const after=earlyMainStats(state);
+    if(before.assignable===after.assignable&&before.assignable===0)throw new Error('현재 새로 배정할 확정 본선 경기가 없습니다.');
+  }
+  if(state.messaging.settings.autoMessageEnabled&&state.messaging.settings.onCourtAssign)generateCurrentCourtMessages(state);
+  const stats=earlyMainStats(state);
+  commit(`확정 본선경기 조기 코트배정 · 확정 ${stats.resolved} · 미확정 ${stats.pending} · 대기중 신규 ${stats.assignable}`);
+  notice('양쪽 참가팀이 확정된 본선 경기만 코트와 대기열에 반영했습니다.','success');
 }
 function openResult(matchId){
   const m=findMatch(state.draw,matchId);if(!m)return;
@@ -219,7 +236,13 @@ function autoFitPrelim(){
 }
 let pendingActiveSwapId=null;
 let reserveSwapMode=false;
+
+function assertPrelimUnlocked(action='이 작업'){
+  if(isPrelimLocked(state))throw new Error(`예선이 최종확정·잠금 상태라 ${action}을 할 수 없습니다.`);
+}
+
 function selectActiveSwap(teamId){
+  try{assertPrelimUnlocked('후보교체');}catch(e){prelimNotice(e.message,'error');return;}
   reserveSwapMode=true;
   pendingActiveSwapId=teamId;
   state.prelim.swapSelection={activeTeamId:teamId};
@@ -228,6 +251,7 @@ function selectActiveSwap(teamId){
   commit();
 }
 function selectReserveSwap(teamId){
+  try{assertPrelimUnlocked('후보교체');}catch(e){prelimNotice(e.message,'error');return;}
   if(!pendingActiveSwapId){prelimNotice('먼저 예선 참가팀에서 교체 버튼을 누르세요.','error');return;}
   try{
     const result=swapActiveReserveTeam(state,pendingActiveSwapId,teamId);
@@ -239,12 +263,14 @@ function selectReserveSwap(teamId){
 }
 
 function createPrelim(){
+  assertPrelimUnlocked('조편성 생성');
   pullPrelimSettings();
   const result=generatePrelim(state,state.prelim.settings);
   commit(`예선 조편성 생성 · ${result.groups}조 · ${result.matches}경기 · ${result.teams}팀`);
   prelimNotice(`${result.groups}개 조와 ${result.matches}경기를 생성했습니다.`,'success');
 }
 function assignPrelim(){
+  assertPrelimUnlocked('코트배정');
   pullPrelimSettings();
   const courts=assignPrelimCourts(state);
   const venueSummary=prelimVenues(state).map(v=>`${v.name} ${v.courtCount}면`).join(' + ');
@@ -252,6 +278,7 @@ function assignPrelim(){
   prelimNotice(`예선 구장 ${venueSummary}에 1조부터 순서대로 배정하고 시합중·대기1·추가대기를 구성했습니다.`,'success');
 }
 function openPrelimResult(matchId){
+  try{assertPrelimUnlocked('결과 입력');}catch(e){prelimNotice(e.message,'error');return;}
   const m=findPrelimMatch(state,matchId);if(!m)return;
   $('prelimResultMatchId').value=matchId;
   $('prelimResultMatchLabel').textContent=`${teamText(m.teamA)} vs ${teamText(m.teamB)}`;
@@ -263,11 +290,13 @@ function confirmPrelimResult(event){
   event.preventDefault();
   const m=submitPrelimResult(state,{matchId:$('prelimResultMatchId').value,winnerId:$('prelimWinnerSelect').value,scoreA:$('prelimScoreA').value,scoreB:$('prelimScoreB').value});
   const syncResult=syncLinkedDraw({silent:true});
-  commit(`예선 결과 확정 · ${m.id} · 승리 ${teamText(m.winner)} · ${m.scoreA}:${m.scoreB}${syncResult.changes.length?` · 본선 자동반영 ${syncResult.changes.length}팀`:''}`);
+  const newlyReady=markResolvedMainMatchesReady(state);
+  commit(`예선 결과 확정 · ${m.id} · 승리 ${teamText(m.winner)} · ${m.scoreA}:${m.scoreB}${syncResult.changes.length?` · 본선 자동반영 ${syncResult.changes.length}팀`:''}${newlyReady?` · 신규 진행가능 ${newlyReady}경기`:''}`);
   $('prelimResultDialog').close();
   prelimNotice('예선 순위와 진출팀을 다시 계산했습니다.','success');
 }
 function resetPrelimOnly(){
+  try{assertPrelimUnlocked('예선 초기화');}catch(e){prelimNotice(e.message,'error');return;}
   if(!confirm('예선 조편성·결과·순위를 모두 초기화할까요?'))return;
   resetPrelim(state);commit('예선만 초기화');prelimNotice('예선 데이터를 초기화했습니다.','info');
 }
@@ -280,6 +309,22 @@ function useQualifiersForDraw(){
   document.querySelector('[data-view="operation"]').click();
 }
 
+
+
+function finalizeAndLockPrelim(){
+  const lock=lockPrelim(state,{lockedBy:'관리자'});
+  const syncResult=syncLinkedDraw({silent:true});
+  commit(`예선 최종확정·잠금 · ${state.prelim.matches.length}경기 · 진출 ${state.prelim.qualifiers.length}팀${syncResult.changes.length?` · 본선 반영 ${syncResult.changes.length}팀`:''}`);
+  prelimNotice(`예선 결과를 최종확정하고 잠갔습니다. 진출팀 ${state.prelim.qualifiers.length}팀이 보호됩니다.`,'success');
+}
+function adminUnlockPrelim(){
+  if(!isPrelimLocked(state)){prelimNotice('예선은 이미 잠금 해제 상태입니다.','info');return;}
+  const phrase=prompt('잠금 해제를 위해 "예선잠금해제"를 입력하세요.');
+  if(phrase!=='예선잠금해제'){prelimNotice('잠금 해제를 취소했습니다.','info');return;}
+  unlockPrelim(state);
+  commit('관리자 예선 잠금 해제');
+  prelimNotice('예선 잠금을 해제했습니다. 결과 수정 후 다시 최종확정하세요.','error');
+}
 
 function createLinkedDraw(){
   pullPrelimSettings();
@@ -310,6 +355,7 @@ function createLinkedDraw(){
   };
   const result=syncLinkedDrawQualifiers(state.draw,state.prelim.qualifiers,{protectStarted:true});
   applyLinkedSyncResult(result);
+  result.newlyReady=markResolvedMainMatchesReady(state);
   commit(`예선 슬롯 본선 선추첨 · ${slots.length}슬롯 · ${state.settings.drawSize}강`);
   prelimNotice('예선 조 순위 슬롯으로 본선 대진을 먼저 생성했습니다.','success');
 }
@@ -801,6 +847,8 @@ function bind(){
   };
   $('generateLinkedDrawBtn').onclick=()=>{try{createLinkedDraw();}catch(e){prelimNotice(e.message,'error');}};
   $('syncLinkedDrawBtn').onclick=()=>{try{syncLinkedDraw();}catch(e){prelimNotice(e.message,'error');}};
+  if($('lockPrelimBtn'))$('lockPrelimBtn').onclick=()=>{try{finalizeAndLockPrelim();}catch(e){prelimNotice(e.message,'error');}};
+  if($('unlockPrelimBtn'))$('unlockPrelimBtn').onclick=adminUnlockPrelim;
   $('confirmPrelimResultBtn').onclick=confirmPrelimResult;
   $('resetPrelimBtn').onclick=resetPrelimOnly;
   $('useQualifiersForDrawBtn').onclick=()=>{try{useQualifiersForDraw();}catch(e){prelimNotice(e.message,'error');}};
@@ -882,4 +930,4 @@ document.addEventListener('click',event=>{
 },{capture:true});
 
 syncInputs();syncPrelimInputs();bind();renderVenueSettingsEditor();calculateTimeMetrics(state);render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus});restartTimeTimer();updateClock();setInterval(updateClock,1000);
-console.log('[230MATCH V3] stage25 prelim-audit-simulation loaded · no legacy code · no Firebase writes');
+console.log('[230MATCH V3] stage27 early-main-operation loaded · no legacy code · no Firebase writes');

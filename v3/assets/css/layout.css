@@ -451,3 +451,66 @@ body.bracket-fullscreen-open #bracketBoard{
 .prelim-court-card.paused>header{background:#8a5d00}
 .prelim-court-status-actions{display:flex;gap:6px;padding:9px 11px;border-top:1px solid #e0e8f3;background:#fafcff}
 .prelim-court-pause-reason{padding:7px 10px;background:#fff0c7;color:#765000;font-size:11px;font-weight:850}
+
+.prelim-lock-status{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  align-items:center;
+  margin-top:10px;
+  padding:11px 13px;
+  border-radius:10px;
+  border:1px solid #cbd8eb;
+  background:#f5f8fc;
+}
+.prelim-lock-status strong{font-size:13px}
+.prelim-lock-status span{font-size:12px;color:#526079}
+.prelim-lock-status.locked{
+  border-color:#d7ad38;
+  background:#fff7d8;
+}
+.prelim-lock-status.locked strong{color:#805b00}
+.prelim-locked-overlay{
+  position:relative;
+}
+.prelim-locked-overlay::after{
+  content:"예선 잠금";
+  position:absolute;
+  top:10px;
+  right:10px;
+  padding:4px 8px;
+  border-radius:999px;
+  background:#8a6400;
+  color:#fff;
+  font-size:10px;
+  font-weight:900;
+  z-index:3;
+}
+
+.early-main-status{
+  display:grid;
+  gap:10px;
+  margin-top:10px;
+  padding:12px 13px;
+  border:1px solid #b9cae3;
+  border-radius:11px;
+  background:#f3f7fd;
+}
+.early-main-status>div:first-child{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  align-items:center;
+}
+.early-main-status strong{font-size:13px;color:#234d87}
+.early-main-status span{font-size:12px;color:#526079}
+.early-main-metrics{display:flex;gap:8px;flex-wrap:wrap}
+.early-main-metrics span{
+  padding:5px 8px;
+  border-radius:999px;
+  background:#e7eef8;
+  color:#40536d;
+  font-size:10px;
+  font-weight:800;
+}
+.early-main-metrics b{color:#173d70}

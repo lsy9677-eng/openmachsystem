@@ -29,9 +29,9 @@
   <main class="app-shell">
     <section class="hero panel">
       <div>
-        <p class="eyebrow">STAGE 25 · PRELIM AUDIT SIMULATION</p>
-        <h1>예선 복제 모의운영·자동점검</h1>
-        <p>예선 3팀조 동적 경기순서와 코트 자동승계를 복제 상태에서 끝까지 실행해 실제 운영 전 오류를 점검합니다.</p>
+        <p class="eyebrow">STAGE 27 · EARLY MAIN OPERATION</p>
+        <h1>예선 진행중 본선 선추첨·확정경기 조기운영</h1>
+        <p>예선 진행 중에도 본선 슬롯을 미리 추첨하고, 양쪽 참가팀이 확정된 본선 경기부터 코트에 배정해 조기 진행할 수 있습니다.</p>
       </div>
       <div class="hero-stats">
         <div><span>대진</span><strong id="heroDrawSize">-</strong></div>
@@ -133,12 +133,20 @@
           <button id="reshuffleDrawBtn" class="btn btn-secondary">현재 방식으로 재추첨</button>
           <button id="lockDrawBtn" class="btn btn-gold">본선 대진 잠금</button>
           <button id="unlockDrawBtn" class="btn btn-danger-outline">관리자 잠금 해제</button>
-          <button id="assignCourtsBtn" class="btn btn-purple">본선 코트배정</button>
+          <button id="assignCourtsBtn" class="btn btn-purple">확정 본선경기 코트배정</button>
           <button id="quickAuditBtn" class="btn btn-secondary">운영 상태 점검</button>
           <button id="resetBtn" class="btn btn-danger-outline">전체 초기화</button>
         </div>
 
         <div id="noticeBar" class="notice info">명단을 불러온 뒤 원하는 추첨 버튼을 직접 누르세요.</div>
+        <div id="earlyMainStatus" class="early-main-status">
+          <div><strong>예선·본선 동시 운영</strong><span>예선 순위가 확정된 본선 경기만 코트배정됩니다.</span></div>
+          <div class="early-main-metrics">
+            <span>확정 경기 <b id="earlyMainReadyCount">0</b></span>
+            <span>미확정 경기 <b id="earlyMainPendingCount">0</b></span>
+            <span>진행 가능 <b id="earlyMainAssignableCount">0</b></span>
+          </div>
+        </div>
         <div id="drawLockInfo" class="draw-lock-info unlocked">
           <strong>본선 대진 잠금 해제 상태</strong>
           <span>추첨과 재추첨이 가능합니다. 대진 검토가 끝난 뒤 잠그세요.</span>
@@ -248,10 +256,16 @@
           <button id="assignPrelimCourtsBtn" class="btn btn-purple">예선 코트배정</button>
           <button id="generateLinkedDrawBtn" class="btn btn-gold">예선 슬롯으로 본선 선추첨</button>
           <button id="syncLinkedDrawBtn" class="btn btn-secondary">확정팀 본선 자동 반영</button>
+          <button id="lockPrelimBtn" class="btn btn-gold">예선 종료 후 최종잠금</button>
+          <button id="unlockPrelimBtn" class="btn btn-danger-outline">관리자 잠금 해제</button>
           <button id="resetPrelimBtn" class="btn btn-danger-outline">예선만 초기화</button>
         </div>
 
         <div id="prelimNoticeBar" class="notice info">통합 운영 탭에서 명단을 먼저 불러오세요.</div>
+        <div id="prelimLockStatus" class="prelim-lock-status unlocked">
+          <strong>예선 잠금 해제 상태</strong>
+          <span>결과 입력·조편성·후보교체가 가능합니다.</span>
+        </div>
         <div class="notice info prelim-order-rule">
           <strong>3팀조 경기순서:</strong> ① 1번팀 vs 2번팀 → ② 첫 경기 승자 vs 3번팀 → ③ 첫 경기 패자 vs 3번팀.
           한 코트에 여러 조가 배정되면 각 조의 같은 순번 경기를 번갈아 진행합니다.
@@ -324,7 +338,7 @@
             <h2>예선 조별 현황</h2>
             <p>결과를 입력하면 승수·득실·득점 기준으로 순위를 다시 계산합니다.</p>
           </div>
-          <button id="useQualifiersForDrawBtn" class="btn btn-light">확정팀만 본선 명단으로 복사</button>
+          <button id="useQualifiersForDrawBtn" class="btn btn-light">예선 종료팀을 본선 명단으로 복사</button>
         </div>
         <div id="prelimGroupGrid" class="prelim-group-grid empty-state">
           <p>예선 조편성을 생성하면 조별 카드가 표시됩니다.</p>
@@ -786,6 +800,6 @@
     <div id="recoveryList" class="recovery-list"></div>
   </dialog>
 
-  <script type="module" src="./assets/js/app-v32500.js?v=32500"></script>
+  <script type="module" src="./assets/js/app-v32700.js?v=32700"></script>
 </body>
 </html>
