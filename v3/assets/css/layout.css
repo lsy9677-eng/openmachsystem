@@ -525,3 +525,7 @@ body.bracket-fullscreen-open #bracketBoard{
 
 .compact-actions{display:flex;gap:8px;flex-wrap:wrap}
 #operationMainReadyList{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
+
+.unified-prelim-setup{scroll-margin-top:90px}
+.single-screen-render-sources{display:none!important}
+#view-operation>.summary-grid{margin-top:14px}

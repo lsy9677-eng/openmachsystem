@@ -1,6 +1,17 @@
-# 230MATCH V3 — Stage 30.1 Null Guard Fix
+# 230MATCH V3 — Stage 31 Single Screen Operation
 
-수정:
-- 전체 통합 운영으로 제거된 구형 `courtGrid`, `sharedQueue`, `refreshQueueBtn` 참조를 안전 처리
-- `Cannot set properties of null (setting 'className')` 오류 수정
-- 전체 통합 운영·미확정 슬롯 보호 기능 유지
+변경:
+- 별도 `예선 설정` 탭 제거
+- 전체 통합 운영 화면에 다음 기능 결합
+  - 예선 사용팀·2팀조·3팀조 설정
+  - 예선 조편성 생성
+  - 예선 코트배정
+  - 예선 슬롯 본선 선추첨
+  - 확정팀 본선 자동 반영
+  - 후보팀 교체
+  - 예선 종료 후 최종잠금
+  - 예선·본선 통합 코트 현황
+  - 예선 조별 현황
+  - 본선 확정·미확정 현황
+- 본선 대진표는 상세 확인용 별도 탭 유지
+- 기존 렌더 엔진 호환을 위해 숨김 소스 영역을 유지
