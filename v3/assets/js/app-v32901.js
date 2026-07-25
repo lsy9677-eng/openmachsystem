@@ -811,6 +811,12 @@ function confirmPrelimCourtStatus(event){
   $('prelimCourtStatusDialog').close();
 }
 
+
+function openView(name){
+  const btn=document.querySelector(`[data-view="${name}"]`);
+  if(btn)btn.click();
+}
+
 function bind(){
   if($('bracketRoundFilter'))$('bracketRoundFilter').onchange=e=>updateBracketView('round',e.target.value);
   if($('bracketStatusFilter'))$('bracketStatusFilter').onchange=e=>updateBracketView('status',e.target.value);
@@ -865,6 +871,8 @@ function bind(){
   $('saveRecoveryBtn').onclick=()=>{const item=saveRecovery(state,`${state.tournament.name} · ${state.tournament.division}`);log(`복구점 저장 · ${item.label}`);saveState(state);render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus});notice('복구점을 저장했습니다.','success');};
   $('openRecoveryBtn').onclick=showRecoveries;$('closeRecoveryBtn').onclick=()=>$('recoveryDialog').close();
   $('clearLogsBtn').onclick=()=>{state.logs=[];commit();};
+  if($('operationGoPrelimSettingsBtn'))$('operationGoPrelimSettingsBtn').onclick=()=>openView('prelim');
+  if($('operationGoBracketBtn'))$('operationGoBracketBtn').onclick=()=>openView('bracket');
   if($('quickAuditBtn'))$('quickAuditBtn').onclick=()=>executeAuditAction(runAllAudit,'전체 운영 점검');
   if($('runStateAuditBtn'))$('runStateAuditBtn').onclick=()=>executeAuditAction(runCurrentAudit,'현재 상태 점검');
   if($('runPrelimSimulationBtn'))$('runPrelimSimulationBtn').onclick=()=>executeAuditAction(runPrelimSimulationAudit,'예선 복제 모의운영');
@@ -939,4 +947,4 @@ document.addEventListener('click',event=>{
 },{capture:true});
 
 syncInputs();syncPrelimInputs();bind();renderVenueSettingsEditor();calculateTimeMetrics(state);render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus});restartTimeTimer();updateClock();setInterval(updateClock,1000);
-console.log('[230MATCH V3] stage29 unified-court-operation loaded · no legacy code · no Firebase writes');
+console.log('[230MATCH V3] stage30 true-unified-operation loaded · no legacy code · no Firebase writes');

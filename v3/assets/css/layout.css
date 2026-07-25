@@ -522,3 +522,6 @@ body.bracket-fullscreen-open #bracketBoard{
 .match-type-chip.prelim{background:#dcecff;color:#194f91}
 .match-type-chip.main{background:#f0e1ff;color:#6c2cb5}
 .unified-court-guide{background:#edf7ff;border:1px solid #bdd8ee;color:#285674}
+
+.compact-actions{display:flex;gap:8px;flex-wrap:wrap}
+#operationMainReadyList{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}

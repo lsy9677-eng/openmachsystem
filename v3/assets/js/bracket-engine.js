@@ -78,9 +78,15 @@ export function generateDraw(teams,requestedSize){
   }
   rounds[size].forEach((m,i)=>{
     m.teamA=slots[i*2];m.teamB=slots[i*2+1];
-    if(m.teamA&&m.teamB)m.status='ready';
-    else if(m.teamA||m.teamB){
+    const aResolved=Boolean(m.teamA&&!m.teamA.placeholder);
+    const bResolved=Boolean(m.teamB&&!m.teamB.placeholder);
+    if(aResolved&&bResolved){
+      m.status='ready';
+    }else if((aResolved||bResolved)&&!(m.teamA?.placeholder||m.teamB?.placeholder)){
       m.winner=m.teamA||m.teamB;m.status='completed';m.bye=true;
+    }else{
+      m.status='waiting_slots';
+      m.winner=null;m.bye=false;
     }
   });
   propagateByes(rounds,size);
@@ -89,7 +95,7 @@ export function generateDraw(teams,requestedSize){
 export function propagateByes(rounds,size){
   for(let roundSize=size;roundSize>2;roundSize/=2){
     rounds[roundSize].forEach(m=>{
-      if(m.status==='completed'&&m.winner&&m.nextMatchId){
+      if(m.status==='completed'&&m.winner&&!m.winner.placeholder&&m.nextMatchId){
         const next=rounds[roundSize/2].find(x=>x.id===m.nextMatchId);
         if(m.nextSlot===1)next.teamA=m.winner;else next.teamB=m.winner;
         if(next.teamA&&next.teamB&&next.status!=='completed')next.status='ready';
@@ -121,8 +127,10 @@ export function syncLinkedDrawQualifiers(draw,qualifiers,{protectStarted=true}={
 
       match[slot]={...resolved,placeholder:false,placeholderKey:'',locked:false};
       changes.push({matchId:match.id,slot,placeholderKey:current.placeholderKey,teamId:resolved.id});
-      if(match.teamA&&match.teamB&&match.status!=='completed'){
-        match.status='ready';
+      const aResolved=Boolean(match.teamA&&!match.teamA.placeholder);
+      const bResolved=Boolean(match.teamB&&!match.teamB.placeholder);
+      if(match.status!=='completed'){
+        match.status=aResolved&&bResolved?'ready':'waiting_slots';
       }
     });
   });

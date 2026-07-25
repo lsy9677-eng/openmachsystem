@@ -33,7 +33,7 @@ export function render(state,handlers){
   setText('baseMatchMinutes',`${state.settings.matchMinutes||30}분`);setText('autoTimeStatus',state.settings.autoTimeEnabled?'ON':'OFF');
   setText('lastTimeCalculated',state.timeMetrics?.lastCalculatedAt?new Date(state.timeMetrics.lastCalculatedAt).toLocaleTimeString('ko-KR'):'-');
   setText('sharedQueueCount',`${totalVenueQueueCount(state)+(state.sharedQueue?.length||0)}경기`);
-  renderCourts(state,handlers);renderQueue(state,handlers);renderPrelim(state,handlers);renderBracket(state);renderDrawHistory(state);renderAudit(state);renderLogs(state);
+  renderCourts(state,handlers);renderQueue(state,handlers);renderPrelim(state,handlers);renderOperationUnified(state,handlers);renderBracket(state);renderDrawHistory(state);renderAudit(state);renderLogs(state);
 }
 function setText(id,value){const el=document.getElementById(id);if(el)el.textContent=value;}
 function currentRound(state){
@@ -227,12 +227,12 @@ function renderLogs(state){
   root.innerHTML=state.logs.length?state.logs.map(x=>`<article class="log-item"><time>${new Date(x.at).toLocaleString('ko-KR')}</time><p>${x.message}</p></article>`).join(''):'<div class="empty-state"><p>운영 로그가 없습니다.</p></div>';
 }
 
-function renderPrelimCourtOperation(state,handlers){
-  const root=document.getElementById('prelimCourtOperationGrid');
-  const count=document.getElementById('prelimCourtOperationCount');
-  if(!root||!count)return;
+function renderUnifiedCourtGrid(state,handlers,rootId,countId){
+  const root=document.getElementById(rootId);
+  const count=document.getElementById(countId);
+  if(!root)return;
   const courts=state.prelim?.courts||[];
-  count.textContent=`${courts.length}면`;
+  if(count)count.textContent=`${courts.length}면`;
   if(!courts.length){
     root.className='prelim-court-operation-grid empty-state';
     root.innerHTML='<p>예선 코트배정을 실행하면 통합 코트 운영 카드가 표시됩니다.</p>';
@@ -244,7 +244,7 @@ function renderPrelimCourtOperation(state,handlers){
     :x?`<span class="match-type-chip prelim">예선</span>${x.match.groupNo}조 · ${x.match.matchNo}경기`:'';
   const names=x=>x?`${operationalTeamText(x.match.teamA,state)} vs ${operationalTeamText(x.match.teamB,state)}`:'';
   root.className='prelim-court-operation-grid';
-  const guide='<div class="prelim-court-manual-guide unified-court-guide" style="grid-column:1/-1">같은 실제 코트에서 예선과 본선을 함께 진행합니다. 확정된 본선 경기는 예선 대기열의 빈자리에 자동으로 들어갑니다.</div>';
+  const guide='<div class="prelim-court-manual-guide unified-court-guide" style="grid-column:1/-1">예선과 본선을 같은 코트에서 함께 운영합니다. 실제 팀이 확정되지 않은 본선 경기는 코트배정하지 않습니다.</div>';
   root.innerHTML=guide+courts.map(c=>{
     const queue=Array.isArray(c.queue)?c.queue:[];
     const playing=item(c.playing),wait1=item(c.wait1);
@@ -261,6 +261,10 @@ function renderPrelimCourtOperation(state,handlers){
   root.querySelectorAll('[data-main-result]').forEach(b=>b.onclick=()=>handlers.openResult(b.dataset.mainResult));
   root.querySelectorAll('[data-prelim-court-status]').forEach(b=>b.onclick=()=>handlers.openPrelimCourtStatus(b.dataset.prelimCourtStatus));
 }
+function renderPrelimCourtOperation(state,handlers){
+  renderUnifiedCourtGrid(state,handlers,'prelimCourtOperationGrid','prelimCourtOperationCount');
+}
+
 
 function renderPrelimLockStatus(state){
   const lock=state.prelim?.lock||{locked:false};
@@ -277,6 +281,28 @@ function renderPrelimLockStatus(state){
   if(unlockBtn)unlockBtn.disabled=!lock.locked;
   const view=document.getElementById('view-prelim');
   if(view)view.classList.toggle('prelim-locked-overlay',lock.locked);
+}
+
+
+function renderOperationUnified(state,handlers){
+  renderUnifiedCourtGrid(state,handlers,'operationUnifiedCourtGrid','operationUnifiedCourtCount');
+  const opGroup=document.getElementById('operationPrelimGroupGrid');
+  const srcGroup=document.getElementById('prelimGroupGrid');
+  if(opGroup&&srcGroup){
+    opGroup.className=srcGroup.className;
+    opGroup.innerHTML=srcGroup.innerHTML;
+    opGroup.querySelectorAll('[data-prelim-result]').forEach(b=>b.onclick=()=>handlers.openPrelimResult(b.dataset.prelimResult));
+  }
+  const list=document.getElementById('operationMainReadyList');
+  const summary=document.getElementById('operationMainReadySummary');
+  if(list){
+    const first=state.draw?.rounds?.[state.draw?.size]||[];
+    const resolved=first.filter(m=>m.teamA&&!m.teamA.placeholder&&m.teamB&&!m.teamB.placeholder);
+    const pending=first.filter(m=>m.teamA?.placeholder||m.teamB?.placeholder);
+    if(summary)summary.textContent=`확정 ${resolved.length} · 미확정 ${pending.length}`;
+    list.className=resolved.length?'shared-queue':'shared-queue empty-state';
+    list.innerHTML=resolved.length?resolved.map((m,i)=>`<article class="queue-card"><span class="num">${i+1}</span><b>${operationalTeamText(m.teamA,state)} vs ${operationalTeamText(m.teamB,state)}</b><em>${m.status==='playing'?'시합중':m.status==='completed'?'완료':m.status==='court_wait1'?'대기1':m.status==='queued'?'추가대기':'배정 대기'} · ${m.id}</em></article>`).join(''):'<p>양쪽 참가팀이 모두 확정된 본선 경기가 없습니다.</p>';
+  }
 }
 
 function renderPrelim(state,handlers){
