@@ -35,3 +35,23 @@ export function canAssignEarlyMain(state){
   if(stats.assignable===0)return{ok:false,reason:'현재 양쪽 참가팀이 모두 확정된 신규 본선 경기가 없습니다.',stats};
   return{ok:true,reason:'',stats};
 }
+
+export function ensureEarlyMainSettings(state){
+  if(!state.settings)state.settings={};
+  if(!('autoIncrementalMainEnabled' in state.settings))state.settings.autoIncrementalMainEnabled=true;
+}
+export function autoAssignResolvedMain(state,{findMatch,queueReadyMatches,refillCourt}){
+  ensureEarlyMainSettings(state);
+  const newlyReady=markResolvedMainMatchesReady(state);
+  if(!state.settings.autoIncrementalMainEnabled)return{enabled:false,newlyReady,assigned:false,reason:'disabled'};
+  if(!Array.isArray(state.courts)||!state.courts.length)return{enabled:true,newlyReady,assigned:false,reason:'no-courts'};
+  const before=earlyMainStats(state);
+  queueReadyMatches(state,id=>findMatch(state.draw,id));
+  state.courts.forEach(c=>refillCourt(state,c,id=>findMatch(state.draw,id)));
+  const after=earlyMainStats(state);
+  return{
+    enabled:true,newlyReady,assigned:true,
+    movedToOperation:Math.max(0,(after.active-before.active)+(before.assignable-after.assignable)),
+    before,after
+  };
+}

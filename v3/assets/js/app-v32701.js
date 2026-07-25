@@ -11,7 +11,7 @@ import{ensureMessagingState,generatePlayingMessages,generateWait1Messages,genera
 import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactData,importContactData}from'./contact-engine.js';
 import{render,teamText}from'./ui.js';
 import{ensureAuditState,runStateAudit,runPrelimSimulation,runFullSimulation,applyAuditResult}from'./audit-engine.js';
-import{earlyMainStats,markResolvedMainMatchesReady,canAssignEarlyMain}from'./early-main-engine.js';
+import{earlyMainStats,markResolvedMainMatchesReady,canAssignEarlyMain,ensureEarlyMainSettings,autoAssignResolvedMain}from'./early-main-engine.js';
 import{ensureVenueSettings,ensureVenueQueues,venuePreset,buildVenueCourts,prelimVenues,mainVenues}from'./venue-engine.js';
 import{moveQueueItem,reorderQueueItem}from'./queue-control-engine.js';
 import{availableCourtSlots,assignQueueMatchToCourt,returnWait1ToVenueQueue}from'./manual-court-engine.js';
@@ -21,7 +21,7 @@ import{ensureCourtManualQueues,assignToCourtManualQueue,moveCourtMatchFlexible,r
 import{reorderPrelimQueue as reorderPrelimQueueItem,movePrelimQueuedMatch,returnPrelimWait1ToQueue}from'./prelim-queue-control-engine.js';
 import{ensurePrelimCourtStatuses,pausePrelimCourt,resumePrelimCourt}from'./prelim-court-status-engine.js';
 
-let state=loadState();ensurePrelimState(state);ensureTimeState(state);ensureDrawMeta(state);ensureMessagingState(state);ensureContacts(state);ensureAuditState(state);ensureVenueSettings(state);ensureVenueQueues(state);ensureCourtStatuses(state);ensureCourtManualQueues(state);ensurePrelimCourtStatuses(state);
+let state=loadState();ensurePrelimState(state);ensureTimeState(state);ensureDrawMeta(state);ensureMessagingState(state);ensureContacts(state);ensureAuditState(state);ensureEarlyMainSettings(state);ensureVenueSettings(state);ensureVenueQueues(state);ensureCourtStatuses(state);ensureCourtManualQueues(state);ensurePrelimCourtStatuses(state);
 const $=id=>document.getElementById(id);
 const setValue=(id,value)=>{const el=$(id);if(el)el.value=value;};
 const setChecked=(id,value)=>{const el=$(id);if(el)el.checked=Boolean(value);};
@@ -56,6 +56,7 @@ function pullSettings(){
   state.settings.minimumMatchMinutes=Math.max(20,Number(getValue('minimumMatchMinutes',state.settings.minimumMatchMinutes||30))||30);
   state.settings.matchMinutes=Math.max(state.settings.minimumMatchMinutes,Number(getValue('matchMinutes',state.settings.matchMinutes||40))||40);
   state.settings.autoTimeEnabled=getChecked('autoTimeEnabled',state.settings.autoTimeEnabled!==false);
+  state.settings.autoIncrementalMainEnabled=getChecked('autoIncrementalMainEnabled',state.settings.autoIncrementalMainEnabled!==false);
   state.settings.timeRefreshSeconds=Number(getValue('timeRefreshSeconds',state.settings.timeRefreshSeconds||30))||30;
   state.settings.drawMethod=getValue('drawMethod',state.settings.drawMethod||'instant');
   state.settings.byePriority=getValue('byePriority',state.settings.byePriority||'group-first');state.settings.venueAssignmentPolicy=getValue('venueAssignmentPolicy',state.settings.venueAssignmentPolicy||'round-robin');state.settings.separateVenueQueues=getChecked('separateVenueQueues',state.settings.separateVenueQueues!==false);state.settings.autoVenuePromotion=getChecked('autoVenuePromotion',state.settings.autoVenuePromotion!==false);state.messaging.settings.autoMessageEnabled=getChecked('autoMessageEnabled',state.messaging.settings.autoMessageEnabled!==false);state.messaging.settings.senderName=getValue('messageSenderName',state.messaging.settings.senderName||'230MATCH');state.messaging.settings.deliveryMode=getValue('messageDeliveryMode',state.messaging.settings.deliveryMode||'sms-uri');state.messaging.settings.onCourtAssign=getChecked('messageOnCourtAssign',state.messaging.settings.onCourtAssign!==false);state.messaging.settings.onQueueMove=getChecked('messageOnQueueMove',state.messaging.settings.onQueueMove!==false);state.messaging.settings.smartMessageUpdate=getChecked('smartMessageUpdate',state.messaging.settings.smartMessageUpdate!==false);state.messaging.settings.repeatPolicy=getValue('messageRepeatPolicy',state.messaging.settings.repeatPolicy||'update-pending');state.messaging.settings.templates.playing=getValue('templatePlaying',state.messaging.settings.templates.playing);state.messaging.settings.templates.wait1=getValue('templateWait1',state.messaging.settings.templates.wait1);state.messaging.settings.templates.shared=getValue('templateShared',state.messaging.settings.templates.shared);
@@ -290,10 +291,17 @@ function confirmPrelimResult(event){
   event.preventDefault();
   const m=submitPrelimResult(state,{matchId:$('prelimResultMatchId').value,winnerId:$('prelimWinnerSelect').value,scoreA:$('prelimScoreA').value,scoreB:$('prelimScoreB').value});
   const syncResult=syncLinkedDraw({silent:true});
-  const newlyReady=markResolvedMainMatchesReady(state);
-  commit(`예선 결과 확정 · ${m.id} · 승리 ${teamText(m.winner)} · ${m.scoreA}:${m.scoreB}${syncResult.changes.length?` · 본선 자동반영 ${syncResult.changes.length}팀`:''}${newlyReady?` · 신규 진행가능 ${newlyReady}경기`:''}`);
+  const autoResult=autoAssignResolvedMain(state,{findMatch,queueReadyMatches,refillCourt});
+  if(autoResult.assigned&&state.messaging.settings.autoMessageEnabled){
+    generateCurrentCourtMessages(state);generateCurrentWaitMessages(state);
+  }
+  commit(`예선 결과 확정 · ${m.id} · 승리 ${teamText(m.winner)} · ${m.scoreA}:${m.scoreB}${syncResult.changes.length?` · 본선 자동반영 ${syncResult.changes.length}팀`:''}${autoResult.newlyReady?` · 신규 확정 ${autoResult.newlyReady}경기`:''}${autoResult.assigned?' · 자동 추가배정':''}`);
   $('prelimResultDialog').close();
-  prelimNotice('예선 순위와 진출팀을 다시 계산했습니다.','success');
+  prelimNotice(autoResult.assigned
+    ?'예선 순위 반영 후 새 본선 경기를 기존 코트 운영에 자동 추가했습니다.'
+    :autoResult.reason==='no-courts'
+      ?'본선 팀은 확정됐습니다. 최초 본선 코트배정을 실행하면 운영이 시작됩니다.'
+      :'예선 순위와 진출팀을 다시 계산했습니다.','success');
 }
 function resetPrelimOnly(){
   try{assertPrelimUnlocked('예선 초기화');}catch(e){prelimNotice(e.message,'error');return;}
@@ -832,6 +840,7 @@ function bind(){
   $('refreshQueueBtn').onclick=refreshQueue;$('resetBtn').onclick=hardReset;
   if($('recalculateTimeBtn'))$('recalculateTimeBtn').onclick=()=>{pullSettings();calculateTimeMetrics(state);commit('예상 대기시간 즉시 계산');notice('예상시간을 다시 계산했습니다.','success');};
   if($('autoTimeEnabled'))$('autoTimeEnabled').onchange=()=>{pullSettings();commit(`대기시간 자동계산 ${state.settings.autoTimeEnabled?'ON':'OFF'}`);restartTimeTimer();};
+  if($('autoIncrementalMainEnabled'))$('autoIncrementalMainEnabled').onchange=()=>{pullSettings();commit(`확정 본선 자동 추가배정 ${state.settings.autoIncrementalMainEnabled?'ON':'OFF'}`);notice(`확정 본선 자동 추가배정을 ${state.settings.autoIncrementalMainEnabled?'켰습니다.':'껐습니다.'}`,'success');};
   if($('timeRefreshSeconds'))$('timeRefreshSeconds').onchange=()=>{pullSettings();commit(`진행시간 갱신주기 ${state.settings.timeRefreshSeconds}초`);restartTimeTimer();};
   $('confirmResultBtn').onclick=confirmResult;
   $('autoFitPrelimBtn').onclick=()=>{try{autoFitPrelim();}catch(e){prelimNotice(e.message,'error');}};
@@ -930,4 +939,4 @@ document.addEventListener('click',event=>{
 },{capture:true});
 
 syncInputs();syncPrelimInputs();bind();renderVenueSettingsEditor();calculateTimeMetrics(state);render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus});restartTimeTimer();updateClock();setInterval(updateClock,1000);
-console.log('[230MATCH V3] stage27 early-main-operation loaded · no legacy code · no Firebase writes');
+console.log('[230MATCH V3] stage28 auto-incremental-main loaded · no legacy code · no Firebase writes');

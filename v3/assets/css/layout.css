@@ -514,3 +514,6 @@ body.bracket-fullscreen-open #bracketBoard{
   font-weight:800;
 }
 .early-main-metrics b{color:#173d70}
+
+.early-main-auto-flash{animation:earlyMainFlash .7s ease}
+@keyframes earlyMainFlash{0%{box-shadow:0 0 0 0 rgba(40,120,210,.45)}100%{box-shadow:0 0 0 12px rgba(40,120,210,0)}}

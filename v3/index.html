@@ -29,9 +29,9 @@
   <main class="app-shell">
     <section class="hero panel">
       <div>
-        <p class="eyebrow">STAGE 27 · EARLY MAIN OPERATION</p>
-        <h1>예선 진행중 본선 선추첨·확정경기 조기운영</h1>
-        <p>예선 진행 중에도 본선 슬롯을 미리 추첨하고, 양쪽 참가팀이 확정된 본선 경기부터 코트에 배정해 조기 진행할 수 있습니다.</p>
+        <p class="eyebrow">STAGE 28 · AUTO INCREMENTAL MAIN</p>
+        <h1>확정 본선경기 자동 추가배정</h1>
+        <p>예선 결과로 새 본선 경기가 확정되면 기존 시합중·대기열은 유지하고 새 경기만 자동으로 빈 코트와 대기열에 추가합니다.</p>
       </div>
       <div class="hero-stats">
         <div><span>대진</span><strong id="heroDrawSize">-</strong></div>
@@ -121,6 +121,7 @@
           <label class="toggle-label"><span>대기시간 자동계산</span><input id="autoTimeEnabled" type="checkbox" checked></label>
           <button id="recalculateTimeBtn" class="btn btn-light">예상시간 즉시 계산</button>
           <label class="toggle-label"><span>운영 문자 자동 생성</span><input id="autoMessageEnabled" type="checkbox" checked></label>
+          <label class="toggle-label"><span>확정 본선 자동 추가배정</span><input id="autoIncrementalMainEnabled" type="checkbox" checked></label>
           <button id="generateTimeMessagesBtn" class="btn btn-light">예상시간 문자 생성</button>
         </div>
 
@@ -145,6 +146,7 @@
             <span>확정 경기 <b id="earlyMainReadyCount">0</b></span>
             <span>미확정 경기 <b id="earlyMainPendingCount">0</b></span>
             <span>진행 가능 <b id="earlyMainAssignableCount">0</b></span>
+            <span>자동 추가배정 <b id="earlyMainAutoStatus">ON</b></span>
           </div>
         </div>
         <div id="drawLockInfo" class="draw-lock-info unlocked">
@@ -800,6 +802,6 @@
     <div id="recoveryList" class="recovery-list"></div>
   </dialog>
 
-  <script type="module" src="./assets/js/app-v32700.js?v=32700"></script>
+  <script type="module" src="./assets/js/app-v32800.js?v=32800"></script>
 </body>
 </html>

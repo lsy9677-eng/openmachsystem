@@ -4,7 +4,7 @@ import{timeInfo}from'./time-engine.js';
 import{contactStats,getTeamContact}from'./contact-engine.js';
 import{venueStats,totalVenueQueueCount}from'./venue-engine.js';
 import{availableCourtSlots}from'./manual-court-engine.js';
-import{earlyMainStats}from'./early-main-engine.js';
+import{earlyMainStats,ensureEarlyMainSettings}from'./early-main-engine.js';
 export function teamText(team){
   if(!team)return'TBD';
   if(team.placeholder)return`${team.name}`;
@@ -12,10 +12,12 @@ export function teamText(team){
 }
 
 function renderEarlyMainStatus(state){
+  ensureEarlyMainSettings(state);
   const stats=earlyMainStats(state);
   setText('earlyMainReadyCount',stats.resolved);
   setText('earlyMainPendingCount',stats.pending);
   setText('earlyMainAssignableCount',stats.assignable);
+  setText('earlyMainAutoStatus',state.settings.autoIncrementalMainEnabled?'ON':'OFF');
 }
 
 export function render(state,handlers){
