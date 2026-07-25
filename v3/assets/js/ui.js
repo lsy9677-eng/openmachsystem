@@ -63,6 +63,7 @@ function operationalTeamText(team,state){
 
 function renderCourts(state,handlers){
   const root=document.getElementById('courtGrid');
+  if(!root)return;
   if(!state.courts.length){root.className='court-grid empty-state';root.innerHTML='<p>대진 생성과 코트배정을 실행하면 코트 카드가 표시됩니다.</p>';return;}
   root.className='court-grid venue-court-grid';
   const groups=new Map();
@@ -85,6 +86,7 @@ function renderCourts(state,handlers){
 }
 function renderQueue(state,handlers){
   const root=document.getElementById('sharedQueue');
+  if(!root)return;
   const venues=state.settings.venues||[];
   const queues=state.venueQueues||{};
   const total=Object.values(queues).reduce((sum,q)=>sum+q.length,0)+(state.sharedQueue?.length||0);

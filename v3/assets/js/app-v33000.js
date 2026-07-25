@@ -843,7 +843,7 @@ function bind(){
   $('cancelRouletteBtn').onclick=()=>{clearInterval(rouletteTimer);$('rouletteDialog').close();};
   $('clearDrawHistoryBtn').onclick=()=>{clearDrawHistory(state);commit('본선 추첨 기록 삭제');};
   $('assignCourtsBtn').onclick=()=>{try{assign();}catch(e){notice(e.message,'error');}};
-  $('refreshQueueBtn').onclick=refreshQueue;$('resetBtn').onclick=hardReset;
+  if($('refreshQueueBtn'))$('refreshQueueBtn').onclick=refreshQueue;if($('resetBtn'))$('resetBtn').onclick=hardReset;
   if($('recalculateTimeBtn'))$('recalculateTimeBtn').onclick=()=>{pullSettings();calculateTimeMetrics(state);commit('예상 대기시간 즉시 계산');notice('예상시간을 다시 계산했습니다.','success');};
   if($('autoTimeEnabled'))$('autoTimeEnabled').onchange=()=>{pullSettings();commit(`대기시간 자동계산 ${state.settings.autoTimeEnabled?'ON':'OFF'}`);restartTimeTimer();};
   if($('autoIncrementalMainEnabled'))$('autoIncrementalMainEnabled').onchange=()=>{pullSettings();commit(`확정 본선 자동 추가배정 ${state.settings.autoIncrementalMainEnabled?'ON':'OFF'}`);notice(`확정 본선 자동 추가배정을 ${state.settings.autoIncrementalMainEnabled?'켰습니다.':'껐습니다.'}`,'success');};
@@ -947,4 +947,4 @@ document.addEventListener('click',event=>{
 },{capture:true});
 
 syncInputs();syncPrelimInputs();bind();renderVenueSettingsEditor();calculateTimeMetrics(state);render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus});restartTimeTimer();updateClock();setInterval(updateClock,1000);
-console.log('[230MATCH V3] stage30 true-unified-operation loaded · no legacy code · no Firebase writes');
+console.log('[230MATCH V3] stage30.1 null-guard-fix loaded · no legacy code · no Firebase writes');

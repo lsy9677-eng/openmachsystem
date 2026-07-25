@@ -1,15 +1,6 @@
-# 230MATCH V3 — Stage 30 True Unified Operation
+# 230MATCH V3 — Stage 30.1 Null Guard Fix
 
-수정 1: 미확정 본선 슬롯
-- `1조 1위`, `2조 2위` 같은 placeholder는 실제 팀으로 취급하지 않음
-- 한쪽 또는 양쪽이 placeholder면 `waiting_slots`
-- placeholder 경기는 부전승·완료 처리 금지
-- 양쪽 실제 팀이 확정된 순간에만 `ready`
-- 코트배정도 실제 팀 2팀 확정 경기만 허용
-
-수정 2: 전체 통합 운영 화면
-- 예선 운영의 코트 카드와 조별 현황을 전체 통합 운영으로 결합
-- 예선·본선 통합 코트 현황
-- 예선 조별 현황
-- 본선 확정·미확정 현황
-- 예선 설정 탭은 설정 중심으로 정리
+수정:
+- 전체 통합 운영으로 제거된 구형 `courtGrid`, `sharedQueue`, `refreshQueueBtn` 참조를 안전 처리
+- `Cannot set properties of null (setting 'className')` 오류 수정
+- 전체 통합 운영·미확정 슬롯 보호 기능 유지
