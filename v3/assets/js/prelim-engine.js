@@ -1,4 +1,5 @@
 import{prelimVenues}from'./venue-engine.js';
+import{promoteUnifiedCourt}from'./unified-court-engine.js';
 
 function clone(v){return structuredClone(v);}
 export function ensurePrelimState(state){
@@ -171,23 +172,7 @@ function resolveNextPrelimMatch(state,completedMatch){
     enqueuePrelimMatch(state,third);
   }
 }
-function promotePrelimCourt(state,court){
-  court.queue=court.queue||[];
-  if(court.isPaused)return court;
-  if(!court.playing&&court.wait1){
-    court.playing=court.wait1;court.wait1=null;
-    const m=state.prelim.matches.find(x=>x.id===court.playing);if(m)m.status='playing';
-  }
-  if(!court.playing&&court.queue.length){
-    court.playing=court.queue.shift();
-    const m=state.prelim.matches.find(x=>x.id===court.playing);if(m)m.status='playing';
-  }
-  if(!court.wait1&&court.queue.length){
-    court.wait1=court.queue.shift();
-    const m=state.prelim.matches.find(x=>x.id===court.wait1);if(m)m.status='court_wait1';
-  }
-  return court;
-}
+function promotePrelimCourt(state,court){return promoteUnifiedCourt(state,court);}
 export function advancePrelimCourt(state,courtId,completedMatch=null){
   const court=state.prelim?.courts?.find(c=>c.id===courtId);
   if(!court)return null;

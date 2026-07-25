@@ -5,6 +5,7 @@ import{contactStats,getTeamContact}from'./contact-engine.js';
 import{venueStats,totalVenueQueueCount}from'./venue-engine.js';
 import{availableCourtSlots}from'./manual-court-engine.js';
 import{earlyMainStats,ensureEarlyMainSettings}from'./early-main-engine.js';
+import{findUnifiedMatch}from'./unified-court-engine.js';
 export function teamText(team){
   if(!team)return'TBD';
   if(team.placeholder)return`${team.name}`;
@@ -234,31 +235,32 @@ function renderPrelimCourtOperation(state,handlers){
   count.textContent=`${courts.length}면`;
   if(!courts.length){
     root.className='prelim-court-operation-grid empty-state';
-    root.innerHTML='<p>예선 코트배정을 실행하면 코트 운영 카드가 표시됩니다.</p>';
+    root.innerHTML='<p>예선 코트배정을 실행하면 통합 코트 운영 카드가 표시됩니다.</p>';
     return;
   }
+  const item=id=>id?findUnifiedMatch(state,id):null;
+  const label=x=>x?.type==='main'
+    ?`<span class="match-type-chip main">본선</span>${x.match.roundSize?`${x.match.roundSize}강`:''}`
+    :x?`<span class="match-type-chip prelim">예선</span>${x.match.groupNo}조 · ${x.match.matchNo}경기`:'';
+  const names=x=>x?`${operationalTeamText(x.match.teamA,state)} vs ${operationalTeamText(x.match.teamB,state)}`:'';
   root.className='prelim-court-operation-grid';
-  const guide='<div class="prelim-court-manual-guide" style="grid-column:1/-1">대기1·추가대기 경기는 ▲▼ 순서 조정과 다른 코트 이동이 가능합니다.</div>';
+  const guide='<div class="prelim-court-manual-guide unified-court-guide" style="grid-column:1/-1">같은 실제 코트에서 예선과 본선을 함께 진행합니다. 확정된 본선 경기는 예선 대기열의 빈자리에 자동으로 들어갑니다.</div>';
   root.innerHTML=guide+courts.map(c=>{
-    const groups=Array.isArray(c.groups)?c.groups:[];
     const queue=Array.isArray(c.queue)?c.queue:[];
-    const playing=state.prelim.matches.find(m=>m.id===c.playing);
-    const wait1=state.prelim.matches.find(m=>m.id===c.wait1);
+    const playing=item(c.playing),wait1=item(c.wait1);
     return`<article class="prelim-court-card ${c.isPaused?'paused':''}">
-      <header><strong>${c.isPaused?'⛔':'🚀'} ${c.name}</strong><span>${c.isPaused?'사용중지 · ':''}${c.venueName?`${c.venueName} · `:''}${playing?'시합중':'빈코트'} · ${groups.length}개 조</span></header>
-      <div class="prelim-court-slot playing"><small>시합중</small>${playing?`<span class="group-label">${playing.groupNo}조 · ${playing.matchNo}경기</span>`:''}<b>${playing?`${operationalTeamText(playing.teamA,state)} vs ${operationalTeamText(playing.teamB,state)}`:'진행 경기 없음'}</b>${playing?`<button class="btn btn-secondary" data-prelim-result="${playing.id}">결과 입력</button>`:''}</div>
-      <div class="prelim-court-slot wait1"><small>대기1</small>${wait1?`<span class="group-label">${wait1.groupNo}조 · ${wait1.matchNo}경기</span>`:''}<b>${wait1?`${operationalTeamText(wait1.teamA,state)} vs ${operationalTeamText(wait1.teamB,state)}`:'대기 경기 없음'}</b>${wait1?`<div class="prelim-queue-actions"><button class="btn btn-light" data-prelim-wait-return="${c.id}">추가대기로</button><button class="btn btn-secondary" data-prelim-move="${wait1.id}" data-source-court="${c.id}">다른 코트로</button></div>`:''}</div>
-      <div class="prelim-extra-queue"><strong>추가 대기 ${queue.length}경기</strong>${queue.length?queue.map((id,i)=>{const m=state.prelim.matches.find(x=>x.id===id);return`<div class="prelim-extra-item"><span class="no">${i+2}</span>${m?`<span class="group-no">${m.groupNo}조</span><span class="match-text">${operationalTeamText(m.teamA,state)} vs ${operationalTeamText(m.teamB,state)}</span><div class="prelim-queue-actions"><button class="btn btn-light" data-prelim-q-up="${id}" data-court-id="${c.id}" ${i===0?'disabled':''}>▲</button><button class="btn btn-light" data-prelim-q-down="${id}" data-court-id="${c.id}" ${i===queue.length-1?'disabled':''}>▼</button><button class="btn btn-secondary" data-prelim-move="${id}" data-source-court="${c.id}">이동</button></div>`:`<span>${id}</span>`}</div>`}).join(''):'<p>추가 대기 없음</p>'}</div>
+      <header><strong>${c.isPaused?'⛔':'🚀'} ${c.name}</strong><span>${c.isPaused?'사용중지 · ':''}${c.venueName?`${c.venueName} · `:''}${playing?'시합중':'빈코트'}</span></header>
+      <div class="prelim-court-slot playing"><small>시합중</small>${playing?`<span class="group-label">${label(playing)}</span>`:''}<b>${playing?names(playing):'진행 경기 없음'}</b>${playing?`<button class="btn btn-secondary" ${playing.type==='prelim'?`data-prelim-result="${playing.match.id}"`:`data-main-result="${playing.match.id}"`}>결과 입력</button>`:''}</div>
+      <div class="prelim-court-slot wait1"><small>대기1</small>${wait1?`<span class="group-label">${label(wait1)}</span>`:''}<b>${wait1?names(wait1):'대기 경기 없음'}</b></div>
+      <div class="prelim-extra-queue"><strong>추가 대기 ${queue.length}경기</strong>${queue.length?queue.map((id,i)=>{const x=item(id);return`<div class="prelim-extra-item"><span class="no">${i+2}</span>${x?`<span class="group-no">${label(x)}</span><span class="match-text">${names(x)}</span>`:`<span>${id}</span>`}</div>`}).join(''):'<p>추가 대기 없음</p>'}</div>
+      ${c.isPaused&&c.pauseReason?`<div class="prelim-court-pause-reason">중지 사유: ${c.pauseReason}</div>`:''}
+      <div class="prelim-court-status-actions"><button class="btn ${c.isPaused?'btn-primary':'btn-danger-outline'}" data-prelim-court-status="${c.id}">${c.isPaused?'코트 사용 재개':'코트 사용중지'}</button></div>
     </article>`;
   }).join('');
   root.querySelectorAll('[data-prelim-result]').forEach(b=>b.onclick=()=>handlers.openPrelimResult(b.dataset.prelimResult));
-  root.querySelectorAll('[data-prelim-q-up]').forEach(b=>b.onclick=()=>handlers.reorderPrelimQueue(b.dataset.courtId,b.dataset.prelimQUp,'up'));
-  root.querySelectorAll('[data-prelim-q-down]').forEach(b=>b.onclick=()=>handlers.reorderPrelimQueue(b.dataset.courtId,b.dataset.prelimQDown,'down'));
-  root.querySelectorAll('[data-prelim-move]').forEach(b=>b.onclick=()=>handlers.openPrelimMove(b.dataset.sourceCourt,b.dataset.prelimMove));
-  root.querySelectorAll('[data-prelim-wait-return]').forEach(b=>b.onclick=()=>handlers.returnPrelimWait1(b.dataset.prelimWaitReturn));
+  root.querySelectorAll('[data-main-result]').forEach(b=>b.onclick=()=>handlers.openResult(b.dataset.mainResult));
   root.querySelectorAll('[data-prelim-court-status]').forEach(b=>b.onclick=()=>handlers.openPrelimCourtStatus(b.dataset.prelimCourtStatus));
 }
-
 
 function renderPrelimLockStatus(state){
   const lock=state.prelim?.lock||{locked:false};

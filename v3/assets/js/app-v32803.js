@@ -12,6 +12,7 @@ import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactD
 import{render,teamText}from'./ui.js';
 import{ensureAuditState,runStateAudit,runPrelimSimulation,runFullSimulation,applyAuditResult}from'./audit-engine.js';
 import{earlyMainStats,markResolvedMainMatchesReady,canAssignEarlyMain,ensureEarlyMainSettings,autoAssignResolvedMain}from'./early-main-engine.js';
+import{useUnifiedCourts,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt}from'./unified-court-engine.js';
 import{ensureVenueSettings,ensureVenueQueues,venuePreset,buildVenueCourts,prelimVenues,mainVenues}from'./venue-engine.js';
 import{moveQueueItem,reorderQueueItem}from'./queue-control-engine.js';
 import{availableCourtSlots,assignQueueMatchToCourt,returnWait1ToVenueQueue}from'./manual-court-engine.js';
@@ -167,24 +168,20 @@ function assign(){
   pullSettings();
   if(!state.draw.size)throw new Error('먼저 예선 슬롯으로 본선 대진을 생성하세요.');
   markResolvedMainMatchesReady(state);
-  const check=canAssignEarlyMain(state);
-  const hasExistingCourts=Array.isArray(state.courts)&&state.courts.length>0;
-  if(!hasExistingCourts){
-    if(!check.ok)throw new Error(check.reason);
-    ensureVenueSettings(state);
-    state.courts=buildVenueCourts(mainVenues(state));
-    state.sharedQueue=assignInitial(state.draw,state.courts,state);
-  }else{
-    const before=earlyMainStats(state);
-    queueReadyMatches(state,id=>findMatch(state.draw,id));
-    state.courts.forEach(c=>refillCourt(state,c,id=>findMatch(state.draw,id)));
-    const after=earlyMainStats(state);
-    if(before.assignable===after.assignable&&before.assignable===0)throw new Error('현재 새로 배정할 확정 본선 경기가 없습니다.');
+  if(useUnifiedCourts(state)){
+    const result=enqueueReadyMainToUnifiedCourts(state);
+    if(!result.assigned)throw new Error('현재 통합 코트에 새로 배정할 확정 본선 경기가 없습니다.');
+    commit(`예선·본선 통합 코트배정 · 신규 본선 ${result.assigned}경기`);
+    notice(`확정 본선 ${result.assigned}경기를 예선 코트의 빈자리와 대기열에 함께 배정했습니다.`,'success');
+    return;
   }
-  if(state.messaging.settings.autoMessageEnabled&&state.messaging.settings.onCourtAssign)generateCurrentCourtMessages(state);
-  const stats=earlyMainStats(state);
-  commit(`확정 본선경기 조기 코트배정 · 확정 ${stats.resolved} · 미확정 ${stats.pending} · 대기중 신규 ${stats.assignable}`);
-  notice('양쪽 참가팀이 확정된 본선 경기만 코트와 대기열에 반영했습니다.','success');
+  const check=canAssignEarlyMain(state);
+  if(!check.ok)throw new Error(check.reason);
+  ensureVenueSettings(state);
+  state.courts=buildVenueCourts(mainVenues(state));
+  state.sharedQueue=assignInitial(state.draw,state.courts,state);
+  commit('본선 전용 코트배정');
+  notice('예선 코트가 없어 본선 전용 코트로 배정했습니다.','success');
 }
 function openResult(matchId){
   const m=findMatch(state.draw,matchId);if(!m)return;
@@ -195,8 +192,9 @@ function openResult(matchId){
 function confirmResult(event){
   event.preventDefault();
   const id=$('resultMatchId').value;
-  const sourceCourt=state.courts.find(c=>c.playing===id);const beforePlaying=sourceCourt?.playing||null,beforeWait1=sourceCourt?.wait1||null;
+  const sourceCourt=[...(state.prelim?.courts||[]),...(state.courts||[])].find(c=>c.playing===id);const beforePlaying=sourceCourt?.playing||null,beforeWait1=sourceCourt?.wait1||null;
   const m=submitResult(state,{matchId:id,winnerId:$('winnerSelect').value,scoreA:$('scoreA').value,scoreB:$('scoreB').value});
+  if(sourceCourt&&(state.prelim?.courts||[]).some(c=>c.id===sourceCourt.id))advanceUnifiedCourt(state,sourceCourt.id,id);
   if(sourceCourt&&state.messaging.settings.autoMessageEnabled&&state.messaging.settings.onQueueMove){if(sourceCourt.playing&&sourceCourt.playing!==beforePlaying)generatePlayingMessages(state,sourceCourt.playing,sourceCourt.name);if(sourceCourt.wait1&&sourceCourt.wait1!==beforeWait1)generateWait1Messages(state,sourceCourt.wait1,sourceCourt.name)}
   commit(`결과 확정 · ${m.id} · 승리 ${teamText(m.winner)} · ${m.scoreA}:${m.scoreB}`);
   $('resultDialog').close();notice('결과와 다음 라운드·코트 큐를 반영했습니다.','success');
@@ -291,11 +289,13 @@ function confirmPrelimResult(event){
   event.preventDefault();
   const m=submitPrelimResult(state,{matchId:$('prelimResultMatchId').value,winnerId:$('prelimWinnerSelect').value,scoreA:$('prelimScoreA').value,scoreB:$('prelimScoreB').value});
   const syncResult=syncLinkedDraw({silent:true});
-  const autoResult=autoAssignResolvedMain(state,{findMatch,queueReadyMatches,refillCourt});
-  if(autoResult.assigned&&state.messaging.settings.autoMessageEnabled){
+  const autoResult=useUnifiedCourts(state)
+    ?enqueueReadyMainToUnifiedCourts(state)
+    :autoAssignResolvedMain(state,{findMatch,queueReadyMatches,refillCourt});
+  if((autoResult.assigned===true||Number(autoResult.assigned)>0)&&state.messaging.settings.autoMessageEnabled){
     generateCurrentCourtMessages(state);generateCurrentWaitMessages(state);
   }
-  commit(`예선 결과 확정 · ${m.id} · 승리 ${teamText(m.winner)} · ${m.scoreA}:${m.scoreB}${syncResult.changes.length?` · 본선 자동반영 ${syncResult.changes.length}팀`:''}${autoResult.newlyReady?` · 신규 확정 ${autoResult.newlyReady}경기`:''}${autoResult.assigned?' · 자동 추가배정':''}`);
+  commit(`예선 결과 확정 · ${m.id} · 승리 ${teamText(m.winner)} · ${m.scoreA}:${m.scoreB}${syncResult.changes.length?` · 본선 자동반영 ${syncResult.changes.length}팀`:''}${autoResult.newlyReady?` · 신규 확정 ${autoResult.newlyReady}경기`:''}${autoResult.assigned?' · 통합 코트 자동배정':''}`);
   $('prelimResultDialog').close();
   prelimNotice(autoResult.assigned
     ?'예선 순위 반영 후 새 본선 경기를 기존 코트 운영에 자동 추가했습니다.'
@@ -939,4 +939,4 @@ document.addEventListener('click',event=>{
 },{capture:true});
 
 syncInputs();syncPrelimInputs();bind();renderVenueSettingsEditor();calculateTimeMetrics(state);render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus});restartTimeTimer();updateClock();setInterval(updateClock,1000);
-console.log('[230MATCH V3] stage28.2 refill-court-import-fix loaded · no legacy code · no Firebase writes');
+console.log('[230MATCH V3] stage29 unified-court-operation loaded · no legacy code · no Firebase writes');

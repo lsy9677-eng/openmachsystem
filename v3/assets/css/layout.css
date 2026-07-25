@@ -517,3 +517,8 @@ body.bracket-fullscreen-open #bracketBoard{
 
 .early-main-auto-flash{animation:earlyMainFlash .7s ease}
 @keyframes earlyMainFlash{0%{box-shadow:0 0 0 0 rgba(40,120,210,.45)}100%{box-shadow:0 0 0 12px rgba(40,120,210,0)}}
+
+.match-type-chip{display:inline-flex;padding:2px 6px;border-radius:999px;font-size:9px;font-weight:900;margin-right:4px}
+.match-type-chip.prelim{background:#dcecff;color:#194f91}
+.match-type-chip.main{background:#f0e1ff;color:#6c2cb5}
+.unified-court-guide{background:#edf7ff;border:1px solid #bdd8ee;color:#285674}
