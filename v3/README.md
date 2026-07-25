@@ -1,9 +1,6 @@
-# 230MATCH V3 — Stage 28 Auto Incremental Main
+# 230MATCH V3 — Stage 28.1 Import Fix
 
-추가:
-- 예선 결과 입력 시 새로 확정된 본선 경기 자동 탐지
-- 최초 본선 코트배정 이후에는 기존 시합중·대기열 유지
-- 새 확정 경기만 빈 코트·대기1·공용대기에 자동 추가
-- 자동 추가배정 ON/OFF 설정
-- 자동배정 시 현재 코트·대기 문자 초안도 갱신
-- 최초 본선 코트가 아직 없으면 ready 상태로 대기
+수정:
+- `isPrelimLocked is not defined` 오류 수정
+- Stage 26 예선 잠금 함수 import 복구
+- Stage 28 자동 추가배정 기능 유지
