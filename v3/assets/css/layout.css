@@ -529,3 +529,6 @@ body.bracket-fullscreen-open #bracketBoard{
 .unified-prelim-setup{scroll-margin-top:90px}
 .single-screen-render-sources{display:none!important}
 #view-operation>.summary-grid{margin-top:14px}
+
+.btn-pulse-guide{animation:linkedGuidePulse 1.2s ease-in-out infinite}
+@keyframes linkedGuidePulse{0%,100%{box-shadow:0 0 0 0 rgba(222,160,0,.2)}50%{box-shadow:0 0 0 7px rgba(222,160,0,.18)}}

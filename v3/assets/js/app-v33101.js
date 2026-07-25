@@ -13,6 +13,7 @@ import{render,teamText}from'./ui.js';
 import{ensureAuditState,runStateAudit,runPrelimSimulation,runFullSimulation,applyAuditResult}from'./audit-engine.js';
 import{earlyMainStats,markResolvedMainMatchesReady,canAssignEarlyMain,ensureEarlyMainSettings,autoAssignResolvedMain}from'./early-main-engine.js';
 import{useUnifiedCourts,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt}from'./unified-court-engine.js';
+import{shouldUseLinkedDraw,linkedDrawNeedsRepair,rebuildLinkedDraw,hasStartedMainMatches}from'./linked-draw-guard-engine.js';
 import{ensureVenueSettings,ensureVenueQueues,venuePreset,buildVenueCourts,prelimVenues,mainVenues}from'./venue-engine.js';
 import{moveQueueItem,reorderQueueItem}from'./queue-control-engine.js';
 import{availableCourtSlots,assignQueueMatchToCourt,returnWait1ToVenueQueue}from'./manual-court-engine.js';
@@ -23,6 +24,15 @@ import{reorderPrelimQueue as reorderPrelimQueueItem,movePrelimQueuedMatch,return
 import{ensurePrelimCourtStatuses,pausePrelimCourt,resumePrelimCourt}from'./prelim-court-status-engine.js';
 
 let state=loadState();ensurePrelimState(state);ensureTimeState(state);ensureDrawMeta(state);ensureMessagingState(state);ensureContacts(state);ensureAuditState(state);ensureEarlyMainSettings(state);ensureVenueSettings(state);ensureVenueQueues(state);ensureCourtStatuses(state);ensureCourtManualQueues(state);ensurePrelimCourtStatuses(state);
+if(linkedDrawNeedsRepair(state)&&!hasStartedMainMatches(state)){
+  try{
+    const repaired=rebuildLinkedDraw(state,state.settings.drawSize||64);
+    saveState(state);
+    console.info(`[230MATCH V3] linked draw repaired · ${repaired.slots} slots`);
+  }catch(error){
+    console.warn('[230MATCH V3] linked draw auto repair skipped',error);
+  }
+}
 const $=id=>document.getElementById(id);
 const setValue=(id,value)=>{const el=$(id);if(el)el.value=value;};
 const setChecked=(id,value)=>{const el=$(id);if(el)el.checked=Boolean(value);};
@@ -79,6 +89,7 @@ function runDrawMethod(method){
 }
 
 function generate(){
+  if(shouldUseLinkedDraw(state))throw new Error('예선 진행 대회는 일반 본선 추첨이 아니라 “예선 슬롯으로 본선 선추첨”을 사용하세요.');
   pullSettings();
   const check=canModifyDraw(state);if(!check.ok&&state.draw.size)throw new Error(check.reason);
   if(state.settings.drawMethod==='roulette'){openRoulette();return;}
@@ -90,6 +101,7 @@ function generate(){
 
 let rouletteTimer=null,roulettePreparedTeams=[];
 function openRoulette(){
+  if(shouldUseLinkedDraw(state))throw new Error('예선 진행 대회는 일반 본선 추첨이 아니라 “예선 슬롯으로 본선 선추첨”을 사용하세요.');
   if(state.teams.length<2)throw new Error('최소 2팀이 필요합니다.');
   roulettePreparedTeams=[...state.teams];
   $('rouletteTeamName').textContent='추첨 준비';
@@ -112,6 +124,7 @@ function startRoulette(){
   },90);
 }
 function finishRoulette(){
+  if(shouldUseLinkedDraw(state))throw new Error('예선 진행 대회는 일반 본선 추첨이 아니라 “예선 슬롯으로 본선 선추첨”을 사용하세요.');
   state.draw=createDrawWithMethod(state,state.teams,state.settings.drawSize,{method:'roulette',byePriority:state.settings.byePriority});
   state.courts=[];state.sharedQueue=[];
   const first=state.draw.rounds[state.draw.size]||[];
@@ -123,6 +136,7 @@ function finishRoulette(){
   setTimeout(()=>$('rouletteDialog').close(),900);
 }
 function reshuffle(){
+  if(shouldUseLinkedDraw(state))throw new Error('예선 진행 대회는 일반 본선 추첨이 아니라 “예선 슬롯으로 본선 선추첨”을 사용하세요.');
   pullSettings();const check=canModifyDraw(state);if(!check.ok)throw new Error(check.reason);
   if(!state.draw.size)throw new Error('재추첨할 본선 대진이 없습니다.');
   if(state.settings.drawMethod==='roulette'){openRoulette();return;}
@@ -265,6 +279,9 @@ function createPrelim(){
   assertPrelimUnlocked('조편성 생성');
   pullPrelimSettings();
   const result=generatePrelim(state,state.prelim.settings);
+  if(state.draw?.size&&!state.prelim.linkedDraw?.active&&!hasStartedMainMatches(state)){
+    state.draw={size:0,rounds:{}};state.courts=[];state.sharedQueue=[];
+  }
   commit(`예선 조편성 생성 · ${result.groups}조 · ${result.matches}경기 · ${result.teams}팀`);
   prelimNotice(`${result.groups}개 조와 ${result.matches}경기를 생성했습니다.`,'success');
 }
@@ -337,35 +354,10 @@ function adminUnlockPrelim(){
 function createLinkedDraw(){
   pullPrelimSettings();
   ensurePrelimState(state);
-  if(!state.prelim.groups.length)throw new Error('먼저 예선 조편성을 생성하세요.');
-  const slots=generateLinkedDrawSlots(
-    state.prelim.groups,
-    state.prelim.settings.qualifiersPerGroup,
-    Number($('drawSize').value)
-  );
-  state.settings.drawSize=Number($('drawSize').value);
-  state.draw=createDrawWithMethod(state,slots,state.settings.drawSize,{method:state.settings.drawMethod||'instant',byePriority:state.settings.byePriority||'group-first'});
-  state.courts=[];
-  state.sharedQueue=[];
-  state.prelim.linkedDraw={
-    active:true,
-    drawSize:state.settings.drawSize,
-    slots:slots.map(s=>({
-      placeholderKey:s.placeholderKey,
-      label:s.name,
-      groupNo:s.groupNo,
-      groupRank:s.groupRank,
-      resolvedTeamId:null,
-      locked:false
-    })),
-    createdAt:new Date().toISOString(),
-    lastSyncedAt:null
-  };
-  const result=syncLinkedDrawQualifiers(state.draw,state.prelim.qualifiers,{protectStarted:true});
-  applyLinkedSyncResult(result);
-  result.newlyReady=markResolvedMainMatchesReady(state);
-  commit(`예선 슬롯 본선 선추첨 · ${slots.length}슬롯 · ${state.settings.drawSize}강`);
-  prelimNotice('예선 조 순위 슬롯으로 본선 대진을 먼저 생성했습니다.','success');
+  const result=rebuildLinkedDraw(state,Number($('drawSize').value));
+  markResolvedMainMatchesReady(state);
+  commit(`예선 슬롯 본선 선추첨 · ${result.slots}슬롯 · ${state.settings.drawSize}강`);
+  prelimNotice(`본선 대진을 조 순위 슬롯으로 생성했습니다. 현재 실제 팀 반영 ${result.changes}팀입니다.`,'success');
 }
 function applyLinkedSyncResult(result){
   if(!state.prelim?.linkedDraw?.active)return;
@@ -950,4 +942,4 @@ document.addEventListener('click',event=>{
 },{capture:true});
 
 syncInputs();syncPrelimInputs();bind();renderVenueSettingsEditor();calculateTimeMetrics(state);render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus});restartTimeTimer();updateClock();setInterval(updateClock,1000);
-console.log('[230MATCH V3] stage31 single-screen-operation loaded · no legacy code · no Firebase writes');
+console.log('[230MATCH V3] stage31.1 linked-draw-strict-fix loaded · no legacy code · no Firebase writes');

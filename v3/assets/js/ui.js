@@ -21,6 +21,20 @@ function renderEarlyMainStatus(state){
   setText('earlyMainAutoStatus',state.settings.autoIncrementalMainEnabled?'ON':'OFF');
 }
 
+
+function renderLinkedDrawModeGuard(state){
+  const guarded=Boolean(state.prelim?.groups?.length);
+  ['instantDrawBtn','rouletteDrawBtn','seededDrawBtn','reshuffleDrawBtn'].forEach(id=>{
+    const btn=document.getElementById(id);if(!btn)return;
+    btn.disabled=guarded;
+    btn.title=guarded?'예선 진행 대회는 예선 슬롯 본선 선추첨을 사용합니다.':'';
+  });
+  const linkedBtn=document.getElementById('generateLinkedDrawBtn');
+  if(linkedBtn){
+    linkedBtn.classList.toggle('btn-pulse-guide',guarded&&!state.prelim?.linkedDraw?.active);
+  }
+}
+
 export function render(state,handlers){
   const matches=allMatches(state.draw);
   const completed=matches.filter(m=>m.status==='completed').length;
