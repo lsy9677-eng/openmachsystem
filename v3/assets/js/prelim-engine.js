@@ -104,7 +104,11 @@ export function generatePrelim(state,settings){
   recalculateStandings(state);
   return {groups:groups.length,matches:matches.length,teams:needed};
 }
-/* 예선은 조 번호 순서대로 선택된 예선 구장의 전체 코트에 순환 배정합니다. */
+/*
+ * 예선 조를 코트별 연속 묶음으로 배정합니다.
+ * 예: 64개 조 / 8코트 => 1~8조는 1번코트, 9~16조는 2번코트 ...
+ * 균등 분배 후 남는 조는 조 번호 순서대로 1번코트부터 한 조씩 추가합니다.
+ */
 export function assignPrelimCourts(state){
   ensurePrelimState(state);
   if(!state.prelim.groups.length)throw new Error('먼저 예선 조편성을 생성하세요.');
@@ -129,14 +133,29 @@ export function assignPrelimCourts(state){
     else m.status='waiting_previous';
   });
 
-  state.prelim.groups.slice().sort((a,b)=>a.groupNo-b.groupNo).forEach((group,index)=>{
-    const court=courts[index%courts.length];
+  const sortedGroups=state.prelim.groups.slice().sort((a,b)=>a.groupNo-b.groupNo);
+  const groupsPerCourt=Math.floor(sortedGroups.length/courts.length);
+  const evenlyAssignedCount=groupsPerCourt*courts.length;
+
+  // 먼저 각 코트에 같은 수의 연속된 조 번호 구간을 배정합니다.
+  courts.forEach((court,courtIndex)=>{
+    const start=courtIndex*groupsPerCourt;
+    const end=start+groupsPerCourt;
+    sortedGroups.slice(start,end).forEach(group=>assignGroupToCourt(group,court));
+  });
+
+  // 균등 배정 후 남은 조는 1번 코트부터 한 조씩 추가합니다.
+  sortedGroups.slice(evenlyAssignedCount).forEach((group,index)=>{
+    assignGroupToCourt(group,courts[index%courts.length]);
+  });
+
+  function assignGroupToCourt(group,court){
     group.court=court.name;group.prelimCourtId=court.id;group.venueId=court.venueId;group.venueName=court.venueName;
     court.groups.push(group.id);
     state.prelim.matches.filter(m=>m.groupId===group.id).forEach(m=>{
       m.court=court.name;m.prelimCourtId=court.id;m.venueId=court.venueId;m.venueName=court.venueName;
     });
-  });
+  }
 
   // 한 코트에 여러 조가 있으면 각 조의 첫 경기부터 번갈아 배치
   courts.forEach(court=>{

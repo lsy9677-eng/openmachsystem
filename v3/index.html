@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#10264a">
   <title>230MATCH V3</title>
-  <link rel="stylesheet" href="./assets/css/tokens.css?v=309012">
-  <link rel="stylesheet" href="./assets/css/layout.css?v=309012">
-  <link rel="stylesheet" href="./assets/css/components.css?v=309012">
-  <link rel="stylesheet" href="./assets/css/responsive.css?v=309012">
+  <link rel="stylesheet" href="./assets/css/tokens.css?v=33104">
+  <link rel="stylesheet" href="./assets/css/layout.css?v=33104">
+  <link rel="stylesheet" href="./assets/css/components.css?v=33104">
+  <link rel="stylesheet" href="./assets/css/responsive.css?v=33104">
 </head>
 <body>
   <header class="topbar">
@@ -29,7 +29,7 @@
   <main class="app-shell">
     <section class="hero panel">
       <div>
-        <p class="eyebrow">STAGE 31.1 · LINKED DRAW STRICT FIX</p>
+        <p class="eyebrow">STAGE 31.4 · AUTO DRAW SIZE & ORDERED SETUP</p>
         <h1>예선·본선 단일 통합 운영</h1>
         <p>코트 운영을 기본 화면으로 두고 예선 조 현황·본선 준비·대회 설정을 필요한 때만 열어 봅니다.</p>
       </div>
@@ -65,11 +65,83 @@
         </div>
       </section>
 
+      <section id="unifiedPrelimSetup" class="panel control-panel unified-prelim-setup operation-setup-section">
+        <div class="section-head">
+          <div>
+            <h2>1단계 · 명단 및 예선 준비</h2>
+            <p>명단을 불러온 뒤 조 자동계산 → 조편성 → 코트배정 순서로 진행합니다. 마지막에 본선 슬롯 선추첨을 실행합니다.</p>
+          </div>
+          <span class="badge badge-safe">V3 예선 엔진</span>
+        </div>
+
+        <div class="control-grid prelim-controls">
+          <label>
+            <span>예선 사용팀 수</span>
+            <input id="prelimActiveTeamCount" type="number" min="2" value="96">
+          </label>
+          <label>
+            <span>3팀조 수</span>
+            <input id="threeTeamGroupCount" type="number" min="0" value="32">
+          </label>
+          <label>
+            <span>2팀조 수</span>
+            <input id="twoTeamGroupCount" type="number" min="0" value="2">
+          </label>
+          <label class="prelim-venue-summary-field">
+            <span>예선 사용 구장</span>
+            <input id="prelimVenueSummary" type="text" value="대회 설정의 예선 사용 구장을 반영합니다." readonly>
+          </label>
+          <label>
+            <span>예선 코트 수</span>
+            <input id="prelimCourtCountSummary" type="text" value="0면" readonly>
+          </label>
+          <label>
+            <span>조당 진출팀</span>
+            <select id="qualifiersPerGroup">
+              <option value="1">1팀</option>
+              <option value="2" selected>2팀</option>
+            </select>
+          </label>
+          <label>
+            <span>순위 기준</span>
+            <select id="prelimRankingRule">
+              <option value="wins-diff-points">승수 → 득실 → 득점</option>
+            </select>
+          </label>
+        </div>
+
+        <div id="linkedDrawSizeGuide" class="notice info">본선 슬롯 수가 현재 대진 규모를 초과하면 32강 → 64강 → 128강 중 필요한 크기로 자동 확대됩니다.</div>
+
+        <div class="button-row prelim-primary-actions">
+          <button id="loadSampleBtn" class="btn btn-secondary">100팀 테스트 명단</button>
+          <label class="btn btn-secondary file-button">명단 JSON 선택<input id="teamFileInput" type="file" accept=".json,application/json"></label>
+          <button id="autoFitPrelimBtn" class="btn btn-secondary">사용팀 수에 맞춰 조 자동계산</button>
+          <button id="generatePrelimBtn" class="btn btn-primary">예선 조편성 생성</button>
+          <button id="assignPrelimCourtsBtn" class="btn btn-purple">예선 코트배정</button>
+          <button id="generateLinkedDrawBtn" class="btn btn-gold">예선 슬롯으로 본선 선추첨</button>
+          <button id="syncLinkedDrawBtn" class="btn btn-secondary">확정팀 본선 자동 반영</button>
+          <button id="lockPrelimBtn" class="btn btn-gold">예선 종료 후 최종잠금</button>
+          <button id="unlockPrelimBtn" class="btn btn-danger-outline">관리자 잠금 해제</button>
+          <button id="resetPrelimBtn" class="btn btn-danger-outline">예선만 초기화</button>
+        </div>
+
+        <div id="prelimNoticeBar" class="notice info">통합 운영 탭에서 명단을 먼저 불러오세요.</div>
+        <div id="prelimLockStatus" class="prelim-lock-status unlocked">
+          <strong>예선 잠금 해제 상태</strong>
+          <span>결과 입력·조편성·후보교체가 가능합니다.</span>
+        </div>
+        <div class="notice info prelim-order-rule">
+          <strong>3팀조 경기순서:</strong> ① 1번팀 vs 2번팀 → ② 첫 경기 승자 vs 3번팀 → ③ 첫 경기 패자 vs 3번팀.
+          한 코트에 여러 조가 배정되면 각 조의 같은 순번 경기를 번갈아 진행합니다.
+        </div>
+      </section>
+
+
       <section class="panel control-panel operation-setup-section operation-general-settings">
         <div class="section-head">
           <div>
-            <h2>대회 기본 설정</h2>
-            <p>명단·시간·추첨 관련 고급 설정입니다. 경기 중에는 닫아두고 사용합니다.</p>
+            <h2>본선 준비와 운영 설정</h2>
+            <p>예선 준비가 끝난 뒤 본선 대진·시간·잠금·코트배정을 설정합니다.</p>
           </div>
           <span class="badge badge-safe">독립 엔진</span>
         </div>
@@ -138,8 +210,6 @@
         </div>
 
         <div class="button-row">
-          <button id="loadSampleBtn" class="btn btn-secondary">100팀 테스트 명단</button>
-          <label class="btn btn-secondary file-button">명단 JSON 선택<input id="teamFileInput" type="file" accept=".json,application/json"></label>
           <button id="instantDrawBtn" class="btn btn-primary">즉시 추첨 실행</button>
           <button id="rouletteDrawBtn" class="btn btn-gold">룰렛 추첨 실행</button>
           <button id="seededDrawBtn" class="btn btn-purple">시드 분산 추첨 실행</button>
@@ -185,73 +255,6 @@
         <article class="summary-card"><span>구장별 공용대기</span><strong id="summaryVenueQueueCount">0경기</strong></article>
       </section>
 
-
-      <section id="unifiedPrelimSetup" class="panel control-panel unified-prelim-setup operation-setup-section">
-        <div class="section-head">
-          <div>
-            <h2>예선 준비와 본선 슬롯 선추첨</h2>
-            <p>예선 조편성부터 예선 슬롯 본선 선추첨까지 이 화면에서 순서대로 진행합니다.</p>
-          </div>
-          <span class="badge badge-safe">V3 예선 엔진</span>
-        </div>
-
-        <div class="control-grid prelim-controls">
-          <label>
-            <span>예선 사용팀 수</span>
-            <input id="prelimActiveTeamCount" type="number" min="2" value="96">
-          </label>
-          <label>
-            <span>3팀조 수</span>
-            <input id="threeTeamGroupCount" type="number" min="0" value="32">
-          </label>
-          <label>
-            <span>2팀조 수</span>
-            <input id="twoTeamGroupCount" type="number" min="0" value="2">
-          </label>
-          <label class="prelim-venue-summary-field">
-            <span>예선 사용 구장</span>
-            <input id="prelimVenueSummary" type="text" value="대회 설정의 예선 사용 구장을 반영합니다." readonly>
-          </label>
-          <label>
-            <span>예선 코트 수</span>
-            <input id="prelimCourtCountSummary" type="text" value="0면" readonly>
-          </label>
-          <label>
-            <span>조당 진출팀</span>
-            <select id="qualifiersPerGroup">
-              <option value="1">1팀</option>
-              <option value="2" selected>2팀</option>
-            </select>
-          </label>
-          <label>
-            <span>순위 기준</span>
-            <select id="prelimRankingRule">
-              <option value="wins-diff-points">승수 → 득실 → 득점</option>
-            </select>
-          </label>
-        </div>
-
-        <div class="button-row">
-          <button id="autoFitPrelimBtn" class="btn btn-secondary">사용팀 수에 맞춰 조 자동계산</button>
-          <button id="generatePrelimBtn" class="btn btn-primary">예선 조편성 생성</button>
-          <button id="assignPrelimCourtsBtn" class="btn btn-purple">예선 코트배정</button>
-          <button id="generateLinkedDrawBtn" class="btn btn-gold">예선 슬롯으로 본선 선추첨</button>
-          <button id="syncLinkedDrawBtn" class="btn btn-secondary">확정팀 본선 자동 반영</button>
-          <button id="lockPrelimBtn" class="btn btn-gold">예선 종료 후 최종잠금</button>
-          <button id="unlockPrelimBtn" class="btn btn-danger-outline">관리자 잠금 해제</button>
-          <button id="resetPrelimBtn" class="btn btn-danger-outline">예선만 초기화</button>
-        </div>
-
-        <div id="prelimNoticeBar" class="notice info">통합 운영 탭에서 명단을 먼저 불러오세요.</div>
-        <div id="prelimLockStatus" class="prelim-lock-status unlocked">
-          <strong>예선 잠금 해제 상태</strong>
-          <span>결과 입력·조편성·후보교체가 가능합니다.</span>
-        </div>
-        <div class="notice info prelim-order-rule">
-          <strong>3팀조 경기순서:</strong> ① 1번팀 vs 2번팀 → ② 첫 경기 승자 vs 3번팀 → ③ 첫 경기 패자 vs 3번팀.
-          한 코트에 여러 조가 배정되면 각 조의 같은 순번 경기를 번갈아 진행합니다.
-        </div>
-      </section>
 
       <section class="summary-grid operation-prelim-summary">
         <article class="summary-card"><span>예선 사용팀</span><strong id="prelimSummaryActiveTeams">0팀</strong></article>
@@ -806,6 +809,6 @@
     <div id="recoveryList" class="recovery-list"></div>
   </dialog>
 
-  <script type="module" src="./assets/js/app-v33102.js?v=33102"></script>
+  <script type="module" src="./assets/js/app-v33104.js?v=33104"></script>
 </body>
 </html>

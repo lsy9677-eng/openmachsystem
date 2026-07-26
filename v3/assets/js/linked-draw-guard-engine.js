@@ -23,7 +23,11 @@ export function linkedDrawNeedsRepair(state){
 export function rebuildLinkedDraw(state,drawSize){
   if(!shouldUseLinkedDraw(state))throw new Error('예선 조편성이 없습니다.');
   if(hasStartedMainMatches(state))throw new Error('이미 시작된 본선 경기가 있어 연결 대진을 자동 복구할 수 없습니다.');
-  const size=Number(drawSize)||Number(state.settings?.drawSize)||64;
+  const slotCount=(state.prelim.groups||[]).length*Number(state.prelim.settings.qualifiersPerGroup||1);
+  if(slotCount>128)throw new Error(`본선 슬롯 ${slotCount}개는 지원 최대 규모인 128강을 초과합니다.`);
+  const requiredSize=slotCount<=32?32:slotCount<=64?64:128;
+  const requested=Number(drawSize)||Number(state.settings?.drawSize)||64;
+  const size=Math.max(requested,requiredSize);
   const slots=generateLinkedDrawSlots(
     state.prelim.groups,
     state.prelim.settings.qualifiersPerGroup,

@@ -209,3 +209,12 @@ input,select{width:100%;border:1px solid #b9cae5;border-radius:10px;padding:11px
 .operation-workspace[data-operation-mode="courts"] .operation-overview-summary,
 .operation-workspace[data-operation-mode="groups"] .operation-prelim-summary,
 .operation-workspace[data-operation-mode="main"] .operation-prelim-summary{display:grid}
+
+/* Stage31.4 ordered setup */
+.operation-workspace[data-operation-mode="setup"] .unified-prelim-setup{order:10;}
+.operation-workspace[data-operation-mode="setup"] .operation-prelim-summary{order:20;}
+.operation-workspace[data-operation-mode="setup"] .reserve-panel{order:30;}
+.operation-workspace[data-operation-mode="setup"] .operation-general-settings{order:40;border-top:4px solid var(--accent,#7c3aed);}
+.operation-general-settings .section-head h2::before{content:"2단계 · ";color:#6d28d9;}
+#linkedDrawSizeGuide{margin:14px 0 4px;}
+.prelim-primary-actions{align-items:center;}
