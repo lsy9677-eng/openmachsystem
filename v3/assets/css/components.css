@@ -166,3 +166,46 @@ input,select{width:100%;border:1px solid #b9cae5;border-radius:10px;padding:11px
   pointer-events:none;
 }
 
+
+
+/* Stage 31.2 compact unified operation workspace */
+.operation-mode-bar{position:sticky;top:8px;z-index:18;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 18px;background:rgba(255,255,255,.96);backdrop-filter:blur(12px);border:1px solid var(--line,#dfe5ec);box-shadow:0 8px 24px rgba(22,34,51,.08)}
+.operation-mode-copy{display:flex;flex-direction:column;gap:2px;min-width:180px}.operation-mode-copy strong{font-size:17px}.operation-mode-copy span{font-size:12px;color:var(--muted,#667085)}
+.operation-mode-buttons{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:8px;flex:1;max-width:760px}
+.operation-mode-btn{border:1px solid #d6dde8;background:#f7f9fc;color:#344054;border-radius:10px;padding:11px 12px;font-weight:800;cursor:pointer;transition:.16s ease}
+.operation-mode-btn:hover{background:#eef3f8}.operation-mode-btn.active{background:#172b4d;color:#fff;border-color:#172b4d;box-shadow:0 5px 14px rgba(23,43,77,.18)}
+.operation-workspace .operation-courts-section,.operation-workspace .operation-groups-section,.operation-workspace .operation-main-section,.operation-workspace .operation-setup-section{display:none}
+.operation-workspace[data-operation-mode="courts"] .operation-courts-section,
+.operation-workspace[data-operation-mode="groups"] .operation-groups-section,
+.operation-workspace[data-operation-mode="main"] .operation-main-section,
+.operation-workspace[data-operation-mode="setup"] .operation-setup-section{display:block}
+.operation-workspace[data-operation-mode="courts"] .operation-overview-summary,
+.operation-workspace[data-operation-mode="groups"] .operation-prelim-summary,
+.operation-workspace[data-operation-mode="main"] .operation-prelim-summary{display:grid}
+.operation-workspace[data-operation-mode="setup"] .operation-overview-summary,
+.operation-workspace[data-operation-mode="setup"] .operation-prelim-summary{display:none}
+.operation-overview-summary{grid-template-columns:repeat(6,minmax(120px,1fr))}
+.operation-overview-summary .summary-card:nth-child(6),
+.operation-overview-summary .summary-card:nth-child(9),
+.operation-overview-summary .summary-card:nth-child(10),
+.operation-overview-summary .summary-card:nth-child(11),
+.operation-overview-summary .summary-card:nth-child(12),
+.operation-overview-summary .summary-card:nth-child(13),
+.operation-overview-summary .summary-card:nth-child(14),
+.operation-overview-summary .summary-card:nth-child(15){display:none}
+.operation-prelim-summary{grid-template-columns:repeat(6,minmax(120px,1fr))}
+.operation-prelim-summary .summary-card:nth-child(2),
+.operation-prelim-summary .summary-card:nth-child(6),
+.operation-prelim-summary .summary-card:nth-child(7){display:none}
+.operation-general-settings .control-grid{grid-template-columns:repeat(3,minmax(180px,1fr))}
+.operation-general-settings .button-row,.unified-prelim-setup .button-row{align-items:stretch}
+.operation-general-settings .button-row .btn,.unified-prelim-setup .button-row .btn{min-height:42px}
+@media(max-width:900px){.operation-mode-bar{position:static;align-items:stretch;flex-direction:column}.operation-mode-buttons{max-width:none;grid-template-columns:repeat(2,1fr)}.operation-overview-summary,.operation-prelim-summary{grid-template-columns:repeat(3,minmax(100px,1fr))}.operation-general-settings .control-grid{grid-template-columns:repeat(2,minmax(150px,1fr))}}
+@media(max-width:560px){.operation-mode-buttons{grid-template-columns:1fr 1fr}.operation-mode-btn{padding:10px 6px;font-size:12px}.operation-overview-summary,.operation-prelim-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.operation-general-settings .control-grid{grid-template-columns:1fr}}
+
+/* Summary visibility follows the selected operation task. */
+.operation-workspace .operation-overview-summary,
+.operation-workspace .operation-prelim-summary{display:none}
+.operation-workspace[data-operation-mode="courts"] .operation-overview-summary,
+.operation-workspace[data-operation-mode="groups"] .operation-prelim-summary,
+.operation-workspace[data-operation-mode="main"] .operation-prelim-summary{display:grid}

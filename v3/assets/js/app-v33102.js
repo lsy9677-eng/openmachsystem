@@ -942,4 +942,36 @@ document.addEventListener('click',event=>{
 },{capture:true});
 
 syncInputs();syncPrelimInputs();bind();renderVenueSettingsEditor();calculateTimeMetrics(state);render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus});restartTimeTimer();updateClock();setInterval(updateClock,1000);
-console.log('[230MATCH V3] stage31.1 linked-draw-strict-fix loaded · no legacy code · no Firebase writes');
+console.log('[230MATCH V3] stage31.2 compact-unified-operation loaded · linked draw strict · no legacy code · no Firebase writes');
+
+
+// Stage 31.2: presentation-only operation workspace controller.
+// Core tournament, draw, court and result state models are unchanged.
+(function initCompactOperationWorkspace(){
+  const workspace=document.getElementById('view-operation');
+  if(!workspace)return;
+  const buttons=[...workspace.querySelectorAll('[data-operation-section]')];
+  const valid=new Set(['courts','groups','main','setup']);
+  const storageKey='230match-v3-operation-section';
+  function setMode(mode,{scroll=false}={}){
+    const next=valid.has(mode)?mode:'courts';
+    workspace.dataset.operationMode=next;
+    buttons.forEach(button=>{
+      const active=button.dataset.operationSection===next;
+      button.classList.toggle('active',active);
+      button.setAttribute('aria-pressed',String(active));
+    });
+    try{localStorage.setItem(storageKey,next);}catch(_error){}
+    if(scroll){workspace.querySelector('.operation-mode-bar')?.scrollIntoView({behavior:'smooth',block:'start'});}
+  }
+  buttons.forEach(button=>button.addEventListener('click',()=>setMode(button.dataset.operationSection)));
+  let initial='courts';
+  try{initial=localStorage.getItem(storageKey)||'courts';}catch(_error){}
+  setMode(initial);
+  const setupJump=document.getElementById('operationGoPrelimSettingsBtn');
+  if(setupJump)setupJump.onclick=()=>setMode('setup',{scroll:true});
+  const bracketJump=document.getElementById('operationGoBracketBtn');
+  if(bracketJump)bracketJump.onclick=()=>{
+    document.querySelector('.tab[data-view="bracket"]')?.click();
+  };
+})();
