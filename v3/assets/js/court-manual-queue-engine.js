@@ -15,28 +15,72 @@ function removeEverywhere(state,matchId){
     if(c.wait1===matchId)c.wait1=null;
   });
 }
+function setMatchPlacement(match,court,status){
+  if(!match)return;
+  match.status=status;
+  match.court=court.name;
+  match.venueId=court.venueId;
+  match.manualAssigned=true;
+}
+function pushDisplacedToReserve(court,matchId,front=true){
+  if(!matchId)return;
+  ensureCourtQueue(court);
+  court.manualQueue=court.manualQueue.filter(id=>id!==matchId);
+  if(front)court.manualQueue.unshift(matchId);else court.manualQueue.push(matchId);
+}
+function refreshCourtMatchStatuses(court,findMatch){
+  if(court.playing){const m=findMatch(court.playing);setMatchPlacement(m,court,'playing');m.startedAt=m.startedAt||new Date().toISOString();}
+  if(court.wait1){const m=findMatch(court.wait1);setMatchPlacement(m,court,'court_wait1');}
+  (court.manualQueue||[]).forEach(id=>setMatchPlacement(findMatch(id),court,'court_manual_queue'));
+}
 export function assignToCourtManualQueue(state,{matchId,courtId,position='bottom'},findMatch){
   const court=state.courts.find(c=>c.id===courtId);if(!court)throw new Error('코트를 찾지 못했습니다.');
   ensureCourtQueue(court);removeEverywhere(state,matchId);
   if(position==='top')court.manualQueue.unshift(matchId);else court.manualQueue.push(matchId);
-  const match=findMatch(matchId);
-  if(match){match.status='court_manual_queue';match.court=court.name;match.venueId=court.venueId;match.manualAssigned=true;}
+  const match=findMatch(matchId);setMatchPlacement(match,court,'court_manual_queue');
   return{court,match};
 }
 export function moveCourtMatchFlexible(state,{matchId,targetCourtId,mode='auto'},findMatch){
   const court=state.courts.find(c=>c.id===targetCourtId);if(!court)throw new Error('대상 코트를 찾지 못했습니다.');
-  ensureCourtQueue(court);removeEverywhere(state,matchId);
+  ensureCourtQueue(court);
   const match=findMatch(matchId);if(!match)throw new Error('경기를 찾지 못했습니다.');
+  const originalStartedAt=match.startedAt||null;
+  removeEverywhere(state,matchId);
+
+  if(mode==='insert-playing'){
+    const oldPlaying=court.playing;
+    const oldWait1=court.wait1;
+    if(oldWait1)pushDisplacedToReserve(court,oldWait1,true);
+    court.wait1=oldPlaying||null;
+    court.playing=matchId;
+    match.startedAt=originalStartedAt||new Date().toISOString();
+    refreshCourtMatchStatuses(court,findMatch);
+    return{court,match,slot:'playing',shifted:[oldPlaying,oldWait1].filter(Boolean)};
+  }
+  if(mode==='insert-wait1'){
+    const oldWait1=court.wait1;
+    if(oldWait1)pushDisplacedToReserve(court,oldWait1,true);
+    court.wait1=matchId;
+    refreshCourtMatchStatuses(court,findMatch);
+    return{court,match,slot:'wait1',shifted:[oldWait1].filter(Boolean)};
+  }
+  if(mode.startsWith('insert-reserve-')){
+    const raw=mode.replace('insert-reserve-','');
+    const index=Math.max(0,Math.min(court.manualQueue.length,Number(raw)||0));
+    court.manualQueue.splice(index,0,matchId);
+    refreshCourtMatchStatuses(court,findMatch);
+    return{court,match,slot:'manual',reserveIndex:index};
+  }
   if(mode==='auto'&&!court.playing&&!court.isPaused){
-    court.playing=matchId;match.status='playing';match.court=court.name;match.venueId=court.venueId;match.startedAt=match.startedAt||new Date().toISOString();
+    court.playing=matchId;match.startedAt=originalStartedAt||new Date().toISOString();refreshCourtMatchStatuses(court,findMatch);
     return{court,match,slot:'playing'};
   }
   if(mode==='auto'&&!court.wait1&&!court.isPaused){
-    court.wait1=matchId;match.status='court_wait1';match.court=court.name;match.venueId=court.venueId;
+    court.wait1=matchId;refreshCourtMatchStatuses(court,findMatch);
     return{court,match,slot:'wait1'};
   }
   if(mode==='manual-top')court.manualQueue.unshift(matchId);else court.manualQueue.push(matchId);
-  match.status='court_manual_queue';match.court=court.name;match.venueId=court.venueId;match.manualAssigned=true;
+  refreshCourtMatchStatuses(court,findMatch);
   return{court,match,slot:'manual'};
 }
 export function promoteCourtManualQueue(state,court,findMatch){
@@ -45,14 +89,12 @@ export function promoteCourtManualQueue(state,court,findMatch){
   let changed=false;
   if(!court.playing&&court.wait1){
     court.playing=court.wait1;court.wait1=null;
-    const m=findMatch(court.playing);if(m){m.status='playing';m.court=court.name;m.venueId=court.venueId;m.startedAt=m.startedAt||new Date().toISOString();}
     changed=true;
   }
   if(!court.wait1&&court.manualQueue.length){
-    court.wait1=court.manualQueue.shift();
-    const m=findMatch(court.wait1);if(m){m.status='court_wait1';m.court=court.name;m.venueId=court.venueId;}
-    changed=true;
+    court.wait1=court.manualQueue.shift();changed=true;
   }
+  refreshCourtMatchStatuses(court,findMatch);
   return changed;
 }
 export function returnManualQueueItemToVenue(state,{courtId,matchId,position='top'},findMatch){
