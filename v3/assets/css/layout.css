@@ -565,3 +565,50 @@ body.bracket-fullscreen-open #bracketBoard{
 /* Stage31.10: 예선 추가대기 최소 예상시간 */
 .prelim-extra-item .prelim-extra-time{flex:0 0 auto;white-space:nowrap;padding:4px 7px;border-radius:8px;background:#fff4d6;color:#8a5a00;font-size:10px;font-weight:900}
 @media(max-width:720px){.prelim-extra-item{flex-wrap:wrap}.prelim-extra-item .prelim-extra-time{margin-left:31px}}
+
+
+/* Stage31.11: 예선 추가대기 카드 정돈 */
+.prelim-extra-item{
+  display:grid;
+  grid-template-columns:24px auto minmax(0,1fr);
+  grid-template-areas:
+    "number group match"
+    ". time time";
+  column-gap:8px;
+  row-gap:6px;
+  align-items:center;
+  padding:10px 0;
+}
+.prelim-extra-item .no{grid-area:number;align-self:start}
+.prelim-extra-item .group-no{grid-area:group;align-self:start;white-space:nowrap}
+.prelim-extra-item .match-text{
+  grid-area:match;
+  min-width:0;
+  display:block;
+  line-height:1.45;
+  font-size:12px;
+  font-weight:800;
+  color:#15233a;
+  word-break:keep-all;
+  overflow-wrap:anywhere;
+}
+.prelim-extra-item .prelim-extra-time{
+  grid-area:time;
+  justify-self:start;
+  margin:0;
+  white-space:normal;
+  line-height:1.25;
+  padding:5px 8px;
+}
+.prelim-extra-queue{padding:10px 12px}
+.prelim-extra-queue strong{margin-bottom:4px}
+@media(max-width:720px){
+  .prelim-extra-item{
+    grid-template-columns:24px minmax(0,1fr);
+    grid-template-areas:
+      "number group"
+      ". match"
+      ". time";
+  }
+  .prelim-extra-item .prelim-extra-time{margin-left:0}
+}
