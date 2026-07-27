@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#10264a">
   <title>230MATCH V3</title>
-  <link rel="stylesheet" href="./assets/css/tokens.css?v=33115">
-  <link rel="stylesheet" href="./assets/css/layout.css?v=33115">
-  <link rel="stylesheet" href="./assets/css/components.css?v=33115">
-  <link rel="stylesheet" href="./assets/css/responsive.css?v=33115">
+  <link rel="stylesheet" href="./assets/css/tokens.css?v=33116">
+  <link rel="stylesheet" href="./assets/css/layout.css?v=33116">
+  <link rel="stylesheet" href="./assets/css/components.css?v=33116">
+  <link rel="stylesheet" href="./assets/css/responsive.css?v=33116">
 </head>
 <body>
   <header class="topbar">
@@ -20,6 +20,12 @@
       </div>
     </div>
     <div class="top-actions">
+      <div class="role-switch" aria-label="운영 권한 선택">
+        <span id="currentRoleBadge" class="badge badge-safe">관리자</span>
+        <button id="roleOperatorBtn" type="button" class="btn btn-light">진행자</button>
+        <button id="roleAdminBtn" type="button" class="btn btn-light active">관리자</button>
+        <button id="changeAdminPinBtn" type="button" class="btn btn-light" data-admin-only="true">PIN 변경</button>
+      </div>
       <span id="saveStateBadge" class="badge badge-muted">저장 대기</span>
       <button id="saveRecoveryBtn" class="btn btn-light">복구점 저장</button>
       <button id="openRecoveryBtn" class="btn btn-light">복구</button>
@@ -29,7 +35,7 @@
   <main class="app-shell">
     <section class="hero panel">
       <div>
-        <p class="eyebrow" id="buildStageLabel">STAGE 31.15 · CLEAN DEPLOYMENT PACKAGE</p>
+        <p class="eyebrow" id="buildStageLabel">STAGE 31.16 · ADMIN & OPERATOR ROLES</p>
         <h1>예선·본선 단일 통합 운영</h1>
         <p>코트 운영을 기본 화면으로 두고 예선 조 현황·본선 준비·대회 설정을 필요한 때만 열어 봅니다.</p>
       </div>
@@ -44,11 +50,11 @@
     <nav class="mode-tabs panel">
       <button class="tab active" data-view="operation">전체 통합 운영</button>
       <button class="tab" data-view="bracket">본선 대진표</button>
-      <button class="tab" data-view="settings">대회 설정</button>
+      <button class="tab" data-view="settings" data-admin-only="true">대회 설정</button>
       <button class="tab" data-view="roster">참가팀 연락처</button>
       <button class="tab" data-view="messages">문자 센터</button>
-      <button class="tab" data-view="audit">운영 점검</button>
-      <button class="tab" data-view="logs">운영 로그</button>
+      <button class="tab" data-view="audit" data-admin-only="true">운영 점검</button>
+      <button class="tab" data-view="logs" data-admin-only="true">운영 로그</button>
     </nav>
 
     <section id="view-operation" class="view active operation-workspace" data-operation-mode="courts">
@@ -860,6 +866,6 @@
     <div id="recoveryList" class="recovery-list"></div>
   </dialog>
 
-  <script type="module" src="./assets/js/app-v33115.js?v=33115"></script>
+  <script type="module" src="./assets/js/app-v33116.js?v=33116"></script>
 </body>
 </html>

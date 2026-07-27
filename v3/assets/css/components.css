@@ -238,3 +238,6 @@ input,select{width:100%;border:1px solid #b9cae5;border-radius:10px;padding:11px
 @keyframes setupFocusPulse{50%{box-shadow:0 0 0 5px rgba(120,65,220,.22);transform:translateY(-1px)}}
 @media(max-width:900px){.setup-progress-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.setup-complete-row{grid-template-columns:1fr}}
 @media(max-width:560px){.setup-progress-grid{grid-template-columns:1fr}}
+
+/* Stage 31.16 role controls */
+.role-switch{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.role-switch .btn{padding:7px 10px}.role-switch .btn.active{box-shadow:0 0 0 2px rgba(255,255,255,.45) inset;font-weight:800}body[data-role="operator"] .operation-setup-section,body[data-role="operator"] .operation-general-settings{display:none!important}body[data-role="operator"] [aria-disabled="true"]{opacity:.45;cursor:not-allowed}body[data-role="operator"] .admin-only-note{display:block}.admin-only-note{display:none}
