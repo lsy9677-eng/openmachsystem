@@ -251,3 +251,6 @@ input,select{width:100%;border:1px solid #b9cae5;border-radius:10px;padding:11px
 .prelim-extra-item{position:relative;padding-right:108px}
 .prelim-extra-move-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);white-space:nowrap;padding:7px 10px}
 @media(max-width:900px){.prelim-extra-item{padding-right:0}.prelim-extra-move-btn{position:static;transform:none;margin-top:8px;width:100%}}
+
+.force-visible-move{display:inline-flex!important;visibility:visible!important;opacity:1!important;position:static!important;transform:none!important;margin-top:8px!important}
+.unified-card-actions{display:flex!important;visibility:visible!important;opacity:1!important}
