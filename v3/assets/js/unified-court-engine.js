@@ -181,3 +181,49 @@ export function enqueueReadyMainToUnifiedCourts(state){
   state.sharedQueue=[];
   return{assigned,playInOnly:playInGate,repair,reason:assigned?'assigned':playInGate?'play-in-gate':ready.length?'no-active-courts':'no-ready'};
 }
+
+function removeUnifiedEverywhere(state,matchId){
+  Object.keys(state.venueQueues||{}).forEach(v=>state.venueQueues[v]=(state.venueQueues[v]||[]).filter(id=>id!==matchId));
+  (state.prelim?.courts||[]).forEach(c=>{
+    c.queue=Array.isArray(c.queue)?c.queue:[];
+    if(c.playing===matchId)c.playing=null;
+    if(c.wait1===matchId)c.wait1=null;
+    c.queue=c.queue.filter(id=>id!==matchId);
+  });
+  (state.courts||[]).forEach(c=>{
+    if(c.playing===matchId)c.playing=null;
+    if(c.wait1===matchId)c.wait1=null;
+    if(Array.isArray(c.manualQueue))c.manualQueue=c.manualQueue.filter(id=>id!==matchId);
+  });
+}
+function refreshUnifiedCourtStatuses(state,court){
+  court.queue=Array.isArray(court.queue)?court.queue:[];
+  if(court.playing)setUnifiedStatus(state,court.playing,'playing',court);
+  if(court.wait1)setUnifiedStatus(state,court.wait1,'court_wait1',court);
+  court.queue.forEach(id=>setUnifiedStatus(state,id,'queued',court));
+}
+export function moveUnifiedCourtMatchFlexible(state,{matchId,targetCourtId,mode='auto'}){
+  const court=(state.prelim?.courts||[]).find(c=>c.id===targetCourtId);
+  if(!court)throw new Error('대상 통합 코트를 찾지 못했습니다.');
+  const item=findUnifiedMatch(state,matchId);if(!item)throw new Error('이동할 경기를 찾지 못했습니다.');
+  court.queue=Array.isArray(court.queue)?court.queue:[];
+  const originalStartedAt=item.match.startedAt||null;
+  removeUnifiedEverywhere(state,matchId);
+  const shifted=[];
+  if(mode==='insert-playing'){
+    if(court.wait1){court.queue.unshift(court.wait1);shifted.push(court.wait1);}
+    if(court.playing){court.wait1=court.playing;shifted.push(court.playing);}else court.wait1=null;
+    court.playing=matchId;item.match.startedAt=originalStartedAt||new Date().toISOString();
+  }else if(mode==='insert-wait1'){
+    if(court.wait1){court.queue.unshift(court.wait1);shifted.push(court.wait1);}
+    court.wait1=matchId;
+  }else if(mode.startsWith('insert-reserve-')){
+    const idx=Math.max(0,Math.min(court.queue.length,Number(mode.replace('insert-reserve-',''))||0));
+    court.queue.splice(idx,0,matchId);
+  }else if(mode==='manual-bottom')court.queue.push(matchId);
+  else if(!court.playing&&!court.isPaused){court.playing=matchId;item.match.startedAt=originalStartedAt||new Date().toISOString();}
+  else if(!court.wait1&&!court.isPaused)court.wait1=matchId;
+  else court.queue.push(matchId);
+  refreshUnifiedCourtStatuses(state,court);
+  return{court,item,shifted};
+}
