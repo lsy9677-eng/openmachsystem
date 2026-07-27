@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#10264a">
   <title>230MATCH V3</title>
-  <link rel="stylesheet" href="./assets/css/tokens.css?v=33104">
-  <link rel="stylesheet" href="./assets/css/layout.css?v=33104">
-  <link rel="stylesheet" href="./assets/css/components.css?v=33104">
-  <link rel="stylesheet" href="./assets/css/responsive.css?v=33104">
+  <link rel="stylesheet" href="./assets/css/tokens.css?v=33105">
+  <link rel="stylesheet" href="./assets/css/layout.css?v=33105">
+  <link rel="stylesheet" href="./assets/css/components.css?v=33105">
+  <link rel="stylesheet" href="./assets/css/responsive.css?v=33105">
 </head>
 <body>
   <header class="topbar">
@@ -29,7 +29,7 @@
   <main class="app-shell">
     <section class="hero panel">
       <div>
-        <p class="eyebrow">STAGE 31.4 · AUTO DRAW SIZE & ORDERED SETUP</p>
+        <p class="eyebrow">STAGE 31.5 · TOURNAMENT READY WORKFLOW</p>
         <h1>예선·본선 단일 통합 운영</h1>
         <p>코트 운영을 기본 화면으로 두고 예선 조 현황·본선 준비·대회 설정을 필요한 때만 열어 봅니다.</p>
       </div>
@@ -62,6 +62,35 @@
           <button type="button" class="operation-mode-btn" data-operation-section="groups">예선 조 현황</button>
           <button type="button" class="operation-mode-btn" data-operation-section="main">본선 준비·진행</button>
           <button type="button" class="operation-mode-btn" data-operation-section="setup">대회 준비·설정</button>
+        </div>
+      </section>
+
+
+      <section class="panel setup-progress-panel operation-setup-section" aria-label="대회 준비 진행상태">
+        <div class="section-head">
+          <div>
+            <h2>대회 준비 진행상태</h2>
+            <p>아래 네 단계를 완료하면 설정 화면을 닫고 코트 운영으로 바로 전환할 수 있습니다.</p>
+          </div>
+          <span id="setupReadyBadge" class="badge badge-muted-dark">준비 확인 중</span>
+        </div>
+        <div class="setup-progress-grid">
+          <button type="button" class="setup-step" id="setupStepRoster" data-setup-jump="roster">
+            <span class="setup-step-number">1</span><span><b>명단</b><small id="setupStepRosterText">명단 필요</small></span>
+          </button>
+          <button type="button" class="setup-step" id="setupStepGroups" data-setup-jump="groups">
+            <span class="setup-step-number">2</span><span><b>예선 조편성</b><small id="setupStepGroupsText">조편성 필요</small></span>
+          </button>
+          <button type="button" class="setup-step" id="setupStepCourts" data-setup-jump="courts">
+            <span class="setup-step-number">3</span><span><b>예선 코트배정</b><small id="setupStepCourtsText">코트배정 필요</small></span>
+          </button>
+          <button type="button" class="setup-step" id="setupStepDraw" data-setup-jump="draw">
+            <span class="setup-step-number">4</span><span><b>본선 슬롯 선추첨</b><small id="setupStepDrawText">선추첨 필요</small></span>
+          </button>
+        </div>
+        <div class="setup-complete-row">
+          <div id="setupNextAction" class="notice info">먼저 참가팀 명단을 불러오세요.</div>
+          <button id="startTournamentOperationBtn" type="button" class="btn btn-primary" disabled>대회 준비 완료 · 코트 운영 시작</button>
         </div>
       </section>
 
@@ -112,13 +141,13 @@
 
         <div id="linkedDrawSizeGuide" class="notice info">본선 슬롯 수가 현재 대진 규모를 초과하면 32강 → 64강 → 128강 중 필요한 크기로 자동 확대됩니다.</div>
 
-        <div class="button-row prelim-primary-actions">
+        <div id="setupRosterActions" class="button-row prelim-primary-actions">
           <button id="loadSampleBtn" class="btn btn-secondary">100팀 테스트 명단</button>
           <label class="btn btn-secondary file-button">명단 JSON 선택<input id="teamFileInput" type="file" accept=".json,application/json"></label>
           <button id="autoFitPrelimBtn" class="btn btn-secondary">사용팀 수에 맞춰 조 자동계산</button>
-          <button id="generatePrelimBtn" class="btn btn-primary">예선 조편성 생성</button>
-          <button id="assignPrelimCourtsBtn" class="btn btn-purple">예선 코트배정</button>
-          <button id="generateLinkedDrawBtn" class="btn btn-gold">예선 슬롯으로 본선 선추첨</button>
+          <button data-setup-anchor="groups" id="generatePrelimBtn" class="btn btn-primary">예선 조편성 생성</button>
+          <button data-setup-anchor="courts" id="assignPrelimCourtsBtn" class="btn btn-purple">예선 코트배정</button>
+          <button data-setup-anchor="draw" id="generateLinkedDrawBtn" class="btn btn-gold">예선 슬롯으로 본선 선추첨</button>
           <button id="syncLinkedDrawBtn" class="btn btn-secondary">확정팀 본선 자동 반영</button>
           <button id="lockPrelimBtn" class="btn btn-gold">예선 종료 후 최종잠금</button>
           <button id="unlockPrelimBtn" class="btn btn-danger-outline">관리자 잠금 해제</button>
@@ -809,6 +838,6 @@
     <div id="recoveryList" class="recovery-list"></div>
   </dialog>
 
-  <script type="module" src="./assets/js/app-v33104.js?v=33104"></script>
+  <script type="module" src="./assets/js/app-v33105.js?v=33105"></script>
 </body>
 </html>

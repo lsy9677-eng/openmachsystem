@@ -218,3 +218,23 @@ input,select{width:100%;border:1px solid #b9cae5;border-radius:10px;padding:11px
 .operation-general-settings .section-head h2::before{content:"2단계 · ";color:#6d28d9;}
 #linkedDrawSizeGuide{margin:14px 0 4px;}
 .prelim-primary-actions{align-items:center;}
+
+
+/* Stage 31.5 tournament-ready workflow */
+.setup-progress-panel{border:1px solid #b9cff0;background:linear-gradient(180deg,#fff 0%,#f7faff 100%)}
+.setup-progress-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:14px}
+.setup-step{display:flex;align-items:center;gap:10px;text-align:left;border:1px solid #d3ddeb;background:#fff;border-radius:14px;padding:13px;cursor:pointer;color:#20314d;transition:.18s ease}
+.setup-step:hover{transform:translateY(-1px);border-color:#8caae0}
+.setup-step-number{display:grid;place-items:center;flex:0 0 30px;height:30px;border-radius:50%;background:#e8eef8;font-weight:800}
+.setup-step span:last-child{display:flex;flex-direction:column;gap:3px;min-width:0}
+.setup-step small{color:#697993;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.setup-step.complete{border-color:#8bd1a8;background:#f1fbf5}
+.setup-step.complete .setup-step-number{background:#198754;color:#fff}
+.setup-step.complete small{color:#167144}
+.setup-complete-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;margin-top:14px}
+.setup-complete-row .notice{margin:0}
+#startTournamentOperationBtn:disabled{opacity:.45;cursor:not-allowed}
+.setup-focus-pulse{animation:setupFocusPulse .55s ease-in-out 3}
+@keyframes setupFocusPulse{50%{box-shadow:0 0 0 5px rgba(120,65,220,.22);transform:translateY(-1px)}}
+@media(max-width:900px){.setup-progress-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.setup-complete-row{grid-template-columns:1fr}}
+@media(max-width:560px){.setup-progress-grid{grid-template-columns:1fr}}
