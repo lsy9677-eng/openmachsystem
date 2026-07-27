@@ -1,0 +1,865 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#10264a">
+  <title>230MATCH V3</title>
+  <link rel="stylesheet" href="./assets/css/tokens.css?v=33115">
+  <link rel="stylesheet" href="./assets/css/layout.css?v=33115">
+  <link rel="stylesheet" href="./assets/css/components.css?v=33115">
+  <link rel="stylesheet" href="./assets/css/responsive.css?v=33115">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">23</div>
+      <div>
+        <strong>230MATCH V3</strong>
+        <span>독립형 시합 운영 시스템</span>
+      </div>
+    </div>
+    <div class="top-actions">
+      <span id="saveStateBadge" class="badge badge-muted">저장 대기</span>
+      <button id="saveRecoveryBtn" class="btn btn-light">복구점 저장</button>
+      <button id="openRecoveryBtn" class="btn btn-light">복구</button>
+    </div>
+  </header>
+
+  <main class="app-shell">
+    <section class="hero panel">
+      <div>
+        <p class="eyebrow" id="buildStageLabel">STAGE 31.15 · CLEAN DEPLOYMENT PACKAGE</p>
+        <h1>예선·본선 단일 통합 운영</h1>
+        <p>코트 운영을 기본 화면으로 두고 예선 조 현황·본선 준비·대회 설정을 필요한 때만 열어 봅니다.</p>
+      </div>
+      <div class="hero-stats">
+        <div><span>대진</span><strong id="heroDrawSize">-</strong></div>
+        <div><span>전체 경기</span><strong id="heroMatchCount">0</strong></div>
+        <div><span>완료</span><strong id="heroCompleted">0</strong></div>
+        <div><span>진행</span><strong id="heroPlaying">0</strong></div>
+      </div>
+    </section>
+
+    <nav class="mode-tabs panel">
+      <button class="tab active" data-view="operation">전체 통합 운영</button>
+      <button class="tab" data-view="bracket">본선 대진표</button>
+      <button class="tab" data-view="settings">대회 설정</button>
+      <button class="tab" data-view="roster">참가팀 연락처</button>
+      <button class="tab" data-view="messages">문자 센터</button>
+      <button class="tab" data-view="audit">운영 점검</button>
+      <button class="tab" data-view="logs">운영 로그</button>
+    </nav>
+
+    <section id="view-operation" class="view active operation-workspace" data-operation-mode="courts">
+      <section class="panel operation-mode-bar" aria-label="통합 운영 보기 선택">
+        <div class="operation-mode-copy">
+          <strong>전체 통합 운영</strong>
+          <span>현재 필요한 화면만 선택해 운영합니다.</span>
+        </div>
+        <div class="operation-mode-buttons">
+          <button type="button" class="operation-mode-btn active" data-operation-section="courts">코트 운영</button>
+          <button type="button" class="operation-mode-btn" data-operation-section="groups">예선 조 현황</button>
+          <button type="button" class="operation-mode-btn" data-operation-section="main">본선 준비·진행</button>
+          <button type="button" class="operation-mode-btn" data-operation-section="setup">대회 준비·설정</button>
+        </div>
+      </section>
+
+
+
+      <section class="panel operator-control-panel operation-courts-section" aria-label="운영자 제어">
+        <div class="operator-control-main">
+          <div><strong>운영자 제어</strong><span>자동배정을 잠시 멈춰도 현재 시합과 대기1은 유지됩니다.</span></div>
+          <div class="operator-control-actions"><button id="globalAutoAssignToggle" type="button" class="btn btn-primary">전체 자동배정 ON</button><span class="badge badge-muted-dark">보류 <b id="heldMatchCount">0</b>경기</span><button id="saveRecoveryBtnInline" type="button" class="btn btn-light">현재 복구점 저장</button></div>
+        </div>
+        <details class="held-match-details"><summary>보류 경기 보기</summary><div id="heldMatchList" class="held-match-list"></div></details>
+      </section>
+
+      <section class="panel setup-progress-panel operation-setup-section" aria-label="대회 준비 진행상태">
+        <div class="section-head">
+          <div>
+            <h2>대회 준비 진행상태</h2>
+            <p>아래 네 단계를 완료하면 설정 화면을 닫고 코트 운영으로 바로 전환할 수 있습니다.</p>
+          </div>
+          <span id="setupReadyBadge" class="badge badge-muted-dark">준비 확인 중</span>
+        </div>
+        <div class="setup-progress-grid">
+          <button type="button" class="setup-step" id="setupStepRoster" data-setup-jump="roster">
+            <span class="setup-step-number">1</span><span><b>명단</b><small id="setupStepRosterText">명단 필요</small></span>
+          </button>
+          <button type="button" class="setup-step" id="setupStepGroups" data-setup-jump="groups">
+            <span class="setup-step-number">2</span><span><b>예선 조편성</b><small id="setupStepGroupsText">조편성 필요</small></span>
+          </button>
+          <button type="button" class="setup-step" id="setupStepCourts" data-setup-jump="courts">
+            <span class="setup-step-number">3</span><span><b>예선 코트배정</b><small id="setupStepCourtsText">코트배정 필요</small></span>
+          </button>
+          <button type="button" class="setup-step" id="setupStepDraw" data-setup-jump="draw">
+            <span class="setup-step-number">4</span><span><b>본선 슬롯 선추첨</b><small id="setupStepDrawText">선추첨 필요</small></span>
+          </button>
+        </div>
+        <div class="setup-complete-row">
+          <div id="setupNextAction" class="notice info">먼저 참가팀 명단을 불러오세요.</div>
+          <button id="startTournamentOperationBtn" type="button" class="btn btn-primary" disabled>대회 준비 완료 · 코트 운영 시작</button>
+        </div>
+      </section>
+
+      <section id="unifiedPrelimSetup" class="panel control-panel unified-prelim-setup operation-setup-section">
+        <div class="section-head">
+          <div>
+            <h2>1단계 · 명단 및 예선 준비</h2>
+            <p>명단을 불러온 뒤 조 자동계산 → 조편성 → 코트배정 순서로 진행합니다. 마지막에 본선 슬롯 선추첨을 실행합니다.</p>
+          </div>
+          <span class="badge badge-safe">V3 예선 엔진</span>
+        </div>
+
+        <div class="control-grid prelim-controls">
+          <label>
+            <span>예선 사용팀 수</span>
+            <input id="prelimActiveTeamCount" type="number" min="2" value="96">
+          </label>
+          <label>
+            <span>3팀조 수</span>
+            <input id="threeTeamGroupCount" type="number" min="0" value="32">
+          </label>
+          <label>
+            <span>2팀조 수</span>
+            <input id="twoTeamGroupCount" type="number" min="0" value="2">
+          </label>
+          <label class="prelim-venue-summary-field">
+            <span>예선 사용 구장</span>
+            <input id="prelimVenueSummary" type="text" value="대회 설정의 예선 사용 구장을 반영합니다." readonly>
+          </label>
+          <label>
+            <span>예선 코트 수</span>
+            <input id="prelimCourtCountSummary" type="text" value="0면" readonly>
+          </label>
+          <label>
+            <span>조당 진출팀</span>
+            <select id="qualifiersPerGroup">
+              <option value="1">1팀</option>
+              <option value="2" selected>2팀</option>
+            </select>
+          </label>
+          <label>
+            <span>순위 기준</span>
+            <select id="prelimRankingRule">
+              <option value="wins-diff-points">승수 → 득실 → 득점</option>
+            </select>
+          </label>
+        </div>
+
+        <div id="linkedDrawSizeGuide" class="notice info">본선 슬롯 수가 현재 대진 규모를 초과하면 32강 → 64강 → 128강 중 필요한 크기로 자동 확대됩니다.</div>
+
+        <div id="setupRosterActions" class="button-row prelim-primary-actions">
+          <button id="loadSampleBtn" class="btn btn-secondary">100팀 테스트 명단</button>
+          <label class="btn btn-secondary file-button">명단 JSON 선택<input id="teamFileInput" type="file" accept=".json,application/json"></label>
+          <button id="autoFitPrelimBtn" class="btn btn-secondary">사용팀 수에 맞춰 조 자동계산</button>
+          <button data-setup-anchor="groups" id="generatePrelimBtn" class="btn btn-primary">예선 조편성 생성</button>
+          <button data-setup-anchor="courts" id="assignPrelimCourtsBtn" class="btn btn-purple">예선 코트배정</button>
+          <button data-setup-anchor="draw" id="generateLinkedDrawBtn" class="btn btn-gold">예선 슬롯으로 본선 선추첨</button>
+          <button id="syncLinkedDrawBtn" class="btn btn-secondary">확정팀 본선 자동 반영</button>
+          <button id="lockPrelimBtn" class="btn btn-gold">예선 종료 후 최종잠금</button>
+          <button id="unlockPrelimBtn" class="btn btn-danger-outline">관리자 잠금 해제</button>
+          <button id="resetPrelimBtn" class="btn btn-danger-outline">예선만 초기화</button>
+        </div>
+
+        <div id="prelimNoticeBar" class="notice info">통합 운영 탭에서 명단을 먼저 불러오세요.</div>
+        <div id="prelimLockStatus" class="prelim-lock-status unlocked">
+          <strong>예선 잠금 해제 상태</strong>
+          <span>결과 입력·조편성·후보교체가 가능합니다.</span>
+        </div>
+        <div class="notice info prelim-order-rule">
+          <strong>3팀조 경기순서:</strong> ① 1번팀 vs 2번팀 → ② 첫 경기 승자 vs 3번팀 → ③ 첫 경기 패자 vs 3번팀.
+          한 코트에 여러 조가 배정되면 각 조의 같은 순번 경기를 번갈아 진행합니다.
+        </div>
+      </section>
+
+
+      <section class="panel control-panel operation-setup-section operation-general-settings">
+        <div class="section-head">
+          <div>
+            <h2>본선 준비와 운영 설정</h2>
+            <p>예선 준비가 끝난 뒤 본선 대진·시간·잠금·코트배정을 설정합니다.</p>
+          </div>
+          <span class="badge badge-safe">독립 엔진</span>
+        </div>
+
+        <div class="control-grid">
+          <label>
+            <span>대회명</span>
+            <input id="tournamentName" type="text" value="230스포츠미디어배 테스트">
+          </label>
+          <label>
+            <span>부서</span>
+            <input id="divisionName" type="text" value="부경신인부">
+          </label>
+          <label>
+            <span>대진 규모</span>
+            <select id="drawSize">
+              <option value="32">32강</option>
+              <option value="64" selected>64강</option>
+              <option value="128">128강</option>
+            </select>
+          </label>
+          <label>
+            <span>기본 추첨 방식(고급)</span>
+            <select id="drawMethod">
+              <option value="instant">즉시 추첨</option>
+              <option value="roulette">룰렛 추첨</option>
+              <option value="seeded">시드 분산 추첨</option>
+            </select>
+          </label>
+          <label>
+            <span>부전승 우선</span>
+            <select id="byePriority">
+              <option value="group-first" selected>조 1위 우선</option>
+              <option value="random">전체 랜덤</option>
+            </select>
+          </label>
+          <label>
+            <span>본선 코트 합계</span>
+            <input id="courtCount" type="text" value="0면" readonly>
+          </label>
+          <label class="venue-summary-control">
+            <span>예선·본선 구장</span>
+            <input id="operationVenueSummary" type="text" value="대회 설정의 구장 구성을 사용합니다." readonly>
+          </label>
+          <label>
+            <span>예상 경기시간</span>
+            <div class="input-suffix"><input id="matchMinutes" type="number" min="30" max="180" value="40"><b>분</b></div>
+          </label>
+          <label>
+            <span>최소 예상시간</span>
+            <div class="input-suffix"><input id="minimumMatchMinutes" type="number" min="20" max="120" value="30"><b>분</b></div>
+          </label>
+        </div>
+
+        <div class="notice info operation-venue-note">
+          코트명과 코트 수는 <b>대회 설정 → 예선·본선 구장·코트 구성</b>에서만 변경합니다.
+        </div>
+
+        <div class="time-settings">
+          <label><span>진행시간 갱신</span><select id="timeRefreshSeconds"><option value="15">15초</option><option value="30" selected>30초</option><option value="60">60초</option></select></label>
+          <label class="toggle-label"><span>대기시간 자동계산</span><input id="autoTimeEnabled" type="checkbox" checked></label>
+          <button id="recalculateTimeBtn" class="btn btn-light">예상시간 즉시 계산</button>
+          <label class="toggle-label"><span>운영 문자 자동 생성</span><input id="autoMessageEnabled" type="checkbox" checked></label>
+          <label class="toggle-label"><span>확정 본선 자동 추가배정</span><input id="autoIncrementalMainEnabled" type="checkbox" checked></label>
+          <button id="generateTimeMessagesBtn" class="btn btn-light">예상시간 문자 생성</button>
+        </div>
+
+        <div class="button-row">
+          <button id="instantDrawBtn" class="btn btn-primary">즉시 추첨 실행</button>
+          <button id="rouletteDrawBtn" class="btn btn-gold">룰렛 추첨 실행</button>
+          <button id="seededDrawBtn" class="btn btn-purple">시드 분산 추첨 실행</button>
+          <button id="reshuffleDrawBtn" class="btn btn-secondary">현재 방식으로 재추첨</button>
+          <button id="lockDrawBtn" class="btn btn-gold">본선 대진 잠금</button>
+          <button id="unlockDrawBtn" class="btn btn-danger-outline">관리자 잠금 해제</button>
+          <button id="assignCourtsBtn" class="btn btn-purple">확정 본선경기 코트배정</button>
+          <button id="quickAuditBtn" class="btn btn-secondary">운영 상태 점검</button>
+          <button id="resetBtn" class="btn btn-danger-outline">전체 초기화</button>
+        </div>
+
+        <div id="noticeBar" class="notice info">명단을 불러온 뒤 원하는 추첨 버튼을 직접 누르세요.</div>
+        <div id="earlyMainStatus" class="early-main-status">
+          <div><strong>예선·본선 동시 운영</strong><span>예선 순위가 확정된 본선 경기만 코트배정됩니다.</span></div>
+          <div class="early-main-metrics">
+            <span>확정 경기 <b id="earlyMainReadyCount">0</b></span>
+            <span>미확정 경기 <b id="earlyMainPendingCount">0</b></span>
+            <span>진행 가능 <b id="earlyMainAssignableCount">0</b></span>
+            <span>자동 추가배정 <b id="earlyMainAutoStatus">ON</b></span>
+          </div>
+        </div>
+        <div id="drawLockInfo" class="draw-lock-info unlocked">
+          <strong>본선 대진 잠금 해제 상태</strong>
+          <span>추첨과 재추첨이 가능합니다. 대진 검토가 끝난 뒤 잠그세요.</span>
+        </div>
+      </section>
+
+      <section class="summary-grid operation-overview-summary">
+        <article class="summary-card"><span>명단</span><strong id="summaryTeams">0팀</strong></article>
+        <article class="summary-card"><span>현재 라운드</span><strong id="summaryRound">-</strong></article>
+        <article class="summary-card"><span>시합중</span><strong id="summaryPlaying">0</strong></article>
+        <article class="summary-card"><span>코트 대기1</span><strong id="summaryWait1">0</strong></article>
+        <article class="summary-card"><span>공용대기</span><strong id="summaryShared">0</strong></article>
+        <article class="summary-card"><span>자동 저장</span><strong id="summaryAutosave">ON</strong></article>
+        <article class="summary-card"><span>평균 진행시간</span><strong id="summaryAverageMinutes">0분</strong></article>
+        <article class="summary-card"><span>최장 예상대기</span><strong id="summaryLongestWait">0분</strong></article>
+        <article class="summary-card"><span>추첨 방식</span><strong id="summaryDrawMethod">-</strong></article>
+        <article class="summary-card"><span>대진 잠금</span><strong id="summaryDrawLock">해제</strong></article>
+        <article class="summary-card"><span>발송 대기 문자</span><strong id="summaryPendingMessages">0건</strong></article>
+        <article class="summary-card"><span>연락처 등록</span><strong id="summaryPhoneTeams">0팀</strong></article>
+        <article class="summary-card"><span>운영 점검</span><strong id="summaryAuditStatus">미실행</strong></article>
+        <article class="summary-card"><span>본선 구장</span><strong id="summaryVenueCount">1곳</strong></article>
+        <article class="summary-card"><span>구장별 공용대기</span><strong id="summaryVenueQueueCount">0경기</strong></article>
+      </section>
+
+
+      <section class="summary-grid operation-prelim-summary">
+        <article class="summary-card"><span>예선 사용팀</span><strong id="prelimSummaryActiveTeams">0팀</strong></article>
+        <article class="summary-card"><span>후보팀</span><strong id="prelimSummaryReserveTeams">0팀</strong></article>
+        <article class="summary-card"><span>예선 조</span><strong id="prelimSummaryGroups">0조</strong></article>
+        <article class="summary-card"><span>예선 경기</span><strong id="prelimSummaryMatches">0</strong></article>
+        <article class="summary-card"><span>완료 경기</span><strong id="prelimSummaryCompleted">0</strong></article>
+        <article class="summary-card"><span>확정 1위</span><strong id="prelimSummaryFirst">0</strong></article>
+        <article class="summary-card"><span>확정 2위</span><strong id="prelimSummarySecond">0</strong></article>
+        <article class="summary-card"><span>본선 진출</span><strong id="prelimSummaryQualifiers">0팀</strong></article>
+        <article class="summary-card"><span>연결 본선 슬롯</span><strong id="prelimSummaryLinkedSlots">0</strong></article>
+      </section>
+
+
+
+      <section class="panel reserve-panel operation-setup-section">
+        <div class="section-head">
+          <div>
+            <h2>예선 참가팀 · 후보팀</h2>
+            <p>명단 앞에서부터 예선 사용팀으로 배정하고, 초과 인원은 후보팀으로 별도 보관합니다.</p>
+          </div>
+          <button id="swapReserveBtn" class="btn btn-light">후보 교체 모드</button>
+        </div>
+        <div class="team-pool-grid">
+          <section>
+            <h3>예선 참가팀 <span id="activePoolCount">0팀</span></h3>
+            <div id="activeTeamPool" class="team-pool empty-state"><p>예선 조편성을 생성하면 표시됩니다.</p></div>
+          </section>
+          <section>
+            <h3>후보팀 <span id="reservePoolCount">0팀</span></h3>
+            <div id="reserveTeamPool" class="team-pool empty-state"><p>후보팀이 없습니다.</p></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="panel linked-draw-panel operation-main-section">
+        <div class="section-head">
+          <div>
+            <h2>예선 → 본선 연결 상태</h2>
+            <p>미확정 슬롯은 ‘1조 1위’, ‘1조 2위’처럼 유지되며 조 순위 확정 시 실제 팀명으로 자동 치환됩니다.</p>
+          </div>
+          <span id="linkedDrawBadge" class="badge badge-muted-dark">연결 대진 없음</span>
+        </div>
+        <div id="linkedDrawStatus" class="linked-status-grid empty-state">
+          <p>예선 슬롯으로 본선 선추첨을 실행하면 연결 상태가 표시됩니다.</p>
+        </div>
+      </section>
+
+
+      <section class="panel prelim-court-operation-panel operation-courts-section">
+        <div class="section-head">
+          <div>
+            <h2>예선·본선 통합 코트 현황</h2>
+            <p>같은 실제 코트에서 예선과 본선을 함께 운영합니다. 미확정 본선 슬롯은 표시만 되고 코트배정되지 않습니다.</p>
+          </div>
+          <span id="operationUnifiedCourtCount" class="badge badge-safe">0면</span>
+        </div>
+        <div id="operationUnifiedCourtGrid" class="prelim-court-operation-grid empty-state">
+          <p>예선 코트배정을 실행하면 통합 코트 카드가 표시됩니다.</p>
+        </div>
+      </section>
+
+      <section class="panel operation-shared-queue-section">
+        <div class="section-head">
+          <div>
+            <h2>본선 공용대기</h2>
+            <p>각 코트에는 시합중 1경기와 대기1 1경기만 배치합니다. 나머지 확정 본선 경기는 이곳에서 순서대로 대기하며 빈 코트에 자동 보충됩니다.</p>
+          </div>
+          <span id="operationSharedQueueCount" class="badge badge-warning">0경기</span>
+        </div>
+        <div id="operationSharedQueue" class="shared-queue venue-queue-board empty-state">
+          <p>확정된 본선 공용대기 경기가 없습니다.</p>
+        </div>
+      </section>
+
+      <section class="panel operation-groups-section">
+        <div class="section-head">
+          <div>
+            <h2>예선 조별 현황</h2>
+            <p>결과 입력, 조 순위, 다음 경기 상태를 통합 운영 화면에서 바로 확인합니다.</p>
+          </div>
+          <div class="button-row compact-actions">
+            <button id="operationGoPrelimSettingsBtn" class="btn btn-light">예선 설정으로 이동</button>
+            <button id="useQualifiersForDrawBtn" class="btn btn-light">예선 종료팀 본선 명단 복사</button>
+            <button id="operationGoBracketBtn" class="btn btn-secondary">본선 대진표 열기</button>
+          </div>
+        </div>
+        <div id="operationPrelimGroupGrid" class="prelim-group-grid empty-state">
+          <p>예선 조편성을 생성하면 조별 카드가 표시됩니다.</p>
+        </div>
+      </section>
+
+      <section class="panel operation-main-section">
+        <div class="section-head">
+          <div>
+            <h2>본선 확정·대기 현황</h2>
+            <p>실제 참가팀 양쪽이 모두 확정된 경기만 진행 가능으로 표시합니다.</p>
+          </div>
+          <strong id="operationMainReadySummary">확정 0 · 미확정 0</strong>
+        </div>
+        <div id="operationMainReadyList" class="shared-queue empty-state">
+          <p>확정된 본선 경기가 없습니다.</p>
+        </div>
+      </section>
+
+      <section class="single-screen-render-sources" hidden aria-hidden="true">
+        <span id="prelimCourtOperationCount">0면</span>
+        <div id="prelimCourtOperationGrid"></div>
+        <div id="prelimGroupGrid"></div>
+      </section>
+    </section>
+
+
+    <section id="view-bracket" class="view">
+      <section class="panel">
+        <div class="section-head">
+          <div><h2>본선 대진표</h2><p>결과 확정 전에는 다음 라운드가 TBD로 유지됩니다.</p></div>
+          <button id="exportJsonBtn" class="btn btn-light">운영 JSON 저장</button>
+        </div>
+        <div class="bracket-view-toolbar">
+          <label><span>라운드</span><select id="bracketRoundFilter"><option value="all">전체 라운드</option></select></label>
+          <label><span>경기 상태</span>
+            <select id="bracketStatusFilter">
+              <option value="all">전체 상태</option>
+              <option value="active">시합중·대기만</option>
+              <option value="playing">시합중</option>
+              <option value="court_wait1">대기1</option>
+              <option value="court_manual_queue">관리자 대기</option>
+              <option value="venue_shared_queue">구장 공용대기</option>
+              <option value="ready">배정 대기</option>
+              <option value="completed">완료</option>
+            </select>
+          </label>
+          <label><span>구장</span><select id="bracketVenueFilter"><option value="all">전체 구장</option></select></label>
+          <label><span>표시 크기</span><select id="bracketDensity"><option value="comfortable">기본</option><option value="compact">간략</option></select></label>
+          <button id="bracketActiveOnlyBtn" class="btn btn-secondary" type="button">활성 경기 집중</button>
+          <button id="bracketResetViewBtn" class="btn btn-light" type="button">필터 초기화</button>
+          <button id="bracketFullscreenBtn" class="btn btn-primary" type="button">대진표 전체화면</button>
+        </div>
+        <div id="bracketViewSummary" class="bracket-view-summary">전체 경기를 표시합니다.</div>
+        <div id="bracketBoard" class="bracket-board empty-state"><p>생성된 대진이 없습니다.</p></div>
+      </section>
+    </section>
+
+    <section id="view-settings" class="view">
+      <section class="panel">
+        <div class="section-head"><div><h2>1단계 설정</h2><p>다음 단계 기능은 구조만 예약하고 아직 활성화하지 않습니다.</p></div></div>
+        
+        <section class="venue-settings-section">
+          <div class="section-head">
+            <div>
+              <h3>예선·본선 구장·코트 구성</h3>
+              <p>구장마다 예선 사용과 본선 사용을 각각 선택할 수 있습니다.</p>
+            </div>
+            <div class="button-row compact">
+              <button id="applyVenuePresetBtn" class="btn btn-primary">국제 8면 + 원도심 4면</button>
+              <button id="addVenueBtn" class="btn btn-light">구장 추가</button>
+              <button id="saveVenueSettingsBtn" class="btn btn-purple">구장 설정 저장</button>
+            </div>
+          </div>
+          <div id="venueSettingsList" class="venue-settings-list"></div>
+          <div class="venue-queue-policy">
+            <label><span>구장별 배정 방식</span>
+              <select id="venueAssignmentPolicy">
+                <option value="round-robin" selected>구장 순환 균등배정</option>
+                <option value="fill-first">첫 구장 우선 채우기</option>
+              </select>
+            </label>
+            <label class="toggle-label"><span>구장별 공용대기 분리</span><input id="separateVenueQueues" type="checkbox" checked></label>
+            <label class="toggle-label"><span>빈 코트 자동 승계</span><input id="autoVenuePromotion" type="checkbox" checked></label>
+          </div>
+          <div class="notice info">각 구장은 시합중 1경기·대기1 1경기·구장 공용대기열을 따로 운영합니다.</div>
+        </section>
+
+        <section class="draw-history-section">
+          <div class="section-head">
+            <div><h3>본선 추첨 기록</h3><p>추첨 시각·방식·대진 체크섬을 저장합니다.</p></div>
+            <button id="clearDrawHistoryBtn" class="btn btn-light">추첨 기록 지우기</button>
+          </div>
+          <div id="drawHistoryList" class="draw-history-list empty-state"><p>추첨 기록이 없습니다.</p></div>
+        </section>
+        <div class="feature-roadmap">
+          <article class="feature enabled"><b>현재 활성</b><h3>V3 단일 상태 저장소</h3><p>대진·코트·큐·결과를 한 객체에서 관리합니다.</p></article>
+          <article class="feature enabled"><b>현재 활성</b><h3>브라우저 자동 저장</h3><p>변경 때마다 로컬에 저장하고 새로고침 후 복원합니다.</p></article>
+          <article class="feature next"><b>2단계</b><h3>대기시간 자동계산</h3><p>코트별 진행시간과 큐 위치로 예상시간을 계산합니다.</p></article>
+          <article class="feature next"><b>후속</b><h3>문자 자동발송</h3><p>호출·코트변경·예상시간 메시지를 새 모듈로 연결합니다.</p></article>
+          <article class="feature next"><b>후속</b><h3>예선 통합</h3><p>예선 결과와 본선 미확정 슬롯을 같은 상태 모델로 연결합니다.</p></article>
+          <article class="feature next"><b>마지막</b><h3>Firebase 동기화</h3><p>V3 전용 컬렉션에만 저장하고 브라우저 백업을 병행합니다.</p></article>
+        </div>
+      </section>
+    </section>
+
+
+
+    <section id="view-roster" class="view">
+      <section class="panel">
+        <div class="section-head">
+          <div><h2>참가팀 연락처 관리</h2><p>팀 대표 연락처를 저장하면 기존 ‘전화번호 없음’ 문자도 자동으로 발송 대기로 전환됩니다.</p></div>
+          <span class="badge badge-safe">브라우저 자동 저장</span>
+        </div>
+        <div class="roster-tools">
+          <input id="rosterSearch" type="search" placeholder="팀명·소속·전화번호 검색">
+          <select id="rosterPhoneFilter">
+            <option value="all">전체 팀</option>
+            <option value="has-phone">연락처 있음</option>
+            <option value="no-phone" selected>연락처 없음</option>
+          </select>
+          <button id="refreshMessagePhonesBtn" class="btn btn-primary">문자 연락처 다시 연결</button>
+          <button id="exportContactsBtn" class="btn btn-light">연락처 JSON 저장</button>
+          <label class="btn btn-secondary file-button">연락처 JSON 불러오기<input id="contactFileInput" type="file" accept=".json,application/json"></label>
+        </div>
+        <div class="contact-help"><strong>전화번호 형식</strong><span>010-1234-5678 또는 01012345678 모두 사용할 수 있습니다.</span></div>
+      </section>
+
+      <section class="summary-grid">
+        <article class="summary-card"><span>전체 팀</span><strong id="rosterTotalTeams">0팀</strong></article>
+        <article class="summary-card"><span>연락처 등록</span><strong id="rosterPhoneCount">0팀</strong></article>
+        <article class="summary-card"><span>연락처 없음</span><strong id="rosterNoPhoneCount">0팀</strong></article>
+        <article class="summary-card"><span>발송 전환 가능</span><strong id="rosterConvertibleMessages">0건</strong></article>
+      </section>
+
+      <section class="panel">
+        <div class="section-head"><div><h2>참가팀 명단</h2><p>수정 버튼을 눌러 팀 대표 연락처를 입력하세요.</p></div><strong id="rosterVisibleCount">0팀 표시</strong></div>
+        <div id="contactRosterList" class="contact-roster-list empty-state"><p>명단을 먼저 불러오세요.</p></div>
+      </section>
+    </section>
+
+    <section id="view-messages" class="view">
+      <section class="panel">
+        <div class="section-head"><div><h2>운영 문자 센터</h2><p>문자를 자동 생성하되 실제 발송 전에는 반드시 운영자가 내용을 확인합니다.</p></div><span class="badge badge-safe">외부 API 미연결</span></div>
+        <div class="message-settings-grid">
+          <label><span>발신 표시명</span><input id="messageSenderName" type="text" value="230MATCH"></label>
+          <label><span>발송 방식</span><select id="messageDeliveryMode"><option value="sms-uri">휴대폰 문자 앱 열기</option><option value="copy-only">내용 복사만</option></select></label>
+          <label class="toggle-label"><span>코트배정 문자 자동 생성</span><input id="messageOnCourtAssign" type="checkbox" checked></label>
+          <label class="toggle-label"><span>대기1 승계 문자 자동 생성</span><input id="messageOnQueueMove" type="checkbox" checked></label>
+          <label class="toggle-label"><span>미발송 문자 최신 내용으로 갱신</span><input id="smartMessageUpdate" type="checkbox" checked></label>
+          <label><span>같은 문자 재생성 기준</span><select id="messageRepeatPolicy"><option value="update-pending" selected>미발송 문자는 갱신</option><option value="always-new">항상 새 문자 생성</option><option value="block-all">같은 경기·팀은 차단</option></select></label>
+        </div>
+        <div class="button-row">
+          <button id="generateCurrentCourtMessagesBtn" class="btn btn-primary">현재 코트 호출 문자 생성</button>
+          <button id="generateCurrentWaitMessagesBtn" class="btn btn-secondary">현재 대기1 문자 생성</button>
+          <button id="generateAllTimeMessagesBtn" class="btn btn-purple">전체 예상시간 문자 생성</button>
+          <button id="markAllMessagesSentBtn" class="btn btn-light">전체 발송완료 표시</button>
+          <button id="clearSentMessagesBtn" class="btn btn-danger-outline">발송완료 문자 정리</button>
+          <button id="mergeDuplicateMessagesBtn" class="btn btn-secondary">기존 중복 문자 정리</button>
+        </div>
+        <div class="message-template-grid">
+          <label><span>시합중 호출 문구</span><textarea id="templatePlaying" rows="4"></textarea></label>
+          <label><span>대기1 안내 문구</span><textarea id="templateWait1" rows="4"></textarea></label>
+          <label><span>공용대기 예상시간 문구</span><textarea id="templateShared" rows="4"></textarea></label>
+        </div>
+      </section>
+      <section class="summary-grid message-summary-grid">
+        <article class="summary-card"><span>전체 문자</span><strong id="messageTotalCount">0건</strong></article>
+        <article class="summary-card"><span>발송 대기</span><strong id="messagePendingCount">0건</strong></article>
+        <article class="summary-card"><span>발송 완료</span><strong id="messageSentCount">0건</strong></article>
+        <article class="summary-card"><span>전화번호 없음</span><strong id="messageNoPhoneCount">0건</strong></article>
+        <article class="summary-card"><span>자동 갱신 횟수</span><strong id="messageUpdatedCount">0건</strong></article>
+      </section>
+      <section class="panel">
+        <div class="section-head"><div><h2>문자 발송 대기열</h2><p>같은 경기·같은 팀의 미발송 문자는 최신 예상시간으로 자동 갱신됩니다.</p></div><select id="messageStatusFilter"><option value="all">전체</option><option value="pending" selected>발송 대기</option><option value="sent">발송 완료</option><option value="no-phone">전화번호 없음</option></select></div>
+        <div id="messageQueueList" class="message-queue-list empty-state"><p>생성된 문자가 없습니다.</p></div>
+      </section>
+    </section>
+
+
+    <section id="view-audit" class="view">
+      <section class="panel">
+        <div class="section-head">
+          <div>
+            <h2>운영 전 자동점검</h2>
+            <p>현재 상태를 검사하고, 별도의 복제 상태에서 예선과 본선을 각각 자동 완주합니다. 실제 대진·결과·문자는 변경하지 않습니다.</p>
+          </div>
+          <span class="badge badge-safe">원본 데이터 미변경</span>
+        </div>
+
+        <div id="auditActionNotice" class="notice info">점검 버튼을 누르면 진행 상태와 결과가 이 영역에 표시됩니다.</div>
+        <div class="audit-action-row">
+          <button id="runStateAuditBtn" class="btn btn-primary">현재 상태 점검</button>
+          <button id="runPrelimSimulationBtn" class="btn btn-secondary">예선 복제 모의운영</button>
+          <button id="runFullSimulationBtn" class="btn btn-purple">본선 복제 모의대회</button>
+          <button id="runAllAuditBtn" class="btn btn-gold">전체 점검 실행</button>
+          <button id="downloadAuditBtn" class="btn btn-light">점검 결과 JSON 저장</button>
+          <button id="clearAuditBtn" class="btn btn-danger-outline">점검 결과 지우기</button>
+        </div>
+
+        <div class="audit-explain">
+          <strong>검사항목</strong>
+          <span>예선 조·경기 수 · 3팀조 순서 · 예선 코트 큐 · 예선 완주 · 본선 경기 수 · 코트·큐 중복 · 승자 진출 · 결승 완료 · 문자 상태</span>
+        </div>
+      </section>
+
+      <section class="summary-grid">
+        <article class="summary-card"><span>통과</span><strong id="auditPassCount">0</strong></article>
+        <article class="summary-card"><span>주의</span><strong id="auditWarnCount">0</strong></article>
+        <article class="summary-card"><span>오류</span><strong id="auditFailCount">0</strong></article>
+        <article class="summary-card"><span>예선 모의 완료</span><strong id="auditPrelimSimCompleted">0</strong></article>
+        <article class="summary-card"><span>예선 확정 순위</span><strong id="auditPrelimRanked">0</strong></article>
+        <article class="summary-card"><span>본선 모의 완료</span><strong id="auditSimCompleted">0</strong></article>
+        <article class="summary-card"><span>모의 우승팀</span><strong id="auditSimWinner">-</strong></article>
+      </section>
+
+      <section class="panel">
+        <div class="section-head">
+          <div><h2>점검 결과</h2><p id="auditLastRunText">아직 실행하지 않았습니다.</p></div>
+          <span id="auditOverallBadge" class="badge badge-muted-dark">미실행</span>
+        </div>
+        <div id="auditResultList" class="audit-result-list empty-state"><p>점검을 실행하면 결과가 표시됩니다.</p></div>
+      </section>
+    </section>
+
+    <section id="view-logs" class="view">
+      <section class="panel">
+        <div class="section-head"><div><h2>운영 로그</h2><p>중요 상태 변경을 시간순으로 기록합니다.</p></div><button id="clearLogsBtn" class="btn btn-light">로그 지우기</button></div>
+        <div id="logList" class="log-list"></div>
+      </section>
+    </section>
+  </main>
+
+
+
+
+
+
+
+
+
+  <dialog id="manualQueueAssignDialog" class="modal">
+    <form method="dialog" id="manualQueueAssignForm">
+      <div class="modal-head"><h2>관리자 지정 코트 대기열</h2><button value="cancel" class="icon-button">×</button></div>
+      <div class="contact-edit-body">
+        <input id="manualQueueAssignMatchId" type="hidden">
+        <input id="manualQueueAssignVenueId" type="hidden">
+        <p id="manualQueueAssignMatchLabel" class="modal-match"></p>
+        <label><span>지정할 코트</span><select id="manualQueueAssignCourt"></select></label>
+        <label><span>배치 위치</span><select id="manualQueueAssignPosition"><option value="top">수동 대기열 맨 앞</option><option value="bottom" selected>수동 대기열 맨 뒤</option></select></label>
+        <div class="notice info">시합중·대기1이 모두 차 있어도 대기2 이후로 등록할 수 있습니다.</div>
+      </div>
+      <menu><button value="cancel" class="btn btn-light">취소</button><button id="confirmManualQueueAssignBtn" value="default" class="btn btn-primary">관리자 지정</button></menu>
+    </form>
+  </dialog>
+
+
+
+  <dialog id="prelimCourtStatusDialog" class="modal">
+    <form method="dialog">
+      <div class="modal-head"><h2>예선 코트 상태 변경</h2><button value="cancel" class="icon-button">×</button></div>
+      <div class="contact-edit-body">
+        <input id="prelimStatusCourtId" type="hidden">
+        <p id="prelimStatusCourtLabel" class="modal-match"></p>
+        <label><span>작업</span><select id="prelimStatusAction">
+          <option value="pause-keep">사용중지 · 현재 배정 유지</option>
+          <option value="pause-evacuate-wait">사용중지 · 대기경기 대피</option>
+          <option value="pause-evacuate-all">사용중지 · 전체 경기 대피</option>
+          <option value="resume">코트 사용 재개</option>
+        </select></label>
+        <label><span>중지 사유</span><input id="prelimStatusReason" type="text" placeholder="예: 조명 문제"></label>
+      </div>
+      <menu><button value="cancel" class="btn btn-light">취소</button><button id="confirmPrelimCourtStatusBtn" value="default" class="btn btn-primary">적용</button></menu>
+    </form>
+  </dialog>
+
+  <dialog id="prelimQueueMoveDialog" class="modal">
+    <form method="dialog" id="prelimQueueMoveForm">
+      <div class="modal-head"><h2>예선 경기 코트 이동</h2><button value="cancel" class="icon-button">×</button></div>
+      <div class="contact-edit-body">
+        <input id="prelimMoveMatchId" type="hidden">
+        <input id="prelimMoveSourceCourtId" type="hidden">
+        <p id="prelimMoveMatchLabel" class="modal-match"></p>
+        <label><span>이동할 코트</span><select id="prelimMoveTargetCourt"></select></label>
+        <label><span>배치 위치</span>
+          <select id="prelimMoveTargetPosition">
+            <option value="wait1-first" selected>대기1이 비면 대기1, 아니면 추가대기 맨 앞</option>
+            <option value="queue-top">추가대기 맨 앞</option>
+            <option value="queue-bottom">추가대기 맨 뒤</option>
+          </select>
+        </label>
+        <div class="notice info">시합중 경기는 결과 처리 후 이동하며, 대기1·추가대기 경기만 직접 이동할 수 있습니다.</div>
+      </div>
+      <menu><button value="cancel" class="btn btn-light">취소</button><button id="confirmPrelimMoveBtn" value="default" class="btn btn-primary">이동</button></menu>
+    </form>
+  </dialog>
+
+  <dialog id="courtStatusDialog" class="modal">
+    <form method="dialog" id="courtStatusForm">
+      <div class="modal-head"><h2>코트 사용 상태 변경</h2><button value="cancel" class="icon-button">×</button></div>
+      <div class="contact-edit-body">
+        <input id="courtStatusCourtId" type="hidden">
+        <p id="courtStatusCourtLabel" class="modal-match"></p>
+        <label><span>변경 작업</span>
+          <select id="courtStatusAction">
+            <option value="pause-keep">사용중지 · 현재 경기 유지</option>
+            <option value="pause-return-wait1">사용중지 · 대기1만 공용대기로</option>
+            <option value="pause-return-all">사용중지 · 시합중·대기1 모두 공용대기로</option>
+            <option value="resume">코트 사용 재개</option>
+          </select>
+        </label>
+        <label><span>중지 사유</span><input id="courtStatusReason" type="text" placeholder="예: 조명 점검, 바닥 정비"></label>
+        <div id="courtStatusInfo" class="notice info">사용중지된 코트는 자동배정과 자동승계에서 제외됩니다.</div>
+      </div>
+      <menu><button value="cancel" class="btn btn-light">취소</button><button id="confirmCourtStatusBtn" value="default" class="btn btn-primary">적용</button></menu>
+    </form>
+  </dialog>
+
+  <dialog id="courtTransferDialog" class="modal">
+    <form method="dialog" id="courtTransferForm">
+      <div class="modal-head"><h2>경기 코트 이동</h2><button value="cancel" class="icon-button">×</button></div>
+      <div class="contact-edit-body">
+        <input id="courtTransferSourceCourtId" type="hidden">
+        <input id="courtTransferSourceSlot" type="hidden">
+        <p id="courtTransferMatchLabel" class="modal-match"></p>
+        <label><span>이동할 코트</span><select id="courtTransferTargetSelect"></select></label>
+        <label><span>배치 방식</span><select id="courtTransferMode"><option value="auto" selected>빈 자리 우선, 없으면 수동 대기열 맨 뒤</option><option value="manual-top">수동 대기열 맨 앞</option><option value="manual-bottom">수동 대기열 맨 뒤</option></select></label>
+        <div id="courtTransferInfo" class="notice info">같은 구장의 어느 코트든 선택할 수 있습니다. 자리가 없으면 대기2 이후로 등록됩니다.</div>
+      </div>
+      <menu><button value="cancel" class="btn btn-light">취소</button><button id="confirmCourtTransferBtn" value="default" class="btn btn-primary">이동</button></menu>
+    </form>
+  </dialog>
+
+  <dialog id="manualCourtAssignDialog" class="modal">
+    <form method="dialog" id="manualCourtAssignForm">
+      <div class="modal-head"><h2>공용대기 경기 코트배정</h2><button value="cancel" class="icon-button">×</button></div>
+      <div class="contact-edit-body">
+        <input id="manualAssignMatchId" type="hidden">
+        <input id="manualAssignVenueId" type="hidden">
+        <p id="manualAssignMatchLabel" class="modal-match"></p>
+        <label><span>배정 가능한 코트</span><select id="manualAssignCourtSelect"></select></label>
+        <div id="manualAssignInfo" class="notice info">같은 구장의 빈코트 또는 빈 대기1 자리만 표시됩니다.</div>
+      </div>
+      <menu><button value="cancel" class="btn btn-light">취소</button><button id="confirmManualAssignBtn" value="default" class="btn btn-primary">코트배정</button></menu>
+    </form>
+  </dialog>
+
+  <dialog id="queueMoveDialog" class="modal">
+    <form method="dialog" id="queueMoveForm">
+      <div class="modal-head"><h2>공용대기 경기 이동</h2><button value="cancel" class="icon-button" aria-label="닫기">×</button></div>
+      <div class="contact-edit-body">
+        <input id="queueMoveMatchId" type="hidden">
+        <input id="queueMoveSourceVenueId" type="hidden">
+        <p id="queueMoveMatchLabel" class="modal-match"></p>
+        <label><span>이동할 구장</span><select id="queueMoveTargetVenue"></select></label>
+        <label><span>배치 위치</span><select id="queueMoveTargetPosition"><option value="top">맨 앞</option><option value="bottom" selected>맨 뒤</option></select></label>
+        <div class="notice info">이동 후 예상 대기시간은 자동으로 다시 계산됩니다.</div>
+      </div>
+      <menu><button value="cancel" class="btn btn-light">취소</button><button id="confirmQueueMoveBtn" value="default" class="btn btn-primary">이동</button></menu>
+    </form>
+  </dialog>
+
+  <dialog id="messageHistoryDialog" class="modal">
+    <div class="modal-head"><h2>문자 변경 이력</h2><button id="closeMessageHistoryBtn" class="icon-button">×</button></div>
+    <div id="messageHistoryList" class="message-history-list"></div>
+  </dialog>
+
+  <dialog id="contactEditDialog" class="modal">
+    <form method="dialog" id="contactEditForm">
+      <div class="modal-head"><h2>팀 연락처 수정</h2><button value="cancel" class="icon-button" aria-label="닫기">×</button></div>
+      <div class="contact-edit-body">
+        <input id="contactEditTeamId" type="hidden">
+        <p id="contactEditTeamName" class="modal-match"></p>
+        <label><span>팀 대표 전화번호</span><input id="contactEditPhone" type="tel" placeholder="010-1234-5678"></label>
+        <label><span>대표자 이름</span><input id="contactEditManager" type="text" placeholder="선택 입력"></label>
+        <div id="contactPhoneValidation" class="notice info">전화번호를 입력하세요.</div>
+      </div>
+      <menu><button value="cancel" class="btn btn-light">취소</button><button id="saveContactBtn" value="default" class="btn btn-primary">저장</button></menu>
+    </form>
+  </dialog>
+
+  <dialog id="drawLockDialog" class="modal lock-confirm-modal">
+    <form method="dialog" id="drawLockForm">
+      <div class="modal-head"><h2>본선 대진을 잠글까요?</h2><button value="cancel" class="icon-button" aria-label="닫기">×</button></div>
+      <div class="lock-confirm-body">
+        <div class="lock-warning-icon">🔒</div>
+        <h3>잠금 후에는 대진을 다시 추첨할 수 없습니다.</h3>
+        <p>아래 항목을 확인한 뒤 잠그세요.</p>
+        <ul class="lock-check-list">
+          <li>참가팀과 본선 진출팀이 정확한지 확인</li>
+          <li>조 1위·2위 슬롯과 실제 팀명이 맞는지 확인</li>
+          <li>부전승과 시드 배치가 적절한지 확인</li>
+          <li>같은 조 또는 같은 소속의 초반 대진을 확인</li>
+          <li>잠금 후에는 코트배정과 경기 운영만 진행</li>
+        </ul>
+        <label class="lock-confirm-check">
+          <input id="drawLockConfirmCheck" type="checkbox">
+          <span>대진표를 확인했으며 본선 대진을 확정합니다.</span>
+        </label>
+        <div class="lock-summary">
+          <div><span>대진 규모</span><strong id="lockDialogDrawSize">-</strong></div>
+          <div><span>추첨 방식</span><strong id="lockDialogMethod">-</strong></div>
+          <div><span>체크섬</span><strong id="lockDialogChecksum">-</strong></div>
+        </div>
+      </div>
+      <menu>
+        <button value="cancel" class="btn btn-light">취소</button>
+        <button id="confirmDrawLockBtn" value="default" class="btn btn-gold" disabled>확인하고 잠금</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <dialog id="drawUnlockDialog" class="modal lock-confirm-modal">
+    <form method="dialog" id="drawUnlockForm">
+      <div class="modal-head"><h2>관리자 잠금 해제</h2><button value="cancel" class="icon-button" aria-label="닫기">×</button></div>
+      <div class="lock-confirm-body">
+        <div class="lock-warning-icon">⚠️</div>
+        <h3>경기가 시작되기 전까지만 해제할 수 있습니다.</h3>
+        <p>잠금 해제 후 재추첨하면 현재 대진이 변경됩니다. 운영 중인 경기나 완료된 경기가 있으면 해제되지 않습니다.</p>
+        <label>
+          <span>확인 문구 입력</span>
+          <input id="unlockConfirmText" type="text" placeholder="잠금해제 입력">
+        </label>
+      </div>
+      <menu>
+        <button value="cancel" class="btn btn-light">취소</button>
+        <button id="confirmDrawUnlockBtn" value="default" class="btn btn-danger-outline" disabled>관리자 잠금 해제</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <dialog id="rouletteDialog" class="modal roulette-modal">
+    <div class="modal-head"><h2>본선 룰렛 추첨</h2><button id="cancelRouletteBtn" class="icon-button">×</button></div>
+    <div class="roulette-body">
+      <div class="roulette-stage">
+        <div class="roulette-ring"></div>
+        <div id="rouletteTeamName" class="roulette-team-name">추첨 준비</div>
+        <div id="rouletteProgress" class="roulette-progress">0 / 0</div>
+      </div>
+      <div class="roulette-actions">
+        <button id="startRouletteBtn" class="btn btn-primary">룰렛 시작</button>
+        <button id="skipRouletteBtn" class="btn btn-light">애니메이션 건너뛰기</button>
+      </div>
+      <div id="rouletteResultList" class="roulette-result-list"></div>
+    </div>
+  </dialog>
+
+  <dialog id="resultDialog" class="modal">
+    <form method="dialog" id="resultForm">
+      <div class="modal-head"><h2>경기 결과 입력</h2><button value="cancel" class="icon-button" aria-label="닫기">×</button></div>
+      <p id="resultMatchLabel" class="modal-match"></p>
+      <input id="resultMatchId" type="hidden">
+      <label><span>승리팀</span><select id="winnerSelect"></select></label>
+      <div class="score-grid">
+        <label><span>1팀 점수</span><input id="scoreA" type="number" min="0" value="6"></label>
+        <label><span>2팀 점수</span><input id="scoreB" type="number" min="0" value="3"></label>
+      </div>
+      <menu><button value="cancel" class="btn btn-light">취소</button><button id="confirmResultBtn" value="default" class="btn btn-primary">결과 확정</button></menu>
+    </form>
+  </dialog>
+
+
+  <dialog id="prelimResultDialog" class="modal">
+    <form method="dialog" id="prelimResultForm">
+      <div class="modal-head"><h2>예선 결과 입력</h2><button value="cancel" class="icon-button" aria-label="닫기">×</button></div>
+      <p id="prelimResultMatchLabel" class="modal-match"></p>
+      <input id="prelimResultMatchId" type="hidden">
+      <label><span>승리팀</span><select id="prelimWinnerSelect"></select></label>
+      <div class="score-grid">
+        <label><span>1팀 점수</span><input id="prelimScoreA" type="number" min="0" value="6"></label>
+        <label><span>2팀 점수</span><input id="prelimScoreB" type="number" min="0" value="3"></label>
+      </div>
+      <menu><button value="cancel" class="btn btn-light">취소</button><button id="confirmPrelimResultBtn" value="default" class="btn btn-primary">예선 결과 확정</button></menu>
+    </form>
+  </dialog>
+
+  <dialog id="recoveryDialog" class="modal">
+    <div class="modal-head"><h2>복구점 관리</h2><button id="closeRecoveryBtn" class="icon-button">×</button></div>
+    <div id="recoveryList" class="recovery-list"></div>
+  </dialog>
+
+  <script type="module" src="./assets/js/app-v33115.js?v=33115"></script>
+</body>
+</html>
