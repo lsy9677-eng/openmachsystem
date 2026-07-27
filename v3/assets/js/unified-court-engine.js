@@ -91,9 +91,43 @@ function activeVenueGroups(courts){
   });
   return groups;
 }
-export function enqueueReadyMainToUnifiedCourts(state){
+
+export function reconcileUnifiedMainQueues(state){
   const courts=state.prelim?.courts||[];
-  if(!courts.length)return{assigned:0,reason:'no-prelim-courts'};
+  ensureVenueQueues(state);
+  const all=Object.values(state.draw?.rounds||{}).flat();
+  const byId=new Map(all.map(m=>[m.id,m]));
+  const seen=new Set();
+  const removed={duplicate:0,invalid:0,completed:0,blocked:0};
+  const playInGate=all.some(m=>m.isPlayIn&&m.status!=='completed');
+  function validMainId(id){
+    const m=byId.get(id);
+    if(!m){removed.invalid++;return false;}
+    if(m.status==='completed'){removed.completed++;return false;}
+    if(playInGate&&!m.isPlayIn&&m.status!=='playing'){removed.blocked++;return false;}
+    if(seen.has(id)){removed.duplicate++;return false;}
+    seen.add(id);return true;
+  }
+  courts.forEach(c=>{
+    if(c.playing&&byId.has(c.playing))seen.add(c.playing);
+    if(c.wait1){
+      if(validMainId(c.wait1)){}else if(byId.has(c.wait1))c.wait1=null;
+    }
+    c.queue=Array.isArray(c.queue)?c.queue:[];
+    c.queue=c.queue.filter(id=>!byId.has(id)||validMainId(id));
+  });
+  Object.keys(state.venueQueues).forEach(venueId=>{
+    const q=Array.isArray(state.venueQueues[venueId])?state.venueQueues[venueId]:[];
+    state.venueQueues[venueId]=q.filter(validMainId);
+  });
+  state.sharedQueue=Array.isArray(state.sharedQueue)?state.sharedQueue.filter(validMainId):[];
+  return{...removed,playInGate,totalRemoved:Object.values(removed).reduce((a,b)=>a+b,0)};
+}
+
+export function enqueueReadyMainToUnifiedCourts(state){
+  const repair=reconcileUnifiedMainQueues(state);
+  const courts=state.prelim?.courts||[];
+  if(!courts.length)return{assigned:0,reason:'no-prelim-courts',repair:{totalRemoved:0}};
   ensureVenueQueues(state);
   const occupied=new Set(courts.flatMap(c=>[c.playing,c.wait1,...(c.queue||[])].filter(Boolean)));
   Object.values(state.venueQueues).flat().forEach(id=>occupied.add(id));
@@ -111,7 +145,7 @@ export function enqueueReadyMainToUnifiedCourts(state){
   });
   const groups=activeVenueGroups(courts);
   const venueIds=[...groups.keys()];
-  if(!venueIds.length)return{assigned:0,reason:'no-active-courts'};
+  if(!venueIds.length)return{assigned:0,reason:'no-active-courts',repair};
   let assigned=0;
   ready.forEach(m=>{
     const preferred=m.venueId&&groups.has(m.venueId)?m.venueId:null;
@@ -128,5 +162,5 @@ export function enqueueReadyMainToUnifiedCourts(state){
   // 각 코트는 시합중 1개와 대기1 1개까지만 유지하고, 나머지는 공용대기에 둡니다.
   courts.filter(c=>!c.isPaused).forEach(c=>promoteUnifiedCourt(state,c));
   state.sharedQueue=[];
-  return{assigned,playInOnly:playInGate,reason:assigned?'assigned':playInGate?'play-in-gate':ready.length?'no-active-courts':'no-ready'};
+  return{assigned,playInOnly:playInGate,repair,reason:assigned?'assigned':playInGate?'play-in-gate':ready.length?'no-active-courts':'no-ready'};
 }
