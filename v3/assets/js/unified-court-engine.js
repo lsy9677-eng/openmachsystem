@@ -98,9 +98,17 @@ export function enqueueReadyMainToUnifiedCourts(state){
   const occupied=new Set(courts.flatMap(c=>[c.playing,c.wait1,...(c.queue||[])].filter(Boolean)));
   Object.values(state.venueQueues).flat().forEach(id=>occupied.add(id));
   (state.sharedQueue||[]).forEach(id=>occupied.add(id));
-  const ready=Object.values(state.draw?.rounds||{}).flat().filter(m=>
+  const all=Object.values(state.draw?.rounds||{}).flat();
+  const playIns=all.filter(m=>m.isPlayIn);
+  const incompletePlayIns=playIns.filter(m=>m.status!=='completed');
+  const playInGate=incompletePlayIns.length>0;
+  const ready=all.filter(m=>
     m.status==='ready'&&m.teamA&&!m.teamA.placeholder&&m.teamB&&!m.teamB.placeholder&&!occupied.has(m.id)
-  ).sort((a,b)=>(Number(b.roundSize)||0)-(Number(a.roundSize)||0)||(Number(a.matchNo)||0)-(Number(b.matchNo)||0));
+    &&(!playInGate||m.isPlayIn)
+  ).sort((a,b)=>{
+    const ap=a.isPlayIn?0:1,bp=b.isPlayIn?0:1;
+    return ap-bp||(Number(b.roundSize)||0)-(Number(a.roundSize)||0)||(Number(a.matchNo)||0)-(Number(b.matchNo)||0);
+  });
   const groups=activeVenueGroups(courts);
   const venueIds=[...groups.keys()];
   if(!venueIds.length)return{assigned:0,reason:'no-active-courts'};
@@ -120,5 +128,5 @@ export function enqueueReadyMainToUnifiedCourts(state){
   // 각 코트는 시합중 1개와 대기1 1개까지만 유지하고, 나머지는 공용대기에 둡니다.
   courts.filter(c=>!c.isPaused).forEach(c=>promoteUnifiedCourt(state,c));
   state.sharedQueue=[];
-  return{assigned,reason:assigned?'assigned':ready.length?'no-active-courts':'no-ready'};
+  return{assigned,playInOnly:playInGate,reason:assigned?'assigned':playInGate?'play-in-gate':ready.length?'no-active-courts':'no-ready'};
 }
