@@ -561,3 +561,7 @@ body.bracket-fullscreen-open #bracketBoard{
   #operationSharedQueue .operation-queue-card>.queue-card-actions{grid-column:1/-1;grid-row:4;grid-template-columns:44px 44px 1fr;border-left:0;border-top:1px dashed #d4deeb;padding:8px 0 0}
   #operationSharedQueue .operation-queue-card>.queue-card-actions .btn:last-child{grid-column:auto}
 }
+
+/* Stage31.10: 예선 추가대기 최소 예상시간 */
+.prelim-extra-item .prelim-extra-time{flex:0 0 auto;white-space:nowrap;padding:4px 7px;border-radius:8px;background:#fff4d6;color:#8a5a00;font-size:10px;font-weight:900}
+@media(max-width:720px){.prelim-extra-item{flex-wrap:wrap}.prelim-extra-item .prelim-extra-time{margin-left:31px}}
