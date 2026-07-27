@@ -44,14 +44,14 @@ function takeSharedMain(state,court){
   if(id)setUnifiedStatus(state,id,'court_wait1',court);
   return id;
 }
-export function promoteUnifiedCourt(state,court){
+function promoteLocalCourt(state,court){
   court.queue=Array.isArray(court.queue)?court.queue:[];
   if(court.isPaused)return court;
   if(!court.playing&&court.wait1){
     court.playing=court.wait1;court.wait1=null;
     setUnifiedStatus(state,court.playing,'playing',court);
   }
-  // 예선에서 이미 코트별로 편성된 추가경기는 기존 순서를 우선 유지합니다.
+  // 예선에서 이미 코트별로 편성된 추가경기는 코트 고정 순서를 우선 유지합니다.
   if(!court.playing&&court.queue.length){
     court.playing=court.queue.shift();
     setUnifiedStatus(state,court.playing,'playing',court);
@@ -60,16 +60,30 @@ export function promoteUnifiedCourt(state,court){
     court.wait1=court.queue.shift();
     setUnifiedStatus(state,court.wait1,'court_wait1',court);
   }
-  // 코트별 추가대기가 소진된 뒤에는 구장 공용대기 첫 경기를 대기1로 자동 보충합니다.
-  if(!court.wait1){
-    court.wait1=takeSharedMain(state,court);
-  }
-  // 완전히 빈 코트라면 공용대기에서 하나를 시합중으로 올리고 다음 하나를 대기1로 채웁니다.
-  if(!court.playing&&court.wait1){
-    court.playing=court.wait1;court.wait1=null;
-    setUnifiedStatus(state,court.playing,'playing',court);
-    court.wait1=takeSharedMain(state,court);
-  }
+  return court;
+}
+function rebalanceUnifiedMainSlots(state,venueId=null){
+  const courts=(state.prelim?.courts||[]).filter(c=>!c.isPaused&&(!venueId||(c.venueId||'venue-default')===venueId));
+  courts.forEach(c=>promoteLocalCourt(state,c));
+  // 1순위: 빈 코트의 시합중 자리를 먼저 채웁니다.
+  // 기존 코트의 본선 대기1도 빈 코트가 있으면 시합중으로 옮겨 코트 유휴를 방지합니다.
+  courts.filter(c=>!c.playing).forEach(empty=>{
+    const donor=courts.find(c=>c.id!==empty.id&&c.wait1&&findUnifiedMatch(state,c.wait1)?.type==='main');
+    if(donor){
+      empty.playing=donor.wait1;donor.wait1=null;
+      setUnifiedStatus(state,empty.playing,'playing',empty);
+      return;
+    }
+    const id=takeSharedMain(state,empty);
+    if(id){empty.playing=id;empty.wait1=null;setUnifiedStatus(state,id,'playing',empty);}
+  });
+  // 2순위: 모든 사용 코트가 찬 뒤에만 대기1을 채웁니다.
+  courts.filter(c=>c.playing&&!c.wait1).forEach(c=>{c.wait1=takeSharedMain(state,c);});
+  return courts;
+}
+export function promoteUnifiedCourt(state,court){
+  promoteLocalCourt(state,court);
+  rebalanceUnifiedMainSlots(state,court.venueId||'venue-default');
   return court;
 }
 export function advanceUnifiedCourt(state,courtId,completedId){
@@ -162,7 +176,8 @@ export function enqueueReadyMainToUnifiedCourts(state){
     assigned++;
   });
   // 각 코트는 시합중 1개와 대기1 1개까지만 유지하고, 나머지는 공용대기에 둡니다.
-  courts.filter(c=>!c.isPaused).forEach(c=>promoteUnifiedCourt(state,c));
+  // 빈 코트 시합중을 전체적으로 먼저 채운 뒤 대기1을 배분합니다.
+  [...new Set(courts.filter(c=>!c.isPaused).map(c=>c.venueId||'venue-default'))].forEach(id=>rebalanceUnifiedMainSlots(state,id));
   state.sharedQueue=[];
   return{assigned,playInOnly:playInGate,repair,reason:assigned?'assigned':playInGate?'play-in-gate':ready.length?'no-active-courts':'no-ready'};
 }

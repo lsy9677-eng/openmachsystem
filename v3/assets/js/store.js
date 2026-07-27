@@ -27,6 +27,7 @@ export function loadState(){
 export function saveState(state){
   state.updatedAt=new Date().toISOString();
   localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
+  try{window.dispatchEvent(new CustomEvent('230match:state-saved',{detail:{state:structuredClone(state)}}));}catch(_error){}
 }
 export function clearState(){localStorage.removeItem(STORAGE_KEY);}
 export function getRecoveries(){
