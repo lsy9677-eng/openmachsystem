@@ -1,5 +1,6 @@
 
 import{allMatches,findMatch}from'./bracket-engine.js';
+import{findUnifiedMatch}from'./unified-court-engine.js';
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
 const fmt=iso=>iso?new Date(iso).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}):'-';
 export function ensureTimeState(state){
@@ -15,45 +16,66 @@ export function calculateTimeMetrics(state){
   ensureTimeState(state);
   const minimum=Math.max(20,Number(state.settings.minimumMatchMinutes)||30);
   const base=Math.max(minimum,Number(state.settings.matchMinutes)||40);
-  const matches=allMatches(state.draw);
-  // 테스트 중 몇 초 만에 결과를 입력한 경기는 실제 경기 평균에서 제외합니다.
+  const mainMatches=allMatches(state.draw);
+  const prelimMatches=state.prelim?.matches||[];
+  const matches=[...mainMatches,...prelimMatches];
   const durations=matches.filter(m=>m.startedAt&&m.completedAt)
     .map(m=>(new Date(m.completedAt)-new Date(m.startedAt))/60000)
     .filter(v=>v>=minimum&&v<300);
-  // 실제 완료 경기와 기준시간을 함께 반영해 급격한 시간 변동을 막습니다.
   const measured=durations.length?durations.reduce((a,b)=>a+b,0)/durations.length:base;
   const avg=clamp(durations.length?((measured*durations.length+base*2)/(durations.length+2)):base,minimum,180);
   const now=Date.now();let longest=0;
-  state.courts.forEach(c=>{
+  const activeCourts=(state.prelim?.courts?.length?state.prelim.courts:state.courts)||[];
+  const getMatch=id=>{
+    if(!id)return null;
+    const unified=findUnifiedMatch(state,id);
+    return unified?.match||findMatch(state.draw,id);
+  };
+  const markPlaying=(m)=>{
+    if(!m)return 0;
+    if(!m.startedAt)m.startedAt=new Date(now).toISOString();
+    const elapsed=Math.max(0,(now-new Date(m.startedAt))/60000),remaining=Math.max(0,avg-elapsed);
+    m.elapsedMinutes=Math.floor(elapsed);m.estimatedRemainingMinutes=Math.round(remaining);
+    m.estimatedEndAt=new Date(now+remaining*60000).toISOString();
+    m.waitStartedAt=null;
+    return now+remaining*60000;
+  };
+  const markWaiting=(m,cursor)=>{
+    if(!m)return;
+    if(!m.waitStartedAt)m.waitStartedAt=new Date(now).toISOString();
+    m.waitElapsedMinutes=Math.max(0,Math.floor((now-new Date(m.waitStartedAt))/60000));
+    m.estimatedWaitMinutes=Math.max(0,Math.round((cursor-now)/60000));
+    m.estimatedStartAt=new Date(cursor).toISOString();
+    m.estimatedEndAt=new Date(cursor+avg*60000).toISOString();
+    longest=Math.max(longest,m.estimatedWaitMinutes);
+  };
+  activeCourts.forEach(c=>{
     let cursor=now;
-    const p=c.playing?findMatch(state.draw,c.playing):null;
-    if(p){
-      if(!p.startedAt)p.startedAt=new Date().toISOString();
-      const elapsed=Math.max(0,(now-new Date(p.startedAt))/60000),remaining=Math.max(0,avg-elapsed);
-      p.elapsedMinutes=Math.round(elapsed);p.estimatedRemainingMinutes=Math.round(remaining);
-      p.estimatedEndAt=new Date(now+remaining*60000).toISOString();cursor=now+remaining*60000;
-    }
-    const w=c.wait1?findMatch(state.draw,c.wait1):null;
-    if(w){
-      w.estimatedWaitMinutes=Math.round((cursor-now)/60000);w.estimatedStartAt=new Date(cursor).toISOString();
-      w.estimatedEndAt=new Date(cursor+avg*60000).toISOString();longest=Math.max(longest,w.estimatedWaitMinutes);
-    }
+    const playing=getMatch(c.playing);
+    if(playing)cursor=markPlaying(playing);
+    const wait1=getMatch(c.wait1);
+    if(wait1){markWaiting(wait1,cursor);cursor+=avg*60000;}
+    (c.queue||[]).forEach(id=>{const m=getMatch(id);if(m){markWaiting(m,cursor);cursor+=avg*60000;}});
   });
   const venueQueues=state.venueQueues&&Object.keys(state.venueQueues).length?state.venueQueues:null;
   if(venueQueues){
     Object.entries(venueQueues).forEach(([venueId,queue])=>{
-      const courtCount=Math.max(1,state.courts.filter(c=>(c.venueId||'venue-default')===venueId).length);
+      const courtCount=Math.max(1,activeCourts.filter(c=>(c.venueId||'venue-default')===venueId&&!c.isPaused).length);
       queue.forEach((id,index)=>{
-        const m=findMatch(state.draw,id);if(!m)return;
+        const m=getMatch(id);if(!m)return;
+        if(!m.waitStartedAt)m.waitStartedAt=new Date(now).toISOString();
+        m.waitElapsedMinutes=Math.max(0,Math.floor((now-new Date(m.waitStartedAt))/60000));
         const wave=Math.floor(index/courtCount)+2,wait=Math.round(avg*wave);
         m.estimatedWaitMinutes=wait;m.estimatedStartAt=new Date(now+wait*60000).toISOString();m.estimatedEndAt=new Date(now+(wait+avg)*60000).toISOString();
         longest=Math.max(longest,wait);
       });
     });
   }else{
-    state.sharedQueue.forEach((id,index)=>{
-      const m=findMatch(state.draw,id);if(!m)return;
-      const wave=Math.floor(index/Math.max(1,state.courts.length))+2,wait=Math.round(avg*wave);
+    (state.sharedQueue||[]).forEach((id,index)=>{
+      const m=getMatch(id);if(!m)return;
+      if(!m.waitStartedAt)m.waitStartedAt=new Date(now).toISOString();
+      m.waitElapsedMinutes=Math.max(0,Math.floor((now-new Date(m.waitStartedAt))/60000));
+      const wave=Math.floor(index/Math.max(1,activeCourts.length))+2,wait=Math.round(avg*wave);
       m.estimatedWaitMinutes=wait;m.estimatedStartAt=new Date(now+wait*60000).toISOString();m.estimatedEndAt=new Date(now+(wait+avg)*60000).toISOString();
       longest=Math.max(longest,wait);
     });
@@ -67,6 +89,6 @@ export function timeInfo(match){
     const e=match.elapsedMinutes||0,r=match.estimatedRemainingMinutes||0;
     return{label:`진행 ${e}분 · 약 ${r}분 남음`,className:e>60?'danger':e>40?'warn':''};
   }
-  const w=Number(match.estimatedWaitMinutes||0);
-  return{label:`예상 ${w}분 대기 · ${fmt(match.estimatedStartAt)} 시작`,className:w>=60?'danger':w>=30?'warn':''};
+  const w=Number(match.estimatedWaitMinutes||0),elapsed=Number(match.waitElapsedMinutes||0);
+  return{label:`대기 ${elapsed}분 경과 · 예상 ${w}분 · ${fmt(match.estimatedStartAt)} 시작`,className:w>=60?'danger':w>=30?'warn':''};
 }

@@ -18,7 +18,14 @@ function venueQueue(state,venueId){
 }
 function setUnifiedStatus(state,id,status,court=null){
   const item=findUnifiedMatch(state,id);if(!item)return;
+  const now=new Date().toISOString();
   item.match.status=status;
+  if(status==='playing'){
+    item.match.startedAt=item.match.startedAt||now;
+    item.match.waitStartedAt=null;
+  }else if(status==='court_wait1'||status==='venue_shared_queue'||status==='shared_queue'||status==='queued'){
+    item.match.waitStartedAt=item.match.waitStartedAt||now;
+  }
   if(court){
     if(item.type==='prelim')item.match.prelimCourtId=court.id;
     else item.match.courtId=court.id;

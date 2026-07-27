@@ -1,5 +1,21 @@
 
 function nextPower(value){let n=1;while(n<value)n*=2;return n;}
+function shuffled(items){
+  const out=[...items];
+  for(let i=out.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[out[i],out[j]]=[out[j],out[i]];}
+  return out;
+}
+function pairAvoidingSameGroup(items){
+  const pool=[...items],pairs=[];
+  while(pool.length){
+    const first=pool.shift();
+    let partnerIndex=pool.findIndex(x=>!first.groupNo||!x.groupNo||x.groupNo!==first.groupNo);
+    if(partnerIndex<0)partnerIndex=0;
+    const second=pool.splice(partnerIndex,1)[0];
+    pairs.push([first,second]);
+  }
+  return pairs;
+}
 function normalizeTeam(team,index){
   if(typeof team==='string')return{id:`team-${index+1}`,name:team,rank:index+1};
   const players=[team.player1,team.player2,team.p1,team.p2].filter(Boolean).map(p=>typeof p==='string'?p:(p.name||p.playerName||'')).filter(Boolean);
@@ -67,26 +83,31 @@ export function generateDraw(teams,requestedSize){
   // 예: 68팀/128드로 => 8팀이 4경기 예비전, 나머지 60팀은 64강 직행.
   if(selected.length>half){
     const preliminaryEntrants=Math.max(0,2*(selected.length-half));
-    const lowerRank=[...rest];
+    // 하위 순위팀 중 예비전 대상과 대진 상대를 매 추첨마다 무작위로 선정합니다.
+    const lowerRank=shuffled(rest);
     const preliminary=lowerRank.slice(0,preliminaryEntrants);
-    const direct=[...top,...lowerRank.slice(preliminaryEntrants)];
+    const directTop=shuffled(top);
+    const directLower=shuffled(lowerRank.slice(preliminaryEntrants));
+    const direct=[...directTop,...directLower];
     if(preliminary.length<preliminaryEntrants){
       const shortage=preliminaryEntrants-preliminary.length;
       preliminary.push(...direct.splice(Math.max(0,direct.length-shortage),shortage));
     }
-    const matchOrder=seedOrder(half).map(x=>x-1);
-    const preliminaryMatchCount=preliminary.length/2;
-    const prelimMatchIndexes=matchOrder.slice(-preliminaryMatchCount);
-    const directMatchIndexes=matchOrder.filter(x=>!prelimMatchIndexes.includes(x));
-    preliminary.forEach((team,i)=>{
-      const matchIndex=prelimMatchIndexes[Math.floor(i/2)];
-      slots[matchIndex*2+(i%2)]=team;
+    const preliminaryPairs=pairAvoidingSameGroup(shuffled(preliminary));
+    const allMatchIndexes=shuffled(seedOrder(half).map(x=>x-1));
+    const prelimMatchIndexes=allMatchIndexes.slice(0,preliminaryPairs.length);
+    const directMatchIndexes=allMatchIndexes.slice(preliminaryPairs.length);
+    preliminaryPairs.forEach((pair,i)=>{
+      const matchIndex=prelimMatchIndexes[i];
+      const oriented=Math.random()<0.5?pair:[pair[1],pair[0]];
+      slots[matchIndex*2]=oriented[0];
+      slots[matchIndex*2+1]=oriented[1];
     });
     direct.forEach((team,i)=>{
       const matchIndex=directMatchIndexes[i];
       if(matchIndex===undefined)return;
-      // 직행팀은 한 경기 칸의 한쪽만 차지하여 BYE로 다음 라운드에 진출한다.
-      slots[matchIndex*2+(i%2)]=team;
+      // 직행팀은 한 경기 칸의 한쪽만 차지하여 BYE로 다음 라운드에 진출합니다.
+      slots[matchIndex*2+(Math.random()<0.5?0:1)]=team;
     });
   }else{
     const spread=seedOrder(size);
@@ -106,6 +127,8 @@ export function generateDraw(teams,requestedSize){
   }
   rounds[size].forEach((m,i)=>{
     m.teamA=slots[i*2];m.teamB=slots[i*2+1];
+    m.isPlayIn=selected.length>size/2&&Boolean(m.teamA&&m.teamB);
+    m.playInLabel=m.isPlayIn?'64강 진입 예비전':'';
     const aResolved=Boolean(m.teamA&&!m.teamA.placeholder);
     const bResolved=Boolean(m.teamB&&!m.teamB.placeholder);
     if(aResolved&&bResolved){

@@ -9,13 +9,16 @@ export function submitResult(state,{matchId,winnerId,scoreA,scoreB}){
   if(!winner)throw new Error('승리팀 선택이 올바르지 않습니다.');
   match.winner=winner;match.scoreA=Number(scoreA);match.scoreB=Number(scoreB);
   match.status='completed';match.completedAt=new Date().toISOString();
-  const sourceCourt=removeFromQueues(state,matchId);
+  const unified=Array.isArray(state.prelim?.courts)&&state.prelim.courts.length>0;
+  const sourceCourt=unified?null:removeFromQueues(state,matchId);
   if(match.nextMatchId){
     const next=findMatch(state.draw,match.nextMatchId);
     if(match.nextSlot===1)next.teamA=winner;else next.teamB=winner;
     if(next.teamA&&next.teamB&&next.status!=='completed')next.status='ready';
   }
-  refillCourt(state,sourceCourt,id=>findMatch(state.draw,id));
-  queueReadyMatches(state,id=>findMatch(state.draw,id));
+  if(!unified){
+    refillCourt(state,sourceCourt,id=>findMatch(state.draw,id));
+    queueReadyMatches(state,id=>findMatch(state.draw,id));
+  }
   return match;
 }
