@@ -424,7 +424,11 @@
       <section class="panel">
         <div class="section-head">
           <div><h2>본선 대진표</h2><p>결과 확정 전에는 다음 라운드가 TBD로 유지됩니다.</p></div>
-          <button id="exportJsonBtn" class="btn btn-light">운영 JSON 저장</button>
+          <div class="bracket-export-actions" data-admin-only="true">
+            <button id="exportJsonBtn" class="btn btn-light" type="button">전체 백업 저장</button>
+            <label class="btn btn-secondary file-button" type="button">백업 불러오기<input id="stateBackupInput" type="file" accept=".json,application/json"></label>
+            <button id="exportResultsCsvBtn" class="btn btn-light" type="button">경기 결과 CSV</button>
+          </div>
         </div>
         <div class="bracket-view-toolbar">
           <label><span>라운드</span><select id="bracketRoundFilter"><option value="all">전체 라운드</option></select></label>
@@ -895,6 +899,6 @@
     <div id="recoveryList" class="recovery-list"></div>
   </dialog>
 
-  <script type="module" src="./assets/js/app-v33133.js?v=33133"></script>
+  <script type="module" src="./assets/js/app-v33134.js?v=33134"></script>
 </body>
 </html>

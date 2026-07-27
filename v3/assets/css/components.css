@@ -405,3 +405,8 @@ body:not([data-role="admin"]) .internal-match-id{display:none!important}
 .tournament-completion-banner strong{display:block;color:#142b50;font-size:24px;line-height:1.35}
 .tournament-completion-banner small{color:#68758a}
 body[data-role=viewer] .tournament-completion-banner{margin-top:10px}
+
+/* Stage 31.34 backup / restore toolbar */
+.bracket-export-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.bracket-export-actions .file-button{margin:0}
+@media (max-width:720px){.bracket-export-actions{width:100%;justify-content:flex-start}.bracket-export-actions .btn{min-height:36px;padding:8px 11px;font-size:13px}}
