@@ -62,10 +62,38 @@ export function generateDraw(teams,requestedSize){
   const top=ranked.filter(t=>t.groupRank===1);
   const rest=ranked.filter(t=>t.groupRank!==1);
   const slots=Array(size).fill(null);
-  const spread=seedOrder(size);
-  top.forEach((team,i)=>{slots[spread[i]-1]=team;});
-  let ri=0;
-  for(let i=0;i<size;i++)if(!slots[i]&&ri<rest.length)slots[i]=rest[ri++];
+  const half=size/2;
+  // 참가 슬롯이 절반을 넘는 경우에는 초과 인원만 1회전 예비전(일명 똥통)을 치른다.
+  // 예: 68팀/128드로 => 8팀이 4경기 예비전, 나머지 60팀은 64강 직행.
+  if(selected.length>half){
+    const preliminaryEntrants=Math.max(0,2*(selected.length-half));
+    const lowerRank=[...rest];
+    const preliminary=lowerRank.slice(0,preliminaryEntrants);
+    const direct=[...top,...lowerRank.slice(preliminaryEntrants)];
+    if(preliminary.length<preliminaryEntrants){
+      const shortage=preliminaryEntrants-preliminary.length;
+      preliminary.push(...direct.splice(Math.max(0,direct.length-shortage),shortage));
+    }
+    const matchOrder=seedOrder(half).map(x=>x-1);
+    const preliminaryMatchCount=preliminary.length/2;
+    const prelimMatchIndexes=matchOrder.slice(-preliminaryMatchCount);
+    const directMatchIndexes=matchOrder.filter(x=>!prelimMatchIndexes.includes(x));
+    preliminary.forEach((team,i)=>{
+      const matchIndex=prelimMatchIndexes[Math.floor(i/2)];
+      slots[matchIndex*2+(i%2)]=team;
+    });
+    direct.forEach((team,i)=>{
+      const matchIndex=directMatchIndexes[i];
+      if(matchIndex===undefined)return;
+      // 직행팀은 한 경기 칸의 한쪽만 차지하여 BYE로 다음 라운드에 진출한다.
+      slots[matchIndex*2+(i%2)]=team;
+    });
+  }else{
+    const spread=seedOrder(size);
+    top.forEach((team,i)=>{slots[spread[i]-1]=team;});
+    let ri=0;
+    for(let i=0;i<size;i++)if(!slots[i]&&ri<rest.length)slots[i]=rest[ri++];
+  }
   const rounds={};
   for(let roundSize=size;roundSize>=2;roundSize/=2){
     const count=roundSize/2;
@@ -129,12 +157,19 @@ export function syncLinkedDrawQualifiers(draw,qualifiers,{protectStarted=true}={
       changes.push({matchId:match.id,slot,placeholderKey:current.placeholderKey,teamId:resolved.id});
       const aResolved=Boolean(match.teamA&&!match.teamA.placeholder);
       const bResolved=Boolean(match.teamB&&!match.teamB.placeholder);
-      if(match.status!=='completed'){
-        match.status=aResolved&&bResolved?'ready':'waiting_slots';
+      if(match.status!=='playing'){
+        if(aResolved&&bResolved){
+          match.status='ready';match.winner=null;match.bye=false;
+        }else if((aResolved||bResolved)&&!(match.teamA?.placeholder||match.teamB?.placeholder)){
+          match.winner=match.teamA||match.teamB;match.status='completed';match.bye=true;
+        }else{
+          match.status='waiting_slots';match.winner=null;match.bye=false;
+        }
       }
     });
   });
 
+  propagateByes(draw.rounds,draw.size);
   return {changes,locked};
 }
 
