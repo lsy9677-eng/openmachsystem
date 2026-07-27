@@ -41,7 +41,7 @@ export function render(state,handlers){
   const playing=matches.filter(m=>m.status==='playing').length;
   setText('heroDrawSize',state.draw.size?`${state.draw.size}강`:'-');setText('heroMatchCount',matches.length);setText('heroCompleted',completed);setText('heroPlaying',playing);
   setText('summaryTeams',`${state.teams.length}팀`);setText('summaryRound',currentRound(state));setText('summaryPlaying',playing);
-  setText('summaryWait1',state.courts.filter(c=>c.wait1).length);setText('summaryShared',totalVenueQueueCount(state)+(state.sharedQueue?.length||0));
+  const activeCourts=(state.prelim?.courts?.length?state.prelim.courts:state.courts)||[];setText('summaryWait1',activeCourts.filter(c=>c.wait1).length);setText('summaryShared',totalVenueQueueCount(state)+(state.sharedQueue?.length||0));
   setText('summaryAverageMinutes',`${state.timeMetrics?.averageMinutes||0}분`);setText('summaryLongestWait',`${state.timeMetrics?.longestWaitMinutes||0}분`);
   setText('summaryDrawMethod',drawMethodLabel(state.drawMeta?.method));setText('summaryDrawLock',state.drawMeta?.locked?'잠금':'해제');setText('summaryPendingMessages',`${state.messaging?.queue?.filter(x=>x.status==='pending'||x.status==='no-phone').length||0}건`);setText('summaryPhoneTeams',`${contactStats(state).withPhone}팀`);setText('summaryAuditStatus',auditLabel(state.audit?.overall));setText('summaryVenueCount',`${venueStats(state).venueCount}곳`);setText('summaryVenueQueueCount',`${totalVenueQueueCount(state)}경기`);renderContactRoster(state,handlers);updateDrawLockInfo(state);renderMessageCenter(state,handlers);
   setText('baseMatchMinutes',`${state.settings.matchMinutes||30}분`);setText('autoTimeStatus',state.settings.autoTimeEnabled?'ON':'OFF');
@@ -268,7 +268,7 @@ function renderUnifiedCourtGrid(state,handlers,rootId,countId){
       <header><strong>${c.isPaused?'⛔':'🚀'} ${c.name}</strong><span>${c.isPaused?'사용중지 · ':''}${c.venueName?`${c.venueName} · `:''}${playing?'시합중':'빈코트'}</span></header>
       <div class="prelim-court-slot playing"><small>시합중</small>${playing?`<span class="group-label">${label(playing)}</span>`:''}<b>${playing?names(playing):'진행 경기 없음'}</b>${playing?`<button class="btn btn-secondary" ${playing.type==='prelim'?`data-prelim-result="${playing.match.id}"`:`data-main-result="${playing.match.id}"`}>결과 입력</button>`:''}</div>
       <div class="prelim-court-slot wait1"><small>대기1</small>${wait1?`<span class="group-label">${label(wait1)}</span>`:''}<b>${wait1?names(wait1):'대기 경기 없음'}</b></div>
-      <div class="prelim-extra-queue"><strong>추가 대기 ${queue.length}경기</strong>${queue.length?queue.map((id,i)=>{const x=item(id);return`<div class="prelim-extra-item"><span class="no">${i+2}</span>${x?`<span class="group-no">${label(x)}</span><span class="match-text">${names(x)}</span>`:`<span>${id}</span>`}</div>`}).join(''):'<p>추가 대기 없음</p>'}</div>
+      <div class="prelim-extra-queue"><strong>예선 추가 대기 ${queue.length}경기</strong>${queue.length?queue.map((id,i)=>{const x=item(id);return`<div class="prelim-extra-item"><span class="no">${i+2}</span>${x?`<span class="group-no">${label(x)}</span><span class="match-text">${names(x)}</span>`:`<span>${id}</span>`}</div>`}).join(''):'<p>예선 추가 대기 없음</p>'}</div>
       ${c.isPaused&&c.pauseReason?`<div class="prelim-court-pause-reason">중지 사유: ${c.pauseReason}</div>`:''}
       <div class="prelim-court-status-actions"><button class="btn ${c.isPaused?'btn-primary':'btn-danger-outline'}" data-prelim-court-status="${c.id}">${c.isPaused?'코트 사용 재개':'코트 사용중지'}</button></div>
     </article>`;
@@ -300,8 +300,32 @@ function renderPrelimLockStatus(state){
 }
 
 
+
+function renderOperationSharedQueue(state,handlers){
+  const root=document.getElementById('operationSharedQueue');
+  const count=document.getElementById('operationSharedQueueCount');
+  if(!root)return;
+  const courts=state.prelim?.courts||[];
+  const venueMap=new Map();
+  courts.forEach(c=>{const id=c.venueId||'venue-default';if(!venueMap.has(id))venueMap.set(id,c.venueName||id);});
+  (state.settings.venues||[]).forEach(v=>{if(!venueMap.has(v.id))venueMap.set(v.id,v.name);});
+  const queues=state.venueQueues||{};
+  const total=[...venueMap.keys()].reduce((n,id)=>n+(queues[id]?.length||0),0);
+  if(count)count.textContent=`${total}경기`;
+  if(!total){root.className='shared-queue venue-queue-board empty-state';root.innerHTML='<p>확정된 본선 공용대기 경기가 없습니다.</p>';return;}
+  root.className='shared-queue venue-queue-board';
+  root.innerHTML=[...venueMap.entries()].map(([venueId,venueName])=>{
+    const queue=queues[venueId]||[];
+    return`<section class="venue-queue-section"><header><h3>📍 ${venueName} 본선 공용대기</h3><span>${queue.length}경기</span></header><div class="venue-queue-cards">${queue.length?queue.map((id,i)=>{const m=findMatch(state.draw,id);return`<article class="queue-card"><span class="num">${i+1}</span><b>${m?`${operationalTeamHtml(m.teamA,state)} vs ${operationalTeamHtml(m.teamB,state)}`:id}</b><em>${m?`${roundLabel(m.roundSize)} · ${id}`:'경기 없음'}</em>${m?timeBadgeHtml(m):''}<div class="queue-card-actions"><button class="btn btn-light" data-op-queue-up="${id}" data-venue-id="${venueId}" ${i===0?'disabled':''}>▲</button><button class="btn btn-light" data-op-queue-down="${id}" data-venue-id="${venueId}" ${i===queue.length-1?'disabled':''}>▼</button><button class="btn btn-secondary" data-op-queue-move="${id}" data-venue-id="${venueId}">구장 이동</button></div></article>`}).join(''):'<div class="empty-state"><p>대기 경기 없음</p></div>'}</div></section>`;
+  }).join('');
+  root.querySelectorAll('[data-op-queue-up]').forEach(b=>b.onclick=()=>handlers.reorderQueue(b.dataset.venueId,b.dataset.opQueueUp,'up'));
+  root.querySelectorAll('[data-op-queue-down]').forEach(b=>b.onclick=()=>handlers.reorderQueue(b.dataset.venueId,b.dataset.opQueueDown,'down'));
+  root.querySelectorAll('[data-op-queue-move]').forEach(b=>b.onclick=()=>handlers.openQueueMove(b.dataset.venueId,b.dataset.opQueueMove));
+}
+
 function renderOperationUnified(state,handlers){
   renderUnifiedCourtGrid(state,handlers,'operationUnifiedCourtGrid','operationUnifiedCourtCount');
+  renderOperationSharedQueue(state,handlers);
   const opGroup=document.getElementById('operationPrelimGroupGrid');
   const srcGroup=document.getElementById('prelimGroupGrid');
   if(opGroup&&srcGroup){
@@ -317,7 +341,7 @@ function renderOperationUnified(state,handlers){
     const pending=first.filter(m=>m.teamA?.placeholder||m.teamB?.placeholder);
     if(summary)summary.textContent=`확정 ${resolved.length} · 미확정 ${pending.length}`;
     list.className=resolved.length?'shared-queue':'shared-queue empty-state';
-    list.innerHTML=resolved.length?resolved.map((m,i)=>`<article class="queue-card"><span class="num">${i+1}</span><b>${operationalTeamText(m.teamA,state)} vs ${operationalTeamText(m.teamB,state)}</b><em>${m.status==='playing'?'시합중':m.status==='completed'?'완료':m.status==='court_wait1'?'대기1':m.status==='queued'?'추가대기':'배정 대기'} · ${m.id}</em></article>`).join(''):'<p>양쪽 참가팀이 모두 확정된 본선 경기가 없습니다.</p>';
+    list.innerHTML=resolved.length?resolved.map((m,i)=>`<article class="queue-card"><span class="num">${i+1}</span><b>${operationalTeamText(m.teamA,state)} vs ${operationalTeamText(m.teamB,state)}</b><em>${m.status==='playing'?'시합중':m.status==='completed'?'완료':m.status==='court_wait1'?'대기1':m.status==='venue_shared_queue'||m.status==='shared_queue'?'공용대기':m.status==='queued'?'추가대기':'배정 대기'} · ${m.id}</em></article>`).join(''):'<p>양쪽 참가팀이 모두 확정된 본선 경기가 없습니다.</p>';
   }
 }
 
