@@ -1,0 +1,97 @@
+
+@media(max-width:1200px){.control-grid{grid-template-columns:repeat(3,1fr)}.summary-grid{grid-template-columns:repeat(3,1fr)}.court-grid,.shared-queue{grid-template-columns:repeat(2,1fr)}.hero{grid-template-columns:1fr}.feature-roadmap{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:700px){.topbar{padding:11px 12px}.brand span{display:none}.top-actions .badge{display:none}.app-shell{padding:10px}.panel{padding:14px;border-radius:15px}.hero h1{font-size:24px}.hero-stats{grid-template-columns:repeat(2,1fr)}.mode-tabs{overflow:auto}.tab{white-space:nowrap}.control-grid,.summary-grid,.court-grid,.shared-queue,.feature-roadmap{grid-template-columns:1fr}.button-row .btn{flex:1 1 45%}.section-head{align-items:stretch}.score-grid{grid-template-columns:1fr}.log-item{grid-template-columns:1fr}.top-actions{gap:5px}.top-actions .btn{padding:8px 9px;font-size:12px}}
+
+@media(max-width:1200px){.prelim-group-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:700px){.prelim-group-grid,.prelim-controls{grid-template-columns:1fr}}
+
+@media(max-width:1200px){.linked-status-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:700px){.linked-status-grid{grid-template-columns:1fr}}
+
+@media(max-width:1200px){.team-pool-grid{grid-template-columns:1fr}.team-pool{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:700px){.team-pool{grid-template-columns:1fr}}
+
+@media(max-width:900px){.time-settings{grid-template-columns:1fr 1fr}.time-strip{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:700px){.time-settings,.time-strip{grid-template-columns:1fr}}
+
+@media(max-width:700px){.draw-history-item{grid-template-columns:1fr}.roulette-result-list{grid-template-columns:1fr}}
+
+@media(max-width:700px){.draw-lock-info{align-items:flex-start;flex-direction:column}.lock-summary{grid-template-columns:1fr}}
+
+@media(max-width:1100px){.message-settings-grid,.message-template-grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:700px){.message-settings-grid,.message-template-grid{grid-template-columns:1fr}.message-card-head{flex-direction:column}}
+
+@media(max-width:1200px){.roster-tools{grid-template-columns:1fr 180px auto}.contact-roster-list{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:700px){.roster-tools,.contact-roster-list{grid-template-columns:1fr}.contact-help{flex-direction:column}}
+
+@media(max-width:700px){.audit-item{grid-template-columns:1fr}.audit-explain{flex-direction:column}}
+
+@media(max-width:850px){.venue-row{grid-template-columns:1fr 100px}.venue-row .venue-prefix{grid-column:1/-1}}
+@media(max-width:600px){.venue-row{grid-template-columns:1fr}}
+
+@media(max-width:1000px){.venue-queue-policy{grid-template-columns:1fr 1fr}.venue-queue-cards{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:650px){.venue-queue-policy,.venue-queue-cards{grid-template-columns:1fr}}
+
+@media(max-width:900px){
+  #sharedQueue.venue-queue-board .venue-queue-cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:620px){
+  #sharedQueue.venue-queue-board .venue-queue-cards{grid-template-columns:1fr}
+}
+
+@media(max-width:620px){.queue-control-guide{align-items:flex-start;flex-direction:column}}
+
+@media(max-width:1100px){.bracket-view-toolbar{grid-template-columns:repeat(3,minmax(150px,1fr))}}
+@media(max-width:720px){.bracket-view-toolbar{grid-template-columns:1fr 1fr}}
+@media(max-width:520px){.bracket-view-toolbar{grid-template-columns:1fr}}
+
+/* Stage 31.64 · mobile usability final polish */
+:root{--mobile-bottom-nav-height:68px;--mobile-safe-bottom:env(safe-area-inset-bottom,0px)}
+.mobile-scroll-top{display:none}
+.mobile-table-scroll{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-inline:contain}
+@media(max-width:700px){
+  html{scroll-padding-top:64px}
+  body.mobile-ux-mode{padding-bottom:calc(var(--mobile-bottom-nav-height) + var(--mobile-safe-bottom) + 12px);overflow-x:hidden}
+  body.mobile-keyboard-open .mobile-bottom-nav{transform:translateY(120%);pointer-events:none}
+  .topbar{position:sticky;top:0;z-index:80;padding:8px 10px;gap:8px}
+  .brand{min-width:0}.brand strong{font-size:.92rem}.brand span{font-size:.62rem}.brand-mark{width:36px;height:36px;flex:0 0 36px}
+  .top-actions{min-width:0}.compact-role-switch{gap:5px;justify-content:flex-end}.compact-role-switch .btn{min-height:40px;padding:8px 10px;font-size:.75rem}.compact-role-switch .badge{display:none}
+  .hero{padding:14px}.hero h1{font-size:1.25rem}.hero p{font-size:.82rem}.hero-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.hero-stats>div{padding:9px}
+  .mode-tabs{display:none!important}
+  .app-shell{width:100%;padding:8px 8px calc(var(--mobile-bottom-nav-height) + var(--mobile-safe-bottom) + 16px)}
+  .panel{border-radius:14px;padding:13px;max-width:100%;box-sizing:border-box}
+  .section-head{align-items:flex-start;gap:10px}.section-head>.actions,.section-head>div:last-child{max-width:100%;flex-wrap:wrap}
+  button,.btn,[role=button],input,select,textarea{font-size:16px}
+  button,.btn,[role=button]{min-height:44px;touch-action:manipulation}
+  input,select,textarea{min-height:44px;padding:10px 12px}
+  textarea{min-height:96px}
+  .mobile-page-bar{top:52px;min-height:48px;padding:6px 9px;z-index:70}.mobile-page-bar strong{font-size:.94rem}.mobile-page-bar button{min-width:44px;min-height:40px}
+  .mobile-bottom-nav{height:calc(var(--mobile-bottom-nav-height) + var(--mobile-safe-bottom));padding:5px 4px calc(5px + var(--mobile-safe-bottom));align-items:start;transition:transform .2s ease;z-index:95}
+  .mobile-nav-button{min-width:0!important;min-height:56px!important;padding:5px 1px!important;gap:2px!important}.mobile-nav-button span{font-size:1.05rem}.mobile-nav-button b{font-size:.65rem;white-space:nowrap}
+  .mobile-more-panel,.settings-hub-panel{max-height:calc(var(--app-vh,1vh)*88);padding-bottom:calc(14px + var(--mobile-safe-bottom));overflow-y:auto;-webkit-overflow-scrolling:touch}
+  dialog.modal{width:calc(100vw - 12px);max-width:none;max-height:calc(var(--app-vh,1vh)*94);margin:auto;border-radius:18px;padding:0;overflow:auto}
+  dialog.modal::backdrop{background:rgba(15,30,58,.55)}
+  .mobile-table-scroll{margin-inline:-5px;padding:0 5px 6px;position:relative}
+  .mobile-table-scroll.has-horizontal-overflow::after,.operation-mode-bar.has-horizontal-overflow::after{content:'좌우로 밀어보세요 ↔';position:sticky;left:8px;display:inline-block;margin-top:4px;padding:3px 7px;border-radius:999px;background:rgba(15,30,58,.82);color:#fff;font-size:.65rem;pointer-events:none}
+  .mobile-table-scroll table{min-width:620px}
+  .public-standing-table{min-width:520px!important}
+  .bracket-tree,.draw-grid,.court-grid{overscroll-behavior-inline:contain;-webkit-overflow-scrolling:touch}
+  .portal-quick-actions,.participant-actions,.entry-admin-actions,.print-actions{gap:7px}.portal-quick-actions .btn,.participant-actions .btn{flex:1 1 auto}
+  .mobile-scroll-top{display:grid;place-items:center;position:fixed;right:12px;bottom:calc(var(--mobile-bottom-nav-height) + var(--mobile-safe-bottom) + 12px);z-index:88;width:44px;height:44px;min-height:44px;border:0;border-radius:50%;background:#10264a;color:#fff;font-size:1.25rem;font-weight:900;box-shadow:0 8px 22px rgba(15,30,58,.28);opacity:0;transform:translateY(12px);pointer-events:none;transition:.18s ease}
+  .mobile-scroll-top.show{opacity:1;transform:none;pointer-events:auto}
+}
+@media(max-width:380px){
+  .compact-role-switch .btn{padding:7px 8px;font-size:.7rem}.brand span{display:none}.mobile-nav-button b{font-size:.6rem}
+  .mobile-more-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
+
+/* Stage 32.1.4 · mobile login access hotfix */
+@media(max-width:700px){
+  .topbar{display:grid;grid-template-columns:minmax(0,1fr) auto;overflow:visible}
+  .top-actions{display:block;overflow:visible}
+  .compact-role-switch{display:flex!important;max-width:none;overflow:visible}
+  .compact-role-switch #currentRoleBadge{display:none!important}
+  .compact-role-switch #roleViewerBtn{display:none!important}
+  .compact-role-switch #openAdminSettingsHubBtn{display:none!important}
+  .compact-role-switch #openSocialLoginBtn{display:inline-flex!important;align-items:center;justify-content:center;min-width:76px!important;min-height:42px!important;padding:8px 12px!important;font-size:.8rem!important;white-space:nowrap}
+  .mobile-more-grid #mobileSocialLoginBtn{background:linear-gradient(145deg,#10264a,#1e4a83);color:#fff;border-color:#10264a}
+}
