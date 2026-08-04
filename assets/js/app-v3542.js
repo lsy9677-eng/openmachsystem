@@ -6674,3 +6674,215 @@ console.info('[230MATCH V3] 34.4.2 ready · main wait1 refill and shared queue e
   window.addEventListener('load',()=>setTimeout(apply,100));
   console.info('[230MATCH] 1.0.0 official release ready');
 })();
+
+/* Stage 35.6.0 · authenticated player self-result entry */
+(function stage3560PlayerSelfResult(){
+  const TYPE_LABELS={normal:'일반 경기',retired:'기권',injury:'부상',walkover:'노쇼'};
+  const normalizePhone=v=>String(v||'').replace(/\D/g,'');
+  const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  function ownership(team){
+    if(!currentAuthUser||!team)return{ok:false,reason:'login'};
+    if(canOperate())return{ok:true,reason:'operator'};
+    const uid=String(currentAuthUser.uid||'');
+    if(uid&&[team.ownerUid,team.applicationOwnerUid].some(v=>String(v||'')===uid))return{ok:true,reason:'uid'};
+    const profilePhone=normalizePhone(v3252ProfileDefaults().phone);
+    const contactPhone=normalizePhone(getTeamContact(state,team)?.phone);
+    const phones=[contactPhone,...(team.playerPhones||[]),...(team.players||[]).map(p=>p?.phone),team.player1Phone,team.player2Phone].map(normalizePhone).filter(Boolean);
+    if(profilePhone&&phones.includes(profilePhone))return{ok:true,reason:'phone'};
+    return{ok:false,reason:'unverified'};
+  }
+  function matchById(id,isPrelim){return isPrelim?findPrelimMatch(state,id):findMatch(state.draw,id)}
+  function scoreLabel(match){
+    const type=match?.resultType||'normal';
+    const label=TYPE_LABELS[type]||match?.resultTypeLabel||'';
+    return type!=='normal'&&label?label:'';
+  }
+  function decorate(team){
+    const root=document.getElementById('myMatchResult');if(!root)return;
+    const own=ownership(team);
+    const teamKey=myMatchTeamKey(team);
+    const prelim=(state.prelim?.matches||[]).filter(m=>myMatchContainsTeam(m,team)).sort((a,b)=>Number(a.matchNo||0)-Number(b.matchNo||0));
+    const main=portalMainMatches().filter(m=>myMatchContainsTeam(m,team)).sort((a,b)=>{const ar=Number(String(a.id||'').match(/^r(\d+)_/)?.[1]||0),br=Number(String(b.id||'').match(/^r(\d+)_/)?.[1]||0);return br-ar;});
+    const sections=[...root.querySelectorAll('.my-match-section')];
+    [[sections[0],prelim,true],[sections[1],main,false]].forEach(([section,matches,isPrelim])=>{
+      if(!section)return;
+      [...section.querySelectorAll('.my-match-game')].forEach((card,index)=>{
+        const match=matches[index];if(!match)return;
+        card.dataset.playerResultMatch=match.id;card.dataset.playerResultPrelim=isPrelim?'1':'0';
+        const special=scoreLabel(match);
+        if(special&&!card.querySelector('.stage3560-result-type')){
+          const score=card.querySelector('.my-match-score');
+          (score||card).insertAdjacentHTML(score?'beforeend':'beforeend',`<span class="stage3560-result-type">${esc(special)}</span>`);
+        }
+        const eligible=own.ok&&match.teamA&&match.teamB&&!match.teamA.placeholder&&!match.teamB.placeholder;
+        if(eligible&&!card.querySelector('[data-player-result-open]')){
+          const button=document.createElement('button');
+          button.type='button';button.className='btn btn-primary btn-small stage3560-result-button';
+          button.dataset.playerResultOpen=match.id;button.dataset.playerResultPrelim=isPrelim?'1':'0';button.dataset.playerResultTeam=teamKey;
+          button.textContent=match.status==='completed'?'결과 수정':'결과 입력';
+          card.appendChild(button);
+        }
+      });
+    });
+    if(!own.ok&&currentAuthUser&&!root.querySelector('.stage3560-verify-note')){
+      root.insertAdjacentHTML('beforeend','<div class="stage3560-verify-note">경기 조회는 가능하지만 결과 입력은 등록 전화번호 또는 참가 신청 계정이 확인된 본인 팀에서만 가능합니다.</div>');
+    }
+  }
+  function installDialog(){
+    if(document.getElementById('stage3560ResultDialog'))return;
+    document.body.insertAdjacentHTML('beforeend',`<dialog id="stage3560ResultDialog" class="stage3560-dialog"><form method="dialog" id="stage3560ResultForm"><div class="stage3560-head"><div><p>PLAYER RESULT</p><h3 id="stage3560Title">경기 결과 입력</h3></div><button type="button" data-stage3560-close aria-label="닫기">×</button></div><div id="stage3560MatchInfo" class="stage3560-match-info"></div><label class="stage3560-label">결과 유형<select id="stage3560Type"><option value="normal">일반 경기</option><option value="retired">기권</option><option value="injury">부상</option><option value="walkover">노쇼</option></select></label><div class="stage3560-score-grid"><button type="button" class="stage3560-team" data-stage3560-winner="A"><span id="stage3560TeamA">A팀</span><input id="stage3560ScoreA" type="number" min="0" max="6" inputmode="numeric" aria-label="A팀 점수"></button><span class="stage3560-colon">:</span><button type="button" class="stage3560-team" data-stage3560-winner="B"><span id="stage3560TeamB">B팀</span><input id="stage3560ScoreB" type="number" min="0" max="6" inputmode="numeric" aria-label="B팀 점수"></button></div><p id="stage3560Guide" class="stage3560-guide">일반 경기는 양 팀 스코어를 입력하세요.</p><div class="stage3560-actions"><button type="button" class="btn btn-secondary" data-stage3560-close>취소</button><button type="submit" class="btn btn-primary">결과 저장</button></div><input type="hidden" id="stage3560MatchId"><input type="hidden" id="stage3560IsPrelim"><input type="hidden" id="stage3560WinnerSide"></form></dialog>`);
+    const style=document.createElement('style');style.id='stage3560Style';style.textContent=`.stage3560-result-button{width:100%;margin-top:10px}.stage3560-result-type{display:inline-flex;margin-left:7px;padding:2px 7px;border-radius:999px;background:rgba(245,158,11,.16);font-size:11px;font-weight:800}.stage3560-verify-note{margin-top:14px;padding:10px 12px;border-radius:10px;background:rgba(100,116,139,.1);font-size:12px;color:#64748b}.stage3560-dialog{width:min(92vw,460px);border:0;border-radius:18px;padding:0;box-shadow:0 24px 80px rgba(15,23,42,.28)}.stage3560-dialog::backdrop{background:rgba(15,23,42,.45)}#stage3560ResultForm{padding:18px}.stage3560-head{display:flex;justify-content:space-between;align-items:flex-start}.stage3560-head p{margin:0;color:#2563eb;font-size:11px;font-weight:900;letter-spacing:.08em}.stage3560-head h3{margin:3px 0 0}.stage3560-head>button{border:0;background:transparent;font-size:28px;line-height:1}.stage3560-match-info{margin:14px 0;padding:11px;border-radius:12px;background:#f8fafc;font-weight:800}.stage3560-label{display:grid;gap:6px;font-size:12px;font-weight:800}.stage3560-label select{height:42px;border:1px solid #cbd5e1;border-radius:10px;padding:0 10px;background:white}.stage3560-score-grid{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:stretch;margin-top:14px}.stage3560-team{border:1px solid #cbd5e1;border-radius:14px;background:white;padding:10px 8px;display:grid;gap:8px;text-align:center}.stage3560-team.is-winner{border-color:#2563eb;background:#eff6ff}.stage3560-team span{font-size:13px;font-weight:800}.stage3560-team input{width:100%;height:52px;border:0;border-radius:10px;background:#f1f5f9;text-align:center;font-size:26px;font-weight:900}.stage3560-colon{align-self:center;font-size:26px;font-weight:900}.stage3560-guide{font-size:12px;color:#64748b;margin:10px 0 0}.stage3560-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}@media(max-width:560px){.stage3560-dialog{width:calc(100vw - 24px)}.stage3560-team span{font-size:12px}.stage3560-result-button{min-height:42px}}`;
+    document.head.appendChild(style);
+  }
+  function open(id,isPrelim){
+    installDialog();const match=matchById(id,isPrelim);if(!match)return notice('경기 정보를 찾을 수 없습니다.','error');
+    const ownA=ownership(match.teamA),ownB=ownership(match.teamB);if(!ownA.ok&&!ownB.ok)return notice('본인 인증된 경기만 결과를 입력할 수 있습니다.','error');
+    document.getElementById('stage3560MatchId').value=id;document.getElementById('stage3560IsPrelim').value=isPrelim?'1':'0';
+    document.getElementById('stage3560Title').textContent=match.status==='completed'?'경기 결과 수정':'경기 결과 입력';
+    document.getElementById('stage3560MatchInfo').textContent=`${isPrelim?myMatchRoundLabel(match,true):myMatchRoundLabel(match,false)} · ${myMatchPlacement(match).label}`;
+    document.getElementById('stage3560TeamA').textContent=portalTeam(match.teamA);document.getElementById('stage3560TeamB').textContent=portalTeam(match.teamB);
+    document.getElementById('stage3560ScoreA').value=match.status==='completed'?Number(match.scoreA??''):'';document.getElementById('stage3560ScoreB').value=match.status==='completed'?Number(match.scoreB??''):'';
+    document.getElementById('stage3560Type').value=match.resultType||'normal';document.getElementById('stage3560WinnerSide').value=Number(match.scoreA)>Number(match.scoreB)?'A':Number(match.scoreB)>Number(match.scoreA)?'B':'';
+    syncDialog();document.getElementById('stage3560ResultDialog').showModal();
+  }
+  function syncDialog(){
+    const type=document.getElementById('stage3560Type')?.value||'normal';const side=document.getElementById('stage3560WinnerSide')?.value||'';
+    document.querySelectorAll('[data-stage3560-winner]').forEach(b=>b.classList.toggle('is-winner',b.dataset.stage3560Winner===side));
+    const guide=document.getElementById('stage3560Guide');if(guide)guide.textContent=type==='normal'?'일반 경기는 양 팀 스코어를 입력하세요. 한 팀은 6점이어야 합니다.':`${TYPE_LABELS[type]} 경기는 승리팀을 누르면 6:0으로 자동 입력됩니다.`;
+  }
+  function recordAudit(match,isPrelim,correcting){
+    state.operation=state.operation||{};state.operation.playerResultHistory=state.operation.playerResultHistory||[];
+    state.operation.playerResultHistory.unshift({id:`pr-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,at:new Date().toISOString(),matchId:match.id,isPrelim:Boolean(isPrelim),teamA:portalTeam(match.teamA),teamB:portalTeam(match.teamB),scoreA:Number(match.scoreA),scoreB:Number(match.scoreB),winner:portalTeam(match.winner),resultType:match.resultType||'normal',resultTypeLabel:match.resultTypeLabel||'일반 경기',enteredByUid:currentAuthUser?.uid||'',enteredByName:authUserLabel(),corrected:Boolean(correcting)});
+    state.operation.playerResultHistory=state.operation.playerResultHistory.slice(0,200);
+  }
+  function submit(event){
+    event.preventDefault();const id=document.getElementById('stage3560MatchId').value;const isPrelim=document.getElementById('stage3560IsPrelim').value==='1';const match=matchById(id,isPrelim);if(!match)return notice('경기 정보를 찾을 수 없습니다.','error');
+    if(!ownership(match.teamA).ok&&!ownership(match.teamB).ok)return notice('본인 인증된 경기만 결과를 입력할 수 있습니다.','error');
+    const type=document.getElementById('stage3560Type').value||'normal';let scoreA=Number(document.getElementById('stage3560ScoreA').value),scoreB=Number(document.getElementById('stage3560ScoreB').value);let side=document.getElementById('stage3560WinnerSide').value;
+    if(type!=='normal'){
+      if(!side)return notice(`${TYPE_LABELS[type]} 처리할 승리팀을 선택하세요.`,'error');scoreA=side==='A'?6:0;scoreB=side==='B'?6:0;
+    }
+    if(!Number.isInteger(scoreA)||!Number.isInteger(scoreB)||scoreA<0||scoreB<0||scoreA>6||scoreB>6||scoreA===scoreB||!((scoreA===6&&scoreB<=5)||(scoreB===6&&scoreA<=5)))return notice('한 팀은 6점, 상대팀은 0~5점으로 입력하세요.','error');
+    const winnerId=scoreA>scoreB?match.teamA.id:match.teamB.id;const correcting=match.status==='completed';
+    const summary=`${portalTeam(match.teamA)} ${scoreA} : ${scoreB} ${portalTeam(match.teamB)}${type!=='normal'?` · ${TYPE_LABELS[type]}`:''}`;if(!confirm(`${summary}\n\n이 결과를 ${correcting?'수정':'저장'}할까요?`))return;
+    try{
+      autoRecovery(correcting?'선수 경기 결과 수정 전':'선수 경기 결과 입력 전');
+      let saved;
+      if(isPrelim){
+        const involved=new Set([match.teamA?.id,match.teamB?.id].filter(Boolean));const beforePlayIns=new Set(Object.values(state.draw?.rounds||{}).flat().filter(x=>x.isPlayIn&&x.teamA&&!x.teamA.placeholder&&x.teamB&&!x.teamB.placeholder).map(x=>x.id));
+        saved=submitPrelimResult(state,{matchId:id,winnerId,scoreA,scoreB});saved.resultType=type;saved.resultTypeLabel=TYPE_LABELS[type];
+        syncLinkedDraw({silent:true});const newly=Object.values(state.draw?.rounds||{}).flat().filter(x=>x.isPlayIn&&!beforePlayIns.has(x.id)&&x.teamA&&!x.teamA.placeholder&&x.teamB&&!x.teamB.placeholder);const priority=newly.filter(x=>involved.has(x.teamA?.id)||involved.has(x.teamB?.id));
+        if(!correcting){if(useUnifiedCourts(state))enqueueReadyMainToUnifiedCourts(state,{priorityMatchIds:(priority.length?priority:newly).map(x=>x.id)});else autoAssignResolvedMain(state,{findMatch,queueReadyMatches,refillCourt});}
+      }else{
+        const sourceCourt=[...(state.prelim?.courts||[]),...(state.courts||[])].find(c=>c.playing===id);saved=submitResult(state,{matchId:id,winnerId,scoreA,scoreB});saved.resultType=type;saved.resultTypeLabel=TYPE_LABELS[type];verifyAndRepairMainFlow(state,{sourceMatchId:id});finalizeTournamentCompletion(state);
+        if(!correcting&&sourceCourt&&(state.prelim?.courts||[]).some(c=>c.id===sourceCourt.id)){advanceUnifiedCourt(state,sourceCourt.id,id);enqueueReadyMainToUnifiedCourts(state);}
+      }
+      saved.enteredByPlayer=true;saved.enteredByUid=currentAuthUser?.uid||'';saved.enteredByName=authUserLabel();saved.enteredAt=new Date().toISOString();recordAudit(saved,isPrelim,correcting);
+      commit(`선수 결과 ${correcting?'수정':'입력'} · ${saved.id} · ${saved.scoreA}:${saved.scoreB}${type!=='normal'?` · ${TYPE_LABELS[type]}`:''}`);
+      document.getElementById('stage3560ResultDialog').close();renderPortalViews();setTimeout(v3252AutoMyMatch,80);notice(`경기 결과가 ${correcting?'수정':'저장'}되었습니다.`,'success');
+    }catch(error){console.error('[35.6.0] player result failed',error);notice(`결과 저장 실패: ${error?.message||error}`,'error')}
+  }
+  const originalRender=renderMyMatchTeam;renderMyMatchTeam=function(team){originalRender.apply(this,arguments);setTimeout(()=>decorate(team),0)};
+  const originalPublic=renderPublicPrelimGroups;renderPublicPrelimGroups=function(){originalPublic.apply(this,arguments);const matches=(state.prelim?.groups||[]).flatMap(g=>(state.prelim?.matches||[]).filter(m=>m.groupId===g.id||Number(m.groupNo)===Number(g.groupNo)));document.querySelectorAll('.public-prelim-match').forEach((node,i)=>{const m=matches[i],label=scoreLabel(m);if(label&&!node.querySelector('.stage3560-result-type'))node.querySelector('.public-match-result')?.insertAdjacentHTML('beforeend',`<span class="stage3560-result-type">${esc(label)}</span>`)});};
+  document.addEventListener('click',event=>{const openBtn=event.target.closest?.('[data-player-result-open]');if(openBtn){event.preventDefault();event.stopPropagation();open(openBtn.dataset.playerResultOpen,openBtn.dataset.playerResultPrelim==='1');return}const winner=event.target.closest?.('[data-stage3560-winner]');if(winner){const type=document.getElementById('stage3560Type').value||'normal';document.getElementById('stage3560WinnerSide').value=winner.dataset.stage3560Winner;if(type!=='normal'){document.getElementById('stage3560ScoreA').value=winner.dataset.stage3560Winner==='A'?6:0;document.getElementById('stage3560ScoreB').value=winner.dataset.stage3560Winner==='B'?6:0;}syncDialog();return}if(event.target.closest?.('[data-stage3560-close]'))document.getElementById('stage3560ResultDialog')?.close();},true);
+  document.addEventListener('change',event=>{if(event.target?.id!=='stage3560Type')return;const type=event.target.value;if(type!=='normal'){document.getElementById('stage3560ScoreA').value='';document.getElementById('stage3560ScoreB').value='';}syncDialog();});
+  document.addEventListener('submit',event=>{if(event.target?.id==='stage3560ResultForm')submit(event)},true);
+  const applyBuild=()=>{installDialog();const label=document.getElementById('buildStageLabel');if(label){label.textContent='230MATCH 35.6.0 · 선수 본인 경기 결과 입력';label.title='Version 35.6.0';}document.documentElement.dataset.build='3560';};
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(applyBuild,0),{once:true});else setTimeout(applyBuild,0);
+  console.info('[230MATCH V3] 35.6.0 ready · authenticated player self-result entry');
+})();
+
+/* Stage 35.6.1 · mandatory member profile + cancellation/refund workflow */
+(function stage3561MemberAndRefund(){
+  const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const digits=v=>String(v||'').replace(/\D/g,'');
+  const now=()=>new Date().toISOString();
+  function ensureRefundState(){
+    ensurePortalState();
+    state.portal.refundSmsSettings=state.portal.refundSmsSettings||{mode:'phone',adminName:'',adminPhone:''};
+    state.portal.refundRequests=state.portal.refundRequests||[];
+  }
+  function profileComplete(p){
+    p=p||{};const d=p.registrationDefaults||{};
+    return Boolean(String(p.name||d.name||'').trim()&&digits(p.phone||d.phone).length>=10&&String(p.club||d.club||'').trim()&&String(p.career||'').trim()&&String(p.gender||'').trim()&&String(p.birthYear||'').trim()&&p.profileCompleted===true);
+  }
+  function installProfileDialog(){
+    if(document.getElementById('stage3561ProfileDialog'))return;
+    const years=[];for(let y=new Date().getFullYear()-10;y>=1930;y--)years.push(`<option value="${y}">${y}년</option>`);
+    document.body.insertAdjacentHTML('beforeend',`<dialog id="stage3561ProfileDialog" class="stage3561-dialog"><form id="stage3561ProfileForm"><div class="stage3561-head"><div><p>MEMBER PROFILE</p><h2>회원 기본정보 등록</h2><span>최초 로그인 시 한 번만 등록합니다.</span></div></div><div class="stage3561-grid"><label>이름<input id="stage3561Name" required maxlength="20"></label><label>휴대전화번호<input id="stage3561Phone" required inputmode="tel" placeholder="01012345678"></label><label>클럽명<input id="stage3561Club" required maxlength="40" placeholder="소속 없음 가능"></label><label>구력<select id="stage3561Career" required><option value="">선택</option><option>1년 미만</option><option>1~3년</option><option>3~5년</option><option>5~10년</option><option>10년 이상</option></select></label><label>성별<select id="stage3561Gender" required><option value="">선택</option><option value="male">남성</option><option value="female">여성</option></select></label><label>출생연도<select id="stage3561BirthYear" required><option value="">선택</option>${years.join('')}</select></label></div><label class="stage3561-agree"><input type="checkbox" id="stage3561Agree" required> 참가신청·본인 경기 확인·대회 안내를 위한 개인정보 수집 및 이용에 동의합니다.</label><button type="submit" class="btn btn-primary stage3561-submit">회원등록 완료</button><p id="stage3561ProfileMessage"></p></form></dialog>`);
+    const style=document.createElement('style');style.id='stage3561Style';style.textContent=`.stage3561-dialog{width:min(94vw,560px);border:0;border-radius:20px;padding:0;box-shadow:0 28px 90px rgba(15,23,42,.35)}.stage3561-dialog::backdrop{background:rgba(15,23,42,.6)}#stage3561ProfileForm{padding:22px}.stage3561-head p{margin:0;color:#2563eb;font-size:11px;font-weight:900;letter-spacing:.08em}.stage3561-head h2{margin:4px 0}.stage3561-head span{font-size:13px;color:#64748b}.stage3561-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}.stage3561-grid label{display:grid;gap:6px;font-size:12px;font-weight:800}.stage3561-grid input,.stage3561-grid select{height:44px;border:1px solid #cbd5e1;border-radius:10px;padding:0 11px;background:#fff}.stage3561-agree{display:flex;gap:8px;align-items:flex-start;margin:16px 0;font-size:12px;line-height:1.5}.stage3561-submit{width:100%;min-height:46px}#stage3561ProfileMessage{font-size:12px;margin:10px 0 0}.stage3561-refund-btn{margin-left:6px}.stage3561-refund-panel{margin:14px 0;padding:14px;border:1px solid #dbeafe;border-radius:14px;background:rgba(239,246,255,.75)}.stage3561-refund-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-bottom:12px}.stage3561-refund-toolbar label{display:grid;gap:4px;font-size:11px;font-weight:800}.stage3561-refund-toolbar input,.stage3561-refund-toolbar select{height:36px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px}.stage3561-refund-card{display:grid;gap:7px;padding:12px;border-radius:12px;background:#fff;border:1px solid #e2e8f0;margin-top:8px}.stage3561-refund-card small{color:#64748b}.stage3561-refund-actions{display:flex;gap:8px;flex-wrap:wrap}.stage3561-badge{display:inline-flex;width:max-content;padding:3px 8px;border-radius:999px;font-size:11px;font-weight:900;background:#fef3c7;color:#92400e}.stage3561-dialog-card{padding:20px}.stage3561-dialog-card label{display:grid;gap:5px;font-size:12px;font-weight:800;margin-top:10px}.stage3561-dialog-card input,.stage3561-dialog-card select,.stage3561-dialog-card textarea{border:1px solid #cbd5e1;border-radius:10px;padding:10px;background:#fff}.stage3561-dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}@media(max-width:560px){.stage3561-grid{grid-template-columns:1fr}.stage3561-dialog{width:calc(100vw - 20px)}.stage3561-refund-toolbar{display:grid;grid-template-columns:1fr 1fr}.stage3561-refund-toolbar label:first-child{grid-column:1/-1}}`;
+    document.head.appendChild(style);
+  }
+  function showProfileDialog(){
+    if(!currentAuthUser||profileComplete(currentAuthUser.appProfile))return;
+    installProfileDialog();const p=currentAuthUser.appProfile||{},d=p.registrationDefaults||{};
+    document.getElementById('stage3561Name').value=p.name||d.name||currentAuthUser.displayName||'';
+    document.getElementById('stage3561Phone').value=p.phone||d.phone||'';
+    document.getElementById('stage3561Club').value=p.club||d.club||p.affiliation||'';
+    document.getElementById('stage3561Career').value=p.career||'';document.getElementById('stage3561Gender').value=p.gender||'';document.getElementById('stage3561BirthYear').value=p.birthYear||'';
+    const dlg=document.getElementById('stage3561ProfileDialog');if(!dlg.open)dlg.showModal();
+  }
+  async function saveProfile(e){
+    e.preventDefault();if(!currentAuthUser)return;
+    const name=String(document.getElementById('stage3561Name').value||'').trim(),phone=digits(document.getElementById('stage3561Phone').value),club=String(document.getElementById('stage3561Club').value||'').trim(),career=document.getElementById('stage3561Career').value,gender=document.getElementById('stage3561Gender').value,birthYear=document.getElementById('stage3561BirthYear').value;
+    if(!name||phone.length<10||!club||!career||!gender||!birthYear||!document.getElementById('stage3561Agree').checked)return notice('필수정보와 개인정보 동의를 모두 확인하세요.','error');
+    const data={name,phone,club,career,gender,birthYear,profileCompleted:true,profileCompletedAt:now(),registrationDefaults:{name,phone,club},updatedAt:now()};
+    try{const rt=await getAuthRuntime();if(!rt?.db||!rt?.user)throw new Error('회원정보 저장소 연결 실패');await rt.api.setDoc(rt.api.doc(rt.db,'users',rt.user.uid),data,{merge:true});currentAuthUser.appProfile={...(currentAuthUser.appProfile||{}),...data};document.getElementById('stage3561ProfileDialog').close();renderAuthStatus();v3252AutofillEntry?.();notice('정식 회원등록이 완료되었습니다.','success');if(document.body?.dataset.currentView==='my-match')setTimeout(v3252AutoMyMatch,100);}catch(err){notice(`회원정보 저장 실패: ${err?.message||err}`,'error')}
+  }
+  const originalApply=applyAuthenticatedRole;applyAuthenticatedRole=function(user,role='viewer',profile=null){originalApply.apply(this,arguments);if(user)setTimeout(showProfileDialog,250)};
+
+  function findApplication(id){return (state.portal?.applications||[]).find(a=>String(a.id)===String(id));}
+  function ownApplication(item){if(!item||!currentAuthUser)return false;if(item.ownerUid&&item.ownerUid===currentAuthUser.uid)return true;const p=digits(v3252ProfileDefaults().phone);return p&&entryApplicationPlayers(item).some(x=>digits(x.phone)===p);}
+  function smsMode(){ensureRefundState();return state.portal.refundSmsSettings.mode||'phone';}
+  function adminRecipient(){ensureRefundState();const s=state.portal.refundSmsSettings;return{name:s.adminName||'환불 관리자',phone:digits(s.adminPhone)};}
+  function requestText(item,r){return `[230MATCH 취소요청]\n${item.tournamentName||state.tournament?.name||'현재 대회'}${item.tournamentDivision?` / ${item.tournamentDivision}`:''}\n${item.teamName}\n입금자 ${r.depositorName} / ${Number(r.amount||0).toLocaleString()}원\n${r.bank} ${r.account} ${r.accountHolder}\n사유: ${r.reason}\n관리자 화면에서 환불 완료 처리 바랍니다.`;}
+  function completeText(item,r){return `[230MATCH 환불완료]\n${item.tournamentName||state.tournament?.name||'현재 대회'}${item.tournamentDivision?` / ${item.tournamentDivision}`:''}\n${item.teamName} 팀의 참가 취소 및 ${Number(r.amount||0).toLocaleString()}원 환불 처리가 완료되었습니다.`;}
+  async function dispatchSms(recipients,body,meta){
+    const mode=smsMode();if(mode==='none')return 'none';
+    const clean=recipients.filter(x=>digits(x.phone).length>=10);if(!clean.length)throw new Error('수신 전화번호가 없습니다.');
+    if(mode==='aligo'){await sendAligoSmsV3(clean,body,{source:'refund',kind:meta.kind,title:meta.title});return 'aligo';}
+    const phones=clean.map(x=>digits(x.phone));if(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||''))location.href=`sms:${phones.join(',')}?body=${encodeURIComponent(body)}`;else{await navigator.clipboard?.writeText(`${phones.join('\n')}\n\n${body}`);notice('문자 수신번호와 내용을 복사했습니다.','info');}return 'phone';
+  }
+  function installRefundDialog(){
+    if(document.getElementById('stage3561RefundDialog'))return;
+    document.body.insertAdjacentHTML('beforeend',`<dialog id="stage3561RefundDialog" class="stage3561-dialog"><form id="stage3561RefundForm" class="stage3561-dialog-card"><h2>참가 취소 및 환불 요청</h2><div id="stage3561RefundInfo"></div><label>취소 사유<textarea id="stage3561Reason" rows="3" required></textarea></label><label>환불 금액<input id="stage3561Amount" type="number" min="0" required></label><label>입금자명<input id="stage3561Depositor" required></label><label>은행<select id="stage3561Bank" required><option value="">선택</option><option>농협</option><option>국민</option><option>신한</option><option>우리</option><option>하나</option><option>기업</option><option>부산</option><option>경남</option><option>카카오뱅크</option><option>토스뱅크</option><option>기타</option></select></label><label>환불계좌<input id="stage3561Account" inputmode="numeric" required></label><label>예금주<input id="stage3561Holder" required></label><div class="stage3561-dialog-actions"><button type="button" class="btn btn-light" data-stage3561-refund-close>취소</button><button type="submit" class="btn btn-primary">취소 승인 요청</button></div><input type="hidden" id="stage3561ApplicationId"></form></dialog>`);
+  }
+  function openRefund(id){
+    const item=findApplication(id);if(!item||!ownApplication(item))return notice('본인의 참가 신청만 취소 요청할 수 있습니다.','error');if(['refund_requested','refund_processing','cancelled','refunded'].includes(item.status))return notice('이미 취소 또는 환불 절차가 진행 중입니다.','info');
+    installRefundDialog();document.getElementById('stage3561ApplicationId').value=item.id;document.getElementById('stage3561RefundInfo').innerHTML=`<strong>${esc(item.teamName)}</strong><p>${esc(item.tournamentName||'현재 대회')} ${item.tournamentDivision?`· ${esc(item.tournamentDivision)}`:''}</p>`;document.getElementById('stage3561Depositor').value=item.representativeName||authUserLabel();document.getElementById('stage3561Amount').value=Number(item.paymentAmount||String(state.portal?.guide?.fee||'').replace(/\D/g,'')||0);document.getElementById('stage3561RefundDialog').showModal();
+  }
+  async function submitRefund(e){
+    e.preventDefault();const item=findApplication(document.getElementById('stage3561ApplicationId').value);if(!item||!ownApplication(item))return;
+    ensureRefundState();const r={id:`refund-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,applicationId:item.id,status:'requested',reason:String(document.getElementById('stage3561Reason').value||'').trim(),amount:Number(document.getElementById('stage3561Amount').value||0),depositorName:String(document.getElementById('stage3561Depositor').value||'').trim(),bank:document.getElementById('stage3561Bank').value,account:String(document.getElementById('stage3561Account').value||'').trim(),accountHolder:String(document.getElementById('stage3561Holder').value||'').trim(),requesterUid:currentAuthUser.uid,requesterName:authUserLabel(),requesterPhone:digits(v3252ProfileDefaults().phone||item.phone),requestedAt:now(),history:[]};
+    if(!r.reason||!r.depositorName||!r.bank||!r.account||!r.accountHolder)return notice('환불 요청 정보를 모두 입력하세요.','error');
+    if(!confirm(`${item.teamName} 참가 취소와 ${r.amount.toLocaleString()}원 환불을 요청할까요?`))return;
+    item.previousStatus=item.status;item.status='refund_requested';item.refundRequestId=r.id;item.updatedAt=now();state.portal.refundRequests.unshift(r);commit(`참가 취소·환불 요청 · ${item.teamName}`);document.getElementById('stage3561RefundDialog').close();lookupPublicApplication();renderApplicationPortal();
+    try{const admin=adminRecipient();await dispatchSms([admin],requestText(item,r),{kind:'request',title:'230MATCH 취소 요청'});r.adminSmsAt=now();r.adminSmsChannel=smsMode();commit(`환불 요청 관리자 문자 · ${item.teamName}`);}catch(err){r.adminSmsError=String(err?.message||err);commit(`환불 요청 문자 실패 · ${item.teamName}`);notice(`취소 요청은 접수됐지만 관리자 문자 처리에 실패했습니다: ${err?.message||err}`,'warning');}
+    notice('취소·환불 요청이 접수되었습니다.','success');
+  }
+  function renderRefundAdmin(){
+    if(!canOperate())return;ensureRefundState();const host=document.querySelector('#view-entry .entry-admin-toolbar')?.parentElement||document.querySelector('#view-entry');if(!host)return;
+    let panel=document.getElementById('stage3561RefundAdmin');if(!panel){panel=document.createElement('section');panel.id='stage3561RefundAdmin';panel.className='stage3561-refund-panel';host.prepend(panel);}
+    const s=state.portal.refundSmsSettings,rows=state.portal.refundRequests.filter(r=>['requested','processing'].includes(r.status));
+    panel.innerHTML=`<h3>취소·환불 관리 <small>${rows.length}건</small></h3><div class="stage3561-refund-toolbar"><label>문자 방식<select data-refund-setting="mode"><option value="aligo">알리고 자동</option><option value="phone">휴대폰 문자앱</option><option value="none">문자 사용 안 함</option></select></label><label>환불 담당자<input data-refund-setting="adminName" value="${esc(s.adminName||'')}"></label><label>담당자 전화번호<input data-refund-setting="adminPhone" value="${esc(s.adminPhone||'')}"></label><button type="button" class="btn btn-secondary btn-small" data-refund-settings-save>설정 저장</button></div>${rows.map(r=>{const item=findApplication(r.applicationId);return `<article class="stage3561-refund-card"><span class="stage3561-badge">${r.status==='processing'?'환불 처리 중':'취소 요청'}</span><strong>${esc(item?.teamName||'신청 정보 없음')}</strong><small>${esc(item?.tournamentName||'')} ${item?.tournamentDivision?`· ${esc(item.tournamentDivision)}`:''}</small><div>${Number(r.amount||0).toLocaleString()}원 · ${esc(r.bank)} ${esc(r.account)} · ${esc(r.accountHolder)}</div><div>입금자 ${esc(r.depositorName)} · 사유 ${esc(r.reason)}</div><div class="stage3561-refund-actions">${r.status==='requested'?`<button type="button" class="btn btn-light btn-small" data-refund-processing="${r.id}">처리 중</button>`:''}<button type="button" class="btn btn-primary btn-small" data-refund-complete="${r.id}">환불 완료 승인</button><button type="button" class="btn btn-danger-outline btn-small" data-refund-reject="${r.id}">요청 반려</button></div></article>`}).join('')||'<div class="portal-empty">처리할 취소·환불 요청이 없습니다.</div>'}`;
+    panel.querySelector('[data-refund-setting="mode"]').value=s.mode||'phone';
+  }
+  function saveRefundSettings(){ensureRefundState();const panel=document.getElementById('stage3561RefundAdmin');const mode=panel.querySelector('[data-refund-setting="mode"]').value,adminName=panel.querySelector('[data-refund-setting="adminName"]').value.trim(),adminPhone=digits(panel.querySelector('[data-refund-setting="adminPhone"]').value);if(mode!=='none'&&adminPhone.length<10)return notice('환불 담당자 전화번호를 입력하세요.','error');state.portal.refundSmsSettings={mode,adminName,adminPhone};commit('취소·환불 문자 설정 저장');notice('취소·환불 문자 설정을 저장했습니다.','success');}
+  function findRefund(id){ensureRefundState();return state.portal.refundRequests.find(r=>r.id===id);}
+  async function completeRefund(id){
+    const r=findRefund(id),item=findApplication(r?.applicationId);if(!r||!item)return;if(!confirm(`${r.amount.toLocaleString()}원을 ${r.bank} ${r.account} 계좌로 실제 이체했습니까?\n\n완료 승인 후 참가자에게 문자가 발송됩니다.`))return;
+    r.status='completed';r.completedAt=now();r.completedByUid=currentAuthUser?.uid||'';r.completedByName=authUserLabel();item.status='cancelled';item.paid=false;item.paymentStatus='refunded';item.refundedAt=r.completedAt;item.refundAmount=r.amount;item.updatedAt=r.completedAt;
+    const team=state.teams?.find(t=>String(t.ownerUid||'')===String(item.ownerUid||'')||myMatchNormalize(t.name)===myMatchNormalize(item.teamName));if(team){state.teams=state.teams.filter(t=>t.id!==team.id);state.prelim.activeTeams=(state.prelim.activeTeams||[]).filter(t=>t.id!==team.id);state.prelim.reserveTeams=(state.prelim.reserveTeams||[]).filter(t=>t.id!==team.id);}
+    commit(`환불 완료 승인 · ${item.teamName}`);renderApplicationPortal();renderParticipantManager?.();lookupPublicApplication();renderRefundAdmin();
+    try{await dispatchSms([{name:item.representativeName||item.teamName,phone:item.phone}],completeText(item,r),{kind:'complete',title:'230MATCH 환불 완료'});r.completionSmsAt=now();r.completionSmsChannel=smsMode();commit(`환불 완료 문자 · ${item.teamName}`);}catch(err){r.completionSmsError=String(err?.message||err);commit(`환불 완료 문자 실패 · ${item.teamName}`);notice(`환불 완료 처리는 저장됐지만 참가자 문자 처리에 실패했습니다: ${err?.message||err}`,'warning');}
+    notice('환불 완료와 참가 취소가 승인되었습니다.','success');
+  }
+  function rejectRefund(id){const r=findRefund(id),item=findApplication(r?.applicationId);if(!r||!item)return;const reason=prompt('취소 요청 반려 사유를 입력하세요.','취소 가능 기간 또는 환불 조건을 확인해 주세요.');if(reason===null)return;r.status='rejected';r.rejectedAt=now();r.rejectReason=reason;item.status=item.previousStatus||'approved';item.updatedAt=now();commit(`취소 요청 반려 · ${item.teamName}`);renderApplicationPortal();lookupPublicApplication();renderRefundAdmin();}
+  const originalLookup=lookupPublicApplication;lookupPublicApplication=function(){originalLookup.apply(this,arguments);const root=document.getElementById('entryLookupResult');if(!root)return;const phone=digits(document.getElementById('entryLookupPhone')?.value);const rows=(state.portal?.applications||[]).filter(a=>a.phone===phone||entryApplicationPlayers(a).some(p=>digits(p.phone)===phone)).sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));[...root.querySelectorAll('.entry-status-card')].forEach((card,i)=>{const item=rows[i];if(!item)return;const active=!['cancelled','rejected','refund_requested','refund_processing','refunded'].includes(item.status);if(active&&!card.querySelector('[data-refund-request]')){let actions=card.querySelector('.entry-public-actions');if(!actions){actions=document.createElement('div');actions.className='entry-public-actions';card.appendChild(actions);}const b=document.createElement('button');b.type='button';b.className='btn btn-danger-outline btn-small stage3561-refund-btn';b.dataset.refundRequest=item.id;b.textContent=item.paid||item.paymentStatus==='paid'?'취소·환불 요청':'참가 취소 요청';actions.appendChild(b);}if(['refund_requested','refund_processing'].includes(item.status))card.insertAdjacentHTML('beforeend','<span class="stage3561-badge">취소·환불 처리 중</span>');});};
+  const originalRenderApplications=renderApplicationPortal;renderApplicationPortal=function(){originalRenderApplications.apply(this,arguments);setTimeout(renderRefundAdmin,0)};
+  document.addEventListener('submit',e=>{if(e.target?.id==='stage3561ProfileForm')saveProfile(e);if(e.target?.id==='stage3561RefundForm')submitRefund(e)},true);
+  document.addEventListener('click',e=>{const req=e.target.closest?.('[data-refund-request]');if(req){openRefund(req.dataset.refundRequest);return}if(e.target.closest?.('[data-stage3561-refund-close]'))document.getElementById('stage3561RefundDialog')?.close();if(e.target.closest?.('[data-refund-settings-save]'))saveRefundSettings();const p=e.target.closest?.('[data-refund-processing]');if(p){const r=findRefund(p.dataset.refundProcessing);if(r){r.status='processing';r.processingAt=now();commit('환불 처리 중 전환');renderRefundAdmin();}}const c=e.target.closest?.('[data-refund-complete]');if(c)completeRefund(c.dataset.refundComplete);const x=e.target.closest?.('[data-refund-reject]');if(x)rejectRefund(x.dataset.refundReject);},true);
+  const applyBuild=()=>{installProfileDialog();ensureRefundState();const label=document.getElementById('buildStageLabel');if(label){label.textContent='230MATCH 35.6.1 · 회원등록·선수결과·취소환불';label.title='Version 35.6.1';}document.documentElement.dataset.build='3561';if(currentAuthUser)setTimeout(showProfileDialog,300);setTimeout(renderRefundAdmin,500)};
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',applyBuild,{once:true});else setTimeout(applyBuild,0);
+  console.info('[230MATCH] 35.6.1 ready · mandatory profile and refund workflow');
+})();
