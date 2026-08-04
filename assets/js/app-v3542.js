@@ -6886,3 +6886,82 @@ console.info('[230MATCH V3] 34.4.2 ready · main wait1 refill and shared queue e
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',applyBuild,{once:true});else setTimeout(applyBuild,0);
   console.info('[230MATCH] 35.6.1 ready · mandatory profile and refund workflow');
 })();
+
+
+/* Stage 35.6.2 · member header, profile settings and direct logout */
+(function stage3562MemberHeader(){
+  const byId=id=>document.getElementById(id);
+  function ensureHeaderLogout(){
+    let btn=byId('directHeaderLogoutBtn');
+    if(btn)return btn;
+    const login=byId('openSocialLoginBtn');
+    if(!login)return null;
+    btn=document.createElement('button');
+    btn.id='directHeaderLogoutBtn';
+    btn.type='button';
+    btn.className='btn btn-light';
+    btn.textContent='로그아웃';
+    btn.hidden=true;
+    btn.addEventListener('click',async event=>{
+      event.preventDefault();event.stopPropagation();
+      if(!currentAuthUser)return;
+      if(!confirm(`${authUserLabel()} 계정에서 로그아웃할까요?`))return;
+      await handleSocialLogout();
+    });
+    login.insertAdjacentElement('afterend',btn);
+    return btn;
+  }
+  function populateMemberProfileDialog(editMode=true){
+    if(!currentAuthUser)return openSocialLogin();
+    installProfileDialog?.();
+    const p=currentAuthUser.appProfile||{},d=p.registrationDefaults||{};
+    const set=(id,v)=>{const el=byId(id);if(el)el.value=v??''};
+    set('stage3561Name',p.name||d.name||currentAuthUser.displayName||'');
+    set('stage3561Phone',p.phone||d.phone||'');
+    set('stage3561Club',p.club||d.club||p.affiliation||'');
+    set('stage3561Career',p.career||'');set('stage3561Gender',p.gender||'');set('stage3561BirthYear',p.birthYear||'');
+    const agree=byId('stage3561Agree');if(agree)agree.checked=Boolean(p.profileCompleted||editMode);
+    const dlg=byId('stage3561ProfileDialog');if(!dlg)return;
+    const h=dlg.querySelector('.stage3561-head h2'),desc=dlg.querySelector('.stage3561-head span'),submit=dlg.querySelector('.stage3561-submit');
+    if(h)h.textContent=editMode?'내 기본정보 설정':'회원 기본정보 등록';
+    if(desc)desc.textContent=editMode?'이름·전화번호·클럽·구력을 확인하고 수정할 수 있습니다.':'최초 로그인 시 한 번만 등록합니다.';
+    if(submit)submit.textContent=editMode?'회원정보 저장':'회원등록 완료';
+    let cancel=byId('stage3562ProfileCloseBtn');
+    if(editMode&&!cancel){
+      cancel=document.createElement('button');cancel.id='stage3562ProfileCloseBtn';cancel.type='button';cancel.className='btn btn-light';cancel.textContent='닫기';
+      cancel.style.cssText='width:100%;min-height:42px;margin-top:8px';cancel.onclick=()=>dlg.close();submit?.insertAdjacentElement('afterend',cancel);
+    }
+    if(cancel)cancel.hidden=!editMode;
+    dlg.dataset.editMode=editMode?'1':'0';if(!dlg.open)dlg.showModal();
+  }
+  window.openMemberProfileSettings=()=>populateMemberProfileDialog(true);
+  const baseRenderAuthStatus=renderAuthStatus;
+  renderAuthStatus=function(){
+    baseRenderAuthStatus.apply(this,arguments);
+    const login=byId('openSocialLoginBtn'),logout=ensureHeaderLogout(),badge=byId('currentRoleBadge');
+    if(login){
+      login.textContent=currentAuthUser?`${authUserLabel()}님`:'간편로그인';
+      login.title=currentAuthUser?'내 기본정보 설정':'간편로그인';
+      login.setAttribute('aria-label',login.title);
+    }
+    if(logout)logout.hidden=!currentAuthUser;
+    if(badge){
+      badge.textContent=isAdmin()?'관리자':isOperator()?'진행자':'일반 선수';
+      badge.title=isAdmin()?'관리자 설정 열기':currentAuthUser?'내 기본정보 설정':'로그인 및 내 설정';
+    }
+  };
+  const baseApplyRoleUI=applyRoleUI;
+  applyRoleUI=function(){baseApplyRoleUI.apply(this,arguments);setTimeout(()=>renderAuthStatus(),0)};
+  function bindHeaderActions(){
+    const badge=byId('currentRoleBadge');
+    if(badge)badge.onclick=()=>{if(isAdmin()||isOperator())window.openAdminSettingsHub?.();else if(currentAuthUser)populateMemberProfileDialog(true);else openSocialLogin();};
+    const login=byId('openSocialLoginBtn');
+    if(login)login.addEventListener('click',event=>{if(!currentAuthUser)return;event.preventDefault();event.stopImmediatePropagation();populateMemberProfileDialog(true);},true);
+    renderAuthStatus();
+  }
+  const baseLogout=handleSocialLogout;
+  handleSocialLogout=async function(){await baseLogout.apply(this,arguments);currentAuthUser=null;currentRole='viewer';sessionStorage.setItem(ROLE_KEY,currentRole);applyRoleUI();renderAuthStatus();closeSocialLogin?.();};
+  const applyBuild=()=>{bindHeaderActions();const label=byId('buildStageLabel');if(label){label.textContent='230MATCH 35.6.2 · 회원 설정·직접 로그아웃';label.title='Version 35.6.2';}document.documentElement.dataset.build='3562';};
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(applyBuild,0),{once:true});else setTimeout(applyBuild,0);
+  console.info('[230MATCH] 35.6.2 ready · named member header, profile settings, direct logout');
+})();
