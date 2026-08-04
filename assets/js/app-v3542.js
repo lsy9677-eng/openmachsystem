@@ -3099,7 +3099,7 @@ function printPrelimAssignmentHtml(){
   const cards=groups.map((g,idx)=>{
     const teams=g.teams||g.teamIds?.map(id=>(state.teams||[]).find(t=>t.id===id)).filter(Boolean)||[];
     const gm=matches.filter(m=>m.groupId===g.id).sort((a,b)=>(a.matchNo||0)-(b.matchNo||0));
-    const court=g.courtName||gm[0]?.courtName||gm[0]?.assignedCourtName||'코트 미정';
+    const court=g.court||g.courtName||gm[0]?.court||gm[0]?.courtName||gm[0]?.assignedCourtName||((state.prelim?.courts||[]).find(c=>c.id===(g.prelimCourtId||gm[0]?.prelimCourtId))?.name)||'코트 미정';
     return `<article class="assignment-group-card"><div class="assignment-group-head"><b>${printEscape(g.name||`${idx+1}조`)}</b><span>${printEscape(court)}</span></div><ol>${teams.map((t,i)=>`<li><em>${i+1}</em><strong>${printEscape(printTeam(t))}</strong>${t?.club||t?.affiliation?`<small>${printEscape(t.club||t.affiliation)}</small>`:''}</li>`).join('')}</ol><div class="assignment-order">${gm.map((m,i)=>`<span>${i+1}경기 ${printEscape(printTeam(m.teamA))} vs ${printEscape(printTeam(m.teamB))}</span>`).join('')}</div></article>`;
   }).join('');
   return printHeader('시합 전 조편성·코트 배정표')+`<div class="assignment-summary"><b>${groups.length}개 조 · ${(state.teams||[]).length}팀</b><span>본인 조와 배정 코트를 확인해 주세요.</span></div><div class="assignment-grid">${cards}</div>`;
@@ -3286,7 +3286,7 @@ function updateDocumentTitle(view='home'){const label=PORTAL_VIEW_TITLES[view]||
 const INTERNAL_ADMIN_PORTAL_VIEWS=new Set(['acceptance','rehearsal','performance']);
 const INTERNAL_OPERATOR_PORTAL_VIEWS=new Set(['messages','notifications','roster','manual','audit','logs','readiness','diagnostics']);
 function portalViewAllowed(name){
-  if(name==='operation'&&!canOperate())return false;
+  // 코트 현황은 일반 선수도 조회할 수 있습니다. 운영·수정 권한은 화면 내부에서 별도로 제한합니다.
   const view=document.getElementById(`view-${name}`);
   if(!view)return false;
   if(name==='rehearsal')return isAdmin()&&isRehearsalUnlocked();
@@ -5965,7 +5965,7 @@ console.info('[230MATCH V3] 34.4.2 ready · main wait1 refill and shared queue e
       const rawTeams=(Array.isArray(g.teams)&&g.teams.length?g.teams:g.teamIds)||[];
       const teams=rawTeams.map(resolvePrintTeamValue).filter(Boolean);
       const gm=matches.filter(m=>m.groupId===g.id).sort((a,b)=>(a.matchNo||0)-(b.matchNo||0));
-      const court=g.courtName||gm[0]?.courtName||gm[0]?.assignedCourtName||'코트 미정';
+      const court=g.court||g.courtName||gm[0]?.court||gm[0]?.courtName||gm[0]?.assignedCourtName||((state.prelim?.courts||[]).find(c=>c.id===(g.prelimCourtId||gm[0]?.prelimCourtId))?.name)||'코트 미정';
       const teamKey=t=>String(t?.id||t?.teamId||t?.name||t?.teamName||t||'');
       const teamNo=value=>{const resolved=resolvePrintTeamValue(value),key=teamKey(resolved);const n=teams.findIndex(t=>teamKey(t)===key);return n>=0?n+1:'?';};
       return {
@@ -7120,4 +7120,122 @@ console.info('[230MATCH V3] 34.4.2 ready · main wait1 refill and shared queue e
   const apply=()=>{install();refresh();const label=document.getElementById('buildStageLabel');if(label){label.textContent='230MATCH 35.6.6 · A4·코트현황·일반로그인 수정';label.title='Version 35.6.6';}document.documentElement.dataset.build='3566'};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(apply,0),{once:true});else setTimeout(apply,0);
   console.info('[230MATCH] 35.6.5 ready · unified social and email/password authentication');
+})();
+
+
+/* Stage 35.6.8 · print assigned prelim courts + distinguish result-only/full resets */
+(function stage3568ResultResetAndPrintFix(){
+  const cloneValue=value=>value==null?value:structuredClone(value);
+  const pendingTeam=(label,key)=>({id:key,name:label,placeholder:true});
+  const clearResultFields=match=>{
+    ['winner','loser','winnerId','loserId','scoreA','scoreB','completedAt','resultType','resultTypeLabel','resultEnteredBy','resultEnteredByUid','resultEnteredAt','resultUpdatedAt'].forEach(key=>{
+      if(key==='scoreA'||key==='scoreB')match[key]=null;
+      else if(key in match)delete match[key];
+    });
+  };
+  function resetPrelimResultsOnly(){
+    if(!requireAdmin('예선 경기결과만 초기화'))return;
+    if(state.prelim?.lock?.locked){notice('예선 잠금 해제 후 경기결과를 초기화하세요.','warning');return;}
+    const completed=(state.prelim?.matches||[]).filter(m=>m.status==='completed').length;
+    if(!completed&&!confirm('완료된 예선 결과가 없습니다. 그래도 예선 순위와 결과 상태를 다시 초기화할까요?'))return;
+    if(completed&&!confirm(`예선 ${completed}경기의 점수·승패·순위만 초기화합니다.\n\n조편성 및 코트배정은 유지됩니다. 계속할까요?`))return;
+    try{saveRecovery(state,`${state.tournament?.name||'대회'} · 예선 경기결과 초기화 전`);}catch(_e){}
+    ensurePrelimState(state);
+    const groups=state.prelim.groups||[];
+    const groupMap=new Map(groups.map(g=>[g.id,g]));
+    (state.prelim.matches||[]).forEach(m=>{
+      const g=groupMap.get(m.groupId),teams=g?.teams||[];
+      clearResultFields(m);
+      if(m.matchNo===1){m.teamA=cloneValue(teams[0]);m.teamB=cloneValue(teams[1]);m.status='ready';}
+      else if(m.matchNo===2){m.teamA=pendingTeam('첫 경기 승자',`${m.groupId}-winner-m1`);m.teamB=cloneValue(teams[2]);m.status='waiting_dependency';}
+      else if(m.matchNo===3){m.teamA=pendingTeam('첫 경기 패자',`${m.groupId}-loser-m1`);m.teamB=cloneValue(teams[2]);m.status='waiting_previous';}
+      m.waitStartedAt=null;
+    });
+    groups.forEach(g=>{g.standings=[];g.nextMatchNo=1;});
+    state.prelim.qualifiers=[];
+    state.prelim.lock={locked:false,lockedAt:null,lockedBy:'',snapshot:null};
+    // 동일한 조·구장 설정으로 코트 운영열만 다시 구성합니다.
+    if(groups.length){try{assignPrelimCourts(state);}catch(_e){}}
+    // 예선 결과로 확정되었던 연결 본선 슬롯은 아직 본선 경기가 시작되지 않았을 때만 재동기화 대상으로 돌립니다.
+    if(!hasStartedMainMatches(state)){
+      try{syncLinkedDraw({silent:true});}catch(_e){}
+    }
+    delete state.completion; if(state.tournament)delete state.tournament.completedAt;
+    commit('예선 경기결과만 초기화 · 조편성·코트배정 유지');
+    renderTournamentLifecycleManager();
+    notice('예선 점수·승패·순위를 초기화했습니다. 조편성과 코트배정은 유지됩니다.','success');
+  }
+  function resetMainResultsOnly(){
+    if(!requireAdmin('본선 경기결과만 초기화'))return;
+    const matches=allMatches(state.draw||{rounds:{}});
+    const completed=matches.filter(m=>m.status==='completed'&&!m.bye).length;
+    if(!state.draw?.size||!matches.length){notice('초기화할 본선 대진이 없습니다.','warning');return;}
+    if(!confirm(`본선 ${completed}경기의 점수·승패만 초기화합니다.\n\n본선 추첨 구조와 1회전 대진은 유지되며, 승자 진출로 채워진 다음 라운드는 비워집니다. 계속할까요?`))return;
+    try{saveRecovery(state,`${state.tournament?.name||'대회'} · 본선 경기결과 초기화 전`);}catch(_e){}
+    const sizes=Object.keys(state.draw.rounds||{}).map(Number).filter(Boolean).sort((a,b)=>b-a);
+    const firstSize=sizes[0];
+    sizes.forEach(size=>{
+      (state.draw.rounds[size]||[]).forEach(m=>{
+        clearResultFields(m);
+        m.waitStartedAt=null;
+        if(size!==firstSize){m.teamA=null;m.teamB=null;m.status='waiting_slots';m.bye=false;}
+        else{
+          const a=!!(m.teamA&&!m.teamA.placeholder),b=!!(m.teamB&&!m.teamB.placeholder);
+          if(a&&b){m.status='ready';m.bye=false;}
+          else if((a||b)&&!(m.teamA?.placeholder||m.teamB?.placeholder)){
+            m.winner=cloneValue(m.teamA||m.teamB);m.status='completed';m.bye=true;
+          }else{m.status='waiting_slots';m.bye=false;}
+        }
+      });
+    });
+    // BYE 승자만 다음 라운드에 다시 전달합니다.
+    for(const size of sizes){
+      if(size<=2)continue;
+      for(const m of state.draw.rounds[size]||[]){
+        if(m.bye&&m.winner&&m.nextMatchId){
+          const next=findMatch(state.draw,m.nextMatchId);if(!next)continue;
+          if(m.nextSlot===1)next.teamA=cloneValue(m.winner);else next.teamB=cloneValue(m.winner);
+          if(next.teamA&&next.teamB)next.status='ready';
+        }
+      }
+    }
+    // 완료 결과가 사라졌으므로 본선 운영 큐는 재배정 전 상태로 정리합니다. 대진 자체는 유지됩니다.
+    state.courts=[];state.sharedQueue=[];state.venueQueues={};
+    delete state.completion;if(state.tournament)delete state.tournament.completedAt;
+    commit('본선 경기결과만 초기화 · 추첨 대진 유지');
+    renderTournamentLifecycleManager();
+    notice('본선 점수·승패를 초기화했습니다. 추첨 대진은 유지되며 코트배정은 다시 실행해야 합니다.','success');
+  }
+  const originalResetTournamentScope=resetTournamentScope;
+  resetTournamentScope=function(scope){
+    if(scope==='prelim')return resetPrelimResultsOnly();
+    if(scope==='main')return resetMainResultsOnly();
+    return originalResetTournamentScope(scope);
+  };
+  function addFullResetButtons(){
+    const prelimBtn=document.querySelector('[data-tournament-reset="prelim"]');
+    const mainBtn=document.querySelector('[data-tournament-reset="main"]');
+    if(prelimBtn){prelimBtn.textContent='예선 경기결과만 초기화';prelimBtn.title='조편성과 코트배정은 유지하고 점수·승패·순위만 삭제합니다.';}
+    if(mainBtn){mainBtn.textContent='본선 경기결과만 초기화';mainBtn.title='본선 추첨 대진은 유지하고 점수·승패·진출 결과만 삭제합니다.';}
+    const host=prelimBtn?.parentElement||mainBtn?.parentElement;
+    if(!host||host.querySelector('[data-stage3568-full-prelim]'))return;
+    const p=document.createElement('button');p.type='button';p.className='btn btn-danger-outline';p.dataset.stage3568FullPrelim='1';p.textContent='예선 조편성 전체 초기화';p.title='예선 조편성·코트배정·경기결과·순위를 모두 삭제합니다.';
+    p.addEventListener('click',()=>{
+      if(!requireAdmin('예선 조편성 전체 초기화'))return;
+      if(prompt('예선 조편성·코트배정·결과·순위를 모두 삭제합니다. 계속하려면 “예선전체초기화”를 입력하세요.','')!=='예선전체초기화')return;
+      try{saveRecovery(state,`${state.tournament?.name||'대회'} · 예선 전체 초기화 전`);}catch(_e){}
+      resetPrelim(state);commit('예선 조편성 전체 초기화');renderTournamentLifecycleManager();notice('예선 조편성·코트배정·결과를 모두 초기화했습니다.','success');
+    });
+    const m=document.createElement('button');m.type='button';m.className='btn btn-danger-outline';m.dataset.stage3568FullMain='1';m.textContent='본선 대진 전체 초기화';m.title='본선 추첨 대진·코트배정·경기결과를 모두 삭제합니다.';
+    m.addEventListener('click',()=>{
+      if(!requireAdmin('본선 대진 전체 초기화'))return;
+      if(prompt('본선 추첨 대진·코트배정·결과를 모두 삭제합니다. 계속하려면 “본선전체초기화”를 입력하세요.','')!=='본선전체초기화')return;
+      try{saveRecovery(state,`${state.tournament?.name||'대회'} · 본선 전체 초기화 전`);}catch(_e){}
+      resetMainDraw(state);commit('본선 대진 전체 초기화');renderTournamentLifecycleManager();notice('본선 추첨 대진·코트배정·결과를 모두 초기화했습니다.','success');
+    });
+    host.insertBefore(p,document.querySelector('[data-tournament-reset="courts"]')||null);
+    host.insertBefore(m,document.querySelector('[data-tournament-reset="courts"]')||null);
+  }
+  const ready=()=>{addFullResetButtons();setTimeout(addFullResetButtons,500);};
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ready,{once:true});else ready();
 })();
