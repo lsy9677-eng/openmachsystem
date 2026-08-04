@@ -1,4 +1,4 @@
-import{getAuthConfig,saveAuthConfig,startAuth,signInGoogle,signOutSocial,beginExternalLogin,getExistingLoginEndpoints}from'./auth-engine.js?v=332015';
+import{getAuthConfig,saveAuthConfig,startAuth,signInGoogle,signOutSocial,beginExternalLogin,getExistingLoginEndpoints,signInEmail,registerEmail,sendPasswordReset,linkEmailPassword,authProviderIds}from'./auth-engine.js?v=3565';
 import{getAuthRuntime}from'./auth-engine.js?v=332015';
 import{notificationSupport,getStoredVapidKey,saveStoredVapidKey,enableMyPush,disableMyPush,queuePush,listPushJobs,listPushTokens}from'./notification-engine.js?v=332012';
 
@@ -7033,4 +7033,75 @@ console.info('[230MATCH V3] 34.4.2 ready · main wait1 refill and shared queue e
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(apply,0),{once:true});else setTimeout(apply,0);
   window.addEventListener('resize',refreshLabels,{passive:true});
   console.info('[230MATCH] 35.6.3 ready · mobile member/admin header actions');
+})();
+
+
+/* Stage 35.6.5 · unified social + email/password authentication */
+(function stage3565UnifiedAuthentication(){
+  const ID='stage3565EmailAuth';
+  const escHtml=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  function friendly(error){
+    const code=String(error?.code||'');
+    if(code.includes('invalid-credential')||code.includes('wrong-password')||code.includes('user-not-found'))return '이메일 또는 비밀번호가 올바르지 않습니다.';
+    if(code.includes('email-already-in-use'))return '이미 가입된 이메일입니다. 기존 방식으로 로그인한 뒤 이메일 로그인을 연결하세요.';
+    if(code.includes('credential-already-in-use'))return '이 이메일 로그인은 다른 계정에 연결되어 있습니다.';
+    if(code.includes('weak-password'))return '비밀번호는 6자리 이상 입력하세요.';
+    if(code.includes('invalid-email'))return '이메일 형식을 확인하세요.';
+    if(code.includes('too-many-requests'))return '로그인 시도가 많습니다. 잠시 후 다시 시도하세요.';
+    if(code.includes('operation-not-allowed'))return 'Firebase 콘솔에서 이메일/비밀번호 로그인을 활성화해야 합니다.';
+    return error?.message||'로그인 처리 중 오류가 발생했습니다.';
+  }
+  function installStyle(){
+    if(document.getElementById(ID+'Style'))return;
+    const style=document.createElement('style');style.id=ID+'Style';style.textContent=`
+      .stage3565-divider{display:flex;align-items:center;gap:10px;color:#8390a5;font-size:12px;margin:14px 0}.stage3565-divider:before,.stage3565-divider:after{content:"";height:1px;background:#dbe3ef;flex:1}
+      .stage3565-email{border:1px solid #dbe4f1;border-radius:15px;padding:14px;background:#f8fbff}.stage3565-email h4{margin:0 0 4px;color:#102b54}.stage3565-email p{margin:0 0 11px;color:#63728a;font-size:12px;line-height:1.45}
+      .stage3565-email label{display:block;margin:8px 0;font-size:12px;font-weight:800;color:#2d405e}.stage3565-email input{display:block;width:100%;box-sizing:border-box;margin-top:5px;height:42px;border:1px solid #cbd8ea;border-radius:11px;padding:0 12px;font-size:14px;background:white}
+      .stage3565-email-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:10px}.stage3565-email-actions button{min-height:40px}.stage3565-email-actions .wide{grid-column:1/-1}
+      .stage3565-linked{padding:11px;border-radius:11px;background:#eaf8ef;color:#17623a;font-weight:800;font-size:13px}.stage3565-message{min-height:18px;margin-top:8px!important;font-size:12px!important;font-weight:700}.stage3565-message.error{color:#b42318}.stage3565-message.success{color:#16754a}
+      @media(max-width:520px){.social-login-card{max-height:92vh;overflow:auto}.stage3565-email-actions{grid-template-columns:1fr}.stage3565-email-actions .wide{grid-column:auto}}
+    `;document.head.appendChild(style);
+  }
+  function block(){return document.getElementById(ID)}
+  function setMessage(text,type=''){const el=document.getElementById(ID+'Message');if(el){el.textContent=text||'';el.className='stage3565-message '+type}}
+  async function refresh(){
+    install();const box=block();if(!box)return;
+    const providers=currentAuthUser?await authProviderIds().catch(()=>[]):[];
+    const linked=providers.includes('password');
+    const email=currentAuthUser?.email||'';
+    box.innerHTML=currentAuthUser?`
+      <h4>일반로그인 연결</h4><p>간편로그인과 이메일 로그인을 같은 회원정보·참가 기록으로 이용합니다.</p>
+      ${linked?`<div class="stage3565-linked">✓ 이메일 로그인이 연결되어 있습니다.<br><small>${escHtml(email)}</small></div>`:`
+      <label>이메일<input id="${ID}Email" type="email" autocomplete="email" value="${escHtml(email)}" placeholder="example@email.com"></label>
+      <label>사용할 비밀번호<input id="${ID}Password" type="password" autocomplete="new-password" placeholder="6자리 이상"></label>
+      <div class="stage3565-email-actions"><button type="button" class="btn btn-primary wide" id="${ID}Link">이 계정에 이메일 로그인 연결</button></div>`}
+      <p id="${ID}Message" class="stage3565-message"></p>`:`
+      <h4>일반로그인</h4><p>이메일과 비밀번호로 로그인하거나 새 회원으로 가입할 수 있습니다.</p>
+      <label>이메일<input id="${ID}Email" type="email" autocomplete="email" placeholder="example@email.com"></label>
+      <label>비밀번호<input id="${ID}Password" type="password" autocomplete="current-password" placeholder="6자리 이상"></label>
+      <div class="stage3565-email-actions"><button type="button" class="btn btn-primary" id="${ID}Login">로그인</button><button type="button" class="btn btn-light" id="${ID}Register">회원가입</button><button type="button" class="btn btn-light wide" id="${ID}Reset">비밀번호 재설정</button></div>
+      <p id="${ID}Message" class="stage3565-message"></p>`;
+    bind();
+  }
+  function values(){return{email:document.getElementById(ID+'Email')?.value.trim()||'',password:document.getElementById(ID+'Password')?.value||''}}
+  function busy(btn,on){if(!btn)return;btn.disabled=on;btn.dataset.oldText=btn.dataset.oldText||btn.textContent;btn.textContent=on?'처리 중…':btn.dataset.oldText}
+  function bind(){
+    const login=document.getElementById(ID+'Login');if(login)login.onclick=async()=>{const v=values();busy(login,true);setMessage('');try{await signInEmail(v.email,v.password);closeSocialLogin();notice('로그인했습니다.','success')}catch(e){setMessage(friendly(e),'error')}finally{busy(login,false)}};
+    const reg=document.getElementById(ID+'Register');if(reg)reg.onclick=async()=>{const v=values();if(!confirm(`${v.email} 주소로 새 회원가입을 진행할까요?`))return;busy(reg,true);setMessage('');try{await registerEmail(v.email,v.password);closeSocialLogin();notice('회원가입이 완료되었습니다. 기본정보를 등록하세요.','success')}catch(e){setMessage(friendly(e),'error')}finally{busy(reg,false)}};
+    const reset=document.getElementById(ID+'Reset');if(reset)reset.onclick=async()=>{const v=values();busy(reset,true);setMessage('');try{await sendPasswordReset(v.email);setMessage('비밀번호 재설정 메일을 보냈습니다.','success')}catch(e){setMessage(friendly(e),'error')}finally{busy(reset,false)}};
+    const link=document.getElementById(ID+'Link');if(link)link.onclick=async()=>{const v=values();if(!confirm('현재 회원정보에 이메일 로그인을 연결할까요?'))return;busy(link,true);setMessage('');try{await linkEmailPassword(v.email,v.password);currentAuthUser={...currentAuthUser,email:v.email};setMessage('이메일 로그인이 연결되었습니다. 다음부터 두 방식 모두 사용할 수 있습니다.','success');setTimeout(refresh,500)}catch(e){setMessage(friendly(e),'error')}finally{busy(link,false)}};
+    const pass=document.getElementById(ID+'Password');if(pass&&!currentAuthUser)pass.onkeydown=e=>{if(e.key==='Enter')document.getElementById(ID+'Login')?.click()};
+  }
+  function install(){
+    installStyle();const card=document.querySelector('#socialLoginModal .social-login-card');if(!card)return;
+    const socialLogout=document.getElementById('socialLogoutBtn');
+    let divider=document.getElementById(ID+'Divider');if(!divider){divider=document.createElement('div');divider.id=ID+'Divider';divider.className='stage3565-divider';divider.textContent='또는';(socialLogout||card.querySelector('p:last-child'))?.insertAdjacentElement('beforebegin',divider)}
+    let box=block();if(!box){box=document.createElement('section');box.id=ID;box.className='stage3565-email';divider.insertAdjacentElement('afterend',box)}
+    const head=card.querySelector('.social-login-head span');if(head)head.textContent='간편로그인 또는 이메일 로그인으로 이용하세요.';
+  }
+  const originalOpen=openSocialLogin;openSocialLogin=function(){originalOpen.apply(this,arguments);setTimeout(refresh,0)};
+  const originalRender=renderAuthStatus;renderAuthStatus=function(){originalRender.apply(this,arguments);if(!document.getElementById('socialLoginModal')?.hidden)setTimeout(refresh,0)};
+  const apply=()=>{install();const label=document.getElementById('buildStageLabel');if(label){label.textContent='230MATCH 35.6.5 · 통합 로그인';label.title='Version 35.6.5';}document.documentElement.dataset.build='3565'};
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(apply,0),{once:true});else setTimeout(apply,0);
+  console.info('[230MATCH] 35.6.5 ready · unified social and email/password authentication');
 })();
