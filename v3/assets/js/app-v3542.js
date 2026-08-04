@@ -3286,9 +3286,10 @@ function updateDocumentTitle(view='home'){const label=PORTAL_VIEW_TITLES[view]||
 const INTERNAL_ADMIN_PORTAL_VIEWS=new Set(['acceptance','rehearsal','performance']);
 const INTERNAL_OPERATOR_PORTAL_VIEWS=new Set(['messages','notifications','roster','manual','audit','logs','readiness','diagnostics']);
 function portalViewAllowed(name){
-  // 코트 현황은 일반 선수도 조회할 수 있습니다. 운영·수정 권한은 화면 내부에서 별도로 제한합니다.
+  // 코트 현황은 모든 사용자에게 공개 조회 화면입니다. 운영·수정 권한만 화면 내부에서 제한합니다.
   const view=document.getElementById(`view-${name}`);
   if(!view)return false;
+  if(name==='operation')return true;
   if(name==='rehearsal')return isAdmin()&&isRehearsalUnlocked();
   if(INTERNAL_ADMIN_PORTAL_VIEWS.has(name))return isAdmin();
   if(INTERNAL_OPERATOR_PORTAL_VIEWS.has(name))return canOperate();
@@ -7259,4 +7260,45 @@ console.info('[230MATCH V3] 34.4.2 ready · main wait1 refill and shared queue e
   };
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',apply,{once:true});else apply();
   console.info('[230MATCH] 35.6.9 ready · runtime errors removed and viewer court route fixed');
+})();
+
+
+/* Stage 35.7.0 · public court-status route final fix */
+(function stage3570PublicCourtRouteFinalFix(){
+  function forcePublicCourtView(){
+    const view=document.getElementById('view-operation');
+    if(!view)return false;
+    document.querySelectorAll('.view').forEach(el=>el.classList.toggle('active',el===view));
+    document.querySelectorAll('.tab').forEach(el=>el.classList.toggle('active',el.dataset.view==='operation'));
+    document.querySelectorAll('.mobile-nav-button').forEach(el=>el.classList.toggle('active',el.dataset.mobileView==='operation'));
+    document.body.dataset.currentView='operation';
+    view.dataset.operationMode='courts';
+    document.querySelectorAll('#view-operation [data-operation-section]').forEach(button=>{
+      const active=button.dataset.operationSection==='courts';
+      button.classList.toggle('active',active);
+      button.setAttribute('aria-pressed',String(active));
+    });
+    try{renderPortalViews();}catch(_e){}
+    // render 후 다른 화면으로 되돌아간 경우 다시 공개 코트 화면을 강제 표시합니다.
+    document.querySelectorAll('.view').forEach(el=>el.classList.toggle('active',el===view));
+    document.body.dataset.currentView='operation';
+    if(location.hash!=='#operation')history.pushState({portalView:'operation'},'','#operation');
+    requestAnimationFrame(()=>document.querySelector('#view-operation .operation-mode-bar, #view-operation h1, #view-operation h2')?.scrollIntoView({block:'start'}));
+    return true;
+  }
+  document.addEventListener('click',event=>{
+    const target=event.target?.closest?.('[data-portal-go="operation"],[data-view="operation"],[data-mobile-view="operation"]');
+    if(!target||target.closest('#view-operation'))return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    forcePublicCourtView();
+  },true);
+  window.addEventListener('hashchange',()=>{if(location.hash==='#operation')forcePublicCourtView();});
+  const apply=()=>{
+    const label=document.getElementById('buildStageLabel');
+    if(label){label.textContent='230MATCH 35.7.0 · 공개 코트현황 이동 최종 수정';label.title='Version 35.7.0';}
+    document.documentElement.dataset.build='3570';
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',apply,{once:true});else apply();
+  console.info('[230MATCH] 35.7.0 ready · public court-status route final fix');
 })();
