@@ -6525,12 +6525,8 @@ console.info('[230MATCH V3] 34.4.2 ready · main wait1 refill and shared queue e
   function patchProviders(){
     tournamentArchiveRows=function(){return [currentTournamentSnapshot(),modernTournament(),...(state.portal?.tournamentArchives||[]).filter(x=>!isModern(x))];};
     resultArchiveRows=function(){return [modernResult(),...(state.portal?.resultArchives||[]).filter(x=>!isModern(x))].map(normalizeResultArchive);};
-    const oldArchived=typeof archivedParticipantRows==='function'?archivedParticipantRows:()=>[];
-    archivedParticipantRows=function(){
-      const rows=oldArchived().filter(r=>!/모던클럽배/.test(String(r?.archiveName||'')));
-      TEAM_NAMES.forEach((name,index)=>{const team={id:`modern-${index}`,name,affiliation:'2026 제1회 모던클럽배 테니스대회'};participantRecordPlayers(team).forEach((player,playerIndex)=>rows.push({team,index,player,playerIndex,status:'active',contact:null,archiveName:'2026 제1회 모던클럽배 테니스대회',archivedAt:ARCHIVE_AT}));});
-      return rows;
-    };
+    // 일부 배포본에는 archivedParticipantRows 함수가 존재하지 않습니다.
+    // 존재하지 않는 함수에 직접 대입하면 전체 렌더링이 중단되므로 참가자 보관함 확장은 안전하게 생략합니다.
   }
   async function recoverLegacyPhotos(){
     try{
@@ -7080,7 +7076,7 @@ console.info('[230MATCH V3] 34.4.2 ready · main wait1 refill and shared queue e
   function block(){return document.getElementById(ID)}
   function setMessage(text,type=''){const el=document.getElementById(ID+'Message');if(el){el.textContent=text||'';el.className='stage3565-message '+type}}
   async function refresh(){
-    install();const box=block();if(!box)return;
+    const box=block();if(!box)return;
     const providers=currentAuthUser?await authProviderIds().catch(()=>[]):[];
     const linked=providers.includes('password');
     const email=currentAuthUser?.email||'';
@@ -7238,4 +7234,45 @@ console.info('[230MATCH V3] 34.4.2 ready · main wait1 refill and shared queue e
   }
   const ready=()=>{addFullResetButtons();setTimeout(addFullResetButtons,500);};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ready,{once:true});else ready();
+})();
+
+
+/* Stage 35.6.9 · runtime error cleanup + reliable public court-status route */
+(function stage3569RuntimeAndCourtRouteFix(){
+  function openPublicCourtStatus(event){
+    const target=event?.target?.closest?.('[data-portal-go="operation"],[data-view="operation"],[data-mobile-view="operation"]');
+    if(!target)return;
+    if(target.closest('#view-operation'))return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    try{
+      navigatePortalView('operation',{pushHistory:true,focus:true});
+      const workspace=document.getElementById('view-operation');
+      if(workspace)workspace.dataset.operationMode='courts';
+      document.querySelectorAll('#view-operation [data-operation-section]').forEach(button=>{
+        const active=button.dataset.operationSection==='courts';
+        button.classList.toggle('active',active);
+        button.setAttribute('aria-pressed',String(active));
+      });
+      setTimeout(()=>document.querySelector('#view-operation .operation-mode-bar, #view-operation h1, #view-operation h2')?.scrollIntoView({block:'start'}),40);
+    }catch(error){
+      console.error('[35.6.9] 코트현황 이동 실패',error);
+      location.hash='#operation';
+    }
+  }
+  document.addEventListener('click',openPublicCourtStatus,true);
+  window.addEventListener('hashchange',()=>{
+    if(location.hash==='#operation'){
+      try{navigatePortalView('operation',{focus:false});}catch(_e){}
+      const workspace=document.getElementById('view-operation');
+      if(workspace)workspace.dataset.operationMode='courts';
+    }
+  });
+  const apply=()=>{
+    const label=document.getElementById('buildStageLabel');
+    if(label){label.textContent='230MATCH 35.6.9 · 오류 정리·코트현황 이동 복구';label.title='Version 35.6.9';}
+    document.documentElement.dataset.build='3569';
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',apply,{once:true});else apply();
+  console.info('[230MATCH] 35.6.9 ready · runtime errors removed and viewer court route fixed');
 })();
