@@ -6965,3 +6965,88 @@ console.info('[230MATCH V3] 34.4.2 ready · main wait1 refill and shared queue e
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(applyBuild,0),{once:true});else setTimeout(applyBuild,0);
   console.info('[230MATCH] 35.6.2 ready · named member header, profile settings, direct logout');
 })();
+
+/* Stage 35.6.3 · mobile member/admin header actions */
+(function stage3563MobileHeaderActions(){
+  const STYLE_ID='stage3563MobileHeaderStyle';
+  function installStyle(){
+    if(document.getElementById(STYLE_ID))return;
+    const style=document.createElement('style');
+    style.id=STYLE_ID;
+    style.textContent=`
+      @media (max-width:720px){
+        .top-actions{min-width:0!important;display:flex!important;align-items:center!important;justify-content:flex-end!important}
+        .role-switch{display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:4px!important;min-width:0!important;flex-wrap:nowrap!important}
+        .role-switch #openSocialLoginBtn,
+        .role-switch #currentRoleBadge,
+        .role-switch #directHeaderLogoutBtn{
+          display:inline-flex!important;align-items:center!important;justify-content:center!important;
+          min-height:36px!important;height:36px!important;margin:0!important;border-radius:12px!important;
+          padding:0 9px!important;font-size:12px!important;line-height:1!important;white-space:nowrap!important;
+          max-width:92px!important;overflow:hidden!important;text-overflow:ellipsis!important;flex:0 1 auto!important;
+        }
+        .role-switch #openSocialLoginBtn{background:rgba(8,38,82,.76)!important;color:#fff!important;border:1px solid rgba(255,255,255,.16)!important;font-weight:800!important}
+        .role-switch #currentRoleBadge{background:#fff!important;color:#14223c!important;border:0!important;font-weight:800!important;max-width:72px!important}
+        .role-switch #directHeaderLogoutBtn{background:rgba(255,255,255,.15)!important;color:#fff!important;border:1px solid rgba(255,255,255,.28)!important;max-width:72px!important}
+        .role-switch #directHeaderLogoutBtn[hidden]{display:none!important}
+      }
+      @media (max-width:420px){
+        .brand-copy small{display:none!important}
+        .role-switch{gap:3px!important}
+        .role-switch #openSocialLoginBtn,
+        .role-switch #currentRoleBadge,
+        .role-switch #directHeaderLogoutBtn{height:34px!important;min-height:34px!important;padding:0 7px!important;font-size:11px!important}
+        .role-switch #openSocialLoginBtn{max-width:76px!important}
+        .role-switch #currentRoleBadge{max-width:62px!important}
+        .role-switch #directHeaderLogoutBtn{max-width:62px!important}
+      }
+    `;
+    document.head.appendChild(style);
+  }
+  function refreshLabels(){
+    const login=document.getElementById('openSocialLoginBtn');
+    const logout=document.getElementById('directHeaderLogoutBtn');
+    const badge=document.getElementById('currentRoleBadge');
+    if(login){
+      login.textContent=currentAuthUser?`${authUserLabel()}님`:'로그인';
+      login.title=currentAuthUser?'내 기본정보 설정 열기':'간편로그인';
+    }
+    if(logout){
+      logout.textContent='로그아웃';
+      logout.hidden=!currentAuthUser;
+      logout.title='바로 로그아웃';
+    }
+    if(badge){
+      badge.textContent=isAdmin()?'관리자':isOperator()?'진행자':'일반 선수';
+      badge.title=isAdmin()||isOperator()?'관리자 설정 열기':currentAuthUser?'내 기본정보 설정 열기':'로그인';
+    }
+  }
+  const previousRender=renderAuthStatus;
+  renderAuthStatus=function(){previousRender.apply(this,arguments);installStyle();refreshLabels();};
+  function bind(){
+    installStyle();refreshLabels();
+    const nameBtn=document.getElementById('openSocialLoginBtn');
+    if(nameBtn&&!nameBtn.dataset.stage3563Bound){
+      nameBtn.dataset.stage3563Bound='1';
+      nameBtn.addEventListener('click',event=>{
+        if(!currentAuthUser)return;
+        event.preventDefault();event.stopImmediatePropagation();
+        window.openMemberProfileSettings?.();
+      },true);
+    }
+    const role=document.getElementById('currentRoleBadge');
+    if(role&&!role.dataset.stage3563Bound){
+      role.dataset.stage3563Bound='1';
+      role.addEventListener('click',event=>{
+        event.preventDefault();event.stopImmediatePropagation();
+        if(isAdmin()||isOperator())window.openAdminSettingsHub?.();
+        else if(currentAuthUser)window.openMemberProfileSettings?.();
+        else openSocialLogin?.();
+      },true);
+    }
+  }
+  const apply=()=>{bind();const label=document.getElementById('buildStageLabel');if(label){label.textContent='230MATCH 35.6.3 · 모바일 로그인·설정·로그아웃';label.title='Version 35.6.3';}document.documentElement.dataset.build='3563';};
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(apply,0),{once:true});else setTimeout(apply,0);
+  window.addEventListener('resize',refreshLabels,{passive:true});
+  console.info('[230MATCH] 35.6.3 ready · mobile member/admin header actions');
+})();
