@@ -1,4 +1,4 @@
-import{getAuthRuntime}from'./auth-engine.js?v=4003';
+import{getAuthRuntime}from'./auth-engine.js?v=4004';
 const SETTINGS_KEY='230match-v5-sync-settings';
 const LEGACY_SETTINGS_KEYS=['230match-v3-sync-settings','230match-sync-settings'];
 const FIREBASE_APP_URL='https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -40,7 +40,7 @@ function buildBundle(state){const{activeId,rows}=normalizeRecords(state);return{
 function manifestRef(){return api.doc(db,MANIFEST_COLLECTION,DEFAULT_ROOM);}
 function tournamentRef(id){return api.doc(db,MANIFEST_COLLECTION,DEFAULT_ROOM,'tournaments',safeId(id,'tournament'));}
 async function readBundle(){
-  const mSnap=await api.getDoc(manifestRef());if(!mSnap.exists())return null;const m=mSnap.data();const ids=(m.tournaments||[]).map(x=>safeId(x.id,'tournament'));const snaps=await Promise.all(ids.map(id=>api.getDoc(tournamentRef(id))));const docs=[];for(let i=0;i<snaps.length;i++){if(snaps[i].exists())docs.push({id:ids[i],...snaps[i].data()});}
+  const mSnap=await api.getDoc(manifestRef());if(!mSnap.exists())return null;const m=mSnap.data();const ids=(m.tournaments||[]).map(x=>safeId(x.id,'tournament'));const snaps=await Promise.all(ids.map(id=>api.getDoc(tournamentRef(id))));const docs=[];for(let i=0;i<snaps.length;i++){if(!snaps[i].exists())continue;const raw=snaps[i].data();let workspace=raw.workspace||null;if(!workspace&&typeof raw.workspaceJson==='string'){try{workspace=JSON.parse(raw.workspaceJson);}catch{workspace=null;}}if(workspace)docs.push({id:ids[i],...raw,workspace});}
   if(!docs.length)return null;const activeId=ids.includes(m.activeTournamentId)?m.activeTournamentId:docs[0].id;const active=docs.find(x=>x.id===activeId)||docs[0];const state=clone(active.workspace||{});state.tournament=state.tournament||{};state.tournament.id=activeId;state.multiTournament={activeTournamentId:activeId,tournaments:docs.map(d=>({id:d.id,name:d.name||d.workspace?.tournament?.name||'대회 준비 중',division:d.division||d.workspace?.tournament?.division||'',createdAt:d.createdAt||'',updatedAt:d.updatedAt||'',snapshot:clone(d.workspace||{})}))};state.updatedAt=m.stateUpdatedAt||state.updatedAt||new Date().toISOString();return{state,manifest:m};
 }
 async function migrateLegacyIfNeeded(){
@@ -51,7 +51,7 @@ async function migrateLegacyIfNeeded(){
 }
 async function writeBundle(state,{migration=false}={}){
   if(!canWriteFn())return;const rt=await runtime({requireUser:true});const bundle=buildBundle(state);const batch=api.writeBatch(db);const now=api.serverTimestamp();
-  for(const row of bundle.rows){const payload={schemaVersion:5,id:row.id,name:row.name,division:row.division,createdAt:row.createdAt,updatedAt:row.updatedAt,workspace:row.workspace,workspaceDigest:digest(row.workspace),lastWriterUid:rt.user.uid,lastWriterEmail:rt.user.email||'',serverUpdatedAt:now};const approx=JSON.stringify(payload).length;if(approx>900000)throw new Error(`${row.name} 대회 데이터가 너무 큽니다(${Math.round(approx/1024)}KB). 사진·대형 기록을 별도 보관한 뒤 다시 저장하세요.`);batch.set(tournamentRef(row.id),payload,{merge:false});}
+  for(const row of bundle.rows){const workspaceJson=JSON.stringify(row.workspace);const payload={schemaVersion:5,id:row.id,name:row.name,division:row.division,createdAt:row.createdAt,updatedAt:row.updatedAt,workspaceJson,workspaceEncoding:'json-v1',workspaceDigest:digest(row.workspace),lastWriterUid:rt.user.uid,lastWriterEmail:rt.user.email||'',serverUpdatedAt:now};const approx=JSON.stringify(payload).length;if(approx>900000)throw new Error(`${row.name} 대회 데이터가 너무 큽니다(${Math.round(approx/1024)}KB). 사진·대형 기록을 별도 보관한 뒤 다시 저장하세요.`);batch.set(tournamentRef(row.id),payload,{merge:false});}
   const revision=lastManifestRevision+1;batch.set(manifestRef(),{...bundle.manifest,revision,lastWriterUid:rt.user.uid,lastWriterEmail:rt.user.email||'',serverUpdatedAt:now,migration:Boolean(migration)},{merge:false});await batch.commit();lastManifestRevision=revision;lastDigest=digest(state);window.__230matchLocalMutationUntil=0;return bundle;
 }
 async function ensureDb(){if(db)return;const cfg=getSyncSettings(),fb=parseConfig(cfg.firebaseConfigText),rt=await runtime();const f=await loadFirebase();let app=rt?.auth?.app; if(!app){const name=`230match-v5-${fb.projectId}`;try{app=f.getApp(name);}catch{app=f.initializeApp(fb,name);}}db=rt?.db||f.getFirestore(app);connectedRoom=DEFAULT_ROOM;}
