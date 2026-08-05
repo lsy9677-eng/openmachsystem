@@ -4,16 +4,19 @@ import{findUnifiedMatch}from'./unified-court-engine.js?v=3511';
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
 const fmt=iso=>iso?new Date(iso).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}):'-';
 export function ensureTimeState(state){
+  if(!state||typeof state!=='object')return false;
+  if(!state.settings||typeof state.settings!=='object'||Array.isArray(state.settings))state.settings={};
   if(!('autoTimeEnabled'in state.settings))state.settings.autoTimeEnabled=true;
   if(!('timeRefreshSeconds'in state.settings))state.settings.timeRefreshSeconds=30;
   if(!('minimumMatchMinutes'in state.settings))state.settings.minimumMatchMinutes=30;
   // 이전 단계의 기본값 30분은 새 기준 40분으로 자동 이전합니다.
   if(!state.settings.matchMinutes || Number(state.settings.matchMinutes)===30)state.settings.matchMinutes=40;
   if(Number(state.settings.minimumMatchMinutes)<20)state.settings.minimumMatchMinutes=30;
-  if(!state.timeMetrics)state.timeMetrics={lastCalculatedAt:null,averageMinutes:0,measuredAverageMinutes:0,measuredSampleCount:0,longestWaitMinutes:0};
+  if(!state.timeMetrics||typeof state.timeMetrics!=='object')state.timeMetrics={lastCalculatedAt:null,averageMinutes:0,measuredAverageMinutes:0,measuredSampleCount:0,longestWaitMinutes:0};
+  return true;
 }
 export function calculateTimeMetrics(state){
-  ensureTimeState(state);
+  if(!ensureTimeState(state))return{lastCalculatedAt:null,averageMinutes:0,measuredAverageMinutes:0,measuredSampleCount:0,longestWaitMinutes:0};
   const minimum=Math.max(20,Number(state.settings.minimumMatchMinutes)||30);
   const base=Math.max(minimum,Number(state.settings.matchMinutes)||40);
   const mainMatches=allMatches(state.draw);
