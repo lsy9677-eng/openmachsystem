@@ -2,7 +2,7 @@ import{getAuthConfig,saveAuthConfig,startAuth,signInGoogle,signOutSocial,beginEx
 import{getAuthRuntime}from'./auth-engine.js?v=332015';
 import{notificationSupport,getStoredVapidKey,saveStoredVapidKey,enableMyPush,disableMyPush,queuePush,listPushJobs,listPushTokens}from'./notification-engine.js?v=332012';
 
-import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=332012';
+import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=4005';
 import{prepareTeams,generateDraw,allMatches,findMatch,generateLinkedDrawSlots,syncLinkedDrawQualifiers}from'./bracket-engine.js?v=332012';
 import{ensureDrawMeta,canModifyDraw,createDrawWithMethod,lockDraw,unlockDrawForDevelopment,clearDrawHistory}from'./draw-method-engine.js?v=332012';
 import{buildCourts,assignInitial,queueReadyMatches,refillCourt}from'./court-engine.js?v=332012';
@@ -3648,10 +3648,12 @@ console.log('[230MATCH] Stage34.3 multi-division independent operation');
 (function initFinalDeploymentStability(){
   const LAST_GOOD_KEY='230match-v3-last-known-good';
   const saveLastKnownGood=()=>{
+    // 전체 상태를 localStorage에 중복 저장하면 브라우저 5MB 한도를 초과합니다.
+    // 실제 복구점은 IndexedDB와 Firebase V5가 담당하고, 여기에는 작은 확인 정보만 남깁니다.
     try{
-      const payload={build:BUILD_LABEL,savedAt:new Date().toISOString(),state:structuredClone(state)};
+      const payload={build:BUILD_LABEL,savedAt:new Date().toISOString(),updatedAt:state?.updatedAt||'',tournamentId:state?.tournament?.id||'',tournamentName:state?.tournament?.name||''};
       localStorage.setItem(LAST_GOOD_KEY,JSON.stringify(payload));
-    }catch(error){console.warn('마지막 정상 상태 저장 실패',error);}
+    }catch(error){try{localStorage.removeItem(LAST_GOOD_KEY);}catch(_e){}console.warn('마지막 정상 상태 표식 저장 실패',error);}
   };
   const verifyAssets=()=>{
     const required=['openAdminSettingsHubBtn','adminSettingsHub','view-home','view-operation','view-entry','view-bracket'];

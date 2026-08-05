@@ -144,8 +144,66 @@ function syncActiveDivisionSnapshot(state){
   active.snapshot=captureDivisionSnapshot(state);
   return state;
 }
-export function loadState(){try{const raw=localStorage.getItem(STORAGE_KEY);return normalizeMultiDivisionState(raw?JSON.parse(raw):initialState());}catch{return normalizeMultiDivisionState(initialState());}}
-export function saveState(state){syncActiveDivisionSnapshot(state);state.updatedAt=new Date().toISOString();localStorage.setItem(STORAGE_KEY,JSON.stringify(state));try{window.dispatchEvent(new CustomEvent('230match:state-saved',{detail:{state:structuredClone(state)}}));}catch(_error){}}
+function compactLocalBootstrap(source){
+  const state=cloneValue(source);
+  // 다중 대회 전체 snapshot은 Firebase V5가 원본을 보관하므로 브라우저에는 요약만 남깁니다.
+  if(Array.isArray(state.multiTournament?.tournaments)){
+    state.multiTournament.tournaments=state.multiTournament.tournaments.map(item=>({
+      id:item?.id||'',name:item?.name||'',division:item?.division||'',
+      createdAt:item?.createdAt||'',updatedAt:item?.updatedAt||'',status:item?.status||''
+    }));
+  }
+  if(state.portal){
+    delete state.portal.tournamentArchives;
+    delete state.portal.participantArchives;
+    delete state.portal.resultArchives;
+    if(Array.isArray(state.portal.posts))state.portal.posts=state.portal.posts.slice(-80);
+  }
+  if(Array.isArray(state.logs))state.logs=state.logs.slice(0,80);
+  if(state.messaging){
+    if(Array.isArray(state.messaging.queue))state.messaging.queue=state.messaging.queue.slice(-80);
+    if(Array.isArray(state.messaging.history))state.messaging.history=state.messaging.history.slice(-80);
+    if(Array.isArray(state.messaging.deliveryLogs))state.messaging.deliveryLogs=state.messaging.deliveryLogs.slice(0,80);
+    if(Array.isArray(state.messaging.smsApprovalHistory))state.messaging.smsApprovalHistory=state.messaging.smsApprovalHistory.slice(0,80);
+  }
+  if(Array.isArray(state.drawMeta?.history))state.drawMeta.history=state.drawMeta.history.slice(-10);
+  state.__localBootstrap=true;
+  return state;
+}
+function clearOversizedLegacyKeys(){
+  [LEGACY_RECOVERY_KEY,'230match-v3-last-known-good','230match-v3-stage35-last-good','230match-v3-stage1-last-good'].forEach(key=>{try{localStorage.removeItem(key);}catch(_e){}});
+}
+export function loadState(){
+  try{
+    const raw=localStorage.getItem(STORAGE_KEY);
+    const state=normalizeMultiDivisionState(raw?JSON.parse(raw):initialState());
+    if(state&&state.__localBootstrap)delete state.__localBootstrap;
+    return state;
+  }catch{return normalizeMultiDivisionState(initialState());}
+}
+export function saveState(state){
+  syncActiveDivisionSnapshot(state);
+  state.updatedAt=new Date().toISOString();
+  const full=JSON.stringify(state);
+  let stored='full';
+  try{
+    localStorage.setItem(STORAGE_KEY,full);
+  }catch(error){
+    clearOversizedLegacyKeys();
+    const compact=JSON.stringify(compactLocalBootstrap(state));
+    try{
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.setItem(STORAGE_KEY,compact);
+      stored='compact';
+      console.warn(`[230MATCH] 브라우저 용량 절약 모드로 저장했습니다. full=${Math.round(full.length/1024)}KB compact=${Math.round(compact.length/1024)}KB`);
+    }catch(secondError){
+      try{localStorage.removeItem(STORAGE_KEY);}catch(_e){}
+      throw secondError;
+    }
+  }
+  try{window.dispatchEvent(new CustomEvent('230match:state-saved',{detail:{state:structuredClone(state),storageMode:stored}}));}catch(_error){}
+  return stored;
+}
 export function clearState(){localStorage.removeItem(STORAGE_KEY);}
 
 export function saveRecovery(state,label='수동 복구점'){
