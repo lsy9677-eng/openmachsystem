@@ -76,6 +76,18 @@
 <style id="stage343MultiDivisionStyles">
 .division-workspace-bar{display:flex;align-items:center;gap:10px;padding:10px 14px;margin-top:10px;border-left:4px solid #1e5aa8}.division-workspace-current{display:flex;align-items:center;gap:8px;min-width:0}.division-workspace-current span{font-size:11px;font-weight:900;color:#64748b}.division-workspace-current strong{max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.division-workspace-bar label{margin-left:auto}.division-workspace-bar select{min-width:190px;border:1px solid #cbd7e8;border-radius:10px;padding:9px 34px 9px 11px;background:#fff;font-weight:900;color:#10264a}.division-workspace-count{font-size:12px;font-weight:800;color:#64748b}.division-manager-card{width:min(820px,94vw);max-height:88vh;overflow:auto}.division-manager-list{display:grid;gap:9px;padding:14px 0}.division-manager-item{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #d9e2ef;border-radius:13px;padding:12px;background:#fff}.division-manager-item.active{border-color:#2d62b5;background:#f1f6ff}.division-manager-item span,.division-manager-item strong,.division-manager-item small{display:block}.division-manager-item span{font-size:11px;font-weight:900;color:#2d62b5}.division-manager-item strong{margin-top:3px}.division-manager-item small{margin-top:4px;color:#64748b}.division-manager-item>div:last-child{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.division-add-row{display:grid;grid-template-columns:minmax(180px,1fr) auto auto;gap:8px}.division-add-row input{border:1px solid #cbd7e8;border-radius:10px;padding:11px}.division-manager-note{margin:10px 0 0;color:#64748b;font-size:13px}.sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}@media(max-width:700px){.division-workspace-bar{display:grid;grid-template-columns:1fr auto;gap:7px}.division-workspace-current{grid-column:1/-1}.division-workspace-bar label{margin:0}.division-workspace-bar select{min-width:0;width:100%}.division-workspace-count{display:none}.division-add-row{grid-template-columns:1fr}.division-manager-item{align-items:flex-start;flex-direction:column}.division-manager-item>div:last-child{justify-content:flex-start}}
 </style>
+
+  <style id="stage5006HomeTournamentStyles">
+    .home-tournament-card-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+    .home-tournament-card{border:1px solid #d7e2f1;border-radius:16px;padding:16px;background:#fff;display:flex;flex-direction:column;gap:10px}
+    .home-tournament-card.current{border:2px solid #173d74;background:#f7faff}
+    .home-tournament-card h3{margin:0;font-size:18px;line-height:1.35}
+    .home-tournament-card .meta{font-size:13px;color:#617089}
+    .home-tournament-card .actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:auto}
+    .home-tournament-card .actions .btn{flex:1 1 auto}
+    .home-tournament-empty{padding:20px;text-align:center;color:#617089;border:1px dashed #c9d6e8;border-radius:14px}
+    @media(max-width:640px){.home-tournament-card-list{grid-template-columns:1fr}.home-tournament-card .actions .btn{width:100%}}
+  </style>
 </head>
 <body>
   <header class="topbar">
@@ -137,6 +149,14 @@
           <strong>현재 대회</strong>
           <span>실시간 경기 현황과 접수 상태를 확인하세요.</span>
         </div>
+      </section>
+
+      <section id="homeTournamentSwitcher" class="panel home-tournament-switcher" aria-label="운영 대회 선택">
+        <div class="section-head">
+          <div><span class="legacy-home-chip">ACTIVE TOURNAMENTS</span><h2>운영 대회 선택</h2><p>운영 중인 대회를 모두 확인하고 바로 선택·편집할 수 있습니다.</p></div>
+          <button type="button" class="btn btn-light btn-small" data-portal-go="tournaments">전체 대회 목록</button>
+        </div>
+        <div id="homeTournamentCardList" class="home-tournament-card-list"></div>
       </section>
 
       <section id="stage3212MatchdayHub" class="stage3212-matchday-hub panel" aria-label="현재 대회 빠른 이용">
@@ -1785,7 +1805,7 @@
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app-v5005.js?v=5005"></script>
+  <script type="module" src="./assets/js/app-v5006.js?v=5006"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
