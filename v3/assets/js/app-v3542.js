@@ -26,7 +26,7 @@ import{ensureCourtStatuses,pauseCourt,resumeCourt}from'./court-status-engine.js?
 import{ensureCourtManualQueues,assignToCourtManualQueue,moveCourtMatchFlexible,returnManualQueueItemToVenue,reorderCourtManualQueue}from'./court-manual-queue-engine.js?v=332012';
 import{reorderPrelimQueue as reorderPrelimQueueItem,movePrelimQueuedMatch,returnPrelimWait1ToQueue}from'./prelim-queue-control-engine.js?v=332012';
 import{ensurePrelimCourtStatuses,pausePrelimCourt,resumePrelimCourt}from'./prelim-court-status-engine.js?v=332012';
-import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection}from'./sync-engine.js?v=3554';
+import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection}from'./sync-engine.js?v=3571';
 import{verifyAndRepairMainFlow}from'./main-flow-integrity-engine.js?v=332012';
 import{finalizeTournamentCompletion}from'./tournament-completion-engine.js?v=332012';
 import{ensureTournamentIdentity,validateTournamentForArchive,createTournamentArchive,archiveListItem,archiveBackupPayload}from'./archive-engine.js?v=354000';
@@ -759,9 +759,9 @@ function updateSyncPanel(status={}){
 }
 function loadSyncPanel(){
   const cfg=getSyncSettings();
-  setChecked('cloudSyncEnabled',cfg.enabled===true);setValue('syncRoomId',cfg.roomId||'');setValue('firebaseConfigJson',cfg.firebaseConfigText||'기존 open-match-manager Firebase 자동 연결');
+  setChecked('cloudSyncEnabled',cfg.enabled===true);setValue('syncRoomId',cfg.roomId||'230match-production');setValue('firebaseConfigJson',cfg.firebaseConfigText||'기존 open-match-manager Firebase 자동 연결');
 }
-function collectSyncPanel(){const raw=String(getValue('firebaseConfigJson','')).trim();return{enabled:getChecked('cloudSyncEnabled',false),roomId:String(getValue('syncRoomId','')).trim(),firebaseConfigText:raw==='기존 open-match-manager Firebase 자동 연결'?'':raw,collection:'v3TournamentRooms'};}
+function collectSyncPanel(){const raw=String(getValue('firebaseConfigJson','')).trim();return{enabled:getChecked('cloudSyncEnabled',false),roomId:'230match-production',firebaseConfigText:raw==='기존 open-match-manager Firebase 자동 연결'?'':raw,collection:'v3TournamentRooms'};}
 async function saveAndConnectSync(){
   if(!requireAdmin('실시간 동기화 설정'))return;
   const cfg=collectSyncPanel();saveSyncSettings(cfg);
