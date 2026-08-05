@@ -7364,12 +7364,12 @@ function renderDivisionWorkspaceBar(){
   bar.innerHTML=`<div class="division-workspace-current"><span>현재 대회</span><label><span class="sr-only">현재 대회 선택</span><select id="activeTournamentSelect">${tournaments.map(t=>`<option value="${escapeHtml(t.id)}" ${t.id===state.multiTournament.activeTournamentId?'selected':''}>${escapeHtml(t.name||'이름 없는 대회')}</option>`).join('')}</select></label></div><label><span class="sr-only">현재 부서</span><select id="activeDivisionSelect">${divisions.map(d=>`<option value="${escapeHtml(d.id)}" ${d.id===state.multiDivision.activeDivisionId?'selected':''}>${escapeHtml(d.name)}</option>`).join('')}</select></label><span class="division-workspace-count">대회 ${tournaments.length}개 · 부서 ${divisions.length}개</span><button type="button" id="openDivisionManagerBtn" class="btn btn-light btn-small" data-admin-only="true">부서 관리</button>`;
   bar.querySelector('#activeTournamentSelect')?.addEventListener('change',e=>switchTournamentWorkspace(e.target.value));bar.querySelector('#activeDivisionSelect')?.addEventListener('change',e=>switchDivisionWorkspace(e.target.value));bar.querySelector('#openDivisionManagerBtn')?.addEventListener('click',openDivisionManager);applyRoleUI();
 }
-function tournamentArchiveRows(){
+tournamentArchiveRows=function(){
   ensureMultiTournamentRuntime();syncCurrentTournamentRuntime();
   const active=state.multiTournament.tournaments.map(r=>tournamentSummaryFromWorkspace(r.id===state.multiTournament.activeTournamentId?state:r.snapshot,r.id,r.id===state.multiTournament.activeTournamentId));
   const modern=(state.portal?.archives||[]).map(archiveListItem);const legacy=(state.portal?.tournamentArchives||[]).filter(x=>!modern.some(m=>m.id===x.id));return [...active,...modern,...legacy];
 }
-function renderTournamentList(){
+renderTournamentList=function(){
   const rows=tournamentArchiveRows(),query=String(document.getElementById('tournamentListSearch')?.value||'').trim().toLowerCase(),status=document.getElementById('tournamentListStatus')?.value||'all';
   const visible=rows.filter(x=>(status==='all'||x.status===status)&&(!query||`${x.name} ${x.division} ${x.venue}`.toLowerCase().includes(query)));
   const summary=document.getElementById('tournamentListSummary');if(summary){const counts={recruiting:rows.filter(x=>x.status==='recruiting').length,ongoing:rows.filter(x=>x.status==='ongoing').length,completed:rows.filter(x=>x.status==='completed').length};summary.textContent=`전체 ${rows.length}개 · 접수중 ${counts.recruiting} · 진행중 ${counts.ongoing} · 종료 ${counts.completed}`;}
