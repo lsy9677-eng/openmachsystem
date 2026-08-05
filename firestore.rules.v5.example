@@ -1,0 +1,27 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function userProfile() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
+    function operator() {
+      return signedIn() && userProfile().approved != false &&
+        userProfile().role in ['developer','admin','administrator','tournament_admin','manager','operator','staff','club_director','tournament_operator','director'];
+    }
+
+    // 공개 대회 조회. 운영 쓰기는 승인된 관리자·진행자만 허용합니다.
+    match /matchRoomsV5/{roomId} {
+      allow read: if true;
+      allow create, update, delete: if operator();
+      match /tournaments/{tournamentId} {
+        allow read: if true;
+        allow create, update, delete: if operator();
+      }
+    }
+
+    // 기존 컬렉션은 이전 안전망으로 유지합니다.
+    match /v3TournamentRooms/{roomId} {
+      allow read: if true;
+      allow write: if operator();
+    }
+  }
+}

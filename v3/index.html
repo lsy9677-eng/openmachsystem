@@ -152,7 +152,7 @@
           <button type="button" data-portal-go="bracket"><span>🏆</span><b>본선 대진표</b><small id="stage3212MainCount">대진·결과</small></button>
           <button type="button" data-portal-go="tournaments"><span>📌</span><b>대회 요강</b><small>대회 목록에서 확인</small></button>
         </div>
-        <div class="stage3212-admin-actions" data-operator-only="true">
+        <div class="stage3212-admin-actions" data-admin-only="true">
           <strong>관리자 빠른 운영</strong>
           <div>
             <button type="button" data-stage3210-open-edit>⚙️ 현재 대회 편집</button>
@@ -164,7 +164,7 @@
         </div>
       </section>
 
-      <section id="stage331OperationDashboard" class="stage331-operation-dashboard panel" data-operator-only="true" aria-label="당일 운영 대시보드">
+      <section id="stage331OperationDashboard" class="stage331-operation-dashboard panel" data-admin-only="true" aria-label="당일 운영 대시보드">
         <div class="stage331-dashboard-head">
           <div><span class="legacy-home-chip">MATCH-DAY CONTROL</span><h2>당일 운영 대시보드</h2><p>빈 코트, 대기열, 지연 경기와 결과 확인이 필요한 경기를 한 화면에서 확인합니다.</p></div>
           <div class="stage331-dashboard-actions"><span id="stage331DashboardState" class="stage331-dashboard-state">운영 대기</span><button type="button" class="btn btn-light btn-small" data-portal-go="operation">경기 운영 열기</button></div>
@@ -1785,7 +1785,7 @@
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app-v3542.js?v=3555"></script>
+  <script type="module" src="./assets/js/app-v3542.js?v=4000"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
