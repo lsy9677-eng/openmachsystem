@@ -13,7 +13,7 @@ const DEFAULT_FIREBASE={apiKey:'AIzaSyAbc17RiYyxCqgbMBkxkMoiRdNTmy2q65w',authDom
 // - IndexedDB cache stores only the active workspace + lightweight tournament registry, not every tournament snapshot.
 const COLLECTION='matchRoomsV7';
 const ROOM_ID='230match-production';
-const STORAGE_MODE='chunked-workspace-v7-selection-local-first';
+const STORAGE_MODE='chunked-workspace-v4-conflict-guard';
 const SAVE_DEBOUNCE=4500;
 const CACHE_DEBOUNCE=60000;
 const TRANSIENT_RETRY=15000;
@@ -140,7 +140,7 @@ async function loadParentRows(){
 }
 async function readInitialBundle(){
   const [roomSnap,rows]=await Promise.all([api.getDoc(roomRef()),loadParentRows()]);const room=roomSnap.exists()?roomSnap.data():{};if(!rows.length)return null;
-  rows.sort((a,b)=>String(b.raw?.updatedAt||'').localeCompare(String(a.raw?.updatedAt||'')));const requested=String(localStorage.getItem('230match-v7-active-tournament')||room.activeTournamentId||'');const activeRow=rows.find(x=>x.id===requested)||rows[0];
+  rows.sort((a,b)=>String(b.raw?.updatedAt||'').localeCompare(String(a.raw?.updatedAt||'')));const routeId=String(new URLSearchParams(location.search).get('tournament')||'');const requested=String(routeId||localStorage.getItem('230match-v7-active-tournament')||room.activeTournamentId||'');const activeRow=rows.find(x=>x.id===requested)||rows[0];
   const activeDecoded=await decodeWorkspace(activeRow.raw);if(!activeDecoded)return null;activeDecoded.tournament={...(activeDecoded.tournament||{}),id:activeRow.id};if(Array.isArray(activeRow.raw.workspaceChunks))knownChunkIds.set(activeRow.id,[...activeRow.raw.workspaceChunks]);
   const meta=rows.map(row=>metaFromRaw(row.id,row.raw,null));
   const state=normalizeState(clone(activeDecoded));state.multiTournament={activeTournamentId:activeRow.id,tournaments:meta,noActiveTournament:false};localStorage.setItem('230match-v7-active-tournament',activeRow.id);lastKnownRoomRevision=Number(room.revision||0);lastKnownPublicRevision=Number(room.publicRevision||room.revision||0);lastWriterUid=String(room.lastWriterUid||'');lastWriterClientId=String(room.lastWriterClientId||'');lastSavedDigest=String(activeRow.raw.workspaceDigest||'');lastSavedPublicDigest=String(activeRow.raw.publicDigest||'');dirtyBaseRevision=lastKnownRoomRevision;return{state,room,count:meta.length};
@@ -164,8 +164,7 @@ async function writeCurrentTournament(source,{force=false}={}){
     const room=roomSnap.exists()?(roomSnap.data()||{}):{};
     const remoteRevision=Number(room.revision||0);
     const remoteClientId=String(room.lastWriterClientId||'');
-    const remoteTournamentId=String(room.lastTournamentId||room.activeTournamentId||'');
-    if(dirtyBaseRevision>0 && remoteRevision>dirtyBaseRevision && remoteClientId && remoteClientId!==CLIENT_ID && (!remoteTournamentId||remoteTournamentId===id)){
+    if(dirtyBaseRevision>0 && remoteRevision>dirtyBaseRevision && remoteClientId && remoteClientId!==CLIENT_ID){
       syncConflict={
         active:true,
         localBaseRevision:dirtyBaseRevision,
@@ -190,7 +189,7 @@ async function writeCurrentTournament(source,{force=false}={}){
     workspaceChunks:newIds,workspaceEncoding:encoded.encoding,workspaceOriginalBytes:encoded.originalBytes,workspaceStoredBytes:encoded.storedBytes,workspaceDigest:d,publicDigest,
     workspaceJson:api.deleteField(),workspace:api.deleteField(),lastWriterUid:rt.user.uid,lastWriterEmail:rt.user.email||'',lastWriterClientId:CLIENT_ID,serverUpdatedAt:api.serverTimestamp()
   },{merge:true});
-  const roomUpdate={schemaVersion:8,roomId:ROOM_ID,activeTournamentId:id,lastTournamentId:id,revision:api.increment(1),lastWriterUid:rt.user.uid,lastWriterEmail:rt.user.email||'',lastWriterClientId:CLIENT_ID,serverUpdatedAt:api.serverTimestamp()};
+  const roomUpdate={schemaVersion:8,roomId:ROOM_ID,activeTournamentId:id,revision:api.increment(1),lastWriterUid:rt.user.uid,lastWriterEmail:rt.user.email||'',lastWriterClientId:CLIENT_ID,serverUpdatedAt:api.serverTimestamp()};
   if(publicChanged)roomUpdate.publicRevision=api.increment(1);
   batch.set(roomRef(),roomUpdate,{merge:true});
   await batch.commit();knownChunkIds.set(id,newIds);lastSavedDigest=d;lastKnownRoomRevision++;dirtyBaseRevision=lastKnownRoomRevision;syncConflict=null;if(publicChanged){lastSavedPublicDigest=publicDigest;lastKnownPublicRevision++;}lastWriterUid=rt.user.uid;lastWriterClientId=CLIENT_ID;localStorage.setItem('230match-v7-active-tournament',id);scheduleCache();return true;
@@ -209,19 +208,30 @@ function schedule(){if(applyingRemote)return;const state=getStateFn();if(!active
 function onSaved(){schedule();}
 async function handleRoomSnapshot(snap){
   if(!snap.exists())return;
-  const room=snap.data()||{},viewer=accessModeFn()==='viewer';
-  const revision=Number(room.revision||0),publicRevision=Number(room.publicRevision||revision||0),relevant=viewer?publicRevision:revision,known=viewer?lastKnownPublicRevision:lastKnownRoomRevision;
-  if(relevant&&relevant<=known)return;
-  const current=getStateFn(),selectedId=String(activeIdOf(current)||localStorage.getItem('230match-v7-active-tournament')||''),changedId=String(room.lastTournamentId||room.activeTournamentId||''),remoteClientId=String(room.lastWriterClientId||'');
-  if(selectedId&&changedId&&selectedId!==changedId){if(viewer)lastKnownPublicRevision=Math.max(lastKnownPublicRevision,relevant);else lastKnownRoomRevision=Math.max(lastKnownRoomRevision,relevant);return;}
-  if(!viewer&&dirtyGeneration>0&&remoteClientId&&remoteClientId!==CLIENT_ID){syncConflict={active:true,localBaseRevision:dirtyBaseRevision,remoteRevision:revision,remoteWriterUid:String(room.lastWriterUid||''),remoteWriterEmail:String(room.lastWriterEmail||''),remoteClientId,detectedAt:new Date().toISOString()};status('동시 편집 감지','warning','같은 대회에서 다른 진행자의 저장이 감지되었습니다. 현재 입력은 자동으로 덮어쓰지 않았습니다.');return;}
-  if(viewer)lastKnownPublicRevision=Math.max(lastKnownPublicRevision,relevant);else lastKnownRoomRevision=Math.max(lastKnownRoomRevision,relevant);
-  if(remoteClientId===CLIENT_ID&&!viewer)return;if(!selectedId)return;
-  try{const bundle=await readOneTournament(selectedId,current?.multiTournament?.tournaments||[]);if(bundle)applyState(bundle.state,'remote');}catch(error){status('다른 기기 반영 실패','warning',error?.message||String(error));}
+  const room=snap.data()||{},rt=await runtime(),writer=String(room.lastWriterUid||''),revision=Number(room.revision||0),publicRevision=Number(room.publicRevision||revision||0),targetId=String(room.activeTournamentId||'');
+  const viewer=accessModeFn()==='viewer';
+  const relevantRevision=viewer?publicRevision:revision;
+  const knownRevision=viewer?lastKnownPublicRevision:lastKnownRoomRevision;
+  // 일반 회원은 관리자 전용 변경으로 publicRevision이 그대로면 아무 데이터도 다시 읽지 않는다.
+  if(relevantRevision&&relevantRevision<=knownRevision)return;
+  const remoteClientId=String(room.lastWriterClientId||'');
+  if(!viewer && dirtyGeneration>0 && remoteClientId && remoteClientId!==CLIENT_ID){
+    syncConflict={active:true,localBaseRevision:dirtyBaseRevision,remoteRevision:revision,remoteWriterUid:writer,remoteWriterEmail:String(room.lastWriterEmail||''),remoteClientId,detectedAt:new Date().toISOString()};
+    status('동시 편집 감지','warning','다른 진행자의 저장이 감지되었습니다. 현재 입력을 자동으로 덮어쓰지 않았습니다.');
+    return;
+  }
+  if(viewer)lastKnownPublicRevision=Math.max(lastKnownPublicRevision,relevantRevision);
+  else lastKnownRoomRevision=Math.max(lastKnownRoomRevision,relevantRevision);
+  if(remoteClientId===CLIENT_ID&&!viewer)return;
+  if(!targetId)return;
+  try{
+    const current=getStateFn(),registry=current?.multiTournament?.tournaments||[],bundle=await readOneTournament(targetId,registry);
+    if(bundle)applyState(bundle.state,'remote');
+  }catch(error){status('다른 기기 반영 실패','warning',error?.message||String(error));}
 }
 
 export function startStateSync({getState,applyRemoteState,onStatus,canWrite,accessMode}={}){getStateFn=getState||getStateFn;applyRemoteFn=applyRemoteState||applyRemoteFn;statusFn=onStatus||statusFn;canWriteFn=canWrite||canWriteFn;accessModeFn=accessMode||accessModeFn;window.addEventListener('230match:state-saved',onSaved);const cfg=saveSyncSettings(getSyncSettings());if(cfg.enabled)connectCloudSync().catch(e=>status('클라우드 연결 실패','warning',e?.message||String(e)));}
-export async function connectCloudSync(){disconnectCloudSync(false);await ensureDb();const remoteBundle=await readInitialBundle(),requested=String(localStorage.getItem('230match-v7-active-tournament')||remoteBundle?.state?.multiTournament?.activeTournamentId||''),cached=await readCachedState(requested);let chosen=chooseInitial(cached,remoteBundle?.state||null);if(cached&&chosen===cached&&remoteBundle?.state)chosen=mergeRemoteRegistry(chosen,remoteBundle.state);if(chosen){applyState(chosen,cached&&chosen===cached?'cache':'firebase');if(cached&&chosen===cached&&canWriteFn())schedule();}unsubscribeRoom=api.onSnapshot(roomRef(),snap=>{void handleRoomSnapshot(snap);},e=>status('실시간 연결 오류','warning',e?.message||String(e)));status('실시간 연결','success',accessModeFn()==='viewer'?'일반 회원 경량 모드: 현재 대회의 공개 변화만 실시간 반영하고 관리자 전용 변경·과거 대회는 다시 읽지 않습니다.':'운영자 모드: 현재 대회 운영 변경을 실시간 반영하고 과거 대회는 지연 로딩합니다.');return true;}
+export async function connectCloudSync(){disconnectCloudSync(false);await ensureDb();const routeId=String(new URLSearchParams(location.search).get('tournament')||'');const remoteBundle=await readInitialBundle(),requested=String(routeId||localStorage.getItem('230match-v7-active-tournament')||remoteBundle?.state?.multiTournament?.activeTournamentId||''),cached=await readCachedState(requested);let chosen=chooseInitial(cached,remoteBundle?.state||null);if(cached&&chosen===cached&&remoteBundle?.state)chosen=mergeRemoteRegistry(chosen,remoteBundle.state);if(chosen){applyState(chosen,cached&&chosen===cached?'cache':'firebase');if(cached&&chosen===cached&&canWriteFn())schedule();}unsubscribeRoom=api.onSnapshot(roomRef(),snap=>{void handleRoomSnapshot(snap);},e=>status('실시간 연결 오류','warning',e?.message||String(e)));status('실시간 연결','success',accessModeFn()==='viewer'?'일반 회원 경량 모드: 현재 대회의 공개 변화만 실시간 반영하고 관리자 전용 변경·과거 대회는 다시 읽지 않습니다.':'운영자 모드: 현재 대회 운영 변경을 실시간 반영하고 과거 대회는 지연 로딩합니다.');return true;}
 export function disconnectCloudSync(show=true){clearTimeout(saveTimer);clearTimeout(cacheTimer);saveTimer=cacheTimer=null;dirtyGeneration=0;dirtyBaseRevision=lastKnownRoomRevision;if(unsubscribeRoom)unsubscribeRoom();unsubscribeRoom=null;db=null;if(show)status('클라우드 연결 해제','info','로컬 화면은 유지됩니다.');}
 export async function prepareCriticalCloudWrite(){clearTimeout(saveTimer);saveTimer=null;autoSaveBlockedUntil=0;const started=Date.now();while(pushInFlight&&Date.now()-started<12000)await new Promise(r=>setTimeout(r,80));if(pushInFlight)throw new Error('이전 서버 저장이 아직 끝나지 않았습니다.');return true;}
 export async function pushStateNow(state=getStateFn()){if(!canWriteFn())throw new Error('관리자 또는 진행자만 클라우드에 저장할 수 있습니다.');await prepareCriticalCloudWrite();await ensureDb();pushInFlight=true;try{const saved=await writeCurrentTournament(state);if(!saved)throw new Error('유효한 현재 대회가 없어 저장하지 않았습니다.');dirtyGeneration=0;status('클라우드 저장 완료','success','현재 대회를 Firestore 안전 조각으로 저장했습니다.');return true;}finally{pushInFlight=false;}}
