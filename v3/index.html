@@ -33,6 +33,11 @@
 @media (min-width:701px){
   .mobile-page-bar,.mobile-bottom-nav{display:none!important}
 }
+
+/* 4.5.0 · compact popup checkbox */
+.home-notice-popup-actions{display:grid!important;grid-template-columns:1fr 1fr!important;gap:10px!important;align-items:center!important}.home-notice-popup-actions label{grid-column:1/-1!important;justify-self:start!important;display:inline-flex!important;align-items:center!important;gap:8px!important;width:auto!important;font-size:14px!important;line-height:1.35!important;color:#475569!important}
+#homeNoticePopupDismiss{appearance:auto!important;-webkit-appearance:checkbox!important;width:20px!important;height:20px!important;min-width:20px!important;max-width:20px!important;min-height:20px!important;max-height:20px!important;margin:0!important;padding:0!important;flex:0 0 20px!important;vertical-align:middle!important}
+@media(max-width:700px){.home-notice-popup-actions{grid-template-columns:1fr 1fr!important}.home-notice-popup-actions .btn{width:100%!important;min-width:0!important;padding-left:10px!important;padding-right:10px!important}.home-notice-popup-actions label{font-size:13px!important}#homeNoticePopupDismiss{width:18px!important;height:18px!important;min-width:18px!important;max-width:18px!important;min-height:18px!important;max-height:18px!important;flex-basis:18px!important}}
 </style>
 
 <style id="stage3214Styles">
@@ -1833,7 +1838,7 @@
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app-v6302.js?v=6302"></script>
+  <script type="module" src="./assets/js/app-v6400.js?v=6400"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
