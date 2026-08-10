@@ -13,7 +13,7 @@ const DEFAULT_FIREBASE={apiKey:'AIzaSyAbc17RiYyxCqgbMBkxkMoiRdNTmy2q65w',authDom
 // - IndexedDB cache stores only the active workspace + lightweight tournament registry, not every tournament snapshot.
 const COLLECTION='matchRoomsV7';
 const ROOM_ID='230match-production';
-const STORAGE_MODE='chunked-workspace-v5-tournament-scoped-room';
+const STORAGE_MODE='chunked-workspace-v6-selection-safe';
 const SAVE_DEBOUNCE=4500;
 const CACHE_DEBOUNCE=60000;
 const TRANSIENT_RETRY=15000;
@@ -210,55 +210,37 @@ function onSaved(){schedule();}
 async function handleRoomSnapshot(snap){
   if(!snap.exists())return;
   const room=snap.data()||{};
-  const rt=await runtime();
   const viewer=accessModeFn()==='viewer';
-  const revision=Number(room.revision||0);
-  const publicRevision=Number(room.publicRevision||revision||0);
-  const relevantRevision=viewer?publicRevision:revision;
-  const knownRevision=viewer?lastKnownPublicRevision:lastKnownRoomRevision;
-  if(relevantRevision&&relevantRevision<=knownRevision)return;
+  const revision=Number(room.revision||0),publicRevision=Number(room.publicRevision||revision||0);
+  const relevant=viewer?publicRevision:revision,known=viewer?lastKnownPublicRevision:lastKnownRoomRevision;
+  if(relevant&&relevant<=known)return;
 
   const current=getStateFn();
   const selectedId=String(activeIdOf(current)||localStorage.getItem('230match-v7-active-tournament')||'');
-  const changedTournamentId=String(room.lastTournamentId||room.activeTournamentId||'');
+  const changedId=String(room.lastTournamentId||room.activeTournamentId||'');
   const remoteClientId=String(room.lastWriterClientId||'');
-  const writer=String(room.lastWriterUid||'');
 
-  // 다른 대회의 저장은 현재 사용자가 선택한 대회를 바꾸거나 다시 불러오게 하지 않는다.
-  if(selectedId&&changedTournamentId&&selectedId!==changedTournamentId){
-    if(viewer)lastKnownPublicRevision=Math.max(lastKnownPublicRevision,relevantRevision);
-    else lastKnownRoomRevision=Math.max(lastKnownRoomRevision,relevantRevision);
+  if(selectedId&&changedId&&selectedId!==changedId){
+    if(viewer)lastKnownPublicRevision=Math.max(lastKnownPublicRevision,relevant);
+    else lastKnownRoomRevision=Math.max(lastKnownRoomRevision,relevant);
     return;
   }
 
-  // 같은 대회에서 로컬 미저장 편집과 다른 운영자의 저장이 겹치면 자동 덮어쓰기를 막는다.
   if(!viewer&&dirtyGeneration>0&&remoteClientId&&remoteClientId!==CLIENT_ID){
-    syncConflict={
-      active:true,
-      localBaseRevision:dirtyBaseRevision,
-      remoteRevision:revision,
-      remoteWriterUid:writer,
-      remoteWriterEmail:String(room.lastWriterEmail||''),
-      remoteClientId,
-      detectedAt:new Date().toISOString()
-    };
-    status('동시 편집 감지','warning','같은 대회에서 다른 진행자의 저장이 감지되었습니다. 현재 입력을 자동으로 덮어쓰지 않았습니다.');
+    syncConflict={active:true,localBaseRevision:dirtyBaseRevision,remoteRevision:revision,remoteWriterUid:String(room.lastWriterUid||''),remoteWriterEmail:String(room.lastWriterEmail||''),remoteClientId,detectedAt:new Date().toISOString()};
+    status('동시 편집 감지','warning','같은 대회에서 다른 진행자의 저장이 감지되었습니다. 현재 입력은 자동으로 덮어쓰지 않았습니다.');
     return;
   }
 
-  if(viewer)lastKnownPublicRevision=Math.max(lastKnownPublicRevision,relevantRevision);
-  else lastKnownRoomRevision=Math.max(lastKnownRoomRevision,relevantRevision);
-
+  if(viewer)lastKnownPublicRevision=Math.max(lastKnownPublicRevision,relevant);
+  else lastKnownRoomRevision=Math.max(lastKnownRoomRevision,relevant);
   if(remoteClientId===CLIENT_ID&&!viewer)return;
   if(!selectedId)return;
 
   try{
-    const registry=current?.multiTournament?.tournaments||[];
-    const bundle=await readOneTournament(selectedId,registry);
+    const bundle=await readOneTournament(selectedId,current?.multiTournament?.tournaments||[]);
     if(bundle)applyState(bundle.state,'remote');
-  }catch(error){
-    status('다른 기기 반영 실패','warning',error?.message||String(error));
-  }
+  }catch(error){status('다른 기기 반영 실패','warning',error?.message||String(error));}
 }
 
 export function startStateSync({getState,applyRemoteState,onStatus,canWrite,accessMode}={}){getStateFn=getState||getStateFn;applyRemoteFn=applyRemoteState||applyRemoteFn;statusFn=onStatus||statusFn;canWriteFn=canWrite||canWriteFn;accessModeFn=accessMode||accessModeFn;window.addEventListener('230match:state-saved',onSaved);const cfg=saveSyncSettings(getSyncSettings());if(cfg.enabled)connectCloudSync().catch(e=>status('클라우드 연결 실패','warning',e?.message||String(e)));}
