@@ -1589,7 +1589,7 @@
   <div id="mobilePageBar" class="mobile-page-bar" aria-live="polite">
     <button id="mobileBackBtn" type="button" class="mobile-back-button" aria-label="이전 화면">‹</button>
     <strong id="mobilePageTitle">홈</strong>
-    <button type="button" class="mobile-guide-button" data-portal-go="tournaments">대회 요강</button>
+    <button type="button" class="mobile-guide-button" data-portal-go="guide">대회 요강</button>
   </div>
 
   <nav class="mobile-bottom-nav" aria-label="모바일 주요 메뉴">
@@ -1609,7 +1609,7 @@
         <button type="button" data-mobile-view="participants" data-portal-go="participants"><span>👥</span><b>참가자 기록</b></button>
         <button type="button" data-mobile-view="notifications" data-portal-go="notifications"><span>🔔</span><b>경기 알림</b></button>
         <button type="button" data-mobile-view="records" data-portal-go="records"><span>📊</span><b>대회 결과</b></button>
-        <button type="button" data-mobile-view="tournaments" data-portal-go="tournaments"><span>📌</span><b>대회 요강</b></button>
+        <button type="button" data-mobile-view="guide" data-portal-go="guide"><span>📌</span><b>대회 요강</b></button>
         <button type="button" data-mobile-view="board" data-portal-go="board"><span>📢</span><b>공지사항</b></button>
         <button type="button" data-mobile-view="print" data-portal-go="print"><span>🖨️</span><b>출력 센터</b></button>
         <button type="button" data-mobile-view="operation" data-portal-go="operation"><span>🎾</span><b>코트 현황</b></button>
@@ -1833,7 +1833,7 @@
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app-v6109.js?v=6109"></script>
+  <script type="module" src="./assets/js/app-v6110.js?v=6110"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
