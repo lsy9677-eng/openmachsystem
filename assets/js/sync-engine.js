@@ -13,7 +13,7 @@ const DEFAULT_FIREBASE={apiKey:'AIzaSyAbc17RiYyxCqgbMBkxkMoiRdNTmy2q65w',authDom
 // - IndexedDB cache stores only the active workspace + lightweight tournament registry, not every tournament snapshot.
 const COLLECTION='matchRoomsV7';
 const ROOM_ID='230match-production';
-const STORAGE_MODE='chunked-workspace-v6-selection-safe';
+const STORAGE_MODE='chunked-workspace-v7-selection-local-first';
 const SAVE_DEBOUNCE=4500;
 const CACHE_DEBOUNCE=60000;
 const TRANSIENT_RETRY=15000;
@@ -209,38 +209,15 @@ function schedule(){if(applyingRemote)return;const state=getStateFn();if(!active
 function onSaved(){schedule();}
 async function handleRoomSnapshot(snap){
   if(!snap.exists())return;
-  const room=snap.data()||{};
-  const viewer=accessModeFn()==='viewer';
-  const revision=Number(room.revision||0),publicRevision=Number(room.publicRevision||revision||0);
-  const relevant=viewer?publicRevision:revision,known=viewer?lastKnownPublicRevision:lastKnownRoomRevision;
+  const room=snap.data()||{},viewer=accessModeFn()==='viewer';
+  const revision=Number(room.revision||0),publicRevision=Number(room.publicRevision||revision||0),relevant=viewer?publicRevision:revision,known=viewer?lastKnownPublicRevision:lastKnownRoomRevision;
   if(relevant&&relevant<=known)return;
-
-  const current=getStateFn();
-  const selectedId=String(activeIdOf(current)||localStorage.getItem('230match-v7-active-tournament')||'');
-  const changedId=String(room.lastTournamentId||room.activeTournamentId||'');
-  const remoteClientId=String(room.lastWriterClientId||'');
-
-  if(selectedId&&changedId&&selectedId!==changedId){
-    if(viewer)lastKnownPublicRevision=Math.max(lastKnownPublicRevision,relevant);
-    else lastKnownRoomRevision=Math.max(lastKnownRoomRevision,relevant);
-    return;
-  }
-
-  if(!viewer&&dirtyGeneration>0&&remoteClientId&&remoteClientId!==CLIENT_ID){
-    syncConflict={active:true,localBaseRevision:dirtyBaseRevision,remoteRevision:revision,remoteWriterUid:String(room.lastWriterUid||''),remoteWriterEmail:String(room.lastWriterEmail||''),remoteClientId,detectedAt:new Date().toISOString()};
-    status('동시 편집 감지','warning','같은 대회에서 다른 진행자의 저장이 감지되었습니다. 현재 입력은 자동으로 덮어쓰지 않았습니다.');
-    return;
-  }
-
-  if(viewer)lastKnownPublicRevision=Math.max(lastKnownPublicRevision,relevant);
-  else lastKnownRoomRevision=Math.max(lastKnownRoomRevision,relevant);
-  if(remoteClientId===CLIENT_ID&&!viewer)return;
-  if(!selectedId)return;
-
-  try{
-    const bundle=await readOneTournament(selectedId,current?.multiTournament?.tournaments||[]);
-    if(bundle)applyState(bundle.state,'remote');
-  }catch(error){status('다른 기기 반영 실패','warning',error?.message||String(error));}
+  const current=getStateFn(),selectedId=String(activeIdOf(current)||localStorage.getItem('230match-v7-active-tournament')||''),changedId=String(room.lastTournamentId||room.activeTournamentId||''),remoteClientId=String(room.lastWriterClientId||'');
+  if(selectedId&&changedId&&selectedId!==changedId){if(viewer)lastKnownPublicRevision=Math.max(lastKnownPublicRevision,relevant);else lastKnownRoomRevision=Math.max(lastKnownRoomRevision,relevant);return;}
+  if(!viewer&&dirtyGeneration>0&&remoteClientId&&remoteClientId!==CLIENT_ID){syncConflict={active:true,localBaseRevision:dirtyBaseRevision,remoteRevision:revision,remoteWriterUid:String(room.lastWriterUid||''),remoteWriterEmail:String(room.lastWriterEmail||''),remoteClientId,detectedAt:new Date().toISOString()};status('동시 편집 감지','warning','같은 대회에서 다른 진행자의 저장이 감지되었습니다. 현재 입력은 자동으로 덮어쓰지 않았습니다.');return;}
+  if(viewer)lastKnownPublicRevision=Math.max(lastKnownPublicRevision,relevant);else lastKnownRoomRevision=Math.max(lastKnownRoomRevision,relevant);
+  if(remoteClientId===CLIENT_ID&&!viewer)return;if(!selectedId)return;
+  try{const bundle=await readOneTournament(selectedId,current?.multiTournament?.tournaments||[]);if(bundle)applyState(bundle.state,'remote');}catch(error){status('다른 기기 반영 실패','warning',error?.message||String(error));}
 }
 
 export function startStateSync({getState,applyRemoteState,onStatus,canWrite,accessMode}={}){getStateFn=getState||getStateFn;applyRemoteFn=applyRemoteState||applyRemoteFn;statusFn=onStatus||statusFn;canWriteFn=canWrite||canWriteFn;accessModeFn=accessMode||accessModeFn;window.addEventListener('230match:state-saved',onSaved);const cfg=saveSyncSettings(getSyncSettings());if(cfg.enabled)connectCloudSync().catch(e=>status('클라우드 연결 실패','warning',e?.message||String(e)));}

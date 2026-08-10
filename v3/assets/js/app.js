@@ -26,7 +26,7 @@ import{ensureCourtStatuses,pauseCourt,resumeCourt}from'./court-status-engine.js?
 import{ensureCourtManualQueues,assignToCourtManualQueue,moveCourtMatchFlexible,returnManualQueueItemToVenue,reorderCourtManualQueue}from'./court-manual-queue-engine.js?v=332012';
 import{reorderPrelimQueue as reorderPrelimQueueItem,movePrelimQueuedMatch,returnPrelimWait1ToQueue}from'./prelim-queue-control-engine.js?v=332012';
 import{ensurePrelimCourtStatuses,pausePrelimCourt,resumePrelimCourt}from'./prelim-court-status-engine.js?v=332012';
-import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=6800';
+import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=6900';
 import{verifyAndRepairMainFlow}from'./main-flow-integrity-engine.js?v=332012';
 import{finalizeTournamentCompletion}from'./tournament-completion-engine.js?v=332012';
 import{ensureTournamentIdentity,validateTournamentForArchive,createTournamentArchive,archiveListItem,archiveBackupPayload}from'./archive-engine.js?v=354000';
@@ -340,6 +340,42 @@ function normalizeV5RuntimeState(source){
   return s;
 }
 let state=normalizeV5RuntimeState(loadState());
+
+// 4.9.0 selection core: bind immediately after runtime state is created.
+function bindWorkspaceSelectionCoreEarly(){
+  if(window.__workspaceSelectionCoreEarlyBound)return;
+  window.__workspaceSelectionCoreEarlyBound=true;
+  window.switchTournamentWorkspace=switchTournamentWorkspace;
+  window.switchDivisionWorkspace=switchDivisionWorkspace;
+  document.addEventListener('change',async e=>{
+    try{
+      if(e.target?.id==='activeTournamentSelect'){await switchTournamentWorkspace(e.target.value,{source:'top-select'});return;}
+      if(e.target?.id==='activeDivisionSelect'){await switchDivisionWorkspace(e.target.value);return;}
+      if(e.target?.id==='entryApplicationTournament'){
+        const id=String(e.target.value||''),current=String(state.multiTournament?.activeTournamentId||state.tournament?.id||'');
+        if(id&&id!==current)await switchTournamentWorkspace(id,{source:'entry'});
+      }
+    }catch(error){console.error('[230MATCH] 선택 변경 오류',error);notice(`선택 변경 오류: ${error?.message||error}`,'error');}
+  },true);
+  document.addEventListener('click',async e=>{
+    try{
+      const tournamentBtn=e.target.closest?.('[data-home-tournament-select],[data-active-tournament-switch]');
+      if(tournamentBtn){
+        e.preventDefault();e.stopImmediatePropagation();
+        const id=String(tournamentBtn.dataset.homeTournamentSelect||tournamentBtn.dataset.activeTournamentSwitch||'');
+        if(id&&!tournamentBtn.disabled)await switchTournamentWorkspace(id,{source:'button'});
+        return;
+      }
+      const divisionCard=e.target.closest?.('[data-v6002-division]');
+      if(divisionCard&&!e.target.closest('button')){
+        e.preventDefault();e.stopImmediatePropagation();
+        await switchDivisionWorkspace(String(divisionCard.dataset.v6002Division||''));return;
+      }
+    }catch(error){console.error('[230MATCH] 선택 클릭 오류',error);notice(`선택 클릭 오류: ${error?.message||error}`,'error');}
+  },true);
+}
+bindWorkspaceSelectionCoreEarly();
+
 function ensurePortalState(){
   state=normalizeV5RuntimeState(state);
   if(!state.portal||typeof state.portal!=='object')state.portal={};
@@ -2507,27 +2543,18 @@ function applicationStatusClass(status){return ['approved','reserve'].includes(s
 function applicationCode(){return `A${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2,5).toUpperCase()}`;}
 function reserveApplicationOrder(item){const rows=(state.portal?.applications||[]).filter(a=>a.status==='reserve').sort((a,b)=>String(a.approvedAt||a.updatedAt||a.createdAt).localeCompare(String(b.approvedAt||b.updatedAt||b.createdAt)));const index=rows.findIndex(a=>a.id===item.id);return index<0?0:index+1;}
 function entryTournamentRows(){
-  ensureMultiTournamentRuntime();
-  const activeId=String(state.multiTournament?.activeTournamentId||state.tournament?.id||'');
-  const live=(state.multiTournament?.tournaments||[]).filter(r=>isRealTournamentName(r?.name||r?.snapshot?.tournament?.name)).map(r=>{
-    const id=String(r.id||'');const current=id===activeId;const ws=current?state:(r.snapshot||{});
-    const completed=Boolean(ws?.completion?.completedAt||ws?.tournament?.completedAt||r?.completedAt||r?.status==='completed');
-    return {id,current,name:String(ws?.tournament?.name||r?.name||'대회 준비 중'),division:String(ws?.tournament?.division||r?.division||''),status:completed?'completed':String(r?.status||'recruiting')};
-  });
-  const history=(state.portal?.tournamentArchives||[]).map(x=>({...x,current:false,status:'completed'}));
-  const seen=new Set();return [...live,...history].filter(x=>{const k=String(x.id||'')+'|'+String(x.name||'');if(seen.has(k))return false;seen.add(k);return true;});
+  const current=currentTournamentSnapshot();
+  const history=(state.portal?.tournamentArchives||[]).map(x=>({...x,current:false}));
+  const seen=new Set();
+  return [current,...history].filter(x=>{const key=String(x.id||'')+'|'+String(x.name||'');if(seen.has(key))return false;seen.add(key);return true;});
 }
 function renderEntryTournamentSelect(){
   const select=document.getElementById('entryApplicationTournament');if(!select)return;
-  const previous=select.value,activeId=String(state.multiTournament?.activeTournamentId||state.tournament?.id||'');
+  const previous=select.value;
   const rows=entryTournamentRows();
-  select.innerHTML='<option value="">대회를 선택하세요</option>'+rows.map(x=>{
-    const selectable=x.status!=='completed';
-    const label=`${x.name||'대회 준비 중'}${x.division?` (${x.division})`:''} · ${tournamentStatusLabel(x.status)}`;
-    return `<option value="${portalEscape(x.id)}" ${selectable?'':'disabled'}>${portalEscape(label)}${selectable?'':' · 신청 불가'}</option>`;
-  }).join('');
+  select.innerHTML='<option value="">대회를 선택하세요</option>'+rows.map(x=>{const selectable=!!x.current&&x.status!=='completed';const label=`${x.name||'대회 준비 중'}${x.division?` (${x.division})`:''} · ${tournamentStatusLabel(x.status)}`;return `<option value="${portalEscape(x.id)}" ${selectable?'':'disabled'}>${portalEscape(label)}${selectable?'':' · 신청 불가'}</option>`;}).join('');
   if(previous&&[...select.options].some(o=>o.value===previous&&!o.disabled))select.value=previous;
-  else if(activeId&&[...select.options].some(o=>o.value===activeId&&!o.disabled))select.value=activeId;
+  else if(rows[0]?.current&&rows[0].status!=='completed')select.value='current';
 }
 function entryPairFormValue(id){return String(document.getElementById(id)?.value||'').trim();}
 function entryPairPhone(id){return String(document.getElementById(id)?.value||'').replace(/[^0-9]/g,'');}
@@ -2550,7 +2577,7 @@ function clearEntryApplicationForm(){
   ['entryPlayer1Name','entryPlayer1Club','entryPlayer1Phone','entryPlayer2Name','entryPlayer2Club','entryPlayer2Phone','entryApplicationMemo'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   const rep1=document.getElementById('entryRepresentative1');if(rep1)rep1.checked=true;
   renderEntryTournamentSelect();
-  const tournament=document.getElementById('entryApplicationTournament'),activeId=String(state.multiTournament?.activeTournamentId||state.tournament?.id||'');if(tournament&&activeId&&[...tournament.options].some(o=>o.value===activeId&&!o.disabled))tournament.value=activeId;
+  const tournament=document.getElementById('entryApplicationTournament');if(tournament&&[...tournament.options].some(o=>o.value==='current'&&!o.disabled))tournament.value='current';
   const submit=document.getElementById('entryApplicationSubmitBtn');if(submit)submit.textContent='참가 신청 접수';
   const cancel=document.getElementById('entryApplicationEditCancelBtn');if(cancel)cancel.hidden=true;
 }
@@ -3417,8 +3444,6 @@ function bindTournamentList(){
   document.getElementById('tournamentListResetBtn')?.addEventListener('click',()=>{const q=document.getElementById('tournamentListSearch'),s=document.getElementById('tournamentListStatus');if(q)q.value='';if(s)s.value='all';renderTournamentList();});
   document.getElementById('tournamentCardList')?.addEventListener('click',async e=>{
     const guideBtn=e.target.closest('[data-guide-tournament-id]');if(guideBtn){e.preventDefault();await stage3610OpenTournamentGuide(guideBtn.dataset.guideTournamentId);return;}
-    const select=e.target.closest('[data-active-tournament-switch]');
-    if(select){e.preventDefault();switchTournamentWorkspace(select.dataset.activeTournamentSwitch);renderTournamentList();renderDivisionWorkspaceBar();return;}
     const edit=e.target.closest('[data-edit-tournament-id]');
     if(edit){e.preventDefault();const id=edit.dataset.editTournamentId;if(id!==state.multiTournament?.activeTournamentId)switchTournamentWorkspace(id);setTimeout(()=>{renderTournamentList();stage329OpenTournamentEdit();},0);return;}
     const remove=e.target.closest('[data-delete-tournament-id]');
@@ -4015,8 +4040,8 @@ loadSyncPanel();startStateSync({getState:()=>state,applyRemoteState:next=>applyS
 const buildStageLabel=document.getElementById('buildStageLabel');
 window.closeAutoSmsDialog=closeAutoSmsDialog;window.approveAutoSmsAligo=approveAutoSmsAligo;window.approveAutoSmsPhone=approveAutoSmsPhone;window.copyAutoSms=copyAutoSms;window.previewCurrentCourtSms=previewCurrentCourtSms;
 if(buildStageLabel)buildStageLabel.textContent=BUILD_LABEL;
-document.documentElement.dataset.build='6800';
-console.log('[230MATCH] 68.0.0 ready · rebuilt tournament and division selection originals');
+document.documentElement.dataset.build='6900';
+console.log('[230MATCH] 69.0.0 ready · early workspace selection core + original switch rebuild');
 
 
 // Stage 31.2: presentation-only operation workspace controller.
@@ -4993,7 +5018,7 @@ window.addEventListener('DOMContentLoaded',()=>{try{const hash=(location.hash||'
     const workspace=document.getElementById('view-operation');
     if(workspace&&currentRole==='admin')workspace.dataset.operationMode='setup';
     const label=document.getElementById('buildStageLabel');if(label){label.textContent='230MATCH 34.2.1 · 자동 문자 전환 승인창 수정 테스트본';label.title='Version 34.2.1';}
-    document.documentElement.dataset.build='6800';
+    document.documentElement.dataset.build='6900';
     console.info('[230MATCH] Stage34.2 single operation workspace ready');
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(init,0),{once:true});else setTimeout(init,0);
@@ -5028,48 +5053,27 @@ function initializeTournamentDivisions(names){
 }
 function applyDivisionSnapshot(record){
   if(!record?.snapshot)return false;
-  const preservedTournament={...(state.tournament||{})};
-  const globalPortal={};
+  const preservedTournament={...(state.tournament||{})};const globalPortal={};
   Object.entries(state.portal||{}).forEach(([key,value])=>{if(DIVISION_GLOBAL_PORTAL_KEYS.has(key))globalPortal[key]=divisionClone(value);});
-
-  const managed=new Set();
-  (state.multiDivision?.divisions||[]).forEach(d=>Object.keys(d.snapshot||{}).forEach(k=>{if(k!=='portal')managed.add(k);}));
+  const managed=new Set();(state.multiDivision?.divisions||[]).forEach(d=>Object.keys(d.snapshot||{}).forEach(k=>{if(k!=='portal')managed.add(k);}));
   managed.forEach(key=>delete state[key]);
   Object.entries(record.snapshot||{}).forEach(([key,value])=>{if(key!=='portal')state[key]=divisionClone(value);});
-
-  state.portal={...globalPortal,...divisionClone(record.snapshot.portal||{})};
-  state.tournament={...preservedTournament,division:record.name};
-  state.multiDivision.activeDivisionId=record.id;
-
-  ensurePortalState();ensurePrelimState(state);ensureTimeState(state);ensureDrawMeta(state);ensureMessagingState(state);
-  ensureContacts(state);ensureAuditState(state);ensureEarlyMainSettings(state);ensureVenueSettings(state);ensureVenueQueues(state);
-  ensureCourtStatuses(state);ensureCourtManualQueues(state);ensurePrelimCourtStatuses(state);ensureOperatorState();ensureMainDrawLifecycle(state);
-  return true;
+  state.portal={...globalPortal,...divisionClone(record.snapshot.portal||{})};state.tournament={...preservedTournament,division:record.name};state.multiDivision.activeDivisionId=record.id;
+  ensurePortalState();ensurePrelimState(state);ensureTimeState(state);ensureDrawMeta(state);ensureMessagingState(state);ensureContacts(state);ensureAuditState(state);ensureEarlyMainSettings(state);ensureVenueSettings(state);ensureVenueQueues(state);ensureCourtStatuses(state);ensureCourtManualQueues(state);ensurePrelimCourtStatuses(state);ensureOperatorState();ensureMainDrawLifecycle(state);return true;
 }
 async function switchDivisionWorkspace(id){
-  ensureMultiDivisionRuntime();
-  id=String(id||'').trim();
+  ensureMultiDivisionRuntime();id=String(id||'').trim();
   const currentId=String(state.multiDivision?.activeDivisionId||'');
-  if(!id||id===currentId)return true;
-
+  if(!id)return false;if(id===currentId)return true;
   const next=(state.multiDivision?.divisions||[]).find(x=>String(x.id)===id);
   if(!next){notice('선택한 부서 정보를 찾을 수 없습니다.','error');return false;}
-
-  // 현재 부서 snapshot을 먼저 저장하고 그 다음 대상 부서를 적용한다.
   syncCurrentDivisionRuntime();
   if(!applyDivisionSnapshot(next)){notice('선택한 부서 데이터를 불러오지 못했습니다.','error');return false;}
-
   state.tournament.capacity=Math.max(1,Number(next.snapshot?.divisionConfig?.capacity||state.prelim?.settings?.activeTeamCount||96));
-  try{window.__normalizeActiveDivisionData?.();}catch(_e){}
-  saveState(state);
-  syncInputs();syncPrelimInputs();renderVenueSettingsEditor();
+  saveState(state);syncInputs();syncPrelimInputs();renderVenueSettingsEditor();
   render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus,holdMainMatch,releaseHeldMatch});
-  renderOperatorControls();renderPortalViewFast(document.body?.dataset.currentView||'home');renderDivisionWorkspaceBar();
-  renderApplicationPortal();renderParticipantManager?.();autoSmsSnapshot=buildAutoSmsSnapshot();
-
-  // saveState가 동기화 큐를 호출하므로 별도 강제 저장은 하지 않는다.
-  notice(`${state.tournament.name} · ${next.name}으로 전환했습니다.`,'success');
-  return true;
+  renderOperatorControls();renderPortalViewFast(document.body?.dataset.currentView||'home');renderDivisionWorkspaceBar();renderApplicationPortal();renderParticipantManager?.();autoSmsSnapshot=buildAutoSmsSnapshot();
+  notice(`${state.tournament.name} · ${next.name}으로 전환했습니다.`,'success');return true;
 }
 function renderDivisionWorkspaceBarLegacy(){
   ensureMultiDivisionRuntime();let bar=document.getElementById('divisionWorkspaceBar');if(!bar){bar=document.createElement('section');bar.id='divisionWorkspaceBar';bar.className='division-workspace-bar panel';const nav=document.querySelector('main.app-shell > nav.mode-tabs');if(nav)nav.insertAdjacentElement('afterend',bar);else document.querySelector('main.app-shell')?.prepend(bar);}
@@ -7870,73 +7874,31 @@ async function switchTournamentWorkspace(id,{source='ui'}={}){
   const currentId=String(state.multiTournament?.activeTournamentId||state.tournament?.id||'');
   if(!id)return false;
   if(id===currentId)return true;
-
   const target=(state.multiTournament?.tournaments||[]).find(r=>String(r.id)===id);
   if(!target){notice('선택한 대회 정보를 찾을 수 없습니다.','error');return false;}
-
-  // 떠나는 대회는 로컬 snapshot으로 먼저 고정한다. 대회 전환이 서버 저장 때문에 막히지 않게 한다.
-  try{
-    syncCurrentDivisionRuntime?.();
-    syncCurrentTournamentRuntime();
-  }catch(_e){}
+  try{syncCurrentDivisionRuntime?.();syncCurrentTournamentRuntime();}catch(_e){}
   const leavingState=structuredClone(state);
   const leavingRecord=(state.multiTournament?.tournaments||[]).find(r=>String(r.id)===currentId);
-  if(leavingRecord){
-    const snap=structuredClone(leavingState);delete snap.multiTournament;
-    leavingRecord.snapshot=snap;
-  }
+  if(leavingRecord){const snap=structuredClone(leavingState);delete snap.multiTournament;leavingRecord.snapshot=snap;}
   const registry=structuredClone(state.multiTournament?.tournaments||[]);
-  const commonPortal={
-    tournamentArchives:structuredClone(state.portal?.tournamentArchives||[]),
-    archives:structuredClone(state.portal?.archives||[]),
-    resultArchives:structuredClone(state.portal?.resultArchives||[]),
-    tournamentTemplates:structuredClone(state.portal?.tournamentTemplates||[])
-  };
-
-  notice('선택한 대회를 불러오는 중입니다.','info');
+  const commonPortal={tournamentArchives:structuredClone(state.portal?.tournamentArchives||[]),archives:structuredClone(state.portal?.archives||[]),resultArchives:structuredClone(state.portal?.resultArchives||[]),tournamentTemplates:structuredClone(state.portal?.tournamentTemplates||[])};
   let loaded=null;
-  try{
-    const bundle=await loadTournamentNow(id,registry);
-    if(bundle?.state)loaded=bundle.state;
-  }catch(error){
-    console.warn('[230MATCH] 대회 서버 로드 실패',error);
-  }
-  if(!loaded&&target.snapshot){
-    loaded=structuredClone(target.snapshot);
-    loaded.multiTournament={activeTournamentId:id,tournaments:registry,noActiveTournament:false};
-  }
+  try{const bundle=await loadTournamentNow(id,registry);if(bundle?.state)loaded=bundle.state;}catch(error){console.warn('[230MATCH] 대회 서버 로드 실패',error);}
+  if(!loaded&&target.snapshot){loaded=structuredClone(target.snapshot);loaded.multiTournament={activeTournamentId:id,tournaments:registry,noActiveTournament:false};}
   if(!loaded){notice('선택한 대회 데이터를 불러오지 못했습니다.','error');return false;}
-
   const merged=new Map(registry.map(r=>[String(r.id),structuredClone(r)]));
-  (loaded.multiTournament?.tournaments||[]).forEach(r=>{
-    const key=String(r.id);merged.set(key,{...(merged.get(key)||{}),...structuredClone(r)});
-  });
-
+  (loaded.multiTournament?.tournaments||[]).forEach(r=>{const key=String(r.id);merged.set(key,{...(merged.get(key)||{}),...structuredClone(r)});});
   const next=structuredClone(loaded);
   next.multiTournament={...(next.multiTournament||{}),activeTournamentId:id,noActiveTournament:false,tournaments:[...merged.values()]};
-  next.tournament=next.tournament||{};next.tournament.id=id;
-  next.portal={...(next.portal||{}),...commonPortal};
-
+  next.tournament=next.tournament||{};next.tournament.id=id;next.portal={...(next.portal||{}),...commonPortal};
   state=normalizeV5RuntimeState(next);
-  ensurePortalState();ensurePrelimState(state);ensureTimeState(state);ensureDrawMeta(state);ensureMessagingState(state);
-  ensureContacts(state);ensureAuditState(state);ensureEarlyMainSettings(state);ensureVenueSettings(state);ensureVenueQueues(state);
-  ensureCourtStatuses(state);ensureCourtManualQueues(state);ensurePrelimCourtStatuses(state);ensureOperatorState();ensureMultiDivisionRuntime();
-
+  ensurePortalState();ensurePrelimState(state);ensureTimeState(state);ensureDrawMeta(state);ensureMessagingState(state);ensureContacts(state);ensureAuditState(state);ensureEarlyMainSettings(state);ensureVenueSettings(state);ensureVenueQueues(state);ensureCourtStatuses(state);ensureCourtManualQueues(state);ensurePrelimCourtStatuses(state);ensureOperatorState();ensureMultiDivisionRuntime();
   localStorage.setItem('230match-v7-active-tournament',id);
-  saveState(state);
-  syncInputs();syncPrelimInputs();renderVenueSettingsEditor();
+  saveState(state);syncInputs();syncPrelimInputs();renderVenueSettingsEditor();
   render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus,holdMainMatch,releaseHeldMatch});
-  renderOperatorControls();renderPortalViewFast(document.body?.dataset.currentView||'home');
-  renderDivisionWorkspaceBar();renderHomeTournamentCards();renderTournamentList();renderApplicationPortal();
-  autoSmsSnapshot=buildAutoSmsSnapshot();
-
-  // 떠난 대회 저장은 백그라운드로 처리한다. 실패해도 현재 대회 선택을 되돌리지 않는다.
-  if((isAdmin()||isOperator())&&currentId){
-    pushStateNow(leavingState).catch(error=>console.warn('[230MATCH] 떠난 대회 백그라운드 저장 실패',error));
-  }
-
-  notice(`${state.tournament?.name||'선택한 대회'} 대회로 전환했습니다.`,'success');
-  return true;
+  renderOperatorControls();renderPortalViewFast(document.body?.dataset.currentView||'home');renderDivisionWorkspaceBar();renderHomeTournamentCards();renderTournamentList();renderApplicationPortal();autoSmsSnapshot=buildAutoSmsSnapshot();
+  if((isAdmin()||isOperator())&&currentId){pushStateNow(leavingState).catch(error=>console.warn('[230MATCH] 떠난 대회 백그라운드 저장 실패',error));}
+  notice(`${state.tournament?.name||'선택한 대회'} 대회로 전환했습니다.`,'success');return true;
 }
 
 function renderDivisionWorkspaceBar(){
@@ -7978,60 +7940,6 @@ async function deleteTournamentById(id){
   try{await deleteTournamentNow(id,state);}catch(error){notice(`서버 대회 삭제 실패: ${error?.message||error}`,'error');return;}
   saveState(state);renderPortalViews();renderDivisionWorkspaceBar();renderTournamentList();notice(`${name} 대회를 삭제했습니다.`,'success');
 }
-
-
-function bindWorkspaceSelectionCore(){
-  if(window.__workspaceSelectionCoreBound)return;
-  window.__workspaceSelectionCoreBound=true;
-
-  document.addEventListener('change',async e=>{
-    if(e.target?.id==='activeTournamentSelect'){
-      await switchTournamentWorkspace(e.target.value,{source:'top-select'});return;
-    }
-    if(e.target?.id==='activeDivisionSelect'){
-      await switchDivisionWorkspace(e.target.value);return;
-    }
-    if(e.target?.id==='entryApplicationTournament'){
-      const id=String(e.target.value||'');
-      if(id&&id!==String(state.multiTournament?.activeTournamentId||state.tournament?.id||''))await switchTournamentWorkspace(id,{source:'entry'});
-    }
-  });
-
-  document.addEventListener('click',async e=>{
-    const tournamentBtn=e.target.closest?.('[data-home-tournament-select],[data-active-tournament-switch]');
-    if(tournamentBtn){
-      e.preventDefault();e.stopPropagation();
-      const id=String(tournamentBtn.dataset.homeTournamentSelect||tournamentBtn.dataset.activeTournamentSwitch||'');
-      if(id&&!tournamentBtn.disabled)await switchTournamentWorkspace(id,{source:'button'});
-      return;
-    }
-
-    const divisionCard=e.target.closest?.('[data-v6002-division]');
-    if(divisionCard&&!e.target.closest('button')){
-      e.preventDefault();
-      await switchDivisionWorkspace(String(divisionCard.dataset.v6002Division||''));
-      return;
-    }
-
-    const edit=e.target.closest?.('[data-home-tournament-edit],[data-edit-tournament-id]');
-    if(edit){
-      e.preventDefault();e.stopPropagation();
-      const id=String(edit.dataset.homeTournamentEdit||edit.dataset.editTournamentId||'');
-      if(id&&id!==String(state.multiTournament?.activeTournamentId||'')){
-        const ok=await switchTournamentWorkspace(id,{source:'edit'});if(!ok)return;
-      }
-      stage329OpenTournamentEdit();return;
-    }
-
-    const del=e.target.closest?.('[data-home-tournament-delete],[data-delete-tournament-id]');
-    if(del){
-      e.preventDefault();e.stopPropagation();
-      await deleteTournamentById(String(del.dataset.homeTournamentDelete||del.dataset.deleteTournamentId||''));
-      renderHomeTournamentCards();renderTournamentList();renderDivisionWorkspaceBar();
-    }
-  });
-}
-bindWorkspaceSelectionCore();
 
 ensureMultiTournamentRuntime();syncCurrentTournamentRuntime();saveState(state);renderDivisionWorkspaceBar();
 
@@ -8132,6 +8040,12 @@ if(!window.__stage5008ListBound){
   document.getElementById('tournamentListSearch')?.addEventListener('input',stage5008RenderTournamentList);
   document.getElementById('tournamentListStatus')?.addEventListener('change',stage5008RenderTournamentList);
   document.getElementById('tournamentListResetBtn')?.addEventListener('click',()=>{const q=document.getElementById('tournamentListSearch'),s=document.getElementById('tournamentListStatus');if(q)q.value='';if(s)s.value='all';stage5008RenderTournamentList();});
+  document.addEventListener('click',async e=>{
+    const edit=e.target.closest?.('[data-edit-tournament-id]');
+    if(edit){e.preventDefault();e.stopImmediatePropagation();const id=edit.dataset.editTournamentId;if(id!==state.multiTournament?.activeTournamentId)switchTournamentWorkspace(id);setTimeout(()=>{stage5008RenderTournamentList();renderDivisionWorkspaceBar();stage329OpenTournamentEdit();},0);return;}
+    const del=e.target.closest?.('[data-delete-tournament-id]');
+    if(del){e.preventDefault();e.stopImmediatePropagation();await deleteTournamentById(del.dataset.deleteTournamentId);stage5008RenderTournamentList();renderHomeTournamentCards?.();}
+  },true);
 }
 if(!document.getElementById('stage5008CompactCss')){
   const style=document.createElement('style');style.id='stage5008CompactCss';style.textContent=`
@@ -8313,10 +8227,11 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
     state.activeContext={...ctx,updatedAt:new Date().toISOString()};
     return ctx;
   }
+  const originalSubmit=typeof submitPublicApplication==='function'?submitPublicApplication:null;
+  if(originalSubmit)submitPublicApplication=function(){const before=state.portal?.applications?.length||0;const out=originalSubmit.apply(this,arguments);setTimeout(()=>{const ctx=normalizeActiveDivisionData();const rows=state.portal?.applications||[];rows.slice(before).forEach(r=>stamp(r,ctx));try{syncCurrentDivisionRuntime?.();saveState(state)}catch(_e){}},0);return out};
   const viewMap={
     'view-entry':'참가 신청·승인','view-roster':'참가팀 명단','view-prelim-public':'예선 현황','view-prelim':'예선 운영','view-operation':'코트 운영','view-bracket':'본선 대진표','view-messages':'문자 센터','view-print':'출력 센터','view-my-match':'내 경기'
   };
-  window.__normalizeActiveDivisionData=normalizeActiveDivisionData;
   function renderContextHeaders(){
     const ctx=context();
     Object.entries(viewMap).forEach(([id,label])=>{
