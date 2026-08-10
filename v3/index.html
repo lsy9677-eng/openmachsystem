@@ -88,6 +88,19 @@
     .home-tournament-empty{padding:20px;text-align:center;color:#617089;border:1px dashed #c9d6e8;border-radius:14px}
     @media(max-width:640px){.home-tournament-card-list{grid-template-columns:1fr}.home-tournament-card .actions .btn{width:100%}}
   </style>
+
+  <style id="stage3610GuideAccessStyles">
+    .tournament-guide-view{display:none}.tournament-guide-view.active{display:block}
+    .tournament-guide-hero{display:flex;align-items:center;justify-content:space-between;gap:14px}.guide-hero-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .tournament-guide-image{order:-1}.tournament-guide-image img{display:block;width:min(100%,1100px);max-height:none;margin:12px auto 0;border-radius:12px;box-shadow:0 8px 26px rgba(18,43,82,.12);cursor:zoom-in}
+    .guide-image-editor-preview img{max-width:100%;max-height:520px;object-fit:contain;border-radius:10px;border:1px solid #d7e2f1}
+    .guide-prominent-note{margin:0 0 12px;padding:11px 13px;border-radius:12px;background:#eef6ff;color:#173d74;font-weight:700}
+    @media(max-width:700px){.tournament-guide-hero{align-items:flex-start;flex-direction:column}.guide-hero-actions{width:100%}.guide-hero-actions .btn{flex:1}.tournament-guide-image .section-head{align-items:flex-start;flex-direction:column}.tournament-guide-image .section-head .btn{width:100%}.tournament-guide-image img{border-radius:8px}}
+  </style>
+
+<style>
+.notice-image-editor-preview{display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap;padding:10px;border:1px solid #d8e2f0;border-radius:12px;background:#f8fbff}.notice-image-editor-preview img{max-width:min(420px,100%);max-height:420px;object-fit:contain;border-radius:10px;border:1px solid #dbe4ef;background:#fff}.portal-board-image-wrap{margin:10px 0}.portal-board-image{display:block;width:min(100%,680px);max-height:720px;object-fit:contain;border-radius:12px;border:1px solid #d8e2f0;background:#fff}.portal-board-image-actions{display:flex;gap:8px;margin-top:8px}.home-notice-popup-image{display:block;max-width:100%;max-height:60vh;object-fit:contain;margin:0 auto 12px;border-radius:10px;background:#f8fafc}.popup-manager-dialog{width:min(860px,96vw);max-height:90vh}.popup-manager-list{display:grid;gap:10px;max-height:62vh;overflow:auto;padding:4px}.popup-manager-item{border:1px solid #d8e2f0;border-radius:14px;padding:12px;background:#fff}.popup-manager-item-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.popup-manager-controls{display:grid;grid-template-columns:auto 1fr 1fr auto;gap:8px;align-items:end;margin-top:10px}.popup-manager-controls label{display:flex;flex-direction:column;gap:4px}.popup-manager-controls .form-check{flex-direction:row;align-items:center;padding-bottom:8px}.popup-manager-thumb{width:88px;max-height:110px;object-fit:cover;border-radius:8px;border:1px solid #d8e2f0}.popup-period-help{margin-top:6px}.notice-image-meta{font-size:.82rem;color:#64748b;margin-top:4px}@media(max-width:700px){.popup-manager-controls{grid-template-columns:1fr}.popup-manager-controls .form-check{padding-bottom:0}.popup-manager-item-head{flex-direction:column}.popup-manager-thumb{width:100%;max-height:220px}.home-notice-popup-image{max-height:52vh}}
+</style>
 </head>
 <body>
   <header class="topbar">
@@ -122,6 +135,7 @@
       <button class="tab" data-view="prelim-public">예선 현황</button>
       <button class="tab" data-view="my-match">내 경기</button>
       <button class="tab" data-view="entry">참가 신청</button>
+      <button class="tab" data-view="guide">대회 요강</button>
       <button class="tab" data-view="board">게시판</button>
       <button class="tab" data-view="participants">참가 기록</button>
       <button class="tab" data-view="records">대회 기록</button>
@@ -170,12 +184,13 @@
           <button type="button" data-portal-go="prelim-public"><span>📋</span><b>예선 현황</b><small id="stage3212PrelimCount">조편성·순위</small></button>
           <button type="button" data-portal-go="operation"><span>🎾</span><b>코트 현황</b><small id="stage3212CourtCount">시합중·대기</small></button>
           <button type="button" data-portal-go="bracket"><span>🏆</span><b>본선 대진표</b><small id="stage3212MainCount">대진·결과</small></button>
-          <button type="button" data-portal-go="tournaments"><span>📌</span><b>대회 요강</b><small>대회 목록에서 확인</small></button>
+          <button type="button" data-portal-go="guide"><span>📌</span><b>대회 요강</b><small>이미지·세부 요강 확인</small></button>
         </div>
         <div class="stage3212-admin-actions" data-admin-only="true">
           <strong>관리자 빠른 운영</strong>
           <div>
             <button type="button" data-stage3210-open-edit>⚙️ 현재 대회 편집</button>
+            <button type="button" data-portal-go="guide">📌 요강 확인·수정</button>
             <button type="button" data-portal-go="entry">✅ 참가 승인·입금</button>
             <button type="button" data-portal-go="operation">🎾 경기 운영</button>
             <button type="button" data-portal-go="messages">💬 문자 센터</button>
@@ -224,7 +239,7 @@
           <button type="button" data-portal-go="my-match"><span>🔎</span><b>내 경기</b><small>선수·팀 검색</small></button>
           <button type="button" data-portal-go="operation"><span>🎾</span><b>경기 현황</b><small>코트·대기 순서</small></button>
           <button type="button" data-portal-go="bracket"><span>🏆</span><b>본선 대진표</b><small>실시간 대진</small></button>
-          <button type="button" data-portal-go="tournaments"><span>📌</span><b>대회 요강</b><small>대회 목록에서 선택</small></button>
+          <button type="button" data-portal-go="guide"><span>📌</span><b>대회 요강</b><small>이미지·세부 요강 확인</small></button>
           <button type="button" data-portal-go="board"><span>📢</span><b>공지사항</b><small>일정·구장 안내</small></button>
           <button type="button" data-portal-go="participants"><span>👥</span><b>참가자 기록</b><small>선수·팀 검색</small></button>
           <button type="button" data-portal-go="records"><span>📚</span><b>대회 결과</b><small>기록·입상팀</small></button>
@@ -385,7 +400,7 @@
           <h1 id="guideTournamentName">대회 요강</h1>
           <p id="guideTournamentMeta" class="portal-muted">대회 일정과 참가 정보를 확인하세요.</p>
         </div>
-        <span id="guideStatusBadge" class="badge badge-warning">접수중</span>
+        <div class="guide-hero-actions"><span id="guideStatusBadge" class="badge badge-warning">접수중</span><button id="editTournamentGuideHeroBtn" type="button" class="btn btn-light btn-small" data-admin-only="true">요강 수정·이미지 등록</button></div>
       </section>
       <section class="tournament-guide-grid">
         <article class="panel tournament-guide-card">
@@ -466,7 +481,9 @@
         <div id="boardPostForm" class="portal-editor" hidden data-admin-only="true">
           <label><span>제목</span><input id="boardPostTitle" type="text" maxlength="80"></label>
           <input id="boardPostEditId" type="hidden">
-          <label><span>내용</span><textarea id="boardPostBody" rows="6" maxlength="3000"></textarea></label>
+          <label><span>내용</span><textarea id="boardPostBody" rows="6" maxlength="3000" placeholder="텍스트 공지 내용을 입력하세요. 이미지만 등록하는 경우 비워도 됩니다."></textarea></label>
+          <label><span>공지 이미지</span><input id="boardPostImageInput" type="file" accept="image/*"><small>JPG·PNG·WEBP 이미지를 등록할 수 있습니다. 화면용으로 자동 최적화됩니다.</small></label>
+          <div id="boardPostImagePreviewWrap" class="notice-image-editor-preview" hidden><img id="boardPostImagePreview" alt="공지 이미지 미리보기"><button id="removeBoardPostImageBtn" type="button" class="btn btn-danger-outline btn-small">이미지 제거</button></div>
           <div class="notice-option-grid">
             <label class="form-check"><input id="boardPostPinned" class="form-check-input" type="checkbox"><span class="form-check-label">상단 고정</span></label>
             <label class="form-check"><input id="boardPostImportant" class="form-check-input" type="checkbox"><span class="form-check-label">중요 공지</span></label>
@@ -476,6 +493,11 @@
             <label><span>게시 시작</span><input id="boardPostStartAt" type="datetime-local"></label>
             <label><span>게시 종료</span><input id="boardPostEndAt" type="datetime-local"></label>
           </div>
+          <div class="notice-period-grid popup-period-grid">
+            <label><span>팝업 시작</span><input id="boardPostPopupStartAt" type="datetime-local"></label>
+            <label><span>팝업 종료</span><input id="boardPostPopupEndAt" type="datetime-local"></label>
+          </div>
+          <p class="portal-muted popup-period-help">‘홈 팝업으로 표시’를 해제하면 팝업은 즉시 중지됩니다. 팝업 기간을 비우면 게시 기간을 따릅니다.</p>
           <div class="portal-editor-actions"><button id="cancelBoardPostBtn" type="button" class="btn btn-light">취소</button><button id="saveBoardPostBtn" type="button" class="btn btn-primary">공지 저장</button></div>
         </div>
         <div id="boardPostList" class="portal-board-list"></div>
@@ -1683,7 +1705,7 @@
     <article>
       <div class="home-notice-popup-head"><span id="homeNoticePopupBadge">중요 공지</span><button id="homeNoticePopupClose" type="button" aria-label="닫기">×</button></div>
       <h2 id="homeNoticePopupTitle"></h2>
-      <div id="homeNoticePopupBody" class="home-notice-popup-body"></div>
+      <img id="homeNoticePopupImage" class="home-notice-popup-image" alt="공지 이미지" hidden><div id="homeNoticePopupBody" class="home-notice-popup-body"></div>
       <div class="home-notice-popup-actions">
         <label><input id="homeNoticePopupDismiss" type="checkbox"> 오늘은 다시 보지 않기</label>
         <button id="homeNoticePopupBoard" type="button" class="btn btn-primary">공지사항 전체보기</button>
@@ -1692,6 +1714,11 @@
     </article>
   </dialog>
 
+  <dialog id="popupManagerDialog" class="modal popup-manager-dialog">
+    <div class="modal-head"><div><h2>🪟 홈 팝업 관리</h2><p>공지별 팝업 표시 여부와 기간을 관리합니다.</p></div><button id="closePopupManagerBtn" class="icon-button" type="button">×</button></div>
+    <div id="popupManagerList" class="popup-manager-list"></div>
+    <div class="portal-editor-actions"><button id="popupManagerNewNoticeBtn" type="button" class="btn btn-primary">새 공지 작성</button><button id="popupManagerDoneBtn" type="button" class="btn btn-light">닫기</button></div>
+  </dialog>
 
   <div id="adminSettingsHub" class="settings-hub" hidden>
     <button type="button" class="settings-hub-backdrop" data-settings-hub-close aria-label="설정 닫기"></button>
@@ -1720,6 +1747,7 @@
           <h3>운영 자료</h3>
           <div class="settings-hub-grid">
             <button type="button" data-settings-view="notices" data-operator-only="true">공지사항<small>일정·구장·운영 안내</small></button>
+            <button type="button" data-settings-action="popup-manager" data-admin-only="true">홈 팝업 관리<small>이미지·텍스트·노출 기간 관리</small></button>
             <button type="button" data-settings-view="notifications" data-operator-only="true">알림 관리<small>푸시 설정·발송 현황</small></button>
             <button type="button" data-settings-view="readiness" data-admin-only="true">당일 운영 준비<small>시작 전 필수 항목 확인</small></button>
             <button type="button" data-settings-view="manual" data-operator-only="true">운영 도움말<small>진행 순서·비상 대응</small></button>
@@ -1805,7 +1833,7 @@
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app-v6105.js?v=6105"></script>
+  <script type="module" src="./assets/js/app-v6109.js?v=6109"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
