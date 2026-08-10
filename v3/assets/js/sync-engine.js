@@ -140,7 +140,7 @@ async function loadParentRows(){
 }
 async function readInitialBundle(){
   const [roomSnap,rows]=await Promise.all([api.getDoc(roomRef()),loadParentRows()]);const room=roomSnap.exists()?roomSnap.data():{};if(!rows.length)return null;
-  rows.sort((a,b)=>String(b.raw?.updatedAt||'').localeCompare(String(a.raw?.updatedAt||'')));const requested=String(room.activeTournamentId||localStorage.getItem('230match-v7-active-tournament')||'');const activeRow=rows.find(x=>x.id===requested)||rows[0];
+  rows.sort((a,b)=>String(b.raw?.updatedAt||'').localeCompare(String(a.raw?.updatedAt||'')));const requested=String(localStorage.getItem('230match-v7-active-tournament')||room.activeTournamentId||'');const activeRow=rows.find(x=>x.id===requested)||rows[0];
   const activeDecoded=await decodeWorkspace(activeRow.raw);if(!activeDecoded)return null;activeDecoded.tournament={...(activeDecoded.tournament||{}),id:activeRow.id};if(Array.isArray(activeRow.raw.workspaceChunks))knownChunkIds.set(activeRow.id,[...activeRow.raw.workspaceChunks]);
   const meta=rows.map(row=>metaFromRaw(row.id,row.raw,null));
   const state=normalizeState(clone(activeDecoded));state.multiTournament={activeTournamentId:activeRow.id,tournaments:meta,noActiveTournament:false};localStorage.setItem('230match-v7-active-tournament',activeRow.id);lastKnownRoomRevision=Number(room.revision||0);lastKnownPublicRevision=Number(room.publicRevision||room.revision||0);lastWriterUid=String(room.lastWriterUid||'');lastWriterClientId=String(room.lastWriterClientId||'');lastSavedDigest=String(activeRow.raw.workspaceDigest||'');lastSavedPublicDigest=String(activeRow.raw.publicDigest||'');dirtyBaseRevision=lastKnownRoomRevision;return{state,room,count:meta.length};
@@ -164,7 +164,8 @@ async function writeCurrentTournament(source,{force=false}={}){
     const room=roomSnap.exists()?(roomSnap.data()||{}):{};
     const remoteRevision=Number(room.revision||0);
     const remoteClientId=String(room.lastWriterClientId||'');
-    if(dirtyBaseRevision>0 && remoteRevision>dirtyBaseRevision && remoteClientId && remoteClientId!==CLIENT_ID){
+    const remoteTournamentId=String(room.lastTournamentId||room.activeTournamentId||'');
+    if(dirtyBaseRevision>0 && remoteRevision>dirtyBaseRevision && remoteClientId && remoteClientId!==CLIENT_ID && (!remoteTournamentId||remoteTournamentId===id)){
       syncConflict={
         active:true,
         localBaseRevision:dirtyBaseRevision,
@@ -189,7 +190,7 @@ async function writeCurrentTournament(source,{force=false}={}){
     workspaceChunks:newIds,workspaceEncoding:encoded.encoding,workspaceOriginalBytes:encoded.originalBytes,workspaceStoredBytes:encoded.storedBytes,workspaceDigest:d,publicDigest,
     workspaceJson:api.deleteField(),workspace:api.deleteField(),lastWriterUid:rt.user.uid,lastWriterEmail:rt.user.email||'',lastWriterClientId:CLIENT_ID,serverUpdatedAt:api.serverTimestamp()
   },{merge:true});
-  const roomUpdate={schemaVersion:8,roomId:ROOM_ID,activeTournamentId:id,revision:api.increment(1),lastWriterUid:rt.user.uid,lastWriterEmail:rt.user.email||'',lastWriterClientId:CLIENT_ID,serverUpdatedAt:api.serverTimestamp()};
+  const roomUpdate={schemaVersion:8,roomId:ROOM_ID,activeTournamentId:id,lastTournamentId:id,revision:api.increment(1),lastWriterUid:rt.user.uid,lastWriterEmail:rt.user.email||'',lastWriterClientId:CLIENT_ID,serverUpdatedAt:api.serverTimestamp()};
   if(publicChanged)roomUpdate.publicRevision=api.increment(1);
   batch.set(roomRef(),roomUpdate,{merge:true});
   await batch.commit();knownChunkIds.set(id,newIds);lastSavedDigest=d;lastKnownRoomRevision++;dirtyBaseRevision=lastKnownRoomRevision;syncConflict=null;if(publicChanged){lastSavedPublicDigest=publicDigest;lastKnownPublicRevision++;}lastWriterUid=rt.user.uid;lastWriterClientId=CLIENT_ID;localStorage.setItem('230match-v7-active-tournament',id);scheduleCache();return true;
@@ -208,10 +209,18 @@ function schedule(){if(applyingRemote)return;const state=getStateFn();if(!active
 function onSaved(){schedule();}
 async function handleRoomSnapshot(snap){
   if(!snap.exists())return;
-  const room=snap.data()||{},rt=await runtime(),writer=String(room.lastWriterUid||''),revision=Number(room.revision||0),publicRevision=Number(room.publicRevision||revision||0),targetId=String(room.activeTournamentId||'');
+  const room=snap.data()||{},rt=await runtime(),writer=String(room.lastWriterUid||''),revision=Number(room.revision||0),publicRevision=Number(room.publicRevision||revision||0);
+  const current=getStateFn(),targetId=String(activeIdOf(current)||localStorage.getItem('230match-v7-active-tournament')||'');
+  const changedTournamentId=String(room.lastTournamentId||room.activeTournamentId||'');
   const viewer=accessModeFn()==='viewer';
   const relevantRevision=viewer?publicRevision:revision;
   const knownRevision=viewer?lastKnownPublicRevision:lastKnownRoomRevision;
+  if(targetId&&changedTournamentId&&changedTournamentId!==targetId){
+    // 다른 대회의 변경은 현재 브라우저가 보고 있는 대회를 건드리지 않는다.
+    if(viewer)lastKnownPublicRevision=Math.max(lastKnownPublicRevision,relevantRevision);
+    else lastKnownRoomRevision=Math.max(lastKnownRoomRevision,relevantRevision);
+    return;
+  }
   // 일반 회원은 관리자 전용 변경으로 publicRevision이 그대로면 아무 데이터도 다시 읽지 않는다.
   if(relevantRevision&&relevantRevision<=knownRevision)return;
   const remoteClientId=String(room.lastWriterClientId||'');
@@ -225,7 +234,7 @@ async function handleRoomSnapshot(snap){
   if(remoteClientId===CLIENT_ID&&!viewer)return;
   if(!targetId)return;
   try{
-    const current=getStateFn(),registry=current?.multiTournament?.tournaments||[],bundle=await readOneTournament(targetId,registry);
+    const registry=current?.multiTournament?.tournaments||[],bundle=await readOneTournament(targetId,registry);
     if(bundle)applyState(bundle.state,'remote');
   }catch(error){status('다른 기기 반영 실패','warning',error?.message||String(error));}
 }

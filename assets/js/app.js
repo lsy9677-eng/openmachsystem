@@ -26,7 +26,7 @@ import{ensureCourtStatuses,pauseCourt,resumeCourt}from'./court-status-engine.js?
 import{ensureCourtManualQueues,assignToCourtManualQueue,moveCourtMatchFlexible,returnManualQueueItemToVenue,reorderCourtManualQueue}from'./court-manual-queue-engine.js?v=332012';
 import{reorderPrelimQueue as reorderPrelimQueueItem,movePrelimQueuedMatch,returnPrelimWait1ToQueue}from'./prelim-queue-control-engine.js?v=332012';
 import{ensurePrelimCourtStatuses,pausePrelimCourt,resumePrelimCourt}from'./prelim-court-status-engine.js?v=332012';
-import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=6600';
+import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=6601';
 import{verifyAndRepairMainFlow}from'./main-flow-integrity-engine.js?v=332012';
 import{finalizeTournamentCompletion}from'./tournament-completion-engine.js?v=332012';
 import{ensureTournamentIdentity,validateTournamentForArchive,createTournamentArchive,archiveListItem,archiveBackupPayload}from'./archive-engine.js?v=354000';
@@ -2507,18 +2507,33 @@ function applicationStatusClass(status){return ['approved','reserve'].includes(s
 function applicationCode(){return `A${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2,5).toUpperCase()}`;}
 function reserveApplicationOrder(item){const rows=(state.portal?.applications||[]).filter(a=>a.status==='reserve').sort((a,b)=>String(a.approvedAt||a.updatedAt||a.createdAt).localeCompare(String(b.approvedAt||b.updatedAt||b.createdAt)));const index=rows.findIndex(a=>a.id===item.id);return index<0?0:index+1;}
 function entryTournamentRows(){
-  const current=currentTournamentSnapshot();
-  const history=(state.portal?.tournamentArchives||[]).map(x=>({...x,current:false}));
+  ensureMultiTournamentRuntime();
+  const activeId=String(state.multiTournament?.activeTournamentId||state.tournament?.id||'');
+  const live=(state.multiTournament?.tournaments||[]).filter(r=>isRealTournamentName(r?.name||r?.snapshot?.tournament?.name)).map(r=>{
+    const current=String(r.id)===activeId;
+    const snap=current?state:(r.snapshot||{});
+    const completed=Boolean(snap?.completion?.completedAt||snap?.tournament?.completedAt||r?.completedAt||r?.status==='completed');
+    return {
+      id:String(r.id||''),
+      current,
+      name:String(r.name||snap?.tournament?.name||'대회 준비 중'),
+      division:String(r.division||snap?.tournament?.division||''),
+      date:String(snap?.portal?.guide?.date||r?.guide?.date||r?.date||''),
+      status:completed?'completed':String(r.status||'recruiting')
+    };
+  });
+  const history=(state.portal?.tournamentArchives||[]).map(x=>({...x,current:false,status:'completed'}));
   const seen=new Set();
-  return [current,...history].filter(x=>{const key=String(x.id||'')+'|'+String(x.name||'');if(seen.has(key))return false;seen.add(key);return true;});
+  return [...live,...history].filter(x=>{const key=String(x.id||'')+'|'+String(x.name||'');if(seen.has(key))return false;seen.add(key);return true;});
 }
+function activeIdOfStateForEntry(){return String(state.multiTournament?.activeTournamentId||state.tournament?.id||'');}
 function renderEntryTournamentSelect(){
   const select=document.getElementById('entryApplicationTournament');if(!select)return;
   const previous=select.value;
   const rows=entryTournamentRows();
-  select.innerHTML='<option value="">대회를 선택하세요</option>'+rows.map(x=>{const selectable=!!x.current&&x.status!=='completed';const label=`${x.name||'대회 준비 중'}${x.division?` (${x.division})`:''} · ${tournamentStatusLabel(x.status)}`;return `<option value="${portalEscape(x.id)}" ${selectable?'':'disabled'}>${portalEscape(label)}${selectable?'':' · 신청 불가'}</option>`;}).join('');
+  select.innerHTML='<option value="">대회를 선택하세요</option>'+rows.map(x=>{const selectable=x.status!=='completed';const label=`${x.name||'대회 준비 중'}${x.division?` (${x.division})`:''} · ${tournamentStatusLabel(x.status)}`;return `<option value="${portalEscape(x.id)}" ${selectable?'':'disabled'}>${portalEscape(label)}${selectable?'':' · 신청 불가'}</option>`;}).join('');
   if(previous&&[...select.options].some(o=>o.value===previous&&!o.disabled))select.value=previous;
-  else if(rows[0]?.current&&rows[0].status!=='completed')select.value='current';
+  else if(activeIdOfStateForEntry()&&[...select.options].some(o=>o.value===activeIdOfStateForEntry()&&!o.disabled))select.value=activeIdOfStateForEntry();
 }
 function entryPairFormValue(id){return String(document.getElementById(id)?.value||'').trim();}
 function entryPairPhone(id){return String(document.getElementById(id)?.value||'').replace(/[^0-9]/g,'');}
@@ -2541,17 +2556,22 @@ function clearEntryApplicationForm(){
   ['entryPlayer1Name','entryPlayer1Club','entryPlayer1Phone','entryPlayer2Name','entryPlayer2Club','entryPlayer2Phone','entryApplicationMemo'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   const rep1=document.getElementById('entryRepresentative1');if(rep1)rep1.checked=true;
   renderEntryTournamentSelect();
-  const tournament=document.getElementById('entryApplicationTournament');if(tournament&&[...tournament.options].some(o=>o.value==='current'&&!o.disabled))tournament.value='current';
+  const tournament=document.getElementById('entryApplicationTournament'),activeId=activeIdOfStateForEntry();if(tournament&&activeId&&[...tournament.options].some(o=>o.value===activeId&&!o.disabled))tournament.value=activeId;
   const submit=document.getElementById('entryApplicationSubmitBtn');if(submit)submit.textContent='참가 신청 접수';
   const cancel=document.getElementById('entryApplicationEditCancelBtn');if(cancel)cancel.hidden=true;
 }
-function submitPublicApplication(){
+async function submitPublicApplication(){
   ensurePortalState();
   const tournamentId=String(document.getElementById('entryApplicationTournament')?.value||'').trim();
-  const selectedTournament=entryTournamentRows().find(x=>String(x.id)===tournamentId);
+  let selectedTournament=entryTournamentRows().find(x=>String(x.id)===tournamentId);
   const {players,representativeIndex,representative}=entryApplicationPlayersFromForm();
   const memo=entryPairFormValue('entryApplicationMemo');
-  if(!selectedTournament||!selectedTournament.current||selectedTournament.status==='completed'){notice('현재 접수 가능한 대회를 선택하세요.','error');return;}
+  if(!selectedTournament||selectedTournament.status==='completed'){notice('현재 접수 가능한 대회를 선택하세요.','error');return;}
+  if(String(tournamentId)!==activeIdOfStateForEntry()){
+    const switched=await switchTournamentWorkspace(tournamentId);
+    if(!switched){notice('선택한 대회로 전환하지 못해 참가 신청을 중단했습니다.','error');return;}
+    selectedTournament=entryTournamentRows().find(x=>String(x.id)===tournamentId)||selectedTournament;
+  }
   for(let i=0;i<players.length;i++){
     const p=players[i];
     if(!p.name){notice(`선수 ${i+1} 이름을 입력하세요.`,'error');document.getElementById(`entryPlayer${i+1}Name`)?.focus();return;}
@@ -2686,6 +2706,12 @@ function cancelEntryApplication(id){
   if(!confirm(`${item.teamName} 참가 신청을 취소할까요?`))return;item.status='cancelled';item.updatedAt=new Date().toISOString();if(entryEditingId===item.id)clearEntryApplicationForm();commit(`참가 신청 취소 · ${item.teamName}`);lookupPublicApplication();renderApplicationPortal();
 }
 function bindEntryApplications(){
+  document.getElementById('entryApplicationTournament')?.addEventListener('change',async e=>{
+    const id=String(e.target.value||'');
+    if(!id||id===activeIdOfStateForEntry())return;
+    const switched=await switchTournamentWorkspace(id);
+    if(switched){renderApplicationPortal();const sel=document.getElementById('entryApplicationTournament');if(sel)sel.value=id;}
+  });
   document.getElementById('entryApplicationSubmitBtn')?.addEventListener('click',submitPublicApplication);
   document.getElementById('entryApplicationEditCancelBtn')?.addEventListener('click',clearEntryApplicationForm);
   document.getElementById('entryLookupBtn')?.addEventListener('click',lookupPublicApplication);
@@ -3409,7 +3435,7 @@ function bindTournamentList(){
   document.getElementById('tournamentCardList')?.addEventListener('click',async e=>{
     const guideBtn=e.target.closest('[data-guide-tournament-id]');if(guideBtn){e.preventDefault();await stage3610OpenTournamentGuide(guideBtn.dataset.guideTournamentId);return;}
     const select=e.target.closest('[data-active-tournament-switch]');
-    if(select){e.preventDefault();switchTournamentWorkspace(select.dataset.activeTournamentSwitch);renderTournamentList();renderDivisionWorkspaceBar();return;}
+    if(select){e.preventDefault();await switchTournamentWorkspace(select.dataset.activeTournamentSwitch);renderTournamentList();renderDivisionWorkspaceBar();renderHomeTournamentCards();return;}
     const edit=e.target.closest('[data-edit-tournament-id]');
     if(edit){e.preventDefault();const id=edit.dataset.editTournamentId;if(id!==state.multiTournament?.activeTournamentId)switchTournamentWorkspace(id);setTimeout(()=>{renderTournamentList();stage329OpenTournamentEdit();},0);return;}
     const remove=e.target.closest('[data-delete-tournament-id]');
@@ -4006,8 +4032,8 @@ loadSyncPanel();startStateSync({getState:()=>state,applyRemoteState:next=>applyS
 const buildStageLabel=document.getElementById('buildStageLabel');
 window.closeAutoSmsDialog=closeAutoSmsDialog;window.approveAutoSmsAligo=approveAutoSmsAligo;window.approveAutoSmsPhone=approveAutoSmsPhone;window.copyAutoSms=copyAutoSms;window.previewCurrentCourtSms=previewCurrentCourtSms;
 if(buildStageLabel)buildStageLabel.textContent=BUILD_LABEL;
-document.documentElement.dataset.build='6600';
-console.log('[230MATCH] 66.0.0 ready · fixed filenames + concurrent operator overwrite guard');
+document.documentElement.dataset.build='6601';
+console.log('[230MATCH] 66.0.1 ready · independent tournament selection + multi-open entry selection');
 
 
 // Stage 31.2: presentation-only operation workspace controller.
@@ -4984,7 +5010,7 @@ window.addEventListener('DOMContentLoaded',()=>{try{const hash=(location.hash||'
     const workspace=document.getElementById('view-operation');
     if(workspace&&currentRole==='admin')workspace.dataset.operationMode='setup';
     const label=document.getElementById('buildStageLabel');if(label){label.textContent='230MATCH 34.2.1 · 자동 문자 전환 승인창 수정 테스트본';label.title='Version 34.2.1';}
-    document.documentElement.dataset.build='6600';
+    document.documentElement.dataset.build='6601';
     console.info('[230MATCH] Stage34.2 single operation workspace ready');
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(init,0),{once:true});else setTimeout(init,0);
@@ -7819,11 +7845,15 @@ function syncCurrentTournamentRuntime(){
   return record;
 }
 
+let tournamentSwitchPromise=null;
 async function switchTournamentWorkspace(id){
   ensureMultiTournamentRuntime();id=String(id||'');if(!id||id===state.multiTournament.activeTournamentId)return true;
+  if(tournamentSwitchPromise)return tournamentSwitchPromise;
+  tournamentSwitchPromise=(async()=>{
   let record=state.multiTournament.tournaments.find(x=>x.id===id);if(!record){notice('선택한 대회 정보를 찾을 수 없습니다.','error');return false;}
   syncCurrentTournamentRuntime();
-  try{if(isAdmin()||isOperator())await pushStateNow(state);}catch(error){notice(`현재 대회 저장 대기: ${error?.message||error}`,'warning');return false;}
+  // 대회 선택 자체 때문에 현재 대회를 강제 저장하지 않는다.
+  // 자동저장/수동저장은 별도로 처리되며, 선택 버튼이 저장 충돌 때문에 막히지 않게 한다.
   let loadedSnapshot=record.snapshot||null;
   if(!loadedSnapshot){
     notice('선택한 대회를 불러오는 중입니다.','info');
@@ -7842,8 +7872,11 @@ async function switchTournamentWorkspace(id){
   saveState(state);syncInputs();syncPrelimInputs();renderVenueSettingsEditor();
   render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus,holdMainMatch,releaseHeldMatch});
   renderOperatorControls();renderPortalViewFast(document.body?.dataset.currentView||'home');renderDivisionWorkspaceBar();autoSmsSnapshot=buildAutoSmsSnapshot();
-  try{pushStateNow(state).catch(()=>{});}catch(_e){}
+  localStorage.setItem('230match-v7-active-tournament',id);
+  // 운영자는 실제 변경이 있을 때만 자동저장이 처리한다. 대회 선택은 서버의 다른 사용자를 강제로 이동시키지 않는다.
   notice(`${state.tournament.name} 대회로 전환했습니다.`,'success');return true;
+  })();
+  try{return await tournamentSwitchPromise;}finally{tournamentSwitchPromise=null;}
 }
 
 function renderDivisionWorkspaceBar(){
@@ -7886,7 +7919,7 @@ async function deleteTournamentById(id){
   try{await deleteTournamentNow(id,state);}catch(error){notice(`서버 대회 삭제 실패: ${error?.message||error}`,'error');return;}
   saveState(state);renderPortalViews();renderDivisionWorkspaceBar();renderTournamentList();notice(`${name} 대회를 삭제했습니다.`,'success');
 }
-if(!window.__stage3572TournamentSelectBound){window.__stage3572TournamentSelectBound=true;document.addEventListener('click',e=>{const btn=e.target.closest('[data-active-tournament-switch]');if(btn){e.preventDefault();switchTournamentWorkspace(btn.dataset.activeTournamentSwitch);setTimeout(()=>{renderTournamentList();renderDivisionWorkspaceBar();},0);}});}
+if(!window.__stage3572TournamentSelectBound){window.__stage3572TournamentSelectBound=true;document.addEventListener('click',async e=>{const btn=e.target.closest('[data-active-tournament-switch]');if(btn){if(btn.closest('#tournamentCardList'))return;e.preventDefault();await switchTournamentWorkspace(btn.dataset.activeTournamentSwitch);renderTournamentList();renderDivisionWorkspaceBar();renderHomeTournamentCards();}});}
 ensureMultiTournamentRuntime();syncCurrentTournamentRuntime();saveState(state);renderDivisionWorkspaceBar();
 
 
@@ -8085,9 +8118,9 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
         }).join('')}
       </div>
       <div class="division-v6002-context">현재 화면의 참가자·경기·코트 데이터 기준: <strong>${esc(state.tournament?.name||'대회')} · ${esc(currentDivision()?.name||state.tournament?.division||'부서')}</strong></div>`;
-    bar.querySelector('#activeTournamentSelect')?.addEventListener('change',e=>{
-      switchTournamentWorkspace(e.target.value);
-      setTimeout(()=>{renderVisibleDivisionBar();renderHomeTournamentCards?.();renderTournamentList?.();},0);
+    bar.querySelector('#activeTournamentSelect')?.addEventListener('change',async e=>{
+      await switchTournamentWorkspace(e.target.value);
+      renderVisibleDivisionBar();renderHomeTournamentCards?.();renderTournamentList?.();
     });
     bar.querySelectorAll('[data-v6002-division]').forEach(card=>{
       const activate=()=>{
