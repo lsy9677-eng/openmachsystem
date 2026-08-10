@@ -92,7 +92,7 @@
   <style id="stage3610GuideAccessStyles">
     .tournament-guide-view{display:none}.tournament-guide-view.active{display:block}
     .tournament-guide-hero{display:flex;align-items:center;justify-content:space-between;gap:14px}.guide-hero-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-    .tournament-guide-image{order:-1}.tournament-guide-image img{display:block;width:min(100%,1100px);max-height:none;margin:12px auto 0;border-radius:12px;box-shadow:0 8px 26px rgba(18,43,82,.12);cursor:zoom-in}
+    .tournament-guide-image{margin:0 0 14px;padding:10px}.tournament-guide-image img{display:block;width:100%;max-width:1100px;max-height:none;margin:8px auto 0;border-radius:12px;box-shadow:0 8px 26px rgba(18,43,82,.12);cursor:zoom-in}
     .guide-image-editor-preview img{max-width:100%;max-height:520px;object-fit:contain;border-radius:10px;border:1px solid #d7e2f1}
     .guide-prominent-note{margin:0 0 12px;padding:11px 13px;border-radius:12px;background:#eef6ff;color:#173d74;font-weight:700}
     @media(max-width:700px){.tournament-guide-hero{align-items:flex-start;flex-direction:column}.guide-hero-actions{width:100%}.guide-hero-actions .btn{flex:1}.tournament-guide-image .section-head{align-items:flex-start;flex-direction:column}.tournament-guide-image .section-head .btn{width:100%}.tournament-guide-image img{border-radius:8px}}
@@ -1833,7 +1833,7 @@
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app-v6112.js?v=6112"></script>
+  <script type="module" src="./assets/js/app-v6113.js?v=6113"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
