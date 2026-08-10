@@ -106,6 +106,27 @@
 <style>
 .notice-image-editor-preview{display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap;padding:10px;border:1px solid #d8e2f0;border-radius:12px;background:#f8fbff}.notice-image-editor-preview img{max-width:min(420px,100%);max-height:420px;object-fit:contain;border-radius:10px;border:1px solid #dbe4ef;background:#fff}.portal-board-image-wrap{margin:10px 0}.portal-board-image{display:block;width:min(100%,680px);max-height:720px;object-fit:contain;border-radius:12px;border:1px solid #d8e2f0;background:#fff}.portal-board-image-actions{display:flex;gap:8px;margin-top:8px}.home-notice-popup-image{display:block;max-width:100%;max-height:60vh;object-fit:contain;margin:0 auto 12px;border-radius:10px;background:#f8fafc}.popup-manager-dialog{width:min(860px,96vw);max-height:90vh}.popup-manager-list{display:grid;gap:10px;max-height:62vh;overflow:auto;padding:4px}.popup-manager-item{border:1px solid #d8e2f0;border-radius:14px;padding:12px;background:#fff}.popup-manager-item-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.popup-manager-controls{display:grid;grid-template-columns:auto 1fr 1fr auto;gap:8px;align-items:end;margin-top:10px}.popup-manager-controls label{display:flex;flex-direction:column;gap:4px}.popup-manager-controls .form-check{flex-direction:row;align-items:center;padding-bottom:8px}.popup-manager-thumb{width:88px;max-height:110px;object-fit:cover;border-radius:8px;border:1px solid #d8e2f0}.popup-period-help{margin-top:6px}.notice-image-meta{font-size:.82rem;color:#64748b;margin-top:4px}@media(max-width:700px){.popup-manager-controls{grid-template-columns:1fr}.popup-manager-controls .form-check{padding-bottom:0}.popup-manager-item-head{flex-direction:column}.popup-manager-thumb{width:100%;max-height:220px}.home-notice-popup-image{max-height:52vh}}
 </style>
+
+<style id="member-lite-6500">
+  [hidden]{display:none!important}
+  body[data-data-mode="member-lite"] .entry-admin-toolbar,
+  body[data-data-mode="member-lite"] .entry-admin-panel,
+  body[data-data-mode="member-lite"] [data-admin-only="true"],
+  body[data-data-mode="member-lite"] [data-operator-only="true"]{display:none!important}
+
+  body[data-data-mode="member-lite"] .mode-tabs .tab[data-view="participants"],
+  body[data-data-mode="member-lite"] .mode-tabs .tab[data-view="records"],
+  body[data-data-mode="member-lite"] .mode-tabs .tab[data-view="print"]{display:none!important}
+  .member-reference-panel{margin-top:14px}
+  .member-reference-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+  .member-reference-actions button{min-height:72px;border:1px solid #d7e0ec;border-radius:14px;background:#fff;padding:12px;text-align:left;cursor:pointer}
+  .member-reference-actions button span{font-size:1.25rem;margin-right:6px}
+  .member-reference-actions button b{display:block;margin-top:4px}
+  .member-reference-actions button small{display:block;margin-top:4px;color:#64748b}
+  @media (max-width:760px){
+    .member-reference-panel{display:none}
+  }
+</style>
 </head>
 <body>
   <header class="topbar">
@@ -204,6 +225,17 @@
         </div>
       </section>
 
+      <section class="panel member-reference-panel" aria-label="기록 및 자료">
+        <div class="section-head">
+          <div><span class="legacy-home-chip">RECORDS & DOWNLOADS</span><h2>기록·자료</h2><p>필요할 때만 열어보는 보조 메뉴입니다.</p></div>
+        </div>
+        <div class="member-reference-actions">
+          <button type="button" data-portal-go="participants"><span>👤</span><b>선수 기록</b><small>지난 참가·선수 기록 조회</small></button>
+          <button type="button" data-portal-go="records"><span>📚</span><b>지난 대회 결과</b><small>종료 대회 결과·입상 기록</small></button>
+          <button type="button" data-portal-go="print"><span>🖨️</span><b>출력 센터</b><small>조편성표·대진표 PDF·이미지 저장</small></button>
+        </div>
+      </section>
+
       <section id="stage331OperationDashboard" class="stage331-operation-dashboard panel" data-admin-only="true" aria-label="당일 운영 대시보드">
         <div class="stage331-dashboard-head">
           <div><span class="legacy-home-chip">MATCH-DAY CONTROL</span><h2>당일 운영 대시보드</h2><p>빈 코트, 대기열, 지연 경기와 결과 확인이 필요한 경기를 한 화면에서 확인합니다.</p></div>
@@ -246,9 +278,6 @@
           <button type="button" data-portal-go="bracket"><span>🏆</span><b>본선 대진표</b><small>실시간 대진</small></button>
           <button type="button" data-portal-go="guide"><span>📌</span><b>대회 요강</b><small>이미지·세부 요강 확인</small></button>
           <button type="button" data-portal-go="board"><span>📢</span><b>공지사항</b><small>일정·구장 안내</small></button>
-          <button type="button" data-portal-go="participants"><span>👥</span><b>참가자 기록</b><small>선수·팀 검색</small></button>
-          <button type="button" data-portal-go="records"><span>📚</span><b>대회 결과</b><small>기록·입상팀</small></button>
-          <button type="button" data-portal-go="print"><span>🖨️</span><b>출력 센터</b><small>인쇄·PDF·이미지</small></button>
           <button type="button" data-portal-go="notifications"><span>🔔</span><b>경기 알림</b><small>푸시 설정·발송 현황</small></button>
         </div>
       </section>
@@ -1838,7 +1867,7 @@
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app-v6400.js?v=6400"></script>
+  <script type="module" src="./assets/js/app-v6501.js?v=6501"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
