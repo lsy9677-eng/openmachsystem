@@ -385,8 +385,13 @@
       </section>
 
       <section class="legacy-entry-layout">
-        <article class="panel entry-public-panel legacy-entry-form-card">
+        <article class="panel entry-public-panel legacy-entry-form-card" id="entryApplicationFormCard">
           <div class="section-head"><div><h2>참가 신청서</h2><p>두 선수의 이름·클럽·연락처를 각각 입력하고 대표 연락처를 선택하세요.</p></div><span class="badge badge-warning">접수중</span></div>
+          <button type="button" id="entryFormCollapseToggle" class="entry-form-collapse-toggle" aria-expanded="true">
+            <span><strong id="entryFormCollapseTitle">참가 신청하기</strong><small id="entryFormCollapseHint">필요할 때만 신청서를 펼칩니다.</small></span>
+            <span class="entry-form-collapse-icon" id="entryFormCollapseIcon">−</span>
+          </button>
+          <div class="entry-form-collapsible-body" id="entryFormCollapsibleBody">
           <div class="entry-form-grid legacy-entry-form-grid entry-pair-form">
             <label class="legacy-full"><span>신청 대회 *</span><select id="entryApplicationTournament" class="form-select"><option value="">대회를 선택하세요</option></select><small class="entry-tournament-help">현재 접수 가능한 대회를 선택한 뒤 신청하세요.</small></label>
             <section id="entryPaymentInfo" class="entry-payment-info legacy-full">
@@ -430,6 +435,7 @@
           <div class="legacy-entry-agreement">두 연락처 모두 상태 조회에 사용할 수 있습니다. 문자 수신 대상은 신청 후에도 관리자가 대표만/두 선수 모두로 변경할 수 있습니다.</div>
           <div class="button-row legacy-entry-actions"><button id="entryApplicationSubmitBtn" type="button" class="btn btn-primary">참가 신청 접수</button><button id="entryApplicationEditCancelBtn" type="button" class="btn btn-light" hidden>수정 취소</button></div>
           <div id="entryApplicationReceipt" class="notice success entry-receipt" hidden></div>
+          </div>
         </article>
 
         <aside class="panel entry-lookup-panel legacy-entry-lookup-card">
@@ -1939,7 +1945,7 @@
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=7109"></script>
+  <script type="module" src="./assets/js/app.js?v=7111"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
@@ -2440,6 +2446,16 @@ input[type="radio"]{
   .entry-cancel-grid .full{grid-column:auto}
   .entry-self-edit-dialog,.entry-cancel-request-dialog{width:calc(100vw - 16px)}
 }
+</style>
+
+
+<style id="stage7110EntryAutoCollapseStyles">
+.entry-form-collapse-toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;margin:0 0 10px;padding:11px 13px;border:1px solid #c9d9ec;border-radius:12px;background:#f4f8fd;color:#17365f;font-weight:900;cursor:pointer}
+.entry-form-collapse-toggle small{display:block;margin-top:2px;font-size:11px;font-weight:700;color:#6b7d91}
+.entry-form-collapse-toggle .entry-form-collapse-icon{font-size:16px}
+#entryApplicationFormCard.entry-form-auto-collapsed .entry-form-collapsible-body{display:none!important}
+#entryApplicationFormCard.entry-form-auto-collapsed .entry-form-collapse-toggle{margin-bottom:0}
+@media(max-width:640px){.entry-form-collapse-toggle{padding:9px 10px;font-size:12px}.entry-form-collapse-toggle small{font-size:10px}}
 </style>
 
 </body>

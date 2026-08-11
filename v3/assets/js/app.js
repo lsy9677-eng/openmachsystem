@@ -1,8 +1,8 @@
 import{getAuthConfig,saveAuthConfig,startAuth,signInGoogle,signOutSocial,beginExternalLogin,getExistingLoginEndpoints,signInEmail,registerEmail,sendPasswordReset,linkEmailPassword,authProviderIds,getAuthRuntime}from'./auth-engine.js?v=3565';
-import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7109';
+import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7111';
 import{notificationSupport,getStoredVapidKey,saveStoredVapidKey,enableMyPush,disableMyPush,queuePush,listPushJobs,listPushTokens}from'./notification-engine.js?v=332012';
 
-import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7109';
+import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7111';
 import{prepareTeams,generateDraw,allMatches,findMatch,generateLinkedDrawSlots,syncLinkedDrawQualifiers}from'./bracket-engine-v5000.js?v=5000';
 import{ensureDrawMeta,canModifyDraw,createDrawWithMethod,lockDraw,unlockDrawForDevelopment,clearDrawHistory}from'./draw-method-engine.js?v=332012';
 import{buildCourts,assignInitial,queueReadyMatches,refillCourt}from'./court-engine.js?v=332012';
@@ -15,7 +15,7 @@ import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactD
 import{render,teamText}from'./ui.js?v=3504';
 import{ensureAuditState,runStateAudit,runPrelimSimulation,runFullSimulation,applyAuditResult}from'./audit-engine.js?v=332012';
 import{earlyMainStats,markResolvedMainMatchesReady,canAssignEarlyMain,ensureEarlyMainSettings,autoAssignResolvedMain}from'./early-main-engine.js?v=332012';
-import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7109';
+import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7111';
 import{ensureMainDrawLifecycle,beginMainDraw,completeMainDraw,failMainDraw,resetMainDraw,hasAuthorizedMainDraw,mainDrawStatus,clearMainPlacement,repairMainDrawAuthorization}from'./main-draw-lifecycle-engine.js?v=3501';
 import{shouldUseLinkedDraw,linkedDrawNeedsRepair,rebuildLinkedDraw,hasStartedMainMatches}from'./linked-draw-guard-engine.js?v=332012';
 import{ensureVenueSettings,ensureVenueQueues,venuePreset,buildVenueCourts,prelimVenues,mainVenues}from'./venue-engine.js?v=332012';
@@ -26,7 +26,7 @@ import{ensureCourtStatuses,pauseCourt,resumeCourt}from'./court-status-engine.js?
 import{ensureCourtManualQueues,assignToCourtManualQueue,moveCourtMatchFlexible,returnManualQueueItemToVenue,reorderCourtManualQueue}from'./court-manual-queue-engine.js?v=332012';
 import{reorderPrelimQueue as reorderPrelimQueueItem,movePrelimQueuedMatch,returnPrelimWait1ToQueue}from'./prelim-queue-control-engine.js?v=332012';
 import{ensurePrelimCourtStatuses,pausePrelimCourt,resumePrelimCourt}from'./prelim-court-status-engine.js?v=332012';
-import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7109';
+import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7111';
 import{verifyAndRepairMainFlow}from'./main-flow-integrity-engine.js?v=332012';
 import{finalizeTournamentCompletion}from'./tournament-completion-engine.js?v=332012';
 import{ensureTournamentIdentity,validateTournamentForArchive,createTournamentArchive,archiveListItem,archiveBackupPayload}from'./archive-engine.js?v=354000';
@@ -3475,6 +3475,7 @@ async function submitPublicApplication(){
     receipt.innerHTML=`<strong>${item.status==='reserve'?'후보팀으로 접수되었습니다.':'참가 신청이 접수되었습니다.'}</strong><span>신청번호 ${portalEscape(item.code)} · ${item.status==='reserve'?`후보 ${simpleRegistrationReserveOrder(item)}번`:'입금 확인 후 입금완료로 표시됩니다.'}</span>${payAccount||payFee?`<span>참가비 ${portalEscape(payFee||'미설정')} · ${portalEscape(payAccount||'계좌 미설정')}</span>`:''}`;
   }}
   notice(item.status==='reserve'?`정원 초과로 후보 ${simpleRegistrationReserveOrder(item)}번에 자동 등록되었습니다.`:'참가 신청이 접수되었습니다. 입금 확인만 남았습니다.','success');
+  entryFormManualExpanded=false;entryFormUserOpened=false;renderEntryFormCollapseState();
   }catch(error){
     console.error('[230MATCH] 참가 신청 처리 오류',error);
     notice(`참가 신청 처리 중 오류가 발생했습니다: ${error?.message||error}`,'error');
@@ -3530,6 +3531,57 @@ async function copyEntryPaymentAccount(){
     }
     notice(`계좌번호를 복사했습니다. ${account}`,'success');
   }catch(error){notice(`계좌번호 복사 실패: ${error?.message||error}`,'error');}
+}
+
+
+let entryFormManualExpanded=false;
+let entryFormUserOpened=false;
+function currentUserHasActiveEntry(){
+  if(!currentAuthUser)return false;
+  const ctx=registrationContext();
+  const rows=registrationCloudReady?registrationCloudRows:(state.portal?.applications||[]);
+  return rows.some(a=>
+    String(a.ownerUid||'')===String(currentAuthUser.uid||'') &&
+    String(a.tournamentId||ctx.tournamentId)===String(ctx.tournamentId||'') &&
+    (
+      !a.divisionId ||
+      String(a.divisionId)===String(ctx.divisionId||'') ||
+      String(a.tournamentDivision||a.divisionName||'').trim()===String(ctx.divisionName||'').trim()
+    ) &&
+    ['approved','reserve'].includes(a.status)
+  );
+}
+function renderEntryFormCollapseState(){
+  const card=document.getElementById('entryApplicationFormCard');
+  const toggle=document.getElementById('entryFormCollapseToggle');
+  const title=document.getElementById('entryFormCollapseTitle');
+  const hint=document.getElementById('entryFormCollapseHint');
+  const icon=document.getElementById('entryFormCollapseIcon');
+  if(!card||!toggle)return;
+
+  const completed=currentUserHasActiveEntry();
+  // 일반회원/관리자 모두 기본은 접힘. 사용자가 명시적으로 열었을 때만 펼칩니다.
+  const shouldCollapse=!entryFormUserOpened&&!entryEditingId;
+
+  card.classList.toggle('entry-form-auto-collapsed',shouldCollapse);
+  toggle.setAttribute('aria-expanded',String(!shouldCollapse));
+
+  if(shouldCollapse){
+    if(title)title.textContent=completed?'✓ 참가 신청 완료':'참가 신청하기';
+    if(hint)hint.textContent=completed
+      ?'신청 완료 상태입니다. 수정은 아래 내 신청 관리에서 진행하세요.'
+      :(canOperate()?'대리접수할 때만 신청서를 펼칩니다.':'신청할 때만 신청서를 펼칩니다.');
+  }else{
+    if(title)title.textContent=canOperate()?'참가 신청서 · 대리접수 가능':'참가 신청서';
+    if(hint)hint.textContent='신청 정보를 입력한 뒤 접수하세요.';
+  }
+  if(icon)icon.textContent=shouldCollapse?'+':'−';
+}
+function toggleEntryFormCollapse(){
+  entryFormUserOpened=!entryFormUserOpened;
+  entryFormManualExpanded=entryFormUserOpened;
+  renderEntryFormCollapseState();
+  if(entryFormUserOpened)setTimeout(()=>document.getElementById('entryPlayer1Name')?.focus(),40);
 }
 
 function renderEntrySelfManager(){
@@ -3671,7 +3723,7 @@ function suggestReservePromotion(){
 }
 
 function renderApplicationPortal(){
-  ensurePortalState();void startPublicRegistrationSync();renderEntryTournamentSelect();renderEntryPaymentInfo();renderEntryLoginGate();renderEntrySelfManager();
+  ensurePortalState();void startPublicRegistrationSync();renderEntryTournamentSelect();renderEntryPaymentInfo();renderEntryLoginGate();renderEntrySelfManager();renderEntryFormCollapseState();
   const privateApplications=[...simpleRegistrationRows()];
   const publicMirror=[...(publicRegistrationReady?publicRegistrationRowsForCurrentDivision():[])];
   const localApplications=[...(state.portal?.applications||[])];
@@ -3881,6 +3933,7 @@ function bindEntryApplications(){
   document.addEventListener('click',e=>{const action=e.target.closest?.('[data-entry-action]');if(action){processEntryApplication(action.dataset.entryId,action.dataset.entryAction);return;}const payment=e.target.closest?.('[data-entry-payment]');if(payment){toggleEntryPayment(payment.dataset.entryPayment);return;}const refund=e.target.closest?.('[data-entry-refund]');if(refund){refundEntryPayment(refund.dataset.entryRefund);return;}const sms=e.target.closest?.('[data-entry-sms]');if(sms){manualEntrySms(sms.dataset.entrySms);return;}const edit=e.target.closest?.('[data-entry-edit]');if(edit)return;const cancel=e.target.closest?.('[data-entry-cancel]');if(cancel){cancelEntryApplication(cancel.dataset.entryCancel);return;}const cancelApprove=e.target.closest?.('[data-entry-cancel-approve]');if(cancelApprove){approveRegistrationCancellation(cancelApprove.dataset.entryCancelApprove);return;}const cancelReject=e.target.closest?.('[data-entry-cancel-reject]');if(cancelReject){rejectRegistrationCancellation(cancelReject.dataset.entryCancelReject);return;}const showAll=e.target.closest?.('[data-entry-show-all]');if(showAll){const type=showAll.dataset.entryShowAll;const rows=simpleRegistrationRows().filter(a=>type==='reserve'?a.status==='reserve':a.status==='approved').sort((a,b)=>String(a.createdAt||'').localeCompare(String(b.createdAt||'')));const root=document.getElementById(type==='reserve'?'entryPublicReserveList':'entryPublicApprovedList');if(root){root.innerHTML=rows.map((a,index)=>`<article class="entry-public-team-row"><span class="entry-public-order">${index+1}</span><div><strong>${portalEscape(a.teamName||'팀명 미등록')}</strong><small>${portalEscape(a.affiliation||'소속 미등록')} · ${a.paid?'입금완료':'미입금'}</small></div>${type==='reserve'?`<span class="badge badge-warning">후보 ${index+1}</span>`:'<span class="badge badge-safe">참가</span>'}</article>`).join('');}return;}const division=e.target.closest?.('[data-entry-open-division]');if(division){switchDivisionWorkspace(String(division.dataset.entryOpenDivision||''),{view:'entry'});return;}});
   }
   const bindOnce=(id,event,handler)=>{const el=document.getElementById(id);if(el&&!el.dataset.entrySelfBound){el.dataset.entrySelfBound='1';el.addEventListener(event,handler);}};
+  bindOnce('entryFormCollapseToggle','click',toggleEntryFormCollapse);
   bindOnce('entrySelfEditCloseBtn','click',()=>document.getElementById('entrySelfEditDialog')?.close());
   bindOnce('entrySelfEditCancelBtn','click',()=>document.getElementById('entrySelfEditDialog')?.close());
   bindOnce('entrySelfEditSaveBtn','click',()=>void saveEntrySelfEdit());
@@ -9925,4 +9978,4 @@ console.info('[230MATCH] 63.0.0 ready · chunked cloud workspace + bounded retry
 
 console.info('[230MATCH] 64.0.0 architecture · lazy cloud registry, worker serialization, visible-view commit rendering');
 
-console.info('[230MATCH] 71.0.9 ready · self edit modal click routing fixed');
+console.info('[230MATCH] 71.1.1 ready · registration form collapsed by default for everyone');
