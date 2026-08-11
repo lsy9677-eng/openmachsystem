@@ -1,8 +1,8 @@
 import{getAuthConfig,saveAuthConfig,startAuth,signInGoogle,signOutSocial,beginExternalLogin,getExistingLoginEndpoints,signInEmail,registerEmail,sendPasswordReset,linkEmailPassword,authProviderIds,getAuthRuntime}from'./auth-engine.js?v=3565';
-import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7108';
+import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7109';
 import{notificationSupport,getStoredVapidKey,saveStoredVapidKey,enableMyPush,disableMyPush,queuePush,listPushJobs,listPushTokens}from'./notification-engine.js?v=332012';
 
-import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7108';
+import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7109';
 import{prepareTeams,generateDraw,allMatches,findMatch,generateLinkedDrawSlots,syncLinkedDrawQualifiers}from'./bracket-engine-v5000.js?v=5000';
 import{ensureDrawMeta,canModifyDraw,createDrawWithMethod,lockDraw,unlockDrawForDevelopment,clearDrawHistory}from'./draw-method-engine.js?v=332012';
 import{buildCourts,assignInitial,queueReadyMatches,refillCourt}from'./court-engine.js?v=332012';
@@ -15,7 +15,7 @@ import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactD
 import{render,teamText}from'./ui.js?v=3504';
 import{ensureAuditState,runStateAudit,runPrelimSimulation,runFullSimulation,applyAuditResult}from'./audit-engine.js?v=332012';
 import{earlyMainStats,markResolvedMainMatchesReady,canAssignEarlyMain,ensureEarlyMainSettings,autoAssignResolvedMain}from'./early-main-engine.js?v=332012';
-import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7108';
+import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7109';
 import{ensureMainDrawLifecycle,beginMainDraw,completeMainDraw,failMainDraw,resetMainDraw,hasAuthorizedMainDraw,mainDrawStatus,clearMainPlacement,repairMainDrawAuthorization}from'./main-draw-lifecycle-engine.js?v=3501';
 import{shouldUseLinkedDraw,linkedDrawNeedsRepair,rebuildLinkedDraw,hasStartedMainMatches}from'./linked-draw-guard-engine.js?v=332012';
 import{ensureVenueSettings,ensureVenueQueues,venuePreset,buildVenueCourts,prelimVenues,mainVenues}from'./venue-engine.js?v=332012';
@@ -26,7 +26,7 @@ import{ensureCourtStatuses,pauseCourt,resumeCourt}from'./court-status-engine.js?
 import{ensureCourtManualQueues,assignToCourtManualQueue,moveCourtMatchFlexible,returnManualQueueItemToVenue,reorderCourtManualQueue}from'./court-manual-queue-engine.js?v=332012';
 import{reorderPrelimQueue as reorderPrelimQueueItem,movePrelimQueuedMatch,returnPrelimWait1ToQueue}from'./prelim-queue-control-engine.js?v=332012';
 import{ensurePrelimCourtStatuses,pausePrelimCourt,resumePrelimCourt}from'./prelim-court-status-engine.js?v=332012';
-import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7108';
+import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7109';
 import{verifyAndRepairMainFlow}from'./main-flow-integrity-engine.js?v=332012';
 import{finalizeTournamentCompletion}from'./tournament-completion-engine.js?v=332012';
 import{ensureTournamentIdentity,validateTournamentForArchive,createTournamentArchive,archiveListItem,archiveBackupPayload}from'./archive-engine.js?v=354000';
@@ -3852,7 +3852,18 @@ async function rejectRegistrationCancellation(id){
 }
 
 let entryApplicationDelegatedBound=false;
+let entryEditCaptureBound=false;
 function bindEntryApplications(){
+  if(!entryEditCaptureBound){
+    entryEditCaptureBound=true;
+    document.addEventListener('click',e=>{
+      const edit=e.target.closest?.('[data-entry-edit]');
+      if(!edit)return;
+      e.preventDefault();
+      e.stopPropagation();
+      editEntryApplication(String(edit.dataset.entryEdit||''));
+    },true);
+  }
   const entrySubmit=document.getElementById('entryApplicationSubmitBtn');if(entrySubmit&&!entrySubmit.dataset.directBound){entrySubmit.dataset.directBound='1';entrySubmit.addEventListener('click',submitPublicApplication);}
   if(!entryApplicationDelegatedBound){entryApplicationDelegatedBound=true;
   document.addEventListener('click',e=>{
@@ -3867,7 +3878,7 @@ function bindEntryApplications(){
   document.getElementById('entryLookupBtn')?.addEventListener('click',lookupPublicApplication);
   document.getElementById('entryLookupPhone')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();lookupPublicApplication();}});
   document.getElementById('entryAdminFilter')?.addEventListener('change',renderApplicationPortal);
-  document.addEventListener('click',e=>{const action=e.target.closest?.('[data-entry-action]');if(action){processEntryApplication(action.dataset.entryId,action.dataset.entryAction);return;}const payment=e.target.closest?.('[data-entry-payment]');if(payment){toggleEntryPayment(payment.dataset.entryPayment);return;}const refund=e.target.closest?.('[data-entry-refund]');if(refund){refundEntryPayment(refund.dataset.entryRefund);return;}const sms=e.target.closest?.('[data-entry-sms]');if(sms){manualEntrySms(sms.dataset.entrySms);return;}const edit=e.target.closest?.('[data-entry-edit]');if(edit){editEntryApplication(edit.dataset.entryEdit);return;}const cancel=e.target.closest?.('[data-entry-cancel]');if(cancel){cancelEntryApplication(cancel.dataset.entryCancel);return;}const cancelApprove=e.target.closest?.('[data-entry-cancel-approve]');if(cancelApprove){approveRegistrationCancellation(cancelApprove.dataset.entryCancelApprove);return;}const cancelReject=e.target.closest?.('[data-entry-cancel-reject]');if(cancelReject){rejectRegistrationCancellation(cancelReject.dataset.entryCancelReject);return;}const showAll=e.target.closest?.('[data-entry-show-all]');if(showAll){const type=showAll.dataset.entryShowAll;const rows=simpleRegistrationRows().filter(a=>type==='reserve'?a.status==='reserve':a.status==='approved').sort((a,b)=>String(a.createdAt||'').localeCompare(String(b.createdAt||'')));const root=document.getElementById(type==='reserve'?'entryPublicReserveList':'entryPublicApprovedList');if(root){root.innerHTML=rows.map((a,index)=>`<article class="entry-public-team-row"><span class="entry-public-order">${index+1}</span><div><strong>${portalEscape(a.teamName||'팀명 미등록')}</strong><small>${portalEscape(a.affiliation||'소속 미등록')} · ${a.paid?'입금완료':'미입금'}</small></div>${type==='reserve'?`<span class="badge badge-warning">후보 ${index+1}</span>`:'<span class="badge badge-safe">참가</span>'}</article>`).join('');}return;}const division=e.target.closest?.('[data-entry-open-division]');if(division){switchDivisionWorkspace(String(division.dataset.entryOpenDivision||''),{view:'entry'});return;}});
+  document.addEventListener('click',e=>{const action=e.target.closest?.('[data-entry-action]');if(action){processEntryApplication(action.dataset.entryId,action.dataset.entryAction);return;}const payment=e.target.closest?.('[data-entry-payment]');if(payment){toggleEntryPayment(payment.dataset.entryPayment);return;}const refund=e.target.closest?.('[data-entry-refund]');if(refund){refundEntryPayment(refund.dataset.entryRefund);return;}const sms=e.target.closest?.('[data-entry-sms]');if(sms){manualEntrySms(sms.dataset.entrySms);return;}const edit=e.target.closest?.('[data-entry-edit]');if(edit)return;const cancel=e.target.closest?.('[data-entry-cancel]');if(cancel){cancelEntryApplication(cancel.dataset.entryCancel);return;}const cancelApprove=e.target.closest?.('[data-entry-cancel-approve]');if(cancelApprove){approveRegistrationCancellation(cancelApprove.dataset.entryCancelApprove);return;}const cancelReject=e.target.closest?.('[data-entry-cancel-reject]');if(cancelReject){rejectRegistrationCancellation(cancelReject.dataset.entryCancelReject);return;}const showAll=e.target.closest?.('[data-entry-show-all]');if(showAll){const type=showAll.dataset.entryShowAll;const rows=simpleRegistrationRows().filter(a=>type==='reserve'?a.status==='reserve':a.status==='approved').sort((a,b)=>String(a.createdAt||'').localeCompare(String(b.createdAt||'')));const root=document.getElementById(type==='reserve'?'entryPublicReserveList':'entryPublicApprovedList');if(root){root.innerHTML=rows.map((a,index)=>`<article class="entry-public-team-row"><span class="entry-public-order">${index+1}</span><div><strong>${portalEscape(a.teamName||'팀명 미등록')}</strong><small>${portalEscape(a.affiliation||'소속 미등록')} · ${a.paid?'입금완료':'미입금'}</small></div>${type==='reserve'?`<span class="badge badge-warning">후보 ${index+1}</span>`:'<span class="badge badge-safe">참가</span>'}</article>`).join('');}return;}const division=e.target.closest?.('[data-entry-open-division]');if(division){switchDivisionWorkspace(String(division.dataset.entryOpenDivision||''),{view:'entry'});return;}});
   }
   const bindOnce=(id,event,handler)=>{const el=document.getElementById(id);if(el&&!el.dataset.entrySelfBound){el.dataset.entrySelfBound='1';el.addEventListener(event,handler);}};
   bindOnce('entrySelfEditCloseBtn','click',()=>document.getElementById('entrySelfEditDialog')?.close());
@@ -5454,7 +5465,11 @@ function v3252Recipients(item){
   const list=mode==='representative'?[ps.find(p=>p.index===Number(item?.representativeIndex||0))||ps[0]].filter(Boolean):ps;
   const seen=new Set();return list.filter(p=>{const k=p.phone;if(!k||seen.has(k))return false;seen.add(k);return true;});
 }
-function v3252CanEdit(item,lookup=''){return !!item&&item.status==='pending'&&((currentAuthUser&&item.ownerUid===currentAuthUser.uid)||entryApplicationPlayers(item).some(p=>p.phone===lookup));}
+function v3252CanEdit(item,lookup=''){
+  if(!item||!['approved','reserve'].includes(item.status)||item.cancelRequestStatus==='requested')return false;
+  if(currentAuthUser&&String(item.ownerUid||'')===String(currentAuthUser.uid||''))return true;
+  return Boolean(lookup)&&entryApplicationPlayers(item).some(p=>String(p.phone||'').replace(/\D/g,'')===String(lookup).replace(/\D/g,''));
+}
 function v3252DeleteRequest(id){const item=simpleRegistrationRows().find(a=>a.id===id);const lookup=String(document.getElementById('entryLookupPhone')?.value||'').replace(/\D/g,'');if(!v3252CanEdit(item,lookup))return notice('로그인한 본인의 승인 대기 신청만 삭제 요청할 수 있습니다.','error');if(!confirm(`${item.teamName} 참가 신청의 삭제를 관리자에게 요청할까요?`))return;item.status='delete_requested';item.deleteRequestedAt=new Date().toISOString();item.updatedAt=item.deleteRequestedAt;commit(`참가 신청 삭제 요청 · ${item.teamName}`);lookupPublicApplication();renderApplicationPortal();notice('삭제 요청을 접수했습니다. 관리자가 확인 후 삭제합니다.','success');}
 function v3252AdminDelete(id){if(!requireAdmin('참가 신청 삭제'))return;const item=simpleRegistrationRows().find(a=>a.id===id);if(!item)return;if(!confirm(`${item.teamName} 참가 신청을 최종 삭제할까요?`))return;state.portal.applications=state.portal.applications.filter(a=>a.id!==id);commit(`참가 신청 관리자 삭제 · ${item.teamName}`);renderApplicationPortal();lookupPublicApplication();notice('참가 신청을 삭제했습니다.','success');}
 function v3252AutoMyMatch(){
@@ -5480,7 +5495,16 @@ function v3252AutoMyMatch(){
   const guide=document.getElementById('myMatchSearchGuide');if(guide)guide.textContent=scored.length>1?'로그인 정보와 가장 잘 일치하는 본인 팀을 먼저 표시했습니다. 다른 팀은 검색할 수 있습니다.':'로그인 정보와 일치하는 본인 경기를 자동 표시했습니다. 다른 선수·팀도 검색할 수 있습니다.';
 }
 const v3252OriginalSubmit=submitPublicApplication;submitPublicApplication=function(){const before=(state.portal?.applications||[]).length;const data=entryApplicationPlayersFromForm();const result=v3252OriginalSubmit.apply(this,arguments);if((state.portal?.applications||[]).length>before)v3252SaveProfile(data.players,data.representative);return result;};
-const v3252OriginalEdit=editEntryApplication;editEntryApplication=function(id){const item=simpleRegistrationRows().find(a=>a.id===id);const lookup=String(document.getElementById('entryLookupPhone')?.value||'').replace(/\D/g,'');if(!v3252CanEdit(item,lookup))return notice('로그인한 본인 또는 등록 연락처로 확인된 승인 대기 신청만 수정할 수 있습니다.','error');return v3252OriginalEdit(id);};
+const v3252OriginalEdit=editEntryApplication;
+editEntryApplication=function(id){
+  const item=(registrationCloudReady?registrationCloudRows:simpleRegistrationRows()).find(a=>String(a.id)===String(id));
+  const lookup=String(document.getElementById('entryLookupPhone')?.value||'').replace(/\D/g,'');
+  if(!v3252CanEdit(item,lookup)){
+    notice('로그인한 본인의 참가 신청만 수정할 수 있습니다. 취소 승인 대기 중에는 수정할 수 없습니다.','error');
+    return;
+  }
+  return v3252OriginalEdit(id);
+};
 function entrySmsDialogPlayers(item){
   const players=entryApplicationPlayers(item).map((p,index)=>({index,name:String(p.name||`선수 ${index+1}`),phone:String(p.phone||'').replace(/\D/g,'')}));
   const repIndex=Number(item?.representativeIndex||0)===1?1:0;
@@ -9901,4 +9925,4 @@ console.info('[230MATCH] 63.0.0 ready · chunked cloud workspace + bounded retry
 
 console.info('[230MATCH] 64.0.0 architecture · lazy cloud registry, worker serialization, visible-view commit rendering');
 
-console.info('[230MATCH] 71.0.8 ready · self edit modal + single cancel request modal');
+console.info('[230MATCH] 71.0.9 ready · self edit modal click routing fixed');
