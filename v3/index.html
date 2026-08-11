@@ -1913,7 +1913,7 @@
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=7014"></script>
+  <script type="module" src="./assets/js/app.js?v=7100"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
@@ -2243,6 +2243,17 @@ input[type="radio"]{
     display:none!important;
   }
 }
+</style>
+
+
+<style id="stage7100SimpleRegistrationStyles">
+.entry-admin-row.simple-registration .entry-actions{display:flex;flex-wrap:wrap;gap:7px}
+.entry-admin-row.simple-registration .entry-payment-wrap{display:flex;flex-direction:column;gap:3px}
+.entry-admin-row.simple-registration .entry-payment-time{font-size:11px;color:#55708e}
+.entry-admin-row.simple-registration .cancel-request-box{grid-column:1/-1;padding:10px 12px;border-radius:12px;background:#fff5f5;border:1px solid #f3c2c2;color:#8b2c2c;font-size:12px;line-height:1.45}
+.entry-admin-row.simple-registration .cancel-request-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:7px}
+.entry-payment-button.paid{background:#e8f7ed;border-color:#b9dec4;color:#22623a}
+.entry-payment-button.unpaid{background:#fff8e6;border-color:#ecd89a;color:#7d5b00}
 </style>
 
 </body>
