@@ -1913,7 +1913,7 @@
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=7009"></script>
+  <script type="module" src="./assets/js/app.js?v=7012"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
@@ -2130,6 +2130,118 @@ input[type="radio"]{
     flex-basis:17px!important;
   }
   .form-check{gap:6px!important}
+}
+</style>
+
+
+<style id="stage7011EntryAdminOverviewStyles">
+.entry-admin-division-overview{margin:12px 0 14px;padding:14px;border:1px solid #d7e2ef;border-radius:16px;background:#f8fbff;display:grid;gap:10px}
+.entry-admin-division-overview-head{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.entry-admin-division-overview-head strong{font-size:14px;color:#15355f}
+.entry-admin-division-overview-head span{font-size:12px;color:#66798f}
+.entry-admin-division-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px}
+.entry-admin-division-card{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 11px;border:1px solid #d7e2ef;border-radius:12px;background:#fff}
+.entry-admin-division-card.current{border-color:#8db5ef;background:#eef5ff}
+.entry-admin-division-card.pending{border-color:#efcf7c;background:#fff9e8}
+.entry-admin-division-card div{display:grid;gap:2px;min-width:0}
+.entry-admin-division-card strong{font-size:13px;color:#17365f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.entry-admin-division-card small{font-size:11px;color:#6a7c91}
+.entry-login-gate{margin:10px 0 0;padding:11px 13px;border-radius:12px;background:#fff6df;border:1px solid #efd28b;color:#765100;font-size:12px;font-weight:800}
+.entry-login-gate.success{background:#eaf8ee;border-color:#b9dec3;color:#26643a}
+@media(max-width:640px){
+  .entry-admin-division-overview{padding:11px}
+  .entry-admin-division-overview-head{align-items:flex-start;flex-direction:column}
+  .entry-admin-division-cards{grid-template-columns:1fr}
+  .entry-admin-division-card{padding:9px 10px}
+}
+</style>
+
+
+<style id="stage7012MobileWorkspaceCompact">
+@media(max-width:760px){
+  #divisionWorkspaceBar{
+    margin:5px 0!important;
+    padding:7px 8px!important;
+  }
+  #divisionWorkspaceBar .division-v6002-top{
+    gap:5px!important;
+  }
+  #divisionWorkspaceBar .division-v6002-current{
+    gap:2px!important;
+  }
+  #divisionWorkspaceBar .division-v6002-current>span{
+    font-size:10px!important;
+  }
+  #divisionWorkspaceBar .division-v6002-current select{
+    min-height:34px!important;
+    height:34px!important;
+    padding:0 9px!important;
+    border-radius:8px!important;
+    font-size:13px!important;
+  }
+  #divisionWorkspaceBar .division-v6002-title{
+    gap:0!important;
+  }
+  #divisionWorkspaceBar .division-v6002-title>strong{
+    font-size:12px!important;
+  }
+  #divisionWorkspaceBar .division-v6002-title>span{
+    display:none!important;
+  }
+  #divisionWorkspaceBar [data-v6002-edit-divisions]{
+    min-height:32px!important;
+    height:32px!important;
+    padding:4px 8px!important;
+    font-size:11px!important;
+  }
+  #divisionWorkspaceBar .division-v6002-grid{
+    gap:5px!important;
+    margin-top:5px!important;
+  }
+  #divisionWorkspaceBar .division-v6002-card,
+  #divisionWorkspaceBar .division-v6002-card.active{
+    padding:6px 7px!important;
+    gap:1px!important;
+    border-radius:10px!important;
+  }
+  #divisionWorkspaceBar .division-v6002-card span{
+    font-size:9px!important;
+    line-height:1.1!important;
+  }
+  #divisionWorkspaceBar .division-v6002-card strong{
+    font-size:13px!important;
+    line-height:1.2!important;
+  }
+  #divisionWorkspaceBar .division-v6002-card small{
+    font-size:9px!important;
+    line-height:1.15!important;
+    margin-top:1px!important;
+  }
+  #divisionWorkspaceBar .division-v6002-card em{
+    display:none!important;
+  }
+  #divisionWorkspaceBar .division-v6003-quick{
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;
+    gap:4px!important;
+    margin-top:4px!important;
+    padding-top:4px!important;
+  }
+  #divisionWorkspaceBar .division-v6003-quick>button,
+  #divisionWorkspaceBar .division-v6003-more>button{
+    min-height:29px!important;
+    height:29px!important;
+    padding:2px 3px!important;
+    border-radius:7px!important;
+    font-size:10px!important;
+    line-height:1.05!important;
+  }
+  #divisionWorkspaceBar .division-v6003-more{
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;
+    gap:4px!important;
+  }
+  #divisionWorkspaceBar .division-v6002-context{
+    display:none!important;
+  }
 }
 </style>
 

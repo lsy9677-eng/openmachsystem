@@ -1,8 +1,8 @@
 import{getAuthConfig,saveAuthConfig,startAuth,signInGoogle,signOutSocial,beginExternalLogin,getExistingLoginEndpoints,signInEmail,registerEmail,sendPasswordReset,linkEmailPassword,authProviderIds,getAuthRuntime}from'./auth-engine.js?v=3565';
-import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7009';
+import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7012';
 import{notificationSupport,getStoredVapidKey,saveStoredVapidKey,enableMyPush,disableMyPush,queuePush,listPushJobs,listPushTokens}from'./notification-engine.js?v=332012';
 
-import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7009';
+import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7012';
 import{prepareTeams,generateDraw,allMatches,findMatch,generateLinkedDrawSlots,syncLinkedDrawQualifiers}from'./bracket-engine-v5000.js?v=5000';
 import{ensureDrawMeta,canModifyDraw,createDrawWithMethod,lockDraw,unlockDrawForDevelopment,clearDrawHistory}from'./draw-method-engine.js?v=332012';
 import{buildCourts,assignInitial,queueReadyMatches,refillCourt}from'./court-engine.js?v=332012';
@@ -15,7 +15,7 @@ import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactD
 import{render,teamText}from'./ui.js?v=3504';
 import{ensureAuditState,runStateAudit,runPrelimSimulation,runFullSimulation,applyAuditResult}from'./audit-engine.js?v=332012';
 import{earlyMainStats,markResolvedMainMatchesReady,canAssignEarlyMain,ensureEarlyMainSettings,autoAssignResolvedMain}from'./early-main-engine.js?v=332012';
-import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7009';
+import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7012';
 import{ensureMainDrawLifecycle,beginMainDraw,completeMainDraw,failMainDraw,resetMainDraw,hasAuthorizedMainDraw,mainDrawStatus,clearMainPlacement,repairMainDrawAuthorization}from'./main-draw-lifecycle-engine.js?v=3501';
 import{shouldUseLinkedDraw,linkedDrawNeedsRepair,rebuildLinkedDraw,hasStartedMainMatches}from'./linked-draw-guard-engine.js?v=332012';
 import{ensureVenueSettings,ensureVenueQueues,venuePreset,buildVenueCourts,prelimVenues,mainVenues}from'./venue-engine.js?v=332012';
@@ -26,14 +26,14 @@ import{ensureCourtStatuses,pauseCourt,resumeCourt}from'./court-status-engine.js?
 import{ensureCourtManualQueues,assignToCourtManualQueue,moveCourtMatchFlexible,returnManualQueueItemToVenue,reorderCourtManualQueue}from'./court-manual-queue-engine.js?v=332012';
 import{reorderPrelimQueue as reorderPrelimQueueItem,movePrelimQueuedMatch,returnPrelimWait1ToQueue}from'./prelim-queue-control-engine.js?v=332012';
 import{ensurePrelimCourtStatuses,pausePrelimCourt,resumePrelimCourt}from'./prelim-court-status-engine.js?v=332012';
-import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7009';
+import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7012';
 import{verifyAndRepairMainFlow}from'./main-flow-integrity-engine.js?v=332012';
 import{finalizeTournamentCompletion}from'./tournament-completion-engine.js?v=332012';
 import{ensureTournamentIdentity,validateTournamentForArchive,createTournamentArchive,archiveListItem,archiveBackupPayload}from'./archive-engine.js?v=354000';
 import{listExistingTournaments,loadExistingTournament,convertExistingTournament}from'./legacy-firestore-bridge.js?v=332023';
 
 
-const WORKSPACE_ROUTE_BUILD='7008';
+const WORKSPACE_ROUTE_BUILD='7012';
 function workspaceRouteUrl(tournamentId='',divisionId='',view='home'){
   const url=new URL(window.location.href);
   url.searchParams.set('v',WORKSPACE_ROUTE_BUILD);
@@ -70,6 +70,7 @@ async function goWorkspaceRoute(tournamentId='',divisionId='',view='home'){
       history.pushState({tournamentId:targetTournamentId,divisionId:targetDivisionId,portalView:targetView},'',href);
       syncInputs();syncPrelimInputs();
       safePersistState('부서 전환');
+      if(registrationCloudReady)mirrorRegistrationRowsToCurrentDivision();
       renderCommittedState6400();
       navigatePortalView(targetView,{focus:false});
       return true;
@@ -644,6 +645,8 @@ function applyAuthenticatedRole(user,role='viewer',profile=null){
   currentAuthUser=user?{...user,appProfile:profile||null}:null;currentRole=user?role:'viewer';sessionStorage.setItem(ROLE_KEY,currentRole);applyRoleUI();renderAuthStatus();
   if(before!==currentRole)refreshSyncAccessMode();
   if(currentAuthUser&&currentRole==='admin'&&globalNoticeReady&&!globalNoticeCloudExists){setTimeout(()=>saveGlobalNoticeCloud('기존 공지 전체 공지로 전환').catch(error=>console.warn('[230MATCH] 기존 공지 전역 전환 대기',error)),250);}
+  setTimeout(()=>void startRegistrationCloudSync({force:true}),80);
+  if(document.body?.dataset.currentView==='entry')setTimeout(()=>{renderEntryLoginGate();renderApplicationPortal();},120);
   if(currentAuthUser&&document.body?.dataset.currentView==='my-match')setTimeout(v3252AutoMyMatch,80);
 }
 function renderAuthStatus(){
@@ -3086,7 +3089,188 @@ function clearEntryApplicationForm(){
   const submit=document.getElementById('entryApplicationSubmitBtn');if(submit)submit.textContent='참가 신청 접수';
   const cancel=document.getElementById('entryApplicationEditCancelBtn');if(cancel)cancel.hidden=true;
 }
-function submitPublicApplication(){
+
+
+const REGISTRATION_COLLECTION='matchRegistrationsV1';
+let registrationCloudRows=[];
+let registrationCloudUnsubscribe=null;
+let registrationCloudKey='';
+let registrationCloudReady=false;
+function registrationContext(){
+  try{ensureMultiDivisionRuntime();}catch(_e){}
+  return {
+    tournamentId:String(state.tournament?.id||state.multiTournament?.activeTournamentId||''),
+    divisionId:String(state.multiDivision?.activeDivisionId||''),
+    divisionName:String(state.multiDivision?.divisions?.find(d=>String(d.id)===String(state.multiDivision?.activeDivisionId))?.name||state.tournament?.division||'')
+  };
+}
+function registrationNormalize(row={}){
+  return {...row,id:String(row.id||''),ownerUid:String(row.ownerUid||''),tournamentId:String(row.tournamentId||''),divisionId:String(row.divisionId||''),status:String(row.status||'pending'),createdAt:String(row.createdAt||''),updatedAt:String(row.updatedAt||row.createdAt||'')};
+}
+function registrationRowsForCurrentDivision(){
+  const ctx=registrationContext();
+  return registrationCloudRows.filter(r=>r.tournamentId===ctx.tournamentId&&r.divisionId===ctx.divisionId);
+}
+function mirrorRegistrationRowsToCurrentDivision(){
+  if(!registrationCloudReady)return;
+  ensurePortalState();
+  state.portal.applications=structuredClone(registrationRowsForCurrentDivision());
+  try{syncCurrentDivisionRuntime?.();}catch(_e){}
+}
+function registrationAdminRowsByDivision(){
+  const ctx=registrationContext();
+  return registrationCloudRows.filter(r=>r.tournamentId===ctx.tournamentId);
+}
+async function registrationRuntime(){
+  const rt=await getAuthRuntime();
+  if(!rt?.db||!rt?.api)throw new Error('참가신청 Firebase 연결에 실패했습니다.');
+  return rt;
+}
+async function saveRegistrationCloud(item){
+  if(!currentAuthUser)throw new Error('로그인이 필요합니다.');
+  const rt=await registrationRuntime();
+  const ctx=registrationContext();
+  const row=registrationNormalize({
+    ...item,
+    id:item.id||crypto.randomUUID(),
+    tournamentId:item.tournamentId||ctx.tournamentId,
+    divisionId:item.divisionId||ctx.divisionId,
+    tournamentDivision:item.tournamentDivision||ctx.divisionName,
+    ownerUid:item.ownerUid||currentAuthUser.uid,
+    updatedAt:new Date().toISOString()
+  });
+  const ref=rt.api.doc(rt.db,REGISTRATION_COLLECTION,row.id);
+  await rt.api.setDoc(ref,row,{merge:true});
+  const idx=registrationCloudRows.findIndex(x=>x.id===row.id);
+  if(idx>=0)registrationCloudRows[idx]=row;else registrationCloudRows.unshift(row);
+  registrationCloudReady=true;
+  mirrorRegistrationRowsToCurrentDivision();
+  return row;
+}
+async function removeRegistrationCloud(id){
+  if(!currentAuthUser)throw new Error('로그인이 필요합니다.');
+  const rt=await registrationRuntime();
+  await rt.api.deleteDoc(rt.api.doc(rt.db,REGISTRATION_COLLECTION,String(id)));
+  registrationCloudRows=registrationCloudRows.filter(x=>x.id!==String(id));
+  mirrorRegistrationRowsToCurrentDivision();
+}
+function registrationProfilePhone(){
+  const p=currentAuthUser?.appProfile||{},d=p.registrationDefaults||{};
+  return String(p.phone||d.phone||'').replace(/\D/g,'');
+}
+async function migrateLocalOwnRegistrations(){
+  if(!currentAuthUser||canOperate())return;
+  const phone=registrationProfilePhone();if(phone.length<10)return;
+  const local=Array.isArray(state.portal?.applications)?state.portal.applications:[];
+  const candidates=local.filter(row=>{
+    const phones=entryApplicationPlayers(row).map(p=>String(p.phone||'').replace(/\D/g,''));
+    return (!row.ownerUid||row.ownerUid===currentAuthUser.uid)&&phones.includes(phone);
+  });
+  for(const row of candidates){
+    if(registrationCloudRows.some(x=>x.id===row.id))continue;
+    try{await saveRegistrationCloud({...row,ownerUid:currentAuthUser.uid});}catch(error){console.warn('[230MATCH] 기존 로컬 참가신청 전환 실패',error);}
+  }
+}
+async function startRegistrationCloudSync({force=false}={}){
+  if(!currentAuthUser){
+    registrationCloudUnsubscribe?.();registrationCloudUnsubscribe=null;registrationCloudRows=[];registrationCloudReady=false;registrationCloudKey='';
+    return;
+  }
+  const rt=await registrationRuntime();
+  const ctx=registrationContext();
+  const key=`${currentAuthUser.uid}|${currentRole}|${ctx.tournamentId}`;
+  if(!force&&registrationCloudUnsubscribe&&registrationCloudKey===key)return;
+  registrationCloudUnsubscribe?.();registrationCloudUnsubscribe=null;registrationCloudKey=key;
+  const collectionRef=rt.api.collection(rt.db,REGISTRATION_COLLECTION);
+  const q=canOperate()
+    ? rt.api.query(collectionRef,rt.api.where('tournamentId','==',ctx.tournamentId))
+    : rt.api.query(collectionRef,rt.api.where('ownerUid','==',currentAuthUser.uid));
+  registrationCloudUnsubscribe=rt.api.onSnapshot(q,snap=>{
+    registrationCloudRows=snap.docs.map(doc=>registrationNormalize({id:doc.id,...doc.data()}));
+    registrationCloudReady=true;
+    mirrorRegistrationRowsToCurrentDivision();
+    if(document.body?.dataset.currentView==='entry'){renderApplicationPortal();lookupPublicApplication();}
+  },error=>{
+    registrationCloudReady=false;
+    console.error('[230MATCH] 참가신청 실시간 연결 실패',error);
+    notice(`참가신청 불러오기 실패: ${error?.message||error}`,'error');
+  });
+  setTimeout(()=>void migrateLocalOwnRegistrations(),300);
+}
+
+function requireEntryLogin(){
+  if(currentAuthUser)return true;
+  notice('참가 신청은 로그인 후 이용할 수 있습니다. 먼저 로그인해 주세요.','warning');
+  openSocialLogin();
+  return false;
+}
+function renderEntryLoginGate(){
+  const submit=document.getElementById('entryApplicationSubmitBtn');
+  if(!submit)return;
+  let gate=document.getElementById('entryLoginGate');
+  if(!gate){
+    gate=document.createElement('div');
+    gate.id='entryLoginGate';
+    submit.parentElement?.insertBefore(gate,submit);
+  }
+  if(currentAuthUser){
+    gate.className='entry-login-gate success';
+    gate.textContent=`✓ ${authUserLabel()}님 로그인 상태 · 참가 신청 가능`;
+    if(!entryEditingId)submit.textContent='참가 신청 접수';
+  }else{
+    gate.className='entry-login-gate';
+    gate.textContent='🔒 참가 신청은 로그인 후 가능합니다. 상단 로그인 버튼 또는 참가 신청 버튼을 눌러 로그인하세요.';
+    if(!entryEditingId)submit.textContent='로그인 후 참가 신청';
+  }
+}
+function entryDivisionApplicationRows(){
+  try{ensureMultiDivisionRuntime();}catch(_e){}
+  const activeId=String(state.multiDivision?.activeDivisionId||'');
+  const ctx=registrationContext();
+  const cloud=registrationCloudReady?registrationAdminRowsByDivision():null;
+  return (state.multiDivision?.divisions||[]).map((division,index)=>{
+    const applications=cloud
+      ? cloud.filter(a=>String(a.divisionId||'')===String(division.id))
+      : (String(division.id)===activeId?[...(state.portal?.applications||[])]:[...(division.snapshot?.portal?.applications||[])]);
+    return {
+      id:String(division.id||''),name:String(division.name||`부서 ${index+1}`),current:String(division.id)===activeId,
+      applications,pending:applications.filter(a=>a.status==='pending').length,
+      approved:applications.filter(a=>a.status==='approved').length,reserve:applications.filter(a=>a.status==='reserve').length
+    };
+  });
+}
+function renderEntryDivisionAdminOverview(){
+  const admin=document.getElementById('entryAdminList');
+  if(!admin||!isAdmin())return;
+  const toolbar=document.querySelector('#view-entry .entry-admin-toolbar');
+  if(!toolbar)return;
+  let root=document.getElementById('entryDivisionAdminOverview');
+  if(!root){
+    root=document.createElement('section');
+    root.id='entryDivisionAdminOverview';
+    root.className='entry-admin-division-overview';
+    toolbar.insertAdjacentElement('afterend',root);
+  }
+  const rows=entryDivisionApplicationRows();
+  const totalPending=rows.reduce((n,r)=>n+r.pending,0);
+  const current=rows.find(r=>r.current);
+  root.innerHTML=`<div class="entry-admin-division-overview-head">
+    <div><strong>전체 부서 참가신청 현황</strong><span>현재 부서와 다른 부서의 승인 대기도 함께 확인합니다.</span></div>
+    <span>전체 승인대기 <b>${totalPending}건</b></span>
+  </div>
+  <div class="entry-admin-division-cards">${rows.map(r=>`<article class="entry-admin-division-card ${r.current?'current':''} ${r.pending?'pending':''}">
+    <div><strong>${portalEscape(r.name)}${r.current?' · 현재':''}</strong><small>승인대기 ${r.pending} · 참가 ${r.approved} · 후보 ${r.reserve}</small></div>
+    ${r.current?'<span class="badge badge-safe">현재 부서</span>':`<button type="button" class="btn btn-light btn-small" data-entry-open-division="${portalEscape(r.id)}">이 부서 열기</button>`}
+  </article>`).join('')}</div>`;
+  const badge=document.getElementById('entryPendingCount');
+  if(badge){
+    const currentPending=current?.pending||0;
+    badge.textContent=totalPending===currentPending?`승인 대기 ${currentPending}건`:`현재 ${currentPending}건 · 전체부서 ${totalPending}건`;
+  }
+}
+
+async function submitPublicApplication(){
+  if(!requireEntryLogin())return;
   ensurePortalState();
   const tournamentId=String(document.getElementById('entryApplicationTournament')?.value||'').trim();
   const selectedTournament=entryTournamentRows().find(x=>String(x.id)===tournamentId);
@@ -3102,17 +3286,17 @@ function submitPublicApplication(){
   const name=players.map(p=>p.name).join(' / ');
   const affiliation=players.map(p=>p.club).join(' / ');
   const phone=representative.phone;
-  const common={tournamentId:selectedTournament.id,tournamentName:selectedTournament.name,tournamentDivision:selectedTournament.division||'',teamName:name,affiliation,phone,memo,players,representativeIndex,representativeName:representative.name,ownerUid:currentAuthUser?.uid||'',smsTargetMode:smsTargetMode||'both',updatedAt:new Date().toISOString()};
+  const entryCtx=registrationContext();const common={tournamentId:selectedTournament.id,tournamentName:selectedTournament.name,tournamentDivision:entryCtx.divisionName||selectedTournament.division||'',divisionId:entryCtx.divisionId,teamName:name,affiliation,phone,memo,players,representativeIndex,representativeName:representative.name,ownerUid:currentAuthUser?.uid||'',smsTargetMode:smsTargetMode||'both',updatedAt:new Date().toISOString()};
   if(entryEditingId){
     const item=state.portal.applications.find(a=>a.id===entryEditingId);if(!item||item.status!=='pending'){clearEntryApplicationForm();notice('승인 대기 신청만 수정할 수 있습니다.','error');return;}
     const duplicate=state.portal.applications.find(a=>a.id!==item.id&&a.status==='pending'&&entryApplicationPlayers(a).some(p=>players.some(n=>n.phone===p.phone)));
     if(duplicate){notice(`같은 연락처가 포함된 승인 대기 신청이 이미 있습니다. 신청번호 ${duplicate.code}`,'error');return;}
-    Object.assign(item,common);commit(`참가 신청 수정 · ${name}`);clearEntryApplicationForm();lookupPublicApplication();notice('참가 신청을 수정했습니다.','success');return;
+    Object.assign(item,common);try{const saved=await saveRegistrationCloud(item);Object.assign(item,saved);}catch(error){notice(`참가 신청 저장 실패: ${error?.message||error}`,'error');return;}try{syncCurrentDivisionRuntime();safePersistState('참가 신청 수정');}catch(_e){}renderApplicationPortal();clearEntryApplicationForm();lookupPublicApplication();notice('참가 신청을 수정했습니다.','success');return;
   }
   const duplicate=state.portal.applications.find(a=>a.status==='pending'&&entryApplicationPlayers(a).some(p=>players.some(n=>n.phone===p.phone)));
   if(duplicate){notice(`두 선수 중 같은 연락처로 승인 대기 중인 신청이 있습니다. 신청번호 ${duplicate.code}`,'info');renderApplicationPortal();return;}
   const item={id:crypto.randomUUID(),code:applicationCode(),...common,status:'pending',paid:false,createdAt:new Date().toISOString()};
-  state.portal.applications.unshift(item);commit(`참가 신청 접수 · ${name}`);clearEntryApplicationForm();
+  try{const saved=await saveRegistrationCloud(item);Object.assign(item,saved);}catch(error){notice(`참가 신청 저장 실패: ${error?.message||error}`,'error');return;}if(!(state.portal.applications||[]).some(a=>a.id===item.id))state.portal.applications.unshift(item);try{syncCurrentDivisionRuntime();safePersistState('참가 신청 접수');}catch(_e){}renderApplicationPortal();clearEntryApplicationForm();
   const receipt=document.getElementById('entryApplicationReceipt');if(receipt){receipt.hidden=false;receipt.innerHTML=`<strong>신청이 접수되었습니다.</strong><span>신청번호 ${portalEscape(item.code)} · 대표 연락처(${portalEscape(representative.name)})로 승인 상태를 조회할 수 있습니다.</span>`;}
   notice('참가 신청을 접수했습니다.','success');
 }
@@ -3120,8 +3304,14 @@ function lookupPublicApplication(){
   const phone=String(document.getElementById('entryLookupPhone')?.value||'').replace(/[^0-9]/g,'');
   const root=document.getElementById('entryLookupResult');if(!root)return;
   if(phone.length<10){root.innerHTML='<div class="portal-empty">신청할 때 입력한 연락처를 입력하세요.</div>';return;}
-  const rows=(state.portal?.applications||[]).filter(a=>a.phone===phone||entryApplicationPlayers(a).some(p=>p.phone===phone)).sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
+  const rows=(registrationCloudReady?registrationCloudRows:(state.portal?.applications||[])).filter(a=>a.phone===phone||entryApplicationPlayers(a).some(p=>p.phone===phone)).sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
   root.innerHTML=rows.map(a=>{const reserveNo=a.status==='reserve'?reserveApplicationOrder(a):0;return `<article class="entry-status-card"><div><strong>${portalEscape(a.teamName)}</strong><span>${portalEscape(a.tournamentName||state.tournament?.name||'현재 대회')}${a.tournamentDivision?` (${portalEscape(a.tournamentDivision)})`:''} · ${portalEscape(a.affiliation||'소속 없음')} · ${new Date(a.createdAt).toLocaleString('ko-KR')}</span></div><span class="entry-status ${applicationStatusClass(a.status)}">${applicationStatusLabel(a.status)}</span><div class="entry-code">${portalEscape(a.code)}</div><div class="entry-extra"><span class="entry-payment ${entryPaymentClass(a)}">${entryPaymentLabel(a)}${a.paidAt?` · ${portalEscape(entryDateTime(a.paidAt))}`:''}</span>${reserveNo?`<span class="entry-wait-number">후보 ${reserveNo}번</span>`:''}</div>${a.adminMemo?`<p>${portalEscape(a.adminMemo)}</p>`:''}${a.status==='pending'?`<div class="entry-public-actions"><button type="button" class="btn btn-light btn-small" data-entry-edit="${a.id}">신청 수정</button><button type="button" class="btn btn-danger-outline btn-small" data-entry-cancel="${a.id}">삭제 요청</button></div>`:''}</article>`;}).join('')||'<div class="portal-empty">해당 연락처의 참가 신청이 없습니다.</div>';
+}
+
+
+async function persistRegistrationAdminMutation(item,label='참가신청 변경'){
+  try{await saveRegistrationCloud(item);return true;}
+  catch(error){notice(`${label} 저장 실패: ${error?.message||error}`,'error');return false;}
 }
 
 function entryPaymentLabel(item){
@@ -3168,7 +3358,7 @@ function suggestReservePromotion(){
 }
 
 function renderApplicationPortal(){
-  ensurePortalState();renderEntryTournamentSelect();
+  ensurePortalState();renderEntryTournamentSelect();renderEntryLoginGate();
   const applications=[...(state.portal?.applications||[])];
   const approved=applications.filter(a=>a.status==='approved').sort((a,b)=>String(a.approvedAt||a.createdAt).localeCompare(String(b.approvedAt||b.createdAt)));
   const reserve=applications.filter(a=>a.status==='reserve').sort((a,b)=>String(a.approvedAt||a.createdAt).localeCompare(String(b.approvedAt||b.createdAt)));
@@ -3188,11 +3378,12 @@ function renderApplicationPortal(){
     const badge=document.getElementById('entryPendingCount');if(badge)badge.textContent=`승인 대기 ${pending}건`;
     const toolbar=document.querySelector('#view-entry .entry-admin-toolbar');if(toolbar){toolbar.dataset.summary=`전체 ${state.portal.applications.length}건 · 승인대기 ${pending}건 · 참가 ${(state.portal.applications||[]).filter(a=>a.status==='approved').length}건 · 후보 ${(state.portal.applications||[]).filter(a=>a.status==='reserve').length}건`;}
     admin.innerHTML=rows.map(a=>{const reserveNo=a.status==='reserve'?reserveApplicationOrder(a):0;const paymentTime=a.paidAt?`<small class="entry-payment-time">입금 ${portalEscape(entryDateTime(a.paidAt))}</small>`:'';const statusActions=a.status==='pending'?`<button class="btn btn-primary btn-small" data-entry-action="approve" data-entry-id="${a.id}">참가 승인</button><button class="btn btn-secondary btn-small" data-entry-action="reserve" data-entry-id="${a.id}">후보 승인</button><button class="btn btn-danger-outline btn-small" data-entry-action="reject" data-entry-id="${a.id}">반려</button>`:a.status==='reserve'?`<button class="btn btn-primary btn-small" data-entry-action="promote" data-entry-id="${a.id}">일반 참가 승격</button><button class="btn btn-light btn-small" data-entry-action="pending" data-entry-id="${a.id}">승인 대기로</button>`:a.status==='approved'?`<button class="btn btn-secondary btn-small" data-entry-action="reserve" data-entry-id="${a.id}">후보 전환</button><button class="btn btn-light btn-small" data-entry-action="pending" data-entry-id="${a.id}">승인 대기로</button>`:`<button class="btn btn-light btn-small" data-entry-action="pending" data-entry-id="${a.id}">승인 대기로</button>`;return `<article class="entry-admin-row"><div class="entry-main"><strong>${portalEscape(a.teamName)}</strong><span>${portalEscape(a.tournamentName||state.tournament?.name||'현재 대회')}${a.tournamentDivision?` (${portalEscape(a.tournamentDivision)})`:''} · ${portalEscape(a.affiliation||'소속 없음')} · ${portalEscape(a.phone)} · ${portalEscape(a.code)}</span><small>${new Date(a.createdAt).toLocaleString('ko-KR')}${a.memo?` · ${portalEscape(a.memo)}`:''}${reserveNo?` · 후보 ${reserveNo}번`:''}</small></div><span class="entry-status ${applicationStatusClass(a.status)}">${applicationStatusLabel(a.status)}</span><div class="entry-payment-wrap"><span class="entry-payment ${entryPaymentClass(a)}">${entryPaymentLabel(a)}</span>${paymentTime}</div><div class="entry-actions">${statusActions}<button class="btn btn-light btn-small" data-entry-payment="${a.id}">${a.paid?'입금 취소':'입금 완료'}</button>${a.paid?`<button class="btn btn-light btn-small" data-entry-refund="${a.id}">환불 완료</button>`:''}<button class="btn btn-light btn-small" data-entry-sms="${a.id}">문자</button></div></article>`;}).join('')||'<div class="portal-empty">조건에 맞는 참가 신청이 없습니다.</div>';
+    renderEntryDivisionAdminOverview();
   }
 }
-function processEntryApplication(id,action){
+async function processEntryApplication(id,action){
   if(!requireAdmin('참가 신청 처리'))return;
-  const item=(state.portal?.applications||[]).find(a=>a.id===id);if(!item)return;
+  const item=(registrationCloudReady?registrationRowsForCurrentDivision():(state.portal?.applications||[])).find(a=>a.id===id);if(!item)return;
   const previous=item.status;
   if(action==='approve'||action==='reserve'||action==='promote'){
     const targetStatus=action==='reserve'?'reserve':'approved';
@@ -3202,7 +3393,7 @@ function processEntryApplication(id,action){
     item.status=targetStatus;item.approvedAt=item.approvedAt||new Date().toISOString();item.updatedAt=new Date().toISOString();item.adminMemo=targetStatus==='approved'?'참가팀 명단에 등록되었습니다.':'후보팀 명단에 등록되었습니다.';
   }else if(action==='reject'){const reason=prompt('반려 사유를 입력하세요.','참가 요건 또는 정원 확인이 필요합니다.');if(reason===null)return;item.status='rejected';item.adminMemo=reason.trim();item.updatedAt=new Date().toISOString();}
   else if(action==='pending'){item.status='pending';item.adminMemo='';item.approvedAt='';item.updatedAt=new Date().toISOString();}
-  commit(`참가 신청 처리 · ${item.teamName} · ${applicationStatusLabel(item.status)}`);renderApplicationPortal();renderParticipantManager();lookupPublicApplication();
+  try{await saveRegistrationCloud(item);}catch(error){notice(`승인 상태 저장 실패: ${error?.message||error}`,'error');return;}commit(`참가 신청 처리 · ${item.teamName} · ${applicationStatusLabel(item.status)}`);renderApplicationPortal();renderParticipantManager();lookupPublicApplication();
   if(action==='promote'||(previous==='reserve'&&item.status==='approved'))openEntrySmsDialog('promote',item);
   else if(action==='approve')openEntrySmsDialog('approve',item);
   else if(action==='reserve')openEntrySmsDialog('reserve',item);
@@ -3211,7 +3402,7 @@ function processEntryApplication(id,action){
 }
 function editEntryApplication(id){
   const lookupPhone=String(document.getElementById('entryLookupPhone')?.value||'').replace(/[^0-9]/g,'');
-  const item=(state.portal?.applications||[]).find(a=>a.id===id);
+  const item=(registrationCloudReady?registrationCloudRows:(state.portal?.applications||[])).find(a=>a.id===id);
   if(!item||!entryApplicationPlayers(item).some(p=>p.phone===lookupPhone)||item.status!=='pending')return;
   entryEditingId=item.id;renderEntryTournamentSelect();
   const tournament=document.getElementById('entryApplicationTournament');if(tournament)tournament.value=item.tournamentId||'current';
@@ -3223,10 +3414,10 @@ function editEntryApplication(id){
   const memo=document.getElementById('entryApplicationMemo');if(memo)memo.value=item.memo||'';
   document.getElementById('entryApplicationSubmitBtn').textContent='신청 수정 저장';document.getElementById('entryApplicationEditCancelBtn').hidden=false;document.getElementById('entryPlayer1Name')?.focus();window.scrollTo({top:0,behavior:'smooth'});
 }
-function cancelEntryApplication(id){
-  const item=(state.portal?.applications||[]).find(a=>a.id===id);if(!item||item.status!=='pending')return;
+async function cancelEntryApplication(id){
+  const item=(registrationCloudReady?registrationCloudRows:(state.portal?.applications||[])).find(a=>a.id===id);if(!item||item.status!=='pending')return;
   const phone=String(document.getElementById('entryLookupPhone')?.value||'').replace(/[^0-9]/g,'');if(item.phone!==phone)return;
-  if(!confirm(`${item.teamName} 참가 신청을 취소할까요?`))return;item.status='cancelled';item.updatedAt=new Date().toISOString();if(entryEditingId===item.id)clearEntryApplicationForm();commit(`참가 신청 취소 · ${item.teamName}`);lookupPublicApplication();renderApplicationPortal();
+  if(!confirm(`${item.teamName} 참가 신청을 취소할까요?`))return;item.status='cancelled';item.updatedAt=new Date().toISOString();try{await saveRegistrationCloud(item);}catch(error){notice(`취소 요청 저장 실패: ${error?.message||error}`,'error');return;}if(entryEditingId===item.id)clearEntryApplicationForm();lookupPublicApplication();renderApplicationPortal();
 }
 function bindEntryApplications(){
   document.getElementById('entryApplicationSubmitBtn')?.addEventListener('click',submitPublicApplication);
@@ -3234,7 +3425,7 @@ function bindEntryApplications(){
   document.getElementById('entryLookupBtn')?.addEventListener('click',lookupPublicApplication);
   document.getElementById('entryLookupPhone')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();lookupPublicApplication();}});
   document.getElementById('entryAdminFilter')?.addEventListener('change',renderApplicationPortal);
-  document.addEventListener('click',e=>{const action=e.target.closest?.('[data-entry-action]');if(action){processEntryApplication(action.dataset.entryId,action.dataset.entryAction);return;}const payment=e.target.closest?.('[data-entry-payment]');if(payment){toggleEntryPayment(payment.dataset.entryPayment);return;}const refund=e.target.closest?.('[data-entry-refund]');if(refund){refundEntryPayment(refund.dataset.entryRefund);return;}const sms=e.target.closest?.('[data-entry-sms]');if(sms){manualEntrySms(sms.dataset.entrySms);return;}const edit=e.target.closest?.('[data-entry-edit]');if(edit){editEntryApplication(edit.dataset.entryEdit);return;}const cancel=e.target.closest?.('[data-entry-cancel]');if(cancel)cancelEntryApplication(cancel.dataset.entryCancel);});
+  document.addEventListener('click',e=>{const action=e.target.closest?.('[data-entry-action]');if(action){processEntryApplication(action.dataset.entryId,action.dataset.entryAction);return;}const payment=e.target.closest?.('[data-entry-payment]');if(payment){toggleEntryPayment(payment.dataset.entryPayment);return;}const refund=e.target.closest?.('[data-entry-refund]');if(refund){refundEntryPayment(refund.dataset.entryRefund);return;}const sms=e.target.closest?.('[data-entry-sms]');if(sms){manualEntrySms(sms.dataset.entrySms);return;}const edit=e.target.closest?.('[data-entry-edit]');if(edit){editEntryApplication(edit.dataset.entryEdit);return;}const cancel=e.target.closest?.('[data-entry-cancel]');if(cancel){cancelEntryApplication(cancel.dataset.entryCancel);return;}const division=e.target.closest?.('[data-entry-open-division]');if(division){switchDivisionWorkspace(String(division.dataset.entryOpenDivision||''),{view:'entry'});return;}});
 }
 
 
@@ -4617,7 +4808,7 @@ document.getElementById('saveAuthSettingsBtn')?.addEventListener('click',saveAut
 loadAuthSettingsPanel();renderAuthStatus();startAuth((user,role,error,profile)=>{if(error)notice('간편로그인 연결 오류: '+(error.message||error),'error');applyAuthenticatedRole(user,role,profile);renderNotificationStatus();});
 
 prepareRecoveryStorage().catch(error=>console.warn('로컬 복구점 저장소 준비 실패',error));
-syncInputs();syncPrelimInputs();bind();bindPortal();void startGlobalNoticeSync();bindPrintCenter();bindParticipantManager();bindEntryApplications();bindPublicParticipantRecords();bindResultArchive();bindTournamentLifecycleManager();bindBackupRecoveryManager();bindNotificationCenter();bindTournamentReadiness();bindAcceptanceCenter();bindRehearsalCenter();bindPerformanceCenter();bindDiagnosticsCenter();window.addEventListener('popstate',()=>navigatePortalView(location.hash.replace(/^#/, '')||'home',{focus:false}));initialPortalView();renderVenueSettingsEditor();calculateTimeMetrics(state);render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus,holdMainMatch,releaseHeldMatch});if(canOperate()){renderOperatorControls();updateSetupProgress();autoSmsSnapshot=buildAutoSmsSnapshot();installUnifiedMoveControlGuard();ensureUnifiedCourtMoveControls();}applyRoleUI();renderPortalViewFast(document.body?.dataset.currentView||'home');decorateBracketLivePlacements();renderStage331OperationDashboard();restartTimeTimer();startClockTicker();
+syncInputs();syncPrelimInputs();bind();bindPortal();void startGlobalNoticeSync();setTimeout(()=>void startRegistrationCloudSync(),500);bindPrintCenter();bindParticipantManager();bindEntryApplications();bindPublicParticipantRecords();bindResultArchive();bindTournamentLifecycleManager();bindBackupRecoveryManager();bindNotificationCenter();bindTournamentReadiness();bindAcceptanceCenter();bindRehearsalCenter();bindPerformanceCenter();bindDiagnosticsCenter();window.addEventListener('popstate',()=>navigatePortalView(location.hash.replace(/^#/, '')||'home',{focus:false}));initialPortalView();renderVenueSettingsEditor();calculateTimeMetrics(state);render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus,holdMainMatch,releaseHeldMatch});if(canOperate()){renderOperatorControls();updateSetupProgress();autoSmsSnapshot=buildAutoSmsSnapshot();installUnifiedMoveControlGuard();ensureUnifiedCourtMoveControls();}applyRoleUI();renderPortalViewFast(document.body?.dataset.currentView||'home');decorateBracketLivePlacements();renderStage331OperationDashboard();restartTimeTimer();startClockTicker();
 loadSyncPanel();startStateSync({getState:()=>state,applyRemoteState:next=>applySynchronizedState(next,'다른 기기'),onStatus:updateSyncPanel,canWrite:()=>isAdmin()||isOperator(),accessMode:()=>canOperate()?'operator':'viewer'});syncAccessStarted=true;
 const buildStageLabel=document.getElementById('buildStageLabel');
 window.closeAutoSmsDialog=closeAutoSmsDialog;window.approveAutoSmsAligo=approveAutoSmsAligo;window.approveAutoSmsPhone=approveAutoSmsPhone;window.copyAutoSms=copyAutoSms;window.previewCurrentCourtSms=previewCurrentCourtSms;
@@ -9262,4 +9453,4 @@ console.info('[230MATCH] 63.0.0 ready · chunked cloud workspace + bounded retry
 
 console.info('[230MATCH] 64.0.0 architecture · lazy cloud registry, worker serialization, visible-view commit rendering');
 
-console.info('[230MATCH] 70.0.9 ready · independent global notice store + scrolling alert ticker');
+console.info('[230MATCH] 70.1.2 ready · cloud-native registration sync + compact mobile workspace');
