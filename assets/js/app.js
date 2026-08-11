@@ -1,8 +1,8 @@
 import{getAuthConfig,saveAuthConfig,startAuth,signInGoogle,signOutSocial,beginExternalLogin,getExistingLoginEndpoints,signInEmail,registerEmail,sendPasswordReset,linkEmailPassword,authProviderIds,getAuthRuntime}from'./auth-engine.js?v=3565';
-import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7013';
+import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7014';
 import{notificationSupport,getStoredVapidKey,saveStoredVapidKey,enableMyPush,disableMyPush,queuePush,listPushJobs,listPushTokens}from'./notification-engine.js?v=332012';
 
-import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7013';
+import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7014';
 import{prepareTeams,generateDraw,allMatches,findMatch,generateLinkedDrawSlots,syncLinkedDrawQualifiers}from'./bracket-engine-v5000.js?v=5000';
 import{ensureDrawMeta,canModifyDraw,createDrawWithMethod,lockDraw,unlockDrawForDevelopment,clearDrawHistory}from'./draw-method-engine.js?v=332012';
 import{buildCourts,assignInitial,queueReadyMatches,refillCourt}from'./court-engine.js?v=332012';
@@ -15,7 +15,7 @@ import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactD
 import{render,teamText}from'./ui.js?v=3504';
 import{ensureAuditState,runStateAudit,runPrelimSimulation,runFullSimulation,applyAuditResult}from'./audit-engine.js?v=332012';
 import{earlyMainStats,markResolvedMainMatchesReady,canAssignEarlyMain,ensureEarlyMainSettings,autoAssignResolvedMain}from'./early-main-engine.js?v=332012';
-import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7013';
+import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7014';
 import{ensureMainDrawLifecycle,beginMainDraw,completeMainDraw,failMainDraw,resetMainDraw,hasAuthorizedMainDraw,mainDrawStatus,clearMainPlacement,repairMainDrawAuthorization}from'./main-draw-lifecycle-engine.js?v=3501';
 import{shouldUseLinkedDraw,linkedDrawNeedsRepair,rebuildLinkedDraw,hasStartedMainMatches}from'./linked-draw-guard-engine.js?v=332012';
 import{ensureVenueSettings,ensureVenueQueues,venuePreset,buildVenueCourts,prelimVenues,mainVenues}from'./venue-engine.js?v=332012';
@@ -26,7 +26,7 @@ import{ensureCourtStatuses,pauseCourt,resumeCourt}from'./court-status-engine.js?
 import{ensureCourtManualQueues,assignToCourtManualQueue,moveCourtMatchFlexible,returnManualQueueItemToVenue,reorderCourtManualQueue}from'./court-manual-queue-engine.js?v=332012';
 import{reorderPrelimQueue as reorderPrelimQueueItem,movePrelimQueuedMatch,returnPrelimWait1ToQueue}from'./prelim-queue-control-engine.js?v=332012';
 import{ensurePrelimCourtStatuses,pausePrelimCourt,resumePrelimCourt}from'./prelim-court-status-engine.js?v=332012';
-import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7013';
+import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7014';
 import{verifyAndRepairMainFlow}from'./main-flow-integrity-engine.js?v=332012';
 import{finalizeTournamentCompletion}from'./tournament-completion-engine.js?v=332012';
 import{ensureTournamentIdentity,validateTournamentForArchive,createTournamentArchive,archiveListItem,archiveBackupPayload}from'./archive-engine.js?v=354000';
@@ -3060,7 +3060,10 @@ function renderEntryTournamentSelect(){
   const rows=entryTournamentRows();
   select.innerHTML='<option value="">대회를 선택하세요</option>'+rows.map(x=>{const selectable=!!x.current&&x.status!=='completed';const label=`${x.name||'대회 준비 중'}${x.division?` (${x.division})`:''} · ${tournamentStatusLabel(x.status)}`;return `<option value="${portalEscape(x.id)}" ${selectable?'':'disabled'}>${portalEscape(label)}${selectable?'':' · 신청 불가'}</option>`;}).join('');
   if(previous&&[...select.options].some(o=>o.value===previous&&!o.disabled))select.value=previous;
-  else if(rows[0]?.current&&rows[0].status!=='completed')select.value='current';
+  else{
+    const current=rows.find(x=>x.current&&x.status!=='completed'&&x.id);
+    if(current)select.value=String(current.id);
+  }
 }
 function entryPairFormValue(id){return String(document.getElementById(id)?.value||'').trim();}
 function entryPairPhone(id){return String(document.getElementById(id)?.value||'').replace(/[^0-9]/g,'');}
@@ -3085,7 +3088,11 @@ function clearEntryApplicationForm(){
   const rep1=document.getElementById('entryRepresentative1');if(rep1)rep1.checked=true;
   const smsBoth=document.getElementById('entrySmsTargetBoth');if(smsBoth)smsBoth.checked=true;
   renderEntryTournamentSelect();
-  const tournament=document.getElementById('entryApplicationTournament');if(tournament&&[...tournament.options].some(o=>o.value==='current'&&!o.disabled))tournament.value='current';
+  const tournament=document.getElementById('entryApplicationTournament');
+  if(tournament){
+    const current=entryTournamentRows().find(x=>x.current&&x.status!=='completed'&&x.id);
+    if(current&&[...tournament.options].some(o=>o.value===String(current.id)&&!o.disabled))tournament.value=String(current.id);
+  }
   const submit=document.getElementById('entryApplicationSubmitBtn');if(submit)submit.textContent='참가 신청 접수';
   const cancel=document.getElementById('entryApplicationEditCancelBtn');if(cancel)cancel.hidden=true;
 }
@@ -3272,8 +3279,19 @@ function renderEntryDivisionAdminOverview(){
 async function submitPublicApplication(){
   if(!requireEntryLogin())return;
   ensurePortalState();
-  const tournamentId=String(document.getElementById('entryApplicationTournament')?.value||'').trim();
-  const selectedTournament=entryTournamentRows().find(x=>String(x.id)===tournamentId);
+  const submitButton=document.getElementById('entryApplicationSubmitBtn');
+  if(submitButton?.dataset.submitting==='1')return;
+  if(submitButton){submitButton.dataset.submitting='1';submitButton.disabled=true;submitButton.dataset.originalText=submitButton.textContent||'참가 신청 접수';submitButton.textContent='접수 중...';}
+  try{
+  let tournamentId=String(document.getElementById('entryApplicationTournament')?.value||'').trim();
+  const rows=entryTournamentRows();
+  let selectedTournament=rows.find(x=>String(x.id)===tournamentId);
+  if(!selectedTournament){
+    selectedTournament=rows.find(x=>x.current&&x.status!=='completed'&&x.id);
+    tournamentId=String(selectedTournament?.id||'');
+    const select=document.getElementById('entryApplicationTournament');
+    if(select&&tournamentId)select.value=tournamentId;
+  }
   const {players,representativeIndex,representative,smsTargetMode}=entryApplicationPlayersFromForm();
   const memo=entryPairFormValue('entryApplicationMemo');
   if(!selectedTournament||!selectedTournament.current||selectedTournament.status==='completed'){notice('현재 접수 가능한 대회를 선택하세요.','error');return;}
@@ -3299,6 +3317,16 @@ async function submitPublicApplication(){
   try{const saved=await saveRegistrationCloud(item);Object.assign(item,saved);}catch(error){notice(`참가 신청 저장 실패: ${error?.message||error}`,'error');return;}if(!(state.portal.applications||[]).some(a=>a.id===item.id))state.portal.applications.unshift(item);try{syncCurrentDivisionRuntime();safePersistState('참가 신청 접수');}catch(_e){}renderApplicationPortal();clearEntryApplicationForm();
   const receipt=document.getElementById('entryApplicationReceipt');if(receipt){receipt.hidden=false;receipt.innerHTML=`<strong>신청이 접수되었습니다.</strong><span>신청번호 ${portalEscape(item.code)} · 대표 연락처(${portalEscape(representative.name)})로 승인 상태를 조회할 수 있습니다.</span>`;}
   notice('참가 신청을 접수했습니다.','success');
+  }catch(error){
+    console.error('[230MATCH] 참가 신청 처리 오류',error);
+    notice(`참가 신청 처리 중 오류가 발생했습니다: ${error?.message||error}`,'error');
+  }finally{
+    if(submitButton){
+      submitButton.dataset.submitting='0';
+      submitButton.disabled=false;
+      submitButton.textContent=entryEditingId?'신청 수정 저장':(submitButton.dataset.originalText||'참가 신청 접수');
+    }
+  }
 }
 function lookupPublicApplication(){
   const phone=String(document.getElementById('entryLookupPhone')?.value||'').replace(/[^0-9]/g,'');
@@ -3420,7 +3448,13 @@ async function cancelEntryApplication(id){
   if(!confirm(`${item.teamName} 참가 신청을 취소할까요?`))return;item.status='cancelled';item.updatedAt=new Date().toISOString();try{await saveRegistrationCloud(item);}catch(error){notice(`취소 요청 저장 실패: ${error?.message||error}`,'error');return;}if(entryEditingId===item.id)clearEntryApplicationForm();lookupPublicApplication();renderApplicationPortal();
 }
 function bindEntryApplications(){
-  document.getElementById('entryApplicationSubmitBtn')?.addEventListener('click',submitPublicApplication);
+  const entrySubmit=document.getElementById('entryApplicationSubmitBtn');if(entrySubmit){entrySubmit.dataset.directBound='1';entrySubmit.addEventListener('click',submitPublicApplication);}
+  document.addEventListener('click',e=>{
+    const submit=e.target.closest?.('#entryApplicationSubmitBtn');
+    if(!submit||submit.dataset.directBound==='1')return;
+    e.preventDefault();
+    void submitPublicApplication();
+  });
   document.getElementById('entryApplicationEditCancelBtn')?.addEventListener('click',clearEntryApplicationForm);
   document.getElementById('entryLookupBtn')?.addEventListener('click',lookupPublicApplication);
   document.getElementById('entryLookupPhone')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();lookupPublicApplication();}});
@@ -9457,4 +9491,4 @@ console.info('[230MATCH] 63.0.0 ready · chunked cloud workspace + bounded retry
 
 console.info('[230MATCH] 64.0.0 architecture · lazy cloud registry, worker serialization, visible-view commit rendering');
 
-console.info('[230MATCH] 70.1.3 ready · cloud registration + staff-only legacy photo recovery');
+console.info('[230MATCH] 70.1.4 ready · registration submit target fix + cloud registration');
