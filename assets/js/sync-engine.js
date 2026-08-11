@@ -1,5 +1,5 @@
 import { getAuthRuntime } from './auth-engine.js?v=3565';
-import { normalizeState } from './store-v6200.js?v=6200';
+import { normalizeState } from './store.js?v=7001';
 
 const SETTINGS_KEY='230match-v7-sync-settings';
 const FIREBASE_APP_URL='https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';

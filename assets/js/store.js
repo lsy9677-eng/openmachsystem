@@ -1,242 +1,84 @@
-const STORAGE_KEY='230match-v3-stage1-state';
-const LEGACY_RECOVERY_KEY='230match-v3-stage1-recovery';
-const DB_NAME='230match-v3-local-db';
+const LEGACY_KEYS=[
+  '230match-v3-stage1-state','230match-v3-stage1-last-known-good','230match-v3-stage1-recovery',
+  '230match-v3-state','230match-state','230match-v5-sync-settings','230match-v3-sync-settings'
+];
+const META_KEY='230match-v6-local-meta';
+const DB_NAME='230match-v6-recovery-db';
 const DB_VERSION=1;
 const RECOVERY_STORE='recoveries';
-const MAX_RECOVERIES=10;
+const MAX_RECOVERIES=8;
 let dbPromise=null;
-let migrationPromise=null;
 
+function clone(v){try{return structuredClone(v);}catch{return JSON.parse(JSON.stringify(v));}}
+function uid(){try{return crypto.randomUUID();}catch{return `id-${Date.now()}-${Math.random().toString(36).slice(2,9)}`;}}
+function emptyPortal(){return{guide:{date:'',venue:'',fee:'',detail:'',startTime:'09:00'},applications:[],posts:[],resultArchives:[],participantArchives:[],tournamentArchives:[],tournamentTemplates:[],archives:[]};}
 export function initialState(){
-  return {
-    schemaVersion:'230match-v3-stage1',
-    tournament:{name:'230스포츠미디어배 테스트',division:'부경신인부'},
+  return normalizeState({
+    schemaVersion:'230match-v6',
+    tournament:{id:'',name:'',division:''},
+    multiTournament:{activeTournamentId:'',tournaments:[],noActiveTournament:true},
     settings:{drawSize:64,courtCount:8,courtPrefix:'국제',venues:[{id:'venue-international',name:'국제',courtCount:8,courtPrefix:'국제'}],venueAssignmentPolicy:'round-robin',separateVenueQueues:true,autoVenuePromotion:true,matchMinutes:40,minimumMatchMinutes:30,autoTimeEnabled:true,timeRefreshSeconds:30,drawMethod:'instant',byePriority:'group-first'},
     teams:[],contacts:{},
-    messaging:{settings:{autoMessageEnabled:true,senderName:'230MATCH',deliveryMode:'sms-uri',onCourtAssign:true,onQueueMove:true,compactTemplateVersion:1,templates:{playing:'{team} {court} 경기. 입장',wait1:'{team} {court} 대기1. 약{wait}분',shared:'{team} 본선대기 {queueNo}번'}},queue:[]},
+    messaging:{settings:{autoMessageEnabled:true,senderName:'230MATCH',deliveryMode:'sms-uri',onCourtAssign:true,onQueueMove:true,compactTemplateVersion:1,templates:{playing:'{team} {court} 경기. 입장',wait1:'{team} {court} 대기1. 약{wait}분',shared:'{team} 본선대기 {queueNo}번'}},queue:[],history:[]},
     drawMeta:{locked:false,method:null,byePriority:null,createdAt:null,checksum:null,history:[]},
-    prelim:{settings:{activeTeamCount:96,threeTeamGroups:32,twoTeamGroups:0,courtCount:8,courtPrefix:'국제',qualifiersPerGroup:2},activeTeams:[],reserveTeams:[],groups:[],matches:[],courts:[],qualifiers:[],linkedDraw:{active:false,drawSize:0,slots:[],createdAt:null,lastSyncedAt:null}},
+    prelim:{settings:{activeTeamCount:64,threeTeamGroups:0,twoTeamGroups:32,courtCount:8,courtPrefix:'국제',qualifiersPerGroup:2},activeTeams:[],reserveTeams:[],groups:[],matches:[],courts:[],qualifiers:[],linkedDraw:{active:false,drawSize:0,slots:[],createdAt:null,lastSyncedAt:null}},
     draw:{size:0,rounds:{}},courts:[],sharedQueue:[],venueQueues:{},
-    audit:{lastRunAt:null,overall:'not-run',results:[],simulation:null},logs:[],updatedAt:null
-  };
-}
-
-function compactRecoveryState(source){
-  const state=structuredClone(source);
-  if(state.audit)state.audit={lastRunAt:state.audit.lastRunAt||null,overall:state.audit.overall||'not-run',results:[],simulation:null};
-  if(Array.isArray(state.logs))state.logs=state.logs.slice(-120);
-  if(state.messaging){
-    if(Array.isArray(state.messaging.queue))state.messaging.queue=state.messaging.queue.slice(-120);
-    if(Array.isArray(state.messaging.history))state.messaging.history=state.messaging.history.slice(-120);
-  }
-  if(state.drawMeta?.history&&Array.isArray(state.drawMeta.history))state.drawMeta.history=state.drawMeta.history.slice(-20);
-  delete state.__ui;delete state.__runtime;delete state.__simulation;
-  return state;
-}
-
-function openRecoveryDb(){
-  if(dbPromise)return dbPromise;
-  dbPromise=new Promise((resolve,reject)=>{
-    if(!('indexedDB' in window)){reject(new Error('IndexedDB를 지원하지 않는 브라우저입니다.'));return;}
-    const request=indexedDB.open(DB_NAME,DB_VERSION);
-    request.onupgradeneeded=()=>{
-      const db=request.result;
-      if(!db.objectStoreNames.contains(RECOVERY_STORE)){
-        const store=db.createObjectStore(RECOVERY_STORE,{keyPath:'id'});
-        store.createIndex('createdAt','createdAt',{unique:false});
-      }
-    };
-    request.onsuccess=()=>resolve(request.result);
-    request.onerror=()=>reject(request.error||new Error('IndexedDB 열기 실패'));
-    request.onblocked=()=>reject(new Error('다른 탭이 로컬 저장소 업그레이드를 막고 있습니다.'));
-  });
-  return dbPromise;
-}
-
-function transaction(mode,handler){
-  return openRecoveryDb().then(db=>new Promise((resolve,reject)=>{
-    const tx=db.transaction(RECOVERY_STORE,mode);
-    const store=tx.objectStore(RECOVERY_STORE);
-    let value;
-    try{value=handler(store,tx);}catch(error){reject(error);return;}
-    tx.oncomplete=()=>resolve(value);
-    tx.onerror=()=>reject(tx.error||new Error('IndexedDB 작업 실패'));
-    tx.onabort=()=>reject(tx.error||new Error('IndexedDB 작업 취소'));
-  }));
-}
-
-async function listRaw(){
-  const db=await openRecoveryDb();
-  return new Promise((resolve,reject)=>{
-    const tx=db.transaction(RECOVERY_STORE,'readonly');
-    const req=tx.objectStore(RECOVERY_STORE).getAll();
-    req.onsuccess=()=>resolve((req.result||[]).sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt))));
-    req.onerror=()=>reject(req.error||new Error('복구점 목록 읽기 실패'));
+    audit:{lastRunAt:null,overall:'not-run',results:[],simulation:null},logs:[],portal:emptyPortal(),updatedAt:null
   });
 }
-
-async function pruneRecoveries(){
-  const list=await listRaw();
-  const excess=list.slice(MAX_RECOVERIES);
-  if(!excess.length)return list.length;
-  await transaction('readwrite',store=>{excess.forEach(item=>store.delete(item.id));});
-  return Math.min(list.length,MAX_RECOVERIES);
-}
-
-async function migrateLegacyRecoveries(){
-  if(migrationPromise)return migrationPromise;
-  migrationPromise=(async()=>{
-    let legacy=[];
-    try{legacy=JSON.parse(localStorage.getItem(LEGACY_RECOVERY_KEY)||'[]');}catch(_error){legacy=[];}
-    if(Array.isArray(legacy)&&legacy.length){
-      await transaction('readwrite',store=>{
-        legacy.slice(0,MAX_RECOVERIES).forEach(raw=>{
-          if(!raw?.state)return;
-          store.put({id:raw.id||crypto.randomUUID(),label:raw.label||'이전 로컬 복구점',createdAt:raw.createdAt||new Date().toISOString(),state:compactRecoveryState(raw.state),source:'localStorage-migrated'});
-        });
-      });
-      await pruneRecoveries();
-    }
-    try{localStorage.removeItem(LEGACY_RECOVERY_KEY);}catch(_error){}
-    return legacy.length;
-  })().catch(error=>{migrationPromise=null;throw error;});
-  return migrationPromise;
-}
-
-export async function prepareRecoveryStorage(){
-  await openRecoveryDb();
-  const migrated=await migrateLegacyRecoveries();
-  try{if(navigator.storage?.persist)await navigator.storage.persist();}catch(_error){}
-  return{ready:true,migrated};
-}
-
-const MULTI_DIVISION_GLOBAL_KEYS=new Set(['schemaVersion','tournament','multiDivision','updatedAt','legacyBridge']);
-const MULTI_DIVISION_GLOBAL_PORTAL_KEYS=new Set(['tournamentArchives','participantArchives','resultArchives','tournamentTemplates']);
-function divisionId(){try{return crypto.randomUUID();}catch(_e){return `division-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;}}
-function cloneValue(value){try{return structuredClone(value);}catch(_e){return JSON.parse(JSON.stringify(value));}}
-function captureDivisionSnapshot(source){
-  const snapshot={};
-  Object.keys(source||{}).forEach(key=>{if(!MULTI_DIVISION_GLOBAL_KEYS.has(key)&&key!=='portal')snapshot[key]=cloneValue(source[key]);});
-  const portal={};
-  Object.entries(source?.portal||{}).forEach(([key,value])=>{if(!MULTI_DIVISION_GLOBAL_PORTAL_KEYS.has(key))portal[key]=cloneValue(value);});
-  snapshot.portal=portal;
-  return snapshot;
-}
-function normalizeMultiDivisionState(source){
-  const state=source&&typeof source==='object'?source:initialState();
-  if(!state.tournament||typeof state.tournament!=='object')state.tournament={name:'대회명 없음',division:'부서 미설정'};
-  if(!state.multiDivision||!Array.isArray(state.multiDivision.divisions)||!state.multiDivision.divisions.length){
-    const id=divisionId();
-    state.multiDivision={version:1,activeDivisionId:id,divisions:[{id,name:String(state.tournament.division||'기본 부서'),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),snapshot:captureDivisionSnapshot(state)}]};
-  }
-  let active=state.multiDivision.divisions.find(x=>x.id===state.multiDivision.activeDivisionId);
-  if(!active){active=state.multiDivision.divisions[0];state.multiDivision.activeDivisionId=active.id;}
-  active.name=String(active.name||state.tournament.division||'부서 미설정');
-  state.tournament.division=active.name;
+export function normalizeState(source){
+  const state=source&&typeof source==='object'?source:{};
+  state.schemaVersion='230match-v6';
+  state.tournament=state.tournament&&typeof state.tournament==='object'?state.tournament:{id:'',name:'',division:''};
+  state.settings=state.settings&&typeof state.settings==='object'?state.settings:{};
+  const defaults={drawSize:64,courtCount:8,courtPrefix:'국제',venues:[{id:'venue-international',name:'국제',courtCount:8,courtPrefix:'국제'}],venueAssignmentPolicy:'round-robin',separateVenueQueues:true,autoVenuePromotion:true,matchMinutes:40,minimumMatchMinutes:30,autoTimeEnabled:true,timeRefreshSeconds:30,drawMethod:'instant',byePriority:'group-first'};
+  state.settings={...defaults,...state.settings};
+  state.teams=Array.isArray(state.teams)?state.teams:[];
+  state.contacts=state.contacts&&typeof state.contacts==='object'&&!Array.isArray(state.contacts)?state.contacts:{};
+  state.messaging=state.messaging&&typeof state.messaging==='object'?state.messaging:{};
+  state.messaging.settings=state.messaging.settings&&typeof state.messaging.settings==='object'?state.messaging.settings:{};
+  state.messaging.queue=Array.isArray(state.messaging.queue)?state.messaging.queue:[];
+  state.messaging.history=Array.isArray(state.messaging.history)?state.messaging.history:[];
+  state.drawMeta=state.drawMeta&&typeof state.drawMeta==='object'?state.drawMeta:{locked:false,history:[]};
+  state.drawMeta.history=Array.isArray(state.drawMeta.history)?state.drawMeta.history:[];
+  state.prelim=state.prelim&&typeof state.prelim==='object'?state.prelim:{};
+  state.prelim.settings=state.prelim.settings&&typeof state.prelim.settings==='object'?state.prelim.settings:{activeTeamCount:64,threeTeamGroups:0,twoTeamGroups:32,courtCount:8,courtPrefix:'국제',qualifiersPerGroup:2};
+  for(const k of ['activeTeams','reserveTeams','groups','matches','courts','qualifiers'])state.prelim[k]=Array.isArray(state.prelim[k])?state.prelim[k]:[];
+  state.prelim.linkedDraw=state.prelim.linkedDraw&&typeof state.prelim.linkedDraw==='object'?state.prelim.linkedDraw:{active:false,drawSize:0,slots:[],createdAt:null,lastSyncedAt:null};
+  state.draw=state.draw&&typeof state.draw==='object'?state.draw:{size:0,rounds:{}};
+  state.draw.rounds=state.draw.rounds&&typeof state.draw.rounds==='object'?state.draw.rounds:{};
+  state.courts=Array.isArray(state.courts)?state.courts:[];
+  state.sharedQueue=Array.isArray(state.sharedQueue)?state.sharedQueue:[];
+  state.venueQueues=state.venueQueues&&typeof state.venueQueues==='object'&&!Array.isArray(state.venueQueues)?state.venueQueues:{};
+  state.audit=state.audit&&typeof state.audit==='object'?state.audit:{lastRunAt:null,overall:'not-run',results:[],simulation:null};
+  state.audit.results=Array.isArray(state.audit.results)?state.audit.results:[];
+  state.logs=Array.isArray(state.logs)?state.logs:[];
+  state.portal=state.portal&&typeof state.portal==='object'?state.portal:emptyPortal();
+  state.portal.guide=state.portal.guide&&typeof state.portal.guide==='object'?state.portal.guide:{};
+  for(const k of ['applications','posts','resultArchives','participantArchives','tournamentArchives','tournamentTemplates','archives'])state.portal[k]=Array.isArray(state.portal[k])?state.portal[k]:[];
+  state.multiTournament=state.multiTournament&&typeof state.multiTournament==='object'?state.multiTournament:{activeTournamentId:'',tournaments:[],noActiveTournament:true};
+  state.multiTournament.tournaments=Array.isArray(state.multiTournament.tournaments)?state.multiTournament.tournaments:[];
+  if(!state.multiTournament.activeTournamentId&&!state.tournament.id){state.multiTournament.noActiveTournament=true;}
   return state;
 }
-function syncActiveDivisionSnapshot(state){
-  normalizeMultiDivisionState(state);
-  const active=state.multiDivision.divisions.find(x=>x.id===state.multiDivision.activeDivisionId);
-  if(!active)return state;
-  active.name=String(state.tournament?.division||active.name||'부서 미설정');
-  active.updatedAt=new Date().toISOString();
-  active.snapshot=captureDivisionSnapshot(state);
-  return state;
-}
-function compactLocalBootstrap(source){
-  const state=cloneValue(source);
-  // 다중 대회 전체 snapshot은 Firebase V5가 원본을 보관하므로 브라우저에는 요약만 남깁니다.
-  if(Array.isArray(state.multiTournament?.tournaments)){
-    state.multiTournament.tournaments=state.multiTournament.tournaments.map(item=>({
-      id:item?.id||'',name:item?.name||'',division:item?.division||'',
-      createdAt:item?.createdAt||'',updatedAt:item?.updatedAt||'',status:item?.status||''
-    }));
-  }
-  if(state.portal){
-    delete state.portal.tournamentArchives;
-    delete state.portal.participantArchives;
-    delete state.portal.resultArchives;
-    if(Array.isArray(state.portal.posts))state.portal.posts=state.portal.posts.slice(-80);
-  }
-  if(Array.isArray(state.logs))state.logs=state.logs.slice(0,80);
-  if(state.messaging){
-    if(Array.isArray(state.messaging.queue))state.messaging.queue=state.messaging.queue.slice(-80);
-    if(Array.isArray(state.messaging.history))state.messaging.history=state.messaging.history.slice(-80);
-    if(Array.isArray(state.messaging.deliveryLogs))state.messaging.deliveryLogs=state.messaging.deliveryLogs.slice(0,80);
-    if(Array.isArray(state.messaging.smsApprovalHistory))state.messaging.smsApprovalHistory=state.messaging.smsApprovalHistory.slice(0,80);
-  }
-  if(Array.isArray(state.drawMeta?.history))state.drawMeta.history=state.drawMeta.history.slice(-10);
-  state.__localBootstrap=true;
-  return state;
-}
-function clearOversizedLegacyKeys(){
-  [LEGACY_RECOVERY_KEY,'230match-v3-last-known-good','230match-v3-stage35-last-good','230match-v3-stage1-last-good'].forEach(key=>{try{localStorage.removeItem(key);}catch(_e){}});
-}
-export function loadState(){
-  try{
-    const raw=localStorage.getItem(STORAGE_KEY);
-    const state=normalizeMultiDivisionState(raw?JSON.parse(raw):initialState());
-    if(state&&state.__localBootstrap)delete state.__localBootstrap;
-    return state;
-  }catch{return normalizeMultiDivisionState(initialState());}
-}
+function cleanupLegacy(){for(const k of LEGACY_KEYS){try{localStorage.removeItem(k);}catch{}}}
+export function loadState(){cleanupLegacy();return initialState();}
 export function saveState(state){
-  syncActiveDivisionSnapshot(state);
+  normalizeState(state);
   state.updatedAt=new Date().toISOString();
-  const full=JSON.stringify(state);
-  let stored='full';
-  try{
-    localStorage.setItem(STORAGE_KEY,full);
-  }catch(error){
-    clearOversizedLegacyKeys();
-    const compact=JSON.stringify(compactLocalBootstrap(state));
-    try{
-      localStorage.removeItem(STORAGE_KEY);
-      localStorage.setItem(STORAGE_KEY,compact);
-      stored='compact';
-      console.warn(`[230MATCH] 브라우저 용량 절약 모드로 저장했습니다. full=${Math.round(full.length/1024)}KB compact=${Math.round(compact.length/1024)}KB`);
-    }catch(secondError){
-      try{localStorage.removeItem(STORAGE_KEY);}catch(_e){}
-      throw secondError;
-    }
-  }
-  try{window.dispatchEvent(new CustomEvent('230match:state-saved',{detail:{state:structuredClone(state),storageMode:stored}}));}catch(_error){}
-  return stored;
+  const activeTournamentId=state.multiTournament?.activeTournamentId||state.tournament?.id||'';
+  try{localStorage.setItem(META_KEY,JSON.stringify({activeTournamentId,updatedAt:state.updatedAt}));}catch{}
+  // 4.3 core: do not structuredClone the entire tournament on every save.
+  // The sync engine snapshots only the active tournament after debounce/idle time.
+  try{window.dispatchEvent(new CustomEvent('230match:state-saved',{detail:{activeTournamentId,updatedAt:state.updatedAt}}));}catch{}
 }
-export function clearState(){localStorage.removeItem(STORAGE_KEY);}
+export function clearState(){try{localStorage.removeItem(META_KEY);}catch{}}
 
-export function saveRecovery(state,label='수동 복구점'){
-  const item={id:crypto.randomUUID(),label,createdAt:new Date().toISOString(),state:compactRecoveryState(state),compact:true,storage:'indexedDB'};
-  const ready=(async()=>{
-    try{
-      await prepareRecoveryStorage();
-      await transaction('readwrite',store=>store.put(item));
-      const count=await pruneRecoveries();
-      try{window.dispatchEvent(new CustomEvent('230match:recovery-saved',{detail:{id:item.id,count,storage:'indexedDB'}}));}catch(_error){}
-      return{saved:true,count,storage:'indexedDB'};
-    }catch(error){
-      console.warn('IndexedDB 로컬 복구점 저장 실패',error);
-      return{saved:false,count:0,storage:'none',error:error?.message||String(error)};
-    }
-  })();
-  return{...item,ready};
-}
-
-export async function getRecoveries(){
-  try{await prepareRecoveryStorage();return await listRaw();}
-  catch(error){console.warn('로컬 복구점 목록 읽기 실패',error);return[];}
-}
-
-export async function getRecovery(id){
-  try{
-    await prepareRecoveryStorage();
-    const db=await openRecoveryDb();
-    return await new Promise((resolve,reject)=>{const tx=db.transaction(RECOVERY_STORE,'readonly');const req=tx.objectStore(RECOVERY_STORE).get(id);req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error);});
-  }catch(error){console.warn('로컬 복구점 읽기 실패',error);return null;}
-}
-
-export async function deleteRecovery(id){
-  try{await prepareRecoveryStorage();await transaction('readwrite',store=>store.delete(id));return true;}
-  catch(error){console.warn('로컬 복구점 삭제 실패',error);return false;}
-}
+function openDb(){if(dbPromise)return dbPromise;dbPromise=new Promise((resolve,reject)=>{const req=indexedDB.open(DB_NAME,DB_VERSION);req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains(RECOVERY_STORE)){const s=db.createObjectStore(RECOVERY_STORE,{keyPath:'id'});s.createIndex('createdAt','createdAt');}};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});return dbPromise;}
+async function getAll(){const db=await openDb();return new Promise((resolve,reject)=>{const tx=db.transaction(RECOVERY_STORE,'readonly');const r=tx.objectStore(RECOVERY_STORE).getAll();r.onsuccess=()=>resolve((r.result||[]).sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt))));r.onerror=()=>reject(r.error);});}
+async function put(item){const db=await openDb();await new Promise((resolve,reject)=>{const tx=db.transaction(RECOVERY_STORE,'readwrite');tx.objectStore(RECOVERY_STORE).put(item);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});const all=await getAll();for(const old of all.slice(MAX_RECOVERIES)){await deleteRecovery(old.id);}return Math.min(all.length,MAX_RECOVERIES);}
+export async function prepareRecoveryStorage(){await openDb();try{await navigator.storage?.persist?.();}catch{}return{ready:true,migrated:0};}
+export function saveRecovery(state,label='수동 복구점'){const item={id:uid(),label,createdAt:new Date().toISOString(),state:clone(normalizeState(clone(state))),storage:'indexedDB-v6'};const ready=put(item).then(count=>({saved:true,count,storage:'indexedDB-v6'})).catch(error=>({saved:false,count:0,storage:'none',error:error?.message||String(error)}));return{...item,ready};}
+export async function getRecoveries(){try{return await getAll();}catch{return[];}}
+export async function getRecovery(id){try{const db=await openDb();return await new Promise((resolve,reject)=>{const tx=db.transaction(RECOVERY_STORE,'readonly');const r=tx.objectStore(RECOVERY_STORE).get(id);r.onsuccess=()=>resolve(r.result||null);r.onerror=()=>reject(r.error);});}catch{return null;}}
+export async function deleteRecovery(id){try{const db=await openDb();await new Promise((resolve,reject)=>{const tx=db.transaction(RECOVERY_STORE,'readwrite');tx.objectStore(RECOVERY_STORE).delete(id);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});return true;}catch{return false;}}
