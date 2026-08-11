@@ -1,8 +1,8 @@
 import{getAuthConfig,saveAuthConfig,startAuth,signInGoogle,signOutSocial,beginExternalLogin,getExistingLoginEndpoints,signInEmail,registerEmail,sendPasswordReset,linkEmailPassword,authProviderIds,getAuthRuntime}from'./auth-engine.js?v=3565';
-import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7122';
+import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7124';
 import{notificationSupport,getStoredVapidKey,saveStoredVapidKey,enableMyPush,disableMyPush,queuePush,listPushJobs,listPushTokens}from'./notification-engine.js?v=332012';
 
-import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7122';
+import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7124';
 import{prepareTeams,generateDraw,allMatches,findMatch,generateLinkedDrawSlots,syncLinkedDrawQualifiers}from'./bracket-engine-v5000.js?v=5000';
 import{ensureDrawMeta,canModifyDraw,createDrawWithMethod,lockDraw,unlockDrawForDevelopment,clearDrawHistory}from'./draw-method-engine.js?v=332012';
 import{buildCourts,assignInitial,queueReadyMatches,refillCourt}from'./court-engine.js?v=332012';
@@ -15,7 +15,7 @@ import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactD
 import{render,teamText}from'./ui.js?v=3504';
 import{ensureAuditState,runStateAudit,runPrelimSimulation,runFullSimulation,applyAuditResult}from'./audit-engine.js?v=332012';
 import{earlyMainStats,markResolvedMainMatchesReady,canAssignEarlyMain,ensureEarlyMainSettings,autoAssignResolvedMain}from'./early-main-engine.js?v=332012';
-import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7122';
+import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7124';
 import{ensureMainDrawLifecycle,beginMainDraw,completeMainDraw,failMainDraw,resetMainDraw,hasAuthorizedMainDraw,mainDrawStatus,clearMainPlacement,repairMainDrawAuthorization}from'./main-draw-lifecycle-engine.js?v=3501';
 import{shouldUseLinkedDraw,linkedDrawNeedsRepair,rebuildLinkedDraw,hasStartedMainMatches}from'./linked-draw-guard-engine.js?v=332012';
 import{ensureVenueSettings,ensureVenueQueues,venuePreset,buildVenueCourts,prelimVenues,mainVenues}from'./venue-engine.js?v=332012';
@@ -26,7 +26,7 @@ import{ensureCourtStatuses,pauseCourt,resumeCourt}from'./court-status-engine.js?
 import{ensureCourtManualQueues,assignToCourtManualQueue,moveCourtMatchFlexible,returnManualQueueItemToVenue,reorderCourtManualQueue}from'./court-manual-queue-engine.js?v=332012';
 import{reorderPrelimQueue as reorderPrelimQueueItem,movePrelimQueuedMatch,returnPrelimWait1ToQueue}from'./prelim-queue-control-engine.js?v=332012';
 import{ensurePrelimCourtStatuses,pausePrelimCourt,resumePrelimCourt}from'./prelim-court-status-engine.js?v=332012';
-import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7122';
+import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7124';
 import{verifyAndRepairMainFlow}from'./main-flow-integrity-engine.js?v=332012';
 import{finalizeTournamentCompletion}from'./tournament-completion-engine.js?v=332012';
 import{ensureTournamentIdentity,validateTournamentForArchive,createTournamentArchive,archiveListItem,archiveBackupPayload}from'./archive-engine.js?v=354000';
@@ -3055,6 +3055,24 @@ function decorateBracketLivePlacements(){
       if(['playing','wait1','waiting','shared'].includes(placement.kind))badge.title='눌러서 코트 현황의 실제 위치로 이동';
       else if(placement.kind!=='completed')badge.title='';
       card.dataset.matchId=String(match.id||'');
+
+      // 5.3.3: 본선 카드의 하단 중복 메타/점수는 숨긴다.
+      // 상태와 스코어는 bracket-live-placement 한 곳에서만 표시한다.
+      const completedScore=match.status==='completed'?`${Number(match.scoreA||0)} : ${Number(match.scoreB||0)}`:'';
+      [...card.querySelectorAll('*')].forEach(el=>{
+        if(el===badge||el.contains(badge)||badge.contains(el))return;
+        if(el.children.length)return;
+        const text=String(el.textContent||'').replace(/\s+/g,' ').trim();
+        const compact=text.replace(/\s+/g,'');
+        const isInternalId=/^ID\s*r\d+_m\d+$/i.test(text)||/^r\d+_m\d+$/i.test(text);
+        const isScheduledMeta=/^경기\s*예정$/i.test(text)||/^경기\s*예정\s*ID\s*r\d+_m\d+$/i.test(text);
+        const isDuplicateScore=Boolean(completedScore)&&compact===completedScore.replace(/\s+/g,'');
+        if(isInternalId||isScheduledMeta||isDuplicateScore){
+          el.hidden=true;
+          el.setAttribute('aria-hidden','true');
+          el.dataset.bracketRedundant='1';
+        }
+      });
     });
   });
 }
@@ -5304,6 +5322,7 @@ function navigatePortalView(name,{pushHistory=false,replaceHistory=false,focus=t
   document.querySelectorAll('.tab[data-view]').forEach(tab=>tab.classList.toggle('active',tab.dataset.view===target));
   document.querySelectorAll('.mobile-nav-button[data-mobile-view]').forEach(btn=>btn.classList.toggle('active',btn.dataset.mobileView===target));
   document.body.dataset.currentView=target;
+  if(typeof window.__update230MatchMatchdayQuickBar==='function')setTimeout(window.__update230MatchMatchdayQuickBar,0);
 
   // 코트 현황도 별도 라우터를 두지 않고 여기에서 모드를 확정합니다.
   if(target==='operation'){
@@ -10404,7 +10423,7 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
   };
   setInterval(tick,2500);
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(tick,350),{once:true});else setTimeout(tick,350);
-  console.info('[230MATCH] 71.2.2 ready · bracket score visibility + direct result edit');
+  console.info('[230MATCH] 71.2.4 ready · matchday participant quick bar');
 })();
 
 
@@ -10496,7 +10515,7 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
   window.addEventListener('pageshow',update);
   setInterval(()=>{if(document.body?.dataset.currentView==='home')update();},5000);
   window.__updateTodayTournamentDashboard=updateTodayDashboard;
-  console.info('[230MATCH] 71.2.2 ready · bracket score visibility + direct result edit');
+  console.info('[230MATCH] 71.2.4 ready · matchday participant quick bar');
 })();
 
 
@@ -10764,7 +10783,72 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
   window.__run230MatchResultFlowCheck=runResultFlowCheck;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(runResultFlowCheck,700),{once:true});else setTimeout(runResultFlowCheck,700);
   setInterval(()=>{if(document.body?.dataset.currentView==='home'&&canOperate())runResultFlowCheck();},10000);
-  console.info('[230MATCH] 71.2.2 ready · bracket score visibility + direct result edit');
+  console.info('[230MATCH] 71.2.4 ready · matchday participant quick bar');
+})();
+
+
+
+/* 230MATCH 5.3.4 · matchday participant quick bar */
+(()=>{
+  const QUICK_VIEWS=new Set(['prelim-public','operation','bracket','my-match']);
+  let idleTimer=null;
+
+  function matchdayHasStarted(){
+    const prelim=Array.isArray(state?.prelim?.matches)?state.prelim.matches:[];
+    let main=[];
+    try{main=typeof allMatches==='function'?(allMatches(state)||[]):[];}catch(_e){}
+    const courts=Array.isArray(state?.courts)?state.courts:[];
+    const prelimCourts=Array.isArray(state?.prelim?.courts)?state.prelim.courts:[];
+    const playing=[...courts,...prelimCourts].some(c=>c&&(c.playing||c.currentMatchId||String(c.status||'').toLowerCase()==='playing'));
+    return Boolean(prelim.length||main.length||playing);
+  }
+
+  function isParticipantQuickBarEligible(){
+    // 시합 진행 중인 일반 참가자 화면에서만 노출.
+    return Boolean(currentAuthUser)&&!canOperate()&&matchdayHasStarted();
+  }
+
+  function wakeQuickBar(){
+    const bar=document.getElementById('stage7124MatchdayQuickBar');if(!bar||bar.hidden)return;
+    bar.classList.remove('stage7124-idle');
+    clearTimeout(idleTimer);
+    idleTimer=setTimeout(()=>bar.classList.add('stage7124-idle'),4000);
+  }
+
+  function updateMatchdayQuickBar(){
+    const bar=document.getElementById('stage7124MatchdayQuickBar');if(!bar)return;
+    const eligible=isParticipantQuickBarEligible();
+    bar.hidden=!eligible;
+    if(!eligible)return;
+    const current=String(document.body?.dataset.currentView||'home');
+    bar.querySelectorAll('[data-matchday-quick-view]').forEach(btn=>{
+      const active=String(btn.dataset.matchdayQuickView||'')===current;
+      btn.classList.toggle('active',active);
+      btn.setAttribute('aria-current',active?'page':'false');
+    });
+    wakeQuickBar();
+  }
+
+  document.addEventListener('click',e=>{
+    const btn=e.target.closest?.('[data-matchday-quick-view]');
+    if(!btn)return;
+    const target=String(btn.dataset.matchdayQuickView||'');
+    if(!QUICK_VIEWS.has(target))return;
+    e.preventDefault();
+    navigatePortalView(target,{pushHistory:true,focus:false});
+    updateMatchdayQuickBar();
+  });
+
+  ['pointerdown','touchstart','mousemove','keydown'].forEach(type=>{
+    document.addEventListener(type,wakeQuickBar,{passive:true});
+  });
+
+  window.__update230MatchMatchdayQuickBar=updateMatchdayQuickBar;
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',()=>setTimeout(updateMatchdayQuickBar,700),{once:true});
+  }else setTimeout(updateMatchdayQuickBar,700);
+  setInterval(updateMatchdayQuickBar,5000);
+  console.info('[230MATCH] 71.2.4 ready · matchday participant quick bar');
 })();
 
 
@@ -10922,4 +11006,4 @@ console.info('[230MATCH] 63.0.0 ready · chunked cloud workspace + bounded retry
 
 console.info('[230MATCH] 64.0.0 architecture · lazy cloud registry, worker serialization, visible-view commit rendering');
 
-console.info('[230MATCH] 71.2.2 ready · bracket score visibility + direct result edit');
+console.info('[230MATCH] 71.2.4 ready · matchday participant quick bar');

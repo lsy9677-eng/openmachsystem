@@ -2048,7 +2048,7 @@
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=7122"></script>
+  <script type="module" src="./assets/js/app.js?v=7124"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
@@ -2823,6 +2823,70 @@ input[type="radio"]{
     font-size:10px!important;
     min-height:25px!important;
   }
+}
+</style>
+
+
+<nav id="stage7124MatchdayQuickBar" aria-label="시합 당일 빠른 이동" hidden>
+  <button type="button" class="stage7124-quick-btn" data-matchday-quick-view="prelim-public">예선현황</button>
+  <button type="button" class="stage7124-quick-btn" data-matchday-quick-view="operation">코트현황</button>
+  <button type="button" class="stage7124-quick-btn" data-matchday-quick-view="bracket">대진표</button>
+  <button type="button" class="stage7124-quick-btn" data-matchday-quick-view="my-match">내경기</button>
+</nav>
+
+<style id="stage7124MatchdayQuickBarStyles">
+#stage7124MatchdayQuickBar{
+  position:fixed;
+  left:50%;
+  bottom:18px;
+  transform:translateX(-50%);
+  z-index:2140;
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:5px;
+  width:min(430px,calc(100vw - 24px));
+  padding:6px;
+  border:1px solid rgba(148,163,184,.42);
+  border-radius:16px;
+  background:rgba(255,255,255,.72);
+  box-shadow:0 8px 24px rgba(15,23,42,.16);
+  backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);
+  opacity:.82;
+  transition:opacity .2s ease,transform .2s ease;
+}
+#stage7124MatchdayQuickBar[hidden]{display:none!important}
+#stage7124MatchdayQuickBar.stage7124-idle{opacity:.48}
+#stage7124MatchdayQuickBar:hover,
+#stage7124MatchdayQuickBar:focus-within{opacity:.98}
+.stage7124-quick-btn{
+  min-width:0;
+  min-height:38px;
+  padding:5px 4px;
+  border:1px solid rgba(148,163,184,.34);
+  border-radius:11px;
+  background:rgba(248,250,252,.8);
+  color:#334155;
+  font:inherit;
+  font-size:11px;
+  font-weight:900;
+  line-height:1.15;
+  cursor:pointer;
+}
+.stage7124-quick-btn:hover{background:rgba(239,246,255,.96)}
+.stage7124-quick-btn.active{
+  background:rgba(37,99,235,.92);
+  border-color:rgba(37,99,235,.96);
+  color:#fff;
+}
+@media(max-width:700px){
+  #stage7124MatchdayQuickBar{
+    bottom:calc(72px + env(safe-area-inset-bottom,0px));
+    width:calc(100vw - 16px);
+    padding:5px;
+    border-radius:14px;
+  }
+  .stage7124-quick-btn{min-height:34px;font-size:10px;padding:4px 2px}
 }
 </style>
 
