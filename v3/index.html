@@ -457,6 +457,7 @@
             <div><span>참가팀</span><strong id="entryPublicApprovedCount">0팀</strong></div>
             <div><span>후보 대기</span><strong id="entryPublicReserveCount">0팀</strong></div>
             <div><span>미입금</span><strong id="entryPublicPendingCount">0팀</strong></div>
+            <div><span>입금완료</span><strong id="entryPublicPaidCount">0팀</strong></div>
           </div>
           <div class="entry-public-columns">
             <div><h3>참가팀</h3><div id="entryPublicApprovedList" class="entry-public-team-list"><div class="portal-empty">승인된 참가팀이 없습니다.</div></div></div>
@@ -465,8 +466,20 @@
         </section>
 
         <section class="entry-admin-manager panel admin-entry-management" data-admin-only="true">
-          <div class="section-head compact-head"><div><h2>참가 신청 현황·승인 관리</h2><p>접수된 신청 명단을 확인하고 참가 승인·후보 승인·입금·문자 처리를 진행합니다.</p></div><span id="entryPendingCount" class="badge badge-warning">승인 대기 0건</span></div>
-          <div class="entry-admin-toolbar"><label><span>처리 상태</span><select id="entryAdminFilter"><option value="all">전체</option><option value="pending">승인 대기</option><option value="approved">참가 승인</option><option value="reserve">후보 승인</option><option value="rejected">반려</option><option value="cancelled">신청 취소</option></select></label><button id="createTestApplicationsBtn" type="button" class="btn btn-light">테스트 신청 4팀 만들기</button></div>
+          <div class="section-head compact-head"><div><h2>참가 접수·입금 관리</h2><p>접수, 입금, 후보, 취소요청을 숫자로 먼저 확인하고 필요한 팀만 빠르게 처리합니다.</p></div><span id="entryPendingCount" class="badge badge-warning">미입금 0건</span></div>
+          <div class="entry-admin-quick-summary" id="entryAdminQuickSummary">
+            <button type="button" class="active" data-entry-quick-filter="all"><strong id="entryQuickAll">0</strong><span>전체</span></button>
+            <button type="button" data-entry-quick-filter="unpaid"><strong id="entryQuickUnpaid">0</strong><span>미입금</span></button>
+            <button type="button" data-entry-quick-filter="paid"><strong id="entryQuickPaid">0</strong><span>입금완료</span></button>
+            <button type="button" data-entry-quick-filter="reserve"><strong id="entryQuickReserve">0</strong><span>후보</span></button>
+            <button type="button" data-entry-quick-filter="cancel"><strong id="entryQuickCancel">0</strong><span>취소요청</span></button>
+          </div>
+          <div class="entry-admin-notify-settings">
+            <label><span>관리자 알림 문자번호</span><input id="entryAdminNotifyPhone" type="tel" inputmode="numeric" placeholder="01012345678"></label>
+            <button id="entryAdminNotifySaveBtn" type="button" class="btn btn-light btn-small">알림번호 저장</button>
+            <small class="entry-admin-sms-note">참가신청·취소요청 때 신청자의 휴대폰 문자앱에 관리자 번호와 내용이 자동 입력됩니다.</small>
+          </div>
+          <div class="entry-admin-toolbar"><label><span>상태</span><select id="entryAdminFilter"><option value="all">전체</option><option value="approved">참가</option><option value="reserve">후보</option><option value="cancelled">취소완료</option></select></label><button id="createTestApplicationsBtn" type="button" class="btn btn-light">테스트 신청 4팀 만들기</button></div>
           <div id="entryAdminList" class="entry-admin-list"><div class="portal-empty">접수된 참가 신청이 없습니다.</div></div>
         </section>
 
@@ -1945,7 +1958,7 @@
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=7111"></script>
+  <script type="module" src="./assets/js/app.js?v=7112"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
@@ -2456,6 +2469,27 @@ input[type="radio"]{
 #entryApplicationFormCard.entry-form-auto-collapsed .entry-form-collapsible-body{display:none!important}
 #entryApplicationFormCard.entry-form-auto-collapsed .entry-form-collapse-toggle{margin-bottom:0}
 @media(max-width:640px){.entry-form-collapse-toggle{padding:9px 10px;font-size:12px}.entry-form-collapse-toggle small{font-size:10px}}
+</style>
+
+
+<style id="stage7112EntryDashboardSmsStyles">
+.entry-public-summary{grid-template-columns:repeat(4,minmax(0,1fr))}
+.entry-admin-quick-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin:10px 0}
+.entry-admin-quick-summary button{display:grid;gap:2px;min-height:54px;padding:8px 6px;border:1px solid #d5e1ef;border-radius:12px;background:#f8fbff;color:#244362;cursor:pointer}
+.entry-admin-quick-summary button strong{font-size:18px;line-height:1.1}
+.entry-admin-quick-summary button span{font-size:10px;font-weight:800;color:#667a92}
+.entry-admin-quick-summary button.active{outline:2px solid #2f6fb0;background:#eef6ff}
+.entry-admin-notify-settings{display:flex;align-items:end;gap:8px;flex-wrap:wrap;margin:10px 0;padding:10px;border:1px solid #d8e3ef;border-radius:12px;background:#fbfdff}
+.entry-admin-notify-settings label{display:grid;gap:4px;min-width:220px;font-size:11px;font-weight:800;color:#5a7089}
+.entry-admin-notify-settings input{min-height:36px}
+.entry-admin-row .entry-actions{flex-wrap:wrap}
+.entry-admin-sms-note{font-size:10px;color:#718197}
+@media(max-width:700px){
+  .entry-public-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .entry-admin-quick-summary{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .entry-admin-notify-settings{align-items:stretch}
+  .entry-admin-notify-settings label{min-width:0;flex:1 1 100%}
+}
 </style>
 
 </body>
