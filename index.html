@@ -276,6 +276,7 @@
           <div><span>본선 경기</span><strong id="homeMainStatus">0 / 0</strong></div>
           <div><span>진행 코트</span><strong id="homePlayingCourts">0</strong></div>
           <div><span>대기 경기</span><strong id="homeWaitingMatches">0</strong></div>
+          <button type="button" class="home-registration-status" data-portal-go="entry"><span>참가 접수</span><strong id="homeRegistrationStatus">0 / 0</strong><small id="homeRegistrationSub">현황 보기</small></button>
         </div>
         <div class="legacy-home-menu">
           <button type="button" data-portal-go="tournaments"><span>🗓️</span><b>대회 목록</b><small>접수·진행·종료 대회</small></button>
@@ -413,21 +414,27 @@
         </article>
 
         <aside class="panel entry-lookup-panel legacy-entry-lookup-card">
-          <div class="section-head"><div><h2>신청 상태 조회</h2><p>신청 시 입력한 대표 연락처를 입력하세요.</p></div></div>
+          <div class="section-head"><div><h2>내 신청 관리</h2><p>로그인한 본인의 신청을 확인하고 수정·취소 요청할 수 있습니다.</p></div></div>
+          <div id="entrySelfManager" class="entry-self-manager">
+            <div class="entry-self-manager-head"><div><h3>내 참가 신청</h3><small>로그인 계정 기준 자동 조회</small></div><span id="entrySelfManagerCount" class="badge badge-safe">0건</span></div>
+            <div id="entrySelfManagerList" class="entry-self-list"><div class="entry-self-empty">로그인 후 내 신청이 자동 표시됩니다.</div></div>
+          </div>
+          <details class="entry-legacy-lookup"><summary>연락처로 신청 조회</summary>
           <div class="entry-lookup-row legacy-entry-lookup-row"><label><span>대표 연락처</span><input id="entryLookupPhone" type="tel" inputmode="numeric" placeholder="01012345678"></label><button id="entryLookupBtn" type="button" class="btn btn-secondary">조회</button></div>
-          <div id="entryLookupResult"><div class="portal-empty">연락처를 입력하면 접수·승인·후보·반려 상태가 표시됩니다.</div></div>
+          <div id="entryLookupResult"><div class="portal-empty">연락처를 입력하면 신청 상태가 표시됩니다.</div></div>
+          </details>
         </aside>
       </section>
 
         <section class="panel entry-public-status-board">
-          <div class="section-head compact-head"><div><h2>참가 신청 현황</h2><p>누구나 현재 참가 승인팀과 후보팀 현황을 확인할 수 있습니다. 연락처는 공개하지 않습니다.</p></div><span id="entryPublicTotalBadge" class="badge badge-safe">전체 0팀</span></div>
+          <div class="section-head compact-head"><div><h2>참가 신청 현황</h2><p>현재 참가팀과 후보팀 현황을 간단히 확인할 수 있습니다. 연락처는 공개하지 않습니다.</p></div><span id="entryPublicTotalBadge" class="badge badge-safe">전체 0팀</span></div>
           <div class="entry-public-summary">
-            <div><span>참가 승인</span><strong id="entryPublicApprovedCount">0팀</strong></div>
+            <div><span>참가팀</span><strong id="entryPublicApprovedCount">0팀</strong></div>
             <div><span>후보 대기</span><strong id="entryPublicReserveCount">0팀</strong></div>
-            <div><span>승인 대기</span><strong id="entryPublicPendingCount">0팀</strong></div>
+            <div><span>미입금</span><strong id="entryPublicPendingCount">0팀</strong></div>
           </div>
           <div class="entry-public-columns">
-            <div><h3>참가 승인팀</h3><div id="entryPublicApprovedList" class="entry-public-team-list"><div class="portal-empty">승인된 참가팀이 없습니다.</div></div></div>
+            <div><h3>참가팀</h3><div id="entryPublicApprovedList" class="entry-public-team-list"><div class="portal-empty">승인된 참가팀이 없습니다.</div></div></div>
             <div><h3>후보팀</h3><div id="entryPublicReserveList" class="entry-public-team-list"><div class="portal-empty">후보팀이 없습니다.</div></div></div>
           </div>
         </section>
@@ -1913,7 +1920,7 @@
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=7102"></script>
+  <script type="module" src="./assets/js/app.js?v=7103"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
@@ -2254,6 +2261,35 @@ input[type="radio"]{
 .entry-admin-row.simple-registration .cancel-request-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:7px}
 .entry-payment-button.paid{background:#e8f7ed;border-color:#b9dec4;color:#22623a}
 .entry-payment-button.unpaid{background:#fff8e6;border-color:#ecd89a;color:#7d5b00}
+</style>
+
+
+<style id="stage7103RegistrationUxStyles">
+.home-registration-status{cursor:pointer}
+.home-registration-status strong{color:#0f4ea3}
+.entry-self-manager{margin:0 0 14px;padding:14px;border:1px solid #cbd9ec;border-radius:16px;background:linear-gradient(135deg,#f8fbff,#eef5ff)}
+.entry-self-manager-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px}
+.entry-self-manager-head h3{margin:0;font-size:17px;color:#17365f}
+.entry-self-manager-head small{color:#6c7d91}
+.entry-self-list{display:grid;gap:8px}
+.entry-self-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:11px 12px;border:1px solid #d7e2ef;border-radius:12px;background:#fff}
+.entry-self-card-main{min-width:0;display:grid;gap:3px}
+.entry-self-card-main strong{font-size:14px;color:#132f55;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.entry-self-card-main small{font-size:11px;color:#687b91}
+.entry-self-card-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
+.entry-self-card-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.entry-self-empty{padding:14px;text-align:center;color:#6b7d90;font-size:12px}
+.entry-public-team-list.compact-list .entry-public-team-row:nth-child(n+7){display:none}
+.entry-public-more-row{display:flex;justify-content:center;margin-top:8px}
+.entry-public-more-row button{min-height:34px}
+.entry-public-status-board .entry-public-columns>div{min-width:0}
+@media(max-width:700px){
+  .entry-self-manager{padding:11px}
+  .entry-self-manager-head{align-items:flex-start;flex-direction:column}
+  .entry-self-card{grid-template-columns:1fr}
+  .entry-self-card-actions{justify-content:flex-start}
+  .entry-public-columns{grid-template-columns:1fr!important}
+}
 </style>
 
 </body>
