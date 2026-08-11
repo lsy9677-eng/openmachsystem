@@ -1,8 +1,8 @@
 import{getAuthConfig,saveAuthConfig,startAuth,signInGoogle,signOutSocial,beginExternalLogin,getExistingLoginEndpoints,signInEmail,registerEmail,sendPasswordReset,linkEmailPassword,authProviderIds,getAuthRuntime}from'./auth-engine.js?v=3565';
-import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7103';
+import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7105';
 import{notificationSupport,getStoredVapidKey,saveStoredVapidKey,enableMyPush,disableMyPush,queuePush,listPushJobs,listPushTokens}from'./notification-engine.js?v=332012';
 
-import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7103';
+import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7105';
 import{prepareTeams,generateDraw,allMatches,findMatch,generateLinkedDrawSlots,syncLinkedDrawQualifiers}from'./bracket-engine-v5000.js?v=5000';
 import{ensureDrawMeta,canModifyDraw,createDrawWithMethod,lockDraw,unlockDrawForDevelopment,clearDrawHistory}from'./draw-method-engine.js?v=332012';
 import{buildCourts,assignInitial,queueReadyMatches,refillCourt}from'./court-engine.js?v=332012';
@@ -15,7 +15,7 @@ import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactD
 import{render,teamText}from'./ui.js?v=3504';
 import{ensureAuditState,runStateAudit,runPrelimSimulation,runFullSimulation,applyAuditResult}from'./audit-engine.js?v=332012';
 import{earlyMainStats,markResolvedMainMatchesReady,canAssignEarlyMain,ensureEarlyMainSettings,autoAssignResolvedMain}from'./early-main-engine.js?v=332012';
-import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7103';
+import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7105';
 import{ensureMainDrawLifecycle,beginMainDraw,completeMainDraw,failMainDraw,resetMainDraw,hasAuthorizedMainDraw,mainDrawStatus,clearMainPlacement,repairMainDrawAuthorization}from'./main-draw-lifecycle-engine.js?v=3501';
 import{shouldUseLinkedDraw,linkedDrawNeedsRepair,rebuildLinkedDraw,hasStartedMainMatches}from'./linked-draw-guard-engine.js?v=332012';
 import{ensureVenueSettings,ensureVenueQueues,venuePreset,buildVenueCourts,prelimVenues,mainVenues}from'./venue-engine.js?v=332012';
@@ -26,7 +26,7 @@ import{ensureCourtStatuses,pauseCourt,resumeCourt}from'./court-status-engine.js?
 import{ensureCourtManualQueues,assignToCourtManualQueue,moveCourtMatchFlexible,returnManualQueueItemToVenue,reorderCourtManualQueue}from'./court-manual-queue-engine.js?v=332012';
 import{reorderPrelimQueue as reorderPrelimQueueItem,movePrelimQueuedMatch,returnPrelimWait1ToQueue}from'./prelim-queue-control-engine.js?v=332012';
 import{ensurePrelimCourtStatuses,pausePrelimCourt,resumePrelimCourt}from'./prelim-court-status-engine.js?v=332012';
-import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7103';
+import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7105';
 import{verifyAndRepairMainFlow}from'./main-flow-integrity-engine.js?v=332012';
 import{finalizeTournamentCompletion}from'./tournament-completion-engine.js?v=332012';
 import{ensureTournamentIdentity,validateTournamentForArchive,createTournamentArchive,archiveListItem,archiveBackupPayload}from'./archive-engine.js?v=354000';
@@ -3099,6 +3099,90 @@ function clearEntryApplicationForm(){
 
 
 const REGISTRATION_COLLECTION='matchRegistrationsV1';
+
+const PUBLIC_REGISTRATION_COLLECTION='matchRegistrationPublicV1';
+let publicRegistrationRows=[];
+let publicRegistrationReady=false;
+let publicRegistrationUnsubscribe=null;
+let publicRegistrationKey='';
+
+function publicRegistrationPayload(item){
+  return {
+    id:String(item?.id||''),
+    tournamentId:String(item?.tournamentId||registrationContext().tournamentId||''),
+    divisionId:String(item?.divisionId||registrationContext().divisionId||''),
+    divisionName:String(item?.tournamentDivision||item?.divisionName||registrationContext().divisionName||''),
+    status:String(item?.status||'approved'),
+    paid:Boolean(item?.paid),
+    paymentStatus:String(item?.paymentStatus||(item?.paid?'paid':'unpaid')),
+    createdAt:String(item?.createdAt||new Date().toISOString()),
+    updatedAt:String(item?.updatedAt||item?.createdAt||new Date().toISOString())
+  };
+}
+async function savePublicRegistrationMirror(item){
+  if(!item?.id)return;
+  const rt=await registrationRuntime();
+  if(!rt?.user)return;
+  const payload=publicRegistrationPayload(item);
+  await rt.api.setDoc(rt.api.doc(rt.db,PUBLIC_REGISTRATION_COLLECTION,payload.id),payload,{merge:true});
+}
+function publicRegistrationBelongsToCurrentDivision(row){
+  const ctx=registrationContext();
+  if(String(row?.tournamentId||'')!==String(ctx.tournamentId||''))return false;
+  const did=String(row?.divisionId||''),dname=String(row?.divisionName||'').trim();
+  if(did&&did===String(ctx.divisionId||''))return true;
+  if(dname&&dname===String(ctx.divisionName||'').trim())return true;
+  if(!did&&(state.multiDivision?.divisions||[]).length<=1)return true;
+  return false;
+}
+function publicRegistrationRowsForCurrentDivision(){
+  return publicRegistrationRows.filter(publicRegistrationBelongsToCurrentDivision);
+}
+function registrationPublicSummary(){
+  const rows=publicRegistrationReady?publicRegistrationRowsForCurrentDivision():(registrationCloudReady?registrationRowsForCurrentDivision():(state.portal?.applications||[]));
+  return {
+    rows,
+    active:rows.filter(a=>a.status==='approved').length,
+    reserve:rows.filter(a=>a.status==='reserve').length,
+    paid:rows.filter(a=>a.status==='approved'&&Boolean(a.paid)).length,
+    unpaid:rows.filter(a=>a.status==='approved'&&!a.paid).length,
+    capacity:simpleRegistrationCapacity()
+  };
+}
+function renderRegistrationSummaryEverywhere(){
+  const s=registrationPublicSummary(),text=`${s.active}/${s.capacity}`;
+  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=String(v);};
+  set('homeRegistrationStatus',`${s.active} / ${s.capacity}`);
+  set('homeRegistrationSub',s.reserve?`후보 ${s.reserve}팀 · 현황 보기`:'접수 현황 보기');
+  set('homeHeroRegistrationCount',`${s.active} / ${s.capacity}`);
+  set('homeHeroUnpaidCount',s.unpaid);set('homeHeroPaidCount',s.paid);set('homeHeroReserveCount',s.reserve);
+  const progress=document.getElementById('homeHeroRegistrationProgress');if(progress)progress.style.width=`${Math.max(0,Math.min(100,s.active/Math.max(1,s.capacity)*100))}%`;
+  const hub=document.querySelector('#stage3212MatchdayHub [data-portal-go="entry"] b');if(hub)hub.textContent=`참가 신청 (${text})`;
+  set('stage3212EntryCount',s.reserve?`후보 ${s.reserve}팀 · 접수 현황`:`접수 ${text}`);
+  const cta=document.querySelector('.legacy-entry-cta[data-portal-go="entry"]');if(cta)cta.textContent=`참가 신청 (${text})`;
+  const nav=document.querySelector('.mode-tabs [data-view="entry"]');if(nav)nav.innerHTML=`참가 신청 <span class="entry-nav-count">(${text})</span>`;
+}
+async function startPublicRegistrationSync({force=false}={}){
+  try{
+    const rt=await registrationRuntime(),ctx=registrationContext();if(!ctx.tournamentId)return;
+    const key=String(ctx.tournamentId);
+    if(!force&&publicRegistrationUnsubscribe&&publicRegistrationKey===key)return;
+    publicRegistrationUnsubscribe?.();publicRegistrationKey=key;
+    const q=rt.api.query(rt.api.collection(rt.db,PUBLIC_REGISTRATION_COLLECTION),rt.api.where('tournamentId','==',ctx.tournamentId));
+    publicRegistrationUnsubscribe=rt.api.onSnapshot(q,snap=>{
+      publicRegistrationRows=snap.docs.map(doc=>({id:doc.id,...doc.data()}));publicRegistrationReady=true;
+      renderRegistrationSummaryEverywhere();
+      if(document.body?.dataset.currentView==='entry')renderApplicationPortal();
+      try{renderVisibleDivisionBar?.();}catch(_e){}
+    },error=>{publicRegistrationReady=false;console.warn('[230MATCH] 공개 참가현황 연결 실패',error);});
+  }catch(error){publicRegistrationReady=false;console.warn('[230MATCH] 공개 참가현황 시작 실패',error);}
+}
+async function backfillPublicRegistrationMirrors(){
+  if(!currentAuthUser||!registrationCloudReady)return;
+  const rows=canOperate()?registrationCloudRows:registrationCloudRows.filter(r=>String(r.ownerUid||'')===String(currentAuthUser.uid||''));
+  for(const row of rows){try{await savePublicRegistrationMirror(row);}catch(error){console.warn('[230MATCH] 공개 참가현황 복구 실패',row?.id,error);}}
+}
+
 let registrationCloudRows=[];
 let registrationCloudUnsubscribe=null;
 let registrationCloudKey='';
@@ -3114,19 +3198,57 @@ function registrationContext(){
 function registrationNormalize(row={}){
   return {...row,id:String(row.id||''),ownerUid:String(row.ownerUid||''),tournamentId:String(row.tournamentId||''),divisionId:String(row.divisionId||''),status:String(row.status||'pending'),createdAt:String(row.createdAt||''),updatedAt:String(row.updatedAt||row.createdAt||'')};
 }
-function registrationRowsForCurrentDivision(){
+function registrationBelongsToCurrentDivision(row){
   const ctx=registrationContext();
-  return registrationCloudRows.filter(r=>r.tournamentId===ctx.tournamentId&&r.divisionId===ctx.divisionId);
+  if(String(row?.tournamentId||'')!==String(ctx.tournamentId||''))return false;
+  const rowDivisionId=String(row?.divisionId||'');
+  const rowDivisionName=String(row?.tournamentDivision||row?.divisionName||'').trim();
+  const currentName=String(ctx.divisionName||'').trim();
+  // 최신 문서는 divisionId로 일치.
+  if(rowDivisionId&&ctx.divisionId&&rowDivisionId===String(ctx.divisionId))return true;
+  // 구버전 문서는 divisionId가 없거나 바뀐 경우가 있어 부서명으로 복구.
+  if(rowDivisionName&&currentName&&rowDivisionName===currentName)return true;
+  // 단일 부서 대회에서 예전 문서가 divisionId 없이 저장된 경우도 현재 부서로 취급.
+  const divisions=state.multiDivision?.divisions||[];
+  if(!rowDivisionId&&divisions.length<=1)return true;
+  return false;
+}
+function registrationRowsForCurrentDivision(){
+  const cloud=registrationCloudRows.filter(registrationBelongsToCurrentDivision);
+  // 업그레이드 전 로컬/부서 snapshot에만 남은 신청도 화면에서 사라지지 않게 합칩니다.
+  const local=Array.isArray(state.portal?.applications)?state.portal.applications:[];
+  const merged=[...cloud];
+  const seen=new Set(cloud.map(r=>String(r.id||'')));
+  for(const row of local){
+    if(!row?.id||seen.has(String(row.id)))continue;
+    const compatible=String(row.tournamentId||state.tournament?.id||'')===String(registrationContext().tournamentId||'');
+    if(!compatible)continue;
+    merged.push(registrationNormalize({...row,tournamentId:row.tournamentId||registrationContext().tournamentId,divisionId:row.divisionId||registrationContext().divisionId,tournamentDivision:row.tournamentDivision||registrationContext().divisionName}));
+    seen.add(String(row.id));
+  }
+  return merged;
 }
 function mirrorRegistrationRowsToCurrentDivision(){
   if(!registrationCloudReady)return;
   ensurePortalState();
-  state.portal.applications=structuredClone(registrationRowsForCurrentDivision());
-  try{syncCurrentDivisionRuntime?.();}catch(_e){}
+  const rows=registrationRowsForCurrentDivision();
+  // 빈 클라우드 조회가 기존 로컬 신청을 지워버리는 상황을 방지합니다.
+  if(rows.length||!(state.portal?.applications||[]).length){
+    state.portal.applications=structuredClone(rows);
+    try{syncCurrentDivisionRuntime?.();}catch(_e){}
+  }
 }
 function registrationAdminRowsByDivision(){
   const ctx=registrationContext();
-  return registrationCloudRows.filter(r=>r.tournamentId===ctx.tournamentId);
+  const rows=registrationCloudRows.filter(r=>String(r.tournamentId||'')===String(ctx.tournamentId||''));
+  const seen=new Set(rows.map(r=>String(r.id||'')));
+  for(const row of (state.portal?.applications||[])){
+    if(!row?.id||seen.has(String(row.id)))continue;
+    if(String(row.tournamentId||ctx.tournamentId)!==String(ctx.tournamentId))continue;
+    rows.push(registrationNormalize({...row,tournamentId:row.tournamentId||ctx.tournamentId,divisionId:row.divisionId||ctx.divisionId,tournamentDivision:row.tournamentDivision||ctx.divisionName}));
+    seen.add(String(row.id));
+  }
+  return rows;
 }
 async function registrationRuntime(){
   const rt=await getAuthRuntime();
@@ -3148,6 +3270,7 @@ async function saveRegistrationCloud(item){
   });
   const ref=rt.api.doc(rt.db,REGISTRATION_COLLECTION,row.id);
   await rt.api.setDoc(ref,row,{merge:true});
+  try{await savePublicRegistrationMirror(row);}catch(error){console.warn('[230MATCH] 공개 참가현황 저장 실패',error);}
   const idx=registrationCloudRows.findIndex(x=>x.id===row.id);
   if(idx>=0)registrationCloudRows[idx]=row;else registrationCloudRows.unshift(row);
   registrationCloudReady=true;
@@ -3195,7 +3318,19 @@ async function startRegistrationCloudSync({force=false}={}){
   registrationCloudUnsubscribe=rt.api.onSnapshot(q,snap=>{
     registrationCloudRows=snap.docs.map(doc=>registrationNormalize({id:doc.id,...doc.data()}));
     registrationCloudReady=true;
+    const ctx=registrationContext();
+    if(canOperate()&&ctx.divisionId){
+      registrationCloudRows.filter(row=>
+        String(row.tournamentId||'')===String(ctx.tournamentId||'') &&
+        String(row.tournamentDivision||row.divisionName||'').trim()===String(ctx.divisionName||'').trim() &&
+        String(row.divisionId||'')!==String(ctx.divisionId)
+      ).forEach(row=>{
+        const fixed={...row,divisionId:ctx.divisionId,tournamentDivision:ctx.divisionName,updatedAt:new Date().toISOString()};
+        saveRegistrationCloud(fixed).catch(error=>console.warn('[230MATCH] 구 참가신청 부서 연결 복구 실패',error));
+      });
+    }
     mirrorRegistrationRowsToCurrentDivision();
+    setTimeout(()=>void backfillPublicRegistrationMirrors(),120);
     if(document.body?.dataset.currentView==='entry'){renderApplicationPortal();lookupPublicApplication();}
     if(document.body?.dataset.currentView==='home')renderHomeFast();
   },error=>{
@@ -3332,9 +3467,12 @@ async function submitPublicApplication(){
 
 function entryOwnedRows(){
   if(!currentAuthUser)return [];
-  const rows=registrationCloudReady?registrationCloudRows:(state.portal?.applications||[]);
-  return rows.filter(a=>String(a.ownerUid||'')===String(currentAuthUser.uid||''))
-    .sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+  const ctx=registrationContext();
+  const rows=registrationCloudReady?registrationAdminRowsByDivision():(state.portal?.applications||[]);
+  return rows.filter(a=>
+    String(a.ownerUid||'')===String(currentAuthUser.uid||'') &&
+    String(a.tournamentId||ctx.tournamentId)===String(ctx.tournamentId)
+  ).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
 }
 function renderEntrySelfManager(){
   const root=document.getElementById('entrySelfManagerList'),count=document.getElementById('entrySelfManagerCount');
@@ -3475,8 +3613,10 @@ function suggestReservePromotion(){
 }
 
 function renderApplicationPortal(){
-  ensurePortalState();renderEntryTournamentSelect();renderEntryLoginGate();renderEntrySelfManager();
-  const applications=[...simpleRegistrationRows()];
+  ensurePortalState();void startPublicRegistrationSync();renderEntryTournamentSelect();renderEntryLoginGate();renderEntrySelfManager();
+  const privateApplications=[...simpleRegistrationRows()];
+  const publicApplications=[...(publicRegistrationReady?publicRegistrationRowsForCurrentDivision():privateApplications)];
+  const applications=canOperate()?privateApplications:publicApplications;
   const approved=applications.filter(a=>a.status==='approved').sort((a,b)=>String(a.createdAt).localeCompare(String(b.createdAt)));
   const reserve=applications.filter(a=>a.status==='reserve').sort((a,b)=>String(a.createdAt).localeCompare(String(b.createdAt)));
   const unpaid=applications.filter(a=>!a.paid&&['approved','reserve'].includes(a.status));
@@ -3971,12 +4111,7 @@ function renderPortalViews(){
   const playing=courts.filter(x=>x.playing).length;const waiting=courts.reduce((n,x)=>n+(x.wait1?1:0)+(x.queue?.length||0)+(x.manualQueue?.length||0),0)+(state.sharedQueue?.length||0)+Object.values(state.venueQueues||{}).reduce((n,q)=>n+(q?.length||0),0);
   const setText=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
   setText('homeTournamentName',state.tournament?.name||'대회 준비 중');setText('homeTournamentDivision',state.tournament?.division||'종목 미설정');setText('homePrelimStatus',`${pDone} / ${prelim.length}`);setText('homeMainStatus',`${mDone} / ${main.length}`);setText('homePlayingCourts',playing);setText('homeWaitingMatches',waiting);
-  const regRows=registrationCloudReady?registrationRowsForCurrentDivision():(state.portal?.applications||[]);
-  const activeRegs=regRows.filter(a=>a.status==='approved').length;
-  const reserveRegs=regRows.filter(a=>a.status==='reserve').length;
-  const capacity=simpleRegistrationCapacity();
-  setText('homeRegistrationStatus',`${activeRegs} / ${capacity}`);
-  setText('homeRegistrationSub',reserveRegs?`후보 ${reserveRegs}팀 · 현황 보기`:'접수 현황 보기');
+  renderRegistrationSummaryEverywhere();
   const posts=visibleBoardPosts({admin:isAdmin()});const publicPosts=visibleBoardPosts();
   const home=document.getElementById('homeNoticeList');if(home)home.innerHTML=publicPosts.slice(0,4).map(p=>`<button type="button" class="portal-list-item notice-home-item" data-portal-go="board"><strong>${p.important?'🚨 ':p.pinned?'📌 ':''}${portalEscape(p.title)}</strong><div class="portal-meta">${new Date(p.updatedAt||p.createdAt).toLocaleDateString('ko-KR')}</div></button>`).join('')||'<div class="portal-empty">등록된 공지가 없습니다.</div>';
   const board=document.getElementById('boardPostList');if(board)board.innerHTML=posts.map(p=>{const status=boardPostStatus(p);const statusText=status==='scheduled'?'게시 예정':status==='expired'?'게시 종료':'게시 중';const popupPeriod=(p.popupStartAt||p.popupEndAt)?`<div class="portal-meta notice-period">팝업기간 · ${p.popupStartAt?new Date(p.popupStartAt).toLocaleString('ko-KR'):'즉시'} ~ ${p.popupEndAt?new Date(p.popupEndAt).toLocaleString('ko-KR'):'계속'}</div>`:'';const postImage=stage6109ImageSrc(p);const image=postImage?`<div class="portal-board-image-wrap"><img class="portal-board-image" src="${postImage}" alt="${portalEscape(p.title)} 공지 이미지" loading="lazy" data-notice-image-view="${portalEscape(p.id)}" title="눌러서 크게 보기"><div class="portal-board-image-actions"><button type="button" class="btn btn-light btn-small" data-notice-image-view="${portalEscape(p.id)}">🔍 크게 보기</button><button type="button" class="btn btn-light btn-small" data-notice-image-download="${portalEscape(p.id)}">⬇ 이미지 다운로드</button></div></div>`:'';return `<article class="portal-board-item ${p.important?'important':''}"><div class="portal-meta notice-meta-row"><span>${p.pinned?'상단 고정 · ':''}${new Date(p.updatedAt||p.createdAt).toLocaleString('ko-KR')}</span><span class="notice-status ${status}">${statusText}${p.popup?' · 홈 팝업':''}</span></div><h3>${p.important?'🚨 ':''}${portalEscape(p.title)}</h3>${image}${p.body?`<div class="portal-board-body">${portalEscape(p.body).replace(/\n/g,'<br>')}</div>`:''}${p.startAt||p.endAt?`<div class="portal-meta notice-period">게시기간 · ${p.startAt?new Date(p.startAt).toLocaleString('ko-KR'):'즉시'} ~ ${p.endAt?new Date(p.endAt).toLocaleString('ko-KR'):'계속'}</div>`:''}${popupPeriod}${isAdmin()?`<div class="portal-board-actions"><button type="button" class="btn btn-light" data-board-edit="${p.id}">수정</button><button type="button" class="btn btn-danger-outline" data-board-delete="${p.id}">삭제</button></div>`:''}</article>`;}).join('')||'<div class="portal-empty">등록된 게시물이 없습니다.</div>';
@@ -4629,7 +4764,7 @@ function portalViewAllowed(name){
   return true;
 }
 function renderHomeFast(){
-  ensurePortalState();
+  ensurePortalState();void startPublicRegistrationSync();
   renderHomeTournamentCards();
   renderStage331OperationDashboard();
   const prelim=state.prelim?.matches||[],main=portalMainMatches(),courts=portalCourtRows();
@@ -4969,7 +5104,7 @@ document.getElementById('saveAuthSettingsBtn')?.addEventListener('click',saveAut
 loadAuthSettingsPanel();renderAuthStatus();startAuth((user,role,error,profile)=>{if(error)notice('간편로그인 연결 오류: '+(error.message||error),'error');applyAuthenticatedRole(user,role,profile);renderNotificationStatus();});
 
 prepareRecoveryStorage().catch(error=>console.warn('로컬 복구점 저장소 준비 실패',error));
-syncInputs();syncPrelimInputs();bind();bindPortal();void startGlobalNoticeSync();setTimeout(()=>void startRegistrationCloudSync(),500);bindPrintCenter();bindParticipantManager();bindEntryApplications();bindPublicParticipantRecords();bindResultArchive();bindTournamentLifecycleManager();bindBackupRecoveryManager();bindNotificationCenter();bindTournamentReadiness();bindAcceptanceCenter();bindRehearsalCenter();bindPerformanceCenter();bindDiagnosticsCenter();window.addEventListener('popstate',()=>navigatePortalView(location.hash.replace(/^#/, '')||'home',{focus:false}));initialPortalView();renderVenueSettingsEditor();calculateTimeMetrics(state);render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus,holdMainMatch,releaseHeldMatch});if(canOperate()){renderOperatorControls();updateSetupProgress();autoSmsSnapshot=buildAutoSmsSnapshot();installUnifiedMoveControlGuard();ensureUnifiedCourtMoveControls();}applyRoleUI();renderPortalViewFast(document.body?.dataset.currentView||'home');decorateBracketLivePlacements();renderStage331OperationDashboard();restartTimeTimer();startClockTicker();
+syncInputs();syncPrelimInputs();bind();bindPortal();void startGlobalNoticeSync();setTimeout(()=>void startRegistrationCloudSync(),500);setTimeout(()=>void startPublicRegistrationSync(),650);bindPrintCenter();bindParticipantManager();bindEntryApplications();bindPublicParticipantRecords();bindResultArchive();bindTournamentLifecycleManager();bindBackupRecoveryManager();bindNotificationCenter();bindTournamentReadiness();bindAcceptanceCenter();bindRehearsalCenter();bindPerformanceCenter();bindDiagnosticsCenter();window.addEventListener('popstate',()=>navigatePortalView(location.hash.replace(/^#/, '')||'home',{focus:false}));initialPortalView();renderVenueSettingsEditor();calculateTimeMetrics(state);render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus,holdMainMatch,releaseHeldMatch});if(canOperate()){renderOperatorControls();updateSetupProgress();autoSmsSnapshot=buildAutoSmsSnapshot();installUnifiedMoveControlGuard();ensureUnifiedCourtMoveControls();}applyRoleUI();renderPortalViewFast(document.body?.dataset.currentView||'home');decorateBracketLivePlacements();renderStage331OperationDashboard();restartTimeTimer();startClockTicker();
 loadSyncPanel();startStateSync({getState:()=>state,applyRemoteState:next=>applySynchronizedState(next,'다른 기기'),onStatus:updateSyncPanel,canWrite:()=>isAdmin()||isOperator(),accessMode:()=>canOperate()?'operator':'viewer'});syncAccessStarted=true;
 const buildStageLabel=document.getElementById('buildStageLabel');
 window.closeAutoSmsDialog=closeAutoSmsDialog;window.approveAutoSmsAligo=approveAutoSmsAligo;window.approveAutoSmsPhone=approveAutoSmsPhone;window.copyAutoSms=copyAutoSms;window.previewCurrentCourtSms=previewCurrentCourtSms;
@@ -9079,7 +9214,7 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
           const active=String(d.id)===activeId;
           const admin=typeof isAdmin==='function'&&isAdmin()&&!document.body.classList.contains('viewer-mode');
           const quick=active?`<div class="division-v6003-quick" data-v6003-quick-wrap>
-            ${admin?`<button type="button" data-v6003-go="entry">참가 승인</button><button type="button" data-v6003-go="roster">참가팀</button><button type="button" data-v6003-go="prelim-public">예선</button><button type="button" data-v6003-go="operation">코트</button><button type="button" data-v6003-go="bracket">본선</button><button type="button" data-v6003-more>${window.__divisionV6003MoreOpen?'접기':'더보기'}</button>`:`<button type="button" data-v6003-go="entry">참가 신청</button><button type="button" data-v6003-go="my-match">내 경기</button><button type="button" data-v6003-go="prelim-public">예선 현황</button><button type="button" data-v6003-go="operation">코트 현황</button><button type="button" data-v6003-go="bracket">본선 대진표</button>`}
+            ${(()=>{const rs=registrationPublicSummary(),rt=`${rs.active}/${rs.capacity}`;return admin?`<button type="button" data-v6003-go="entry">참가 접수 (${rt})</button><button type="button" data-v6003-go="roster">참가팀</button><button type="button" data-v6003-go="prelim-public">예선</button><button type="button" data-v6003-go="operation">코트</button><button type="button" data-v6003-go="bracket">본선</button><button type="button" data-v6003-more>${window.__divisionV6003MoreOpen?'접기':'더보기'}</button>`:`<button type="button" data-v6003-go="entry">참가 신청 (${rt})</button><button type="button" data-v6003-go="my-match">내 경기</button><button type="button" data-v6003-go="prelim-public">예선 현황</button><button type="button" data-v6003-go="operation">코트 현황</button><button type="button" data-v6003-go="bracket">본선 대진표</button>`;})()}
             ${admin?`<div class="division-v6003-more" ${window.__divisionV6003MoreOpen?'':'hidden'}><button type="button" data-v6003-go="messages">문자 센터</button><button type="button" data-v6003-go="print">출력 센터</button><button type="button" data-v6003-edit>부서 설정</button></div>`:''}
           </div>`:'';
           return `<div class="division-v6002-card ${active?'active':''}" data-v6002-division="${esc(d.id)}" role="button" tabindex="0">
@@ -9608,4 +9743,4 @@ console.info('[230MATCH] 63.0.0 ready · chunked cloud workspace + bounded retry
 
 console.info('[230MATCH] 64.0.0 architecture · lazy cloud registry, worker serialization, visible-view commit rendering');
 
-console.info('[230MATCH] 71.0.3 ready · owner self-management + home registration status + compact lists');
+console.info('[230MATCH] 71.0.5 ready · public registration summary + home capacity indicators');

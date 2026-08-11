@@ -196,6 +196,14 @@
           <strong>현재 대회</strong>
           <span>실시간 경기 현황과 접수 상태를 확인하세요.</span>
         </div>
+        <button type="button" class="home-hero-registration" data-portal-go="entry" aria-label="참가 접수 현황 보기">
+          <span>참가 접수 현황</span>
+          <strong id="homeHeroRegistrationCount">0 / 0</strong>
+          <span class="home-reg-mini"><b id="homeHeroUnpaidCount">0</b><small>미입금</small></span>
+          <span class="home-reg-mini"><b id="homeHeroPaidCount">0</b><small>입금완료</small></span>
+          <span class="home-reg-mini"><b id="homeHeroReserveCount">0</b><small>후보</small></span>
+          <span class="home-reg-progress"><i id="homeHeroRegistrationProgress"></i></span>
+        </button>
       </section>
 
       <section id="homeTournamentSwitcher" class="panel home-tournament-switcher" aria-label="운영 대회 선택">
@@ -1920,7 +1928,7 @@
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=7103"></script>
+  <script type="module" src="./assets/js/app.js?v=7105"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
@@ -2290,6 +2298,16 @@ input[type="radio"]{
   .entry-self-card-actions{justify-content:flex-start}
   .entry-public-columns{grid-template-columns:1fr!important}
 }
+</style>
+
+
+<style id="stage7105PublicRegistrationSummaryStyles">
+.home-hero-registration{grid-column:1/-1;display:grid;grid-template-columns:auto minmax(130px,1fr) repeat(3,auto);align-items:center;gap:10px 14px;margin-top:12px;padding:12px 14px;border:1px solid rgba(255,255,255,.22);border-radius:14px;background:rgba(255,255,255,.10);color:#fff;cursor:pointer}
+.home-hero-registration>span{font-size:12px;font-weight:900;opacity:.86}.home-hero-registration>strong{font-size:23px;line-height:1}
+.home-hero-registration .home-reg-mini{display:grid;gap:1px;text-align:center}.home-hero-registration .home-reg-mini b{font-size:14px}.home-hero-registration .home-reg-mini small{font-size:10px;opacity:.8}
+.home-reg-progress{grid-column:1/-1;height:5px;border-radius:999px;background:rgba(255,255,255,.18);overflow:hidden}.home-reg-progress>i{display:block;height:100%;width:0;background:#7ee2a8;border-radius:999px;transition:width .25s ease}
+.mode-tabs [data-view="entry"] .entry-nav-count{font-size:11px;font-weight:900}
+@media(max-width:700px){.home-hero-registration{grid-template-columns:1fr auto auto auto;gap:7px 9px;margin-top:8px;padding:9px 10px}.home-hero-registration>span{display:none}.home-hero-registration>strong{font-size:19px}.home-hero-registration .home-reg-mini b{font-size:12px}.home-hero-registration .home-reg-mini small{font-size:9px}}
 </style>
 
 </body>
