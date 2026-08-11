@@ -1,5 +1,5 @@
 import { getAuthRuntime } from './auth-engine.js?v=3565';
-import { normalizeState } from './store.js?v=7001';
+import { normalizeState } from './store.js?v=7008';
 
 const SETTINGS_KEY='230match-v7-sync-settings';
 const FIREBASE_APP_URL='https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -38,7 +38,28 @@ function chunkId(owner,index){return `${safeId(owner).slice(0,90)}--ws--${String
 function activeIdOf(state){return String(state?.multiTournament?.activeTournamentId||state?.tournament?.id||'').trim();}
 function isRealTournament(workspace){const name=String(workspace?.tournament?.name||'').trim(),id=String(workspace?.tournament?.id||'').trim();return Boolean(id&&name&&!['대회 준비 중','이름 없는 대회','등록된 운영 대회 없음'].includes(name));}
 function clone(value){return structuredClone(value);}
-function compactCloneWithoutRegistry(source){if(!source||typeof source!=='object')return null;const shallow={...source};delete shallow.multiTournament;return shallow;}
+function compactCloneWithoutRegistry(source){
+  if(!source||typeof source!=='object')return null;
+  const shallow={...source};delete shallow.multiTournament;
+  if(source.portal&&typeof source.portal==='object'){
+    shallow.portal={...source.portal};
+    delete shallow.portal.posts;
+    delete shallow.portal.globalTicker;
+  }
+  if(source.multiDivision&&typeof source.multiDivision==='object'){
+    shallow.multiDivision={...source.multiDivision,divisions:(source.multiDivision.divisions||[]).map(d=>{
+      if(!d?.snapshot)return d;
+      const snap={...d.snapshot};
+      if(d.snapshot.portal&&typeof d.snapshot.portal==='object'){
+        snap.portal={...d.snapshot.portal};
+        delete snap.portal.posts;
+        delete snap.portal.globalTicker;
+      }
+      return {...d,snapshot:snap};
+    })};
+  }
+  return shallow;
+}
 const DIVISION_GLOBAL_KEYS=new Set(['schemaVersion','tournament','multiDivision','updatedAt','legacyBridge','multiTournament']);
 const DIVISION_GLOBAL_PORTAL_KEYS=new Set(['tournamentArchives','participantArchives','resultArchives','tournamentTemplates','archives','legacyTournamentSummaries']);
 function countCompleted(rows){return Array.isArray(rows)?rows.filter(x=>x?.status==='completed'||x?.winnerId||x?.winner).length:0;}
@@ -104,7 +125,7 @@ function ensureEncodeWorker(){
         completion:w?.completion||{},
         mainDrawLifecycle:w?.mainDrawLifecycle||{},
         multiDivision:w?.multiDivision||{},
-        portal:{guide:portal.guide||{},posts:portal.posts||[],applications:portal.applications||[]}
+        portal:{guide:portal.guide||{},applications:portal.applications||[]}
       };
     }
     self.onmessage=async e=>{const {id,workspace}=e.data||{};try{const digestObj={...workspace};delete digestObj.updatedAt;const digest=hashString(JSON.stringify(digestObj));const publicDigest=hashString(JSON.stringify(publicSlice(workspace)));const json=JSON.stringify(workspace);let data=json,encoding='json-v1';if(typeof CompressionStream==='function'){const stream=new Blob([json]).stream().pipeThrough(new CompressionStream('gzip'));const bytes=new Uint8Array(await new Response(stream).arrayBuffer());const base64=bytesToBase64(bytes);if(base64.length<json.length){data=base64;encoding='gzip-base64-v1';}}self.postMessage({id,ok:true,data,encoding,digest,publicDigest,originalBytes:new Blob([json]).size,storedBytes:new Blob([data]).size});}catch(error){self.postMessage({id,ok:false,error:error?.message||String(error)});}};`;

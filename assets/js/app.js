@@ -1,8 +1,8 @@
 import{getAuthConfig,saveAuthConfig,startAuth,signInGoogle,signOutSocial,beginExternalLogin,getExistingLoginEndpoints,signInEmail,registerEmail,sendPasswordReset,linkEmailPassword,authProviderIds,getAuthRuntime}from'./auth-engine.js?v=3565';
-import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7005';
+import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7008';
 import{notificationSupport,getStoredVapidKey,saveStoredVapidKey,enableMyPush,disableMyPush,queuePush,listPushJobs,listPushTokens}from'./notification-engine.js?v=332012';
 
-import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7005';
+import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7008';
 import{prepareTeams,generateDraw,allMatches,findMatch,generateLinkedDrawSlots,syncLinkedDrawQualifiers}from'./bracket-engine-v5000.js?v=5000';
 import{ensureDrawMeta,canModifyDraw,createDrawWithMethod,lockDraw,unlockDrawForDevelopment,clearDrawHistory}from'./draw-method-engine.js?v=332012';
 import{buildCourts,assignInitial,queueReadyMatches,refillCourt}from'./court-engine.js?v=332012';
@@ -15,7 +15,7 @@ import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactD
 import{render,teamText}from'./ui.js?v=3504';
 import{ensureAuditState,runStateAudit,runPrelimSimulation,runFullSimulation,applyAuditResult}from'./audit-engine.js?v=332012';
 import{earlyMainStats,markResolvedMainMatchesReady,canAssignEarlyMain,ensureEarlyMainSettings,autoAssignResolvedMain}from'./early-main-engine.js?v=332012';
-import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7005';
+import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7008';
 import{ensureMainDrawLifecycle,beginMainDraw,completeMainDraw,failMainDraw,resetMainDraw,hasAuthorizedMainDraw,mainDrawStatus,clearMainPlacement,repairMainDrawAuthorization}from'./main-draw-lifecycle-engine.js?v=3501';
 import{shouldUseLinkedDraw,linkedDrawNeedsRepair,rebuildLinkedDraw,hasStartedMainMatches}from'./linked-draw-guard-engine.js?v=332012';
 import{ensureVenueSettings,ensureVenueQueues,venuePreset,buildVenueCourts,prelimVenues,mainVenues}from'./venue-engine.js?v=332012';
@@ -26,14 +26,14 @@ import{ensureCourtStatuses,pauseCourt,resumeCourt}from'./court-status-engine.js?
 import{ensureCourtManualQueues,assignToCourtManualQueue,moveCourtMatchFlexible,returnManualQueueItemToVenue,reorderCourtManualQueue}from'./court-manual-queue-engine.js?v=332012';
 import{reorderPrelimQueue as reorderPrelimQueueItem,movePrelimQueuedMatch,returnPrelimWait1ToQueue}from'./prelim-queue-control-engine.js?v=332012';
 import{ensurePrelimCourtStatuses,pausePrelimCourt,resumePrelimCourt}from'./prelim-court-status-engine.js?v=332012';
-import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7005';
+import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7008';
 import{verifyAndRepairMainFlow}from'./main-flow-integrity-engine.js?v=332012';
 import{finalizeTournamentCompletion}from'./tournament-completion-engine.js?v=332012';
 import{ensureTournamentIdentity,validateTournamentForArchive,createTournamentArchive,archiveListItem,archiveBackupPayload}from'./archive-engine.js?v=354000';
 import{listExistingTournaments,loadExistingTournament,convertExistingTournament}from'./legacy-firestore-bridge.js?v=332023';
 
 
-const WORKSPACE_ROUTE_BUILD='7002';
+const WORKSPACE_ROUTE_BUILD='7008';
 function workspaceRouteUrl(tournamentId='',divisionId='',view='home'){
   const url=new URL(window.location.href);
   url.searchParams.set('v',WORKSPACE_ROUTE_BUILD);
@@ -443,10 +443,156 @@ function normalizeV5RuntimeState(source){
   return s;
 }
 let state=normalizeV5RuntimeState(loadState());
+
+const GLOBAL_NOTICE_CACHE_KEY='230match-global-notices-v1';
+const GLOBAL_NOTICE_ROOM_COLLECTION='matchRoomsV7';
+const GLOBAL_NOTICE_ROOM_ID='230match-production';
+let globalNoticeState={posts:[],ticker:{enabled:false,text:'',startAt:'',endAt:'',updatedAt:''},updatedAt:''};
+let globalNoticeReady=false;
+let globalNoticeCloudExists=false;
+let globalNoticeUnsubscribe=null;
+let globalNoticeLoading=null;
+function normalizeGlobalNoticeState(value={}){
+  const posts=Array.isArray(value.posts)?value.posts.map(post=>({...post,important:Boolean(post.important),popup:Boolean(post.popup),startAt:post.startAt||'',endAt:post.endAt||'',popupStartAt:post.popupStartAt||'',popupEndAt:post.popupEndAt||'',imageUrl:post.imageUrl||'',imageStoragePath:post.imageStoragePath||'',imageDataUrl:post.imageDataUrl||'',imageName:post.imageName||'',imageType:post.imageType||'',updatedAt:post.updatedAt||post.createdAt||new Date().toISOString()})):[];
+  const ticker=value.ticker&&typeof value.ticker==='object'?value.ticker:{};
+  return {posts,ticker:{enabled:Boolean(ticker.enabled),text:String(ticker.text||''),startAt:String(ticker.startAt||''),endAt:String(ticker.endAt||''),updatedAt:String(ticker.updatedAt||'')},updatedAt:String(value.updatedAt||'')};
+}
+function readGlobalNoticeCache(){
+  try{return normalizeGlobalNoticeState(JSON.parse(localStorage.getItem(GLOBAL_NOTICE_CACHE_KEY)||'null')||{});}catch{return normalizeGlobalNoticeState({});}
+}
+function cacheGlobalNoticeState(){
+  try{localStorage.setItem(GLOBAL_NOTICE_CACHE_KEY,JSON.stringify(globalNoticeState));}catch(_e){}
+}
+function globalTickerActive(ticker=globalNoticeState.ticker,now=Date.now()){
+  if(!ticker?.enabled||!String(ticker.text||'').trim())return false;
+  const start=ticker.startAt?new Date(ticker.startAt).getTime():0,end=ticker.endAt?new Date(ticker.endAt).getTime():0;
+  if(start&&start>now)return false;if(end&&end<now)return false;return true;
+}
+function applyGlobalNoticeState(value,{render=true}={}){
+  const next=normalizeGlobalNoticeState(value);
+  globalNoticeState=next;globalNoticeReady=true;cacheGlobalNoticeState();
+  ensurePortalState();
+  state.portal.posts=structuredClone(next.posts);
+  state.portal.globalTicker=structuredClone(next.ticker);
+  if(render){
+    renderGlobalAlertTicker();
+    const view=document.body?.dataset.currentView||'home';
+    if(view==='home')renderHomeFast();
+    if(view==='board')renderBoardFast();
+    if(isAdmin())renderGlobalTickerEditor();
+    renderPopupManager();
+    showEligibleHomePopup();
+  }
+}
+async function globalNoticeRuntime(){
+  const rt=await getAuthRuntime();
+  if(!rt?.db||!rt?.api)throw new Error('Firebase 공지 저장소 연결에 실패했습니다.');
+  return rt;
+}
+async function loadGlobalNoticeCloud(){
+  if(globalNoticeLoading)return globalNoticeLoading;
+  globalNoticeLoading=(async()=>{
+    try{
+      const rt=await globalNoticeRuntime();
+      const ref=rt.api.doc(rt.db,GLOBAL_NOTICE_ROOM_COLLECTION,GLOBAL_NOTICE_ROOM_ID);
+      const snap=await rt.api.getDoc(ref),room=snap.exists()?(snap.data()||{}):{};
+      if(room.globalNoticeBoard||room.globalTicker){
+        globalNoticeCloudExists=true;
+        applyGlobalNoticeState({posts:room.globalNoticeBoard||[],ticker:room.globalTicker||{},updatedAt:room.globalNoticeUpdatedAt||''});
+      }else{
+        globalNoticeCloudExists=false;
+        // 최초 전환 시 현재 화면의 기존 공지를 한 번 보존해 전역 공지의 초기값으로 사용합니다.
+        const existing=Array.isArray(state.portal?.posts)?structuredClone(state.portal.posts):[];
+        const cached=readGlobalNoticeCache();
+        const initial=cached.posts.length||cached.ticker.text?cached:{posts:existing,ticker:{enabled:false,text:'',startAt:'',endAt:''}};
+        applyGlobalNoticeState(initial);
+      }
+      return globalNoticeState;
+    }finally{globalNoticeLoading=null;}
+  })();
+  return globalNoticeLoading;
+}
+async function saveGlobalNoticeCloud(reason='전체 공지 저장'){
+  if(!isAdmin())throw new Error('관리자만 전체 공지를 저장할 수 있습니다.');
+  const rt=await globalNoticeRuntime();
+  if(!rt.user)throw new Error('로그인 후 전체 공지를 저장하세요.');
+  globalNoticeState=normalizeGlobalNoticeState({
+    posts:state.portal?.posts||[],
+    ticker:state.portal?.globalTicker||globalNoticeState.ticker||{},
+    updatedAt:new Date().toISOString()
+  });
+  cacheGlobalNoticeState();
+  const ref=rt.api.doc(rt.db,GLOBAL_NOTICE_ROOM_COLLECTION,GLOBAL_NOTICE_ROOM_ID);
+  await rt.api.setDoc(ref,{
+    globalNoticeBoard:globalNoticeState.posts,
+    globalTicker:globalNoticeState.ticker,
+    globalNoticeUpdatedAt:new Date().toISOString(),
+    globalNoticeWriterUid:rt.user.uid||'',
+    globalNoticeWriterEmail:rt.user.email||''
+  },{merge:true});
+  globalNoticeCloudExists=true;
+  renderGlobalAlertTicker();
+  return true;
+}
+async function startGlobalNoticeSync(){
+  const cached=readGlobalNoticeCache();
+  if(cached.posts.length||cached.ticker.text)applyGlobalNoticeState(cached,{render:false});
+  try{
+    await loadGlobalNoticeCloud();
+    const rt=await globalNoticeRuntime();
+    const ref=rt.api.doc(rt.db,GLOBAL_NOTICE_ROOM_COLLECTION,GLOBAL_NOTICE_ROOM_ID);
+    if(globalNoticeUnsubscribe)globalNoticeUnsubscribe();
+    globalNoticeUnsubscribe=rt.api.onSnapshot(ref,snap=>{
+      if(!snap.exists())return;
+      const room=snap.data()||{};
+      if(room.globalNoticeBoard||room.globalTicker)applyGlobalNoticeState({posts:room.globalNoticeBoard||[],ticker:room.globalTicker||{},updatedAt:room.globalNoticeUpdatedAt||''});
+    },error=>console.warn('[230MATCH] 전체 공지 실시간 연결 실패',error));
+  }catch(error){console.warn('[230MATCH] 전체 공지 불러오기 실패 · 로컬 캐시 사용',error);}
+  renderGlobalAlertTicker();
+}
+function renderGlobalAlertTicker(){
+  const root=document.getElementById('globalAlertTicker'),text=document.getElementById('globalAlertTickerText'),track=document.getElementById('globalAlertTickerTrack');
+  if(!root||!text)return;
+  const ticker=state.portal?.globalTicker||globalNoticeState.ticker||{};
+  const active=globalTickerActive(ticker);
+  root.hidden=!active;
+  if(!active){text.textContent='';return;}
+  const value=String(ticker.text||'').trim();
+  if(text.textContent!==value)text.textContent=value;
+  if(track){
+    const seconds=Math.min(80,Math.max(14,Math.round(value.length*0.42+14)));
+    track.style.setProperty('--ticker-duration',`${seconds}s`);
+  }
+}
+function renderGlobalTickerEditor(){
+  const ticker=state.portal?.globalTicker||globalNoticeState.ticker||{};
+  const enabled=document.getElementById('globalTickerEnabled'),text=document.getElementById('globalTickerTextInput'),start=document.getElementById('globalTickerStartAt'),end=document.getElementById('globalTickerEndAt');
+  if(enabled)enabled.checked=Boolean(ticker.enabled);
+  if(text&&document.activeElement!==text)text.value=String(ticker.text||'');
+  if(start&&document.activeElement!==start)start.value=boardDateValue(ticker.startAt||'');
+  if(end&&document.activeElement!==end)end.value=boardDateValue(ticker.endAt||'');
+}
+async function saveGlobalTicker(){
+  if(!requireAdmin('상단 흐르는 알림 저장'))return;
+  const enabled=Boolean(document.getElementById('globalTickerEnabled')?.checked);
+  const text=String(document.getElementById('globalTickerTextInput')?.value||'').trim();
+  const startAt=String(document.getElementById('globalTickerStartAt')?.value||'');
+  const endAt=String(document.getElementById('globalTickerEndAt')?.value||'');
+  if(enabled&&!text){notice('상단에 표시할 알림 내용을 입력하세요.','error');return;}
+  if(startAt&&endAt&&new Date(startAt)>=new Date(endAt)){notice('알림 종료는 시작보다 뒤여야 합니다.','error');return;}
+  ensurePortalState();
+  state.portal.globalTicker={enabled,text,startAt,endAt,updatedAt:new Date().toISOString()};
+  globalNoticeState.ticker=structuredClone(state.portal.globalTicker);
+  renderGlobalAlertTicker();
+  try{await saveGlobalNoticeCloud('상단 흐르는 알림 저장');notice(enabled?'상단 흐르는 알림을 저장했습니다.':'상단 흐르는 알림을 해제했습니다.','success');}
+  catch(error){notice(`상단 알림 저장 실패: ${error?.message||error}`,'error');}
+}
+
 function ensurePortalState(){
   state=normalizeV5RuntimeState(state);
   if(!state.portal||typeof state.portal!=='object')state.portal={};
-  if(!Array.isArray(state.portal.posts))state.portal.posts=[{id:crypto.randomUUID(),title:'230MATCH 대회 안내',body:'대회 일정과 경기 진행 상황은 홈 화면과 경기 현황에서 확인해 주세요.',pinned:true,important:true,popup:false,startAt:'',endAt:'',createdAt:new Date().toISOString()}];
+  if(globalNoticeReady)state.portal.posts=structuredClone(globalNoticeState.posts);else if(!Array.isArray(state.portal.posts))state.portal.posts=[{id:crypto.randomUUID(),title:'230MATCH 대회 안내',body:'대회 일정과 경기 진행 상황은 홈 화면과 경기 현황에서 확인해 주세요.',pinned:true,important:true,popup:false,startAt:'',endAt:'',createdAt:new Date().toISOString()}];
+  if(globalNoticeReady)state.portal.globalTicker=structuredClone(globalNoticeState.ticker);else if(!state.portal.globalTicker||typeof state.portal.globalTicker!=='object')state.portal.globalTicker={enabled:false,text:'',startAt:'',endAt:'',updatedAt:''};
   state.portal.posts=state.portal.posts.map(post=>({...post,important:Boolean(post.important),popup:Boolean(post.popup),startAt:post.startAt||'',endAt:post.endAt||'',popupStartAt:post.popupStartAt||'',popupEndAt:post.popupEndAt||'',imageUrl:post.imageUrl||'',imageStoragePath:post.imageStoragePath||'',imageDataUrl:post.imageDataUrl||'',imageName:post.imageName||'',imageType:post.imageType||'',updatedAt:post.updatedAt||post.createdAt||new Date().toISOString()}));
   if(!Array.isArray(state.portal.resultArchives))state.portal.resultArchives=[];
   if(!Array.isArray(state.portal.tournamentArchives))state.portal.tournamentArchives=[];
@@ -479,6 +625,7 @@ function applyAuthenticatedRole(user,role='viewer',profile=null){
   const before=currentRole;
   currentAuthUser=user?{...user,appProfile:profile||null}:null;currentRole=user?role:'viewer';sessionStorage.setItem(ROLE_KEY,currentRole);applyRoleUI();renderAuthStatus();
   if(before!==currentRole)refreshSyncAccessMode();
+  if(currentAuthUser&&currentRole==='admin'&&globalNoticeReady&&!globalNoticeCloudExists){setTimeout(()=>saveGlobalNoticeCloud('기존 공지 전체 공지로 전환').catch(error=>console.warn('[230MATCH] 기존 공지 전역 전환 대기',error)),250);}
   if(currentAuthUser&&document.body?.dataset.currentView==='my-match')setTimeout(v3252AutoMyMatch,80);
 }
 function renderAuthStatus(){
@@ -1026,6 +1173,7 @@ function renderCommittedState6400(){
   if(CORE_RENDER_VIEWS_6400.has(view)){
     render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus,holdMainMatch,releaseHeldMatch});
     if(view==='operation'||view==='settings'||view==='roster')renderOperatorControls();
+    if(view==='bracket')decorateBracketLivePlacements();
   }else{
     renderPortalViewFast(view);
   }
@@ -1047,6 +1195,7 @@ function commit(message){
 function applySynchronizedState(nextState,source='동기화'){
   if(!nextState||typeof nextState!=='object')return;
   state=structuredClone(nextState);
+  if(globalNoticeReady){state.portal=state.portal||{};state.portal.posts=structuredClone(globalNoticeState.posts);state.portal.globalTicker=structuredClone(globalNoticeState.ticker);}
   try{ensureMultiTournamentRuntime();}catch(_e){}
   const routedDivision=routeDivisionId();
   if(routedDivision){
@@ -2662,26 +2811,70 @@ function myMatchUniqueTeams(){
 }
 function myMatchContainsTeam(match,team){const key=myMatchTeamKey(team);return key&&(myMatchTeamKey(match?.teamA)===key||myMatchTeamKey(match?.teamB)===key||myMatchTeamKey(match?.winner)===key);}
 function myMatchOpponent(match,team){const key=myMatchTeamKey(team);if(myMatchTeamKey(match?.teamA)===key)return match.teamB;if(myMatchTeamKey(match?.teamB)===key)return match.teamA;return null;}
-function myMatchPlacement(match){
+
+function liveMatchPlacement(match){
   if(!match)return{label:'경기 정보 없음',kind:'unknown'};
-  const id=match.id;
+  const id=String(match.id||'');
   const courts=portalCourtRows();
   for(const court of courts){
-    if(court.playing===id)return{label:`${court.name||court.id} · 시합중`,kind:'playing'};
-    if(court.wait1===id)return{label:`${court.name||court.id} · 대기1`,kind:'wait1'};
-    const queue=[...(court.queue||[]),...(court.manualQueue||[])];const idx=queue.indexOf(id);if(idx>=0)return{label:`${court.name||court.id} · 추가대기 ${idx+1}`,kind:'waiting'};
+    const courtName=String(court.name||court.id||'코트');
+    if(String(court.playing||'')===id)return{label:`${courtName} · 시합중`,kind:'playing'};
+    if(String(court.wait1||'')===id)return{label:`${courtName} · 대기1`,kind:'wait1'};
+    const q=Array.isArray(court.queue)?court.queue:[];
+    const qi=q.findIndex(x=>String(x)===id);
+    if(qi>=0)return{label:`${courtName} · 대기${qi+2}`,kind:'waiting'};
+    const mq=Array.isArray(court.manualQueue)?court.manualQueue:[];
+    const mi=mq.findIndex(x=>String(x)===id);
+    if(mi>=0)return{label:`${courtName} · 관리자 대기${mi+2}`,kind:'waiting'};
   }
-  const venueEntries=Object.entries(state.venueQueues||{});for(const [venueId,queue] of venueEntries){const idx=(queue||[]).indexOf(id);if(idx>=0){const venue=(state.settings?.venues||[]).find(v=>v.id===venueId);return{label:`${venue?.name||venueId} 공용대기 ${idx+1}`,kind:'shared'};}}
-  const shared=(state.sharedQueue||[]).indexOf(id);if(shared>=0)return{label:`본선 공용대기 ${shared+1}`,kind:'shared'};
+  for(const [venueId,queue] of Object.entries(state.venueQueues||{})){
+    const idx=(Array.isArray(queue)?queue:[]).findIndex(x=>String(x)===id);
+    if(idx>=0){
+      const venue=(state.settings?.venues||[]).find(v=>String(v.id)===String(venueId));
+      return{label:`${venue?.name||venueId} · 공용대기 ${idx+1}번`,kind:'shared'};
+    }
+  }
+  const shared=(state.sharedQueue||[]).findIndex(x=>String(x)===id);
+  if(shared>=0)return{label:`공용대기 ${shared+1}번`,kind:'shared'};
   if(match.status==='completed')return{label:'경기 완료',kind:'completed'};
-  if(match.status==='playing')return{label:`${match.court||'코트'} · 시합중`,kind:'playing'};
-  return{label:match.court?`${match.court} · 경기 예정`:'경기 예정',kind:'waiting'};
+  if(match.status==='playing')return{label:`${match.court||'코트 확인중'} · 시합중`,kind:'playing'};
+  if(match.status==='court_wait1')return{label:`${match.court||'코트 확인중'} · 대기1`,kind:'wait1'};
+  if(match.status==='venue_shared_queue'||match.status==='shared_queue')return{label:'공용대기 · 순번 확인중',kind:'shared'};
+  if(match.status==='ready')return{label:'코트 배정 대기',kind:'waiting'};
+  return{label:match.court?`${match.court} · 경기 예정`:'대진 대기',kind:'waiting'};
 }
+function decorateBracketLivePlacements(){
+  const board=document.getElementById('bracketBoard');
+  if(!board||!state.draw?.rounds)return;
+  const sizes=Object.keys(state.draw.rounds).map(Number).sort((a,b)=>b-a);
+  const columns=[...board.querySelectorAll('.round-column')];
+  columns.forEach((column,columnIndex)=>{
+    const size=sizes[columnIndex];
+    const matches=state.draw.rounds?.[size]||[];
+    const cards=[...column.querySelectorAll('.round-match-stack > .match-card')];
+    cards.forEach((card,index)=>{
+      const match=matches[index];if(!match)return;
+      const placement=liveMatchPlacement(match);
+      let badge=card.querySelector('.bracket-court-label');
+      if(!badge){
+        badge=document.createElement('div');
+        const header=card.querySelector('header');
+        if(header)header.insertAdjacentElement('afterend',badge);else card.prepend(badge);
+      }
+      badge.className='bracket-court-label bracket-live-placement';
+      badge.textContent=placement.label;
+      badge.dataset.placementKind=placement.kind;
+      card.dataset.matchId=String(match.id||'');
+    });
+  });
+}
+
+function myMatchPlacement(match){return liveMatchPlacement(match);}
 function myMatchRoundLabel(match,isPrelim){
   if(isPrelim)return `${Number(match.groupNo||0)}조 ${Number(match.matchNo||0)}경기`;
   const id=String(match.id||'');const found=id.match(/^r(\d+)_/);return found?`${found[1]}강`:'본선 경기';
 }
-function myMatchStatusText(match){if(match.status==='completed')return'완료';if(match.status==='playing')return'시합중';return'대기';}
+function myMatchStatusText(match){if(!match)return'대기';if(match.status==='completed')return'완료';if(match.status==='playing')return'시합중';if(match.status==='court_wait1')return'코트 대기1';if(match.status==='venue_shared_queue'||match.status==='shared_queue')return'공용대기';if(match.status==='ready')return'배정 대기';return'대기';}
 function renderMyMatchTeam(team){
   const root=document.getElementById('myMatchResult');if(!root)return;
   const teamLabel=portalTeam(team);const teamKey=myMatchTeamKey(team);
@@ -2690,16 +2883,58 @@ function renderMyMatchTeam(team){
   const prelimMatches=(prelim.matches||[]).filter(m=>myMatchContainsTeam(m,team)).sort((a,b)=>Number(a.matchNo||0)-Number(b.matchNo||0));
   const mainMatches=portalMainMatches().filter(m=>myMatchContainsTeam(m,team)).sort((a,b)=>{const ar=Number(String(a.id||'').match(/^r(\d+)_/)?.[1]||0),br=Number(String(b.id||'').match(/^r(\d+)_/)?.[1]||0);return br-ar;});
   const active=[...prelimMatches,...mainMatches].find(m=>m.status==='playing')||[...prelimMatches,...mainMatches].find(m=>m.status!=='completed');
-  const activePlacement=myMatchPlacement(active);
-  const groupComplete=group&&prelimMatches.length&&prelimMatches.every(m=>m.status==='completed');
+  const activePlacement=active?myMatchPlacement(active):{label:'경기 대기',kind:'waiting'};
+  const groupComplete=Boolean(group&&prelimMatches.length&&prelimMatches.every(m=>m.status==='completed'));
   const qualifiers=Number(prelim.settings?.qualifiersPerGroup||state.settings?.qualifiersPerGroup||2);
   const rank=Number(standing?.rank||0);const qualified=Boolean(rank&&rank<=qualifiers&&groupComplete);
-  const matchCards=(items,isPrelim)=>items.map(match=>{const opponent=myMatchOpponent(match,team);const placement=myMatchPlacement(match);const score=match.status==='completed'?`${Number(match.scoreA||0)} : ${Number(match.scoreB||0)}`:'';const won=myMatchTeamKey(match.winner)===teamKey;return `<article class="my-match-game ${portalEscape(placement.kind)}"><div class="my-match-game-head"><b>${portalEscape(myMatchRoundLabel(match,isPrelim))}</b><span>${portalEscape(myMatchStatusText(match))}</span></div><div class="my-match-opponent">상대 · <strong>${portalEscape(portalTeam(opponent))}</strong></div><div class="my-match-placement">${portalEscape(placement.label)}</div>${score?`<div class="my-match-score ${won?'win':'loss'}">${won?'승':'패'} · ${score}</div>`:''}</article>`;}).join('');
+  const locationBits=[group?`${Number(group.groupNo||0)}조`:null,group?.venueName||null,group?.court||null].filter(Boolean);
+  const summaryLine=locationBits.length?locationBits.join(' · '):'예선 조 미배정';
+  const currentLabel=active?activePlacement.label:(qualified?'본선 진출 확정':groupComplete?'예선 종료':'경기 대기');
+  const currentSub=active?`${myMatchRoundLabel(active,prelimMatches.includes(active))} · ${myMatchStatusText(active)}`:(qualified?'본선 대진표 확인':groupComplete?'예선 경기 종료':'다음 경기 배정 대기');
+  const mainStatus=qualified?'진출 확정':groupComplete?'예선 탈락/대기':'결과 대기';
+  const metricCards=[
+    {label:'예선 순위',value:rank?`${rank}위`:'-',hint:'조 순위'},
+    {label:'승·패',value:`${Number(standing?.wins||0)}승 ${Number(standing?.losses||0)}패`,hint:'예선 누적'},
+    {label:'득실',value:`${Number(standing?.diff||0)>0?'+':''}${Number(standing?.diff||0)}`,hint:'게임 득실'},
+    {label:'본선 상태',value:mainStatus,hint:qualified?'본선 진출':'예선 기준'}
+  ];
+  const matchCards=(items,isPrelim)=>items.length?items.map(match=>{
+    const opponent=myMatchOpponent(match,team);const placement=myMatchPlacement(match);
+    const score=match.status==='completed'?`${Number(match.scoreA||0)} : ${Number(match.scoreB||0)}`:'';
+    const won=myMatchTeamKey(match.winner)===teamKey;const statusKind=portalEscape(placement.kind);
+    return `<article class="my-match-game ${statusKind}">
+      <div class="my-match-game-head">
+        <span class="my-match-round">${portalEscape(myMatchRoundLabel(match,isPrelim))}</span>
+        <span class="my-match-status-badge ${statusKind}">${portalEscape(myMatchStatusText(match))}</span>
+      </div>
+      <div class="my-match-opponent">상대 · <strong>${portalEscape(portalTeam(opponent))}</strong></div>
+      <div class="my-match-info-row">
+        <span class="my-match-pill">📍 ${portalEscape(placement.label)}</span>
+        ${score?`<span class="my-match-pill score ${won?'win':'loss'}">${won?'승':'패'} · ${score}</span>`:''}
+      </div>
+    </article>`;
+  }).join(''):'<div class="my-match-empty-inline">해당 경기 정보가 아직 없습니다.</div>';
   root.className='my-match-result';
-  root.innerHTML=`<section class="my-match-summary"><div><p class="eyebrow">MY MATCH</p><h3>${portalEscape(teamLabel)}</h3><div class="portal-muted">${group?`${Number(group.groupNo||0)}조 · ${portalEscape(group.venueName||'')} ${portalEscape(group.court||'')}`:'예선 조 미배정'}</div></div><div class="my-match-current ${portalEscape(activePlacement.kind)}"><span>현재 안내</span><strong>${portalEscape(active?activePlacement.label:(qualified?'본선 진출 확정':groupComplete?'예선 종료':'경기 대기'))}</strong></div></section>
-  <div class="my-match-metrics"><div><span>예선 순위</span><b>${rank?`${rank}위`:'-'}</b></div><div><span>승·패</span><b>${Number(standing?.wins||0)}승 ${Number(standing?.losses||0)}패</b></div><div><span>득실</span><b>${Number(standing?.diff||0)>0?'+':''}${Number(standing?.diff||0)}</b></div><div><span>본선 상태</span><b>${qualified?'진출 확정':groupComplete?'예선 탈락/대기':'결과 대기'}</b></div></div>
-  <section class="my-match-section"><h3>예선 경기</h3><div class="my-match-games">${matchCards(prelimMatches,true)||'<div class="portal-empty">예선 경기 정보가 없습니다.</div>'}</div></section>
-  <section class="my-match-section"><h3>본선 경기</h3><div class="my-match-games">${matchCards(mainMatches,false)||'<div class="portal-empty">아직 확정된 본선 경기가 없습니다.</div>'}</div></section>`;
+  root.innerHTML=`<section class="my-match-hero">
+    <div class="my-match-hero-main">
+      <p class="eyebrow">MY MATCH</p>
+      <h3>${portalEscape(teamLabel)}</h3>
+      <p class="my-match-subline">${portalEscape(summaryLine)}</p>
+      <div class="my-match-chip-row">
+        <span class="my-match-chip emphasis">${qualified?'본선 진출팀':groupComplete?'예선 종료':'현재 조회 팀'}</span>
+        <span class="my-match-chip">예선 ${prelimMatches.length}경기</span>
+        <span class="my-match-chip">본선 ${mainMatches.length}경기</span>
+      </div>
+    </div>
+    <div class="my-match-current-card ${portalEscape(activePlacement.kind)}">
+      <span>현재 안내</span>
+      <strong>${portalEscape(currentLabel)}</strong>
+      <small>${portalEscape(currentSub)}</small>
+    </div>
+  </section>
+  <div class="my-match-stat-grid">${metricCards.map(card=>`<div class="my-match-stat-card"><span>${portalEscape(card.label)}</span><b>${portalEscape(card.value)}</b><small>${portalEscape(card.hint)}</small></div>`).join('')}</div>
+  <section class="my-match-section"><div class="my-match-section-head"><h3>예선 경기</h3><span class="count">${prelimMatches.length}경기</span></div><div class="my-match-games">${matchCards(prelimMatches,true)}</div></section>
+  <section class="my-match-section"><div class="my-match-section-head"><h3>본선 경기</h3><span class="count">${mainMatches.length}경기</span></div><div class="my-match-games">${matchCards(mainMatches,false)}</div></section>`;
 }
 function searchMyMatch(){
   const input=document.getElementById('myMatchSearchInput');const choices=document.getElementById('myMatchTeamChoices');const guide=document.getElementById('myMatchSearchGuide');if(!input||!choices)return;
@@ -3244,8 +3479,27 @@ function renderStage331OperationDashboard(){
   if(!root)return;
   const courts=portalCourtRows();
   const activeCourts=courts.filter(c=>!c.isPaused);
-  const playingRows=activeCourts.filter(c=>c.playing).map(c=>({court:c,match:stage331FindAnyMatch(c.playing)}));
-  const emptyCourts=activeCourts.filter(c=>!c.playing);
+  const allOperationalMatches=[...(state.prelim?.matches||[]),...portalMainMatches()];
+  const rowsByCourt=new Map();
+
+  // 1) 코트 슬롯이 가장 우선인 실제 배치 정보
+  activeCourts.forEach(c=>{
+    if(c.playing)rowsByCourt.set(String(c.id||c.name),{court:c,match:stage331FindAnyMatch(c.playing)});
+  });
+
+  // 2) 과거/동기화 데이터에서 match.status만 playing이고 court.playing이 비어 있는 경우 보완
+  allOperationalMatches.filter(m=>m?.status==='playing').forEach(match=>{
+    const wanted=String(match.court||'').trim();
+    let court=activeCourts.find(c=>String(c.id)===String(match.courtId||'')||String(c.name||'').trim()===wanted);
+    if(!court&&wanted)court={id:`status-${wanted}`,name:wanted,isPaused:false,playing:match.id,wait1:null,queue:[]};
+    if(!court)return;
+    const key=String(court.id||court.name);
+    if(!rowsByCourt.has(key))rowsByCourt.set(key,{court,match});
+  });
+
+  const playingRows=[...rowsByCourt.values()];
+  const occupiedCourtNames=new Set(playingRows.map(x=>String(x.court.name||x.court.id)));
+  const emptyCourts=activeCourts.filter(c=>!c.playing&&!occupiedCourtNames.has(String(c.name||c.id)));
   const wait1Count=activeCourts.filter(c=>c.wait1).length;
   const manualWaiting=activeCourts.reduce((n,c)=>n+(c.queue?.length||0)+(c.manualQueue?.length||0),0);
   const venueShared=Object.values(state.venueQueues||{}).reduce((n,q)=>n+(Array.isArray(q)?q.length:0),0);
@@ -3258,7 +3512,7 @@ function renderStage331OperationDashboard(){
   const set=(id,value)=>{const el=document.getElementById(id);if(el)el.textContent=String(value)};
   set('stage331PlayingCount',playingRows.length);set('stage331EmptyCourtCount',emptyCourts.length);set('stage331Wait1Count',wait1Count);set('stage331SharedCount',sharedCount);set('stage331DelayedCount',delayed.length);set('stage331ResultCheckCount',resultCheck.length);set('stage331PlayingSummary',`${playingRows.length}경기`);
   const alerts=[];
-  if(emptyCourts.length&&(sharedCount+manualWaiting)>0)alerts.push({level:'danger',title:`빈 코트 ${emptyCourts.length}면에 배정 가능한 대기 경기가 있습니다.`,detail:`공용대기 ${sharedCount}경기 · 추가대기 ${manualWaiting}경기`});
+  if(emptyCourts.length&&(sharedCount+manualWaiting)>0)alerts.push({level:'danger',title:`빈 코트 ${emptyCourts.length}면에 배정 가능한 대기 경기가 있습니다.`,detail:`공용대기 ${sharedCount}경기 · 코트 추가대기 ${manualWaiting}경기`});
   resultCheck.forEach(x=>alerts.push({level:'danger',title:`${x.court.name||x.court.id} 결과 확인 필요`,detail:`${stage331TeamLabel(x.match)} · 진행 ${elapsedMinutes(x.match)}분`}));
   delayed.filter(x=>!resultCheck.includes(x)).forEach(x=>alerts.push({level:'warn',title:`${x.court.name||x.court.id} 경기 지연`,detail:`${stage331TeamLabel(x.match)} · 진행 ${elapsedMinutes(x.match)}분`}));
   const paused=courts.filter(c=>c.isPaused);
@@ -3269,13 +3523,12 @@ function renderStage331OperationDashboard(){
   const alertRoot=document.getElementById('stage331AlertList');
   if(alertRoot)alertRoot.innerHTML=alerts.length?alerts.slice(0,8).map(a=>`<button type="button" class="stage331-list-item ${a.level}" data-portal-go="operation"><span>${a.level==='danger'?'!':'△'}</span><div><strong>${portalEscape(a.title)}</strong><small>${portalEscape(a.detail)}</small></div></button>`).join(''):'<div class="stage331-empty-ok">✓ 현재 우선 확인할 운영 항목이 없습니다.</div>';
   const playingRoot=document.getElementById('stage331PlayingList');
-  if(playingRoot)playingRoot.innerHTML=playingRows.length?playingRows.slice(0,8).map(x=>`<button type="button" class="stage331-list-item" data-portal-go="operation"><span>🎾</span><div><strong>${portalEscape(x.court.name||x.court.id)} · ${portalEscape(stage331TeamLabel(x.match))}</strong><small>진행 ${elapsedMinutes(x.match)}분${x.court.wait1?' · 대기1 있음':' · 대기1 없음'}</small></div></button>`).join(''):'<div class="stage331-empty">현재 시합중인 경기가 없습니다.</div>';
+  if(playingRoot)playingRoot.innerHTML=playingRows.length?playingRows.slice(0,12).map(x=>`<button type="button" class="stage331-list-item" data-portal-go="operation"><span>🎾</span><div><strong>${portalEscape(x.court.name||x.court.id)} · ${portalEscape(stage331TeamLabel(x.match))}</strong><small>${liveMatchPlacement(x.match).label} · 진행 ${elapsedMinutes(x.match)}분${x.court.wait1?' · 대기1 있음':' · 대기1 없음'}</small></div></button>`).join(''):'<div class="stage331-empty">현재 시합중인 경기가 없습니다.</div>';
   const resultHistory=Array.isArray(state.operation?.resultChangeHistory)?state.operation.resultChangeHistory:[];
   set('stage332ResultHistoryCount',`${resultHistory.length}건`);
   const historyRoot=document.getElementById('stage332ResultHistoryList');
   if(historyRoot)historyRoot.innerHTML=resultHistory.length?resultHistory.slice(0,6).map(h=>`<div class="stage332-history-item ${h.corrected?'corrected':''}"><span>${h.corrected?'✏️':'✓'}</span><div><strong>${portalEscape(h.teamA)} ${Number(h.scoreA)} : ${Number(h.scoreB)} ${portalEscape(h.teamB)}</strong><small>${h.corrected?'결과 수정':'결과 확정'} · 승리 ${portalEscape(h.winner)} · ${new Date(h.at).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})}</small></div></div>`).join(''):'<div class="stage331-empty">아직 입력된 경기 결과가 없습니다.</div>';
 }
-
 function tournamentSelectorLabels(records){
   const rows=(Array.isArray(records)?records:[]).map((r,index)=>{
     const snap=r?.snapshot||{};
@@ -3565,7 +3818,7 @@ async function saveBoardPost(){
   try{
     if(String(stage4108PendingNoticeImage||'').startsWith('data:image/')){
       notice('공지 이미지를 Firebase Storage에 업로드하고 있습니다.','info');
-      const uploaded=await uploadManagedImage({folder:'noticePosts',ownerId:state.tournament?.id||state.multiTournament?.activeTournamentId||'tournament',itemId:postId,dataUrl:stage4108PendingNoticeImage,fileName:stage4108PendingNoticeImageName,contentType:stage4108PendingNoticeImageType,previousPath:current?.imageStoragePath||''});
+      const uploaded=await uploadManagedImage({folder:'noticePosts',ownerId:'230match-global',itemId:postId,dataUrl:stage4108PendingNoticeImage,fileName:stage4108PendingNoticeImageName,contentType:stage4108PendingNoticeImageType,previousPath:current?.imageStoragePath||''});
       imageUrl=uploaded.url;imageStoragePath=uploaded.path;stage4108PendingNoticeImage=uploaded.url;stage4108PendingNoticeStoragePath=uploaded.path;
     }else if(!stage4108PendingNoticeImage&&current?.imageStoragePath){await deleteManagedImage(current.imageStoragePath);imageStoragePath='';}
     else if(String(stage4108PendingNoticeImage||'').startsWith('data:'))imageDataUrl=stage4108PendingNoticeImage;
@@ -3573,7 +3826,7 @@ async function saveBoardPost(){
   const payload={title,body,pinned:Boolean(document.getElementById('boardPostPinned')?.checked),important:Boolean(document.getElementById('boardPostImportant')?.checked),popup:Boolean(document.getElementById('boardPostPopup')?.checked),startAt,endAt,popupStartAt,popupEndAt,imageUrl:imageUrl&&!String(imageUrl).startsWith('data:')?imageUrl:'',imageStoragePath,imageDataUrl,imageName:stage4108PendingNoticeImageName||'',imageType:stage4108PendingNoticeImageType||'',updatedAt:new Date().toISOString()};
   if(current){Object.assign(current,payload);commit(`게시판 공지 수정 · ${title}`);notice('공지를 수정했습니다.','success');}
   else{state.portal.posts.unshift({id:postId,...payload,createdAt:new Date().toISOString()});commit(`게시판 공지 등록 · ${title}`);notice('공지를 등록했습니다.','success');}
-  const open=document.getElementById('homeNoticePopup');if(open?.open&&open.dataset.postId===editId&&!payload.popup)open.close();clearBoardPostForm();renderBoardFast();renderPopupManager();showEligibleHomePopup();
+  const open=document.getElementById('homeNoticePopup');if(open?.open&&open.dataset.postId===editId&&!payload.popup)open.close();globalNoticeState.posts=structuredClone(state.portal.posts);await saveGlobalNoticeCloud('전체 공지 저장');clearBoardPostForm();renderBoardFast();renderPopupManager();showEligibleHomePopup();
 }
 function popupDismissKey(post){return `230match-notice-dismiss-${post.id}-${new Date().toISOString().slice(0,10)}`;}
 function popupPostStatus(post,now=Date.now()){const start=post.popupStartAt?new Date(post.popupStartAt).getTime():(post.startAt?new Date(post.startAt).getTime():0),end=post.popupEndAt?new Date(post.popupEndAt).getTime():(post.endAt?new Date(post.endAt).getTime():0);if(start&&start>now)return 'scheduled';if(end&&end<now)return 'expired';return 'active';}
@@ -3582,7 +3835,7 @@ function showEligibleHomePopup(){if(document.body.dataset.currentView!=='home')r
 function renderPopupManager(){const root=document.getElementById('popupManagerList');if(!root)return;const rows=[...(state.portal?.posts||[])].sort((a,b)=>String(b.updatedAt||b.createdAt).localeCompare(String(a.updatedAt||a.createdAt)));root.innerHTML=rows.map(p=>{const st=popupPostStatus(p),label=st==='scheduled'?'예정':st==='expired'?'종료':'현재';return `<article class="popup-manager-item" data-popup-manager-id="${p.id}"><div class="popup-manager-item-head"><div><strong>${portalEscape(p.title)}</strong><div class="portal-meta">${p.popup?'홈 팝업 ON':'홈 팝업 OFF'} · ${label}</div></div>${stage6109ImageSrc(p)?`<img class="popup-manager-thumb" src="${stage6109ImageSrc(p)}" alt="공지 이미지">`:''}</div><div class="popup-manager-controls"><label class="form-check"><input type="checkbox" data-popup-enabled ${p.popup?'checked':''}><span>홈 팝업 표시</span></label><label><span>팝업 시작</span><input type="datetime-local" data-popup-start value="${boardDateValue(p.popupStartAt)}"></label><label><span>팝업 종료</span><input type="datetime-local" data-popup-end value="${boardDateValue(p.popupEndAt)}"></label><button type="button" class="btn btn-primary btn-small" data-popup-save>저장</button></div></article>`;}).join('')||'<div class="portal-empty">등록된 공지가 없습니다. 먼저 공지사항을 작성하세요.</div>';}
 function openPopupManager(){if(!requireAdmin('홈 팝업 관리'))return;renderPopupManager();document.getElementById('popupManagerDialog')?.showModal();}
 function closePopupManager(){const d=document.getElementById('popupManagerDialog');if(d?.open)d.close();}
-function savePopupManagerItem(article){const id=article?.dataset.popupManagerId,post=state.portal.posts.find(p=>p.id===id);if(!post)return;const enabled=Boolean(article.querySelector('[data-popup-enabled]')?.checked),start=String(article.querySelector('[data-popup-start]')?.value||''),end=String(article.querySelector('[data-popup-end]')?.value||'');if(start&&end&&new Date(start)>=new Date(end)){notice('팝업 종료는 시작보다 뒤여야 합니다.','error');return;}post.popup=enabled;post.popupStartAt=start;post.popupEndAt=end;post.updatedAt=new Date().toISOString();commit(`홈 팝업 설정 저장 · ${post.title}`);renderPopupManager();renderBoardFast();if(!enabled){const d=document.getElementById('homeNoticePopup');if(d?.open&&d.dataset.postId===id)d.close();}showEligibleHomePopup();notice(enabled?'홈 팝업 설정을 저장했습니다.':'홈 팝업 표시를 해제했습니다.','success');}
+function savePopupManagerItem(article){const id=article?.dataset.popupManagerId,post=state.portal.posts.find(p=>p.id===id);if(!post)return;const enabled=Boolean(article.querySelector('[data-popup-enabled]')?.checked),start=String(article.querySelector('[data-popup-start]')?.value||''),end=String(article.querySelector('[data-popup-end]')?.value||'');if(start&&end&&new Date(start)>=new Date(end)){notice('팝업 종료는 시작보다 뒤여야 합니다.','error');return;}post.popup=enabled;post.popupStartAt=start;post.popupEndAt=end;post.updatedAt=new Date().toISOString();globalNoticeState.posts=structuredClone(state.portal.posts);saveGlobalNoticeCloud('홈 팝업 설정 저장').catch(error=>notice(`팝업 설정 저장 실패: ${error?.message||error}`,'error'));renderPopupManager();renderBoardFast();if(!enabled){const d=document.getElementById('homeNoticePopup');if(d?.open&&d.dataset.postId===id)d.close();}showEligibleHomePopup();notice(enabled?'홈 팝업 설정을 저장했습니다.':'홈 팝업 표시를 해제했습니다.','success');}
 
 
 function tournamentLifecycle(){
@@ -3958,6 +4211,7 @@ function portalViewAllowed(name){
 function renderHomeFast(){
   ensurePortalState();
   renderHomeTournamentCards();
+  renderStage331OperationDashboard();
   const prelim=state.prelim?.matches||[],main=portalMainMatches(),courts=portalCourtRows();
   const setText=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
   setText('homeTournamentName',state.tournament?.name||'대회 준비 중');
@@ -3972,11 +4226,13 @@ function renderHomeFast(){
 }
 function renderBoardFast(){
   ensurePortalState();
+  renderGlobalTickerEditor();
   const posts=visibleBoardPosts({admin:isAdmin()});
   const board=document.getElementById('boardPostList');if(!board)return;
   board.innerHTML=posts.map(p=>{const status=boardPostStatus(p);const statusText=status==='scheduled'?'게시 예정':status==='expired'?'게시 종료':'게시 중';const popupPeriod=(p.popupStartAt||p.popupEndAt)?`<div class="portal-meta notice-period">팝업기간 · ${p.popupStartAt?new Date(p.popupStartAt).toLocaleString('ko-KR'):'즉시'} ~ ${p.popupEndAt?new Date(p.popupEndAt).toLocaleString('ko-KR'):'계속'}</div>`:'';const postImage=stage6109ImageSrc(p);const image=postImage?`<div class="portal-board-image-wrap"><img class="portal-board-image" src="${postImage}" alt="${portalEscape(p.title)} 공지 이미지" loading="lazy" data-notice-image-view="${portalEscape(p.id)}" title="눌러서 크게 보기"><div class="portal-board-image-actions"><button type="button" class="btn btn-light btn-small" data-notice-image-view="${portalEscape(p.id)}">🔍 크게 보기</button><button type="button" class="btn btn-light btn-small" data-notice-image-download="${portalEscape(p.id)}">⬇ 이미지 다운로드</button></div></div>`:'';return `<article class="portal-board-item ${p.important?'important':''}"><div class="portal-meta notice-meta-row"><span>${p.pinned?'상단 고정 · ':''}${new Date(p.updatedAt||p.createdAt).toLocaleString('ko-KR')}</span><span class="notice-status ${status}">${statusText}${p.popup?' · 홈 팝업':''}</span></div><h3>${p.important?'🚨 ':''}${portalEscape(p.title)}</h3>${image}${p.body?`<div class="portal-board-body">${portalEscape(p.body).replace(/\n/g,'<br>')}</div>`:''}${p.startAt||p.endAt?`<div class="portal-meta notice-period">게시기간 · ${p.startAt?new Date(p.startAt).toLocaleString('ko-KR'):'즉시'} ~ ${p.endAt?new Date(p.endAt).toLocaleString('ko-KR'):'계속'}</div>`:''}${popupPeriod}${isAdmin()?`<div class="portal-board-actions"><button type="button" class="btn btn-light" data-board-edit="${p.id}">수정</button><button type="button" class="btn btn-danger-outline" data-board-delete="${p.id}">삭제</button></div>`:''}</article>`;}).join('')||'<div class="portal-empty">등록된 게시물이 없습니다.</div>';
 }
 function renderPortalViewFast(target){
+  renderGlobalAlertTicker();
   // 4.5.0: 현재 보이는 화면만 갱신한다. 숨겨진 10여 개 화면을 매번 다시 만들지 않는다.
   try{
     if(target==='home'){renderHomeFast();return;}
@@ -3988,7 +4244,8 @@ function renderPortalViewFast(target){
     if(target==='participants'){renderPublicParticipantRecords();return;}
     if(target==='records'){renderResultArchive();return;}
     if(target==='print'){renderPrintPreview();return;}
-    // operation/bracket/home/my-match/settings already have live DOM maintained by state renders.
+    if(target==='bracket'){decorateBracketLivePlacements();return;}
+    // operation/home/my-match/settings already have live DOM maintained by state renders.
   }catch(error){console.warn('[230MATCH 61.1.1] fast view render warning',target,error);}
 }
 function navigatePortalView(name,{pushHistory=false,replaceHistory=false,focus=true}={}){
@@ -4246,6 +4503,8 @@ function createStage3261TestApplications(){
   notice('테스트 참가 신청 4팀을 만들었습니다. 승인·후보·입금·문자 기능을 점검하세요.','success');
 }
 function bindPortal(){
+  const saveTicker=document.getElementById('saveGlobalTickerBtn');if(saveTicker&&!saveTicker.dataset.bound){saveTicker.dataset.bound='1';saveTicker.addEventListener('click',()=>void saveGlobalTicker());}
+
   bindMobileMoreMenu();bindMobileSettingsAccess();
   document.getElementById('createTestApplicationsBtn')?.addEventListener('click',createStage3261TestApplications);
   document.addEventListener('click',event=>{const btn=event.target.closest?.('#createTestApplicationsBtn');if(btn&&!btn.dataset.stage3262Handled){event.preventDefault();btn.dataset.stage3262Handled='1';try{createStage3261TestApplications();}finally{setTimeout(()=>delete btn.dataset.stage3262Handled,50);}}},true);
@@ -4274,7 +4533,7 @@ function bindPortal(){
   document.getElementById('myMatchSearchInput')?.addEventListener('input',()=>{const value=document.getElementById('myMatchSearchInput')?.value||'';if(myMatchNormalize(value).length>=2)searchMyMatch();});
   document.getElementById('myMatchClearBtn')?.addEventListener('click',()=>{const input=document.getElementById('myMatchSearchInput');if(input)input.value='';const choices=document.getElementById('myMatchTeamChoices');if(choices)choices.innerHTML='';const result=document.getElementById('myMatchResult');if(result){result.className='my-match-result empty-state';result.innerHTML='<p>검색할 선수 이름이나 팀명을 입력하세요.</p>';}const guide=document.getElementById('myMatchSearchGuide');if(guide)guide.textContent='두 글자 이상 입력하면 일치하는 팀을 보여줍니다.';});
   document.getElementById('homeNoticePopupClose')?.addEventListener('click',closeHomeNoticePopup);document.getElementById('homeNoticePopupConfirm')?.addEventListener('click',closeHomeNoticePopup);document.getElementById('homeNoticePopupBoard')?.addEventListener('click',()=>{closeHomeNoticePopup();navigatePortalView('board',{pushHistory:true});});
-  document.addEventListener('click',e=>{const noticeView=e.target.closest?.('[data-notice-image-view]');if(noticeView){e.preventDefault();openNoticeImageViewer(noticeView.dataset.noticeImageView);return;}const noticeDownload=e.target.closest?.('[data-notice-image-download]');if(noticeDownload){e.preventDefault();downloadNoticeImageById(noticeDownload.dataset.noticeImageDownload);return;}const portal=e.target.closest?.('[data-portal-go]');if(portal&&!portal.dataset.portalBound){navigatePortalView(portal.dataset.portalGo,{pushHistory:true});return;}const choice=e.target.closest?.('[data-my-match-index]');if(choice){const teams=document.getElementById('myMatchTeamChoices')?._teams||[];const team=teams[Number(choice.dataset.myMatchIndex)];if(team)renderMyMatchTeam(team);return;}const edit=e.target.closest?.('[data-board-edit]');if(edit&&isAdmin()){const post=state.portal.posts.find(p=>p.id===edit.dataset.boardEdit);if(post)openBoardPostEditor(post);return;}const btn=e.target.closest?.('[data-board-delete]');if(!btn||!isAdmin())return;if(!confirm('이 게시물을 삭제할까요?'))return;const deleting=state.portal.posts.find(p=>p.id===btn.dataset.boardDelete);if(deleting?.imageStoragePath)deleteManagedImage(deleting.imageStoragePath);state.portal.posts=state.portal.posts.filter(p=>p.id!==btn.dataset.boardDelete);commit('게시판 공지 삭제');renderBoardFast();});
+  document.addEventListener('click',e=>{const noticeView=e.target.closest?.('[data-notice-image-view]');if(noticeView){e.preventDefault();openNoticeImageViewer(noticeView.dataset.noticeImageView);return;}const noticeDownload=e.target.closest?.('[data-notice-image-download]');if(noticeDownload){e.preventDefault();downloadNoticeImageById(noticeDownload.dataset.noticeImageDownload);return;}const portal=e.target.closest?.('[data-portal-go]');if(portal&&!portal.dataset.portalBound){navigatePortalView(portal.dataset.portalGo,{pushHistory:true});return;}const choice=e.target.closest?.('[data-my-match-index]');if(choice){const teams=document.getElementById('myMatchTeamChoices')?._teams||[];const team=teams[Number(choice.dataset.myMatchIndex)];if(team)renderMyMatchTeam(team);return;}const edit=e.target.closest?.('[data-board-edit]');if(edit&&isAdmin()){const post=state.portal.posts.find(p=>p.id===edit.dataset.boardEdit);if(post)openBoardPostEditor(post);return;}const btn=e.target.closest?.('[data-board-delete]');if(!btn||!isAdmin())return;if(!confirm('이 게시물을 삭제할까요?'))return;const deleting=state.portal.posts.find(p=>p.id===btn.dataset.boardDelete);if(deleting?.imageStoragePath)deleteManagedImage(deleting.imageStoragePath);state.portal.posts=state.portal.posts.filter(p=>p.id!==btn.dataset.boardDelete);globalNoticeState.posts=structuredClone(state.portal.posts);saveGlobalNoticeCloud('전체 공지 삭제').then(()=>notice('공지를 삭제했습니다.','success')).catch(error=>notice(`공지 삭제 저장 실패: ${error?.message||error}`,'error'));renderBoardFast();renderPopupManager();});
 }
 
 window.addEventListener('pagehide',()=>{try{safePersistState('페이지 종료 전');}catch(_error){}});
@@ -4290,13 +4549,13 @@ document.getElementById('saveAuthSettingsBtn')?.addEventListener('click',saveAut
 loadAuthSettingsPanel();renderAuthStatus();startAuth((user,role,error,profile)=>{if(error)notice('간편로그인 연결 오류: '+(error.message||error),'error');applyAuthenticatedRole(user,role,profile);renderNotificationStatus();});
 
 prepareRecoveryStorage().catch(error=>console.warn('로컬 복구점 저장소 준비 실패',error));
-syncInputs();syncPrelimInputs();bind();bindPortal();bindPrintCenter();bindParticipantManager();bindEntryApplications();bindPublicParticipantRecords();bindResultArchive();bindTournamentLifecycleManager();bindBackupRecoveryManager();bindNotificationCenter();bindTournamentReadiness();bindAcceptanceCenter();bindRehearsalCenter();bindPerformanceCenter();bindDiagnosticsCenter();window.addEventListener('popstate',()=>navigatePortalView(location.hash.replace(/^#/, '')||'home',{focus:false}));initialPortalView();renderVenueSettingsEditor();calculateTimeMetrics(state);render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus,holdMainMatch,releaseHeldMatch});if(canOperate()){renderOperatorControls();updateSetupProgress();autoSmsSnapshot=buildAutoSmsSnapshot();installUnifiedMoveControlGuard();ensureUnifiedCourtMoveControls();}applyRoleUI();renderPortalViewFast(document.body?.dataset.currentView||'home');restartTimeTimer();startClockTicker();
+syncInputs();syncPrelimInputs();bind();bindPortal();void startGlobalNoticeSync();bindPrintCenter();bindParticipantManager();bindEntryApplications();bindPublicParticipantRecords();bindResultArchive();bindTournamentLifecycleManager();bindBackupRecoveryManager();bindNotificationCenter();bindTournamentReadiness();bindAcceptanceCenter();bindRehearsalCenter();bindPerformanceCenter();bindDiagnosticsCenter();window.addEventListener('popstate',()=>navigatePortalView(location.hash.replace(/^#/, '')||'home',{focus:false}));initialPortalView();renderVenueSettingsEditor();calculateTimeMetrics(state);render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus,holdMainMatch,releaseHeldMatch});if(canOperate()){renderOperatorControls();updateSetupProgress();autoSmsSnapshot=buildAutoSmsSnapshot();installUnifiedMoveControlGuard();ensureUnifiedCourtMoveControls();}applyRoleUI();renderPortalViewFast(document.body?.dataset.currentView||'home');decorateBracketLivePlacements();renderStage331OperationDashboard();restartTimeTimer();startClockTicker();
 loadSyncPanel();startStateSync({getState:()=>state,applyRemoteState:next=>applySynchronizedState(next,'다른 기기'),onStatus:updateSyncPanel,canWrite:()=>isAdmin()||isOperator(),accessMode:()=>canOperate()?'operator':'viewer'});syncAccessStarted=true;
 const buildStageLabel=document.getElementById('buildStageLabel');
 window.closeAutoSmsDialog=closeAutoSmsDialog;window.approveAutoSmsAligo=approveAutoSmsAligo;window.approveAutoSmsPhone=approveAutoSmsPhone;window.copyAutoSms=copyAutoSms;window.previewCurrentCourtSms=previewCurrentCourtSms;
 if(buildStageLabel)buildStageLabel.textContent=BUILD_LABEL;
 document.documentElement.dataset.build='7002';
-console.log('[230MATCH] 70.0.5 ready · stable court placement + rank-aware main draw');
+console.log('[230MATCH] 70.0.7 ready · refreshed my match cards and mobile readability');
 
 
 // Stage 31.2: presentation-only operation workspace controller.
@@ -5351,7 +5610,7 @@ window.addEventListener('DOMContentLoaded',()=>{try{const hash=(location.hash||'
 
 /* Stage 34.3 · multi-division independent operation */
 const DIVISION_GLOBAL_KEYS=new Set(['schemaVersion','tournament','multiDivision','updatedAt','legacyBridge']);
-const DIVISION_GLOBAL_PORTAL_KEYS=new Set(['tournamentArchives','participantArchives','resultArchives','tournamentTemplates']);
+const DIVISION_GLOBAL_PORTAL_KEYS=new Set(['tournamentArchives','participantArchives','resultArchives','tournamentTemplates','posts','globalTicker']);
 function divisionClone(value){try{return structuredClone(value);}catch(_e){return JSON.parse(JSON.stringify(value));}}
 function newDivisionId(){try{return crypto.randomUUID();}catch(_e){return `division-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;}}
 function parseDivisionNames(value){const rows=String(value||'').split(/[,\n]/).map(v=>v.trim()).filter(Boolean);return [...new Set(rows.length?rows:['기본 부서'])];}
@@ -5367,7 +5626,7 @@ function ensureMultiDivisionRuntime(){
 function syncCurrentDivisionRuntime(){const active=ensureMultiDivisionRuntime();active.name=state.tournament?.division||active.name;active.updatedAt=new Date().toISOString();active.snapshot=captureCurrentDivisionSnapshot();return active;}
 function blankDivisionSnapshot(name,copySettings=true){
   const blank=initialState();blank.tournament={name:state.tournament?.name||'대회',division:name};
-  if(copySettings){blank.settings=divisionClone(state.settings||blank.settings);blank.prelim.settings=divisionClone(state.prelim?.settings||blank.prelim.settings);blank.messaging.settings=divisionClone(state.messaging?.settings||blank.messaging.settings);blank.portal={...(blank.portal||{}),guide:divisionClone(state.portal?.guide||{}),posts:divisionClone(state.portal?.posts||[]),applications:[],resultArchives:[]};}
+  if(copySettings){blank.settings=divisionClone(state.settings||blank.settings);blank.prelim.settings=divisionClone(state.prelim?.settings||blank.prelim.settings);blank.messaging.settings=divisionClone(state.messaging?.settings||blank.messaging.settings);blank.portal={...(blank.portal||{}),guide:divisionClone(state.portal?.guide||{}),applications:[],resultArchives:[]};delete blank.portal.posts;delete blank.portal.globalTicker;}
   const snapshot={};Object.keys(blank).forEach(key=>{if(!DIVISION_GLOBAL_KEYS.has(key)&&key!=='portal')snapshot[key]=divisionClone(blank[key]);});snapshot.portal={};Object.entries(blank.portal||{}).forEach(([key,value])=>{if(!DIVISION_GLOBAL_PORTAL_KEYS.has(key))snapshot.portal[key]=divisionClone(value);});return snapshot;
 }
 function initializeTournamentDivisions(names){
@@ -8935,4 +9194,4 @@ console.info('[230MATCH] 63.0.0 ready · chunked cloud workspace + bounded retry
 
 console.info('[230MATCH] 64.0.0 architecture · lazy cloud registry, worker serialization, visible-view commit rendering');
 
-console.info('[230MATCH] 70.0.5 ready · fixed filenames + stable court placement');
+console.info('[230MATCH] 70.0.8 ready · app-wide notices + restored scrolling alert ticker');

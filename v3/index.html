@@ -153,6 +153,13 @@
     </div>
   </header>
 
+  <section id="globalAlertTicker" class="global-alert-ticker" hidden aria-live="polite">
+    <div class="global-alert-ticker-label">📢 알림</div>
+    <div class="global-alert-ticker-viewport">
+      <div id="globalAlertTickerTrack" class="global-alert-ticker-track"><span id="globalAlertTickerText"></span></div>
+    </div>
+  </section>
+
   <main class="app-shell">
 
     <nav class="mode-tabs panel">
@@ -166,7 +173,7 @@
       <button class="tab" data-view="participants">참가 기록</button>
       <button class="tab" data-view="records">대회 기록</button>
       <button class="tab" data-view="print">출력 센터</button>
-      <button class="tab" data-view="operation" data-operator-only="true">경기 운영</button>
+      <button class="tab court-primary-tab" data-view="operation">코트 현황</button>
       <button class="tab" data-view="bracket">본선 대진표</button>
       <button class="tab settings-managed-tab" data-view="settings" data-admin-only="true">대회 관리</button>
       <button class="tab settings-managed-tab" data-view="roster" data-operator-only="true">참가팀 관리</button>
@@ -238,8 +245,8 @@
 
       <section id="stage331OperationDashboard" class="stage331-operation-dashboard panel" data-admin-only="true" aria-label="당일 운영 대시보드">
         <div class="stage331-dashboard-head">
-          <div><span class="legacy-home-chip">MATCH-DAY CONTROL</span><h2>당일 운영 대시보드</h2><p>빈 코트, 대기열, 지연 경기와 결과 확인이 필요한 경기를 한 화면에서 확인합니다.</p></div>
-          <div class="stage331-dashboard-actions"><span id="stage331DashboardState" class="stage331-dashboard-state">운영 대기</span><button type="button" class="btn btn-light btn-small" data-portal-go="operation">경기 운영 열기</button></div>
+          <div><span class="legacy-home-chip">MATCH-DAY CONTROL</span><h2>당일 운영 대시보드</h2><p>현재 시합중·빈 코트·코트 대기·공용대기·지연 경기와 결과 확인 대상을 실시간으로 요약합니다.</p></div>
+          <div class="stage331-dashboard-actions"><span id="stage331DashboardState" class="stage331-dashboard-state">운영 대기</span><button type="button" class="btn btn-light btn-small" data-portal-go="operation">코트 현황 열기</button></div>
         </div>
         <div class="stage331-metric-grid">
           <button type="button" data-portal-go="operation"><span>시합중</span><strong id="stage331PlayingCount">0</strong><small>현재 진행 경기</small></button>
@@ -518,7 +525,20 @@
 
     <section id="view-board" class="view portal-view">
       <section class="panel">
-        <div class="section-head"><div><h2>대회 게시판</h2><p>공지, 일정 변경, 구장 안내를 확인합니다.</p></div><button id="newBoardPostBtn" type="button" class="btn btn-primary" data-admin-only="true">새 공지 작성</button></div>
+        <div class="section-head"><div><h2>230MATCH 전체 공지사항</h2><p>대회·부서를 바꿔도 동일하게 유지되는 앱 전체 공지입니다.</p></div><button id="newBoardPostBtn" type="button" class="btn btn-primary" data-admin-only="true">새 공지 작성</button></div>
+        <section id="globalTickerAdminPanel" class="global-ticker-admin" data-admin-only="true">
+          <div class="global-ticker-admin-head">
+            <div><strong>📢 상단 흐르는 알림</strong><small>입력한 문구를 모든 대회·부서 화면 상단에 계속 흐르게 표시합니다.</small></div>
+            <label class="form-check"><input id="globalTickerEnabled" class="form-check-input" type="checkbox"><span class="form-check-label">사용</span></label>
+          </div>
+          <div class="global-ticker-admin-grid">
+            <label class="global-ticker-text-field"><span>알림 내용</span><input id="globalTickerTextInput" type="text" maxlength="300" placeholder="예: 국제테니스장 3번 코트 경기가 20분 지연되고 있습니다."></label>
+            <label><span>표시 시작</span><input id="globalTickerStartAt" type="datetime-local"></label>
+            <label><span>표시 종료</span><input id="globalTickerEndAt" type="datetime-local"></label>
+            <button id="saveGlobalTickerBtn" type="button" class="btn btn-primary">상단 알림 저장</button>
+          </div>
+          <p class="portal-muted">기간을 비우면 사용 체크를 해제할 때까지 계속 표시됩니다.</p>
+        </section>
         <div id="boardPostForm" class="portal-editor" hidden data-admin-only="true">
           <label><span>제목</span><input id="boardPostTitle" type="text" maxlength="80"></label>
           <input id="boardPostEditId" type="hidden">
@@ -1893,7 +1913,7 @@
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=7005"></script>
+  <script type="module" src="./assets/js/app.js?v=7008"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
@@ -1967,6 +1987,91 @@
 .entry-sms-recipient-head{display:flex;justify-content:space-between;align-items:center;gap:10px}.entry-sms-recipient-actions{display:flex;gap:6px;flex-wrap:wrap}
 .entry-sms-recipient-editor{display:grid;gap:8px;margin-top:10px}.entry-sms-recipient-row{display:grid;grid-template-columns:auto minmax(90px,.7fr) minmax(150px,1fr);gap:8px;align-items:center;background:#fff;border:1px solid #d8e2ee;border-radius:10px;padding:8px}.entry-sms-recipient-row input[type="text"],.entry-sms-recipient-row input[type="tel"]{width:100%;box-sizing:border-box}
 @media(max-width:700px){.entry-sms-target-options,.contact-player-grid{grid-template-columns:1fr}.entry-sms-recipient-row{grid-template-columns:auto 1fr}.entry-sms-recipient-row input[type="tel"]{grid-column:2}.entry-sms-recipient-head{align-items:flex-start;flex-direction:column}}
+</style>
+
+
+<style id="stage7006LivePositionStyles">
+.mode-tabs .court-primary-tab{font-weight:900}
+.bracket-live-placement{margin:0 8px 5px;padding:4px 7px;border-radius:7px;font-size:11px;font-weight:900;line-height:1.25;background:#edf4ff;color:#163f75;border:1px solid #c8d9ef}
+.match-card.is-playing .bracket-live-placement{background:#ffe4e1;color:#a51f16;border-color:#ffb9b3}
+.match-card.is-wait1 .bracket-live-placement{background:#fff5d8;color:#8a5b00;border-color:#ecd28b}
+.match-card.is-shared-wait .bracket-live-placement{background:#eef0ff;color:#51409a;border-color:#cfcaef}
+.match-card.completed .bracket-live-placement{background:#edf7ef;color:#2e6f3a;border-color:#c9e2ce}
+@media(max-width:800px){.mode-tabs .court-primary-tab{order:-1}.bracket-live-placement{font-size:10px;margin:0 6px 4px}}
+</style>
+
+
+<style id="stage7007MyMatchStyles">
+.my-match-result{display:grid;gap:16px}
+.my-match-result.empty-state{display:block}
+.my-match-hero{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(260px,.85fr);gap:14px;align-items:stretch}
+.my-match-hero-main,.my-match-current-card,.my-match-section,.my-match-stat-card{background:#fff;border:1px solid #d9e4f1;border-radius:20px;box-shadow:0 10px 28px rgba(15,23,42,.06)}
+.my-match-hero-main{padding:20px 22px;background:linear-gradient(135deg,#f8fbff 0%,#eef5ff 100%)}
+.my-match-hero-main h3{margin:4px 0 10px;font-size:30px;line-height:1.18;color:#0f264d}
+.my-match-hero-main .eyebrow{margin:0;color:#c69000;font-size:12px;font-weight:900;letter-spacing:.12em}
+.my-match-subline{margin:0 0 14px;color:#56708e;font-size:14px;font-weight:700}
+.my-match-chip-row{display:flex;flex-wrap:wrap;gap:8px}
+.my-match-chip{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:999px;background:#fff;border:1px solid #d7e1ef;color:#244269;font-size:12px;font-weight:800}
+.my-match-chip.emphasis{background:#102d59;color:#fff;border-color:#102d59}
+.my-match-current-card{padding:18px 18px 16px;display:grid;gap:8px;align-content:center}
+.my-match-current-card>span{font-size:12px;font-weight:900;letter-spacing:.08em;color:#5a6c84;text-transform:uppercase}
+.my-match-current-card strong{font-size:26px;line-height:1.22;color:#0f264d}
+.my-match-current-card small{font-size:13px;font-weight:700;color:#61748c}
+.my-match-current-card.playing{background:linear-gradient(135deg,#fff1f1 0%,#ffe5e5 100%);border-color:#ffb3b3}
+.my-match-current-card.playing strong{color:#a42323}
+.my-match-current-card.wait1,.my-match-current-card.waiting{background:linear-gradient(135deg,#fff8e9 0%,#ffefc6 100%);border-color:#f0d899}
+.my-match-current-card.wait1 strong,.my-match-current-card.waiting strong{color:#8a5b00}
+.my-match-current-card.shared{background:linear-gradient(135deg,#f2f0ff 0%,#e6e0ff 100%);border-color:#d2c4ff}
+.my-match-current-card.shared strong{color:#5442b5}
+.my-match-current-card.completed{background:linear-gradient(135deg,#edf8ef 0%,#dcf2e1 100%);border-color:#b8e0c1}
+.my-match-current-card.completed strong{color:#237143}
+.my-match-stat-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.my-match-stat-card{padding:16px 16px 14px;display:grid;gap:6px}
+.my-match-stat-card span{font-size:12px;font-weight:800;color:#6a7d93}
+.my-match-stat-card b{font-size:28px;line-height:1.1;color:#0f264d}
+.my-match-stat-card small{font-size:12px;color:#6b7f96}
+.my-match-section{padding:16px 16px 14px;display:grid;gap:12px}
+.my-match-section-head{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.my-match-section-head h3{margin:0;font-size:18px;color:#102d59}
+.my-match-section-head .count{display:inline-flex;padding:6px 10px;border-radius:999px;background:#eef4ff;color:#23406b;font-size:12px;font-weight:900}
+.my-match-games{display:grid;gap:12px}
+.my-match-game{padding:16px;border-radius:18px;border:1px solid #d8e3f0;background:linear-gradient(180deg,#fff 0%,#f9fbff 100%);display:grid;gap:12px;position:relative;overflow:hidden}
+.my-match-game::before{content:'';position:absolute;left:0;top:0;bottom:0;width:5px;background:#cbd5e1}
+.my-match-game.playing::before{background:#ef4444}.my-match-game.wait1::before,.my-match-game.waiting::before{background:#f59e0b}.my-match-game.shared::before{background:#8b5cf6}.my-match-game.completed::before{background:#22c55e}
+.my-match-game-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.my-match-round{font-size:18px;font-weight:900;color:#0f264d}
+.my-match-status-badge{display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:900;background:#eef2f7;color:#41556f}
+.my-match-status-badge.playing{background:#fee2e2;color:#b91c1c}.my-match-status-badge.wait1,.my-match-status-badge.waiting{background:#fef3c7;color:#9a6500}.my-match-status-badge.shared{background:#ede9fe;color:#6d28d9}.my-match-status-badge.completed{background:#dcfce7;color:#166534}
+.my-match-opponent{font-size:16px;line-height:1.45;color:#102a4d}
+.my-match-opponent strong{font-size:18px;color:#0b2040}
+.my-match-info-row{display:flex;flex-wrap:wrap;gap:8px}
+.my-match-pill{display:inline-flex;align-items:center;gap:6px;padding:7px 11px;border-radius:999px;background:#eef4fb;color:#26466e;font-size:12px;font-weight:800;border:1px solid #d8e3f0}
+.my-match-pill.score{background:#eefbf2;border-color:#cde8d4;color:#1f6a39}.my-match-pill.score.loss{background:#fff1f2;border-color:#ffd5d8;color:#a11c37}
+.my-match-empty-inline{padding:20px;border:1px dashed #d4e0ee;border-radius:16px;background:#fbfdff;color:#6b7f96;text-align:center;font-weight:700}
+.my-match-result .stage3560-result-button{border-radius:14px;min-height:46px;font-size:15px;font-weight:900}
+@media(max-width:980px){.my-match-hero{grid-template-columns:1fr}.my-match-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.my-match-hero-main h3{font-size:26px}.my-match-current-card strong{font-size:22px}}
+@media(max-width:640px){.my-match-result{gap:12px}.my-match-hero-main,.my-match-current-card,.my-match-section,.my-match-stat-card{border-radius:16px}.my-match-hero-main{padding:16px}.my-match-current-card{padding:15px}.my-match-stat-grid{grid-template-columns:1fr 1fr;gap:10px}.my-match-stat-card{padding:14px 13px 12px}.my-match-stat-card b{font-size:22px}.my-match-section{padding:14px}.my-match-round{font-size:16px}.my-match-opponent{font-size:15px}.my-match-opponent strong{font-size:16px}.my-match-info-row{display:grid;gap:7px}.my-match-pill{font-size:11px;padding:6px 10px}.my-match-current-card strong{font-size:20px}}
+</style>
+
+
+<style id="stage7008GlobalNoticeStyles">
+.global-alert-ticker{position:sticky;top:0;z-index:950;display:flex;align-items:center;min-height:38px;background:#fff8dd;border-bottom:1px solid #ead48a;color:#493900;overflow:hidden}
+.global-alert-ticker[hidden]{display:none!important}
+.global-alert-ticker-label{flex:0 0 auto;align-self:stretch;display:flex;align-items:center;padding:0 14px;background:#f3c744;color:#172b4d;font-size:13px;font-weight:1000;white-space:nowrap}
+.global-alert-ticker-viewport{min-width:0;flex:1;overflow:hidden}
+.global-alert-ticker-track{display:inline-flex;align-items:center;min-width:max-content;white-space:nowrap;will-change:transform;animation:globalAlertMarquee var(--ticker-duration,22s) linear infinite}
+.global-alert-ticker-track span{display:inline-block;padding-left:100vw;padding-right:80px;font-size:14px;font-weight:900;letter-spacing:.01em}
+.global-alert-ticker:hover .global-alert-ticker-track{animation-play-state:paused}
+@keyframes globalAlertMarquee{from{transform:translateX(0)}to{transform:translateX(-100%)}}
+.global-ticker-admin{margin:0 0 14px;padding:16px;border:1px solid #e3cf80;border-radius:16px;background:linear-gradient(135deg,#fffdf4,#fff7d7)}
+.global-ticker-admin-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.global-ticker-admin-head>div{display:grid;gap:3px}.global-ticker-admin-head strong{font-size:16px;color:#1e3555}.global-ticker-admin-head small{font-size:12px;color:#6c7280}
+.global-ticker-admin-grid{display:grid;grid-template-columns:minmax(260px,2fr) minmax(170px,.8fr) minmax(170px,.8fr) auto;gap:10px;align-items:end}
+.global-ticker-admin-grid label{display:grid;gap:5px;font-size:12px;font-weight:800;color:#43556e}
+.global-ticker-admin-grid input{height:42px;border:1px solid #cfd9e6;border-radius:10px;padding:0 10px;background:#fff}
+.global-ticker-admin-grid .btn{min-height:42px;white-space:nowrap}
+@media(max-width:900px){.global-ticker-admin-grid{grid-template-columns:1fr 1fr}.global-ticker-text-field{grid-column:1/-1}.global-ticker-admin-grid .btn{width:100%}}
+@media(max-width:640px){.global-alert-ticker{min-height:34px}.global-alert-ticker-label{padding:0 9px;font-size:11px}.global-alert-ticker-track span{font-size:12px;padding-right:50px}.global-ticker-admin{padding:13px}.global-ticker-admin-head{align-items:flex-start}.global-ticker-admin-grid{grid-template-columns:1fr}.global-ticker-text-field{grid-column:auto}}
 </style>
 
 </body>
