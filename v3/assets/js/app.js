@@ -1,8 +1,8 @@
 import{getAuthConfig,saveAuthConfig,startAuth,signInGoogle,signOutSocial,beginExternalLogin,getExistingLoginEndpoints,signInEmail,registerEmail,sendPasswordReset,linkEmailPassword,authProviderIds,getAuthRuntime}from'./auth-engine.js?v=3565';
-import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7124';
+import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7126';
 import{notificationSupport,getStoredVapidKey,saveStoredVapidKey,enableMyPush,disableMyPush,queuePush,listPushJobs,listPushTokens}from'./notification-engine.js?v=332012';
 
-import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7124';
+import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7126';
 import{prepareTeams,generateDraw,allMatches,findMatch,generateLinkedDrawSlots,syncLinkedDrawQualifiers}from'./bracket-engine-v5000.js?v=5000';
 import{ensureDrawMeta,canModifyDraw,createDrawWithMethod,lockDraw,unlockDrawForDevelopment,clearDrawHistory}from'./draw-method-engine.js?v=332012';
 import{buildCourts,assignInitial,queueReadyMatches,refillCourt}from'./court-engine.js?v=332012';
@@ -15,7 +15,7 @@ import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactD
 import{render,teamText}from'./ui.js?v=3504';
 import{ensureAuditState,runStateAudit,runPrelimSimulation,runFullSimulation,applyAuditResult}from'./audit-engine.js?v=332012';
 import{earlyMainStats,markResolvedMainMatchesReady,canAssignEarlyMain,ensureEarlyMainSettings,autoAssignResolvedMain}from'./early-main-engine.js?v=332012';
-import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7124';
+import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7126';
 import{ensureMainDrawLifecycle,beginMainDraw,completeMainDraw,failMainDraw,resetMainDraw,hasAuthorizedMainDraw,mainDrawStatus,clearMainPlacement,repairMainDrawAuthorization}from'./main-draw-lifecycle-engine.js?v=3501';
 import{shouldUseLinkedDraw,linkedDrawNeedsRepair,rebuildLinkedDraw,hasStartedMainMatches}from'./linked-draw-guard-engine.js?v=332012';
 import{ensureVenueSettings,ensureVenueQueues,venuePreset,buildVenueCourts,prelimVenues,mainVenues}from'./venue-engine.js?v=332012';
@@ -26,7 +26,7 @@ import{ensureCourtStatuses,pauseCourt,resumeCourt}from'./court-status-engine.js?
 import{ensureCourtManualQueues,assignToCourtManualQueue,moveCourtMatchFlexible,returnManualQueueItemToVenue,reorderCourtManualQueue}from'./court-manual-queue-engine.js?v=332012';
 import{reorderPrelimQueue as reorderPrelimQueueItem,movePrelimQueuedMatch,returnPrelimWait1ToQueue}from'./prelim-queue-control-engine.js?v=332012';
 import{ensurePrelimCourtStatuses,pausePrelimCourt,resumePrelimCourt}from'./prelim-court-status-engine.js?v=332012';
-import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7124';
+import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7126';
 import{verifyAndRepairMainFlow}from'./main-flow-integrity-engine.js?v=332012';
 import{finalizeTournamentCompletion}from'./tournament-completion-engine.js?v=332012';
 import{ensureTournamentIdentity,validateTournamentForArchive,createTournamentArchive,archiveListItem,archiveBackupPayload}from'./archive-engine.js?v=354000';
@@ -5346,7 +5346,10 @@ function navigatePortalView(name,{pushHistory=false,replaceHistory=false,focus=t
   else if(replaceHistory&&location.hash!==hash)history.replaceState({portalView:target},'',hash);
 
   renderPortalViewFast(target);
-  if(target==='home')setTimeout(showEligibleHomePopup,120);
+  if(target==='home'){
+    setTimeout(showEligibleHomePopup,120);
+    if(typeof window.__update230MatchHomeFeedback==='function')setTimeout(window.__update230MatchHomeFeedback,80);
+  }
   if(target==='my-match')setTimeout(v3252AutoMyMatch,60);
   if(target==='entry')setTimeout(renderApplicationPortal,30);
   if(target==='notifications')setTimeout(refreshNotificationManager,30);
@@ -10423,7 +10426,7 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
   };
   setInterval(tick,2500);
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(tick,350),{once:true});else setTimeout(tick,350);
-  console.info('[230MATCH] 71.2.4 ready · matchday participant quick bar');
+  console.info('[230MATCH] 71.2.6 ready · home native SMS inquiry');
 })();
 
 
@@ -10515,7 +10518,7 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
   window.addEventListener('pageshow',update);
   setInterval(()=>{if(document.body?.dataset.currentView==='home')update();},5000);
   window.__updateTodayTournamentDashboard=updateTodayDashboard;
-  console.info('[230MATCH] 71.2.4 ready · matchday participant quick bar');
+  console.info('[230MATCH] 71.2.6 ready · home native SMS inquiry');
 })();
 
 
@@ -10783,7 +10786,7 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
   window.__run230MatchResultFlowCheck=runResultFlowCheck;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(runResultFlowCheck,700),{once:true});else setTimeout(runResultFlowCheck,700);
   setInterval(()=>{if(document.body?.dataset.currentView==='home'&&canOperate())runResultFlowCheck();},10000);
-  console.info('[230MATCH] 71.2.4 ready · matchday participant quick bar');
+  console.info('[230MATCH] 71.2.6 ready · home native SMS inquiry');
 })();
 
 
@@ -10848,7 +10851,182 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
     document.addEventListener('DOMContentLoaded',()=>setTimeout(updateMatchdayQuickBar,700),{once:true});
   }else setTimeout(updateMatchdayQuickBar,700);
   setInterval(updateMatchdayQuickBar,5000);
-  console.info('[230MATCH] 71.2.4 ready · matchday participant quick bar');
+  console.info('[230MATCH] 71.2.6 ready · home native SMS inquiry');
+})();
+
+
+
+/* 230MATCH 5.3.5 · home admin feedback SMS + receipt history */
+(()=>{
+  const COLLECTION='adminRegistrationNotifications';
+  const LOCAL_KEY='230match-home-feedback-history-v1';
+  const KIND_LABELS={match:'시합 문의',improve:'개선사항',app:'앱 문의',etc:'기타'};
+  let inboxUnsub=null,inboxStarted=false;
+
+  const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const localRows=()=>{
+    try{const rows=JSON.parse(localStorage.getItem(LOCAL_KEY)||'[]');return Array.isArray(rows)?rows:[];}catch(_e){return[];}
+  };
+  function saveLocalReceipt(row){
+    const rows=localRows();
+    rows.unshift(row);
+    try{localStorage.setItem(LOCAL_KEY,JSON.stringify(rows.slice(0,8)));}catch(_e){}
+    renderMyReceipt();
+  }
+  function renderMyReceipt(){
+    const root=document.getElementById('stage7125MyFeedbackHistory');if(!root)return;
+    const row=localRows()[0];
+    if(!row){root.innerHTML='';return;}
+    const when=row.sentAt?new Date(row.sentAt).toLocaleString('ko-KR'):'';
+    const label=row.status==='copied'?'문자 내용이 복사되었습니다.':'관리자에게 보낼 문의 문자를 문자앱에 준비했습니다.';
+    root.innerHTML=`<div class="stage7125-feedback-sent"><span>✓ ${esc(label)} <b>${esc(KIND_LABELS[row.kind]||'문의')}</b></span><span>${esc(when)}</span></div>`;
+  }
+  function feedbackContext(){
+    let ctx={};try{ctx=registrationContext()||{};}catch(_e){}
+    return {
+      tournamentId:String(ctx.tournamentId||state?.multiTournament?.activeTournamentId||state?.tournament?.id||''),
+      tournamentName:String(ctx.tournamentName||state?.tournament?.name||'현재 대회'),
+      divisionId:String(ctx.divisionId||state?.multiDivision?.activeDivisionId||''),
+      divisionName:String(ctx.divisionName||state?.tournament?.division||'')
+    };
+  }
+  function senderLabel(){
+    return String(currentAuthUser?.appProfile?.name||currentAuthUser?.displayName||currentAuthUser?.email||'로그인 사용자');
+  }
+  function senderPhone(){
+    try{
+      const p=v3252ProfileDefaults?.()||{};
+      return String(p.phone||currentAuthUser?.appProfile?.phone||'').replace(/\D/g,'');
+    }catch(_e){
+      return String(currentAuthUser?.appProfile?.phone||'').replace(/\D/g,'');
+    }
+  }
+  function senderTeamLabel(){
+    try{
+      const uid=String(currentAuthUser?.uid||'');
+      const mine=(registrationCloudRows||[]).find(r=>String(r?.ownerUid||'')===uid&&registrationBelongsToCurrentDivision(r));
+      return String(mine?.teamName||mine?.affiliation||'').trim();
+    }catch(_e){return'';}
+  }
+  function feedbackSmsBody(kind,body){
+    const c=feedbackContext(),label=KIND_LABELS[kind]||'문의';
+    const team=senderTeamLabel(),phone=senderPhone();
+    return `[230MATCH ${label}]
+보낸사람: ${senderLabel()}${team?` / ${team}`:''}
+대회: ${c.tournamentName}${c.divisionName?` · ${c.divisionName}`:''}${phone?`\n연락처: ${phone}`:''}
+
+${body}
+
+※ 230MATCH 홈 화면에서 작성한 문의입니다.`;
+  }
+  async function saveFeedbackCloud(row){
+    const rt=await getAuthRuntime();
+    if(!rt?.db||!rt?.api||!rt?.user)throw new Error('로그인이 필요합니다.');
+    const id=`feedback_${Date.now()}_${String(rt.user.uid||'user').slice(0,10)}`;
+    await rt.api.setDoc(rt.api.doc(rt.db,COLLECTION,id),{id,...row});
+    return id;
+  }
+  async function sendFeedback(){
+    if(!currentAuthUser){
+      notice('관리자 문의 문자는 로그인 후 보낼 수 있습니다.','warning');
+      try{openSocialLogin();}catch(_e){}
+      return;
+    }
+    const kind=document.getElementById('stage7125FeedbackKind')?.value||'match';
+    const body=String(document.getElementById('stage7125FeedbackBody')?.value||'').trim();
+    if(body.length<2)return notice('문의 내용을 입력하세요.','error');
+    const adminPhone=registrationAdminNotifyPhone();
+    if(!validatePhone(adminPhone))return notice('관리자 문자 수신번호가 아직 설정되지 않았습니다. 관리자에게 알려주세요.','error');
+
+    const c=feedbackContext(),openedAt=new Date().toISOString();
+    const smsBody=feedbackSmsBody(kind,body);
+    const row={
+      type:'home_feedback',
+      kind,body,
+      tournamentId:c.tournamentId,tournamentName:c.tournamentName,
+      divisionId:c.divisionId,divisionName:c.divisionName,
+      senderUid:String(currentAuthUser.uid||''),
+      senderName:senderLabel(),
+      senderPhone:senderPhone(),
+      senderEmail:String(currentAuthUser.email||''),
+      adminPhone:String(adminPhone).replace(/\D/g,''),
+      sentAt:openedAt,createdAt:openedAt,
+      channel:'phone',
+      deliveryStatus:'sms-app-opened',
+      source:'home'
+    };
+
+    const btn=document.getElementById('stage7125SendFeedbackBtn');
+    if(btn){btn.disabled=true;btn.textContent='문자 준비 중...';}
+    try{
+      // 실제 전송 여부는 웹앱에서 확인할 수 없으므로 "문자앱 열기" 이력으로만 저장한다.
+      row.id=await saveFeedbackCloud(row);
+
+      const mobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||'');
+      if(mobile){
+        location.href=`sms:${String(adminPhone).replace(/\D/g,'')}?body=${encodeURIComponent(smsBody)}`;
+        saveLocalReceipt({id:row.id,kind,body,sentAt:openedAt,status:'sms-app-opened'});
+        const box=document.getElementById('stage7125FeedbackBody');if(box)box.value='';
+        const status=document.getElementById('stage7125FeedbackStatus');
+        if(status){status.className='badge badge-safe';status.textContent='문자앱 열기 완료';}
+        notice('관리자 번호와 문의 내용을 문자앱에 입력했습니다. 마지막 전송 버튼을 눌러주세요.','success');
+      }else{
+        await navigator.clipboard.writeText(`${String(adminPhone).replace(/\D/g,'')}\n\n${smsBody}`);
+        saveLocalReceipt({id:row.id,kind,body,sentAt:openedAt,status:'copied'});
+        const status=document.getElementById('stage7125FeedbackStatus');
+        if(status){status.className='badge badge-warning';status.textContent='문자 내용 복사됨';}
+        notice('PC에서는 문자앱을 직접 열 수 없어 관리자 번호와 문의 내용을 복사했습니다.','info');
+      }
+      if(canOperate())startAdminInbox(true);
+    }catch(e){
+      console.error('[230MATCH] 홈 문의 문자 준비 실패',e);
+      notice(`문의 문자 준비 실패: ${e?.message||e}`,'error');
+    }finally{
+      if(btn){btn.disabled=false;btn.textContent='📱 내 문자앱으로 관리자에게 보내기';}
+    }
+  }
+  function renderAdminInbox(rows){
+    const wrap=document.getElementById('stage7125AdminFeedbackInbox'),root=document.getElementById('stage7125AdminFeedbackList');
+    if(!wrap||!root)return;
+    wrap.hidden=!canOperate();
+    if(!canOperate())return;
+    const filtered=(rows||[]).filter(x=>x?.type==='home_feedback').sort((a,b)=>String(b.sentAt||'').localeCompare(String(a.sentAt||''))).slice(0,8);
+    root.innerHTML=filtered.length?filtered.map(r=>{
+      const when=r.sentAt?new Date(r.sentAt).toLocaleString('ko-KR'):'';
+      return `<div class="stage7125-admin-feedback-row"><span class="kind">${esc(KIND_LABELS[r.kind]||'문의')}</span><div class="body"><b>${esc(r.senderName||'사용자')}</b>${r.senderPhone?` · ${esc(r.senderPhone)}`:''}<br>${esc(r.body||'')}</div><span class="meta">${esc(r.tournamentName||'')}${r.divisionName?` · ${esc(r.divisionName)}`:''}<br>문자앱 열기 · ${esc(when)}</span></div>`;
+    }).join(''):'<div class="portal-empty">아직 홈 문의가 없습니다.</div>';
+  }
+  async function startAdminInbox(force=false){
+    if(!canOperate())return;
+    if(inboxStarted&&!force)return;
+    try{
+      const rt=await getAuthRuntime();if(!rt?.db||!rt?.api||!rt?.user)return;
+      inboxUnsub?.();inboxStarted=true;
+      const ref=rt.api.collection(rt.db,COLLECTION);
+      inboxUnsub=rt.api.onSnapshot(ref,snap=>{
+        const rows=snap.docs.map(d=>({id:d.id,...d.data()}));
+        renderAdminInbox(rows);
+      },e=>console.warn('[230MATCH] 홈 문의함 실시간 연결 실패',e));
+    }catch(e){console.warn('[230MATCH] 홈 문의함 시작 실패',e);}
+  }
+  function updateFeedbackHome(){
+    renderMyReceipt();
+    const guide=document.getElementById('stage7125FeedbackGuide');
+    if(guide){
+      const adminPhone=registrationAdminNotifyPhone();
+      guide.textContent=validatePhone(adminPhone)
+        ?'문자에는 현재 대회·부서와 로그인 사용자 정보가 자동으로 포함됩니다. 문자앱에서 마지막 전송 버튼만 눌러주세요.'
+        :'관리자 문자 수신번호가 설정되면 사용할 수 있습니다.';
+    }
+    if(canOperate())startAdminInbox();
+  }
+  document.addEventListener('click',e=>{
+    if(e.target.closest?.('#stage7125SendFeedbackBtn'))sendFeedback();
+  });
+  window.__update230MatchHomeFeedback=updateFeedbackHome;
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(updateFeedbackHome,800),{once:true});else setTimeout(updateFeedbackHome,800);
+  setInterval(()=>{if(document.body?.dataset.currentView==='home')updateFeedbackHome();},10000);
+  console.info('[230MATCH] 71.2.6 ready · home native SMS inquiry');
 })();
 
 
@@ -11006,4 +11184,4 @@ console.info('[230MATCH] 63.0.0 ready · chunked cloud workspace + bounded retry
 
 console.info('[230MATCH] 64.0.0 architecture · lazy cloud registry, worker serialization, visible-view commit rendering');
 
-console.info('[230MATCH] 71.2.4 ready · matchday participant quick bar');
+console.info('[230MATCH] 71.2.6 ready · home native SMS inquiry');

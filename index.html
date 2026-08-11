@@ -361,6 +361,41 @@
           <div id="homeCourtSummary" class="portal-court-summary"></div>
         </article>
       </section>
+
+      <section id="stage7125HomeFeedback" class="panel stage7125-home-feedback" aria-label="관리자 문의 문자">
+        <div class="section-head">
+          <div>
+            <span class="legacy-home-chip">CONTACT ADMIN</span>
+            <h2>관리자에게 문의·개선사항 보내기</h2>
+            <p>시합 관련 문의, 불편사항, 앱 개선 의견을 남겨주세요. 로그인 후 누르면 본인 휴대폰 문자앱에 관리자 번호와 내용이 자동으로 입력됩니다.</p>
+          </div>
+          <span id="stage7125FeedbackStatus" class="badge badge-muted">문자 문의</span>
+        </div>
+        <div class="stage7125-feedback-grid">
+          <label>
+            <span>문의 종류</span>
+            <select id="stage7125FeedbackKind">
+              <option value="match">시합 관련 문의</option>
+              <option value="improve">개선사항</option>
+              <option value="app">앱 사용 문의</option>
+              <option value="etc">기타</option>
+            </select>
+          </label>
+          <label class="stage7125-feedback-wide">
+            <span>내용</span>
+            <textarea id="stage7125FeedbackBody" rows="4" maxlength="500" placeholder="문의하거나 개선이 필요한 내용을 적어주세요."></textarea>
+          </label>
+        </div>
+        <div class="stage7125-feedback-actions">
+          <small id="stage7125FeedbackGuide">보낸 내용에는 현재 대회·부서와 로그인 사용자 정보가 함께 표시됩니다.</small>
+          <button id="stage7125SendFeedbackBtn" type="button" class="btn btn-primary">📱 내 문자앱으로 관리자에게 보내기</button>
+        </div>
+        <div id="stage7125MyFeedbackHistory" class="stage7125-feedback-history"></div>
+        <div id="stage7125AdminFeedbackInbox" class="stage7125-admin-inbox" data-admin-only="true" hidden>
+          <div class="stage7125-inbox-head"><strong>최근 접수된 문의</strong><span>홈에서 전송된 문자 문의</span></div>
+          <div id="stage7125AdminFeedbackList"></div>
+        </div>
+      </section>
     </section>
 
     <section id="view-tournaments" class="view portal-view tournament-list-view">
@@ -2048,7 +2083,7 @@
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=7124"></script>
+  <script type="module" src="./assets/js/app.js?v=7126"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
@@ -2887,6 +2922,36 @@ input[type="radio"]{
     border-radius:14px;
   }
   .stage7124-quick-btn{min-height:34px;font-size:10px;padding:4px 2px}
+}
+</style>
+
+
+<style id="stage7125HomeFeedbackStyles">
+.stage7125-home-feedback{margin-top:14px}
+.stage7125-feedback-grid{display:grid;grid-template-columns:minmax(160px,.36fr) 1fr;gap:10px}
+.stage7125-feedback-grid label{display:grid;gap:6px}
+.stage7125-feedback-grid label>span{font-size:11px;font-weight:900;color:#52677d}
+.stage7125-feedback-grid select,.stage7125-feedback-grid textarea{width:100%;box-sizing:border-box}
+.stage7125-feedback-wide{grid-column:2}
+.stage7125-feedback-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:10px}
+.stage7125-feedback-actions small{color:#718096;line-height:1.45}
+.stage7125-feedback-history{margin-top:10px}
+.stage7125-feedback-sent{display:flex;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid #cfe6d8;border-radius:10px;background:#f0fbf4;color:#2c6a45;font-size:11px}
+.stage7125-feedback-sent b{font-size:11px}
+.stage7125-admin-inbox{margin-top:12px;padding-top:11px;border-top:1px dashed #d7e0e9}
+.stage7125-inbox-head{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:7px}
+.stage7125-inbox-head strong{font-size:12px;color:#294b6c}.stage7125-inbox-head span{font-size:10px;color:#7a8b9b}
+.stage7125-admin-feedback-row{display:grid;grid-template-columns:84px 1fr auto;gap:8px;align-items:start;padding:8px 0;border-bottom:1px solid #edf1f5}
+.stage7125-admin-feedback-row:last-child{border-bottom:0}
+.stage7125-admin-feedback-row .kind{font-size:10px;font-weight:900;color:#466582}
+.stage7125-admin-feedback-row .body{font-size:11px;color:#334155;line-height:1.45}
+.stage7125-admin-feedback-row .meta{font-size:9px;color:#8493a3;text-align:right;white-space:nowrap}
+@media(max-width:700px){
+  .stage7125-feedback-grid{grid-template-columns:1fr}
+  .stage7125-feedback-wide{grid-column:auto}
+  .stage7125-feedback-actions{align-items:stretch;flex-direction:column}
+  .stage7125-feedback-actions .btn{width:100%}
+  .stage7125-admin-feedback-row{grid-template-columns:70px 1fr}.stage7125-admin-feedback-row .meta{grid-column:2;text-align:left}
 }
 </style>
 
