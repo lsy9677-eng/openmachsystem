@@ -1,8 +1,8 @@
 import{getAuthConfig,saveAuthConfig,startAuth,signInGoogle,signOutSocial,beginExternalLogin,getExistingLoginEndpoints,signInEmail,registerEmail,sendPasswordReset,linkEmailPassword,authProviderIds,getAuthRuntime}from'./auth-engine.js?v=3565';
-import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7003';
+import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7005';
 import{notificationSupport,getStoredVapidKey,saveStoredVapidKey,enableMyPush,disableMyPush,queuePush,listPushJobs,listPushTokens}from'./notification-engine.js?v=332012';
 
-import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7003';
+import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7005';
 import{prepareTeams,generateDraw,allMatches,findMatch,generateLinkedDrawSlots,syncLinkedDrawQualifiers}from'./bracket-engine-v5000.js?v=5000';
 import{ensureDrawMeta,canModifyDraw,createDrawWithMethod,lockDraw,unlockDrawForDevelopment,clearDrawHistory}from'./draw-method-engine.js?v=332012';
 import{buildCourts,assignInitial,queueReadyMatches,refillCourt}from'./court-engine.js?v=332012';
@@ -15,7 +15,7 @@ import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactD
 import{render,teamText}from'./ui.js?v=3504';
 import{ensureAuditState,runStateAudit,runPrelimSimulation,runFullSimulation,applyAuditResult}from'./audit-engine.js?v=332012';
 import{earlyMainStats,markResolvedMainMatchesReady,canAssignEarlyMain,ensureEarlyMainSettings,autoAssignResolvedMain}from'./early-main-engine.js?v=332012';
-import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=3542';
+import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7005';
 import{ensureMainDrawLifecycle,beginMainDraw,completeMainDraw,failMainDraw,resetMainDraw,hasAuthorizedMainDraw,mainDrawStatus,clearMainPlacement,repairMainDrawAuthorization}from'./main-draw-lifecycle-engine.js?v=3501';
 import{shouldUseLinkedDraw,linkedDrawNeedsRepair,rebuildLinkedDraw,hasStartedMainMatches}from'./linked-draw-guard-engine.js?v=332012';
 import{ensureVenueSettings,ensureVenueQueues,venuePreset,buildVenueCourts,prelimVenues,mainVenues}from'./venue-engine.js?v=332012';
@@ -26,7 +26,7 @@ import{ensureCourtStatuses,pauseCourt,resumeCourt}from'./court-status-engine.js?
 import{ensureCourtManualQueues,assignToCourtManualQueue,moveCourtMatchFlexible,returnManualQueueItemToVenue,reorderCourtManualQueue}from'./court-manual-queue-engine.js?v=332012';
 import{reorderPrelimQueue as reorderPrelimQueueItem,movePrelimQueuedMatch,returnPrelimWait1ToQueue}from'./prelim-queue-control-engine.js?v=332012';
 import{ensurePrelimCourtStatuses,pausePrelimCourt,resumePrelimCourt}from'./prelim-court-status-engine.js?v=332012';
-import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7003';
+import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7005';
 import{verifyAndRepairMainFlow}from'./main-flow-integrity-engine.js?v=332012';
 import{finalizeTournamentCompletion}from'./tournament-completion-engine.js?v=332012';
 import{ensureTournamentIdentity,validateTournamentForArchive,createTournamentArchive,archiveListItem,archiveBackupPayload}from'./archive-engine.js?v=354000';
@@ -618,6 +618,124 @@ function smsTeamName(team){
   return String(teamText(team)||team?.name||'참가팀').replace(/\([^)]*\)/g,'').replace(/\s*\/\s*/g,'/').replace(/\s+/g,' ').trim()||'참가팀';
 }
 function findAnyMatchById(id){return findMatch(state.draw,id)||(state.prelim?.matches||[]).find(m=>String(m.id)===String(id))||null;}
+
+// 70.0.4 · 본선 1회전 배정 원칙
+// - 조 1·2위가 모두 진출하는 꽉 찬 대진은 반드시 1위 vs 2위
+// - 같은 조의 1위/2위 재대결 금지
+// - BYE가 필요한 경우 조 1위부터 우선 배정
+function mainDrawShuffle(list){
+  const a=[...(list||[])];
+  for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}
+  return a;
+}
+function mainDrawGroupRank(item){
+  const direct=Number(item?.groupRank||item?.qualifierRank||item?.prelimRank||0);
+  if(direct>0)return direct;
+  const key=String(item?.placeholderKey||item?.slotKey||'');
+  const km=key.match(/(?:rank|r)[-_ ]?(\d+)/i);if(km)return Number(km[1]);
+  const label=`${item?.name||''} ${item?.label||''}`;
+  const lm=label.match(/(?:조\s*)?(\d+)\s*위/);return lm?Number(lm[1]):0;
+}
+function mainDrawGroupNo(item){
+  const direct=Number(item?.groupNo||item?.prelimGroupNo||0);
+  if(direct>0)return direct;
+  const key=String(item?.placeholderKey||item?.slotKey||'');
+  let m=key.match(/(?:group|g)[-_ ]?(\d+)/i);if(m)return Number(m[1]);
+  const label=`${item?.name||''} ${item?.label||''}`;
+  m=label.match(/(\d+)\s*조/);return m?Number(m[1]):0;
+}
+function mainDrawIsRealSlot(x){return !!x;}
+function pairAvoidingSameGroup(left,right){
+  const a=mainDrawShuffle(left), pool=mainDrawShuffle(right), pairs=[];
+  for(const x of a){
+    if(!pool.length){pairs.push([x,null]);continue;}
+    const gx=mainDrawGroupNo(x);
+    let idx=pool.findIndex(y=>!gx||!mainDrawGroupNo(y)||mainDrawGroupNo(y)!==gx);
+    if(idx<0)idx=0;
+    pairs.push([x,pool.splice(idx,1)[0]]);
+  }
+  return {pairs,leftover:pool};
+}
+function buildRankAwareMainSlots(source,drawSize){
+  const size=Math.max(2,Number(drawSize)||64), raw=(source||[]).filter(mainDrawIsRealSlot);
+  const rank1=mainDrawShuffle(raw.filter(x=>mainDrawGroupRank(x)===1));
+  const rank2=mainDrawShuffle(raw.filter(x=>mainDrawGroupRank(x)===2));
+  const other=mainDrawShuffle(raw.filter(x=>![1,2].includes(mainDrawGroupRank(x))));
+  let byeCount=Math.max(0,size-raw.length), pairs=[];
+
+  // BYE는 조 1위 우선. 그래도 남으면 2위, 기타 순서.
+  const bye1=Math.min(byeCount,rank1.length);
+  for(let i=0;i<bye1;i++)pairs.push([rank1.shift(),null]);
+  byeCount-=bye1;
+  const bye2=Math.min(byeCount,rank2.length);
+  for(let i=0;i<bye2;i++)pairs.push([rank2.shift(),null]);
+  byeCount-=bye2;
+  const bye3=Math.min(byeCount,other.length);
+  for(let i=0;i<bye3;i++)pairs.push([other.shift(),null]);
+  byeCount-=bye3;
+
+  // 남은 1위는 가능한 한 반드시 다른 조 2위와 대진.
+  const matched=pairAvoidingSameGroup(rank1,rank2);
+  pairs.push(...matched.pairs);
+  let leftovers=[...matched.leftover,...other];
+
+  // 남은 팀은 불가피한 경우끼리만 묶음.
+  leftovers=mainDrawShuffle(leftovers);
+  while(leftovers.length>=2)pairs.push([leftovers.shift(),leftovers.shift()]);
+  if(leftovers.length)pairs.push([leftovers.shift(),null]);
+
+  while(pairs.length<size/2)pairs.push([null,null]);
+  if(pairs.length>size/2)pairs=pairs.slice(0,size/2);
+
+  // 대진 전체 위치는 다시 섞되 각 경기 내부 1위/2위 구조는 유지.
+  pairs=mainDrawShuffle(pairs);
+  return pairs.flat();
+}
+function firstRoundMatches(draw){
+  const rounds=Object.values(draw?.rounds||{}).filter(Array.isArray);
+  return rounds.sort((a,b)=>b.length-a.length)[0]||[];
+}
+function validateRankAwareMainDraw(draw,{strictOneVsTwo=false}={}){
+  const first=firstRoundMatches(draw);
+  let sameRank=0,sameGroup=0,realMatches=0,byeRank1=0,byeOther=0;
+  for(const m of first){
+    const a=m?.teamA,b=m?.teamB;
+    if(a&&b&&!a.placeholder&&!b.placeholder){
+      realMatches++;
+      const ra=mainDrawGroupRank(a),rb=mainDrawGroupRank(b);
+      if(ra&&rb&&ra===rb)sameRank++;
+      const ga=mainDrawGroupNo(a),gb=mainDrawGroupNo(b);
+      if(ga&&gb&&ga===gb)sameGroup++;
+    }else{
+      const real=a&&!a.placeholder?a:(b&&!b.placeholder?b:null);
+      if(real){if(mainDrawGroupRank(real)===1)byeRank1++;else byeOther++;}
+    }
+  }
+  if(sameGroup)throw new Error(`본선 대진 검증 실패: 같은 조 재대결 ${sameGroup}경기가 발견되었습니다.`);
+  if(strictOneVsTwo&&sameRank)throw new Error(`본선 대진 검증 실패: 64강 1회전에서 같은 순위끼리 ${sameRank}경기가 발견되었습니다.`);
+  return {realMatches,sameRank,sameGroup,byeRank1,byeOther};
+}
+function createRankAwareDrawFromSlots(slots,size){
+  const arranged=buildRankAwareMainSlots(slots,size);
+  const draw=generateDraw(arranged,size);
+  const ranks=arranged.filter(Boolean).map(mainDrawGroupRank);
+  const allRanked=ranks.length>0&&ranks.every(r=>r===1||r===2);
+  const noByes=arranged.filter(Boolean).length===Number(size);
+  validateRankAwareMainDraw(draw,{strictOneVsTwo:allRanked&&noByes});
+  return {draw,arranged};
+}
+function createRankAwareFinalDraw(qualifiers,size){
+  // drawMeta/history는 기존 엔진이 만들도록 한 번 실행하고 실제 대진은 순위 정책으로 재생성한다.
+  createDrawWithMethod(state,qualifiers,size,{method:'instant',byePriority:'group-first'});
+  const result=createRankAwareDrawFromSlots(qualifiers,size);
+  state.draw=result.draw;
+  ensureDrawMeta(state);
+  state.drawMeta.method='group-rank';
+  state.drawMeta.byePriority='group-first';
+  state.drawMeta.createdAt=new Date().toISOString();
+  state.drawMeta.rankPolicy='1v2-same-group-blocked';
+  return state.draw;
+}
 function smsTeamRecipients(team){
   if(!team)return[];const saved=getTeamContact(state,team)||{};const phones=[];
   const add=(name,phone)=>{phone=smsDigits(phone);if(phone.length>=9&&!phones.some(x=>x.phone===phone))phones.push({name:name||smsTeamName(team),phone});};
@@ -1478,20 +1596,34 @@ function adminUnlockPrelim(){
 function createLinkedDraw(){
   pullPrelimSettings();
   ensurePrelimState(state);
-  const slotCount=(state.prelim.groups||[]).length*Number(state.prelim.settings.qualifiersPerGroup||1);
+  const q=Math.max(1,Number(state.prelim.settings.qualifiersPerGroup||1));
+  const slotCount=(state.prelim.groups||[]).length*q;
   if(slotCount>128)throw new Error(`본선 슬롯 ${slotCount}개는 지원 최대 규모인 128강을 초과합니다. 조당 진출팀 수 또는 예선 조 수를 줄여야 합니다.`);
   const requiredSize=slotCount<=32?32:slotCount<=64?64:128;
   const selectedSize=Number($('drawSize').value)||64;
   const appliedSize=Math.max(selectedSize,requiredSize);
   const autoExpanded=appliedSize!==selectedSize;
-  if(autoExpanded){
-    $('drawSize').value=String(appliedSize);
-    state.settings.drawSize=appliedSize;
-  }
-  const result=rebuildLinkedDraw(state,appliedSize);
+  if(autoExpanded){$('drawSize').value=String(appliedSize);state.settings.drawSize=appliedSize;}
+
+  const sourceSlots=generateLinkedDrawSlots(state.prelim.groups,q,appliedSize).filter(Boolean);
+  const {draw,arranged}=createRankAwareDrawFromSlots(sourceSlots,appliedSize);
+  state.draw=draw;
+  state.draw.linked=true;
+  state.prelim.linkedDraw={
+    active:true,drawSize:appliedSize,
+    slots:arranged.filter(Boolean),
+    createdAt:new Date().toISOString(),
+    lastSyncedAt:null,
+    rankPolicy:'1v2-same-group-blocked',
+    byePriority:'group-first'
+  };
+  const syncResult=syncLinkedDrawQualifiers(state.draw,state.prelim.qualifiers,{protectStarted:true});
+  applyLinkedSyncResult(syncResult);
   markResolvedMainMatchesReady(state);
-  commit(`예선 슬롯 본선 선추첨 · ${result.slots}슬롯 · ${state.settings.drawSize}강${autoExpanded?' · 자동확대':''}`);
-  prelimNotice(`${autoExpanded?`본선 슬롯 ${slotCount}개에 맞춰 대진 규모를 ${selectedSize}강에서 ${appliedSize}강으로 자동 확대했습니다. `:''}본선 대진을 조 순위 슬롯으로 생성했습니다. 현재 실제 팀 반영 ${result.changes}팀입니다.`,'success');
+  const audit=validateRankAwareMainDraw(state.draw,{strictOneVsTwo:slotCount===appliedSize&&q===2});
+  commit(`예선 슬롯 본선 선추첨 · ${slotCount}슬롯 · ${state.settings.drawSize}강 · 1위-2위 우선 · BYE 1위 우선${autoExpanded?' · 자동확대':''}`);
+  prelimNotice(`${autoExpanded?`본선 슬롯 ${slotCount}개에 맞춰 대진 규모를 ${selectedSize}강에서 ${appliedSize}강으로 자동 확대했습니다. `:''}본선 1회전은 조 1위-조 2위 대진을 우선하고 같은 조 재대결을 막았습니다.${appliedSize>slotCount?` BYE ${appliedSize-slotCount}개는 조 1위부터 우선 배정합니다.`:''}`,'success');
+  return {slots:slotCount,changes:syncResult.changes?.length||0,audit};
 }
 function applyLinkedSyncResult(result){
   if(!state.prelim?.linkedDraw?.active)return;
@@ -4164,7 +4296,7 @@ const buildStageLabel=document.getElementById('buildStageLabel');
 window.closeAutoSmsDialog=closeAutoSmsDialog;window.approveAutoSmsAligo=approveAutoSmsAligo;window.approveAutoSmsPhone=approveAutoSmsPhone;window.copyAutoSms=copyAutoSms;window.previewCurrentCourtSms=previewCurrentCourtSms;
 if(buildStageLabel)buildStageLabel.textContent=BUILD_LABEL;
 document.documentElement.dataset.build='7002';
-console.log('[230MATCH] 70.0.3 ready · dual-player SMS recipients + editable contacts');
+console.log('[230MATCH] 70.0.5 ready · stable court placement + rank-aware main draw');
 
 
 // Stage 31.2: presentation-only operation workspace controller.
@@ -6054,7 +6186,7 @@ let refreshDivisionEditorPanel = window.refreshDivisionEditorPanel || (()=>{});
           <summary>고급 추첨 방식</summary>
           <div class="stage3440-advanced-actions" id="stage3440AdvancedActions"></div>
         </details>
-        <div id="stage3440MainHelp" class="notice info">본선 추첨 후 예선 순위가 확정되는 대로 실제 팀명이 자동 반영됩니다.</div>`;
+        <div id="stage3440MainHelp" class="notice info">본선 추첨 후 예선 순위가 확정되는 대로 실제 팀명이 자동 반영됩니다. 조 1·2위가 모두 진출하는 경우 1회전은 1위 vs 2위로 배정하며 같은 조 재대결은 막고, BYE는 조 1위부터 우선합니다.</div>`;
       target.prepend(shell);
     }
     const settings=byId('stage3440MainSettings');
@@ -6136,7 +6268,7 @@ let refreshDivisionEditorPanel = window.refreshDivisionEditorPanel || (()=>{});
     const size=Number(state?.settings?.drawSize)|| (qualifiers.length<=32?32:qualifiers.length<=64?64:128);
     if(!confirm(`확정된 ${qualifiers.length}팀으로 ${size}강 최종 본선 대진을 추첨할까요?\n기존 슬롯 대진과 본선 코트배정은 초기화됩니다.`))return;
     try{saveRecovery(state,`${state.tournament?.name||'대회'} · 최종 본선 추첨 전`)}catch(_e){}
-    state.draw=createDrawWithMethod(state,qualifiers,size,{method:'instant',byePriority:state.settings?.byePriority});
+    state.draw=createRankAwareFinalDraw(qualifiers,size);
     state.draw.stage3441Explicit='final';state.draw.stage3441DrawAt=new Date().toISOString();
     state.prelim.linkedDraw={active:false,slots:[],createdAt:null,lastSyncedAt:null,userInitiated:false,finalDrawAt:new Date().toISOString()};
     state.courts=[];state.sharedQueue=[];state.venueQueues={};
@@ -6438,7 +6570,7 @@ console.info('[230MATCH V3] 34.4.2 ready · main wait1 refill and shared queue e
     if(!confirm(`${qualifiers.length}팀으로 ${size}강 최종 본선 추첨을 실행할까요?\n이 작업을 실행해야만 본선 카드와 공용대기가 생성됩니다.`))return;
     try{
       beginMainDraw(state,'final');
-      state.draw=createDrawWithMethod(state,qualifiers,size,{method:'instant',byePriority:state.settings?.byePriority});
+      state.draw=createRankAwareFinalDraw(qualifiers,size);
       state.prelim.linkedDraw={active:false,slots:[],createdAt:null,lastSyncedAt:null,userInitiated:false,finalDrawAt:new Date().toISOString()};
       completeMainDraw(state,'final');
       commit(`사용자 실행 · 최종 본선 추첨 · ${qualifiers.length}팀 · ${size}강`);
@@ -8803,4 +8935,4 @@ console.info('[230MATCH] 63.0.0 ready · chunked cloud workspace + bounded retry
 
 console.info('[230MATCH] 64.0.0 architecture · lazy cloud registry, worker serialization, visible-view commit rendering');
 
-console.info('[230MATCH] 70.0.3 ready · fixed filenames + dual-player SMS');
+console.info('[230MATCH] 70.0.5 ready · fixed filenames + stable court placement');
