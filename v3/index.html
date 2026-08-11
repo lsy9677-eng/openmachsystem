@@ -376,11 +376,11 @@
         <div>
           <span class="legacy-home-chip">대회 참가 접수</span>
           <h1>참가 신청</h1>
-          <p>팀 정보를 입력해 신청하고, 대표 연락처로 접수·승인 상태를 확인할 수 있습니다.</p>
+          <p>팀 정보를 입력해 신청하고, 로그인한 계정에서 신청·입금·취소 상태를 확인할 수 있습니다.</p>
         </div>
         <div class="legacy-entry-guide">
           <strong>신청 절차</strong>
-          <span>신청 접수 → 관리자 확인 → 참가 또는 후보 승인</span>
+          <span>신청 접수 → 입금 확인 → 참가 완료 · 정원 초과 시 후보 자동 등록</span>
         </div>
       </section>
 
@@ -389,6 +389,17 @@
           <div class="section-head"><div><h2>참가 신청서</h2><p>두 선수의 이름·클럽·연락처를 각각 입력하고 대표 연락처를 선택하세요.</p></div><span class="badge badge-warning">접수중</span></div>
           <div class="entry-form-grid legacy-entry-form-grid entry-pair-form">
             <label class="legacy-full"><span>신청 대회 *</span><select id="entryApplicationTournament" class="form-select"><option value="">대회를 선택하세요</option></select><small class="entry-tournament-help">현재 접수 가능한 대회를 선택한 뒤 신청하세요.</small></label>
+            <section id="entryPaymentInfo" class="entry-payment-info legacy-full">
+              <div class="entry-payment-info-main">
+                <span>참가비 입금 안내</span>
+                <strong id="entryPaymentAccountText">입금계좌를 불러오는 중입니다.</strong>
+                <div class="entry-payment-info-meta">
+                  <span id="entryPaymentFeeText">참가비 -</span>
+                  <span id="entryPaymentNoteText"></span>
+                </div>
+              </div>
+              <button id="entryPaymentAccountCopyBtn" type="button" class="btn btn-light entry-payment-copy">계좌번호 복사</button>
+            </section>
             <fieldset class="entry-player-card legacy-full">
               <legend>선수 1</legend>
               <div class="entry-player-grid">
@@ -1928,7 +1939,7 @@
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=7106"></script>
+  <script type="module" src="./assets/js/app.js?v=7107"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
@@ -2308,6 +2319,33 @@ input[type="radio"]{
 .home-reg-progress{grid-column:1/-1;height:5px;border-radius:999px;background:rgba(255,255,255,.18);overflow:hidden}.home-reg-progress>i{display:block;height:100%;width:0;background:#7ee2a8;border-radius:999px;transition:width .25s ease}
 .mode-tabs [data-view="entry"] .entry-nav-count{font-size:11px;font-weight:900}
 @media(max-width:700px){.home-hero-registration{grid-template-columns:1fr auto auto auto;gap:7px 9px;margin-top:8px;padding:9px 10px}.home-hero-registration>span{display:none}.home-hero-registration>strong{font-size:19px}.home-hero-registration .home-reg-mini b{font-size:12px}.home-hero-registration .home-reg-mini small{font-size:9px}}
+</style>
+
+
+<style id="stage7107EntryPaymentInfoStyles">
+.entry-payment-info{
+  grid-column:1/-1;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:10px 14px;
+  align-items:center;
+  padding:13px 14px;
+  border:1px solid #d5e1ef;
+  border-radius:14px;
+  background:linear-gradient(135deg,#f8fbff,#eef5ff);
+}
+.entry-payment-info-main{display:grid;gap:5px;min-width:0}
+.entry-payment-info-main>span{font-size:11px;font-weight:900;color:#667a92}
+.entry-payment-info-main>strong{font-size:17px;color:#17365f;word-break:break-all}
+.entry-payment-info-meta{display:flex;gap:8px;flex-wrap:wrap;color:#526a85;font-size:12px;font-weight:800}
+.entry-payment-copy{min-height:38px!important;white-space:nowrap}
+.entry-self-card-actions .btn{min-width:82px}
+.entry-self-edit-note{font-size:10px;color:#6c7e92}
+@media(max-width:640px){
+  .entry-payment-info{grid-template-columns:1fr;padding:11px 12px}
+  .entry-payment-info-main>strong{font-size:15px}
+  .entry-payment-copy{width:100%}
+}
 </style>
 
 </body>
