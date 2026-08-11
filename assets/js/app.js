@@ -1,8 +1,8 @@
 import{getAuthConfig,saveAuthConfig,startAuth,signInGoogle,signOutSocial,beginExternalLogin,getExistingLoginEndpoints,signInEmail,registerEmail,sendPasswordReset,linkEmailPassword,authProviderIds,getAuthRuntime}from'./auth-engine.js?v=3565';
-import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7101';
+import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7102';
 import{notificationSupport,getStoredVapidKey,saveStoredVapidKey,enableMyPush,disableMyPush,queuePush,listPushJobs,listPushTokens}from'./notification-engine.js?v=332012';
 
-import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7101';
+import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7102';
 import{prepareTeams,generateDraw,allMatches,findMatch,generateLinkedDrawSlots,syncLinkedDrawQualifiers}from'./bracket-engine-v5000.js?v=5000';
 import{ensureDrawMeta,canModifyDraw,createDrawWithMethod,lockDraw,unlockDrawForDevelopment,clearDrawHistory}from'./draw-method-engine.js?v=332012';
 import{buildCourts,assignInitial,queueReadyMatches,refillCourt}from'./court-engine.js?v=332012';
@@ -15,7 +15,7 @@ import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactD
 import{render,teamText}from'./ui.js?v=3504';
 import{ensureAuditState,runStateAudit,runPrelimSimulation,runFullSimulation,applyAuditResult}from'./audit-engine.js?v=332012';
 import{earlyMainStats,markResolvedMainMatchesReady,canAssignEarlyMain,ensureEarlyMainSettings,autoAssignResolvedMain}from'./early-main-engine.js?v=332012';
-import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7101';
+import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7102';
 import{ensureMainDrawLifecycle,beginMainDraw,completeMainDraw,failMainDraw,resetMainDraw,hasAuthorizedMainDraw,mainDrawStatus,clearMainPlacement,repairMainDrawAuthorization}from'./main-draw-lifecycle-engine.js?v=3501';
 import{shouldUseLinkedDraw,linkedDrawNeedsRepair,rebuildLinkedDraw,hasStartedMainMatches}from'./linked-draw-guard-engine.js?v=332012';
 import{ensureVenueSettings,ensureVenueQueues,venuePreset,buildVenueCourts,prelimVenues,mainVenues}from'./venue-engine.js?v=332012';
@@ -26,7 +26,7 @@ import{ensureCourtStatuses,pauseCourt,resumeCourt}from'./court-status-engine.js?
 import{ensureCourtManualQueues,assignToCourtManualQueue,moveCourtMatchFlexible,returnManualQueueItemToVenue,reorderCourtManualQueue}from'./court-manual-queue-engine.js?v=332012';
 import{reorderPrelimQueue as reorderPrelimQueueItem,movePrelimQueuedMatch,returnPrelimWait1ToQueue}from'./prelim-queue-control-engine.js?v=332012';
 import{ensurePrelimCourtStatuses,pausePrelimCourt,resumePrelimCourt}from'./prelim-court-status-engine.js?v=332012';
-import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7101';
+import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7102';
 import{verifyAndRepairMainFlow}from'./main-flow-integrity-engine.js?v=332012';
 import{finalizeTournamentCompletion}from'./tournament-completion-engine.js?v=332012';
 import{ensureTournamentIdentity,validateTournamentForArchive,createTournamentArchive,archiveListItem,archiveBackupPayload}from'./archive-engine.js?v=354000';
@@ -3483,7 +3483,7 @@ function editEntryApplication(id){
   const memo=document.getElementById('entryApplicationMemo');if(memo)memo.value=item.memo||'';
   document.getElementById('entryApplicationSubmitBtn').textContent='신청 수정 저장';document.getElementById('entryApplicationEditCancelBtn').hidden=false;document.getElementById('entryPlayer1Name')?.focus();window.scrollTo({top:0,behavior:'smooth'});
 }
-async async function cancelEntryApplication(id){
+async function cancelEntryApplication(id){
   const item=(registrationCloudReady?registrationCloudRows:(state.portal?.applications||[])).find(a=>a.id===id);
   if(!item||!['approved','reserve'].includes(item.status))return;
   const phone=String(document.getElementById('entryLookupPhone')?.value||'').replace(/[^0-9]/g,'');
@@ -9565,4 +9565,4 @@ console.info('[230MATCH] 63.0.0 ready · chunked cloud workspace + bounded retry
 
 console.info('[230MATCH] 64.0.0 architecture · lazy cloud registry, worker serialization, visible-view commit rendering');
 
-console.info('[230MATCH] 71.0.1 ready · simple registration flow + fatal syntax correction');
+console.info('[230MATCH] 71.0.2 ready · all duplicated async declarations removed');
