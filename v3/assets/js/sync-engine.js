@@ -189,7 +189,7 @@ async function writeCurrentTournament(source,{force=false}={}){
     workspaceChunks:newIds,workspaceEncoding:encoded.encoding,workspaceOriginalBytes:encoded.originalBytes,workspaceStoredBytes:encoded.storedBytes,workspaceDigest:d,publicDigest,
     workspaceJson:api.deleteField(),workspace:api.deleteField(),lastWriterUid:rt.user.uid,lastWriterEmail:rt.user.email||'',lastWriterClientId:CLIENT_ID,serverUpdatedAt:api.serverTimestamp()
   },{merge:true});
-  const roomUpdate={schemaVersion:8,roomId:ROOM_ID,activeTournamentId:id,revision:api.increment(1),lastWriterUid:rt.user.uid,lastWriterEmail:rt.user.email||'',lastWriterClientId:CLIENT_ID,serverUpdatedAt:api.serverTimestamp()};
+  const roomUpdate={schemaVersion:8,roomId:ROOM_ID,revision:api.increment(1),lastWriterUid:rt.user.uid,lastWriterEmail:rt.user.email||'',lastWriterClientId:CLIENT_ID,serverUpdatedAt:api.serverTimestamp()};
   if(publicChanged)roomUpdate.publicRevision=api.increment(1);
   batch.set(roomRef(),roomUpdate,{merge:true});
   await batch.commit();knownChunkIds.set(id,newIds);lastSavedDigest=d;lastKnownRoomRevision++;dirtyBaseRevision=lastKnownRoomRevision;syncConflict=null;if(publicChanged){lastSavedPublicDigest=publicDigest;lastKnownPublicRevision++;}lastWriterUid=rt.user.uid;lastWriterClientId=CLIENT_ID;localStorage.setItem('230match-v7-active-tournament',id);scheduleCache();return true;
@@ -208,7 +208,7 @@ function schedule(){if(applyingRemote)return;const state=getStateFn();if(!active
 function onSaved(){schedule();}
 async function handleRoomSnapshot(snap){
   if(!snap.exists())return;
-  const room=snap.data()||{},rt=await runtime(),writer=String(room.lastWriterUid||''),revision=Number(room.revision||0),publicRevision=Number(room.publicRevision||revision||0),targetId=String(room.activeTournamentId||'');
+  const room=snap.data()||{},rt=await runtime(),writer=String(room.lastWriterUid||''),revision=Number(room.revision||0),publicRevision=Number(room.publicRevision||revision||0),targetId=String(activeIdOf(getStateFn())||'');
   const viewer=accessModeFn()==='viewer';
   const relevantRevision=viewer?publicRevision:revision;
   const knownRevision=viewer?lastKnownPublicRevision:lastKnownRoomRevision;
@@ -235,7 +235,7 @@ export async function connectCloudSync(){disconnectCloudSync(false);await ensure
 export function disconnectCloudSync(show=true){clearTimeout(saveTimer);clearTimeout(cacheTimer);saveTimer=cacheTimer=null;dirtyGeneration=0;dirtyBaseRevision=lastKnownRoomRevision;if(unsubscribeRoom)unsubscribeRoom();unsubscribeRoom=null;db=null;if(show)status('클라우드 연결 해제','info','로컬 화면은 유지됩니다.');}
 export async function prepareCriticalCloudWrite(){clearTimeout(saveTimer);saveTimer=null;autoSaveBlockedUntil=0;const started=Date.now();while(pushInFlight&&Date.now()-started<12000)await new Promise(r=>setTimeout(r,80));if(pushInFlight)throw new Error('이전 서버 저장이 아직 끝나지 않았습니다.');return true;}
 export async function pushStateNow(state=getStateFn()){if(!canWriteFn())throw new Error('관리자 또는 진행자만 클라우드에 저장할 수 있습니다.');await prepareCriticalCloudWrite();await ensureDb();pushInFlight=true;try{const saved=await writeCurrentTournament(state);if(!saved)throw new Error('유효한 현재 대회가 없어 저장하지 않았습니다.');dirtyGeneration=0;status('클라우드 저장 완료','success','현재 대회를 Firestore 안전 조각으로 저장했습니다.');return true;}finally{pushInFlight=false;}}
-export async function loadTournamentNow(tournamentId,registry=[]){await ensureDb();const bundle=await readOneTournament(tournamentId,registry);return bundle;}
+export async function loadTournamentNow(tournamentId,registry=[]){await ensureDb();const id=safeId(tournamentId);const cached=await readCachedState(id);if(cached){try{localStorage.setItem('230match-v7-active-tournament',id);}catch(_e){};return{state:cached,raw:null,source:'cache'};}const bundle=await readOneTournament(id,registry);if(bundle?.state){try{localStorage.setItem('230match-v7-active-tournament',id);}catch(_e){};lastSavedDigest=String(bundle.raw?.workspaceDigest||'');lastSavedPublicDigest=String(bundle.raw?.publicDigest||'');scheduleCache();}return bundle;}
 export async function pullStateNow(){await ensureDb();return (await readInitialBundle())?.state||null;}
 export async function resolveConflictWithRemote(){
   const state=await pullStateNow();
