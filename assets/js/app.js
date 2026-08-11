@@ -1,8 +1,8 @@
 import{getAuthConfig,saveAuthConfig,startAuth,signInGoogle,signOutSocial,beginExternalLogin,getExistingLoginEndpoints,signInEmail,registerEmail,sendPasswordReset,linkEmailPassword,authProviderIds,getAuthRuntime}from'./auth-engine.js?v=3565';
-import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7113';
+import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7115';
 import{notificationSupport,getStoredVapidKey,saveStoredVapidKey,enableMyPush,disableMyPush,queuePush,listPushJobs,listPushTokens}from'./notification-engine.js?v=332012';
 
-import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7113';
+import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7115';
 import{prepareTeams,generateDraw,allMatches,findMatch,generateLinkedDrawSlots,syncLinkedDrawQualifiers}from'./bracket-engine-v5000.js?v=5000';
 import{ensureDrawMeta,canModifyDraw,createDrawWithMethod,lockDraw,unlockDrawForDevelopment,clearDrawHistory}from'./draw-method-engine.js?v=332012';
 import{buildCourts,assignInitial,queueReadyMatches,refillCourt}from'./court-engine.js?v=332012';
@@ -15,7 +15,7 @@ import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactD
 import{render,teamText}from'./ui.js?v=3504';
 import{ensureAuditState,runStateAudit,runPrelimSimulation,runFullSimulation,applyAuditResult}from'./audit-engine.js?v=332012';
 import{earlyMainStats,markResolvedMainMatchesReady,canAssignEarlyMain,ensureEarlyMainSettings,autoAssignResolvedMain}from'./early-main-engine.js?v=332012';
-import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7113';
+import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7115';
 import{ensureMainDrawLifecycle,beginMainDraw,completeMainDraw,failMainDraw,resetMainDraw,hasAuthorizedMainDraw,mainDrawStatus,clearMainPlacement,repairMainDrawAuthorization}from'./main-draw-lifecycle-engine.js?v=3501';
 import{shouldUseLinkedDraw,linkedDrawNeedsRepair,rebuildLinkedDraw,hasStartedMainMatches}from'./linked-draw-guard-engine.js?v=332012';
 import{ensureVenueSettings,ensureVenueQueues,venuePreset,buildVenueCourts,prelimVenues,mainVenues}from'./venue-engine.js?v=332012';
@@ -26,7 +26,7 @@ import{ensureCourtStatuses,pauseCourt,resumeCourt}from'./court-status-engine.js?
 import{ensureCourtManualQueues,assignToCourtManualQueue,moveCourtMatchFlexible,returnManualQueueItemToVenue,reorderCourtManualQueue}from'./court-manual-queue-engine.js?v=332012';
 import{reorderPrelimQueue as reorderPrelimQueueItem,movePrelimQueuedMatch,returnPrelimWait1ToQueue}from'./prelim-queue-control-engine.js?v=332012';
 import{ensurePrelimCourtStatuses,pausePrelimCourt,resumePrelimCourt}from'./prelim-court-status-engine.js?v=332012';
-import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7113';
+import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7115';
 import{verifyAndRepairMainFlow}from'./main-flow-integrity-engine.js?v=332012';
 import{finalizeTournamentCompletion}from'./tournament-completion-engine.js?v=332012';
 import{ensureTournamentIdentity,validateTournamentForArchive,createTournamentArchive,archiveListItem,archiveBackupPayload}from'./archive-engine.js?v=354000';
@@ -2839,24 +2839,24 @@ function liveMatchPlacement(match){
   const courts=portalCourtRows();
   for(const court of courts){
     const courtName=String(court.name||court.id||'코트');
-    if(String(court.playing||'')===id)return{label:`${courtName} · 시합중`,kind:'playing'};
-    if(String(court.wait1||'')===id)return{label:`${courtName} · 대기1`,kind:'wait1'};
+    if(String(court.playing||'')===id)return{label:`${courtName} · 시합중`,kind:'playing',courtId:String(court.id||''),courtName,position:0};
+    if(String(court.wait1||'')===id)return{label:`${courtName} · 대기1`,kind:'wait1',courtId:String(court.id||''),courtName,position:1};
     const q=Array.isArray(court.queue)?court.queue:[];
     const qi=q.findIndex(x=>String(x)===id);
-    if(qi>=0)return{label:`${courtName} · 대기${qi+2}`,kind:'waiting'};
+    if(qi>=0)return{label:`${courtName} · 대기${qi+2}`,kind:'waiting',courtId:String(court.id||''),courtName,position:qi+2};
     const mq=Array.isArray(court.manualQueue)?court.manualQueue:[];
     const mi=mq.findIndex(x=>String(x)===id);
-    if(mi>=0)return{label:`${courtName} · 관리자 대기${mi+2}`,kind:'waiting'};
+    if(mi>=0)return{label:`${courtName} · 관리자 대기${mi+2}`,kind:'waiting',courtId:String(court.id||''),courtName,position:mi+2,manual:true};
   }
   for(const [venueId,queue] of Object.entries(state.venueQueues||{})){
     const idx=(Array.isArray(queue)?queue:[]).findIndex(x=>String(x)===id);
     if(idx>=0){
       const venue=(state.settings?.venues||[]).find(v=>String(v.id)===String(venueId));
-      return{label:`${venue?.name||venueId} · 공용대기 ${idx+1}번`,kind:'shared'};
+      return{label:`${venue?.name||venueId} · 공용대기 ${idx+1}번`,kind:'shared',venueId:String(venueId),position:idx+1};
     }
   }
   const shared=(state.sharedQueue||[]).findIndex(x=>String(x)===id);
-  if(shared>=0)return{label:`공용대기 ${shared+1}번`,kind:'shared'};
+  if(shared>=0)return{label:`공용대기 ${shared+1}번`,kind:'shared',position:shared+1};
   if(match.status==='completed')return{label:'경기 완료',kind:'completed'};
   if(match.status==='playing')return{label:`${match.court||'코트 확인중'} · 시합중`,kind:'playing'};
   if(match.status==='court_wait1')return{label:`${match.court||'코트 확인중'} · 대기1`,kind:'wait1'};
@@ -2885,6 +2885,10 @@ function decorateBracketLivePlacements(){
       badge.className='bracket-court-label bracket-live-placement';
       badge.textContent=placement.label;
       badge.dataset.placementKind=placement.kind;
+      badge.dataset.matchId=String(match.id||'');
+      badge.dataset.courtId=String(placement.courtId||'');
+      badge.dataset.venueId=String(placement.venueId||'');
+      badge.title=['playing','wait1','waiting','shared'].includes(placement.kind)?'눌러서 코트 현황의 실제 위치로 이동':'';
       card.dataset.matchId=String(match.id||'');
     });
   });
@@ -3179,6 +3183,7 @@ async function startPublicRegistrationSync({force=false}={}){
     publicRegistrationUnsubscribe=rt.api.onSnapshot(q,snap=>{
       publicRegistrationRows=snap.docs.map(doc=>({id:doc.id,...doc.data()}));publicRegistrationReady=true;
       renderRegistrationSummaryEverywhere();
+      try{window.__updateTodayTournamentDashboard?.();}catch(_e){}
       if(document.body?.dataset.currentView==='entry')renderApplicationPortal();
       if(document.body?.dataset.currentView==='home')renderHomeFast();
       try{renderVisibleDivisionBar?.();}catch(_e){}
@@ -5083,6 +5088,7 @@ function portalViewAllowed(name){
 function renderHomeFast(){
   ensurePortalState();
   renderRegistrationSummaryEverywhere();
+  try{window.__updateTodayTournamentDashboard?.();}catch(_e){}
   void startPublicRegistrationSync();
   renderHomeTournamentCards();
   renderStage331OperationDashboard();
@@ -10046,6 +10052,196 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
 })();
 
 
+
+/* 230MATCH 5.2.4 · bracket ↔ court canonical placement consistency */
+(()=>{
+  const $=id=>document.getElementById(id);
+  const mainMatches=()=>{try{return portalMainMatches();}catch(_e){return Object.values(state.draw?.rounds||{}).flat();}};
+  const expectedStatus=p=>p.kind==='playing'?'playing':p.kind==='wait1'?'court_wait1':p.kind==='shared'?'venue_shared_queue':p.kind==='waiting'&&p.courtId?'court_manual_queue':null;
+  function audit(){
+    const rows=mainMatches().filter(m=>m&&!m.bye&&m.status!=='completed');
+    let ok=0,waiting=0,mismatch=0;
+    const details=[];
+    for(const match of rows){
+      const p=liveMatchPlacement(match);
+      const canonical=['playing','wait1','waiting','shared'].includes(p.kind);
+      if(!canonical){waiting++;continue;}
+      const expected=expectedStatus(p);
+      const statusOk=!expected||String(match.status||'')===expected||
+        (p.kind==='shared'&&['venue_shared_queue','shared_queue'].includes(String(match.status||'')))||
+        (p.kind==='waiting'&&['court_manual_queue','ready','waiting'].includes(String(match.status||'')));
+      const courtOk=!p.courtName||!match.court||String(match.court)===String(p.courtName)||String(match.court)===String(p.courtId||'');
+      if(statusOk&&courtOk)ok++;else{mismatch++;details.push({match,p,statusOk,courtOk});}
+    }
+    const set=(id,v)=>{const el=$(id);if(el)el.textContent=String(v);};
+    set('bracketCourtSyncOk',`일치 ${ok}`);
+    set('bracketCourtSyncWaiting',`미배정 ${waiting}`);
+    set('bracketCourtSyncMismatch',`불일치 ${mismatch}`);
+    const bad=$('bracketCourtSyncMismatch');if(bad)bad.className=`sync-chip ${mismatch?'bad':'ok'}`;
+    const op=$('operationBracketSyncState');
+    if(op){
+      op.className=`operation-bracket-sync-state ${mismatch?'warn':'ok'}`;
+      op.textContent=mismatch?`⚠ 대진표 위치정보 ${mismatch}경기 보정 필요 · 실제 코트 위치를 기준으로 화면은 표시 중입니다.`:`✓ 본선 대진표와 실제 코트 위치가 일치합니다.`;
+    }
+    return{ok,waiting,mismatch,details};
+  }
+  function repair(){
+    if(!canOperate())return notice('관리자/운영자만 위치정보를 맞출 수 있습니다.','error');
+    const report=audit();
+    if(!report.mismatch)return notice('현재 본선 대진표와 코트 위치가 이미 일치합니다.','success');
+    let changed=0;
+    for(const {match,p} of report.details){
+      const status=expectedStatus(p);
+      if(status&&String(match.status||'')!==status){match.status=status;changed++;}
+      if(p.courtName&&String(match.court||'')!==String(p.courtName)){match.court=p.courtName;changed++;}
+      if(p.kind==='shared'&&match.court){match.court='';changed++;}
+    }
+    try{safePersistState('본선 대진표-코트 위치정보 동기화');}catch(_e){try{commit('본선 대진표-코트 위치정보 동기화');}catch(__e){}}
+    decorateBracketLivePlacements();
+    audit();
+    renderPortalViewFast(document.body?.dataset.currentView||'operation');
+    notice(`실제 코트 배정을 기준으로 본선 위치정보를 맞췄습니다. (${changed}개 항목)`,'success');
+  }
+  function courtCardById(courtId){
+    const grid=$('operationUnifiedCourtGrid');
+    return [...(grid?.querySelectorAll('.prelim-court-card')||[])].find(card=>{
+      const transfer=card.querySelector('[data-unified-transfer]')?.dataset.unifiedTransfer;
+      const status=card.querySelector('[data-prelim-court-status]')?.dataset.prelimCourtStatus;
+      const sms=card.querySelector('[data-court-id]')?.dataset.courtId;
+      return [transfer,status,sms].some(v=>String(v||'')===String(courtId||''));
+    });
+  }
+  function highlightMatchLocation(matchId,courtId,kind){
+    navigatePortalView('operation',{focus:false});
+    setTimeout(()=>{
+      if(kind==='shared'){
+        const q=$('operationSharedQueue')||document.querySelector('.operation-shared-queue-section');
+        q?.scrollIntoView({behavior:'smooth',block:'center'});
+        q?.classList.add('court-sync-highlight');setTimeout(()=>q?.classList.remove('court-sync-highlight'),2400);
+        return;
+      }
+      const card=courtCardById(courtId);
+      if(!card)return;
+      const slot=kind==='playing'?card.querySelector('.prelim-court-slot.playing'):kind==='wait1'?card.querySelector('.prelim-court-slot.wait1'):card;
+      (slot||card).scrollIntoView({behavior:'smooth',block:'center'});
+      (slot||card).classList.add('court-sync-highlight');
+      setTimeout(()=>(slot||card).classList.remove('court-sync-highlight'),2400);
+    },180);
+  }
+  document.addEventListener('click',e=>{
+    const badge=e.target.closest?.('.bracket-live-placement');
+    if(badge&&['playing','wait1','waiting','shared'].includes(String(badge.dataset.placementKind||''))){
+      e.preventDefault();
+      highlightMatchLocation(String(badge.dataset.matchId||''),String(badge.dataset.courtId||''),String(badge.dataset.placementKind||''));
+      return;
+    }
+    if(e.target.closest?.('#bracketCourtSyncRepairBtn')){repair();return;}
+  });
+  const oldDecorate=window.decorateBracketLivePlacements||null;
+  const tick=()=>{
+    if(document.body?.dataset.currentView==='bracket'){
+      try{decorateBracketLivePlacements();}catch(_e){}
+    }
+    audit();
+  };
+  setInterval(tick,2500);
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(tick,350),{once:true});else setTimeout(tick,350);
+  console.info('[230MATCH] 71.1.5 ready · compact today tournament admin dashboard');
+})();
+
+
+
+/* 230MATCH 5.2.5 · compact admin "today tournament" dashboard */
+(()=>{
+  const safe=v=>Array.isArray(v)?v:[];
+  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=String(v);};
+  const done=list=>safe(list).filter(x=>x&&(['completed','done','finished'].includes(String(x.status||'').toLowerCase())||x.winner||x.winnerId)).length;
+  function sharedQueueCount(){
+    try{
+      ensureVenueQueues(state);
+      const venue=Object.values(state.operation?.venueQueues||{}).reduce((n,q)=>n+(Array.isArray(q)?q.length:0),0);
+      const shared=Array.isArray(state.operation?.sharedQueue)?state.operation.sharedQueue.length:0;
+      return venue+shared;
+    }catch(_e){
+      return (state.sharedQueue?.length||0)+Object.values(state.venueQueues||{}).reduce((n,q)=>n+(q?.length||0),0);
+    }
+  }
+  function playingCourtCount(){
+    try{
+      const rows=typeof portalCourtRows==='function'?portalCourtRows():safe(state.courts);
+      return rows.filter(c=>c?.playing).length;
+    }catch(_e){return 0;}
+  }
+  function currentCancelRequests(){
+    try{
+      const rows=typeof simpleRegistrationRows==='function'?simpleRegistrationRows():safe(state.portal?.applications);
+      return rows.filter(a=>a?.cancelRequestStatus==='requested').length;
+    }catch(_e){return 0;}
+  }
+  function updateTodayDashboard(){
+    const root=document.getElementById('stage7115TodayDashboard');
+    if(!root)return;
+    const summary=typeof registrationPublicSummary==='function'
+      ? registrationPublicSummary()
+      : {active:safe(state.teams).length,capacity:Number(state.tournament?.capacity||96),unpaid:0,reserve:0};
+    const prelim=safe(state.prelim?.matches);
+    const main=typeof portalMainMatches==='function'?safe(portalMainMatches()):safe(state.draw?.matches);
+    set('todayEntryCount',`${summary.active}/${summary.capacity}`);
+    set('todayUnpaidCount',summary.unpaid||0);
+    set('todayReserveCount',summary.reserve||0);
+    set('todayCancelCount',currentCancelRequests());
+    set('todayPrelimCount',`${done(prelim)}/${prelim.length}`);
+    set('todayPlayingCount',playingCourtCount());
+    set('todaySharedCount',sharedQueueCount());
+    set('todayMainCount',`${done(main)}/${main.length}`);
+    const status=document.getElementById('stage7115TodayStatus');
+    if(status){
+      const live=playingCourtCount()>0;
+      status.textContent=live?'경기 진행 중 · 숫자를 누르면 바로 이동':'접수·대회 준비 · 숫자를 누르면 바로 이동';
+    }
+  }
+  function openEntryFilter(filter){
+    try{entryAdminQuickFilter=filter||'all';}catch(_e){}
+    navigatePortalView('entry',{pushHistory:true});
+    setTimeout(()=>{
+      try{renderApplicationPortal();}catch(_e){}
+      const target=document.getElementById('entryAdminQuickSummary')||document.querySelector('.entry-admin-quick-summary');
+      target?.scrollIntoView({behavior:'smooth',block:'start'});
+    },100);
+  }
+  document.addEventListener('click',e=>{
+    const entry=e.target.closest?.('[data-today-entry-filter]');
+    if(entry){
+      e.preventDefault();
+      openEntryFilter(String(entry.dataset.todayEntryFilter||'all'));
+      return;
+    }
+    const go=e.target.closest?.('[data-today-go]');
+    if(go){
+      e.preventDefault();
+      const target=String(go.dataset.todayGo||'home');
+      navigatePortalView(target,{pushHistory:true});
+      const kind=String(go.dataset.todayCourtKind||'');
+      if(target==='operation'&&kind){
+        setTimeout(()=>{
+          const btn=document.querySelector(`[data-court-summary-go="${kind}"]`);
+          btn?.click();
+        },180);
+      }
+    }
+  },true);
+
+  const update=()=>{try{updateTodayDashboard();}catch(error){console.warn('[230MATCH] 오늘 대회 대시보드 갱신 실패',error);}};
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(update,350),{once:true});
+  else setTimeout(update,350);
+  document.addEventListener('click',()=>setTimeout(update,120),true);
+  window.addEventListener('pageshow',update);
+  setInterval(()=>{if(document.body?.dataset.currentView==='home')update();},5000);
+  window.__updateTodayTournamentDashboard=updateTodayDashboard;
+  console.info('[230MATCH] 71.1.5 ready · compact today tournament admin dashboard');
+})();
+
+
 /* 230MATCH 4.1.4 · update-safe prelim record preservation */
 (()=>{document.documentElement.dataset.build='6104';console.info('[230MATCH] 61.0.4 ready · update-safe local cache and richer-state recovery');})();
 
@@ -10200,4 +10396,4 @@ console.info('[230MATCH] 63.0.0 ready · chunked cloud workspace + bounded retry
 
 console.info('[230MATCH] 64.0.0 architecture · lazy cloud registry, worker serialization, visible-view commit rendering');
 
-console.info('[230MATCH] 71.1.3 ready · court mobile dashboard + elapsed/result alerts');
+console.info('[230MATCH] 71.1.5 ready · compact today tournament admin dashboard');
