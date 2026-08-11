@@ -1,8 +1,8 @@
 import{getAuthConfig,saveAuthConfig,startAuth,signInGoogle,signOutSocial,beginExternalLogin,getExistingLoginEndpoints,signInEmail,registerEmail,sendPasswordReset,linkEmailPassword,authProviderIds,getAuthRuntime}from'./auth-engine.js?v=3565';
-import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7105';
+import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7106';
 import{notificationSupport,getStoredVapidKey,saveStoredVapidKey,enableMyPush,disableMyPush,queuePush,listPushJobs,listPushTokens}from'./notification-engine.js?v=332012';
 
-import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7105';
+import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7106';
 import{prepareTeams,generateDraw,allMatches,findMatch,generateLinkedDrawSlots,syncLinkedDrawQualifiers}from'./bracket-engine-v5000.js?v=5000';
 import{ensureDrawMeta,canModifyDraw,createDrawWithMethod,lockDraw,unlockDrawForDevelopment,clearDrawHistory}from'./draw-method-engine.js?v=332012';
 import{buildCourts,assignInitial,queueReadyMatches,refillCourt}from'./court-engine.js?v=332012';
@@ -15,7 +15,7 @@ import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactD
 import{render,teamText}from'./ui.js?v=3504';
 import{ensureAuditState,runStateAudit,runPrelimSimulation,runFullSimulation,applyAuditResult}from'./audit-engine.js?v=332012';
 import{earlyMainStats,markResolvedMainMatchesReady,canAssignEarlyMain,ensureEarlyMainSettings,autoAssignResolvedMain}from'./early-main-engine.js?v=332012';
-import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7105';
+import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7106';
 import{ensureMainDrawLifecycle,beginMainDraw,completeMainDraw,failMainDraw,resetMainDraw,hasAuthorizedMainDraw,mainDrawStatus,clearMainPlacement,repairMainDrawAuthorization}from'./main-draw-lifecycle-engine.js?v=3501';
 import{shouldUseLinkedDraw,linkedDrawNeedsRepair,rebuildLinkedDraw,hasStartedMainMatches}from'./linked-draw-guard-engine.js?v=332012';
 import{ensureVenueSettings,ensureVenueQueues,venuePreset,buildVenueCourts,prelimVenues,mainVenues}from'./venue-engine.js?v=332012';
@@ -26,7 +26,7 @@ import{ensureCourtStatuses,pauseCourt,resumeCourt}from'./court-status-engine.js?
 import{ensureCourtManualQueues,assignToCourtManualQueue,moveCourtMatchFlexible,returnManualQueueItemToVenue,reorderCourtManualQueue}from'./court-manual-queue-engine.js?v=332012';
 import{reorderPrelimQueue as reorderPrelimQueueItem,movePrelimQueuedMatch,returnPrelimWait1ToQueue}from'./prelim-queue-control-engine.js?v=332012';
 import{ensurePrelimCourtStatuses,pausePrelimCourt,resumePrelimCourt}from'./prelim-court-status-engine.js?v=332012';
-import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7105';
+import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7106';
 import{verifyAndRepairMainFlow}from'./main-flow-integrity-engine.js?v=332012';
 import{finalizeTournamentCompletion}from'./tournament-completion-engine.js?v=332012';
 import{ensureTournamentIdentity,validateTournamentForArchive,createTournamentArchive,archiveListItem,archiveBackupPayload}from'./archive-engine.js?v=354000';
@@ -3112,6 +3112,8 @@ function publicRegistrationPayload(item){
     tournamentId:String(item?.tournamentId||registrationContext().tournamentId||''),
     divisionId:String(item?.divisionId||registrationContext().divisionId||''),
     divisionName:String(item?.tournamentDivision||item?.divisionName||registrationContext().divisionName||''),
+    teamName:String(item?.teamName||''),
+    affiliation:String(item?.affiliation||''),
     status:String(item?.status||'approved'),
     paid:Boolean(item?.paid),
     paymentStatus:String(item?.paymentStatus||(item?.paid?'paid':'unpaid')),
@@ -3139,7 +3141,12 @@ function publicRegistrationRowsForCurrentDivision(){
   return publicRegistrationRows.filter(publicRegistrationBelongsToCurrentDivision);
 }
 function registrationPublicSummary(){
-  const rows=publicRegistrationReady?publicRegistrationRowsForCurrentDivision():(registrationCloudReady?registrationRowsForCurrentDivision():(state.portal?.applications||[]));
+  const publicRows=publicRegistrationReady?publicRegistrationRowsForCurrentDivision():[];
+  const cloudRows=registrationCloudReady?registrationRowsForCurrentDivision():[];
+  const localRows=Array.isArray(state.portal?.applications)?state.portal.applications:[];
+  // 초기 진입 시 공개 미러가 아직 0건이어도 이미 로드된 참가신청을 0/64로 덮지 않습니다.
+  const candidates=[publicRows,cloudRows,localRows].filter(rows=>Array.isArray(rows));
+  const rows=candidates.sort((a,b)=>b.length-a.length)[0]||[];
   return {
     rows,
     active:rows.filter(a=>a.status==='approved').length,
@@ -3173,12 +3180,24 @@ async function startPublicRegistrationSync({force=false}={}){
       publicRegistrationRows=snap.docs.map(doc=>({id:doc.id,...doc.data()}));publicRegistrationReady=true;
       renderRegistrationSummaryEverywhere();
       if(document.body?.dataset.currentView==='entry')renderApplicationPortal();
+      if(document.body?.dataset.currentView==='home')renderHomeFast();
       try{renderVisibleDivisionBar?.();}catch(_e){}
     },error=>{publicRegistrationReady=false;console.warn('[230MATCH] 공개 참가현황 연결 실패',error);});
   }catch(error){publicRegistrationReady=false;console.warn('[230MATCH] 공개 참가현황 시작 실패',error);}
 }
 async function backfillPublicRegistrationMirrors(){
-  if(!currentAuthUser||!registrationCloudReady)return;
+  if(!currentAuthUser)return;
+  const ctx=registrationContext();
+  if(canOperate()){
+    const seeded=registrationCloudReady?registrationCloudRows:(state.portal?.applications||[]);
+    for(const row of seeded){
+      if(String(row?.tournamentId||ctx.tournamentId)!==String(ctx.tournamentId))continue;
+      try{await savePublicRegistrationMirror({...row,tournamentId:row.tournamentId||ctx.tournamentId,divisionId:row.divisionId||ctx.divisionId,tournamentDivision:row.tournamentDivision||ctx.divisionName});}
+      catch(error){console.warn('[230MATCH] 공개 참가현황 초기 동기화 실패',row?.id,error);}
+    }
+    return;
+  }
+  if(!registrationCloudReady)return;
   const rows=canOperate()?registrationCloudRows:registrationCloudRows.filter(r=>String(r.ownerUid||'')===String(currentAuthUser.uid||''));
   for(const row of rows){try{await savePublicRegistrationMirror(row);}catch(error){console.warn('[230MATCH] 공개 참가현황 복구 실패',row?.id,error);}}
 }
@@ -3615,7 +3634,9 @@ function suggestReservePromotion(){
 function renderApplicationPortal(){
   ensurePortalState();void startPublicRegistrationSync();renderEntryTournamentSelect();renderEntryLoginGate();renderEntrySelfManager();
   const privateApplications=[...simpleRegistrationRows()];
-  const publicApplications=[...(publicRegistrationReady?publicRegistrationRowsForCurrentDivision():privateApplications)];
+  const publicMirror=[...(publicRegistrationReady?publicRegistrationRowsForCurrentDivision():[])];
+  const localApplications=[...(state.portal?.applications||[])];
+  const publicApplications=[publicMirror,privateApplications,localApplications].sort((a,b)=>b.length-a.length)[0]||[];
   const applications=canOperate()?privateApplications:publicApplications;
   const approved=applications.filter(a=>a.status==='approved').sort((a,b)=>String(a.createdAt).localeCompare(String(b.createdAt)));
   const reserve=applications.filter(a=>a.status==='reserve').sort((a,b)=>String(a.createdAt).localeCompare(String(b.createdAt)));
@@ -4764,7 +4785,9 @@ function portalViewAllowed(name){
   return true;
 }
 function renderHomeFast(){
-  ensurePortalState();void startPublicRegistrationSync();
+  ensurePortalState();
+  renderRegistrationSummaryEverywhere();
+  void startPublicRegistrationSync();
   renderHomeTournamentCards();
   renderStage331OperationDashboard();
   const prelim=state.prelim?.matches||[],main=portalMainMatches(),courts=portalCourtRows();
@@ -9183,6 +9206,7 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
   }
   function renderVisibleDivisionBar(){
     try{ensureMultiTournamentRuntime();ensureMultiDivisionRuntime();}catch(_e){}
+    try{renderRegistrationSummaryEverywhere();}catch(_e){}
     let bar=document.getElementById('divisionWorkspaceBar');
     if(!bar){
       bar=document.createElement('section');bar.id='divisionWorkspaceBar';bar.className='division-workspace-bar panel';
@@ -9743,4 +9767,4 @@ console.info('[230MATCH] 63.0.0 ready · chunked cloud workspace + bounded retry
 
 console.info('[230MATCH] 64.0.0 architecture · lazy cloud registry, worker serialization, visible-view commit rendering');
 
-console.info('[230MATCH] 71.0.5 ready · public registration summary + home capacity indicators');
+console.info('[230MATCH] 71.0.6 ready · registration summary immediate sync + public team labels');
