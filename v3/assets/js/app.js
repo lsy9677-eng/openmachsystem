@@ -1,8 +1,8 @@
 import{getAuthConfig,saveAuthConfig,startAuth,signInGoogle,signOutSocial,beginExternalLogin,getExistingLoginEndpoints,signInEmail,registerEmail,sendPasswordReset,linkEmailPassword,authProviderIds,getAuthRuntime}from'./auth-engine.js?v=3565';
-import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7112';
+import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7113';
 import{notificationSupport,getStoredVapidKey,saveStoredVapidKey,enableMyPush,disableMyPush,queuePush,listPushJobs,listPushTokens}from'./notification-engine.js?v=332012';
 
-import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7112';
+import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7113';
 import{prepareTeams,generateDraw,allMatches,findMatch,generateLinkedDrawSlots,syncLinkedDrawQualifiers}from'./bracket-engine-v5000.js?v=5000';
 import{ensureDrawMeta,canModifyDraw,createDrawWithMethod,lockDraw,unlockDrawForDevelopment,clearDrawHistory}from'./draw-method-engine.js?v=332012';
 import{buildCourts,assignInitial,queueReadyMatches,refillCourt}from'./court-engine.js?v=332012';
@@ -15,7 +15,7 @@ import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactD
 import{render,teamText}from'./ui.js?v=3504';
 import{ensureAuditState,runStateAudit,runPrelimSimulation,runFullSimulation,applyAuditResult}from'./audit-engine.js?v=332012';
 import{earlyMainStats,markResolvedMainMatchesReady,canAssignEarlyMain,ensureEarlyMainSettings,autoAssignResolvedMain}from'./early-main-engine.js?v=332012';
-import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7112';
+import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7113';
 import{ensureMainDrawLifecycle,beginMainDraw,completeMainDraw,failMainDraw,resetMainDraw,hasAuthorizedMainDraw,mainDrawStatus,clearMainPlacement,repairMainDrawAuthorization}from'./main-draw-lifecycle-engine.js?v=3501';
 import{shouldUseLinkedDraw,linkedDrawNeedsRepair,rebuildLinkedDraw,hasStartedMainMatches}from'./linked-draw-guard-engine.js?v=332012';
 import{ensureVenueSettings,ensureVenueQueues,venuePreset,buildVenueCourts,prelimVenues,mainVenues}from'./venue-engine.js?v=332012';
@@ -26,7 +26,7 @@ import{ensureCourtStatuses,pauseCourt,resumeCourt}from'./court-status-engine.js?
 import{ensureCourtManualQueues,assignToCourtManualQueue,moveCourtMatchFlexible,returnManualQueueItemToVenue,reorderCourtManualQueue}from'./court-manual-queue-engine.js?v=332012';
 import{reorderPrelimQueue as reorderPrelimQueueItem,movePrelimQueuedMatch,returnPrelimWait1ToQueue}from'./prelim-queue-control-engine.js?v=332012';
 import{ensurePrelimCourtStatuses,pausePrelimCourt,resumePrelimCourt}from'./prelim-court-status-engine.js?v=332012';
-import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7112';
+import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7113';
 import{verifyAndRepairMainFlow}from'./main-flow-integrity-engine.js?v=332012';
 import{finalizeTournamentCompletion}from'./tournament-completion-engine.js?v=332012';
 import{ensureTournamentIdentity,validateTournamentForArchive,createTournamentArchive,archiveListItem,archiveBackupPayload}from'./archive-engine.js?v=354000';
@@ -9922,6 +9922,130 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
   console.info('[230MATCH] 61.0.3 ready · direct court SMS via Aligo or phone app');
 })();
 
+
+/* 230MATCH 5.2.3 · court operation mobile compact + live runtime dashboard */
+(()=>{
+  const BUILD='7113';
+  const $id=id=>document.getElementById(id);
+  const expectedMinutes=()=>{
+    const direct=Number(state.prelim?.settings?.matchMinutes||state.tournament?.matchMinutes||0);
+    if(direct>0)return direct;
+    try{
+      const active=(state.multiDivision?.divisions||[]).find(d=>String(d.id)===String(state.multiDivision?.activeDivisionId||''));
+      const v=Number(active?.settings?.matchMinutes||active?.matchMinutes||0);if(v>0)return v;
+    }catch(_e){}
+    return 30;
+  };
+  const getCourt=courtId=>[...(state.prelim?.courts||[]),...(state.courts||[])].find(c=>String(c.id)===String(courtId));
+  const getMatch=id=>{
+    if(!id)return null;
+    try{const u=findUnifiedMatch(state,id);if(u?.match)return u.match;}catch(_e){}
+    try{return findPrelimMatch(state,id)||findMatch(state.draw,id)||null;}catch(_e){return null;}
+  };
+  const elapsed=m=>m?.startedAt?Math.max(0,Math.floor((Date.now()-new Date(m.startedAt).getTime())/60000)):0;
+  const courtIdFromCard=card=>{
+    const direct=card.querySelector('[data-unified-transfer]')?.dataset.unifiedTransfer;
+    if(direct)return direct;
+    const status=card.querySelector('[data-prelim-court-status]')?.dataset.prelimCourtStatus;
+    if(status)return status;
+    const sms=card.querySelector('[data-court-id]')?.dataset.courtId;
+    return sms||'';
+  };
+  const setText=(id,v)=>{const el=$id(id);if(el)el.textContent=String(v);};
+  function mainSharedCount(){
+    try{
+      ensureVenueQueues(state);
+      return Object.values(state.operation?.venueQueues||{}).reduce((sum,q)=>sum+(Array.isArray(q)?q.length:0),0);
+    }catch(_e){}
+    try{return Array.isArray(state.operation?.sharedQueue)?state.operation.sharedQueue.length:0;}catch(_e){return 0;}
+  }
+  function collect(){
+    const grid=$id('operationUnifiedCourtGrid');
+    const cards=[...(grid?.querySelectorAll('.prelim-court-card')||[])];
+    const seen=new Set(),items=[];
+    for(const card of cards){
+      const courtId=courtIdFromCard(card);if(!courtId||seen.has(courtId))continue;
+      seen.add(courtId);
+      const court=getCourt(courtId);if(!court)continue;
+      const match=getMatch(court.playing);
+      const mins=elapsed(match);
+      items.push({card,court,match,mins});
+    }
+    return items;
+  }
+  function enhance(){
+    const items=collect(),limit=expectedMinutes();
+    let playing=0,empty=0,wait1=0,delayed=0,result=0;
+    for(const item of items){
+      const {card,court,match,mins}=item;
+      const isPlaying=Boolean(court.playing&&match);
+      const isDelayed=isPlaying&&mins>=limit;
+      const needsResult=isPlaying&&mins>=limit+10;
+      playing+=isPlaying?1:0;empty+=isPlaying?0:1;wait1+=court.wait1?1:0;delayed+=isDelayed?1:0;result+=needsResult?1:0;
+
+      card.classList.toggle('court-live-empty',!isPlaying);
+      card.classList.toggle('court-live-delayed',isDelayed&&!needsResult);
+      card.classList.toggle('court-live-result-check',needsResult);
+
+      const head=card.querySelector('.prelim-court-card-head, header, h3, h4')?.parentElement || card.firstElementChild || card;
+      let badge=card.querySelector('.court-live-runtime');
+      let emptyBadge=card.querySelector('.court-live-empty-badge');
+      if(isPlaying){
+        emptyBadge?.remove();
+        if(!badge){badge=document.createElement('span');badge.className='court-live-runtime';head.appendChild(badge);}
+        badge.className=`court-live-runtime${needsResult?' danger':isDelayed?' warn':''}`;
+        badge.textContent=needsResult?`결과확인 · ${mins}분`:isDelayed?`지연 · ${mins}분`:`진행 ${mins}분`;
+        badge.title=`경기시간 기준 ${limit}분`;
+      }else{
+        badge?.remove();
+        if(!emptyBadge){emptyBadge=document.createElement('span');emptyBadge.className='court-live-empty-badge';head.appendChild(emptyBadge);}
+        emptyBadge.textContent='빈 코트';
+      }
+    }
+    setText('operationCourtTotalLive',items.length);
+    setText('operationCourtPlayingLive',playing);
+    setText('operationCourtEmptyLive',empty);
+    setText('operationCourtWait1Live',wait1);
+    setText('operationCourtSharedLive',mainSharedCount());
+    setText('operationCourtDelayedLive',delayed);
+    setText('operationCourtResultLive',result);
+  }
+  function focusKind(kind){
+    if(kind==='shared'){
+      document.getElementById('operationSharedQueue')?.scrollIntoView({behavior:'smooth',block:'start'});return;
+    }
+    const items=collect();
+    const limit=expectedMinutes();
+    const target=items.find(({court,match,mins})=>{
+      if(kind==='empty')return !court.playing;
+      if(kind==='playing')return Boolean(court.playing);
+      if(kind==='wait1')return Boolean(court.wait1);
+      if(kind==='delayed')return Boolean(match&&mins>=limit);
+      if(kind==='result')return Boolean(match&&mins>=limit+10);
+      return true;
+    });
+    (target?.card||document.getElementById('operationUnifiedCourtGrid'))?.scrollIntoView({behavior:'smooth',block:'center'});
+  }
+  document.addEventListener('click',e=>{
+    const b=e.target.closest?.('[data-court-summary-go]');if(!b)return;
+    focusKind(String(b.dataset.courtSummaryGo||'all'));
+  });
+  let queued=false;
+  const queue=()=>{if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;enhance();});};
+  const start=()=>{
+    enhance();
+    const grid=$id('operationUnifiedCourtGrid'),shared=$id('operationSharedQueue');
+    const observer=new MutationObserver(queue);
+    if(grid)observer.observe(grid,{childList:true,subtree:true,attributes:true});
+    if(shared)observer.observe(shared,{childList:true,subtree:true});
+    setInterval(()=>{if(document.body?.dataset.currentView==='operation')enhance();},30000);
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
+  document.documentElement.dataset.build=BUILD;
+  console.info('[230MATCH] 71.1.3 ready · compact mobile court dashboard + live elapsed/result alerts');
+})();
+
+
 /* 230MATCH 4.1.4 · update-safe prelim record preservation */
 (()=>{document.documentElement.dataset.build='6104';console.info('[230MATCH] 61.0.4 ready · update-safe local cache and richer-state recovery');})();
 
@@ -10076,4 +10200,4 @@ console.info('[230MATCH] 63.0.0 ready · chunked cloud workspace + bounded retry
 
 console.info('[230MATCH] 64.0.0 architecture · lazy cloud registry, worker serialization, visible-view commit rendering');
 
-console.info('[230MATCH] 71.1.2 ready · entry dashboard + admin SMS notices + payment SMS');
+console.info('[230MATCH] 71.1.3 ready · court mobile dashboard + elapsed/result alerts');

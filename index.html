@@ -1104,6 +1104,15 @@
           </div>
           <span id="operationUnifiedCourtCount" class="badge badge-safe">0면</span>
         </div>
+        <div id="operationCourtLiveSummary" class="operation-court-live-summary" aria-label="코트 실시간 요약">
+          <button type="button" data-court-summary-go="all"><strong id="operationCourtTotalLive">0</strong><span>사용코트</span></button>
+          <button type="button" data-court-summary-go="playing"><strong id="operationCourtPlayingLive">0</strong><span>시합중</span></button>
+          <button type="button" class="empty" data-court-summary-go="empty"><strong id="operationCourtEmptyLive">0</strong><span>빈코트</span></button>
+          <button type="button" data-court-summary-go="wait1"><strong id="operationCourtWait1Live">0</strong><span>대기1</span></button>
+          <button type="button" data-court-summary-go="shared"><strong id="operationCourtSharedLive">0</strong><span>공용대기</span></button>
+          <button type="button" class="warn" data-court-summary-go="delayed"><strong id="operationCourtDelayedLive">0</strong><span>지연</span></button>
+          <button type="button" class="danger" data-court-summary-go="result"><strong id="operationCourtResultLive">0</strong><span>결과확인</span></button>
+        </div>
         <div id="operationUnifiedCourtGrid" class="prelim-court-operation-grid empty-state">
           <p>예선 코트배정을 실행하면 통합 코트 카드가 표시됩니다.</p>
         </div>
@@ -1958,7 +1967,7 @@
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=7112"></script>
+  <script type="module" src="./assets/js/app.js?v=7113"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
@@ -2489,6 +2498,98 @@ input[type="radio"]{
   .entry-admin-quick-summary{grid-template-columns:repeat(3,minmax(0,1fr))}
   .entry-admin-notify-settings{align-items:stretch}
   .entry-admin-notify-settings label{min-width:0;flex:1 1 100%}
+}
+</style>
+
+
+<style id="stage7113CourtOperationCompactStyles">
+.operation-court-live-summary{
+  display:grid;
+  grid-template-columns:repeat(7,minmax(0,1fr));
+  gap:7px;
+  margin:0 0 10px;
+}
+.operation-court-live-summary button{
+  display:grid;
+  gap:2px;
+  min-height:52px;
+  padding:8px 6px;
+  border:1px solid #d4e0ed;
+  border-radius:12px;
+  background:#f8fbff;
+  color:#294966;
+  text-align:center;
+  cursor:pointer;
+}
+.operation-court-live-summary button strong{font-size:18px;line-height:1.05}
+.operation-court-live-summary button span{font-size:9px;font-weight:900;color:#6a7d91}
+.operation-court-live-summary button.warn{background:#fff8e6;border-color:#efd596}
+.operation-court-live-summary button.danger{background:#fff0f0;border-color:#efb2b2}
+.operation-court-live-summary button.empty{background:#effbf4;border-color:#b9e3c8}
+.prelim-court-card.court-live-empty{outline:2px solid rgba(45,161,88,.28);background:#f7fff9!important}
+.prelim-court-card.court-live-delayed{outline:2px solid rgba(226,158,25,.35)}
+.prelim-court-card.court-live-result-check{outline:2px solid rgba(207,64,64,.45)}
+.court-live-runtime{
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  margin-left:6px;
+  padding:3px 7px;
+  border-radius:999px;
+  background:#edf4fd;
+  color:#365978;
+  font-size:10px;
+  font-weight:900;
+  white-space:nowrap;
+}
+.court-live-runtime.warn{background:#fff2c9;color:#8a6100}
+.court-live-runtime.danger{background:#ffe0e0;color:#a32020}
+.court-live-empty-badge{
+  display:inline-flex;
+  align-items:center;
+  margin-left:6px;
+  padding:3px 7px;
+  border-radius:999px;
+  background:#def6e6;
+  color:#176839;
+  font-size:10px;
+  font-weight:900;
+}
+.prelim-court-slot.wait1::before{
+  content:"대기1";
+  display:inline-flex;
+  margin:0 6px 4px 0;
+  padding:2px 6px;
+  border-radius:999px;
+  background:#fff3d4;
+  color:#8b6200;
+  font-size:9px;
+  font-weight:900;
+}
+@media(max-width:760px){
+  .operation-court-live-summary{grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+  .operation-court-live-summary button{min-height:45px;padding:6px 3px;border-radius:10px}
+  .operation-court-live-summary button strong{font-size:16px}
+  .operation-court-live-summary button span{font-size:8px}
+  #operationUnifiedCourtGrid.prelim-court-operation-grid{gap:7px!important}
+  #operationUnifiedCourtGrid .prelim-court-card{
+    padding:8px!important;
+    border-radius:12px!important;
+  }
+  #operationUnifiedCourtGrid .prelim-court-card h3,
+  #operationUnifiedCourtGrid .prelim-court-card h4{margin:0!important;font-size:13px!important}
+  #operationUnifiedCourtGrid .prelim-court-slot{padding:7px!important;margin-top:5px!important}
+  #operationUnifiedCourtGrid .prelim-court-slot strong{font-size:12px!important}
+  #operationUnifiedCourtGrid .prelim-court-slot small,
+  #operationUnifiedCourtGrid .prelim-extra-item small{font-size:9px!important}
+  #operationUnifiedCourtGrid .unified-card-actions{gap:4px!important;margin-top:5px!important}
+  #operationUnifiedCourtGrid .unified-card-actions .btn,
+  #operationUnifiedCourtGrid .court-direct-sms-btn{
+    min-height:28px!important;
+    padding:4px 7px!important;
+    font-size:9px!important;
+  }
+  #operationUnifiedCourtGrid .prelim-extra-item{padding:6px!important;font-size:10px!important}
 }
 </style>
 
