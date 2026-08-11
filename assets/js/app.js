@@ -1,8 +1,8 @@
 import{getAuthConfig,saveAuthConfig,startAuth,signInGoogle,signOutSocial,beginExternalLogin,getExistingLoginEndpoints,signInEmail,registerEmail,sendPasswordReset,linkEmailPassword,authProviderIds,getAuthRuntime}from'./auth-engine.js?v=3565';
-import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7116';
+import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7119';
 import{notificationSupport,getStoredVapidKey,saveStoredVapidKey,enableMyPush,disableMyPush,queuePush,listPushJobs,listPushTokens}from'./notification-engine.js?v=332012';
 
-import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7116';
+import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7119';
 import{prepareTeams,generateDraw,allMatches,findMatch,generateLinkedDrawSlots,syncLinkedDrawQualifiers}from'./bracket-engine-v5000.js?v=5000';
 import{ensureDrawMeta,canModifyDraw,createDrawWithMethod,lockDraw,unlockDrawForDevelopment,clearDrawHistory}from'./draw-method-engine.js?v=332012';
 import{buildCourts,assignInitial,queueReadyMatches,refillCourt}from'./court-engine.js?v=332012';
@@ -15,7 +15,7 @@ import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactD
 import{render,teamText}from'./ui.js?v=3504';
 import{ensureAuditState,runStateAudit,runPrelimSimulation,runFullSimulation,applyAuditResult}from'./audit-engine.js?v=332012';
 import{earlyMainStats,markResolvedMainMatchesReady,canAssignEarlyMain,ensureEarlyMainSettings,autoAssignResolvedMain}from'./early-main-engine.js?v=332012';
-import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7116';
+import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7119';
 import{ensureMainDrawLifecycle,beginMainDraw,completeMainDraw,failMainDraw,resetMainDraw,hasAuthorizedMainDraw,mainDrawStatus,clearMainPlacement,repairMainDrawAuthorization}from'./main-draw-lifecycle-engine.js?v=3501';
 import{shouldUseLinkedDraw,linkedDrawNeedsRepair,rebuildLinkedDraw,hasStartedMainMatches}from'./linked-draw-guard-engine.js?v=332012';
 import{ensureVenueSettings,ensureVenueQueues,venuePreset,buildVenueCourts,prelimVenues,mainVenues}from'./venue-engine.js?v=332012';
@@ -26,7 +26,7 @@ import{ensureCourtStatuses,pauseCourt,resumeCourt}from'./court-status-engine.js?
 import{ensureCourtManualQueues,assignToCourtManualQueue,moveCourtMatchFlexible,returnManualQueueItemToVenue,reorderCourtManualQueue}from'./court-manual-queue-engine.js?v=332012';
 import{reorderPrelimQueue as reorderPrelimQueueItem,movePrelimQueuedMatch,returnPrelimWait1ToQueue}from'./prelim-queue-control-engine.js?v=332012';
 import{ensurePrelimCourtStatuses,pausePrelimCourt,resumePrelimCourt}from'./prelim-court-status-engine.js?v=332012';
-import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7116';
+import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7119';
 import{verifyAndRepairMainFlow}from'./main-flow-integrity-engine.js?v=332012';
 import{finalizeTournamentCompletion}from'./tournament-completion-engine.js?v=332012';
 import{ensureTournamentIdentity,validateTournamentForArchive,createTournamentArchive,archiveListItem,archiveBackupPayload}from'./archive-engine.js?v=354000';
@@ -163,6 +163,82 @@ function buildRehearsalSandbox(teamCount=32){
   sim.prelim.linkedDraw={active:true,drawSize:sim.settings.drawSize,slots,createdAt:new Date().toISOString(),lastSyncedAt:null};
   return sim;
 }
+
+function currentRehearsalContext(){
+  const teamCount=(state.teams||[]).length;
+  const groups=(state.prelim?.groups||[]);
+  const courts=(state.prelim?.courts||[]);
+  const q=Math.max(1,Number(state.prelim?.settings?.qualifiersPerGroup||2));
+  const qualifierCount=groups.length*q;
+  const configured=Number(state.settings?.drawSize||0);
+  const drawSize=configured>=qualifierCount&&[32,64,128].includes(configured)
+    ?configured
+    :(qualifierCount<=32?32:qualifierCount<=64?64:128);
+  return {teamCount,groups,courts,q,qualifierCount,drawSize};
+}
+function renderCurrentRehearsalContext(){
+  const c=currentRehearsalContext();
+  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=String(v);};
+  set('rehearsalCurrentTeams',`${c.teamCount}팀`);
+  set('rehearsalCurrentGroups',`${c.groups.length}조`);
+  set('rehearsalCurrentCourts',`${c.courts.length}코트`);
+  set('rehearsalCurrentDraw',`${c.drawSize}강 · ${c.qualifierCount}명단`);
+}
+function buildCurrentTournamentRehearsalSandbox(){
+  const c=currentRehearsalContext();
+  if(c.teamCount<2)throw new Error('현재 참가팀이 없습니다. 참가접수를 먼저 완료하세요.');
+  if(!c.groups.length)throw new Error('예선 조편성이 없습니다. 예선 조추첨을 먼저 확정하세요.');
+  if(!state.prelim?.matches?.length)throw new Error('예선 경기표가 없습니다. 예선 조추첨을 먼저 완료하세요.');
+  if(!c.courts.length)throw new Error('예선 코트배정이 없습니다. 코트배정을 먼저 확정하세요.');
+
+  // 실제 상태를 깊은 복제. 이후 모든 리허설 처리는 이 복제본에서만 수행한다.
+  const sim=structuredClone(state);
+  sim.messaging={settings:{autoMessageEnabled:false},queue:[],metrics:{updatedCount:0}};
+
+  // 현재 확정된 예선 조·코트는 그대로 둔 채, 본선만 새로 리허설할 준비를 한다.
+  const slots=generateLinkedDrawSlots(sim.prelim.groups,c.q,c.drawSize);
+  const ranked=createRankAwareDrawFromSlots(slots,c.drawSize);
+  sim.draw=ranked.draw;
+  sim.settings={...(sim.settings||{}),drawSize:c.drawSize};
+  sim.prelim.linkedDraw={
+    active:true,drawSize:c.drawSize,slots:ranked.arranged,
+    createdAt:new Date().toISOString(),lastSyncedAt:null,rehearsalOnly:true
+  };
+  return {sim,context:c};
+}
+function currentTournamentRehearsalPayload(){
+  const started=performance.now();
+  let sandbox,context,prelim,full,audit,error='';
+  try{
+    const built=buildCurrentTournamentRehearsalSandbox();
+    sandbox=built.sim;context=built.context;
+
+    // 실제 조/코트 복제본에서만 가상의 예선 결과를 만들어 순위를 확정한다.
+    prelim=runPrelimSimulation(sandbox);
+
+    // runFullSimulation 역시 내부에서 state를 다시 clone하므로 실제 state는 두 번 격리된다.
+    full=runFullSimulation(sandbox);
+    audit=runStateAudit(sandbox);
+  }catch(e){
+    error=e?.message||String(e);
+    storeDiagnosticEntry({level:'error',message:`현재 대회 본선 리허설 실패: ${error}`});
+  }
+  return {
+    format:'230MATCH_CURRENT_TOURNAMENT_REHEARSAL',
+    build:BUILD_LABEL,generatedAt:new Date().toISOString(),
+    teamCount:context?.teamCount||(state.teams||[]).length,
+    elapsedMs:Math.round(performance.now()-started),
+    isolated:true,realStateChanged:false,currentTournament:true,
+    tournamentName:state.tournament?.name||'',
+    divisionName:state.tournament?.division||registrationContext()?.divisionName||'',
+    fixedPrelimGroups:context?.groups?.length||0,
+    fixedPrelimCourts:context?.courts?.length||0,
+    qualifiersPerGroup:context?.q||0,
+    drawSize:context?.drawSize||0,
+    prelim,full,audit,error
+  };
+}
+
 function rehearsalPayload(teamCount=32){
   const started=performance.now();
   let sandbox,prelim,full,audit,error='';
@@ -183,7 +259,13 @@ function renderRehearsal(report=rehearsalReport){
   const ok=!report.error&&report.prelim?.success&&report.full?.success;
   overall.className=`rehearsal-overall ${ok?'safe':'danger'}`;
   overall.innerHTML=`<strong>${ok?'리허설 완주 · PASS':'리허설 확인 필요 · HOLD'}</strong><span>${report.teamCount}팀 · ${report.elapsedMs}ms · 실제 데이터 변경 없음</span>`;
-  const rows=[
+  const rows=report.currentTournament?[
+    ['실제 대회 복제',report.isolated&&report.realStateChanged===false,`${report.tournamentName||'현재 대회'} · ${report.divisionName||''}`],
+    ['예선 조·코트 고정',Boolean(report.fixedPrelimGroups&&report.fixedPrelimCourts),`${report.fixedPrelimGroups}조 · ${report.fixedPrelimCourts}코트 · 실제 배정 변경 없음`],
+    ['복제 예선 결과 완주',report.prelim?.success,report.prelim?`${report.prelim.completedMatches}/${report.prelim.totalMatches}경기 · ${report.prelim.rankedGroups}/${report.prelim.totalGroups}조 순위`:'미실행'],
+    ['본선 추첨·결승 완주',report.full?.success,report.full?`${report.drawSize}강 · 실경기 ${report.full.completedMatches} · BYE ${report.full.autoByeCount} · 우승 ${report.full.winner?.name||'-'}`:'미실행'],
+    ['데이터 정합성 검사',report.audit?.overall!=='fail',report.audit?`통과 ${report.audit.counts.pass} · 경고 ${report.audit.counts.warn} · 실패 ${report.audit.counts.fail}`:'미실행']
+  ]:[
     ['격리 샌드박스',report.isolated&&report.realStateChanged===false,'실제 운영 상태와 분리'],
     ['테스트팀·예선 생성',Boolean(report.prelim),report.prelim?`${report.prelim.totalGroups}조 · ${report.prelim.totalMatches}경기`:'생성 실패'],
     ['예선 자동 완주',report.prelim?.success,report.prelim?`${report.prelim.completedMatches}/${report.prelim.totalMatches}경기 · ${report.prelim.rankedGroups}/${report.prelim.totalGroups}조 순위`:'미실행'],
@@ -191,7 +273,7 @@ function renderRehearsal(report=rehearsalReport){
     ['데이터 정합성 검사',report.audit?.overall!=='fail',report.audit?`통과 ${report.audit.counts.pass} · 경고 ${report.audit.counts.warn} · 실패 ${report.audit.counts.fail}`:'미실행']
   ];
   if(stages)stages.innerHTML=rows.map(([label,pass,detail])=>`<article class="rehearsal-stage ${pass?'ok':'fail'}"><span>${pass?'✓':'×'}</span><div><strong>${escapeHtml(label)}</strong><p>${escapeHtml(detail)}</p></div></article>`).join('');
-  if(summary)summary.innerHTML=`<div><span>실행 시각</span><strong>${new Date(report.generatedAt).toLocaleString('ko-KR')}</strong></div><div><span>테스트 규모</span><strong>${report.teamCount}팀 / ${report.full?.totalMatches||0} 본선경기</strong></div><div><span>우승팀</span><strong>${escapeHtml(report.full?.winner?.name||'-')}</strong></div><div><span>실행 시간</span><strong>${report.elapsedMs}ms</strong></div>${report.error?`<div class="wide"><span>오류</span><strong>${escapeHtml(report.error)}</strong></div>`:''}`;
+  if(summary)summary.innerHTML=`<div><span>실행 시각</span><strong>${new Date(report.generatedAt).toLocaleString('ko-KR')}</strong></div><div><span>${report.currentTournament?'현재 대회':'테스트 규모'}</span><strong>${report.currentTournament?`${escapeHtml(report.tournamentName||'-')} · ${escapeHtml(report.divisionName||'-')}`:`${report.teamCount}팀 / ${report.full?.totalMatches||0} 본선경기`}</strong></div><div><span>본선 규모</span><strong>${report.drawSize?`${report.drawSize}강`:report.full?.totalMatches?`${report.full.totalMatches}경기`:'-'}</strong></div><div><span>가상 우승팀</span><strong>${escapeHtml(report.full?.winner?.name||'-')}</strong></div><div><span>실행 시간</span><strong>${report.elapsedMs}ms</strong></div>${report.error?`<div class="wide"><span>오류</span><strong>${escapeHtml(report.error)}</strong></div>`:''}`;
   if(details){
     const auditItems=Array.isArray(report.audit?.results)?report.audit.results:[];
     const structural=[
@@ -203,16 +285,33 @@ function renderRehearsal(report=rehearsalReport){
   }
 }
 function bindRehearsalCenter(){
-  document.getElementById('runRehearsalBtn')?.addEventListener('click',()=>{
-    if(!requireAdmin('리허설 실행'))return;
-    const count=Number(document.getElementById('rehearsalTeamCount')?.value||32);
-    if(!confirm(`${count}팀 격리 리허설을 실행할까요? 실제 대회 데이터는 변경되지 않습니다.`))return;
-    rehearsalReport=rehearsalPayload(count);try{sessionStorage.setItem(REHEARSAL_KEY,JSON.stringify(rehearsalReport));}catch(_e){}
-    renderRehearsal();notice(rehearsalReport.full?.success?'리허설을 완주했습니다.':'리허설에서 확인할 항목이 발견됐습니다.',rehearsalReport.full?.success?'success':'error');
+  const runCurrent=()=>{
+    if(!requireAdmin('현재 대회 본선 리허설'))return;
+    const c=currentRehearsalContext();
+    if(!c.groups.length||!c.courts.length){
+      notice('예선 조추첨과 코트배정을 먼저 확정한 뒤 리허설을 실행하세요.','error');return;
+    }
+    if(!confirm(`현재 ${c.teamCount}팀 · ${c.groups.length}조 · ${c.courts.length}코트 배정을 그대로 복제해 본선 ${c.drawSize}강부터 결승까지 리허설할까요?\n\n실제 대회 데이터는 변경되지 않습니다.`))return;
+    rehearsalReport=currentTournamentRehearsalPayload();
+    try{sessionStorage.setItem(REHEARSAL_KEY,JSON.stringify(rehearsalReport));}catch(_e){}
+    renderRehearsal();
+    notice(rehearsalReport.full?.success?'현재 대회 기준 본선 리허설을 완주했습니다.':'리허설에서 확인할 항목이 발견됐습니다.',rehearsalReport.full?.success?'success':'error');
+  };
+  document.getElementById('runCurrentTournamentRehearsalBtn')?.addEventListener('click',runCurrent);
+  document.getElementById('runCurrentTournamentRehearsalBtn2')?.addEventListener('click',runCurrent);
+  document.getElementById('runSyntheticRehearsalBtn')?.addEventListener('click',()=>{
+    if(!requireAdmin('가상 데이터 전체 리허설'))return;
+    const count=Math.max(32,Math.min(128,(state.teams||[]).length||64));
+    if(!confirm(`${count}팀 가상 데이터 전체 리허설을 실행할까요? 실제 대회 데이터는 변경되지 않습니다.`))return;
+    rehearsalReport=rehearsalPayload(count);
+    try{sessionStorage.setItem(REHEARSAL_KEY,JSON.stringify(rehearsalReport));}catch(_e){}
+    renderRehearsal();
+    notice(rehearsalReport.full?.success?'가상 데이터 전체 리허설을 완주했습니다.':'리허설에서 확인할 항목이 발견됐습니다.',rehearsalReport.full?.success?'success':'error');
   });
-  document.getElementById('downloadRehearsalBtn')?.addEventListener('click',()=>{if(!rehearsalReport)return notice('먼저 리허설을 실행하세요.','error');downloadJson(`230match-rehearsal-${rehearsalReport.teamCount}teams-${Date.now()}.json`,rehearsalReport);});
+  document.getElementById('downloadRehearsalBtn')?.addEventListener('click',()=>{if(!rehearsalReport)return notice('먼저 리허설을 실행하세요.','error');downloadJson(`230match-rehearsal-${rehearsalReport.currentTournament?'current':'synthetic'}-${Date.now()}.json`,rehearsalReport);});
   document.getElementById('clearRehearsalBtn')?.addEventListener('click',()=>{rehearsalReport=null;sessionStorage.removeItem(REHEARSAL_KEY);renderRehearsal();});
   document.getElementById('lockRehearsalBtn')?.addEventListener('click',lockRehearsalMode);
+  renderCurrentRehearsalContext();
   renderRehearsal();
 }
 
@@ -5225,7 +5324,7 @@ function navigatePortalView(name,{pushHistory=false,replaceHistory=false,focus=t
   if(target==='messages')setTimeout(()=>renderSmsAcceptance(lastSmsAcceptance),30);
   if(target==='print')setTimeout(renderPrintPreview,30);
   if(target==='acceptance')setTimeout(renderAcceptance,30);
-  if(target==='rehearsal')setTimeout(()=>renderRehearsal(),30);
+  if(target==='rehearsal')setTimeout(()=>{renderCurrentRehearsalContext();renderRehearsal();},30);
   if(target==='performance')setTimeout(renderPerformanceCenter,30);
   if(target==='diagnostics')setTimeout(renderDiagnostics,30);
   if(target==='manual')setTimeout(renderOperationsManual,30);
@@ -10202,7 +10301,7 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
   };
   setInterval(tick,2500);
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(tick,350),{once:true});else setTimeout(tick,350);
-  console.info('[230MATCH] 71.1.6 ready · exact-slot rank-aware main draw fixed');
+  console.info('[230MATCH] 71.1.9 ready · current tournament fixed-prelim main-draw rehearsal');
 })();
 
 
@@ -10294,7 +10393,115 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
   window.addEventListener('pageshow',update);
   setInterval(()=>{if(document.body?.dataset.currentView==='home')update();},5000);
   window.__updateTodayTournamentDashboard=updateTodayDashboard;
-  console.info('[230MATCH] 71.1.6 ready · exact-slot rank-aware main draw fixed');
+  console.info('[230MATCH] 71.1.9 ready · current tournament fixed-prelim main-draw rehearsal');
+})();
+
+
+
+/* 230MATCH 5.2.7 · non-destructive operation healthcheck */
+(()=>{
+  const safe=v=>Array.isArray(v)?v:[];
+  const setCard=(id,status,text)=>{
+    const el=document.getElementById(id);if(!el)return;
+    el.className=`stage7117-healthcheck-card ${status}`;
+    const span=el.querySelector('span');if(span)span.textContent=text;
+  };
+  const rows=()=>{try{return simpleRegistrationRows();}catch(_e){return safe(state.portal?.applications);}};
+  const activeDivision=()=>registrationContext();
+  const prelimMatches=()=>safe(state.prelim?.matches);
+  const mainMatches=()=>{try{return portalMainMatches();}catch(_e){return Object.values(state.draw?.rounds||{}).flat();}};
+  const groupRank=x=>{
+    try{return mainDrawGroupRank(x);}catch(_e){}
+    const m=String(x?.name||x?.label||'').match(/(\d+)조\s*([12])위/);return m?Number(m[2]):0;
+  };
+  const groupNo=x=>{
+    try{return mainDrawGroupNo(x);}catch(_e){}
+    const m=String(x?.name||x?.label||'').match(/(\d+)조/);return m?Number(m[1]):0;
+  };
+  function inspectEntry(){
+    const list=rows(),ids=new Set(),dup=[];
+    for(const r of list){const id=String(r?.id||'');if(id&&ids.has(id))dup.push(id);ids.add(id);}
+    return dup.length?{status:'bad',text:`중복 ${dup.length}건`,detail:`참가접수 중복 ID: ${dup.join(', ')}`}:{status:'ok',text:`${list.length}건 정상`,detail:`참가접수 ${list.length}건 · 중복 ID 없음`};
+  }
+  function inspectDivision(){
+    const ctx=activeDivision(),list=rows();
+    const mixed=list.filter(r=>r?.divisionId&&ctx.divisionId&&String(r.divisionId)!==String(ctx.divisionId)&&String(r.tournamentDivision||'')===String(ctx.divisionName||''));
+    return mixed.length?{status:'warn',text:`연결확인 ${mixed.length}건`,detail:`현재 부서명은 같지만 divisionId가 다른 신청 ${mixed.length}건`}:{status:'ok',text:'분리 정상',detail:`현재 대회/부서: ${ctx.tournamentId||'-'} / ${ctx.divisionName||ctx.divisionId||'-'}`};
+  }
+  function inspectPrelim(){
+    const ms=prelimMatches();const bad=ms.filter(m=>m&&!m.id);
+    return bad.length?{status:'bad',text:`ID 누락 ${bad.length}`,detail:`예선 경기 ID 누락 ${bad.length}건`}:{status:'ok',text:`${ms.length}경기`,detail:`예선 경기 ${ms.length}건 · ID 구조 정상`};
+  }
+  function inspectMainRank(){
+    const first=mainMatches().filter(m=>Number(m?.roundSize)===64||String(m?.id||'').startsWith('r64_'));
+    let bad=0,sameGroup=0,checked=0;
+    for(const m of first){
+      const a=m?.teamA,b=m?.teamB;if(!a||!b||a.placeholder||b.placeholder)continue;
+      const ra=groupRank(a),rb=groupRank(b),ga=groupNo(a),gb=groupNo(b);if(!(ra&&rb))continue;
+      checked++;
+      if(!((ra===1&&rb===2)||(ra===2&&rb===1)))bad++;
+      if(ga&&gb&&ga===gb)sameGroup++;
+    }
+    if(bad||sameGroup)return{status:'bad',text:`오류 ${bad+sameGroup}`,detail:`64강 검증 ${checked}경기 · 1위-2위 위반 ${bad} · 같은조 재대결 ${sameGroup}`};
+    return{status:'ok',text:checked?`${checked}경기 정상`:'대진 전',detail:checked?`64강 ${checked}경기 모두 1위-2위, 같은조 재대결 없음`:'본선 64강 확정 전이라 검증 대상 없음'};
+  }
+  function inspectCourt(){
+    const courts=safe(state.prelim?.courts).length?safe(state.prelim?.courts):safe(state.courts);
+    const seen=new Map(),dups=[];
+    for(const c of courts){
+      const all=[c?.playing,c?.wait1,...safe(c?.queue),...safe(c?.manualQueue)].filter(Boolean);
+      for(const id of all){const key=String(id);if(seen.has(key)&&seen.get(key)!==String(c.id))dups.push(key);else seen.set(key,String(c.id));}
+    }
+    return dups.length?{status:'bad',text:`중복배정 ${dups.length}`,detail:`다른 코트에 동시에 존재하는 경기: ${[...new Set(dups)].join(', ')}`}:{status:'ok',text:`${courts.length}코트 정상`,detail:`코트 ${courts.length}개 · 경기 중복 코트배정 없음`};
+  }
+  function inspectBracketCourt(){
+    try{
+      const report=typeof audit==='function'?audit():null;
+      if(report)return report.mismatch?{status:'warn',text:`불일치 ${report.mismatch}`,detail:`대진표↔코트 위치 불일치 ${report.mismatch}경기`}:{status:'ok',text:'위치 일치',detail:`대진표↔코트 위치 일치 ${report.ok}경기 · 미배정 ${report.waiting}경기`};
+    }catch(_e){}
+    // audit() is closure-local in prior stage; reproduce a lightweight canonical check.
+    let mismatch=0,ok=0;
+    for(const m of mainMatches().filter(x=>x&&!x.bye&&x.status!=='completed')){
+      let p;try{p=liveMatchPlacement(m);}catch(_e){continue;}
+      if(!['playing','wait1','waiting','shared'].includes(p?.kind))continue;
+      const courtOk=!p.courtName||!m.court||String(m.court)===String(p.courtName)||String(m.court)===String(p.courtId||'');
+      if(courtOk)ok++;else mismatch++;
+    }
+    return mismatch?{status:'warn',text:`불일치 ${mismatch}`,detail:`실제 코트 위치와 경기 court 값 불일치 ${mismatch}경기`}:{status:'ok',text:'위치 일치',detail:`본선 위치 일치 ${ok}경기`};
+  }
+  function runHealthcheck(){
+    const results=[
+      ['healthEntry',inspectEntry()],
+      ['healthDivision',inspectDivision()],
+      ['healthPrelim',inspectPrelim()],
+      ['healthMainRank',inspectMainRank()],
+      ['healthCourt',inspectCourt()],
+      ['healthBracketCourt',inspectBracketCourt()]
+    ];
+    let bad=0,warn=0;
+    results.forEach(([id,r])=>{setCard(id,r.status,r.text);if(r.status==='bad')bad++;if(r.status==='warn')warn++;});
+    const overall=document.getElementById('stage7117HealthOverall');
+    if(overall){
+      overall.className=`badge ${bad?'badge-danger':warn?'badge-warning':'badge-safe'}`;
+      overall.textContent=bad?`문제 ${bad}개`:warn?`확인 ${warn}개`:'전체 정상';
+    }
+    const detail=document.getElementById('stage7117HealthDetail');
+    if(detail)detail.innerHTML=results.map(([,r],i)=>`${i+1}. ${r.detail}`).join('<br>');
+    window.__stage7117LastHealth=results;
+    return{bad,warn,results};
+  }
+  document.addEventListener('click',e=>{
+    if(e.target.closest?.('#stage7117RunHealthcheck')){runHealthcheck();return;}
+    if(e.target.closest?.('#stage7117OpenHealthDetail')){
+      const d=document.getElementById('stage7117HealthDetail');if(!d)return;
+      if(!window.__stage7117LastHealth)runHealthcheck();
+      d.hidden=!d.hidden;return;
+    }
+  });
+  window.__run230MatchHealthcheck=runHealthcheck;
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(runHealthcheck,500),{once:true});else setTimeout(runHealthcheck,500);
+  setInterval(()=>{if(document.body?.dataset.currentView==='home'&&canOperate())runHealthcheck();},10000);
+  console.info('[230MATCH] 71.1.7 ready · non-destructive operation healthcheck');
 })();
 
 
@@ -10452,4 +10659,4 @@ console.info('[230MATCH] 63.0.0 ready · chunked cloud workspace + bounded retry
 
 console.info('[230MATCH] 64.0.0 architecture · lazy cloud registry, worker serialization, visible-view commit rendering');
 
-console.info('[230MATCH] 71.1.6 ready · exact-slot rank-aware main draw fixed');
+console.info('[230MATCH] 71.1.9 ready · current tournament fixed-prelim main-draw rehearsal');

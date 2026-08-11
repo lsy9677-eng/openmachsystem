@@ -235,6 +235,25 @@
             <button type="button" data-today-go="bracket"><strong id="todayMainCount">0/0</strong><span>본선</span></button>
           </div>
         </section>
+        <section id="stage7117OperationHealthcheck" class="stage7117-healthcheck" data-admin-only="true">
+          <div class="stage7117-healthcheck-head">
+            <strong>대회 운영 사전 점검</strong>
+            <span id="stage7117HealthOverall" class="badge badge-safe">점검 대기</span>
+          </div>
+          <div class="stage7117-healthcheck-grid">
+            <div id="healthEntry" class="stage7117-healthcheck-card"><b>참가접수</b><span>확인 전</span></div>
+            <div id="healthDivision" class="stage7117-healthcheck-card"><b>부서 분리</b><span>확인 전</span></div>
+            <div id="healthPrelim" class="stage7117-healthcheck-card"><b>예선</b><span>확인 전</span></div>
+            <div id="healthMainRank" class="stage7117-healthcheck-card"><b>본선 1위-2위</b><span>확인 전</span></div>
+            <div id="healthCourt" class="stage7117-healthcheck-card"><b>코트 대기열</b><span>확인 전</span></div>
+            <div id="healthBracketCourt" class="stage7117-healthcheck-card"><b>대진표↔코트</b><span>확인 전</span></div>
+          </div>
+          <div class="stage7117-healthcheck-actions">
+            <button id="stage7117RunHealthcheck" type="button" class="btn btn-light btn-small">지금 점검</button>
+            <button id="stage7117OpenHealthDetail" type="button" class="btn btn-light btn-small">상세 보기</button>
+          </div>
+          <div id="stage7117HealthDetail" class="stage7117-healthcheck-detail" hidden></div>
+        </section>
         <div class="stage3212-public-actions">
           <button type="button" data-portal-go="entry"><span>📝</span><b>참가 신청</b><small id="stage3212EntryCount">접수 현황 확인</small></button>
           <button type="button" data-portal-go="my-match"><span>🔎</span><b>내 경기</b><small>내 경기·대기 순서</small></button>
@@ -1632,11 +1651,29 @@
 
   <section id="view-rehearsal" class="view portal-view rehearsal-center-view">
     <section class="panel rehearsal-head">
-      <div class="section-head"><div><span class="legacy-home-chip">ISOLATED REHEARSAL</span><h1>관리자 실전 운영 리허설</h1><p>실제 운영 데이터와 완전히 분리된 복제 상태에서 참가팀 생성부터 예선·본선 우승까지 자동 점검합니다.</p></div><div class="button-row"><button id="lockRehearsalBtn" type="button" class="btn btn-light">리허설 잠그기</button><button id="runRehearsalBtn" type="button" class="btn btn-primary">리허설 실행</button></div></div>
+      <div class="section-head"><div><span class="legacy-home-chip">ISOLATED REHEARSAL</span><h1>관리자 실전 운영 리허설</h1><p>실제 대회 데이터를 수정하지 않고, 현재 확정된 예선 조편성·코트배정을 복제해 본선 추첨부터 결승까지 미리 완주합니다.</p></div><div class="button-row"><button id="lockRehearsalBtn" type="button" class="btn btn-light">리허설 잠그기</button><button id="runCurrentTournamentRehearsalBtn" type="button" class="btn btn-primary">현재 대회 본선 리허설</button></div></div>
       <div id="rehearsalOverall" class="rehearsal-overall">리허설 대기 중</div>
     </section>
     <section class="rehearsal-layout">
-      <article class="panel"><div class="section-head compact-head"><div><h2>리허설 설정</h2><p>실제 대회 규모에 가까운 팀 수를 선택하세요.</p></div></div><label><span>테스트 참가팀 수</span><select id="rehearsalTeamCount"><option value="12">12팀 · 기능 확인</option><option value="32">32팀 · 32강</option><option value="48">48팀 · 64강</option><option value="64">64팀 · 64강</option><option value="68">68팀 · 128강·BYE 점검</option><option value="96">96팀 · 128강</option><option value="128">128팀 · 128강</option></select></label><div class="rehearsal-safety"><strong>안전 격리</strong><p>현재 참가자·대진·결과·코트 배정은 저장하거나 변경하지 않습니다. 리허설 결과만 현재 브라우저 세션에 보관합니다.</p></div><div class="button-row"><button id="downloadRehearsalBtn" type="button" class="btn btn-light">결과 JSON 저장</button><button id="clearRehearsalBtn" type="button" class="btn btn-danger-outline">리허설 기록 지우기</button></div></article>
+      <article class="panel"><div class="section-head compact-head"><div><h2>현재 대회 기준 리허설</h2><p>참가접수 완료 후 예선 조편성·예선 코트배정을 확정한 상태에서 실행하세요.</p></div></div>
+      <div class="rehearsal-current-box">
+        <h3>실제 예선 구조를 그대로 복제</h3>
+        <p>예선 조와 코트는 바꾸지 않습니다. 복제본에서만 예선 결과를 가상으로 완주해 조 1·2위를 만든 뒤, 실제 본선 규칙으로 추첨하고 결승까지 자동 진행합니다.</p>
+        <div class="rehearsal-current-grid">
+          <div><span>참가팀</span><strong id="rehearsalCurrentTeams">-</strong></div>
+          <div><span>예선 조</span><strong id="rehearsalCurrentGroups">-</strong></div>
+          <div><span>예선 코트</span><strong id="rehearsalCurrentCourts">-</strong></div>
+          <div><span>본선 예정</span><strong id="rehearsalCurrentDraw">-</strong></div>
+        </div>
+        <div class="rehearsal-current-safety">✓ 실제 참가자·예선 조편성·코트배정·결과·본선 데이터에는 저장하지 않습니다.</div>
+        <div class="rehearsal-current-actions">
+          <button id="runCurrentTournamentRehearsalBtn2" type="button" class="btn btn-primary">본선~결승 리허설 실행</button>
+          <button id="runSyntheticRehearsalBtn" type="button" class="btn btn-light">가상 데이터 전체 리허설</button>
+          <button id="downloadRehearsalBtn" type="button" class="btn btn-light">결과 JSON 저장</button>
+          <button id="clearRehearsalBtn" type="button" class="btn btn-danger-outline">리허설 기록 지우기</button>
+        </div>
+      </div>
+    </article>
       <article class="panel"><div class="section-head compact-head"><div><h2>단계별 결과</h2><p>팀 생성, 예선, 본선, 정합성 검사를 순서대로 확인합니다.</p></div></div><div id="rehearsalStages" class="rehearsal-stages"></div></article>
     </section>
     <section class="panel"><div class="section-head compact-head"><div><h2>리허설 요약</h2><p>완주 여부와 처리 시간을 확인합니다.</p></div></div><div id="rehearsalSummary" class="rehearsal-summary"><div class="portal-empty">팀 수를 선택하고 리허설을 실행하세요.</div></div></section><section class="panel"><div class="section-head compact-head"><div><h2>세부 점검 내용</h2><p>경고와 통과 항목을 항목별로 확인합니다.</p></div></div><div id="rehearsalDetails" class="rehearsal-details"><div class="portal-empty">리허설 실행 후 세부 점검 항목이 표시됩니다.</div></div></section>
@@ -1993,7 +2030,7 @@
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=7116"></script>
+  <script type="module" src="./assets/js/app.js?v=7119"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
@@ -2688,6 +2725,42 @@ input[type="radio"]{
   .stage7115-today-grid button strong{font-size:15px}
   .stage7115-today-grid button span{font-size:8px}
 }
+</style>
+
+
+<style id="stage7117OperationHealthcheckStyles">
+.stage7117-healthcheck{
+  margin:10px 0 12px;padding:11px;border:1px solid #d5e1ee;border-radius:14px;background:#fbfdff
+}
+.stage7117-healthcheck-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.stage7117-healthcheck-head strong{font-size:13px;color:#214768}
+.stage7117-healthcheck-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
+.stage7117-healthcheck-card{display:grid;gap:3px;min-height:54px;padding:8px;border:1px solid #dae4ee;border-radius:11px;background:#fff}
+.stage7117-healthcheck-card b{font-size:11px;color:#31516f}
+.stage7117-healthcheck-card span{font-size:10px;color:#6d7e91}
+.stage7117-healthcheck-card.ok{background:#f1fbf5;border-color:#bfe4cd}
+.stage7117-healthcheck-card.warn{background:#fff9ea;border-color:#efdca2}
+.stage7117-healthcheck-card.bad{background:#fff1f1;border-color:#edbbbb}
+.stage7117-healthcheck-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}
+.stage7117-healthcheck-detail{margin-top:8px;padding:9px;border-radius:10px;background:#f5f8fc;color:#526b84;font-size:11px;line-height:1.45}
+@media(max-width:850px){.stage7117-healthcheck-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:520px){.stage7117-healthcheck-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+</style>
+
+
+<style id="stage7119CurrentTournamentRehearsalStyles">
+.rehearsal-current-box{
+  margin-top:12px;padding:12px;border:1px solid #cfe0ef;border-radius:14px;background:#f8fbff
+}
+.rehearsal-current-box h3{margin:0 0 5px;color:#1f466a;font-size:15px}
+.rehearsal-current-box p{margin:0;color:#667d93;font-size:11px;line-height:1.45}
+.rehearsal-current-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin-top:9px}
+.rehearsal-current-grid>div{padding:8px;border:1px solid #d9e4ef;border-radius:10px;background:#fff}
+.rehearsal-current-grid span{display:block;font-size:9px;font-weight:900;color:#6c7f92}
+.rehearsal-current-grid strong{display:block;margin-top:2px;font-size:13px;color:#244968}
+.rehearsal-current-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}
+.rehearsal-current-safety{margin-top:8px;padding:8px 9px;border-radius:10px;background:#eaf8ef;color:#286c43;font-size:10px;font-weight:800}
+@media(max-width:650px){.rehearsal-current-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style>
 
 </body>
