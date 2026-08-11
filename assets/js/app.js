@@ -1,8 +1,8 @@
 import{getAuthConfig,saveAuthConfig,startAuth,signInGoogle,signOutSocial,beginExternalLogin,getExistingLoginEndpoints,signInEmail,registerEmail,sendPasswordReset,linkEmailPassword,authProviderIds,getAuthRuntime}from'./auth-engine.js?v=3565';
-import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7107';
+import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7108';
 import{notificationSupport,getStoredVapidKey,saveStoredVapidKey,enableMyPush,disableMyPush,queuePush,listPushJobs,listPushTokens}from'./notification-engine.js?v=332012';
 
-import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7107';
+import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7108';
 import{prepareTeams,generateDraw,allMatches,findMatch,generateLinkedDrawSlots,syncLinkedDrawQualifiers}from'./bracket-engine-v5000.js?v=5000';
 import{ensureDrawMeta,canModifyDraw,createDrawWithMethod,lockDraw,unlockDrawForDevelopment,clearDrawHistory}from'./draw-method-engine.js?v=332012';
 import{buildCourts,assignInitial,queueReadyMatches,refillCourt}from'./court-engine.js?v=332012';
@@ -15,7 +15,7 @@ import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactD
 import{render,teamText}from'./ui.js?v=3504';
 import{ensureAuditState,runStateAudit,runPrelimSimulation,runFullSimulation,applyAuditResult}from'./audit-engine.js?v=332012';
 import{earlyMainStats,markResolvedMainMatchesReady,canAssignEarlyMain,ensureEarlyMainSettings,autoAssignResolvedMain}from'./early-main-engine.js?v=332012';
-import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7107';
+import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7108';
 import{ensureMainDrawLifecycle,beginMainDraw,completeMainDraw,failMainDraw,resetMainDraw,hasAuthorizedMainDraw,mainDrawStatus,clearMainPlacement,repairMainDrawAuthorization}from'./main-draw-lifecycle-engine.js?v=3501';
 import{shouldUseLinkedDraw,linkedDrawNeedsRepair,rebuildLinkedDraw,hasStartedMainMatches}from'./linked-draw-guard-engine.js?v=332012';
 import{ensureVenueSettings,ensureVenueQueues,venuePreset,buildVenueCourts,prelimVenues,mainVenues}from'./venue-engine.js?v=332012';
@@ -26,7 +26,7 @@ import{ensureCourtStatuses,pauseCourt,resumeCourt}from'./court-status-engine.js?
 import{ensureCourtManualQueues,assignToCourtManualQueue,moveCourtMatchFlexible,returnManualQueueItemToVenue,reorderCourtManualQueue}from'./court-manual-queue-engine.js?v=332012';
 import{reorderPrelimQueue as reorderPrelimQueueItem,movePrelimQueuedMatch,returnPrelimWait1ToQueue}from'./prelim-queue-control-engine.js?v=332012';
 import{ensurePrelimCourtStatuses,pausePrelimCourt,resumePrelimCourt}from'./prelim-court-status-engine.js?v=332012';
-import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7107';
+import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7108';
 import{verifyAndRepairMainFlow}from'./main-flow-integrity-engine.js?v=332012';
 import{finalizeTournamentCompletion}from'./tournament-completion-engine.js?v=332012';
 import{ensureTournamentIdentity,validateTournamentForArchive,createTournamentArchive,archiveListItem,archiveBackupPayload}from'./archive-engine.js?v=354000';
@@ -3719,32 +3719,115 @@ async function processEntryApplication(id,action){
 function editEntryApplication(id){
   const item=(registrationCloudReady?registrationCloudRows:(state.portal?.applications||[])).find(a=>a.id===id);
   const mine=Boolean(currentAuthUser&&String(item?.ownerUid||'')===String(currentAuthUser.uid||''));
-  if(!item||!mine||!['approved','reserve'].includes(item.status)||item.cancelRequestStatus==='requested'){notice('본인의 참가 신청만 수정할 수 있습니다. 취소 승인 대기 중에는 수정할 수 없습니다.','error');return;}
-  entryEditingId=item.id;renderEntryTournamentSelect();renderEntryPaymentInfo();
-  const tournament=document.getElementById('entryApplicationTournament');if(tournament)tournament.value=item.tournamentId||'current';
+  if(!item||!mine||!['approved','reserve'].includes(item.status)||item.cancelRequestStatus==='requested'){
+    notice('본인의 참가 신청만 수정할 수 있습니다. 취소 승인 대기 중에는 수정할 수 없습니다.','error');return;
+  }
+  const d=document.getElementById('entrySelfEditDialog');
+  if(!d)return notice('수정창을 열 수 없습니다. 새로고침 후 다시 시도해 주세요.','error');
   const players=entryApplicationPlayers(item);
-  players.forEach((p,i)=>{const n=i+1;const name=document.getElementById(`entryPlayer${n}Name`);const club=document.getElementById(`entryPlayer${n}Club`);const phone=document.getElementById(`entryPlayer${n}Phone`);if(name)name.value=p.name||'';if(club)club.value=p.club||'';if(phone)phone.value=p.phone||'';});
-  const rep=Number(item.representativeIndex||0)===1?document.getElementById('entryRepresentative2'):document.getElementById('entryRepresentative1');if(rep)rep.checked=true;
-  const smsMode=item.smsTargetMode==='representative'?'representative':'both';
-  const smsChoice=document.querySelector(`input[name="entrySmsTargetMode"][value="${smsMode}"]`);if(smsChoice)smsChoice.checked=true;
-  const memo=document.getElementById('entryApplicationMemo');if(memo)memo.value=item.memo||'';
-  document.getElementById('entryApplicationSubmitBtn').textContent='신청 수정 저장';document.getElementById('entryApplicationEditCancelBtn').hidden=false;document.getElementById('entryPlayer1Name')?.focus();window.scrollTo({top:0,behavior:'smooth'});
+  const p1=players[0]||{},p2=players[1]||{};
+  document.getElementById('entrySelfEditId').value=item.id;
+  document.getElementById('entrySelfEditP1Name').value=p1.name||'';
+  document.getElementById('entrySelfEditP1Club').value=p1.club||'';
+  document.getElementById('entrySelfEditP1Phone').value=p1.phone||'';
+  document.getElementById('entrySelfEditP2Name').value=p2.name||'';
+  document.getElementById('entrySelfEditP2Club').value=p2.club||'';
+  document.getElementById('entrySelfEditP2Phone').value=p2.phone||'';
+  (Number(item.representativeIndex||0)===1?document.getElementById('entrySelfRep2'):document.getElementById('entrySelfRep1')).checked=true;
+  (item.smsTargetMode==='representative'?document.getElementById('entrySelfSmsRepresentative'):document.getElementById('entrySelfSmsBoth')).checked=true;
+  document.getElementById('entrySelfEditMemo').value=item.memo||'';
+  const fb=document.getElementById('entrySelfEditFeedback');if(fb){fb.hidden=true;fb.textContent='';}
+  if(!d.open)d.showModal();
+  setTimeout(()=>document.getElementById('entrySelfEditP1Name')?.focus(),40);
 }
+async function saveEntrySelfEdit(){
+  const id=String(document.getElementById('entrySelfEditId')?.value||'');
+  const item=(registrationCloudReady?registrationCloudRows:(state.portal?.applications||[])).find(a=>a.id===id);
+  const mine=Boolean(currentAuthUser&&String(item?.ownerUid||'')===String(currentAuthUser.uid||''));
+  const fb=document.getElementById('entrySelfEditFeedback');
+  const feedback=(msg,type='error')=>{if(fb){fb.hidden=false;fb.className=`notice ${type} entry-modal-feedback`;fb.textContent=msg;}};
+  if(!item||!mine)return feedback('본인의 참가 신청을 찾을 수 없습니다.');
+  if(item.cancelRequestStatus==='requested')return feedback('취소 승인 대기 중에는 신청 내용을 수정할 수 없습니다.');
+  const cleanPhone=v=>String(v||'').replace(/\D/g,'');
+  const players=[
+    {name:String(document.getElementById('entrySelfEditP1Name')?.value||'').trim(),club:String(document.getElementById('entrySelfEditP1Club')?.value||'').trim(),phone:cleanPhone(document.getElementById('entrySelfEditP1Phone')?.value)},
+    {name:String(document.getElementById('entrySelfEditP2Name')?.value||'').trim(),club:String(document.getElementById('entrySelfEditP2Club')?.value||'').trim(),phone:cleanPhone(document.getElementById('entrySelfEditP2Phone')?.value)}
+  ];
+  if(players.some(p=>!p.name||!p.club||p.phone.length<10))return feedback('두 선수의 이름·소속 클럽·휴대전화를 모두 정확히 입력하세요.');
+  const representativeIndex=Number(document.querySelector('input[name="entrySelfRepresentative"]:checked')?.value||0);
+  const representative=players[representativeIndex]||players[0];
+  const smsTargetMode=String(document.querySelector('input[name="entrySelfSmsMode"]:checked')?.value||'both');
+  item.players=players;
+  item.teamName=players.map(p=>p.name).join(' / ');
+  item.affiliation=players.map(p=>p.club).join(' / ');
+  item.phone=representative.phone;
+  item.representativeIndex=representativeIndex;
+  item.representativeName=representative.name;
+  item.smsTargetMode=smsTargetMode;
+  item.memo=String(document.getElementById('entrySelfEditMemo')?.value||'').trim();
+  item.updatedAt=new Date().toISOString();
+  const saveBtn=document.getElementById('entrySelfEditSaveBtn');
+  if(saveBtn){saveBtn.disabled=true;saveBtn.textContent='저장 중...';}
+  try{
+    await saveRegistrationCloud(item);
+    try{await simpleSyncTeam(item);safePersistState('본인 참가 신청 수정');}catch(_e){}
+    document.getElementById('entrySelfEditDialog')?.close();
+    renderApplicationPortal();lookupPublicApplication();renderParticipantManager?.();
+    notice('참가 신청 내용을 수정했습니다.','success');
+  }catch(error){
+    feedback(`수정 저장 실패: ${error?.message||error}`);
+  }finally{
+    if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='수정 저장';}
+  }
+}
+
 async function cancelEntryApplication(id){
   const item=(registrationCloudReady?registrationCloudRows:(state.portal?.applications||[])).find(a=>a.id===id);
   if(!item||!['approved','reserve'].includes(item.status))return;
   const mine=Boolean(currentAuthUser&&String(item.ownerUid||'')===String(currentAuthUser.uid||''));
   if(!mine)return notice('본인의 참가 신청만 취소 요청할 수 있습니다.','error');
   if(item.cancelRequestStatus==='requested')return notice('이미 취소 승인을 기다리고 있습니다.','info');
-  const bank=prompt('환불 은행을 입력하세요. 예: 농협');if(bank===null)return;
-  const account=prompt('환불 계좌번호를 입력하세요.');if(account===null)return;
-  const holder=prompt('예금주를 입력하세요.');if(holder===null)return;
-  const reason=prompt('참가 취소 사유를 입력하세요.','개인 사정');if(reason===null)return;
-  if(!bank.trim()||!account.replace(/\D/g,'')||!holder.trim())return notice('취소 신청에는 환불 은행·계좌번호·예금주가 모두 필요합니다.','error');
-  if(!confirm(`${item.teamName} 참가 취소를 신청할까요?\n관리자 승인 전까지 참가 상태는 유지됩니다.`))return;
-  item.cancelRequestStatus='requested';item.cancelReason=reason.trim();item.refundBank=bank.trim();item.refundAccount=account.trim();item.refundAccountHolder=holder.trim();item.cancelRequestedAt=new Date().toISOString();item.updatedAt=item.cancelRequestedAt;
-  try{await saveRegistrationCloud(item);lookupPublicApplication();renderApplicationPortal();notice('취소 신청이 접수되었습니다. 관리자 승인 후 취소됩니다.','success');}catch(error){notice(`취소 신청 저장 실패: ${error?.message||error}`,'error');}
+  const d=document.getElementById('entryCancelRequestDialog');
+  if(!d)return notice('취소 요청창을 열 수 없습니다. 새로고침 후 다시 시도해 주세요.','error');
+  document.getElementById('entryCancelRequestId').value=item.id;
+  document.getElementById('entryCancelBank').value=item.refundBank||'';
+  document.getElementById('entryCancelAccount').value=item.refundAccount||'';
+  document.getElementById('entryCancelHolder').value=item.refundAccountHolder||'';
+  document.getElementById('entryCancelReason').value=item.cancelReason||'';
+  const fb=document.getElementById('entryCancelRequestFeedback');if(fb){fb.hidden=true;fb.textContent='';}
+  if(!d.open)d.showModal();
+  setTimeout(()=>document.getElementById('entryCancelBank')?.focus(),40);
 }
+async function submitEntryCancelRequest(){
+  const id=String(document.getElementById('entryCancelRequestId')?.value||'');
+  const item=(registrationCloudReady?registrationCloudRows:(state.portal?.applications||[])).find(a=>a.id===id);
+  const mine=Boolean(currentAuthUser&&String(item?.ownerUid||'')===String(currentAuthUser.uid||''));
+  const fb=document.getElementById('entryCancelRequestFeedback');
+  const feedback=(msg,type='error')=>{if(fb){fb.hidden=false;fb.className=`notice ${type} entry-modal-feedback`;fb.textContent=msg;}};
+  if(!item||!mine)return feedback('본인의 참가 신청을 찾을 수 없습니다.');
+  const bank=String(document.getElementById('entryCancelBank')?.value||'').trim();
+  const account=String(document.getElementById('entryCancelAccount')?.value||'').trim();
+  const holder=String(document.getElementById('entryCancelHolder')?.value||'').trim();
+  const reason=String(document.getElementById('entryCancelReason')?.value||'').trim()||'개인 사정';
+  if(!bank)return feedback('환불 은행을 입력하세요.');
+  if(account.replace(/\D/g,'').length<6)return feedback('환불 계좌번호를 정확히 입력하세요.');
+  if(!holder)return feedback('예금주를 입력하세요.');
+  if(!confirm(`${item.teamName} 참가 취소를 요청할까요?\n관리자 승인 전까지 참가 상태는 유지됩니다.`))return;
+  item.cancelRequestStatus='requested';item.cancelReason=reason;item.refundBank=bank;item.refundAccount=account;item.refundAccountHolder=holder;item.cancelRequestedAt=new Date().toISOString();item.updatedAt=item.cancelRequestedAt;
+  const btn=document.getElementById('entryCancelRequestSubmitBtn');
+  if(btn){btn.disabled=true;btn.textContent='요청 중...';}
+  try{
+    await saveRegistrationCloud(item);
+    document.getElementById('entryCancelRequestDialog')?.close();
+    lookupPublicApplication();renderApplicationPortal();
+    notice('취소 요청이 접수되었습니다. 관리자 승인 후 취소됩니다.','success');
+  }catch(error){
+    feedback(`취소 요청 저장 실패: ${error?.message||error}`);
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='취소 요청 보내기';}
+  }
+}
+
 async function approveRegistrationCancellation(id){
   if(!requireAdmin('참가 취소 승인'))return;
   const item=simpleRegistrationRows().find(a=>a.id===id);if(!item||item.cancelRequestStatus!=='requested')return;
@@ -3768,8 +3851,10 @@ async function rejectRegistrationCancellation(id){
   try{await saveRegistrationCloud(item);renderApplicationPortal();lookupPublicApplication();notice('취소 신청을 반려했습니다.','success');}catch(error){notice(`취소 반려 저장 실패: ${error?.message||error}`,'error');}
 }
 
+let entryApplicationDelegatedBound=false;
 function bindEntryApplications(){
-  const entrySubmit=document.getElementById('entryApplicationSubmitBtn');if(entrySubmit){entrySubmit.dataset.directBound='1';entrySubmit.addEventListener('click',submitPublicApplication);}
+  const entrySubmit=document.getElementById('entryApplicationSubmitBtn');if(entrySubmit&&!entrySubmit.dataset.directBound){entrySubmit.dataset.directBound='1';entrySubmit.addEventListener('click',submitPublicApplication);}
+  if(!entryApplicationDelegatedBound){entryApplicationDelegatedBound=true;
   document.addEventListener('click',e=>{
     const submit=e.target.closest?.('#entryApplicationSubmitBtn');
     if(!submit||submit.dataset.directBound==='1')return;
@@ -3783,6 +3868,14 @@ function bindEntryApplications(){
   document.getElementById('entryLookupPhone')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();lookupPublicApplication();}});
   document.getElementById('entryAdminFilter')?.addEventListener('change',renderApplicationPortal);
   document.addEventListener('click',e=>{const action=e.target.closest?.('[data-entry-action]');if(action){processEntryApplication(action.dataset.entryId,action.dataset.entryAction);return;}const payment=e.target.closest?.('[data-entry-payment]');if(payment){toggleEntryPayment(payment.dataset.entryPayment);return;}const refund=e.target.closest?.('[data-entry-refund]');if(refund){refundEntryPayment(refund.dataset.entryRefund);return;}const sms=e.target.closest?.('[data-entry-sms]');if(sms){manualEntrySms(sms.dataset.entrySms);return;}const edit=e.target.closest?.('[data-entry-edit]');if(edit){editEntryApplication(edit.dataset.entryEdit);return;}const cancel=e.target.closest?.('[data-entry-cancel]');if(cancel){cancelEntryApplication(cancel.dataset.entryCancel);return;}const cancelApprove=e.target.closest?.('[data-entry-cancel-approve]');if(cancelApprove){approveRegistrationCancellation(cancelApprove.dataset.entryCancelApprove);return;}const cancelReject=e.target.closest?.('[data-entry-cancel-reject]');if(cancelReject){rejectRegistrationCancellation(cancelReject.dataset.entryCancelReject);return;}const showAll=e.target.closest?.('[data-entry-show-all]');if(showAll){const type=showAll.dataset.entryShowAll;const rows=simpleRegistrationRows().filter(a=>type==='reserve'?a.status==='reserve':a.status==='approved').sort((a,b)=>String(a.createdAt||'').localeCompare(String(b.createdAt||'')));const root=document.getElementById(type==='reserve'?'entryPublicReserveList':'entryPublicApprovedList');if(root){root.innerHTML=rows.map((a,index)=>`<article class="entry-public-team-row"><span class="entry-public-order">${index+1}</span><div><strong>${portalEscape(a.teamName||'팀명 미등록')}</strong><small>${portalEscape(a.affiliation||'소속 미등록')} · ${a.paid?'입금완료':'미입금'}</small></div>${type==='reserve'?`<span class="badge badge-warning">후보 ${index+1}</span>`:'<span class="badge badge-safe">참가</span>'}</article>`).join('');}return;}const division=e.target.closest?.('[data-entry-open-division]');if(division){switchDivisionWorkspace(String(division.dataset.entryOpenDivision||''),{view:'entry'});return;}});
+  }
+  const bindOnce=(id,event,handler)=>{const el=document.getElementById(id);if(el&&!el.dataset.entrySelfBound){el.dataset.entrySelfBound='1';el.addEventListener(event,handler);}};
+  bindOnce('entrySelfEditCloseBtn','click',()=>document.getElementById('entrySelfEditDialog')?.close());
+  bindOnce('entrySelfEditCancelBtn','click',()=>document.getElementById('entrySelfEditDialog')?.close());
+  bindOnce('entrySelfEditSaveBtn','click',()=>void saveEntrySelfEdit());
+  bindOnce('entryCancelRequestCloseBtn','click',()=>document.getElementById('entryCancelRequestDialog')?.close());
+  bindOnce('entryCancelRequestCancelBtn','click',()=>document.getElementById('entryCancelRequestDialog')?.close());
+  bindOnce('entryCancelRequestSubmitBtn','click',()=>void submitEntryCancelRequest());
 }
 
 
@@ -9808,4 +9901,4 @@ console.info('[230MATCH] 63.0.0 ready · chunked cloud workspace + bounded retry
 
 console.info('[230MATCH] 64.0.0 architecture · lazy cloud registry, worker serialization, visible-view commit rendering');
 
-console.info('[230MATCH] 71.0.7 ready · self edit after payment + fee account copy');
+console.info('[230MATCH] 71.0.8 ready · self edit modal + single cancel request modal');

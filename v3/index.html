@@ -1939,7 +1939,7 @@
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=7107"></script>
+  <script type="module" src="./assets/js/app.js?v=7108"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
@@ -1984,6 +1984,77 @@
       <div id="entryAdminEditFeedback" class="notice info" hidden></div>
     </div>
     <div class="modal-actions"><button type="button" class="btn btn-light" id="entryAdminEditCancelBtn">취소</button><button type="button" class="btn btn-primary" id="entryAdminEditSaveBtn">수정 완료</button></div>
+  </form>
+</dialog>
+
+
+<dialog id="entrySelfEditDialog" class="modal entry-self-edit-dialog">
+  <form method="dialog" onsubmit="return false">
+    <div class="modal-head">
+      <div><span class="eyebrow">MY REGISTRATION</span><h3>참가 신청 수정</h3></div>
+      <button type="button" class="icon-btn" id="entrySelfEditCloseBtn">×</button>
+    </div>
+    <div class="modal-body entry-self-modal-body">
+      <input type="hidden" id="entrySelfEditId">
+      <section class="entry-self-player-box">
+        <h4>선수 1</h4>
+        <div class="entry-self-edit-grid">
+          <label><span>이름</span><input id="entrySelfEditP1Name"></label>
+          <label><span>소속 클럽</span><input id="entrySelfEditP1Club"></label>
+          <label><span>휴대전화</span><input id="entrySelfEditP1Phone" inputmode="numeric"></label>
+        </div>
+      </section>
+      <section class="entry-self-player-box">
+        <h4>선수 2</h4>
+        <div class="entry-self-edit-grid">
+          <label><span>이름</span><input id="entrySelfEditP2Name"></label>
+          <label><span>소속 클럽</span><input id="entrySelfEditP2Club"></label>
+          <label><span>휴대전화</span><input id="entrySelfEditP2Phone" inputmode="numeric"></label>
+        </div>
+      </section>
+      <div class="entry-self-edit-options">
+        <fieldset>
+          <legend>대표 연락처</legend>
+          <label><input type="radio" name="entrySelfRepresentative" value="0" id="entrySelfRep1"> 선수 1</label>
+          <label><input type="radio" name="entrySelfRepresentative" value="1" id="entrySelfRep2"> 선수 2</label>
+        </fieldset>
+        <fieldset>
+          <legend>안내 문자 수신 대상</legend>
+          <label><input type="radio" name="entrySelfSmsMode" value="both" id="entrySelfSmsBoth"> 두 선수 모두</label>
+          <label><input type="radio" name="entrySelfSmsMode" value="representative" id="entrySelfSmsRepresentative"> 대표 연락처만</label>
+        </fieldset>
+      </div>
+      <label><span>전달사항</span><textarea id="entrySelfEditMemo" rows="3"></textarea></label>
+      <div id="entrySelfEditFeedback" class="notice info entry-modal-feedback" hidden></div>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-light" id="entrySelfEditCancelBtn">취소</button>
+      <button type="button" class="btn btn-primary" id="entrySelfEditSaveBtn">수정 저장</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="entryCancelRequestDialog" class="modal entry-cancel-request-dialog">
+  <form method="dialog" onsubmit="return false">
+    <div class="modal-head">
+      <div><span class="eyebrow">CANCEL REQUEST</span><h3>참가 취소 요청</h3></div>
+      <button type="button" class="icon-btn" id="entryCancelRequestCloseBtn">×</button>
+    </div>
+    <div class="modal-body entry-self-modal-body">
+      <input type="hidden" id="entryCancelRequestId">
+      <div class="notice info">관리자 승인 전까지 참가 상태는 유지됩니다. 환불계좌는 취소 처리를 위해 필수입니다.</div>
+      <div class="entry-cancel-grid">
+        <label><span>환불 은행 *</span><input id="entryCancelBank" placeholder="예: 농협"></label>
+        <label><span>예금주 *</span><input id="entryCancelHolder" placeholder="예: 홍길동"></label>
+        <label class="full"><span>환불 계좌번호 *</span><input id="entryCancelAccount" inputmode="numeric" placeholder="- 없이 입력 가능"></label>
+        <label class="full"><span>취소 사유</span><textarea id="entryCancelReason" rows="3" placeholder="예: 개인 사정"></textarea></label>
+      </div>
+      <div id="entryCancelRequestFeedback" class="notice info entry-modal-feedback" hidden></div>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-light" id="entryCancelRequestCancelBtn">닫기</button>
+      <button type="button" class="btn btn-danger-outline" id="entryCancelRequestSubmitBtn">취소 요청 보내기</button>
+    </div>
   </form>
 </dialog>
 
@@ -2345,6 +2416,29 @@ input[type="radio"]{
   .entry-payment-info{grid-template-columns:1fr;padding:11px 12px}
   .entry-payment-info-main>strong{font-size:15px}
   .entry-payment-copy{width:100%}
+}
+</style>
+
+
+<style id="stage7108EntrySelfModalStyles">
+.entry-self-edit-dialog,.entry-cancel-request-dialog{width:min(680px,calc(100vw - 24px))}
+.entry-self-modal-body{display:grid;gap:14px}
+.entry-self-player-box{padding:12px;border:1px solid #d7e2ef;border-radius:14px;background:#f9fbff}
+.entry-self-player-box h4{margin:0 0 9px;color:#17365f}
+.entry-self-edit-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.entry-self-edit-grid label,.entry-cancel-grid label{display:grid;gap:5px;font-size:12px;font-weight:800;color:#4c6079}
+.entry-self-edit-grid input,.entry-self-edit-grid select,.entry-cancel-grid input,.entry-cancel-grid textarea{width:100%;box-sizing:border-box}
+.entry-self-edit-options{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.entry-self-edit-options fieldset{border:1px solid #d7e2ef;border-radius:12px;padding:10px}
+.entry-self-edit-options legend{font-size:12px;font-weight:900;color:#4c6079}
+.entry-self-edit-options label{display:flex;align-items:center;gap:7px;margin:5px 0}
+.entry-cancel-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.entry-cancel-grid .full{grid-column:1/-1}
+.entry-modal-feedback{margin-top:2px}
+@media(max-width:640px){
+  .entry-self-edit-grid,.entry-self-edit-options,.entry-cancel-grid{grid-template-columns:1fr}
+  .entry-cancel-grid .full{grid-column:auto}
+  .entry-self-edit-dialog,.entry-cancel-request-dialog{width:calc(100vw - 16px)}
 }
 </style>
 
