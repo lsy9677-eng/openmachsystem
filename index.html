@@ -2048,7 +2048,7 @@
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=7121"></script>
+  <script type="module" src="./assets/js/app.js?v=7122"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
@@ -2798,6 +2798,32 @@ input[type="radio"]{
 .stage7121-flow-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}
 .stage7121-flow-detail{margin-top:8px;padding:9px;border-radius:10px;background:#f5f8fc;color:#526b84;font-size:11px;line-height:1.5}
 @media(max-width:780px){.stage7121-flow-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+</style>
+
+
+<style id="stage7122BracketScoreVisibilityStyles">
+.bracket-live-placement[data-placement-kind="completed"]{
+  font-weight:900!important;
+  letter-spacing:.01em;
+}
+.bracket-live-placement[data-placement-kind="completed"].has-score{
+  background:#eaf8ef!important;
+  border-color:#a9d9bc!important;
+  color:#17633a!important;
+}
+.bracket-live-placement[data-placement-kind="completed"].editable-result{
+  cursor:pointer!important;
+}
+.bracket-live-placement[data-placement-kind="completed"].editable-result:hover{
+  filter:brightness(.97);
+  text-decoration:underline;
+}
+@media(max-width:700px){
+  .bracket-live-placement[data-placement-kind="completed"]{
+    font-size:10px!important;
+    min-height:25px!important;
+  }
+}
 </style>
 
 </body>
