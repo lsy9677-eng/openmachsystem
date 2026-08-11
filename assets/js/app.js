@@ -1,8 +1,8 @@
 import{getAuthConfig,saveAuthConfig,startAuth,signInGoogle,signOutSocial,beginExternalLogin,getExistingLoginEndpoints,signInEmail,registerEmail,sendPasswordReset,linkEmailPassword,authProviderIds,getAuthRuntime}from'./auth-engine.js?v=3565';
-import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7115';
+import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7116';
 import{notificationSupport,getStoredVapidKey,saveStoredVapidKey,enableMyPush,disableMyPush,queuePush,listPushJobs,listPushTokens}from'./notification-engine.js?v=332012';
 
-import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7115';
+import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7116';
 import{prepareTeams,generateDraw,allMatches,findMatch,generateLinkedDrawSlots,syncLinkedDrawQualifiers}from'./bracket-engine-v5000.js?v=5000';
 import{ensureDrawMeta,canModifyDraw,createDrawWithMethod,lockDraw,unlockDrawForDevelopment,clearDrawHistory}from'./draw-method-engine.js?v=332012';
 import{buildCourts,assignInitial,queueReadyMatches,refillCourt}from'./court-engine.js?v=332012';
@@ -15,7 +15,7 @@ import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactD
 import{render,teamText}from'./ui.js?v=3504';
 import{ensureAuditState,runStateAudit,runPrelimSimulation,runFullSimulation,applyAuditResult}from'./audit-engine.js?v=332012';
 import{earlyMainStats,markResolvedMainMatchesReady,canAssignEarlyMain,ensureEarlyMainSettings,autoAssignResolvedMain}from'./early-main-engine.js?v=332012';
-import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7115';
+import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7116';
 import{ensureMainDrawLifecycle,beginMainDraw,completeMainDraw,failMainDraw,resetMainDraw,hasAuthorizedMainDraw,mainDrawStatus,clearMainPlacement,repairMainDrawAuthorization}from'./main-draw-lifecycle-engine.js?v=3501';
 import{shouldUseLinkedDraw,linkedDrawNeedsRepair,rebuildLinkedDraw,hasStartedMainMatches}from'./linked-draw-guard-engine.js?v=332012';
 import{ensureVenueSettings,ensureVenueQueues,venuePreset,buildVenueCourts,prelimVenues,mainVenues}from'./venue-engine.js?v=332012';
@@ -26,7 +26,7 @@ import{ensureCourtStatuses,pauseCourt,resumeCourt}from'./court-status-engine.js?
 import{ensureCourtManualQueues,assignToCourtManualQueue,moveCourtMatchFlexible,returnManualQueueItemToVenue,reorderCourtManualQueue}from'./court-manual-queue-engine.js?v=332012';
 import{reorderPrelimQueue as reorderPrelimQueueItem,movePrelimQueuedMatch,returnPrelimWait1ToQueue}from'./prelim-queue-control-engine.js?v=332012';
 import{ensurePrelimCourtStatuses,pausePrelimCourt,resumePrelimCourt}from'./prelim-court-status-engine.js?v=332012';
-import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7115';
+import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7116';
 import{verifyAndRepairMainFlow}from'./main-flow-integrity-engine.js?v=332012';
 import{finalizeTournamentCompletion}from'./tournament-completion-engine.js?v=332012';
 import{ensureTournamentIdentity,validateTournamentForArchive,createTournamentArchive,archiveListItem,archiveBackupPayload}from'./archive-engine.js?v=354000';
@@ -871,7 +871,9 @@ function validateRankAwareMainDraw(draw,{strictOneVsTwo=false}={}){
     if(a&&b&&!a.placeholder&&!b.placeholder){
       realMatches++;
       const ra=mainDrawGroupRank(a),rb=mainDrawGroupRank(b);
-      if(ra&&rb&&ra===rb)sameRank++;
+      if(strictOneVsTwo){
+        if(!((ra===1&&rb===2)||(ra===2&&rb===1)))sameRank++;
+      }else if(ra&&rb&&ra===rb)sameRank++;
       const ga=mainDrawGroupNo(a),gb=mainDrawGroupNo(b);
       if(ga&&gb&&ga===gb)sameGroup++;
     }else{
@@ -883,9 +885,63 @@ function validateRankAwareMainDraw(draw,{strictOneVsTwo=false}={}){
   if(strictOneVsTwo&&sameRank)throw new Error(`본선 대진 검증 실패: 64강 1회전에서 같은 순위끼리 ${sameRank}경기가 발견되었습니다.`);
   return {realMatches,sameRank,sameGroup,byeRank1,byeOther};
 }
+
+function createExactMainDrawFromSlots(arranged,size){
+  const drawSize=Number(size)||64;
+  if(![32,64,128].includes(drawSize))throw new Error('지원 대진 규모는 32·64·128강입니다.');
+  const exact=[...(arranged||[])].slice(0,drawSize);
+  while(exact.length<drawSize)exact.push(null);
+
+  const rounds={};
+  for(let roundSize=drawSize;roundSize>=2;roundSize/=2){
+    const count=roundSize/2;
+    rounds[roundSize]=Array.from({length:count},(_,i)=>({
+      id:`r${roundSize}_m${i+1}`,
+      roundSize,matchNo:i+1,
+      teamA:null,teamB:null,winner:null,scoreA:null,scoreB:null,
+      status:'waiting_slots',court:null,
+      nextMatchId:roundSize>2?`r${roundSize/2}_m${Math.floor(i/2)+1}`:null,
+      nextSlot:roundSize>2?(i%2===0?1:2):null
+    }));
+  }
+
+  rounds[drawSize].forEach((m,i)=>{
+    m.teamA=exact[i*2]||null;
+    m.teamB=exact[i*2+1]||null;
+    const aResolved=Boolean(m.teamA&&!m.teamA.placeholder);
+    const bResolved=Boolean(m.teamB&&!m.teamB.placeholder);
+    if(aResolved&&bResolved){
+      m.status='ready';
+    }else if((aResolved||bResolved)&&!(m.teamA?.placeholder||m.teamB?.placeholder)){
+      m.winner=m.teamA||m.teamB;
+      m.status='completed';
+      m.bye=true;
+    }else{
+      m.status='waiting_slots';
+      m.winner=null;
+      m.bye=false;
+    }
+  });
+
+  // linked draw의 placeholder는 그대로 유지하고, 실제 BYE만 다음 라운드로 전파한다.
+  for(let roundSize=drawSize;roundSize>2;roundSize/=2){
+    for(const m of rounds[roundSize]){
+      if(m.status==='completed'&&m.winner&&!m.winner.placeholder&&m.nextMatchId){
+        const next=rounds[roundSize/2].find(x=>x.id===m.nextMatchId);
+        if(!next)continue;
+        if(m.nextSlot===1)next.teamA=m.winner;else next.teamB=m.winner;
+        if(next.teamA&&next.teamB&&next.status!=='completed')next.status='ready';
+      }
+    }
+  }
+  return {size:drawSize,rounds};
+}
+
 function createRankAwareDrawFromSlots(slots,size){
   const arranged=buildRankAwareMainSlots(slots,size);
-  const draw=generateDraw(arranged,size);
+  // 중요: generateDraw()는 전달받은 슬롯을 다시 순위 정렬/시드 배치하므로
+  // 이미 만든 1위-vs-2위 페어를 깨뜨릴 수 있다. 여기서는 정확한 슬롯 순서를 그대로 사용한다.
+  const draw=createExactMainDrawFromSlots(arranged,size);
   const ranks=arranged.filter(Boolean).map(mainDrawGroupRank);
   const allRanked=ranks.length>0&&ranks.every(r=>r===1||r===2);
   const noByes=arranged.filter(Boolean).length===Number(size);
@@ -10146,7 +10202,7 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
   };
   setInterval(tick,2500);
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(tick,350),{once:true});else setTimeout(tick,350);
-  console.info('[230MATCH] 71.1.5 ready · compact today tournament admin dashboard');
+  console.info('[230MATCH] 71.1.6 ready · exact-slot rank-aware main draw fixed');
 })();
 
 
@@ -10238,7 +10294,7 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
   window.addEventListener('pageshow',update);
   setInterval(()=>{if(document.body?.dataset.currentView==='home')update();},5000);
   window.__updateTodayTournamentDashboard=updateTodayDashboard;
-  console.info('[230MATCH] 71.1.5 ready · compact today tournament admin dashboard');
+  console.info('[230MATCH] 71.1.6 ready · exact-slot rank-aware main draw fixed');
 })();
 
 
@@ -10396,4 +10452,4 @@ console.info('[230MATCH] 63.0.0 ready · chunked cloud workspace + bounded retry
 
 console.info('[230MATCH] 64.0.0 architecture · lazy cloud registry, worker serialization, visible-view commit rendering');
 
-console.info('[230MATCH] 71.1.5 ready · compact today tournament admin dashboard');
+console.info('[230MATCH] 71.1.6 ready · exact-slot rank-aware main draw fixed');
