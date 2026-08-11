@@ -235,6 +235,24 @@
             <button type="button" data-today-go="bracket"><strong id="todayMainCount">0/0</strong><span>본선</span></button>
           </div>
         </section>
+        <section id="stage7121ResultFlowCheck" class="stage7121-flow-check" data-admin-only="true">
+          <div class="stage7121-flow-head">
+            <strong>결과 입력 → 다음 경기 흐름 점검</strong>
+            <span id="stage7121FlowOverall" class="badge badge-warning">점검 전</span>
+          </div>
+          <div class="stage7121-flow-grid">
+            <div id="flowPrelimRanking" class="stage7121-flow-card"><b>예선 순위</b><span>확인 전</span></div>
+            <div id="flowMainQualifier" class="stage7121-flow-card"><b>본선 진출</b><span>확인 전</span></div>
+            <div id="flowMainAdvance" class="stage7121-flow-card"><b>다음 라운드</b><span>확인 전</span></div>
+            <div id="flowCourtAdvance" class="stage7121-flow-card"><b>코트 진행</b><span>확인 전</span></div>
+            <div id="flowDuplicate" class="stage7121-flow-card"><b>중복/고아 경기</b><span>확인 전</span></div>
+          </div>
+          <div class="stage7121-flow-actions">
+            <button id="stage7121RunFlowCheck" type="button" class="btn btn-primary btn-small">흐름 점검</button>
+            <button id="stage7121ToggleFlowDetail" type="button" class="btn btn-light btn-small">상세 보기</button>
+          </div>
+          <div id="stage7121FlowDetail" class="stage7121-flow-detail" hidden></div>
+        </section>
         <section id="stage7117OperationHealthcheck" class="stage7117-healthcheck" data-admin-only="true">
           <div class="stage7117-healthcheck-head">
             <strong>대회 운영 사전 점검</strong>
@@ -2030,7 +2048,7 @@
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=7119"></script>
+  <script type="module" src="./assets/js/app.js?v=7121"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
@@ -2761,6 +2779,25 @@ input[type="radio"]{
 .rehearsal-current-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}
 .rehearsal-current-safety{margin-top:8px;padding:8px 9px;border-radius:10px;background:#eaf8ef;color:#286c43;font-size:10px;font-weight:800}
 @media(max-width:650px){.rehearsal-current-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+</style>
+
+
+<style id="stage7121ResultFlowValidatorStyles">
+.stage7121-flow-check{
+  margin:10px 0 12px;padding:11px;border:1px solid #d5e1ee;border-radius:14px;background:#fbfdff
+}
+.stage7121-flow-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.stage7121-flow-head strong{font-size:13px;color:#214768}
+.stage7121-flow-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.stage7121-flow-card{display:grid;gap:3px;min-height:56px;padding:8px;border:1px solid #d9e3ed;border-radius:11px;background:#fff}
+.stage7121-flow-card b{font-size:11px;color:#31516f}
+.stage7121-flow-card span{font-size:10px;color:#6d7e91}
+.stage7121-flow-card.ok{background:#eefaf3;border-color:#bfe2cb}
+.stage7121-flow-card.warn{background:#fff8e8;border-color:#ecd89e}
+.stage7121-flow-card.bad{background:#fff0f0;border-color:#ebb8b8}
+.stage7121-flow-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}
+.stage7121-flow-detail{margin-top:8px;padding:9px;border-radius:10px;background:#f5f8fc;color:#526b84;font-size:11px;line-height:1.5}
+@media(max-width:780px){.stage7121-flow-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style>
 
 </body>
