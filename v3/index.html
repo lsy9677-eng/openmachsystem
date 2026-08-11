@@ -391,9 +391,16 @@
                 <label class="entry-primary-contact"><input id="entryRepresentative2" type="radio" name="entryRepresentative" value="2"><span>대표 연락처로 사용</span></label>
               </div>
             </fieldset>
+            <fieldset class="entry-sms-target-card legacy-full">
+              <legend>안내 문자 수신 대상</legend>
+              <div class="entry-sms-target-options">
+                <label><input id="entrySmsTargetBoth" type="radio" name="entrySmsTargetMode" value="both" checked><span><strong>두 선수 모두</strong><small>승인·입금·후보·대회 안내를 두 선수에게 발송합니다. 권장</small></span></label>
+                <label><input id="entrySmsTargetRepresentative" type="radio" name="entrySmsTargetMode" value="representative"><span><strong>대표 연락처만</strong><small>선택한 대표 선수에게만 안내 문자를 발송합니다.</small></span></label>
+              </div>
+            </fieldset>
             <label class="entry-memo legacy-full"><span>전달사항</span><input id="entryApplicationMemo" type="text" placeholder="운영진에게 전달할 내용이 있으면 입력하세요."></label>
           </div>
-          <div class="legacy-entry-agreement">두 연락처 모두 상태 조회에 사용할 수 있습니다. 관리자는 대표전화만 또는 두 선수 모두에게 문자를 보낼 수 있습니다.</div>
+          <div class="legacy-entry-agreement">두 연락처 모두 상태 조회에 사용할 수 있습니다. 문자 수신 대상은 신청 후에도 관리자가 대표만/두 선수 모두로 변경할 수 있습니다.</div>
           <div class="button-row legacy-entry-actions"><button id="entryApplicationSubmitBtn" type="button" class="btn btn-primary">참가 신청 접수</button><button id="entryApplicationEditCancelBtn" type="button" class="btn btn-light" hidden>수정 취소</button></div>
           <div id="entryApplicationReceipt" class="notice success entry-receipt" hidden></div>
         </article>
@@ -1440,9 +1447,28 @@
       <div class="contact-edit-body">
         <input id="contactEditTeamId" type="hidden">
         <p id="contactEditTeamName" class="modal-match"></p>
-        <label><span>팀 대표 전화번호</span><input id="contactEditPhone" type="tel" placeholder="010-1234-5678"></label>
-        <label><span>대표자 이름</span><input id="contactEditManager" type="text" placeholder="선택 입력"></label>
-        <div id="contactPhoneValidation" class="notice info">전화번호를 입력하세요.</div>
+        <div class="contact-player-grid">
+          <fieldset class="contact-player-card">
+            <legend>선수 1</legend>
+            <label><span>이름</span><input id="contactEditPlayer1Name" type="text" placeholder="선수 1"></label>
+            <label><span>휴대전화</span><input id="contactEditPlayer1Phone" type="tel" inputmode="numeric" placeholder="010-1234-5678"></label>
+            <label class="contact-representative-choice"><input id="contactEditRepresentative1" type="radio" name="contactEditRepresentative" value="1"><span>대표 연락처</span></label>
+          </fieldset>
+          <fieldset class="contact-player-card">
+            <legend>선수 2</legend>
+            <label><span>이름</span><input id="contactEditPlayer2Name" type="text" placeholder="선수 2"></label>
+            <label><span>휴대전화</span><input id="contactEditPlayer2Phone" type="tel" inputmode="numeric" placeholder="010-9876-5432"></label>
+            <label class="contact-representative-choice"><input id="contactEditRepresentative2" type="radio" name="contactEditRepresentative" value="2"><span>대표 연락처</span></label>
+          </fieldset>
+        </div>
+        <fieldset class="contact-sms-target-card">
+          <legend>문자 수신 대상</legend>
+          <label><input id="contactEditSmsBoth" type="radio" name="contactEditSmsTarget" value="both"><span>두 선수 모두 발송</span></label>
+          <label><input id="contactEditSmsRepresentative" type="radio" name="contactEditSmsTarget" value="representative"><span>대표 연락처만 발송</span></label>
+        </fieldset>
+        <input id="contactEditPhone" type="hidden">
+        <input id="contactEditManager" type="hidden">
+        <div id="contactPhoneValidation" class="notice info">두 선수 연락처를 확인하세요.</div>
       </div>
       <menu><button value="cancel" class="btn btn-light">취소</button><button id="saveContactBtn" value="default" class="btn btn-primary">저장</button></menu>
     </form>
@@ -1867,7 +1893,7 @@
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=7002"></script>
+  <script type="module" src="./assets/js/app.js?v=7003"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
@@ -1919,13 +1945,30 @@
   <form method="dialog" onsubmit="return false">
     <div class="modal-head"><div><span class="eyebrow">REGISTRATION SMS</span><h3 id="entrySmsTitle">참가 신청 문자 확인</h3></div><button type="button" class="icon-btn" id="entrySmsCloseBtn">×</button></div>
     <div class="modal-body">
-      <div class="notice info"><strong>수신 대상</strong><div id="entrySmsTarget">-</div></div>
+      <div class="notice info">
+        <div class="entry-sms-recipient-head"><strong>수신 대상</strong><div class="entry-sms-recipient-actions"><button type="button" class="btn btn-light btn-small" id="entrySmsSelectBothBtn">두 선수 모두</button><button type="button" class="btn btn-light btn-small" id="entrySmsSelectRepresentativeBtn">대표만</button></div></div>
+        <div id="entrySmsTarget">-</div>
+        <div id="entrySmsRecipientEditor" class="entry-sms-recipient-editor"></div>
+      </div>
       <label><span>문자 내용</span><textarea id="entrySmsBody" rows="7"></textarea></label>
       <p class="settings-help">알리고 발송 전 내용을 확인하고 수정할 수 있습니다. 휴대전화 문자앱 방식은 마지막 전송 버튼을 직접 눌러야 합니다.</p>
     </div>
     <div class="modal-actions auto-sms-actions"><button type="button" class="btn btn-primary" id="entrySmsAligoBtn">📡 알리고 발송</button><button type="button" class="btn btn-light" id="entrySmsPhoneBtn">📱 문자앱 열기</button><button type="button" class="btn btn-light" id="entrySmsCopyBtn">📋 복사</button><button type="button" class="btn btn-danger-outline" id="entrySmsSkipBtn">이번만 건너뛰기</button></div>
   </form>
 </dialog>
+
+<style id="stage7003SmsRecipientStyles">
+.entry-sms-target-card,.contact-sms-target-card{border:1px solid #ccd9ea;border-radius:14px;padding:12px 14px;background:#f8fbff}
+.entry-sms-target-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.entry-sms-target-options label,.contact-sms-target-card label{display:flex;align-items:flex-start;gap:9px;border:1px solid #d5e0ee;border-radius:12px;padding:10px;background:#fff;cursor:pointer}
+.entry-sms-target-options label span{display:flex;flex-direction:column;gap:3px}.entry-sms-target-options small{color:#66778f;font-size:12px}
+.contact-player-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.contact-player-card{border:1px solid #d5e0ee;border-radius:12px;padding:12px}.contact-player-card label{display:flex;flex-direction:column;gap:5px;margin-bottom:9px}.contact-representative-choice{flex-direction:row!important;align-items:center}
+.contact-sms-target-card{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}.contact-sms-target-card legend{font-weight:800}.contact-sms-target-card label{flex:1;min-width:180px;align-items:center}
+.entry-sms-recipient-head{display:flex;justify-content:space-between;align-items:center;gap:10px}.entry-sms-recipient-actions{display:flex;gap:6px;flex-wrap:wrap}
+.entry-sms-recipient-editor{display:grid;gap:8px;margin-top:10px}.entry-sms-recipient-row{display:grid;grid-template-columns:auto minmax(90px,.7fr) minmax(150px,1fr);gap:8px;align-items:center;background:#fff;border:1px solid #d8e2ee;border-radius:10px;padding:8px}.entry-sms-recipient-row input[type="text"],.entry-sms-recipient-row input[type="tel"]{width:100%;box-sizing:border-box}
+@media(max-width:700px){.entry-sms-target-options,.contact-player-grid{grid-template-columns:1fr}.entry-sms-recipient-row{grid-template-columns:auto 1fr}.entry-sms-recipient-row input[type="tel"]{grid-column:2}.entry-sms-recipient-head{align-items:flex-start;flex-direction:column}}
+</style>
+
 </body>
 </html>
 <style id="stage3210Styles">
