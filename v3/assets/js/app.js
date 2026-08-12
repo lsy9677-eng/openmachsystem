@@ -11395,7 +11395,7 @@ console.info('[230MATCH] 71.3.3 ready · classic direct SMS rebuild');
     #printPreview .assignment-print-sheet .assignment-group-head{padding:2px 4px!important;min-height:0!important}
     #printPreview .assignment-print-sheet .assignment-group-head b,#printPreview .assignment-print-sheet .assignment-group-head span{font-size:9px!important;line-height:1.15!important}
     #printPreview .assignment-print-sheet .assignment-group-card ol{padding:1px 4px!important;gap:0!important}
-    #printPreview .assignment-print-sheet .assignment-group-card li{grid-template-columns:12px minmax(0,1fr)!important;gap:2px!important;min-height:12px!important;font-size:8px!important;line-height:1.05!important}
+    #printPreview .assignment-print-sheet .assignment-group-card li{grid-template-columns:12px minmax(0,1fr) auto!important;gap:2px!important;min-height:12px!important;font-size:8px!important;line-height:1.05!important}
     #printPreview .assignment-print-sheet .assignment-group-card li em{width:10px!important;height:10px!important;font-size:7px!important}
     #printPreview .assignment-print-sheet .assignment-order{padding:1px 4px 2px!important;gap:0!important;font-size:7px!important;line-height:1.05!important}
     #printPreview .assignment-print-sheet .print-footer{display:none!important}
@@ -11425,4 +11425,425 @@ console.info('[230MATCH] 71.3.3 ready · classic direct SMS rebuild');
   window.addEventListener('hashchange',()=>{if(location.hash.includes('print'))setTimeout(()=>{bind546();if($('printTargetSelect')&&!$('printTargetSelect').dataset.userSelected546){forceAssignmentDefaults();refreshPreview546(false);}},120);});
   setTimeout(activate,900);
   console.info('[230MATCH] 5.4.6 ready · print center default assignment/A4 compact/preview/PNG repair');
+})();
+
+/* 230MATCH 5.4.8 · interleaved prelim schedule + per-player first-match estimates */
+(function stage547UnifiedAssignmentOutput(){
+  const $=id=>document.getElementById(id);
+  const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  const START_MIN=9*60, SLOT_MIN=40;
+
+  function resolveTeam547(value){
+    if(value&&typeof value==='object')return value;
+    const key=String(value??'');
+    return (state.teams||[]).find(t=>String(t.id)===key||String(t.teamId||'')===key||String(t.name||'')===key||String(t.teamName||'')===key)||value;
+  }
+  function labelTeam547(team){
+    try{return printTeam(team)||'미정';}catch(_e){return team?.teamName||team?.name||String(team||'미정');}
+  }
+  function fmtTime547(mins){
+    const m=((Number(mins)||0)%(24*60)+(24*60))%(24*60);
+    return `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
+  }
+  function courtKey547(court){return String(court||'').trim().replace(/\s+/g,' ').toLowerCase();}
+  function isCourtAssigned547(court){return court&&court!=='코트 미정'&&!/미정/.test(court);}
+  function expectedMatchCount547(teamCount,actualCount){
+    if(actualCount>0)return actualCount;
+    const n=Math.max(0,Number(teamCount)||0);
+    return Math.max(1,n>=2?(n*(n-1))/2:1);
+  }
+  function assignmentData547(){
+    const groups=state.prelim?.groups||[],matches=state.prelim?.matches||[];
+    const infos=groups.map((g,idx)=>{
+      const raw=(Array.isArray(g.teams)&&g.teams.length?g.teams:(g.teamIds||[]));
+      const teams=raw.map(resolveTeam547).filter(Boolean);
+      const gm=matches.filter(m=>m.groupId===g.id).sort((a,b)=>(a.matchNo||0)-(b.matchNo||0));
+      const court=g.court||g.courtName||gm[0]?.court||gm[0]?.courtName||gm[0]?.assignedCourtName||((state.prelim?.courts||[]).find(c=>c.id===(g.prelimCourtId||gm[0]?.prelimCourtId))?.name)||'코트 미정';
+      return {g,idx,teams,gm,court,ck:courtKey547(court),assigned:isCourtAssigned547(court)};
+    });
+
+    /* 5.4.9: 고정코트와 공동 코트풀의 예상시간을 구분한다.
+       - 고정코트: 같은 코트의 조를 경기 차수별로 교차 진행
+       - 공동풀: 여러 코트가 하나의 FIFO 대기열을 공유. 먼저 비는 코트에 다음 가능한 경기를 투입
+         (동일 40분 가정에서는 슬롯 단위로 동시 종료 처리) */
+    const scheduleMeta=new Map();
+    const poolList=Array.isArray(state.prelim?.sharedCourtPools)?state.prelim.sharedCourtPools:[];
+    const poolByGroup=new Map();
+    poolList.forEach(pool=>(pool.groupIds||[]).forEach(id=>poolByGroup.set(String(id),pool)));
+
+    // 공동풀: 대기 중인 1경기들을 먼저 넣고, 완료된 경기의 다음 차수를 FIFO 뒤에 붙인다.
+    for(const pool of poolList){
+      const arr=infos.filter(info=>(pool.groupIds||[]).some(id=>String(id)===String(info.g.id)));
+      const capacity=Math.max(1,(pool.courtIds||[]).length||Number(pool.courtCount)||1);
+      if(!arr.length)continue;
+      const nextRound=new Map(arr.map(info=>[String(info.g.id),0]));
+      const queue=arr.map(info=>({info,round:0}));
+      let slot=0,guard=0;
+      while(queue.length&&guard++<1000){
+        const running=queue.splice(0,capacity);
+        for(const item of running){
+          const info=item.info,round=item.round,cnt=expectedMatchCount547(info.teams.length,info.gm.length);
+          const meta=scheduleMeta.get(info.g.id)||{slots:[],firstTeamSlot:{}};
+          meta.slots[round]=slot;
+          if(round===0){meta.firstTeamSlot[1]=slot;meta.firstTeamSlot[2]=slot;}
+          if(round===1&&info.teams.length>=3)meta.firstTeamSlot[3]=slot;
+          scheduleMeta.set(info.g.id,meta);
+          nextRound.set(String(info.g.id),round+1);
+          if(round+1<cnt)queue.push({info,round:round+1});
+        }
+        slot++;
+      }
+    }
+
+    // 고정코트: 기존 방식 유지. 공동풀에 속한 조는 제외한다.
+    const courtGroups=new Map();
+    infos.forEach(info=>{if(!info.assigned||poolByGroup.has(String(info.g.id)))return;const arr=courtGroups.get(info.ck)||[];arr.push(info);courtGroups.set(info.ck,arr);});
+    courtGroups.forEach(arr=>{
+      let globalSlot=0;
+      const maxRounds=Math.max(0,...arr.map(info=>expectedMatchCount547(info.teams.length,info.gm.length)));
+      for(let round=0;round<maxRounds;round++){
+        for(const info of arr){
+          const cnt=expectedMatchCount547(info.teams.length,info.gm.length);
+          if(round>=cnt)continue;
+          const meta=scheduleMeta.get(info.g.id)||{slots:[],firstTeamSlot:{}};
+          meta.slots[round]=globalSlot;
+          if(round===0){meta.firstTeamSlot[1]=globalSlot;meta.firstTeamSlot[2]=globalSlot;}
+          if(round===1&&info.teams.length>=3)meta.firstTeamSlot[3]=globalSlot;
+          scheduleMeta.set(info.g.id,meta);
+          globalSlot++;
+        }
+      }
+    });
+
+    return infos.map(info=>{
+      const {g,idx,teams,gm,court,assigned}=info;
+      const key=t=>String(t?.id||t?.teamId||t?.name||t?.teamName||t||'');
+      const num=v=>{const k=key(resolveTeam547(v)),n=teams.findIndex(t=>key(t)===k);return n>=0?n+1:'?';};
+      const matchCount=expectedMatchCount547(teams.length,gm.length);
+      const meta=scheduleMeta.get(g.id)||{slots:[],firstTeamSlot:{}};
+      const groupSlot=meta.slots[0]??0;
+      const orders=gm.length?gm.map((m,i)=>({text:`${i+1}경기 ${num(m.teamA)}-${num(m.teamB)}`})):
+        Array.from({length:matchCount},(_,i)=>({text:`${i+1}경기`}));
+      return {
+        name:g.name||`${idx+1}조`,court,
+        estimate:assigned?fmtTime547(START_MIN+groupSlot*SLOT_MIN):'시간 미정',
+        teams:teams.map((t,i)=>({
+          n:i+1,label:labelTeam547(t),
+          firstTime:assigned&&meta.firstTeamSlot[i+1]!=null?fmtTime547(START_MIN+meta.firstTeamSlot[i+1]*SLOT_MIN):''
+        })),orders
+      };
+    });
+  }
+
+  printPrelimAssignmentHtml=window.printPrelimAssignmentHtml=function(){
+    const cards=assignmentData547();
+    if(!cards.length)return `<header class="assignment547-title"><h1>시합 전 조편성·코트 배정표</h1><p>${esc(state.tournament?.name||'230MATCH 대회')}${state.tournament?.division?` · ${esc(state.tournament.division)}`:''}</p></header><div class="print-empty">생성된 예선 조편성이 없습니다.</div>`;
+    const html=cards.map(card=>`<article class="assignment-group-card assignment547-card"><div class="assignment-group-head"><b>${esc(card.name)}</b><span>${esc(card.court)} · <em>${esc(card.estimate)}</em></span></div><ol>${card.teams.map(team=>`<li><em>${team.n}</em><strong title="${esc(team.label)}">${esc(team.label)}</strong>${team.firstTime?`<small class="assignment547-firsttime">${esc(team.firstTime)}</small>`:''}</li>`).join('')}</ol><div class="assignment-order">${card.orders.map(o=>`<span>${o.time?`<b>${esc(o.time)}</b> · `:''}${esc(o.text)}</span>`).join('')}</div></article>`).join('');
+    return `<header class="assignment547-title"><h1>시합 전 조편성·코트 배정표</h1><p>${esc(state.tournament?.name||'230MATCH 대회')}${state.tournament?.division?` · ${esc(state.tournament.division)}`:''}</p></header><div class="assignment-summary assignment547-summary"><b>${cards.length}개 조 · ${(state.teams||[]).length}팀</b><span>09:00 시작 · 경기당 40분 · 각 선수 첫 경기 예상시간</span></div><div class="assignment-grid assignment547-grid">${html}</div>`;
+  };
+
+  function fit547(ctx,text,maxWidth){
+    let s=String(text||'');if(ctx.measureText(s).width<=maxWidth)return s;
+    while(s.length>2&&ctx.measureText(s+'…').width>maxWidth)s=s.slice(0,-1);
+    return s+'…';
+  }
+  function download547(blob,name){const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1200);}
+  async function saveAssignmentPng547(){
+    const cards=assignmentData547();if(!cards.length)throw new Error('PNG로 저장할 예선 조편성이 없습니다.');
+    const W=1754,H=1240,margin=26,cols=4,gap=10,top=126,bottom=20,rowGap=8,rows=Math.ceil(cards.length/cols);
+    const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;const ctx=canvas.getContext('2d');
+    ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);ctx.textBaseline='middle';
+    ctx.fillStyle='#10264a';ctx.font='700 31px sans-serif';ctx.textAlign='center';ctx.fillText('시합 전 조편성·코트 배정표',W/2,34);
+    ctx.font='600 17px sans-serif';ctx.fillStyle='#53657d';ctx.fillText(`${state.tournament?.name||'230MATCH 대회'}${state.tournament?.division?` · ${state.tournament.division}`:''}`,W/2,65);
+    ctx.textAlign='left';ctx.fillStyle='#eef4fb';ctx.fillRect(margin,82,W-margin*2,34);
+    ctx.fillStyle='#173b70';ctx.font='700 16px sans-serif';ctx.fillText(`${cards.length}개 조 · ${(state.teams||[]).length}팀`,margin+12,99);
+    ctx.textAlign='right';ctx.font='600 14px sans-serif';ctx.fillText('09:00 시작 · 경기당 40분 · 첫 경기 예상시간',W-margin-12,99);ctx.textAlign='left';
+    const cardW=(W-margin*2-gap*(cols-1))/cols,cardH=Math.floor((H-top-bottom-rowGap*(rows-1))/Math.max(1,rows));
+    cards.forEach((card,i)=>{
+      const col=i%cols,row=Math.floor(i/cols),x=margin+col*(cardW+gap),y=top+row*(cardH+rowGap);
+      ctx.strokeStyle='#91a7c6';ctx.lineWidth=1;ctx.strokeRect(x,y,cardW,cardH);ctx.fillStyle='#173b70';ctx.fillRect(x,y,cardW,25);
+      ctx.fillStyle='#fff';ctx.font='700 15px sans-serif';ctx.textAlign='left';ctx.fillText(card.name,x+9,y+12.5);
+      ctx.textAlign='right';ctx.font='700 13px sans-serif';ctx.fillText(fit547(ctx,`${card.court} · ${card.estimate}`,cardW*0.63),x+cardW-9,y+12.5);ctx.textAlign='left';
+      const orderLines=Math.max(1,card.orders.length),orderH=Math.max(17,orderLines*13+4),teamArea=Math.max(28,cardH-25-orderH);
+      const teamLine=Math.max(12,Math.min(19,teamArea/Math.max(1,card.teams.length)));ctx.font=`700 ${Math.max(10,Math.min(14,teamLine-3))}px sans-serif`;
+      card.teams.forEach((t,ti)=>{const yy=y+25+teamLine*(ti+.5);ctx.fillStyle='#173b70';ctx.textAlign='left';ctx.fillText(String(t.n),x+8,yy);ctx.fillStyle='#111827';ctx.fillText(fit547(ctx,t.label,cardW-(t.firstTime?82:38)),x+28,yy);if(t.firstTime){ctx.textAlign='right';ctx.fillStyle='#173b70';ctx.font='800 10px sans-serif';ctx.fillText(t.firstTime,x+cardW-8,yy);ctx.textAlign='left';ctx.font=`700 ${Math.max(10,Math.min(14,teamLine-3))}px sans-serif`;}});
+      const orderY=y+cardH-orderH;ctx.fillStyle='#f7fbff';ctx.fillRect(x+1,orderY,cardW-2,orderH-1);ctx.fillStyle='#4b5f79';ctx.font='600 10px sans-serif';
+      card.orders.forEach((o,oi)=>ctx.fillText(fit547(ctx,`${o.time?o.time+' · ':''}${o.text}`,cardW-16),x+8,orderY+8+oi*13));
+    });
+    const blob=await new Promise(r=>canvas.toBlob(r,'image/png'));if(!blob)throw new Error('PNG 이미지 생성에 실패했습니다.');
+    download547(blob,`230MATCH_예선조편성_코트배정표_${new Date().toISOString().slice(0,10)}.png`);
+  }
+
+  const style=document.createElement('style');style.id='stage547UnifiedAssignmentStyles';style.textContent=`
+    #printPreview .assignment-print-sheet{padding:3mm!important}
+    #printPreview .assignment547-title{text-align:center;margin:0 0 7px!important;padding:0!important}
+    #printPreview .assignment547-title h1{margin:0!important;color:#10264a;font-size:22px!important;line-height:1.05!important;font-weight:900!important;letter-spacing:-.03em}
+    #printPreview .assignment547-title p{margin:4px 0 0!important;color:#53657d;font-size:11px!important;font-weight:700!important}
+    #printPreview .assignment547-summary{margin:0 0 5px!important;padding:4px 8px!important;min-height:0!important;border:0!important;border-radius:0!important;background:#eef4fb!important;color:#173b70!important;font-size:9px!important}
+    #printPreview .assignment547-grid{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:4px!important}
+    #printPreview .assignment547-card{border:1px solid #91a7c6!important;border-radius:0!important;box-shadow:none!important;overflow:hidden!important}
+    #printPreview .assignment547-card .assignment-group-head{padding:2px 5px!important;background:#173b70!important;min-height:0!important}
+    #printPreview .assignment547-card .assignment-group-head b{font-size:9px!important;line-height:1.15!important}
+    #printPreview .assignment547-card .assignment-group-head span{font-size:8px!important;line-height:1.15!important;font-weight:800!important;white-space:nowrap!important}
+    #printPreview .assignment547-card .assignment-group-head span em{font-style:normal!important;color:#fff!important}
+    #printPreview .assignment547-card ol{padding:1px 5px!important;margin:0!important;gap:0!important}
+    #printPreview .assignment547-card li{grid-template-columns:12px minmax(0,1fr) auto!important;gap:2px!important;min-height:12px!important;font-size:8px!important;line-height:1.05!important;border-bottom:0!important}
+    #printPreview .assignment547-card li em{width:auto!important;height:auto!important;background:transparent!important;color:#173b70!important;font-size:7px!important;font-weight:900!important}
+    #printPreview .assignment547-card li strong{font-weight:800!important}
+
+    #printPreview .assignment547-firsttime{font-size:7px!important;line-height:1!important;color:#173b70!important;font-weight:900!important;white-space:nowrap!important}
+    #printPreview .assignment547-card .assignment-order{padding:1px 5px 2px!important;gap:0!important;border-top:0!important;background:#f7fbff!important;font-size:6.7px!important;line-height:1.05!important;color:#53657d!important}
+    #printPreview .assignment547-card .assignment-order b{color:#173b70!important;font-weight:900!important}
+    #printPreview .assignment-print-sheet .print-footer{display:none!important}
+    @media print{
+      @page{size:A4 landscape;margin:3mm}
+      body.printing-output #printOutputRoot .assignment-print-sheet{padding:0!important;margin:0!important;width:auto!important;min-height:0!important;box-shadow:none!important}
+      body.printing-output #printOutputRoot .assignment547-title{text-align:center;margin:0 0 1.4mm!important;padding:0!important}
+      body.printing-output #printOutputRoot .assignment547-title h1{margin:0!important;color:#10264a!important;font-size:15pt!important;line-height:1!important;font-weight:900!important}
+      body.printing-output #printOutputRoot .assignment547-title p{margin:.8mm 0 0!important;color:#53657d!important;font-size:7.8pt!important;font-weight:700!important}
+      body.printing-output #printOutputRoot .assignment547-summary{margin:0 0 1mm!important;padding:.9mm 1.6mm!important;min-height:0!important;border:0!important;border-radius:0!important;background:#eef4fb!important;color:#173b70!important;font-size:6.7pt!important}
+      body.printing-output #printOutputRoot .assignment547-grid{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:.9mm!important}
+      body.printing-output #printOutputRoot .assignment547-card{break-inside:avoid!important;border:1px solid #91a7c6!important;border-radius:0!important;box-shadow:none!important;overflow:hidden!important}
+      body.printing-output #printOutputRoot .assignment547-card .assignment-group-head{padding:.45mm 1mm!important;background:#173b70!important;min-height:0!important}
+      body.printing-output #printOutputRoot .assignment547-card .assignment-group-head b{font-size:6.8pt!important;line-height:1!important}
+      body.printing-output #printOutputRoot .assignment547-card .assignment-group-head span{font-size:6pt!important;line-height:1!important;font-weight:800!important;white-space:nowrap!important}
+      body.printing-output #printOutputRoot .assignment547-card .assignment-group-head span em{font-style:normal!important;color:#fff!important}
+      body.printing-output #printOutputRoot .assignment547-card ol{padding:.3mm 1mm!important;margin:0!important;gap:0!important}
+      body.printing-output #printOutputRoot .assignment547-card li{grid-template-columns:3mm minmax(0,1fr) auto!important;gap:.4mm!important;min-height:3mm!important;font-size:6.3pt!important;line-height:1!important;border-bottom:0!important}
+      body.printing-output #printOutputRoot .assignment547-card li em{width:auto!important;height:auto!important;background:transparent!important;color:#173b70!important;font-size:5.8pt!important;font-weight:900!important}
+      body.printing-output #printOutputRoot .assignment547-card li strong{font-weight:800!important}
+
+      body.printing-output #printOutputRoot .assignment547-firsttime{font-size:5.7pt!important;line-height:1!important;color:#173b70!important;font-weight:900!important;white-space:nowrap!important}
+      body.printing-output #printOutputRoot .assignment547-card .assignment-order{padding:.25mm 1mm .4mm!important;gap:0!important;border-top:0!important;background:#f7fbff!important;font-size:5.3pt!important;line-height:1.05!important;color:#53657d!important}
+      body.printing-output #printOutputRoot .assignment547-card .assignment-order b{color:#173b70!important;font-weight:900!important}
+      body.printing-output #printOutputRoot .assignment-print-sheet .print-footer{display:none!important}
+    }
+  `;document.head.appendChild(style);
+
+  document.addEventListener('click',e=>{
+    const btn=e.target.closest?.('#savePrintImageBtn');if(!btn)return;
+    if(($('printTargetSelect')?.value||'')!=='prelim-assignment')return;
+    e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();
+    void saveAssignmentPng547().then(()=>notice('미리보기·인쇄와 같은 구성으로 PNG를 저장했습니다.','success')).catch(err=>{console.error('[5.4.7 assignment PNG]',err);notice(err?.message||'PNG 저장 중 오류가 발생했습니다.','error');});
+  },true);
+
+  function rerender547(){if(($('printTargetSelect')?.value||'')==='prelim-assignment'){try{renderPrintPreview();}catch(e){console.error('[5.4.7 preview]',e);}}}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(rerender547,220),{once:true});else setTimeout(rerender547,220);
+  window.addEventListener('hashchange',()=>{if(location.hash.includes('print'))setTimeout(rerender547,260);});
+  console.info('[230MATCH] 5.4.8 ready · interleaved prelim schedule + first-match estimates');
+})();
+
+/* 230MATCH 5.4.9 · prelim shared court pool for uneven group/court counts */
+(function stage549PrelimSharedCourtPool(){
+  const $=id=>document.getElementById(id);
+  const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  const safe=a=>Array.isArray(a)?a:[];
+  const poolList=()=>safe(state.prelim?.sharedCourtPools);
+  const groupId=x=>String(typeof x==='object'?(x?.id??x?.groupId??''):x??'');
+  const matchReal=m=>Boolean(m?.teamA&&m?.teamB&&!m.teamA.placeholder&&!m.teamB.placeholder);
+  const matchReady=m=>Boolean(m&&m.status!=='completed'&&matchReal(m)&&!['waiting_dependency','waiting_previous','held'].includes(String(m.status||'')));
+  const groupNo=id=>Number((state.prelim?.groups||[]).find(g=>String(g.id)===String(id))?.groupNo||String((state.prelim?.groups||[]).find(g=>String(g.id)===String(id))?.name||'').match(/\d+/)?.[0]||9999);
+  const matchSort=(a,b)=>(Number(a.matchNo||0)-Number(b.matchNo||0))||(groupNo(a.groupId)-groupNo(b.groupId))||String(a.id).localeCompare(String(b.id));
+  const findPool=id=>poolList().find(p=>String(p.id)===String(id));
+  const poolForMatch=m=>m?.prelimPoolId?findPool(m.prelimPoolId):poolList().find(p=>safe(p.groupIds).some(id=>String(id)===String(m?.groupId)));
+  const courtById=id=>safe(state.prelim?.courts).find(c=>String(c.id)===String(id));
+  const matchById=id=>findPrelimMatch(state,id);
+  const courtLabel=c=>String(c?.name||c?.courtName||c?.id||'코트');
+  const venueLabel=(venue,courts)=>{
+    const names=courts.map(c=>courtLabel(c));
+    if(names.length===2)return `${names[0]}·${names[1]} 공용`;
+    return `${venue?.name||courts[0]?.venueName||'예선'} ${names.join('·')} 공용`;
+  };
+
+  function ensurePoolState(){
+    ensurePrelimState(state);
+    if(!Array.isArray(state.prelim.sharedCourtPools))state.prelim.sharedCourtPools=[];
+    return state.prelim.sharedCourtPools;
+  }
+  function venueGroupsFromAssignedCourts(courts){
+    const ids=[];
+    for(const c of courts){
+      for(const raw of safe(c.groups)){const id=groupId(raw);if(id&&!ids.includes(id))ids.push(id);}
+    }
+    if(ids.length)return ids;
+    for(const g of safe(state.prelim?.groups)){
+      const gm=safe(state.prelim?.matches).filter(m=>String(m.groupId)===String(g.id));
+      const assignedId=String(g.prelimCourtId||gm.find(m=>m.prelimCourtId)?.prelimCourtId||'');
+      if(courts.some(c=>String(c.id)===assignedId))ids.push(String(g.id));
+    }
+    return [...new Set(ids)];
+  }
+  function detectPoolCandidates(){
+    const courts=safe(state.prelim?.courts),venues=prelimVenues(state)||[];
+    const candidates=[];
+    for(const venue of venues){
+      const venueId=String(venue.id||venue.name||'');
+      let vc=courts.filter(c=>String(c.venueId||c.venueName||'')===venueId||String(c.venueName||'')===String(venue.name||''));
+      if(!vc.length&&venues.length===1)vc=courts.slice();
+      if(vc.length<2)continue;
+      const gids=venueGroupsFromAssignedCourts(vc);
+      // 나누어 떨어지는 경우(예: 4조/2코트)는 기존 고정코트가 더 단순하고 안정적이다.
+      if(gids.length<=vc.length||gids.length%vc.length===0)continue;
+      candidates.push({venue,venueId:venueId||String(vc[0]?.venueId||''),courts:vc,groupIds:gids.sort((a,b)=>groupNo(a)-groupNo(b))});
+    }
+    return candidates;
+  }
+  function resetPoolPlacement(pool){
+    const groupSet=new Set(safe(pool.groupIds).map(String));
+    const courts=safe(pool.courtIds).map(courtById).filter(Boolean);
+    const matches=safe(state.prelim?.matches).filter(m=>groupSet.has(String(m.groupId)));
+    for(const c of courts){c.playing=null;c.wait1=null;c.queue=[];}
+    for(const m of matches){
+      m.prelimPoolId=pool.id;m.poolLabel=pool.label;
+      if(m.status!=='completed'){
+        m.prelimCourtId=null;m.courtId=null;m.court=pool.label;m.courtName=pool.label;
+        if(m.matchNo===1&&matchReal(m))m.status='ready';
+      }
+    }
+    for(const g of safe(state.prelim?.groups).filter(g=>groupSet.has(String(g.id)))){
+      g.prelimPoolId=pool.id;g.court=pool.label;g.courtName=pool.label;g.prelimCourtId=null;
+    }
+    pool.queue=matches.filter(matchReady).sort(matchSort).map(m=>m.id);
+    pool.active=true;pool.completed=false;pool.updatedAt=new Date().toISOString();
+    fillPoolCourts(pool,{initial:true});
+  }
+  function pushMainBackToVenue(pool,id){
+    if(!id)return false;
+    const u=findUnifiedMatch(state,id);if(!u||u.type!=='main')return false;
+    const venueId=String(pool.venueId||u.match?.venueId||'');
+    if(!state.venueQueues||typeof state.venueQueues!=='object')state.venueQueues={};
+    if(!Array.isArray(state.venueQueues[venueId]))state.venueQueues[venueId]=[];
+    if(!state.venueQueues[venueId].includes(id))state.venueQueues[venueId].unshift(id);
+    const m=u.match;if(m){m.status='venue_shared_queue';m.court=null;m.courtId=null;m.waitStartedAt=m.waitStartedAt||new Date().toISOString();}
+    return true;
+  }
+  function protectPoolCourts(pool){
+    if(pool.completed)return;
+    for(const cid of safe(pool.courtIds)){
+      const c=courtById(cid);if(!c)continue;
+      if(c.playing&&findUnifiedMatch(state,c.playing)?.type==='main'){pushMainBackToVenue(pool,c.playing);c.playing=null;}
+      if(c.wait1&&findUnifiedMatch(state,c.wait1)?.type==='main'){pushMainBackToVenue(pool,c.wait1);c.wait1=null;}
+      c.queue=safe(c.queue).filter(id=>{if(findUnifiedMatch(state,id)?.type==='main'){pushMainBackToVenue(pool,id);return false;}return false;});
+    }
+  }
+  function enqueueNewReady(pool){
+    const groupSet=new Set(safe(pool.groupIds).map(String));
+    const occupied=new Set();
+    for(const cid of safe(pool.courtIds)){const c=courtById(cid);if(c?.playing)occupied.add(String(c.playing));}
+    const queued=new Set(safe(pool.queue).map(String));
+    const newly=safe(state.prelim?.matches).filter(m=>groupSet.has(String(m.groupId))&&matchReady(m)&&!occupied.has(String(m.id))&&!queued.has(String(m.id))).sort(matchSort);
+    for(const m of newly){pool.queue.push(m.id);m.prelimPoolId=pool.id;m.poolLabel=pool.label;m.prelimCourtId=null;m.courtId=null;m.court=pool.label;m.courtName=pool.label;m.waitStartedAt=m.waitStartedAt||new Date().toISOString();}
+  }
+  function fillPoolCourts(pool,{initial=false}={}){
+    protectPoolCourts(pool);
+    enqueueNewReady(pool);
+    pool.queue=safe(pool.queue).filter(id=>{const m=matchById(id);return m&&m.status!=='completed'&&matchReady(m);});
+    for(const cid of safe(pool.courtIds)){
+      const c=courtById(cid);if(!c||c.isPaused||c.playing)continue;
+      const id=pool.queue.shift();if(!id)break;
+      const m=matchById(id);if(!m)continue;
+      c.playing=id;c.wait1=null;c.queue=[];
+      m.status='playing';m.prelimPoolId=pool.id;m.prelimCourtId=c.id;m.courtId=c.id;m.court=courtLabel(c);m.courtName=courtLabel(c);m.waitStartedAt=null;
+      if(!m.startedAt)m.startedAt=new Date().toISOString();
+    }
+    const groupSet=new Set(safe(pool.groupIds).map(String));
+    const remaining=safe(state.prelim?.matches).filter(m=>groupSet.has(String(m.groupId))&&m.status!=='completed');
+    pool.completed=remaining.length===0;pool.active=!pool.completed;pool.updatedAt=new Date().toISOString();
+    if(pool.completed){
+      pool.queue=[];
+      for(const cid of safe(pool.courtIds)){const c=courtById(cid);if(c){c.wait1=null;c.queue=[];}}
+      try{enqueueReadyMainToUnifiedCourts(state);}catch(_e){}
+    }
+    if(!initial)renderPoolPanel();
+  }
+  function buildPoolsAfterAssignment(){
+    const pools=ensurePoolState();pools.length=0;
+    const candidates=detectPoolCandidates();
+    for(const item of candidates){
+      const id=`prelim-pool-${item.venueId||item.courts.map(c=>c.id).join('-')}`;
+      const pool={id,venueId:item.venueId,venueName:item.venue?.name||item.courts[0]?.venueName||'',courtIds:item.courts.map(c=>c.id),groupIds:item.groupIds,label:venueLabel(item.venue,item.courts),queue:[],active:true,completed:false,createdAt:new Date().toISOString()};
+      pools.push(pool);resetPoolPlacement(pool);
+    }
+    return pools;
+  }
+  function reclaimSourceAutoPromotion(pool,sourceCourtId,completedId){
+    const c=courtById(sourceCourtId);if(!c)return;
+    const recovered=[];
+    const take=id=>{
+      if(!id||String(id)===String(completedId))return;
+      const m=matchById(id);if(!m||String(m.prelimPoolId||'')!==String(pool.id)||m.status==='completed')return;
+      m.status='ready';m.prelimCourtId=null;m.courtId=null;m.court=pool.label;m.courtName=pool.label;m.waitStartedAt=m.waitStartedAt||new Date().toISOString();
+      recovered.push(id);
+    };
+    take(c.playing);take(c.wait1);safe(c.queue).forEach(take);
+    c.playing=null;c.wait1=null;c.queue=[];
+    for(const id of recovered)if(!safe(pool.queue).includes(id))pool.queue.push(id);
+  }
+  function reconcilePool(poolId){
+    const pool=findPool(poolId);if(!pool)return false;
+    protectPoolCourts(pool);
+    // 완료된 경기는 코트에서 제거하고, 의존성이 풀린 다음 경기를 공동대기 뒤에 붙인다.
+    for(const cid of safe(pool.courtIds)){
+      const c=courtById(cid);if(!c)continue;
+      if(c.playing&&matchById(c.playing)?.status==='completed')c.playing=null;
+      c.wait1=null;c.queue=[];
+    }
+    enqueueNewReady(pool);fillPoolCourts(pool);return true;
+  }
+  function poolStatusText(pool){
+    const playing=safe(pool.courtIds).map(courtById).filter(Boolean).filter(c=>c.playing).length;
+    return `${pool.label} · ${pool.groupIds.length}개 조 · 시합중 ${playing}/${pool.courtIds.length} · 공동대기 ${safe(pool.queue).length}`;
+  }
+  function renderPoolPanel(){
+    const grid=$('prelimCourtOperationGrid');if(!grid)return;
+    let root=$('prelimSharedPoolPanel549');
+    const active=poolList().filter(p=>p.active&&!p.completed);
+    if(!active.length){if(root)root.remove();return;}
+    if(!root){root=document.createElement('section');root.id='prelimSharedPoolPanel549';root.className='prelim-shared-pool549';grid.insertAdjacentElement('beforebegin',root);}
+    root.innerHTML=active.map(pool=>{
+      const rows=safe(pool.queue).map((id,i)=>{const m=matchById(id);return `<div class="prelim-pool-row549"><b>${i+1}</b><span><strong>${esc(m?.groupNo||groupNo(m?.groupId))}조 ${esc(m?.matchNo||'')}경기</strong><small>${esc(teamText(m?.teamA))} vs ${esc(teamText(m?.teamB))}</small></span><em>먼저 빈 코트</em></div>`;}).join('')||'<div class="prelim-pool-empty549">현재 공동대기 경기가 없습니다. 진행 중 경기 결과가 입력되면 다음 가능한 경기가 자동으로 추가됩니다.</div>';
+      return `<article class="prelim-pool-card549"><header><div><small>공동 코트풀</small><strong>${esc(poolStatusText(pool))}</strong></div><span>${esc(pool.courtIds.map(id=>courtLabel(courtById(id))).join(' · '))}</span></header><div class="prelim-pool-list549">${rows}</div></article>`;
+    }).join('');
+  }
+  function installStyle(){if($('prelimSharedPoolStyle549'))return;const st=document.createElement('style');st.id='prelimSharedPoolStyle549';st.textContent=`
+    .prelim-shared-pool549{display:grid;gap:8px;margin:0 0 10px}.prelim-pool-card549{border:2px solid #315f96;border-radius:10px;overflow:hidden;background:#fff}.prelim-pool-card549 header{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:8px 10px;background:#eaf2fb}.prelim-pool-card549 header div{display:grid;gap:1px}.prelim-pool-card549 header small{font-size:11px;font-weight:900;color:#315f96}.prelim-pool-card549 header strong{font-size:14px;color:#122b4a}.prelim-pool-card549 header>span{font-size:12px;font-weight:900;color:#315f96;white-space:nowrap}.prelim-pool-list549{display:grid}.prelim-pool-row549{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:8px;align-items:center;padding:6px 10px;border-top:1px solid #e1e8f0}.prelim-pool-row549>b{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#315f96;color:#fff;font-size:11px}.prelim-pool-row549 span{display:grid;gap:1px}.prelim-pool-row549 strong{font-size:13px;color:#10264a}.prelim-pool-row549 small{font-size:12px;color:#40556f}.prelim-pool-row549 em{font-style:normal;font-size:11px;font-weight:900;color:#315f96}.prelim-pool-empty549{padding:9px 10px;font-size:12px;color:#62738a}@media(max-width:640px){.prelim-pool-card549 header{padding:7px 8px}.prelim-pool-card549 header>span{font-size:10px}.prelim-pool-row549{grid-template-columns:22px minmax(0,1fr);padding:6px 8px}.prelim-pool-row549 em{display:none}.prelim-pool-row549 strong{font-size:12px}.prelim-pool-row549 small{font-size:11px}}
+  `;document.head.appendChild(st);}
+
+  const originalAssignPrelim=assignPrelim;
+  assignPrelim=function(){
+    const result=originalAssignPrelim.apply(this,arguments);
+    const pools=buildPoolsAfterAssignment();
+    if(pools.length){
+      const summary=pools.map(p=>`${p.label} (${p.groupIds.length}조/${p.courtIds.length}코트)`).join(' · ');
+      commit(`예선 공동 코트풀 자동구성 · ${summary}`);
+      prelimNotice(`나누어 떨어지지 않는 구간을 공동 코트풀로 구성했습니다. ${summary} · 확정 경기만 코트에 올리고 나머지는 먼저 빈 코트로 자동 승격합니다.`,'success');
+    }
+    renderPoolPanel();return result;
+  };
+
+  const originalConfirmPrelimResult=confirmPrelimResult;
+  confirmPrelimResult=function(event){
+    const id=$('prelimResultMatchId')?.value||'';
+    const before=matchById(id);const poolId=before?.prelimPoolId||poolForMatch(before)?.id||'';
+    const sourceCourtId=before?.prelimCourtId||before?.courtId||'';
+    const result=originalConfirmPrelimResult.apply(this,arguments);
+    const pool=poolId?findPool(poolId):null;
+    if(pool&&sourceCourtId)reclaimSourceAutoPromotion(pool,sourceCourtId,id);
+    if(poolId&&reconcilePool(poolId)){
+      const pool=findPool(poolId);
+      commit(`예선 공동 코트풀 승격 · ${pool?.label||poolId} · 공동대기 ${safe(pool?.queue).length}경기`);
+      prelimNotice(pool?.completed?`${pool.label} 예선 경기가 모두 끝났습니다.`:`${pool.label}: 먼저 빈 코트에 다음 가능한 경기를 자동 배정했습니다. 공동대기 ${safe(pool?.queue).length}경기.`,'success');
+    }
+    return result;
+  };
+
+  // 클라우드 동기화/화면 재렌더 후에도 공동대기 패널을 복원한다.
+  function restore(){installStyle();ensurePoolState();for(const pool of poolList())if(pool.active&&!pool.completed)reconcilePool(pool.id);renderPoolPanel();}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(restore,500),{once:true});else setTimeout(restore,500);
+  window.addEventListener('hashchange',()=>setTimeout(renderPoolPanel,180));
+  const gridObserver=()=>{const grid=$('prelimCourtOperationGrid');if(!grid)return;let pending=false;new MutationObserver(()=>{if(pending)return;pending=true;requestAnimationFrame(()=>{pending=false;renderPoolPanel();});}).observe(grid,{childList:true,subtree:true});};
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(gridObserver,700),{once:true});else setTimeout(gridObserver,700);
+
+  window.stage549PrelimPool={build:buildPoolsAfterAssignment,reconcile:reconcilePool,list:()=>structuredClone(poolList())};
+  console.info('[230MATCH] 5.4.9 ready · prelim shared court pool active');
 })();
