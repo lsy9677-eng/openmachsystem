@@ -3651,16 +3651,16 @@ async function submitPublicApplication(){
   if(entryEditingId){
     const item=simpleRegistrationRows().find(a=>a.id===entryEditingId);if(!item||!['approved','reserve'].includes(item.status)||item.cancelRequestStatus==='requested'){clearEntryApplicationForm();notice('현재 수정할 수 없는 신청입니다.','error');return;}
     const duplicate=simpleRegistrationRows().find(a=>a.id!==item.id&&['approved','reserve'].includes(a.status)&&entryApplicationPlayers(a).some(p=>players.some(n=>n.phone===p.phone)));
-    if(duplicate){notice(`같은 연락처가 포함된 승인 대기 신청이 이미 있습니다. 신청번호 ${duplicate.code}`,'error');return;}
+    if(duplicate){notice(`같은 연락처가 포함된 승인 대기 신청이 이미 있습니다.${duplicate.teamName?` 기존 신청: ${duplicate.teamName}`:''}`,'error');return;}
     Object.assign(item,common);try{const saved=await saveRegistrationCloud(item);Object.assign(item,saved);}catch(error){notice(`참가 신청 저장 실패: ${error?.message||error}`,'error');return;}try{syncCurrentDivisionRuntime();safePersistState('참가 신청 수정');}catch(_e){}renderApplicationPortal();clearEntryApplicationForm();lookupPublicApplication();notice('참가 신청을 수정했습니다.','success');return;
   }
   const duplicate=simpleRegistrationRows().find(a=>['approved','reserve'].includes(a.status)&&entryApplicationPlayers(a).some(p=>players.some(n=>n.phone===p.phone)));
-  if(duplicate){notice(`두 선수 중 같은 연락처로 승인 대기 중인 신청이 있습니다. 신청번호 ${duplicate.code}`,'info');renderApplicationPortal();return;}
+  if(duplicate){notice(`두 선수 중 같은 연락처로 승인 대기 중인 신청이 있습니다.${duplicate.teamName?` 기존 신청: ${duplicate.teamName}`:''}`,'info');renderApplicationPortal();return;}
   const autoStatus=simpleRegistrationAutoStatus();const createdAt=new Date().toISOString();const item={id:crypto.randomUUID(),code:applicationCode(),...common,status:autoStatus,paid:false,paymentStatus:'unpaid',createdAt,approvedAt:autoStatus==='approved'?createdAt:'',adminMemo:autoStatus==='reserve'?'정원 초과로 후보팀에 자동 등록되었습니다.':'참가 신청이 접수되었습니다.'};
   try{const saved=await saveRegistrationCloud(item);Object.assign(item,saved);}catch(error){notice(`참가 신청 저장 실패: ${error?.message||error}`,'error');return;}if(!(state.portal.applications||[]).some(a=>a.id===item.id))state.portal.applications.unshift(item);try{syncCurrentDivisionRuntime();safePersistState('참가 신청 접수');}catch(_e){}renderApplicationPortal();clearEntryApplicationForm();
   const receipt=document.getElementById('entryApplicationReceipt');if(receipt){receipt.hidden=false;{
     const guide=entrySelectedPaymentGuide(),payAccount=[guide?.bank,guide?.account].filter(Boolean).join(' '),payFee=guide?.fee||'';
-    receipt.innerHTML=`<strong>${item.status==='reserve'?'후보팀으로 접수되었습니다.':'참가 신청이 접수되었습니다.'}</strong><span>신청번호 ${portalEscape(item.code)} · ${item.status==='reserve'?`후보 ${simpleRegistrationReserveOrder(item)}번`:'입금 확인 후 입금완료로 표시됩니다.'}</span>${payAccount||payFee?`<span>참가비 ${portalEscape(payFee||'미설정')} · ${portalEscape(payAccount||'계좌 미설정')}</span>`:''}`;
+    receipt.innerHTML=`<strong>${item.status==='reserve'?'후보팀으로 접수되었습니다.':'참가 신청이 접수되었습니다.'}</strong><span>${item.status==='reserve'?`후보 ${simpleRegistrationReserveOrder(item)}번`:'입금 확인 후 입금완료로 표시됩니다.'}</span>${payAccount||payFee?`<span>참가비 ${portalEscape(payFee||'미설정')} · ${portalEscape(payAccount||'계좌 미설정')}</span>`:''}`;
   }}
   notice(item.status==='reserve'?`정원 초과로 후보 ${simpleRegistrationReserveOrder(item)}번에 자동 등록되었습니다.`:'참가 신청이 접수되었습니다. 입금 확인만 남았습니다.','success');
   entryFormManualExpanded=false;entryFormUserOpened=false;renderEntryFormCollapseState();
@@ -3793,7 +3793,7 @@ function renderEntrySelfManager(){
     return `<article class="entry-self-card">
       <div class="entry-self-card-main">
         <strong>${portalEscape(a.teamName)}</strong>
-        <small>${portalEscape(a.tournamentDivision||'현재 부서')} · 신청번호 ${portalEscape(a.code||'')}</small>
+        <small>${portalEscape(a.tournamentDivision||'현재 부서')}</small>
         <div class="entry-self-card-meta">
           <span class="badge ${a.status==='reserve'?'badge-warning':'badge-safe'}">${status}</span>
           <span class="entry-payment ${entryPaymentClass(a)}">${portalEscape(paid)}</span>
@@ -3818,7 +3818,7 @@ function lookupPublicApplication(){
     const reserveNo=simpleRegistrationReserveOrder(a);
     const status=a.status==='reserve'?`후보 ${reserveNo}번`:a.status==='cancelled'?'취소 완료':'참가 신청';
     const cancelLabel=a.cancelRequestStatus==='requested'?'취소 승인 대기':'참가 취소 신청';
-    return `<article class="entry-status-card"><div><strong>${portalEscape(a.teamName)}</strong><span>${portalEscape(a.tournamentName||state.tournament?.name||'현재 대회')}${a.tournamentDivision?` (${portalEscape(a.tournamentDivision)})`:''} · ${portalEscape(a.affiliation||'소속 없음')} · ${new Date(a.createdAt).toLocaleString('ko-KR')}</span></div><span class="entry-status ${applicationStatusClass(a.status)}">${status}</span><div class="entry-code">${portalEscape(a.code)}</div><div class="entry-extra"><span class="entry-payment ${entryPaymentClass(a)}">${entryPaymentLabel(a)}${a.paidAt?` · ${portalEscape(entryDateTime(a.paidAt))}`:''}</span>${reserveNo?`<span class="entry-wait-number">후보 ${reserveNo}번</span>`:''}</div>${a.adminMemo?`<p>${portalEscape(a.adminMemo)}</p>`:''}${['approved','reserve'].includes(a.status)?`<div class="entry-public-actions"><button type="button" class="btn btn-light btn-small" data-entry-edit="${a.id}">신청 수정</button><button type="button" class="btn btn-danger-outline btn-small" data-entry-cancel="${a.id}">${cancelLabel}</button></div>`:''}</article>`;
+    return `<article class="entry-status-card"><div><strong>${portalEscape(a.teamName)}</strong><span>${portalEscape(a.tournamentName||state.tournament?.name||'현재 대회')}${a.tournamentDivision?` (${portalEscape(a.tournamentDivision)})`:''} · ${portalEscape(a.affiliation||'소속 없음')} · ${new Date(a.createdAt).toLocaleString('ko-KR')}</span></div><span class="entry-status ${applicationStatusClass(a.status)}">${status}</span><div class="entry-extra"><span class="entry-payment ${entryPaymentClass(a)}">${entryPaymentLabel(a)}${a.paidAt?` · ${portalEscape(entryDateTime(a.paidAt))}`:''}</span>${reserveNo?`<span class="entry-wait-number">후보 ${reserveNo}번</span>`:''}</div>${a.adminMemo?`<p>${portalEscape(a.adminMemo)}</p>`:''}${['approved','reserve'].includes(a.status)?`<div class="entry-public-actions"><button type="button" class="btn btn-light btn-small" data-entry-edit="${a.id}">신청 수정</button><button type="button" class="btn btn-danger-outline btn-small" data-entry-cancel="${a.id}">${cancelLabel}</button></div>`:''}</article>`;
   }).join('')||'<div class="portal-empty">해당 연락처의 참가 신청이 없습니다.</div>';
 }
 
@@ -3919,8 +3919,7 @@ function registrationAdminNoticeBody(kind,item){
 입금상태: ${item.paid?'입금완료':'미입금'}
 취소사유: ${item.cancelReason||'-'}
 환불계좌: ${item.refundBank||''} ${item.refundAccount||''}
-예금주: ${item.refundAccountHolder||''}
-신청번호: ${item.code||''}`;
+예금주: ${item.refundAccountHolder||''}`;
   }
   return `[230MATCH 참가신청]
 대회: ${event}${division?` · ${division}`:''}
@@ -3928,8 +3927,7 @@ function registrationAdminNoticeBody(kind,item){
 참가자: ${playerText}
 대표 연락처: ${item.phone||''}
 상태: ${item.status==='reserve'?`후보 ${simpleRegistrationReserveOrder(item)}번`:'참가'}
-입금상태: ${item.paid?'입금완료':'미입금'}
-신청번호: ${item.code||''}${item.memo?`\n전달사항: ${item.memo}`:''}`;
+입금상태: ${item.paid?'입금완료':'미입금'}${item.memo?`\n전달사항: ${item.memo}`:''}`;
 }
 async function openAdminNoticeSms(kind,item,{ask=true}={}){
   const adminPhone=registrationAdminNotifyPhone();
@@ -4052,7 +4050,7 @@ function renderApplicationPortal(){
       const reserveNo=simpleRegistrationReserveOrder(a);
       const paymentTime=a.paidAt?`<small class="entry-payment-time">입금확인 ${portalEscape(entryDateTime(a.paidAt))}${a.paymentConfirmedByName?` · ${portalEscape(a.paymentConfirmedByName)}`:''}</small>`:'<small class="entry-payment-time">아직 입금확인 전</small>';
       const cancelBox=a.cancelRequestStatus==='requested'?`<div class="cancel-request-box"><strong>취소 신청</strong><br>사유 ${portalEscape(a.cancelReason||'-')}<br>환불계좌 ${portalEscape(a.refundBank||'')} ${portalEscape(a.refundAccount||'')} · ${portalEscape(a.refundAccountHolder||'')}<div class="cancel-request-actions"><button class="btn btn-danger-outline btn-small" data-entry-cancel-approve="${a.id}">취소 승인${a.paid?'·환불완료':''}</button><button class="btn btn-light btn-small" data-entry-cancel-reject="${a.id}">취소 반려</button></div></div>`:'';
-      return `<article class="entry-admin-row simple-registration"><div class="entry-main"><strong>${portalEscape(a.teamName)}</strong><span>${portalEscape(a.tournamentName||state.tournament?.name||'현재 대회')}${a.tournamentDivision?` (${portalEscape(a.tournamentDivision)})`:''} · ${portalEscape(a.affiliation||'소속 없음')} · ${portalEscape(a.phone)} · ${portalEscape(a.code)}</span><small>${new Date(a.createdAt).toLocaleString('ko-KR')}${a.memo?` · ${portalEscape(a.memo)}`:''}</small></div><span class="entry-status ${applicationStatusClass(a.status)}">${a.status==='reserve'?`후보 ${reserveNo}번`:a.status==='cancelled'?'취소 완료':'참가'}</span><div class="entry-payment-wrap"><span class="entry-payment ${entryPaymentClass(a)}">${entryPaymentLabel(a)}</span>${paymentTime}</div><div class="entry-actions">${['approved','reserve'].includes(a.status)?`<button class="btn btn-small entry-payment-button ${a.paid?'paid':'unpaid'}" data-entry-payment="${a.id}">${a.paid?'✓ 입금완료':'입금확인'}</button>`:''}${a.paid&&['approved','reserve'].includes(a.status)?`<button class="btn btn-light btn-small" data-entry-payment-sms="${a.id}">입금완료 문자</button>`:''}<button class="btn btn-light btn-small" data-entry-sms="${a.id}">일반 문자</button></div>${cancelBox}</article>`;
+      return `<article class="entry-admin-row simple-registration"><div class="entry-main"><strong>${portalEscape(a.teamName)}</strong><span>${portalEscape(a.tournamentName||state.tournament?.name||'현재 대회')}${a.tournamentDivision?` (${portalEscape(a.tournamentDivision)})`:''} · ${portalEscape(a.affiliation||'소속 없음')} · ${portalEscape(a.phone)}</span><small>${new Date(a.createdAt).toLocaleString('ko-KR')}${a.memo?` · ${portalEscape(a.memo)}`:''}</small></div><span class="entry-status ${applicationStatusClass(a.status)}">${a.status==='reserve'?`후보 ${reserveNo}번`:a.status==='cancelled'?'취소 완료':'참가'}</span><div class="entry-payment-wrap"><span class="entry-payment ${entryPaymentClass(a)}">${entryPaymentLabel(a)}</span>${paymentTime}</div><div class="entry-actions">${['approved','reserve'].includes(a.status)?`<button class="btn btn-small entry-payment-button ${a.paid?'paid':'unpaid'}" data-entry-payment="${a.id}">${a.paid?'✓ 입금완료':'입금확인'}</button>`:''}${a.paid&&['approved','reserve'].includes(a.status)?`<button class="btn btn-light btn-small" data-entry-payment-sms="${a.id}">입금완료 문자</button>`:''}<button class="btn btn-light btn-small" data-entry-sms="${a.id}">일반 문자</button></div>${cancelBox}</article>`;
     }).join('')||'<div class="portal-empty">조건에 맞는 참가 신청이 없습니다.</div>';
     renderEntryDivisionAdminOverview();
   }
