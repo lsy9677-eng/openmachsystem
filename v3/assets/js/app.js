@@ -1,8 +1,8 @@
 import{getAuthConfig,saveAuthConfig,startAuth,signInGoogle,signOutSocial,beginExternalLogin,getExistingLoginEndpoints,signInEmail,registerEmail,sendPasswordReset,linkEmailPassword,authProviderIds,getAuthRuntime}from'./auth-engine.js?v=3565';
-import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7130';
+import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7131';
 import{notificationSupport,getStoredVapidKey,saveStoredVapidKey,enableMyPush,disableMyPush,queuePush,listPushJobs,listPushTokens}from'./notification-engine.js?v=332012';
 
-import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7130';
+import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7131';
 import{prepareTeams,generateDraw,allMatches,findMatch,generateLinkedDrawSlots,syncLinkedDrawQualifiers}from'./bracket-engine-v5000.js?v=5000';
 import{ensureDrawMeta,canModifyDraw,createDrawWithMethod,lockDraw,unlockDrawForDevelopment,clearDrawHistory}from'./draw-method-engine.js?v=332012';
 import{buildCourts,assignInitial,queueReadyMatches,refillCourt}from'./court-engine.js?v=332012';
@@ -15,7 +15,7 @@ import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactD
 import{render,teamText}from'./ui.js?v=3504';
 import{ensureAuditState,runStateAudit,runPrelimSimulation,runFullSimulation,applyAuditResult}from'./audit-engine.js?v=332012';
 import{earlyMainStats,markResolvedMainMatchesReady,canAssignEarlyMain,ensureEarlyMainSettings,autoAssignResolvedMain}from'./early-main-engine.js?v=332012';
-import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7130';
+import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7131';
 import{ensureMainDrawLifecycle,beginMainDraw,completeMainDraw,failMainDraw,resetMainDraw,hasAuthorizedMainDraw,mainDrawStatus,clearMainPlacement,repairMainDrawAuthorization}from'./main-draw-lifecycle-engine.js?v=3501';
 import{shouldUseLinkedDraw,linkedDrawNeedsRepair,rebuildLinkedDraw,hasStartedMainMatches}from'./linked-draw-guard-engine.js?v=332012';
 import{ensureVenueSettings,ensureVenueQueues,venuePreset,buildVenueCourts,prelimVenues,mainVenues}from'./venue-engine.js?v=332012';
@@ -26,7 +26,7 @@ import{ensureCourtStatuses,pauseCourt,resumeCourt}from'./court-status-engine.js?
 import{ensureCourtManualQueues,assignToCourtManualQueue,moveCourtMatchFlexible,returnManualQueueItemToVenue,reorderCourtManualQueue}from'./court-manual-queue-engine.js?v=332012';
 import{reorderPrelimQueue as reorderPrelimQueueItem,movePrelimQueuedMatch,returnPrelimWait1ToQueue}from'./prelim-queue-control-engine.js?v=332012';
 import{ensurePrelimCourtStatuses,pausePrelimCourt,resumePrelimCourt}from'./prelim-court-status-engine.js?v=332012';
-import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7130';
+import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7131';
 import{verifyAndRepairMainFlow}from'./main-flow-integrity-engine.js?v=332012';
 import{finalizeTournamentCompletion}from'./tournament-completion-engine.js?v=332012';
 import{ensureTournamentIdentity,validateTournamentForArchive,createTournamentArchive,archiveListItem,archiveBackupPayload}from'./archive-engine.js?v=354000';
@@ -10428,7 +10428,7 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
   };
   setInterval(tick,2500);
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(tick,350),{once:true});else setTimeout(tick,350);
-  console.info('[230MATCH] 71.3.0 ready · native sms anchor launch');
+  console.info('[230MATCH] 71.3.1 ready · native sms recipient autofill');
 })();
 
 
@@ -10520,7 +10520,7 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
   window.addEventListener('pageshow',update);
   setInterval(()=>{if(document.body?.dataset.currentView==='home')update();},5000);
   window.__updateTodayTournamentDashboard=updateTodayDashboard;
-  console.info('[230MATCH] 71.3.0 ready · native sms anchor launch');
+  console.info('[230MATCH] 71.3.1 ready · native sms recipient autofill');
 })();
 
 
@@ -10788,7 +10788,7 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
   window.__run230MatchResultFlowCheck=runResultFlowCheck;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(runResultFlowCheck,700),{once:true});else setTimeout(runResultFlowCheck,700);
   setInterval(()=>{if(document.body?.dataset.currentView==='home'&&canOperate())runResultFlowCheck();},10000);
-  console.info('[230MATCH] 71.3.0 ready · native sms anchor launch');
+  console.info('[230MATCH] 71.3.1 ready · native sms recipient autofill');
 })();
 
 
@@ -10853,7 +10853,7 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
     document.addEventListener('DOMContentLoaded',()=>setTimeout(updateMatchdayQuickBar,700),{once:true});
   }else setTimeout(updateMatchdayQuickBar,700);
   setInterval(updateMatchdayQuickBar,5000);
-  console.info('[230MATCH] 71.3.0 ready · native sms anchor launch');
+  console.info('[230MATCH] 71.3.1 ready · native sms recipient autofill');
 })();
 
 
@@ -10986,46 +10986,40 @@ ${body}
     const smsBody=feedbackSmsBody(kind,body);
     const href=window.__230matchBuildNativeSmsHref
       ? window.__230matchBuildNativeSmsHref(adminPhone,smsBody)
-      : `sms:${String(adminPhone).replace(/\D/g,'')}?body=${encodeURIComponent(smsBody)}`;
+      : (/iPhone|iPad|iPod/i.test(navigator.userAgent||'')
+          ? `sms:${String(adminPhone).replace(/\D/g,'')}&body=${encodeURIComponent(smsBody)}`
+          : `smsto:${String(adminPhone).replace(/\D/g,'')}?body=${encodeURIComponent(smsBody)}`);
     link.setAttribute('href',href);
     link.dataset.ready='1';
     link.dataset.adminPhone=String(adminPhone).replace(/\D/g,'');
     return true;
   }
-  function stage7125NativeSmsPointerDown(e){
-    const link=e.currentTarget;
-    if(!prepareFeedbackNativeLink({showWarning:true})){
-      e.preventDefault();
-      return;
-    }
-    const kind=document.getElementById('stage7125FeedbackKind')?.value||'match';
-    const body=String(document.getElementById('stage7125FeedbackBody')?.value||'').trim();
-    const adminPhone=registrationAdminNotifyPhone();
-    const row=buildFeedbackRow(kind,body,adminPhone);
-
-    // 브라우저가 실제 <a href="sms:..."> 기본 동작을 처리하게 두고,
-    // 앱 기록만 먼저 로컬에 보관한다. preventDefault를 호출하지 않는다.
-    storePendingFeedback(row);
-    const status=document.getElementById('stage7125FeedbackStatus');
-    if(status){status.className='badge badge-safe';status.textContent='문자앱 연결';}
-  }
   function bindFeedbackNativeLink(){
     const link=document.getElementById('stage7125SendFeedbackBtn');if(!link||link.dataset.nativeBound==='1')return;
     link.dataset.nativeBound='1';
-    // touchstart/pointerdown에서 href를 먼저 확정해야 모바일 브라우저가 외부앱 링크로 인정한다.
-    link.addEventListener('pointerdown',stage7125NativeSmsPointerDown);
-    link.addEventListener('touchstart',()=>{
-      prepareFeedbackNativeLink({showWarning:false});
-    },{passive:true});
+
+    // href는 사용자가 누르기 전에 미리 완성해 둔다.
+    // 클릭 순간에 href를 바꾸면 일부 모바일 브라우저/웹앱이 기존 sms: 값을 사용해
+    // 받는 사람 번호가 비어버리는 경우가 있다.
+    const refresh=()=>prepareFeedbackNativeLink({showWarning:false});
+    document.getElementById('stage7125FeedbackBody')?.addEventListener('input',refresh);
+    document.getElementById('stage7125FeedbackKind')?.addEventListener('change',refresh);
+
     link.addEventListener('click',e=>{
-      if(link.dataset.ready!=='1'){
+      if(!prepareFeedbackNativeLink({showWarning:true})){
         e.preventDefault();
-        prepareFeedbackNativeLink({showWarning:true});
+        return;
       }
+      const kind=document.getElementById('stage7125FeedbackKind')?.value||'match';
+      const body=String(document.getElementById('stage7125FeedbackBody')?.value||'').trim();
+      const adminPhone=registrationAdminNotifyPhone();
+      storePendingFeedback(buildFeedbackRow(kind,body,adminPhone));
+      const status=document.getElementById('stage7125FeedbackStatus');
+      if(status){status.className='badge badge-safe';status.textContent='문자앱 연결';}
+      // preventDefault 금지: 실제 <a href="smsto:..."> 기본 동작으로 문자앱을 연다.
     });
-    document.getElementById('stage7125FeedbackBody')?.addEventListener('input',()=>prepareFeedbackNativeLink());
-    document.getElementById('stage7125FeedbackKind')?.addEventListener('change',()=>prepareFeedbackNativeLink());
-    prepareFeedbackNativeLink();
+
+    refresh();
   }
   function renderAdminInbox(rows){
     const wrap=document.getElementById('stage7125AdminFeedbackInbox'),root=document.getElementById('stage7125AdminFeedbackList');
@@ -11071,7 +11065,7 @@ ${body}
   window.addEventListener('pageshow',()=>setTimeout(updateFeedbackHome,150));
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(updateFeedbackHome,150);});
   setInterval(()=>{if(document.body?.dataset.currentView==='home')updateFeedbackHome();},10000);
-  console.info('[230MATCH] 71.3.0 ready · home native sms anchor launch');
+  console.info('[230MATCH] 71.3.1 ready · home native sms recipient autofill');
 })();
 
 
@@ -11084,12 +11078,12 @@ ${body}
     const to=digits(phone);
     const text=String(body||'');
     const ua=navigator.userAgent||'';
-    // Android/iOS browser differences: Android commonly accepts ?body,
-    // iOS commonly needs &body when a recipient already exists.
     const isIOS=/iPhone|iPad|iPod/i.test(ua);
+    // Android(특히 삼성 메시지/Chrome)은 smsto: 형식이 수신번호 전달이 가장 안정적이다.
+    // iOS는 sms:수신번호&body= 형식을 사용한다.
     return isIOS
       ? `sms:${to}&body=${encodeURIComponent(text)}`
-      : `sms:${to}?body=${encodeURIComponent(text)}`;
+      : `smsto:${to}?body=${encodeURIComponent(text)}`;
   }
   function openNativeSmsComposer(phone,body){
     const to=digits(phone);
@@ -11126,6 +11120,13 @@ ${body}
     const legacyInput=document.getElementById('entryAdminNotifyPhone');
     if(legacyInput&&document.activeElement!==legacyInput)legacyInput.value=p;
     try{window.__update230MatchHomeFeedback?.();}catch(_e){}
+    try{
+      const link=document.getElementById('stage7125SendFeedbackBtn');
+      if(link){
+        // updateFeedbackHome → bind/refresh 로 실제 수신번호가 href에 즉시 반영된다.
+        setTimeout(()=>window.__update230MatchHomeFeedback?.(),0);
+      }
+    }catch(_e){}
     return true;
   }
   async function loadGlobalAdminPhone(){
@@ -11339,4 +11340,4 @@ console.info('[230MATCH] 63.0.0 ready · chunked cloud workspace + bounded retry
 
 console.info('[230MATCH] 64.0.0 architecture · lazy cloud registry, worker serialization, visible-view commit rendering');
 
-console.info('[230MATCH] 71.3.0 ready · native sms anchor launch');
+console.info('[230MATCH] 71.3.1 ready · native sms recipient autofill');
