@@ -9749,6 +9749,53 @@ if(!window.__stage5008ListBound){
     if(del){e.preventDefault();e.stopImmediatePropagation();await deleteTournamentById(del.dataset.deleteTournamentId);stage5008RenderTournamentList();renderHomeTournamentCards?.();}
   },true);
 }
+
+// 5.4.18 · 홈 운영대회 카드 수정·편집/삭제 버튼 실제 동작 연결
+if(!window.__homeTournamentAdminActionsBound){
+  window.__homeTournamentAdminActionsBound=true;
+  document.addEventListener('click',async e=>{
+    const edit=e.target.closest?.('[data-home-tournament-edit]');
+    if(edit){
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if(typeof requireAdmin==='function'&&!requireAdmin('대회 수정·편집'))return;
+      const id=String(edit.dataset.homeTournamentEdit||'').trim();
+      if(!id)return;
+      try{
+        const currentId=String(state.multiTournament?.activeTournamentId||state.tournament?.id||'').trim();
+        if(id!==currentId){
+          const switched=await switchTournamentWorkspace(id,{view:'home'});
+          if(!switched)return;
+        }
+        // 통합 대회편집기(60.0.1)를 직접 호출한다.
+        const opener=window.stage329OpenTournamentEdit || window.stage3210OpenTournamentEdit || (typeof stage329OpenTournamentEdit==='function'?stage329OpenTournamentEdit:null);
+        if(typeof opener!=='function')throw new Error('대회 편집기를 찾을 수 없습니다.');
+        requestAnimationFrame(()=>opener());
+      }catch(err){
+        console.error('[230MATCH] 홈 대회 수정·편집 열기 실패',err);
+        notice(err?.message||'대회 편집 화면을 열지 못했습니다.','error');
+      }
+      return;
+    }
+    const del=e.target.closest?.('[data-home-tournament-delete]');
+    if(del){
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      const id=String(del.dataset.homeTournamentDelete||'').trim();
+      if(!id)return;
+      try{
+        await deleteTournamentById(id);
+        renderHomeTournamentCards?.();
+        stage5008RenderTournamentList?.();
+      }catch(err){
+        console.error('[230MATCH] 홈 대회 삭제 실패',err);
+        notice(err?.message||'대회를 삭제하지 못했습니다.','error');
+      }
+      return;
+    }
+  },true);
+}
+
 if(!document.getElementById('stage5008CompactCss')){
   const style=document.createElement('style');style.id='stage5008CompactCss';style.textContent=`
   #tournamentCardList.stage5008-compact-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
