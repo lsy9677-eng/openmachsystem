@@ -127,6 +127,18 @@
     .member-reference-panel{display:none}
   }
 </style>
+
+<style id="stage5415HomeSimplifyStyles">
+/* 5.4.15 · 홈 중복 제거 + 역할별 빠른 바로가기 */
+body[data-role="admin"] .stage5415-member-quick{display:none!important}
+.stage5415-admin-quick{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+/* 기존 대회 운영 현황/중복 메뉴는 상단 바로가기와 기능이 겹쳐 숨깁니다. */
+#view-home .legacy-tournament-card{display:none!important}
+@media(max-width:700px){
+  .stage5415-admin-quick{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .stage5415-admin-quick button{min-height:92px!important}
+}
+</style>
 </head>
 <body>
   <header class="topbar">
@@ -272,7 +284,7 @@
           </div>
           <div id="stage7117HealthDetail" class="stage7117-healthcheck-detail" hidden></div>
         </section>
-        <div class="stage3212-public-actions">
+        <div class="stage3212-public-actions stage5415-member-quick">
           <button type="button" data-portal-go="entry"><span>📝</span><b>참가 신청</b><small id="stage3212EntryCount">접수 현황 확인</small></button>
           <button type="button" data-portal-go="my-match"><span>🔎</span><b>내 경기</b><small>내 경기·대기 순서</small></button>
           <button type="button" data-portal-go="prelim-public"><span>📋</span><b>예선 현황</b><small id="stage3212PrelimCount">조편성·순위</small></button>
@@ -280,16 +292,11 @@
           <button type="button" data-portal-go="bracket"><span>🏆</span><b>본선 대진표</b><small id="stage3212MainCount">대진·결과</small></button>
           <button type="button" data-portal-go="guide"><span>📌</span><b>대회 요강</b><small>이미지·세부 요강 확인</small></button>
         </div>
-        <div class="stage3212-admin-actions" data-admin-only="true">
-          <strong>관리자 빠른 운영</strong>
-          <div>
-            <button type="button" data-stage3210-open-edit>⚙️ 현재 대회 편집</button>
-            <button type="button" data-portal-go="guide">📌 요강 확인·수정</button>
-            <button type="button" data-portal-go="entry">💳 참가 접수·입금</button>
-            <button type="button" data-portal-go="operation">🎾 경기 운영</button>
-            <button type="button" data-portal-go="messages">💬 문자 센터</button>
-            <button type="button" data-portal-go="print">🖨️ 출력 센터</button>
-          </div>
+        <div class="stage3212-public-actions stage5415-admin-quick" data-admin-only="true">
+          <button type="button" data-portal-go="prelim-public"><span>📋</span><b>예선 현황</b><small>조편성·순위·결과</small></button>
+          <button type="button" data-portal-go="operation"><span>🎾</span><b>코트 현황</b><small>시합중·대기·결과 입력</small></button>
+          <button type="button" data-portal-go="bracket"><span>🏆</span><b>본선 대진표</b><small>대진·진행·결과</small></button>
+          <button type="button" onclick="window.openAdminSettingsHub&&window.openAdminSettingsHub()"><span>⚙️</span><b>설정</b><small>현재 대회 운영 설정</small></button>
         </div>
       </section>
 
@@ -2102,7 +2109,7 @@
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=7154"></script>
+  <script type="module" src="./assets/js/app.js?v=7155"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">

@@ -6483,7 +6483,10 @@ void 0;
     const pc=document.getElementById('stage3212PrelimCount');if(pc)pc.textContent=prelim.length?`${countDone(prelim)} / ${prelim.length}경기 완료`:'조편성·순위';
     const cc=document.getElementById('stage3212CourtCount');if(cc)cc.textContent=`진행 ${playing}코트 · 전체 ${courts.length}코트`;
     const mc=document.getElementById('stage3212MainCount');if(mc)mc.textContent=main.length?`${countDone(main)} / ${main.length}경기 완료`:'대진·결과';
-    const admin=hub.querySelector('.stage3212-admin-actions');if(admin)admin.hidden=!(typeof isAdmin==='function'&&isAdmin());
+    const adminQuick=hub.querySelector('.stage5415-admin-quick');if(adminQuick)adminQuick.hidden=!(typeof isAdmin==='function'&&isAdmin());
+    const memberQuick=hub.querySelector('.stage5415-member-quick');if(memberQuick)memberQuick.hidden=(typeof isAdmin==='function'&&isAdmin());
+    const title=hub.querySelector('.stage3212-hub-head h2');if(title)title.textContent=(typeof isAdmin==='function'&&isAdmin())?'관리자 바로가기':'현재 대회 바로가기';
+    const desc=hub.querySelector('.stage3212-hub-head p');if(desc)desc.textContent=(typeof isAdmin==='function'&&isAdmin())?'예선·코트·본선·설정으로 바로 이동합니다.':'참가 신청부터 내 경기·코트·대진을 빠르게 확인합니다.';
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',update,{once:true});else update();
   document.addEventListener('click',e=>{
