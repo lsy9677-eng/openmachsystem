@@ -4179,19 +4179,60 @@ async function submitEntryCancelRequest(){
   }
 }
 
+function cancellationApprovalSmsBody(item,wasPaid){
+  const event=String(item?.tournamentName||state.tournament?.name||'').trim();
+  const division=String(item?.tournamentDivision||'').trim();
+  const head=[event,division].filter(Boolean).join(' ');
+  return `[230MATCH] ${head?head+' / ':''}${item.teamName} ${wasPaid?'참가취소 승인·환불완료.':'참가취소 승인완료.'}`;
+}
+async function sendCancellationApprovalSms(item,wasPaid){
+  const recipients=(typeof v3252Recipients==='function'?v3252Recipients(item):[]).map(x=>({name:x.name||item.teamName,phone:String(x.phone||'').replace(/\D/g,'')})).filter(x=>validatePhone(x.phone));
+  if(!recipients.length){notice('취소 승인 완료 · 참가자 문자 수신번호가 없어 문자는 보내지 못했습니다.','warning');return false;}
+  const body=cancellationApprovalSmsBody(item,wasPaid);
+  item.smsHistory=item.smsHistory||[];
+  try{
+    await sendAligoSmsV3(recipients,body,{source:'registration_cancel_approved',kind:'cancel_approved',title:'230MATCH 취소 승인'});
+    item.smsHistory.unshift({kind:'cancel_approved',channel:'aligo',sentAt:new Date().toISOString(),body,recipients});
+    try{await saveRegistrationCloud(item);}catch(_e){}
+    try{safePersistState('취소 승인 자동문자');}catch(_e){}
+    notice(`취소 승인 문자 ${recipients.length}명 자동 발송 완료`,'success');
+    return true;
+  }catch(error){
+    console.warn('[5.4.23] cancellation approval aligo failed, fallback to phone composer',error);
+    const phones=recipients.map(x=>x.phone);
+    try{
+      if(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||'')){
+        window.location.href=`sms:${phones.join(',')}?body=${encodeURIComponent(body)}`;
+        item.smsHistory.unshift({kind:'cancel_approved',channel:'phone',sentAt:new Date().toISOString(),body,recipients});
+        try{safePersistState('취소 승인 문자앱 열기');}catch(_e){}
+        notice('알리고 자동발송에 실패해 문자앱에 취소 승인 문자를 준비했습니다. 전송 버튼만 눌러주세요.','warning');
+        return true;
+      }
+      await navigator.clipboard?.writeText(`${phones.join('\n')}\n\n${body}`);
+      notice('알리고 자동발송에 실패해 수신번호와 취소 승인 문구를 복사했습니다.','warning');
+      return true;
+    }catch(_e){
+      notice(`취소 승인은 완료됐지만 문자 발송에 실패했습니다: ${error?.message||error}`,'warning');
+      return false;
+    }
+  }
+}
 async function approveRegistrationCancellation(id){
   if(!requireAdmin('참가 취소 승인'))return;
   const item=simpleRegistrationRows().find(a=>a.id===id);if(!item||item.cancelRequestStatus!=='requested')return;
-  if(!confirm(`${item.teamName}의 참가 취소를 승인할까요?${item.paid?'\n입금완료 상태이므로 환불완료로 함께 처리됩니다.':''}`))return;
+  const wasPaid=Boolean(item.paid||item.paymentStatus==='paid');
+  if(!confirm(`${item.teamName}의 참가 취소를 승인할까요?${wasPaid?'\n입금완료 상태이므로 환불완료로 함께 처리됩니다.':''}`))return;
   item.status='cancelled';item.cancelRequestStatus='approved';item.cancelApprovedAt=new Date().toISOString();item.cancelApprovedByUid=currentAuthUser?.uid||'';item.cancelApprovedByName=authUserLabel();
-  if(item.paid){item.paid=false;item.paymentStatus='refunded';item.refundedAt=item.cancelApprovedAt;}
+  if(wasPaid){item.paid=false;item.paymentStatus='refunded';item.refundedAt=item.cancelApprovedAt;}
   item.updatedAt=item.cancelApprovedAt;
   try{
     await saveRegistrationCloud(item);
     const team=(state.teams||[]).find(t=>String(t.registrationId||'')===String(item.id)||myMatchNormalize(t.name)===myMatchNormalize(item.teamName));
     if(team){state.teams=state.teams.filter(t=>t.id!==team.id);state.prelim.activeTeams=(state.prelim.activeTeams||[]).filter(t=>t.id!==team.id);state.prelim.reserveTeams=(state.prelim.reserveTeams||[]).filter(t=>t.id!==team.id);}
     const promoted=await simplePromoteNextReserve();try{safePersistState('참가 취소 승인');}catch(_e){}
-    renderApplicationPortal();renderParticipantManager?.();lookupPublicApplication();notice(promoted?`취소 승인 완료 · ${promoted.teamName} 후보팀이 자동 참가 전환되었습니다.`:'참가 취소를 승인했습니다.','success');
+    renderApplicationPortal();renderParticipantManager?.();lookupPublicApplication();
+    notice(promoted?`취소 승인 완료 · ${promoted.teamName} 후보팀이 자동 참가 전환되었습니다.`:'참가 취소를 승인했습니다.','success');
+    await sendCancellationApprovalSms(item,wasPaid);
   }catch(error){notice(`취소 승인 저장 실패: ${error?.message||error}`,'error');}
 }
 async function rejectRegistrationCancellation(id){
