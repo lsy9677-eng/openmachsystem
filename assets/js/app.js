@@ -8698,7 +8698,7 @@ console.info('[230MATCH V3] 34.4.2 ready · main wait1 refill and shared queue e
 })();
 
 
-/* Stage 35.3.0 · Modern Cup exact archive + legacy photo recovery */
+/* Stage 35.3.0 · Modern Cup exact archive preservation (legacy photo network recovery removed) */
 (function stage3530ModernCupExactRestore(){
   const ID='modern-cup-2026-06-14-exact';
   const DATE='2026-06-14';
@@ -8749,37 +8749,9 @@ console.info('[230MATCH V3] 34.4.2 ready · main wait1 refill and shared queue e
     // 일부 배포본에는 archivedParticipantRows 함수가 존재하지 않습니다.
     // 존재하지 않는 함수에 직접 대입하면 전체 렌더링이 중단되므로 참가자 보관함 확장은 안전하게 생략합니다.
   }
-  async function recoverLegacyPhotos(){
-    // 과거 noticePosts 사진 복구는 관리자/운영자용 유지보수 기능입니다.
-    // 일반 선수·로그아웃 사용자는 Firestore 권한 요청 자체를 하지 않습니다.
-    if(!canOperate())return;
-    try{
-      const rt=await getAuthRuntime();
-      if(!rt?.db)return;
-      const api=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
-      const {collection,getDocs,query,orderBy,limit}=api;
-      let snap;
-      try{snap=await getDocs(query(collection(rt.db,'noticePosts'),orderBy('createdAtMs','desc'),limit(160)));}
-      catch(_e){snap=await getDocs(collection(rt.db,'noticePosts'));}
-      const photos=[];
-      snap.docs.forEach(d=>{
-        const n={id:d.id,...d.data()};
-        const text=`${n.title||''} ${n.body||''} ${n.category||''} ${n.tournamentName||''}`;
-        const urls=[...(Array.isArray(n.imageUrls)?n.imageUrls:[]),n.imageUrl].filter(Boolean);
-        if(!urls.length)return;
-        const modern=/모던|230스포츠미디어배|지역신인부/i.test(text);
-        const result=/우승|준우승|공동\s*3위|3위|8강|시합결과|대회결과|입상|경기사진/i.test(text);
-        if(!(modern||result))return;
-        urls.forEach((url,i)=>{if(!photos.some(x=>x.url===url))photos.push({url,title:n.title||`모던배 결과사진 ${i+1}`,body:n.body||'',noticeId:n.id,createdAtMs:Number(n.createdAtMs||0)});});
-      });
-      if(photos.length){
-        recoveredPhotos=photos;
-        persistExact();
-        refreshViews();
-        notice(`모던배 결과사진 ${photos.length}장을 기존 230 앱에서 불러왔습니다.`,'success');
-      }
-    }catch(error){console.warn('[35.3.0] legacy photo recovery skipped',error);}
-  }
+  // 5.4.17: 구버전 noticePosts 사진 자동 복구 제거.
+  // 과거 사진 때문에 Firestore 권한을 넓히거나 앱 시작 시 불필요한 조회를 하지 않습니다.
+  // 이미 내장된 보관 기록/사진 정보는 그대로 유지합니다.
   function refreshViews(){
     try{renderTournamentList();}catch(_e){}
     try{renderResultArchive();}catch(_e){}
@@ -8790,14 +8762,14 @@ console.info('[230MATCH V3] 34.4.2 ready · main wait1 refill and shared queue e
     const host=document.querySelector('#page-tournaments .section-head .button-row,#page-tournaments .button-row');
     if(!host||document.getElementById('restoreModernExact3530'))return;
     const b=document.createElement('button');b.id='restoreModernExact3530';b.type='button';b.className='btn btn-primary';b.textContent='모던배 전체 기록 복구';
-    b.onclick=()=>{persistExact();refreshViews();recoverLegacyPhotos();notice('모던배 입상·8강·참가자 기록을 복구했습니다.','success');};host.appendChild(b);
+    b.onclick=()=>{persistExact();refreshViews();notice('모던배 입상·8강·참가자 기록을 복구했습니다.','success');};host.appendChild(b);
   }
-  function run(){patchProviders();persistExact();refreshViews();installRestoreButton();recoverLegacyPhotos();const label=document.getElementById('buildStageLabel');if(label){label.textContent='230MATCH 35.3.1 · 모던배 기록·사진 직접 내장 복구';label.title='Version 35.3.1';}}
+  function run(){patchProviders();persistExact();refreshViews();installRestoreButton();const label=document.getElementById('buildStageLabel');if(label){label.textContent='230MATCH 35.3.1 · 모던배 기록·사진 직접 내장 복구';label.title='Version 35.3.1';}}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(run,100),{once:true});else setTimeout(run,100);
   window.addEventListener('hashchange',()=>setTimeout(()=>{refreshViews();installRestoreButton();},120));
   setTimeout(run,1200);
-  window.restoreModernCupExact3530=()=>{persistExact();refreshViews();recoverLegacyPhotos();};
-  console.info('[230MATCH V3] 35.3.1 ready · embedded Modern Cup records and photos active');
+  window.restoreModernCupExact3530=()=>{persistExact();refreshViews();};
+  console.info('[230MATCH V3] 35.3.1 archive active · legacy photo network recovery disabled');
 })();
 
 
@@ -9754,7 +9726,25 @@ if(!window.__stage5008ListBound){
   document.getElementById('tournamentListResetBtn')?.addEventListener('click',()=>{const q=document.getElementById('tournamentListSearch'),s=document.getElementById('tournamentListStatus');if(q)q.value='';if(s)s.value='all';stage5008RenderTournamentList();});
   document.addEventListener('click',async e=>{
     const edit=e.target.closest?.('[data-edit-tournament-id]');
-    if(edit){e.preventDefault();e.stopImmediatePropagation();const id=edit.dataset.editTournamentId;if(id!==state.multiTournament?.activeTournamentId)switchTournamentWorkspace(id);setTimeout(()=>{stage5008RenderTournamentList();renderDivisionWorkspaceBar();stage329OpenTournamentEdit();},0);return;}
+    if(edit){
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      const id=String(edit.dataset.editTournamentId||'').trim();
+      if(!id)return;
+      try{
+        if(id!==String(state.multiTournament?.activeTournamentId||'')){
+          const switched=await switchTournamentWorkspace(id,{view:'tournaments'});
+          if(!switched)return;
+        }
+        stage5008RenderTournamentList();
+        renderDivisionWorkspaceBar();
+        requestAnimationFrame(()=>stage329OpenTournamentEdit());
+      }catch(err){
+        console.error('[230MATCH] 대회 수정·편집 열기 실패',err);
+        notice(err?.message||'대회 편집 화면을 열지 못했습니다.','error');
+      }
+      return;
+    }
     const del=e.target.closest?.('[data-delete-tournament-id]');
     if(del){e.preventDefault();e.stopImmediatePropagation();await deleteTournamentById(del.dataset.deleteTournamentId);stage5008RenderTournamentList();renderHomeTournamentCards?.();}
   },true);
