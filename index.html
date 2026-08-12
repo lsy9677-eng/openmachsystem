@@ -519,6 +519,13 @@ body[data-role="admin"] .stage5415-member-quick{display:none!important}
               </div>
               <button id="entryPaymentAccountCopyBtn" type="button" class="btn btn-light entry-payment-copy">계좌번호 복사</button>
             </section>
+            <fieldset class="entry-sms-target-card legacy-full entry-payment-choice-card">
+              <legend>현재 입금 여부</legend>
+              <div class="entry-sms-target-options">
+                <label><input id="entryPaymentChoiceUnpaid" type="radio" name="entryPaymentChoice" value="unpaid" checked><span><strong>미입금</strong><small>신청 후 입금하면 내 신청에서 입금완료 문자를 보낼 수 있습니다.</small></span></label>
+                <label><input id="entryPaymentChoicePaid" type="radio" name="entryPaymentChoice" value="paid"><span><strong>입금</strong><small>관리자가 실제 입금을 확인하기 전까지는 입금 확인 중으로 표시됩니다.</small></span></label>
+              </div>
+            </fieldset>
             <fieldset class="entry-player-card legacy-full">
               <legend>선수 1</legend>
               <div class="entry-player-grid">
@@ -2109,7 +2116,7 @@ body[data-role="admin"] .stage5415-member-quick{display:none!important}
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=7163"></script>
+  <script type="module" src="./assets/js/app.js?v=7164"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">

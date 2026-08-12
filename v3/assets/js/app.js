@@ -3274,6 +3274,7 @@ function clearEntryApplicationForm(){
   ['entryPlayer1Name','entryPlayer1Club','entryPlayer1Phone','entryPlayer2Name','entryPlayer2Club','entryPlayer2Phone','entryApplicationMemo'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   const rep1=document.getElementById('entryRepresentative1');if(rep1)rep1.checked=true;
   const smsBoth=document.getElementById('entrySmsTargetBoth');if(smsBoth)smsBoth.checked=true;
+  const paymentUnpaid=document.getElementById('entryPaymentChoiceUnpaid');if(paymentUnpaid)paymentUnpaid.checked=true;
   renderEntryTournamentSelect();
   const tournament=document.getElementById('entryApplicationTournament');
   if(tournament){
@@ -3656,13 +3657,15 @@ async function submitPublicApplication(){
   }
   const duplicate=simpleRegistrationRows().find(a=>['approved','reserve'].includes(a.status)&&entryApplicationPlayers(a).some(p=>players.some(n=>n.phone===p.phone)));
   if(duplicate){notice(`두 선수 중 같은 연락처로 승인 대기 중인 신청이 있습니다.${duplicate.teamName?` 기존 신청: ${duplicate.teamName}`:''}`,'info');renderApplicationPortal();return;}
-  const autoStatus=simpleRegistrationAutoStatus();const createdAt=new Date().toISOString();const item={id:crypto.randomUUID(),code:applicationCode(),...common,status:autoStatus,paid:false,paymentStatus:'unpaid',createdAt,approvedAt:autoStatus==='approved'?createdAt:'',adminMemo:autoStatus==='reserve'?'정원 초과로 후보팀에 자동 등록되었습니다.':'참가 신청이 접수되었습니다.'};
+  const autoStatus=simpleRegistrationAutoStatus();const createdAt=new Date().toISOString();
+  const paymentChoice=document.querySelector('input[name="entryPaymentChoice"]:checked')?.value==='paid'?'paid':'unpaid';
+  const item={id:crypto.randomUUID(),code:applicationCode(),...common,status:autoStatus,paid:false,paymentStatus:paymentChoice==='paid'?'checking':'unpaid',paymentNoticeRequestedAt:paymentChoice==='paid'?createdAt:'',createdAt,approvedAt:autoStatus==='approved'?createdAt:'',adminMemo:autoStatus==='reserve'?'정원 초과로 후보팀에 자동 등록되었습니다.':'참가 신청이 접수되었습니다.'};
   try{const saved=await saveRegistrationCloud(item);Object.assign(item,saved);}catch(error){notice(`참가 신청 저장 실패: ${error?.message||error}`,'error');return;}if(!(state.portal.applications||[]).some(a=>a.id===item.id))state.portal.applications.unshift(item);try{syncCurrentDivisionRuntime();safePersistState('참가 신청 접수');}catch(_e){}renderApplicationPortal();clearEntryApplicationForm();
   const receipt=document.getElementById('entryApplicationReceipt');if(receipt){receipt.hidden=false;{
     const guide=entrySelectedPaymentGuide(),payAccount=[guide?.bank,guide?.account].filter(Boolean).join(' '),payFee=guide?.fee||'';
-    receipt.innerHTML=`<strong>${item.status==='reserve'?'후보팀으로 접수되었습니다.':'참가 신청이 접수되었습니다.'}</strong><span>${item.status==='reserve'?`후보 ${simpleRegistrationReserveOrder(item)}번`:'입금 확인 후 입금완료로 표시됩니다.'}</span>${payAccount||payFee?`<span>참가비 ${portalEscape(payFee||'미설정')} · ${portalEscape(payAccount||'계좌 미설정')}</span>`:''}`;
+    receipt.innerHTML=`<strong>${item.status==='reserve'?'후보팀으로 접수되었습니다.':'참가 신청이 접수되었습니다.'}</strong><span>${item.status==='reserve'?`후보 ${simpleRegistrationReserveOrder(item)}번`:item.paymentStatus==='checking'?'입금 확인 요청 상태입니다. 관리자 확인 후 입금완료로 표시됩니다.':'입금 확인 후 입금완료로 표시됩니다.'}</span>${payAccount||payFee?`<span>참가비 ${portalEscape(payFee||'미설정')} · ${portalEscape(payAccount||'계좌 미설정')}</span>`:''}`;
   }}
-  notice(item.status==='reserve'?`정원 초과로 후보 ${simpleRegistrationReserveOrder(item)}번에 자동 등록되었습니다.`:'참가 신청이 접수되었습니다. 입금 확인만 남았습니다.','success');
+  notice(item.status==='reserve'?`정원 초과로 후보 ${simpleRegistrationReserveOrder(item)}번에 자동 등록되었습니다.`:(item.paymentStatus==='checking'?'참가 신청이 접수되었습니다. 입금 확인 요청도 함께 표시됩니다.':'참가 신청이 접수되었습니다. 입금 확인만 남았습니다.'),'success');
   entryFormManualExpanded=false;entryFormUserOpened=false;renderEntryFormCollapseState();
   if(!canOperate())setTimeout(()=>void openAdminNoticeSms('registration',item,{ask:true}),180);
   }catch(error){
@@ -3786,7 +3789,8 @@ function renderEntrySelfManager(){
   root.innerHTML=rows.map(a=>{
     const reserveNo=simpleRegistrationReserveOrder(a);
     const status=a.status==='reserve'?`후보 ${reserveNo}번`:a.status==='cancelled'?'취소 완료':'참가';
-    const paid=a.paid?`입금완료${a.paidAt?` · ${entryDateTime(a.paidAt)}`:''}`:'미입금';
+    const paymentState=a.paymentStatus||(a.paid?'paid':'unpaid');
+    const paid=paymentState==='paid'?`입금완료${a.paidAt?` · ${entryDateTime(a.paidAt)}`:''}`:paymentState==='checking'?'입금 확인 중':'미입금';
     const cancelRequested=a.cancelRequestStatus==='requested';
     const canEdit=['approved','reserve'].includes(a.status)&&!cancelRequested;
     const canCancel=['approved','reserve'].includes(a.status)&&!cancelRequested;
@@ -3802,6 +3806,7 @@ function renderEntrySelfManager(){
       </div>
       <div class="entry-self-card-actions">
         ${canEdit?`<button type="button" class="btn btn-light btn-small" data-entry-edit="${portalEscape(a.id)}">신청 수정</button>`:''}
+        ${canEdit&&paymentState!=='paid'?`<button type="button" class="btn btn-light btn-small" data-entry-payment-notice="${portalEscape(a.id)}">입금완료 문자 발송</button>`:''}
         ${canCancel?`<button type="button" class="btn btn-danger-outline btn-small" data-entry-cancel="${portalEscape(a.id)}">취소 요청</button>`:''}
         ${cancelRequested?`<button type="button" class="btn btn-light btn-small" data-entry-admin-notice="cancel" data-entry-id="${portalEscape(a.id)}">관리자에게 취소문자</button>`:''}
       </div>
@@ -3910,13 +3915,16 @@ function registrationAdminNoticeBody(kind,item){
   const division=item.tournamentDivision||registrationContext().divisionName||'';
   const players=entryApplicationPlayers(item);
   const playerText=players.map(p=>`${p.name}${p.club?`(${p.club})`:''} ${p.phone||''}`).join(' / ');
+  if(kind==='payment'){
+    return `[230MATCH 입금알림]\n${event}${division?` · ${division}`:''}\n${item.teamName}\n입금했습니다. 확인 바랍니다.\n${item.phone||''}`;
+  }
   if(kind==='cancel'){
     return `[230MATCH 취소요청]
 대회: ${event}${division?` · ${division}`:''}
 팀: ${item.teamName}
 참가자: ${playerText}
 대표 연락처: ${item.phone||''}
-입금상태: ${item.paid?'입금완료':'미입금'}
+입금상태: ${entryPaymentLabel(item)}
 취소사유: ${item.cancelReason||'-'}
 환불계좌: ${item.refundBank||''} ${item.refundAccount||''}
 예금주: ${item.refundAccountHolder||''}`;
@@ -3927,7 +3935,7 @@ function registrationAdminNoticeBody(kind,item){
 참가자: ${playerText}
 대표 연락처: ${item.phone||''}
 상태: ${item.status==='reserve'?`후보 ${simpleRegistrationReserveOrder(item)}번`:'참가'}
-입금상태: ${item.paid?'입금완료':'미입금'}${item.memo?`\n전달사항: ${item.memo}`:''}`;
+입금상태: ${entryPaymentLabel(item)}${item.memo?`\n전달사항: ${item.memo}`:''}`;
 }
 async function openAdminNoticeSms(kind,item,{ask=true}={}){
   const adminPhone=registrationAdminNotifyPhone();
@@ -3935,7 +3943,7 @@ async function openAdminNoticeSms(kind,item,{ask=true}={}){
     notice('관리자 알림번호가 없습니다. 관리자가 참가 접수 화면의 “관리자 알림 문자번호”를 먼저 저장해야 합니다.','warning');
     return false;
   }
-  const label=kind==='cancel'?'취소 요청':'참가 신청';
+  const label=kind==='cancel'?'취소 요청':kind==='payment'?'입금 완료 알림':'참가 신청';
   if(ask&&!confirm(`관리자에게 ${label} 문자를 보낼까요?`))return false;
   const body=registrationAdminNoticeBody(kind,item);
   const ua=navigator.userAgent||'';
@@ -4243,6 +4251,20 @@ async function rejectRegistrationCancellation(id){
   try{await saveRegistrationCloud(item);renderApplicationPortal();lookupPublicApplication();notice('취소 신청을 반려했습니다.','success');}catch(error){notice(`취소 반려 저장 실패: ${error?.message||error}`,'error');}
 }
 
+async function notifyRegistrationPaymentToAdmin(id){
+  const item=(registrationCloudReady?registrationCloudRows:simpleRegistrationRows()).find(a=>String(a.id)===String(id));
+  const mine=Boolean(currentAuthUser&&String(item?.ownerUid||'')===String(currentAuthUser.uid||''));
+  if(!item||!mine)return notice('본인의 참가 신청을 찾을 수 없습니다.','error');
+  if(!['approved','reserve'].includes(item.status)||item.cancelRequestStatus==='requested')return notice('현재 상태에서는 입금 알림을 보낼 수 없습니다.','warning');
+  if(item.paid||item.paymentStatus==='paid')return notice('이미 입금완료 처리된 신청입니다.','info');
+  const now=new Date().toISOString();
+  item.paymentStatus='checking';item.paymentNoticeRequestedAt=now;item.updatedAt=now;
+  renderApplicationPortal();
+  // Keep the native SMS invocation inside the user's click gesture. Firestore save runs in parallel.
+  void saveRegistrationCloud(item).then(()=>{try{syncCurrentDivisionRuntime();safePersistState('참가자 입금 알림');}catch(_e){}renderApplicationPortal();}).catch(error=>{console.warn('[230MATCH] 입금 알림 상태 저장 실패',error);});
+  void openAdminNoticeSms('payment',item,{ask:false});
+}
+
 let entryApplicationDelegatedBound=false;
 let entryEditCaptureBound=false;
 function bindEntryApplications(){
@@ -4273,6 +4295,7 @@ function bindEntryApplications(){
   document.addEventListener('click',e=>{const action=e.target.closest?.('[data-entry-action]');if(action){processEntryApplication(action.dataset.entryId,action.dataset.entryAction);return;}const payment=e.target.closest?.('[data-entry-payment]');if(payment){toggleEntryPayment(payment.dataset.entryPayment);return;}const refund=e.target.closest?.('[data-entry-refund]');if(refund){refundEntryPayment(refund.dataset.entryRefund);return;}const sms=e.target.closest?.('[data-entry-sms]');if(sms){manualEntrySms(sms.dataset.entrySms);return;}const edit=e.target.closest?.('[data-entry-edit]');if(edit)return;const cancel=e.target.closest?.('[data-entry-cancel]');if(cancel){cancelEntryApplication(cancel.dataset.entryCancel);return;}const cancelApprove=e.target.closest?.('[data-entry-cancel-approve]');if(cancelApprove){approveRegistrationCancellation(cancelApprove.dataset.entryCancelApprove);return;}const cancelReject=e.target.closest?.('[data-entry-cancel-reject]');if(cancelReject){rejectRegistrationCancellation(cancelReject.dataset.entryCancelReject);return;}
     const quick=e.target.closest?.('[data-entry-quick-filter]');if(quick){entryAdminQuickFilter=String(quick.dataset.entryQuickFilter||'all');renderApplicationPortal();return;}
     const paymentSms=e.target.closest?.('[data-entry-payment-sms]');if(paymentSms){const item=simpleRegistrationRows().find(a=>String(a.id)===String(paymentSms.dataset.entryPaymentSms));if(item)openEntrySmsDialog('payment',item);return;}
+    const paymentNotice=e.target.closest?.('[data-entry-payment-notice]');if(paymentNotice){void notifyRegistrationPaymentToAdmin(String(paymentNotice.dataset.entryPaymentNotice||''));return;}
     const adminNotice=e.target.closest?.('[data-entry-admin-notice]');if(adminNotice){const item=(registrationCloudReady?registrationCloudRows:simpleRegistrationRows()).find(a=>String(a.id)===String(adminNotice.dataset.entryId));if(item)void openAdminNoticeSms(String(adminNotice.dataset.entryAdminNotice||'registration'),item,{ask:true});return;}
     const showAll=e.target.closest?.('[data-entry-show-all]');if(showAll){const type=showAll.dataset.entryShowAll;const rows=simpleRegistrationRows().filter(a=>type==='reserve'?a.status==='reserve':a.status==='approved').sort((a,b)=>String(a.createdAt||'').localeCompare(String(b.createdAt||'')));const root=document.getElementById(type==='reserve'?'entryPublicReserveList':'entryPublicApprovedList');if(root){root.innerHTML=rows.map((a,index)=>`<article class="entry-public-team-row"><span class="entry-public-order">${index+1}</span><div><strong>${portalEscape(a.teamName||'팀명 미등록')}</strong><small>${portalEscape(a.affiliation||'소속 미등록')} · ${a.paid?'입금완료':'미입금'}</small></div>${type==='reserve'?`<span class="badge badge-warning">후보 ${index+1}</span>`:'<span class="badge badge-safe">참가</span>'}</article>`).join('');}return;}const division=e.target.closest?.('[data-entry-open-division]');if(division){switchDivisionWorkspace(String(division.dataset.entryOpenDivision||''),{view:'entry'});return;}});
   }
