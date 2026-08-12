@@ -11246,3 +11246,183 @@ console.info('[230MATCH] 63.0.0 ready · chunked cloud workspace + bounded retry
 console.info('[230MATCH] 64.0.0 architecture · lazy cloud registry, worker serialization, visible-view commit rendering');
 
 console.info('[230MATCH] 71.3.3 ready · classic direct SMS rebuild');
+
+/* 230MATCH 5.4.6 · print center default assignment + A4 single-page compact + refresh/PNG repair */
+(function stage546PrintCenterRepair(){
+  const $=id=>document.getElementById(id);
+  const escText=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+
+  function forceAssignmentDefaults({onlyIfUnset=false}={}){
+    const target=$('printTargetSelect'),paper=$('printPaperSelect'),orientation=$('printOrientationSelect'),scale=$('printScaleSelect');
+    if(!target)return;
+    if(!onlyIfUnset || !target.dataset.userSelected546) target.value='prelim-assignment';
+    if(paper)paper.value='a4';
+    if(orientation)orientation.value='landscape';
+    if(scale)scale.value='small';
+  }
+
+  function refreshPreview546(showNotice=false){
+    try{
+      const target=$('printTargetSelect');
+      if(target?.value==='prelim-assignment'){
+        if($('printPaperSelect'))$('printPaperSelect').value='a4';
+        if($('printOrientationSelect'))$('printOrientationSelect').value='landscape';
+        if($('printScaleSelect'))$('printScaleSelect').value='small';
+      }
+      renderPrintPreview();
+      if(showNotice)notice('출력 미리보기를 최신 데이터로 갱신했습니다.','success');
+    }catch(error){
+      console.error('[5.4.6 print preview]',error);
+      notice(error?.message||'미리보기 갱신 중 오류가 발생했습니다.','error');
+    }
+  }
+
+  function teamLabel546(team){
+    try{return printTeam(team)||'미정';}catch(_e){return team?.teamName||team?.name||String(team||'미정');}
+  }
+  function resolveTeam546(value){
+    if(value&&typeof value==='object')return value;
+    const key=String(value??'');
+    return (state.teams||[]).find(t=>String(t.id)===key||String(t.teamId||'')===key||String(t.name||'')===key||String(t.teamName||'')===key)||value;
+  }
+  function assignmentData546(){
+    const groups=state.prelim?.groups||[],matches=state.prelim?.matches||[];
+    return groups.map((g,idx)=>{
+      const raw=(Array.isArray(g.teams)&&g.teams.length?g.teams:(g.teamIds||[]));
+      const teams=raw.map(resolveTeam546).filter(Boolean);
+      const gm=matches.filter(m=>m.groupId===g.id).sort((a,b)=>(a.matchNo||0)-(b.matchNo||0));
+      const court=g.court||g.courtName||gm[0]?.court||gm[0]?.courtName||gm[0]?.assignedCourtName||((state.prelim?.courts||[]).find(c=>c.id===(g.prelimCourtId||gm[0]?.prelimCourtId))?.name)||'코트 미정';
+      const key=t=>String(t?.id||t?.teamId||t?.name||t?.teamName||t||'');
+      const num=v=>{const k=key(resolveTeam546(v)),n=teams.findIndex(t=>key(t)===k);return n>=0?n+1:'?';};
+      return {name:g.name||`${idx+1}조`,court,teams:teams.map((t,i)=>({n:i+1,label:teamLabel546(t)})),orders:gm.map((m,i)=>`${i+1}경기 ${num(m.teamA)}-${num(m.teamB)}`)};
+    });
+  }
+
+  function downloadBlob546(blob,filename){
+    const url=URL.createObjectURL(blob),a=document.createElement('a');
+    a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1500);
+  }
+  function fitText546(ctx,text,maxWidth){
+    let s=String(text||'');
+    if(ctx.measureText(s).width<=maxWidth)return s;
+    while(s.length>2&&ctx.measureText(s+'…').width>maxWidth)s=s.slice(0,-1);
+    return s+'…';
+  }
+  async function saveAssignmentPng546(){
+    const cards=assignmentData546();
+    if(!cards.length)throw new Error('PNG로 저장할 예선 조편성이 없습니다.');
+    const W=1754,H=1240,margin=26,cols=4,gap=10;
+    const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;
+    const ctx=canvas.getContext('2d');
+    ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);
+    ctx.textBaseline='middle';
+    ctx.fillStyle='#10264a';ctx.font='700 31px sans-serif';ctx.textAlign='center';ctx.fillText('시합 전 조편성·코트 배정표',W/2,34);
+    ctx.font='600 17px sans-serif';ctx.fillStyle='#53657d';ctx.fillText(`${state.tournament?.name||'230MATCH 대회'}${state.tournament?.division?` · ${state.tournament.division}`:''}`,W/2,65);
+    ctx.textAlign='left';ctx.fillStyle='#eef4fb';ctx.fillRect(margin,82,W-margin*2,34);
+    ctx.fillStyle='#173b70';ctx.font='700 16px sans-serif';ctx.fillText(`${cards.length}개 조 · ${(state.teams||[]).length}팀`,margin+12,99);
+    ctx.textAlign='right';ctx.font='500 14px sans-serif';ctx.fillText('본인 조와 배정 코트를 확인해 주세요.',W-margin-12,99);
+    ctx.textAlign='left';
+    const top=126,bottom=20,rows=Math.ceil(cards.length/cols),rowGap=8;
+    const cardW=(W-margin*2-gap*(cols-1))/cols;
+    const cardH=Math.floor((H-top-bottom-rowGap*(rows-1))/Math.max(1,rows));
+    cards.forEach((card,i)=>{
+      const col=i%cols,row=Math.floor(i/cols),x=margin+col*(cardW+gap),y=top+row*(cardH+rowGap);
+      ctx.strokeStyle='#91a7c6';ctx.lineWidth=1;ctx.strokeRect(x,y,cardW,cardH);
+      ctx.fillStyle='#173b70';ctx.fillRect(x,y,cardW,25);
+      ctx.fillStyle='#fff';ctx.font='700 15px sans-serif';ctx.textAlign='left';ctx.fillText(card.name,x+9,y+12.5);
+      ctx.textAlign='right';ctx.fillText(card.court,x+cardW-9,y+12.5);ctx.textAlign='left';
+      const teamArea=Math.max(30,cardH-25-Math.max(18,card.orders.length*14+5));
+      const teamLine=Math.max(13,Math.min(20,teamArea/Math.max(1,card.teams.length)));
+      ctx.font=`700 ${Math.max(11,Math.min(14,teamLine-3))}px sans-serif`;
+      card.teams.forEach((t,ti)=>{
+        const yy=y+25+teamLine*(ti+.5);ctx.fillStyle='#173b70';ctx.fillText(String(t.n),x+8,yy);ctx.fillStyle='#111827';ctx.fillText(fitText546(ctx,t.label,cardW-38),x+28,yy);
+      });
+      const orderY=y+cardH-Math.max(16,card.orders.length*14+3);
+      ctx.fillStyle='#f7fbff';ctx.fillRect(x+1,orderY,cardW-2,y+cardH-orderY-1);
+      ctx.fillStyle='#4b5f79';ctx.font='500 10px sans-serif';
+      card.orders.forEach((line,oi)=>ctx.fillText(fitText546(ctx,line,cardW-16),x+8,orderY+8+oi*13));
+    });
+    const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+    if(!blob)throw new Error('PNG 이미지 생성에 실패했습니다.');
+    downloadBlob546(blob,`230MATCH_예선조편성_코트배정표_${new Date().toISOString().slice(0,10)}.png`);
+  }
+
+  async function saveCurrentPng546(){
+    const target=$('printTargetSelect')?.value||'prelim-assignment';
+    try{
+      refreshPreview546(false);
+      if(target==='prelim-assignment'){
+        await saveAssignmentPng546();
+        notice('예선 조편성·코트 배정표 PNG를 저장했습니다.','success');
+        return;
+      }
+      await Promise.resolve(savePrintPng());
+    }catch(error){
+      console.error('[5.4.6 PNG]',error);
+      notice(error?.message||'PNG 저장 중 오류가 발생했습니다.','error');
+    }
+  }
+
+  function replaceActionButton546(id,handler){
+    const old=$(id);if(!old)return;
+    const fresh=old.cloneNode(true);old.replaceWith(fresh);fresh.addEventListener('click',handler);
+  }
+
+  function bind546(){
+    const target=$('printTargetSelect');if(!target)return;
+    if(target.dataset.stage546==='1')return;
+    target.dataset.stage546='1';
+    forceAssignmentDefaults();
+    target.addEventListener('change',()=>{target.dataset.userSelected546='1';refreshPreview546(false);});
+    ['printPaperSelect','printOrientationSelect','printToneSelect','printScaleSelect','labelStatusSelect','labelContentSelect','labelCopySelect'].forEach(id=>$(id)?.addEventListener('change',()=>refreshPreview546(false)));
+    replaceActionButton546('refreshPrintPreviewBtn',()=>refreshPreview546(true));
+    replaceActionButton546('savePrintImageBtn',()=>void saveCurrentPng546());
+    refreshPreview546(false);
+  }
+
+  const style=document.createElement('style');
+  style.id='stage546PrintStyles';
+  style.textContent=`
+    #printPreview .assignment-print-sheet{padding:3mm!important}
+    #printPreview .assignment-print-sheet .print-title{margin:0 0 2px!important;padding:0!important}
+    #printPreview .assignment-print-sheet .print-title h1{font-size:20px!important;line-height:1.05!important;margin:0!important}
+    #printPreview .assignment-print-sheet .print-title p{font-size:10px!important;margin:2px 0 0!important}
+    #printPreview .assignment-print-sheet .print-meta{font-size:8px!important;margin:2px 0 3px!important;min-height:0!important}
+    #printPreview .assignment-print-sheet .assignment-summary{margin:0 0 3px!important;padding:3px 6px!important;font-size:9px!important;border-radius:3px!important}
+    #printPreview .assignment-print-sheet .assignment-grid.compact-3col,#printPreview .assignment-print-sheet .assignment-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:3px!important}
+    #printPreview .assignment-print-sheet .assignment-group-card{border-radius:3px!important;box-shadow:none!important}
+    #printPreview .assignment-print-sheet .assignment-group-head{padding:2px 4px!important;min-height:0!important}
+    #printPreview .assignment-print-sheet .assignment-group-head b,#printPreview .assignment-print-sheet .assignment-group-head span{font-size:9px!important;line-height:1.15!important}
+    #printPreview .assignment-print-sheet .assignment-group-card ol{padding:1px 4px!important;gap:0!important}
+    #printPreview .assignment-print-sheet .assignment-group-card li{grid-template-columns:12px minmax(0,1fr)!important;gap:2px!important;min-height:12px!important;font-size:8px!important;line-height:1.05!important}
+    #printPreview .assignment-print-sheet .assignment-group-card li em{width:10px!important;height:10px!important;font-size:7px!important}
+    #printPreview .assignment-print-sheet .assignment-order{padding:1px 4px 2px!important;gap:0!important;font-size:7px!important;line-height:1.05!important}
+    #printPreview .assignment-print-sheet .print-footer{display:none!important}
+    @media print{
+      @page{size:A4 landscape;margin:3mm}
+      body.printing-output #printOutputRoot .assignment-print-sheet{padding:0!important;margin:0!important;width:auto!important;min-height:0!important;box-shadow:none!important}
+      body.printing-output #printOutputRoot .assignment-print-sheet .print-title{margin:0 0 1mm!important;padding:0!important}
+      body.printing-output #printOutputRoot .assignment-print-sheet .print-title h1{font-size:14pt!important;line-height:1!important;margin:0!important}
+      body.printing-output #printOutputRoot .assignment-print-sheet .print-title p{font-size:7.5pt!important;margin:1mm 0 0!important}
+      body.printing-output #printOutputRoot .assignment-print-sheet .print-meta{font-size:6.5pt!important;margin:1mm 0!important;min-height:0!important}
+      body.printing-output #printOutputRoot .assignment-print-sheet .assignment-summary{margin:0 0 1mm!important;padding:1mm 2mm!important;font-size:7pt!important;border-radius:1mm!important}
+      body.printing-output #printOutputRoot .assignment-print-sheet .assignment-grid.compact-3col,body.printing-output #printOutputRoot .assignment-print-sheet .assignment-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:1mm!important}
+      body.printing-output #printOutputRoot .assignment-print-sheet .assignment-group-card{break-inside:avoid!important;border-radius:1mm!important;box-shadow:none!important}
+      body.printing-output #printOutputRoot .assignment-print-sheet .assignment-group-head{padding:.6mm 1mm!important}
+      body.printing-output #printOutputRoot .assignment-print-sheet .assignment-group-head b,body.printing-output #printOutputRoot .assignment-print-sheet .assignment-group-head span{font-size:7pt!important;line-height:1!important}
+      body.printing-output #printOutputRoot .assignment-print-sheet .assignment-group-card ol{padding:.4mm 1mm!important;gap:0!important}
+      body.printing-output #printOutputRoot .assignment-print-sheet .assignment-group-card li{grid-template-columns:3mm minmax(0,1fr)!important;gap:.5mm!important;min-height:3.2mm!important;font-size:6.6pt!important;line-height:1!important}
+      body.printing-output #printOutputRoot .assignment-print-sheet .assignment-group-card li em{width:2.6mm!important;height:2.6mm!important;font-size:5.8pt!important}
+      body.printing-output #printOutputRoot .assignment-print-sheet .assignment-order{padding:.4mm 1mm .6mm!important;gap:0!important;font-size:5.7pt!important;line-height:1.05!important}
+      body.printing-output #printOutputRoot .assignment-print-sheet .print-footer{display:none!important}
+    }
+  `;
+  document.head.appendChild(style);
+
+  function activate(){bind546();}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(activate,120),{once:true});else setTimeout(activate,120);
+  window.addEventListener('hashchange',()=>{if(location.hash.includes('print'))setTimeout(()=>{bind546();if($('printTargetSelect')&&!$('printTargetSelect').dataset.userSelected546){forceAssignmentDefaults();refreshPreview546(false);}},120);});
+  setTimeout(activate,900);
+  console.info('[230MATCH] 5.4.6 ready · print center default assignment/A4 compact/preview/PNG repair');
+})();
