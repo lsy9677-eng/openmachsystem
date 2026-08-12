@@ -1,8 +1,8 @@
 import{getAuthConfig,saveAuthConfig,startAuth,signInGoogle,signOutSocial,beginExternalLogin,getExistingLoginEndpoints,signInEmail,registerEmail,sendPasswordReset,linkEmailPassword,authProviderIds,getAuthRuntime}from'./auth-engine.js?v=3565';
-import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7127';
+import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7128';
 import{notificationSupport,getStoredVapidKey,saveStoredVapidKey,enableMyPush,disableMyPush,queuePush,listPushJobs,listPushTokens}from'./notification-engine.js?v=332012';
 
-import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7127';
+import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7128';
 import{prepareTeams,generateDraw,allMatches,findMatch,generateLinkedDrawSlots,syncLinkedDrawQualifiers}from'./bracket-engine-v5000.js?v=5000';
 import{ensureDrawMeta,canModifyDraw,createDrawWithMethod,lockDraw,unlockDrawForDevelopment,clearDrawHistory}from'./draw-method-engine.js?v=332012';
 import{buildCourts,assignInitial,queueReadyMatches,refillCourt}from'./court-engine.js?v=332012';
@@ -15,7 +15,7 @@ import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactD
 import{render,teamText}from'./ui.js?v=3504';
 import{ensureAuditState,runStateAudit,runPrelimSimulation,runFullSimulation,applyAuditResult}from'./audit-engine.js?v=332012';
 import{earlyMainStats,markResolvedMainMatchesReady,canAssignEarlyMain,ensureEarlyMainSettings,autoAssignResolvedMain}from'./early-main-engine.js?v=332012';
-import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7127';
+import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7128';
 import{ensureMainDrawLifecycle,beginMainDraw,completeMainDraw,failMainDraw,resetMainDraw,hasAuthorizedMainDraw,mainDrawStatus,clearMainPlacement,repairMainDrawAuthorization}from'./main-draw-lifecycle-engine.js?v=3501';
 import{shouldUseLinkedDraw,linkedDrawNeedsRepair,rebuildLinkedDraw,hasStartedMainMatches}from'./linked-draw-guard-engine.js?v=332012';
 import{ensureVenueSettings,ensureVenueQueues,venuePreset,buildVenueCourts,prelimVenues,mainVenues}from'./venue-engine.js?v=332012';
@@ -26,7 +26,7 @@ import{ensureCourtStatuses,pauseCourt,resumeCourt}from'./court-status-engine.js?
 import{ensureCourtManualQueues,assignToCourtManualQueue,moveCourtMatchFlexible,returnManualQueueItemToVenue,reorderCourtManualQueue}from'./court-manual-queue-engine.js?v=332012';
 import{reorderPrelimQueue as reorderPrelimQueueItem,movePrelimQueuedMatch,returnPrelimWait1ToQueue}from'./prelim-queue-control-engine.js?v=332012';
 import{ensurePrelimCourtStatuses,pausePrelimCourt,resumePrelimCourt}from'./prelim-court-status-engine.js?v=332012';
-import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7127';
+import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7128';
 import{verifyAndRepairMainFlow}from'./main-flow-integrity-engine.js?v=332012';
 import{finalizeTournamentCompletion}from'./tournament-completion-engine.js?v=332012';
 import{ensureTournamentIdentity,validateTournamentForArchive,createTournamentArchive,archiveListItem,archiveBackupPayload}from'./archive-engine.js?v=354000';
@@ -3937,7 +3937,7 @@ async function openAdminNoticeSms(kind,item,{ask=true}={}){
   const body=registrationAdminNoticeBody(kind,item);
   const ua=navigator.userAgent||'';
   if(/Android|iPhone|iPad|iPod/i.test(ua)){
-    location.href=`sms:${adminPhone}?body=${encodeURIComponent(body)}`;
+    window.__230matchOpenNativeSmsComposer(adminPhone,body);
     notice(`관리자 ${adminPhone}에게 보낼 ${label} 문자를 문자앱에 입력했습니다. 전송 버튼만 눌러주세요.`,'success');
     return true;
   }
@@ -10428,7 +10428,7 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
   };
   setInterval(tick,2500);
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(tick,350),{once:true});else setTimeout(tick,350);
-  console.info('[230MATCH] 71.2.7 ready · global admin phone + native SMS inquiry');
+  console.info('[230MATCH] 71.2.8 ready · native SMS recipient autofill + repeat-open fix');
 })();
 
 
@@ -10520,7 +10520,7 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
   window.addEventListener('pageshow',update);
   setInterval(()=>{if(document.body?.dataset.currentView==='home')update();},5000);
   window.__updateTodayTournamentDashboard=updateTodayDashboard;
-  console.info('[230MATCH] 71.2.7 ready · global admin phone + native SMS inquiry');
+  console.info('[230MATCH] 71.2.8 ready · native SMS recipient autofill + repeat-open fix');
 })();
 
 
@@ -10788,7 +10788,7 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
   window.__run230MatchResultFlowCheck=runResultFlowCheck;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(runResultFlowCheck,700),{once:true});else setTimeout(runResultFlowCheck,700);
   setInterval(()=>{if(document.body?.dataset.currentView==='home'&&canOperate())runResultFlowCheck();},10000);
-  console.info('[230MATCH] 71.2.7 ready · global admin phone + native SMS inquiry');
+  console.info('[230MATCH] 71.2.8 ready · native SMS recipient autofill + repeat-open fix');
 })();
 
 
@@ -10853,7 +10853,7 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
     document.addEventListener('DOMContentLoaded',()=>setTimeout(updateMatchdayQuickBar,700),{once:true});
   }else setTimeout(updateMatchdayQuickBar,700);
   setInterval(updateMatchdayQuickBar,5000);
-  console.info('[230MATCH] 71.2.7 ready · global admin phone + native SMS inquiry');
+  console.info('[230MATCH] 71.2.8 ready · native SMS recipient autofill + repeat-open fix');
 })();
 
 
@@ -10966,7 +10966,7 @@ ${body}
 
       const mobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||'');
       if(mobile){
-        location.href=`sms:${String(adminPhone).replace(/\D/g,'')}?body=${encodeURIComponent(smsBody)}`;
+        window.__230matchOpenNativeSmsComposer(String(adminPhone).replace(/\D/g,''),smsBody);
         saveLocalReceipt({id:row.id,kind,body,sentAt:openedAt,status:'sms-app-opened'});
         const box=document.getElementById('stage7125FeedbackBody');if(box)box.value='';
         const status=document.getElementById('stage7125FeedbackStatus');
@@ -11028,9 +11028,46 @@ ${body}
   window.__update230MatchHomeFeedback=updateFeedbackHome;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(updateFeedbackHome,800),{once:true});else setTimeout(updateFeedbackHome,800);
   setInterval(()=>{if(document.body?.dataset.currentView==='home')updateFeedbackHome();},10000);
-  console.info('[230MATCH] 71.2.7 ready · global admin phone + native SMS inquiry');
+  console.info('[230MATCH] 71.2.8 ready · native SMS recipient autofill + repeat-open fix');
 })();
 
+
+
+
+/* 230MATCH 5.3.8 · native SMS target/body compatibility + repeated-open fix */
+(()=>{
+  const digits=v=>String(v||'').replace(/\D/g,'');
+  function buildNativeSmsHref(phone,body){
+    const to=digits(phone);
+    const text=String(body||'');
+    const ua=navigator.userAgent||'';
+    // Android/iOS browser differences: Android commonly accepts ?body,
+    // iOS commonly needs &body when a recipient already exists.
+    const isIOS=/iPhone|iPad|iPod/i.test(ua);
+    return isIOS
+      ? `sms:${to}&body=${encodeURIComponent(text)}`
+      : `sms:${to}?body=${encodeURIComponent(text)}`;
+  }
+  function openNativeSmsComposer(phone,body){
+    const to=digits(phone);
+    if(!to)throw new Error('관리자 번호가 없습니다.');
+    const href=buildNativeSmsHref(to,body);
+
+    // Repeated assignment to location.href can be ignored after returning from an external app.
+    // Use a fresh hidden anchor every time so each user click is a new navigation gesture.
+    const a=document.createElement('a');
+    a.href=href;
+    a.style.display='none';
+    a.setAttribute('aria-hidden','true');
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(()=>a.remove(),800);
+    return true;
+  }
+  window.__230matchBuildNativeSmsHref=buildNativeSmsHref;
+  window.__230matchOpenNativeSmsComposer=openNativeSmsComposer;
+  console.info('[230MATCH] 71.2.8 ready · native SMS compatibility helper');
+})();
 
 
 /* 230MATCH 5.3.7 · app-wide administrator contact phone */
@@ -11051,6 +11088,8 @@ ${body}
     try{localStorage.setItem(CACHE_KEY,p);}catch(_e){}
     const input=document.getElementById('stage7127AdminPhoneInput');
     if(input&&document.activeElement!==input)input.value=p;
+    const legacyInput=document.getElementById('entryAdminNotifyPhone');
+    if(legacyInput&&document.activeElement!==legacyInput)legacyInput.value=p;
     try{window.__update230MatchHomeFeedback?.();}catch(_e){}
     return true;
   }
@@ -11105,7 +11144,9 @@ ${body}
   window.__load230MatchGlobalAdminPhone=loadGlobalAdminPhone;
   const boot=()=>setTimeout(loadGlobalAdminPhone,350);
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
-  console.info('[230MATCH] 71.2.7 ready · app-wide admin contact phone');
+  window.addEventListener('pageshow',()=>setTimeout(loadGlobalAdminPhone,120));
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(loadGlobalAdminPhone,120);});
+  console.info('[230MATCH] 71.2.8 ready · app-wide admin contact phone');
 })();
 
 
@@ -11263,4 +11304,4 @@ console.info('[230MATCH] 63.0.0 ready · chunked cloud workspace + bounded retry
 
 console.info('[230MATCH] 64.0.0 architecture · lazy cloud registry, worker serialization, visible-view commit rendering');
 
-console.info('[230MATCH] 71.2.7 ready · global admin phone + native SMS inquiry');
+console.info('[230MATCH] 71.2.8 ready · native SMS recipient autofill + repeat-open fix');
