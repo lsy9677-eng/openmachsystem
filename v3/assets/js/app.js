@@ -29,7 +29,7 @@ import{ensurePrelimCourtStatuses,pausePrelimCourt,resumePrelimCourt}from'./preli
 import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7133';
 import{verifyAndRepairMainFlow}from'./main-flow-integrity-engine.js?v=332012';
 import{finalizeTournamentCompletion}from'./tournament-completion-engine.js?v=332012';
-import{ensureTournamentIdentity,validateTournamentForArchive,createTournamentArchive,archiveListItem,archiveBackupPayload}from'./archive-engine.js?v=354000';
+import{ensureTournamentIdentity,validateTournamentForArchive,createTournamentArchive,archiveListItem,archiveBackupPayload}from'./archive-engine.js?v=354101';
 import{listExistingTournaments,loadExistingTournament,convertExistingTournament}from'./legacy-firestore-bridge.js?v=332023';
 
 
@@ -1356,7 +1356,45 @@ function renderCommittedState6400(){
   if(['home','tournaments','operation','prelim-public','entry','bracket'].includes(view))renderDivisionWorkspaceBar();
   if(view==='settings')updateSetupProgress();
 }
+let __tournamentWriteBypass=false;
+function currentTournamentArchiveRecord(){
+  const archiveId=String(state?.operation?.archiveId||state?.completion?.archiveId||'');
+  const rows=Array.isArray(state?.portal?.archives)?state.portal.archives:[];
+  if(archiveId)return rows.find(x=>String(x?.archiveId||'')===archiveId)||null;
+  const tid=String(state?.tournament?.id||'');
+  return rows.find(x=>String(x?.tournamentId||'')===tid)||null;
+}
+function tournamentReadOnly(){
+  return Boolean(state?.completion?.readOnly||state?.completion?.completedAt||state?.operation?.readOnly||state?.operation?.tournamentCompletedAt||state?.tournament?.completedAt);
+}
+function restoreClosedTournamentSnapshot(){
+  const archive=currentTournamentArchiveRecord();
+  if(!archive?.workspaceSnapshot)return false;
+  const preservedArchives=structuredClone(state?.portal?.archives||[]);
+  const preservedPosts=globalNoticeReady?structuredClone(globalNoticeState.posts):structuredClone(state?.portal?.posts||[]);
+  const preservedTicker=globalNoticeReady?structuredClone(globalNoticeState.ticker):structuredClone(state?.portal?.globalTicker||{});
+  state=structuredClone(archive.workspaceSnapshot);
+  state.portal=state.portal||{};state.portal.archives=preservedArchives;
+  state.portal.posts=preservedPosts;state.portal.globalTicker=preservedTicker;
+  return true;
+}
+function withTournamentWriteBypass(fn){
+  const before=__tournamentWriteBypass;__tournamentWriteBypass=true;
+  try{return fn();}finally{__tournamentWriteBypass=before;}
+}
+function applyTournamentReadOnlyUi(){
+  const closed=tournamentReadOnly();document.body?.classList.toggle('tournament-readonly',closed);
+  document.body?.toggleAttribute('data-tournament-readonly',closed);
+  const btn=document.getElementById('archiveTournamentBtn');
+  if(btn){btn.disabled=closed;btn.textContent=closed?'종료·보관 완료':'대회 종료·보관';}
+}
 function commit(message){
+  if(tournamentReadOnly()&&!__tournamentWriteBypass){
+    restoreClosedTournamentSnapshot();
+    renderCommittedState6400();applyTournamentReadOnlyUi();
+    notice('종료된 대회는 읽기 전용입니다. 기록을 수정할 수 없습니다.','warning');
+    return false;
+  }
   if(message)log(message);
   if(state.settings.autoTimeEnabled)calculateTimeMetrics(state);
   syncInputs();
@@ -3524,8 +3562,11 @@ async function startRegistrationCloudSync({force=false}={}){
     ? rt.api.query(collectionRef,rt.api.where('tournamentId','==',ctx.tournamentId))
     : rt.api.query(collectionRef,rt.api.where('ownerUid','==',currentAuthUser.uid));
   registrationCloudUnsubscribe=rt.api.onSnapshot(q,snap=>{
-    registrationCloudRows=snap.docs.map(doc=>registrationNormalize({id:doc.id,...doc.data()}));
+    const stage354OperatorDocs=snap.docs.map(doc=>({id:doc.id,...doc.data()}));
+    window.__stage354OperatorRequestRows=stage354OperatorDocs.filter(row=>String(row?.recordType||'')==='operator_request');
+    registrationCloudRows=stage354OperatorDocs.filter(row=>String(row?.recordType||'')!=='operator_request').map(row=>registrationNormalize(row));
     registrationCloudReady=true;
+    try{window.renderOperatorAccessManager?.();}catch(_e){}
     const ctx=registrationContext();
     if(canOperate()&&ctx.divisionId){
       registrationCloudRows.filter(row=>
@@ -5042,21 +5083,27 @@ function tournamentArchiveRows(){
 }
 function archiveCurrentTournament(){
   if(!requireAdmin('현재 대회 종료·보관'))return;
+  if(tournamentReadOnly()){notice('이미 종료·보관된 대회입니다.','warning');return;}
   const check=validateTournamentForArchive(state);
   if(!check.ok){notice(check.errors.join(' '),'error');return;}
   const warning=check.warnings.length?`\n\n주의: ${check.warnings.join(' ')}`:'';
-  if(!confirm(`현재 대회를 종료하고 읽기 전용 기록으로 보관할까요?\n\n부서 ${check.counts.divisions}개 · 참가팀 ${check.counts.teams}팀 · 예선 ${check.counts.prelim}경기 · 본선 ${check.counts.main}경기${warning}`))return;
-  if(check.counts.unfinished>0&&!requireTypedConfirmation('미완료 경기가 있는 대회 강제 보관','강제보관'))return;
+  if(!confirm(`현재 대회를 종료하고 최종 기록을 읽기 전용으로 보관할까요?\n\n부서 ${check.counts.divisions}개 · 참가팀 ${check.counts.teams}팀 · 예선 ${check.counts.prelim}경기 · 본선 ${check.counts.main}경기${warning}\n\n종료 후에는 경기·명단·대진 수정이 차단됩니다.`))return;
+  if(check.counts.unfinished>0&&!requireTypedConfirmation('미완료 경기가 있는 대회 강제 종료','강제보관'))return;
   const archive=createTournamentArchive(state,{force:check.counts.unfinished>0,reason:check.counts.unfinished>0?'forced-manual':'completed-manual'});
-  const same=(state.portal.archives||[]).findIndex(x=>x.tournamentId===archive.tournamentId);
-  if(same>=0){notice('이미 보관된 대회입니다. 읽기 전용 기록은 덮어쓰지 않습니다.','warning');return;}
+  const same=(state.portal.archives||[]).findIndex(x=>String(x.tournamentId)===String(archive.tournamentId));
+  if(same>=0){notice('이미 최종 보관된 대회입니다. 기존 스냅샷은 덮어쓰지 않습니다.','warning');return;}
+  const completedAt=archive.archivedAt;
   state.portal.archives.unshift(archive);
-  state.operation=state.operation||{};state.operation.tournamentCompletedAt=state.operation.tournamentCompletedAt||archive.archivedAt;state.operation.archiveId=archive.archiveId;state.operation.autoAssignmentEnabled=false;
+  state.completion={...(state.completion||{}),completedAt,archiveId:archive.archiveId,readOnly:true,reason:archive.reason};
+  state.tournament={...(state.tournament||{}),completedAt,status:'completed'};
+  state.operation=state.operation||{};
+  Object.assign(state.operation,{tournamentCompletedAt:completedAt,archiveId:archive.archiveId,readOnly:true,autoAssignmentEnabled:false});
   state.portal.tournamentArchives=(state.portal.tournamentArchives||[]).filter(x=>String(x.sourceTournamentId||x.tournamentId||'')!==String(archive.tournamentId));
   state.portal.tournamentArchives.unshift(archiveListItem(archive));
-  commit(`대회 종료·읽기 전용 보관 · ${archive.tournament.name}`);renderTournamentList();
-  downloadJson(`${safeFilePart(archive.tournament.name)}-${safeFilePart(archive.tournament.division||'전체')}-종료기록.json`,archiveBackupPayload(archive));
-  notice('대회 전체 기록을 읽기 전용으로 보관하고 JSON 백업도 저장했습니다.','success');
+  withTournamentWriteBypass(()=>commit(`Stage35.4-1 대회 종료·최종 스냅샷 · ${archive.tournament.name}`));
+  applyTournamentReadOnlyUi();renderTournamentList();
+  downloadJson(`${safeFilePart(archive.tournament.name)}-${safeFilePart(archive.tournament.division||'전체')}-최종기록.json`,archiveBackupPayload(archive));
+  notice('대회를 종료했습니다. 최종 스냅샷을 보관하고 현재 대회를 읽기 전용으로 잠갔습니다.','success');
 }
 
 async function deleteCurrentTournamentSafely(){
@@ -5111,6 +5158,19 @@ function renderTournamentList(){
   const root=document.getElementById('tournamentCardList');if(!root)return;
   root.innerHTML=visible.map(x=>`<article class="panel tournament-list-card ${x.current?'current':''}"><div class="tournament-card-top"><div><span class="tournament-state ${x.status}">${x.current?'현재 · ':''}${tournamentStatusLabel(x.status)}</span><h2>${portalEscape(x.name)}</h2><p>${portalEscape(x.division||'부서 미설정')}</p></div>${x.readOnly?'<span class="badge badge-safe">읽기 전용</span>':''}</div><div class="tournament-card-info"><span>📅 ${x.date?new Date(x.date+'T00:00:00').toLocaleDateString('ko-KR'):'일정 미정'}</span><span>📍 ${portalEscape(x.venue||'장소 미정')}</span><span>👥 참가 ${x.active||0}팀${x.reserve?` · 후보 ${x.reserve}팀`:''}</span></div><div class="tournament-card-progress"><div><span>예선</span><b>${x.prelimCompleted||0}/${x.prelimTotal||0}</b></div><div><span>본선</span><b>${x.mainCompleted||0}/${x.mainTotal||0}</b></div><div><span>상태</span><b>${x.current?'현재 선택':x.workspace?'운영 가능':'보관'}</b></div></div>${x.workspace?`<div class="button-row tournament-card-actions"><a class="btn btn-primary" href="${portalEscape(workspaceRouteUrl(x.id,'','guide'))}">요강 보기</a>${x.current?`<button type="button" class="btn btn-primary" disabled>선택됨</button>`:`<a class="btn btn-light" href="${portalEscape(workspaceRouteUrl(x.id,'','home'))}">이 대회 선택</a>`}${isAdmin()?`<button type="button" class="btn btn-light" data-admin-only="true" data-edit-tournament-id="${x.id}">대회 수정·편집</button><button type="button" class="btn btn-danger-outline" data-admin-only="true" data-delete-tournament-id="${x.id}">삭제</button>`:''}</div>`:`<button type="button" class="btn btn-light tournament-open-btn" data-tournament-open="${x.id}">대회 기록 보기</button>`}</article>`).join('')||'<div class="panel portal-empty">조건에 맞는 대회가 없습니다.</div>';
 }
+setTimeout(applyTournamentReadOnlyUi,0);
+document.addEventListener('click',e=>{
+  if(!tournamentReadOnly())return;
+  const view=document.body?.dataset.currentView||'';
+  if(!['operation','roster','prelim','prelim-manage','bracket','settings','entry'].includes(view))return;
+  const target=e.target.closest('button,[role="button"]');if(!target)return;
+  if(target.id==='archiveTournamentBtn'||target.closest('[data-portal-go],[data-view],[data-tournament-open],[data-archive-download],[data-direct-guide-download],[data-notice-image-download]'))return;
+  const text=String(target.textContent||'').trim();
+  if(/닫기|보기|출력|인쇄|다운로드|저장 이미지|복사|문자앱/.test(text))return;
+  e.preventDefault();e.stopImmediatePropagation();
+  notice('종료된 대회는 읽기 전용입니다. 운영 데이터를 변경할 수 없습니다.','warning');
+},true);
+
 function bindTournamentList(){
   document.getElementById('archiveTournamentBtn')?.addEventListener('click',archiveCurrentTournament);
   document.getElementById('tournamentListSearch')?.addEventListener('input',renderTournamentList);
@@ -9734,17 +9794,77 @@ tournamentArchiveRows=function(){
   const modern=(state.portal?.archives||[]).map(archiveListItem);const legacy=(state.portal?.tournamentArchives||[]).filter(x=>!modern.some(m=>m.id===x.id));return [...active,...modern,...legacy];
 }
 
+function purgeTournamentScopedLocalData(targetState,tournamentId){
+  if(!targetState||!tournamentId)return targetState;
+  const tid=String(tournamentId);
+  const same=row=>String(row?.tournamentId||row?.sourceTournamentId||row?.sourceId||'')===tid;
+  targetState.portal=targetState.portal||{};
+  ['applications','refundRequests','participantArchives','resultArchives','tournamentArchives','archives'].forEach(key=>{
+    if(Array.isArray(targetState.portal[key]))targetState.portal[key]=targetState.portal[key].filter(row=>!same(row));
+  });
+  targetState.messaging=targetState.messaging||{};
+  ['history','courtSmsHistory'].forEach(key=>{
+    if(Array.isArray(targetState.messaging[key]))targetState.messaging[key]=targetState.messaging[key].filter(row=>String(row?.tournamentId||'')!==tid);
+  });
+  return targetState;
+}
+async function purgeTournamentRegistrationCloud(tournamentId){
+  const tid=String(tournamentId||'');if(!tid)return {private:0,public:0};
+  let rt;try{rt=await registrationRuntime();}catch(_e){return {private:0,public:0,skipped:true};}
+  const removeCollection=async(collectionName,cachedRows=[])=>{
+    let rows=[];
+    try{
+      if(typeof rt.api.getDocs==='function'){
+        const q=rt.api.query(rt.api.collection(rt.db,collectionName),rt.api.where('tournamentId','==',tid));
+        const snap=await rt.api.getDocs(q);
+        rows=snap.docs.map(d=>({id:d.id}));
+      }else rows=(cachedRows||[]).filter(r=>String(r?.tournamentId||'')===tid).map(r=>({id:r.id}));
+    }catch(_e){rows=(cachedRows||[]).filter(r=>String(r?.tournamentId||'')===tid).map(r=>({id:r.id}));}
+    const ids=[...new Set(rows.map(r=>String(r?.id||'')).filter(Boolean))];
+    await Promise.all(ids.map(docId=>rt.api.deleteDoc(rt.api.doc(rt.db,collectionName,docId))));
+    return ids.length;
+  };
+  const privateCount=await removeCollection(REGISTRATION_COLLECTION,registrationCloudRows);
+  const publicCount=await removeCollection(PUBLIC_REGISTRATION_COLLECTION,publicRegistrationRows);
+  registrationCloudRows=registrationCloudRows.filter(r=>String(r?.tournamentId||'')!==tid);
+  publicRegistrationRows=publicRegistrationRows.filter(r=>String(r?.tournamentId||'')!==tid);
+  return {private:privateCount,public:publicCount};
+}
 async function deleteTournamentById(id){
   if(!requireAdmin('대회 삭제'))return;
   ensureMultiTournamentRuntime();id=String(id||'');const record=(state.multiTournament.tournaments||[]).find(r=>String(r.id)===id);if(!record)return;
-  const name=record.name||record.snapshot?.tournament?.name||'선택한 대회';
-  if(!confirm(`“${name}” 대회를 완전히 삭제할까요?\n\n참가팀·예선·본선·코트 데이터가 함께 삭제됩니다.\n종료 보관 기록은 유지됩니다.`))return;
-  if(prompt('삭제하려면 “대회삭제”를 입력하세요.','')!=='대회삭제')return notice('확인 문구가 일치하지 않아 취소했습니다.','warning');
-  const wasCurrent=id===state.multiTournament.activeTournamentId;
-  state.multiTournament.tournaments=state.multiTournament.tournaments.filter(r=>String(r.id)!==id);
-  if(wasCurrent){const next=state.multiTournament.tournaments[0];if(next?.snapshot){const registry=structuredClone(state.multiTournament);const restored=structuredClone(next.snapshot);restored.multiTournament=registry;restored.multiTournament.activeTournamentId=next.id;state=normalizeV5RuntimeState(restored);}else{state.multiTournament.activeTournamentId='';state.multiTournament.noActiveTournament=true;state.tournament={id:'',name:'',division:''};}}
-  try{await deleteTournamentNow(id,state);}catch(error){notice(`서버 대회 삭제 실패: ${error?.message||error}`,'error');return;}
-  saveState(state);renderPortalViews();renderDivisionWorkspaceBar();renderTournamentList();notice(`${name} 대회를 삭제했습니다.`,'success');
+  const workspace=id===String(state.multiTournament.activeTournamentId||'')?state:(record.snapshot||{});
+  const name=record.name||workspace?.tournament?.name||'선택한 대회';
+  if(!confirm(`“${name}” 대회를 완전히 삭제할까요?\n\n이 대회의 참가명단·신청내역·부서·예선 조편성/결과·코트배정/대기열·본선 대진/결과·문자기록 등 운영 데이터가 모두 삭제됩니다.\n\n테스트 대회 삭제는 되돌릴 수 없습니다.`))return;
+  if(prompt('완전 삭제하려면 “대회삭제”를 입력하세요.','')!=='대회삭제')return notice('확인 문구가 일치하지 않아 취소했습니다.','warning');
+  try{
+    await prepareCriticalCloudWrite();
+    await purgeTournamentRegistrationCloud(id);
+    await deleteTournamentNow(id,state);
+  }catch(error){notice(`대회 전체 삭제 실패: ${error?.message||error}`,'error');return;}
+  const wasCurrent=id===String(state.multiTournament.activeTournamentId||'');
+  state.multiTournament.tournaments=(state.multiTournament.tournaments||[]).filter(r=>String(r.id)!==id);
+  // 남아 있는 각 대회 스냅샷과 공통 포털에 삭제한 대회의 흔적이 섞여 있으면 함께 제거합니다.
+  purgeTournamentScopedLocalData(state,id);
+  state.multiTournament.tournaments.forEach(r=>{if(r?.snapshot)purgeTournamentScopedLocalData(r.snapshot,id);});
+  if(wasCurrent){
+    const next=state.multiTournament.tournaments[0];
+    if(next?.snapshot){
+      const registry=structuredClone(state.multiTournament);
+      const restored=structuredClone(next.snapshot);
+      restored.multiTournament=registry;restored.multiTournament.activeTournamentId=next.id;restored.multiTournament.noActiveTournament=false;
+      state=normalizeV5RuntimeState(restored);purgeTournamentScopedLocalData(state,id);
+    }else{
+      const keepPortal=structuredClone(state.portal||{}),keepSettings=structuredClone(state.settings||{}),keepAuth=structuredClone(state.auth||{}),keepOperator=structuredClone(state.operator||{}),keepSync=structuredClone(state.sync||{});
+      const nextState=initialState();
+      nextState.tournament={id:'',name:'',division:''};nextState.multiTournament={activeTournamentId:'',tournaments:[],noActiveTournament:true};
+      nextState.settings={...nextState.settings,...keepSettings};nextState.portal={...nextState.portal,...keepPortal,applications:[]};
+      nextState.auth=keepAuth;nextState.operator=keepOperator;nextState.sync=keepSync;state=nextState;
+    }
+  }
+  ensurePortalState();ensurePrelimState(state);ensureTimeState(state);ensureDrawMeta(state);ensureMessagingState(state);ensureContacts(state);ensureAuditState(state);ensureEarlyMainSettings(state);ensureVenueSettings(state);ensureVenueQueues(state);ensureCourtStatuses(state);ensureCourtManualQueues(state);ensurePrelimCourtStatuses(state);ensureOperatorState();
+  saveState(state);syncInputs?.();syncPrelimInputs?.();renderPortalViews();renderDivisionWorkspaceBar();renderTournamentList();renderHomeTournamentCards?.();
+  notice(`${name} 대회와 해당 대회의 운영 데이터를 모두 삭제했습니다.`,'success');
 }
 
 ensureMultiTournamentRuntime();syncCurrentTournamentRuntime();saveState(state);renderDivisionWorkspaceBar();
@@ -12165,3 +12285,210 @@ function stage7152CompactCourtCards(){
   console.info('[230MATCH] 5.4.14 ready · safe bracket connectors + round colors');
 })();
 
+
+
+/* 5.4.27 · Stage35.4 진행자 계정 승인·기간·세부권한 */
+const STAGE354_OPERATOR_BASE_PERMISSIONS=['court','queue','score'];
+const STAGE354_OPERATOR_EXTRA_PERMISSIONS=['participants','prelim','draw','messaging','print'];
+let stage354AuthBaseRole='viewer';
+window.__stage354OperatorRequestRows=window.__stage354OperatorRequestRows||[];
+function stage354EnsureOperatorAccess(){
+  if(!state.operatorAccess||typeof state.operatorAccess!=='object')state.operatorAccess={};
+  if(!Array.isArray(state.operatorAccess.grants))state.operatorAccess.grants=[];
+  return state.operatorAccess;
+}
+function stage354CurrentTournamentId(){return String(state?.tournament?.id||state?.multiTournament?.activeTournamentId||'');}
+function stage354CurrentDivisionId(){return String(state?.multiDivision?.activeDivisionId||'');}
+function stage354GrantIdentityMatch(grant,user=currentAuthUser){
+  if(!grant||!user)return false;
+  const uid=String(user.uid||''), email=String(user.email||'').trim().toLowerCase();
+  return (!!uid&&String(grant.uid||'')===uid)|| (!!email&&String(grant.email||'').trim().toLowerCase()===email);
+}
+function stage354GrantActive(grant,user=currentAuthUser){
+  if(!stage354GrantIdentityMatch(grant,user)||String(grant.status||'active')!=='active')return false;
+  const tid=stage354CurrentTournamentId();if(!tid||String(grant.tournamentId||'')!==tid)return false;
+  if(tournamentReadOnly?.())return false;
+  const exp=String(grant.expiresAt||'');if(exp&&Date.parse(exp)<=Date.now())return false;
+  if(String(grant.scope||'division')==='division'&&String(grant.divisionId||'')!==stage354CurrentDivisionId())return false;
+  return true;
+}
+function stage354ActiveGrant(user=currentAuthUser){
+  stage354EnsureOperatorAccess();
+  return state.operatorAccess.grants.find(g=>stage354GrantActive(g,user))||null;
+}
+function stage354OperatorPermissions(){
+  const grant=stage354ActiveGrant();
+  if(!grant)return new Set(STAGE354_OPERATOR_BASE_PERMISSIONS);
+  return new Set([...STAGE354_OPERATOR_BASE_PERMISSIONS,...(Array.isArray(grant.permissions)?grant.permissions:[])]);
+}
+function stage354HasPermission(key){return isAdmin()||(isOperator()&&stage354OperatorPermissions().has(key));}
+function stage354ResolveRole(baseRole=stage354AuthBaseRole){
+  if(baseRole==='admin')return 'admin';
+  if(baseRole==='operator')return 'operator'; // 기존 등록 이메일/비상 권한 호환
+  if(currentAuthUser&&stage354ActiveGrant(currentAuthUser))return 'operator';
+  return 'viewer';
+}
+function stage354RefreshGrantedRole({quiet=true}={}){
+  if(!currentAuthUser||stage354AuthBaseRole==='admin')return;
+  const next=stage354ResolveRole(stage354AuthBaseRole), before=currentRole;
+  if(next===before)return;
+  currentRole=next;sessionStorage.setItem(ROLE_KEY,currentRole);applyRoleUI();renderAuthStatus();refreshSyncAccessMode();
+  setTimeout(()=>void startRegistrationCloudSync({force:true}).catch(error=>console.warn('[230MATCH] 진행자 권한 전환 후 참가신청 동기화 실패',error)),80);
+  if(!quiet)notice(next==='operator'?'진행자 권한이 활성화되었습니다.':'진행자 권한이 종료되었습니다.',next==='operator'?'success':'info');
+}
+function stage354PermissionForAdminAction(action=''){
+  const s=String(action||'');
+  if(/삭제|종료|보관|복구|백업|PIN|권한|관리자|대회 생성|대회 편집|새 대회|초기화 전체/.test(s))return '';
+  if(/참가|입금|환불|취소|후보|명단|연락처/.test(s))return 'participants';
+  if(/예선|조편성|조 편성/.test(s))return 'prelim';
+  if(/본선|대진|추첨|시드/.test(s))return 'draw';
+  if(/문자|공지|알림/.test(s))return 'messaging';
+  if(/출력|인쇄|PNG/.test(s))return 'print';
+  return '';
+}
+const stage354OriginalRequireAdmin=requireAdmin;
+requireAdmin=function(action='이 작업'){
+  if(isAdmin())return true;
+  const key=stage354PermissionForAdminAction(action);
+  if(key&&isOperator()&&stage354HasPermission(key))return true;
+  notice(`${action}은 관리자 권한이 필요합니다.`,'error');return false;
+};
+const stage354OriginalApplyAuth=applyAuthenticatedRole;
+applyAuthenticatedRole=function(user,role='viewer',profile=null){
+  stage354AuthBaseRole=user?role:'viewer';
+  stage354OriginalApplyAuth(user,role,profile);
+  if(user&&role!=='admin')stage354RefreshGrantedRole({quiet:true});
+  setTimeout(()=>{try{stage354RenderAccessButtonState();}catch(_e){}},80);
+};
+const stage354OriginalApplySync=applySynchronizedState;
+applySynchronizedState=function(nextState,source='동기화'){
+  stage354OriginalApplySync(nextState,source);
+  stage354EnsureOperatorAccess();stage354RefreshGrantedRole({quiet:false});
+  setTimeout(()=>window.renderOperatorAccessManager?.(),50);
+};
+const stage354OriginalApplyRoleUI=applyRoleUI;
+applyRoleUI=function(){
+  stage354OriginalApplyRoleUI();
+  if(!isOperator()||isAdmin())return;
+  const accountGrant=stage354ActiveGrant();if(!accountGrant)return; // PIN/legacy 진행자는 기존 호환
+  const map={
+    roster:'participants',messages:'messaging',notifications:'messaging',notices:'messaging',print:'print'
+  };
+  Object.entries(map).forEach(([view,perm])=>{
+    document.querySelectorAll(`[data-settings-view="${view}"]`).forEach(el=>el.hidden=!stage354HasPermission(perm));
+  });
+  // 계정형 진행자에게 복구/백업/대회설정 등 위험 도구는 절대 노출하지 않는다.
+  document.querySelectorAll('[data-settings-action="save-recovery"],[data-settings-action="open-recovery"],[data-settings-view="backup"],[data-stage3210-open-edit]').forEach(el=>el.hidden=true);
+  const idPerm={generatePrelimBtn:'prelim',assignPrelimCourtsBtn:'prelim',autoFitPrelimBtn:'prelim',generateLinkedDrawBtn:'draw',lockPrelimBtn:'prelim',unlockPrelimBtn:'prelim',lockDrawBtn:'draw',confirmDrawLockBtn:'draw'};
+  Object.entries(idPerm).forEach(([id,perm])=>{const el=document.getElementById(id);if(!el)return;const ok=stage354HasPermission(perm);el.disabled=!ok;el.setAttribute('aria-disabled',String(!ok));if(ok)el.title='';});
+};
+function stage354Escape(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function stage354ExpiryDefault(){
+  const d=new Date();d.setDate(d.getDate()+2);d.setHours(23,59,0,0);return d.toISOString().slice(0,16);
+}
+function stage354RequestRows(){
+  const tid=stage354CurrentTournamentId();
+  return (window.__stage354OperatorRequestRows||[]).filter(r=>String(r?.tournamentId||'')===tid&&String(r?.recordType||'')==='operator_request');
+}
+async function stage354SubmitOperatorRequest(){
+  if(!currentAuthUser){openSocialLogin();return notice('로그인 후 진행자 권한을 요청하세요.','info');}
+  if(isAdmin())return notice('관리자 계정은 진행자 권한 요청이 필요하지 않습니다.','info');
+  const tid=stage354CurrentTournamentId();if(!tid)return notice('현재 대회를 먼저 선택하세요.','warning');
+  const rt=await registrationRuntime();
+  const did=stage354CurrentDivisionId(), name=authUserLabel();
+  const id=`opreq_${String(currentAuthUser.uid||'').replace(/[^a-zA-Z0-9_-]/g,'_')}_${tid}_${did||'all'}`;
+  const row={id,recordType:'operator_request',ownerUid:String(currentAuthUser.uid||''),uid:String(currentAuthUser.uid||''),email:String(currentAuthUser.email||''),name,tournamentId:tid,tournamentName:String(state?.tournament?.name||''),divisionId:did,divisionName:String(state?.multiDivision?.divisions?.find(d=>String(d.id)===did)?.name||state?.tournament?.division||''),status:'pending',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
+  await rt.api.setDoc(rt.api.doc(rt.db,REGISTRATION_COLLECTION,id),row,{merge:true});
+  window.__stage354OperatorRequestRows=[row,...(window.__stage354OperatorRequestRows||[]).filter(x=>String(x.id)!==id)];
+  notice('진행자 권한 요청을 보냈습니다. 관리자 승인 후 자동으로 활성화됩니다.','success');stage354RenderAccessButtonState();
+}
+async function stage354DeleteRequest(id){
+  try{const rt=await registrationRuntime();await rt.api.deleteDoc(rt.api.doc(rt.db,REGISTRATION_COLLECTION,String(id)));}catch(error){console.warn('[230MATCH] 진행자 요청 정리 실패',error);}
+  window.__stage354OperatorRequestRows=(window.__stage354OperatorRequestRows||[]).filter(x=>String(x.id)!==String(id));
+}
+function stage354GrantFromRequest(req,opts={}){
+  stage354EnsureOperatorAccess();
+  const grant={id:`grant_${crypto.randomUUID()}`,uid:String(req.uid||req.ownerUid||''),email:String(req.email||'').trim().toLowerCase(),name:String(req.name||req.email||'진행자'),tournamentId:stage354CurrentTournamentId(),scope:opts.scope||'division',divisionId:opts.scope==='tournament'?'':String(req.divisionId||stage354CurrentDivisionId()),divisionName:opts.scope==='tournament'?'전체 부서':String(req.divisionName||state?.tournament?.division||''),permissions:[...(opts.permissions||[])],status:'active',approvedAt:new Date().toISOString(),expiresAt:String(opts.expiresAt||''),approvedBy:String(currentAuthUser?.email||authUserLabel())};
+  state.operatorAccess.grants=state.operatorAccess.grants.filter(g=>!(stage354GrantIdentityMatch(g,{uid:grant.uid,email:grant.email})&&String(g.tournamentId||'')===grant.tournamentId&&String(g.divisionId||'')===grant.divisionId));
+  state.operatorAccess.grants.unshift(grant);return grant;
+}
+function stage354PermissionChecksHtml(prefix,selected=[]){
+  const s=new Set(selected||[]);return `
+    <div class="stage354-perm-grid">
+      <label class="fixed"><input type="checkbox" checked disabled> 코트 운영</label><label class="fixed"><input type="checkbox" checked disabled> 대기 이동</label><label class="fixed"><input type="checkbox" checked disabled> 스코어·결과</label>
+      <label><input type="checkbox" data-${prefix}-perm="participants" ${s.has('participants')?'checked':''}> 참가·입금·취소</label>
+      <label><input type="checkbox" data-${prefix}-perm="prelim" ${s.has('prelim')?'checked':''}> 예선 관리</label>
+      <label><input type="checkbox" data-${prefix}-perm="draw" ${s.has('draw')?'checked':''}> 본선 관리</label>
+      <label><input type="checkbox" data-${prefix}-perm="messaging" ${s.has('messaging')?'checked':''}> 문자·공지</label>
+      <label><input type="checkbox" data-${prefix}-perm="print" ${s.has('print')?'checked':''}> 출력 센터</label>
+    </div>`;
+}
+function stage354CollectPerms(root,prefix){return [...root.querySelectorAll(`[data-${prefix}-perm]:checked`)].map(x=>x.getAttribute(`data-${prefix}-perm`)).filter(Boolean);}
+function stage354RenderAccessButtonState(){
+  const btn=document.querySelector('[data-settings-action="operator-access-request"]');if(!btn)return;
+  if(isAdmin()){btn.innerHTML='진행자 권한 관리<small>요청 승인·기간·추가 권한</small>';return;}
+  const grant=stage354ActiveGrant();const mine=stage354RequestRows().find(r=>String(r.ownerUid||'')===String(currentAuthUser?.uid||''));
+  btn.innerHTML=grant?'진행자 권한 활성<small>현재 대회 운영 권한 사용 중</small>':mine?'진행자 승인 대기<small>관리자 승인 대기 중</small>':'진행자 권한 요청<small>현재 대회·부서 권한 요청</small>';
+}
+function stage354EnsureAccessUi(){
+  const hub=document.querySelector('#adminSettingsHub .simplified-settings-hub');
+  if(hub&&!hub.querySelector('[data-settings-action="operator-access-request"]')){
+    const group=document.createElement('section');group.className='settings-hub-group stage354-operator-group';
+    group.innerHTML='<h3>진행자 권한</h3><div class="settings-hub-grid"><button type="button" data-settings-action="operator-access-request">진행자 권한 요청<small>현재 대회·부서 권한 요청</small></button></div>';
+    const account=hub.querySelector('.settings-hub-group:nth-of-type(3)');hub.insertBefore(group,account||null);
+  }
+  if(!document.getElementById('stage354OperatorDialog')){
+    const dialog=document.createElement('dialog');dialog.id='stage354OperatorDialog';dialog.className='modal stage354-operator-dialog';dialog.innerHTML=`<div class="modal-head"><div><span class="eyebrow">OPERATOR ACCESS</span><h2>진행자 권한 관리</h2><p>기본 운영 권한 + 필요한 추가 권한만 부여합니다.</p></div><button type="button" class="icon-button" data-stage354-close>×</button></div><div id="stage354OperatorManagerBody" class="modal-body"></div>`;document.body.appendChild(dialog);
+  }
+  if(!document.getElementById('stage354OperatorStyle')){
+    const style=document.createElement('style');style.id='stage354OperatorStyle';style.textContent=`
+      .stage354-operator-dialog{width:min(920px,96vw);max-height:90vh}.stage354-operator-dialog .modal-body{overflow:auto;max-height:76vh}
+      .stage354-op-card{border:1px solid #dce4ef;border-radius:14px;padding:12px;margin:10px 0;background:#fff}.stage354-op-card strong{font-size:15px}.stage354-op-meta{font-size:12px;color:#65758b;margin-top:3px}
+      .stage354-perm-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:10px 0}.stage354-perm-grid label{font-size:12px;border:1px solid #dfe6ef;border-radius:9px;padding:7px;background:#f8fafc}.stage354-perm-grid label.fixed{background:#eef8f2;color:#17643c;font-weight:800}
+      .stage354-op-actions{display:flex;gap:7px;flex-wrap:wrap;align-items:center}.stage354-op-actions select,.stage354-op-actions input{min-height:34px;border:1px solid #ccd6e3;border-radius:8px;padding:5px 8px}
+      .stage354-danger-note{font-size:12px;background:#fff4f0;border:1px solid #ffd6c8;padding:9px;border-radius:10px;color:#8a321a;margin:9px 0}
+      @media(max-width:640px){.stage354-perm-grid{grid-template-columns:1fr 1fr}.stage354-operator-dialog{width:98vw}.stage354-op-actions>*{flex:1 1 44%}}
+    `;document.head.appendChild(style);
+  }
+  stage354RenderAccessButtonState();
+}
+function stage354OpenOperatorManager(){
+  stage354EnsureAccessUi();
+  if(!isAdmin()){
+    const grant=stage354ActiveGrant();if(grant)return notice('현재 대회의 진행자 권한이 이미 활성화되어 있습니다.','success');
+    const mine=stage354RequestRows().find(r=>String(r.ownerUid||'')===String(currentAuthUser?.uid||''));if(mine)return notice('진행자 권한 승인 대기 중입니다.','info');
+    return void stage354SubmitOperatorRequest().catch(e=>notice(`권한 요청 실패: ${e?.message||e}`,'error'));
+  }
+  window.renderOperatorAccessManager();const d=document.getElementById('stage354OperatorDialog');d?.showModal?.();
+}
+window.renderOperatorAccessManager=function(){
+  const root=document.getElementById('stage354OperatorManagerBody');if(!root)return;
+  if(!isAdmin()){root.innerHTML='<div class="notice warning">관리자만 진행자 권한을 관리할 수 있습니다.</div>';return;}
+  stage354EnsureOperatorAccess();
+  const reqs=stage354RequestRows().filter(r=>String(r.status||'pending')==='pending');
+  const grants=state.operatorAccess.grants.filter(g=>String(g.tournamentId||'')===stage354CurrentTournamentId()&&String(g.status||'active')==='active');
+  const reqHtml=reqs.length?reqs.map(r=>`<article class="stage354-op-card" data-stage354-req-card="${stage354Escape(r.id)}"><strong>${stage354Escape(r.name||r.email||'진행자 요청')}</strong><div class="stage354-op-meta">${stage354Escape(r.email||'이메일 없음')} · ${stage354Escape(r.divisionName||'현재 부서')} · 요청 ${stage354Escape(new Date(r.createdAt||Date.now()).toLocaleString('ko-KR'))}</div>${stage354PermissionChecksHtml('req')}<div class="stage354-op-actions"><select data-stage354-scope><option value="division">현재 부서만</option><option value="tournament">현재 대회 전체</option></select><input data-stage354-expiry type="datetime-local" value="${stage354ExpiryDefault()}"><button class="btn btn-primary" type="button" data-stage354-approve="${stage354Escape(r.id)}">승인</button><button class="btn btn-light" type="button" data-stage354-reject="${stage354Escape(r.id)}">거절</button></div></article>`).join(''):'<div class="portal-empty">대기 중인 진행자 권한 요청이 없습니다.</div>';
+  const grantHtml=grants.length?grants.map(g=>`<article class="stage354-op-card" data-stage354-grant-card="${stage354Escape(g.id)}"><strong>${stage354Escape(g.name||g.email||'진행자')}</strong><div class="stage354-op-meta">${stage354Escape(g.email||'')} · ${g.scope==='tournament'?'대회 전체':stage354Escape(g.divisionName||'현재 부서')} · 만료 ${stage354Escape(g.expiresAt?new Date(g.expiresAt).toLocaleString('ko-KR'):'대회 종료 시')}</div>${stage354PermissionChecksHtml('grant',g.permissions)}<div class="stage354-op-actions"><button class="btn btn-primary" type="button" data-stage354-save-grant="${stage354Escape(g.id)}">권한 변경 저장</button><button class="btn btn-danger-outline" type="button" data-stage354-revoke="${stage354Escape(g.id)}">권한 해제</button></div></article>`).join(''):'<div class="portal-empty">현재 대회에 승인된 진행자가 없습니다.</div>';
+  root.innerHTML=`<div class="stage354-danger-note">진행자에게는 대회 삭제·종료/보관·백업/복구·관리자 설정·진행자 승인 권한을 부여할 수 없습니다.</div><h3>승인 대기 ${reqs.length}명</h3>${reqHtml}<h3 style="margin-top:18px">승인된 진행자 ${grants.length}명</h3>${grantHtml}<h3 style="margin-top:18px">직접 추가</h3><article class="stage354-op-card" data-stage354-manual-card><div class="stage354-op-actions"><input data-stage354-manual-name placeholder="이름"><input data-stage354-manual-email type="email" placeholder="회원가입 이메일"><select data-stage354-manual-scope><option value="division">현재 부서만</option><option value="tournament">현재 대회 전체</option></select><input data-stage354-manual-expiry type="datetime-local" value="${stage354ExpiryDefault()}"></div>${stage354PermissionChecksHtml('manual')}<button class="btn btn-primary" type="button" data-stage354-manual-add>진행자 추가</button></article>`;
+};
+document.addEventListener('click',async event=>{
+  const access=event.target.closest?.('[data-settings-action="operator-access-request"]');if(access){event.preventDefault();event.stopPropagation();closeAdminSettingsHub();setTimeout(stage354OpenOperatorManager,80);return;}
+  if(event.target.closest?.('[data-stage354-close]')){document.getElementById('stage354OperatorDialog')?.close();return;}
+  const approve=event.target.closest?.('[data-stage354-approve]');if(approve){
+    if(!requireAdmin('진행자 권한 승인'))return;const req=stage354RequestRows().find(r=>String(r.id)===String(approve.dataset.stage354Approve));if(!req)return;
+    const card=approve.closest('[data-stage354-req-card]'),scope=card.querySelector('[data-stage354-scope]')?.value||'division',expiry=card.querySelector('[data-stage354-expiry]')?.value||'';
+    stage354GrantFromRequest(req,{scope,expiresAt:expiry?new Date(expiry).toISOString():'',permissions:stage354CollectPerms(card,'req')});commit(`진행자 승인 · ${req.name||req.email}`);await stage354DeleteRequest(req.id);window.renderOperatorAccessManager();return;
+  }
+  const reject=event.target.closest?.('[data-stage354-reject]');if(reject){if(!requireAdmin('진행자 권한 거절'))return;await stage354DeleteRequest(reject.dataset.stage354Reject);window.renderOperatorAccessManager();notice('진행자 권한 요청을 거절했습니다.','info');return;}
+  const save=event.target.closest?.('[data-stage354-save-grant]');if(save){if(!requireAdmin('진행자 권한 변경'))return;const g=state.operatorAccess.grants.find(x=>String(x.id)===String(save.dataset.stage354SaveGrant));if(!g)return;g.permissions=stage354CollectPerms(save.closest('[data-stage354-grant-card]'),'grant');g.updatedAt=new Date().toISOString();commit(`진행자 추가 권한 변경 · ${g.name||g.email}`);window.renderOperatorAccessManager();notice('진행자 권한을 변경했습니다.','success');return;}
+  const revoke=event.target.closest?.('[data-stage354-revoke]');if(revoke){if(!requireAdmin('진행자 권한 해제'))return;if(!confirm('이 진행자의 현재 대회 권한을 해제할까요?'))return;const g=state.operatorAccess.grants.find(x=>String(x.id)===String(revoke.dataset.stage354Revoke));if(g){g.status='revoked';g.revokedAt=new Date().toISOString();commit(`진행자 권한 해제 · ${g.name||g.email}`);}window.renderOperatorAccessManager();return;}
+  const add=event.target.closest?.('[data-stage354-manual-add]');if(add){
+    if(!requireAdmin('진행자 직접 추가'))return;const card=add.closest('[data-stage354-manual-card]'),email=String(card.querySelector('[data-stage354-manual-email]')?.value||'').trim().toLowerCase(),name=String(card.querySelector('[data-stage354-manual-name]')?.value||'').trim();if(!email||!email.includes('@'))return notice('회원가입에 사용한 이메일을 입력하세요.','warning');
+    const scope=card.querySelector('[data-stage354-manual-scope]')?.value||'division',expiry=card.querySelector('[data-stage354-manual-expiry]')?.value||'';stage354GrantFromRequest({email,name:name||email,divisionId:stage354CurrentDivisionId(),divisionName:state?.tournament?.division||''},{scope,expiresAt:expiry?new Date(expiry).toISOString():'',permissions:stage354CollectPerms(card,'manual')});commit(`진행자 직접 추가 · ${name||email}`);window.renderOperatorAccessManager();return;
+  }
+},true);
+const stage354OriginalOpenSettings=openAdminSettingsHub;
+openAdminSettingsHub=function(){stage354EnsureAccessUi();stage354OriginalOpenSettings();stage354RenderAccessButtonState();};
+window.openAdminSettingsHub=openAdminSettingsHub;
+stage354EnsureOperatorAccess();stage354EnsureAccessUi();setTimeout(()=>stage354RefreshGrantedRole({quiet:true}),180);
+console.info('[230MATCH] 5.4.27 ready · account operator requests, expiry and granular permissions');
