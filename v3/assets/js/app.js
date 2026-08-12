@@ -11920,4 +11920,86 @@ function stage7152CompactCourtCards(){
   }
 })();
 
-\n\n/* 230MATCH 5.4.13 · restore bracket connector tree + round color coding */\n(()=>{\n  const SVG_NS='http://www.w3.org/2000/svg';\n  function bracketRoundSizes(){\n    try{return Object.keys(state?.draw?.rounds||{}).map(Number).filter(Number.isFinite).sort((a,b)=>b-a);}catch(_e){return [];}\n  }\n  function visibleCard(el){return !!(el&&el.getClientRects&&el.getClientRects().length&&!el.hidden);}\n  function roundLineColor(size){\n    const map={128:'#8aaed1',64:'#6fa9dc',32:'#9384ca',16:'#c69c45',8:'#cf8067',4:'#a978c1',2:'#c89b2c'};\n    return map[Number(size)]||'#6f91c7';\n  }\n  function enhanceBracketTree(){\n    const board=document.getElementById('bracketBoard');\n    if(!board||board.classList.contains('empty-state'))return;\n    const columns=[...board.querySelectorAll(':scope > .round-column, .round-column')];\n    if(columns.length<1)return;\n    const sizes=bracketRoundSizes();\n    columns.forEach((col,i)=>{\n      const size=sizes[i]||Number(col.dataset.roundSize||0)||0;\n      if(size)col.dataset.roundSize=String(size);\n      [...col.querySelectorAll('.round-match-stack > .match-card')].forEach(card=>{if(size)card.dataset.roundSize=String(size);});\n    });\n\n    let svg=board.querySelector(':scope > .stage7153-bracket-connectors');\n    if(!svg){\n      svg=document.createElementNS(SVG_NS,'svg');\n      svg.classList.add('stage7153-bracket-connectors');\n      svg.setAttribute('aria-hidden','true');\n      board.prepend(svg);\n    }\n    while(svg.firstChild)svg.removeChild(svg.firstChild);\n    const width=Math.max(board.scrollWidth,board.clientWidth,1),height=Math.max(board.scrollHeight,board.clientHeight,1);\n    svg.setAttribute('width',String(width));svg.setAttribute('height',String(height));svg.setAttribute('viewBox',`0 0 ${width} ${height}`);\n    const br=board.getBoundingClientRect();\n    const pos=el=>{const r=el.getBoundingClientRect();return{left:r.left-br.left+board.scrollLeft,right:r.right-br.left+board.scrollLeft,top:r.top-br.top+board.scrollTop,bottom:r.bottom-br.top+board.scrollTop,cy:(r.top+r.bottom)/2-br.top+board.scrollTop};};\n\n    for(let ci=0;ci<columns.length-1;ci++){\n      const current=[...columns[ci].querySelectorAll('.round-match-stack > .match-card')];\n      const next=[...columns[ci+1].querySelectorAll('.round-match-stack > .match-card')];\n      if(!current.length||!next.length)continue;\n      const size=sizes[ci]||Number(columns[ci].dataset.roundSize||0)||0;\n      current.forEach((card,index)=>{\n        if(!visibleCard(card))return;\n        const target=next[Math.floor(index/2)];\n        if(!visibleCard(target))return;\n        const a=pos(card),b=pos(target);\n        if(!(Number.isFinite(a.right)&&Number.isFinite(a.cy)&&Number.isFinite(b.left)&&Number.isFinite(b.cy)))return;\n        const gap=b.left-a.right;\n        if(gap<=2)return;\n        const mid=a.right+gap/2;\n        const path=document.createElementNS(SVG_NS,'path');\n        path.setAttribute('d',`M ${a.right.toFixed(1)} ${a.cy.toFixed(1)} H ${mid.toFixed(1)} V ${b.cy.toFixed(1)} H ${b.left.toFixed(1)}`);\n        path.setAttribute('stroke',roundLineColor(size));\n        svg.appendChild(path);\n      });\n    }\n  }\n  let raf=0;\n  function schedule(){cancelAnimationFrame(raf);raf=requestAnimationFrame(()=>requestAnimationFrame(enhanceBracketTree));}\n  window.addEventListener('resize',schedule,{passive:true});\n  document.addEventListener('click',e=>{if(e.target.closest?.('[data-view="bracket"], [data-portal-go="bracket"], #bracketFullscreenBtn'))setTimeout(schedule,120);});\n  document.addEventListener('change',e=>{if(e.target.closest?.('#bracketViewControls, [data-bracket-view]'))setTimeout(schedule,80);});\n  setInterval(()=>{if(document.body?.dataset.currentView==='bracket')schedule();},1800);\n  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(schedule,450),{once:true});else setTimeout(schedule,450);\n  console.info('[230MATCH] 5.4.13 ready · bracket connectors restored + round colors');\n})();\n
+/* 230MATCH 5.4.14 · safe bracket connector redraw + round color coding */
+(()=>{
+  const SVG_NS='http://www.w3.org/2000/svg';
+  let rafId=0;
+  let observer=null;
+  function getRoundSize(col,index){
+    const direct=Number(col?.dataset?.roundSize||0);
+    if(direct)return direct;
+    const title=(col?.querySelector('h3')?.textContent||'').replace(/\s+/g,'');
+    const m=title.match(/(128|64|32|16|8|4|2)강/);
+    if(m)return Number(m[1]);
+    try{
+      const sizes=Object.keys(state?.draw?.rounds||{}).map(Number).filter(Number.isFinite).sort((a,b)=>b-a);
+      return sizes[index]||0;
+    }catch(_e){return 0;}
+  }
+  function visible(el){return !!(el&&el.getClientRects&&el.getClientRects().length&&!el.hidden);}
+  function draw(){
+    const board=document.getElementById('bracketBoard');
+    if(!board||board.classList.contains('empty-state'))return;
+    const columns=[...board.querySelectorAll(':scope > .round-column')];
+    if(columns.length<2)return;
+    columns.forEach((col,i)=>{
+      const size=getRoundSize(col,i);
+      if(size)col.dataset.roundSize=String(size);
+      col.querySelectorAll('.round-match-stack > .match-card').forEach(card=>{if(size)card.dataset.roundSize=String(size);});
+    });
+    let svg=board.querySelector(':scope > .stage7154-bracket-connectors');
+    if(!svg){
+      svg=document.createElementNS(SVG_NS,'svg');
+      svg.classList.add('stage7154-bracket-connectors');
+      svg.setAttribute('aria-hidden','true');
+      board.prepend(svg);
+    }
+    const width=Math.max(board.scrollWidth,board.clientWidth,1);
+    const height=Math.max(board.scrollHeight,board.clientHeight,1);
+    svg.setAttribute('width',String(width));
+    svg.setAttribute('height',String(height));
+    svg.setAttribute('viewBox',`0 0 ${width} ${height}`);
+    svg.replaceChildren();
+    const br=board.getBoundingClientRect();
+    const point=(el)=>{
+      const r=el.getBoundingClientRect();
+      return {x1:r.right-br.left+board.scrollLeft,y:(r.top+r.bottom)/2-br.top+board.scrollTop,x2:r.left-br.left+board.scrollLeft};
+    };
+    for(let i=0;i<columns.length-1;i++){
+      const current=[...columns[i].querySelectorAll('.round-match-stack > .match-card')].filter(visible);
+      const next=[...columns[i+1].querySelectorAll('.round-match-stack > .match-card')].filter(visible);
+      if(!current.length||!next.length)continue;
+      current.forEach((card,idx)=>{
+        const target=next[Math.floor(idx/2)];
+        if(!target)return;
+        const a=point(card),b=point(target);
+        const gap=b.x2-a.x1;
+        if(!Number.isFinite(gap)||gap<=2)return;
+        const mid=a.x1+gap/2;
+        const path=document.createElementNS(SVG_NS,'path');
+        path.setAttribute('d',`M ${a.x1.toFixed(1)} ${a.y.toFixed(1)} H ${mid.toFixed(1)} V ${b.y.toFixed(1)} H ${b.x2.toFixed(1)}`);
+        svg.appendChild(path);
+      });
+    }
+  }
+  function schedule(){
+    if(rafId)cancelAnimationFrame(rafId);
+    rafId=requestAnimationFrame(()=>{rafId=requestAnimationFrame(draw);});
+  }
+  function bindBoardObserver(){
+    const board=document.getElementById('bracketBoard');
+    if(!board)return;
+    if(observer)observer.disconnect();
+    observer=new MutationObserver(schedule);
+    observer.observe(board,{childList:true,subtree:true,attributes:true,attributeFilter:['class','hidden','style']});
+    schedule();
+  }
+  window.addEventListener('resize',schedule,{passive:true});
+  document.addEventListener('click',e=>{
+    if(e.target.closest?.('[data-view="bracket"], [data-portal-go="bracket"], #bracketFullscreenBtn'))setTimeout(()=>{bindBoardObserver();schedule();},100);
+  });
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(bindBoardObserver,350),{once:true});
+  else setTimeout(bindBoardObserver,350);
+  console.info('[230MATCH] 5.4.14 ready · safe bracket connectors + round colors');
+})();
+
