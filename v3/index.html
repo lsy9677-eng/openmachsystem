@@ -363,55 +363,56 @@
       </section>
 
 
-      <section id="stage7132ContactCenter" class="panel stage7132-contact-center" aria-label="관리자 문의 문자센터">
+
+      <section id="stage7133HomeSms" class="panel stage7133-home-sms" aria-label="관리자 문자 문의">
         <div class="section-head">
           <div>
             <span class="legacy-home-chip">CONTACT ADMIN</span>
-            <h2>관리자에게 문의·개선사항 보내기</h2>
-            <p>시합 문의나 개선 의견을 작성한 뒤, 문의내용을 복사하고 문자앱을 열어 관리자에게 보내세요.</p>
+            <h2>관리자에게 문자 보내기</h2>
+            <p>시합 관련 문의나 개선사항을 작성하면 관리자 번호와 내용이 문자앱에 자동 입력됩니다.</p>
           </div>
-          <span id="stage7132ContactStatus" class="badge badge-muted">문자 문의</span>
+          <span id="stage7133SmsStatus" class="badge badge-muted">문자 문의</span>
         </div>
 
-        <div id="stage7132AdminPhoneSetting" class="stage7132-admin-setting" data-admin-only="true">
+        <div id="stage7133AdminPhoneSetting" class="stage7133-admin-phone-setting" data-admin-only="true">
           <div>
-            <strong>관리자 문의 수신번호</strong>
+            <strong>관리자 문자 수신번호</strong>
             <small>한 번 저장하면 모든 대회에서 공통으로 사용합니다.</small>
           </div>
-          <input id="stage7132AdminPhoneInput" type="tel" inputmode="numeric" autocomplete="tel" placeholder="01012345678" maxlength="13">
-          <button id="stage7132SaveAdminPhoneBtn" type="button" class="btn btn-light btn-small">번호 저장</button>
+          <input id="stage7133AdminPhoneInput" type="tel" inputmode="numeric" autocomplete="tel" placeholder="01012345678" maxlength="13">
+          <button type="button" class="btn btn-light btn-small" onclick="saveHomeAdminSmsPhone()">번호 저장</button>
         </div>
 
-        <div class="stage7132-contact-grid">
+        <div class="stage7133-sms-grid">
           <label>
             <span>문의 종류</span>
-            <select id="stage7132ContactKind">
+            <select id="stage7133SmsKind">
               <option value="match">시합 관련 문의</option>
               <option value="improve">개선사항</option>
               <option value="app">앱 사용 문의</option>
               <option value="etc">기타</option>
             </select>
           </label>
-          <label class="stage7132-wide">
-            <span>문의 내용</span>
-            <textarea id="stage7132ContactBody" rows="4" maxlength="500" placeholder="문의하거나 개선이 필요한 내용을 적어주세요."></textarea>
+          <label class="stage7133-wide">
+            <span>내용</span>
+            <textarea id="stage7133SmsBody" rows="4" maxlength="500" placeholder="문의하거나 개선이 필요한 내용을 적어주세요."></textarea>
           </label>
         </div>
 
-        <div id="stage7132RecipientInfo" class="stage7132-recipient-info">
-          <span>받는 사람</span><strong>관리자 번호 확인 중...</strong>
+        <div id="stage7133SmsRecipient" class="stage7133-recipient">
+          <span>받는 사람</span><strong>관리자 번호 불러오는 중...</strong>
         </div>
 
-        <div class="stage7132-contact-actions">
-          <button id="stage7132CopyMessageBtn" type="button" class="btn btn-light">① 문의내용 복사</button>
-          <a id="stage7132OpenSmsBtn" class="btn btn-primary" href="sms:" role="button">② 문자앱 열기</a>
-        </div>
-        <p class="stage7132-help">문자앱은 <b>받는 사람을 관리자 번호로 직접 지정</b>해서 엽니다. 문자앱이 열리면 복사한 문의내용을 붙여넣고 전송하세요.</p>
+        <button id="stage7133SendSmsBtn" type="button" class="btn btn-primary stage7133-send-btn" onclick="sendHomeAdminSms()">
+          📱 관리자에게 문자 발송
+        </button>
 
-        <div id="stage7132MyContactReceipt" class="stage7132-receipt"></div>
-        <div id="stage7132AdminInbox" class="stage7132-admin-inbox" data-admin-only="true" hidden>
-          <div class="stage7132-inbox-head"><strong>최근 홈 문의</strong><span>문자앱 열기 기록</span></div>
-          <div id="stage7132AdminInboxList"></div>
+        <p class="stage7133-guide">버튼을 누르면 휴대폰 문자앱이 바로 열리고, 받는 사람과 문의 내용이 자동으로 입력됩니다. 문자앱에서 전송만 누르면 됩니다.</p>
+        <div id="stage7133SmsReceipt" class="stage7133-receipt"></div>
+
+        <div id="stage7133AdminInbox" class="stage7133-admin-inbox" data-admin-only="true" hidden>
+          <div class="stage7133-inbox-head"><strong>최근 홈 문자 문의</strong><span>문자앱 열기 기록</span></div>
+          <div id="stage7133AdminInboxList"></div>
         </div>
       </section>
     </section>
@@ -2101,7 +2102,7 @@
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=7132"></script>
+  <script type="module" src="./assets/js/app.js?v=7133"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
@@ -2948,17 +2949,20 @@ input[type="radio"]{
 
 
 
-<style id="stage7132ContactCenterStyles">
-.stage7132-contact-center{margin-top:14px}
-.stage7132-admin-setting{display:grid;grid-template-columns:1fr minmax(150px,220px) auto;gap:8px;align-items:center;margin-bottom:12px;padding:9px 10px;border:1px solid #d7e3ee;border-radius:11px;background:#f8fbff}
-.stage7132-admin-setting strong{display:block;font-size:11px;color:#31516f}.stage7132-admin-setting small{display:block;margin-top:2px;font-size:9px;color:#7a8b9b}
-.stage7132-contact-grid{display:grid;grid-template-columns:minmax(160px,.34fr) 1fr;gap:10px}.stage7132-contact-grid label{display:grid;gap:6px}.stage7132-contact-grid label>span{font-size:11px;font-weight:900;color:#52677d}.stage7132-contact-grid select,.stage7132-contact-grid textarea{width:100%;box-sizing:border-box}.stage7132-wide{grid-column:2}
-.stage7132-recipient-info{display:flex;align-items:center;gap:8px;margin:11px 0 8px;padding:9px 11px;border-radius:10px;background:#f4f7fb;border:1px solid #dde5ee}.stage7132-recipient-info span{font-size:10px;color:#708196}.stage7132-recipient-info strong{font-size:12px;color:#263b51}
-.stage7132-contact-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.stage7132-contact-actions .btn{width:100%;box-sizing:border-box;text-align:center;text-decoration:none}
-.stage7132-help{margin:8px 0 0;font-size:10px;line-height:1.5;color:#718096}.stage7132-receipt{margin-top:9px}.stage7132-receipt>div{padding:8px 10px;border:1px solid #cfe6d8;border-radius:10px;background:#f0fbf4;color:#2c6a45;font-size:10px}
-.stage7132-admin-inbox{margin-top:12px;padding-top:10px;border-top:1px dashed #d7e0e9}.stage7132-inbox-head{display:flex;justify-content:space-between;gap:8px;margin-bottom:7px}.stage7132-inbox-head strong{font-size:12px}.stage7132-inbox-head span{font-size:10px;color:#7a8b9b}
-.stage7132-inbox-row{display:grid;grid-template-columns:74px 1fr auto;gap:8px;padding:7px 0;border-bottom:1px solid #edf1f5;font-size:10px}.stage7132-inbox-row:last-child{border-bottom:0}.stage7132-inbox-row .kind{font-weight:900;color:#466582}.stage7132-inbox-row .meta{color:#8493a3;text-align:right;white-space:nowrap}
-@media(max-width:700px){.stage7132-admin-setting,.stage7132-contact-grid{grid-template-columns:1fr}.stage7132-wide{grid-column:auto}.stage7132-contact-actions{grid-template-columns:1fr 1fr}.stage7132-inbox-row{grid-template-columns:64px 1fr}.stage7132-inbox-row .meta{grid-column:2;text-align:left}}
+
+
+<style id="stage7133HomeSmsStyles">
+.stage7133-home-sms{margin-top:14px}
+.stage7133-admin-phone-setting{display:grid;grid-template-columns:1fr minmax(150px,220px) auto;gap:8px;align-items:center;margin-bottom:12px;padding:9px 10px;border:1px solid #d7e3ee;border-radius:11px;background:#f8fbff}
+.stage7133-admin-phone-setting strong{display:block;font-size:11px;color:#31516f}.stage7133-admin-phone-setting small{display:block;margin-top:2px;font-size:9px;color:#7a8b9b}
+.stage7133-sms-grid{display:grid;grid-template-columns:minmax(160px,.34fr) 1fr;gap:10px}.stage7133-sms-grid label{display:grid;gap:6px}.stage7133-sms-grid label>span{font-size:11px;font-weight:900;color:#52677d}.stage7133-sms-grid select,.stage7133-sms-grid textarea{width:100%;box-sizing:border-box}.stage7133-wide{grid-column:2}
+.stage7133-recipient{display:flex;align-items:center;gap:8px;margin:11px 0 8px;padding:9px 11px;border-radius:10px;background:#f4f7fb;border:1px solid #dde5ee}.stage7133-recipient span{font-size:10px;color:#708196}.stage7133-recipient strong{font-size:12px;color:#263b51}
+.stage7133-send-btn{width:100%;min-height:46px;font-size:14px;font-weight:900}
+.stage7133-guide{margin:8px 0 0;font-size:10px;line-height:1.5;color:#718096}
+.stage7133-receipt{margin-top:9px}.stage7133-receipt>div{padding:8px 10px;border:1px solid #cfe6d8;border-radius:10px;background:#f0fbf4;color:#2c6a45;font-size:10px}
+.stage7133-admin-inbox{margin-top:12px;padding-top:10px;border-top:1px dashed #d7e0e9}.stage7133-inbox-head{display:flex;justify-content:space-between;gap:8px;margin-bottom:7px}.stage7133-inbox-head strong{font-size:12px}.stage7133-inbox-head span{font-size:10px;color:#7a8b9b}
+.stage7133-inbox-row{display:grid;grid-template-columns:74px 1fr auto;gap:8px;padding:7px 0;border-bottom:1px solid #edf1f5;font-size:10px}.stage7133-inbox-row:last-child{border-bottom:0}.stage7133-inbox-row .kind{font-weight:900;color:#466582}.stage7133-inbox-row .meta{color:#8493a3;text-align:right;white-space:nowrap}
+@media(max-width:700px){.stage7133-admin-phone-setting,.stage7133-sms-grid{grid-template-columns:1fr}.stage7133-wide{grid-column:auto}.stage7133-inbox-row{grid-template-columns:64px 1fr}.stage7133-inbox-row .meta{grid-column:2;text-align:left}}
 </style>
 
 </body>
