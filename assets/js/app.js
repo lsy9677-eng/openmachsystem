@@ -1,8 +1,8 @@
 import{getAuthConfig,saveAuthConfig,startAuth,signInGoogle,signOutSocial,beginExternalLogin,getExistingLoginEndpoints,signInEmail,registerEmail,sendPasswordReset,linkEmailPassword,authProviderIds,getAuthRuntime}from'./auth-engine.js?v=3565';
-import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7126';
+import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7127';
 import{notificationSupport,getStoredVapidKey,saveStoredVapidKey,enableMyPush,disableMyPush,queuePush,listPushJobs,listPushTokens}from'./notification-engine.js?v=332012';
 
-import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7126';
+import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7127';
 import{prepareTeams,generateDraw,allMatches,findMatch,generateLinkedDrawSlots,syncLinkedDrawQualifiers}from'./bracket-engine-v5000.js?v=5000';
 import{ensureDrawMeta,canModifyDraw,createDrawWithMethod,lockDraw,unlockDrawForDevelopment,clearDrawHistory}from'./draw-method-engine.js?v=332012';
 import{buildCourts,assignInitial,queueReadyMatches,refillCourt}from'./court-engine.js?v=332012';
@@ -15,7 +15,7 @@ import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactD
 import{render,teamText}from'./ui.js?v=3504';
 import{ensureAuditState,runStateAudit,runPrelimSimulation,runFullSimulation,applyAuditResult}from'./audit-engine.js?v=332012';
 import{earlyMainStats,markResolvedMainMatchesReady,canAssignEarlyMain,ensureEarlyMainSettings,autoAssignResolvedMain}from'./early-main-engine.js?v=332012';
-import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7126';
+import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7127';
 import{ensureMainDrawLifecycle,beginMainDraw,completeMainDraw,failMainDraw,resetMainDraw,hasAuthorizedMainDraw,mainDrawStatus,clearMainPlacement,repairMainDrawAuthorization}from'./main-draw-lifecycle-engine.js?v=3501';
 import{shouldUseLinkedDraw,linkedDrawNeedsRepair,rebuildLinkedDraw,hasStartedMainMatches}from'./linked-draw-guard-engine.js?v=332012';
 import{ensureVenueSettings,ensureVenueQueues,venuePreset,buildVenueCourts,prelimVenues,mainVenues}from'./venue-engine.js?v=332012';
@@ -26,7 +26,7 @@ import{ensureCourtStatuses,pauseCourt,resumeCourt}from'./court-status-engine.js?
 import{ensureCourtManualQueues,assignToCourtManualQueue,moveCourtMatchFlexible,returnManualQueueItemToVenue,reorderCourtManualQueue}from'./court-manual-queue-engine.js?v=332012';
 import{reorderPrelimQueue as reorderPrelimQueueItem,movePrelimQueuedMatch,returnPrelimWait1ToQueue}from'./prelim-queue-control-engine.js?v=332012';
 import{ensurePrelimCourtStatuses,pausePrelimCourt,resumePrelimCourt}from'./prelim-court-status-engine.js?v=332012';
-import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7126';
+import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7127';
 import{verifyAndRepairMainFlow}from'./main-flow-integrity-engine.js?v=332012';
 import{finalizeTournamentCompletion}from'./tournament-completion-engine.js?v=332012';
 import{ensureTournamentIdentity,validateTournamentForArchive,createTournamentArchive,archiveListItem,archiveBackupPayload}from'./archive-engine.js?v=354000';
@@ -3881,6 +3881,8 @@ function registrationAdminNotifyPhone(){
   ensurePortalState();
   const configured=String(state.portal?.registrationSmsSettings?.adminPhone||'').replace(/\D/g,'');
   if(validatePhone(configured))return configured;
+  const globalPhone=String(window.__230matchGlobalAdminPhone||'').replace(/\D/g,'');
+  if(validatePhone(globalPhone))return globalPhone;
   const guideContact=String(state.portal?.guide?.contact||'').replace(/\D/g,'');
   return validatePhone(guideContact)?guideContact:'';
 }
@@ -10426,7 +10428,7 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
   };
   setInterval(tick,2500);
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(tick,350),{once:true});else setTimeout(tick,350);
-  console.info('[230MATCH] 71.2.6 ready · home native SMS inquiry');
+  console.info('[230MATCH] 71.2.7 ready · global admin phone + native SMS inquiry');
 })();
 
 
@@ -10518,7 +10520,7 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
   window.addEventListener('pageshow',update);
   setInterval(()=>{if(document.body?.dataset.currentView==='home')update();},5000);
   window.__updateTodayTournamentDashboard=updateTodayDashboard;
-  console.info('[230MATCH] 71.2.6 ready · home native SMS inquiry');
+  console.info('[230MATCH] 71.2.7 ready · global admin phone + native SMS inquiry');
 })();
 
 
@@ -10786,7 +10788,7 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
   window.__run230MatchResultFlowCheck=runResultFlowCheck;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(runResultFlowCheck,700),{once:true});else setTimeout(runResultFlowCheck,700);
   setInterval(()=>{if(document.body?.dataset.currentView==='home'&&canOperate())runResultFlowCheck();},10000);
-  console.info('[230MATCH] 71.2.6 ready · home native SMS inquiry');
+  console.info('[230MATCH] 71.2.7 ready · global admin phone + native SMS inquiry');
 })();
 
 
@@ -10851,7 +10853,7 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
     document.addEventListener('DOMContentLoaded',()=>setTimeout(updateMatchdayQuickBar,700),{once:true});
   }else setTimeout(updateMatchdayQuickBar,700);
   setInterval(updateMatchdayQuickBar,5000);
-  console.info('[230MATCH] 71.2.6 ready · home native SMS inquiry');
+  console.info('[230MATCH] 71.2.7 ready · global admin phone + native SMS inquiry');
 })();
 
 
@@ -11026,7 +11028,84 @@ ${body}
   window.__update230MatchHomeFeedback=updateFeedbackHome;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(updateFeedbackHome,800),{once:true});else setTimeout(updateFeedbackHome,800);
   setInterval(()=>{if(document.body?.dataset.currentView==='home')updateFeedbackHome();},10000);
-  console.info('[230MATCH] 71.2.6 ready · home native SMS inquiry');
+  console.info('[230MATCH] 71.2.7 ready · global admin phone + native SMS inquiry');
+})();
+
+
+
+/* 230MATCH 5.3.7 · app-wide administrator contact phone */
+(()=>{
+  const CACHE_KEY='230match-global-admin-phone-v1';
+  const ROOM_COLLECTION='matchRoomsV7';
+  const ROOM_ID='230match-production';
+
+  const digits=v=>String(v||'').replace(/\D/g,'');
+  function valid(v){const p=digits(v);return /^01\d{8,9}$/.test(p);}
+  function cachedPhone(){
+    try{return digits(localStorage.getItem(CACHE_KEY)||'');}catch(_e){return'';}
+  }
+  function applyPhone(phone){
+    const p=digits(phone);
+    if(!valid(p))return false;
+    window.__230matchGlobalAdminPhone=p;
+    try{localStorage.setItem(CACHE_KEY,p);}catch(_e){}
+    const input=document.getElementById('stage7127AdminPhoneInput');
+    if(input&&document.activeElement!==input)input.value=p;
+    try{window.__update230MatchHomeFeedback?.();}catch(_e){}
+    return true;
+  }
+  async function loadGlobalAdminPhone(){
+    const cached=cachedPhone();if(valid(cached))applyPhone(cached);
+    try{
+      const rt=await getAuthRuntime();if(!rt?.db||!rt?.api)return;
+      const ref=rt.api.doc(rt.db,ROOM_COLLECTION,ROOM_ID);
+      const snap=await rt.api.getDoc(ref);
+      if(!snap.exists())return;
+      const room=snap.data()||{};
+      const phone=digits(room.globalAdminContactPhone||room.adminContactPhone||'');
+      if(valid(phone))applyPhone(phone);
+    }catch(e){console.warn('[230MATCH] 관리자 공통번호 불러오기 실패',e);}
+  }
+  async function saveGlobalAdminPhone(){
+    if(!requireAdmin('관리자 문의 수신번호 저장'))return;
+    const input=document.getElementById('stage7127AdminPhoneInput');
+    const phone=digits(input?.value||'');
+    if(!valid(phone))return notice('관리자 휴대전화 번호를 정확히 입력하세요. 예: 01012345678','error');
+    const btn=document.getElementById('stage7127SaveAdminPhoneBtn');
+    if(btn){btn.disabled=true;btn.textContent='저장 중...';}
+    try{
+      const rt=await getAuthRuntime();
+      if(!rt?.db||!rt?.api||!rt?.user)throw new Error('관리자 로그인이 필요합니다.');
+      const ref=rt.api.doc(rt.db,ROOM_COLLECTION,ROOM_ID);
+      await rt.api.setDoc(ref,{
+        globalAdminContactPhone:phone,
+        globalAdminContactPhoneUpdatedAt:new Date().toISOString(),
+        globalAdminContactPhoneWriterUid:String(rt.user.uid||''),
+        globalAdminContactPhoneWriterEmail:String(rt.user.email||'')
+      },{merge:true});
+      applyPhone(phone);
+
+      // 현재 대회에도 같이 미러링해 기존 참가신청/취소 문자 기능과 즉시 호환.
+      state.portal=state.portal||{};
+      state.portal.registrationSmsSettings={...(state.portal.registrationSmsSettings||{}),adminPhone:phone};
+      try{commit('관리자 공통 문의번호 저장');}catch(_e){}
+      notice('관리자 문의 수신번호를 저장했습니다. 모든 대회 문의에 공통으로 사용됩니다.','success');
+    }catch(e){
+      console.error('[230MATCH] 관리자 공통번호 저장 실패',e);
+      notice(`관리자 번호 저장 실패: ${e?.message||e}`,'error');
+    }finally{
+      if(btn){btn.disabled=false;btn.textContent='번호 저장';}
+    }
+  }
+
+  document.addEventListener('click',e=>{
+    if(e.target.closest?.('#stage7127SaveAdminPhoneBtn'))saveGlobalAdminPhone();
+  });
+
+  window.__load230MatchGlobalAdminPhone=loadGlobalAdminPhone;
+  const boot=()=>setTimeout(loadGlobalAdminPhone,350);
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+  console.info('[230MATCH] 71.2.7 ready · app-wide admin contact phone');
 })();
 
 
@@ -11184,4 +11263,4 @@ console.info('[230MATCH] 63.0.0 ready · chunked cloud workspace + bounded retry
 
 console.info('[230MATCH] 64.0.0 architecture · lazy cloud registry, worker serialization, visible-view commit rendering');
 
-console.info('[230MATCH] 71.2.6 ready · home native SMS inquiry');
+console.info('[230MATCH] 71.2.7 ready · global admin phone + native SMS inquiry');

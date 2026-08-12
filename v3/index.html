@@ -371,6 +371,15 @@
           </div>
           <span id="stage7125FeedbackStatus" class="badge badge-muted">문자 문의</span>
         </div>
+
+        <div id="stage7127AdminPhoneSetting" class="stage7127-admin-phone-setting" data-admin-only="true">
+          <div>
+            <strong>관리자 문의 수신번호</strong>
+            <small>참가신청·취소요청·홈 문의에 공통으로 사용하는 번호입니다.</small>
+          </div>
+          <input id="stage7127AdminPhoneInput" type="tel" inputmode="numeric" placeholder="01012345678" maxlength="13" aria-label="관리자 문의 수신번호">
+          <button id="stage7127SaveAdminPhoneBtn" type="button" class="btn btn-light btn-small">번호 저장</button>
+        </div>
         <div class="stage7125-feedback-grid">
           <label>
             <span>문의 종류</span>
@@ -2083,7 +2092,7 @@
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=7126"></script>
+  <script type="module" src="./assets/js/app.js?v=7127"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
@@ -2952,6 +2961,21 @@ input[type="radio"]{
   .stage7125-feedback-actions{align-items:stretch;flex-direction:column}
   .stage7125-feedback-actions .btn{width:100%}
   .stage7125-admin-feedback-row{grid-template-columns:70px 1fr}.stage7125-admin-feedback-row .meta{grid-column:2;text-align:left}
+}
+</style>
+
+
+<style id="stage7127GlobalAdminPhoneStyles">
+.stage7127-admin-phone-setting{
+  display:grid;grid-template-columns:1fr minmax(150px,220px) auto;gap:8px;align-items:center;
+  margin:0 0 10px;padding:9px 10px;border:1px solid #d7e3ee;border-radius:11px;background:#f8fbff
+}
+.stage7127-admin-phone-setting strong{display:block;font-size:11px;color:#31516f}
+.stage7127-admin-phone-setting small{display:block;margin-top:2px;font-size:9px;line-height:1.4;color:#7a8b9b}
+.stage7127-admin-phone-setting input{width:100%;box-sizing:border-box}
+@media(max-width:700px){
+  .stage7127-admin-phone-setting{grid-template-columns:1fr}
+  .stage7127-admin-phone-setting .btn{width:100%}
 }
 </style>
 
