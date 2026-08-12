@@ -1,8 +1,8 @@
 import{getAuthConfig,saveAuthConfig,startAuth,signInGoogle,signOutSocial,beginExternalLogin,getExistingLoginEndpoints,signInEmail,registerEmail,sendPasswordReset,linkEmailPassword,authProviderIds,getAuthRuntime}from'./auth-engine.js?v=3565';
-import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7131';
+import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7132';
 import{notificationSupport,getStoredVapidKey,saveStoredVapidKey,enableMyPush,disableMyPush,queuePush,listPushJobs,listPushTokens}from'./notification-engine.js?v=332012';
 
-import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7131';
+import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7132';
 import{prepareTeams,generateDraw,allMatches,findMatch,generateLinkedDrawSlots,syncLinkedDrawQualifiers}from'./bracket-engine-v5000.js?v=5000';
 import{ensureDrawMeta,canModifyDraw,createDrawWithMethod,lockDraw,unlockDrawForDevelopment,clearDrawHistory}from'./draw-method-engine.js?v=332012';
 import{buildCourts,assignInitial,queueReadyMatches,refillCourt}from'./court-engine.js?v=332012';
@@ -15,7 +15,7 @@ import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactD
 import{render,teamText}from'./ui.js?v=3504';
 import{ensureAuditState,runStateAudit,runPrelimSimulation,runFullSimulation,applyAuditResult}from'./audit-engine.js?v=332012';
 import{earlyMainStats,markResolvedMainMatchesReady,canAssignEarlyMain,ensureEarlyMainSettings,autoAssignResolvedMain}from'./early-main-engine.js?v=332012';
-import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7131';
+import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7132';
 import{ensureMainDrawLifecycle,beginMainDraw,completeMainDraw,failMainDraw,resetMainDraw,hasAuthorizedMainDraw,mainDrawStatus,clearMainPlacement,repairMainDrawAuthorization}from'./main-draw-lifecycle-engine.js?v=3501';
 import{shouldUseLinkedDraw,linkedDrawNeedsRepair,rebuildLinkedDraw,hasStartedMainMatches}from'./linked-draw-guard-engine.js?v=332012';
 import{ensureVenueSettings,ensureVenueQueues,venuePreset,buildVenueCourts,prelimVenues,mainVenues}from'./venue-engine.js?v=332012';
@@ -26,7 +26,7 @@ import{ensureCourtStatuses,pauseCourt,resumeCourt}from'./court-status-engine.js?
 import{ensureCourtManualQueues,assignToCourtManualQueue,moveCourtMatchFlexible,returnManualQueueItemToVenue,reorderCourtManualQueue}from'./court-manual-queue-engine.js?v=332012';
 import{reorderPrelimQueue as reorderPrelimQueueItem,movePrelimQueuedMatch,returnPrelimWait1ToQueue}from'./prelim-queue-control-engine.js?v=332012';
 import{ensurePrelimCourtStatuses,pausePrelimCourt,resumePrelimCourt}from'./prelim-court-status-engine.js?v=332012';
-import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7131';
+import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7132';
 import{verifyAndRepairMainFlow}from'./main-flow-integrity-engine.js?v=332012';
 import{finalizeTournamentCompletion}from'./tournament-completion-engine.js?v=332012';
 import{ensureTournamentIdentity,validateTournamentForArchive,createTournamentArchive,archiveListItem,archiveBackupPayload}from'./archive-engine.js?v=354000';
@@ -5350,7 +5350,7 @@ function navigatePortalView(name,{pushHistory=false,replaceHistory=false,focus=t
   renderPortalViewFast(target);
   if(target==='home'){
     setTimeout(showEligibleHomePopup,120);
-    if(typeof window.__update230MatchHomeFeedback==='function')setTimeout(window.__update230MatchHomeFeedback,80);
+    if(typeof window.__refresh230MatchContactCenter==='function')setTimeout(window.__refresh230MatchContactCenter,80);
   }
   if(target==='my-match')setTimeout(v3252AutoMyMatch,60);
   if(target==='entry')setTimeout(renderApplicationPortal,30);
@@ -10428,7 +10428,7 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
   };
   setInterval(tick,2500);
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(tick,350),{once:true});else setTimeout(tick,350);
-  console.info('[230MATCH] 71.3.1 ready · native sms recipient autofill');
+  console.info('[230MATCH] 71.3.2 ready · rebuilt home contact center');
 })();
 
 
@@ -10520,7 +10520,7 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
   window.addEventListener('pageshow',update);
   setInterval(()=>{if(document.body?.dataset.currentView==='home')update();},5000);
   window.__updateTodayTournamentDashboard=updateTodayDashboard;
-  console.info('[230MATCH] 71.3.1 ready · native sms recipient autofill');
+  console.info('[230MATCH] 71.3.2 ready · rebuilt home contact center');
 })();
 
 
@@ -10788,7 +10788,7 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
   window.__run230MatchResultFlowCheck=runResultFlowCheck;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(runResultFlowCheck,700),{once:true});else setTimeout(runResultFlowCheck,700);
   setInterval(()=>{if(document.body?.dataset.currentView==='home'&&canOperate())runResultFlowCheck();},10000);
-  console.info('[230MATCH] 71.3.1 ready · native sms recipient autofill');
+  console.info('[230MATCH] 71.3.2 ready · rebuilt home contact center');
 })();
 
 
@@ -10853,336 +10853,236 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
     document.addEventListener('DOMContentLoaded',()=>setTimeout(updateMatchdayQuickBar,700),{once:true});
   }else setTimeout(updateMatchdayQuickBar,700);
   setInterval(updateMatchdayQuickBar,5000);
-  console.info('[230MATCH] 71.3.1 ready · native sms recipient autofill');
+  console.info('[230MATCH] 71.3.2 ready · rebuilt home contact center');
 })();
 
 
 
-/* 230MATCH 5.3.5 · home admin feedback SMS + receipt history */
-(()=>{
-  const COLLECTION='adminRegistrationNotifications';
-  const LOCAL_KEY='230match-home-feedback-history-v1';
-  const KIND_LABELS={match:'시합 문의',improve:'개선사항',app:'앱 문의',etc:'기타'};
-  let inboxUnsub=null,inboxStarted=false;
 
+/* 230MATCH 5.4.2 · rebuilt home contact center */
+(()=>{
+  const ROOM_COLLECTION='matchRoomsV7';
+  const ROOM_ID='230match-production';
+  const INBOX_COLLECTION='adminRegistrationNotifications';
+  const CACHE_KEY='230match-global-admin-phone-v2';
+  const RECEIPT_KEY='230match-contact-center-receipt-v1';
+  const KIND_LABELS={match:'시합 문의',improve:'개선사항',app:'앱 문의',etc:'기타'};
+  let adminPhone='',inboxUnsub=null;
+
+  const digits=v=>String(v||'').replace(/\D/g,'');
+  const valid=v=>/^01\d{8,9}$/.test(digits(v));
   const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-  const localRows=()=>{
-    try{const rows=JSON.parse(localStorage.getItem(LOCAL_KEY)||'[]');return Array.isArray(rows)?rows:[];}catch(_e){return[];}
-  };
-  function saveLocalReceipt(row){
-    const rows=localRows();
-    rows.unshift(row);
-    try{localStorage.setItem(LOCAL_KEY,JSON.stringify(rows.slice(0,8)));}catch(_e){}
-    renderMyReceipt();
-  }
-  function renderMyReceipt(){
-    const root=document.getElementById('stage7125MyFeedbackHistory');if(!root)return;
-    const row=localRows()[0];
-    if(!row){root.innerHTML='';return;}
-    const when=row.sentAt?new Date(row.sentAt).toLocaleString('ko-KR'):'';
-    const label=row.status==='copied'?'문자 내용이 복사되었습니다.':'관리자에게 보낼 문의 문자를 문자앱에 준비했습니다.';
-    root.innerHTML=`<div class="stage7125-feedback-sent"><span>✓ ${esc(label)} <b>${esc(KIND_LABELS[row.kind]||'문의')}</b></span><span>${esc(when)}</span></div>`;
-  }
-  function feedbackContext(){
-    let ctx={};try{ctx=registrationContext()||{};}catch(_e){}
+
+  function context(){
+    let c={};try{c=registrationContext()||{};}catch(_e){}
     return {
-      tournamentId:String(ctx.tournamentId||state?.multiTournament?.activeTournamentId||state?.tournament?.id||''),
-      tournamentName:String(ctx.tournamentName||state?.tournament?.name||'현재 대회'),
-      divisionId:String(ctx.divisionId||state?.multiDivision?.activeDivisionId||''),
-      divisionName:String(ctx.divisionName||state?.tournament?.division||'')
+      tournamentId:String(c.tournamentId||state?.tournament?.id||''),
+      tournamentName:String(c.tournamentName||state?.tournament?.name||'현재 대회'),
+      divisionId:String(c.divisionId||state?.multiDivision?.activeDivisionId||''),
+      divisionName:String(c.divisionName||state?.tournament?.division||'')
     };
   }
-  function senderLabel(){
-    return String(currentAuthUser?.appProfile?.name||currentAuthUser?.displayName||currentAuthUser?.email||'로그인 사용자');
-  }
+  function senderName(){return String(currentAuthUser?.appProfile?.name||currentAuthUser?.displayName||currentAuthUser?.email||'사용자');}
   function senderPhone(){
-    try{
-      const p=v3252ProfileDefaults?.()||{};
-      return String(p.phone||currentAuthUser?.appProfile?.phone||'').replace(/\D/g,'');
-    }catch(_e){
-      return String(currentAuthUser?.appProfile?.phone||'').replace(/\D/g,'');
-    }
+    try{return digits(v3252ProfileDefaults?.().phone||currentAuthUser?.appProfile?.phone||'');}
+    catch(_e){return digits(currentAuthUser?.appProfile?.phone||'');}
   }
-  function senderTeamLabel(){
+  function teamName(){
     try{
       const uid=String(currentAuthUser?.uid||'');
-      const mine=(registrationCloudRows||[]).find(r=>String(r?.ownerUid||'')===uid&&registrationBelongsToCurrentDivision(r));
-      return String(mine?.teamName||mine?.affiliation||'').trim();
+      const row=(registrationCloudRows||[]).find(r=>String(r?.ownerUid||'')===uid&&registrationBelongsToCurrentDivision(r));
+      return String(row?.teamName||row?.affiliation||'').trim();
     }catch(_e){return'';}
   }
-  function feedbackSmsBody(kind,body){
-    const c=feedbackContext(),label=KIND_LABELS[kind]||'문의';
-    const team=senderTeamLabel(),phone=senderPhone();
-    return `[230MATCH ${label}]
-보낸사람: ${senderLabel()}${team?` / ${team}`:''}
+
+  function buildMessage(){
+    const kind=document.getElementById('stage7132ContactKind')?.value||'match';
+    const body=String(document.getElementById('stage7132ContactBody')?.value||'').trim();
+    const c=context(),team=teamName(),phone=senderPhone();
+    return `[230MATCH ${KIND_LABELS[kind]||'문의'}]
+보낸사람: ${senderName()}${team?` / ${team}`:''}
 대회: ${c.tournamentName}${c.divisionName?` · ${c.divisionName}`:''}${phone?`\n연락처: ${phone}`:''}
 
 ${body}
 
 ※ 230MATCH 홈 화면에서 작성한 문의입니다.`;
   }
-  async function saveFeedbackCloud(row){
-    const rt=await getAuthRuntime();
-    if(!rt?.db||!rt?.api||!rt?.user)throw new Error('로그인이 필요합니다.');
-    const id=`feedback_${Date.now()}_${String(rt.user.uid||'user').slice(0,10)}`;
-    await rt.api.setDoc(rt.api.doc(rt.db,COLLECTION,id),{id,...row});
-    return id;
-  }
-  function pendingFeedbackKey(){return '230match-home-feedback-pending-v1';}
-  function storePendingFeedback(row){
-    try{localStorage.setItem(pendingFeedbackKey(),JSON.stringify(row));}catch(_e){}
-  }
-  function takePendingFeedback(){
+
+  function resolvedPhone(){
+    const legacy=digits(state?.portal?.registrationSmsSettings?.adminPhone||'');
+    if(valid(adminPhone))return adminPhone;
+    if(valid(legacy))return legacy;
     try{
-      const raw=localStorage.getItem(pendingFeedbackKey());if(!raw)return null;
-      localStorage.removeItem(pendingFeedbackKey());
-      return JSON.parse(raw);
-    }catch(_e){return null;}
-  }
-  async function flushPendingFeedback(){
-    const row=takePendingFeedback();if(!row||!currentAuthUser)return;
-    try{
-      const id=await saveFeedbackCloud(row);
-      saveLocalReceipt({id,kind:row.kind,body:row.body,sentAt:row.sentAt,status:'sms-app-opened'});
-      if(canOperate())startAdminInbox(true);
-    }catch(e){
-      storePendingFeedback(row);
-      console.warn('[230MATCH] 홈 문의 이력 저장 재시도 대기',e);
-    }
-  }
-  function buildFeedbackRow(kind,body,adminPhone){
-    const c=feedbackContext(),openedAt=new Date().toISOString();
-    return {
-      type:'home_feedback',kind,body,
-      tournamentId:c.tournamentId,tournamentName:c.tournamentName,
-      divisionId:c.divisionId,divisionName:c.divisionName,
-      senderUid:String(currentAuthUser?.uid||''),
-      senderName:senderLabel(),senderPhone:senderPhone(),
-      senderEmail:String(currentAuthUser?.email||''),
-      adminPhone:String(adminPhone||'').replace(/\D/g,''),
-      sentAt:openedAt,createdAt:openedAt,
-      channel:'phone',deliveryStatus:'sms-app-opened',source:'home'
-    };
-  }
-  function prepareFeedbackNativeLink({showWarning=false}={}){
-    const link=document.getElementById('stage7125SendFeedbackBtn');if(!link)return false;
-    const kind=document.getElementById('stage7125FeedbackKind')?.value||'match';
-    const body=String(document.getElementById('stage7125FeedbackBody')?.value||'').trim();
-    const adminPhone=registrationAdminNotifyPhone();
-
-    if(!validatePhone(adminPhone)){
-      link.setAttribute('href','sms:');
-      link.dataset.ready='0';
-      if(showWarning)notice('관리자 문자 수신번호가 설정되지 않았습니다. 관리자 번호를 먼저 저장하세요.','error');
-      return false;
-    }
-    if(body.length<2){
-      link.setAttribute('href','sms:');
-      link.dataset.ready='0';
-      if(showWarning)notice('문의 내용을 입력하세요.','error');
-      return false;
-    }
-
-    const smsBody=feedbackSmsBody(kind,body);
-    const href=window.__230matchBuildNativeSmsHref
-      ? window.__230matchBuildNativeSmsHref(adminPhone,smsBody)
-      : (/iPhone|iPad|iPod/i.test(navigator.userAgent||'')
-          ? `sms:${String(adminPhone).replace(/\D/g,'')}&body=${encodeURIComponent(smsBody)}`
-          : `smsto:${String(adminPhone).replace(/\D/g,'')}?body=${encodeURIComponent(smsBody)}`);
-    link.setAttribute('href',href);
-    link.dataset.ready='1';
-    link.dataset.adminPhone=String(adminPhone).replace(/\D/g,'');
-    return true;
-  }
-  function bindFeedbackNativeLink(){
-    const link=document.getElementById('stage7125SendFeedbackBtn');if(!link||link.dataset.nativeBound==='1')return;
-    link.dataset.nativeBound='1';
-
-    // href는 사용자가 누르기 전에 미리 완성해 둔다.
-    // 클릭 순간에 href를 바꾸면 일부 모바일 브라우저/웹앱이 기존 sms: 값을 사용해
-    // 받는 사람 번호가 비어버리는 경우가 있다.
-    const refresh=()=>prepareFeedbackNativeLink({showWarning:false});
-    document.getElementById('stage7125FeedbackBody')?.addEventListener('input',refresh);
-    document.getElementById('stage7125FeedbackKind')?.addEventListener('change',refresh);
-
-    link.addEventListener('click',e=>{
-      if(!prepareFeedbackNativeLink({showWarning:true})){
-        e.preventDefault();
-        return;
-      }
-      const kind=document.getElementById('stage7125FeedbackKind')?.value||'match';
-      const body=String(document.getElementById('stage7125FeedbackBody')?.value||'').trim();
-      const adminPhone=registrationAdminNotifyPhone();
-      storePendingFeedback(buildFeedbackRow(kind,body,adminPhone));
-      const status=document.getElementById('stage7125FeedbackStatus');
-      if(status){status.className='badge badge-safe';status.textContent='문자앱 연결';}
-      // preventDefault 금지: 실제 <a href="smsto:..."> 기본 동작으로 문자앱을 연다.
-    });
-
-    refresh();
-  }
-  function renderAdminInbox(rows){
-    const wrap=document.getElementById('stage7125AdminFeedbackInbox'),root=document.getElementById('stage7125AdminFeedbackList');
-    if(!wrap||!root)return;
-    wrap.hidden=!canOperate();
-    if(!canOperate())return;
-    const filtered=(rows||[]).filter(x=>x?.type==='home_feedback').sort((a,b)=>String(b.sentAt||'').localeCompare(String(a.sentAt||''))).slice(0,8);
-    root.innerHTML=filtered.length?filtered.map(r=>{
-      const when=r.sentAt?new Date(r.sentAt).toLocaleString('ko-KR'):'';
-      return `<div class="stage7125-admin-feedback-row"><span class="kind">${esc(KIND_LABELS[r.kind]||'문의')}</span><div class="body"><b>${esc(r.senderName||'사용자')}</b>${r.senderPhone?` · ${esc(r.senderPhone)}`:''}<br>${esc(r.body||'')}</div><span class="meta">${esc(r.tournamentName||'')}${r.divisionName?` · ${esc(r.divisionName)}`:''}<br>문자앱 열기 · ${esc(when)}</span></div>`;
-    }).join(''):'<div class="portal-empty">아직 홈 문의가 없습니다.</div>';
-  }
-  async function startAdminInbox(force=false){
-    if(!canOperate())return;
-    if(inboxStarted&&!force)return;
-    try{
-      const rt=await getAuthRuntime();if(!rt?.db||!rt?.api||!rt?.user)return;
-      inboxUnsub?.();inboxStarted=true;
-      const ref=rt.api.collection(rt.db,COLLECTION);
-      inboxUnsub=rt.api.onSnapshot(ref,snap=>{
-        const rows=snap.docs.map(d=>({id:d.id,...d.data()}));
-        renderAdminInbox(rows);
-      },e=>console.warn('[230MATCH] 홈 문의함 실시간 연결 실패',e));
-    }catch(e){console.warn('[230MATCH] 홈 문의함 시작 실패',e);}
-  }
-  function updateFeedbackHome(){
-    flushPendingFeedback();
-    bindFeedbackNativeLink();
-    renderMyReceipt();
-    const guide=document.getElementById('stage7125FeedbackGuide');
-    if(guide){
-      const adminPhone=registrationAdminNotifyPhone();
-      guide.textContent=validatePhone(adminPhone)
-        ?'문자에는 현재 대회·부서와 로그인 사용자 정보가 자동으로 포함됩니다. 문자앱에서 마지막 전송 버튼만 눌러주세요.'
-        :'관리자 문자 수신번호가 설정되면 사용할 수 있습니다.';
-    }
-    if(canOperate())startAdminInbox();
-  }
-  // 문의 버튼은 일반 click 라우팅이 아니라 실제 sms: 링크 자체로 동작한다.
-  // 동적 렌더 후에도 직접 이벤트가 붙도록 홈 갱신 때 다시 확인한다.
-  window.__update230MatchHomeFeedback=updateFeedbackHome;
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(updateFeedbackHome,800),{once:true});else setTimeout(updateFeedbackHome,800);
-  window.addEventListener('pageshow',()=>setTimeout(updateFeedbackHome,150));
-  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(updateFeedbackHome,150);});
-  setInterval(()=>{if(document.body?.dataset.currentView==='home')updateFeedbackHome();},10000);
-  console.info('[230MATCH] 71.3.1 ready · home native sms recipient autofill');
-})();
-
-
-
-
-/* 230MATCH 5.3.8 · native SMS target/body compatibility + repeated-open fix */
-(()=>{
-  const digits=v=>String(v||'').replace(/\D/g,'');
-  function buildNativeSmsHref(phone,body){
-    const to=digits(phone);
-    const text=String(body||'');
-    const ua=navigator.userAgent||'';
-    const isIOS=/iPhone|iPad|iPod/i.test(ua);
-    // Android(특히 삼성 메시지/Chrome)은 smsto: 형식이 수신번호 전달이 가장 안정적이다.
-    // iOS는 sms:수신번호&body= 형식을 사용한다.
-    return isIOS
-      ? `sms:${to}&body=${encodeURIComponent(text)}`
-      : `smsto:${to}?body=${encodeURIComponent(text)}`;
-  }
-  function openNativeSmsComposer(phone,body){
-    const to=digits(phone);
-    if(!to)throw new Error('관리자 번호가 없습니다.');
-    const href=buildNativeSmsHref(to,body);
-    // 문자앱 호출은 사용자의 탭 이벤트 안에서 즉시 실행해야 한다.
-    window.location.href=href;
-    return true;
-  }
-  window.__230matchBuildNativeSmsHref=buildNativeSmsHref;
-  window.__230matchOpenNativeSmsComposer=openNativeSmsComposer;
-  console.info('[230MATCH] 71.2.8 ready · native SMS compatibility helper');
-})();
-
-
-/* 230MATCH 5.3.7 · app-wide administrator contact phone */
-(()=>{
-  const CACHE_KEY='230match-global-admin-phone-v1';
-  const ROOM_COLLECTION='matchRoomsV7';
-  const ROOM_ID='230match-production';
-
-  const digits=v=>String(v||'').replace(/\D/g,'');
-  function valid(v){const p=digits(v);return /^01\d{8,9}$/.test(p);}
-  function cachedPhone(){
-    try{return digits(localStorage.getItem(CACHE_KEY)||'');}catch(_e){return'';}
-  }
-  function applyPhone(phone){
-    const p=digits(phone);
-    if(!valid(p))return false;
-    window.__230matchGlobalAdminPhone=p;
-    try{localStorage.setItem(CACHE_KEY,p);}catch(_e){}
-    const input=document.getElementById('stage7127AdminPhoneInput');
-    if(input&&document.activeElement!==input)input.value=p;
-    const legacyInput=document.getElementById('entryAdminNotifyPhone');
-    if(legacyInput&&document.activeElement!==legacyInput)legacyInput.value=p;
-    try{window.__update230MatchHomeFeedback?.();}catch(_e){}
-    try{
-      const link=document.getElementById('stage7125SendFeedbackBtn');
-      if(link){
-        // updateFeedbackHome → bind/refresh 로 실제 수신번호가 href에 즉시 반영된다.
-        setTimeout(()=>window.__update230MatchHomeFeedback?.(),0);
-      }
+      const cached=digits(localStorage.getItem(CACHE_KEY)||'');
+      if(valid(cached))return cached;
     }catch(_e){}
+    return '';
+  }
+
+  function applyPhone(phone){
+    const p=digits(phone);if(!valid(p))return false;
+    adminPhone=p;window.__230matchGlobalAdminPhone=p;
+    try{localStorage.setItem(CACHE_KEY,p);}catch(_e){}
+    const input=document.getElementById('stage7132AdminPhoneInput');
+    if(input&&document.activeElement!==input)input.value=p;
+    const legacy=document.getElementById('entryAdminNotifyPhone');
+    if(legacy&&document.activeElement!==legacy)legacy.value=p;
+    refreshRecipient();
     return true;
   }
-  async function loadGlobalAdminPhone(){
-    const cached=cachedPhone();if(valid(cached))applyPhone(cached);
-    try{
-      const rt=await getAuthRuntime();if(!rt?.db||!rt?.api)return;
-      const ref=rt.api.doc(rt.db,ROOM_COLLECTION,ROOM_ID);
-      const snap=await rt.api.getDoc(ref);
-      if(!snap.exists())return;
-      const room=snap.data()||{};
-      const phone=digits(room.globalAdminContactPhone||room.adminContactPhone||'');
-      if(valid(phone))applyPhone(phone);
-    }catch(e){console.warn('[230MATCH] 관리자 공통번호 불러오기 실패',e);}
+
+  function refreshRecipient(){
+    const p=resolvedPhone();
+    const info=document.getElementById('stage7132RecipientInfo');
+    const link=document.getElementById('stage7132OpenSmsBtn');
+    if(info){
+      const strong=info.querySelector('strong');
+      if(strong)strong.textContent=p?p:'관리자 번호 미설정';
+    }
+    if(link){
+      // 새 기능의 핵심: 쿼리스트링/본문 없이 수신번호만 가진 순수 sms 링크.
+      // 모바일 브라우저가 받는 사람 번호를 가장 안정적으로 넘긴다.
+      link.href=p?`sms:${p}`:'sms:';
+      link.dataset.ready=p?'1':'0';
+      link.setAttribute('aria-disabled',p?'false':'true');
+    }
+    const status=document.getElementById('stage7132ContactStatus');
+    if(status){
+      status.textContent=p?'관리자 번호 연결됨':'번호 설정 필요';
+      status.className=`badge ${p?'badge-safe':'badge-muted'}`;
+    }
   }
-  async function saveGlobalAdminPhone(){
-    if(!requireAdmin('관리자 문의 수신번호 저장'))return;
-    const input=document.getElementById('stage7127AdminPhoneInput');
-    const phone=digits(input?.value||'');
-    if(!valid(phone))return notice('관리자 휴대전화 번호를 정확히 입력하세요. 예: 01012345678','error');
-    const btn=document.getElementById('stage7127SaveAdminPhoneBtn');
-    if(btn){btn.disabled=true;btn.textContent='저장 중...';}
+
+  async function loadPhone(){
     try{
-      const rt=await getAuthRuntime();
-      if(!rt?.db||!rt?.api||!rt?.user)throw new Error('관리자 로그인이 필요합니다.');
-      const ref=rt.api.doc(rt.db,ROOM_COLLECTION,ROOM_ID);
-      await rt.api.setDoc(ref,{
-        globalAdminContactPhone:phone,
+      const cached=digits(localStorage.getItem(CACHE_KEY)||'');if(valid(cached))applyPhone(cached);
+    }catch(_e){}
+    try{
+      const rt=await getAuthRuntime();if(!rt?.db||!rt?.api)return refreshRecipient();
+      const snap=await rt.api.getDoc(rt.api.doc(rt.db,ROOM_COLLECTION,ROOM_ID));
+      const room=snap.exists()?(snap.data()||{}):{};
+      const p=digits(room.globalAdminContactPhone||room.adminContactPhone||'');
+      if(valid(p))applyPhone(p);else refreshRecipient();
+    }catch(e){console.warn('[230MATCH] 문의 수신번호 불러오기 실패',e);refreshRecipient();}
+  }
+
+  async function savePhone(){
+    if(!requireAdmin('관리자 문의 수신번호 저장'))return;
+    const p=digits(document.getElementById('stage7132AdminPhoneInput')?.value||'');
+    if(!valid(p))return notice('관리자 휴대전화 번호를 정확히 입력하세요.','error');
+    try{
+      const rt=await getAuthRuntime();if(!rt?.db||!rt?.api||!rt?.user)throw new Error('관리자 로그인이 필요합니다.');
+      await rt.api.setDoc(rt.api.doc(rt.db,ROOM_COLLECTION,ROOM_ID),{
+        globalAdminContactPhone:p,
         globalAdminContactPhoneUpdatedAt:new Date().toISOString(),
         globalAdminContactPhoneWriterUid:String(rt.user.uid||''),
         globalAdminContactPhoneWriterEmail:String(rt.user.email||'')
       },{merge:true});
-      applyPhone(phone);
-
-      // 현재 대회에도 같이 미러링해 기존 참가신청/취소 문자 기능과 즉시 호환.
       state.portal=state.portal||{};
-      state.portal.registrationSmsSettings={...(state.portal.registrationSmsSettings||{}),adminPhone:phone};
-      try{commit('관리자 공통 문의번호 저장');}catch(_e){}
-      notice('관리자 문의 수신번호를 저장했습니다. 모든 대회 문의에 공통으로 사용됩니다.','success');
-    }catch(e){
-      console.error('[230MATCH] 관리자 공통번호 저장 실패',e);
-      notice(`관리자 번호 저장 실패: ${e?.message||e}`,'error');
-    }finally{
-      if(btn){btn.disabled=false;btn.textContent='번호 저장';}
+      state.portal.registrationSmsSettings={...(state.portal.registrationSmsSettings||{}),adminPhone:p};
+      try{commit('관리자 문의 수신번호 저장');}catch(_e){}
+      applyPhone(p);
+      notice('관리자 문의 수신번호를 저장했습니다.','success');
+    }catch(e){notice(`관리자 번호 저장 실패: ${e?.message||e}`,'error');}
+  }
+
+  async function copyMessage(){
+    const body=String(document.getElementById('stage7132ContactBody')?.value||'').trim();
+    if(body.length<2)return notice('문의 내용을 먼저 입력하세요.','error');
+    try{
+      await navigator.clipboard.writeText(buildMessage());
+      notice('문의내용을 복사했습니다. 이제 문자앱을 열어 붙여넣으세요.','success');
+      const status=document.getElementById('stage7132ContactStatus');
+      if(status){status.textContent='문의내용 복사됨';status.className='badge badge-safe';}
+    }catch(_e){
+      notice('문의내용 복사에 실패했습니다. 내용을 길게 눌러 직접 복사해주세요.','warning');
     }
   }
 
-  document.addEventListener('click',e=>{
-    if(e.target.closest?.('#stage7127SaveAdminPhoneBtn'))saveGlobalAdminPhone();
-  });
+  function saveReceipt(){
+    const kind=document.getElementById('stage7132ContactKind')?.value||'match';
+    const body=String(document.getElementById('stage7132ContactBody')?.value||'').trim();
+    if(body.length<2)return;
+    const p=resolvedPhone();if(!p)return;
+    const c=context(),at=new Date().toISOString();
+    const row={kind,body,at,adminPhone:p};
+    try{localStorage.setItem(RECEIPT_KEY,JSON.stringify(row));}catch(_e){}
+    renderReceipt();
 
-  window.__load230MatchGlobalAdminPhone=loadGlobalAdminPhone;
-  const boot=()=>setTimeout(loadGlobalAdminPhone,350);
+    // 기록 저장은 문자앱 실행을 절대 막지 않도록 비동기로만 실행한다.
+    if(currentAuthUser){
+      void (async()=>{
+        try{
+          const rt=await getAuthRuntime();if(!rt?.db||!rt?.api||!rt?.user)return;
+          const id=`homecontact_${Date.now()}_${String(rt.user.uid||'user').slice(0,8)}`;
+          await rt.api.setDoc(rt.api.doc(rt.db,INBOX_COLLECTION,id),{
+            id,type:'home_feedback',kind,body,
+            senderUid:String(rt.user.uid||''),senderName:senderName(),senderPhone:senderPhone(),
+            tournamentId:c.tournamentId,tournamentName:c.tournamentName,
+            divisionId:c.divisionId,divisionName:c.divisionName,
+            adminPhone:p,source:'home-contact-center',deliveryStatus:'sms-app-opened',createdAt:at,sentAt:at
+          });
+        }catch(e){console.warn('[230MATCH] 홈 문의 열기 기록 저장 실패',e);}
+      })();
+    }
+  }
+
+  function renderReceipt(){
+    const root=document.getElementById('stage7132MyContactReceipt');if(!root)return;
+    let row=null;try{row=JSON.parse(localStorage.getItem(RECEIPT_KEY)||'null');}catch(_e){}
+    if(!row){root.innerHTML='';return;}
+    const when=row.at?new Date(row.at).toLocaleString('ko-KR'):'';
+    root.innerHTML=`<div>✓ 최근 관리자 문자앱을 열었습니다. ${esc(KIND_LABELS[row.kind]||'문의')} · ${esc(when)}</div>`;
+  }
+
+  async function startInbox(){
+    const wrap=document.getElementById('stage7132AdminInbox'),root=document.getElementById('stage7132AdminInboxList');
+    if(!wrap||!root||!canOperate())return;
+    wrap.hidden=false;
+    try{
+      const rt=await getAuthRuntime();if(!rt?.db||!rt?.api||!rt?.user)return;
+      inboxUnsub?.();
+      inboxUnsub=rt.api.onSnapshot(rt.api.collection(rt.db,INBOX_COLLECTION),snap=>{
+        const rows=snap.docs.map(d=>({id:d.id,...d.data()}))
+          .filter(r=>r?.type==='home_feedback')
+          .sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||''))).slice(0,8);
+        root.innerHTML=rows.length?rows.map(r=>{
+          const when=r.createdAt?new Date(r.createdAt).toLocaleString('ko-KR'):'';
+          return `<div class="stage7132-inbox-row"><span class="kind">${esc(KIND_LABELS[r.kind]||'문의')}</span><span><b>${esc(r.senderName||'사용자')}</b><br>${esc(r.body||'')}</span><span class="meta">${esc(when)}</span></div>`;
+        }).join(''):'<div class="portal-empty">아직 홈 문의가 없습니다.</div>';
+      },e=>console.warn('[230MATCH] 홈 문의함 연결 실패',e));
+    }catch(e){console.warn('[230MATCH] 홈 문의함 시작 실패',e);}
+  }
+
+  function bind(){
+    const save=document.getElementById('stage7132SaveAdminPhoneBtn');
+    if(save&&!save.dataset.bound){save.dataset.bound='1';save.addEventListener('click',savePhone);}
+    const copy=document.getElementById('stage7132CopyMessageBtn');
+    if(copy&&!copy.dataset.bound){copy.dataset.bound='1';copy.addEventListener('click',copyMessage);}
+    const sms=document.getElementById('stage7132OpenSmsBtn');
+    if(sms&&!sms.dataset.bound){
+      sms.dataset.bound='1';
+      sms.addEventListener('click',e=>{
+        if(!resolvedPhone()){
+          e.preventDefault();
+          notice('관리자 문의 수신번호가 설정되지 않았습니다.','error');
+          return;
+        }
+        saveReceipt();
+        // preventDefault 하지 않는다. 순수 sms:관리자번호 링크가 그대로 실행된다.
+      });
+    }
+    refreshRecipient();renderReceipt();
+    if(canOperate())startInbox();
+  }
+
+  function refresh(){bind();loadPhone();}
+  window.__refresh230MatchContactCenter=refresh;
+  const boot=()=>setTimeout(refresh,450);
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
-  window.addEventListener('pageshow',()=>setTimeout(loadGlobalAdminPhone,120));
-  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(loadGlobalAdminPhone,120);});
-  console.info('[230MATCH] 71.2.8 ready · app-wide admin contact phone');
+  window.addEventListener('pageshow',()=>setTimeout(refresh,120));
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(refresh,120);});
+  console.info('[230MATCH] 71.3.2 ready · rebuilt home contact center');
 })();
 
 
@@ -11340,4 +11240,4 @@ console.info('[230MATCH] 63.0.0 ready · chunked cloud workspace + bounded retry
 
 console.info('[230MATCH] 64.0.0 architecture · lazy cloud registry, worker serialization, visible-view commit rendering');
 
-console.info('[230MATCH] 71.3.1 ready · native sms recipient autofill');
+console.info('[230MATCH] 71.3.2 ready · rebuilt home contact center');
