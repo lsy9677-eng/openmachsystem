@@ -11431,7 +11431,28 @@ console.info('[230MATCH] 71.3.3 ready · classic direct SMS rebuild');
 (function stage547UnifiedAssignmentOutput(){
   const $=id=>document.getElementById(id);
   const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-  const START_MIN=9*60, SLOT_MIN=40;
+  function scheduleTiming547(){
+    const activeId=String(state.multiDivision?.activeDivisionId||'');
+    const active=(state.multiDivision?.divisions||[]).find(d=>String(d.id)===activeId);
+    const activeSnap=active?.snapshot||{};
+    const rawMinutes=Number(
+      state.settings?.matchMinutes ??
+      activeSnap.settings?.matchMinutes ??
+      active?.settings?.matchMinutes ??
+      state.prelim?.settings?.matchMinutes ??
+      40
+    );
+    const slotMinutes=Math.max(10,Number.isFinite(rawMinutes)?rawMinutes:40);
+    const rawStart=String(
+      state.portal?.guide?.startTime ||
+      activeSnap.portal?.guide?.startTime ||
+      state.tournament?.startTime ||
+      '09:00'
+    ).trim();
+    const m=rawStart.match(/^(\d{1,2}):(\d{2})$/);
+    const startMinutes=m?Math.max(0,Math.min(23,Number(m[1])))*60+Math.max(0,Math.min(59,Number(m[2]))):9*60;
+    return {startMinutes,slotMinutes,startLabel:fmtTime547(startMinutes)};
+  }
 
   function resolveTeam547(value){
     if(value&&typeof value==='object')return value;
@@ -11454,6 +11475,7 @@ console.info('[230MATCH] 71.3.3 ready · classic direct SMS rebuild');
   }
   function assignmentData547(){
     const groups=state.prelim?.groups||[],matches=state.prelim?.matches||[];
+    const timing=scheduleTiming547(),START_MIN=timing.startMinutes,SLOT_MIN=timing.slotMinutes;
     const infos=groups.map((g,idx)=>{
       const raw=(Array.isArray(g.teams)&&g.teams.length?g.teams:(g.teamIds||[]));
       const teams=raw.map(resolveTeam547).filter(Boolean);
@@ -11465,7 +11487,7 @@ console.info('[230MATCH] 71.3.3 ready · classic direct SMS rebuild');
     /* 5.4.9: 고정코트와 공동 코트풀의 예상시간을 구분한다.
        - 고정코트: 같은 코트의 조를 경기 차수별로 교차 진행
        - 공동풀: 여러 코트가 하나의 FIFO 대기열을 공유. 먼저 비는 코트에 다음 가능한 경기를 투입
-         (동일 40분 가정에서는 슬롯 단위로 동시 종료 처리) */
+         (설정된 경기시간을 동일 슬롯으로 적용해 동시 종료 처리) */
     const scheduleMeta=new Map();
     const poolList=Array.isArray(state.prelim?.sharedCourtPools)?state.prelim.sharedCourtPools:[];
     const poolByGroup=new Map();
@@ -11539,7 +11561,8 @@ console.info('[230MATCH] 71.3.3 ready · classic direct SMS rebuild');
     const cards=assignmentData547();
     if(!cards.length)return `<header class="assignment547-title"><h1>시합 전 조편성·코트 배정표</h1><p>${esc(state.tournament?.name||'230MATCH 대회')}${state.tournament?.division?` · ${esc(state.tournament.division)}`:''}</p></header><div class="print-empty">생성된 예선 조편성이 없습니다.</div>`;
     const html=cards.map(card=>`<article class="assignment-group-card assignment547-card"><div class="assignment-group-head"><b>${esc(card.name)}</b><span>${esc(card.court)} · <em>${esc(card.estimate)}</em></span></div><ol>${card.teams.map(team=>`<li><em>${team.n}</em><strong title="${esc(team.label)}">${esc(team.label)}</strong>${team.firstTime?`<small class="assignment547-firsttime">${esc(team.firstTime)}</small>`:''}</li>`).join('')}</ol><div class="assignment-order">${card.orders.map(o=>`<span>${o.time?`<b>${esc(o.time)}</b> · `:''}${esc(o.text)}</span>`).join('')}</div></article>`).join('');
-    return `<header class="assignment547-title"><h1>시합 전 조편성·코트 배정표</h1><p>${esc(state.tournament?.name||'230MATCH 대회')}${state.tournament?.division?` · ${esc(state.tournament.division)}`:''}</p></header><div class="assignment-summary assignment547-summary"><b>${cards.length}개 조 · ${(state.teams||[]).length}팀</b><span>09:00 시작 · 경기당 40분 · 각 선수 첫 경기 예상시간</span></div><div class="assignment-grid assignment547-grid">${html}</div>`;
+    const timing=scheduleTiming547();
+    return `<header class="assignment547-title"><h1>시합 전 조편성·코트 배정표</h1><p>${esc(state.tournament?.name||'230MATCH 대회')}${state.tournament?.division?` · ${esc(state.tournament.division)}`:''}</p></header><div class="assignment-summary assignment547-summary"><div class="assignment547-summary-main"><b>${cards.length}개 조 · ${(state.teams||[]).length}팀</b><span>${esc(timing.startLabel)} 시작 · 경기당 ${timing.slotMinutes}분 · 각 선수 첫 경기 예상시간</span></div><div class="assignment547-warning">※ 예상 시합시간은 경기 진행에 따라 변동되며 더 빨라질 수 있습니다. 최소 예상시간 20분 전까지 출전신고 바랍니다.</div></div><div class="assignment-grid assignment547-grid">${html}</div>`;
   };
 
   function fit547(ctx,text,maxWidth){
@@ -11550,14 +11573,16 @@ console.info('[230MATCH] 71.3.3 ready · classic direct SMS rebuild');
   function download547(blob,name){const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1200);}
   async function saveAssignmentPng547(){
     const cards=assignmentData547();if(!cards.length)throw new Error('PNG로 저장할 예선 조편성이 없습니다.');
-    const W=1754,H=1240,margin=26,cols=4,gap=10,top=126,bottom=20,rowGap=8,rows=Math.ceil(cards.length/cols);
+    const W=1754,H=1240,margin=26,cols=4,gap=10,top=148,bottom=20,rowGap=8,rows=Math.ceil(cards.length/cols);
     const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;const ctx=canvas.getContext('2d');
     ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);ctx.textBaseline='middle';
     ctx.fillStyle='#10264a';ctx.font='700 31px sans-serif';ctx.textAlign='center';ctx.fillText('시합 전 조편성·코트 배정표',W/2,34);
     ctx.font='600 17px sans-serif';ctx.fillStyle='#53657d';ctx.fillText(`${state.tournament?.name||'230MATCH 대회'}${state.tournament?.division?` · ${state.tournament.division}`:''}`,W/2,65);
-    ctx.textAlign='left';ctx.fillStyle='#eef4fb';ctx.fillRect(margin,82,W-margin*2,34);
-    ctx.fillStyle='#173b70';ctx.font='700 16px sans-serif';ctx.fillText(`${cards.length}개 조 · ${(state.teams||[]).length}팀`,margin+12,99);
-    ctx.textAlign='right';ctx.font='600 14px sans-serif';ctx.fillText('09:00 시작 · 경기당 40분 · 첫 경기 예상시간',W-margin-12,99);ctx.textAlign='left';
+    ctx.textAlign='left';ctx.fillStyle='#eef4fb';ctx.fillRect(margin,82,W-margin*2,56);
+    ctx.fillStyle='#173b70';ctx.font='700 16px sans-serif';ctx.fillText(`${cards.length}개 조 · ${(state.teams||[]).length}팀`,margin+12,98);
+    const timing=scheduleTiming547();
+    ctx.textAlign='right';ctx.font='600 14px sans-serif';ctx.fillText(`${timing.startLabel} 시작 · 경기당 ${timing.slotMinutes}분 · 첫 경기 예상시간`,W-margin-12,98);ctx.textAlign='left';
+    ctx.fillStyle='#b42318';ctx.font='700 13px sans-serif';ctx.textAlign='center';ctx.fillText('※ 예상 시합시간은 경기 진행에 따라 변동되며 더 빨라질 수 있습니다. 최소 예상시간 20분 전까지 출전신고 바랍니다.',W/2,122);ctx.textAlign='left';
     const cardW=(W-margin*2-gap*(cols-1))/cols,cardH=Math.floor((H-top-bottom-rowGap*(rows-1))/Math.max(1,rows));
     cards.forEach((card,i)=>{
       const col=i%cols,row=Math.floor(i/cols),x=margin+col*(cardW+gap),y=top+row*(cardH+rowGap);
@@ -11579,7 +11604,7 @@ console.info('[230MATCH] 71.3.3 ready · classic direct SMS rebuild');
     #printPreview .assignment547-title{text-align:center;margin:0 0 7px!important;padding:0!important}
     #printPreview .assignment547-title h1{margin:0!important;color:#10264a;font-size:22px!important;line-height:1.05!important;font-weight:900!important;letter-spacing:-.03em}
     #printPreview .assignment547-title p{margin:4px 0 0!important;color:#53657d;font-size:11px!important;font-weight:700!important}
-    #printPreview .assignment547-summary{margin:0 0 5px!important;padding:4px 8px!important;min-height:0!important;border:0!important;border-radius:0!important;background:#eef4fb!important;color:#173b70!important;font-size:9px!important}
+    #printPreview .assignment547-summary{margin:0 0 5px!important;padding:4px 8px!important;min-height:0!important;border:0!important;border-radius:0!important;background:#eef4fb!important;color:#173b70!important;font-size:9px!important}\n    #printPreview .assignment547-summary-main{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:8px!important}\n    #printPreview .assignment547-warning{margin-top:2px!important;text-align:center!important;color:#b42318!important;font-size:8px!important;line-height:1.1!important;font-weight:900!important}
     #printPreview .assignment547-grid{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:4px!important}
     #printPreview .assignment547-card{border:1px solid #91a7c6!important;border-radius:0!important;box-shadow:none!important;overflow:hidden!important}
     #printPreview .assignment547-card .assignment-group-head{padding:2px 5px!important;background:#173b70!important;min-height:0!important}
@@ -11601,7 +11626,7 @@ console.info('[230MATCH] 71.3.3 ready · classic direct SMS rebuild');
       body.printing-output #printOutputRoot .assignment547-title{text-align:center;margin:0 0 1.4mm!important;padding:0!important}
       body.printing-output #printOutputRoot .assignment547-title h1{margin:0!important;color:#10264a!important;font-size:15pt!important;line-height:1!important;font-weight:900!important}
       body.printing-output #printOutputRoot .assignment547-title p{margin:.8mm 0 0!important;color:#53657d!important;font-size:7.8pt!important;font-weight:700!important}
-      body.printing-output #printOutputRoot .assignment547-summary{margin:0 0 1mm!important;padding:.9mm 1.6mm!important;min-height:0!important;border:0!important;border-radius:0!important;background:#eef4fb!important;color:#173b70!important;font-size:6.7pt!important}
+      body.printing-output #printOutputRoot .assignment547-summary{margin:0 0 1mm!important;padding:.9mm 1.6mm!important;min-height:0!important;border:0!important;border-radius:0!important;background:#eef4fb!important;color:#173b70!important;font-size:6.7pt!important}\n      body.printing-output #printOutputRoot .assignment547-summary-main{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:2mm!important}\n      body.printing-output #printOutputRoot .assignment547-warning{margin-top:.45mm!important;text-align:center!important;color:#b42318!important;font-size:5.8pt!important;line-height:1!important;font-weight:900!important}
       body.printing-output #printOutputRoot .assignment547-grid{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:.9mm!important}
       body.printing-output #printOutputRoot .assignment547-card{break-inside:avoid!important;border:1px solid #91a7c6!important;border-radius:0!important;box-shadow:none!important;overflow:hidden!important}
       body.printing-output #printOutputRoot .assignment547-card .assignment-group-head{padding:.45mm 1mm!important;background:#173b70!important;min-height:0!important}
