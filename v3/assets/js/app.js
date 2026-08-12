@@ -11872,3 +11872,51 @@ console.info('[230MATCH] 71.3.3 ready · classic direct SMS rebuild');
   window.stage549PrelimPool={build:buildPoolsAfterAssignment,reconcile:reconcilePool,list:()=>structuredClone(poolList())};
   console.info('[230MATCH] 5.4.9 ready · prelim shared court pool active');
 })();
+
+/* 230MATCH 5.4.12 · 코트현황 빈 공간 자동 접기 */
+function stage7152CompactCourtCards(){
+  const grid=document.getElementById('operationUnifiedCourtGrid')||document.getElementById('prelimCourtOperationGrid');
+  if(!grid)return;
+  grid.querySelectorAll('.prelim-court-card').forEach(card=>{
+    card.querySelectorAll('.court-compact-empty-extra,.court-compact-admin-footer,.court-compact-empty-wait').forEach(el=>{
+      el.classList.remove('court-compact-empty-extra','court-compact-admin-footer','court-compact-empty-wait');
+    });
+
+    const wait=card.querySelector('.prelim-court-slot.wait1');
+    if(wait && /대기\s*경기\s*없음/.test((wait.textContent||'').replace(/\s+/g,' '))){
+      wait.classList.add('court-compact-empty-wait');
+    }
+
+    const statusBtn=card.querySelector('[data-prelim-court-status]');
+    if(statusBtn && statusBtn.parentElement && statusBtn.parentElement!==card){
+      statusBtn.parentElement.classList.add('court-compact-admin-footer');
+    }
+
+    const nodes=[...card.querySelectorAll('div,section,article')];
+    let best=null;
+    for(const el of nodes){
+      if(el===card)continue;
+      const text=(el.textContent||'').replace(/\s+/g,' ').trim();
+      if(!/예선\s*추가\s*대기\s*0경기/.test(text) || !/예선\s*추가\s*대기\s*없음/.test(text))continue;
+      if(el.querySelector('button,[data-prelim-result],[data-main-result]'))continue;
+      if(!best || el.querySelectorAll('*').length < best.querySelectorAll('*').length)best=el;
+    }
+    if(best)best.classList.add('court-compact-empty-extra');
+  });
+}
+(function stage7152InstallCourtCompactor(){
+  const install=()=>{
+    const grid=document.getElementById('operationUnifiedCourtGrid')||document.getElementById('prelimCourtOperationGrid');
+    if(!grid)return false;
+    let queued=false;
+    const run=()=>{if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;stage7152CompactCourtCards();});};
+    new MutationObserver(run).observe(grid,{childList:true,subtree:true,characterData:true});
+    run();
+    return true;
+  };
+  if(!install()){
+    document.addEventListener('DOMContentLoaded',install,{once:true});
+    setTimeout(install,600);
+  }
+})();
+
