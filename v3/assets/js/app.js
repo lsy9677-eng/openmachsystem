@@ -1,8 +1,8 @@
 import{getAuthConfig,saveAuthConfig,startAuth,signInGoogle,signOutSocial,beginExternalLogin,getExistingLoginEndpoints,signInEmail,registerEmail,sendPasswordReset,linkEmailPassword,authProviderIds,getAuthRuntime}from'./auth-engine.js?v=3565';
-import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7129';
+import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7130';
 import{notificationSupport,getStoredVapidKey,saveStoredVapidKey,enableMyPush,disableMyPush,queuePush,listPushJobs,listPushTokens}from'./notification-engine.js?v=332012';
 
-import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7129';
+import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=7130';
 import{prepareTeams,generateDraw,allMatches,findMatch,generateLinkedDrawSlots,syncLinkedDrawQualifiers}from'./bracket-engine-v5000.js?v=5000';
 import{ensureDrawMeta,canModifyDraw,createDrawWithMethod,lockDraw,unlockDrawForDevelopment,clearDrawHistory}from'./draw-method-engine.js?v=332012';
 import{buildCourts,assignInitial,queueReadyMatches,refillCourt}from'./court-engine.js?v=332012';
@@ -15,7 +15,7 @@ import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactD
 import{render,teamText}from'./ui.js?v=3504';
 import{ensureAuditState,runStateAudit,runPrelimSimulation,runFullSimulation,applyAuditResult}from'./audit-engine.js?v=332012';
 import{earlyMainStats,markResolvedMainMatchesReady,canAssignEarlyMain,ensureEarlyMainSettings,autoAssignResolvedMain}from'./early-main-engine.js?v=332012';
-import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7129';
+import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7130';
 import{ensureMainDrawLifecycle,beginMainDraw,completeMainDraw,failMainDraw,resetMainDraw,hasAuthorizedMainDraw,mainDrawStatus,clearMainPlacement,repairMainDrawAuthorization}from'./main-draw-lifecycle-engine.js?v=3501';
 import{shouldUseLinkedDraw,linkedDrawNeedsRepair,rebuildLinkedDraw,hasStartedMainMatches}from'./linked-draw-guard-engine.js?v=332012';
 import{ensureVenueSettings,ensureVenueQueues,venuePreset,buildVenueCourts,prelimVenues,mainVenues}from'./venue-engine.js?v=332012';
@@ -26,7 +26,7 @@ import{ensureCourtStatuses,pauseCourt,resumeCourt}from'./court-status-engine.js?
 import{ensureCourtManualQueues,assignToCourtManualQueue,moveCourtMatchFlexible,returnManualQueueItemToVenue,reorderCourtManualQueue}from'./court-manual-queue-engine.js?v=332012';
 import{reorderPrelimQueue as reorderPrelimQueueItem,movePrelimQueuedMatch,returnPrelimWait1ToQueue}from'./prelim-queue-control-engine.js?v=332012';
 import{ensurePrelimCourtStatuses,pausePrelimCourt,resumePrelimCourt}from'./prelim-court-status-engine.js?v=332012';
-import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7129';
+import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7130';
 import{verifyAndRepairMainFlow}from'./main-flow-integrity-engine.js?v=332012';
 import{finalizeTournamentCompletion}from'./tournament-completion-engine.js?v=332012';
 import{ensureTournamentIdentity,validateTournamentForArchive,createTournamentArchive,archiveListItem,archiveBackupPayload}from'./archive-engine.js?v=354000';
@@ -10428,7 +10428,7 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
   };
   setInterval(tick,2500);
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(tick,350),{once:true});else setTimeout(tick,350);
-  console.info('[230MATCH] 71.2.9 ready · native SMS direct-tap launch fix');
+  console.info('[230MATCH] 71.3.0 ready · native sms anchor launch');
 })();
 
 
@@ -10520,7 +10520,7 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
   window.addEventListener('pageshow',update);
   setInterval(()=>{if(document.body?.dataset.currentView==='home')update();},5000);
   window.__updateTodayTournamentDashboard=updateTodayDashboard;
-  console.info('[230MATCH] 71.2.9 ready · native SMS direct-tap launch fix');
+  console.info('[230MATCH] 71.3.0 ready · native sms anchor launch');
 })();
 
 
@@ -10788,7 +10788,7 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
   window.__run230MatchResultFlowCheck=runResultFlowCheck;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(runResultFlowCheck,700),{once:true});else setTimeout(runResultFlowCheck,700);
   setInterval(()=>{if(document.body?.dataset.currentView==='home'&&canOperate())runResultFlowCheck();},10000);
-  console.info('[230MATCH] 71.2.9 ready · native SMS direct-tap launch fix');
+  console.info('[230MATCH] 71.3.0 ready · native sms anchor launch');
 })();
 
 
@@ -10853,7 +10853,7 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
     document.addEventListener('DOMContentLoaded',()=>setTimeout(updateMatchdayQuickBar,700),{once:true});
   }else setTimeout(updateMatchdayQuickBar,700);
   setInterval(updateMatchdayQuickBar,5000);
-  console.info('[230MATCH] 71.2.9 ready · native SMS direct-tap launch fix');
+  console.info('[230MATCH] 71.3.0 ready · native sms anchor launch');
 })();
 
 
@@ -10950,57 +10950,82 @@ ${body}
       console.warn('[230MATCH] 홈 문의 이력 저장 재시도 대기',e);
     }
   }
-  function sendFeedback(){
-    if(!currentAuthUser){
-      notice('관리자 문의 문자는 로그인 후 보낼 수 있습니다.','warning');
-      try{openSocialLogin();}catch(_e){}
+  function buildFeedbackRow(kind,body,adminPhone){
+    const c=feedbackContext(),openedAt=new Date().toISOString();
+    return {
+      type:'home_feedback',kind,body,
+      tournamentId:c.tournamentId,tournamentName:c.tournamentName,
+      divisionId:c.divisionId,divisionName:c.divisionName,
+      senderUid:String(currentAuthUser?.uid||''),
+      senderName:senderLabel(),senderPhone:senderPhone(),
+      senderEmail:String(currentAuthUser?.email||''),
+      adminPhone:String(adminPhone||'').replace(/\D/g,''),
+      sentAt:openedAt,createdAt:openedAt,
+      channel:'phone',deliveryStatus:'sms-app-opened',source:'home'
+    };
+  }
+  function prepareFeedbackNativeLink({showWarning=false}={}){
+    const link=document.getElementById('stage7125SendFeedbackBtn');if(!link)return false;
+    const kind=document.getElementById('stage7125FeedbackKind')?.value||'match';
+    const body=String(document.getElementById('stage7125FeedbackBody')?.value||'').trim();
+    const adminPhone=registrationAdminNotifyPhone();
+
+    if(!validatePhone(adminPhone)){
+      link.setAttribute('href','sms:');
+      link.dataset.ready='0';
+      if(showWarning)notice('관리자 문자 수신번호가 설정되지 않았습니다. 관리자 번호를 먼저 저장하세요.','error');
+      return false;
+    }
+    if(body.length<2){
+      link.setAttribute('href','sms:');
+      link.dataset.ready='0';
+      if(showWarning)notice('문의 내용을 입력하세요.','error');
+      return false;
+    }
+
+    const smsBody=feedbackSmsBody(kind,body);
+    const href=window.__230matchBuildNativeSmsHref
+      ? window.__230matchBuildNativeSmsHref(adminPhone,smsBody)
+      : `sms:${String(adminPhone).replace(/\D/g,'')}?body=${encodeURIComponent(smsBody)}`;
+    link.setAttribute('href',href);
+    link.dataset.ready='1';
+    link.dataset.adminPhone=String(adminPhone).replace(/\D/g,'');
+    return true;
+  }
+  function stage7125NativeSmsPointerDown(e){
+    const link=e.currentTarget;
+    if(!prepareFeedbackNativeLink({showWarning:true})){
+      e.preventDefault();
       return;
     }
     const kind=document.getElementById('stage7125FeedbackKind')?.value||'match';
     const body=String(document.getElementById('stage7125FeedbackBody')?.value||'').trim();
-    if(body.length<2)return notice('문의 내용을 입력하세요.','error');
     const adminPhone=registrationAdminNotifyPhone();
-    if(!validatePhone(adminPhone))return notice('관리자 문자 수신번호가 아직 설정되지 않았습니다. 관리자에게 알려주세요.','error');
+    const row=buildFeedbackRow(kind,body,adminPhone);
 
-    const c=feedbackContext(),openedAt=new Date().toISOString();
-    const smsBody=feedbackSmsBody(kind,body);
-    const row={
-      type:'home_feedback',kind,body,
-      tournamentId:c.tournamentId,tournamentName:c.tournamentName,
-      divisionId:c.divisionId,divisionName:c.divisionName,
-      senderUid:String(currentAuthUser.uid||''),
-      senderName:senderLabel(),senderPhone:senderPhone(),
-      senderEmail:String(currentAuthUser.email||''),
-      adminPhone:String(adminPhone).replace(/\D/g,''),
-      sentAt:openedAt,createdAt:openedAt,
-      channel:'phone',deliveryStatus:'sms-app-opened',source:'home'
-    };
-
-    const mobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||'');
-    if(mobile){
-      // 중요: 비동기 저장을 기다리지 않고 이 탭 동작 안에서 바로 문자앱을 연다.
-      storePendingFeedback(row);
-      const box=document.getElementById('stage7125FeedbackBody');if(box)box.value='';
-      const status=document.getElementById('stage7125FeedbackStatus');
-      if(status){status.className='badge badge-safe';status.textContent='문자앱 여는 중';}
-      try{
-        window.__230matchOpenNativeSmsComposer(String(adminPhone).replace(/\D/g,''),smsBody);
-      }catch(e){
-        console.error('[230MATCH] 문자앱 열기 실패',e);
-        notice(`문자앱을 열지 못했습니다: ${e?.message||e}`,'error');
+    // 브라우저가 실제 <a href="sms:..."> 기본 동작을 처리하게 두고,
+    // 앱 기록만 먼저 로컬에 보관한다. preventDefault를 호출하지 않는다.
+    storePendingFeedback(row);
+    const status=document.getElementById('stage7125FeedbackStatus');
+    if(status){status.className='badge badge-safe';status.textContent='문자앱 연결';}
+  }
+  function bindFeedbackNativeLink(){
+    const link=document.getElementById('stage7125SendFeedbackBtn');if(!link||link.dataset.nativeBound==='1')return;
+    link.dataset.nativeBound='1';
+    // touchstart/pointerdown에서 href를 먼저 확정해야 모바일 브라우저가 외부앱 링크로 인정한다.
+    link.addEventListener('pointerdown',stage7125NativeSmsPointerDown);
+    link.addEventListener('touchstart',()=>{
+      prepareFeedbackNativeLink({showWarning:false});
+    },{passive:true});
+    link.addEventListener('click',e=>{
+      if(link.dataset.ready!=='1'){
+        e.preventDefault();
+        prepareFeedbackNativeLink({showWarning:true});
       }
-      return;
-    }
-
-    navigator.clipboard.writeText(`${String(adminPhone).replace(/\D/g,'')}\n\n${smsBody}`).then(async()=>{
-      try{
-        const id=await saveFeedbackCloud(row);
-        saveLocalReceipt({id,kind,body,sentAt:openedAt,status:'copied'});
-      }catch(e){console.warn('[230MATCH] PC 문의 이력 저장 실패',e);}
-      const status=document.getElementById('stage7125FeedbackStatus');
-      if(status){status.className='badge badge-warning';status.textContent='문자 내용 복사됨';}
-      notice('관리자 번호와 문의 내용을 복사했습니다.','info');
-    }).catch(()=>notice('클립보드 복사에 실패했습니다.','error'));
+    });
+    document.getElementById('stage7125FeedbackBody')?.addEventListener('input',()=>prepareFeedbackNativeLink());
+    document.getElementById('stage7125FeedbackKind')?.addEventListener('change',()=>prepareFeedbackNativeLink());
+    prepareFeedbackNativeLink();
   }
   function renderAdminInbox(rows){
     const wrap=document.getElementById('stage7125AdminFeedbackInbox'),root=document.getElementById('stage7125AdminFeedbackList');
@@ -11028,6 +11053,7 @@ ${body}
   }
   function updateFeedbackHome(){
     flushPendingFeedback();
+    bindFeedbackNativeLink();
     renderMyReceipt();
     const guide=document.getElementById('stage7125FeedbackGuide');
     if(guide){
@@ -11038,15 +11064,14 @@ ${body}
     }
     if(canOperate())startAdminInbox();
   }
-  document.addEventListener('click',e=>{
-    if(e.target.closest?.('#stage7125SendFeedbackBtn'))sendFeedback();
-  });
+  // 문의 버튼은 일반 click 라우팅이 아니라 실제 sms: 링크 자체로 동작한다.
+  // 동적 렌더 후에도 직접 이벤트가 붙도록 홈 갱신 때 다시 확인한다.
   window.__update230MatchHomeFeedback=updateFeedbackHome;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(updateFeedbackHome,800),{once:true});else setTimeout(updateFeedbackHome,800);
   window.addEventListener('pageshow',()=>setTimeout(updateFeedbackHome,150));
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(updateFeedbackHome,150);});
   setInterval(()=>{if(document.body?.dataset.currentView==='home')updateFeedbackHome();},10000);
-  console.info('[230MATCH] 71.2.9 ready · home native SMS direct-tap launch');
+  console.info('[230MATCH] 71.3.0 ready · home native sms anchor launch');
 })();
 
 
@@ -11314,4 +11339,4 @@ console.info('[230MATCH] 63.0.0 ready · chunked cloud workspace + bounded retry
 
 console.info('[230MATCH] 64.0.0 architecture · lazy cloud registry, worker serialization, visible-view commit rendering');
 
-console.info('[230MATCH] 71.2.9 ready · native SMS direct-tap launch fix');
+console.info('[230MATCH] 71.3.0 ready · native sms anchor launch');
