@@ -139,41 +139,6 @@ body[data-role="admin"] .stage5415-member-quick{display:none!important}
   .stage5415-admin-quick button{min-height:92px!important}
 }
 </style>
-
-<style id="stage5419-mobile-record-notice-fix">
-/* 5.4.19 · 모바일 대회기록 폭 고정 + 공지 최신상세/목록 */
-.legacy-result-view,.legacy-result-archive-card,.portal-record-list,.legacy-result-list,.portal-record-item,.legacy-result-item{min-width:0;max-width:100%;box-sizing:border-box}
-.legacy-result-item{overflow:hidden}
-.legacy-result-item-head,.legacy-result-item-head>div,.legacy-result-mini-podium,.legacy-result-mini-podium>div,.legacy-quarterfinal-record,.legacy-quarterfinal-record span{min-width:0;max-width:100%}
-.legacy-result-item strong,.legacy-result-item b,.legacy-result-item span,.legacy-result-item .portal-meta{overflow-wrap:anywhere;word-break:keep-all}
-.legacy-quarterfinal-record{display:flex;flex-wrap:wrap;align-items:flex-start;gap:6px 10px}
-.legacy-quarterfinal-record strong{flex:0 0 auto}.legacy-quarterfinal-record span{flex:1 1 220px;line-height:1.55}
-.legacy-result-photo-strip{display:flex;gap:8px;max-width:100%;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;padding-bottom:4px;scrollbar-width:thin}
-.legacy-result-photo-strip a{flex:0 0 auto}.legacy-result-photo-strip img{display:block;max-width:none}
-.portal-board-list{display:grid;gap:12px;min-width:0}
-.notice-featured{position:relative;min-width:0;overflow:hidden}
-.notice-featured-label{display:inline-flex;align-items:center;padding:5px 9px;margin-bottom:8px;border-radius:999px;background:#e8f1ff;color:#17477f;font-size:12px;font-weight:900}
-.notice-archive-list{border:1px solid #dbe4ef;border-radius:14px;overflow:hidden;background:#fff}
-.notice-archive-head{display:flex;justify-content:space-between;align-items:center;padding:11px 13px;background:#f6f8fc;border-bottom:1px solid #e4e9f1;color:#243653}
-.notice-archive-head span{font-size:12px;color:#64748b}
-.notice-archive-row{appearance:none;width:100%;border:0;border-bottom:1px solid #edf1f6;background:#fff;display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:8px;padding:12px 13px;text-align:left;color:#17233b;cursor:pointer}
-.notice-archive-row:last-child{border-bottom:0}.notice-archive-row:hover{background:#f8fbff}
-.notice-archive-title{min-width:0;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.notice-archive-date{font-size:12px;color:#728096;white-space:nowrap}.notice-archive-arrow{font-size:22px;line-height:1;color:#8aa0bc}
-@media(max-width:700px){
-  #view-records .panel{max-width:100%;overflow:hidden}
-  .legacy-result-item{width:100%;padding-left:12px!important;padding-right:12px!important}
-  .legacy-result-item-head{gap:8px}
-  .legacy-result-mini-podium{grid-template-columns:1fr!important;width:100%}
-  .legacy-result-mini-podium>div{width:100%}
-  .legacy-quarterfinal-record{display:block!important;width:100%;overflow:hidden}
-  .legacy-quarterfinal-record strong{display:block;margin-bottom:5px}.legacy-quarterfinal-record span{display:block;width:100%;white-space:normal!important;overflow-wrap:anywhere;word-break:keep-all}
-  .legacy-result-photo-strip{width:100%;max-width:100%;margin-left:0;margin-right:0}
-  .legacy-result-photo-strip img{width:92px!important;height:76px!important;object-fit:cover}
-  .notice-featured{padding:12px!important}.portal-board-image{width:100%!important;max-height:62vh}
-  .notice-archive-row{padding:11px 10px;gap:6px}.notice-archive-date{font-size:11px}.notice-archive-title{font-size:14px}
-}
-</style>
-
 </head>
 <body>
   <header class="topbar">
@@ -2144,7 +2109,7 @@ body[data-role="admin"] .stage5415-member-quick{display:none!important}
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=7159"></script>
+  <script type="module" src="./assets/js/app.js?v=7160"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">

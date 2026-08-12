@@ -3937,9 +3937,18 @@ async function openAdminNoticeSms(kind,item,{ask=true}={}){
   const body=registrationAdminNoticeBody(kind,item);
   const ua=navigator.userAgent||'';
   if(/Android|iPhone|iPad|iPod/i.test(ua)){
-    window.__230matchOpenNativeSmsComposer(adminPhone,body);
-    notice(`관리자 ${adminPhone}에게 보낼 ${label} 문자를 문자앱에 입력했습니다. 전송 버튼만 눌러주세요.`,'success');
-    return true;
+    // 5.4.20: keep the proven 5.4.3 direct SMS URI flow.
+    // Do not route through an undefined helper or async wrapper.
+    const smsUrl=`sms:${adminPhone}?body=${encodeURIComponent(body)}`;
+    try{
+      window.location.href=smsUrl;
+      notice(`관리자 ${adminPhone}에게 보낼 ${label} 문자를 문자앱에 입력했습니다. 전송 버튼만 눌러주세요.`,'success');
+      return true;
+    }catch(error){
+      console.warn('[5.4.20] admin notice sms open failed',error);
+      notice('문자앱을 열지 못했습니다. 아래 관리자 문자 버튼을 다시 눌러 주세요.','warning');
+      return false;
+    }
   }
   try{
     await navigator.clipboard.writeText(`${adminPhone}\n\n${body}`);
@@ -4154,8 +4163,10 @@ async function submitEntryCancelRequest(){
     await saveRegistrationCloud(item);
     document.getElementById('entryCancelRequestDialog')?.close();
     lookupPublicApplication();renderApplicationPortal();
-    notice('취소 요청이 접수되었습니다. 관리자 승인 후 취소됩니다.','success');
-    setTimeout(()=>void openAdminNoticeSms('cancel',item,{ask:true}),180);
+    notice('취소 요청이 접수되었습니다. 관리자 승인 후 취소됩니다. 관리자 취소문자를 준비합니다.','success');
+    // External-app navigation after an awaited Firestore write can be blocked by mobile browsers.
+    // Try once automatically, but keep the visible manual button as the guaranteed fallback.
+    setTimeout(()=>void openAdminNoticeSms('cancel',item,{ask:false}),80);
   }catch(error){
     feedback(`취소 요청 저장 실패: ${error?.message||error}`);
   }finally{
