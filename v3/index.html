@@ -2102,7 +2102,7 @@
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=7152"></script>
+  <script type="module" src="./assets/js/app.js?v=7153"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
@@ -3256,3 +3256,23 @@ body[data-role="viewer"] #prelimCourtOperationGrid [data-prelim-court-status]{di
 }
 </style>
 
+
+<style id="stage7153BracketVisualStyles">
+/* 230MATCH 5.4.13 · 본선 대진 연결선 복구 + 단계별 카드 색상 */
+#bracketBoard{position:relative!important}
+#bracketBoard>.round-column{position:relative!important;z-index:1}
+#bracketBoard .stage7153-bracket-connectors{position:absolute;inset:0 auto auto 0;z-index:0;pointer-events:none;overflow:visible}
+#bracketBoard .stage7153-bracket-connectors path{fill:none;stroke:#6f91c7;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+#bracketBoard .match-card[data-round-size]{background:var(--round-bg,#fff)!important;border-color:var(--round-border,#cbd8e8)!important}
+#bracketBoard .match-card[data-round-size] header{background:var(--round-head,#edf3fa)!important;border-color:var(--round-border,#cbd8e8)!important}
+#bracketBoard .match-card[data-round-size="128"]{--round-bg:#f7fbff;--round-head:#eaf3ff;--round-border:#a9c7e8}
+#bracketBoard .match-card[data-round-size="64"]{--round-bg:#eef7ff;--round-head:#dbeeff;--round-border:#87b9e8}
+#bracketBoard .match-card[data-round-size="32"]{--round-bg:#f3f0ff;--round-head:#e7e0ff;--round-border:#aa9bdc}
+#bracketBoard .match-card[data-round-size="16"]{--round-bg:#fff8e8;--round-head:#ffedc3;--round-border:#dfb967}
+#bracketBoard .match-card[data-round-size="8"]{--round-bg:#fff1ec;--round-head:#ffdfd4;--round-border:#df9b84}
+#bracketBoard .match-card[data-round-size="4"]{--round-bg:#f8efff;--round-head:#ecd8fb;--round-border:#bb91d6}
+#bracketBoard .match-card[data-round-size="2"]{--round-bg:#fff6d8;--round-head:#ffe7a0;--round-border:#d9aa35}
+/* 완료 상태도 단계색을 유지하고 완료 표시는 기존 상태 배지/좌측 강조로 구분 */
+#bracketBoard .match-card[data-round-size].completed{background:var(--round-bg,#eef8f1)!important;border-color:var(--round-border,#9fcfaf)!important}
+@media(max-width:760px){#bracketBoard .stage7153-bracket-connectors path{stroke-width:1.35}}
+</style>
