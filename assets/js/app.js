@@ -3879,10 +3879,15 @@ function entryDateTime(value){if(!value)return '';try{return new Date(value).toL
 let entryAdminQuickFilter='all';
 function registrationAdminNotifyPhone(){
   ensurePortalState();
-  const configured=String(state.portal?.registrationSmsSettings?.adminPhone||'').replace(/\D/g,'');
-  if(validatePhone(configured))return configured;
+  // 5.4.21: use the same administrator-number source priority as the proven Home SMS flow.
   const globalPhone=String(window.__230matchGlobalAdminPhone||'').replace(/\D/g,'');
   if(validatePhone(globalPhone))return globalPhone;
+  const configured=String(state.portal?.registrationSmsSettings?.adminPhone||'').replace(/\D/g,'');
+  if(validatePhone(configured))return configured;
+  try{
+    const cached=String(localStorage.getItem('230match-home-admin-sms-phone-v1')||'').replace(/\D/g,'');
+    if(validatePhone(cached))return cached;
+  }catch(_e){}
   const guideContact=String(state.portal?.guide?.contact||'').replace(/\D/g,'');
   return validatePhone(guideContact)?guideContact:'';
 }
@@ -3939,7 +3944,9 @@ async function openAdminNoticeSms(kind,item,{ask=true}={}){
   if(/Android|iPhone|iPad|iPod/i.test(ua)){
     // 5.4.20: keep the proven 5.4.3 direct SMS URI flow.
     // Do not route through an undefined helper or async wrapper.
-    const smsUrl=`sms:${adminPhone}?body=${encodeURIComponent(body)}`;
+    // Match Home SMS exactly: sanitize the recipient again immediately before invoking the native app.
+    const smsPhone=String(adminPhone||'').replace(/\D/g,'');
+    const smsUrl='sms:'+smsPhone+'?body='+encodeURIComponent(body);
     try{
       window.location.href=smsUrl;
       notice(`관리자 ${adminPhone}에게 보낼 ${label} 문자를 문자앱에 입력했습니다. 전송 버튼만 눌러주세요.`,'success');
