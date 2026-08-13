@@ -3180,6 +3180,7 @@ function updateBracketView(key,value){
   }
   saveState(state);
   render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus,holdMainMatch,releaseHeldMatch});
+  if(key==='round')setTimeout(bindBracketMobileView571,0);
 }
 function resetBracketView(){
   state.ui=state.ui||{};
@@ -3395,21 +3396,29 @@ function bindBracketMobileView571(){
   if(plus)plus.onclick=()=>setBracketZoom(getBracketZoom()+.1);
   if(reset)reset.onclick=()=>setBracketZoom(1);
 
-  document.querySelectorAll('#bracketRoundButtons [data-bracket-round]').forEach(btn=>{
-    btn.onclick=()=>{
+  const roundButtons=document.getElementById('bracketRoundButtons');
+  if(roundButtons&&!roundButtons.dataset.stage573Delegated){
+    roundButtons.dataset.stage573Delegated='1';
+    roundButtons.onclick=event=>{
+      const btn=event.target.closest?.('[data-bracket-round]');
+      if(!btn||!roundButtons.contains(btn))return;
       const round=String(btn.dataset.bracketRound||'all');
       updateBracketView('round',round);
-      requestAnimationFrame(()=>{
-        const col=round==='all'?null:document.querySelector(`#bracketBoard .round-column[data-round-size="${CSS.escape(round)}"]`);
-        if(col&&window.matchMedia('(max-width:760px)').matches){
-          const left=Math.max(0,col.offsetLeft-8);
-          viewport.scrollTo({left,behavior:'smooth'});
-        }else if(round==='all'){
-          viewport.scrollTo({left:0,behavior:'smooth'});
+
+      // updateBracketView()가 버튼/컬럼 DOM을 다시 그린 뒤 새 DOM 기준으로 이동한다.
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{
+        const currentViewport=document.getElementById('bracketViewport');
+        const col=round==='all'
+          ? null
+          : document.querySelector(`#bracketBoard .round-column[data-round-size="${round.replace(/"/g,'')}"]`);
+        if(currentViewport&&col&&window.matchMedia('(max-width:760px)').matches){
+          currentViewport.scrollTo({left:Math.max(0,col.offsetLeft-8),behavior:'smooth'});
+        }else if(currentViewport&&round==='all'){
+          currentViewport.scrollTo({left:0,behavior:'smooth'});
         }
-      });
+      }));
     };
-  });
+  }
 
   // Mobile two-finger pinch changes bracket scale without zooming unrelated UI.
   let pinchStartDistance=0,pinchStartZoom=1;
@@ -6564,7 +6573,11 @@ function renderPortalViewFast(target){
     if(target==='records'){renderResultArchive();return;}
     if(target==='print'){renderPrintPreview();return;}
     if(target==='settings'){stage3210RenderSettingsSummary();return;}
-    if(target==='bracket'){decorateBracketLivePlacements();return;}
+    if(target==='bracket'){
+      decorateBracketLivePlacements();
+      setTimeout(bindBracketMobileView571,0);
+      return;
+    }
     // operation/home/my-match/settings already have live DOM maintained by state renders.
   }catch(error){console.warn('[230MATCH 61.1.1] fast view render warning',target,error);}
 }
@@ -14214,4 +14227,5 @@ console.info('[230MATCH] 5.7.0 STABLE · centralized shortcuts / role persistenc
 
 console.info('[230MATCH] 5.7.1 ready · bracket mobile zoom + round buttons + final visibility fix');
 
-console.info('[230MATCH] 5.7.2 ready · result dialogs show player names only');
+
+console.info('[230MATCH] 5.7.3 ready · bracket round buttons use persistent event delegation');
