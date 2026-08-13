@@ -322,6 +322,19 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
   #operationPrelimSharedQueue .stage557-prelim-shared-actions .btn{width:100%!important}
 }
 </style>
+<style id="stage5518StableHeaderAndMainQueue">
+/* 자동저장 상태 문구가 바뀌어도 헤더가 흔들리지 않도록 고정폭 */
+#saveStateBadge{display:inline-flex!important;align-items:center!important;justify-content:center!important;box-sizing:border-box!important;flex:0 0 104px!important;width:104px!important;min-width:104px!important;max-width:104px!important;white-space:nowrap!important;text-align:center!important}
+.top-actions{align-items:center!important}
+/* 본선 공용대기: 실제 canonical venueQueues 기준 */
+#operationSharedQueue.stage5518-main-shared-board{display:grid!important;gap:8px!important}
+#operationSharedQueue .stage5518-main-shared-item{display:grid!important;grid-template-columns:34px minmax(0,1fr)!important;align-items:center!important;gap:9px!important;padding:9px 11px!important;border:1px solid #cbd9ea!important;border-radius:11px!important;background:#f8fbff!important}
+#operationSharedQueue .stage5518-main-shared-item .queue-order{display:flex!important;align-items:center!important;justify-content:center!important;width:28px!important;height:28px!important;border-radius:999px!important;background:#173f76!important;color:#fff!important;font-weight:900!important;font-size:12px!important}
+#operationSharedQueue .stage5518-main-shared-item .queue-match{min-width:0!important;display:grid!important;gap:3px!important}
+#operationSharedQueue .stage5518-main-shared-item .queue-match strong{font-size:13px!important;line-height:1.3!important;color:#132b50!important;overflow-wrap:anywhere!important}
+#operationSharedQueue .stage5518-main-shared-item .queue-match small{font-size:11px!important;color:#5a718d!important;line-height:1.3!important}
+@media(max-width:700px){#saveStateBadge{flex-basis:88px!important;width:88px!important;min-width:88px!important;max-width:88px!important;font-size:10px!important}#operationSharedQueue .stage5518-main-shared-item{padding:8px!important}}
+</style>
 </head>
 <body>
   <header class="topbar">
@@ -2322,7 +2335,7 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=7192"></script>
+  <script type="module" src="./assets/js/app.js?v=7193"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">

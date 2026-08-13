@@ -1505,6 +1505,7 @@ function renderCommittedState6400(){
   }
   if(['home','tournaments','operation','prelim-public','entry','bracket'].includes(view))renderDivisionWorkspaceBar();
   if(view==='settings')updateSetupProgress();
+  if(view==='operation'){scheduleRenderMainSharedQueue5518();}
   if(view==='operation'||view==='bracket')stage5517ScheduleMainSharedRepair();
 }
 let __tournamentWriteBypass=false;
@@ -11332,10 +11333,8 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
   const setText=(id,v)=>{const el=$id(id);if(el)el.textContent=String(v);};
   function mainSharedCount(){
     try{
-      ensureVenueQueues(state);
-      return Object.values(state.operation?.venueQueues||{}).reduce((sum,q)=>sum+(Array.isArray(q)?q.length:0),0);
-    }catch(_e){}
-    try{return Array.isArray(state.operation?.sharedQueue)?state.operation.sharedQueue.length:0;}catch(_e){return 0;}
+      return (state.sharedQueue?.length||0)+Object.values(state.venueQueues||{}).reduce((sum,q)=>sum+(Array.isArray(q)?q.length:0),0);
+    }catch(_e){return 0;}
   }
   function collect(){
     const grid=$id('operationUnifiedCourtGrid');
@@ -13556,6 +13555,34 @@ console.info('[230MATCH] 5.5.11 ready · same-court reorder and safe transfer de
 
 console.info('[230MATCH] 5.5.13 ready · prelim shared queue is authoritative and duplicate court restoration is blocked');
 
+/* 230MATCH 5.5.18 · 본선 공용대기 canonical UI */
+function stage5518MainQueueRows(){
+  const rows=[];let globalNo=1;
+  const venueName=id=>{const v=(state.settings?.venues||[]).find(x=>String(x.id||'')===String(id));return v?.name||String(id||'구장');};
+  for(const [venueId,qRaw] of Object.entries(state.venueQueues||{})){
+    const q=Array.isArray(qRaw)?qRaw:[];
+    q.forEach((id,idx)=>{const m=findMatch(state.draw,id);if(m)rows.push({id:String(id),match:m,venueId,venueName:venueName(venueId),position:idx+1,globalNo:globalNo++});});
+  }
+  for(const id of (state.sharedQueue||[])){
+    const m=findMatch(state.draw,id);if(m)rows.push({id:String(id),match:m,venueId:'',venueName:'전체',position:globalNo,globalNo:globalNo++});
+  }
+  return rows;
+}
+function renderMainSharedQueue5518(){
+  const root=document.getElementById('operationSharedQueue'),count=document.getElementById('operationSharedQueueCount');
+  if(!root)return;
+  const rows=stage5518MainQueueRows();
+  if(count)count.textContent=`${rows.length}경기`;
+  if(!rows.length){root.className='shared-queue venue-queue-board empty-state';root.innerHTML='<p>확정된 본선 공용대기 경기가 없습니다.</p>';return;}
+  root.className='shared-queue venue-queue-board stage5518-main-shared-board';
+  root.innerHTML=rows.map(r=>{
+    const a=smsTeamName(r.match.teamA),b=smsTeamName(r.match.teamB);
+    const eta=typeof smsExpectedClock==='function'?smsExpectedClock(r.id,{venueId:r.venueId,position:r.position}):'';
+    return `<article class="shared-queue-item stage5518-main-shared-item" data-main-shared-match="${portalEscape(r.id)}"><div class="queue-order">${r.globalNo}</div><div class="queue-match"><strong>${portalEscape(a)} <span>vs</span> ${portalEscape(b)}</strong><small>${portalEscape(r.venueName)} · 공용대기 ${r.position}번${eta?` · 예상 ${portalEscape(eta)}`:''} · 빈자리 자동배정</small></div></article>`;
+  }).join('');
+}
+function scheduleRenderMainSharedQueue5518(){clearTimeout(window.__stage5518MainQueueRender);window.__stage5518MainQueueRender=setTimeout(()=>{try{renderMainSharedQueue5518();}catch(e){console.error('[5.5.18] main queue UI',e);}},0);}
+
 /* 230MATCH 5.5.17 · 본선 공용대기 무결성 복구
    원칙:
    1) 정상 venueQueues/sharedQueue 순서는 절대 재정렬하지 않는다.
@@ -13658,6 +13685,7 @@ function stage5517RepairAndResumeMainShared(){
       const message=`본선 공용대기 무결성 복구 · 누락큐 ${repair.added}경기${assigned?` · 빈자리 자동배정 ${assigned}경기`:''}`;
       // 정상 큐 순서는 유지한 채 복구된 상태만 저장한다.
       commit(message);
+      scheduleRenderMainSharedQueue5518();
       if(repair.added)notice(`본선 공용대기에서 빠져 있던 ${repair.added}경기의 순번을 복구했습니다.${assigned?` ${assigned}경기는 기존 자동배정으로 빈자리에 배정했습니다.`:''}`,'success');
     }
   }finally{
@@ -13674,3 +13702,5 @@ function stage5517ScheduleMainSharedRepair(){
 console.info('[230MATCH] 5.5.16 ready · prelim shared queue unified duplicate guard');
 
 console.info('[230MATCH] 5.5.17 ready · main shared queue orphan recovery + existing auto assignment resume');
+
+console.info('[230MATCH] 5.5.18 ready · canonical main shared queue UI + autosave badge fixed');
