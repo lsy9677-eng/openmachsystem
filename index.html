@@ -145,6 +145,18 @@ body.tournament-readonly .tournament-state.current{font-weight:900}
 body.tournament-readonly #archiveTournamentBtn{opacity:.72}
 body.tournament-readonly [data-operator-only="true"]{filter:saturate(.75)}
 </style>
+
+<style id="stage3543SafeRestoreStyle">
+.stage3543-preview{display:grid;gap:10px;padding:12px!important;border:1px solid #bfdbfe!important;background:#f8fbff!important}.stage3543-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.stage3543-head strong{font-size:1rem}.stage3543-head span{font-size:.76rem;color:#64748b}.stage3543-select{display:grid;gap:5px}.stage3543-select span{font-size:.76rem;font-weight:800;color:#475569}.stage3543-select select{width:100%;min-height:38px}.stage3543-summary{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 10px;padding:10px;border:1px solid #e2e8f0;border-radius:10px;background:#fff}.stage3543-summary>strong{min-width:0;overflow-wrap:anywhere}.stage3543-summary>span{font-size:.8rem;color:#475569}.stage3543-summary>div{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:5px}.stage3543-summary b{font-size:.72rem;padding:3px 7px;border-radius:999px;background:#eef4ff;color:#1e40af}.stage3543-summary small{grid-column:1/-1;color:#64748b}.stage3543-actions{display:flex;flex-wrap:wrap;gap:7px}.stage3543-note{margin:0;font-size:.76rem;line-height:1.45;color:#64748b}@media(max-width:600px){.stage3543-actions .btn{flex:1 1 calc(50% - 4px);min-height:38px;padding:7px 8px}.stage3543-summary{grid-template-columns:1fr}.stage3543-summary>span{grid-column:1}.stage3543-head{align-items:flex-start;flex-direction:column;gap:2px}}
+</style>
+
+<style id="stage3544ClosedTournamentStyles">
+.stage3544-readonly-banner{margin:8px auto 10px;max-width:1480px;padding:9px 13px;border:1px solid #cbd5e1;border-radius:11px;background:#f8fafc;display:flex;align-items:center;gap:10px;flex-wrap:wrap;color:#334155;font-size:.82rem}
+.stage3544-readonly-banner strong{font-size:.9rem;color:#0f172a}.stage3544-readonly-banner span{color:#64748b}
+body.tournament-readonly #view-operation .btn-primary,body.tournament-readonly #view-operation .btn-danger,body.tournament-readonly #view-operation [data-operator-only="true"],body.tournament-readonly #view-entry [data-admin-only="true"],body.tournament-readonly #view-entry [data-operator-only="true"]{display:none!important}
+body.tournament-readonly #view-operation input:not([type="search"]),body.tournament-readonly #view-operation select,body.tournament-readonly #view-operation textarea{pointer-events:none!important;opacity:.78}
+@media(max-width:640px){.stage3544-readonly-banner{margin:6px 8px 8px;padding:7px 9px;gap:5px;font-size:.74rem}.stage3544-readonly-banner strong{font-size:.8rem;width:100%}}
+</style>
 </head>
 <body>
   <header class="topbar">
@@ -1013,6 +1025,8 @@ body.tournament-readonly [data-operator-only="true"]{filter:saturate(.75)}
             <button id="backupRefreshBtn" type="button" class="btn btn-light">목록 새로고침</button>
           </div>
           <div id="backupImportPreview" class="backup-import-preview" hidden></div>
+          <div class="section-head compact-head backup-list-head"><div><h3>대회별 백업</h3><p>현재 대회와 종료·보관된 대회를 각각 독립된 JSON으로 저장할 수 있습니다.</p></div><button id="backupDownloadAllTournamentsBtn" type="button" class="btn btn-secondary">모든 대회 묶음 저장</button></div>
+          <div id="backupTournamentList" class="backup-recovery-list"><div class="portal-empty">대회 백업 목록을 불러오는 중입니다.</div></div>
           <div class="section-head compact-head backup-list-head"><div><h3>저장된 복구점</h3><p>복원 전 현재 상태가 자동으로 한 번 더 저장됩니다.</p></div><button id="backupDeleteAllBtn" type="button" class="btn btn-danger-outline">복구점 전체 삭제</button></div>
           <div id="backupRecoveryManagerList" class="backup-recovery-list"><div class="portal-empty">저장된 복구점이 없습니다.</div></div>
           <div class="notice warning"><b>브라우저 복구점은 현재 기기에만 저장됩니다.</b> 휴대전화 교체·브라우저 데이터 삭제에 대비해 전체 백업 JSON도 별도로 보관하세요.</div>
@@ -2122,7 +2136,7 @@ body.tournament-readonly [data-operator-only="true"]{filter:saturate(.75)}
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=7168"></script>
+  <script type="module" src="./assets/js/app.js?v=7171"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
