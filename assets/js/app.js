@@ -1559,6 +1559,8 @@ function commit(message){
     return false;
   }
   if(message)log(message);
+  // 5.5.16: 공용대기 수동 이동은 저장 직전에도 최종 권위로 보장한다.
+  stage5513GuardPrelimManualSharedQueue();
   if(state.settings.autoTimeEnabled)calculateTimeMetrics(state);
   resolveSmsDynamicTimes();
   syncInputs();
@@ -1573,6 +1575,8 @@ function commit(message){
 function applySynchronizedState(nextState,source='동기화'){
   if(!nextState||typeof nextState!=='object')return;
   state=structuredClone(nextState);
+  // 다른 관리자 기기/탭에서 오래된 코트 상태가 들어와도 공용대기 중복을 허용하지 않는다.
+  stage5513GuardPrelimManualSharedQueue();
   if(globalNoticeReady){state.portal=state.portal||{};state.portal.posts=structuredClone(globalNoticeState.posts);state.portal.globalTicker=structuredClone(globalNoticeState.ticker);}
   try{ensureMultiTournamentRuntime();}catch(_e){}
   const routedDivision=routeDivisionId();
@@ -2661,6 +2665,13 @@ function stage555MoveToVenueSharedQueue({unified,source,sourceSlot,matchId}){
       if(String(c.wait1||'')===id)c.wait1=null;
       if(Array.isArray(c.queue))c.queue=c.queue.filter(x=>String(x)!==id);
     }
+    // 통합 코트 상태에도 같은 예선 ID가 남는 경로가 있으므로 exact-id만 함께 제거한다.
+    for(const c of (state.courts||[])){
+      if(String(c.playing||'')===id)c.playing=null;
+      if(String(c.wait1||'')===id)c.wait1=null;
+      if(Array.isArray(c.manualQueue))c.manualQueue=c.manualQueue.filter(x=>String(x)!==id);
+      if(Array.isArray(c.queue))c.queue=c.queue.filter(x=>String(x)!==id);
+    }
     for(const pool of (state.prelim.sharedCourtPools||[])){if(Array.isArray(pool.queue))pool.queue=pool.queue.filter(x=>String(x)!==id);}
     state.prelim.manualSharedQueue=state.prelim.manualSharedQueue.filter(x=>String(x)!==id);
     state.prelim.manualSharedQueue.push(id);
@@ -2709,32 +2720,52 @@ function stage5513GuardPrelimManualSharedQueue(){
     }
     state.prelim.manualSharedQueue=keep;
     if(!sharedIds.size)return {removed:0,remaining:0};
+
     let removed=0;
-    for(const court of (state.prelim.courts||[])){
+    const cleanCourt=(court,reserveKey,compactUnified)=>{
+      if(!court)return;
       let touched=false;
       if(sharedIds.has(String(court.playing||''))){court.playing=null;removed++;touched=true;}
       if(sharedIds.has(String(court.wait1||''))){court.wait1=null;removed++;touched=true;}
-      if(Array.isArray(court.queue)){
-        const before=court.queue.length;
-        court.queue=court.queue.filter(id=>!sharedIds.has(String(id)));
-        if(court.queue.length!==before){removed+=before-court.queue.length;touched=true;}
+      if(Array.isArray(court[reserveKey])){
+        const before=court[reserveKey].length;
+        court[reserveKey]=court[reserveKey].filter(id=>!sharedIds.has(String(id)));
+        if(court[reserveKey].length!==before){removed+=before-court[reserveKey].length;touched=true;}
       }
-      if(touched)stage555CompactSourceCourt(court,true);
+      if(touched)stage555CompactSourceCourt(court,compactUnified);
+    };
+
+    // 예선 전용 코트 큐
+    for(const court of (state.prelim.courts||[]))cleanCourt(court,'queue',true);
+
+    // 통합 코트/본선 코트 큐에도 예선 경기 ID가 남을 수 있으므로 함께 정리한다.
+    // 기존 본선 경기 자체는 건드리지 않고 manualSharedQueue에 있는 정확한 ID만 제거한다.
+    for(const court of (state.courts||[]))cleanCourt(court,'manualQueue',false);
+
+    // 일부 통합 상태에서 reserve가 queue에 들어 있는 경우까지 방어.
+    for(const court of (state.courts||[])){
+      if(!Array.isArray(court.queue))continue;
+      const before=court.queue.length;
+      court.queue=court.queue.filter(id=>!sharedIds.has(String(id)));
+      removed+=before-court.queue.length;
     }
+
     for(const pool of (state.prelim.sharedCourtPools||[])){
       if(!Array.isArray(pool.queue))continue;
       const before=pool.queue.length;
       pool.queue=pool.queue.filter(id=>!sharedIds.has(String(id)));
       removed+=before-pool.queue.length;
     }
-    // Re-assert the shared status only for ids that are still in the shared queue.
+
+    // 공용대기에 남아 있는 동안 이 상태가 최종 권위다.
     for(const id of keep){
       const m=findPrelimMatch(state,id);if(!m)continue;
-      m.status='prelim_shared_queue';m.prelimCourtId=null;m.courtId=null;m.court=null;m.courtName=null;
+      m.status='prelim_shared_queue';
+      m.prelimCourtId=null;m.courtId=null;m.court=null;m.courtName=null;
     }
     return {removed,remaining:keep.length};
   }catch(error){
-    console.error('[5.5.13] prelim shared duplicate guard failed',error);
+    console.error('[5.5.16] prelim shared duplicate guard failed',error);
     return {removed:0,remaining:Array.isArray(state.prelim?.manualSharedQueue)?state.prelim.manualSharedQueue.length:0,error};
   }
 }
@@ -2809,8 +2840,15 @@ function stage558AutoPromotePrelimManualSharedQueue(){
 }
 
 function renderPrelimManualSharedQueue557(){
-  stage5513GuardPrelimManualSharedQueue();
+  const guard=stage5513GuardPrelimManualSharedQueue();
   const root=document.getElementById('operationPrelimSharedQueue');
+  if(guard?.removed>0&&!window.__stage5516RepairRenderPending){
+    window.__stage5516RepairRenderPending=true;
+    setTimeout(()=>{
+      try{renderCommittedState6400();}catch(_e){}
+      window.__stage5516RepairRenderPending=false;
+    },0);
+  }
   const count=document.getElementById('operationPrelimSharedQueueCount');
   if(!root)return;
   state.prelim=state.prelim||{};
@@ -13515,3 +13553,5 @@ console.info('[230MATCH] 5.5.7 ready · prelim/main shared queue transfer fixed'
 console.info('[230MATCH] 5.5.11 ready · same-court reorder and safe transfer default');
 
 console.info('[230MATCH] 5.5.13 ready · prelim shared queue is authoritative and duplicate court restoration is blocked');
+
+console.info('[230MATCH] 5.5.16 ready · prelim shared queue unified duplicate guard');
