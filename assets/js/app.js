@@ -26,7 +26,7 @@ import{ensureCourtStatuses,pauseCourt,resumeCourt}from'./court-status-engine.js?
 import{ensureCourtManualQueues,assignToCourtManualQueue,moveCourtMatchFlexible,returnManualQueueItemToVenue,reorderCourtManualQueue}from'./court-manual-queue-engine.js?v=332012';
 import{reorderPrelimQueue as reorderPrelimQueueItem,movePrelimQueuedMatch,returnPrelimWait1ToQueue}from'./prelim-queue-control-engine.js?v=332012';
 import{ensurePrelimCourtStatuses,pausePrelimCourt,resumePrelimCourt}from'./prelim-court-status-engine.js?v=332012';
-import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7212';
+import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7213';
 import{verifyAndRepairMainFlow}from'./main-flow-integrity-engine.js?v=332012';
 import{finalizeTournamentCompletion}from'./tournament-completion-engine.js?v=332012';
 import{ensureTournamentIdentity,validateTournamentForArchive,createTournamentArchive,archiveListItem,archiveBackupPayload}from'./archive-engine.js?v=354101';
@@ -9072,7 +9072,7 @@ console.info('[230MATCH] 34.4.2 ready · main wait1 refill and shared queue elap
   const oldCommit3443=commit;commit=function(message){const r=oldCommit3443(message);setTimeout(refresh,0);return r;};
 
   const style=document.createElement('style');style.textContent=`
-    .admin-action-center-3443{position:fixed;right:18px;bottom:18px;z-index:100000;width:min(420px,calc(100vw - 36px));border:1px solid rgba(143,164,194,.72);border-radius:16px;background:rgba(255,255,255,.86);box-shadow:0 12px 32px rgba(15,42,79,.18);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);overflow:hidden;transition:width .18s ease,opacity .18s ease,box-shadow .18s ease}.aac-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 13px;background:rgba(16,45,87,.84);color:#fff}.aac-head>div:first-child{display:grid;gap:2px}.aac-head small{opacity:.78}.aac-head-actions{display:flex;gap:6px}.aac-head-actions button{width:30px;height:30px;border:0;border-radius:8px;background:rgba(255,255,255,.17);color:#fff;font-size:18px;cursor:pointer}.aac-current{display:grid;grid-template-columns:1fr auto;gap:4px 10px;padding:12px 14px;border-left:5px solid #55759e;background:rgba(255,255,255,.72)}.aac-current strong,.aac-current span{grid-column:1}.aac-current small{grid-column:2;grid-row:1/3;color:#68758a}.aac-current.success{border-color:#1f9d62;background:rgba(239,251,245,.78)}.aac-current.error{border-color:#df3f4f;background:rgba(255,241,242,.9)}.aac-current.warning{border-color:#e0a000;background:rgba(255,248,223,.84)}.aac-current.processing{border-color:#6c45dc;background:rgba(245,241,255,.82)}.aac-history{max-height:210px;overflow:auto;border-top:1px solid rgba(226,232,242,.8);background:rgba(255,255,255,.7)}.aac-log{display:grid;grid-template-columns:70px 110px 1fr;gap:8px;padding:8px 12px;border-bottom:1px solid rgba(237,241,247,.85);font-size:12px}.aac-log time{color:#6d7788}.aac-log.error b{color:#c72f40}.aac-log.success b{color:#168553}.admin-action-center-3443.minimized{width:190px;opacity:.72;box-shadow:0 8px 22px rgba(15,42,79,.14)}.admin-action-center-3443.minimized .aac-current,.admin-action-center-3443.minimized .aac-history{display:none}.admin-action-center-3443.minimized .aac-head small{display:none}.admin-action-center-3443.minimized #aacClear3443{display:none}.stage3443-prelim-lock-panel{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 16px;margin:0 0 14px;border:1px solid #b8c9e2;border-radius:14px;background:#f7faff}.p-lock-copy{display:grid;gap:4px}.p-lock-copy span{color:#5b6c82}.p-lock-actions{display:flex;gap:8px;flex-wrap:wrap}.p-lock-actions .btn{min-height:44px}@media(max-width:700px){.admin-action-center-3443{left:auto!important;top:auto!important;right:8px!important;bottom:76px!important;width:calc(100vw - 16px);background:rgba(255,255,255,.76);box-shadow:0 9px 24px rgba(15,42,79,.14)}.admin-action-center-3443 .aac-head{background:rgba(16,45,87,.72)}.admin-action-center-3443.minimized{width:142px;opacity:.58;border-radius:13px}.admin-action-center-3443.minimized .aac-head{padding:8px 9px;gap:5px}.admin-action-center-3443.minimized .aac-head b{font-size:0}.admin-action-center-3443.minimized .aac-head b::after{content:'⚙ 운영상태';font-size:13px;white-space:nowrap}.admin-action-center-3443.minimized .aac-head-actions button{width:27px;height:27px;font-size:17px}.stage3443-prelim-lock-panel{align-items:stretch;flex-direction:column}.p-lock-actions .btn{flex:1}.aac-log{grid-template-columns:64px 90px 1fr}}
+    .admin-action-center-3443{position:fixed;right:18px;bottom:18px;z-index:100000;width:min(420px,calc(100vw - 36px));border:1px solid rgba(143,164,194,.72);border-radius:16px;background:rgba(255,255,255,.86);box-shadow:0 12px 32px rgba(15,42,79,.18);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);overflow:hidden;transition:width .18s ease,opacity .18s ease,box-shadow .18s ease}.aac-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 13px;background:rgba(16,45,87,.84);color:#fff}.aac-head>div:first-child{display:grid;gap:2px}.aac-head small{opacity:.78}.aac-head-actions{display:flex;gap:6px}.aac-head-actions button{width:30px;height:30px;border:0;border-radius:8px;background:rgba(255,255,255,.17);color:#fff;font-size:18px;cursor:pointer}.aac-current{display:grid;grid-template-columns:1fr auto;gap:4px 10px;padding:12px 14px;border-left:5px solid #55759e;background:rgba(255,255,255,.72)}.aac-current strong,.aac-current span{grid-column:1}.aac-current small{grid-column:2;grid-row:1/3;color:#68758a}.aac-current.success{border-color:#1f9d62;background:rgba(239,251,245,.78)}.aac-current.error{border-color:#df3f4f;background:rgba(255,241,242,.9)}.aac-current.warning{border-color:#e0a000;background:rgba(255,248,223,.84)}.aac-current.processing{border-color:#6c45dc;background:rgba(245,241,255,.82)}.aac-history{max-height:210px;overflow:auto;border-top:1px solid rgba(226,232,242,.8);background:rgba(255,255,255,.7)}.aac-log{display:grid;grid-template-columns:70px 110px 1fr;gap:8px;padding:8px 12px;border-bottom:1px solid rgba(237,241,247,.85);font-size:12px}.aac-log time{color:#6d7788}.aac-log.error b{color:#c72f40}.aac-log.success b{color:#168553}.admin-action-center-3443.minimized{width:190px;opacity:.72;box-shadow:0 8px 22px rgba(15,42,79,.14)}.admin-action-center-3443.minimized .aac-current,.admin-action-center-3443.minimized .aac-history{display:none}.admin-action-center-3443.minimized .aac-head small{display:none}.admin-action-center-3443.minimized #aacClear3443{display:none}.stage3443-prelim-lock-panel{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 16px;margin:0 0 14px;border:1px solid #b8c9e2;border-radius:14px;background:#f7faff}.p-lock-copy{display:grid;gap:4px}.p-lock-copy span{color:#5b6c82}.p-lock-actions{display:flex;gap:8px;flex-wrap:wrap}.p-lock-actions .btn{min-height:44px}@media(max-width:700px){.admin-action-center-3443{left:auto!important;top:auto!important;right:8px!important;bottom:calc(126px + env(safe-area-inset-bottom,0px))!important;width:calc(100vw - 16px);background:rgba(255,255,255,.76);box-shadow:0 9px 24px rgba(15,42,79,.14)}.admin-action-center-3443 .aac-head{background:rgba(16,45,87,.72)}.admin-action-center-3443.minimized{width:142px;opacity:.58;border-radius:13px}.admin-action-center-3443.minimized .aac-head{padding:8px 9px;gap:5px}.admin-action-center-3443.minimized .aac-head b{font-size:0}.admin-action-center-3443.minimized .aac-head b::after{content:'⚙ 운영상태';font-size:13px;white-space:nowrap}.admin-action-center-3443.minimized .aac-head-actions button{width:27px;height:27px;font-size:17px}.stage3443-prelim-lock-panel{align-items:stretch;flex-direction:column}.p-lock-actions .btn{flex:1}.aac-log{grid-template-columns:64px 90px 1fr}}
   `;document.head.appendChild(style);
   const label=byId('buildStageLabel');if(label){label.textContent='230MATCH 34.4.3 · 관리자 실행 상태·예선 잠금 복구';label.title='Version 34.4.3';}
   document.documentElement.dataset.build='3443';
@@ -9314,15 +9314,99 @@ console.info('[230MATCH] 34.4.2 ready · main wait1 refill and shared queue elap
     const root=document.getElementById('adminActionCenter3443'),head=root?.querySelector('.aac-head');
     if(!root||!head||root.dataset.draggable3522==='1')return;
     root.dataset.draggable3522='1';head.classList.add('aac-drag-handle');head.title='이 부분을 잡고 상태창을 이동할 수 있습니다.';
-    const key='230match-admin-action-center-position';
-    const clamp=(x,y)=>({x:Math.max(6,Math.min(x,window.innerWidth-root.offsetWidth-6)),y:Math.max(6,Math.min(y,window.innerHeight-root.offsetHeight-6))});
-    try{const saved=JSON.parse(localStorage.getItem(key)||'null');if(saved&&Number.isFinite(saved.x)&&Number.isFinite(saved.y)){const p=clamp(saved.x,saved.y);root.style.left=p.x+'px';root.style.top=p.y+'px';root.style.setProperty('right','auto','important');root.style.setProperty('bottom','auto','important');}}catch(_e){}
+    const desktopKey='230match-admin-action-center-position';
+    const mobile=()=>window.matchMedia('(max-width:700px)').matches;
+    const clamp=(x,y)=>{
+      const w=Math.max(root.offsetWidth,140),h=Math.max(root.offsetHeight,48);
+      return {
+        x:Math.max(6,Math.min(x,window.innerWidth-w-6)),
+        y:Math.max(6,Math.min(y,window.innerHeight-h-6))
+      };
+    };
+
+    // 데스크톱에서만 기존 저장 위치를 복원한다.
+    // 모바일에서는 PC 좌표/hidden 상태의 0-size 계산 때문에 화면 밖으로 사라질 수 있어 적용하지 않는다.
+    if(!mobile()){
+      try{
+        const saved=JSON.parse(localStorage.getItem(desktopKey)||'null');
+        if(saved&&Number.isFinite(saved.x)&&Number.isFinite(saved.y)){
+          const p=clamp(saved.x,saved.y);
+          root.style.left=p.x+'px';
+          root.style.top=p.y+'px';
+          root.style.right='auto';
+          root.style.bottom='auto';
+        }
+      }catch(_e){}
+    }else{
+      root.style.removeProperty('left');
+      root.style.removeProperty('top');
+      root.style.removeProperty('right');
+      root.style.removeProperty('bottom');
+    }
+
     let drag=null;
-    head.addEventListener('pointerdown',e=>{if(e.target.closest('button'))return;const r=root.getBoundingClientRect();drag={dx:e.clientX-r.left,dy:e.clientY-r.top};head.setPointerCapture?.(e.pointerId);root.classList.add('dragging');e.preventDefault();});
-    head.addEventListener('pointermove',e=>{if(!drag)return;const p=clamp(e.clientX-drag.dx,e.clientY-drag.dy);root.style.left=p.x+'px';root.style.top=p.y+'px';root.style.setProperty('right','auto','important');root.style.setProperty('bottom','auto','important');});
-    const stop=e=>{if(!drag)return;drag=null;root.classList.remove('dragging');const r=root.getBoundingClientRect();localStorage.setItem(key,JSON.stringify({x:Math.round(r.left),y:Math.round(r.top)}));try{head.releasePointerCapture?.(e.pointerId);}catch(_e){}};
-    head.addEventListener('pointerup',stop);head.addEventListener('pointercancel',stop);
-    window.addEventListener('resize',()=>{if(root.style.left){const r=root.getBoundingClientRect(),p=clamp(r.left,r.top);root.style.left=p.x+'px';root.style.top=p.y+'px';root.style.setProperty('right','auto','important');root.style.setProperty('bottom','auto','important');}});
+    head.addEventListener('pointerdown',e=>{
+      if(e.target.closest('button'))return;
+      const r=root.getBoundingClientRect();
+
+      // 모바일에서는 실제 보이는 현재 위치를 기준으로 inline 좌표로 전환한 뒤 드래그 시작.
+      if(mobile()){
+        root.style.setProperty('left',r.left+'px','important');
+        root.style.setProperty('top',r.top+'px','important');
+        root.style.setProperty('right','auto','important');
+        root.style.setProperty('bottom','auto','important');
+      }
+
+      drag={dx:e.clientX-r.left,dy:e.clientY-r.top};
+      head.setPointerCapture?.(e.pointerId);
+      root.classList.add('dragging');
+      e.preventDefault();
+    });
+
+    head.addEventListener('pointermove',e=>{
+      if(!drag)return;
+      const p=clamp(e.clientX-drag.dx,e.clientY-drag.dy);
+      if(mobile()){
+        root.style.setProperty('left',p.x+'px','important');
+        root.style.setProperty('top',p.y+'px','important');
+        root.style.setProperty('right','auto','important');
+        root.style.setProperty('bottom','auto','important');
+      }else{
+        root.style.left=p.x+'px';
+        root.style.top=p.y+'px';
+        root.style.right='auto';
+        root.style.bottom='auto';
+      }
+    });
+
+    const stop=e=>{
+      if(!drag)return;
+      drag=null;
+      root.classList.remove('dragging');
+      if(!mobile()){
+        const r=root.getBoundingClientRect();
+        try{localStorage.setItem(desktopKey,JSON.stringify({x:Math.round(r.left),y:Math.round(r.top)}));}catch(_e){}
+      }
+      try{head.releasePointerCapture?.(e.pointerId);}catch(_e){}
+    };
+    head.addEventListener('pointerup',stop);
+    head.addEventListener('pointercancel',stop);
+
+    window.addEventListener('resize',()=>{
+      if(mobile()){
+        // 회전/리사이즈 때 모바일은 안전한 기본 위치로 복귀.
+        root.style.removeProperty('left');
+        root.style.removeProperty('top');
+        root.style.removeProperty('right');
+        root.style.removeProperty('bottom');
+        return;
+      }
+      if(root.style.left){
+        const r=root.getBoundingClientRect(),p=clamp(r.left,r.top);
+        root.style.left=p.x+'px';
+        root.style.top=p.y+'px';
+      }
+    });
   }
   const style=document.createElement('style');style.textContent=`
     .aac-drag-handle{cursor:move;touch-action:none;user-select:none}.admin-action-center-3443.dragging{opacity:.92;box-shadow:0 18px 46px rgba(15,42,79,.32)}
@@ -14048,4 +14132,4 @@ console.info('[230MATCH] 5.6.6 ready · shortcuts now use same simple onclick mo
 
 console.info('[230MATCH] 5.6.8 ready · manual admin/operator role survives tournament grant refresh');
 
-console.info('[230MATCH] 5.6.9 ready · mobile admin status drag fixed + explicit tournament list access');
+console.info('[230MATCH] 5.6.10 ready · mobile admin center safe-visible drag + tournament list');
