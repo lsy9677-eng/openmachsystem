@@ -13852,3 +13852,65 @@ console.info('[230MATCH] 5.5.20 stable baseline · 5.5.17+ main queue auto-repai
 })();
 
 console.info('[230MATCH] 5.5.24 ready · court round color CSS priority fixed; operation logic untouched');
+
+
+/* 230MATCH 5.5.25 · 하단 고정바 직접 클릭 처리
+   운영 데이터/자동배정에는 영향 없음. */
+(function stage5525QuickBarDirectNavigation(){
+  function go(target){
+    if(!target)return;
+    if(target==='operation-game'){
+      navigatePortalView('operation',{pushHistory:true,focus:false});
+      const view=document.getElementById('view-operation');
+      if(view){
+        view.dataset.operationMode='groups';
+        view.querySelectorAll('[data-operation-section]').forEach(button=>{
+          const active=button.dataset.operationSection==='groups';
+          button.classList.toggle('active',active);
+          button.setAttribute('aria-pressed',String(active));
+        });
+        try{renderPortalViewFast('operation');}catch(_e){}
+      }
+      return;
+    }
+    if(target==='operation'){
+      navigatePortalView('operation',{pushHistory:true,focus:false});
+      const view=document.getElementById('view-operation');
+      if(view){
+        view.dataset.operationMode='courts';
+        view.querySelectorAll('[data-operation-section]').forEach(button=>{
+          const active=button.dataset.operationSection==='courts';
+          button.classList.toggle('active',active);
+          button.setAttribute('aria-pressed',String(active));
+        });
+        try{renderPortalViewFast('operation');}catch(_e){}
+      }
+      return;
+    }
+    navigatePortalView(target,{pushHistory:true,focus:false});
+  }
+
+  function bind(){
+    const bar=document.getElementById('stage7124MatchdayQuickBar');
+    if(!bar||bar.dataset.stage5525Bound==='1')return;
+    bar.dataset.stage5525Bound='1';
+
+    // bar 자체가 capture 단계에서 먼저 처리하여 다른 전역 클릭 핸들러와 충돌하지 않게 한다.
+    bar.addEventListener('click',event=>{
+      const btn=event.target.closest?.('[data-matchday-quick-view]');
+      if(!btn||btn.hidden)return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      const target=String(btn.dataset.matchdayQuickView||'').trim();
+      go(target);
+      try{window.__update230MatchMatchdayQuickBar?.();}catch(_e){}
+    },true);
+  }
+
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind,{once:true});
+  else bind();
+  window.addEventListener('pageshow',()=>setTimeout(bind,20));
+
+  console.info('[230MATCH] 5.5.25 ready · persistent quickbar direct navigation');
+})();
