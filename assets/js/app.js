@@ -14021,3 +14021,94 @@ console.info('[230MATCH] 5.6.4 ready · direct quickbar handlers + stale writer 
 console.info('[230MATCH] 5.6.5 ready · home top shortcuts direct-bound; common portal delegation excluded for hub');
 
 console.info('[230MATCH] 5.6.6 ready · shortcuts now use same simple onclick model as working tab strip');
+
+
+/* 230MATCH 5.6.7 · invisible interaction blocker guard
+   버튼 이벤트를 변경하지 않고, 닫혀 있어야 할 overlay/dialog가 클릭을 가로채는 상태만 복구한다. */
+(()=>{
+  const NON_DIALOG_LAYERS=[
+    ['adminSettingsHub', el=>el.classList.contains('open')&&!el.hidden],
+    ['mobileMoreSheet', el=>el.classList.contains('open')&&!el.hidden],
+    ['newTournamentWizard', el=>!el.hidden&&el.getAttribute('aria-hidden')!=='true'],
+    ['noticeImageViewer', el=>el.classList.contains('open')],
+  ];
+
+  function visuallyGhostDialog(d){
+    if(!d?.open)return false;
+    if(d.hidden || d.getAttribute('aria-hidden')==='true')return true;
+    let cs=null;
+    try{cs=getComputedStyle(d);}catch(_e){}
+    if(cs && (cs.display==='none'||cs.visibility==='hidden'||Number(cs.opacity)===0))return true;
+    try{
+      const r=d.getBoundingClientRect();
+      if(r.width<2||r.height<2)return true;
+    }catch(_e){}
+    return false;
+  }
+
+  function closeGhostDialogs(){
+    document.querySelectorAll('dialog[open]').forEach(d=>{
+      if(!visuallyGhostDialog(d))return;
+      try{d.close();}catch(_e){try{d.removeAttribute('open');}catch(__e){}}
+      console.warn('[230MATCH 5.6.7] 숨은 dialog 차단 해제:',d.id||'(no id)');
+    });
+  }
+
+  function normalizeLayerPointerEvents(){
+    NON_DIALOG_LAYERS.forEach(([id,isActive])=>{
+      const el=document.getElementById(id);if(!el)return;
+      let active=false;try{active=Boolean(isActive(el));}catch(_e){}
+      el.style.pointerEvents=active?'auto':'none';
+    });
+    const install=document.getElementById('appInstallPrompt');
+    if(install){
+      let cs=null;try{cs=getComputedStyle(install);}catch(_e){}
+      const hidden=install.hidden || (cs&&(cs.display==='none'||cs.visibility==='hidden'||Number(cs.opacity)===0));
+      if(hidden)install.style.pointerEvents='none';
+    }
+  }
+
+  function repairInteractionBlockers(){
+    closeGhostDialogs();
+    normalizeLayerPointerEvents();
+  }
+
+  // 설정을 열 때 native dialog가 top-layer에 고아 상태로 남아 있으면 먼저 제거한다.
+  const originalOpenSettings=window.openAdminSettingsHub;
+  if(typeof originalOpenSettings==='function'){
+    window.openAdminSettingsHub=function(...args){
+      closeGhostDialogs();
+      const result=originalOpenSettings.apply(this,args);
+      const hub=document.getElementById('adminSettingsHub');
+      if(hub)hub.style.pointerEvents='auto';
+      return result;
+    };
+  }
+  const originalCloseSettings=window.closeAdminSettingsHub;
+  if(typeof originalCloseSettings==='function'){
+    window.closeAdminSettingsHub=function(...args){
+      const result=originalCloseSettings.apply(this,args);
+      const hub=document.getElementById('adminSettingsHub');
+      if(hub&&!hub.classList.contains('open'))hub.style.pointerEvents='none';
+      return result;
+    };
+  }
+
+  // 백드롭은 capture 단계에서도 확실하게 닫히도록 하되 다른 버튼 이벤트는 건드리지 않는다.
+  document.addEventListener('pointerdown',e=>{
+    const close=e.target?.closest?.('[data-settings-hub-close]');
+    if(close){
+      e.preventDefault();
+      window.closeAdminSettingsHub?.();
+    }
+  },true);
+
+  window.__repair230MatchInteractionBlockers=repairInteractionBlockers;
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(repairInteractionBlockers,50),{once:true});
+  else setTimeout(repairInteractionBlockers,50);
+  window.addEventListener('pageshow',()=>setTimeout(repairInteractionBlockers,30));
+  window.addEventListener('focus',()=>setTimeout(repairInteractionBlockers,30));
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(repairInteractionBlockers,30);});
+  setInterval(repairInteractionBlockers,700);
+  console.info('[230MATCH] 5.6.7 ready · invisible dialog/overlay interaction blocker guard');
+})();

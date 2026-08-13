@@ -544,6 +544,21 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
 </style>
 
 
+
+<style id="stage567InteractionLayerSafety">
+/* 설정 패널은 자체 백드롭보다 반드시 위에 위치한다. */
+#adminSettingsHub.settings-hub{pointer-events:none}
+#adminSettingsHub.settings-hub.open:not([hidden]){pointer-events:auto}
+#adminSettingsHub .settings-hub-backdrop{z-index:0!important;pointer-events:auto!important}
+#adminSettingsHub .settings-hub-panel{z-index:1!important;pointer-events:auto!important}
+#adminSettingsHub .settings-hub-close{position:relative;z-index:2!important;pointer-events:auto!important}
+/* 닫힌 전체화면 레이어가 투명하게 클릭을 먹지 못하도록 강제 */
+#mobileMoreSheet:not(.open),
+#newTournamentWizard[hidden],
+#newTournamentWizard[aria-hidden="true"],
+#noticeImageViewer:not(.open){pointer-events:none!important}
+</style>
+
 </head>
 <body>
   <header class="topbar">
@@ -2544,7 +2559,7 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=7209"></script>
+  <script type="module" src="./assets/js/app.js?v=7210"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
