@@ -2445,7 +2445,8 @@ function openUnifiedCourtTransfer(sourceCourtId,sourceSlot){
   $('courtTransferSourceCourtId').value=`unified:${sourceCourtId}`;
   $('courtTransferSourceSlot').value=sourceSlot;
   $('courtTransferMatchLabel').textContent=`${source.name} · ${teamText(item.match.teamA)} vs ${teamText(item.match.teamB)}`;
-  $('courtTransferTargetSelect').innerHTML=(item.type==='main'?`<option value="__venue_shared__">↩ ${source.venueName||'해당 구장'} 공용대기 맨 뒤로 이동</option>`:'')+targets.map(c=>`<option value="${c.id}">${c.name} · 시합중 ${c.playing?'있음':'없음'} · 대기1 ${c.wait1?'있음':'없음'} · 예비 ${(c.queue?.length||0)}경기${c.isPaused?' · 사용중지':''}</option>`).join('');
+  const isMainDrawMatch=Boolean(findMatch(state.draw,matchId));
+  $('courtTransferTargetSelect').innerHTML=(isMainDrawMatch?`<option value="__venue_shared__">↩ ${source.venueName||'해당 구장'} 공용대기 맨 뒤로 이동</option>`:'')+targets.map(c=>`<option value="${c.id}">${c.name} · 시합중 ${c.playing?'있음':'없음'} · 대기1 ${c.wait1?'있음':'없음'} · 예비 ${(c.queue?.length||0)}경기${c.isPaused?' · 사용중지':''}</option>`).join('');
   refreshCourtTransferPositions();
   $('courtTransferDialog').showModal();
 }
@@ -2521,8 +2522,9 @@ function stage555MoveToVenueSharedQueue({unified,source,sourceSlot,matchId}){
   if(!source||!matchId)throw new Error('공용대기로 이동할 경기를 찾지 못했습니다.');
   const id=String(matchId);
   const u=findUnifiedMatch(state,id);
-  const match=u?.match||findMatch(state.draw,id);
-  if(!match||u?.type==='prelim')throw new Error('예선 경기는 현재 공용대기 이동 대상이 아닙니다.');
+  const drawMatch=findMatch(state.draw,id);
+  const match=drawMatch||u?.match;
+  if(!drawMatch||!match)throw new Error('본선 경기만 공용대기로 이동할 수 있습니다.');
   if(String(source.playing||'')===id)source.playing=null;
   if(String(source.wait1||'')===id)source.wait1=null;
   if(Array.isArray(source.queue))source.queue=source.queue.filter(x=>String(x)!==id);
@@ -13085,3 +13087,5 @@ document.addEventListener('change',event=>{
   if(event.target?.id==='courtTransferTargetSelect')refreshCourtTransferPositions();
 });
 console.info('[230MATCH] 5.5.5 ready · court → shared queue transfer');
+
+console.info('[230MATCH] 5.5.6 ready · shared queue option visibility fixed');
