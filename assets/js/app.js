@@ -7869,7 +7869,7 @@ let refreshDivisionEditorPanel = window.refreshDivisionEditorPanel || (()=>{});
     const snap=clone(rec.snapshot||baseSnapshot());const ps=snap.prelim?.settings||{};
     const capacity=Math.max(1,Number(d.querySelector('#s6001Capacity')?.value||96));
     const drawSize=Number(d.querySelector('#s6001DrawSize')?.value||64),qualifiers=Math.max(1,Number(d.querySelector('#s6001Qualifiers')?.value||2)),two=Math.max(0,Number(d.querySelector('#s6001TwoGroups')?.value||0)),minutes=Math.max(10,Number(d.querySelector('#s6001Minutes')?.value||40));
-    rec.name=name;rec.updatedAt=now();snap.divisionConfig={...(snap.divisionConfig||{}),capacity};snap.prelim=snap.prelim||{};snap.prelim.settings={...ps,activeTeamCount:capacity,qualifiersPerGroup:qualifiers,twoTeamGroups:two,twoTeamGroupCount:two};snap.settings={...(snap.settings||{}),drawSize,matchMinutes:minutes,venues:clone(venues)};rec.snapshot=snap;
+    rec.name=name;rec.updatedAt=now();snap.divisionConfig={...(snap.divisionConfig||{}),capacity};snap.prelim=snap.prelim||{};snap.prelim.settings={...ps,activeTeamCount:capacity,qualifiersPerGroup:qualifiers,twoTeamGroups:two,twoTeamGroupCount:two,matchMinutes:minutes};snap.settings={...(snap.settings||{}),drawSize,matchMinutes:minutes,venues:clone(venues)};rec.snapshot=snap;
     if(msg&&showMessage)msg.textContent='이 부서 변경을 편집창에 적용했습니다. 전체 저장을 눌러 서버에 저장하세요.';
     dirty=true;renderTabs();setSaveText('변경사항이 편집창에 적용되었습니다.','전체 변경사항 저장을 눌러 서버에 저장하세요.','pending');return true;
   }
@@ -7897,7 +7897,7 @@ let refreshDivisionEditorPanel = window.refreshDivisionEditorPanel || (()=>{});
       const textGuide={...previousGuide,date:d.querySelector('#s6001Date')?.value||'',startTime:d.querySelector('#s6001Time')?.value||'09:00',venue:d.querySelector('#s6001Venue')?.value||'',fee:String(d.querySelector('#s6001GuideFee')?.value||'').trim(),entryPeriod:String(d.querySelector('#s6001GuideEntryPeriod')?.value||'').trim(),eligibility:String(d.querySelector('#s6001GuideEligibility')?.value||'').trim(),matchFormat:String(d.querySelector('#s6001GuideMatchFormat')?.value||'').trim(),awards:String(d.querySelector('#s6001GuideAwards')?.value||'').trim(),refundPolicy:String(d.querySelector('#s6001GuideRefund')?.value||'').trim(),contact:String(d.querySelector('#s6001GuideContact')?.value||'').trim(),organizer:String(d.querySelector('#s6001GuideOrganizer')?.value||'').trim(),detail:String(d.querySelector('#s6001GuideDetail')?.value||'').trim()};
       state.portal.guide=textGuide;
       state.multiDivision={...(state.multiDivision||{}),activeDivisionId:activeId,divisions:clone(divisions())};
-      const active=record(activeId)||divisions()[0];if(active){const snap=clone(active.snapshot||{});state.tournament.division=active.name;state.prelim=clone(snap.prelim||state.prelim||{});state.settings={...(state.settings||{}),...(clone(snap.settings||{}))};state.teams=clone(snap.teams||[]);state.entryRecords=clone(snap.entryRecords||[]);state.draw=clone(snap.draw||{rounds:{}});state.courts=clone(snap.courts||[]);state.queues=clone(snap.queues||{});state.messages=clone(snap.messages||[]);}
+      const active=record(activeId)||divisions()[0];if(active){const snap=clone(active.snapshot||{});state.tournament.division=active.name;state.prelim=clone(snap.prelim||state.prelim||{});state.settings={...(state.settings||{}),...(clone(snap.settings||{}))};state.prelim.settings={...(state.prelim?.settings||{}),matchMinutes:Math.max(10,Number(state.settings?.matchMinutes||40))};state.teams=clone(snap.teams||[]);state.entryRecords=clone(snap.entryRecords||[]);state.draw=clone(snap.draw||{rounds:{}});state.courts=clone(snap.courts||[]);state.queues=clone(snap.queues||{});state.messages=clone(snap.messages||[]);}
       state.updatedAt=now();saveState(state);await pushStateNow(state); // text/division settings are committed even if Storage fails later
       if(removeGuideImage){state.portal.guide={...textGuide,imageUrl:'',imageStoragePath:'',imageName:'',imageType:'',imageDataUrl:''};saveState(state);await pushStateNow(state);if(previousGuide.imageStoragePath)void deleteManagedImage(previousGuide.imageStoragePath);}
       if(guideFile){setSaveText('대회 내용 저장 완료 · 이미지 업로드 중','Firebase Storage에 요강 이미지를 저장합니다.','saving');const compressed=await stage328CompressGuideImage(guideFile),tid=String(state.tournament?.id||state.multiTournament?.activeTournamentId||'current');const uploaded=await uploadManagedImage({folder:'tournamentGuides',ownerId:tid,dataUrl:compressed.dataUrl,fileName:compressed.name,contentType:compressed.type,previousPath:previousGuide.imageStoragePath||''});state.portal.guide={...textGuide,imageUrl:uploaded.url||'',imageStoragePath:uploaded.path||'',imageName:uploaded.name||compressed.name,imageType:uploaded.type||compressed.type,imageDataUrl:''};saveState(state);await pushStateNow(state);}
@@ -10749,13 +10749,16 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
   const BUILD='7113';
   const $id=id=>document.getElementById(id);
   const expectedMinutes=()=>{
-    const direct=Number(state.prelim?.settings?.matchMinutes||state.tournament?.matchMinutes||0);
-    if(direct>0)return direct;
+    const canonical=Number(state.settings?.matchMinutes||0);
+    if(canonical>0)return canonical;
     try{
       const active=(state.multiDivision?.divisions||[]).find(d=>String(d.id)===String(state.multiDivision?.activeDivisionId||''));
-      const v=Number(active?.settings?.matchMinutes||active?.matchMinutes||0);if(v>0)return v;
+      const v=Number(active?.snapshot?.settings?.matchMinutes||active?.settings?.matchMinutes||active?.matchMinutes||0);
+      if(v>0)return v;
     }catch(_e){}
-    return 30;
+    const legacy=Number(state.prelim?.settings?.matchMinutes||state.tournament?.matchMinutes||0);
+    if(legacy>0)return legacy;
+    return 40;
   };
   const getCourt=courtId=>[...(state.prelim?.courts||[]),...(state.courts||[])].find(c=>String(c.id)===String(courtId));
   const getMatch=id=>{
@@ -12895,3 +12898,21 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 window.addEventListener('pageshow',()=>setTimeout(stage3544Refresh,120));
 console.info('[230MATCH] 5.4.31 ready · Stage35.4-4 closed tournament snapshot/read-only optimization');
 (()=>{document.documentElement.dataset.release='5.4.33';console.info('[230MATCH] 5.4.33 ready · Stage35.4 final integrity acceptance');})();
+
+
+/* 230MATCH 5.5.2 · canonical match-minutes synchronization */
+(function stage552MatchMinutesSync(){
+  function sync(){
+    try{
+      const canonical=Math.max(10,Number(state?.settings?.matchMinutes||0));
+      if(!canonical)return;
+      state.prelim=state.prelim||{};
+      state.prelim.settings=state.prelim.settings||{};
+      if(Number(state.prelim.settings.matchMinutes)!==canonical){state.prelim.settings.matchMinutes=canonical;}
+    }catch(_e){}
+  }
+  if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',()=>{sync();setTimeout(sync,400);setTimeout(sync,1400);},{once:true});}
+  else{sync();setTimeout(sync,400);setTimeout(sync,1400);}
+  window.addEventListener('hashchange',()=>setTimeout(sync,50));
+  console.info('[230MATCH] 5.5.2 ready · matchMinutes synchronization fixed');
+})();
