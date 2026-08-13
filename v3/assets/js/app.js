@@ -3553,6 +3553,7 @@ async function startRegistrationCloudSync({force=false}={}){
     return;
   }
   const rt=await registrationRuntime();
+  try{void stage354StartOperatorRequestAdminSync();}catch(_e){}
   const ctx=registrationContext();
   const key=`${currentAuthUser.uid}|${currentRole}|${ctx.tournamentId}`;
   if(!force&&registrationCloudUnsubscribe&&registrationCloudKey===key)return;
@@ -3563,7 +3564,13 @@ async function startRegistrationCloudSync({force=false}={}){
     : rt.api.query(collectionRef,rt.api.where('ownerUid','==',currentAuthUser.uid));
   registrationCloudUnsubscribe=rt.api.onSnapshot(q,snap=>{
     const stage354OperatorDocs=snap.docs.map(doc=>({id:doc.id,...doc.data()}));
-    window.__stage354OperatorRequestRows=stage354OperatorDocs.filter(row=>String(row?.recordType||'')==='operator_request');
+    // 진행자 요청은 별도 관리자 알림 컬렉션에서 동기화한다. 구버전 문서가 남아 있으면 요청 목록에만 병합한다.
+    const legacyOperatorRequests=stage354OperatorDocs.filter(row=>String(row?.recordType||'')==='operator_request');
+    if(legacyOperatorRequests.length){
+      const merged=new Map((window.__stage354OperatorRequestRows||[]).map(row=>[String(row.id||''),row]));
+      legacyOperatorRequests.forEach(row=>merged.set(String(row.id||''),row));
+      window.__stage354OperatorRequestRows=[...merged.values()];
+    }
     registrationCloudRows=stage354OperatorDocs.filter(row=>String(row?.recordType||'')!=='operator_request').map(row=>registrationNormalize(row));
     registrationCloudReady=true;
     try{window.renderOperatorAccessManager?.();}catch(_e){}
@@ -12386,10 +12393,49 @@ function stage354Escape(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&am
 function stage354ExpiryDefault(){
   const d=new Date();d.setDate(d.getDate()+2);d.setHours(23,59,0,0);return d.toISOString().slice(0,16);
 }
+const STAGE354_OPERATOR_REQUEST_COLLECTION='adminRegistrationNotifications';
+let stage354OperatorRequestUnsubscribe=null;
+let stage354OperatorRequestSyncKey='';
+function stage354PendingRequestKey(){
+  const uid=String(currentAuthUser?.uid||'');
+  const tid=stage354CurrentTournamentId();
+  const did=stage354CurrentDivisionId()||'all';
+  return `230match-operator-request:${uid}:${tid}:${did}`;
+}
+function stage354LocalPendingRequest(){
+  if(!currentAuthUser)return null;
+  try{const raw=localStorage.getItem(stage354PendingRequestKey());return raw?JSON.parse(raw):null;}catch(_e){return null;}
+}
+function stage354SaveLocalPendingRequest(row){
+  try{localStorage.setItem(stage354PendingRequestKey(),JSON.stringify(row));}catch(_e){}
+}
+function stage354ClearLocalPendingRequest(){
+  try{localStorage.removeItem(stage354PendingRequestKey());}catch(_e){}
+}
 function stage354RequestRows(){
   const tid=stage354CurrentTournamentId();
   return (window.__stage354OperatorRequestRows||[]).filter(r=>String(r?.tournamentId||'')===tid&&String(r?.recordType||'')==='operator_request');
 }
+async function stage354StartOperatorRequestAdminSync({force=false}={}){
+  if(!currentAuthUser||!isAdmin()){
+    stage354OperatorRequestUnsubscribe?.();stage354OperatorRequestUnsubscribe=null;stage354OperatorRequestSyncKey='';
+    return;
+  }
+  const key=String(currentAuthUser.uid||currentAuthUser.email||'admin');
+  if(!force&&stage354OperatorRequestUnsubscribe&&stage354OperatorRequestSyncKey===key)return;
+  stage354OperatorRequestUnsubscribe?.();stage354OperatorRequestUnsubscribe=null;stage354OperatorRequestSyncKey=key;
+  const rt=await registrationRuntime();
+  const ref=rt.api.collection(rt.db,STAGE354_OPERATOR_REQUEST_COLLECTION);
+  stage354OperatorRequestUnsubscribe=rt.api.onSnapshot(ref,snap=>{
+    window.__stage354OperatorRequestRows=snap.docs.map(doc=>({id:doc.id,...doc.data()})).filter(row=>String(row?.recordType||'')==='operator_request');
+    try{window.renderOperatorAccessManager?.();}catch(_e){}
+    try{stage354RenderAccessButtonState();}catch(_e){}
+  },error=>{
+    console.warn('[230MATCH] 진행자 권한 요청 관리자 동기화 실패',error);
+    notice(`진행자 요청 확인 실패: ${error?.message||error}`,'error');
+  });
+}
+window.stage354StartOperatorRequestAdminSync=stage354StartOperatorRequestAdminSync;
 async function stage354SubmitOperatorRequest(){
   if(!currentAuthUser){openSocialLogin();return notice('로그인 후 진행자 권한을 요청하세요.','info');}
   if(isAdmin())return notice('관리자 계정은 진행자 권한 요청이 필요하지 않습니다.','info');
@@ -12398,12 +12444,14 @@ async function stage354SubmitOperatorRequest(){
   const did=stage354CurrentDivisionId(), name=authUserLabel();
   const id=`opreq_${String(currentAuthUser.uid||'').replace(/[^a-zA-Z0-9_-]/g,'_')}_${tid}_${did||'all'}`;
   const row={id,recordType:'operator_request',ownerUid:String(currentAuthUser.uid||''),uid:String(currentAuthUser.uid||''),email:String(currentAuthUser.email||''),name,tournamentId:tid,tournamentName:String(state?.tournament?.name||''),divisionId:did,divisionName:String(state?.multiDivision?.divisions?.find(d=>String(d.id)===did)?.name||state?.tournament?.division||''),status:'pending',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
-  await rt.api.setDoc(rt.api.doc(rt.db,REGISTRATION_COLLECTION,id),row,{merge:true});
-  window.__stage354OperatorRequestRows=[row,...(window.__stage354OperatorRequestRows||[]).filter(x=>String(x.id)!==id)];
-  notice('진행자 권한 요청을 보냈습니다. 관리자 승인 후 자동으로 활성화됩니다.','success');stage354RenderAccessButtonState();
+  await rt.api.setDoc(rt.api.doc(rt.db,STAGE354_OPERATOR_REQUEST_COLLECTION,id),row,{merge:true});
+  stage354SaveLocalPendingRequest(row);
+  notice('진행자 권한 요청이 완료되었습니다. 관리자 승인 후 자동으로 활성화됩니다.','success');
+  stage354RenderAccessButtonState();
+  alert(`진행자 권한 요청이 완료되었습니다.\n\n대회: ${row.tournamentName||'-'}\n부서: ${row.divisionName||'-'}\n\n관리자 승인 후 진행자 권한이 활성화됩니다.`);
 }
 async function stage354DeleteRequest(id){
-  try{const rt=await registrationRuntime();await rt.api.deleteDoc(rt.api.doc(rt.db,REGISTRATION_COLLECTION,String(id)));}catch(error){console.warn('[230MATCH] 진행자 요청 정리 실패',error);}
+  try{const rt=await registrationRuntime();await rt.api.deleteDoc(rt.api.doc(rt.db,STAGE354_OPERATOR_REQUEST_COLLECTION,String(id)));}catch(error){console.warn('[230MATCH] 진행자 요청 정리 실패',error);}
   window.__stage354OperatorRequestRows=(window.__stage354OperatorRequestRows||[]).filter(x=>String(x.id)!==String(id));
 }
 function stage354GrantFromRequest(req,opts={}){
@@ -12427,7 +12475,9 @@ function stage354CollectPerms(root,prefix){return [...root.querySelectorAll(`[da
 function stage354RenderAccessButtonState(){
   const btn=document.querySelector('[data-settings-action="operator-access-request"]');if(!btn)return;
   if(isAdmin()){btn.innerHTML='진행자 권한 관리<small>요청 승인·기간·추가 권한</small>';return;}
-  const grant=stage354ActiveGrant();const mine=stage354RequestRows().find(r=>String(r.ownerUid||'')===String(currentAuthUser?.uid||''));
+  const grant=stage354ActiveGrant();
+  if(grant)stage354ClearLocalPendingRequest();
+  const mine=stage354RequestRows().find(r=>String(r.ownerUid||'')===String(currentAuthUser?.uid||''))||stage354LocalPendingRequest();
   btn.innerHTML=grant?'진행자 권한 활성<small>현재 대회 운영 권한 사용 중</small>':mine?'진행자 승인 대기<small>관리자 승인 대기 중</small>':'진행자 권한 요청<small>현재 대회·부서 권한 요청</small>';
 }
 function stage354EnsureAccessUi(){
@@ -12456,7 +12506,7 @@ function stage354OpenOperatorManager(){
   stage354EnsureAccessUi();
   if(!isAdmin()){
     const grant=stage354ActiveGrant();if(grant)return notice('현재 대회의 진행자 권한이 이미 활성화되어 있습니다.','success');
-    const mine=stage354RequestRows().find(r=>String(r.ownerUid||'')===String(currentAuthUser?.uid||''));if(mine)return notice('진행자 권한 승인 대기 중입니다.','info');
+    const mine=stage354RequestRows().find(r=>String(r.ownerUid||'')===String(currentAuthUser?.uid||''))||stage354LocalPendingRequest();if(mine)return notice('진행자 권한 승인 대기 중입니다.','info');
     return void stage354SubmitOperatorRequest().catch(e=>notice(`권한 요청 실패: ${e?.message||e}`,'error'));
   }
   window.renderOperatorAccessManager();const d=document.getElementById('stage354OperatorDialog');d?.showModal?.();
@@ -12490,5 +12540,5 @@ document.addEventListener('click',async event=>{
 const stage354OriginalOpenSettings=openAdminSettingsHub;
 openAdminSettingsHub=function(){stage354EnsureAccessUi();stage354OriginalOpenSettings();stage354RenderAccessButtonState();};
 window.openAdminSettingsHub=openAdminSettingsHub;
-stage354EnsureOperatorAccess();stage354EnsureAccessUi();setTimeout(()=>stage354RefreshGrantedRole({quiet:true}),180);
-console.info('[230MATCH] 5.4.27 ready · account operator requests, expiry and granular permissions');
+stage354EnsureOperatorAccess();stage354EnsureAccessUi();setTimeout(()=>stage354RefreshGrantedRole({quiet:true}),180);setTimeout(()=>void stage354StartOperatorRequestAdminSync().catch(error=>console.warn('[230MATCH] 진행자 요청 동기화 시작 실패',error)),350);
+console.info('[230MATCH] 5.4.28 ready · operator request channel fixed and admin realtime approval sync');
