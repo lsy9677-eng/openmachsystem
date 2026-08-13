@@ -11338,71 +11338,98 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
 
 
 
-/* 230MATCH 5.3.4 · matchday participant quick bar */
+/* 230MATCH 5.5.3 · role-aware persistent quick bar · mobile + PC */
 (()=>{
-  const QUICK_VIEWS=new Set(['prelim-public','operation','bracket','my-match']);
   let idleTimer=null;
+  const MEMBER_ITEMS=[
+    ['prelim-public','예선현황'],['operation','코트현황'],['bracket','대진표'],['my-match','내경기']
+  ];
+  const ADMIN_ITEMS=[
+    ['prelim-public','예선현황'],['operation','코트현황'],['bracket','대진표'],['operation-game','경기운영'],['settings','설정']
+  ];
 
-  function matchdayHasStarted(){
-    const prelim=Array.isArray(state?.prelim?.matches)?state.prelim.matches:[];
-    let main=[];
-    try{main=typeof allMatches==='function'?(allMatches(state)||[]):[];}catch(_e){}
-    const courts=Array.isArray(state?.courts)?state.courts:[];
-    const prelimCourts=Array.isArray(state?.prelim?.courts)?state.prelim.courts:[];
-    const playing=[...courts,...prelimCourts].some(c=>c&&(c.playing||c.currentMatchId||String(c.status||'').toLowerCase()==='playing'));
-    return Boolean(prelim.length||main.length||playing);
+  function quickRole(){
+    if(typeof isAdmin==='function'&&isAdmin())return 'admin';
+    if(typeof isOperator==='function'&&isOperator())return 'operator';
+    return 'member';
   }
-
-  function isParticipantQuickBarEligible(){
-    // 시합 진행 중인 일반 참가자 화면에서만 노출.
-    return Boolean(currentAuthUser)&&!canOperate()&&matchdayHasStarted();
+  function quickEligible(){
+    // 관리자/진행자는 로그인 상태에서 항상, 일반회원은 로그인 상태에서 항상 노출.
+    return Boolean(currentAuthUser)||(typeof canOperate==='function'&&canOperate());
   }
-
+  function configureBar(bar){
+    const role=quickRole();
+    // 진행자는 운영 동선이 중요하므로 관리자형을 사용하되 설정은 관리자만 표시한다.
+    const items=role==='admin'?ADMIN_ITEMS:(role==='operator'?ADMIN_ITEMS.slice(0,4):MEMBER_ITEMS);
+    bar.classList.toggle('stage553-admin',role!=='member');
+    bar.classList.toggle('stage553-member',role==='member');
+    const buttons=[...bar.querySelectorAll('.stage7124-quick-btn')];
+    buttons.forEach((btn,i)=>{
+      const item=items[i];
+      if(!item){btn.hidden=true;return;}
+      btn.hidden=false;
+      btn.dataset.matchdayQuickView=item[0];
+      btn.textContent=item[1];
+    });
+    bar.style.gridTemplateColumns=`repeat(${items.length},minmax(0,1fr))`;
+    bar.setAttribute('aria-label',role==='member'?'선수 빠른 이동':'운영 빠른 이동');
+  }
   function wakeQuickBar(){
     const bar=document.getElementById('stage7124MatchdayQuickBar');if(!bar||bar.hidden)return;
     bar.classList.remove('stage7124-idle');
     clearTimeout(idleTimer);
-    idleTimer=setTimeout(()=>bar.classList.add('stage7124-idle'),4000);
+    idleTimer=setTimeout(()=>bar.classList.add('stage7124-idle'),5000);
   }
-
+  function normalizeCurrentForButton(target,current){
+    if(target==='operation-game')return current==='operation'&&document.getElementById('view-operation')?.dataset?.operationMode==='groups';
+    if(target==='operation')return current==='operation'&&document.getElementById('view-operation')?.dataset?.operationMode!=='groups';
+    return target===current;
+  }
   function updateMatchdayQuickBar(){
     const bar=document.getElementById('stage7124MatchdayQuickBar');if(!bar)return;
-    const eligible=isParticipantQuickBarEligible();
+    const eligible=quickEligible();
     bar.hidden=!eligible;
     if(!eligible)return;
+    configureBar(bar);
     const current=String(document.body?.dataset.currentView||'home');
-    bar.querySelectorAll('[data-matchday-quick-view]').forEach(btn=>{
-      const active=String(btn.dataset.matchdayQuickView||'')===current;
+    bar.querySelectorAll('[data-matchday-quick-view]:not([hidden])').forEach(btn=>{
+      const active=normalizeCurrentForButton(String(btn.dataset.matchdayQuickView||''),current);
       btn.classList.toggle('active',active);
       btn.setAttribute('aria-current',active?'page':'false');
     });
     wakeQuickBar();
   }
-
+  function openOperationMode(mode){
+    navigatePortalView('operation',{pushHistory:true,focus:false});
+    const view=document.getElementById('view-operation');
+    if(!view)return;
+    view.dataset.operationMode=mode;
+    view.querySelectorAll('[data-operation-section]').forEach(button=>{
+      const active=button.dataset.operationSection===mode;
+      button.classList.toggle('active',active);
+      button.setAttribute('aria-pressed',String(active));
+    });
+    try{renderPortalViewFast('operation');}catch(_e){}
+  }
   document.addEventListener('click',e=>{
-    const btn=e.target.closest?.('[data-matchday-quick-view]');
-    if(!btn)return;
+    const btn=e.target.closest?.('#stage7124MatchdayQuickBar [data-matchday-quick-view]');
+    if(!btn||btn.hidden)return;
     const target=String(btn.dataset.matchdayQuickView||'');
-    if(!QUICK_VIEWS.has(target))return;
     e.preventDefault();
-    navigatePortalView(target,{pushHistory:true,focus:false});
-    updateMatchdayQuickBar();
+    if(target==='operation-game')openOperationMode('groups');
+    else if(target==='operation')openOperationMode('courts');
+    else navigatePortalView(target,{pushHistory:true,focus:false});
+    setTimeout(updateMatchdayQuickBar,20);
   });
-
-  ['pointerdown','touchstart','mousemove','keydown'].forEach(type=>{
-    document.addEventListener(type,wakeQuickBar,{passive:true});
-  });
-
+  ['pointerdown','touchstart','mousemove','keydown'].forEach(type=>document.addEventListener(type,wakeQuickBar,{passive:true}));
   window.__update230MatchMatchdayQuickBar=updateMatchdayQuickBar;
-  if(document.readyState==='loading'){
-    document.addEventListener('DOMContentLoaded',()=>setTimeout(updateMatchdayQuickBar,700),{once:true});
-  }else setTimeout(updateMatchdayQuickBar,700);
-  setInterval(updateMatchdayQuickBar,5000);
-  console.info('[230MATCH] 71.3.3 ready · classic direct SMS rebuild');
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(updateMatchdayQuickBar,500),{once:true});
+  else setTimeout(updateMatchdayQuickBar,500);
+  window.addEventListener('pageshow',()=>setTimeout(updateMatchdayQuickBar,80));
+  window.addEventListener('resize',()=>setTimeout(updateMatchdayQuickBar,50));
+  setInterval(updateMatchdayQuickBar,4000);
+  console.info('[230MATCH] 5.5.3 ready · persistent role quick bar on mobile and PC');
 })();
-
-
-
 
 
 /* 230MATCH 5.4.3 · classic direct SMS rebuilt from proven 230MATCH flow */

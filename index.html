@@ -2143,7 +2143,7 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=7177"></script>
+  <script type="module" src="./assets/js/app.js?v=7178"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
@@ -2922,11 +2922,12 @@ input[type="radio"]{
 </style>
 
 
-<nav id="stage7124MatchdayQuickBar" aria-label="시합 당일 빠른 이동" hidden>
-  <button type="button" class="stage7124-quick-btn" data-matchday-quick-view="prelim-public">예선현황</button>
-  <button type="button" class="stage7124-quick-btn" data-matchday-quick-view="operation">코트현황</button>
-  <button type="button" class="stage7124-quick-btn" data-matchday-quick-view="bracket">대진표</button>
-  <button type="button" class="stage7124-quick-btn" data-matchday-quick-view="my-match">내경기</button>
+<nav id="stage7124MatchdayQuickBar" aria-label="항상 빠른 이동" hidden>
+  <button type="button" class="stage7124-quick-btn" data-quick-slot="1" data-matchday-quick-view="prelim-public">예선현황</button>
+  <button type="button" class="stage7124-quick-btn" data-quick-slot="2" data-matchday-quick-view="operation">코트현황</button>
+  <button type="button" class="stage7124-quick-btn" data-quick-slot="3" data-matchday-quick-view="bracket">대진표</button>
+  <button type="button" class="stage7124-quick-btn" data-quick-slot="4" data-matchday-quick-view="my-match">내경기</button>
+  <button type="button" class="stage7124-quick-btn" data-quick-slot="5" data-matchday-quick-view="settings" hidden>설정</button>
 </nav>
 
 <style id="stage7124MatchdayQuickBarStyles">
@@ -2939,7 +2940,7 @@ input[type="radio"]{
   display:grid;
   grid-template-columns:repeat(4,minmax(0,1fr));
   gap:5px;
-  width:min(430px,calc(100vw - 24px));
+  width:min(520px,calc(100vw - 24px));
   padding:6px;
   border:1px solid rgba(148,163,184,.42);
   border-radius:16px;
@@ -2952,6 +2953,12 @@ input[type="radio"]{
 }
 #stage7124MatchdayQuickBar[hidden]{display:none!important}
 #stage7124MatchdayQuickBar.stage7124-idle{opacity:.48}
+#stage7124MatchdayQuickBar.stage553-admin{grid-template-columns:repeat(5,minmax(0,1fr));width:min(650px,calc(100vw - 28px))}
+#stage7124MatchdayQuickBar.stage553-member{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media(min-width:701px){
+  #stage7124MatchdayQuickBar{bottom:16px;padding:7px;border-radius:15px;background:rgba(255,255,255,.84);box-shadow:0 10px 30px rgba(15,23,42,.2)}
+  .stage7124-quick-btn{min-height:40px;font-size:12px}
+}
 #stage7124MatchdayQuickBar:hover,
 #stage7124MatchdayQuickBar:focus-within{opacity:.98}
 .stage7124-quick-btn{
@@ -2982,7 +2989,10 @@ input[type="radio"]{
     border-radius:14px;
   }
   .stage7124-quick-btn{min-height:34px;font-size:10px;padding:4px 2px}
+  #stage7124MatchdayQuickBar.stage553-admin{grid-template-columns:repeat(5,minmax(0,1fr));width:calc(100vw - 12px)}
+  #stage7124MatchdayQuickBar.stage553-admin .stage7124-quick-btn{font-size:9.5px}
 }
+
 </style>
 
 
