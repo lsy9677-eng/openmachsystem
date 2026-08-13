@@ -259,290 +259,6 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
 }
 </style>
 
-<style id="stage7182PrelimSharedQueueStyles">
-#operationPrelimSharedQueueSection .stage557-prelim-shared-item{display:grid;grid-template-columns:34px minmax(0,1fr) minmax(260px,auto);gap:10px;align-items:center}
-.stage557-prelim-shared-actions{display:flex;gap:6px;align-items:center}.stage557-prelim-shared-actions select{min-width:220px}
-@media(max-width:760px){#operationPrelimSharedQueueSection .stage557-prelim-shared-item{grid-template-columns:28px minmax(0,1fr)}.stage557-prelim-shared-actions{grid-column:2;display:grid;grid-template-columns:1fr auto}.stage557-prelim-shared-actions select{min-width:0;width:100%}}
-</style>
-
-<style id="stage7185PrelimSharedAlignmentAndNames">
-/* 230MATCH 5.5.10 · 예선 공용대기 정렬 + 예선 현황 선수명 전용 표시 */
-#operationPrelimSharedQueue{
-  display:grid!important;
-  grid-template-columns:minmax(0,1fr)!important;
-  gap:8px!important;
-  width:100%!important;
-  min-width:0!important;
-}
-#operationPrelimSharedQueue .stage557-prelim-shared-item{
-  display:grid!important;
-  grid-template-columns:36px minmax(0,1fr) minmax(300px,420px)!important;
-  gap:10px!important;
-  align-items:center!important;
-  width:100%!important;
-  max-width:100%!important;
-  min-width:0!important;
-  box-sizing:border-box!important;
-}
-#operationPrelimSharedQueue .queue-order{
-  width:28px!important;
-  min-width:28px!important;
-  height:28px!important;
-  display:grid!important;
-  place-items:center!important;
-}
-#operationPrelimSharedQueue .queue-match{min-width:0!important;width:auto!important;display:grid!important;gap:3px!important}
-#operationPrelimSharedQueue .queue-match>strong{
-  min-width:0!important;
-  white-space:normal!important;
-  word-break:keep-all!important;
-  overflow-wrap:anywhere!important;
-  line-height:1.35!important;
-}
-#operationPrelimSharedQueue .queue-match>small{white-space:normal!important;line-height:1.3!important}
-#operationPrelimSharedQueue .stage557-prelim-shared-actions{
-  min-width:0!important;
-  display:grid!important;
-  grid-template-columns:minmax(0,1fr) auto!important;
-  gap:7px!important;
-  align-items:center!important;
-}
-#operationPrelimSharedQueue .stage557-prelim-shared-actions select{min-width:0!important;width:100%!important;max-width:100%!important}
-#operationPrelimSharedQueue .stage557-prelim-shared-actions .btn{white-space:nowrap!important}
-.stage5510-vs{display:inline-block;margin:0 4px;color:#64748b;font-weight:700}
-/* 5.5.4의 이름 전용 표시를 모든 예선 카드/순위/공용대기에 동일 적용 */
-#publicPrelimGroupGrid .prelim-name-only,
-#operationPrelimSharedQueue .prelim-name-only{max-width:100%!important;white-space:normal!important;word-break:keep-all!important;overflow-wrap:anywhere!important}
-@media(max-width:900px){
-  #operationPrelimSharedQueue .stage557-prelim-shared-item{grid-template-columns:30px minmax(0,1fr)!important;gap:7px!important}
-  #operationPrelimSharedQueue .stage557-prelim-shared-actions{grid-column:2!important;grid-template-columns:minmax(0,1fr) auto!important}
-}
-@media(max-width:560px){
-  #operationPrelimSharedQueue .stage557-prelim-shared-actions{grid-template-columns:1fr!important}
-  #operationPrelimSharedQueue .stage557-prelim-shared-actions .btn{width:100%!important}
-}
-</style>
-
-<style id="stage5520StableAutosaveBadge">
-#saveStateBadge{
-  display:inline-flex!important;
-  align-items:center!important;
-  justify-content:center!important;
-  box-sizing:border-box!important;
-  flex:0 0 104px!important;
-  width:104px!important;
-  min-width:104px!important;
-  max-width:104px!important;
-  white-space:nowrap!important;
-  text-align:center!important;
-}
-.top-actions{align-items:center!important}
-@media(max-width:700px){
-  #saveStateBadge{
-    flex-basis:88px!important;
-    width:88px!important;
-    min-width:88px!important;
-    max-width:88px!important;
-    font-size:10px!important;
-  }
-}
-</style>
-
-
-<style id="stage5523RoundColorCoding">
-/* 230MATCH 5.5.23 · 코트현황/공용대기 단계별 색상 구분
-   표시 전용. 운영 상태/큐/자동배정 데이터에는 영향 없음. */
-#operationUnifiedCourtGrid .stage5523-round-prelim,
-#prelimCourtOperationGrid .stage5523-round-prelim{
-  background:#eef8ff!important;
-  border-color:#8fc4ea!important;
-}
-#operationUnifiedCourtGrid .stage5523-round-64,
-#prelimCourtOperationGrid .stage5523-round-64,
-#operationSharedQueue .stage5523-round-64{
-  background:#edf5ff!important;
-  border-color:#7fb2e8!important;
-}
-#operationUnifiedCourtGrid .stage5523-round-32,
-#prelimCourtOperationGrid .stage5523-round-32,
-#operationSharedQueue .stage5523-round-32{
-  background:#f2efff!important;
-  border-color:#a38ce0!important;
-}
-#operationUnifiedCourtGrid .stage5523-round-16,
-#prelimCourtOperationGrid .stage5523-round-16,
-#operationSharedQueue .stage5523-round-16{
-  background:#fbf0ff!important;
-  border-color:#c17bd5!important;
-}
-#operationUnifiedCourtGrid .stage5523-round-8,
-#prelimCourtOperationGrid .stage5523-round-8,
-#operationSharedQueue .stage5523-round-8{
-  background:#fff6df!important;
-  border-color:#e2b457!important;
-}
-#operationUnifiedCourtGrid .stage5523-round-4,
-#prelimCourtOperationGrid .stage5523-round-4,
-#operationSharedQueue .stage5523-round-4{
-  background:#fff0e8!important;
-  border-color:#e58c68!important;
-}
-#operationUnifiedCourtGrid .stage5523-round-2,
-#prelimCourtOperationGrid .stage5523-round-2,
-#operationSharedQueue .stage5523-round-2{
-  background:#ffecef!important;
-  border-color:#df6677!important;
-}
-
-/* 진행/대기 상태색은 유지하되 라운드색을 얇은 좌측선으로도 확실히 구분 */
-.stage5523-round-prelim{box-shadow:inset 4px 0 0 #4aa3df!important}
-.stage5523-round-64{box-shadow:inset 4px 0 0 #3478d4!important}
-.stage5523-round-32{box-shadow:inset 4px 0 0 #6a55cf!important}
-.stage5523-round-16{box-shadow:inset 4px 0 0 #a346b8!important}
-.stage5523-round-8{box-shadow:inset 4px 0 0 #d87522!important}
-.stage5523-round-4{box-shadow:inset 4px 0 0 #df6745!important}
-.stage5523-round-2{box-shadow:inset 4px 0 0 #c52f42!important}
-
-/* 공용대기 카드는 단계 구분이 더 잘 보이도록 */
-#operationSharedQueue .shared-queue-item[class*="stage5523-round-"],
-#operationSharedQueue article[class*="stage5523-round-"],
-#operationSharedQueue .queue-item[class*="stage5523-round-"],
-#operationSharedQueue .venue-queue-item[class*="stage5523-round-"]{
-  border-width:1.5px!important;
-}
-
-/* 단계 뱃지 */
-.stage5523-round-badge{
-  display:inline-flex;
-  align-items:center;
-  margin-left:6px;
-  padding:2px 7px;
-  border-radius:999px;
-  font-size:10px;
-  line-height:1.2;
-  font-weight:900;
-  white-space:nowrap;
-  color:#263552;
-  background:rgba(255,255,255,.72);
-  border:1px solid rgba(60,80,120,.16);
-}
-@media(max-width:700px){
-  .stage5523-round-badge{font-size:9px;padding:2px 6px;margin-left:4px}
-}
-</style>
-
-
-<style id="stage5524CourtRoundColorPriorityFix">
-/* 230MATCH 5.5.24
-   기존 .playing/.wait1 배경보다 라운드 색을 우선 적용한다.
-   상태 구분은 테두리/상태 배지로 유지한다. */
-
-/* 예선 */
-#operationUnifiedCourtGrid .prelim-court-slot.stage5523-round-prelim,
-#prelimCourtOperationGrid .prelim-court-slot.stage5523-round-prelim{
-  background:#eaf7ff!important;
-  border-color:#6fb6e6!important;
-}
-/* 64강 */
-#operationUnifiedCourtGrid .prelim-court-slot.stage5523-round-64,
-#prelimCourtOperationGrid .prelim-court-slot.stage5523-round-64{
-  background:#e8f2ff!important;
-  border-color:#5b9fe3!important;
-}
-/* 32강 */
-#operationUnifiedCourtGrid .prelim-court-slot.stage5523-round-32,
-#prelimCourtOperationGrid .prelim-court-slot.stage5523-round-32{
-  background:#f0ecff!important;
-  border-color:#8f78dc!important;
-}
-/* 16강 */
-#operationUnifiedCourtGrid .prelim-court-slot.stage5523-round-16,
-#prelimCourtOperationGrid .prelim-court-slot.stage5523-round-16{
-  background:#f8eaff!important;
-  border-color:#b967cf!important;
-}
-/* 8강 */
-#operationUnifiedCourtGrid .prelim-court-slot.stage5523-round-8,
-#prelimCourtOperationGrid .prelim-court-slot.stage5523-round-8{
-  background:#fff4d9!important;
-  border-color:#dfa84a!important;
-}
-/* 준결승 */
-#operationUnifiedCourtGrid .prelim-court-slot.stage5523-round-4,
-#prelimCourtOperationGrid .prelim-court-slot.stage5523-round-4{
-  background:#ffeadf!important;
-  border-color:#df805d!important;
-}
-/* 결승 */
-#operationUnifiedCourtGrid .prelim-court-slot.stage5523-round-2,
-#prelimCourtOperationGrid .prelim-court-slot.stage5523-round-2{
-  background:#ffe7eb!important;
-  border-color:#d65366!important;
-}
-
-/* 같은 라운드 안에서도 시합중 / 대기1 상태는 외곽선으로 즉시 구분 */
-#operationUnifiedCourtGrid .prelim-court-slot.playing[class*="stage5523-round-"],
-#prelimCourtOperationGrid .prelim-court-slot.playing[class*="stage5523-round-"]{
-  outline:2px solid rgba(220,65,65,.28)!important;
-  outline-offset:-2px!important;
-}
-#operationUnifiedCourtGrid .prelim-court-slot.wait1[class*="stage5523-round-"],
-#prelimCourtOperationGrid .prelim-court-slot.wait1[class*="stage5523-round-"]{
-  outline:2px solid rgba(205,150,25,.30)!important;
-  outline-offset:-2px!important;
-}
-
-/* 추가대기 카드도 동일한 단계 색상 체계 */
-#operationUnifiedCourtGrid .prelim-extra-item.stage5523-round-prelim{background:#eaf7ff!important;border-color:#6fb6e6!important}
-#operationUnifiedCourtGrid .prelim-extra-item.stage5523-round-64{background:#e8f2ff!important;border-color:#5b9fe3!important}
-#operationUnifiedCourtGrid .prelim-extra-item.stage5523-round-32{background:#f0ecff!important;border-color:#8f78dc!important}
-#operationUnifiedCourtGrid .prelim-extra-item.stage5523-round-16{background:#f8eaff!important;border-color:#b967cf!important}
-#operationUnifiedCourtGrid .prelim-extra-item.stage5523-round-8{background:#fff4d9!important;border-color:#dfa84a!important}
-#operationUnifiedCourtGrid .prelim-extra-item.stage5523-round-4{background:#ffeadf!important;border-color:#df805d!important}
-#operationUnifiedCourtGrid .prelim-extra-item.stage5523-round-2{background:#ffe7eb!important;border-color:#d65366!important}
-
-/* 공용대기도 동일 팔레트 유지 */
-#operationSharedQueue .stage5523-round-prelim{background:#eaf7ff!important;border-color:#6fb6e6!important}
-#operationSharedQueue .stage5523-round-64{background:#e8f2ff!important;border-color:#5b9fe3!important}
-#operationSharedQueue .stage5523-round-32{background:#f0ecff!important;border-color:#8f78dc!important}
-#operationSharedQueue .stage5523-round-16{background:#f8eaff!important;border-color:#b967cf!important}
-#operationSharedQueue .stage5523-round-8{background:#fff4d9!important;border-color:#dfa84a!important}
-#operationSharedQueue .stage5523-round-4{background:#ffeadf!important;border-color:#df805d!important}
-#operationSharedQueue .stage5523-round-2{background:#ffe7eb!important;border-color:#d65366!important}
-</style>
-
-
-<style id="stage5525QuickBarReliabilityStyles">
-/* 230MATCH 5.5.25 · 하단 고정 바로가기 클릭 안정화 */
-#stage7124MatchdayQuickBar{
-  z-index:999999!important;
-  pointer-events:auto!important;
-  isolation:isolate!important;
-  touch-action:manipulation!important;
-}
-#stage7124MatchdayQuickBar .stage7124-quick-btn{
-  pointer-events:auto!important;
-  touch-action:manipulation!important;
-  user-select:none!important;
-  -webkit-user-select:none!important;
-  position:relative!important;
-  z-index:1!important;
-}
-</style>
-
-
-<style id="stage5526QuickbarFix">
-#stage7124MatchdayQuickBar{
-  z-index:999999!important;
-  pointer-events:auto!important;
-}
-#stage7124MatchdayQuickBar [data-matchday-quick-view]{
-  pointer-events:auto!important;
-  cursor:pointer!important;
-  touch-action:manipulation!important;
-}
-</style>
-
 </head>
 <body>
   <header class="topbar">
@@ -1652,19 +1368,6 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
         </div>
       </section>
 
-      <section class="panel operation-shared-queue-section operation-courts-section" id="operationPrelimSharedQueueSection">
-        <div class="section-head">
-          <div>
-            <h2>예선 공용대기</h2>
-            <p>코트현황에서 관리자가 공용대기로 이동한 예선 경기를 보관합니다. 필요할 때 원하는 코트로 다시 배정할 수 있습니다.</p>
-          </div>
-          <span id="operationPrelimSharedQueueCount" class="badge badge-warning">0경기</span>
-        </div>
-        <div id="operationPrelimSharedQueue" class="shared-queue venue-queue-board empty-state">
-          <p>수동으로 보낸 예선 공용대기 경기가 없습니다.</p>
-        </div>
-      </section>
-
       <section class="panel operation-shared-queue-section operation-courts-section">
         <div class="section-head">
           <div>
@@ -1833,9 +1536,9 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
         <section class="sms-setting-section">
           <div class="sms-setting-title"><div><strong>3. 알리고 단문 문구</strong><span>짧고 바로 이해되는 문구만 사용합니다.</span></div><button id="resetSmsShortTemplatesBtn" type="button" class="btn btn-light">단문 기본값 적용</button></div>
           <div class="message-template-grid sms-short-template-grid">
-            <label><span>시합 시작 안내</span><textarea id="templatePlaying" rows="3"></textarea><small>{team} {court} 입장</small></label>
-            <label><span>코트 대기1 안내</span><textarea id="templateWait1" rows="3"></textarea><small>{team} {court} 대기1 예상{time}</small></label>
-            <label><span>본선 공용대기 안내</span><textarea id="templateShared" rows="3"></textarea><small>{team} 본선대기{queueNo}번 예상{time}</small></label>
+            <label><span>시합 시작 안내</span><textarea id="templatePlaying" rows="3"></textarea><small>{team} {court} 경기. 입장</small></label>
+            <label><span>코트 대기1 안내</span><textarea id="templateWait1" rows="3"></textarea><small>{team} {court} 대기1. 약{wait}분</small></label>
+            <label><span>본선 공용대기 안내</span><textarea id="templateShared" rows="3"></textarea><small>{team} 본선대기 {queueNo}번</small></label>
           </div>
         </section>
 
@@ -1990,13 +1693,12 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
         <label><span>이동할 코트</span><select id="prelimMoveTargetCourt"></select></label>
         <label><span>배치 위치</span>
           <select id="prelimMoveTargetPosition">
-            <option value="playing">시합 바로시작 자리</option>
-            <option value="wait1-first">대기1 자리</option>
+            <option value="wait1-first" selected>대기1이 비면 대기1, 아니면 추가대기 맨 앞</option>
             <option value="queue-top">추가대기 맨 앞</option>
-            <option value="queue-bottom" selected>추가대기 맨 뒤 · 기본</option>
+            <option value="queue-bottom">추가대기 맨 뒤</option>
           </select>
         </label>
-        <div class="notice info">기본 위치는 선택한 코트의 추가대기 맨 뒤입니다. 시합중·대기1로 보내려면 배치 위치를 직접 선택하세요.</div>
+        <div class="notice info">시합중 경기는 결과 처리 후 이동하며, 대기1·추가대기 경기만 직접 이동할 수 있습니다.</div>
       </div>
       <menu><button value="cancel" class="btn btn-light">취소</button><button id="confirmPrelimMoveBtn" value="default" class="btn btn-primary">이동</button></menu>
     </form>
@@ -2543,7 +2245,7 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=7201"></script>
+  <script type="module" src="./assets/js/app.js?v=7179"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
