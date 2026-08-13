@@ -26,7 +26,7 @@ import{ensureCourtStatuses,pauseCourt,resumeCourt}from'./court-status-engine.js?
 import{ensureCourtManualQueues,assignToCourtManualQueue,moveCourtMatchFlexible,returnManualQueueItemToVenue,reorderCourtManualQueue}from'./court-manual-queue-engine.js?v=332012';
 import{reorderPrelimQueue as reorderPrelimQueueItem,movePrelimQueuedMatch,returnPrelimWait1ToQueue}from'./prelim-queue-control-engine.js?v=332012';
 import{ensurePrelimCourtStatuses,pausePrelimCourt,resumePrelimCourt}from'./prelim-court-status-engine.js?v=332012';
-import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7213';
+import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7214';
 import{verifyAndRepairMainFlow}from'./main-flow-integrity-engine.js?v=332012';
 import{finalizeTournamentCompletion}from'./tournament-completion-engine.js?v=332012';
 import{ensureTournamentIdentity,validateTournamentForArchive,createTournamentArchive,archiveListItem,archiveBackupPayload}from'./archive-engine.js?v=354101';
@@ -6745,7 +6745,7 @@ function bindHomeTopShortcuts565(){
     if(!view)return;
     view.dataset.operationMode=mode;
     view.querySelectorAll('[data-operation-section]').forEach(button=>{
-      const active=button.dataset.operationSection===mode;
+      const active=mode!=='hub'&&button.dataset.operationSection===mode;
       button.classList.toggle('active',active);
       button.setAttribute('aria-pressed',String(active));
     });
@@ -6758,7 +6758,7 @@ function bindHomeTopShortcuts565(){
       if(btn.hidden)return;
       if(btn.hasAttribute('data-stage551-admin-operation')){
         if(typeof isAdmin==='function'&&!isAdmin())return;
-        openMode('groups');
+        openMode('hub');
         return;
       }
       if(btn.hasAttribute('data-stage565-home-settings')){
@@ -7703,11 +7703,10 @@ void 0;
       navigatePortalView('operation',{pushHistory:true});
       const view=document.getElementById('view-operation');
       if(view){
-        view.dataset.operationMode='groups';
+        view.dataset.operationMode='hub';
         view.querySelectorAll('[data-operation-section]').forEach(button=>{
-          const active=button.dataset.operationSection==='groups';
-          button.classList.toggle('active',active);
-          button.setAttribute('aria-pressed',String(active));
+          button.classList.remove('active');
+          button.setAttribute('aria-pressed','false');
         });
         view.scrollIntoView({block:'start'});
       }
@@ -12242,8 +12241,8 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
     idleTimer=setTimeout(()=>bar.classList.add('stage7124-idle'),5000);
   }
   function normalizeCurrentForButton(target,current){
-    if(target==='operation-game')return current==='operation'&&document.getElementById('view-operation')?.dataset?.operationMode==='groups';
-    if(target==='operation')return current==='operation'&&document.getElementById('view-operation')?.dataset?.operationMode!=='groups';
+    if(target==='operation-game')return current==='operation'&&document.getElementById('view-operation')?.dataset?.operationMode==='hub';
+    if(target==='operation')return current==='operation'&&document.getElementById('view-operation')?.dataset?.operationMode==='courts';
     if(target==='settings-hub')return document.getElementById('adminSettingsHub')?.classList.contains('open')===true;
     return target===current;
   }
@@ -12267,14 +12266,14 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
     if(!view)return;
     view.dataset.operationMode=mode;
     view.querySelectorAll('[data-operation-section]').forEach(button=>{
-      const active=button.dataset.operationSection===mode;
+      const active=mode!=='hub'&&button.dataset.operationSection===mode;
       button.classList.toggle('active',active);
       button.setAttribute('aria-pressed',String(active));
     });
     try{renderPortalViewFast('operation');}catch(_e){}
   }
   function activateQuickTarget(target){
-    if(target==='operation-game')openOperationMode('groups');
+    if(target==='operation-game')openOperationMode('hub');
     else if(target==='operation')openOperationMode('courts');
     else if(target==='settings-hub'){
       if(typeof window.openAdminSettingsHub==='function')window.openAdminSettingsHub();
@@ -14133,3 +14132,5 @@ console.info('[230MATCH] 5.6.6 ready · shortcuts now use same simple onclick mo
 console.info('[230MATCH] 5.6.8 ready · manual admin/operator role survives tournament grant refresh');
 
 console.info('[230MATCH] 5.6.10 ready · mobile admin center safe-visible drag + tournament list');
+
+console.info('[230MATCH] 5.6.11 ready · 경기운영 shortcut opens neutral operation hub, not prelim groups');

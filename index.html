@@ -545,6 +545,27 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
 
 
 
+
+<style id="stage5611OperationHubRoute">
+#view-operation[data-operation-mode="hub"] .operation-setup-section,
+#view-operation[data-operation-mode="hub"] .operation-groups-section,
+#view-operation[data-operation-mode="hub"] .operation-main-section,
+#view-operation[data-operation-mode="hub"] .operation-courts-section{
+  display:none!important;
+}
+#view-operation[data-operation-mode="hub"] .operation-mode-bar{
+  display:block!important;
+}
+#view-operation[data-operation-mode="hub"] .operation-mode-copy::after{
+  content:'준비 · 예선 · 본선 · 코트 중 운영할 화면을 선택하세요.';
+  display:block;
+  margin-top:6px;
+  font-size:12px;
+  font-weight:800;
+  color:#64748b;
+}
+</style>
+
 </head>
 <body>
   <header class="topbar">
@@ -2546,7 +2567,7 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=7213"></script>
+  <script type="module" src="./assets/js/app.js?v=7214"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
