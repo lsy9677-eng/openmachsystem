@@ -2781,23 +2781,48 @@ function reorderPrelimQueue(courtId,matchId,direction){
   if(!reorderPrelimQueueItem(state,{courtId,matchId,direction}))return;
   commit(`예선 추가대기 순서 변경 · ${courtId} · ${direction}`);
 }
+function stage559SyncPrelimMovePosition(){
+  const target=$('prelimMoveTargetCourt'),position=$('prelimMoveTargetPosition');
+  if(!target||!position)return;
+  const shared=target.value==='__prelim_shared__';
+  position.disabled=shared;
+  if(shared){
+    if(![...position.options].some(o=>o.value==='shared-bottom'))position.add(new Option('예선 공용대기 맨 뒤','shared-bottom'));
+    position.value='shared-bottom';
+  }else if(position.value==='shared-bottom')position.value='wait1-first';
+}
 function openPrelimMove(sourceCourtId,matchId){
   const match=findPrelimMatch(state,matchId);if(!match)return;
-  const source=state.prelim.courts.find(c=>c.id===sourceCourtId);
+  const source=state.prelim.courts.find(c=>c.id===sourceCourtId);if(!source)return;
   const targets=state.prelim.courts.filter(c=>c.id!==sourceCourtId);
-  if(!targets.length){prelimNotice('이동할 다른 예선 코트가 없습니다.','error');return;}
   $('prelimMoveSourceCourtId').value=sourceCourtId;
   $('prelimMoveMatchId').value=matchId;
   $('prelimMoveMatchLabel').textContent=`${match.groupNo}조 ${match.matchNo}경기 · ${teamText(match.teamA)} vs ${teamText(match.teamB)}`;
-  $('prelimMoveTargetCourt').innerHTML=targets.map(c=>`<option value="${c.id}">${c.venueName||''} ${c.name} · 대기1 ${c.wait1?'있음':'비어있음'} · 추가대기 ${(c.queue||[]).length}경기</option>`).join('');
+  const sharedLabel=`↩ ${source.venueName||'해당 구장'} 예선 공용대기 맨 뒤로 이동`;
+  $('prelimMoveTargetCourt').innerHTML=`<option value="__prelim_shared__">${sharedLabel}</option>`+targets.map(c=>`<option value="${c.id}">${c.venueName||''} ${c.name} · 대기1 ${c.wait1?'있음':'비어있음'} · 추가대기 ${(c.queue||[]).length}경기</option>`).join('');
+  $('prelimMoveTargetCourt').onchange=stage559SyncPrelimMovePosition;
+  stage559SyncPrelimMovePosition();
   $('prelimQueueMoveDialog').showModal();
 }
 function confirmPrelimMove(event){
   event.preventDefault();
+  const sourceCourtId=$('prelimMoveSourceCourtId').value;
+  const matchId=$('prelimMoveMatchId').value;
+  const targetCourtId=$('prelimMoveTargetCourt').value;
+  if(targetCourtId==='__prelim_shared__'){
+    const source=(state.prelim?.courts||[]).find(c=>String(c.id)===String(sourceCourtId));
+    const result=stage555MoveToVenueSharedQueue({unified:true,source,sourceSlot:'prelim-manual',matchId});
+    calculateTimeMetrics(state);
+    commit(`예선 경기 공용대기 이동 · ${source?.name||sourceCourtId} · ${matchId}`);
+    $('prelimQueueMoveDialog').close();
+    renderPrelimManualSharedQueue557();
+    prelimNotice(`${result.match.groupNo}조 ${result.match.matchNo}경기를 예선 공용대기 맨 뒤로 이동했습니다.`,'success');
+    return;
+  }
   const result=movePrelimQueuedMatch(state,{
-    sourceCourtId:$('prelimMoveSourceCourtId').value,
-    targetCourtId:$('prelimMoveTargetCourt').value,
-    matchId:$('prelimMoveMatchId').value,
+    sourceCourtId,
+    targetCourtId,
+    matchId,
     position:$('prelimMoveTargetPosition').value
   });
   commit(`예선 경기 코트 이동 · ${result.source.name} → ${result.target.name}`);
