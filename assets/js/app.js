@@ -921,12 +921,41 @@ let autoSmsSnapshot=null;
 let autoSmsDialogQueue=[];
 let autoSmsDialogOpen=false;
 function smsDigits(v){let p=String(v||'').replace(/[^0-9]/g,'');if(p.startsWith('82')&&p.length>=11)p='0'+p.slice(2);return p;}
+function smsAffiliationValues(){
+  const out=new Set();
+  const add=v=>{v=String(v||'').trim();if(v)out.add(v);};
+  for(const t of (state.teams||[])){
+    add(t.club);add(t.affiliation);
+    for(const p of [t.player1,t.player2,t.p1,t.p2,...(Array.isArray(t.players)?t.players:[]),...(Array.isArray(t.individualPlayers)?t.individualPlayers:[])])if(p&&typeof p==='object'){add(p.club);add(p.affiliation);}
+  }
+  for(const a of (state.portal?.applications||[])){
+    add(a.affiliation);
+    for(const p of (Array.isArray(a.players)?a.players:[]))if(p&&typeof p==='object'){add(p.club);add(p.affiliation);}
+  }
+  return [...out].sort((a,b)=>b.length-a.length);
+}
+function smsStripAffiliations(value){
+  let s=String(value??'');
+  const esc=v=>String(v).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  for(const club of smsAffiliationValues()){
+    const c=esc(club);
+    s=s.replace(new RegExp(`\\s*\\(\\s*${c}\\s*\\)`,'gi'),'');
+    s=s.replace(new RegExp(`\\s*\\[\\s*${c}\\s*\\]`,'gi'),'');
+  }
+  return s.replace(/[ \t]{2,}/g,' ').replace(/ *\n */g,'\n').trim();
+}
+function smsApplicationTeamName(item){
+  const players=entryApplicationPlayers?.(item)||[];
+  const names=players.map(p=>String(p?.name||'').trim()).filter(Boolean);
+  if(names.length)return names.slice(0,2).join('/');
+  return smsStripAffiliations(String(item?.teamName||'참가팀').replace(/\([^)]*\)/g,'')).replace(/\s*\/\s*/g,'/').trim()||'참가팀';
+}
 function smsTeamName(team){
   if(!team)return'참가팀';
   const rows=[team.player1,team.player2,team.p1,team.p2,...(Array.isArray(team.players)?team.players:[]),...(Array.isArray(team.individualPlayers)?team.individualPlayers:[])];
-  const names=rows.map(p=>typeof p==='string'?p:(p?.name||p?.playerName||'')).map(v=>String(v||'').replace(/\([^)]*\)/g,'').trim()).filter(Boolean);
+  const names=rows.map(p=>typeof p==='string'?p:(p?.name||p?.playerName||'')).map(v=>smsStripAffiliations(String(v||'').replace(/\([^)]*\)/g,'')).trim()).filter(Boolean);
   if(names.length)return names.slice(0,2).join('/');
-  return String(teamText(team)||team?.name||'참가팀').replace(/\([^)]*\)/g,'').replace(/\s*\/\s*/g,'/').replace(/\s+/g,' ').trim()||'참가팀';
+  return smsStripAffiliations(String(teamText(team)||team?.name||'참가팀').replace(/\([^)]*\)/g,'')).replace(/\s*\/\s*/g,'/').replace(/\s+/g,' ').trim()||'참가팀';
 }
 function findAnyMatchById(id){return findMatch(state.draw,id)||(state.prelim?.matches||[]).find(m=>String(m.id)===String(id))||null;}
 
@@ -1185,13 +1214,14 @@ function showNextAutoSmsDialog(){
     sendButtons.forEach(b=>b.disabled=true);if(skip)skip.textContent='확인';
   }else{
     title.textContent=({start:'🎾 시합 시작 문자 확인',waiting:'⏳ 코트 대기 문자 확인',changed:'🔄 코트·순서 변경 문자 확인',complete:'✅ 경기 완료 문자 확인'})[item.kind]||'문자 확인';
-    target.textContent=`${item.recipients.length}명 · ${item.recipients.map(x=>`${x.name} ${x.phone}`).join(' / ')}`;body.value=item.body;
+    target.textContent=`${item.recipients.length}명 · ${item.recipients.map(x=>`${x.name} ${x.phone}`).join(' / ')}`;body.value=smsStripAffiliations(item.body);
     sendButtons.forEach(b=>b.disabled=false);if(skip)skip.textContent='이번만 건너뛰기';
   }
   d.__smsItem=item;d.showModal();
 }
 function closeAutoSmsDialog(status='skipped'){const d=document.getElementById('autoSmsApprovalDialog');const item=d?.__smsItem;if(item)markAutoSmsHistory(item.key,status);if(d?.open)d.close();if(d)d.__smsItem=null;autoSmsDialogOpen=false;setTimeout(showNextAutoSmsDialog,60);}
 async function sendAligoSmsV3(recipients,msg,meta={}){
+  msg=smsStripAffiliations(msg);
   const list=[];for(const r of recipients||[]){const phone=smsDigits(r.phone);if(phone.length>=9&&!list.some(x=>x.phone===phone))list.push({name:r.name||'수신자',phone});}if(!list.length)throw new Error('문자 받을 번호가 없습니다.');
   const receivers=list.map(x=>x.phone),body=String(msg||'').trim();const type=new Blob([body]).size>90?'LMS':'SMS';
   const payload={receivers,receiver:receivers[0],recipients:list,targets:list,phones:receivers,to:receivers,msg:body,body,message:body,content:body,type,title:String(meta.title||'230MATCH 문자').slice(0,40),meta:{app:'230MATCH',version:'stage31.68',...meta}};
@@ -2110,8 +2140,8 @@ let clockTimer=null;
 function updateClock(){const el=$('currentClock');if(el)el.textContent=new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});}
 function startClockTicker(){clearInterval(clockTimer);updateClock();clockTimer=setInterval(()=>{if(!document.hidden)updateClock();},30000);}
 
-async function copyMessage(id){const item=state.messaging.queue.find(x=>x.id===id);if(!item)return;try{await navigator.clipboard.writeText(item.body);notice('문자 내용을 복사했습니다.','success')}catch{prompt('아래 내용을 복사하세요.',item.body)}}
-function openSmsMessage(id){const item=state.messaging.queue.find(x=>x.id===id);if(!item)return;const uri=smsUri(item);if(!uri){notice('전화번호가 없어 문자 앱을 열 수 없습니다.','error');return}window.location.href=uri}
+async function copyMessage(id){const item=state.messaging.queue.find(x=>x.id===id);if(!item)return;const cleanBody=smsStripAffiliations(item.body);try{await navigator.clipboard.writeText(cleanBody);notice('문자 내용을 복사했습니다.','success')}catch{prompt('아래 내용을 복사하세요.',cleanBody)}}
+function openSmsMessage(id){const item=state.messaging.queue.find(x=>x.id===id);if(!item)return;const uri=smsUri({...item,body:smsStripAffiliations(item.body)});if(!uri){notice('전화번호가 없어 문자 앱을 열 수 없습니다.','error');return}window.location.href=uri}
 function setMessageSent(id){markMessageSent(state,id);commit('문자 발송완료 표시')}
 function removeMessage(id){deleteMessage(state,id);commit('문자 삭제')}
 function createCurrentCourtMessages(){const a=generateCurrentCourtMessages(state);commit(`현재 코트 호출 문자 ${a.length}건 생성`);notice(`중복을 제외하고 ${a.length}건을 생성했습니다.`,'success')}
@@ -2441,13 +2471,18 @@ function openUnifiedCourtTransfer(sourceCourtId,sourceSlot){
   const matchId=unifiedSourceMatchId(source,sourceSlot);
   const item=findUnifiedMatch(state,matchId);
   if(!source||!item){notice('이동할 통합 코트 경기를 찾지 못했습니다.','error');return;}
-  const targets=(state.prelim?.courts||[]).filter(c=>(c.venueId||'venue-default')===(source.venueId||'venue-default')&&c.id!==sourceCourtId);
+  const targets=(state.prelim?.courts||[]).filter(c=>(c.venueId||'venue-default')===(source.venueId||'venue-default'));
   $('courtTransferSourceCourtId').value=`unified:${sourceCourtId}`;
   $('courtTransferSourceSlot').value=sourceSlot;
   $('courtTransferMatchLabel').textContent=`${source.name} · ${teamText(item.match.teamA)} vs ${teamText(item.match.teamB)}`;
   const sharedLabel=item.type==='prelim'?'예선 공용대기':'본선 공용대기';
-  $('courtTransferTargetSelect').innerHTML=`<option value="__venue_shared__">↩ ${source.venueName||'해당 구장'} ${sharedLabel} 맨 뒤로 이동</option>`+targets.map(c=>`<option value="${c.id}">${c.name} · 시합중 ${c.playing?'있음':'없음'} · 대기1 ${c.wait1?'있음':'없음'} · 예비 ${(c.queue?.length||0)}경기${c.isPaused?' · 사용중지':''}</option>`).join('');
+  $('courtTransferTargetSelect').innerHTML=`<option value="__venue_shared__">↩ ${source.venueName||'해당 구장'} ${sharedLabel} 맨 뒤로 이동</option>`+targets.map(c=>`<option value="${c.id}">${c.id===sourceCourtId?'↻ 현재코트 · ':''}${c.name} · 시합중 ${c.playing?'있음':'없음'} · 대기1 ${c.wait1?'있음':'없음'} · 예비 ${(c.queue?.length||0)}경기${c.isPaused?' · 사용중지':''}</option>`).join('');
+  $('courtTransferTargetSelect').value=sourceCourtId;
   refreshCourtTransferPositions();
+  if($('courtTransferMode')&&!$('courtTransferMode').disabled){
+    const values=[...$('courtTransferMode').options].map(o=>o.value);
+    $('courtTransferMode').value=values.includes('manual-bottom')?'manual-bottom':(values.includes('insert-reserve-'+((source.queue?.length||source.manualQueue?.length||0)))?'insert-reserve-'+((source.queue?.length||source.manualQueue?.length||0)):$('courtTransferMode').value);
+  }
   $('courtTransferDialog').showModal();
 }
 function openCourtTransfer(sourceCourtId,sourceSlot){
@@ -2455,13 +2490,17 @@ function openCourtTransfer(sourceCourtId,sourceSlot){
   const matchId=sourceTransferMatchId(source,sourceSlot);
   const match=findMatch(state.draw,matchId);
   if(!source||!match){notice('이동할 경기를 찾지 못했습니다.','error');return;}
-  const targets=state.courts.filter(c=>(c.venueId||'venue-default')===(source.venueId||'venue-default')&&c.id!==sourceCourtId);
-  if(!targets.length){notice('같은 구장에 이동할 다른 코트가 없습니다.','error');return;}
-  $('courtTransferSourceCourtId').value=sourceCourtId;
+  const targets=state.courts.filter(c=>(c.venueId||'venue-default')===(source.venueId||'venue-default'));
+    $('courtTransferSourceCourtId').value=sourceCourtId;
   $('courtTransferSourceSlot').value=sourceSlot;
   $('courtTransferMatchLabel').textContent=`${source.name} · ${teamText(match.teamA)} vs ${teamText(match.teamB)}`;
-  $('courtTransferTargetSelect').innerHTML=`<option value="__venue_shared__">↩ ${source.venueName||'해당 구장'} 공용대기 맨 뒤로 이동</option>`+targets.map(c=>`<option value="${c.id}">${c.name} · 시합중 ${c.playing?'있음':'없음'} · 대기1 ${c.wait1?'있음':'없음'} · 예비 ${(c.manualQueue?.length||0)}경기${c.isPaused?' · 사용중지':''}</option>`).join('');
+  $('courtTransferTargetSelect').innerHTML=`<option value="__venue_shared__">↩ ${source.venueName||'해당 구장'} 공용대기 맨 뒤로 이동</option>`+targets.map(c=>`<option value="${c.id}">${c.id===sourceCourtId?'↻ 현재코트 · ':''}${c.name} · 시합중 ${c.playing?'있음':'없음'} · 대기1 ${c.wait1?'있음':'없음'} · 예비 ${(c.manualQueue?.length||0)}경기${c.isPaused?' · 사용중지':''}</option>`).join('');
+  $('courtTransferTargetSelect').value=sourceCourtId;
   refreshCourtTransferPositions();
+  if($('courtTransferMode')&&!$('courtTransferMode').disabled){
+    const values=[...$('courtTransferMode').options].map(o=>o.value);
+    $('courtTransferMode').value=values.includes('manual-bottom')?'manual-bottom':(values.includes('insert-reserve-'+((source.queue?.length||source.manualQueue?.length||0)))?'insert-reserve-'+((source.queue?.length||source.manualQueue?.length||0)):$('courtTransferMode').value);
+  }
   $('courtTransferDialog').showModal();
 }
 
@@ -2485,6 +2524,8 @@ function refreshCourtTransferPositions(){
     ['manual-bottom','예비 대기 맨 뒤']
   ];
   select.innerHTML=opts.map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
+  // 5.5.11 safety default: never insert into playing/wait1 unless the operator explicitly chooses it.
+  select.value='manual-bottom';
 }
 
 function stage555RemoveFromAllMainQueues(matchId){
@@ -2656,7 +2697,7 @@ function renderPrelimManualSharedQueue557(){
     const venueId=String(m.venueId||'venue-default');
     const courts=(state.prelim?.courts||[]).filter(c=>String(c.venueId||'venue-default')===venueId);
     const options=courts.map(c=>`<option value="${c.id}">${c.name} · 시합중 ${c.playing?'있음':'없음'} · 대기1 ${c.wait1?'있음':'없음'} · 예비 ${(c.queue||[]).length}</option>`).join('');
-    return `<article class="shared-queue-item stage557-prelim-shared-item"><div class="queue-order">${i+1}</div><div class="queue-match"><strong>${teamText(m.teamA)} vs ${teamText(m.teamB)}</strong><small>${m.groupNo||''}조 · ${m.matchNo||''}경기 · 예선 공용대기 · 빈자리 자동승격</small></div><div class="stage557-prelim-shared-actions"><select data-prelim-shared-court="${id}">${options}</select><button type="button" class="btn btn-light btn-small" data-prelim-shared-assign="${id}">긴급 수동배정</button></div></article>`;
+    return `<article class="shared-queue-item stage557-prelim-shared-item"><div class="queue-order">${i+1}</div><div class="queue-match"><strong>${portalTeamNameHtml(m.teamA)} <span class="stage5510-vs">vs</span> ${portalTeamNameHtml(m.teamB)}</strong><small>${m.groupNo||''}조 · ${m.matchNo||''}경기 · 예선 공용대기 · 빈자리 자동승격</small></div><div class="stage557-prelim-shared-actions"><select data-prelim-shared-court="${id}">${options}</select><button type="button" class="btn btn-light btn-small" data-prelim-shared-assign="${id}">긴급 수동배정</button></div></article>`;
   }).join('');
 }
 function assignPrelimSharedQueue557(matchId,courtId){
@@ -2669,6 +2710,36 @@ function assignPrelimSharedQueue557(matchId,courtId){
   m.prelimCourtId=court.id;m.courtId=court.id;m.court=court.name;m.courtName=court.name;
   calculateTimeMetrics(state);commit(`예선 공용대기 코트배정 · ${court.name} · ${id}`);renderPrelimManualSharedQueue557();notice(`${court.name}에 예선 경기를 배정했습니다.`,'success');
 }
+function stage5511ReorderSameCourt({court,matchId,mode,unified}){
+  if(!court||!matchId)throw new Error('현재 코트 순서 변경 정보를 찾지 못했습니다.');
+  const id=String(matchId);
+  const reserveKey=unified?'queue':'manualQueue';
+  const reserve=Array.isArray(court[reserveKey])?court[reserveKey].map(String):[];
+  let ordered=[];
+  if(court.playing)ordered.push(String(court.playing));
+  if(court.wait1)ordered.push(String(court.wait1));
+  ordered.push(...reserve);
+  ordered=ordered.filter((x,i,a)=>x&&a.indexOf(x)===i&&x!==id);
+  let insertAt=ordered.length;
+  if(mode==='insert-playing')insertAt=0;
+  else if(mode==='insert-wait1')insertAt=Math.min(1,ordered.length);
+  else if(String(mode).startsWith('insert-reserve-')){
+    const n=Math.max(0,Number(String(mode).slice('insert-reserve-'.length))||0);
+    insertAt=Math.min((ordered.length?Math.min(2,ordered.length):0)+n,ordered.length);
+  }
+  ordered.splice(insertAt,0,id);
+  court.playing=ordered[0]||null;
+  court.wait1=ordered[1]||null;
+  court[reserveKey]=ordered.slice(2);
+  const mark=(mid,status)=>{if(!mid)return;stage555MarkCourtSlot(mid,status,court);};
+  mark(court.playing,'playing');mark(court.wait1,'court_wait1');
+  for(const mid of court[reserveKey]){
+    const u=findUnifiedMatch(state,mid);const m=u?.match||findMatch(state.draw,mid)||findPrelimMatch(state,mid);
+    if(m){m.status='ready';m.courtId=court.id;m.prelimCourtId=u?.type==='prelim'?court.id:m.prelimCourtId;m.court=court.name;m.courtName=court.name;}
+  }
+  return {court,slot:insertAt===0?'playing':insertAt===1?'wait1':'manual',shifted:ordered.filter(x=>x!==id)};
+}
+
 function confirmCourtTransfer(event){
   event.preventDefault();
   const rawSourceId=$('courtTransferSourceCourtId').value;
@@ -2685,9 +2756,12 @@ function confirmCourtTransfer(event){
     notice(result.prelim?'예선 경기를 예선 공용대기 맨 뒤로 이동했습니다.':'본선 경기를 해당 구장 공용대기 맨 뒤로 이동했습니다.','success');
     return;
   }
-  const result=unified
-    ?moveUnifiedCourtMatchFlexible(state,{matchId,targetCourtId:targetValue,mode:$('courtTransferMode').value})
-    :moveCourtMatchFlexible(state,{matchId,targetCourtId:targetValue,mode:$('courtTransferMode').value},id=>findMatch(state.draw,id));
+  const mode=$('courtTransferMode').value;
+  const result=String(targetValue)===String(sourceId)
+    ?stage5511ReorderSameCourt({court:source,matchId,mode,unified})
+    :(unified
+      ?moveUnifiedCourtMatchFlexible(state,{matchId,targetCourtId:targetValue,mode})
+      :moveCourtMatchFlexible(state,{matchId,targetCourtId:targetValue,mode},id=>findMatch(state.draw,id)));
   calculateTimeMetrics(state);commit(`경기 카드 삽입 이동 · ${result.court.name}`);
   $('courtTransferDialog').close();notice(result.shifted?.length?`선택한 위치에 넣고 기존 카드 ${result.shifted.length}개를 한 단계씩 밀었습니다.`:result.slot==='manual'?'선택한 예비 대기 위치에 넣었습니다.':'경기를 선택한 위치로 이동했습니다.','success');
 }
@@ -2789,21 +2863,49 @@ function stage559SyncPrelimMovePosition(){
   if(shared){
     if(![...position.options].some(o=>o.value==='shared-bottom'))position.add(new Option('예선 공용대기 맨 뒤','shared-bottom'));
     position.value='shared-bottom';
-  }else if(position.value==='shared-bottom')position.value='wait1-first';
+  }else{
+    if(position.value==='shared-bottom')position.value='queue-bottom';
+    // Safe default on every court selection.
+    position.value='queue-bottom';
+    const sourceId=$('prelimMoveSourceCourtId')?.value||'';
+    const playingOpt=[...position.options].find(o=>o.value==='playing');
+    if(playingOpt)playingOpt.disabled=String(target.value)!==String(sourceId);
+  }
 }
 function openPrelimMove(sourceCourtId,matchId){
   const match=findPrelimMatch(state,matchId);if(!match)return;
   const source=state.prelim.courts.find(c=>c.id===sourceCourtId);if(!source)return;
-  const targets=state.prelim.courts.filter(c=>c.id!==sourceCourtId);
+  const targets=state.prelim.courts.filter(c=>(c.venueId||'venue-default')===(source.venueId||'venue-default'));
   $('prelimMoveSourceCourtId').value=sourceCourtId;
   $('prelimMoveMatchId').value=matchId;
   $('prelimMoveMatchLabel').textContent=`${match.groupNo}조 ${match.matchNo}경기 · ${teamText(match.teamA)} vs ${teamText(match.teamB)}`;
   const sharedLabel=`↩ ${source.venueName||'해당 구장'} 예선 공용대기 맨 뒤로 이동`;
-  $('prelimMoveTargetCourt').innerHTML=`<option value="__prelim_shared__">${sharedLabel}</option>`+targets.map(c=>`<option value="${c.id}">${c.venueName||''} ${c.name} · 대기1 ${c.wait1?'있음':'비어있음'} · 추가대기 ${(c.queue||[]).length}경기</option>`).join('');
+  $('prelimMoveTargetCourt').innerHTML=`<option value="__prelim_shared__">${sharedLabel}</option>`+targets.map(c=>`<option value="${c.id}">${c.id===sourceCourtId?'↻ 현재코트 · ':''}${c.venueName||''} ${c.name} · 시합중 ${c.playing?'있음':'없음'} · 대기1 ${c.wait1?'있음':'비어있음'} · 추가대기 ${(c.queue||[]).length}경기</option>`).join('');
   $('prelimMoveTargetCourt').onchange=stage559SyncPrelimMovePosition;
+  $('prelimMoveTargetCourt').value=sourceCourtId;
   stage559SyncPrelimMovePosition();
+  $('prelimMoveTargetPosition').value='queue-bottom';
   $('prelimQueueMoveDialog').showModal();
 }
+function stage5511ReorderSamePrelimCourt(court,matchId,position){
+  if(!court||!matchId)throw new Error('현재 예선 코트 순서 변경 정보를 찾지 못했습니다.');
+  const id=String(matchId);
+  let ordered=[];
+  if(court.playing)ordered.push(String(court.playing));
+  if(court.wait1)ordered.push(String(court.wait1));
+  ordered.push(...(Array.isArray(court.queue)?court.queue.map(String):[]));
+  ordered=ordered.filter((x,i,a)=>x&&a.indexOf(x)===i&&x!==id);
+  let at=ordered.length;
+  if(position==='playing')at=0;
+  else if(position==='wait1-first')at=Math.min(1,ordered.length);
+  else if(position==='queue-top')at=Math.min(2,ordered.length);
+  ordered.splice(at,0,id);
+  court.playing=ordered[0]||null;court.wait1=ordered[1]||null;court.queue=ordered.slice(2);
+  const update=(mid,status)=>{const m=findPrelimMatch(state,mid);if(!m)return;m.status=status;m.prelimCourtId=court.id;m.courtId=court.id;m.court=court.name;m.courtName=court.name;if(status==='playing')m.startedAt=m.startedAt||new Date().toISOString();if(status==='court_wait1')m.waitStartedAt=m.waitStartedAt||new Date().toISOString();};
+  update(court.playing,'playing');update(court.wait1,'court_wait1');for(const mid of court.queue)update(mid,'ready');
+  calculateTimeMetrics(state);return {court,match:findPrelimMatch(state,id)};
+}
+
 function confirmPrelimMove(event){
   event.preventDefault();
   const sourceCourtId=$('prelimMoveSourceCourtId').value;
@@ -2819,12 +2921,10 @@ function confirmPrelimMove(event){
     prelimNotice(`${result.match.groupNo}조 ${result.match.matchNo}경기를 예선 공용대기 맨 뒤로 이동했습니다.`,'success');
     return;
   }
-  const result=movePrelimQueuedMatch(state,{
-    sourceCourtId,
-    targetCourtId,
-    matchId,
-    position:$('prelimMoveTargetPosition').value
-  });
+  const position=$('prelimMoveTargetPosition').value;
+  const result=String(targetCourtId)===String(sourceCourtId)
+    ?stage5511ReorderSamePrelimCourt((state.prelim?.courts||[]).find(c=>String(c.id)===String(sourceCourtId)),matchId,position)
+    :movePrelimQueuedMatch(state,{sourceCourtId,targetCourtId,matchId,position});
   commit(`예선 경기 코트 이동 · ${result.source.name} → ${result.target.name}`);
   $('prelimQueueMoveDialog').close();
   prelimNotice(`${result.match.groupNo}조 ${result.match.matchNo}경기를 ${result.target.name}으로 이동했습니다.`,'success');
@@ -3267,14 +3367,19 @@ function portalTeamNamesOnly(value){
         if(arr.length)return arr.join(' / ');
       }
       if(value.teamName&&typeof value.teamName==='string'){
-        return String(value.teamName).split(/\s*\/\s*/).map(part=>part.replace(/\([^)]*\)/g,'').trim()).filter(Boolean).join(' / ')||String(value.teamName);
+        const raw=String(value.teamName);
+        const clean=raw.replace(/\([^)]*\)/g,'').replace(/\s*\/\s*/g,' / ').replace(/\s{2,}/g,' ').trim();
+        return clean||raw;
       }
       if(value.name&&typeof value.name==='string'){
-        return String(value.name).split(/\s*\/\s*/).map(part=>part.replace(/\([^)]*\)/g,'').trim()).filter(Boolean).join(' / ')||String(value.name);
+        const raw=String(value.name);
+        const clean=raw.replace(/\([^)]*\)/g,'').replace(/\s*\/\s*/g,' / ').replace(/\s{2,}/g,' ').trim();
+        return clean||raw;
       }
     }
   }catch(_e){}
-  return String(portalTeam(value)||'-').split(/\s*\/\s*/).map(part=>part.replace(/\([^)]*\)/g,'').trim()).filter(Boolean).join(' / ')||String(portalTeam(value)||'-');
+  const fallback=String(portalTeam(value)||'-');
+  return fallback.replace(/\([^)]*\)/g,'').replace(/\s*\/\s*/g,' / ').replace(/\s{2,}/g,' ').trim()||fallback;
 }
 function portalTeamAffiliation(value){
   if(!value)return '';
@@ -4285,14 +4390,14 @@ function registrationAdminNoticeBody(kind,item){
   const event=item.tournamentName||state.tournament?.name||'현재 대회';
   const division=item.tournamentDivision||registrationContext().divisionName||'';
   const players=entryApplicationPlayers(item);
-  const playerText=players.map(p=>`${p.name}${p.club?`(${p.club})`:''} ${p.phone||''}`).join(' / ');
+  const playerText=players.map(p=>`${p.name} ${p.phone||''}`).join(' / ');
   if(kind==='payment'){
     return `[230MATCH 입금알림]\n${event}${division?` · ${division}`:''}\n${item.teamName}\n입금했습니다. 확인 바랍니다.\n${item.phone||''}`;
   }
   if(kind==='cancel'){
     return `[230MATCH 취소요청]
 대회: ${event}${division?` · ${division}`:''}
-팀: ${item.teamName}
+팀: ${smsApplicationTeamName(item)}
 참가자: ${playerText}
 대표 연락처: ${item.phone||''}
 입금상태: ${entryPaymentLabel(item)}
@@ -4302,7 +4407,7 @@ function registrationAdminNoticeBody(kind,item){
   }
   return `[230MATCH 참가신청]
 대회: ${event}${division?` · ${division}`:''}
-팀: ${item.teamName}
+팀: ${smsApplicationTeamName(item)}
 참가자: ${playerText}
 대표 연락처: ${item.phone||''}
 상태: ${item.status==='reserve'?`후보 ${simpleRegistrationReserveOrder(item)}번`:'참가'}
@@ -4348,13 +4453,13 @@ function entrySmsTemplate(kind,item){
   const sender=state.messaging?.settings?.senderName||'230MATCH';
   const event=item.tournamentName||state.tournament?.name||'현재 대회';
   const fee=state.portal?.guide?.fee||'';
-  if(kind==='payment')return `[${sender}] ${item.teamName}님, ${event} 참가비 입금이 확인되었습니다.${fee?` 참가비 ${fee}.`:''} 참가 확정 명단을 확인해 주세요.`;
-  if(kind==='promote')return `[${sender}] ${item.teamName}님, ${event} 후보에서 일반 참가팀으로 승격되었습니다. 대회 일정과 준비사항을 확인해 주세요.`;
-  if(kind==='approve')return `[${sender}] ${item.teamName}님, ${event} 참가 신청이 승인되었습니다.${item.paid?' 참가비 입금도 확인되었습니다.':' 참가비 입금 확인 후 최종 참가가 확정됩니다.'}`;
-  if(kind==='reserve')return `[${sender}] ${item.teamName}님, ${event} 후보팀으로 접수되었습니다. 후보 순번은 ${reserveApplicationOrder(item)||'-'}번이며, 승격 시 다시 안내드리겠습니다.`;
-  if(kind==='reject')return `[${sender}] ${item.teamName}님, ${event} 참가 신청이 반려되었습니다.${item.adminMemo?` 사유: ${item.adminMemo}`:''}`;
-  if(kind==='refund')return `[${sender}] ${item.teamName}님, ${event} 참가비 환불 처리가 완료되었습니다.`;
-  return `[${sender}] ${item.teamName}님, ${event} 참가 신청 안내입니다.`;
+  if(kind==='payment')return `[${sender}] ${smsApplicationTeamName(item)}님, ${event} 참가비 입금이 확인되었습니다.${fee?` 참가비 ${fee}.`:''} 참가 확정 명단을 확인해 주세요.`;
+  if(kind==='promote')return `[${sender}] ${smsApplicationTeamName(item)}님, ${event} 후보에서 일반 참가팀으로 승격되었습니다. 대회 일정과 준비사항을 확인해 주세요.`;
+  if(kind==='approve')return `[${sender}] ${smsApplicationTeamName(item)}님, ${event} 참가 신청이 승인되었습니다.${item.paid?' 참가비 입금도 확인되었습니다.':' 참가비 입금 확인 후 최종 참가가 확정됩니다.'}`;
+  if(kind==='reserve')return `[${sender}] ${smsApplicationTeamName(item)}님, ${event} 후보팀으로 접수되었습니다. 후보 순번은 ${reserveApplicationOrder(item)||'-'}번이며, 승격 시 다시 안내드리겠습니다.`;
+  if(kind==='reject')return `[${sender}] ${smsApplicationTeamName(item)}님, ${event} 참가 신청이 반려되었습니다.${item.adminMemo?` 사유: ${item.adminMemo}`:''}`;
+  if(kind==='refund')return `[${sender}] ${smsApplicationTeamName(item)}님, ${event} 참가비 환불 처리가 완료되었습니다.`;
+  return `[${sender}] ${smsApplicationTeamName(item)}님, ${event} 참가 신청 안내입니다.`;
 }
 function entrySmsMessage(kind,item){return entrySmsTemplate(kind,item);}
 let entrySmsItem=null;
@@ -10910,7 +11015,7 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
   const canSend=()=>{try{return isAdmin()||isOperator();}catch(_e){return false;}};
   const getCourt=courtId=>[...(state.prelim?.courts||[]),...(state.courts||[])].find(c=>String(c.id)===String(courtId));
   const getMatch=id=>{if(!id)return null;const u=findUnifiedMatch(state,id);return u?.match||findPrelimMatch(state,id)||findMatch(state.draw,id)||null;};
-  const teamText=team=>{try{return portalTeam(team)||smsTeamName(team)||'미정';}catch(_e){return team?.name||String(team||'미정');}};
+  const teamText=team=>{try{return smsTeamName(team)||'미정';}catch(_e){return smsStripAffiliations(team?.name||String(team||'미정'));}};
   const matchTitle=match=>match?`${teamText(match.teamA)} vs ${teamText(match.teamB)}`:'경기 정보 없음';
   const recipientsFor=match=>{try{return smsMatchRecipients(match);}catch(_e){return [];}};
   const currentMeta=()=>({tournament:String(state.tournament?.name||'230MATCH 대회'),division:String(state.tournament?.division||'부서 미설정')});
@@ -10947,7 +11052,7 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
   }
   async function sendFromDialog(){
     const dialog=document.getElementById('courtDirectSmsDialog'),item=dialog?.__item;if(!item)return;
-    const body=String(document.getElementById('courtDirectSmsBody')?.value||'').trim();const channel=document.querySelector('input[name="courtDirectSmsChannel"]:checked')?.value||'aligo';const box=document.getElementById('courtDirectSmsNotice');
+    const body=smsStripAffiliations(String(document.getElementById('courtDirectSmsBody')?.value||'').trim());const channel=document.querySelector('input[name="courtDirectSmsChannel"]:checked')?.value||'aligo';const box=document.getElementById('courtDirectSmsNotice');
     if(!body){box.className='court-direct-sms-notice error';box.textContent='문자 내용을 입력하세요.';return;}
     if(!item.recipients.length){box.className='court-direct-sms-notice error';box.textContent='등록된 휴대전화 번호가 없습니다.';return;}
     if(duplicateRecent(item.matchId,body)&&!confirm('같은 경기와 같은 내용의 문자가 최근 3분 이내 처리되었습니다. 그래도 다시 보낼까요?'))return;
@@ -13263,3 +13368,6 @@ console.info('[230MATCH] 5.5.7 ready · prelim/main shared queue transfer fixed'
   };
   console.info('[230MATCH] 5.5.8 ready · existing court engines unchanged; manual prelim shared queue promotes only after native result advancement');
 })();
+
+/* 230MATCH 5.5.11 · safe same-court reorder + queue-bottom default */
+console.info('[230MATCH] 5.5.11 ready · same-court reorder and safe transfer default');
