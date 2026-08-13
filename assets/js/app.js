@@ -1505,7 +1505,6 @@ function renderCommittedState6400(){
   }
   if(['home','tournaments','operation','prelim-public','entry','bracket'].includes(view))renderDivisionWorkspaceBar();
   if(view==='settings')updateSetupProgress();
-  if(view==='operation'||view==='bracket')stage5517ScheduleMainSharedRepair();
 }
 let __tournamentWriteBypass=false;
 function currentTournamentArchiveRecord(){
@@ -1580,7 +1579,6 @@ function applySynchronizedState(nextState,source='동기화'){
   stage5513GuardPrelimManualSharedQueue();
   if(globalNoticeReady){state.portal=state.portal||{};state.portal.posts=structuredClone(globalNoticeState.posts);state.portal.globalTicker=structuredClone(globalNoticeState.ticker);}
   try{ensureMultiTournamentRuntime();}catch(_e){}
-  setTimeout(stage5517ScheduleMainSharedRepair,0);
   const routedDivision=routeDivisionId();
   if(routedDivision){
     try{
@@ -13556,123 +13554,6 @@ console.info('[230MATCH] 5.5.11 ready · same-court reorder and safe transfer de
 
 console.info('[230MATCH] 5.5.13 ready · prelim shared queue is authoritative and duplicate court restoration is blocked');
 
-/* 230MATCH 5.5.17 · 본선 공용대기 무결성 복구
-   원칙:
-   1) 정상 venueQueues/sharedQueue 순서는 절대 재정렬하지 않는다.
-   2) 상태가 공용대기인데 실제 큐에서만 빠진 '고아 ID'만 기존 큐 맨 뒤에 복구한다.
-   3) 복구 후 배정은 새 엔진을 만들지 않고 기존 enqueueReadyMainToUnifiedCourts()만 호출한다.
-*/
-let __stage5517MainQueueRepairBusy=false;
-function stage5517MainMatches(){
-  try{return Object.values(state.draw?.rounds||{}).flat().filter(Boolean);}catch(_e){return[];}
-}
-function stage5517OccupiedMainIds(){
-  const out=new Set();
-  const add=v=>{const id=String(v||'');if(id)out.add(id);};
-  for(const c of [...(state.prelim?.courts||[]),...(state.courts||[])]){
-    add(c?.playing);add(c?.wait1);
-    for(const id of (c?.queue||[]))add(id);
-    for(const id of (c?.manualQueue||[]))add(id);
-  }
-  return out;
-}
-function stage5517QueuedMainIds(){
-  const out=new Set();
-  const add=v=>{const id=String(v||'');if(id)out.add(id);};
-  for(const q of Object.values(state.venueQueues||{}))for(const id of (Array.isArray(q)?q:[]))add(id);
-  for(const id of (state.sharedQueue||[]))add(id);
-  return out;
-}
-function stage5517FallbackVenueId(match){
-  const direct=String(match?.venueId||'').trim();
-  if(direct&&direct!=='venue-default')return direct;
-  const keys=Object.keys(state.venueQueues||{}).filter(Boolean);
-  if(keys.length===1)return keys[0];
-  const venues=(state.settings?.venues||[]).filter(v=>v?.main!==false&&v?.useMain!==false);
-  if(venues.length===1)return String(venues[0].id||venues[0].name||'');
-  const courtVenues=[...new Set((state.prelim?.courts||[]).map(c=>String(c?.venueId||'')).filter(Boolean))];
-  if(courtVenues.length===1)return courtVenues[0];
-  return'';
-}
-function stage5517RepairMainSharedQueueOrphans(){
-  state.venueQueues=state.venueQueues&&typeof state.venueQueues==='object'&&!Array.isArray(state.venueQueues)?state.venueQueues:{};
-  state.sharedQueue=Array.isArray(state.sharedQueue)?state.sharedQueue:[];
-  const occupied=stage5517OccupiedMainIds();
-  const queued=stage5517QueuedMainIds();
-  const candidates=stage5517MainMatches().filter(m=>{
-    const id=String(m?.id||'');
-    if(!id||m?.status==='completed'||occupied.has(id)||queued.has(id))return false;
-    return m?.status==='venue_shared_queue'||m?.status==='shared_queue';
-  }).sort((a,b)=>{
-    const ta=Date.parse(a?.waitStartedAt||a?.updatedAt||a?.createdAt||'')||0;
-    const tb=Date.parse(b?.waitStartedAt||b?.updatedAt||b?.createdAt||'')||0;
-    if(ta!==tb)return ta-tb;
-    return String(a?.id||'').localeCompare(String(b?.id||''));
-  });
-  let added=0;
-  for(const m of candidates){
-    const id=String(m.id);
-    if(m.status==='venue_shared_queue'){
-      const venueId=stage5517FallbackVenueId(m);
-      if(venueId){
-        if(!Array.isArray(state.venueQueues[venueId]))state.venueQueues[venueId]=[];
-        if(!state.venueQueues[venueId].some(x=>String(x)===id)){
-          state.venueQueues[venueId].push(id);
-          m.venueId=venueId;
-          added++;
-        }
-        continue;
-      }
-    }
-    if(!state.sharedQueue.some(x=>String(x)===id)){
-      state.sharedQueue.push(id);
-      m.status='shared_queue';
-      added++;
-    }
-  }
-  return {added,candidates:candidates.length};
-}
-function stage5517HasMainSharedWaiting(){
-  return (state.sharedQueue?.length||0)+Object.values(state.venueQueues||{}).reduce((n,q)=>n+(Array.isArray(q)?q.length:0),0)>0;
-}
-function stage5517HasUnifiedVacancy(){
-  const courts=state.prelim?.courts||[];
-  return courts.some(c=>!c?.isPaused&&(!c?.playing||!c?.wait1));
-}
-function stage5517RepairAndResumeMainShared(){
-  if(__stage5517MainQueueRepairBusy||tournamentReadOnly())return;
-  if(!useUnifiedCourts(state))return;
-  __stage5517MainQueueRepairBusy=true;
-  try{
-    const repair=stage5517RepairMainSharedQueueOrphans();
-    let assigned=0;
-    if(state.operation?.autoAssignmentEnabled!==false&&stage5517HasMainSharedWaiting()&&stage5517HasUnifiedVacancy()){
-      try{
-        const result=enqueueReadyMainToUnifiedCourts(state);
-        assigned=Number(result?.assigned||0);
-      }catch(error){
-        console.error('[5.5.17] 기존 본선 자동배정 재개 실패',error);
-      }
-    }
-    if(repair.added||assigned){
-      const message=`본선 공용대기 무결성 복구 · 누락큐 ${repair.added}경기${assigned?` · 빈자리 자동배정 ${assigned}경기`:''}`;
-      // 정상 큐 순서는 유지한 채 복구된 상태만 저장한다.
-      commit(message);
-      if(repair.added)notice(`본선 공용대기에서 빠져 있던 ${repair.added}경기의 순번을 복구했습니다.${assigned?` ${assigned}경기는 기존 자동배정으로 빈자리에 배정했습니다.`:''}`,'success');
-    }
-  }finally{
-    __stage5517MainQueueRepairBusy=false;
-  }
-}
-function stage5517ScheduleMainSharedRepair(){
-  const view=document.body?.dataset.currentView||'';
-  if(view!=='operation'&&view!=='bracket')return;
-  clearTimeout(window.__stage5517MainQueueRepairTimer);
-  window.__stage5517MainQueueRepairTimer=setTimeout(stage5517RepairAndResumeMainShared,30);
-}
-
 console.info('[230MATCH] 5.5.16 ready · prelim shared queue unified duplicate guard');
 
-console.info('[230MATCH] 5.5.17 ready · main shared queue orphan recovery + existing auto assignment resume');
-
-console.info('[230MATCH] 5.5.19 ready · court board restored to 5.5.17 renderer; autosave badge UI only');
+console.info('[230MATCH] 5.5.20 stable baseline · 5.5.17+ main queue auto-repair removed; court rendering/state mutation separated');
