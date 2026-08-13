@@ -12,7 +12,7 @@ import{downloadJson}from'./recovery.js?v=332012';
 import{ensureTimeState,calculateTimeMetrics}from'./time-engine-v5000.js?v=5000';
 import{ensureMessagingState,generatePlayingMessages,generateWait1Messages,generateCurrentCourtMessages,generateCurrentWaitMessages,generateAllTimeMessages,markMessageSent,deleteMessage,clearSentMessages,markAllSent,smsUri,refreshMessageContacts,mergePendingDuplicates,getMessageHistory}from'./message-engine.js?v=3521';
 import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactData,importContactData}from'./contact-engine-v5000.js?v=5000';
-import{render,teamText}from'./ui.js?v=3504';
+import{render,teamText}from'./ui.js?v=5701';
 import{ensureAuditState,runStateAudit,runPrelimSimulation,runFullSimulation,applyAuditResult}from'./audit-engine.js?v=332012';
 import{earlyMainStats,markResolvedMainMatchesReady,canAssignEarlyMain,ensureEarlyMainSettings,autoAssignResolvedMain}from'./early-main-engine.js?v=332012';
 import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7133';
@@ -978,6 +978,9 @@ function smsTeamName(team){
   if(names.length)return names.slice(0,2).join('/');
   return smsStripAffiliations(String(teamText(team)||team?.name||'참가팀').replace(/\([^)]*\)/g,'')).replace(/\s*\/\s*/g,'/').replace(/\s+/g,' ').trim()||'참가팀';
 }
+function resultDialogTeamName(team){
+  return smsTeamName(team)||'참가팀';
+}
 function findAnyMatchById(id){return findMatch(state.draw,id)||(state.prelim?.matches||[]).find(m=>String(m.id)===String(id))||null;}
 
 // 70.0.4 · 본선 1회전 배정 원칙
@@ -1578,7 +1581,10 @@ function renderCommittedState6400(){
   if(CORE_RENDER_VIEWS_6400.has(view)){
     render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus,holdMainMatch,releaseHeldMatch});
     if(view==='operation'||view==='settings'||view==='roster')renderOperatorControls();
-    if(view==='bracket')decorateBracketLivePlacements();
+    if(view==='bracket'){
+      decorateBracketLivePlacements();
+      setTimeout(bindBracketMobileView571,0);
+    }
   }else{
     renderPortalViewFast(view);
   }
@@ -2025,8 +2031,8 @@ function openResult(matchId){
   if(!requireOperator('경기 운영'))return;
   const m=findMatch(state.draw,matchId);if(!m)return;
   stage333BindQuickScoreInputs();stage340BindScorePanels();stage340ResetPanel('');
-  $('resultMatchId').value=matchId;$('resultMatchLabel').textContent=`${teamText(m.teamA)} vs ${teamText(m.teamB)}`;
-  $('winnerSelect').innerHTML=`<option value="${m.teamA.id}">${teamText(m.teamA)}</option><option value="${m.teamB.id}">${teamText(m.teamB)}</option>`;if($('resultTeamAName'))$('resultTeamAName').textContent=teamText(m.teamA);if($('resultTeamBName'))$('resultTeamBName').textContent=teamText(m.teamB);
+  $('resultMatchId').value=matchId;$('resultMatchLabel').textContent=`${resultDialogTeamName(m.teamA)} vs ${resultDialogTeamName(m.teamB)}`;
+  $('winnerSelect').innerHTML=`<option value="${m.teamA.id}">${resultDialogTeamName(m.teamA)}</option><option value="${m.teamB.id}">${resultDialogTeamName(m.teamB)}</option>`;if($('resultTeamAName'))$('resultTeamAName').textContent=resultDialogTeamName(m.teamA);if($('resultTeamBName'))$('resultTeamBName').textContent=resultDialogTeamName(m.teamB);
   if(m.status==='completed'){
     $('winnerSelect').value=m.winner?.id||m.winnerId||m.teamA.id;
     stage333PrepareScoreInputs('',{scoreA:Number(m.scoreA??6),scoreB:Number(m.scoreB??0),completed:true});
@@ -2112,7 +2118,7 @@ async function confirmResult(event){
   if(correcting){
     const typed=prompt('확정된 결과를 수정하려면 “결과수정”을 입력하세요.','');
     if(typed!=='결과수정'){notice('결과 수정을 취소했습니다.','error');return;}
-  }else if(!confirm(`${teamText(before.teamA)} ${scoreA} : ${scoreB} ${teamText(before.teamB)}\n\n승리팀: ${teamText(scoreA>scoreB?before.teamA:before.teamB)}\n이 결과를 확정할까요?`))return;
+  }else if(!confirm(`${resultDialogTeamName(before.teamA)} ${scoreA} : ${scoreB} ${resultDialogTeamName(before.teamB)}\n\n승리팀: ${resultDialogTeamName(scoreA>scoreB?before.teamA:before.teamB)}\n이 결과를 확정할까요?`))return;
   autoRecovery(correcting?'확정 경기 결과 수정 전':'경기 결과 입력 전');
   const history=ensureResultChangeHistory();
   const beforeSnapshot={status:before.status||'waiting',winner:before.winner?teamText(before.winner):'',scoreA:Number(before.scoreA||0),scoreB:Number(before.scoreB||0)};
@@ -2231,8 +2237,8 @@ function openPrelimResult(matchId){
   const m=findPrelimMatch(state,matchId);if(!m)return;
   stage333BindQuickScoreInputs();stage340BindScorePanels();stage340ResetPanel('prelim');
   $('prelimResultMatchId').value=matchId;
-  $('prelimResultMatchLabel').textContent=`${teamText(m.teamA)} vs ${teamText(m.teamB)}`;
-  $('prelimWinnerSelect').innerHTML=`<option value="${m.teamA.id}">${teamText(m.teamA)}</option><option value="${m.teamB.id}">${teamText(m.teamB)}</option>`;if($('prelimResultTeamAName'))$('prelimResultTeamAName').textContent=teamText(m.teamA);if($('prelimResultTeamBName'))$('prelimResultTeamBName').textContent=teamText(m.teamB);
+  $('prelimResultMatchLabel').textContent=`${resultDialogTeamName(m.teamA)} vs ${resultDialogTeamName(m.teamB)}`;
+  $('prelimWinnerSelect').innerHTML=`<option value="${m.teamA.id}">${resultDialogTeamName(m.teamA)}</option><option value="${m.teamB.id}">${resultDialogTeamName(m.teamB)}</option>`;if($('prelimResultTeamAName'))$('prelimResultTeamAName').textContent=resultDialogTeamName(m.teamA);if($('prelimResultTeamBName'))$('prelimResultTeamBName').textContent=resultDialogTeamName(m.teamB);
   $('prelimWinnerSelect').value=m.winner?.id||m.winnerId||m.teamA.id;
   stage333PrepareScoreInputs('prelim',{scoreA:m.scoreA,scoreB:m.scoreB,completed:m.status==='completed'});
   $('prelimResultDialog').showModal();
@@ -3165,6 +3171,13 @@ function updateBracketView(key,value){
   if(!state.ui)state.ui={};
   if(!state.ui.bracketView)state.ui.bracketView={round:'all',status:'all',venue:'all',density:'comfortable',activeOnly:false};
   state.ui.bracketView[key]=value;
+  // 5.7.1: 라운드 조회는 해당 라운드 자체가 항상 보여야 한다.
+  // 이전 상태/구장/활성필터가 남아 결승 카드까지 숨기던 문제를 제거한다.
+  if(key==='round'){
+    state.ui.bracketView.status='all';
+    state.ui.bracketView.venue='all';
+    state.ui.bracketView.activeOnly=false;
+  }
   saveState(state);
   render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus,holdMainMatch,releaseHeldMatch});
 }
@@ -3346,6 +3359,84 @@ function startTournamentOperation(){
   flashSaved();
 }
 
+
+const BRACKET_ZOOM_KEY='230match-bracket-zoom-v571';
+function clampBracketZoom(value){
+  const n=Number(value)||1;
+  return Math.max(.65,Math.min(1.75,Math.round(n*20)/20));
+}
+function getBracketZoom(){
+  try{return clampBracketZoom(localStorage.getItem(BRACKET_ZOOM_KEY)||1);}catch(_e){return 1;}
+}
+function setBracketZoom(value,{save=true}={}){
+  const board=document.getElementById('bracketBoard');
+  const label=document.getElementById('bracketZoomLabel');
+  const zoom=clampBracketZoom(value);
+  if(board){
+    board.style.zoom=String(zoom);
+    board.dataset.bracketZoom=String(zoom);
+  }
+  if(label)label.textContent=`${Math.round(zoom*100)}%`;
+  if(save){try{localStorage.setItem(BRACKET_ZOOM_KEY,String(zoom));}catch(_e){}}
+  setTimeout(()=>{try{window.dispatchEvent(new Event('resize'));}catch(_e){}},30);
+  return zoom;
+}
+function bindBracketMobileView571(){
+  const viewport=document.getElementById('bracketViewport');
+  const board=document.getElementById('bracketBoard');
+  if(!viewport||!board)return;
+
+  setBracketZoom(getBracketZoom(),{save:false});
+
+  const minus=document.getElementById('bracketZoomOutBtn');
+  const plus=document.getElementById('bracketZoomInBtn');
+  const reset=document.getElementById('bracketZoomResetBtn');
+  if(minus)minus.onclick=()=>setBracketZoom(getBracketZoom()-.1);
+  if(plus)plus.onclick=()=>setBracketZoom(getBracketZoom()+.1);
+  if(reset)reset.onclick=()=>setBracketZoom(1);
+
+  document.querySelectorAll('#bracketRoundButtons [data-bracket-round]').forEach(btn=>{
+    btn.onclick=()=>{
+      const round=String(btn.dataset.bracketRound||'all');
+      updateBracketView('round',round);
+      requestAnimationFrame(()=>{
+        const col=round==='all'?null:document.querySelector(`#bracketBoard .round-column[data-round-size="${CSS.escape(round)}"]`);
+        if(col&&window.matchMedia('(max-width:760px)').matches){
+          const left=Math.max(0,col.offsetLeft-8);
+          viewport.scrollTo({left,behavior:'smooth'});
+        }else if(round==='all'){
+          viewport.scrollTo({left:0,behavior:'smooth'});
+        }
+      });
+    };
+  });
+
+  // Mobile two-finger pinch changes bracket scale without zooming unrelated UI.
+  let pinchStartDistance=0,pinchStartZoom=1;
+  const distance=touches=>{
+    if(!touches||touches.length<2)return 0;
+    const dx=touches[0].clientX-touches[1].clientX;
+    const dy=touches[0].clientY-touches[1].clientY;
+    return Math.hypot(dx,dy);
+  };
+  viewport.ontouchstart=e=>{
+    if(e.touches?.length===2){
+      pinchStartDistance=distance(e.touches);
+      pinchStartZoom=getBracketZoom();
+    }
+  };
+  viewport.ontouchmove=e=>{
+    if(e.touches?.length!==2||!pinchStartDistance)return;
+    e.preventDefault();
+    const ratio=distance(e.touches)/pinchStartDistance;
+    setBracketZoom(pinchStartZoom*ratio);
+  };
+  viewport.ontouchend=e=>{
+    if((e.touches?.length||0)<2)pinchStartDistance=0;
+  };
+}
+window.__bindBracketMobileView571=bindBracketMobileView571;
+
 function bind(){
   document.querySelectorAll('[data-setup-jump]').forEach(button=>button.addEventListener('click',()=>jumpSetupStep(button.dataset.setupJump)));
   if($('startTournamentOperationBtn'))$('startTournamentOperationBtn').onclick=()=>{try{startTournamentOperation();}catch(error){prelimNotice(error.message,'error');}};
@@ -3356,6 +3447,7 @@ function bind(){
   if($('bracketActiveOnlyBtn'))$('bracketActiveOnlyBtn').onclick=()=>updateBracketView('activeOnly',!(state.ui?.bracketView?.activeOnly));
   if($('bracketResetViewBtn'))$('bracketResetViewBtn').onclick=resetBracketView;
   if($('bracketFullscreenBtn'))$('bracketFullscreenBtn').onclick=toggleBracketFullscreen;
+  bindBracketMobileView571();
   document.addEventListener('keydown',event=>{if(event.key==='Escape'&&document.body.classList.contains('bracket-fullscreen-open'))setBracketFullscreen(false);});
 
 
@@ -6476,7 +6568,7 @@ function renderPortalViewFast(target){
     // operation/home/my-match/settings already have live DOM maintained by state renders.
   }catch(error){console.warn('[230MATCH 61.1.1] fast view render warning',target,error);}
 }
-function navigatePortalView(name,{pushHistory=false,replaceHistory=false,focus=true}={}){
+function navigatePortalView(name,{pushHistory=false,replaceHistory=false,focus=true,operationMode=null}={}){
   const requested=String(name||'home').replace(/^#/,'').trim()||'home';
   const target=portalViewAllowed(requested)?requested:'home';
   const targetView=document.getElementById(`view-${target}`);
@@ -6489,11 +6581,13 @@ function navigatePortalView(name,{pushHistory=false,replaceHistory=false,focus=t
   document.body.dataset.currentView=target;
   if(typeof window.__update230MatchMatchdayQuickBar==='function')setTimeout(window.__update230MatchMatchdayQuickBar,0);
 
-  // 코트 현황도 별도 라우터를 두지 않고 여기에서 모드를 확정합니다.
+  // 5.7.0 안정화: operation 화면의 하위 모드는 라우터 한 곳에서만 확정한다.
+  // 일반 operation 링크는 코트현황, 경기운영 바로가기는 operationMode:'hub'를 명시한다.
   if(target==='operation'){
-    targetView.dataset.operationMode='courts';
+    const mode=String(operationMode||'courts');
+    targetView.dataset.operationMode=mode;
     document.querySelectorAll('#view-operation [data-operation-section]').forEach(button=>{
-      const active=button.dataset.operationSection==='courts';
+      const active=mode!=='hub'&&button.dataset.operationSection===mode;
       button.classList.toggle('active',active);
       button.setAttribute('aria-pressed',String(active));
     });
@@ -6735,39 +6829,40 @@ function createStage3261TestApplications(){
   notice('테스트 참가 신청 4팀을 만들었습니다. 승인·후보·입금·문자 기능을 점검하세요.','success');
 }
 
+function stage570NavigateShortcut(target,{pushHistory=true}={}){
+  const route=String(target||'').trim();
+  if(!route)return false;
+  if(route==='operation-game'){
+    return navigatePortalView('operation',{pushHistory,focus:false,operationMode:'hub'});
+  }
+  if(route==='operation'){
+    return navigatePortalView('operation',{pushHistory,focus:false,operationMode:'courts'});
+  }
+  if(route==='settings-hub'){
+    if(typeof window.openAdminSettingsHub==='function'){window.openAdminSettingsHub();return true;}
+    return false;
+  }
+  return navigatePortalView(route,{pushHistory,focus:false});
+}
+window.__stage570NavigateShortcut=stage570NavigateShortcut;
+
 function bindHomeTopShortcuts565(){
   const hub=document.getElementById('stage3212MatchdayHub');
   if(!hub)return;
-
-  function openMode(mode){
-    navigatePortalView('operation',{pushHistory:true,focus:false});
-    const view=document.getElementById('view-operation');
-    if(!view)return;
-    view.dataset.operationMode=mode;
-    view.querySelectorAll('[data-operation-section]').forEach(button=>{
-      const active=mode!=='hub'&&button.dataset.operationSection===mode;
-      button.classList.toggle('active',active);
-      button.setAttribute('aria-pressed',String(active));
-    });
-    try{renderPortalViewFast('operation');}catch(_e){}
-  }
-
   hub.querySelectorAll('.stage3212-public-actions button').forEach(btn=>{
-    // 정상 동작하는 상단 띠(.tab)의 방식과 동일하게 onclick 하나만 사용한다.
     btn.onclick=()=>{
       if(btn.hidden)return;
       if(btn.hasAttribute('data-stage551-admin-operation')){
         if(typeof isAdmin==='function'&&!isAdmin())return;
-        openMode('hub');
+        stage570NavigateShortcut('operation-game');
         return;
       }
       if(btn.hasAttribute('data-stage565-home-settings')){
-        window.openAdminSettingsHub?.();
+        stage570NavigateShortcut('settings-hub');
         return;
       }
       const target=String(btn.dataset.portalGo||'');
-      if(target==='operation'){openMode('courts');return;}
-      if(target)navigatePortalView(target,{pushHistory:true,focus:false});
+      if(target)stage570NavigateShortcut(target);
     };
   });
 }
@@ -7696,24 +7791,8 @@ void 0;
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',update,{once:true});else update();
   document.addEventListener('click',e=>{
-    const op=e.target.closest?.('[data-stage551-admin-operation]');
-    if(op){
-      e.preventDefault();e.stopPropagation();
-      if(typeof isAdmin==='function'&&!isAdmin())return;
-      navigatePortalView('operation',{pushHistory:true});
-      const view=document.getElementById('view-operation');
-      if(view){
-        view.dataset.operationMode='hub';
-        view.querySelectorAll('[data-operation-section]').forEach(button=>{
-          button.classList.remove('active');
-          button.setAttribute('aria-pressed','false');
-        });
-        view.scrollIntoView({block:'start'});
-      }
-      setTimeout(update,80);
-      return;
-    }
-    if(e.target.closest('[data-portal-go],#currentRoleBadge,[data-stage3210-open-edit]'))setTimeout(update,80);
+    // 5.7.0: 홈 경기운영 클릭은 bindHomeTopShortcuts565 한 곳에서만 처리한다.
+    if(e.target.closest('[data-portal-go],#currentRoleBadge,[data-stage3210-open-edit],[data-stage551-admin-operation],[data-stage565-home-settings]'))setTimeout(update,80);
   },true);
   window.addEventListener('pageshow',update);
   window.addEventListener('storage',update);
@@ -7750,8 +7829,25 @@ window.addEventListener('DOMContentLoaded',()=>{try{const hash=(location.hash||'
     window.__230matchRouteAudit={checkedAt:new Date().toISOString(),invalid:[...new Set(invalid)]};
     if(invalid.length)console.warn('[230MATCH] invalid portal routes',window.__230matchRouteAudit.invalid);
     else void 0;
+    auditShortcutRoutes();
   };
 
+  const auditShortcutRoutes=()=>{
+    const problems=[];
+    const adminOp=document.querySelector('#stage3212MatchdayHub [data-stage551-admin-operation]');
+    const adminSettings=document.querySelector('#stage3212MatchdayHub [data-stage565-home-settings]');
+    const quick=document.getElementById('stage7124MatchdayQuickBar');
+    if(!adminOp)problems.push('홈 관리자 경기운영 버튼 누락');
+    if(!adminSettings)problems.push('홈 관리자 설정 버튼 누락');
+    if(!quick)problems.push('하단 빠른이동 바 누락');
+    const required=['prelim-public','operation','bracket'];
+    required.forEach(route=>{
+      if(!document.querySelector(`[data-portal-go="${route}"]`)&&!quick?.querySelector(`[data-matchday-quick-view="${route}"]`))problems.push(`${route} 경로 누락`);
+    });
+    window.__230matchShortcutAudit={checkedAt:new Date().toISOString(),problems};
+    if(problems.length)console.warn('[230MATCH] shortcut audit',problems);
+    return problems;
+  };
   const normalizeMobileLabels=()=>{
     const labels={
       participants:'참가 기록', notifications:'알림 관리', records:'대회 기록',
@@ -12260,26 +12356,8 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
     });
     wakeQuickBar();
   }
-  function openOperationMode(mode){
-    navigatePortalView('operation',{pushHistory:true,focus:false});
-    const view=document.getElementById('view-operation');
-    if(!view)return;
-    view.dataset.operationMode=mode;
-    view.querySelectorAll('[data-operation-section]').forEach(button=>{
-      const active=mode!=='hub'&&button.dataset.operationSection===mode;
-      button.classList.toggle('active',active);
-      button.setAttribute('aria-pressed',String(active));
-    });
-    try{renderPortalViewFast('operation');}catch(_e){}
-  }
   function activateQuickTarget(target){
-    if(target==='operation-game')openOperationMode('hub');
-    else if(target==='operation')openOperationMode('courts');
-    else if(target==='settings-hub'){
-      if(typeof window.openAdminSettingsHub==='function')window.openAdminSettingsHub();
-    }else{
-      navigatePortalView(target,{pushHistory:true,focus:false});
-    }
+    stage570NavigateShortcut(target,{pushHistory:true});
     setTimeout(updateMatchdayQuickBar,20);
   }
   function bindQuickButtons(bar){
@@ -14129,8 +14207,11 @@ console.info('[230MATCH] 5.6.5 ready · home top shortcuts direct-bound; common 
 
 console.info('[230MATCH] 5.6.6 ready · shortcuts now use same simple onclick model as working tab strip');
 
-console.info('[230MATCH] 5.6.8 ready · manual admin/operator role survives tournament grant refresh');
 
-console.info('[230MATCH] 5.6.10 ready · mobile admin center safe-visible drag + tournament list');
 
-console.info('[230MATCH] 5.6.11 ready · 경기운영 shortcut opens neutral operation hub, not prelim groups');
+
+console.info('[230MATCH] 5.7.0 STABLE · centralized shortcuts / role persistence / mobile admin center / final-save ordering');
+
+console.info('[230MATCH] 5.7.1 ready · bracket mobile zoom + round buttons + final visibility fix');
+
+console.info('[230MATCH] 5.7.2 ready · result dialogs show player names only');

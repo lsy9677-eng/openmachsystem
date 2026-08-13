@@ -179,11 +179,24 @@ function bracketMatchVisible(match,view){
 }
 function syncBracketViewControls(state){
   const view=ensureBracketViewState(state);
-  const sizes=Object.keys(state.draw.rounds||{}).map(Number).sort((a,b)=>b-a);
+  const sizes=Object.keys(state.draw.rounds||{}).map(Number).filter(Number.isFinite).sort((a,b)=>b-a);
+
+  // 오래된/잘못된 라운드 값이 남으면 전체보기로 복구한다.
+  if(view.round!=='all'&&!sizes.includes(Number(view.round)))view.round='all';
+
   const round=document.getElementById('bracketRoundFilter');
   if(round){
     round.innerHTML='<option value="all">전체 라운드</option>'+sizes.map(size=>`<option value="${size}">${roundLabel(size)}</option>`).join('');
     round.value=String(view.round);
+  }
+
+  const roundButtons=document.getElementById('bracketRoundButtons');
+  if(roundButtons){
+    const buttons=[
+      `<button type="button" class="bracket-round-btn ${view.round==='all'?'active':''}" data-bracket-round="all">전체</button>`,
+      ...sizes.map(size=>`<button type="button" class="bracket-round-btn ${String(view.round)===String(size)?'active':''}" data-bracket-round="${size}">${roundLabel(size)}</button>`)
+    ];
+    roundButtons.innerHTML=buttons.join('');
   }
   const venue=document.getElementById('bracketVenueFilter');
   if(venue){
@@ -235,7 +248,7 @@ function renderBracket(state){
       const visible=roundVisible&&bracketMatchVisible(m,view);
       if(visible)visibleCount++;
       const courtLabel=bracketCourtLabel(m);
-      return`<article class="match-card ${bracketStatusClass(m.status)} ${visible?'':'is-filtered-out'}">
+      return`<article class="match-card ${bracketStatusClass(m.status)} ${visible?'':'is-filtered-out'}" data-round-size="${size}" data-match-id="${m.id}">
         <header><span>${m.matchNo}경기</span><span class="match-status-label">${statusText(m.status)}</span></header>
         ${courtLabel?`<div class="bracket-court-label">${courtLabel}</div>`:''}
         <div class="match-team ${m.winner?.id===m.teamA?.id?'winner':''}">${bracketTeamHtml(m.teamA)}</div>
@@ -244,12 +257,12 @@ function renderBracket(state){
       </article>`;
     }).join('');
     const hasVisible=state.draw.rounds[size].some(m=>roundVisible&&bracketMatchVisible(m,view));
-    return`<section class="round-column ${roundThemeClass(size)} ${size===maxSize?'first-round':''} ${roundVisible?'':'is-round-filtered-out'} ${hasVisible?'has-visible-match':''}" style="--round-offset:${roundOffset}px;--round-gap:${roundGap}px;--round-card-height:${cardHeight}px"><h3>${roundLabel(size)}</h3><div class="round-match-stack">${cards}</div></section>`;
+    return`<section class="round-column ${roundThemeClass(size)} ${size===maxSize?'first-round':''} ${roundVisible?'':'is-round-filtered-out'} ${hasVisible?'has-visible-match':''}" data-round-size="${size}" style="--round-offset:${roundOffset}px;--round-gap:${roundGap}px;--round-card-height:${cardHeight}px"><h3>${roundLabel(size)}</h3><div class="round-match-stack">${cards}</div></section>`;
   }).join('');
   const summary=document.getElementById('bracketViewSummary');
   if(summary){
     const parts=[`${visibleCount}/${totalCount}경기 표시`];
-    if(view.round!=='all')parts.push(roundLabel(Number(view.round)));
+    if(view.round!=='all')parts.push(`${roundLabel(Number(view.round))} 전체 경기`);
     if(view.status!=='all')parts.push(document.getElementById('bracketStatusFilter')?.selectedOptions?.[0]?.textContent||view.status);
     if(view.venue!=='all')parts.push(document.getElementById('bracketVenueFilter')?.selectedOptions?.[0]?.textContent||view.venue);
     if(view.activeOnly)parts.push('활성 경기 집중');

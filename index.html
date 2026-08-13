@@ -566,6 +566,103 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
 }
 </style>
 
+
+<style id="stage571BracketMobileView">
+.bracket-round-quick{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin:0 0 10px;
+  padding:10px 12px;
+  border:1px solid #d7dee8;
+  border-radius:12px;
+  background:#fff;
+}
+.bracket-round-quick>strong{flex:0 0 auto;font-size:12px}
+.bracket-round-buttons{display:flex;flex-wrap:wrap;gap:6px;min-width:0}
+.bracket-round-btn{
+  appearance:none;
+  border:1px solid #cbd5e1;
+  border-radius:999px;
+  background:#fff;
+  padding:7px 11px;
+  min-height:34px;
+  font:inherit;
+  font-size:12px;
+  font-weight:900;
+  cursor:pointer;
+}
+.bracket-round-btn.active{border-width:2px;padding:6px 10px}
+.bracket-mobile-tools{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin:0 0 8px;
+  padding:8px 10px;
+  border:1px solid #d7dee8;
+  border-radius:10px;
+  background:#fff;
+}
+.bracket-mobile-tools>span{font-size:12px;font-weight:900}
+.bracket-mobile-tools>small{font-size:11px;margin-left:auto}
+.bracket-zoom-buttons{display:flex;gap:4px;align-items:center}
+.bracket-zoom-buttons .btn{min-width:40px;min-height:34px;padding:5px 9px}
+.bracket-viewport{
+  width:100%;
+  max-width:100%;
+  overflow:auto;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
+  padding-bottom:10px;
+}
+#bracketBoard{
+  transform-origin:top left;
+  min-width:max-content;
+}
+@media(max-width:760px){
+  .bracket-round-quick{
+    display:block;
+    padding:9px;
+  }
+  .bracket-round-quick>strong{display:block;margin-bottom:7px}
+  .bracket-round-buttons{
+    display:grid;
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    gap:5px;
+  }
+  .bracket-round-btn{
+    width:100%;
+    min-width:0;
+    padding:7px 4px;
+    font-size:11px;
+  }
+  .bracket-round-btn.active{padding:6px 3px}
+  .bracket-round-select-fallback{display:none!important}
+  .bracket-view-toolbar{grid-template-columns:1fr 1fr!important}
+  .bracket-mobile-tools{
+    position:sticky;
+    left:0;
+    z-index:5;
+    flex-wrap:wrap;
+  }
+  .bracket-mobile-tools>small{
+    width:100%;
+    margin-left:0;
+  }
+  .bracket-viewport{
+    min-height:360px;
+    touch-action:pan-x pan-y;
+  }
+  #bracketBoard.bracket-live-board .round-column{
+    min-width:238px!important;
+  }
+}
+@media(max-width:420px){
+  .bracket-round-buttons{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .bracket-view-toolbar{grid-template-columns:1fr!important}
+}
+</style>
+
 </head>
 <body>
   <header class="topbar">
@@ -721,10 +818,10 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
         </div>
         <div class="stage3212-public-actions stage5415-admin-quick" data-admin-only="true">
           <button type="button" data-portal-go="prelim-public"><span>📋</span><b>예선 현황</b><small>조편성·순위·결과</small></button>
-          <button type="button" data-stage551-admin-operation><span>🎛️</span><b>경기 운영</b><small>예선·본선·대기 운영</small></button>
+          <button type="button" data-stage551-admin-operation data-stage570-route="operation-game"><span>🎛️</span><b>경기 운영</b><small>예선·본선·대기 운영</small></button>
           <button type="button" data-portal-go="operation"><span>🎾</span><b>코트 현황</b><small>시합중·대기·결과 입력</small></button>
           <button type="button" data-portal-go="bracket"><span>🏆</span><b>본선 대진표</b><small>대진·진행·결과</small></button>
-          <button type="button" data-stage565-home-settings><span>⚙️</span><b>설정</b><small>현재 대회 운영 설정</small></button>
+          <button type="button" data-stage565-home-settings data-stage570-route="settings-hub"><span>⚙️</span><b>설정</b><small>현재 대회 운영 설정</small></button>
         </div>
       </section>
 
@@ -1747,8 +1844,12 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
             <button id="exportResultsCsvBtn" class="btn btn-light" type="button">경기 결과 CSV</button>
           </div>
         </div>
+        <div class="bracket-round-quick">
+          <strong>라운드 바로보기</strong>
+          <div id="bracketRoundButtons" class="bracket-round-buttons" aria-label="본선 라운드 바로보기"></div>
+        </div>
         <div class="bracket-view-toolbar">
-          <label><span>라운드</span><select id="bracketRoundFilter"><option value="all">전체 라운드</option></select></label>
+          <label class="bracket-round-select-fallback"><span>라운드</span><select id="bracketRoundFilter"><option value="all">전체 라운드</option></select></label>
           <label><span>경기 상태</span>
             <select id="bracketStatusFilter">
               <option value="all">전체 상태</option>
@@ -1777,7 +1878,18 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
           </div>
           <button id="bracketCourtSyncRepairBtn" type="button" class="btn btn-light btn-small" data-admin-only="true">위치정보 맞추기</button>
         </div>
-        <div id="bracketBoard" class="bracket-board empty-state"><p>생성된 대진이 없습니다.</p></div>
+        <div class="bracket-mobile-tools">
+          <span>대진표 확대</span>
+          <div class="bracket-zoom-buttons">
+            <button id="bracketZoomOutBtn" type="button" class="btn btn-light" aria-label="대진표 축소">−</button>
+            <button id="bracketZoomResetBtn" type="button" class="btn btn-light"><span id="bracketZoomLabel">100%</span></button>
+            <button id="bracketZoomInBtn" type="button" class="btn btn-light" aria-label="대진표 확대">＋</button>
+          </div>
+          <small>모바일에서는 두 손가락으로도 확대·축소할 수 있습니다.</small>
+        </div>
+        <div id="bracketViewport" class="bracket-viewport">
+          <div id="bracketBoard" class="bracket-board empty-state"><p>생성된 대진이 없습니다.</p></div>
+        </div>
       </section>
     </section>
 
@@ -2567,7 +2679,7 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=7214"></script>
+  <script type="module" src="./assets/js/app.js?v=5702"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
