@@ -515,7 +515,7 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
 <style id="stage5525QuickBarReliabilityStyles">
 /* 230MATCH 5.5.25 · 하단 고정 바로가기 클릭 안정화 */
 #stage7124MatchdayQuickBar{
-  z-index:999999!important;
+  z-index:900!important;
   pointer-events:auto!important;
   isolation:isolate!important;
   touch-action:manipulation!important;
@@ -533,7 +533,7 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
 
 <style id="stage5526QuickbarFix">
 #stage7124MatchdayQuickBar{
-  z-index:999999!important;
+  z-index:900!important;
   pointer-events:auto!important;
 }
 #stage7124MatchdayQuickBar [data-matchday-quick-view]{
@@ -543,39 +543,6 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
 }
 </style>
 
-
-<style id="stage564QuickbarDirectLayer">
-/* 5.6.4 · PC/모바일 하단 바로가기 자체가 항상 클릭 최상위 */
-#stage7124MatchdayQuickBar{
-  z-index:2147483000!important;
-  pointer-events:auto!important;
-  isolation:isolate!important;
-}
-#stage7124MatchdayQuickBar .stage7124-quick-btn{
-  position:relative!important;
-  z-index:1!important;
-  pointer-events:auto!important;
-  cursor:pointer!important;
-  touch-action:manipulation!important;
-}
-</style>
-
-
-<style id="stage565HomeTopShortcutClickFix">
-/* 5.6.5 · 홈 상단 바로가기 PC 클릭 안정화 */
-#stage3212MatchdayHub .stage3212-public-actions{
-  position:relative!important;
-  z-index:20!important;
-  pointer-events:auto!important;
-}
-#stage3212MatchdayHub .stage3212-public-actions button{
-  position:relative!important;
-  z-index:1!important;
-  pointer-events:auto!important;
-  cursor:pointer!important;
-  touch-action:manipulation!important;
-}
-</style>
 
 </head>
 <body>
@@ -2577,7 +2544,7 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=7208"></script>
+  <script type="module" src="./assets/js/app.js?v=7209"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">

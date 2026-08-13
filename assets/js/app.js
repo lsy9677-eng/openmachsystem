@@ -6590,8 +6590,8 @@ function bindSettingsNavigationFallback(){
 }
 
 function bindAdminSettingsHub(){
-  const settingsBtn=document.getElementById('openAdminSettingsHubBtn');if(settingsBtn){settingsBtn.onclick=(event)=>{event?.preventDefault();event?.stopPropagation();openAdminSettingsHub();};}
-  document.querySelectorAll('[data-settings-hub-close]').forEach(el=>el.addEventListener('click',closeAdminSettingsHub));
+  const settingsBtn=document.getElementById('openAdminSettingsHubBtn');if(settingsBtn){settingsBtn.onclick=()=>openAdminSettingsHub();}
+  document.querySelectorAll('[data-settings-hub-close]').forEach(el=>{el.onclick=closeAdminSettingsHub;});
   document.getElementById('adminSettingsHub')?.addEventListener('click',event=>{
     const action=event.target.closest('[data-settings-action]')?.dataset.settingsAction;
     const view=event.target.closest('[data-settings-view]')?.dataset.settingsView;
@@ -6719,7 +6719,7 @@ function bindHomeTopShortcuts565(){
   const hub=document.getElementById('stage3212MatchdayHub');
   if(!hub)return;
 
-  function openOperationMode565(mode){
+  function openMode(mode){
     navigatePortalView('operation',{pushHistory:true,focus:false});
     const view=document.getElementById('view-operation');
     if(!view)return;
@@ -6730,48 +6730,25 @@ function bindHomeTopShortcuts565(){
       button.setAttribute('aria-pressed',String(active));
     });
     try{renderPortalViewFast('operation');}catch(_e){}
-    try{view.scrollIntoView({block:'start'});}catch(_e){}
-  }
-
-  function activate(target,button){
-    if(button?.hasAttribute('data-stage551-admin-operation')){
-      if(typeof isAdmin==='function'&&!isAdmin())return;
-      openOperationMode565('groups');
-      return;
-    }
-    if(button?.hasAttribute('data-stage565-home-settings')){
-      if(typeof window.openAdminSettingsHub==='function')window.openAdminSettingsHub();
-      return;
-    }
-    if(target==='operation'){
-      // 홈의 "코트 현황"은 반드시 코트 모드로 연다.
-      openOperationMode565('courts');
-      return;
-    }
-    if(target)navigatePortalView(target,{pushHistory:true,focus:false});
   }
 
   hub.querySelectorAll('.stage3212-public-actions button').forEach(btn=>{
-    if(btn.dataset.stage565HomeBound==='1')return;
-    btn.dataset.stage565HomeBound='1';
-    btn.type='button';
-    btn.style.pointerEvents='auto';
-    btn.style.cursor='pointer';
-
-    btn.addEventListener('click',event=>{
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation();
-      activate(String(btn.dataset.portalGo||''),btn);
-    },true);
-
-    btn.addEventListener('pointerup',event=>{
-      if(event.pointerType==='mouse')return;
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation();
-      activate(String(btn.dataset.portalGo||''),btn);
-    },true);
+    // 정상 동작하는 상단 띠(.tab)의 방식과 동일하게 onclick 하나만 사용한다.
+    btn.onclick=()=>{
+      if(btn.hidden)return;
+      if(btn.hasAttribute('data-stage551-admin-operation')){
+        if(typeof isAdmin==='function'&&!isAdmin())return;
+        openMode('groups');
+        return;
+      }
+      if(btn.hasAttribute('data-stage565-home-settings')){
+        window.openAdminSettingsHub?.();
+        return;
+      }
+      const target=String(btn.dataset.portalGo||'');
+      if(target==='operation'){openMode('courts');return;}
+      if(target)navigatePortalView(target,{pushHistory:true,focus:false});
+    };
   });
 }
 window.__bind230MatchHomeTopShortcuts=bindHomeTopShortcuts565;
@@ -12205,23 +12182,12 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
   function bindQuickButtons(bar){
     if(!bar)return;
     bar.querySelectorAll('.stage7124-quick-btn').forEach(btn=>{
-      if(btn.dataset.stage564DirectBound==='1')return;
-      btn.dataset.stage564DirectBound='1';
-      btn.addEventListener('click',event=>{
+      // 정상 동작하는 .mode-tabs의 tab.onclick 방식과 동일하게 단일 onclick만 사용한다.
+      btn.onclick=()=>{
         if(btn.hidden)return;
-        event.preventDefault();
-        event.stopPropagation();
         const target=String(btn.dataset.matchdayQuickView||'');
         if(target)activateQuickTarget(target);
-      });
-      btn.addEventListener('pointerup',event=>{
-        if(event.pointerType==='mouse')return;
-        if(btn.hidden)return;
-        event.preventDefault();
-        event.stopPropagation();
-        const target=String(btn.dataset.matchdayQuickView||'');
-        if(target)activateQuickTarget(target);
-      });
+      };
     });
   }
   ['pointerdown','touchstart','mousemove','keydown'].forEach(type=>document.addEventListener(type,wakeQuickBar,{passive:true}));
@@ -14053,3 +14019,5 @@ console.info('[230MATCH] 5.6.3 ready · final result save-before-readonly + real
 console.info('[230MATCH] 5.6.4 ready · direct quickbar handlers + stale writer guard');
 
 console.info('[230MATCH] 5.6.5 ready · home top shortcuts direct-bound; common portal delegation excluded for hub');
+
+console.info('[230MATCH] 5.6.6 ready · shortcuts now use same simple onclick model as working tab strip');
