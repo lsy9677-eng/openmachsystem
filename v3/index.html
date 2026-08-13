@@ -2078,6 +2078,7 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
           <summary>고급 관리</summary>
           <p class="settings-advanced-note">문제가 생겼을 때만 사용하세요. Firebase 자동 동기화는 계속 작동합니다.</p>
           <div class="settings-hub-grid">
+            <button type="button" data-settings-view="acceptance">최종 운영 검수<small>Stage35.4·정식판 전환 전 종합검사</small></button>
             <button type="button" data-settings-view="audit">운영 점검<small>데이터 정합성 검사</small></button>
             <button type="button" data-settings-view="logs">운영 로그<small>관리자 작업 기록</small></button>
             <button type="button" data-settings-view="diagnostics">오류 진단<small>버튼·저장·연동 오류 확인</small></button>
@@ -2141,7 +2142,7 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=7172"></script>
+  <script type="module" src="./assets/js/app.js?v=7173"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">

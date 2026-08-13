@@ -440,7 +440,7 @@ function bindDiagnosticsCenter(){
   renderDiagnostics();
 }
 function acceptanceChecks(){
-  const requiredViews=['home','tournaments','prelim-public','my-match','entry','guide','board','participants','records','print','operation','bracket','settings','readiness','diagnostics'];
+  const requiredViews=['home','tournaments','prelim-public','my-match','entry','guide','board','participants','records','print','operation','bracket','settings','readiness','acceptance','diagnostics'];
   const requiredButtons=['openAdminSettingsHubBtn','openSocialLoginBtn'];
   const teamIds=(state?.teams||[]).map(x=>String(x?.id||'')).filter(Boolean);
   const duplicateTeamIds=teamIds.filter((id,index)=>teamIds.indexOf(id)!==index);
@@ -449,6 +449,33 @@ function acceptanceChecks(){
   const matchIds=[...prelimMatches,...mainMatches].map(x=>String(x?.id||'')).filter(Boolean);
   const duplicateMatchIds=matchIds.filter((id,index)=>matchIds.indexOf(id)!==index);
   const courts=(state?.venues||[]).flatMap(v=>(v?.courts||[]).map(c=>typeof c==='string'?c:c?.name||c?.id||'')).filter(Boolean);
+
+  // Stage35.4 final integrity checks. These are inspection-only and do not alter tournament data.
+  const activeTournamentId=String(state?.multiTournament?.activeTournamentId||state?.tournament?.id||'');
+  const tournamentRegistry=Array.isArray(state?.multiTournament?.tournaments)?state.multiTournament.tournaments:[];
+  const tournamentRegistryOk=!activeTournamentId||!tournamentRegistry.length||tournamentRegistry.some(x=>String(x?.id||'')===activeTournamentId);
+  const activeDivisionId=String(state?.multiDivision?.activeDivisionId||'');
+  const divisionRegistry=Array.isArray(state?.multiDivision?.divisions)?state.multiDivision.divisions:[];
+  const divisionRegistryOk=!activeDivisionId||!divisionRegistry.length||divisionRegistry.some(x=>String(x?.id||'')===activeDivisionId);
+  const currentDivisionName=String(state?.tournament?.division||'');
+  const activeDivision=divisionRegistry.find(x=>String(x?.id||'')===activeDivisionId)||null;
+  const divisionNameOk=!activeDivision||!currentDivisionName||String(activeDivision?.name||'')===currentDivisionName;
+  const applicationRows=Array.isArray(state?.portal?.applications)?state.portal.applications:[];
+  const foreignApplications=applicationRows.filter(row=>{
+    const tid=String(row?.tournamentId||'');
+    const did=String(row?.divisionId||'');
+    return (tid&&activeTournamentId&&tid!==activeTournamentId)||(did&&activeDivisionId&&did!==activeDivisionId);
+  });
+  const closed=typeof tournamentReadOnly==='function'?Boolean(tournamentReadOnly()):Boolean(state?.completion?.readOnly||state?.completion?.completedAt);
+  const archiveId=String(state?.completion?.archiveId||state?.operation?.archiveId||'');
+  const finalArchives=Array.isArray(state?.portal?.archives)?state.portal.archives:[];
+  const finalArchiveOk=!closed||(!!archiveId&&finalArchives.some(a=>String(a?.archiveId||'')===archiveId));
+  const currentTid=activeTournamentId;
+  const grants=Array.isArray(state?.operatorAccess?.grants)?state.operatorAccess.grants:[];
+  const activeClosedGrants=closed?grants.filter(g=>String(g?.tournamentId||'')===currentTid&&String(g?.status||'active')==='active'):[];
+  const backupEngineOk=typeof stage3542TournamentBackupPayload==='function'&&typeof stage3543RestoreAsNew==='function'&&typeof createTournamentArchive==='function';
+  const readonlyGuardOk=!closed||(state?.completion?.readOnly===true&&state?.operation?.readOnly===true&&state?.operation?.autoAssignmentEnabled===false);
+
   return [
     {group:'화면',label:'필수 페이지 존재',ok:requiredViews.every(v=>document.getElementById(`view-${v}`)),detail:`${requiredViews.filter(v=>document.getElementById(`view-${v}`)).length}/${requiredViews.length}개`,required:true},
     {group:'화면',label:'설정 허브 존재',ok:Boolean(document.getElementById('adminSettingsHub')),detail:document.getElementById('adminSettingsHub')?'정상':'설정 시트 누락',required:true},
@@ -457,11 +484,18 @@ function acceptanceChecks(){
     {group:'저장',label:'로컬 저장 가능',ok:(()=>{try{const k='__230_acceptance__';localStorage.setItem(k,'1');localStorage.removeItem(k);return true;}catch(_e){return false;}})(),detail:'localStorage 쓰기 테스트',required:true},
     {group:'저장',label:'상태 저장 함수',ok:typeof saveState==='function'&&typeof saveRecovery==='function',detail:'현재 상태·복구점 함수',required:true},
     {group:'대회',label:'대회 기본정보',ok:Boolean(state?.tournament?.name),detail:state?.tournament?.name||'대회명 미설정',required:true},
+    {group:'대회',label:'현재 대회 ID 분리',ok:tournamentRegistryOk,detail:tournamentRegistryOk?`현재 대회 ${activeTournamentId||'-'}`:'현재 대회 ID가 대회 목록과 일치하지 않음',required:true},
+    {group:'부서',label:'현재 부서 ID 분리',ok:divisionRegistryOk&&divisionNameOk,detail:divisionRegistryOk&&divisionNameOk?`${activeDivision?.name||currentDivisionName||'-'} · ${activeDivisionId||'-'}`:'현재 부서 ID/이름이 부서 목록과 일치하지 않음',required:true},
+    {group:'부서',label:'참가접수 범위 혼입 없음',ok:foreignApplications.length===0,detail:foreignApplications.length?`다른 대회/부서 신청 ${foreignApplications.length}건 확인 필요`:`현재 화면 신청 ${applicationRows.length}건 범위 정상`,required:true},
     {group:'대회',label:'참가팀 ID 중복 없음',ok:duplicateTeamIds.length===0,detail:duplicateTeamIds.length?`중복 ${[...new Set(duplicateTeamIds)].length}건`:`${teamIds.length}팀 정상`,required:true},
     {group:'경기',label:'경기 ID 중복 없음',ok:duplicateMatchIds.length===0,detail:duplicateMatchIds.length?`중복 ${[...new Set(duplicateMatchIds)].length}건`:`${matchIds.length}경기 정상`,required:true},
     {group:'경기',label:'예선 데이터 구조',ok:Array.isArray(state?.prelim?.matches),detail:`예선 ${prelimMatches.length}경기`,required:true},
     {group:'경기',label:'본선 데이터 구조',ok:Array.isArray(mainMatches),detail:`본선 ${mainMatches.length}경기`,required:true},
     {group:'코트',label:'코트 설정',ok:courts.length>0,detail:courts.length?`${courts.length}면 확인`:'등록 코트 없음',required:true},
+    {group:'Stage35.4',label:'종료 스냅샷 연결',ok:finalArchiveOk,detail:closed?(finalArchiveOk?`최종 스냅샷 ${archiveId}`:'종료 상태인데 최종 스냅샷을 찾을 수 없음'):'운영 중 대회 · 종료 시 검사',required:true},
+    {group:'Stage35.4',label:'종료대회 읽기전용 잠금',ok:readonlyGuardOk,detail:closed?(readonlyGuardOk?'읽기전용·자동배정 OFF':'종료 잠금 상태 불일치'):'운영 중 대회',required:true},
+    {group:'Stage35.4',label:'종료대회 진행자 권한 만료',ok:activeClosedGrants.length===0,detail:closed?(activeClosedGrants.length?`활성 진행자 권한 ${activeClosedGrants.length}건 남음`:'활성 진행자 권한 없음'):`현재 대회 권한 ${grants.filter(g=>String(g?.tournamentId||'')===currentTid&&String(g?.status||'active')==='active').length}건`,required:true},
+    {group:'Stage35.4',label:'백업·안전복구 엔진',ok:backupEngineOk,detail:backupEngineOk?'종료·대회별백업·새대회복구 함수 정상':'Stage35.4 백업/복구 함수 누락',required:true},
     {group:'운영',label:'설정 버튼 직접 연결',ok:typeof window.openAdminSettingsHub==='function',detail:typeof window.openAdminSettingsHub==='function'?'정상':'함수 미연결',required:true},
     {group:'운영',label:'오류 기록',ok:diagnosticEntries.filter(x=>x.level==='error').length===0,detail:`오류 ${diagnosticEntries.filter(x=>x.level==='error').length}건 · 경고 ${diagnosticEntries.filter(x=>x.level==='warning').length}건`,required:false},
     {group:'네트워크',label:'온라인 연결',ok:navigator.onLine,detail:navigator.onLine?'온라인':'오프라인 운영 중',required:false},
@@ -12832,4 +12866,4 @@ function stage3544Refresh(){
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(stage3544Refresh,200),{once:true});else setTimeout(stage3544Refresh,200);
 window.addEventListener('pageshow',()=>setTimeout(stage3544Refresh,120));
 console.info('[230MATCH] 5.4.31 ready · Stage35.4-4 closed tournament snapshot/read-only optimization');
-(()=>{document.documentElement.dataset.release='5.4.32';console.info('[230MATCH] 5.4.32 ready · legacy recovery tools cleaned up');})();
+(()=>{document.documentElement.dataset.release='5.4.33';console.info('[230MATCH] 5.4.33 ready · Stage35.4 final integrity acceptance');})();
