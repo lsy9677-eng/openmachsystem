@@ -185,7 +185,7 @@ async function writeCurrentTournament(source,{force=false}={}){
     const room=roomSnap.exists()?(roomSnap.data()||{}):{};
     const remoteRevision=Number(room.revision||0);
     const remoteClientId=String(room.lastWriterClientId||'');
-    if(dirtyBaseRevision>0 && remoteRevision>dirtyBaseRevision && remoteClientId && remoteClientId!==CLIENT_ID){
+    if(remoteRevision>dirtyBaseRevision && remoteClientId && remoteClientId!==CLIENT_ID){
       syncConflict={
         active:true,
         localBaseRevision:dirtyBaseRevision,
@@ -195,7 +195,7 @@ async function writeCurrentTournament(source,{force=false}={}){
         remoteClientId,
         detectedAt:new Date().toISOString()
       };
-      throw new Error('다른 진행자가 먼저 저장한 변경이 감지되어 자동 저장을 중단했습니다. 최신 서버 데이터를 확인한 뒤 다시 저장해 주세요.');
+      throw new Error(`다른 기기의 최신 저장(revision ${remoteRevision})이 현재 편집 기준(revision ${dirtyBaseRevision})보다 앞서 있어 오래된 저장을 차단했습니다. 최신 서버 상태를 확인해 주세요.`);
     }
   }
   const encoded=await encodeWorkspace(workspace),d=encoded.digest||'',publicDigest=encoded.publicDigest||'';if(d&&d===lastSavedDigest)return true;const publicChanged=!lastSavedPublicDigest||publicDigest!==lastSavedPublicDigest;
@@ -273,4 +273,4 @@ export function getSyncConflict(){return syncConflict?{...syncConflict}:{active:
 export async function testCloudConnection(){await ensureDb();const room=await api.getDoc(roomRef()),parents=await loadParentRows();return{ok:true,roomId:ROOM_ID,collection:COLLECTION,exists:room.exists(),mode:canWriteFn()?'read-write':'read-only',online:navigator.onLine,pending:Boolean(dirtyGeneration),writing:pushInFlight,revision:Number(room.data()?.revision||0),conflict:Boolean(syncConflict?.active),clientId:CLIENT_ID,schemaVersion:8,tournamentCount:parents.length,listenerMode:accessModeFn()==='viewer'?'public-revision-filter':'operator-revision',storageMode:STORAGE_MODE};}
 export async function deleteTournamentNow(tournamentId){if(!canWriteFn())throw new Error('관리자만 대회를 삭제할 수 있습니다.');await prepareCriticalCloudWrite();await ensureDb();const id=safeId(tournamentId),snap=await api.getDoc(tournamentRef(id)),chunks=Array.isArray(snap.data()?.workspaceChunks)?snap.data().workspaceChunks:[];const batch=api.writeBatch(db);chunks.forEach(cid=>batch.delete(tournamentRef(cid)));batch.delete(tournamentRef(id));await batch.commit();knownChunkIds.delete(id);const remaining=await api.getDocs(tournamentsCollection()),parents=parentRowsFromSnaps(remaining),nextId=parents.find(r=>r.id!==id)?.id||'';await api.setDoc(roomRef(),{activeTournamentId:nextId,revision:api.increment(1),lastWriterUid:(await runtime({requireUser:true})).user.uid,serverUpdatedAt:api.serverTimestamp()},{merge:true});return true;}
 
-console.info('[230MATCH] sync-engine 5.6.2 · stable Firestore instance / reconnect race removed');
+console.info('[230MATCH] sync-engine 5.6.4 · stable Firestore + stale-client write blocked even from revision 0');

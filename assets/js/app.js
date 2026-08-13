@@ -26,7 +26,7 @@ import{ensureCourtStatuses,pauseCourt,resumeCourt}from'./court-status-engine.js?
 import{ensureCourtManualQueues,assignToCourtManualQueue,moveCourtMatchFlexible,returnManualQueueItemToVenue,reorderCourtManualQueue}from'./court-manual-queue-engine.js?v=332012';
 import{reorderPrelimQueue as reorderPrelimQueueItem,movePrelimQueuedMatch,returnPrelimWait1ToQueue}from'./prelim-queue-control-engine.js?v=332012';
 import{ensurePrelimCourtStatuses,pausePrelimCourt,resumePrelimCourt}from'./prelim-court-status-engine.js?v=332012';
-import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7205';
+import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7208';
 import{verifyAndRepairMainFlow}from'./main-flow-integrity-engine.js?v=332012';
 import{finalizeTournamentCompletion}from'./tournament-completion-engine.js?v=332012';
 import{ensureTournamentIdentity,validateTournamentForArchive,createTournamentArchive,archiveListItem,archiveBackupPayload}from'./archive-engine.js?v=354101';
@@ -859,6 +859,7 @@ function applyRoleUI(){
   ADMIN_ONLY_IDS.forEach(id=>{const el=document.getElementById(id);if(!el)return;el.disabled=!isAdmin();el.setAttribute('aria-disabled',String(!isAdmin()));el.title=!isAdmin()?'관리자 전용 기능':'';});
   document.querySelectorAll('[data-admin-only="true"]').forEach(el=>{el.hidden=!isAdmin();});
   document.querySelectorAll('[data-operator-only="true"]').forEach(el=>{el.hidden=!canOperate();});
+  setTimeout(()=>{try{bindHomeTopShortcuts565();}catch(_e){}},0);
 
   // 4.5.1 member-lite: 일반 회원에게는 당일 필요한 핵심 화면만 노출한다.
   // 알림 관리 등 운영용 화면만 숨긴다. 선수 기록·지난 대회 결과·출력 센터는 일반 회원도 보조 메뉴에서 사용할 수 있다.
@@ -6713,6 +6714,68 @@ function createStage3261TestApplications(){
   renderApplicationPortal();
   notice('테스트 참가 신청 4팀을 만들었습니다. 승인·후보·입금·문자 기능을 점검하세요.','success');
 }
+
+function bindHomeTopShortcuts565(){
+  const hub=document.getElementById('stage3212MatchdayHub');
+  if(!hub)return;
+
+  function openOperationMode565(mode){
+    navigatePortalView('operation',{pushHistory:true,focus:false});
+    const view=document.getElementById('view-operation');
+    if(!view)return;
+    view.dataset.operationMode=mode;
+    view.querySelectorAll('[data-operation-section]').forEach(button=>{
+      const active=button.dataset.operationSection===mode;
+      button.classList.toggle('active',active);
+      button.setAttribute('aria-pressed',String(active));
+    });
+    try{renderPortalViewFast('operation');}catch(_e){}
+    try{view.scrollIntoView({block:'start'});}catch(_e){}
+  }
+
+  function activate(target,button){
+    if(button?.hasAttribute('data-stage551-admin-operation')){
+      if(typeof isAdmin==='function'&&!isAdmin())return;
+      openOperationMode565('groups');
+      return;
+    }
+    if(button?.hasAttribute('data-stage565-home-settings')){
+      if(typeof window.openAdminSettingsHub==='function')window.openAdminSettingsHub();
+      return;
+    }
+    if(target==='operation'){
+      // 홈의 "코트 현황"은 반드시 코트 모드로 연다.
+      openOperationMode565('courts');
+      return;
+    }
+    if(target)navigatePortalView(target,{pushHistory:true,focus:false});
+  }
+
+  hub.querySelectorAll('.stage3212-public-actions button').forEach(btn=>{
+    if(btn.dataset.stage565HomeBound==='1')return;
+    btn.dataset.stage565HomeBound='1';
+    btn.type='button';
+    btn.style.pointerEvents='auto';
+    btn.style.cursor='pointer';
+
+    btn.addEventListener('click',event=>{
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      activate(String(btn.dataset.portalGo||''),btn);
+    },true);
+
+    btn.addEventListener('pointerup',event=>{
+      if(event.pointerType==='mouse')return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      activate(String(btn.dataset.portalGo||''),btn);
+    },true);
+  });
+}
+window.__bind230MatchHomeTopShortcuts=bindHomeTopShortcuts565;
+
 function bindPortal(){
   const saveTicker=document.getElementById('saveGlobalTickerBtn');if(saveTicker&&!saveTicker.dataset.bound){saveTicker.dataset.bound='1';saveTicker.addEventListener('click',()=>void saveGlobalTicker());}
 
@@ -6724,8 +6787,12 @@ function bindPortal(){
   bindOperationsManual();
   bindTournamentList();
   document.querySelectorAll('[data-portal-go]').forEach(btn => {
-    btn.dataset.portalBound='1';btn.addEventListener('click', () => navigatePortalView(btn.dataset.portalGo, { pushHistory: true }));
+    // 5.6.5: 홈 상단 바로가기는 PC 클릭 충돌 방지를 위해 별도 직접 바인더가 담당한다.
+    if(btn.closest('#stage3212MatchdayHub'))return;
+    btn.dataset.portalBound='1';
+    btn.addEventListener('click', () => navigatePortalView(btn.dataset.portalGo, { pushHistory: true }));
   });
+  bindHomeTopShortcuts565();
   document.getElementById('mobileBackBtn')?.addEventListener('click',()=>{if(history.length>1)history.back();else navigatePortalView('home',{pushHistory:true});});
   document.getElementById('editTournamentGuideBtn')?.addEventListener('click',openTournamentGuideEditor);
   document.getElementById('cancelTournamentGuideBtn')?.addEventListener('click',()=>{const el=document.getElementById('tournamentGuideEditor');if(el)el.hidden=true;});
@@ -12085,6 +12152,7 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
     });
     bar.style.gridTemplateColumns=`repeat(${items.length},minmax(0,1fr))`;
     bar.setAttribute('aria-label',role==='member'?'선수 빠른 이동':'운영 빠른 이동');
+    bindQuickButtons(bar);
   }
   function wakeQuickBar(){
     const bar=document.getElementById('stage7124MatchdayQuickBar');if(!bar||bar.hidden)return;
@@ -12124,17 +12192,38 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
     });
     try{renderPortalViewFast('operation');}catch(_e){}
   }
-  document.addEventListener('click',e=>{
-    const btn=e.target.closest?.('#stage7124MatchdayQuickBar [data-matchday-quick-view]');
-    if(!btn||btn.hidden)return;
-    const target=String(btn.dataset.matchdayQuickView||'');
-    e.preventDefault();
+  function activateQuickTarget(target){
     if(target==='operation-game')openOperationMode('groups');
     else if(target==='operation')openOperationMode('courts');
-    else if(target==='settings-hub'){if(typeof openAdminSettingsHub==='function')openAdminSettingsHub();}
-    else navigatePortalView(target,{pushHistory:true,focus:false});
+    else if(target==='settings-hub'){
+      if(typeof window.openAdminSettingsHub==='function')window.openAdminSettingsHub();
+    }else{
+      navigatePortalView(target,{pushHistory:true,focus:false});
+    }
     setTimeout(updateMatchdayQuickBar,20);
-  });
+  }
+  function bindQuickButtons(bar){
+    if(!bar)return;
+    bar.querySelectorAll('.stage7124-quick-btn').forEach(btn=>{
+      if(btn.dataset.stage564DirectBound==='1')return;
+      btn.dataset.stage564DirectBound='1';
+      btn.addEventListener('click',event=>{
+        if(btn.hidden)return;
+        event.preventDefault();
+        event.stopPropagation();
+        const target=String(btn.dataset.matchdayQuickView||'');
+        if(target)activateQuickTarget(target);
+      });
+      btn.addEventListener('pointerup',event=>{
+        if(event.pointerType==='mouse')return;
+        if(btn.hidden)return;
+        event.preventDefault();
+        event.stopPropagation();
+        const target=String(btn.dataset.matchdayQuickView||'');
+        if(target)activateQuickTarget(target);
+      });
+    });
+  }
   ['pointerdown','touchstart','mousemove','keydown'].forEach(type=>document.addEventListener(type,wakeQuickBar,{passive:true}));
   window.__update230MatchMatchdayQuickBar=updateMatchdayQuickBar;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(updateMatchdayQuickBar,500),{once:true});
@@ -13960,3 +14049,7 @@ console.info('[230MATCH] 5.5.24 ready · court round color CSS priority fixed; o
 console.info('[230MATCH] 5.6.2 · PC quickbar restored to single handler; settings direct render enabled');
 
 console.info('[230MATCH] 5.6.3 ready · final result save-before-readonly + real settings hub quickbar');
+
+console.info('[230MATCH] 5.6.4 ready · direct quickbar handlers + stale writer guard');
+
+console.info('[230MATCH] 5.6.5 ready · home top shortcuts direct-bound; common portal delegation excluded for hub');
