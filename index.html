@@ -131,7 +131,7 @@
 <style id="stage5415HomeSimplifyStyles">
 /* 5.4.15 · 홈 중복 제거 + 역할별 빠른 바로가기 */
 body[data-role="admin"] .stage5415-member-quick{display:none!important}
-.stage5415-admin-quick{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+.stage5415-admin-quick{grid-template-columns:repeat(5,minmax(0,1fr))!important}
 /* 기존 대회 운영 현황/중복 메뉴는 상단 바로가기와 기능이 겹쳐 숨깁니다. */
 #view-home .legacy-tournament-card{display:none!important}
 @media(max-width:700px){
@@ -312,6 +312,7 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
         </div>
         <div class="stage3212-public-actions stage5415-admin-quick" data-admin-only="true">
           <button type="button" data-portal-go="prelim-public"><span>📋</span><b>예선 현황</b><small>조편성·순위·결과</small></button>
+          <button type="button" data-stage551-admin-operation><span>🎛️</span><b>경기 운영</b><small>예선·본선·대기 운영</small></button>
           <button type="button" data-portal-go="operation"><span>🎾</span><b>코트 현황</b><small>시합중·대기·결과 입력</small></button>
           <button type="button" data-portal-go="bracket"><span>🏆</span><b>본선 대진표</b><small>대진·진행·결과</small></button>
           <button type="button" onclick="window.openAdminSettingsHub&&window.openAdminSettingsHub()"><span>⚙️</span><b>설정</b><small>현재 대회 운영 설정</small></button>
@@ -2142,7 +2143,7 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=7175"></script>
+  <script type="module" src="./assets/js/app.js?v=7176"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">

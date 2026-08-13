@@ -6935,6 +6935,24 @@ void 0;
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',update,{once:true});else update();
   document.addEventListener('click',e=>{
+    const op=e.target.closest?.('[data-stage551-admin-operation]');
+    if(op){
+      e.preventDefault();e.stopPropagation();
+      if(typeof isAdmin==='function'&&!isAdmin())return;
+      navigatePortalView('operation',{pushHistory:true});
+      const view=document.getElementById('view-operation');
+      if(view){
+        view.dataset.operationMode='groups';
+        view.querySelectorAll('[data-operation-section]').forEach(button=>{
+          const active=button.dataset.operationSection==='groups';
+          button.classList.toggle('active',active);
+          button.setAttribute('aria-pressed',String(active));
+        });
+        view.scrollIntoView({block:'start'});
+      }
+      setTimeout(update,80);
+      return;
+    }
     if(e.target.closest('[data-portal-go],#currentRoleBadge,[data-stage3210-open-edit]'))setTimeout(update,80);
   },true);
   window.addEventListener('pageshow',update);
