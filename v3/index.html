@@ -1029,6 +1029,11 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
           <div id="backupTournamentList" class="backup-recovery-list"><div class="portal-empty">대회 백업 목록을 불러오는 중입니다.</div></div>
           <div class="section-head compact-head backup-list-head"><div><h3>저장된 복구점</h3><p>복원 전 현재 상태가 자동으로 한 번 더 저장됩니다.</p></div><button id="backupDeleteAllBtn" type="button" class="btn btn-danger-outline">복구점 전체 삭제</button></div>
           <div id="backupRecoveryManagerList" class="backup-recovery-list"><div class="portal-empty">저장된 복구점이 없습니다.</div></div>
+          <details class="backup-advanced-tools">
+            <summary>고급 복구 도구</summary>
+            <div class="notice info" style="margin-top:10px">평상시에는 사용할 필요가 없습니다. 지난 대회 기록이 누락되었을 때만 로컬 복구점에서 보존 기록을 다시 검사합니다.</div>
+            <div class="button-row" style="margin-top:10px"><button id="backupLegacyRecoveryScanBtn" type="button" class="btn btn-light">지난 기록 복구 검사</button></div>
+          </details>
           <div class="notice warning"><b>브라우저 복구점은 현재 기기에만 저장됩니다.</b> 휴대전화 교체·브라우저 데이터 삭제에 대비해 전체 백업 JSON도 별도로 보관하세요.</div>
         </section>
 
@@ -2136,7 +2141,7 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=7171"></script>
+  <script type="module" src="./assets/js/app.js?v=7172"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">

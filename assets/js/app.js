@@ -8945,12 +8945,12 @@ console.info('[230MATCH V3] 34.4.2 ready · main wait1 refill and shared queue e
     const btn=document.createElement('button');btn.type='button';btn.className='btn btn-light';btn.dataset.stage3527Recover='1';btn.textContent='지난 기록 복구 검사';btn.addEventListener('click',()=>salvageArchives({showNotice:true}));head.appendChild(btn);
   }
   async function run(){
-    addRecoveryButton();
-    await salvageArchives({showNotice:false});
-    const label=document.getElementById('buildStageLabel');if(label){label.textContent='230MATCH 35.2.7 · 지난 대회 기록 보존·복구';label.title='Version 35.2.7';}
+    // 5.4.32: 과거 기록 검사는 평상시 자동 실행하지 않습니다.
+    // 필요할 때 관리자 설정 > 백업·복구 관리 > 고급 복구 도구에서 수동 실행합니다.
+    const label=document.getElementById('buildStageLabel');if(label){label.textContent='230MATCH 35.2.7 · 지난 대회 기록 보존';label.title='Version 35.2.7';}
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(run,80),{once:true});else setTimeout(run,80);
-  window.addEventListener('hashchange',()=>setTimeout(addRecoveryButton,80));
+  window.stage3527SalvageArchives=salvageArchives;
   console.info('[230MATCH V3] 35.2.7 ready · archive preservation and local recovery salvage active');
 })();
 
@@ -9002,15 +9002,9 @@ console.info('[230MATCH V3] 34.4.2 ready · main wait1 refill and shared queue e
     }else if(!silent){notice('모던클럽배 기록이 이미 보관되어 있습니다.','info');}
     return changed;
   }
-  function installButton(){
-    const host=document.querySelector('.tournament-list-view .section-actions, #tournamentListView .section-actions, #tournamentListView .button-row');
-    if(!host||document.getElementById('restoreModernCupArchiveBtn'))return;
-    const btn=document.createElement('button');btn.id='restoreModernCupArchiveBtn';btn.type='button';btn.className='btn btn-primary';btn.textContent='모던배 기록 복구';
-    btn.addEventListener('click',()=>restoreModernArchive(false));host.appendChild(btn);
-  }
-  const run=()=>{restoreModernArchive(true);installButton();const label=document.getElementById('buildStageLabel');if(label){label.textContent='230MATCH 35.2.8 · 모던배 기록 내장 복구';label.title='Version 35.2.8';}};
+  function installButton(){ /* 5.4.32: 모던배 수동 복구 버튼 제거 */ }
+  const run=()=>{restoreModernArchive(true);const label=document.getElementById('buildStageLabel');if(label){label.textContent='230MATCH 35.2.8 · 모던배 기록 보존';label.title='Version 35.2.8';}};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(run,300),{once:true});else setTimeout(run,300);
-  window.addEventListener('hashchange',()=>setTimeout(installButton,100));
   window.restoreModernCupArchive3528=()=>restoreModernArchive(false);
   console.info('[230MATCH V3] 35.2.8 ready · built-in Modern Cup archive restoration active');
 })();
@@ -9069,16 +9063,7 @@ console.info('[230MATCH V3] 34.4.2 ready · main wait1 refill and shared queue e
     state.portal.participantArchives=appendModern(state.portal.participantArchives,modernParticipants);
     try{saveState(state);}catch(_e){}
   }
-  function installRestoreButton(){
-    if(document.getElementById('restoreModernCupArchive3529Btn'))return;
-    const candidates=[...document.querySelectorAll('button')];
-    const anchor=candidates.find(b=>/지난 기록 복구 검사/.test(b.textContent||''))||document.getElementById('archiveTournamentBtn');
-    const host=anchor?.parentElement||document.querySelector('#tournamentListView .button-row')||document.querySelector('[data-view="tournaments"] .button-row');
-    if(!host)return;
-    const btn=document.createElement('button');btn.id='restoreModernCupArchive3529Btn';btn.type='button';btn.className='btn btn-primary';btn.textContent='모던배 기록 복구';
-    btn.addEventListener('click',()=>{persistCopy();renderTournamentList();renderResultArchive();renderPublicParticipantRecords();notice('모던클럽배 기록을 다시 표시했습니다.','success');});
-    host.appendChild(btn);
-  }
+  function installRestoreButton(){ /* 5.4.32: 일회성 모던배 복구 버튼 제거 */ }
   function refreshVisibleViews(){
     try{renderTournamentList();}catch(_e){}
     try{renderResultArchive();}catch(_e){}
@@ -9158,13 +9143,7 @@ console.info('[230MATCH V3] 34.4.2 ready · main wait1 refill and shared queue e
     try{renderResultArchive();}catch(_e){}
     try{renderPublicParticipantRecords();}catch(_e){}
   }
-  function installRestoreButton(){
-    if(!canOperate())return;
-    const host=document.querySelector('#page-tournaments .section-head .button-row,#page-tournaments .button-row');
-    if(!host||document.getElementById('restoreModernExact3530'))return;
-    const b=document.createElement('button');b.id='restoreModernExact3530';b.type='button';b.className='btn btn-primary';b.textContent='모던배 전체 기록 복구';
-    b.onclick=()=>{persistExact();refreshViews();notice('모던배 입상·8강·참가자 기록을 복구했습니다.','success');};host.appendChild(b);
-  }
+  function installRestoreButton(){ /* 5.4.32: 모던배 수동 복구 버튼 제거. 보존 데이터는 유지 */ }
   function run(){patchProviders();persistExact();refreshViews();installRestoreButton();const label=document.getElementById('buildStageLabel');if(label){label.textContent='230MATCH 35.3.1 · 모던배 기록·사진 직접 내장 복구';label.title='Version 35.3.1';}}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(run,100),{once:true});else setTimeout(run,100);
   window.addEventListener('hashchange',()=>setTimeout(()=>{refreshViews();installRestoreButton();},120));
@@ -12755,6 +12734,24 @@ window.openAdminSettingsHub=openAdminSettingsHub;
 stage354EnsureOperatorAccess();stage354EnsureAccessUi();setTimeout(()=>stage354RefreshGrantedRole({quiet:true}),180);setTimeout(()=>void stage354StartOperatorRequestAdminSync().catch(error=>console.warn('[230MATCH] 진행자 요청 동기화 시작 실패',error)),350);
 console.info('[230MATCH] 5.4.28 ready · operator request channel fixed and admin realtime approval sync');
 
+
+/* 5.4.32 · legacy recovery tools cleanup */
+function stage35432BindAdvancedRecoveryTools(){
+  const btn=document.getElementById('backupLegacyRecoveryScanBtn');
+  if(!btn||btn.dataset.bound==='1')return;
+  btn.dataset.bound='1';
+  btn.addEventListener('click',async()=>{
+    if(!requireAdmin('지난 기록 복구 검사'))return;
+    if(typeof window.stage3527SalvageArchives!=='function')return notice('복구 검사 엔진을 찾을 수 없습니다.','error');
+    btn.disabled=true;const before=btn.textContent;btn.textContent='검사 중…';
+    try{await window.stage3527SalvageArchives({showNotice:true});}
+    catch(error){console.error('[230MATCH] 지난 기록 복구 검사 실패',error);notice('지난 기록 복구 검사 중 오류가 발생했습니다.','error');}
+    finally{btn.disabled=false;btn.textContent=before;}
+  });
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(stage35432BindAdvancedRecoveryTools,180),{once:true});else setTimeout(stage35432BindAdvancedRecoveryTools,180);
+window.addEventListener('pageshow',()=>setTimeout(stage35432BindAdvancedRecoveryTools,100));
+
 /* 5.4.30 · Stage35.4-3 safe restore release */
 (()=>{document.documentElement.dataset.release='5.4.30';console.info('[230MATCH] 5.4.30 · Stage35.4-3 안전 복구 ready');})();
 
@@ -12835,3 +12832,4 @@ function stage3544Refresh(){
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(stage3544Refresh,200),{once:true});else setTimeout(stage3544Refresh,200);
 window.addEventListener('pageshow',()=>setTimeout(stage3544Refresh,120));
 console.info('[230MATCH] 5.4.31 ready · Stage35.4-4 closed tournament snapshot/read-only optimization');
+(()=>{document.documentElement.dataset.release='5.4.32';console.info('[230MATCH] 5.4.32 ready · legacy recovery tools cleaned up');})();
