@@ -1494,8 +1494,66 @@ async function importLegacyTournament(){
   catch(e){legacyBridgeStatus('연결 실패',e.message||String(e),'error');notice(e.message||String(e),'error');}
 }
 const CORE_RENDER_VIEWS_6400=new Set(['operation','bracket','settings','roster','audit','logs','messages','readiness','diagnostics']);
+
+/* 230MATCH 5.5.21 · 안전 코트 구조 복구
+   - 이미 존재하는 경기/큐/대진 데이터는 재배정하지 않는다.
+   - 코트 배열이 통째로 비어 있을 때만 설정된 구장/코트 틀을 복구한다.
+   - 초기 코트배정/공용대기/자동승격 엔진은 호출하지 않는다.
+*/
+let __stage5521CourtRepairPersisted=false;
+function stage5521ConfiguredCourtCount(){
+  try{
+    return (prelimVenues(state)||[]).reduce((sum,v)=>{
+      const nums=Array.isArray(v?.courtNumbers)?v.courtNumbers.filter(Boolean):[];
+      return sum+(nums.length||Number(v?.courtCount||0));
+    },0);
+  }catch(_e){
+    return (state.settings?.venues||[]).reduce((sum,v)=>sum+(Array.isArray(v?.courtNumbers)?v.courtNumbers.length:Number(v?.courtCount||0)),0);
+  }
+}
+function stage5521RepairMissingCourtStructure(){
+  try{
+    ensurePrelimState(state);
+    const configured=stage5521ConfiguredCourtCount();
+    if(configured<=0)return {repaired:false,reason:'no-config'};
+    if(Array.isArray(state.prelim?.courts)&&state.prelim.courts.length)return {repaired:false,reason:'already-ok'};
+
+    let skeleton=[];
+    // 통합 코트 상태가 남아 있다면 그것을 가장 먼저 보존한다.
+    if(Array.isArray(state.courts)&&state.courts.length){
+      skeleton=structuredClone(state.courts);
+    }else{
+      try{skeleton=buildVenueCourts(prelimVenues(state))||[];}catch(_e){skeleton=[];}
+    }
+    if(!skeleton.length)return {repaired:false,reason:'cannot-build'};
+
+    try{if(!__stage5521CourtRepairPersisted)saveRecovery(state,'5.5.21 코트 구조 복구 직전');}catch(_e){}
+
+    state.prelim=state.prelim||{};
+    state.prelim.courts=skeleton.map((c,index)=>({
+      ...c,
+      id:c?.id||`court-${index+1}`,
+      name:c?.name||c?.label||`코트${index+1}`,
+      playing:c?.playing||null,
+      wait1:c?.wait1||null,
+      queue:Array.isArray(c?.queue)?c.queue:[],
+      isPaused:Boolean(c?.isPaused)
+    }));
+
+    // 기존 본선/예선 경기 상태와 공용대기는 절대 재배정하지 않는다.
+    __stage5521CourtRepairPersisted=true;
+    return {repaired:true,count:state.prelim.courts.length};
+  }catch(error){
+    console.error('[5.5.21] 코트 구조 안전 복구 실패',error);
+    return {repaired:false,error};
+  }
+}
 function renderCommittedState6400(){
   const view=document.body?.dataset.currentView||'home';
+  const courtRepair=(view==='operation'||view==='settings'||view==='bracket')?stage5521RepairMissingCourtStructure():{repaired:false};
+  if(courtRepair?.repaired&&!__stage5521CourtRepairPersisted){
+    __stage5521CourtRepairPersisted=true;
+  }
   if(CORE_RENDER_VIEWS_6400.has(view)){
     render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus,holdMainMatch,releaseHeldMatch});
     if(view==='operation'||view==='settings'||view==='roster')renderOperatorControls();
@@ -1577,6 +1635,13 @@ function applySynchronizedState(nextState,source='동기화'){
   state=structuredClone(nextState);
   // 다른 관리자 기기/탭에서 오래된 코트 상태가 들어와도 공용대기 중복을 허용하지 않는다.
   stage5513GuardPrelimManualSharedQueue();
+  const stage5521Repair=stage5521RepairMissingCourtStructure();
+  if(stage5521Repair?.repaired){
+    setTimeout(()=>{
+      try{safePersistState(`코트 구조 안전 복구 · ${stage5521Repair.count}면`);}catch(_e){}
+      try{notice(`설정된 코트 ${stage5521Repair.count}면의 운영 카드 구조를 복구했습니다. 경기 재배정은 하지 않았습니다.`,'success');}catch(_e){}
+    },0);
+  }
   if(globalNoticeReady){state.portal=state.portal||{};state.portal.posts=structuredClone(globalNoticeState.posts);state.portal.globalTicker=structuredClone(globalNoticeState.ticker);}
   try{ensureMultiTournamentRuntime();}catch(_e){}
   const routedDivision=routeDivisionId();
@@ -13557,3 +13622,17 @@ console.info('[230MATCH] 5.5.13 ready · prelim shared queue is authoritative an
 console.info('[230MATCH] 5.5.16 ready · prelim shared queue unified duplicate guard');
 
 console.info('[230MATCH] 5.5.20 stable baseline · 5.5.17+ main queue auto-repair removed; court rendering/state mutation separated');
+
+(function stage5521StartupCourtRecovery(){
+  const run=()=>{
+    const result=stage5521RepairMissingCourtStructure();
+    if(result?.repaired){
+      try{safePersistState(`코트 구조 안전 복구 · ${result.count}면`);}catch(_e){}
+      try{renderCommittedState6400();}catch(_e){}
+      try{notice(`비어 있던 코트 운영 구조 ${result.count}면을 복구했습니다. 기존 경기·공용대기 순서는 변경하지 않았습니다.`,'success');}catch(_e){}
+    }
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(run,250),{once:true});
+  else setTimeout(run,250);
+  console.info('[230MATCH] 5.5.21 ready · safe court skeleton recovery only');
+})();
