@@ -1143,12 +1143,88 @@ function smsTeamRecipients(team){
 }
 function smsMatchRecipients(match){const out=[];for(const t of [match?.teamA,match?.teamB])for(const r of smsTeamRecipients(t))if(!out.some(x=>x.phone===r.phone))out.push(r);return out;}
 function smsOpponent(match,team){const a=match?.teamA,b=match?.teamB;return String(a?.id||a?.name)===String(team?.id||team?.name)?b:a;}
+function smsConfiguredMatchMinutes(){
+  return Math.max(10,Number(state?.settings?.matchMinutes||state?.prelim?.settings?.matchMinutes||40));
+}
+function smsFormatClock(date){
+  try{return date.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',hour12:false}).replace('24:','00:');}
+  catch(_e){return'';}
+}
+function smsPlayingRemainingMinutes(court){
+  const slot=smsConfiguredMatchMinutes();
+  const matchId=String(court?.playing||'');
+  if(!matchId)return 0;
+  const match=findAnyMatchById(matchId);
+  const started=match?.startedAt?new Date(match.startedAt).getTime():0;
+  if(!started||!Number.isFinite(started))return slot;
+  const elapsed=Math.max(0,Math.floor((Date.now()-started)/60000));
+  return Math.max(0,slot-elapsed);
+}
+function smsExpectedClock(matchId,placement={}){
+  const id=String(matchId||'');
+  if(!id)return'';
+  const slot=smsConfiguredMatchMinutes();
+  const courts=[...(state.prelim?.courts||[]),...(state.courts||[])];
+  let court=courts.find(c=>String(c.id||'')===String(placement.courtId||''))||
+            courts.find(c=>String(c.name||'')===String(placement.court||''));
+  if(!court){
+    court=courts.find(c=>{
+      if(String(c.playing||'')===id||String(c.wait1||'')===id)return true;
+      return [...(c.queue||[]),...(c.manualQueue||[])].some(x=>String(x)===id);
+    });
+  }
+  let minutes=0;
+  if(court){
+    if(String(court.playing||'')===id)return smsFormatClock(new Date());
+    minutes=smsPlayingRemainingMinutes(court);
+    if(String(court.wait1||'')===id)return smsFormatClock(new Date(Date.now()+minutes*60000));
+    const local=[...(court.queue||[]),...(court.manualQueue||[])];
+    const idx=local.findIndex(x=>String(x)===id);
+    if(idx>=0){
+      minutes += (court.wait1?slot:0) + idx*slot;
+      return smsFormatClock(new Date(Date.now()+minutes*60000));
+    }
+  }
+  // 본선 구장 공용대기: 해당 구장 코트들의 "다음 빈자리"를 간단히 시뮬레이션한다.
+  for(const [venueId,qRaw] of Object.entries(state.venueQueues||{})){
+    const q=Array.isArray(qRaw)?qRaw:[];
+    const qi=q.findIndex(x=>String(x)===id);
+    if(qi<0)continue;
+    const venueCourts=courts.filter(c=>String(c.venueId||'')===String(venueId));
+    const avail=(venueCourts.length?venueCourts:courts).map(c=>
+      smsPlayingRemainingMinutes(c)+(c.wait1?slot:0)+((c.queue||[]).length+(c.manualQueue||[]).length)*slot
+    );
+    if(!avail.length)return smsFormatClock(new Date(Date.now()+(qi+1)*slot*60000));
+    for(let i=0;i<=qi;i++){
+      let best=0;
+      for(let j=1;j<avail.length;j++)if(avail[j]<avail[best])best=j;
+      if(i===qi)return smsFormatClock(new Date(Date.now()+avail[best]*60000));
+      avail[best]+=slot;
+    }
+  }
+  const shared=(state.sharedQueue||[]).findIndex(x=>String(x)===id);
+  if(shared>=0)return smsFormatClock(new Date(Date.now()+(shared+1)*slot*60000));
+  return'';
+}
+function smsResolveDynamicBody(body,matchId='',placement={}){
+  const time=smsExpectedClock(matchId,placement);
+  return String(body||'').replace(/\{time\}/g,time||'미정');
+}
+function resolveSmsDynamicTimes(){
+  try{
+    ensureMessagingState(state);
+    for(const item of (state.messaging?.queue||[])){
+      if(!item||!String(item.body||'').includes('{time}'))continue;
+      item.body=smsResolveDynamicBody(item.body,item.matchId||'',item.placement||{});
+    }
+  }catch(_e){}
+}
 function autoSmsBody(kind,match,placement={}){
   const court=placement.court||match?.court||'배정코트';
   const teams=[match?.teamA,match?.teamB].filter(Boolean).map(smsTeamName).join('vs');
-  if(kind==='start')return `${teams} ${court} 경기. 입장`;
-  if(kind==='waiting')return `${teams} ${court} 대기${placement.position||1}`;
-  if(kind==='changed')return `${teams} ${court} ${placement.slotLabel||'대기'} 변경`;
+  if(kind==='start')return `${teams} ${court} 입장`;
+  if(kind==='waiting'){const eta=smsExpectedClock(match?.id,placement);return `${teams} ${court} 대기${placement.position||1}${eta?` 예상${eta}`:''}`;}
+  if(kind==='changed'){const eta=placement?.slot==='playing'?'':smsExpectedClock(match?.id,placement);return `${teams} ${court} ${placement.slotLabel||'대기'}${eta?` 예상${eta}`:''}`;}
   return `${teams} 경기완료`;
 }
 
@@ -1221,7 +1297,7 @@ function showNextAutoSmsDialog(){
 }
 function closeAutoSmsDialog(status='skipped'){const d=document.getElementById('autoSmsApprovalDialog');const item=d?.__smsItem;if(item)markAutoSmsHistory(item.key,status);if(d?.open)d.close();if(d)d.__smsItem=null;autoSmsDialogOpen=false;setTimeout(showNextAutoSmsDialog,60);}
 async function sendAligoSmsV3(recipients,msg,meta={}){
-  msg=smsStripAffiliations(msg);
+  msg=smsResolveDynamicBody(smsStripAffiliations(msg),meta?.matchId||'',meta?.placement||{});
   const list=[];for(const r of recipients||[]){const phone=smsDigits(r.phone);if(phone.length>=9&&!list.some(x=>x.phone===phone))list.push({name:r.name||'수신자',phone});}if(!list.length)throw new Error('문자 받을 번호가 없습니다.');
   const receivers=list.map(x=>x.phone),body=String(msg||'').trim();const type=new Blob([body]).size>90?'LMS':'SMS';
   const payload={receivers,receiver:receivers[0],recipients:list,targets:list,phones:receivers,to:receivers,msg:body,body,message:body,content:body,type,title:String(meta.title||'230MATCH 문자').slice(0,40),meta:{app:'230MATCH',version:'stage31.68',...meta}};
@@ -1484,6 +1560,7 @@ function commit(message){
   }
   if(message)log(message);
   if(state.settings.autoTimeEnabled)calculateTimeMetrics(state);
+  resolveSmsDynamicTimes();
   syncInputs();
   try{syncCurrentTournamentRuntime();}catch(_e){}
   safePersistState(message||'현재 상태');
@@ -1998,7 +2075,9 @@ function confirmPrelimResult(event){
   const involvedTeamIds=new Set([pendingMatch?.teamA?.id,pendingMatch?.teamB?.id].filter(Boolean));
   const beforeResolvedPlayIns=new Set(Object.values(state.draw?.rounds||{}).flat().filter(x=>x.isPlayIn&&x.teamA&&!x.teamA.placeholder&&x.teamB&&!x.teamB.placeholder).map(x=>x.id));
   const m=submitPrelimResult(state,{matchId:$('prelimResultMatchId').value,winnerId,scoreA,scoreB});const meta340=stage340ResultMeta('prelim');m.resultType=meta340.resultType;m.resultTypeLabel=STAGE340_EXCEPTION_LABELS[meta340.resultType]||'일반 경기';
+  const stage5513Guard=stage5513GuardPrelimManualSharedQueue();
   const stage558Shared=stage558AutoPromotePrelimManualSharedQueue();
+  stage5513GuardPrelimManualSharedQueue();
   const syncResult=syncLinkedDraw({silent:true});
   const newlyResolvedPlayIns=Object.values(state.draw?.rounds||{}).flat().filter(x=>x.isPlayIn&&!beforeResolvedPlayIns.has(x.id)&&x.teamA&&!x.teamA.placeholder&&x.teamB&&!x.teamB.placeholder);
   const directPlayIn=newlyResolvedPlayIns.find(x=>involvedTeamIds.has(x.teamA?.id)||involvedTeamIds.has(x.teamB?.id))||newlyResolvedPlayIns[0]||null;
@@ -2140,13 +2219,13 @@ let clockTimer=null;
 function updateClock(){const el=$('currentClock');if(el)el.textContent=new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});}
 function startClockTicker(){clearInterval(clockTimer);updateClock();clockTimer=setInterval(()=>{if(!document.hidden)updateClock();},30000);}
 
-async function copyMessage(id){const item=state.messaging.queue.find(x=>x.id===id);if(!item)return;const cleanBody=smsStripAffiliations(item.body);try{await navigator.clipboard.writeText(cleanBody);notice('문자 내용을 복사했습니다.','success')}catch{prompt('아래 내용을 복사하세요.',cleanBody)}}
-function openSmsMessage(id){const item=state.messaging.queue.find(x=>x.id===id);if(!item)return;const uri=smsUri({...item,body:smsStripAffiliations(item.body)});if(!uri){notice('전화번호가 없어 문자 앱을 열 수 없습니다.','error');return}window.location.href=uri}
+async function copyMessage(id){const item=state.messaging.queue.find(x=>x.id===id);if(!item)return;const cleanBody=smsResolveDynamicBody(smsStripAffiliations(item.body),item.matchId||'',item.placement||{});try{await navigator.clipboard.writeText(cleanBody);notice('문자 내용을 복사했습니다.','success')}catch{prompt('아래 내용을 복사하세요.',cleanBody)}}
+function openSmsMessage(id){const item=state.messaging.queue.find(x=>x.id===id);if(!item)return;const uri=smsUri({...item,body:smsResolveDynamicBody(smsStripAffiliations(item.body),item.matchId||'',item.placement||{})});if(!uri){notice('전화번호가 없어 문자 앱을 열 수 없습니다.','error');return}window.location.href=uri}
 function setMessageSent(id){markMessageSent(state,id);commit('문자 발송완료 표시')}
 function removeMessage(id){deleteMessage(state,id);commit('문자 삭제')}
 function createCurrentCourtMessages(){const a=generateCurrentCourtMessages(state);commit(`현재 코트 호출 문자 ${a.length}건 생성`);notice(`중복을 제외하고 ${a.length}건을 생성했습니다.`,'success')}
-function createCurrentWaitMessages(){const a=generateCurrentWaitMessages(state);commit(`현재 대기1 문자 ${a.length}건 생성`);notice(`중복을 제외하고 ${a.length}건을 생성했습니다.`,'success')}
-function createAllTimeMessages(){calculateTimeMetrics(state);const a=generateAllTimeMessages(state);commit(`전체 예상시간 문자 ${a.length}건 생성`);notice(`중복을 제외하고 ${a.length}건을 생성했습니다.`,'success')}
+function createCurrentWaitMessages(){const a=generateCurrentWaitMessages(state);resolveSmsDynamicTimes();commit(`현재 대기1 문자 ${a.length}건 생성`);notice(`중복을 제외하고 ${a.length}건을 생성했습니다.`,'success')}
+function createAllTimeMessages(){calculateTimeMetrics(state);const a=generateAllTimeMessages(state);resolveSmsDynamicTimes();commit(`전체 예상시간 문자 ${a.length}건 생성`);notice(`중복을 제외하고 ${a.length}건을 생성했습니다.`,'success')}
 
 
 function contactEditPlayers(team){
@@ -2612,6 +2691,54 @@ function stage555MoveToVenueSharedQueue({unified,source,sourceSlot,matchId}){
 }
 
 
+/* 230MATCH 5.5.13 · prelim manual shared queue duplicate guard.
+   The manual shared queue is authoritative: while an id remains here, native prelim
+   advancement must not also leave that same match on a court. Existing court order
+   is otherwise preserved and compacted only after removing the duplicate id. */
+function stage5513GuardPrelimManualSharedQueue(){
+  try{
+    state.prelim=state.prelim||{};
+    const raw=Array.isArray(state.prelim.manualSharedQueue)?state.prelim.manualSharedQueue:[];
+    const keep=[];const sharedIds=new Set();
+    for(const rawId of raw){
+      const id=String(rawId||'');
+      if(!id||sharedIds.has(id))continue;
+      const m=findPrelimMatch(state,id);
+      if(!m||m.status==='completed')continue;
+      sharedIds.add(id);keep.push(id);
+    }
+    state.prelim.manualSharedQueue=keep;
+    if(!sharedIds.size)return {removed:0,remaining:0};
+    let removed=0;
+    for(const court of (state.prelim.courts||[])){
+      let touched=false;
+      if(sharedIds.has(String(court.playing||''))){court.playing=null;removed++;touched=true;}
+      if(sharedIds.has(String(court.wait1||''))){court.wait1=null;removed++;touched=true;}
+      if(Array.isArray(court.queue)){
+        const before=court.queue.length;
+        court.queue=court.queue.filter(id=>!sharedIds.has(String(id)));
+        if(court.queue.length!==before){removed+=before-court.queue.length;touched=true;}
+      }
+      if(touched)stage555CompactSourceCourt(court,true);
+    }
+    for(const pool of (state.prelim.sharedCourtPools||[])){
+      if(!Array.isArray(pool.queue))continue;
+      const before=pool.queue.length;
+      pool.queue=pool.queue.filter(id=>!sharedIds.has(String(id)));
+      removed+=before-pool.queue.length;
+    }
+    // Re-assert the shared status only for ids that are still in the shared queue.
+    for(const id of keep){
+      const m=findPrelimMatch(state,id);if(!m)continue;
+      m.status='prelim_shared_queue';m.prelimCourtId=null;m.courtId=null;m.court=null;m.courtName=null;
+    }
+    return {removed,remaining:keep.length};
+  }catch(error){
+    console.error('[5.5.13] prelim shared duplicate guard failed',error);
+    return {removed:0,remaining:Array.isArray(state.prelim?.manualSharedQueue)?state.prelim.manualSharedQueue.length:0,error};
+  }
+}
+
 /* 230MATCH 5.5.8 · SAFE supplemental promotion for manually moved prelim shared queue.
    IMPORTANT: This does NOT replace or reorder the existing initial assignment / court queue engines.
    It only consumes manualSharedQueue after native prelim promotion has already completed,
@@ -2682,6 +2809,7 @@ function stage558AutoPromotePrelimManualSharedQueue(){
 }
 
 function renderPrelimManualSharedQueue557(){
+  stage5513GuardPrelimManualSharedQueue();
   const root=document.getElementById('operationPrelimSharedQueue');
   const count=document.getElementById('operationPrelimSharedQueueCount');
   if(!root)return;
@@ -3214,11 +3342,21 @@ function exportPrelimPilotReport(){if(!prelimPilotReport){notice('먼저 예선 
   if($('previewSmsRecipientBtn'))$('previewSmsRecipientBtn').onclick=previewSmsRecipient;
   if($('downloadSmsReportBtn'))$('downloadSmsReportBtn').onclick=downloadSmsAcceptance;
   if($('sendSmsTestBtn'))$('sendSmsTestBtn').onclick=sendSmsTestOne;
+  try{
+    ensureMessagingState(state);
+    const t=state.messaging.settings.templates||{};
+    if(t.wait1==='{team} {court} 대기1')t.wait1='{team} {court} 대기1 예상{time}';
+    if(t.shared==='{team} 본선대기{queueNo}번')t.shared='{team} 본선대기{queueNo}번 예상{time}';
+  }catch(_e){}
   if($('resetSmsShortTemplatesBtn'))$('resetSmsShortTemplatesBtn').onclick=()=>{
-    setValue('templatePlaying','{team} {court} 경기. 입장');
-    setValue('templateWait1','{team} {court} 대기1. 약{wait}분');
-    setValue('templateShared','{team} 본선대기 {queueNo}번');
-    pullSettings();commit('알리고 단문 기본값 적용');notice('짧은 문자 기본값을 적용했습니다.','success');
+    const shortTemplates={playing:'{team} {court} 입장',wait1:'{team} {court} 대기1 예상{time}',shared:'{team} 본선대기{queueNo}번 예상{time}'};
+    state.messaging=state.messaging||{};state.messaging.settings=state.messaging.settings||{};state.messaging.settings.templates={...(state.messaging.settings.templates||{}),...shortTemplates};
+    setValue('templatePlaying',shortTemplates.playing);
+    setValue('templateWait1',shortTemplates.wait1);
+    setValue('templateShared',shortTemplates.shared);
+    commit('알리고 단문 기본값 적용');
+    setTimeout(()=>{setValue('templatePlaying',shortTemplates.playing);setValue('templateWait1',shortTemplates.wait1);setValue('templateShared',shortTemplates.shared);},0);
+    notice('단문 기본값으로 변경했습니다.','success');
   };
   if($('messageStatusFilter'))$('messageStatusFilter').onchange=()=>render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus,holdMainMatch,releaseHeldMatch});
 
@@ -9860,7 +9998,9 @@ console.info('[230MATCH] 34.4.2 ready · main wait1 refill and shared queue elap
       if(isPrelim){
         const involved=new Set([match.teamA?.id,match.teamB?.id].filter(Boolean));const beforePlayIns=new Set(Object.values(state.draw?.rounds||{}).flat().filter(x=>x.isPlayIn&&x.teamA&&!x.teamA.placeholder&&x.teamB&&!x.teamB.placeholder).map(x=>x.id));
         saved=submitPrelimResult(state,{matchId:id,winnerId,scoreA,scoreB});saved.resultType=type;saved.resultTypeLabel=TYPE_LABELS[type];
+        stage5513GuardPrelimManualSharedQueue();
         stage558AutoPromotePrelimManualSharedQueue();
+        stage5513GuardPrelimManualSharedQueue();
         syncLinkedDraw({silent:true});const newly=Object.values(state.draw?.rounds||{}).flat().filter(x=>x.isPlayIn&&!beforePlayIns.has(x.id)&&x.teamA&&!x.teamA.placeholder&&x.teamB&&!x.teamB.placeholder);const priority=newly.filter(x=>involved.has(x.teamA?.id)||involved.has(x.teamB?.id));
         if(!correcting){if(useUnifiedCourts(state))enqueueReadyMainToUnifiedCourts(state,{priorityMatchIds:(priority.length?priority:newly).map(x=>x.id)});else autoAssignResolvedMain(state,{findMatch,queueReadyMatches,refillCourt});}
       }else{
@@ -11020,10 +11160,12 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
   const recipientsFor=match=>{try{return smsMatchRecipients(match);}catch(_e){return [];}};
   const currentMeta=()=>({tournament:String(state.tournament?.name||'230MATCH 대회'),division:String(state.tournament?.division||'부서 미설정')});
   const defaultBody=(kind,court,match,position)=>{
-    const {tournament,division}=currentMeta();
     const title=matchTitle(match);
-    if(kind==='playing')return `[230MATCH]\n${tournament} · ${division}\n\n${title}\n${court?.name||'배정 코트'}에서 경기를 시작해 주세요.\n코트 주변에서 바로 입장해 주세요.`;
-    return `[230MATCH]\n${tournament} · ${division}\n\n${title}\n${court?.name||'배정 코트'} 대기 ${position||1}번입니다.\n앞 경기 종료 후 바로 입장할 수 있도록 코트 주변에서 대기해 주세요.`;
+    const courtName=court?.name||'배정코트';
+    if(kind==='playing')return `[230MATCH]\n${title}\n${courtName} 입장`;
+    const eta=smsExpectedClock(match?.id,{court:courtName,courtId:court?.id||'',position:Number(position||1),slot:Number(position||1)<=1?'wait1':'queue'});
+    if(Number(position||1)<=1)return `[230MATCH]\n${title}\n${courtName} 대기1${eta?` 예상${eta}`:''}`;
+    return `[230MATCH]\n${title}\n${courtName} 대기${Number(position||1)}${eta?` 예상${eta}`:''}`;
   };
   const ensureHistory=()=>{state.messaging=state.messaging||{};if(!Array.isArray(state.messaging.courtSmsHistory))state.messaging.courtSmsHistory=[];return state.messaging.courtSmsHistory;};
   const duplicateRecent=(matchId,body)=>ensureHistory().find(x=>String(x.matchId)===String(matchId)&&x.body===body&&(Date.now()-new Date(x.at).getTime())<180000);
@@ -11044,7 +11186,7 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
     const recipients=recipientsFor(match);const position=Number(data.position||1);const item={...data,court,match,position,recipients,defaultBody:defaultBody(data.kind,court,match,position)};
     const dialog=document.getElementById('courtDirectSmsDialog');dialog.__item=item;
     document.getElementById('courtDirectSmsTarget').textContent=matchTitle(match);
-    document.getElementById('courtDirectSmsMeta').textContent=`${state.tournament?.name||''} · ${state.tournament?.division||''} · ${court.name||''} · ${data.kind==='playing'?'시합 시작':`대기 ${position}번`}`;
+    document.getElementById('courtDirectSmsMeta').textContent=`${court.name||''} · ${data.kind==='playing'?'시합 시작':`대기 ${position}번`}`;
     document.getElementById('courtDirectSmsRecipients').textContent=recipients.length?`수신 ${recipients.length}명 · ${recipients.map(r=>r.name||r.phone).join(', ')}`:'등록된 수신번호 없음';
     document.getElementById('courtDirectSmsBody').value=item.defaultBody;
     const noticeBox=document.getElementById('courtDirectSmsNotice');noticeBox.className='court-direct-sms-notice';noticeBox.textContent=recipients.length?'자동 문구를 확인하고 필요하면 수정하세요.':'참가팀 연락처를 먼저 등록하세요.';
@@ -13371,3 +13513,5 @@ console.info('[230MATCH] 5.5.7 ready · prelim/main shared queue transfer fixed'
 
 /* 230MATCH 5.5.11 · safe same-court reorder + queue-bottom default */
 console.info('[230MATCH] 5.5.11 ready · same-court reorder and safe transfer default');
+
+console.info('[230MATCH] 5.5.13 ready · prelim shared queue is authoritative and duplicate court restoration is blocked');

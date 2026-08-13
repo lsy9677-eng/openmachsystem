@@ -1612,9 +1612,9 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
         <section class="sms-setting-section">
           <div class="sms-setting-title"><div><strong>3. 알리고 단문 문구</strong><span>짧고 바로 이해되는 문구만 사용합니다.</span></div><button id="resetSmsShortTemplatesBtn" type="button" class="btn btn-light">단문 기본값 적용</button></div>
           <div class="message-template-grid sms-short-template-grid">
-            <label><span>시합 시작 안내</span><textarea id="templatePlaying" rows="3"></textarea><small>{team} {court} 경기. 입장</small></label>
-            <label><span>코트 대기1 안내</span><textarea id="templateWait1" rows="3"></textarea><small>{team} {court} 대기1. 약{wait}분</small></label>
-            <label><span>본선 공용대기 안내</span><textarea id="templateShared" rows="3"></textarea><small>{team} 본선대기 {queueNo}번</small></label>
+            <label><span>시합 시작 안내</span><textarea id="templatePlaying" rows="3"></textarea><small>{team} {court} 입장</small></label>
+            <label><span>코트 대기1 안내</span><textarea id="templateWait1" rows="3"></textarea><small>{team} {court} 대기1 예상{time}</small></label>
+            <label><span>본선 공용대기 안내</span><textarea id="templateShared" rows="3"></textarea><small>{team} 본선대기{queueNo}번 예상{time}</small></label>
           </div>
         </section>
 
@@ -2322,7 +2322,7 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=7187"></script>
+  <script type="module" src="./assets/js/app.js?v=7190"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
