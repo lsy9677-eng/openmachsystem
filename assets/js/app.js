@@ -1565,6 +1565,7 @@ function renderCommittedState6400(){
   if(view==='settings')updateSetupProgress();
 }
 let __tournamentWriteBypass=false;
+let __closedCloudWriteBypass=false;
 function currentTournamentArchiveRecord(){
   const archiveId=String(state?.operation?.archiveId||state?.completion?.archiveId||'');
   const rows=Array.isArray(state?.portal?.archives)?state.portal.archives:[];
@@ -2019,10 +2020,12 @@ let __stage5526CriticalPushTimer=null;
 let __stage5526CriticalPushRunning=false;
 let __stage5526LastRemoteApplyAt=0;
 
-async function stage5526PushCriticalState(reason='경기 결과'){
-  if(__stage5526CriticalPushRunning||tournamentReadOnly())return;
+async function stage5526PushCriticalState(reason='경기 결과',{allowClosed=false}={}){
+  if(__stage5526CriticalPushRunning||(tournamentReadOnly()&&!allowClosed))return;
   if(!(isAdmin()||isOperator()))return;
   __stage5526CriticalPushRunning=true;
+  const previousClosedBypass=__closedCloudWriteBypass;
+  if(allowClosed)__closedCloudWriteBypass=true;
   try{
     try{await prepareCriticalCloudWrite();}catch(_e){}
     await pushStateNow(state);
@@ -2032,6 +2035,8 @@ async function stage5526PushCriticalState(reason='경기 결과'){
     updateSyncPanel({label:'재시도 중',level:'warning',detail:`${reason} 클라우드 저장 재시도 중`});
     clearTimeout(__stage5526CriticalPushTimer);
     __stage5526CriticalPushTimer=setTimeout(async()=>{
+      const retryPreviousClosedBypass=__closedCloudWriteBypass;
+      if(allowClosed)__closedCloudWriteBypass=true;
       try{
         await connectCloudSync();
         await pushStateNow(state);
@@ -2039,9 +2044,12 @@ async function stage5526PushCriticalState(reason='경기 결과'){
       }catch(e){
         console.error('[5.5.26] critical cloud push retry failed',e);
         updateSyncPanel({label:'동기화 오류',level:'error',detail:`${reason} 저장 실패 · 네트워크/Firestore 연결을 확인하세요.`});
+      }finally{
+        __closedCloudWriteBypass=retryPreviousClosedBypass;
       }
     },900);
   }finally{
+    __closedCloudWriteBypass=previousClosedBypass;
     __stage5526CriticalPushRunning=false;
   }
 }
@@ -2073,7 +2081,7 @@ function stage5526ReconnectRealtime(reason='실시간 재연결'){
     });
 }
 
-function confirmResult(event){
+async function confirmResult(event){
   event.preventDefault();
   const id=$('resultMatchId').value;
   const before=findMatch(state.draw,id);if(!before){notice('경기 정보를 찾을 수 없습니다.','error');return;}
@@ -2088,16 +2096,30 @@ function confirmResult(event){
   const history=ensureResultChangeHistory();
   const beforeSnapshot={status:before.status||'waiting',winner:before.winner?teamText(before.winner):'',scoreA:Number(before.scoreA||0),scoreB:Number(before.scoreB||0)};
   const sourceCourt=[...(state.prelim?.courts||[]),...(state.courts||[])].find(c=>c.playing===id);const beforePlaying=sourceCourt?.playing||null,beforeWait1=sourceCourt?.wait1||null;
+  const isFinalMatch=!before.nextMatchId;
   const m=submitResult(state,{matchId:id,winnerId,scoreA,scoreB});const meta340=stage340ResultMeta('');m.resultType=meta340.resultType;m.resultTypeLabel=STAGE340_EXCEPTION_LABELS[meta340.resultType]||'일반 경기';
   history.unshift({id:`rh-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,at:new Date().toISOString(),matchId:id,teamA:teamText(m.teamA),teamB:teamText(m.teamB),scoreA:Number(m.scoreA),scoreB:Number(m.scoreB),winner:teamText(m.winner),corrected:correcting,before:beforeSnapshot});
   state.operation.resultChangeHistory=history.slice(0,100);
   const flowReport=verifyAndRepairMainFlow(state,{sourceMatchId:id});
-  const completionReport=finalizeTournamentCompletion(state);
   const isUnifiedCourt=Boolean(sourceCourt&&(state.prelim?.courts||[]).some(c=>c.id===sourceCourt.id));
   if(isUnifiedCourt){advanceUnifiedCourt(state,sourceCourt.id,id);enqueueReadyMainToUnifiedCourts(state);}
   if(sourceCourt&&state.messaging.settings.autoMessageEnabled&&state.messaging.settings.onQueueMove){if(sourceCourt.playing&&sourceCourt.playing!==beforePlaying)generatePlayingMessages(state,sourceCourt.playing,sourceCourt.name);if(sourceCourt.wait1&&sourceCourt.wait1!==beforeWait1)generateWait1Messages(state,sourceCourt.wait1,sourceCourt.name)}
-  commit(`결과 확정 · ${m.id} · 승리 ${teamText(m.winner)} · ${m.scoreA}:${m.scoreB}`);
-  void stage5526PushCriticalState('본선 결과');
+  let completionReport={completed:false,champion:null};
+  if(isFinalMatch){
+    // 5.6.3: 결승 결과를 먼저 저장한다. 종료 플래그가 먼저 생기면 commit()이 읽기전용으로 판단해 결승 저장을 거부한다.
+    commit(`결승 결과 확정 · ${m.id} · 승리 ${teamText(m.winner)} · ${m.scoreA}:${m.scoreB}`);
+    await stage5526PushCriticalState('결승 결과');
+    completionReport=finalizeTournamentCompletion(state);
+    if(completionReport.completed){
+      withTournamentWriteBypass(()=>commit(`대회 자동 종료 확정 · 우승 ${teamText(completionReport.champion)}`));
+      await stage5526PushCriticalState('대회 종료 확정',{allowClosed:true});
+      applyTournamentReadOnlyUi();
+    }
+  }else{
+    completionReport=finalizeTournamentCompletion(state);
+    commit(`결과 확정 · ${m.id} · 승리 ${teamText(m.winner)} · ${m.scoreA}:${m.scoreB}`);
+    await stage5526PushCriticalState('본선 결과');
+  }
   $('resultDialog').close();
   const flowText=completionReport.completed?` 대회가 종료되었습니다. 우승 ${teamText(completionReport.champion)}.`:(flowReport.nextMatchId?(flowReport.nextReady?' 다음 라운드 경기가 확정되어 자동 대기열에 연결됩니다.':' 다음 라운드는 상대 결과를 기다립니다.'):' 최종 경기 결과가 반영되었습니다.');
   notice(`결과와 대진표·코트 큐를 동기화했습니다.${flowText}${flowReport.propagated||flowReport.statusFixed?` 연결 보정 ${flowReport.propagated+flowReport.statusFixed}건.`:''}`,'success');
@@ -6739,7 +6761,7 @@ loadAuthSettingsPanel();renderAuthStatus();startAuth((user,role,error,profile)=>
 
 prepareRecoveryStorage().catch(error=>console.warn('로컬 복구점 저장소 준비 실패',error));
 syncInputs();syncPrelimInputs();bind();bindPortal();void startGlobalNoticeSync();setTimeout(()=>void startRegistrationCloudSync(),500);setTimeout(()=>void startPublicRegistrationSync(),650);bindPrintCenter();bindParticipantManager();bindEntryApplications();bindPublicParticipantRecords();bindResultArchive();bindTournamentLifecycleManager();bindBackupRecoveryManager();bindNotificationCenter();bindTournamentReadiness();bindAcceptanceCenter();bindRehearsalCenter();bindPerformanceCenter();bindDiagnosticsCenter();window.addEventListener('popstate',()=>navigatePortalView(location.hash.replace(/^#/, '')||'home',{focus:false}));initialPortalView();renderVenueSettingsEditor();calculateTimeMetrics(state);render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus,holdMainMatch,releaseHeldMatch});if(canOperate()){renderOperatorControls();updateSetupProgress();autoSmsSnapshot=buildAutoSmsSnapshot();installUnifiedMoveControlGuard();ensureUnifiedCourtMoveControls();}applyRoleUI();renderPortalViewFast(document.body?.dataset.currentView||'home');decorateBracketLivePlacements();renderStage331OperationDashboard();restartTimeTimer();startClockTicker();
-loadSyncPanel();startStateSync({getState:()=>state,applyRemoteState:next=>applySynchronizedState(next,'다른 기기'),onStatus:updateSyncPanel,canWrite:()=>!tournamentReadOnly()&&(isAdmin()||isOperator()),accessMode:()=>tournamentReadOnly()?'viewer':(canOperate()?'operator':'viewer')});syncAccessStarted=true;
+loadSyncPanel();startStateSync({getState:()=>state,applyRemoteState:next=>applySynchronizedState(next,'다른 기기'),onStatus:updateSyncPanel,canWrite:()=>((!tournamentReadOnly()||__closedCloudWriteBypass)&&(isAdmin()||isOperator())),accessMode:()=>tournamentReadOnly()?'viewer':(canOperate()?'operator':'viewer')});syncAccessStarted=true;
 const buildStageLabel=document.getElementById('buildStageLabel');
 window.closeAutoSmsDialog=closeAutoSmsDialog;window.approveAutoSmsAligo=approveAutoSmsAligo;window.approveAutoSmsPhone=approveAutoSmsPhone;window.copyAutoSms=copyAutoSms;window.previewCurrentCourtSms=previewCurrentCourtSms;
 if(buildStageLabel)buildStageLabel.textContent=BUILD_LABEL;
@@ -10144,7 +10166,7 @@ console.info('[230MATCH] 34.4.2 ready · main wait1 refill and shared queue elap
     return{ok:true,warning:''};
   }
 
-  function submit(event){
+  async function submit(event){
     event.preventDefault();const id=document.getElementById('stage3560MatchId').value;const isPrelim=document.getElementById('stage3560IsPrelim').value==='1';const match=matchById(id,isPrelim);if(!match)return notice('경기 정보를 찾을 수 없습니다.','error');
     if(!ownership(match.teamA).ok&&!ownership(match.teamB).ok)return notice('본인 인증된 경기만 결과를 입력할 수 있습니다.','error');
     const type=document.getElementById('stage3560Type').value||'normal';let scoreA=Number(document.getElementById('stage3560ScoreA').value),scoreB=Number(document.getElementById('stage3560ScoreB').value);let side=document.getElementById('stage3560WinnerSide').value;
@@ -10170,11 +10192,21 @@ console.info('[230MATCH] 34.4.2 ready · main wait1 refill and shared queue elap
         syncLinkedDraw({silent:true});const newly=Object.values(state.draw?.rounds||{}).flat().filter(x=>x.isPlayIn&&!beforePlayIns.has(x.id)&&x.teamA&&!x.teamA.placeholder&&x.teamB&&!x.teamB.placeholder);const priority=newly.filter(x=>involved.has(x.teamA?.id)||involved.has(x.teamB?.id));
         if(!correcting){if(useUnifiedCourts(state))enqueueReadyMainToUnifiedCourts(state,{priorityMatchIds:(priority.length?priority:newly).map(x=>x.id)});else autoAssignResolvedMain(state,{findMatch,queueReadyMatches,refillCourt});}
       }else{
-        const sourceCourt=[...(state.prelim?.courts||[]),...(state.courts||[])].find(c=>c.playing===id);saved=submitResult(state,{matchId:id,winnerId,scoreA,scoreB});saved.resultType=type;saved.resultTypeLabel=TYPE_LABELS[type];verifyAndRepairMainFlow(state,{sourceMatchId:id});finalizeTournamentCompletion(state);
+        const sourceCourt=[...(state.prelim?.courts||[]),...(state.courts||[])].find(c=>c.playing===id);saved=submitResult(state,{matchId:id,winnerId,scoreA,scoreB});saved.resultType=type;saved.resultTypeLabel=TYPE_LABELS[type];verifyAndRepairMainFlow(state,{sourceMatchId:id});
         if(!correcting&&sourceCourt&&(state.prelim?.courts||[]).some(c=>c.id===sourceCourt.id)){advanceUnifiedCourt(state,sourceCourt.id,id);enqueueReadyMainToUnifiedCourts(state);}
       }
       saved.enteredByPlayer=true;saved.enteredByUid=currentAuthUser?.uid||'';saved.enteredByName=authUserLabel();saved.enteredAt=new Date().toISOString();recordAudit(saved,isPrelim,correcting);
-      commit(`선수 결과 ${correcting?'수정':'입력'} · ${saved.id} · ${saved.scoreA}:${saved.scoreB}${type!=='normal'?` · ${TYPE_LABELS[type]}`:''}`);
+      const playerFinal=!isPrelim&&!match.nextMatchId;
+      commit(`${playerFinal?'결승 결과 확정':'선수 결과 '+(correcting?'수정':'입력')} · ${saved.id} · ${saved.scoreA}:${saved.scoreB}${type!=='normal'?` · ${TYPE_LABELS[type]}`:''}`);
+      if(playerFinal){
+        await stage5526PushCriticalState('결승 결과');
+        const completionReport=finalizeTournamentCompletion(state);
+        if(completionReport.completed){
+          withTournamentWriteBypass(()=>commit(`대회 자동 종료 확정 · 우승 ${teamText(completionReport.champion)}`));
+          await stage5526PushCriticalState('대회 종료 확정',{allowClosed:true});
+          applyTournamentReadOnlyUi();
+        }
+      }
       document.getElementById('stage3560ResultDialog').close();renderPortalViews();setTimeout(v3252AutoMyMatch,80);notice(`경기 결과가 ${correcting?'수정':'저장'}되었습니다.`,'success');
     }catch(error){console.error('[35.6.0] player result failed',error);notice(`결과 저장 실패: ${error?.message||error}`,'error')}
   }
@@ -12025,7 +12057,7 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
     ['prelim-public','예선현황'],['operation','코트현황'],['bracket','대진표'],['my-match','내경기']
   ];
   const ADMIN_ITEMS=[
-    ['prelim-public','예선현황'],['operation','코트현황'],['bracket','대진표'],['operation-game','경기운영'],['settings','설정']
+    ['prelim-public','예선현황'],['operation','코트현황'],['bracket','대진표'],['operation-game','경기운영'],['settings-hub','설정']
   ];
 
   function quickRole(){
@@ -12063,6 +12095,7 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
   function normalizeCurrentForButton(target,current){
     if(target==='operation-game')return current==='operation'&&document.getElementById('view-operation')?.dataset?.operationMode==='groups';
     if(target==='operation')return current==='operation'&&document.getElementById('view-operation')?.dataset?.operationMode!=='groups';
+    if(target==='settings-hub')return document.getElementById('adminSettingsHub')?.classList.contains('open')===true;
     return target===current;
   }
   function updateMatchdayQuickBar(){
@@ -12098,6 +12131,7 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
     e.preventDefault();
     if(target==='operation-game')openOperationMode('groups');
     else if(target==='operation')openOperationMode('courts');
+    else if(target==='settings-hub'){if(typeof openAdminSettingsHub==='function')openAdminSettingsHub();}
     else navigatePortalView(target,{pushHistory:true,focus:false});
     setTimeout(updateMatchdayQuickBar,20);
   });
@@ -13924,3 +13958,5 @@ console.info('[230MATCH] 5.5.24 ready · court round color CSS priority fixed; o
 
 
 console.info('[230MATCH] 5.6.2 · PC quickbar restored to single handler; settings direct render enabled');
+
+console.info('[230MATCH] 5.6.3 ready · final result save-before-readonly + real settings hub quickbar');
