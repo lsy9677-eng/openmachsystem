@@ -157,6 +157,108 @@ body.tournament-readonly #view-operation .btn-primary,body.tournament-readonly #
 body.tournament-readonly #view-operation input:not([type="search"]),body.tournament-readonly #view-operation select,body.tournament-readonly #view-operation textarea{pointer-events:none!important;opacity:.78}
 @media(max-width:640px){.stage3544-readonly-banner{margin:6px 8px 8px;padding:7px 9px;gap:5px;font-size:.74rem}.stage3544-readonly-banner strong{font-size:.8rem;width:100%}}
 </style>
+
+<style id="stage7179PrelimNameAndBracketMetaFix">
+/* 5.5.4 예선현황: 선수명 중심 표시, 소속은 hover/tap */
+.public-standing-table td:nth-child(2),
+.public-prelim-match strong{overflow:visible!important}
+.prelim-name-only{
+  appearance:none;
+  -webkit-appearance:none;
+  border:0;
+  background:transparent;
+  padding:0;
+  margin:0;
+  color:inherit;
+  font:inherit;
+  font-weight:inherit;
+  line-height:inherit;
+  text-align:left;
+  display:inline;
+  position:relative;
+  max-width:100%;
+}
+.prelim-name-only.has-affiliation{
+  cursor:help;
+  text-decoration:underline;
+  text-decoration-style:dotted;
+  text-decoration-color:#9aabc0;
+  text-underline-offset:3px;
+}
+.prelim-name-only.has-affiliation::after{
+  content:attr(data-prelim-affiliation);
+  position:absolute;
+  left:0;
+  bottom:calc(100% + 7px);
+  z-index:120;
+  min-width:max-content;
+  max-width:min(300px,78vw);
+  padding:7px 9px;
+  border-radius:8px;
+  background:#10264a;
+  color:#fff;
+  box-shadow:0 6px 18px rgba(15,38,74,.22);
+  font-size:11px;
+  font-weight:800;
+  line-height:1.3;
+  white-space:normal;
+  word-break:keep-all;
+  opacity:0;
+  visibility:hidden;
+  pointer-events:none;
+  transform:translateY(3px);
+  transition:opacity .12s ease,transform .12s ease;
+}
+.prelim-name-only.has-affiliation:hover::after,
+.prelim-name-only.has-affiliation:focus::after,
+.prelim-name-only.has-affiliation.show-affiliation::after{
+  opacity:1;
+  visibility:visible;
+  transform:translateY(0);
+}
+/* 본선 대진표: 경기 예정/상태 문구가 카드 경계에 걸리지 않도록 여유 확보 */
+#bracketBoard .round-match-stack>.match-card{
+  overflow:visible!important;
+  padding-bottom:9px!important;
+}
+#bracketBoard .round-match-stack>.match-card .match-meta{
+  position:static!important;
+  display:block!important;
+  margin:5px 8px 1px!important;
+  min-height:14px!important;
+  line-height:1.25!important;
+  overflow:visible!important;
+  white-space:normal!important;
+}
+#bracketBoard .bracket-live-placement{
+  box-sizing:border-box!important;
+  min-height:25px!important;
+  margin-bottom:7px!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  overflow:visible!important;
+}
+@media(max-width:700px){
+  .prelim-name-only.has-affiliation::after{
+    position:fixed;
+    left:50%;
+    bottom:84px;
+    transform:translate(-50%,3px);
+    max-width:86vw;
+    min-width:180px;
+    text-align:center;
+  }
+  .prelim-name-only.has-affiliation:hover::after,
+  .prelim-name-only.has-affiliation:focus::after,
+  .prelim-name-only.has-affiliation.show-affiliation::after{
+    transform:translate(-50%,0);
+  }
+  #bracketBoard .round-match-stack>.match-card{padding-bottom:11px!important}
+  #bracketBoard .round-match-stack>.match-card .match-meta{margin-top:6px!important;font-size:10px!important}
+}
+</style>
+
 </head>
 <body>
   <header class="topbar">
@@ -2143,7 +2245,7 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=7178"></script>
+  <script type="module" src="./assets/js/app.js?v=7180"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
