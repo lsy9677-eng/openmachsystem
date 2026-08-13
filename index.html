@@ -259,6 +259,11 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
 }
 </style>
 
+<style id="stage7182PrelimSharedQueueStyles">
+#operationPrelimSharedQueueSection .stage557-prelim-shared-item{display:grid;grid-template-columns:34px minmax(0,1fr) minmax(260px,auto);gap:10px;align-items:center}
+.stage557-prelim-shared-actions{display:flex;gap:6px;align-items:center}.stage557-prelim-shared-actions select{min-width:220px}
+@media(max-width:760px){#operationPrelimSharedQueueSection .stage557-prelim-shared-item{grid-template-columns:28px minmax(0,1fr)}.stage557-prelim-shared-actions{grid-column:2;display:grid;grid-template-columns:1fr auto}.stage557-prelim-shared-actions select{min-width:0;width:100%}}
+</style>
 </head>
 <body>
   <header class="topbar">
@@ -1368,6 +1373,19 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
         </div>
       </section>
 
+      <section class="panel operation-shared-queue-section operation-courts-section" id="operationPrelimSharedQueueSection">
+        <div class="section-head">
+          <div>
+            <h2>예선 공용대기</h2>
+            <p>코트현황에서 관리자가 공용대기로 이동한 예선 경기를 보관합니다. 필요할 때 원하는 코트로 다시 배정할 수 있습니다.</p>
+          </div>
+          <span id="operationPrelimSharedQueueCount" class="badge badge-warning">0경기</span>
+        </div>
+        <div id="operationPrelimSharedQueue" class="shared-queue venue-queue-board empty-state">
+          <p>수동으로 보낸 예선 공용대기 경기가 없습니다.</p>
+        </div>
+      </section>
+
       <section class="panel operation-shared-queue-section operation-courts-section">
         <div class="section-head">
           <div>
@@ -2245,7 +2263,7 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=7181"></script>
+  <script type="module" src="./assets/js/app.js?v=7183"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
