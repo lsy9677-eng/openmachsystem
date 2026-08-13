@@ -13636,3 +13636,217 @@ console.info('[230MATCH] 5.5.20 stable baseline · 5.5.17+ main queue auto-repai
   else setTimeout(run,250);
   console.info('[230MATCH] 5.5.21 ready · safe court skeleton recovery only');
 })();
+
+
+/* 230MATCH 5.5.22 · 표시 전용 무결성 정리
+   중요: state / venueQueues / sharedQueue / 자동배정 엔진은 절대 수정하지 않는다.
+   - 본선 공용대기 DOM에 같은 경기가 반복 렌더링되면 화면에서만 1개로 정리
+   - 관리자 실행 상태 DOM이 중복 생성된 경우 첫 1개만 유지
+*/
+(function stage5522DisplayOnlyIntegrity(){
+  let queued=false;
+  let observer=null;
+
+  function normalized(value){
+    return String(value||'').replace(/\s+/g,' ').trim();
+  }
+
+  function explicitMatchKey(item){
+    if(!item)return'';
+    const attrs=[
+      'data-match-id','data-queue-match-id','data-main-match-id',
+      'data-shared-match-id','data-match','data-id'
+    ];
+    for(const name of attrs){
+      const value=item.getAttribute?.(name);
+      if(value)return `id:${value}`;
+    }
+    for(const el of item.querySelectorAll?.('*')||[]){
+      for(const attr of [...(el.attributes||[])]){
+        const n=String(attr.name||'').toLowerCase();
+        const v=String(attr.value||'').trim();
+        if(!v)continue;
+        if(n.includes('match')&&n.startsWith('data-'))return `id:${v}`;
+        const token=v.match(/\b(?:r\d+_m\d+|m-[a-z0-9_-]{4,}|match-[a-z0-9_-]{4,})\b/i);
+        if(token)return `id:${token[0]}`;
+      }
+    }
+    return'';
+  }
+
+  function semanticMatchKey(item){
+    const strong=normalized(item.querySelector?.('.queue-match strong, strong')?.textContent);
+    const small=normalized(item.querySelector?.('.queue-match small, small')?.textContent)
+      .replace(/(?:예상|약)\s*\d{1,2}:\d{2}/g,'')
+      .replace(/\b\d+\s*분\b/g,'')
+      .trim();
+    if(strong)return `text:${strong}|${small}`;
+
+    // 최후 fallback: 순번/버튼 문구처럼 변할 수 있는 부분은 제거한다.
+    let txt=normalized(item.textContent);
+    txt=txt
+      .replace(/^\s*\d+\s*/,'')
+      .replace(/(?:▲|▼|위로|아래로|수동\s*배정|긴급\s*수동배정|구장\s*이동|보류)/g,'')
+      .replace(/\s+/g,' ')
+      .trim();
+    return txt?`text:${txt}`:'';
+  }
+
+  function mainSharedItems(root){
+    const direct=[...root.querySelectorAll('.shared-queue-item')];
+    if(direct.length)return direct;
+    // 구형 UI 호환: 공용대기 보드 안의 반복 카드 후보
+    return [...root.querySelectorAll('article, .queue-item, .venue-queue-item')].filter(el=>{
+      const t=normalized(el.textContent);
+      return t && (el.querySelector('button,select') || /vs|대기|경기/.test(t));
+    });
+  }
+
+  function dedupeMainSharedDisplay(){
+    const root=document.getElementById('operationSharedQueue');
+    if(!root)return 0;
+    const seen=new Set();
+    let hidden=0;
+    for(const item of mainSharedItems(root)){
+      const key=explicitMatchKey(item)||semanticMatchKey(item);
+      if(!key)continue;
+      if(seen.has(key)){
+        item.hidden=true;
+        item.dataset.stage5522Duplicate='1';
+        hidden++;
+      }else{
+        seen.add(key);
+        if(item.dataset.stage5522Duplicate==='1'){
+          item.hidden=false;
+          delete item.dataset.stage5522Duplicate;
+        }
+      }
+    }
+
+    // 숫자는 "화면에 실제 보이는 고유 카드" 기준으로만 보정한다.
+    const visible=mainSharedItems(root).filter(x=>!x.hidden).length;
+    const count=document.getElementById('operationSharedQueueCount');
+    if(count && visible>=0)count.textContent=`${visible}경기`;
+    return hidden;
+  }
+
+  function keepSingleAdminCenter(){
+    const nodes=[...document.querySelectorAll('#adminActionCenter3443, .admin-action-center-3443')];
+    if(nodes.length<=1)return 0;
+    const keep=nodes.find(x=>x.id==='adminActionCenter3443')||nodes[0];
+    let removed=0;
+    for(const node of nodes){
+      if(node===keep)continue;
+      node.remove();
+      removed++;
+    }
+    return removed;
+  }
+
+  function run(){
+    queued=false;
+    try{dedupeMainSharedDisplay();}catch(e){console.error('[5.5.22] shared display dedupe',e);}
+    try{keepSingleAdminCenter();}catch(e){console.error('[5.5.22] admin center singleton',e);}
+  }
+
+  function schedule(){
+    if(queued)return;
+    queued=true;
+    requestAnimationFrame(run);
+  }
+
+  function start(){
+    run();
+    observer=new MutationObserver(schedule);
+    observer.observe(document.body,{childList:true,subtree:true});
+    window.addEventListener('hashchange',()=>setTimeout(run,80));
+    setInterval(()=>{
+      if(document.body?.dataset.currentView==='operation')run();
+    },3000);
+  }
+
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});
+  else start();
+
+  console.info('[230MATCH] 5.5.22 ready · display-only main shared queue dedupe + admin center singleton');
+})();
+
+
+/* 230MATCH 5.5.23 · 코트현황/공용대기 단계별 색상 데코레이터
+   DOM 표시만 변경하며 state/큐/배정 엔진을 수정하지 않는다. */
+(function stage5523RoundColorDecorator(){
+  const ROUND_CLASSES=[
+    'stage5523-round-prelim','stage5523-round-64','stage5523-round-32',
+    'stage5523-round-16','stage5523-round-8','stage5523-round-4','stage5523-round-2'
+  ];
+
+  function classify(text){
+    const t=String(text||'').replace(/\s+/g,' ');
+    if(/예선/.test(t) && !/(64|32|16|8|4|2)\s*강/.test(t)) return {cls:'stage5523-round-prelim',label:'예선'};
+    if(/64\s*강/.test(t)) return {cls:'stage5523-round-64',label:'64강'};
+    if(/32\s*강/.test(t)) return {cls:'stage5523-round-32',label:'32강'};
+    if(/16\s*강/.test(t)) return {cls:'stage5523-round-16',label:'16강'};
+    if(/8\s*강/.test(t)) return {cls:'stage5523-round-8',label:'8강'};
+    if(/(?:4\s*강|준결승)/.test(t)) return {cls:'stage5523-round-4',label:'준결승'};
+    if(/(?:2\s*강|결승)/.test(t)) return {cls:'stage5523-round-2',label:'결승'};
+    return null;
+  }
+
+  function apply(el){
+    if(!el)return;
+    const info=classify(el.textContent);
+    for(const cls of ROUND_CLASSES)el.classList.remove(cls);
+    el.querySelectorAll(':scope > .stage5523-round-badge').forEach(x=>x.remove());
+    if(!info)return;
+    el.classList.add(info.cls);
+
+    // 공용대기 카드에서 라운드 문구가 잘 안 보이는 경우만 작은 배지를 추가.
+    if(el.closest('#operationSharedQueue')){
+      const head=el.querySelector('.queue-match strong, strong, h3, h4') || el.firstElementChild;
+      if(head && !String(head.textContent||'').includes(info.label)){
+        const badge=document.createElement('span');
+        badge.className='stage5523-round-badge';
+        badge.textContent=info.label;
+        head.insertAdjacentElement('afterend',badge);
+      }
+    }
+  }
+
+  function decorateCourtGrid(root){
+    if(!root)return;
+    root.querySelectorAll('.prelim-court-slot').forEach(apply);
+    root.querySelectorAll('.prelim-extra-item').forEach(apply);
+  }
+
+  function decorateShared(root){
+    if(!root)return;
+    const direct=[...root.querySelectorAll('.shared-queue-item')];
+    const items=direct.length?direct:[...root.querySelectorAll('article,.queue-item,.venue-queue-item')];
+    items.forEach(apply);
+  }
+
+  let pending=false;
+  function run(){
+    pending=false;
+    decorateCourtGrid(document.getElementById('operationUnifiedCourtGrid'));
+    decorateCourtGrid(document.getElementById('prelimCourtOperationGrid'));
+    decorateShared(document.getElementById('operationSharedQueue'));
+    decorateShared(document.getElementById('operationPrelimSharedQueue'));
+  }
+  function schedule(){
+    if(pending)return;
+    pending=true;
+    requestAnimationFrame(run);
+  }
+  function start(){
+    run();
+    const observer=new MutationObserver(schedule);
+    observer.observe(document.body,{childList:true,subtree:true,characterData:true});
+    window.addEventListener('hashchange',()=>setTimeout(run,80));
+  }
+
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});
+  else start();
+
+  console.info('[230MATCH] 5.5.23 ready · court/shared round color coding (display only)');
+})();

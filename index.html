@@ -348,6 +348,89 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
 }
 </style>
 
+
+<style id="stage5523RoundColorCoding">
+/* 230MATCH 5.5.23 · 코트현황/공용대기 단계별 색상 구분
+   표시 전용. 운영 상태/큐/자동배정 데이터에는 영향 없음. */
+#operationUnifiedCourtGrid .stage5523-round-prelim,
+#prelimCourtOperationGrid .stage5523-round-prelim{
+  background:#eef8ff!important;
+  border-color:#8fc4ea!important;
+}
+#operationUnifiedCourtGrid .stage5523-round-64,
+#prelimCourtOperationGrid .stage5523-round-64,
+#operationSharedQueue .stage5523-round-64{
+  background:#edf5ff!important;
+  border-color:#7fb2e8!important;
+}
+#operationUnifiedCourtGrid .stage5523-round-32,
+#prelimCourtOperationGrid .stage5523-round-32,
+#operationSharedQueue .stage5523-round-32{
+  background:#f2efff!important;
+  border-color:#a38ce0!important;
+}
+#operationUnifiedCourtGrid .stage5523-round-16,
+#prelimCourtOperationGrid .stage5523-round-16,
+#operationSharedQueue .stage5523-round-16{
+  background:#fbf0ff!important;
+  border-color:#c17bd5!important;
+}
+#operationUnifiedCourtGrid .stage5523-round-8,
+#prelimCourtOperationGrid .stage5523-round-8,
+#operationSharedQueue .stage5523-round-8{
+  background:#fff6df!important;
+  border-color:#e2b457!important;
+}
+#operationUnifiedCourtGrid .stage5523-round-4,
+#prelimCourtOperationGrid .stage5523-round-4,
+#operationSharedQueue .stage5523-round-4{
+  background:#fff0e8!important;
+  border-color:#e58c68!important;
+}
+#operationUnifiedCourtGrid .stage5523-round-2,
+#prelimCourtOperationGrid .stage5523-round-2,
+#operationSharedQueue .stage5523-round-2{
+  background:#ffecef!important;
+  border-color:#df6677!important;
+}
+
+/* 진행/대기 상태색은 유지하되 라운드색을 얇은 좌측선으로도 확실히 구분 */
+.stage5523-round-prelim{box-shadow:inset 4px 0 0 #4aa3df!important}
+.stage5523-round-64{box-shadow:inset 4px 0 0 #3478d4!important}
+.stage5523-round-32{box-shadow:inset 4px 0 0 #6a55cf!important}
+.stage5523-round-16{box-shadow:inset 4px 0 0 #a346b8!important}
+.stage5523-round-8{box-shadow:inset 4px 0 0 #d87522!important}
+.stage5523-round-4{box-shadow:inset 4px 0 0 #df6745!important}
+.stage5523-round-2{box-shadow:inset 4px 0 0 #c52f42!important}
+
+/* 공용대기 카드는 단계 구분이 더 잘 보이도록 */
+#operationSharedQueue .shared-queue-item[class*="stage5523-round-"],
+#operationSharedQueue article[class*="stage5523-round-"],
+#operationSharedQueue .queue-item[class*="stage5523-round-"],
+#operationSharedQueue .venue-queue-item[class*="stage5523-round-"]{
+  border-width:1.5px!important;
+}
+
+/* 단계 뱃지 */
+.stage5523-round-badge{
+  display:inline-flex;
+  align-items:center;
+  margin-left:6px;
+  padding:2px 7px;
+  border-radius:999px;
+  font-size:10px;
+  line-height:1.2;
+  font-weight:900;
+  white-space:nowrap;
+  color:#263552;
+  background:rgba(255,255,255,.72);
+  border:1px solid rgba(60,80,120,.16);
+}
+@media(max-width:700px){
+  .stage5523-round-badge{font-size:9px;padding:2px 6px;margin-left:4px}
+}
+</style>
+
 </head>
 <body>
   <header class="topbar">
@@ -2348,7 +2431,7 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=7196"></script>
+  <script type="module" src="./assets/js/app.js?v=7198"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
