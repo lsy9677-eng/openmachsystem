@@ -13850,3 +13850,5 @@ console.info('[230MATCH] 5.5.20 stable baseline · 5.5.17+ main queue auto-repai
 
   console.info('[230MATCH] 5.5.23 ready · court/shared round color coding (display only)');
 })();
+
+console.info('[230MATCH] 5.5.24 ready · court round color CSS priority fixed; operation logic untouched');

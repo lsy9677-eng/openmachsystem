@@ -431,6 +431,86 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
 }
 </style>
 
+
+<style id="stage5524CourtRoundColorPriorityFix">
+/* 230MATCH 5.5.24
+   기존 .playing/.wait1 배경보다 라운드 색을 우선 적용한다.
+   상태 구분은 테두리/상태 배지로 유지한다. */
+
+/* 예선 */
+#operationUnifiedCourtGrid .prelim-court-slot.stage5523-round-prelim,
+#prelimCourtOperationGrid .prelim-court-slot.stage5523-round-prelim{
+  background:#eaf7ff!important;
+  border-color:#6fb6e6!important;
+}
+/* 64강 */
+#operationUnifiedCourtGrid .prelim-court-slot.stage5523-round-64,
+#prelimCourtOperationGrid .prelim-court-slot.stage5523-round-64{
+  background:#e8f2ff!important;
+  border-color:#5b9fe3!important;
+}
+/* 32강 */
+#operationUnifiedCourtGrid .prelim-court-slot.stage5523-round-32,
+#prelimCourtOperationGrid .prelim-court-slot.stage5523-round-32{
+  background:#f0ecff!important;
+  border-color:#8f78dc!important;
+}
+/* 16강 */
+#operationUnifiedCourtGrid .prelim-court-slot.stage5523-round-16,
+#prelimCourtOperationGrid .prelim-court-slot.stage5523-round-16{
+  background:#f8eaff!important;
+  border-color:#b967cf!important;
+}
+/* 8강 */
+#operationUnifiedCourtGrid .prelim-court-slot.stage5523-round-8,
+#prelimCourtOperationGrid .prelim-court-slot.stage5523-round-8{
+  background:#fff4d9!important;
+  border-color:#dfa84a!important;
+}
+/* 준결승 */
+#operationUnifiedCourtGrid .prelim-court-slot.stage5523-round-4,
+#prelimCourtOperationGrid .prelim-court-slot.stage5523-round-4{
+  background:#ffeadf!important;
+  border-color:#df805d!important;
+}
+/* 결승 */
+#operationUnifiedCourtGrid .prelim-court-slot.stage5523-round-2,
+#prelimCourtOperationGrid .prelim-court-slot.stage5523-round-2{
+  background:#ffe7eb!important;
+  border-color:#d65366!important;
+}
+
+/* 같은 라운드 안에서도 시합중 / 대기1 상태는 외곽선으로 즉시 구분 */
+#operationUnifiedCourtGrid .prelim-court-slot.playing[class*="stage5523-round-"],
+#prelimCourtOperationGrid .prelim-court-slot.playing[class*="stage5523-round-"]{
+  outline:2px solid rgba(220,65,65,.28)!important;
+  outline-offset:-2px!important;
+}
+#operationUnifiedCourtGrid .prelim-court-slot.wait1[class*="stage5523-round-"],
+#prelimCourtOperationGrid .prelim-court-slot.wait1[class*="stage5523-round-"]{
+  outline:2px solid rgba(205,150,25,.30)!important;
+  outline-offset:-2px!important;
+}
+
+/* 추가대기 카드도 동일한 단계 색상 체계 */
+#operationUnifiedCourtGrid .prelim-extra-item.stage5523-round-prelim{background:#eaf7ff!important;border-color:#6fb6e6!important}
+#operationUnifiedCourtGrid .prelim-extra-item.stage5523-round-64{background:#e8f2ff!important;border-color:#5b9fe3!important}
+#operationUnifiedCourtGrid .prelim-extra-item.stage5523-round-32{background:#f0ecff!important;border-color:#8f78dc!important}
+#operationUnifiedCourtGrid .prelim-extra-item.stage5523-round-16{background:#f8eaff!important;border-color:#b967cf!important}
+#operationUnifiedCourtGrid .prelim-extra-item.stage5523-round-8{background:#fff4d9!important;border-color:#dfa84a!important}
+#operationUnifiedCourtGrid .prelim-extra-item.stage5523-round-4{background:#ffeadf!important;border-color:#df805d!important}
+#operationUnifiedCourtGrid .prelim-extra-item.stage5523-round-2{background:#ffe7eb!important;border-color:#d65366!important}
+
+/* 공용대기도 동일 팔레트 유지 */
+#operationSharedQueue .stage5523-round-prelim{background:#eaf7ff!important;border-color:#6fb6e6!important}
+#operationSharedQueue .stage5523-round-64{background:#e8f2ff!important;border-color:#5b9fe3!important}
+#operationSharedQueue .stage5523-round-32{background:#f0ecff!important;border-color:#8f78dc!important}
+#operationSharedQueue .stage5523-round-16{background:#f8eaff!important;border-color:#b967cf!important}
+#operationSharedQueue .stage5523-round-8{background:#fff4d9!important;border-color:#dfa84a!important}
+#operationSharedQueue .stage5523-round-4{background:#ffeadf!important;border-color:#df805d!important}
+#operationSharedQueue .stage5523-round-2{background:#ffe7eb!important;border-color:#d65366!important}
+</style>
+
 </head>
 <body>
   <header class="topbar">
@@ -2431,7 +2511,7 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=7198"></script>
+  <script type="module" src="./assets/js/app.js?v=7199"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
