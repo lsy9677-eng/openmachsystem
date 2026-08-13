@@ -448,7 +448,17 @@ function acceptanceChecks(){
   const mainMatches=typeof allMatches==='function'?allMatches(state):[];
   const matchIds=[...prelimMatches,...mainMatches].map(x=>String(x?.id||'')).filter(Boolean);
   const duplicateMatchIds=matchIds.filter((id,index)=>matchIds.indexOf(id)!==index);
-  const courts=(state?.venues||[]).flatMap(v=>(v?.courts||[]).map(c=>typeof c==='string'?c:c?.name||c?.id||'')).filter(Boolean);
+  // 5.4.34: current tournament editor stores venue/court configuration in state.settings.venues.
+  // Support both the current courtNumbers model and older courtCount/courts models so the acceptance
+  // check validates the same data the tournament editor actually saves.
+  const configuredVenues=Array.isArray(state?.settings?.venues)?state.settings.venues:[];
+  const configuredCourtCount=configuredVenues.reduce((sum,v)=>{
+    if(Array.isArray(v?.courtNumbers)&&v.courtNumbers.length)return sum+v.courtNumbers.length;
+    if(Array.isArray(v?.courts)&&v.courts.length)return sum+v.courts.length;
+    return sum+Math.max(0,Number(v?.courtCount)||0);
+  },0);
+  const legacyCourts=(state?.venues||[]).flatMap(v=>(v?.courts||[]).map(c=>typeof c==='string'?c:c?.name||c?.id||'')).filter(Boolean);
+  const courtCount=Math.max(configuredCourtCount,legacyCourts.length);
 
   // Stage35.4 final integrity checks. These are inspection-only and do not alter tournament data.
   const activeTournamentId=String(state?.multiTournament?.activeTournamentId||state?.tournament?.id||'');
@@ -491,7 +501,7 @@ function acceptanceChecks(){
     {group:'경기',label:'경기 ID 중복 없음',ok:duplicateMatchIds.length===0,detail:duplicateMatchIds.length?`중복 ${[...new Set(duplicateMatchIds)].length}건`:`${matchIds.length}경기 정상`,required:true},
     {group:'경기',label:'예선 데이터 구조',ok:Array.isArray(state?.prelim?.matches),detail:`예선 ${prelimMatches.length}경기`,required:true},
     {group:'경기',label:'본선 데이터 구조',ok:Array.isArray(mainMatches),detail:`본선 ${mainMatches.length}경기`,required:true},
-    {group:'코트',label:'코트 설정',ok:courts.length>0,detail:courts.length?`${courts.length}면 확인`:'등록 코트 없음',required:true},
+    {group:'코트',label:'코트 설정',ok:courtCount>0,detail:courtCount?`${configuredVenues.length||state?.venues?.length||0}개 구장 · ${courtCount}면 확인`:'등록 코트 없음',required:true},
     {group:'Stage35.4',label:'종료 스냅샷 연결',ok:finalArchiveOk,detail:closed?(finalArchiveOk?`최종 스냅샷 ${archiveId}`:'종료 상태인데 최종 스냅샷을 찾을 수 없음'):'운영 중 대회 · 종료 시 검사',required:true},
     {group:'Stage35.4',label:'종료대회 읽기전용 잠금',ok:readonlyGuardOk,detail:closed?(readonlyGuardOk?'읽기전용·자동배정 OFF':'종료 잠금 상태 불일치'):'운영 중 대회',required:true},
     {group:'Stage35.4',label:'종료대회 진행자 권한 만료',ok:activeClosedGrants.length===0,detail:closed?(activeClosedGrants.length?`활성 진행자 권한 ${activeClosedGrants.length}건 남음`:'활성 진행자 권한 없음'):`현재 대회 권한 ${grants.filter(g=>String(g?.tournamentId||'')===currentTid&&String(g?.status||'active')==='active').length}건`,required:true},
@@ -504,7 +514,7 @@ function acceptanceChecks(){
 }
 function buildAcceptancePayload(){
   const checks=acceptanceChecks(),failed=checks.filter(x=>x.required&&!x.ok);
-  return {format:'230MATCH_V3_OPERATION_ACCEPTANCE',build:BUILD_LABEL,generatedAt:new Date().toISOString(),url:location.href,role:typeof currentRole==='string'?currentRole:'unknown',releaseDecision:failed.length?'HOLD':'PASS',tournament:{name:state?.tournament?.name||'',division:state?.tournament?.division||'',teams:state?.teams?.length||0,prelimMatches:state?.prelim?.matches?.length||0,mainMatches:typeof allMatches==='function'?allMatches(state).length:0,venues:state?.venues?.length||0},checks};
+  return {format:'230MATCH_V3_OPERATION_ACCEPTANCE',build:BUILD_LABEL,generatedAt:new Date().toISOString(),url:location.href,role:typeof currentRole==='string'?currentRole:'unknown',releaseDecision:failed.length?'HOLD':'PASS',tournament:{name:state?.tournament?.name||'',division:state?.tournament?.division||'',teams:state?.teams?.length||0,prelimMatches:state?.prelim?.matches?.length||0,mainMatches:typeof allMatches==='function'?allMatches(state).length:0,venues:Array.isArray(state?.settings?.venues)?state.settings.venues.length:(state?.venues?.length||0)},checks};
 }
 function renderAcceptance(){
   const list=document.getElementById('acceptanceChecklist');if(!list)return;
