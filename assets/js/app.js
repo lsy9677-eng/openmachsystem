@@ -26,7 +26,7 @@ import{ensureCourtStatuses,pauseCourt,resumeCourt}from'./court-status-engine.js?
 import{ensureCourtManualQueues,assignToCourtManualQueue,moveCourtMatchFlexible,returnManualQueueItemToVenue,reorderCourtManualQueue}from'./court-manual-queue-engine.js?v=332012';
 import{reorderPrelimQueue as reorderPrelimQueueItem,movePrelimQueuedMatch,returnPrelimWait1ToQueue}from'./prelim-queue-control-engine.js?v=332012';
 import{ensurePrelimCourtStatuses,pausePrelimCourt,resumePrelimCourt}from'./prelim-court-status-engine.js?v=332012';
-import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7208';
+import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7211';
 import{verifyAndRepairMainFlow}from'./main-flow-integrity-engine.js?v=332012';
 import{finalizeTournamentCompletion}from'./tournament-completion-engine.js?v=332012';
 import{ensureTournamentIdentity,validateTournamentForArchive,createTournamentArchive,archiveListItem,archiveBackupPayload}from'./archive-engine.js?v=354101';
@@ -773,6 +773,14 @@ if(stage3500LifecycleInit.migrated){try{saveState(state);}catch(_e){}}
 const ROLE_KEY='230match-v3-session-role';
 const ADMIN_PIN_KEY='230match-v3-admin-pin';
 const OPERATOR_PIN_KEY='230match-v3-operator-pin';
+const MANUAL_ROLE_OVERRIDE_KEY='230match-v3-manual-role-override';
+let manualRoleOverride=sessionStorage.getItem(MANUAL_ROLE_OVERRIDE_KEY)||'';
+function setManualRoleOverride(role){
+  manualRoleOverride=['admin','operator'].includes(role)?role:'';
+  if(manualRoleOverride)sessionStorage.setItem(MANUAL_ROLE_OVERRIDE_KEY,manualRoleOverride);
+  else sessionStorage.removeItem(MANUAL_ROLE_OVERRIDE_KEY);
+}
+
 let currentRole=sessionStorage.getItem(ROLE_KEY)||'viewer';
 let currentAuthUser=null;
 let syncAccessStarted=false;
@@ -785,7 +793,18 @@ function refreshSyncAccessMode(){
 function authUserLabel(){return currentAuthUser?.appProfile?.name||currentAuthUser?.displayName||currentAuthUser?.email||'로그인 사용자';}
 function applyAuthenticatedRole(user,role='viewer',profile=null){
   const before=currentRole;
-  currentAuthUser=user?{...user,appProfile:profile||null}:null;currentRole=user?role:'viewer';sessionStorage.setItem(ROLE_KEY,currentRole);applyRoleUI();renderAuthStatus();
+  currentAuthUser=user?{...user,appProfile:profile||null}:null;
+  if(!user){
+    currentRole='viewer';
+    setManualRoleOverride('');
+  }else if(manualRoleOverride==='admin'){
+    currentRole='admin';
+  }else if(manualRoleOverride==='operator'){
+    currentRole='operator';
+  }else{
+    currentRole=role;
+  }
+  sessionStorage.setItem(ROLE_KEY,currentRole);applyRoleUI();renderAuthStatus();
   if(before!==currentRole)refreshSyncAccessMode();
   if(currentAuthUser&&currentRole==='admin'&&globalNoticeReady&&!globalNoticeCloudExists){setTimeout(()=>saveGlobalNoticeCloud('기존 공지 전체 공지로 전환').catch(error=>console.warn('[230MATCH] 기존 공지 전역 전환 대기',error)),250);}
   setTimeout(()=>void startRegistrationCloudSync({force:true}),80);
@@ -830,6 +849,7 @@ function setRole(role){
   }
   const before=currentRole;
   currentRole=target;
+  setManualRoleOverride(target);
   sessionStorage.setItem(ROLE_KEY,currentRole);
   applyRoleUI();
   if(before!==currentRole)refreshSyncAccessMode();
@@ -10432,7 +10452,7 @@ console.info('[230MATCH] 34.4.2 ready · main wait1 refill and shared queue elap
     renderAuthStatus();
   }
   const baseLogout=handleSocialLogout;
-  handleSocialLogout=async function(){await baseLogout.apply(this,arguments);currentAuthUser=null;currentRole='viewer';sessionStorage.setItem(ROLE_KEY,currentRole);applyRoleUI();renderAuthStatus();closeSocialLogin?.();};
+  handleSocialLogout=async function(){await baseLogout.apply(this,arguments);currentAuthUser=null;currentRole='viewer';setManualRoleOverride('');sessionStorage.setItem(ROLE_KEY,currentRole);applyRoleUI();renderAuthStatus();closeSocialLogin?.();};
   const applyBuild=()=>{bindHeaderActions();const label=byId('buildStageLabel');if(label){label.textContent='230MATCH 35.6.2 · 회원 설정·직접 로그아웃';label.title='Version 35.6.2';}document.documentElement.dataset.build='3562';};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(applyBuild,0),{once:true});else setTimeout(applyBuild,0);
   console.info('[230MATCH] 35.6.2 ready · named member header, profile settings, direct logout');
@@ -13389,6 +13409,10 @@ function stage354ResolveRole(baseRole=stage354AuthBaseRole){
 }
 function stage354RefreshGrantedRole({quiet=true}={}){
   if(!currentAuthUser||stage354AuthBaseRole==='admin')return;
+  // 5.6.8: PIN으로 직접 올린 관리자/진행자 세션은 대회별 grant 만료가 강등할 수 없다.
+  // 특히 종료된 테스트 대회 선택 시 grant가 expired 되어 admin -> viewer 로 떨어지던 문제를 차단한다.
+  if(manualRoleOverride==='admin'&&currentRole==='admin')return;
+  if(manualRoleOverride==='operator'&&currentRole==='operator')return;
   const next=stage354ResolveRole(stage354AuthBaseRole), before=currentRole;
   if(next===before)return;
   currentRole=next;sessionStorage.setItem(ROLE_KEY,currentRole);applyRoleUI();renderAuthStatus();refreshSyncAccessMode();
@@ -14022,93 +14046,4 @@ console.info('[230MATCH] 5.6.5 ready · home top shortcuts direct-bound; common 
 
 console.info('[230MATCH] 5.6.6 ready · shortcuts now use same simple onclick model as working tab strip');
 
-
-/* 230MATCH 5.6.7 · invisible interaction blocker guard
-   버튼 이벤트를 변경하지 않고, 닫혀 있어야 할 overlay/dialog가 클릭을 가로채는 상태만 복구한다. */
-(()=>{
-  const NON_DIALOG_LAYERS=[
-    ['adminSettingsHub', el=>el.classList.contains('open')&&!el.hidden],
-    ['mobileMoreSheet', el=>el.classList.contains('open')&&!el.hidden],
-    ['newTournamentWizard', el=>!el.hidden&&el.getAttribute('aria-hidden')!=='true'],
-    ['noticeImageViewer', el=>el.classList.contains('open')],
-  ];
-
-  function visuallyGhostDialog(d){
-    if(!d?.open)return false;
-    if(d.hidden || d.getAttribute('aria-hidden')==='true')return true;
-    let cs=null;
-    try{cs=getComputedStyle(d);}catch(_e){}
-    if(cs && (cs.display==='none'||cs.visibility==='hidden'||Number(cs.opacity)===0))return true;
-    try{
-      const r=d.getBoundingClientRect();
-      if(r.width<2||r.height<2)return true;
-    }catch(_e){}
-    return false;
-  }
-
-  function closeGhostDialogs(){
-    document.querySelectorAll('dialog[open]').forEach(d=>{
-      if(!visuallyGhostDialog(d))return;
-      try{d.close();}catch(_e){try{d.removeAttribute('open');}catch(__e){}}
-      console.warn('[230MATCH 5.6.7] 숨은 dialog 차단 해제:',d.id||'(no id)');
-    });
-  }
-
-  function normalizeLayerPointerEvents(){
-    NON_DIALOG_LAYERS.forEach(([id,isActive])=>{
-      const el=document.getElementById(id);if(!el)return;
-      let active=false;try{active=Boolean(isActive(el));}catch(_e){}
-      el.style.pointerEvents=active?'auto':'none';
-    });
-    const install=document.getElementById('appInstallPrompt');
-    if(install){
-      let cs=null;try{cs=getComputedStyle(install);}catch(_e){}
-      const hidden=install.hidden || (cs&&(cs.display==='none'||cs.visibility==='hidden'||Number(cs.opacity)===0));
-      if(hidden)install.style.pointerEvents='none';
-    }
-  }
-
-  function repairInteractionBlockers(){
-    closeGhostDialogs();
-    normalizeLayerPointerEvents();
-  }
-
-  // 설정을 열 때 native dialog가 top-layer에 고아 상태로 남아 있으면 먼저 제거한다.
-  const originalOpenSettings=window.openAdminSettingsHub;
-  if(typeof originalOpenSettings==='function'){
-    window.openAdminSettingsHub=function(...args){
-      closeGhostDialogs();
-      const result=originalOpenSettings.apply(this,args);
-      const hub=document.getElementById('adminSettingsHub');
-      if(hub)hub.style.pointerEvents='auto';
-      return result;
-    };
-  }
-  const originalCloseSettings=window.closeAdminSettingsHub;
-  if(typeof originalCloseSettings==='function'){
-    window.closeAdminSettingsHub=function(...args){
-      const result=originalCloseSettings.apply(this,args);
-      const hub=document.getElementById('adminSettingsHub');
-      if(hub&&!hub.classList.contains('open'))hub.style.pointerEvents='none';
-      return result;
-    };
-  }
-
-  // 백드롭은 capture 단계에서도 확실하게 닫히도록 하되 다른 버튼 이벤트는 건드리지 않는다.
-  document.addEventListener('pointerdown',e=>{
-    const close=e.target?.closest?.('[data-settings-hub-close]');
-    if(close){
-      e.preventDefault();
-      window.closeAdminSettingsHub?.();
-    }
-  },true);
-
-  window.__repair230MatchInteractionBlockers=repairInteractionBlockers;
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(repairInteractionBlockers,50),{once:true});
-  else setTimeout(repairInteractionBlockers,50);
-  window.addEventListener('pageshow',()=>setTimeout(repairInteractionBlockers,30));
-  window.addEventListener('focus',()=>setTimeout(repairInteractionBlockers,30));
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(repairInteractionBlockers,30);});
-  setInterval(repairInteractionBlockers,700);
-  console.info('[230MATCH] 5.6.7 ready · invisible dialog/overlay interaction blocker guard');
-})();
+console.info('[230MATCH] 5.6.8 ready · manual admin/operator role survives tournament grant refresh');
