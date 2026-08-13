@@ -26,7 +26,7 @@ import{ensureCourtStatuses,pauseCourt,resumeCourt}from'./court-status-engine.js?
 import{ensureCourtManualQueues,assignToCourtManualQueue,moveCourtMatchFlexible,returnManualQueueItemToVenue,reorderCourtManualQueue}from'./court-manual-queue-engine.js?v=332012';
 import{reorderPrelimQueue as reorderPrelimQueueItem,movePrelimQueuedMatch,returnPrelimWait1ToQueue}from'./prelim-queue-control-engine.js?v=332012';
 import{ensurePrelimCourtStatuses,pausePrelimCourt,resumePrelimCourt}from'./prelim-court-status-engine.js?v=332012';
-import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7133';
+import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7205';
 import{verifyAndRepairMainFlow}from'./main-flow-integrity-engine.js?v=332012';
 import{finalizeTournamentCompletion}from'./tournament-completion-engine.js?v=332012';
 import{ensureTournamentIdentity,validateTournamentForArchive,createTournamentArchive,archiveListItem,archiveBackupPayload}from'./archive-engine.js?v=354101';
@@ -6428,6 +6428,7 @@ function renderPortalViewFast(target){
     if(target==='participants'){renderPublicParticipantRecords();return;}
     if(target==='records'){renderResultArchive();return;}
     if(target==='print'){renderPrintPreview();return;}
+    if(target==='settings'){stage3210RenderSettingsSummary();return;}
     if(target==='bracket'){decorateBracketLivePlacements();return;}
     // operation/home/my-match/settings already have live DOM maintained by state renders.
   }catch(error){console.warn('[230MATCH 61.1.1] fast view render warning',target,error);}
@@ -13919,98 +13920,7 @@ console.info('[230MATCH] 5.5.24 ready · court round color CSS priority fixed; o
 
 
 
-/* 230MATCH 5.5.26 · PC/모바일 고정 바로가기 + 실시간 결과 동기화 안전장치 */
-(function stage5526RuntimeReliability(){
-  function goQuick(target){
-    if(!target)return;
-    if(target==='operation-game'){
-      navigatePortalView('operation',{pushHistory:true,focus:false});
-      const view=document.getElementById('view-operation');
-      if(view){
-        view.dataset.operationMode='groups';
-        view.querySelectorAll('[data-operation-section]').forEach(button=>{
-          const active=button.dataset.operationSection==='groups';
-          button.classList.toggle('active',active);
-          button.setAttribute('aria-pressed',String(active));
-        });
-        try{renderPortalViewFast('operation');}catch(_e){}
-      }
-      return;
-    }
-    if(target==='operation'){
-      navigatePortalView('operation',{pushHistory:true,focus:false});
-      const view=document.getElementById('view-operation');
-      if(view){
-        view.dataset.operationMode='courts';
-        view.querySelectorAll('[data-operation-section]').forEach(button=>{
-          const active=button.dataset.operationSection==='courts';
-          button.classList.toggle('active',active);
-          button.setAttribute('aria-pressed',String(active));
-        });
-        try{renderPortalViewFast('operation');}catch(_e){}
-      }
-      return;
-    }
-    navigatePortalView(target,{pushHistory:true,focus:false});
-  }
+/* 230MATCH 5.6.2: 5.5.26 중복 quickbar/reconnect watchdog 제거. 기존 5.5.3 quickbar + sync-engine onSnapshot만 사용. */
 
-  function bindQuickButtons(){
-    const bar=document.getElementById('stage7124MatchdayQuickBar');
-    if(!bar)return;
-    bar.style.pointerEvents='auto';
-    bar.style.zIndex='999999';
-    for(const btn of bar.querySelectorAll('[data-matchday-quick-view]')){
-      if(btn.dataset.stage5526Bound==='1')continue;
-      btn.dataset.stage5526Bound='1';
-      btn.type='button';
-      btn.style.pointerEvents='auto';
-      btn.style.cursor='pointer';
-      btn.addEventListener('click',event=>{
-        event.preventDefault();
-        event.stopPropagation();
-        event.stopImmediatePropagation();
-        goQuick(String(btn.dataset.matchdayQuickView||''));
-        setTimeout(()=>window.__update230MatchMatchdayQuickBar?.(),20);
-      },true);
-    }
-  }
 
-  let lifecycleBusy=false;
-  async function refreshRealtime(reason){
-    if(lifecycleBusy||document.hidden)return;
-    lifecycleBusy=true;
-    try{
-      stage5526ReconnectRealtime(reason);
-      await stage5526PullLatestIfNewer(reason);
-    }finally{
-      lifecycleBusy=false;
-    }
-  }
-
-  function start(){
-    bindQuickButtons();
-    const mo=new MutationObserver(()=>bindQuickButtons());
-    mo.observe(document.body,{childList:true,subtree:true});
-
-    window.addEventListener('pageshow',()=>setTimeout(()=>refreshRealtime('페이지 복귀'),120));
-    window.addEventListener('online',()=>setTimeout(()=>refreshRealtime('네트워크 복구'),120));
-    window.addEventListener('focus',()=>setTimeout(()=>refreshRealtime('화면 포커스'),180));
-    document.addEventListener('visibilitychange',()=>{
-      if(!document.hidden)setTimeout(()=>refreshRealtime('화면 활성화'),120);
-    });
-
-    // 관리자/진행자 기기는 경기운영 중 실시간 리스너가 조용히 끊긴 경우를 대비해
-    // 20초마다 연결 상태만 재확인한다. 일반 참가자에게 반복 Firestore pull은 하지 않는다.
-    setInterval(()=>{
-      if(document.hidden||!(isAdmin()||isOperator())||tournamentReadOnly())return;
-      const view=document.body?.dataset.currentView||'';
-      if(!['operation','bracket','prelim-public','my-match'].includes(view))return;
-      stage5526ReconnectRealtime('운영 실시간 확인');
-    },20000);
-  }
-
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});
-  else start();
-
-  console.info('[230MATCH] 5.5.26 ready · quickbar direct binding + critical result cloud push + realtime reconnect');
-})();
+console.info('[230MATCH] 5.6.2 · PC quickbar restored to single handler; settings direct render enabled');
