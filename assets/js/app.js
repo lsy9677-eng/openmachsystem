@@ -26,7 +26,7 @@ import{ensureCourtStatuses,pauseCourt,resumeCourt}from'./court-status-engine.js?
 import{ensureCourtManualQueues,assignToCourtManualQueue,moveCourtMatchFlexible,returnManualQueueItemToVenue,reorderCourtManualQueue}from'./court-manual-queue-engine.js?v=332012';
 import{reorderPrelimQueue as reorderPrelimQueueItem,movePrelimQueuedMatch,returnPrelimWait1ToQueue}from'./prelim-queue-control-engine.js?v=332012';
 import{ensurePrelimCourtStatuses,pausePrelimCourt,resumePrelimCourt}from'./prelim-court-status-engine.js?v=332012';
-import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7211';
+import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7212';
 import{verifyAndRepairMainFlow}from'./main-flow-integrity-engine.js?v=332012';
 import{finalizeTournamentCompletion}from'./tournament-completion-engine.js?v=332012';
 import{ensureTournamentIdentity,validateTournamentForArchive,createTournamentArchive,archiveListItem,archiveBackupPayload}from'./archive-engine.js?v=354101';
@@ -7532,7 +7532,7 @@ function stage329OrganizeMobileMore(){
   const grid=document.querySelector('#mobileMoreSheet .mobile-more-grid');if(!grid||grid.dataset.stage329==='1')return;grid.dataset.stage329='1';
   const buttons=[...grid.children];const map={};buttons.forEach(b=>{map[b.dataset.portalGo||b.id]=b;});grid.innerHTML='';
   const addHead=t=>{const h=document.createElement('div');h.className='stage329-mobile-head';h.textContent=t;grid.appendChild(h);};
-  addHead('현재 대회');['operation','prelim-public','board'].forEach(k=>map[k]&&grid.appendChild(map[k]));
+  addHead('현재 대회');['tournaments','operation','prelim-public','board'].forEach(k=>map[k]&&grid.appendChild(map[k]));
   addHead('지난 기록·자료');['records','participants','print'].forEach(k=>map[k]&&grid.appendChild(map[k]));
   addHead('계정·관리');['mobileSocialLoginBtn','mobileSettingsBtn'].forEach(k=>map[k]&&grid.appendChild(map[k]));
 }
@@ -9316,13 +9316,13 @@ console.info('[230MATCH] 34.4.2 ready · main wait1 refill and shared queue elap
     root.dataset.draggable3522='1';head.classList.add('aac-drag-handle');head.title='이 부분을 잡고 상태창을 이동할 수 있습니다.';
     const key='230match-admin-action-center-position';
     const clamp=(x,y)=>({x:Math.max(6,Math.min(x,window.innerWidth-root.offsetWidth-6)),y:Math.max(6,Math.min(y,window.innerHeight-root.offsetHeight-6))});
-    try{const saved=JSON.parse(localStorage.getItem(key)||'null');if(saved&&Number.isFinite(saved.x)&&Number.isFinite(saved.y)){const p=clamp(saved.x,saved.y);root.style.left=p.x+'px';root.style.top=p.y+'px';root.style.right='auto';root.style.bottom='auto';}}catch(_e){}
+    try{const saved=JSON.parse(localStorage.getItem(key)||'null');if(saved&&Number.isFinite(saved.x)&&Number.isFinite(saved.y)){const p=clamp(saved.x,saved.y);root.style.left=p.x+'px';root.style.top=p.y+'px';root.style.setProperty('right','auto','important');root.style.setProperty('bottom','auto','important');}}catch(_e){}
     let drag=null;
     head.addEventListener('pointerdown',e=>{if(e.target.closest('button'))return;const r=root.getBoundingClientRect();drag={dx:e.clientX-r.left,dy:e.clientY-r.top};head.setPointerCapture?.(e.pointerId);root.classList.add('dragging');e.preventDefault();});
-    head.addEventListener('pointermove',e=>{if(!drag)return;const p=clamp(e.clientX-drag.dx,e.clientY-drag.dy);root.style.left=p.x+'px';root.style.top=p.y+'px';root.style.right='auto';root.style.bottom='auto';});
+    head.addEventListener('pointermove',e=>{if(!drag)return;const p=clamp(e.clientX-drag.dx,e.clientY-drag.dy);root.style.left=p.x+'px';root.style.top=p.y+'px';root.style.setProperty('right','auto','important');root.style.setProperty('bottom','auto','important');});
     const stop=e=>{if(!drag)return;drag=null;root.classList.remove('dragging');const r=root.getBoundingClientRect();localStorage.setItem(key,JSON.stringify({x:Math.round(r.left),y:Math.round(r.top)}));try{head.releasePointerCapture?.(e.pointerId);}catch(_e){}};
     head.addEventListener('pointerup',stop);head.addEventListener('pointercancel',stop);
-    window.addEventListener('resize',()=>{if(root.style.left){const r=root.getBoundingClientRect(),p=clamp(r.left,r.top);root.style.left=p.x+'px';root.style.top=p.y+'px';}});
+    window.addEventListener('resize',()=>{if(root.style.left){const r=root.getBoundingClientRect(),p=clamp(r.left,r.top);root.style.left=p.x+'px';root.style.top=p.y+'px';root.style.setProperty('right','auto','important');root.style.setProperty('bottom','auto','important');}});
   }
   const style=document.createElement('style');style.textContent=`
     .aac-drag-handle{cursor:move;touch-action:none;user-select:none}.admin-action-center-3443.dragging{opacity:.92;box-shadow:0 18px 46px rgba(15,42,79,.32)}
@@ -14047,3 +14047,5 @@ console.info('[230MATCH] 5.6.5 ready · home top shortcuts direct-bound; common 
 console.info('[230MATCH] 5.6.6 ready · shortcuts now use same simple onclick model as working tab strip');
 
 console.info('[230MATCH] 5.6.8 ready · manual admin/operator role survives tournament grant refresh');
+
+console.info('[230MATCH] 5.6.9 ready · mobile admin status drag fixed + explicit tournament list access');

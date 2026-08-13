@@ -545,6 +545,28 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
 
 
 
+
+<style id="stage569MobileAdminStatusFix">
+@media(max-width:700px){
+  #adminActionCenter3443 .aac-head{
+    touch-action:none!important;
+  }
+  #adminActionCenter3443 .aac-head>div:first-child::after{
+    content:'끌어서 이동';
+    display:inline-block;
+    margin-top:2px;
+    font-size:9px;
+    font-weight:800;
+    opacity:.7;
+  }
+  #adminActionCenter3443.minimized .aac-head>div:first-child::after{display:none}
+  .mobile-bottom-nav [data-mobile-view="tournaments"] b{
+    font-size:9px!important;
+    letter-spacing:-.05em;
+  }
+}
+</style>
+
 </head>
 <body>
   <header class="topbar">
@@ -2305,7 +2327,7 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
 
   <nav class="mobile-bottom-nav" aria-label="모바일 주요 메뉴">
     <button type="button" class="mobile-nav-button active" data-mobile-view="home" data-portal-go="home"><span>🏠</span><b>홈</b></button>
-    <button type="button" class="mobile-nav-button" data-mobile-view="tournaments" data-portal-go="tournaments"><span>🏆</span><b>대회</b></button>
+    <button type="button" class="mobile-nav-button" data-mobile-view="tournaments" data-portal-go="tournaments"><span>🏆</span><b>대회목록</b></button>
     <button type="button" class="mobile-nav-button" data-mobile-view="entry" data-portal-go="entry"><span>📋</span><b>참가접수</b></button>
     <button type="button" class="mobile-nav-button" data-mobile-view="bracket" data-portal-go="bracket"><span>🎾</span><b>대진표</b></button>
     <button type="button" class="mobile-nav-button" data-mobile-view="my-match" data-portal-go="my-match"><span>👤</span><b>내 경기</b></button>
@@ -2317,6 +2339,7 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
     <section class="mobile-more-panel" role="dialog" aria-modal="true" aria-labelledby="mobileMoreTitle">
       <div class="mobile-more-head"><strong id="mobileMoreTitle">더보기</strong><button type="button" class="mobile-more-close" data-mobile-more-close aria-label="닫기">×</button></div>
       <div class="mobile-more-grid">
+        <button type="button" data-mobile-view="tournaments" data-portal-go="tournaments"><span>🏆</span><b>대회 목록</b></button>
         <button type="button" data-mobile-view="participants" data-portal-go="participants"><span>👥</span><b>참가자 기록</b></button>
         <button type="button" data-mobile-view="notifications" data-portal-go="notifications"><span>🔔</span><b>경기 알림</b></button>
         <button type="button" data-mobile-view="records" data-portal-go="records"><span>📊</span><b>대회 결과</b></button>
@@ -2545,7 +2568,7 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=7211"></script>
+  <script type="module" src="./assets/js/app.js?v=7212"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
