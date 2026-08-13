@@ -1632,6 +1632,7 @@ function commit(message){
 
 function applySynchronizedState(nextState,source='동기화'){
   if(!nextState||typeof nextState!=='object')return;
+  __stage5526LastRemoteApplyAt=Date.now();
   state=structuredClone(nextState);
   // 다른 관리자 기기/탭에서 오래된 코트 상태가 들어와도 공용대기 중복을 허용하지 않는다.
   stage5513GuardPrelimManualSharedQueue();
@@ -2013,6 +2014,65 @@ function openResult(matchId){
   $('resultDialog').showModal();
   setTimeout(()=>stage340Panel('')?.querySelector('[data-team-score]')?.focus(),0);
 }
+
+let __stage5526CriticalPushTimer=null;
+let __stage5526CriticalPushRunning=false;
+let __stage5526LastRemoteApplyAt=0;
+
+async function stage5526PushCriticalState(reason='경기 결과'){
+  if(__stage5526CriticalPushRunning||tournamentReadOnly())return;
+  if(!(isAdmin()||isOperator()))return;
+  __stage5526CriticalPushRunning=true;
+  try{
+    try{await prepareCriticalCloudWrite();}catch(_e){}
+    await pushStateNow(state);
+    updateSyncPanel({label:'클라우드 저장 완료',level:'success',detail:`${reason} 즉시 동기화 완료 · ${new Date().toLocaleTimeString('ko-KR')}`});
+  }catch(error){
+    console.error('[5.5.26] critical cloud push failed',error);
+    updateSyncPanel({label:'재시도 중',level:'warning',detail:`${reason} 클라우드 저장 재시도 중`});
+    clearTimeout(__stage5526CriticalPushTimer);
+    __stage5526CriticalPushTimer=setTimeout(async()=>{
+      try{
+        await connectCloudSync();
+        await pushStateNow(state);
+        updateSyncPanel({label:'클라우드 저장 완료',level:'success',detail:`${reason} 재시도 저장 완료 · ${new Date().toLocaleTimeString('ko-KR')}`});
+      }catch(e){
+        console.error('[5.5.26] critical cloud push retry failed',e);
+        updateSyncPanel({label:'동기화 오류',level:'error',detail:`${reason} 저장 실패 · 네트워크/Firestore 연결을 확인하세요.`});
+      }
+    },900);
+  }finally{
+    __stage5526CriticalPushRunning=false;
+  }
+}
+
+async function stage5526PullLatestIfNewer(reason='화면 복귀'){
+  if(tournamentReadOnly())return;
+  try{
+    await connectCloudSync();
+    const next=await pullStateNow();
+    if(!next||typeof next!=='object')return;
+    const remote=Date.parse(next.updatedAt||next.timestamp||'')||0;
+    const local=Date.parse(state?.updatedAt||'')||0;
+    if(remote>local+250){
+      applySynchronizedState(next,reason);
+      __stage5526LastRemoteApplyAt=Date.now();
+    }
+  }catch(error){
+    console.warn('[5.5.26] latest state pull skipped',error);
+  }
+}
+
+function stage5526ReconnectRealtime(reason='실시간 재연결'){
+  if(tournamentReadOnly())return;
+  connectCloudSync()
+    .then(()=>updateSyncPanel({label:'실시간 연결',level:'success',detail:`${reason} 완료 · ${new Date().toLocaleTimeString('ko-KR')}`}))
+    .catch(error=>{
+      console.warn('[5.5.26] realtime reconnect failed',error);
+      updateSyncPanel({label:'재시도 중',level:'warning',detail:`${reason} 실패 · 자동 재시도합니다.`});
+    });
+}
+
 function confirmResult(event){
   event.preventDefault();
   const id=$('resultMatchId').value;
@@ -2037,6 +2097,7 @@ function confirmResult(event){
   if(isUnifiedCourt){advanceUnifiedCourt(state,sourceCourt.id,id);enqueueReadyMainToUnifiedCourts(state);}
   if(sourceCourt&&state.messaging.settings.autoMessageEnabled&&state.messaging.settings.onQueueMove){if(sourceCourt.playing&&sourceCourt.playing!==beforePlaying)generatePlayingMessages(state,sourceCourt.playing,sourceCourt.name);if(sourceCourt.wait1&&sourceCourt.wait1!==beforeWait1)generateWait1Messages(state,sourceCourt.wait1,sourceCourt.name)}
   commit(`결과 확정 · ${m.id} · 승리 ${teamText(m.winner)} · ${m.scoreA}:${m.scoreB}`);
+  void stage5526PushCriticalState('본선 결과');
   $('resultDialog').close();
   const flowText=completionReport.completed?` 대회가 종료되었습니다. 우승 ${teamText(completionReport.champion)}.`:(flowReport.nextMatchId?(flowReport.nextReady?' 다음 라운드 경기가 확정되어 자동 대기열에 연결됩니다.':' 다음 라운드는 상대 결과를 기다립니다.'):' 최종 경기 결과가 반영되었습니다.');
   notice(`결과와 대진표·코트 큐를 동기화했습니다.${flowText}${flowReport.propagated||flowReport.statusFixed?` 연결 보정 ${flowReport.propagated+flowReport.statusFixed}건.`:''}`,'success');
@@ -2156,6 +2217,7 @@ function confirmPrelimResult(event){
   const autoResult=useUnifiedCourts(state)?enqueueReadyMainToUnifiedCourts(state,{priorityMatchIds:newlyResolvedPlayIns.map(x=>x.id)}):autoAssignResolvedMain(state,{findMatch,queueReadyMatches,refillCourt});
   if((autoResult.assigned===true||Number(autoResult.assigned)>0)&&state.messaging.settings.autoMessageEnabled){generateCurrentCourtMessages(state);generateCurrentWaitMessages(state);}
   commit(`예선 결과 확정 · ${m.id} · 승리 ${teamText(m.winner)} · ${m.scoreA}:${m.scoreB}${stage558Shared.assigned?` · 예선 공용대기 자동승격 ${stage558Shared.assigned}경기`:''}${syncResult.changes.length?` · 본선 자동반영 ${syncResult.changes.length}팀`:''}${newlyResolvedPlayIns.length?` · 본선 신규확정 ${newlyResolvedPlayIns.length}경기`:''}${autoResult.assigned?' · 빈 자리 본선 자동배정':''}`);
+  void stage5526PushCriticalState('예선 결과');
   $('prelimResultDialog').close();
   prelimNotice(autoResult.assigned?'예선 대기열을 먼저 승격한 뒤 남은 빈 자리만 본선으로 채웠습니다.':autoResult.reason==='no-courts'?'본선 팀은 확정됐습니다. 최초 본선 코트배정을 실행하면 운영이 시작됩니다.':'예선 순위와 진출팀을 다시 계산했습니다. 확정된 본선 경기는 예선 예약열 뒤의 빈 자리에서만 배정됩니다.','success');
 }
@@ -13854,10 +13916,12 @@ console.info('[230MATCH] 5.5.20 stable baseline · 5.5.17+ main queue auto-repai
 console.info('[230MATCH] 5.5.24 ready · court round color CSS priority fixed; operation logic untouched');
 
 
-/* 230MATCH 5.5.25 · 하단 고정바 직접 클릭 처리
-   운영 데이터/자동배정에는 영향 없음. */
-(function stage5525QuickBarDirectNavigation(){
-  function go(target){
+
+
+
+/* 230MATCH 5.5.26 · PC/모바일 고정 바로가기 + 실시간 결과 동기화 안전장치 */
+(function stage5526RuntimeReliability(){
+  function goQuick(target){
     if(!target)return;
     if(target==='operation-game'){
       navigatePortalView('operation',{pushHistory:true,focus:false});
@@ -13890,27 +13954,63 @@ console.info('[230MATCH] 5.5.24 ready · court round color CSS priority fixed; o
     navigatePortalView(target,{pushHistory:true,focus:false});
   }
 
-  function bind(){
+  function bindQuickButtons(){
     const bar=document.getElementById('stage7124MatchdayQuickBar');
-    if(!bar||bar.dataset.stage5525Bound==='1')return;
-    bar.dataset.stage5525Bound='1';
-
-    // bar 자체가 capture 단계에서 먼저 처리하여 다른 전역 클릭 핸들러와 충돌하지 않게 한다.
-    bar.addEventListener('click',event=>{
-      const btn=event.target.closest?.('[data-matchday-quick-view]');
-      if(!btn||btn.hidden)return;
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation();
-      const target=String(btn.dataset.matchdayQuickView||'').trim();
-      go(target);
-      try{window.__update230MatchMatchdayQuickBar?.();}catch(_e){}
-    },true);
+    if(!bar)return;
+    bar.style.pointerEvents='auto';
+    bar.style.zIndex='999999';
+    for(const btn of bar.querySelectorAll('[data-matchday-quick-view]')){
+      if(btn.dataset.stage5526Bound==='1')continue;
+      btn.dataset.stage5526Bound='1';
+      btn.type='button';
+      btn.style.pointerEvents='auto';
+      btn.style.cursor='pointer';
+      btn.addEventListener('click',event=>{
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        goQuick(String(btn.dataset.matchdayQuickView||''));
+        setTimeout(()=>window.__update230MatchMatchdayQuickBar?.(),20);
+      },true);
+    }
   }
 
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind,{once:true});
-  else bind();
-  window.addEventListener('pageshow',()=>setTimeout(bind,20));
+  let lifecycleBusy=false;
+  async function refreshRealtime(reason){
+    if(lifecycleBusy||document.hidden)return;
+    lifecycleBusy=true;
+    try{
+      stage5526ReconnectRealtime(reason);
+      await stage5526PullLatestIfNewer(reason);
+    }finally{
+      lifecycleBusy=false;
+    }
+  }
 
-  console.info('[230MATCH] 5.5.25 ready · persistent quickbar direct navigation');
+  function start(){
+    bindQuickButtons();
+    const mo=new MutationObserver(()=>bindQuickButtons());
+    mo.observe(document.body,{childList:true,subtree:true});
+
+    window.addEventListener('pageshow',()=>setTimeout(()=>refreshRealtime('페이지 복귀'),120));
+    window.addEventListener('online',()=>setTimeout(()=>refreshRealtime('네트워크 복구'),120));
+    window.addEventListener('focus',()=>setTimeout(()=>refreshRealtime('화면 포커스'),180));
+    document.addEventListener('visibilitychange',()=>{
+      if(!document.hidden)setTimeout(()=>refreshRealtime('화면 활성화'),120);
+    });
+
+    // 관리자/진행자 기기는 경기운영 중 실시간 리스너가 조용히 끊긴 경우를 대비해
+    // 20초마다 연결 상태만 재확인한다. 일반 참가자에게 반복 Firestore pull은 하지 않는다.
+    setInterval(()=>{
+      if(document.hidden||!(isAdmin()||isOperator())||tournamentReadOnly())return;
+      const view=document.body?.dataset.currentView||'';
+      if(!['operation','bracket','prelim-public','my-match'].includes(view))return;
+      stage5526ReconnectRealtime('운영 실시간 확인');
+    },20000);
+  }
+
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});
+  else start();
+
+  console.info('[230MATCH] 5.5.26 ready · quickbar direct binding + critical result cloud push + realtime reconnect');
 })();
