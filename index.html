@@ -1743,6 +1743,75 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
 }
 </style>
 
+
+<style id="stage5920HeldDisplayDecorator">
+/* 5.9.20 보류 표시 전용 — 보류/배정 로직은 건드리지 않음 */
+.queue-card.stage5920-held-card,
+.operation-queue-card.stage5920-held-card{
+  position:relative!important;
+  border:3px solid #d97706!important;
+  background:#fff1c7!important;
+  box-shadow:0 0 0 4px rgba(245,158,11,.16),0 5px 14px rgba(120,53,15,.14)!important;
+}
+.stage5920-hold-badge{
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  min-height:25px!important;
+  padding:3px 10px!important;
+  margin:0 5px 5px 0!important;
+  border-radius:999px!important;
+  background:#b45309!important;
+  border:1px solid #92400e!important;
+  color:#fff!important;
+  font-size:11px!important;
+  line-height:1!important;
+  font-weight:950!important;
+  letter-spacing:.04em!important;
+}
+.stage5920-hold-reason{
+  display:grid!important;
+  grid-template-columns:auto 1fr!important;
+  gap:3px 7px!important;
+  width:100%!important;
+  margin:7px 0!important;
+  padding:8px 10px!important;
+  border:1px solid #f59e0b!important;
+  border-radius:9px!important;
+  background:#fffbeb!important;
+  color:#78350f!important;
+  box-sizing:border-box!important;
+}
+.stage5920-hold-reason strong{
+  font-size:11px!important;
+  font-weight:950!important;
+}
+.stage5920-hold-reason span{
+  font-size:12px!important;
+  font-weight:900!important;
+}
+.stage5920-hold-reason em{
+  grid-column:1/-1!important;
+  font-size:10px!important;
+  font-style:normal!important;
+  font-weight:800!important;
+  color:#a16207!important;
+}
+.stage5920-release-btn{
+  background:#d97706!important;
+  border-color:#b45309!important;
+  color:#fff!important;
+  font-weight:950!important;
+}
+.stage5920-held-card [data-manual-assign]:disabled,
+.stage5920-held-card [data-admin-queue]:disabled,
+.stage5920-held-card [data-queue-move]:disabled,
+.stage5920-held-card [data-op-queue-move]:disabled{
+  opacity:.38!important;
+  cursor:not-allowed!important;
+}
+</style>
+
 </head>
 <body>
   <header class="topbar">
@@ -3771,7 +3840,7 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=59180"></script>
+  <script type="module" src="./assets/js/app.js?v=59200"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">

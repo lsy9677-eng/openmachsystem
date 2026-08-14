@@ -1598,6 +1598,70 @@ function stage5521RepairMissingCourtStructure(){
     return {repaired:false,error};
   }
 }
+
+function stage5920DecorateHeldQueueCards(){
+  const heldList=Array.isArray(state.operation?.heldMatches)?state.operation.heldMatches:[];
+  const heldMap=new Map(heldList.map(x=>[String(x?.matchId||''),x]));
+
+  document.querySelectorAll('[data-main-match-id]').forEach(card=>{
+    const id=String(card.dataset.mainMatchId||'');
+    if(!id)return;
+
+    const held=heldMap.get(id);
+    const match=findMatch(state.draw,id);
+    const isHeld=Boolean(held||match?.status==='held'||match?.holdReason);
+
+    card.classList.toggle('stage5920-held-card',isHeld);
+    card.setAttribute('data-held',isHeld?'true':'false');
+
+    let badge=card.querySelector('.stage5920-hold-badge');
+    if(isHeld){
+      if(!badge){
+        badge=document.createElement('span');
+        badge.className='stage5920-hold-badge';
+        badge.textContent='보류';
+        const num=card.querySelector('.num');
+        if(num?.nextSibling)num.parentNode.insertBefore(badge,num.nextSibling);
+        else card.prepend(badge);
+      }
+      const reason=String(held?.reason||match?.holdReason||'운영자 보류').trim()||'운영자 보류';
+      let reasonEl=card.querySelector('.stage5920-hold-reason');
+      if(!reasonEl){
+        reasonEl=document.createElement('div');
+        reasonEl.className='stage5920-hold-reason';
+        const actions=card.querySelector('.queue-card-actions');
+        if(actions)card.insertBefore(reasonEl,actions);
+        else card.appendChild(reasonEl);
+      }
+      reasonEl.innerHTML=`<strong>보류 사유</strong><span>${escapeHtml(reason)}</span><em>자동배정 제외 · 해제 전까지 현재 대기 위치 유지</em>`;
+
+      const btn=card.querySelector('[data-hold-main]');
+      if(btn){
+        btn.textContent='보류 해제';
+        btn.classList.remove('btn-danger-outline');
+        btn.classList.add('btn-warning','stage5920-release-btn');
+        btn.title='보류를 해제하고 자동배정 대상으로 복귀';
+      }
+
+      card.querySelectorAll('[data-manual-assign],[data-admin-queue],[data-queue-move],[data-op-queue-move]').forEach(btn=>{
+        btn.disabled=true;
+        btn.title='보류 해제 후 배정/이동할 수 있습니다.';
+      });
+    }else{
+      badge?.remove();
+      card.querySelector('.stage5920-hold-reason')?.remove();
+
+      const btn=card.querySelector('[data-hold-main]');
+      if(btn){
+        btn.textContent='보류';
+        btn.classList.remove('btn-warning','stage5920-release-btn');
+        btn.classList.add('btn-danger-outline');
+        btn.title='이 경기를 보류하고 자동배정에서 제외';
+      }
+    }
+  });
+}
+
 function renderCommittedState6400(){
   const view=document.body?.dataset.currentView||'home';
   const courtRepair=(view==='operation'||view==='settings'||view==='bracket')?stage5521RepairMissingCourtStructure():{repaired:false};
@@ -1606,6 +1670,7 @@ function renderCommittedState6400(){
   }
   if(CORE_RENDER_VIEWS_6400.has(view)){
     render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus,holdMainMatch,releaseHeldMatch});
+    requestAnimationFrame(()=>stage5920DecorateHeldQueueCards());
     if(view==='operation'||view==='settings'||view==='roster')renderOperatorControls();
     if(view==='bracket'){
       decorateBracketLivePlacements();
@@ -1874,6 +1939,7 @@ function holdMainMatch(matchId){
   m.court=null;m.courtId=null;
 
   commit(`본선 경기 보류 · ${matchId} · ${reason}`);
+  requestAnimationFrame(()=>stage5920DecorateHeldQueueCards());
   notice('보류 표시를 유지한 채 공용대기에 남겼습니다. 보류 해제 전까지 자동배정에서 제외됩니다.','success');
 }
 function releaseHeldMatch(matchId){
@@ -1913,6 +1979,7 @@ function releaseHeldMatch(matchId){
   }
 
   commit(`본선 경기 보류 해제 · ${matchId}`);
+  requestAnimationFrame(()=>stage5920DecorateHeldQueueCards());
   notice('보류를 해제했습니다. 현재 공용대기 위치에서 다시 자동배정 대상이 됩니다.','success');
 }
 
@@ -15341,3 +15408,5 @@ console.info('[230MATCH] 5.9.12 stabilization · bracket placement uses match-id
 console.info('[230MATCH] 5.9.16 stabilization · bracket active state follows actual court placement only');
 
 console.info('[230MATCH] 5.9.18 · held shared-queue cards stay visible and auto-assignment skips them');
+
+console.info('[230MATCH] 5.9.20 stabilization · hold display forced from heldMatches after every render');
