@@ -4,6 +4,7 @@ import{findUnifiedMatch}from'./unified-court-engine.js?v=3511';
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
 const fmt=iso=>iso?new Date(iso).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}):'-';
 function officialStartMs(state){
+  if(state?.settings?.officialStartClockEnabled!==true)return 0;
   const date=String(state?.portal?.guide?.date||'').trim();
   const time=String(state?.portal?.guide?.startTime||'').trim();
   if(!date||!time)return 0;
@@ -22,6 +23,7 @@ export function ensureTimeState(state){
   if(!state.settings||typeof state.settings!=='object'||Array.isArray(state.settings))state.settings={};
   if(!('autoTimeEnabled'in state.settings))state.settings.autoTimeEnabled=true;
   if(!('timeRefreshSeconds'in state.settings))state.settings.timeRefreshSeconds=30;
+  if(!('officialStartClockEnabled'in state.settings))state.settings.officialStartClockEnabled=false;
   if(!('minimumMatchMinutes'in state.settings))state.settings.minimumMatchMinutes=30;
   // 이전 단계의 기본값 30분은 새 기준 40분으로 자동 이전합니다.
   if(!state.settings.matchMinutes || Number(state.settings.matchMinutes)===30)state.settings.matchMinutes=40;
@@ -124,3 +126,5 @@ export function timeInfo(match){
 }
 
 console.info('[230MATCH] time-engine 5.9.3 · court clocks respect official tournament start time');
+
+console.info('[230MATCH] time-engine 5.9.4 · official start gate opt-in + live refresh');

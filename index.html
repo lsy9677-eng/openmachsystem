@@ -877,6 +877,25 @@ body.stage593-operator-scale-active dialog[id]{
 }
 </style>
 
+
+<style id="stage594BracketSafeUiScale">
+body.stage593-operator-scale-active main.app-shell{zoom:1!important}
+body.stage593-operator-scale-active #view-bracket{zoom:1!important}
+body.stage593-operator-scale-active main.app-shell > .view:not(#view-bracket),
+body.stage593-operator-scale-active main.app-shell > .mode-tabs{
+  zoom:var(--stage593-ui-scale);
+}
+.stage594-clock-gate{display:grid;gap:5px}
+.stage594-clock-gate small{font-size:11px;color:#64748b;line-height:1.35}
+@media(max-width:760px){
+  body.stage593-operator-scale-active main.app-shell > .view:not(#view-bracket),
+  body.stage593-operator-scale-active main.app-shell > .mode-tabs{
+    zoom:min(var(--stage593-ui-scale),1.06);
+  }
+  body.stage593-operator-scale-active #view-bracket{zoom:1!important}
+}
+</style>
+
 </head>
 <body>
   <header class="topbar">
@@ -2114,7 +2133,7 @@ body.stage593-operator-scale-active dialog[id]{
         <div id="stage3210SettingsSummary" class="notice info">현재 대회의 기본정보·요강·예선·본선·구장·코트를 한 화면에서 관리합니다.</div>
 
         <section id="stage593OperatorUiScale" class="stage593-ui-scale-card" data-operator-only="true">
-          <div><strong>운영 화면 글자 크기</strong><small>이 브라우저에만 저장됩니다. 일반 사용자 화면과 대회 데이터에는 영향을 주지 않습니다.</small></div>
+          <div><strong>운영 화면 글자 크기</strong><small>이 브라우저에만 저장됩니다. 일반 사용자 화면과 대회 데이터에는 영향을 주지 않습니다. 대진표는 자체 확대 기능을 사용합니다.</small></div>
           <div class="stage593-ui-scale-buttons" role="group" aria-label="운영 화면 글자 크기">
             <button type="button" data-stage593-scale="compact">작게</button>
             <button type="button" data-stage593-scale="default">기본 · 권장</button>
@@ -2904,7 +2923,7 @@ body.stage593-operator-scale-active dialog[id]{
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=5930"></script>
+  <script type="module" src="./assets/js/app.js?v=5940"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">

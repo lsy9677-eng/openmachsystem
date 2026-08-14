@@ -9,7 +9,7 @@ import{buildCourts,assignInitial,queueReadyMatches,refillCourt}from'./court-engi
 import{submitResult}from'./result-engine.js?v=5800';
 import{ensurePrelimState,generatePrelim,assignPrelimCourts,findPrelimMatch,submitPrelimResult,resetPrelim,autoFitPrelimGroups,swapActiveReserveTeam,isPrelimLocked,lockPrelim,unlockPrelim}from'./prelim-engine.js?v=5800';
 import{downloadJson}from'./recovery.js?v=332012';
-import{ensureTimeState,calculateTimeMetrics}from'./time-engine-v5000.js?v=5930';
+import{ensureTimeState,calculateTimeMetrics,timeInfo}from'./time-engine-v5000.js?v=5940';
 import{ensureMessagingState,generatePlayingMessages,generateWait1Messages,generateCurrentCourtMessages,generateCurrentWaitMessages,generateAllTimeMessages,markMessageSent,deleteMessage,clearSentMessages,markAllSent,smsUri,refreshMessageContacts,mergePendingDuplicates,getMessageHistory}from'./message-engine.js?v=3521';
 import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactData,importContactData}from'./contact-engine-v5000.js?v=5000';
 import{render,teamText}from'./ui.js?v=5701';
@@ -1177,6 +1177,7 @@ function smsFormatClock(date){
   catch(_e){return'';}
 }
 function stage593OfficialStartMs(){
+  if(state?.settings?.officialStartClockEnabled!==true)return 0;
   const date=String(state?.portal?.guide?.date||'').trim();
   const time=String(state?.portal?.guide?.startTime||'').trim();
   if(!date||!time)return 0;
@@ -2745,11 +2746,31 @@ function refreshTimeEngine({save=false,renderNow=false}={}){
   if(save)safePersistState('시간 정보 갱신');
   if(renderNow)render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus,holdMainMatch,releaseHeldMatch});
 }
+function stage594RefreshVisibleTimeBadges(){
+  if(!state.settings?.autoTimeEnabled)return;
+  calculateTimeMetrics(state);
+  document.querySelectorAll('[data-time-match]').forEach(node=>{
+    const id=String(node.dataset.timeMatch||'');
+    const match=findAnyMatchById(id);
+    if(!match)return;
+    const info=timeInfo(match);
+    const badge=node.querySelector('.time-badge');
+    if(badge){
+      badge.textContent=info.label;
+      badge.className=`time-badge ${info.className||''}`;
+    }
+    const fill=node.querySelector('.progress-fill');
+    if(fill&&match.status==='playing'){
+      const total=Number(match.elapsedMinutes||0)+Number(match.estimatedRemainingMinutes||0);
+      const pct=total?Math.min(100,Math.max(0,(Number(match.elapsedMinutes||0)/total)*100)):0;
+      fill.style.width=`${pct}%`;
+    }
+  });
+}
 function restartTimeTimer(){
-  // 4.5.0: 전체 대회 시간 계산을 주기적으로 반복하지 않는다.
-  // 시간값은 실제 경기/코트 상태가 바뀌는 commit 경로에서만 계산한다.
-  // 이 변경으로 60초 단위 전체 경기 순회로 인한 주기적 멈춤을 제거한다.
-  clearInterval(timeTimer);timeTimer=null;
+  clearInterval(timeTimer);
+  stage594RefreshVisibleTimeBadges();
+  timeTimer=setInterval(()=>{if(!document.hidden)stage594RefreshVisibleTimeBadges();},30000);
 }
 let clockTimer=null;
 function updateClock(){const el=$('currentClock');if(el)el.textContent=new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});}
@@ -8064,7 +8085,8 @@ function stage329EnsureEditor(){
         <small><b>자동 판단</b>: 현재 경기 데이터로 접수중·시합중·시합완료를 판단합니다. <b>직접 선택</b>: 관리자가 선택한 상태를 우선 표시합니다. 표시 상태를 바꿔도 경기 결과·대진 데이터는 변경하지 않습니다.</small>
       </div>
       <label><span>대회일</span><input id="stage329Date" type="date"></label>
-      <label class="stage593-official-start"><span>공식 경기 시작 시간</span><input id="stage329StartTime" type="time"><small>코트를 미리 배정해도 이 시각 전에는 경기 진행시간이 흐르지 않습니다.</small></label>
+      <label class="stage593-official-start"><span>공식 경기 시작 시간</span><input id="stage329StartTime" type="time"><small>아래 시간 잠금을 켠 경우에만 타이머 기준으로 사용합니다.</small></label>
+      <label class="stage594-clock-gate"><span>사전 코트배정 시간 잠금</span><select id="stage329OfficialStartClockEnabled"><option value="false">OFF · 배정 즉시 시간 시작</option><option value="true">ON · 공식 시작시간까지 대기</option></select><small>대회 전에 코트를 미리 배정할 때만 ON을 권장합니다.</small></label>
       <label class="stage329-span-2"><span>장소</span><input id="stage329Venue"></label>
       <label><span>참가 정원</span><input id="stage329Capacity" type="number" min="1"></label>
       <label><span>본선 규모</span><select id="stage329DrawSize"><option value="32">32강</option><option value="64">64강</option><option value="128">128강</option></select></label>
@@ -8193,7 +8215,7 @@ function stage329OpenTournamentEdit(){
   if(!requireAdmin('대회 세부정보 수정'))return;
   const d=stage329EnsureEditor(),g=state.portal?.guide||{},ps=state.prelim?.settings||{},s=state.settings||{};
   const set=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v??'';};
-  set('stage329Name',state.tournament?.name||'');set('stage329Division',state.tournament?.division||'');set('stage329DisplayStatus',stage583NormalizeDisplayStatus(state.tournament?.displayStatus||'auto'));set('stage329Date',g.date||'');set('stage329StartTime',g.startTime||'09:00');set('stage329Venue',g.venue||'');set('stage329Capacity',state.tournament?.capacity||ps.activeTeamCount||96);set('stage329DrawSize',s.drawSize||128);set('stage329Qualifiers',ps.qualifiersPerGroup||2);set('stage329TwoTeamGroups',ps.twoTeamGroupCount||0);set('stage329CourtCount',s.courtCount||8);set('stage329CourtPrefix',s.courtPrefix||'국제');set('stage329Fee',g.fee||'');set('stage329Bank',g.bank||'');set('stage329Account',g.account||'');set('stage329Organizer',g.organizer||g.host||'');set('stage329EntryStart',stage329Local(g.entryStart||g.registrationStart||''));set('stage329EntryEnd',stage329Local(g.entryEnd||g.registrationEnd||''));set('stage329Eligibility',g.eligibility||'');set('stage329Format',g.format||g.matchFormat||'');set('stage329Awards',g.awards||'');set('stage329Refund',g.refund||g.refundPolicy||'');set('stage329Contact',g.contact||'');set('stage329Detail',g.detail||'');
+  set('stage329Name',state.tournament?.name||'');set('stage329Division',state.tournament?.division||'');set('stage329DisplayStatus',stage583NormalizeDisplayStatus(state.tournament?.displayStatus||'auto'));set('stage329Date',g.date||'');set('stage329StartTime',g.startTime||'09:00');set('stage329OfficialStartClockEnabled',state.settings?.officialStartClockEnabled===true?'true':'false');set('stage329Venue',g.venue||'');set('stage329Capacity',state.tournament?.capacity||ps.activeTeamCount||96);set('stage329DrawSize',s.drawSize||128);set('stage329Qualifiers',ps.qualifiersPerGroup||2);set('stage329TwoTeamGroups',ps.twoTeamGroupCount||0);set('stage329CourtCount',s.courtCount||8);set('stage329CourtPrefix',s.courtPrefix||'국제');set('stage329Fee',g.fee||'');set('stage329Bank',g.bank||'');set('stage329Account',g.account||'');set('stage329Organizer',g.organizer||g.host||'');set('stage329EntryStart',stage329Local(g.entryStart||g.registrationStart||''));set('stage329EntryEnd',stage329Local(g.entryEnd||g.registrationEnd||''));set('stage329Eligibility',g.eligibility||'');set('stage329Format',g.format||g.matchFormat||'');set('stage329Awards',g.awards||'');set('stage329Refund',g.refund||g.refundPolicy||'');set('stage329Contact',g.contact||'');set('stage329Detail',g.detail||'');
   document.getElementById('stage329EditMessage').textContent='';stage583BindStatusButtons();stage583RenderStatusButtons();d.showModal();setTimeout(()=>document.getElementById('stage329Name')?.focus(),30);
 }
 async function stage329SaveTournamentEdit(e){
@@ -8218,7 +8240,7 @@ async function stage329SaveTournamentEdit(e){
       }
     }catch(_e){}
     state.portal=state.portal||{};state.portal.guide={...(state.portal.guide||{}),date:val('stage329Date'),startTime:val('stage329StartTime'),venue:val('stage329Venue'),fee:val('stage329Fee'),bank:val('stage329Bank'),account:val('stage329Account'),organizer:val('stage329Organizer'),host:val('stage329Organizer'),entryStart:val('stage329EntryStart'),entryEnd:val('stage329EntryEnd'),registrationStart:val('stage329EntryStart'),registrationEnd:val('stage329EntryEnd'),eligibility:val('stage329Eligibility'),format:val('stage329Format'),matchFormat:val('stage329Format'),awards:val('stage329Awards'),refund:val('stage329Refund'),refundPolicy:val('stage329Refund'),contact:val('stage329Contact'),detail:val('stage329Detail')};
-    state.settings={...(state.settings||{}),drawSize:Number(val('stage329DrawSize')||128),courtCount:Math.max(1,Number(val('stage329CourtCount')||8)),courtPrefix:val('stage329CourtPrefix')||'코트'};
+    state.settings={...(state.settings||{}),drawSize:Number(val('stage329DrawSize')||128),courtCount:Math.max(1,Number(val('stage329CourtCount')||8)),courtPrefix:val('stage329CourtPrefix')||'코트',officialStartClockEnabled:val('stage329OfficialStartClockEnabled')==='true'};
     state.prelim=state.prelim||{};state.prelim.settings={...(state.prelim.settings||{}),activeTeamCount:state.tournament.capacity,qualifiersPerGroup:Math.max(1,Number(val('stage329Qualifiers')||2)),twoTeamGroupCount:Math.max(0,Number(val('stage329TwoTeamGroups')||0))};
     commit(`대회 세부정보 수정 · ${name}`);stage329EnsureEditor().close();renderPortalViews();renderTournamentList();notice('대회 세부정보와 운영 설정을 수정했습니다.','success');
   }catch(err){msg.textContent=`수정 실패: ${err?.message||err}`;msg.className='stage329-edit-message error';}
@@ -8311,7 +8333,8 @@ function stage3210EnsureEditor(){
   <div class="modal-head"><div><span class="stage329-kicker">현재 대회 전용 설정</span><h2>대회 세부정보·예선·본선 구장 편집</h2><p>현재 진행 중인 대회에만 적용됩니다. 지난 대회 기록은 변경되지 않습니다.</p></div><button type="button" class="icon-button" data-stage3210-close>×</button></div>
   <div class="stage3210-section"><h3>① 대회 기본정보</h3><div class="stage329-edit-grid">
   <label><span>대회명 *</span><input id="stage329Name" required></label><label><span>부서 *</span><input id="stage329Division" required></label>
-  <label><span>대회일</span><input id="stage329Date" type="date"></label><label><span>시작 시간</span><input id="stage329StartTime" type="time"></label>
+  <label><span>대회일</span><input id="stage329Date" type="date"></label><label><span>공식 경기 시작 시간</span><input id="stage329StartTime" type="time"></label>
+  <label class="stage594-clock-gate"><span>사전 코트배정 시간 잠금</span><select id="stage329OfficialStartClockEnabled"><option value="false">OFF · 배정 즉시 시간 시작</option><option value="true">ON · 공식 시작시간까지 대기</option></select><small>미리 코트를 배정하고 정해진 시각에 시작할 때만 ON</small></label>
   <label class="stage329-span-2"><span>대표 장소 안내</span><input id="stage329Venue" placeholder="예: 김해 국제테니스장 외"></label>
   <label><span>참가 정원</span><input id="stage329Capacity" type="number" min="1"></label><label><span>본선 규모</span><select id="stage329DrawSize"><option value="32">32강</option><option value="64">64강</option><option value="128">128강</option></select></label>
   <label><span>조당 본선 진출팀</span><input id="stage329Qualifiers" type="number" min="1" max="3"></label><label><span>2팀조 수</span><input id="stage329TwoTeamGroups" type="number" min="0"></label>
@@ -8327,7 +8350,7 @@ function stage3210EnsureEditor(){
 function stage3210OpenTournamentEdit(){
   if(!requireAdmin('현재 대회 설정 편집'))return;ensureVenueSettings(state);
   const d=stage3210EnsureEditor(),g=state.portal?.guide||{},ps=state.prelim?.settings||{},s=state.settings||{};const set=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v??'';};
-  set('stage329Name',state.tournament?.name||'');set('stage329Division',state.tournament?.division||'');set('stage329Date',g.date||'');set('stage329StartTime',g.startTime||'09:00');set('stage329Venue',g.venue||'');set('stage329Capacity',state.tournament?.capacity||ps.activeTeamCount||96);set('stage329DrawSize',s.drawSize||128);set('stage329Qualifiers',ps.qualifiersPerGroup||2);set('stage329TwoTeamGroups',ps.twoTeamGroupCount||0);set('stage329Fee',g.fee||'');set('stage329Bank',g.bank||'');set('stage329Account',g.account||'');set('stage329Organizer',g.organizer||g.host||'');set('stage329EntryStart',stage329Local(g.entryStart||g.registrationStart||''));set('stage329EntryEnd',stage329Local(g.entryEnd||g.registrationEnd||''));set('stage329Eligibility',g.eligibility||'');set('stage329Format',g.format||g.matchFormat||'');set('stage329Awards',g.awards||'');set('stage329Refund',g.refund||g.refundPolicy||'');set('stage329Contact',g.contact||'');set('stage329Detail',g.detail||'');
+  set('stage329Name',state.tournament?.name||'');set('stage329Division',state.tournament?.division||'');set('stage329Date',g.date||'');set('stage329StartTime',g.startTime||'09:00');set('stage329OfficialStartClockEnabled',state.settings?.officialStartClockEnabled===true?'true':'false');set('stage329Venue',g.venue||'');set('stage329Capacity',state.tournament?.capacity||ps.activeTeamCount||96);set('stage329DrawSize',s.drawSize||128);set('stage329Qualifiers',ps.qualifiersPerGroup||2);set('stage329TwoTeamGroups',ps.twoTeamGroupCount||0);set('stage329Fee',g.fee||'');set('stage329Bank',g.bank||'');set('stage329Account',g.account||'');set('stage329Organizer',g.organizer||g.host||'');set('stage329EntryStart',stage329Local(g.entryStart||g.registrationStart||''));set('stage329EntryEnd',stage329Local(g.entryEnd||g.registrationEnd||''));set('stage329Eligibility',g.eligibility||'');set('stage329Format',g.format||g.matchFormat||'');set('stage329Awards',g.awards||'');set('stage329Refund',g.refund||g.refundPolicy||'');set('stage329Contact',g.contact||'');set('stage329Detail',g.detail||'');
   stage3210VenueDraft=structuredClone(s.venues||[]);if(!stage3210VenueDraft.length)stage3210VenueDraft=[{id:'venue-default',name:s.courtPrefix||'구장',courtCount:s.courtCount||8,courtPrefix:s.courtPrefix||'코트',usePrelim:true,useMain:true}];stage3210RenderVenueDraft();stage3210UpdateVenueSummary();set('stage3210VenuePolicy',s.venueAssignmentPolicy||'round-robin');document.getElementById('stage3210SeparateQueues').checked=s.separateVenueQueues!==false;document.getElementById('stage3210AutoPromotion').checked=s.autoVenuePromotion!==false;document.getElementById('stage329EditMessage').textContent='';d.showModal();
 }
 async function stage3210SaveTournamentEdit(e){
@@ -8335,7 +8358,7 @@ async function stage3210SaveTournamentEdit(e){
   if(!name||!division){msg.textContent='대회명과 부서는 반드시 입력하세요.';msg.className='stage329-edit-message error';return;}if(!stage3210VenueDraft.some(v=>v.usePrelim)){msg.textContent='예선에 사용할 구장을 한 곳 이상 선택하세요.';msg.className='stage329-edit-message error';return;}if(!stage3210VenueDraft.some(v=>v.useMain)){msg.textContent='본선에 사용할 구장을 한 곳 이상 선택하세요.';msg.className='stage329-edit-message error';return;}
   try{const recovery=saveRecovery(state,`${state.tournament?.name||'현재 대회'} · 설정 변경 전`);if(recovery?.ready)await recovery.ready;
     state.tournament={...(state.tournament||{}),name,division,capacity:Math.max(1,Number(val('stage329Capacity')||96))};state.portal=state.portal||{};state.portal.guide={...(state.portal.guide||{}),date:val('stage329Date'),startTime:val('stage329StartTime'),venue:val('stage329Venue'),fee:val('stage329Fee'),bank:val('stage329Bank'),account:val('stage329Account'),organizer:val('stage329Organizer'),host:val('stage329Organizer'),entryStart:val('stage329EntryStart'),entryEnd:val('stage329EntryEnd'),registrationStart:val('stage329EntryStart'),registrationEnd:val('stage329EntryEnd'),eligibility:val('stage329Eligibility'),format:val('stage329Format'),matchFormat:val('stage329Format'),awards:val('stage329Awards'),refund:val('stage329Refund'),refundPolicy:val('stage329Refund'),contact:val('stage329Contact'),detail:val('stage329Detail')};
-    state.settings={...(state.settings||{}),drawSize:Number(val('stage329DrawSize')||128),venues:structuredClone(stage3210VenueDraft),venueAssignmentPolicy:val('stage3210VenuePolicy')||'round-robin',separateVenueQueues:document.getElementById('stage3210SeparateQueues').checked,autoVenuePromotion:document.getElementById('stage3210AutoPromotion').checked};ensureVenueSettings(state);ensureVenueQueues(state);
+    state.settings={...(state.settings||{}),drawSize:Number(val('stage329DrawSize')||128),venues:structuredClone(stage3210VenueDraft),venueAssignmentPolicy:val('stage3210VenuePolicy')||'round-robin',separateVenueQueues:document.getElementById('stage3210SeparateQueues').checked,autoVenuePromotion:document.getElementById('stage3210AutoPromotion').checked,officialStartClockEnabled:val('stage329OfficialStartClockEnabled')==='true'};ensureVenueSettings(state);ensureVenueQueues(state);
     state.prelim=state.prelim||{};state.prelim.settings={...(state.prelim.settings||{}),activeTeamCount:state.tournament.capacity,qualifiersPerGroup:Math.max(1,Number(val('stage329Qualifiers')||2)),twoTeamGroupCount:Math.max(0,Number(val('stage329TwoTeamGroups')||0))};
     // 이미 생성된 경기·대기열은 안전을 위해 즉시 재배치하지 않습니다. 다음 조편성·코트배정부터 새 구장 구성을 사용합니다.
     commit(`현재 대회 설정 수정 · ${name}`);const editDialog=document.getElementById('stage3210TournamentEditDialog');editDialog?.close();renderPortalViews();renderTournamentList();renderVenueSettingsEditor();notice('현재 대회의 기본정보와 예선·본선 구장·코트 설정을 저장했습니다.','success');stage3210RenderSettingsSummary();
@@ -14939,3 +14962,5 @@ document.addEventListener('click',e=>{
 },true);
 
 console.info('[230MATCH] 5.9.3 ready · operator local UI scale + official-start-gated court clock');
+
+console.info('[230MATCH] 5.9.4 ready · bracket-safe scale + opt-in official clock gate + live 30s time badges');

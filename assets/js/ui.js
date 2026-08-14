@@ -492,14 +492,14 @@ function renderTeamPools(state,handlers){
 
 function sharedQueueTimeBadgeHtml(match){
   const elapsed=Number(match?.waitElapsedMinutes||0);
-  return `<div class="time-wrap"><span class="time-badge">대기 ${elapsed}분 경과 · 코트 배정 대기</span></div>`;
+  return `<div class="time-wrap" data-time-match="${match?.id||''}"><span class="time-badge">대기 ${elapsed}분 경과 · 코트 배정 대기</span></div>`;
 }
 
 function timeBadgeHtml(match){
   const info=timeInfo(match);
   const total=(match.elapsedMinutes||0)+(match.estimatedRemainingMinutes||0);
   const pct=match.status==='playing'&&total?Math.min(100,Math.max(0,(match.elapsedMinutes/total)*100)):0;
-  return `<div class="time-wrap"><span class="time-badge ${info.className}">${info.label}</span>${match.status==='playing'?`<div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>`:''}</div>`;
+  return `<div class="time-wrap" data-time-match="${match.id||''}"><span class="time-badge ${info.className}">${info.label}</span>${match.status==='playing'?`<div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>`:''}</div>`;
 }
 
 function drawMethodLabel(method){return({instant:'즉시',roulette:'룰렛',seeded:'시드분산'})[method]||'-';}
