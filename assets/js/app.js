@@ -2800,19 +2800,105 @@ function openPrelimResult(matchId){
   $('prelimWinnerSelect').innerHTML=`<option value="${m.teamA.id}">${resultDialogTeamName(m.teamA)}</option><option value="${m.teamB.id}">${resultDialogTeamName(m.teamB)}</option>`;if($('prelimResultTeamAName'))$('prelimResultTeamAName').textContent=resultDialogTeamName(m.teamA);if($('prelimResultTeamBName'))$('prelimResultTeamBName').textContent=resultDialogTeamName(m.teamB);
   $('prelimWinnerSelect').value=m.winner?.id||m.winnerId||m.teamA.id;
   stage333PrepareScoreInputs('prelim',{scoreA:m.scoreA,scoreB:m.scoreB,completed:m.status==='completed'});
+  stage340UpdatePreview('prelim');
   $('prelimResultDialog').showModal();
   setTimeout(()=>stage340Panel('prelim')?.querySelector('[data-team-score]')?.focus(),0);
 }
-function confirmPrelimResult(event){
+
+let __stage5928PrelimConfirmResolver=null;
+function stage5928EnsurePrelimResultConfirmDialog(){
+  let dialog=document.getElementById('stage5928PrelimResultConfirmDialog');
+  if(dialog)return dialog;
+
+  dialog=document.createElement('dialog');
+  dialog.id='stage5928PrelimResultConfirmDialog';
+  dialog.className='modal stage5928-result-confirm-dialog';
+  dialog.innerHTML=`
+    <div class="modal-head">
+      <div><p class="stage5928-kicker">PRELIM RESULT</p><h2>예선 경기 결과 확인</h2></div>
+      <button type="button" class="icon-button" data-stage5928-cancel aria-label="닫기">×</button>
+    </div>
+    <div class="stage5928-result-confirm-body">
+      <div id="stage5928ResultMatch" class="stage5928-round"></div>
+      <div id="stage5928ResultScore" class="stage5928-score"></div>
+      <div id="stage5928ResultWinner" class="stage5928-winner"></div>
+      <div id="stage5928ResultWarning" class="stage5928-warning" hidden></div>
+      <p class="stage5928-question">이 결과를 확정할까요?</p>
+    </div>
+    <menu>
+      <button type="button" class="btn btn-light" data-stage5928-cancel>취소</button>
+      <button type="button" class="btn btn-primary" data-stage5928-confirm>결과 확정</button>
+    </menu>`;
+
+  const finish=value=>{
+    const resolve=__stage5928PrelimConfirmResolver;
+    __stage5928PrelimConfirmResolver=null;
+    try{dialog.close();}catch(_e){}
+    if(resolve)resolve(Boolean(value));
+  };
+
+  dialog.addEventListener('click',event=>{
+    if(event.target.closest?.('[data-stage5928-confirm]')){finish(true);return;}
+    if(event.target.closest?.('[data-stage5928-cancel]'))finish(false);
+  });
+  dialog.addEventListener('cancel',event=>{event.preventDefault();finish(false);});
+  dialog.addEventListener('close',()=>{
+    if(__stage5928PrelimConfirmResolver){
+      const resolve=__stage5928PrelimConfirmResolver;
+      __stage5928PrelimConfirmResolver=null;
+      resolve(false);
+    }
+  });
+
+  document.body.appendChild(dialog);
+  return dialog;
+}
+function stage5928ConfirmPrelimResult(match,{scoreA,scoreB,winnerId,resultTypeLabel='',warning=''}={}){
+  if(!match)return Promise.resolve(false);
+  const dialog=stage5928EnsurePrelimResultConfirmDialog();
+  if(dialog.open||__stage5928PrelimConfirmResolver)return Promise.resolve(false);
+
+  const teamA=resultDialogTeamName(match.teamA);
+  const teamB=resultDialogTeamName(match.teamB);
+  const winner=String(winnerId)===String(match.teamA?.id)?teamA:teamB;
+  const groupLabel=match.groupNo?`${match.groupNo}조`:match.groupName||'예선';
+  const matchLabel=match.matchNo?`${match.matchNo}경기`:match.id||'';
+
+  dialog.querySelector('#stage5928ResultMatch').textContent=`${groupLabel} · ${matchLabel}`;
+  dialog.querySelector('#stage5928ResultScore').innerHTML=`<strong>${escapeHtml(teamA)}</strong><b>${Number(scoreA)} : ${Number(scoreB)}</b><strong>${escapeHtml(teamB)}</strong>`;
+  dialog.querySelector('#stage5928ResultWinner').innerHTML=`승리팀 <strong>${escapeHtml(winner)}</strong>${resultTypeLabel?`<span>${escapeHtml(resultTypeLabel)}</span>`:''}`;
+
+  const warningEl=dialog.querySelector('#stage5928ResultWarning');
+  if(warning){
+    warningEl.textContent=warning;
+    warningEl.hidden=false;
+  }else{
+    warningEl.textContent='';
+    warningEl.hidden=true;
+  }
+
+  return new Promise(resolve=>{
+    __stage5928PrelimConfirmResolver=resolve;
+    dialog.showModal();
+    requestAnimationFrame(()=>dialog.querySelector('[data-stage5928-confirm]')?.focus());
+  });
+}
+
+async function confirmPrelimResult(event){
   event.preventDefault();
   const pendingMatch=findPrelimMatch(state,$('prelimResultMatchId').value);
   if(!pendingMatch){prelimNotice('경기 정보를 찾을 수 없습니다.','error');return;}
   let normalized;try{normalized=stage333NormalizeScores('prelim',pendingMatch);}catch(error){prelimNotice(error.message,'error');return;}
   const {scoreA,scoreB,winnerId}=normalized;
+  const meta340=stage340ResultMeta('prelim');
+  const resultTypeLabel=STAGE340_EXCEPTION_LABELS[meta340.resultType]||'일반 경기';
+  const confirmed=await stage5928ConfirmPrelimResult(pendingMatch,{scoreA,scoreB,winnerId,resultTypeLabel});
+  if(!confirmed)return false;
+
   const sourceCourtId=pendingMatch?.prelimCourtId||null;
   const involvedTeamIds=new Set([pendingMatch?.teamA?.id,pendingMatch?.teamB?.id].filter(Boolean));
   const beforeResolvedPlayIns=new Set(Object.values(state.draw?.rounds||{}).flat().filter(x=>x.isPlayIn&&x.teamA&&!x.teamA.placeholder&&x.teamB&&!x.teamB.placeholder).map(x=>x.id));
-  const m=submitPrelimResult(state,{matchId:$('prelimResultMatchId').value,winnerId,scoreA,scoreB});const meta340=stage340ResultMeta('prelim');m.resultType=meta340.resultType;m.resultTypeLabel=STAGE340_EXCEPTION_LABELS[meta340.resultType]||'일반 경기';
+  const m=submitPrelimResult(state,{matchId:$('prelimResultMatchId').value,winnerId,scoreA,scoreB});m.resultType=meta340.resultType;m.resultTypeLabel=resultTypeLabel;
   const autoAssignmentOn=state.operation?.autoAssignmentEnabled!==false;
   const stage5513Guard=stage5513GuardPrelimManualSharedQueue();
   const stage558Shared=autoAssignmentOn?stage558AutoPromotePrelimManualSharedQueue():{assigned:0,remaining:(state.prelim?.manualSharedQueue||[]).length};
@@ -2831,6 +2917,7 @@ function confirmPrelimResult(event){
   void stage5526PushCriticalState('예선 결과');
   $('prelimResultDialog').close();
   prelimNotice(!autoAssignmentOn?'결과는 확정했습니다. 수동 운영 중이므로 대기1·추가대기·본선 코트배정은 자동으로 움직이지 않습니다.':(autoResult.assigned?'예선 대기열을 먼저 승격한 뒤 남은 빈 자리만 본선으로 채웠습니다.':autoResult.reason==='no-courts'?'본선 팀은 확정됐습니다. 최초 본선 코트배정을 실행하면 운영이 시작됩니다.':'예선 순위와 진출팀을 다시 계산했습니다. 확정된 본선 경기는 예선 예약열 뒤의 빈 자리에서만 배정됩니다.'),'success');
+  return true;
 }
 function resetPrelimOnly(){
   if(!requireAdmin('예선 초기화'))return;
@@ -14459,11 +14546,13 @@ console.info('[230MATCH] 71.3.3 ready · classic direct SMS rebuild');
   };
 
   const originalConfirmPrelimResult=confirmPrelimResult;
-  confirmPrelimResult=function(event){
+  confirmPrelimResult=async function(event){
     const id=$('prelimResultMatchId')?.value||'';
     const before=matchById(id);const poolId=before?.prelimPoolId||poolForMatch(before)?.id||'';
     const sourceCourtId=before?.prelimCourtId||before?.courtId||'';
-    const result=originalConfirmPrelimResult.apply(this,arguments);
+    const result=await originalConfirmPrelimResult.apply(this,arguments);
+    if(result!==true)return result;
+
     const pool=poolId?findPool(poolId):null;
     if(pool&&sourceCourtId)reclaimSourceAutoPromotion(pool,sourceCourtId,id);
     if(poolId&&reconcilePool(poolId)){
@@ -15437,3 +15526,5 @@ console.info('[230MATCH] 5.9.23 stabilization · every main-draw result save pas
 console.info('[230MATCH] 5.9.25 stabilization · hold feature retired; legacy held matches auto-return to shared queue');
 
 console.info('[230MATCH] 5.9.27 stabilization · main redraw/reset clears all placement residue; unplaced ready shows 대진 대기');
+
+console.info('[230MATCH] 5.9.28 stabilization · prelim result uses in-app confirmation; fresh prelim score preview resets correctly');
