@@ -963,6 +963,37 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
 }
 </style>
 
+
+<style id="stage596OperationSettingsVisibility">
+.stage596-operation-state-section{
+  border:2px solid #bfdbfe!important;
+  background:#f8fbff!important;
+}
+.stage596-section-title h3{margin:0}
+.stage596-section-title p{margin:4px 0 0;color:#64748b;font-size:12px}
+.stage596-operation-grid{
+  display:grid;
+  grid-template-columns:minmax(0,1.35fr) minmax(260px,.65fr);
+  gap:12px;
+  margin-top:10px;
+}
+.stage596-status-box,.stage596-clock-box{
+  display:grid;
+  gap:8px;
+  padding:12px;
+  border:1px solid #cbd5e1;
+  border-radius:12px;
+  background:#fff;
+}
+.stage596-status-box>strong{font-size:13px;color:#0f172a}
+.stage596-status-box>small,.stage596-clock-box small{font-size:11px;color:#64748b;line-height:1.4}
+.stage596-clock-box label{display:grid;gap:5px}
+.stage596-clock-box label>span{font-size:12px;font-weight:900;color:#334155}
+@media(max-width:760px){
+  .stage596-operation-grid{grid-template-columns:1fr}
+}
+</style>
+
 </head>
 <body>
   <header class="topbar">
@@ -2991,7 +3022,7 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=5950"></script>
+  <script type="module" src="./assets/js/app.js?v=5960"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
