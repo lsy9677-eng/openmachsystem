@@ -4800,9 +4800,18 @@ async function saveRegistrationCloud(item){
 async function removeRegistrationCloud(id){
   if(!currentAuthUser)throw new Error('로그인이 필요합니다.');
   const rt=await registrationRuntime();
-  await rt.api.deleteDoc(rt.api.doc(rt.db,REGISTRATION_COLLECTION,String(id)));
-  registrationCloudRows=registrationCloudRows.filter(x=>x.id!==String(id));
+  const key=String(id||'');
+  if(!key)throw new Error('삭제할 참가신청 ID가 없습니다.');
+  // 5.9.1: 관리자 즉시 삭제는 비공개 신청 + 공개 참가현황을 함께 제거한다.
+  // 둘 중 하나라도 남으면 onSnapshot이 삭제된 팀을 다시 화면에 살릴 수 있다.
+  await rt.api.deleteDoc(rt.api.doc(rt.db,REGISTRATION_COLLECTION,key));
+  await rt.api.deleteDoc(rt.api.doc(rt.db,PUBLIC_REGISTRATION_COLLECTION,key));
+  registrationCloudRows=registrationCloudRows.filter(x=>String(x.id)!==key);
+  publicRegistrationRows=publicRegistrationRows.filter(x=>String(x.id)!==key);
+  registrationCloudReady=true;publicRegistrationReady=true;
   mirrorRegistrationRowsToCurrentDivision();
+  renderRegistrationSummaryEverywhere();
+  return true;
 }
 function registrationProfilePhone(){
   const p=currentAuthUser?.appProfile||{},d=p.registrationDefaults||{};
@@ -7787,12 +7796,35 @@ function stage3264AdminEditApplicationPromptLegacy(id){
   item.teamName=item.players.map(p=>p.name).join(' / ');item.affiliation=item.players.map(p=>p.club).join(' / ');item.updatedAt=new Date().toISOString();
   stage3264SyncApplicationTeam(item);commit(`관리자 참가 신청 수정 · ${item.teamName}`);renderApplicationPortal();renderParticipantManager();lookupPublicApplication();notice('참가 신청과 참가팀 정보를 수정했습니다.','success');
 }
-function stage3264DeleteApplication(id,label='바로 삭제'){
+async function stage3264DeleteApplication(id,label='바로 삭제'){
   if(!requireAdmin('참가 신청 삭제'))return;
   const item=stage3264FindApplication(id);if(!item)return;
-  if(!confirm(`${item.teamName} 참가 신청을 ${label}할까요?\n승인·후보 명단에 등록된 팀도 함께 제거됩니다.`))return;
-  const team=stage3264ApplicationTeam(item);if(team){state.teams=(state.teams||[]).filter(t=>String(t.id)!==String(team.id));if(state.prelim){state.prelim.activeTeams=(state.prelim.activeTeams||[]).filter(t=>String(t.id)!==String(team.id));state.prelim.reserveTeams=(state.prelim.reserveTeams||[]).filter(t=>String(t.id)!==String(team.id));}}
-  state.portal.applications=(state.portal.applications||[]).filter(a=>String(a.id)!==String(id));commit(`관리자 참가 신청 ${label} · ${item.teamName}`);renderApplicationPortal();renderParticipantManager();lookupPublicApplication();notice('참가 신청을 삭제했습니다.','success');
+  if(!confirm(`${item.teamName} 참가 신청을 ${label}할까요?\n승인·후보 명단과 Firebase 참가현황에서도 즉시 제거됩니다.`))return;
+  const key=String(id||'');
+  const team=stage3264ApplicationTeam(item);
+  autoRecovery(`참가팀 ${label} 직전 · ${item.teamName}`);
+  try{
+    // 클라우드 문서를 먼저 삭제한다. 실패했는데 로컬만 지우면 실시간 리스너가 다시 살리기 때문이다.
+    await removeRegistrationCloud(key);
+  }catch(error){
+    console.error('[230MATCH] 관리자 참가팀 즉시 삭제 실패',error);
+    notice(`참가팀 삭제에 실패했습니다. Firebase 데이터는 유지했습니다: ${error?.message||error}`,'error');
+    return;
+  }
+  if(team){
+    const teamId=String(team.id||'');
+    state.teams=(state.teams||[]).filter(t=>String(t.id)!==teamId);
+    if(state.prelim){
+      state.prelim.activeTeams=(state.prelim.activeTeams||[]).filter(t=>String(t.id)!==teamId);
+      state.prelim.reserveTeams=(state.prelim.reserveTeams||[]).filter(t=>String(t.id)!==teamId);
+    }
+  }
+  state.portal.applications=(state.portal.applications||[]).filter(row=>String(row.id)!==key);
+  try{syncCurrentDivisionRuntime?.();}catch(_e){}
+  commit(`관리자 참가 신청 ${label} · ${item.teamName}`);
+  try{await stage5526PushCriticalState?.('관리자 참가팀 삭제');}catch(error){console.warn('[230MATCH] 참가팀 삭제 state push 경고',error);}
+  renderApplicationPortal();renderParticipantManager();lookupPublicApplication();renderRegistrationSummaryEverywhere();
+  notice(`${item.teamName} 참가팀을 즉시 삭제했습니다.`,'success');
 }
 const stage3264BaseRenderApplications=renderApplicationPortal;
 renderApplicationPortal=function(){
@@ -7812,8 +7844,8 @@ lookupPublicApplication=function(){stage3264BaseLookup.apply(this,arguments);ren
 v3252DeleteRequest=function(id){return cancelEntryApplication(id);};
 document.addEventListener('click',e=>{
   const edit=e.target.closest?.('[data-entry-admin-edit]');if(edit){e.preventDefault();e.stopImmediatePropagation();stage3264AdminEditApplication(edit.dataset.entryAdminEdit);return;}
-  const approve=e.target.closest?.('[data-entry-admin-delete]');if(approve){e.preventDefault();e.stopImmediatePropagation();stage3264DeleteApplication(approve.dataset.entryAdminDelete,'삭제 승인');return;}
-  const force=e.target.closest?.('[data-entry-admin-force-delete]');if(force){e.preventDefault();e.stopImmediatePropagation();stage3264DeleteApplication(force.dataset.entryAdminForceDelete,'바로 삭제');}
+  const approve=e.target.closest?.('[data-entry-admin-delete]');if(approve){e.preventDefault();e.stopImmediatePropagation();void stage3264DeleteApplication(approve.dataset.entryAdminDelete,'삭제 승인');return;}
+  const force=e.target.closest?.('[data-entry-admin-force-delete]');if(force){e.preventDefault();e.stopImmediatePropagation();void stage3264DeleteApplication(force.dataset.entryAdminForceDelete,'바로 삭제');}
 },true);
 
 function stage3264GuideFor(item){return item?.guide||{date:item?.date||'',venue:item?.venue||'',fee:item?.fee||'',detail:item?.detail||'',bank:'',account:'',paymentNote:'',imageDataUrl:'',imageName:'',imageType:''};}
@@ -14822,3 +14854,5 @@ setTimeout(()=>{
   if(close)close.onclick=()=>{clearInterval(stage590PerformanceTimer);d?.close();notice('퍼포먼스 화면만 닫았습니다. 이미 확정된 추첨 결과는 유지됩니다.','info');};
 },0);
 console.info('[230MATCH] 5.9.0 ready · fair draw results are committed before performance reveal');
+
+console.info('[230MATCH] 5.9.1 ready · admin immediate participant deletion removes private/public Firebase registration docs first');
