@@ -1276,6 +1276,18 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
 }
 </style>
 
+
+<style id="stage5912RecoveryPreview">
+.stage5912-recovery-main{min-width:0}
+.stage5912-recovery-summary{margin-top:7px;padding:6px 8px;border-radius:8px;background:#eef6ff;color:#173f78;font-size:11px;font-weight:900;line-height:1.4}
+.stage5912-recovery-details{margin-top:6px;border:1px solid #dbe4ef;border-radius:8px;background:#fff;overflow:hidden}
+.stage5912-recovery-details>summary{padding:6px 8px;cursor:pointer;color:#334155;font-size:11px;font-weight:900;background:#f8fafc}
+.stage5912-recovery-details>div,.stage5912-recovery-details>ul{margin:0;padding:7px 9px;font-size:11px;line-height:1.45;color:#475569}
+.stage5912-recovery-details>ul{padding-left:24px;padding-top:0}
+.stage5912-recovery-updated{padding-top:0!important;color:#64748b!important}
+.recovery-item .stage5912-recovery-main{flex:1 1 auto}
+</style>
+
 </head>
 <body>
   <header class="topbar">
@@ -3304,7 +3316,7 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=5990"></script>
+  <script type="module" src="./assets/js/app.js?v=59120"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
