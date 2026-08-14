@@ -4180,19 +4180,32 @@ function stage5929BindBracketZoomDelegation(){
   if(document.documentElement.dataset.stage5929ZoomDelegated==='1')return;
   document.documentElement.dataset.stage5929ZoomDelegated='1';
 
-  document.addEventListener('click',event=>{
-    const button=event.target.closest?.('#bracketZoomOutBtn,#bracketZoomResetBtn,#bracketZoomInBtn');
+  const applyFromButton=button=>{
     if(!button)return;
-    event.preventDefault();
-    event.stopPropagation();
-
     const current=getBracketZoom();
     if(button.id==='bracketZoomOutBtn')setBracketZoom(current-.10);
     else if(button.id==='bracketZoomInBtn')setBracketZoom(current+.10);
-    else setBracketZoom(1);
+    else if(button.id==='bracketZoomResetBtn')setBracketZoom(1);
+    requestAnimationFrame(()=>window.__redrawBracketConnectors?.('zoom-button'));
+  };
 
-    requestAnimationFrame(()=>window.__redrawBracketConnectors?.('mobile-zoom-button'));
-  },true);
+  // click + touchend 둘 다 지원하되 같은 터치에서 중복 실행되지 않게 표시한다.
+  let lastTouchAt=0;
+  document.addEventListener('touchend',event=>{
+    const button=event.target.closest?.('#bracketZoomOutBtn,#bracketZoomResetBtn,#bracketZoomInBtn');
+    if(!button)return;
+    event.preventDefault();
+    lastTouchAt=Date.now();
+    applyFromButton(button);
+  },{passive:false});
+
+  document.addEventListener('click',event=>{
+    const button=event.target.closest?.('#bracketZoomOutBtn,#bracketZoomResetBtn,#bracketZoomInBtn');
+    if(!button)return;
+    if(Date.now()-lastTouchAt<700)return;
+    event.preventDefault();
+    applyFromButton(button);
+  });
 }
 
 
@@ -4245,6 +4258,7 @@ function stage5932WinnerSide(match){
   return '';
 }
 
+
 function stage5932BuildBracketSvg(){
   const rounds=state.draw?.rounds||{};
   const sizes=Object.keys(rounds).map(Number).filter(n=>Number.isFinite(n)&&n>=2).sort((x,y)=>y-x);
@@ -4254,18 +4268,18 @@ function stage5932BuildBracketSvg(){
   const firstMatches=Array.isArray(rounds[firstSize])?rounds[firstSize]:[];
   if(!firstMatches.length)return null;
 
-  // 5.9.34 출력 전용 압축 레이아웃.
-  // 실제 대진/코트 데이터는 읽기만 하고, 출력 좌표만 별도로 계산한다.
-  const cardW=226;
-  const cardH=78;
-  const colGap=54;
+  // 5.9.35 poster style:
+  // 운영 state는 읽기만 하고, 이미지용 좌표/스타일만 별도로 계산한다.
+  const cardW=232;
+  const cardH=76;
+  const colGap=58;
   const stepX=cardW+colGap;
-  const rowStep=88;
+  const rowStep=86;
   const left=34;
-  const top=108;
+  const top=110;
   const right=34;
-  const bottom=42;
-  const headerY=48;
+  const bottom=44;
+  const headerY=50;
   const headerH=40;
 
   const centersBySize={};
@@ -4286,25 +4300,18 @@ function stage5932BuildBracketSvg(){
   }
 
   const width=left + sizes.length*cardW + Math.max(0,sizes.length-1)*colGap + right;
-  const height=Math.max(780, top + Math.max(1,firstMatches.length-1)*rowStep + cardH + bottom);
+  const height=Math.max(760, top + Math.max(1,firstMatches.length-1)*rowStep + cardH + bottom);
 
-  // 배경과 라운드 컬럼 가이드
-  let backdrop=`<defs>
-    <filter id="stage5934Shadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="2" stdDeviation="2.2" flood-color="#0f172a" flood-opacity=".12"/>
+  let defs=`<defs>
+    <filter id="stage5935CardShadow" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2.3" flood-color="#0f172a" flood-opacity=".13"/>
     </filter>
-  </defs>
-  <rect width="100%" height="100%" fill="#f7f9fc"/>`;
+    <filter id="stage5935HeaderShadow" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="3" stdDeviation="3.2" flood-color="#0f172a" flood-opacity=".16"/>
+    </filter>
+  </defs>`;
 
-  sizes.forEach((size,colIndex)=>{
-    const x=left+colIndex*stepX;
-    const color=stage5932RoundColor(size);
-    backdrop+=`
-      <rect x="${x-10}" y="${headerY-8}" width="${cardW+20}" height="${height-headerY-24}" rx="18" fill="#ffffff" stroke="#e2e8f0"/>
-      <rect x="${x-10}" y="${headerY-8}" width="5" height="${height-headerY-24}" rx="3" fill="${color}" opacity=".18"/>`;
-  });
-
-  // 얇고 단정한 연결선
+  // 연결선: 카드보다 뒤에 깔고, 진입/이탈점은 작게 표시.
   let lines='';
   for(let i=0;i<sizes.length-1;i++){
     const fromSize=sizes[i];
@@ -4314,13 +4321,19 @@ function stage5932BuildBracketSvg(){
     const x1=left+i*stepX+cardW;
     const x2=left+(i+1)*stepX;
     const mid=x1+colGap/2;
+
     for(let j=0;j<to.length;j++){
-      const yA=from[j*2],yB=from[j*2+1],yT=to[j];
+      const yA=from[j*2], yB=from[j*2+1], yT=to[j];
       if(Number.isFinite(yA)){
-        lines+=`<path d="M${x1} ${yA} H${mid} V${yT} H${x2}" fill="none" stroke="#7fa4d6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>`;
+        lines+=`<path d="M${x1} ${yA} H${mid} V${yT} H${x2}" fill="none" stroke="#6f93c8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
+        lines+=`<circle cx="${x1}" cy="${yA}" r="2.2" fill="#6f93c8"/>`;
       }
       if(Number.isFinite(yB)){
-        lines+=`<path d="M${x1} ${yB} H${mid}" fill="none" stroke="#7fa4d6" stroke-width="1.8" stroke-linecap="round"/>`;
+        lines+=`<path d="M${x1} ${yB} H${mid}" fill="none" stroke="#6f93c8" stroke-width="2" stroke-linecap="round"/>`;
+        lines+=`<circle cx="${x1}" cy="${yB}" r="2.2" fill="#6f93c8"/>`;
+      }
+      if(Number.isFinite(yT)){
+        lines+=`<circle cx="${x2}" cy="${yT}" r="2.2" fill="#6f93c8"/>`;
       }
     }
   }
@@ -4332,11 +4345,14 @@ function stage5932BuildBracketSvg(){
     const x=left+colIndex*stepX;
     const label=stage5932RoundLabel(size);
 
-    cols+=`<g filter="url(#stage5934Shadow)">
+    // 세로 패널 제거. 헤더만 떠 있게 해서 빈 공간을 덜 보이게 한다.
+    cols+=`<g filter="url(#stage5935HeaderShadow)">
       <rect x="${x}" y="${headerY}" width="${cardW}" height="${headerH}" rx="11" fill="${color}"/>
       <text x="${x+14}" y="${headerY+26}" fill="#fff" font-size="18" font-weight="900">${stage5932Xml(label)}</text>
-      <text x="${x+cardW-14}" y="${headerY+25}" text-anchor="end" fill="#fff" opacity=".88" font-size="10" font-weight="800">${matches.length}경기</text>
-    </g>`;
+      <rect x="${x+cardW-60}" y="${headerY+9}" width="48" height="21" rx="10.5" fill="rgba(255,255,255,.18)"/>
+      <text x="${x+cardW-36}" y="${headerY+23.5}" text-anchor="middle" fill="#fff" font-size="9.5" font-weight="850">${matches.length}경기</text>
+    </g>
+    <rect x="${x}" y="${headerY+headerH+7}" width="${cardW}" height="2" rx="1" fill="${color}" opacity=".22"/>`;
 
     matches.forEach((m,index)=>{
       const center=(centersBySize[size]||[])[index] ?? (top+index*rowStep+cardH/2);
@@ -4350,31 +4366,35 @@ function stage5932BuildBracketSvg(){
       const completed=m?.status==='completed';
       const playing=status.kind==='playing';
 
-      const bodyFill=completed?'#eef2f6':playing?'#fff4f4':'#f8fbff';
-      const border=completed?'#94a3b8':playing?'#ef4444':'#bfd0e6';
-      const rowAFill=winner==='A'?'#dff3e5':'transparent';
-      const rowBFill=winner==='B'?'#dff3e5':'transparent';
+      const bodyFill=completed?'#edf1f5':playing?'#fff3f3':'#ffffff';
+      const border=completed?'#94a3b8':playing?'#ef4444':'#b7c9df';
+      const topFill=completed?'#e3e8ee':playing?'#ffe2e2':'#f4f8fc';
+      const rowAFill=winner==='A'?'#d9eee0':'transparent';
+      const rowBFill=winner==='B'?'#d9eee0':'transparent';
       const matchNo=String(m?.matchNo||index+1);
-      const labelText=stage5932Xml(status.label);
 
-      cols+=`<g filter="url(#stage5934Shadow)">
-        <rect x="${x}" y="${y}" width="${cardW}" height="${cardH}" rx="10" fill="${bodyFill}" stroke="${border}" stroke-width="${playing?2.2:1.4}"/>
+      cols+=`<g filter="url(#stage5935CardShadow)">
+        <rect x="${x}" y="${y}" width="${cardW}" height="${cardH}" rx="10" fill="${bodyFill}" stroke="${border}" stroke-width="${playing?2.2:1.35}"/>
         <rect x="${x}" y="${y}" width="5" height="${cardH}" rx="3" fill="${color}"/>
+        <rect x="${x+5}" y="${y}" width="${cardW-5}" height="26" rx="9" fill="${topFill}"/>
+        <rect x="${x+5}" y="${y+18}" width="${cardW-5}" height="8" fill="${topFill}"/>
 
-        <text x="${x+12}" y="${y+17}" fill="#334155" font-size="10.5" font-weight="900">${stage5932Xml(matchNo)}경기</text>
-        <rect x="${x+cardW-69}" y="${y+6}" width="59" height="20" rx="10" fill="${status.fill}"/>
-        <text x="${x+cardW-39.5}" y="${y+20}" text-anchor="middle" fill="${status.text}" font-size="9.5" font-weight="900">${labelText}</text>
+        <text x="${x+13}" y="${y+17}" fill="#24364f" font-size="10.5" font-weight="900">${stage5932Xml(matchNo)}경기</text>
 
-        <line x1="${x+9}" y1="${y+28}" x2="${x+cardW-9}" y2="${y+28}" stroke="#dbe5f1" stroke-width="1"/>
+        <rect x="${x+cardW-68}" y="${y+5}" width="58" height="20" rx="10" fill="${status.fill}"/>
+        <text x="${x+cardW-39}" y="${y+19}" text-anchor="middle" fill="${status.text}" font-size="9.4" font-weight="900">${stage5932Xml(status.label)}</text>
 
-        <rect x="${x+8}" y="${y+31}" width="${cardW-16}" height="20" rx="4" fill="${rowAFill}"/>
-        <rect x="${x+8}" y="${y+54}" width="${cardW-16}" height="20" rx="4" fill="${rowBFill}"/>
+        <rect x="${x+8}" y="${y+29}" width="${cardW-16}" height="20" rx="4" fill="${rowAFill}"/>
+        <rect x="${x+8}" y="${y+52}" width="${cardW-16}" height="20" rx="4" fill="${rowBFill}"/>
 
-        <text x="${x+13}" y="${y+45}" fill="#1f2937" font-size="11.5" font-weight="${winner==='A'?'900':'650'}">${stage5932Xml(teamA.slice(0,27))}</text>
-        <text x="${x+13}" y="${y+68}" fill="#1f2937" font-size="11.5" font-weight="${winner==='B'?'900':'650'}">${stage5932Xml(teamB.slice(0,27))}</text>
+        ${winner==='A'?`<text x="${x+13}" y="${y+43}" fill="#16804a" font-size="11.5" font-weight="950">✓</text>`:''}
+        ${winner==='B'?`<text x="${x+13}" y="${y+66}" fill="#16804a" font-size="11.5" font-weight="950">✓</text>`:''}
 
-        ${completed?`<text x="${x+cardW-14}" y="${y+45}" text-anchor="end" fill="#0f172a" font-size="12" font-weight="900">${stage5932Xml(scoreA)}</text>
-        <text x="${x+cardW-14}" y="${y+68}" text-anchor="end" fill="#0f172a" font-size="12" font-weight="900">${stage5932Xml(scoreB)}</text>`:''}
+        <text x="${x+(winner==='A'?27:13)}" y="${y+43}" fill="#1f2937" font-size="11.2" font-weight="${winner==='A'?'900':'650'}">${stage5932Xml(teamA.slice(0,27))}</text>
+        <text x="${x+(winner==='B'?27:13)}" y="${y+66}" fill="#1f2937" font-size="11.2" font-weight="${winner==='B'?'900':'650'}">${stage5932Xml(teamB.slice(0,27))}</text>
+
+        ${completed?`<text x="${x+cardW-14}" y="${y+43}" text-anchor="end" fill="#111827" font-size="12" font-weight="950">${stage5932Xml(scoreA)}</text>
+        <text x="${x+cardW-14}" y="${y+66}" text-anchor="end" fill="#111827" font-size="12" font-weight="950">${stage5932Xml(scoreB)}</text>`:''}
       </g>`;
     });
   });
@@ -4382,17 +4402,85 @@ function stage5932BuildBracketSvg(){
   const tournament=stage5932Xml(state.tournament?.name||'230MATCH 본선 대진표');
   const date=stage5932Xml(state.tournament?.date||'');
   const venue=stage5932Xml(state.tournament?.venue||state.tournament?.location||'');
+  const totalMatches=sizes.reduce((sum,size)=>sum+(Array.isArray(rounds[size])?rounds[size].length:0),0);
 
   const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-    ${backdrop}
-    <rect x="0" y="0" width="${width}" height="36" fill="#102b55"/>
-    <text x="${left}" y="24" fill="#ffffff" font-size="17" font-weight="900">${tournament}</text>
-    <text x="${width-right}" y="23" text-anchor="end" fill="#dbeafe" font-size="10.5">${date}${date&&venue?' · ':''}${venue}</text>
+    ${defs}
+    <rect width="100%" height="100%" fill="#f8fafc"/>
+    <rect x="0" y="0" width="${width}" height="38" fill="#102b55"/>
+    <text x="${left}" y="25" fill="#ffffff" font-size="17" font-weight="900">${tournament}</text>
+    <text x="${width-right}" y="24" text-anchor="end" fill="#dbeafe" font-size="10.5">${date}${date&&venue?' · ':''}${venue}</text>
+
+    <text x="${left}" y="${headerY-10}" fill="#64748b" font-size="9.5" font-weight="800">${firstSize}팀 · 총 ${totalMatches}경기</text>
+
     ${lines}
     ${cols}
   </svg>`;
 
   return{svg,width,height};
+}
+
+
+async function stage5936DownloadBracketPng({source='direct'}={}){
+  const payload=stage5932BuildBracketSvg();
+  if(!payload){
+    notice('저장할 본선 대진표가 없습니다.','error');
+    return false;
+  }
+
+  let svgUrl='';
+  try{
+    svgUrl=URL.createObjectURL(new Blob([payload.svg],{type:'image/svg+xml;charset=utf-8'}));
+    const img=new Image();
+    img.decoding='async';
+
+    await new Promise((resolve,reject)=>{
+      img.onload=resolve;
+      img.onerror=()=>reject(new Error('SVG load failed'));
+      img.src=svgUrl;
+    });
+
+    const maxWidth=4200;
+    const scale=Math.min(2,maxWidth/payload.width);
+    const canvas=document.createElement('canvas');
+    canvas.width=Math.max(1,Math.round(payload.width*scale));
+    canvas.height=Math.max(1,Math.round(payload.height*scale));
+
+    const ctx=canvas.getContext('2d',{alpha:false});
+    if(!ctx)throw new Error('Canvas context unavailable');
+    ctx.fillStyle='#ffffff';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.drawImage(img,0,0,canvas.width,canvas.height);
+
+    const blob=await new Promise((resolve,reject)=>{
+      canvas.toBlob(result=>result?resolve(result):reject(new Error('PNG blob failed')),'image/png',1);
+    });
+
+    URL.revokeObjectURL(svgUrl);svgUrl='';
+
+    const downloadUrl=URL.createObjectURL(blob);
+    const link=document.createElement('a');
+    const tournament=String(state.tournament?.name||'230MATCH')
+      .replace(/[\\/:*?"<>|]+/g,'_')
+      .replace(/\s+/g,'_');
+    link.href=downloadUrl;
+    link.download=`${tournament}_전체본선대진표_${new Date().toISOString().slice(0,10)}.png`;
+    link.style.display='none';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(()=>URL.revokeObjectURL(downloadUrl),2500);
+
+    notice(source==='print-center'
+      ?'출력센터 본선 대진표 PNG를 저장했습니다.'
+      :'전체 본선 대진표 PNG를 저장했습니다.','success');
+    return true;
+  }catch(error){
+    if(svgUrl)URL.revokeObjectURL(svgUrl);
+    console.error('[5.9.36 bracket PNG]',error);
+    notice('대진표 PNG 저장에 실패했습니다. 다시 시도해 주세요.','error');
+    return false;
+  }
 }
 
 function stage5932SetPreview(payload){
@@ -4405,64 +4493,27 @@ function stage5932SetPreview(payload){
   viewport.scrollTo({left:0,top:0});
 }
 function stage5931OpenBracketImageView(){
-  const dialog=document.getElementById('stage5931BracketImageDialog');
-  if(!dialog)return;
-  const payload=stage5932BuildBracketSvg();
-  if(!payload){notice('전체보기할 본선 대진표가 없습니다.','error');return;}
-  stage5932SetPreview(payload);
-  if(!dialog.open)dialog.showModal();
+  // 5.9.36: 미리보기 없이 바로 PNG 저장.
+  return stage5936DownloadBracketPng({source:'direct'});
 }
 async function stage5931SaveBracketImagePng(){
-  const payload=__stage5932BracketSvgPayload||stage5932BuildBracketSvg();
-  if(!payload){notice('저장할 전체 대진 이미지가 없습니다.','error');return;}
+  return stage5936DownloadBracketPng({source:'direct'});
+}
 
-  const button=document.getElementById('stage5931SaveBracketPngBtn');
-  if(button){button.disabled=true;button.textContent='PNG 만드는 중…';}
+function stage5936BindPrintCenterBracketPng(){
+  if(document.documentElement.dataset.stage5936PrintBracketBound==='1')return;
+  document.documentElement.dataset.stage5936PrintBracketBound='1';
 
-  let svgUrl='';
-  try{
-    svgUrl=URL.createObjectURL(new Blob([payload.svg],{type:'image/svg+xml;charset=utf-8'}));
-    const img=new Image();
-
-    await new Promise((resolve,reject)=>{
-      img.onload=resolve;
-      img.onerror=()=>reject(new Error('SVG load failed'));
-      img.src=svgUrl;
-    });
-
-    const maxWidth=3600;
-    const scale=Math.min(2,maxWidth/payload.width);
-    const canvas=document.createElement('canvas');
-    canvas.width=Math.max(1,Math.round(payload.width*scale));
-    canvas.height=Math.max(1,Math.round(payload.height*scale));
-    const ctx=canvas.getContext('2d');
-    ctx.fillStyle='#fff';
-    ctx.fillRect(0,0,canvas.width,canvas.height);
-    ctx.drawImage(img,0,0,canvas.width,canvas.height);
-
-    const png=await new Promise((resolve,reject)=>{
-      canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('PNG blob failed')),'image/png');
-    });
-
-    URL.revokeObjectURL(svgUrl);svgUrl='';
-
-    const downloadUrl=URL.createObjectURL(png);
-    const link=document.createElement('a');
-    const tournament=String(state.tournament?.name||'230MATCH').replace(/[\\/:*?"<>|]+/g,'_').replace(/\s+/g,'_');
-    link.href=downloadUrl;
-    link.download=`${tournament}_전체본선대진표_${new Date().toISOString().slice(0,10)}.png`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    setTimeout(()=>URL.revokeObjectURL(downloadUrl),1500);
-    notice('전체 본선 대진표 PNG 이미지를 저장했습니다.','success');
-  }catch(error){
-    if(svgUrl)URL.revokeObjectURL(svgUrl);
-    console.error('[5.9.32 bracket PNG]',error);
-    notice('PNG 저장에 실패했습니다. 다시 시도해 주세요.','error');
-  }finally{
-    if(button){button.disabled=false;button.textContent='PNG 저장';}
-  }
+  document.addEventListener('click',event=>{
+    const button=event.target.closest?.(
+      '#saveBracketPngBtn,#printBracketPngBtn,#downloadBracketPngBtn,'+
+      '[data-export-bracket-png],[data-save-bracket-png],[data-print-bracket-png]'
+    );
+    if(!button)return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    stage5936DownloadBracketPng({source:'print-center'});
+  },true);
 }
 
 function stage5931BindBracketImageView(){
@@ -4472,7 +4523,7 @@ function stage5931BindBracketImageView(){
   document.addEventListener('click',event=>{
     if(event.target.closest?.('#stage5931BracketImageBtn')){
       event.preventDefault();
-      stage5931OpenBracketImageView();
+      stage5936DownloadBracketPng({source:'direct'});
       return;
     }
     if(event.target.closest?.('#stage5931SaveBracketPngBtn')){
@@ -4536,6 +4587,7 @@ function bindBracketMobileView571(){
   setBracketZoom(getBracketZoom(),{save:false});
   stage5929BindBracketZoomDelegation();
   stage5931BindBracketImageView();
+  stage5936BindPrintCenterBracketPng();
 
   // 5.9.29: zoom buttons use persistent delegated handler so mobile re-render cannot detach them.
 
@@ -15915,3 +15967,7 @@ console.info('[230MATCH] 5.9.32 stabilization · bracket full image uses pure SV
 })();
 
 console.info('[230MATCH] 5.9.34 · polished compact SVG bracket layout');
+
+console.info('[230MATCH] 5.9.35 · refined poster-style bracket image');
+
+console.info('[230MATCH] 5.9.36 · zoom buttons hardened + one direct SVG->PNG path for bracket exports');
