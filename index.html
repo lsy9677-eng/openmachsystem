@@ -1835,6 +1835,22 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
 }
 </style>
 
+
+<style id="stage5922HoldUiSingleDisplay">
+/* 5.9.22 — 보류 표시는 stage5920 decorator 1개만 사용 */
+.stage5920-held-card .stage5918-hold-badge{
+  display:none!important;
+}
+.stage5920-held-card>em{
+  /* 5.9.18 템플릿의 '· 보류: 사유' 중복 문구가 있더라도 강조하지 않음 */
+  font-weight:700!important;
+}
+.stage5920-held-card .stage5920-hold-reason{
+  max-height:none!important;
+  overflow:visible!important;
+}
+</style>
+
 </head>
 <body>
   <header class="topbar">
@@ -3863,7 +3879,7 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=59200"></script>
+  <script type="module" src="./assets/js/app.js?v=59220"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
