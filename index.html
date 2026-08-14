@@ -1288,6 +1288,111 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
 .recovery-item .stage5912-recovery-main{flex:1 1 auto}
 </style>
 
+
+<style id="stage5913BracketVisualPolish">
+/* 5.9.13 — 대진표 시각 효과 전용. 로직/좌표/상태 계산은 변경하지 않음. */
+
+/* 5.9.10의 카드별 왼쪽 띠를 제거하고, 라운드 컬럼 전체에 이어지는 세로선으로 대체 */
+#bracketBoard .match-card[data-round-size]{
+  box-shadow:0 2px 7px rgba(15,23,42,.10)!important;
+}
+#bracketBoard .round-column{
+  position:relative;
+}
+#bracketBoard .round-column::before{
+  content:"";
+  position:absolute;
+  left:0;
+  top:0;
+  bottom:0;
+  width:5px;
+  border-radius:999px;
+  background:var(--stage5913-column-accent,#64748b);
+  opacity:.95;
+  pointer-events:none;
+  z-index:2;
+}
+#bracketBoard .round-column[data-round-size="128"]{--stage5913-column-accent:#3b82f6}
+#bracketBoard .round-column[data-round-size="64"]{--stage5913-column-accent:#1677d2}
+#bracketBoard .round-column[data-round-size="32"]{--stage5913-column-accent:#7257c8}
+#bracketBoard .round-column[data-round-size="16"]{--stage5913-column-accent:#c28416}
+#bracketBoard .round-column[data-round-size="8"]{--stage5913-column-accent:#d66b44}
+#bracketBoard .round-column[data-round-size="4"]{--stage5913-column-accent:#9a4fbd}
+#bracketBoard .round-column[data-round-size="2"]{--stage5913-column-accent:#c48b00}
+
+/* 시합중 카드 — 부드러운 pulse. transform은 쓰지 않아 대진표 좌표/연결선에 영향 없음 */
+@keyframes stage5913PlayingPulse{
+  0%,100%{
+    outline-color:rgba(220,38,38,.28);
+    box-shadow:
+      0 0 0 2px rgba(239,68,68,.08),
+      0 4px 12px rgba(127,29,29,.12)!important;
+  }
+  50%{
+    outline-color:rgba(220,38,38,.70);
+    box-shadow:
+      0 0 0 5px rgba(239,68,68,.18),
+      0 6px 16px rgba(127,29,29,.22)!important;
+  }
+}
+#bracketBoard .match-card.is-playing{
+  animation:stage5913PlayingPulse 1.45s ease-in-out infinite!important;
+  border-color:#dc2626!important;
+  outline:2px solid rgba(220,38,38,.42)!important;
+  outline-offset:1px!important;
+}
+#bracketBoard .match-card.is-playing .match-status-label{
+  background:#b91c1c!important;
+  border-color:#991b1b!important;
+  color:#fff!important;
+}
+
+/* 경기 완료 — 카드 전체를 어둡게, 단 정보 가독성은 유지 */
+#bracketBoard .match-card.completed{
+  background:#d8dee7!important;
+  border-color:#6b7280!important;
+  outline:2px solid rgba(71,85,105,.30)!important;
+  outline-offset:1px!important;
+  box-shadow:0 3px 10px rgba(15,23,42,.14)!important;
+  filter:saturate(.68);
+}
+#bracketBoard .match-card.completed header{
+  background:#c8d0dc!important;
+  color:#334155!important;
+}
+#bracketBoard .match-card.completed .match-team{
+  background:#e3e7ed!important;
+  color:#475569!important;
+}
+#bracketBoard .match-card.completed .match-team.winner{
+  background:#c9dfd1!important;
+  color:#14532d!important;
+  font-weight:950!important;
+}
+#bracketBoard .match-card.completed .match-status-label{
+  background:#475569!important;
+  border-color:#334155!important;
+  color:#fff!important;
+}
+#bracketBoard .match-card.completed .bracket-live-placement,
+#bracketBoard .bracket-live-placement[data-placement-kind="completed"]{
+  background:#cbd5e1!important;
+  border:2px solid #94a3b8!important;
+  color:#334155!important;
+  font-weight:950!important;
+}
+#bracketBoard .match-card.completed .match-team.winner::before{
+  color:#166534!important;
+}
+
+/* 접근성: 모션 감소 설정 사용자는 pulse 비활성 */
+@media(prefers-reduced-motion:reduce){
+  #bracketBoard .match-card.is-playing{
+    animation:none!important;
+  }
+}
+</style>
+
 </head>
 <body>
   <header class="topbar">
