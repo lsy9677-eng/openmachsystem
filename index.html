@@ -746,6 +746,56 @@ body.tournament-completed-admin #view-operation textarea{
 }
 </style>
 
+
+<style id="stage583TournamentStatusSetting">
+.stage583-status-field{
+  display:grid;
+  gap:7px;
+  padding:11px 12px;
+  border:1px solid #cbd5e1;
+  border-radius:12px;
+  background:#f8fafc;
+}
+.stage583-status-field>span{font-size:12px;font-weight:900;color:#334155}
+.stage583-status-field>small{font-size:11px;color:#64748b;line-height:1.45}
+.stage583-status-buttons{
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:6px;
+}
+.stage583-status-buttons button{
+  min-height:40px;
+  border:1.5px solid #cbd5e1;
+  border-radius:10px;
+  background:#fff;
+  color:#334155;
+  font:inherit;
+  font-size:12px;
+  font-weight:900;
+  cursor:pointer;
+}
+.stage583-status-buttons button:hover{border-color:#60a5fa;background:#eff6ff}
+.stage583-status-buttons button.active,
+.stage583-status-buttons button[aria-pressed="true"]{
+  background:#2563eb!important;
+  border-color:#1d4ed8!important;
+  color:#fff!important;
+  box-shadow:0 3px 9px rgba(37,99,235,.2);
+}
+.stage583-status-select{
+  position:absolute!important;
+  left:-10000px!important;
+  width:1px!important;
+  height:1px!important;
+  overflow:hidden!important;
+}
+.tournament-state.closed{background:#fff7ed!important;color:#c2410c!important}
+@media(max-width:720px){
+  .stage583-status-buttons{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .stage583-status-buttons button:first-child{grid-column:1/-1}
+}
+</style>
+
 </head>
 <body>
   <header class="topbar">
@@ -1040,7 +1090,7 @@ body.tournament-completed-admin #view-operation textarea{
         </div>
         <div class="tournament-list-tools">
           <input id="tournamentListSearch" type="search" placeholder="대회명·부서·장소 검색">
-          <select id="tournamentListStatus"><option value="all">전체 상태</option><option value="recruiting">접수중</option><option value="ongoing">진행중</option><option value="completed">종료</option></select>
+          <select id="tournamentListStatus"><option value="all">전체 상태</option><option value="recruiting">접수중</option><option value="closed">접수마감</option><option value="ongoing">시합중</option><option value="completed">시합완료</option></select>
           <button id="tournamentListResetBtn" type="button" class="btn btn-light">초기화</button>
         </div>
         <div id="tournamentListSummary" class="portal-muted">대회 정보를 불러오는 중입니다.</div>
@@ -2763,7 +2813,7 @@ body.tournament-completed-admin #view-operation textarea{
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=5802"></script>
+  <script type="module" src="./assets/js/app.js?v=5804"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">

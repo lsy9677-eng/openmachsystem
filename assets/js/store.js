@@ -6,7 +6,9 @@ const META_KEY='230match-v6-local-meta';
 const DB_NAME='230match-v6-recovery-db';
 const DB_VERSION=1;
 const RECOVERY_STORE='recoveries';
-const MAX_RECOVERIES=8;
+const MAX_MANUAL_RECOVERIES=12;
+const MAX_AUTO_RECOVERIES=24;
+const MAX_RECOVERIES=MAX_MANUAL_RECOVERIES+MAX_AUTO_RECOVERIES;
 let dbPromise=null;
 
 function clone(v){try{return structuredClone(v);}catch{return JSON.parse(JSON.stringify(v));}}
@@ -76,9 +78,61 @@ export function clearState(){try{localStorage.removeItem(META_KEY);}catch{}}
 
 function openDb(){if(dbPromise)return dbPromise;dbPromise=new Promise((resolve,reject)=>{const req=indexedDB.open(DB_NAME,DB_VERSION);req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains(RECOVERY_STORE)){const s=db.createObjectStore(RECOVERY_STORE,{keyPath:'id'});s.createIndex('createdAt','createdAt');}};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});return dbPromise;}
 async function getAll(){const db=await openDb();return new Promise((resolve,reject)=>{const tx=db.transaction(RECOVERY_STORE,'readonly');const r=tx.objectStore(RECOVERY_STORE).getAll();r.onsuccess=()=>resolve((r.result||[]).sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt))));r.onerror=()=>reject(r.error);});}
-async function put(item){const db=await openDb();await new Promise((resolve,reject)=>{const tx=db.transaction(RECOVERY_STORE,'readwrite');tx.objectStore(RECOVERY_STORE).put(item);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});const all=await getAll();for(const old of all.slice(MAX_RECOVERIES)){await deleteRecovery(old.id);}return Math.min(all.length,MAX_RECOVERIES);}
+function recoveryKind(item){
+  if(item?.kind==='manual')return 'manual';
+  if(item?.kind==='critical-auto')return 'critical-auto';
+  if(item?.kind==='auto')return 'auto';
+  const label=String(item?.label||'');
+  return /자동|직전|초기화 전|변경 전|수정 전|배정 전|추첨 전|복원 전|복구 전|연결 전|시작 전|점검 전/.test(label)?'auto':'manual';
+}
+function isCriticalRecoveryLabel(label=''){
+  return /결승|경기 결과|결과 입력|결과 수정|자동배정|초기화|복구|복원|설정 변경|세부정보 수정|공통정보 변경|본선 재추첨|코트배정|대회 시작/.test(String(label||''));
+}
+async function trimRecoveries(){
+  const all=await getAll();
+  const manual=all.filter(x=>recoveryKind(x)==='manual');
+  const autos=all.filter(x=>recoveryKind(x)!=='manual');
+  const keep=new Set();
+
+  manual.slice(0,MAX_MANUAL_RECOVERIES).forEach(x=>keep.add(x.id));
+
+  // 자동 복구는 최대 24개. 중요 복구점을 먼저 보존하고 나머지는 최신순으로 채운다.
+  const critical=autos.filter(x=>recoveryKind(x)==='critical-auto'||isCriticalRecoveryLabel(x.label));
+  const regular=autos.filter(x=>!critical.includes(x));
+  const selected=[];
+  for(const x of critical){if(selected.length<MAX_AUTO_RECOVERIES)selected.push(x);}
+  for(const x of regular){if(selected.length<MAX_AUTO_RECOVERIES)selected.push(x);}
+  selected.forEach(x=>keep.add(x.id));
+
+  for(const old of all){if(!keep.has(old.id))await deleteRecovery(old.id);}
+  return {
+    count:keep.size,
+    manualCount:Math.min(manual.length,MAX_MANUAL_RECOVERIES),
+    autoCount:Math.min(autos.length,MAX_AUTO_RECOVERIES),
+    max:MAX_RECOVERIES
+  };
+}
+async function put(item){
+  const db=await openDb();
+  await new Promise((resolve,reject)=>{
+    const tx=db.transaction(RECOVERY_STORE,'readwrite');
+    tx.objectStore(RECOVERY_STORE).put(item);
+    tx.oncomplete=resolve;
+    tx.onerror=()=>reject(tx.error);
+  });
+  return trimRecoveries();
+}
 export async function prepareRecoveryStorage(){await openDb();try{await navigator.storage?.persist?.();}catch{}return{ready:true,migrated:0};}
-export function saveRecovery(state,label='수동 복구점'){const item={id:uid(),label,createdAt:new Date().toISOString(),state:clone(normalizeState(clone(state))),storage:'indexedDB-v6'};const ready=put(item).then(count=>({saved:true,count,storage:'indexedDB-v6'})).catch(error=>({saved:false,count:0,storage:'none',error:error?.message||String(error)}));return{...item,ready};}
+export function saveRecovery(state,label='수동 복구점',options={}){
+  const requested=String(options?.kind||'').trim();
+  const kind=requested==='manual'?'manual':requested==='critical-auto'?'critical-auto':requested==='auto'?'auto':(isCriticalRecoveryLabel(label)?'critical-auto':'auto');
+  const item={id:uid(),label,kind,createdAt:new Date().toISOString(),state:clone(normalizeState(clone(state))),storage:'indexedDB-v6'};
+  const ready=put(item).then(info=>({saved:true,count:info.count,manualCount:info.manualCount,autoCount:info.autoCount,max:info.max,kind,storage:'indexedDB-v6'})).catch(error=>({saved:false,count:0,manualCount:0,autoCount:0,max:MAX_RECOVERIES,kind,storage:'none',error:error?.message||String(error)}));
+  return{...item,ready};
+}
 export async function getRecoveries(){try{return await getAll();}catch{return[];}}
 export async function getRecovery(id){try{const db=await openDb();return await new Promise((resolve,reject)=>{const tx=db.transaction(RECOVERY_STORE,'readonly');const r=tx.objectStore(RECOVERY_STORE).get(id);r.onsuccess=()=>resolve(r.result||null);r.onerror=()=>reject(r.error);});}catch{return null;}}
 export async function deleteRecovery(id){try{const db=await openDb();await new Promise((resolve,reject)=>{const tx=db.transaction(RECOVERY_STORE,'readwrite');tx.objectStore(RECOVERY_STORE).delete(id);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});return true;}catch{return false;}}
+
+export const RECOVERY_LIMITS={manual:MAX_MANUAL_RECOVERIES,auto:MAX_AUTO_RECOVERIES,total:MAX_RECOVERIES};
+console.info('[230MATCH] store 5.8.4 · recovery retention manual 12 + auto 24');
