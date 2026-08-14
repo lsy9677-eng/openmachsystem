@@ -14498,7 +14498,7 @@ console.info('[230MATCH] 71.3.3 ready · classic direct SMS rebuild');
     downloadBlob546(blob,`230MATCH_예선조편성_코트배정표_${new Date().toISOString().slice(0,10)}.png`);
   }
 
-  async async function saveCurrentPng546(){
+  async function saveCurrentPng546(){
     const target=$('printTargetSelect')?.value||'prelim-assignment';
     try{
       // 5.9.42 안정화:
@@ -16068,3 +16068,5 @@ console.info('[230MATCH] 5.9.40 final · print center clone keeps #bracketBoard 
 console.info('[230MATCH] 5.9.41 final · winner-path now traces only the surviving lineage (a match\'s advancing line goes bold only if its winner is still undecided-or-winning in the next match, not merely because that match finished)');
 
 console.info('[230MATCH] 5.9.42 · print-center bracket save directly uses stage5937 live bracket capture');
+
+console.info('[230MATCH] 5.9.43 HOTFIX · duplicate async syntax fixed');
