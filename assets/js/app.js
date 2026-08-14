@@ -6210,9 +6210,10 @@ function renderHomeTournamentCards(){
     const division=String(r.division||snap?.tournament?.division||'부서 미설정');
     const date=String(snap?.portal?.guide?.date||r?.guide?.date||r?.date||'');
     const venue=String(snap?.portal?.guide?.venue||r?.guide?.venue||r?.venue||'');
+    const capacity=stage592TournamentCapacity((snap&&Object.keys(snap).length)?snap:state,r);
     const displaySource=(snap&&Object.keys(snap).length)?snap:{tournament:{...r,displayStatus:r?.displayStatus||'auto'},prelim:{matches:[]},draw:{rounds:{}},completion:{completedAt:r?.completedAt||''},operation:{}};
     const displayStatus=stage587TournamentDisplayStatus(displaySource);
-    return `<article class="home-tournament-card ${current?'current':''}" data-home-tournament-id="${portalEscape(id)}"><div><div class="stage586-home-badges">${current?`<span class="tournament-state current-selection">현재 선택</span>`:`<span class="tournament-state neutral">운영 대회</span>`}<span class="tournament-state ${portalEscape(displayStatus)}">${tournamentStatusLabel(displayStatus)}</span></div><h3>${portalEscape(labels.get(id)||name)}</h3><div class="meta">${portalEscape(division)}${date?` · ${portalEscape(date)}`:''}${venue?` · ${portalEscape(venue)}`:''}</div></div><div class="actions"><a class="btn btn-primary" href="${portalEscape(workspaceRouteUrl(id,'','guide'))}">요강 보기</a>${current?`<button type="button" class="btn btn-primary" disabled>선택됨</button>`:`<a class="btn btn-light" href="${portalEscape(workspaceRouteUrl(id,'','home'))}">이 대회 선택</a>`}${isAdmin()?`<button type="button" class="btn btn-light" data-admin-only="true" data-home-tournament-edit="${portalEscape(id)}">수정·편집</button><button type="button" class="btn btn-danger-outline" data-admin-only="true" data-home-tournament-delete="${portalEscape(id)}">삭제</button>`:''}</div></article>`;
+    return `<article class="home-tournament-card ${current?'current':''}" data-home-tournament-id="${portalEscape(id)}"><div><div class="stage586-home-badges">${current?`<span class="tournament-state current-selection">현재 선택</span>`:`<span class="tournament-state neutral">운영 대회</span>`}<span class="tournament-state ${portalEscape(displayStatus)}">${tournamentStatusLabel(displayStatus)}</span></div><h3>${portalEscape(labels.get(id)||name)}</h3><div class="meta">${portalEscape(division)}${date?` · ${portalEscape(date)}`:''}${venue?` · ${portalEscape(venue)}`:''}${capacity?` · 정원 ${capacity}팀`:''}</div></div><div class="actions"><a class="btn btn-primary" href="${portalEscape(workspaceRouteUrl(id,'','guide'))}">요강 보기</a>${current?`<button type="button" class="btn btn-primary" disabled>선택됨</button>`:`<a class="btn btn-light" href="${portalEscape(workspaceRouteUrl(id,'','home'))}">이 대회 선택</a>`}${isAdmin()?`<button type="button" class="btn btn-light" data-admin-only="true" data-home-tournament-edit="${portalEscape(id)}">수정·편집</button><button type="button" class="btn btn-danger-outline" data-admin-only="true" data-home-tournament-delete="${portalEscape(id)}">삭제</button>`:''}</div></article>`;
   }).join('');
 }
 
@@ -6549,13 +6550,28 @@ function tournamentLifecycle(){
 function tournamentStatusLabel(status){
   return ({recruiting:'접수중',closed:'접수마감',ongoing:'시합중',completed:'시합완료',empty:'대회 없음'})[status]||'접수중';
 }
+function stage592TournamentCapacity(source=state,record=null){
+  const s=source||{};
+  const direct=Number(s.tournament?.capacity||0);
+  if(direct>0)return direct;
+  const activeDivisionId=String(s.multiDivision?.activeDivisionId||'');
+  const div=Array.isArray(s.multiDivision?.divisions)?s.multiDivision.divisions.find(d=>String(d?.id||'')===activeDivisionId):null;
+  const divCap=Number(div?.snapshot?.divisionConfig?.capacity||div?.snapshot?.prelim?.settings?.activeTeamCount||0);
+  if(divCap>0)return divCap;
+  const divisionConfig=Number(s.divisionConfig?.capacity||0);
+  if(divisionConfig>0)return divisionConfig;
+  const prelimCap=Number(s.prelim?.settings?.activeTeamCount||0);
+  if(prelimCap>0)return prelimCap;
+  const recordCap=Number(record?.capacity||record?.snapshot?.tournament?.capacity||record?.snapshot?.divisionConfig?.capacity||record?.snapshot?.prelim?.settings?.activeTeamCount||0);
+  return recordCap>0?recordCap:0;
+}
 function currentTournamentSnapshot(){
   const name=String(state.tournament?.name||'').trim();
   const noActive=Boolean(state.multiTournament?.noActiveTournament)||!isRealTournamentName(name);
   if(noActive)return {id:'',current:false,empty:true,name:'',division:'',status:'empty'};
   const teams=state.teams||[],active=teams.filter(x=>x.status!=='reserve').length,reserve=teams.filter(x=>x.status==='reserve').length;
   const prelim=state.prelim?.matches||[],main=portalMainMatches(),podium=currentPodium(),guide=state.portal?.guide||{};
-  return {id:String(state.tournament?.id||state.multiTournament?.activeTournamentId||'current'),current:true,empty:false,name,division:state.tournament?.division||'',date:guide.date||'',venue:guide.venue||'',fee:guide.fee||'',capacity:Number(state.prelim?.settings?.activeTeamCount||0),active,reserve,status:tournamentLifecycle(),champion:podium.champion||'',runnerUp:podium.runnerUp||'',thirds:podium.thirds||[],prelimCompleted:prelim.filter(x=>x.status==='completed').length,prelimTotal:prelim.length,mainCompleted:main.filter(x=>x.status==='completed').length,mainTotal:main.length,detail:guide.detail||'',updatedAt:state.updatedAt||new Date().toISOString()};
+  return {id:String(state.tournament?.id||state.multiTournament?.activeTournamentId||'current'),current:true,empty:false,name,division:state.tournament?.division||'',date:guide.date||'',venue:guide.venue||'',fee:guide.fee||'',capacity:stage592TournamentCapacity(state),active,reserve,status:tournamentLifecycle(),champion:podium.champion||'',runnerUp:podium.runnerUp||'',thirds:podium.thirds||[],prelimCompleted:prelim.filter(x=>x.status==='completed').length,prelimTotal:prelim.length,mainCompleted:main.filter(x=>x.status==='completed').length,mainTotal:main.length,detail:guide.detail||'',updatedAt:state.updatedAt||new Date().toISOString()};
 }
 function tournamentArchiveRows(){
   try{ensureMultiTournamentRuntime();syncCurrentTournamentRuntime();}catch(_e){}
@@ -6662,7 +6678,7 @@ function renderTournamentList(){
   const summary=document.getElementById('tournamentListSummary');
   if(summary){const counts={recruiting:rows.filter(x=>x.status==='recruiting').length,closed:rows.filter(x=>x.status==='closed').length,ongoing:rows.filter(x=>x.status==='ongoing').length,completed:rows.filter(x=>x.status==='completed').length};summary.textContent=`전체 ${rows.length}개 · 접수중 ${counts.recruiting} · 접수마감 ${counts.closed} · 시합중 ${counts.ongoing} · 시합완료 ${counts.completed}`;}
   const root=document.getElementById('tournamentCardList');if(!root)return;
-  root.innerHTML=visible.map(x=>`<article class="panel tournament-list-card ${x.current?'current':''}"><div class="tournament-card-top"><div><span class="tournament-state ${x.status}">${x.current?'현재 · ':''}${tournamentStatusLabel(x.status)}</span><h2>${portalEscape(x.name)}</h2><p>${portalEscape(x.division||'부서 미설정')}</p></div>${x.readOnly?'<span class="badge badge-safe">읽기 전용</span>':''}</div><div class="tournament-card-info"><span>📅 ${x.date?new Date(x.date+'T00:00:00').toLocaleDateString('ko-KR'):'일정 미정'}</span><span>📍 ${portalEscape(x.venue||'장소 미정')}</span><span>👥 참가 ${x.active||0}팀${x.reserve?` · 후보 ${x.reserve}팀`:''}</span></div><div class="tournament-card-progress"><div><span>예선</span><b>${x.prelimCompleted||0}/${x.prelimTotal||0}</b></div><div><span>본선</span><b>${x.mainCompleted||0}/${x.mainTotal||0}</b></div><div><span>상태</span><b>${tournamentStatusLabel(x.status)}</b></div></div>${x.workspace?`<div class="button-row tournament-card-actions"><a class="btn btn-primary" href="${portalEscape(workspaceRouteUrl(x.id,'','guide'))}">요강 보기</a>${x.current?`<button type="button" class="btn btn-primary" disabled>선택됨</button>`:`<a class="btn btn-light" href="${portalEscape(workspaceRouteUrl(x.id,'','home'))}">이 대회 선택</a>`}${isAdmin()?`<button type="button" class="btn btn-light" data-admin-only="true" data-edit-tournament-id="${x.id}">대회 수정·편집</button><button type="button" class="btn btn-danger-outline" data-admin-only="true" data-delete-tournament-id="${x.id}">삭제</button>`:''}</div>`:`<button type="button" class="btn btn-light tournament-open-btn" data-tournament-open="${x.id}">대회 기록 보기</button>`}</article>`).join('')||'<div class="panel portal-empty">조건에 맞는 대회가 없습니다.</div>';
+  root.innerHTML=visible.map(x=>`<article class="panel tournament-list-card ${x.current?'current':''}"><div class="tournament-card-top"><div><span class="tournament-state ${x.status}">${x.current?'현재 · ':''}${tournamentStatusLabel(x.status)}</span><h2>${portalEscape(x.name)}</h2><p>${portalEscape(x.division||'부서 미설정')}</p></div>${x.readOnly?'<span class="badge badge-safe">읽기 전용</span>':''}</div><div class="tournament-card-info"><span>📅 ${x.date?new Date(x.date+'T00:00:00').toLocaleDateString('ko-KR'):'일정 미정'}</span><span>📍 ${portalEscape(x.venue||'장소 미정')}</span><span>👥 정원 ${x.capacity||0}팀${x.active?` · 참가 ${x.active}팀`:''}${x.reserve?` · 후보 ${x.reserve}팀`:''}</span></div><div class="tournament-card-progress"><div><span>예선</span><b>${x.prelimCompleted||0}/${x.prelimTotal||0}</b></div><div><span>본선</span><b>${x.mainCompleted||0}/${x.mainTotal||0}</b></div><div><span>상태</span><b>${tournamentStatusLabel(x.status)}</b></div></div>${x.workspace?`<div class="button-row tournament-card-actions"><a class="btn btn-primary" href="${portalEscape(workspaceRouteUrl(x.id,'','guide'))}">요강 보기</a>${x.current?`<button type="button" class="btn btn-primary" disabled>선택됨</button>`:`<a class="btn btn-light" href="${portalEscape(workspaceRouteUrl(x.id,'','home'))}">이 대회 선택</a>`}${isAdmin()?`<button type="button" class="btn btn-light" data-admin-only="true" data-edit-tournament-id="${x.id}">대회 수정·편집</button><button type="button" class="btn btn-danger-outline" data-admin-only="true" data-delete-tournament-id="${x.id}">삭제</button>`:''}</div>`:`<button type="button" class="btn btn-light tournament-open-btn" data-tournament-open="${x.id}">대회 기록 보기</button>`}</article>`).join('')||'<div class="panel portal-empty">조건에 맞는 대회가 없습니다.</div>';
 }
 setTimeout(applyTournamentReadOnlyUi,0);
 document.addEventListener('click',e=>{
@@ -8143,6 +8159,7 @@ async function stage329SaveTournamentEdit(e){
         record.name=name;
         record.division=division;
         record.displayStatus=state.tournament.displayStatus;
+        record.capacity=state.tournament.capacity;
         record.updatedAt=new Date().toISOString();
       }
     }catch(_e){}
@@ -11480,7 +11497,7 @@ function tournamentSummaryFromWorkspace(workspace,id,current=false){
   const reserve=Math.max(0,(s.teams||[]).length-active);
   const displayStatus=stage583NormalizeDisplayStatus(s.tournament?.displayStatus||'auto');
   const status=stage587TournamentDisplayStatus(s);
-  return {id,current,name,division:s.tournament?.division||'',date:guide.date||'',venue:guide.venue||'',fee:guide.fee||'',active,reserve,status,displayStatus,champion:'',runnerUp:'',thirds:[],prelimCompleted:prelim.filter(x=>x.status==='completed').length,prelimTotal:prelim.length,mainCompleted:main.filter(x=>x.status==='completed').length,mainTotal:main.length,detail:guide.detail||'',updatedAt:s.updatedAt||new Date().toISOString(),selectable:!['closed','completed'].includes(status),workspace:true};
+  return {id,current,name,division:s.tournament?.division||'',date:guide.date||'',venue:guide.venue||'',fee:guide.fee||'',capacity:stage592TournamentCapacity(s),active,reserve,status,displayStatus,champion:'',runnerUp:'',thirds:[],prelimCompleted:prelim.filter(x=>x.status==='completed').length,prelimTotal:prelim.length,mainCompleted:main.filter(x=>x.status==='completed').length,mainTotal:main.length,detail:guide.detail||'',updatedAt:s.updatedAt||new Date().toISOString(),selectable:!['closed','completed'].includes(status),workspace:true};
 }
 function isRealTournamentName(value){const n=String(value||'').trim();return Boolean(n&&n!=='대회 준비 중'&&n!=='등록된 운영 대회 없음'&&n!=='이름 없는 대회');}
 function ensureMultiTournamentRuntime(){
@@ -11492,9 +11509,10 @@ function ensureMultiTournamentRuntime(){
   if(!activeId)activeId=state.multiTournament.tournaments[0]?.id||multiTournamentId();
   state.tournament=state.tournament||{};state.tournament.id=activeId;
   let record=state.multiTournament.tournaments.find(x=>x.id===activeId);
-  if(!record&&hasNamedTournament){record={id:activeId,name:state.tournament.name,division:state.tournament.division||'',displayStatus:stage583NormalizeDisplayStatus(state.tournament?.displayStatus||'auto'),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),snapshot:cloneTournamentWorkspace(state)};state.multiTournament.tournaments.push(record);}
+  if(!record&&hasNamedTournament){record={id:activeId,name:state.tournament.name,division:state.tournament.division||'',capacity:stage592TournamentCapacity(state),displayStatus:stage583NormalizeDisplayStatus(state.tournament?.displayStatus||'auto'),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),snapshot:cloneTournamentWorkspace(state)};state.multiTournament.tournaments.push(record);}
   if(record&&String(record.id)===activeId){
     record.displayStatus=stage583NormalizeDisplayStatus(state.tournament?.displayStatus||record.displayStatus||'auto');
+    record.capacity=stage592TournamentCapacity(state,record);
   }
   state.multiTournament.activeTournamentId=record?activeId:'';
   state.multiTournament.noActiveTournament=!record;
@@ -11665,6 +11683,7 @@ function stage5008TournamentRows(){
       id,current,workspace:true,readOnly:false,
       name,division:String(t.division||record?.division||''),
       date:String(g.date||record?.date||''),venue:String(g.venue||record?.venue||''),
+      capacity:stage592TournamentCapacity(workspace,record),
       active:workspace&&Object.keys(workspace).length?activeCount:Number(record?.active||0),reserve:workspace&&Object.keys(workspace).length?teams.filter(x=>x?.status==='reserve').length:Number(record?.reserve||0),
       prelimCompleted:workspace&&Object.keys(workspace).length?prelim.filter(x=>x?.status==='completed').length:Number(record?.prelimCompleted||0),prelimTotal:workspace&&Object.keys(workspace).length?prelim.length:Number(record?.prelimTotal||0),
       mainCompleted:workspace&&Object.keys(workspace).length?main.filter(x=>x?.status==='completed').length:Number(record?.mainCompleted||0),mainTotal:workspace&&Object.keys(workspace).length?main.length:Number(record?.mainTotal||0),
@@ -11724,7 +11743,7 @@ function stage5008RenderTournamentList(){
     const admin=isAdmin();
     const status=x.current?`현재 선택 · ${tournamentStatusLabel(x.status)}`:tournamentStatusLabel(x.status);
     const actions=x.workspace?`<div class="stage5008-actions">${x.current?`<button type="button" class="btn btn-primary btn-small" disabled>선택됨</button>`:`<a class="btn btn-light btn-small" href="${portalEscape(workspaceRouteUrl(x.id,'','home'))}">이 대회 선택</a>`}${admin?`<button type="button" class="btn btn-light btn-small" data-edit-tournament-id="${portalEscape(x.id)}">수정·편집</button><button type="button" class="btn btn-danger-outline btn-small" data-delete-tournament-id="${portalEscape(x.id)}">삭제</button>`:''}</div>`:`<div class="stage5008-actions"><button type="button" class="btn btn-light btn-small" data-tournament-open="${portalEscape(x.id)}">대회 기록 보기</button>${admin?`<button type="button" class="btn btn-danger-outline btn-small" data-delete-archive-only="${portalEscape(x.id)}">보관기록 삭제</button>`:''}</div>`;
-    return `<article class="panel tournament-list-card stage5008-card ${x.current?'current':''}"><div class="stage5008-head"><div><span class="tournament-state ${portalEscape(x.status)}">${status}</span><h2>${portalEscape(x.name)}</h2><p>${portalEscape(x.division||'부서 미설정')}</p></div></div><div class="stage5008-meta"><span>📅 ${portalEscape(date)}</span><span>📍 ${portalEscape(x.venue||'장소 미정')}</span><span>👥 ${x.active||0}팀</span></div><div class="stage5008-progress"><span>예선 <b>${x.prelimCompleted||0}/${x.prelimTotal||0}</b></span><span>본선 <b>${x.mainCompleted||0}/${x.mainTotal||0}</b></span></div>${actions}</article>`;
+    return `<article class="panel tournament-list-card stage5008-card ${x.current?'current':''}"><div class="stage5008-head"><div><span class="tournament-state ${portalEscape(x.status)}">${status}</span><h2>${portalEscape(x.name)}</h2><p>${portalEscape(x.division||'부서 미설정')}</p></div></div><div class="stage5008-meta"><span>📅 ${portalEscape(date)}</span><span>📍 ${portalEscape(x.venue||'장소 미정')}</span><span>👥 정원 ${x.capacity||0}팀</span></div><div class="stage5008-progress"><span>예선 <b>${x.prelimCompleted||0}/${x.prelimTotal||0}</b></span><span>본선 <b>${x.mainCompleted||0}/${x.mainTotal||0}</b></span></div>${actions}</article>`;
   };
   const section=(title,subtitle,items,kind)=>items.length?`<div class="stage6301-list-heading ${kind}"><div><strong>${title}</strong><span>${subtitle}</span></div><em>${items.length}개</em></div>${items.map(cardHtml).join('')}`:'';
   const html=[
@@ -14856,3 +14875,5 @@ setTimeout(()=>{
 console.info('[230MATCH] 5.9.0 ready · fair draw results are committed before performance reveal');
 
 console.info('[230MATCH] 5.9.1 ready · admin immediate participant deletion removes private/public Firebase registration docs first');
+
+console.info('[230MATCH] 5.9.2 ready · tournament cards use configured capacity consistently');
