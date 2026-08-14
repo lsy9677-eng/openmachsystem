@@ -1197,6 +1197,85 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
 }
 </style>
 
+
+<style id="stage5911CompactCourtSummary">
+/* 5.9.11 코트현황 요약 표시 전용.
+   데이터 ID와 JS 로직은 그대로 두고, 세로 카드 묶음을 한 줄 상태바로 압축한다. */
+.stage5911-compact-summary{
+  display:flex!important;
+  align-items:center!important;
+  gap:0!important;
+  width:100%;
+  min-width:0;
+  margin:8px 0 10px!important;
+  padding:7px 10px!important;
+  border:1px solid #cbd5e1;
+  border-radius:12px;
+  background:#fff;
+  box-shadow:0 2px 8px rgba(15,23,42,.06);
+  overflow-x:auto;
+  overflow-y:hidden;
+  white-space:nowrap;
+  scrollbar-width:thin;
+}
+.stage5911-compact-summary .summary-card{
+  display:inline-flex!important;
+  align-items:baseline!important;
+  gap:5px!important;
+  flex:0 0 auto!important;
+  min-width:0!important;
+  width:auto!important;
+  margin:0!important;
+  padding:2px 11px!important;
+  border:0!important;
+  border-right:1px solid #e2e8f0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+}
+.stage5911-compact-summary .summary-card:last-child{
+  border-right:0!important;
+}
+.stage5911-compact-summary .summary-card>span{
+  display:inline!important;
+  margin:0!important;
+  color:#64748b!important;
+  font-size:11px!important;
+  line-height:1.2!important;
+  font-weight:800!important;
+}
+.stage5911-compact-summary .summary-card>strong{
+  display:inline!important;
+  margin:0!important;
+  color:#0f172a!important;
+  font-size:13px!important;
+  line-height:1.2!important;
+  font-weight:950!important;
+}
+.stage5911-compact-summary .stage5911-hot>span,
+.stage5911-compact-summary .stage5911-hot>strong{
+  color:#b91c1c!important;
+}
+.stage5911-compact-summary .stage5911-secondary{
+  display:none!important;
+}
+@media(max-width:760px){
+  .stage5911-compact-summary{
+    padding:6px 7px!important;
+    margin:6px 0 8px!important;
+  }
+  .stage5911-compact-summary .summary-card{
+    padding:2px 8px!important;
+  }
+  .stage5911-compact-summary .summary-card>span{
+    font-size:10px!important;
+  }
+  .stage5911-compact-summary .summary-card>strong{
+    font-size:12px!important;
+  }
+}
+</style>
+
 </head>
 <body>
   <header class="topbar">
@@ -2216,23 +2295,23 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
         <div><span>대회 최종 결과</span><strong id="tournamentChampionName">-</strong><small id="tournamentCompletedTime"></small></div>
       </section>
 
-      <section class="summary-grid operation-overview-summary" data-operator-only="true">
+      <section class="summary-grid operation-overview-summary stage5911-compact-summary" data-operator-only="true" aria-label="코트 운영 요약">
         <article class="summary-card"><span>명단</span><strong id="summaryTeams">0팀</strong></article>
-        <article class="summary-card"><span>현재 라운드</span><strong id="summaryRound">-</strong></article>
-        <article class="summary-card"><span>시합중</span><strong id="summaryPlaying">0</strong></article>
-        <article class="summary-card"><span>코트 대기1</span><strong id="summaryWait1">0</strong></article>
+        <article class="summary-card"><span>라운드</span><strong id="summaryRound">-</strong></article>
+        <article class="summary-card stage5911-hot"><span>시합중</span><strong id="summaryPlaying">0</strong></article>
+        <article class="summary-card"><span>대기1</span><strong id="summaryWait1">0</strong></article>
         <article class="summary-card"><span>공용대기</span><strong id="summaryShared">0</strong></article>
-        <article class="summary-card"><span>자동 저장</span><strong id="summaryAutosave">ON</strong></article>
-        <article class="summary-card"><span>예상시간 기준</span><strong id="summaryAverageMinutes">0분</strong></article>
-        <article class="summary-card"><span>실측 평균</span><strong id="summaryMeasuredMinutes">표본 없음</strong></article>
-        <article class="summary-card"><span>최장 예상대기</span><strong id="summaryLongestWait">0분</strong></article>
-        <article class="summary-card"><span>추첨 방식</span><strong id="summaryDrawMethod">-</strong></article>
-        <article class="summary-card"><span>대진 잠금</span><strong id="summaryDrawLock">해제</strong></article>
-        <article class="summary-card"><span>발송 대기 문자</span><strong id="summaryPendingMessages">0건</strong></article>
-        <article class="summary-card"><span>연락처 등록</span><strong id="summaryPhoneTeams">0팀</strong></article>
-        <article class="summary-card"><span>운영 점검</span><strong id="summaryAuditStatus">미실행</strong></article>
-        <article class="summary-card"><span>본선 구장</span><strong id="summaryVenueCount">1곳</strong></article>
-        <article class="summary-card"><span>구장별 공용대기</span><strong id="summaryVenueQueueCount">0경기</strong></article>
+        <article class="summary-card stage5911-secondary"><span>자동저장</span><strong id="summaryAutosave">ON</strong></article>
+        <article class="summary-card"><span>예상</span><strong id="summaryAverageMinutes">0분</strong></article>
+        <article class="summary-card"><span>실측</span><strong id="summaryMeasuredMinutes">표본 없음</strong></article>
+        <article class="summary-card stage5911-secondary"><span>최장대기</span><strong id="summaryLongestWait">0분</strong></article>
+        <article class="summary-card stage5911-secondary"><span>추첨</span><strong id="summaryDrawMethod">-</strong></article>
+        <article class="summary-card stage5911-secondary"><span>대진잠금</span><strong id="summaryDrawLock">해제</strong></article>
+        <article class="summary-card stage5911-secondary"><span>문자대기</span><strong id="summaryPendingMessages">0건</strong></article>
+        <article class="summary-card stage5911-secondary"><span>연락처</span><strong id="summaryPhoneTeams">0팀</strong></article>
+        <article class="summary-card stage5911-secondary"><span>점검</span><strong id="summaryAuditStatus">미실행</strong></article>
+        <article class="summary-card stage5911-secondary"><span>구장</span><strong id="summaryVenueCount">1곳</strong></article>
+        <article class="summary-card"><span>구장대기</span><strong id="summaryVenueQueueCount">0경기</strong></article>
       </section>
 
 
