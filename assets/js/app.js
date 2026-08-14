@@ -4244,6 +4244,7 @@ function stage5932WinnerSide(match){
   if(Number.isFinite(a)&&Number.isFinite(b)&&a!==b)return a>b?'A':'B';
   return '';
 }
+
 function stage5932BuildBracketSvg(){
   const rounds=state.draw?.rounds||{};
   const sizes=Object.keys(rounds).map(Number).filter(n=>Number.isFinite(n)&&n>=2).sort((x,y)=>y-x);
@@ -4253,16 +4254,19 @@ function stage5932BuildBracketSvg(){
   const firstMatches=Array.isArray(rounds[firstSize])?rounds[firstSize]:[];
   if(!firstMatches.length)return null;
 
-  const cardW=250;
-  const cardH=82;
-  const colGap=94;
+  // 5.9.34 출력 전용 압축 레이아웃.
+  // 실제 대진/코트 데이터는 읽기만 하고, 출력 좌표만 별도로 계산한다.
+  const cardW=226;
+  const cardH=78;
+  const colGap=54;
   const stepX=cardW+colGap;
-  const headerH=92;
-  const rowStep=104;
-  const left=44;
-  const top=headerH+42;
-  const right=44;
-  const bottom=54;
+  const rowStep=88;
+  const left=34;
+  const top=108;
+  const right=34;
+  const bottom=42;
+  const headerY=48;
+  const headerH=40;
 
   const centersBySize={};
   centersBySize[firstSize]=firstMatches.map((_,i)=>top+i*rowStep+cardH/2);
@@ -4282,8 +4286,25 @@ function stage5932BuildBracketSvg(){
   }
 
   const width=left + sizes.length*cardW + Math.max(0,sizes.length-1)*colGap + right;
-  const height=Math.max(900, top + Math.max(1,firstMatches.length-1)*rowStep + cardH + bottom);
+  const height=Math.max(780, top + Math.max(1,firstMatches.length-1)*rowStep + cardH + bottom);
 
+  // 배경과 라운드 컬럼 가이드
+  let backdrop=`<defs>
+    <filter id="stage5934Shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2.2" flood-color="#0f172a" flood-opacity=".12"/>
+    </filter>
+  </defs>
+  <rect width="100%" height="100%" fill="#f7f9fc"/>`;
+
+  sizes.forEach((size,colIndex)=>{
+    const x=left+colIndex*stepX;
+    const color=stage5932RoundColor(size);
+    backdrop+=`
+      <rect x="${x-10}" y="${headerY-8}" width="${cardW+20}" height="${height-headerY-24}" rx="18" fill="#ffffff" stroke="#e2e8f0"/>
+      <rect x="${x-10}" y="${headerY-8}" width="5" height="${height-headerY-24}" rx="3" fill="${color}" opacity=".18"/>`;
+  });
+
+  // 얇고 단정한 연결선
   let lines='';
   for(let i=0;i<sizes.length-1;i++){
     const fromSize=sizes[i];
@@ -4296,10 +4317,10 @@ function stage5932BuildBracketSvg(){
     for(let j=0;j<to.length;j++){
       const yA=from[j*2],yB=from[j*2+1],yT=to[j];
       if(Number.isFinite(yA)){
-        lines+=`<path d="M${x1} ${yA} H${mid} V${yT} H${x2}" fill="none" stroke="#87a8d8" stroke-width="2"/>`;
+        lines+=`<path d="M${x1} ${yA} H${mid} V${yT} H${x2}" fill="none" stroke="#7fa4d6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>`;
       }
       if(Number.isFinite(yB)){
-        lines+=`<path d="M${x1} ${yB} H${mid}" fill="none" stroke="#87a8d8" stroke-width="2"/>`;
+        lines+=`<path d="M${x1} ${yB} H${mid}" fill="none" stroke="#7fa4d6" stroke-width="1.8" stroke-linecap="round"/>`;
       }
     }
   }
@@ -4311,9 +4332,10 @@ function stage5932BuildBracketSvg(){
     const x=left+colIndex*stepX;
     const label=stage5932RoundLabel(size);
 
-    cols+=`<g>
-      <rect x="${x}" y="28" width="${cardW}" height="44" rx="10" fill="${color}"/>
-      <text x="${x+14}" y="56" fill="#fff" font-size="19" font-weight="800">${stage5932Xml(label)}</text>
+    cols+=`<g filter="url(#stage5934Shadow)">
+      <rect x="${x}" y="${headerY}" width="${cardW}" height="${headerH}" rx="11" fill="${color}"/>
+      <text x="${x+14}" y="${headerY+26}" fill="#fff" font-size="18" font-weight="900">${stage5932Xml(label)}</text>
+      <text x="${x+cardW-14}" y="${headerY+25}" text-anchor="end" fill="#fff" opacity=".88" font-size="10" font-weight="800">${matches.length}경기</text>
     </g>`;
 
     matches.forEach((m,index)=>{
@@ -4326,27 +4348,33 @@ function stage5932BuildBracketSvg(){
       const scoreA=Number.isFinite(Number(m?.scoreA))?Number(m.scoreA):'';
       const scoreB=Number.isFinite(Number(m?.scoreB))?Number(m.scoreB):'';
       const completed=m?.status==='completed';
+      const playing=status.kind==='playing';
 
-      const bodyFill=completed?'#e2e8f0':'#f8fbff';
-      const border=completed?'#94a3b8':color;
-      const rowAFill=winner==='A'?'#d9eadf':'transparent';
-      const rowBFill=winner==='B'?'#d9eadf':'transparent';
+      const bodyFill=completed?'#eef2f6':playing?'#fff4f4':'#f8fbff';
+      const border=completed?'#94a3b8':playing?'#ef4444':'#bfd0e6';
+      const rowAFill=winner==='A'?'#dff3e5':'transparent';
+      const rowBFill=winner==='B'?'#dff3e5':'transparent';
       const matchNo=String(m?.matchNo||index+1);
+      const labelText=stage5932Xml(status.label);
 
-      cols+=`<g>
-        <rect x="${x}" y="${y}" width="${cardW}" height="${cardH}" rx="10" fill="${bodyFill}" stroke="${border}" stroke-width="2"/>
+      cols+=`<g filter="url(#stage5934Shadow)">
+        <rect x="${x}" y="${y}" width="${cardW}" height="${cardH}" rx="10" fill="${bodyFill}" stroke="${border}" stroke-width="${playing?2.2:1.4}"/>
         <rect x="${x}" y="${y}" width="5" height="${cardH}" rx="3" fill="${color}"/>
-        <text x="${x+12}" y="${y+18}" fill="#334155" font-size="11" font-weight="800">${stage5932Xml(matchNo)}경기</text>
-        <rect x="${x+cardW-72}" y="${y+7}" width="62" height="21" rx="10" fill="${status.fill}"/>
-        <text x="${x+cardW-41}" y="${y+21.5}" text-anchor="middle" fill="${status.text}" font-size="10" font-weight="800">${stage5932Xml(status.label)}</text>
 
-        <rect x="${x+8}" y="${y+31}" width="${cardW-16}" height="22" rx="4" fill="${rowAFill}"/>
-        <rect x="${x+8}" y="${y+55}" width="${cardW-16}" height="22" rx="4" fill="${rowBFill}"/>
+        <text x="${x+12}" y="${y+17}" fill="#334155" font-size="10.5" font-weight="900">${stage5932Xml(matchNo)}경기</text>
+        <rect x="${x+cardW-69}" y="${y+6}" width="59" height="20" rx="10" fill="${status.fill}"/>
+        <text x="${x+cardW-39.5}" y="${y+20}" text-anchor="middle" fill="${status.text}" font-size="9.5" font-weight="900">${labelText}</text>
 
-        <text x="${x+13}" y="${y+46}" fill="#1f2937" font-size="12" font-weight="${winner==='A'?'800':'600'}">${stage5932Xml(teamA.slice(0,28))}</text>
-        <text x="${x+13}" y="${y+70}" fill="#1f2937" font-size="12" font-weight="${winner==='B'?'800':'600'}">${stage5932Xml(teamB.slice(0,28))}</text>
-        ${completed?`<text x="${x+cardW-16}" y="${y+46}" text-anchor="end" fill="#334155" font-size="12" font-weight="800">${stage5932Xml(scoreA)}</text>
-        <text x="${x+cardW-16}" y="${y+70}" text-anchor="end" fill="#334155" font-size="12" font-weight="800">${stage5932Xml(scoreB)}</text>`:''}
+        <line x1="${x+9}" y1="${y+28}" x2="${x+cardW-9}" y2="${y+28}" stroke="#dbe5f1" stroke-width="1"/>
+
+        <rect x="${x+8}" y="${y+31}" width="${cardW-16}" height="20" rx="4" fill="${rowAFill}"/>
+        <rect x="${x+8}" y="${y+54}" width="${cardW-16}" height="20" rx="4" fill="${rowBFill}"/>
+
+        <text x="${x+13}" y="${y+45}" fill="#1f2937" font-size="11.5" font-weight="${winner==='A'?'900':'650'}">${stage5932Xml(teamA.slice(0,27))}</text>
+        <text x="${x+13}" y="${y+68}" fill="#1f2937" font-size="11.5" font-weight="${winner==='B'?'900':'650'}">${stage5932Xml(teamB.slice(0,27))}</text>
+
+        ${completed?`<text x="${x+cardW-14}" y="${y+45}" text-anchor="end" fill="#0f172a" font-size="12" font-weight="900">${stage5932Xml(scoreA)}</text>
+        <text x="${x+cardW-14}" y="${y+68}" text-anchor="end" fill="#0f172a" font-size="12" font-weight="900">${stage5932Xml(scoreB)}</text>`:''}
       </g>`;
     });
   });
@@ -4356,15 +4384,17 @@ function stage5932BuildBracketSvg(){
   const venue=stage5932Xml(state.tournament?.venue||state.tournament?.location||'');
 
   const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-    <rect width="100%" height="100%" fill="#ffffff"/>
-    <text x="${left}" y="22" fill="#0f2a50" font-size="20" font-weight="900">${tournament}</text>
-    <text x="${width-right}" y="22" text-anchor="end" fill="#64748b" font-size="11">${date}${date&&venue?' · ':''}${venue}</text>
+    ${backdrop}
+    <rect x="0" y="0" width="${width}" height="36" fill="#102b55"/>
+    <text x="${left}" y="24" fill="#ffffff" font-size="17" font-weight="900">${tournament}</text>
+    <text x="${width-right}" y="23" text-anchor="end" fill="#dbeafe" font-size="10.5">${date}${date&&venue?' · ':''}${venue}</text>
     ${lines}
     ${cols}
   </svg>`;
 
   return{svg,width,height};
 }
+
 function stage5932SetPreview(payload){
   const viewport=document.getElementById('stage5931BracketImageViewport');
   if(!viewport)return;
@@ -15883,3 +15913,5 @@ console.info('[230MATCH] 5.9.32 stabilization · bracket full image uses pure SV
   });
   console.info('[230MATCH] 5.9.33 stabilization · print center bracket unified with pure SVG renderer');
 })();
+
+console.info('[230MATCH] 5.9.34 · polished compact SVG bracket layout');
