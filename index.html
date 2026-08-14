@@ -796,6 +796,17 @@ body.tournament-completed-admin #view-operation textarea{
 }
 </style>
 
+
+<style id="stage586HomeTournamentStatusBadges">
+.stage586-home-badges{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px}
+.stage586-home-badges .tournament-state.current-selection{background:#fef3c7!important;color:#92400e!important}
+.stage586-home-badges .tournament-state.neutral{background:#e2e8f0!important;color:#475569!important}
+.stage586-home-badges .tournament-state.recruiting{background:#dcfce7!important;color:#166534!important}
+.stage586-home-badges .tournament-state.closed{background:#ffedd5!important;color:#c2410c!important}
+.stage586-home-badges .tournament-state.ongoing{background:#dbeafe!important;color:#1d4ed8!important}
+.stage586-home-badges .tournament-state.completed{background:#e2e8f0!important;color:#475569!important}
+</style>
+
 </head>
 <body>
   <header class="topbar">
@@ -2813,7 +2824,7 @@ body.tournament-completed-admin #view-operation textarea{
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=5805"></script>
+  <script type="module" src="./assets/js/app.js?v=5806"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
