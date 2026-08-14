@@ -994,6 +994,50 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
 }
 </style>
 
+
+<style id="stage597ExactSettingsPlacement">
+.s6001-status-control{
+  display:grid!important;
+  gap:8px;
+  margin-top:4px;
+  padding:12px 14px;
+  border:1px solid #cbd5e1;
+  border-radius:12px;
+  background:#f8fafc;
+}
+.s6001-status-control>strong{font-size:13px;color:#0f172a}
+.s6001-status-control>small{font-size:11px;color:#64748b;line-height:1.45}
+.s6001-status-preview{font-size:12px;color:#475569}
+.s6001-status-preview b{color:#1d4ed8}
+.s6001-status-buttons{
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:6px;
+}
+.s6001-status-buttons button{
+  min-height:40px;
+  border:1.5px solid #cbd5e1;
+  border-radius:10px;
+  background:#fff;
+  color:#334155;
+  font:inherit;
+  font-size:12px;
+  font-weight:900;
+  cursor:pointer;
+}
+.s6001-status-buttons button.active,
+.s6001-status-buttons button[aria-pressed="true"]{
+  background:#2563eb!important;
+  border-color:#1d4ed8!important;
+  color:#fff!important;
+}
+#stage597ClockGateToggle{font-weight:900}
+@media(max-width:720px){
+  .s6001-status-buttons{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .s6001-status-buttons button:first-child{grid-column:1/-1}
+}
+</style>
+
 </head>
 <body>
   <header class="topbar">
@@ -1660,7 +1704,7 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
       <section class="panel operator-control-panel operation-courts-section" aria-label="운영자 제어" data-operator-only="true">
         <div class="operator-control-main">
           <div><strong>운영자 제어</strong><span>자동배정을 잠시 멈춰도 현재 시합과 대기1은 유지됩니다.</span></div>
-          <div class="operator-control-actions"><button id="globalAutoAssignToggle" type="button" class="btn btn-primary">자동배정 ON · 수동운영 전환</button><span class="badge badge-muted-dark">보류 <b id="heldMatchCount">0</b>경기</span><button id="saveRecoveryBtnInline" type="button" class="btn btn-light">현재 복구점 저장</button></div>
+          <div class="operator-control-actions"><button id="globalAutoAssignToggle" type="button" class="btn btn-primary">자동배정 ON · 수동운영 전환</button><button id="stage597ClockGateToggle" type="button" class="btn btn-light">시간 잠금 OFF</button><span class="badge badge-muted-dark">보류 <b id="heldMatchCount">0</b>경기</span><button id="saveRecoveryBtnInline" type="button" class="btn btn-light">현재 복구점 저장</button></div>
           <div id="manualOperationBanner" class="stage580-manual-banner" hidden></div>
         </div>
         <details class="held-match-details"><summary>보류 경기 보기</summary><div id="heldMatchList" class="held-match-list"></div></details>
@@ -3022,7 +3066,7 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=5960"></script>
+  <script type="module" src="./assets/js/app.js?v=5970"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">

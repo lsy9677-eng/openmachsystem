@@ -1941,11 +1941,30 @@ function stage580ToggleAutoAssignment(){
   if(state.operation.autoAssignmentEnabled===false)stage580ResumeAutoAssignment();
   else stage580PauseAutoAssignment();
 }
+function stage597ToggleClockGate(){
+  if(!requireOperator('코트 시간 잠금 변경'))return;
+  ensureTimeState(state);
+  const next=!(state.settings?.officialStartClockEnabled===true);
+  autoRecovery('코트 시간 잠금 변경 전');
+  state.settings.officialStartClockEnabled=next;
+  calculateTimeMetrics(state);
+  commit(`코트 시간 잠금 ${next?'ON':'OFF'}`);
+  renderOperatorControls();
+  try{stage594RefreshVisibleTimeBadges();}catch(_e){}
+  const start=state.portal?.guide?.startTime||'미설정';
+  notice(next?`시간 잠금 ON · 공식 시작 ${start} 전까지 미리 배정된 경기의 진행시간을 멈춥니다.`:'시간 잠금 OFF · 코트 배정 시각부터 진행시간을 계산합니다.','success');
+}
 
 function renderOperatorControls(){
   ensureOperatorState();
   const manual=state.operation.autoAssignmentEnabled===false;
   const toggle=$('globalAutoAssignToggle');if(toggle){toggle.textContent=manual?'정합성 확인 후 자동배정 재개':'자동배정 ON · 수동운영 전환';toggle.className=`btn ${manual?'btn-warning':'btn-primary'}`;}
+  const clock=$('stage597ClockGateToggle');if(clock){
+    const on=state.settings?.officialStartClockEnabled===true;
+    clock.textContent=on?'시간 잠금 ON':'시간 잠금 OFF';
+    clock.className=`btn ${on?'btn-warning':'btn-light'}`;
+    clock.title=on?'공식 시작시간 전까지 미리 배정한 경기의 진행시간을 멈춥니다.':'코트 배정 즉시 진행시간을 계산합니다.';
+  }
   const banner=$('manualOperationBanner');if(banner){banner.hidden=!manual;banner.innerHTML=manual?'<strong>🛠 수동 운영 중</strong><span>결과 입력 후에도 코트·대기열은 자동 이동하지 않습니다. 경기 카드의 <b>이동</b> 버튼으로 직접 배치하세요.</span>':'';}
   const count=$('heldMatchCount');if(count)count.textContent=String(state.operation.heldMatches.length);
   const list=$('heldMatchList');if(list){list.innerHTML=state.operation.heldMatches.length?state.operation.heldMatches.map(x=>{const m=findMatch(state.draw,x.matchId);return`<article class="held-match-item"><div><b>${m?`${teamText(m.teamA)} vs ${teamText(m.teamB)}`:x.matchId}</b><span>${x.reason} · ${new Date(x.heldAt).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})}</span></div><button class="btn btn-light" data-release-held="${x.matchId}">보류 해제</button></article>`}).join(''):'<div class="empty-state"><p>보류된 본선 경기가 없습니다.</p></div>';list.querySelectorAll('[data-release-held]').forEach(b=>b.onclick=()=>releaseHeldMatch(b.dataset.releaseHeld));}
@@ -4103,6 +4122,7 @@ function exportPrelimPilotReport(){if(!prelimPilotReport){notice('먼저 예선 
   if($('operationGoBracketBtn'))$('operationGoBracketBtn').onclick=()=>openView('bracket');
   if($('quickAuditBtn'))$('quickAuditBtn').onclick=()=>executeAuditAction(runAllAudit,'전체 운영 점검');
   if($('globalAutoAssignToggle'))$('globalAutoAssignToggle').onclick=stage580ToggleAutoAssignment;
+  if($('stage597ClockGateToggle'))$('stage597ClockGateToggle').onclick=stage597ToggleClockGate;
   if($('runStateAuditBtn'))$('runStateAuditBtn').onclick=()=>executeAuditAction(runCurrentAudit,'현재 상태 점검');
   if($('runPrelimSimulationBtn'))$('runPrelimSimulationBtn').onclick=()=>executeAuditAction(runPrelimSimulationAudit,'예선 복제 모의운영');
   if($('runFullSimulationBtn'))$('runFullSimulationBtn').onclick=()=>executeAuditAction(runSimulationAudit,'본선 복제 모의대회');
@@ -8128,7 +8148,7 @@ function stage329EnsureEditor(){
       </div>
       <label><span>대회일</span><input id="stage329Date" type="date"></label>
       <label class="stage593-official-start"><span>공식 경기 시작 시간</span><input id="stage329StartTime" type="time"><small>아래 시간 잠금을 켠 경우에만 타이머 기준으로 사용합니다.</small></label>
-      <label class="stage594-clock-gate"><span>사전 코트배정 시간 잠금</span><select id="stage329OfficialStartClockEnabled"><option value="false">OFF · 배정 즉시 시간 시작</option><option value="true">ON · 공식 시작시간까지 대기</option></select><small>대회 전에 코트를 미리 배정할 때만 ON을 권장합니다.</small></label>
+      
       <label class="stage329-span-2"><span>장소</span><input id="stage329Venue"></label>
       <label><span>참가 정원</span><input id="stage329Capacity" type="number" min="1"></label>
       <label><span>본선 규모</span><select id="stage329DrawSize"><option value="32">32강</option><option value="64">64강</option><option value="128">128강</option></select></label>
@@ -8257,7 +8277,7 @@ function stage329OpenTournamentEdit(){
   if(!requireAdmin('대회 세부정보 수정'))return;
   const d=stage329EnsureEditor(),g=state.portal?.guide||{},ps=state.prelim?.settings||{},s=state.settings||{};
   const set=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v??'';};
-  set('stage329Name',state.tournament?.name||'');set('stage329Division',state.tournament?.division||'');set('stage329DisplayStatus',stage583NormalizeDisplayStatus(state.tournament?.displayStatus||'auto'));set('stage329Date',g.date||'');set('stage329StartTime',g.startTime||'09:00');set('stage329OfficialStartClockEnabled',state.settings?.officialStartClockEnabled===true?'true':'false');set('stage329Venue',g.venue||'');set('stage329Capacity',state.tournament?.capacity||ps.activeTeamCount||96);set('stage329DrawSize',s.drawSize||128);set('stage329Qualifiers',ps.qualifiersPerGroup||2);set('stage329TwoTeamGroups',ps.twoTeamGroupCount||0);set('stage329CourtCount',s.courtCount||8);set('stage329CourtPrefix',s.courtPrefix||'국제');set('stage329Fee',g.fee||'');set('stage329Bank',g.bank||'');set('stage329Account',g.account||'');set('stage329Organizer',g.organizer||g.host||'');set('stage329EntryStart',stage329Local(g.entryStart||g.registrationStart||''));set('stage329EntryEnd',stage329Local(g.entryEnd||g.registrationEnd||''));set('stage329Eligibility',g.eligibility||'');set('stage329Format',g.format||g.matchFormat||'');set('stage329Awards',g.awards||'');set('stage329Refund',g.refund||g.refundPolicy||'');set('stage329Contact',g.contact||'');set('stage329Detail',g.detail||'');
+  set('stage329Name',state.tournament?.name||'');set('stage329Division',state.tournament?.division||'');set('stage329DisplayStatus',stage583NormalizeDisplayStatus(state.tournament?.displayStatus||'auto'));set('stage329Date',g.date||'');set('stage329StartTime',g.startTime||'09:00');set('stage329Venue',g.venue||'');set('stage329Capacity',state.tournament?.capacity||ps.activeTeamCount||96);set('stage329DrawSize',s.drawSize||128);set('stage329Qualifiers',ps.qualifiersPerGroup||2);set('stage329TwoTeamGroups',ps.twoTeamGroupCount||0);set('stage329CourtCount',s.courtCount||8);set('stage329CourtPrefix',s.courtPrefix||'국제');set('stage329Fee',g.fee||'');set('stage329Bank',g.bank||'');set('stage329Account',g.account||'');set('stage329Organizer',g.organizer||g.host||'');set('stage329EntryStart',stage329Local(g.entryStart||g.registrationStart||''));set('stage329EntryEnd',stage329Local(g.entryEnd||g.registrationEnd||''));set('stage329Eligibility',g.eligibility||'');set('stage329Format',g.format||g.matchFormat||'');set('stage329Awards',g.awards||'');set('stage329Refund',g.refund||g.refundPolicy||'');set('stage329Contact',g.contact||'');set('stage329Detail',g.detail||'');
   document.getElementById('stage329EditMessage').textContent='';stage583BindStatusButtons();stage583RenderStatusButtons();d.showModal();setTimeout(()=>document.getElementById('stage329Name')?.focus(),30);
 }
 async function stage329SaveTournamentEdit(e){
@@ -8282,7 +8302,7 @@ async function stage329SaveTournamentEdit(e){
       }
     }catch(_e){}
     state.portal=state.portal||{};state.portal.guide={...(state.portal.guide||{}),date:val('stage329Date'),startTime:val('stage329StartTime'),venue:val('stage329Venue'),fee:val('stage329Fee'),bank:val('stage329Bank'),account:val('stage329Account'),organizer:val('stage329Organizer'),host:val('stage329Organizer'),entryStart:val('stage329EntryStart'),entryEnd:val('stage329EntryEnd'),registrationStart:val('stage329EntryStart'),registrationEnd:val('stage329EntryEnd'),eligibility:val('stage329Eligibility'),format:val('stage329Format'),matchFormat:val('stage329Format'),awards:val('stage329Awards'),refund:val('stage329Refund'),refundPolicy:val('stage329Refund'),contact:val('stage329Contact'),detail:val('stage329Detail')};
-    state.settings={...(state.settings||{}),drawSize:Number(val('stage329DrawSize')||128),courtCount:Math.max(1,Number(val('stage329CourtCount')||8)),courtPrefix:val('stage329CourtPrefix')||'코트',officialStartClockEnabled:val('stage329OfficialStartClockEnabled')==='true'};
+    state.settings={...(state.settings||{}),drawSize:Number(val('stage329DrawSize')||128),courtCount:Math.max(1,Number(val('stage329CourtCount')||8)),courtPrefix:val('stage329CourtPrefix')||'코트'};
     state.prelim=state.prelim||{};state.prelim.settings={...(state.prelim.settings||{}),activeTeamCount:state.tournament.capacity,qualifiersPerGroup:Math.max(1,Number(val('stage329Qualifiers')||2)),twoTeamGroupCount:Math.max(0,Number(val('stage329TwoTeamGroups')||0))};
     commit(`대회 세부정보 수정 · ${name}`);stage329EnsureEditor().close();renderPortalViews();renderTournamentList();notice('대회 세부정보와 운영 설정을 수정했습니다.','success');
   }catch(err){msg.textContent=`수정 실패: ${err?.message||err}`;msg.className='stage329-edit-message error';}
@@ -8373,43 +8393,14 @@ function stage3210EnsureEditor(){
   d=document.createElement('dialog');d.id='stage3210TournamentEditDialog';d.className='modal stage329-tournament-edit-dialog stage3210-dialog';
   d.innerHTML=`<form id="stage3210TournamentEditForm" method="dialog">
   <div class="modal-head"><div><span class="stage329-kicker">현재 대회 전용 설정</span><h2>대회 세부정보·예선·본선 구장 편집</h2><p>현재 진행 중인 대회에만 적용됩니다. 지난 대회 기록은 변경되지 않습니다.</p></div><button type="button" class="icon-button" data-stage3210-close>×</button></div>
-  <div class="stage3210-section stage596-operation-state-section">
-    <div class="stage596-section-title"><div><h3>① 운영 상태·시간</h3><p>대회 표시 상태와 코트 진행시간 기준을 여기서 바로 설정합니다.</p></div></div>
-    <div class="stage596-operation-grid">
-      <div class="stage596-status-box">
-        <strong>대회 현재 상태</strong>
-        <div class="stage587-status-preview">현재 적용 상태: <b id="stage587StatusPreview">-</b></div>
-        <div id="stage583TournamentStatusButtons" class="stage583-status-buttons" role="group" aria-label="대회 현재 상태 표시">
-          <button type="button" data-stage583-status="auto">자동 판단</button>
-          <button type="button" data-stage583-status="recruiting">접수중</button>
-          <button type="button" data-stage583-status="closed">접수마감</button>
-          <button type="button" data-stage583-status="ongoing">시합중</button>
-          <button type="button" data-stage583-status="completed">시합완료</button>
-        </div>
-        <select id="stage329DisplayStatus" class="stage583-status-select" aria-label="대회 현재 상태">
-          <option value="auto">자동 판단</option>
-          <option value="recruiting">접수중</option>
-          <option value="closed">접수마감</option>
-          <option value="ongoing">시합중</option>
-          <option value="completed">시합완료</option>
-        </select>
-        <small>자동 판단은 현재 경기 데이터 기준입니다. 직접 선택하면 관리자 설정이 우선합니다.</small>
-      </div>
-      <div class="stage596-clock-box">
-        <label><span>대회일</span><input id="stage329Date" type="date"></label>
-        <label><span>공식 경기 시작 시간</span><input id="stage329StartTime" type="time"></label>
-        <label class="stage594-clock-gate"><span>사전 코트배정 시간 잠금</span><select id="stage329OfficialStartClockEnabled"><option value="false">OFF · 배정 즉시 시간 시작</option><option value="true">ON · 공식 시작시간까지 대기</option></select><small>대회 전에 코트를 미리 배정할 때만 ON을 권장합니다.</small></label>
-      </div>
-    </div>
-  </div>
-  <div class="stage3210-section"><h3>② 대회 기본정보</h3><div class="stage329-edit-grid">
+  <div class="stage3210-section"><h3>① 대회 기본정보</h3><div class="stage329-edit-grid">
   <label><span>대회명 *</span><input id="stage329Name" required></label><label><span>부서 *</span><input id="stage329Division" required></label>
   <label class="stage329-span-2"><span>대표 장소 안내</span><input id="stage329Venue" placeholder="예: 김해 국제테니스장 외"></label>
   <label><span>참가 정원</span><input id="stage329Capacity" type="number" min="1"></label><label><span>본선 규모</span><select id="stage329DrawSize"><option value="32">32강</option><option value="64">64강</option><option value="128">128강</option></select></label>
   <label><span>조당 본선 진출팀</span><input id="stage329Qualifiers" type="number" min="1" max="3"></label><label><span>2팀조 수</span><input id="stage329TwoTeamGroups" type="number" min="0"></label>
   </div></div>
-  <div class="stage3210-section"><div class="stage3210-section-head"><div><h3>③ 구장 생성·코트 면수·예선/본선 선택</h3><p>구장을 만든 뒤 코트 면수를 설정하고, 예선과 본선 사용 여부를 각각 선택합니다.</p></div><button type="button" class="btn btn-primary" id="stage3210AddVenue">+ 구장 생성</button></div><div id="stage3210VenueRows"></div><div id="stage3210VenueSummary" class="notice info"></div><div class="stage3210-policy-grid"><label><span>구장별 배정 방식</span><select id="stage3210VenuePolicy"><option value="round-robin">구장 순환 균등배정</option><option value="fill-first">첫 구장 우선 채우기</option></select></label><label class="toggle-label"><span>구장별 공용대기 분리</span><input id="stage3210SeparateQueues" type="checkbox"></label><label class="toggle-label"><span>경기 종료 시 다음 경기 자동 투입</span><input id="stage3210AutoPromotion" type="checkbox"></label></div></div>
-  <div class="stage3210-section"><h3>④ 접수·요강 정보</h3><div class="stage329-edit-grid">
+  <div class="stage3210-section"><div class="stage3210-section-head"><div><h3>② 구장 생성·코트 면수·예선/본선 선택</h3><p>구장을 만든 뒤 코트 면수를 설정하고, 예선과 본선 사용 여부를 각각 선택합니다.</p></div><button type="button" class="btn btn-primary" id="stage3210AddVenue">+ 구장 생성</button></div><div id="stage3210VenueRows"></div><div id="stage3210VenueSummary" class="notice info"></div><div class="stage3210-policy-grid"><label><span>구장별 배정 방식</span><select id="stage3210VenuePolicy"><option value="round-robin">구장 순환 균등배정</option><option value="fill-first">첫 구장 우선 채우기</option></select></label><label class="toggle-label"><span>구장별 공용대기 분리</span><input id="stage3210SeparateQueues" type="checkbox"></label><label class="toggle-label"><span>경기 종료 시 다음 경기 자동 투입</span><input id="stage3210AutoPromotion" type="checkbox"></label></div></div>
+  <div class="stage3210-section"><h3>③ 접수·요강 정보</h3><div class="stage329-edit-grid">
   <label><span>참가비</span><input id="stage329Fee"></label><label><span>은행·예금주</span><input id="stage329Bank"></label><label class="stage329-span-2"><span>입금 계좌</span><input id="stage329Account"></label><label class="stage329-span-2"><span>주최·주관</span><input id="stage329Organizer"></label><label><span>접수 시작</span><input id="stage329EntryStart" type="datetime-local"></label><label><span>접수 마감</span><input id="stage329EntryEnd" type="datetime-local"></label><label class="stage329-span-2"><span>참가 자격</span><textarea id="stage329Eligibility" rows="3"></textarea></label><label class="stage329-span-2"><span>경기 방식</span><textarea id="stage329Format" rows="3"></textarea></label><label class="stage329-span-2"><span>시상 내용</span><textarea id="stage329Awards" rows="3"></textarea></label><label class="stage329-span-2"><span>환불 규정</span><textarea id="stage329Refund" rows="3"></textarea></label><label class="stage329-span-2"><span>문의처</span><input id="stage329Contact"></label><label class="stage329-span-2"><span>기타 안내·세부 요강</span><textarea id="stage329Detail" rows="5"></textarea></label>
   </div></div><div id="stage329EditMessage" class="stage329-edit-message"></div><menu><button type="button" class="btn btn-light" data-stage3210-close>취소</button><button type="submit" class="btn btn-primary">현재 대회 설정 저장</button></menu></form>`;
   document.body.appendChild(d);d.querySelectorAll('[data-stage3210-close]').forEach(b=>b.onclick=()=>d.close());d.addEventListener('click',e=>{if(e.target===d)d.close();});d.querySelector('form').addEventListener('submit',stage3210SaveTournamentEdit);
@@ -8419,7 +8410,7 @@ function stage3210EnsureEditor(){
 function stage3210OpenTournamentEdit(){
   if(!requireAdmin('현재 대회 설정 편집'))return;ensureVenueSettings(state);
   const d=stage3210EnsureEditor(),g=state.portal?.guide||{},ps=state.prelim?.settings||{},s=state.settings||{};const set=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v??'';};
-  set('stage329Name',state.tournament?.name||'');set('stage329Division',state.tournament?.division||'');set('stage329DisplayStatus',stage583NormalizeDisplayStatus(state.tournament?.displayStatus||'auto'));set('stage329Date',g.date||'');set('stage329StartTime',g.startTime||'09:00');set('stage329OfficialStartClockEnabled',state.settings?.officialStartClockEnabled===true?'true':'false');set('stage329Venue',g.venue||'');set('stage329Capacity',state.tournament?.capacity||ps.activeTeamCount||96);set('stage329DrawSize',s.drawSize||128);set('stage329Qualifiers',ps.qualifiersPerGroup||2);set('stage329TwoTeamGroups',ps.twoTeamGroupCount||0);set('stage329Fee',g.fee||'');set('stage329Bank',g.bank||'');set('stage329Account',g.account||'');set('stage329Organizer',g.organizer||g.host||'');set('stage329EntryStart',stage329Local(g.entryStart||g.registrationStart||''));set('stage329EntryEnd',stage329Local(g.entryEnd||g.registrationEnd||''));set('stage329Eligibility',g.eligibility||'');set('stage329Format',g.format||g.matchFormat||'');set('stage329Awards',g.awards||'');set('stage329Refund',g.refund||g.refundPolicy||'');set('stage329Contact',g.contact||'');set('stage329Detail',g.detail||'');
+  set('stage329Name',state.tournament?.name||'');set('stage329Division',state.tournament?.division||'');set('stage329DisplayStatus',stage583NormalizeDisplayStatus(state.tournament?.displayStatus||'auto'));set('stage329Date',g.date||'');set('stage329StartTime',g.startTime||'09:00');set('stage329Venue',g.venue||'');set('stage329Capacity',state.tournament?.capacity||ps.activeTeamCount||96);set('stage329DrawSize',s.drawSize||128);set('stage329Qualifiers',ps.qualifiersPerGroup||2);set('stage329TwoTeamGroups',ps.twoTeamGroupCount||0);set('stage329Fee',g.fee||'');set('stage329Bank',g.bank||'');set('stage329Account',g.account||'');set('stage329Organizer',g.organizer||g.host||'');set('stage329EntryStart',stage329Local(g.entryStart||g.registrationStart||''));set('stage329EntryEnd',stage329Local(g.entryEnd||g.registrationEnd||''));set('stage329Eligibility',g.eligibility||'');set('stage329Format',g.format||g.matchFormat||'');set('stage329Awards',g.awards||'');set('stage329Refund',g.refund||g.refundPolicy||'');set('stage329Contact',g.contact||'');set('stage329Detail',g.detail||'');
   stage3210VenueDraft=structuredClone(s.venues||[]);if(!stage3210VenueDraft.length)stage3210VenueDraft=[{id:'venue-default',name:s.courtPrefix||'구장',courtCount:s.courtCount||8,courtPrefix:s.courtPrefix||'코트',usePrelim:true,useMain:true}];stage3210RenderVenueDraft();stage3210UpdateVenueSummary();set('stage3210VenuePolicy',s.venueAssignmentPolicy||'round-robin');document.getElementById('stage3210SeparateQueues').checked=s.separateVenueQueues!==false;document.getElementById('stage3210AutoPromotion').checked=s.autoVenuePromotion!==false;document.getElementById('stage329EditMessage').textContent='';stage583BindStatusButtons();stage583RenderStatusButtons();d.showModal();
 }
 async function stage3210SaveTournamentEdit(e){
@@ -8427,7 +8418,7 @@ async function stage3210SaveTournamentEdit(e){
   if(!name||!division){msg.textContent='대회명과 부서는 반드시 입력하세요.';msg.className='stage329-edit-message error';return;}if(!stage3210VenueDraft.some(v=>v.usePrelim)){msg.textContent='예선에 사용할 구장을 한 곳 이상 선택하세요.';msg.className='stage329-edit-message error';return;}if(!stage3210VenueDraft.some(v=>v.useMain)){msg.textContent='본선에 사용할 구장을 한 곳 이상 선택하세요.';msg.className='stage329-edit-message error';return;}
   try{const recovery=saveRecovery(state,`${state.tournament?.name||'현재 대회'} · 설정 변경 전`);if(recovery?.ready)await recovery.ready;
     state.tournament={...(state.tournament||{}),name,division,capacity:Math.max(1,Number(val('stage329Capacity')||96)),displayStatus:stage583NormalizeDisplayStatus(val('stage329DisplayStatus'))};state.portal=state.portal||{};state.portal.guide={...(state.portal.guide||{}),date:val('stage329Date'),startTime:val('stage329StartTime'),venue:val('stage329Venue'),fee:val('stage329Fee'),bank:val('stage329Bank'),account:val('stage329Account'),organizer:val('stage329Organizer'),host:val('stage329Organizer'),entryStart:val('stage329EntryStart'),entryEnd:val('stage329EntryEnd'),registrationStart:val('stage329EntryStart'),registrationEnd:val('stage329EntryEnd'),eligibility:val('stage329Eligibility'),format:val('stage329Format'),matchFormat:val('stage329Format'),awards:val('stage329Awards'),refund:val('stage329Refund'),refundPolicy:val('stage329Refund'),contact:val('stage329Contact'),detail:val('stage329Detail')};
-    state.settings={...(state.settings||{}),drawSize:Number(val('stage329DrawSize')||128),venues:structuredClone(stage3210VenueDraft),venueAssignmentPolicy:val('stage3210VenuePolicy')||'round-robin',separateVenueQueues:document.getElementById('stage3210SeparateQueues').checked,autoVenuePromotion:document.getElementById('stage3210AutoPromotion').checked,officialStartClockEnabled:val('stage329OfficialStartClockEnabled')==='true'};ensureVenueSettings(state);ensureVenueQueues(state);
+    state.settings={...(state.settings||{}),drawSize:Number(val('stage329DrawSize')||128),venues:structuredClone(stage3210VenueDraft),venueAssignmentPolicy:val('stage3210VenuePolicy')||'round-robin',separateVenueQueues:document.getElementById('stage3210SeparateQueues').checked,autoVenuePromotion:document.getElementById('stage3210AutoPromotion').checked};ensureVenueSettings(state);ensureVenueQueues(state);
     state.prelim=state.prelim||{};state.prelim.settings={...(state.prelim.settings||{}),activeTeamCount:state.tournament.capacity,qualifiersPerGroup:Math.max(1,Number(val('stage329Qualifiers')||2)),twoTeamGroupCount:Math.max(0,Number(val('stage329TwoTeamGroups')||0))};
     // 이미 생성된 경기·대기열은 안전을 위해 즉시 재배치하지 않습니다. 다음 조편성·코트배정부터 새 구장 구성을 사용합니다.
     commit(`현재 대회 설정 수정 · ${name}`);const editDialog=document.getElementById('stage3210TournamentEditDialog');editDialog?.close();renderPortalViews();renderTournamentList();renderVenueSettingsEditor();notice('현재 대회의 기본정보와 예선·본선 구장·코트 설정을 저장했습니다.','success');stage3210RenderSettingsSummary();
@@ -9394,7 +9385,7 @@ let refreshDivisionEditorPanel = window.refreshDivisionEditorPanel || (()=>{});
   function ensureDialog(){
     document.getElementById('stage6001TournamentEditor')?.remove();
     const d=document.createElement('dialog');d.id='stage6001TournamentEditor';d.className='s6001-dialog';
-    d.innerHTML=`<div class="s6001-shell"><header><div><small>TOURNAMENT EDITOR</small><h2>대회 편집</h2><p>대회 정보·요강·모든 부서를 한 창에서 수정하고, 마지막에 한 번만 서버에 저장합니다.</p></div><button type="button" data-s6001-close aria-label="닫기">×</button></header><div class="s6001-body"><section class="s6001-common"><h3>대회 공통정보</h3><div class="s6001-grid"><label>대회명<input id="s6001Name"></label><label>대회일<input id="s6001Date" type="date"></label><label>시작 시간<input id="s6001Time" type="time"></label><label>대표 장소 안내<input id="s6001Venue"></label></div></section><section class="s6001-guide"><div class="s6001-section-head"><div><h3>대회 요강</h3><p>홈과 대회 요강 화면에 표시되는 내용을 여기서 함께 관리합니다.</p></div><button type="button" class="btn btn-light" data-s6001-open-guide>요강 화면 미리보기</button></div><div class="s6001-grid"><label>참가비<input id="s6001GuideFee" placeholder="예: 팀당 60,000원"></label><label>접수 기간<input id="s6001GuideEntryPeriod" placeholder="예: 9월 14일(월)까지"></label><label class="s6001-wide">참가 자격<textarea id="s6001GuideEligibility" rows="3"></textarea></label><label class="s6001-wide">경기 방식<textarea id="s6001GuideMatchFormat" rows="3"></textarea></label><label class="s6001-wide">시상 내용<textarea id="s6001GuideAwards" rows="3"></textarea></label><label class="s6001-wide">환불 규정<textarea id="s6001GuideRefund" rows="3"></textarea></label><label>문의처<input id="s6001GuideContact"></label><label>주최·주관<input id="s6001GuideOrganizer"></label><label class="s6001-wide">세부 안내<textarea id="s6001GuideDetail" rows="5"></textarea></label><label class="s6001-wide">요강 이미지<input id="s6001GuideImage" type="file" accept="image/*"><small>새 이미지를 선택하면 Firebase Storage에 저장됩니다.</small></label><label class="s6001-guide-remove"><input id="s6001GuideRemoveImage" type="checkbox"> 현재 요강 이미지 제거</label><div id="s6001GuideCurrentImage" class="s6001-guide-image" hidden><span>현재 등록 이미지</span><img alt="현재 요강 이미지"></div></div></section><section class="s6001-divisions"><div class="s6001-section-head"><div><h3>부서별 설정</h3><p>부서를 추가해도 별도 투명창을 열지 않고 이 편집창 안에서 바로 설정합니다.</p></div><button type="button" class="btn btn-primary" data-s6001-add-division>+ 빈 부서 추가</button></div><div id="s6001Tabs" class="s6001-tabs"></div><div id="s6001Panel"></div></section></div><footer><div><strong id="s6001SaveState">변경사항을 확인한 뒤 저장하세요.</strong><span id="s6001SaveDetail">저장 성공 시 창이 자동으로 닫힙니다.</span></div><button type="button" class="btn btn-light" data-s6001-cancel>취소</button><button type="button" class="btn btn-primary" data-s6001-save-all>전체 변경사항 저장</button></footer></div>`;
+    d.innerHTML=`<div class="s6001-shell"><header><div><small>TOURNAMENT EDITOR</small><h2>대회 편집</h2><p>대회 정보·요강·모든 부서를 한 창에서 수정하고, 마지막에 한 번만 서버에 저장합니다.</p></div><button type="button" data-s6001-close aria-label="닫기">×</button></header><div class="s6001-body"><section class="s6001-common"><h3>대회 공통정보</h3><div class="s6001-grid"><label>대회명<input id="s6001Name"></label><label>대회일<input id="s6001Date" type="date"></label><label>시작 시간<input id="s6001Time" type="time"></label><label>대표 장소 안내<input id="s6001Venue"></label><div class="s6001-status-control s6001-wide"><strong>대회 현재 상태</strong><div class="s6001-status-preview">현재 적용 상태: <b id="s6001StatusPreview">-</b></div><div id="s6001StatusButtons" class="s6001-status-buttons" role="group" aria-label="대회 현재 상태"><button type="button" data-s6001-status="auto">자동 판단</button><button type="button" data-s6001-status="recruiting">접수중</button><button type="button" data-s6001-status="closed">접수마감</button><button type="button" data-s6001-status="ongoing">시합중</button><button type="button" data-s6001-status="completed">시합완료</button></div><input id="s6001DisplayStatus" type="hidden" value="auto"><small>자동 판단은 실제 경기 데이터 기준입니다. 직접 선택하면 관리자 지정 상태가 우선합니다.</small></div></div></section><section class="s6001-guide"><div class="s6001-section-head"><div><h3>대회 요강</h3><p>홈과 대회 요강 화면에 표시되는 내용을 여기서 함께 관리합니다.</p></div><button type="button" class="btn btn-light" data-s6001-open-guide>요강 화면 미리보기</button></div><div class="s6001-grid"><label>참가비<input id="s6001GuideFee" placeholder="예: 팀당 60,000원"></label><label>접수 기간<input id="s6001GuideEntryPeriod" placeholder="예: 9월 14일(월)까지"></label><label class="s6001-wide">참가 자격<textarea id="s6001GuideEligibility" rows="3"></textarea></label><label class="s6001-wide">경기 방식<textarea id="s6001GuideMatchFormat" rows="3"></textarea></label><label class="s6001-wide">시상 내용<textarea id="s6001GuideAwards" rows="3"></textarea></label><label class="s6001-wide">환불 규정<textarea id="s6001GuideRefund" rows="3"></textarea></label><label>문의처<input id="s6001GuideContact"></label><label>주최·주관<input id="s6001GuideOrganizer"></label><label class="s6001-wide">세부 안내<textarea id="s6001GuideDetail" rows="5"></textarea></label><label class="s6001-wide">요강 이미지<input id="s6001GuideImage" type="file" accept="image/*"><small>새 이미지를 선택하면 Firebase Storage에 저장됩니다.</small></label><label class="s6001-guide-remove"><input id="s6001GuideRemoveImage" type="checkbox"> 현재 요강 이미지 제거</label><div id="s6001GuideCurrentImage" class="s6001-guide-image" hidden><span>현재 등록 이미지</span><img alt="현재 요강 이미지"></div></div></section><section class="s6001-divisions"><div class="s6001-section-head"><div><h3>부서별 설정</h3><p>부서를 추가해도 별도 투명창을 열지 않고 이 편집창 안에서 바로 설정합니다.</p></div><button type="button" class="btn btn-primary" data-s6001-add-division>+ 빈 부서 추가</button></div><div id="s6001Tabs" class="s6001-tabs"></div><div id="s6001Panel"></div></section></div><footer><div><strong id="s6001SaveState">변경사항을 확인한 뒤 저장하세요.</strong><span id="s6001SaveDetail">저장 성공 시 창이 자동으로 닫힙니다.</span></div><button type="button" class="btn btn-light" data-s6001-cancel>취소</button><button type="button" class="btn btn-primary" data-s6001-save-all>전체 변경사항 저장</button></footer></div>`;
     document.body.appendChild(d);
     d.addEventListener('cancel',e=>{e.preventDefault();requestClose();});
     d.addEventListener('click',e=>{if(e.target===d||e.target.closest('[data-s6001-close],[data-s6001-cancel]'))requestClose();});
@@ -9412,10 +9403,36 @@ let refreshDivisionEditorPanel = window.refreshDivisionEditorPanel || (()=>{});
     d.querySelector('#s6001Tabs').innerHTML=divisions().map((r,i)=>`<button type="button" class="${String(r.id)===String(selectedId)?'active':''}" data-s6001-select="${esc(r.id)}"><strong>${esc(r.name||`새 부서 ${i+1}`)}</strong><small>${esc(snapshotValues(r).capacity)}팀 · ${esc(snapshotValues(r).drawSize)}강</small></button>`).join('');
     const rec=record(selectedId);d.querySelector('#s6001Panel').innerHTML=rec?panelHtml(rec):'';
   }
+  function renderStatusControl(){
+    const d=document.getElementById('stage6001TournamentEditor');if(!d)return;
+    const input=d.querySelector('#s6001DisplayStatus'),root=d.querySelector('#s6001StatusButtons'),preview=d.querySelector('#s6001StatusPreview');
+    if(!input||!root)return;
+    const current=stage583NormalizeDisplayStatus(input.value||'auto');
+    root.querySelectorAll('[data-s6001-status]').forEach(btn=>{
+      const active=String(btn.dataset.s6001Status)===current;
+      btn.classList.toggle('active',active);btn.setAttribute('aria-pressed',String(active));
+    });
+    if(preview){
+      const applied=current==='auto'?stage587AutoTournamentStatus(state):current;
+      preview.textContent=`${tournamentStatusLabel(applied)}${current==='auto'?' · 자동':' · 관리자 지정'}`;
+    }
+  }
+  function bindStatusControl(){
+    const d=document.getElementById('stage6001TournamentEditor');if(!d)return;
+    const root=d.querySelector('#s6001StatusButtons'),input=d.querySelector('#s6001DisplayStatus');
+    if(!root||!input||root.dataset.bound==='1')return;
+    root.dataset.bound='1';
+    root.addEventListener('click',e=>{
+      const btn=e.target.closest?.('[data-s6001-status]');if(!btn)return;
+      input.value=stage583NormalizeDisplayStatus(btn.dataset.s6001Status);
+      dirty=true;renderStatusControl();
+      setSaveText('수정한 내용이 아직 서버에 저장되지 않았습니다.','전체 변경사항 저장을 눌러 주세요.','pending');
+    });
+  }
   function openEditor(){
     if(typeof requireAdmin==='function'&&!requireAdmin('대회 편집'))return;
     makeDraft();const d=ensureDialog();
-    d.querySelector('#s6001Name').value=draft.common.name;d.querySelector('#s6001Date').value=draft.common.date;d.querySelector('#s6001Time').value=draft.common.time;d.querySelector('#s6001Venue').value=draft.common.venue;
+    d.querySelector('#s6001Name').value=draft.common.name;d.querySelector('#s6001Date').value=draft.common.date;d.querySelector('#s6001Time').value=draft.common.time;d.querySelector('#s6001Venue').value=draft.common.venue;d.querySelector('#s6001DisplayStatus').value=stage583NormalizeDisplayStatus(state.tournament?.displayStatus||'auto');bindStatusControl();renderStatusControl();
     const g=draft.guide||{};d.querySelector('#s6001GuideFee').value=g.fee||'';d.querySelector('#s6001GuideEntryPeriod').value=g.entryPeriod||'';d.querySelector('#s6001GuideEligibility').value=g.eligibility||'';d.querySelector('#s6001GuideMatchFormat').value=g.matchFormat||'';d.querySelector('#s6001GuideAwards').value=g.awards||'';d.querySelector('#s6001GuideRefund').value=g.refundPolicy||'';d.querySelector('#s6001GuideContact').value=g.contact||'';d.querySelector('#s6001GuideOrganizer').value=g.organizer||'';d.querySelector('#s6001GuideDetail').value=g.detail||'';d.querySelector('#s6001GuideRemoveImage').checked=false;
     const imgWrap=d.querySelector('#s6001GuideCurrentImage'),img=imgWrap?.querySelector('img'),src=stage6109ImageSrc(g);if(imgWrap){imgWrap.hidden=!src;if(img&&src)img.src=src;}
     renderTabs();setSaveText('변경사항을 확인한 뒤 저장하세요.','저장 성공 시 창이 자동으로 닫힙니다.','ready');d.showModal();
@@ -9460,7 +9477,7 @@ let refreshDivisionEditorPanel = window.refreshDivisionEditorPanel || (()=>{});
     saving=true;const saveBtn=d.querySelector('[data-s6001-save-all]'),cancel=d.querySelector('[data-s6001-cancel]');saveBtn.disabled=true;cancel.disabled=true;saveBtn.textContent='서버 저장 중…';setSaveText('대회 내용부터 안전하게 저장하고 있습니다.','이미지는 별도 저장소로 이어서 저장합니다.','saving');
     try{
       const activeId=String(state.multiDivision?.activeDivisionId||draft.activeDivisionId||divisions()[0]?.id||'');
-      state.tournament={...(state.tournament||{}),name,division:record(activeId)?.name||divisions()[0]?.name||'',capacity:Number(record(activeId)?.snapshot?.divisionConfig?.capacity||state.tournament?.capacity||96)};
+      state.tournament={...(state.tournament||{}),name,division:record(activeId)?.name||divisions()[0]?.name||'',capacity:Number(record(activeId)?.snapshot?.divisionConfig?.capacity||state.tournament?.capacity||96),displayStatus:stage583NormalizeDisplayStatus(d.querySelector('#s6001DisplayStatus')?.value||'auto')};
       state.portal=state.portal||{};const previousGuide=state.portal.guide||{};
       const removeGuideImage=Boolean(d.querySelector('#s6001GuideRemoveImage')?.checked),guideFile=d.querySelector('#s6001GuideImage')?.files?.[0];
       const textGuide={...previousGuide,date:d.querySelector('#s6001Date')?.value||'',startTime:d.querySelector('#s6001Time')?.value||'09:00',venue:d.querySelector('#s6001Venue')?.value||'',fee:String(d.querySelector('#s6001GuideFee')?.value||'').trim(),entryPeriod:String(d.querySelector('#s6001GuideEntryPeriod')?.value||'').trim(),eligibility:String(d.querySelector('#s6001GuideEligibility')?.value||'').trim(),matchFormat:String(d.querySelector('#s6001GuideMatchFormat')?.value||'').trim(),awards:String(d.querySelector('#s6001GuideAwards')?.value||'').trim(),refundPolicy:String(d.querySelector('#s6001GuideRefund')?.value||'').trim(),contact:String(d.querySelector('#s6001GuideContact')?.value||'').trim(),organizer:String(d.querySelector('#s6001GuideOrganizer')?.value||'').trim(),detail:String(d.querySelector('#s6001GuideDetail')?.value||'').trim()};
@@ -15037,3 +15054,5 @@ console.info('[230MATCH] 5.9.4 ready · bracket-safe scale + opt-in official clo
 console.info('[230MATCH] 5.9.5 ready · bracket scroll works from main canvas with visible horizontal scrollbar');
 
 console.info('[230MATCH] 5.9.6 ready · current tournament editor exposes status + official clock controls at top');
+
+console.info('[230MATCH] 5.9.7 ready · status in visible tournament editor + clock lock beside court auto assignment');
