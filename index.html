@@ -2252,6 +2252,70 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
 }
 </style>
 
+
+<style id="stage5930MobileScrollEdgeGuides">
+/* 5.9.30 — 모바일 대진표 세로 스크롤 위치 안내만 강화.
+   JS/터치/줌/대진표 로직은 변경하지 않는다. */
+
+.stage5930-scroll-edge{display:none}
+
+@media(max-width:760px){
+  #bracketViewport{
+    position:relative!important;
+  }
+
+  .stage5930-scroll-edge{
+    display:flex!important;
+    position:sticky!important;
+    top:34vh!important;
+    width:30px!important;
+    height:150px!important;
+    align-items:center!important;
+    justify-content:center!important;
+    z-index:24!important;
+    pointer-events:none!important;
+    border:2px solid rgba(37,99,235,.78)!important;
+    background:rgba(219,234,254,.94)!important;
+    box-shadow:0 3px 12px rgba(30,64,175,.20)!important;
+  }
+
+  .stage5930-scroll-edge-left{
+    float:left!important;
+    left:2px!important;
+    margin-right:-30px!important;
+    border-radius:0 12px 12px 0!important;
+  }
+
+  .stage5930-scroll-edge-right{
+    float:right!important;
+    right:2px!important;
+    margin-left:-30px!important;
+    border-radius:12px 0 0 12px!important;
+  }
+
+  .stage5930-scroll-edge span{
+    writing-mode:vertical-rl!important;
+    text-orientation:mixed!important;
+    color:#1d4ed8!important;
+    font-size:10px!important;
+    line-height:1!important;
+    font-weight:950!important;
+    letter-spacing:.02em!important;
+    white-space:nowrap!important;
+  }
+
+  /* 5.9.29의 단일 우측 SCROLL 표시는 새 양쪽 가이드로 대체 */
+  .stage5929-vertical-scroll-guide{
+    display:none!important;
+  }
+
+  .stage5929-mobile-scroll-hint{
+    border-color:#2563eb!important;
+    background:#eff6ff!important;
+  }
+}
+</style>
+
 </head>
 <body>
   <header class="topbar">
@@ -3476,8 +3540,10 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
           </div>
           <small>모바일에서도 − / 100% / ＋ 버튼 또는 두 손가락으로 확대·축소할 수 있습니다.</small>
         </div>
-        <div class="stage595-bracket-scroll-hint stage5929-mobile-scroll-hint"><strong>모바일 조작</strong><span>↕ 위·아래: 페이지 스크롤</span><span>↔ 좌·우: 대진표 이동</span><span>− / ＋: 대진표 확대·축소</span></div>
-        <div id="bracketViewport" class="bracket-viewport"><div class="stage5929-vertical-scroll-guide" aria-hidden="true"><span>↕ SCROLL</span></div>
+        <div class="stage595-bracket-scroll-hint stage5929-mobile-scroll-hint"><strong>모바일 조작</strong><span>↕ 세로 스크롤: 대진표 좌·우 가장자리</span><span>↔ 좌·우: 대진표 이동</span><span>− / ＋: 확대·축소</span></div>
+        <div id="bracketViewport" class="bracket-viewport">
+          <div class="stage5930-scroll-edge stage5930-scroll-edge-left" aria-hidden="true"><span>↕ 위아래 스크롤</span></div>
+          <div class="stage5930-scroll-edge stage5930-scroll-edge-right" aria-hidden="true"><span>↕ 위아래 스크롤</span></div>
           <div id="bracketBoard" class="bracket-board empty-state"><p>생성된 대진이 없습니다.</p></div>
         </div>
       </section>
