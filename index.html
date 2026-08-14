@@ -807,6 +807,18 @@ body.tournament-completed-admin #view-operation textarea{
 .stage586-home-badges .tournament-state.completed{background:#e2e8f0!important;color:#475569!important}
 </style>
 
+
+<style id="stage587StatusAutoManual">
+.stage587-status-preview{
+  padding:8px 10px;
+  border-radius:9px;
+  background:#eef4ff;
+  color:#334155;
+  font-size:12px;
+}
+.stage587-status-preview b{color:#1d4ed8}
+</style>
+
 </head>
 <body>
   <header class="topbar">
@@ -2824,7 +2836,7 @@ body.tournament-completed-admin #view-operation textarea{
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=5806"></script>
+  <script type="module" src="./assets/js/app.js?v=5807"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">

@@ -6007,12 +6007,8 @@ function renderHomeTournamentCards(){
     const division=String(r.division||snap?.tournament?.division||'부서 미설정');
     const date=String(snap?.portal?.guide?.date||r?.guide?.date||r?.date||'');
     const venue=String(snap?.portal?.guide?.venue||r?.guide?.venue||r?.venue||'');
-    const configured=stage583NormalizeDisplayStatus(snap?.tournament?.displayStatus||r?.displayStatus||'auto');
-    const prelim=snap?.prelim?.matches||[];
-    const main=(()=>{try{return Object.values(snap?.draw?.rounds||{}).flat().filter(Boolean);}catch(_e){return [];}})();
-    const completed=Boolean(snap?.completion?.completedAt||snap?.operation?.tournamentCompletedAt||snap?.tournament?.completedAt||r?.completedAt);
-    const started=prelim.some(x=>x?.status&&x.status!=='waiting')||main.some(x=>x?.status&&x.status!=='waiting');
-    const displayStatus=configured!=='auto'?configured:(completed?'completed':started?'ongoing':'recruiting');
+    const displaySource=(snap&&Object.keys(snap).length)?snap:{tournament:{...r,displayStatus:r?.displayStatus||'auto'},prelim:{matches:[]},draw:{rounds:{}},completion:{completedAt:r?.completedAt||''},operation:{}};
+    const displayStatus=stage587TournamentDisplayStatus(displaySource);
     return `<article class="home-tournament-card ${current?'current':''}" data-home-tournament-id="${portalEscape(id)}"><div><div class="stage586-home-badges">${current?`<span class="tournament-state current-selection">현재 선택</span>`:`<span class="tournament-state neutral">운영 대회</span>`}<span class="tournament-state ${portalEscape(displayStatus)}">${tournamentStatusLabel(displayStatus)}</span></div><h3>${portalEscape(labels.get(id)||name)}</h3><div class="meta">${portalEscape(division)}${date?` · ${portalEscape(date)}`:''}${venue?` · ${portalEscape(venue)}`:''}</div></div><div class="actions"><a class="btn btn-primary" href="${portalEscape(workspaceRouteUrl(id,'','guide'))}">요강 보기</a>${current?`<button type="button" class="btn btn-primary" disabled>선택됨</button>`:`<a class="btn btn-light" href="${portalEscape(workspaceRouteUrl(id,'','home'))}">이 대회 선택</a>`}${isAdmin()?`<button type="button" class="btn btn-light" data-admin-only="true" data-home-tournament-edit="${portalEscape(id)}">수정·편집</button><button type="button" class="btn btn-danger-outline" data-admin-only="true" data-home-tournament-delete="${portalEscape(id)}">삭제</button>`:''}</div></article>`;
   }).join('');
 }
@@ -6180,7 +6176,8 @@ function renderTournamentGuide(){
   }
   const badge=document.getElementById('guideStatusBadge');if(badge){
     const configured=stage583NormalizeDisplayStatus(state.tournament?.displayStatus||'auto');
-    const status=configured==='auto'?(Boolean(state.completion?.completedAt||state.tournament?.completedAt)?'completed':capacity&&active>=capacity?'closed':tournamentLifecycle()):configured;
+    let status=stage587TournamentDisplayStatus(state);
+    if(configured==='auto'&&status==='recruiting'&&capacity&&active>=capacity)status='closed';
     badge.textContent=tournamentStatusLabel(status);
     badge.className=`badge ${status==='completed'?'badge-muted':status==='ongoing'?'badge-safe':status==='closed'?'badge-danger':'badge-warning'}`;
   }
@@ -6344,13 +6341,7 @@ function savePopupManagerItem(article){const id=article?.dataset.popupManagerId,
 
 
 function tournamentLifecycle(){
-  const manual=stage583NormalizeDisplayStatus(state.tournament?.displayStatus||'auto');
-  if(manual!=='auto')return manual;
-  const prelim=state.prelim?.matches||[],main=portalMainMatches();
-  const all=[...prelim,...main],completed=all.length>0&&all.every(x=>x.status==='completed');
-  if(completed||state.completion?.completedAt)return 'completed';
-  if(all.some(x=>['playing','completed'].includes(x.status)))return 'ongoing';
-  return 'recruiting';
+  return stage587TournamentDisplayStatus(state);
 }
 function tournamentStatusLabel(status){
   return ({recruiting:'접수중',closed:'접수마감',ongoing:'시합중',completed:'시합완료',empty:'대회 없음'})[status]||'접수중';
@@ -7796,6 +7787,7 @@ function stage329EnsureEditor(){
       <label><span>부서 *</span><input id="stage329Division" required></label>
       <div class="stage583-status-field stage329-span-2">
         <span>대회 현재 상태 표시</span>
+        <div class="stage587-status-preview">현재 적용 상태: <b id="stage587StatusPreview">-</b></div>
         <div id="stage583TournamentStatusButtons" class="stage583-status-buttons" role="group" aria-label="대회 현재 상태 표시">
           <button type="button" data-stage583-status="auto">자동 판단</button>
           <button type="button" data-stage583-status="recruiting">접수중</button>
@@ -7810,7 +7802,7 @@ function stage329EnsureEditor(){
           <option value="ongoing">시합중</option>
           <option value="completed">시합완료</option>
         </select>
-        <small>표시 상태만 바뀝니다. 경기 결과·대진·결승 완료 데이터는 자동 변경하지 않습니다.</small>
+        <small><b>자동 판단</b>: 현재 경기 데이터로 접수중·시합중·시합완료를 판단합니다. <b>직접 선택</b>: 관리자가 선택한 상태를 우선 표시합니다. 표시 상태를 바꿔도 경기 결과·대진 데이터는 변경하지 않습니다.</small>
       </div>
       <label><span>대회일</span><input id="stage329Date" type="date"></label>
       <label><span>시작 시간</span><input id="stage329StartTime" type="time"></label>
@@ -7848,6 +7840,28 @@ function stage583NormalizeDisplayStatus(value){
   const v=String(value||'auto');
   return ['auto','recruiting','closed','ongoing','completed'].includes(v)?v:'auto';
 }
+function stage587AutoTournamentStatus(source=state){
+  const s=source||{};
+  const prelim=(s.prelim?.matches||[]).filter(Boolean);
+  const main=(()=>{try{return Object.values(s.draw?.rounds||{}).flat().filter(Boolean);}catch(_e){return [];}})();
+  const all=[...prelim,...main];
+  const realMatches=all.filter(m=>m&&m.teamA&&m.teamB&&!m.isBye);
+  const anyStarted=realMatches.some(m=>['playing','completed'].includes(String(m.status||'')));
+  const allCompleted=realMatches.length>0&&realMatches.every(m=>String(m.status||'')==='completed');
+  const explicitCompleted=Boolean(s.completion?.completedAt||s.operation?.tournamentCompletedAt||s.tournament?.completedAt);
+
+  // 5.8.7:
+  // 과거 시뮬레이션의 completion 플래그만 남고 현재 경기 데이터가 없는 경우는 접수중으로 본다.
+  // 실제 경기 데이터가 있고 전 경기 완료일 때만 자동 시합완료.
+  if(allCompleted&&explicitCompleted)return 'completed';
+  if(allCompleted)return 'completed';
+  if(anyStarted)return 'ongoing';
+  return 'recruiting';
+}
+function stage587TournamentDisplayStatus(source=state){
+  const manual=stage583NormalizeDisplayStatus(source?.tournament?.displayStatus||'auto');
+  return manual==='auto'?stage587AutoTournamentStatus(source):manual;
+}
 function stage583RenderStatusButtons(){
   const select=document.getElementById('stage329DisplayStatus');
   const root=document.getElementById('stage583TournamentStatusButtons');
@@ -7858,6 +7872,11 @@ function stage583RenderStatusButtons(){
     btn.classList.toggle('active',active);
     btn.setAttribute('aria-pressed',String(active));
   });
+  const preview=document.getElementById('stage587StatusPreview');
+  if(preview){
+    const applied=current==='auto'?stage587AutoTournamentStatus(state):current;
+    preview.textContent=tournamentStatusLabel(applied)+(current==='auto'?' · 자동':' · 관리자 지정');
+  }
 }
 function stage583BindStatusButtons(){
   const select=document.getElementById('stage329DisplayStatus');
@@ -11233,10 +11252,8 @@ function tournamentSummaryFromWorkspace(workspace,id,current=false){
   const main=(()=>{try{return Object.values(s.draw?.rounds||{}).flat().filter(Boolean);}catch(_e){return [];}})();
   const active=(s.teams||[]).filter((t,i)=>t?.status!=='reserve'&&i<Number(s.prelim?.settings?.activeTeamCount||9999)).length;
   const reserve=Math.max(0,(s.teams||[]).length-active);
-  const completed=Boolean(s.completion?.completedAt||s.operation?.tournamentCompletedAt||s.tournament?.completedAt);
-  const started=prelim.some(x=>x.status&&x.status!=='waiting')||main.some(x=>x.status&&x.status!=='waiting');
   const displayStatus=stage583NormalizeDisplayStatus(s.tournament?.displayStatus||'auto');
-  const status=displayStatus!=='auto'?displayStatus:(completed?'completed':started?'ongoing':'recruiting');
+  const status=stage587TournamentDisplayStatus(s);
   return {id,current,name,division:s.tournament?.division||'',date:guide.date||'',venue:guide.venue||'',fee:guide.fee||'',active,reserve,status,displayStatus,champion:'',runnerUp:'',thirds:[],prelimCompleted:prelim.filter(x=>x.status==='completed').length,prelimTotal:prelim.length,mainCompleted:main.filter(x=>x.status==='completed').length,mainTotal:main.length,detail:guide.detail||'',updatedAt:s.updatedAt||new Date().toISOString(),selectable:!['closed','completed'].includes(status),workspace:true};
 }
 function isRealTournamentName(value){const n=String(value||'').trim();return Boolean(n&&n!=='대회 준비 중'&&n!=='등록된 운영 대회 없음'&&n!=='이름 없는 대회');}
@@ -11426,11 +11443,8 @@ function stage5008TournamentRows(){
       prelimCompleted:workspace&&Object.keys(workspace).length?prelim.filter(x=>x?.status==='completed').length:Number(record?.prelimCompleted||0),prelimTotal:workspace&&Object.keys(workspace).length?prelim.length:Number(record?.prelimTotal||0),
       mainCompleted:workspace&&Object.keys(workspace).length?main.filter(x=>x?.status==='completed').length:Number(record?.mainCompleted||0),mainTotal:workspace&&Object.keys(workspace).length?main.length:Number(record?.mainTotal||0),
       status:(()=>{
-        const configured=stage583NormalizeDisplayStatus(t.displayStatus||record?.displayStatus||'auto');
-        if(configured!=='auto')return configured;
-        const completed=Boolean(workspace?.completion?.completedAt||workspace?.operation?.tournamentCompletedAt||t.completedAt||record?.completedAt||record?.status==='completed');
-        const started=Boolean((workspace&&Object.keys(workspace).length)&&(prelim.some(x=>x?.status&&x.status!=='waiting')||main.some(x=>x?.status&&x.status!=='waiting')))||record?.status==='ongoing';
-        return completed?'completed':started?'ongoing':'recruiting';
+        const source=(workspace&&Object.keys(workspace).length)?workspace:{tournament:{...t,displayStatus:t.displayStatus||record?.displayStatus||'auto'},prelim:{matches:prelim},draw:{rounds:workspace?.draw?.rounds||{}},completion:{completedAt:t.completedAt||record?.completedAt||''},operation:{}};
+        return stage587TournamentDisplayStatus(source);
       })(),
       displayStatus:stage583NormalizeDisplayStatus(t.displayStatus||record?.displayStatus||'auto'),
       updatedAt:record?.updatedAt||record?.createdAt||'',order:index
@@ -14565,3 +14579,5 @@ console.info('[230MATCH] 5.8.4 ready · recovery history expanded and manual poi
 console.info('[230MATCH] 5.8.5 ready · tournament display status unified across multi-tournament list/home/guide');
 
 console.info('[230MATCH] 5.8.6 ready · home tournament cards show configured tournament status beside selection badge');
+
+console.info('[230MATCH] 5.8.7 ready · tournament status supports reliable auto judgement and admin manual override');
