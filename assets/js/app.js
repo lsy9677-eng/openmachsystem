@@ -11771,7 +11771,26 @@ console.info('[230MATCH] 34.4.2 ready · main wait1 refill and shared queue elap
     .live-bracket-print-viewport{width:100%;overflow:visible;background:#fff;padding:2mm 0 4mm}
     .print-live-bracket-board{display:flex!important;align-items:flex-start!important;gap:14px!important;overflow:visible!important;width:max-content!important;min-width:100%!important;padding:4px 2px 18px!important;background:#fff!important}
     .print-live-bracket-board .round-column{display:grid!important;min-width:205px!important;width:205px!important;gap:8px!important;align-content:start!important}
-    .print-live-bracket-board .round-column>h3{position:static!important;top:auto!important;background:var(--surface,#fff)!important;padding:7px 0!important;font-size:14px!important}
+    .print-live-bracket-board .round-column>h3{
+      position:static!important;
+      top:auto!important;
+      display:block!important;
+      visibility:visible!important;
+      opacity:1!important;
+      background:var(--stage5913-column-accent,#64748b)!important;
+      color:#ffffff!important;
+      margin:0 0 6px!important;
+      padding:8px 10px!important;
+      min-height:16px!important;
+      font-size:14px!important;
+      font-weight:900!important;
+      line-height:1.3!important;
+      text-align:center!important;
+      border:0!important;
+      border-radius:8px!important;
+      overflow:visible!important;
+      white-space:nowrap!important;
+    }
     .print-live-bracket-board .round-match-stack{gap:var(--round-gap,14px)!important;padding-top:var(--round-offset,0px)!important}
     .print-live-bracket-board .round-match-stack>.match-card{min-height:var(--round-card-height,118px)!important;height:var(--round-card-height,118px)!important;break-inside:avoid!important}
     .print-live-bracket-board .match-card header{font-size:11px!important}
@@ -15109,6 +15128,13 @@ function stage7152CompactCourtCards(){
         x2:(r.left-br.left)/sx+board.scrollLeft
       };
     };
+    const matchLookup=new Map();
+    try{for(const m of allMatches(state.draw)||[])if(m&&m.id!=null)matchLookup.set(String(m.id),m);}catch(_e){}
+    const winnerIdOf=m=>{
+      const w=m?.winner;
+      const raw=(w&&typeof w==='object')?(w.id??w.teamId):(m?.winnerId??w);
+      return raw==null?'':String(raw);
+    };
     for(let i=0;i<columns.length-1;i++){
       const current=[...columns[i].querySelectorAll('.round-match-stack > .match-card')].filter(visible);
       const next=[...columns[i+1].querySelectorAll('.round-match-stack > .match-card')].filter(visible);
@@ -15122,9 +15148,21 @@ function stage7152CompactCourtCards(){
         const mid=a.x1+gap/2;
         const path=document.createElementNS(SVG_NS,'path');
         path.setAttribute('d',`M ${a.x1.toFixed(1)} ${a.y.toFixed(1)} H ${mid.toFixed(1)} V ${b.y.toFixed(1)} H ${b.x2.toFixed(1)}`);
-        // 5.9.39: 완료된 경기(승자가 다음 라운드로 올라간 연결선)는 굵고 진하게.
-        // 연결선을 그리는 이 시점에 카드를 이미 알고 있으므로 좌표 추측 없이 바로 표시한다.
-        if(card.classList.contains('completed'))path.classList.add('stage5938-winner-path');
+        // 5.9.41: 이 경기(card)가 완료됐고, 그 승자가 다음 경기(target)에서도 이겼거나
+        // 다음 경기가 아직 안 끝났으면(=아직 살아있으면) 굵게. 다음 경기에서 진 팀의
+        // 이전 라운드 연결선은 더 이상 굵게 표시하지 않는다 — 굵은 선만 따라가면 우승 후보로 이어진다.
+        const curId=card.dataset.matchId||card.dataset.id;
+        const curMatch=curId?matchLookup.get(String(curId)):null;
+        if(curMatch&&curMatch.status==='completed'){
+          const curWinner=winnerIdOf(curMatch);
+          if(curWinner){
+            const targetId=target.dataset.matchId||target.dataset.id;
+            const nextMatch=targetId?matchLookup.get(String(targetId)):null;
+            const nextWinner=nextMatch?winnerIdOf(nextMatch):'';
+            const stillAdvancing=!nextMatch||nextMatch.status!=='completed'||!nextWinner||nextWinner===curWinner;
+            if(stillAdvancing)path.classList.add('stage5938-winner-path');
+          }
+        }
         svg.appendChild(path);
       });
     }
@@ -16015,4 +16053,6 @@ console.info('[230MATCH] 5.9.38 final stabilization · print-center capture unif
 
 console.info('[230MATCH] 5.9.39 final · winner-path highlight drawn inside connector redraw (never wiped) + print center bracket reverted to live board renderer (no more separate SVG poster)');
 
-console.info('[230MATCH] 5.9.40 final · print center clone keeps #bracketBoard id (round colors/completed styling/checkmarks now apply) + connector lines recomputed for the clone\'s own layout before preview/print');
+console.info('[230MATCH] 5.9.40 final · print center clone keeps #bracketBoard id (round colors/completed styling/checkmarks now apply) + connector lines recomputed for the clone\'s own layout before preview/print + round title header made always-visible');
+
+console.info('[230MATCH] 5.9.41 final · winner-path now traces only the surviving lineage (a match\'s advancing line goes bold only if its winner is still undecided-or-winning in the next match, not merely because that match finished)');
