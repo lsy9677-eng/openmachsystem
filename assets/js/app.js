@@ -14498,18 +14498,28 @@ console.info('[230MATCH] 71.3.3 ready · classic direct SMS rebuild');
     downloadBlob546(blob,`230MATCH_예선조편성_코트배정표_${new Date().toISOString().slice(0,10)}.png`);
   }
 
-  async function saveCurrentPng546(){
+  async async function saveCurrentPng546(){
     const target=$('printTargetSelect')?.value||'prelim-assignment';
     try{
+      // 5.9.42 안정화:
+      // 출력센터의 본선 대진표 저장은 미리보기 렌더를 거치지 않고
+      // 본선 대진표 화면에서 이미 검증된 동일 캡처 함수를 직접 사용한다.
+      if(target==='bracket'){
+        await stage5937CaptureVisibleBracketPng({source:'print-center'});
+        return;
+      }
+
       refreshPreview546(false);
+
       if(target==='prelim-assignment'){
         await saveAssignmentPng546();
         notice('예선 조편성·코트 배정표 PNG를 저장했습니다.','success');
         return;
       }
+
       await Promise.resolve(savePrintPng());
     }catch(error){
-      console.error('[5.4.6 PNG]',error);
+      console.error('[5.9.42 PNG]',error);
       notice(error?.message||'PNG 저장 중 오류가 발생했습니다.','error');
     }
   }
@@ -16056,3 +16066,5 @@ console.info('[230MATCH] 5.9.39 final · winner-path highlight drawn inside conn
 console.info('[230MATCH] 5.9.40 final · print center clone keeps #bracketBoard id (round colors/completed styling/checkmarks now apply) + connector lines recomputed for the clone\'s own layout before preview/print + round title header made always-visible');
 
 console.info('[230MATCH] 5.9.41 final · winner-path now traces only the surviving lineage (a match\'s advancing line goes bold only if its winner is still undecided-or-winning in the next match, not merely because that match finished)');
+
+console.info('[230MATCH] 5.9.42 · print-center bracket save directly uses stage5937 live bracket capture');
