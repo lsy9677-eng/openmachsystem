@@ -4195,6 +4195,125 @@ function stage5929BindBracketZoomDelegation(){
   },true);
 }
 
+
+function stage5931CollectPageCss(){
+  let css='';
+  for(const sheet of [...document.styleSheets]){
+    try{css+=[...sheet.cssRules].map(rule=>rule.cssText).join('\n');}catch(_e){}
+  }
+  return css;
+}
+function stage5931BracketImageDocumentHtml(){
+  const source=document.getElementById('bracketBoard');
+  if(!source||source.classList.contains('empty-state')||!source.querySelector('.round-column'))return '';
+  return `<article class="print-sheet bracket-tree-print-sheet stage5931-bracket-image-sheet">${printBracketHtml()}</article>`;
+}
+function stage5931OpenBracketImageView(){
+  const dialog=document.getElementById('stage5931BracketImageDialog');
+  const viewport=document.getElementById('stage5931BracketImageViewport');
+  if(!dialog||!viewport)return;
+
+  const html=stage5931BracketImageDocumentHtml();
+  if(!html){notice('전체보기할 본선 대진표가 없습니다.','error');return;}
+
+  viewport.innerHTML=html;
+  if(!dialog.open)dialog.showModal();
+
+  requestAnimationFrame(()=>{
+    const board=viewport.querySelector('.print-live-bracket-board');
+    if(board){
+      board.style.zoom='1';
+      board.style.transform='none';
+    }
+    viewport.scrollTo({left:0,top:0});
+  });
+}
+async function stage5931SaveBracketImagePng(){
+  const dialog=document.getElementById('stage5931BracketImageDialog');
+  const sheet=dialog?.querySelector('.stage5931-bracket-image-sheet');
+  if(!sheet){notice('저장할 전체 대진 이미지가 없습니다.','error');return;}
+
+  const button=document.getElementById('stage5931SaveBracketPngBtn');
+  if(button){button.disabled=true;button.textContent='이미지 만드는 중…';}
+
+  let sourceUrl='';
+  try{
+    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+    const clone=sheet.cloneNode(true);
+    const rect=sheet.getBoundingClientRect();
+    const width=Math.max(1400,Math.round(sheet.scrollWidth||rect.width||1800));
+    const height=Math.max(900,Math.round(sheet.scrollHeight||rect.height||1100));
+    const css=stage5931CollectPageCss();
+
+    const xhtml=`<div xmlns="http://www.w3.org/1999/xhtml" style="width:${width}px;background:#fff;padding:0;margin:0"><style>${css}
+      .stage5931-bracket-image-sheet{width:${width}px!important;max-width:none!important;margin:0!important;background:#fff!important}
+      .stage5931-bracket-image-sheet .print-live-bracket-board{zoom:1!important;transform:none!important}
+    </style>${clone.outerHTML}</div>`;
+    const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><foreignObject width="100%" height="100%">${xhtml}</foreignObject></svg>`;
+    sourceUrl=URL.createObjectURL(new Blob([svg],{type:'image/svg+xml;charset=utf-8'}));
+    const img=new Image();
+
+    const blob=await new Promise((resolve,reject)=>{
+      img.onload=()=>{
+        try{
+          const maxW=3200;
+          const scale=Math.min(2,maxW/width);
+          const canvas=document.createElement('canvas');
+          canvas.width=Math.max(1,Math.round(width*scale));
+          canvas.height=Math.max(1,Math.round(height*scale));
+          const ctx=canvas.getContext('2d');
+          ctx.scale(scale,scale);
+          ctx.fillStyle='#fff';
+          ctx.fillRect(0,0,width,height);
+          ctx.drawImage(img,0,0);
+          canvas.toBlob(result=>result?resolve(result):reject(new Error('PNG blob failed')),'image/png');
+        }catch(error){reject(error);}
+      };
+      img.onerror=()=>reject(new Error('SVG image load failed'));
+      img.src=sourceUrl;
+    });
+
+    URL.revokeObjectURL(sourceUrl);sourceUrl='';
+
+    const downloadUrl=URL.createObjectURL(blob);
+    const link=document.createElement('a');
+    const tournament=String(state.tournament?.name||'230MATCH').replace(/[\\/:*?"<>|]+/g,'_').replace(/\s+/g,'_');
+    link.href=downloadUrl;
+    link.download=`${tournament}_전체본선대진표_${new Date().toISOString().slice(0,10)}.png`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(()=>URL.revokeObjectURL(downloadUrl),1500);
+    notice('전체 본선 대진표 PNG 이미지를 저장했습니다.','success');
+  }catch(error){
+    if(sourceUrl)URL.revokeObjectURL(sourceUrl);
+    console.error('[5.9.31 bracket image]',error);
+    notice('대진 이미지 저장에 실패했습니다. 출력 센터의 PNG 저장을 이용해 주세요.','error');
+  }finally{
+    if(button){button.disabled=false;button.textContent='PNG 저장';}
+  }
+}
+function stage5931BindBracketImageView(){
+  if(document.documentElement.dataset.stage5931BracketImageBound==='1')return;
+  document.documentElement.dataset.stage5931BracketImageBound='1';
+
+  document.addEventListener('click',event=>{
+    if(event.target.closest?.('#stage5931BracketImageBtn')){
+      event.preventDefault();
+      stage5931OpenBracketImageView();
+      return;
+    }
+    if(event.target.closest?.('#stage5931SaveBracketPngBtn')){
+      event.preventDefault();
+      stage5931SaveBracketImagePng();
+      return;
+    }
+    if(event.target.closest?.('[data-stage5931-close]')){
+      document.getElementById('stage5931BracketImageDialog')?.close();
+    }
+  },true);
+}
+
 function bindBracketMobileView571(){
   const viewport=document.getElementById('bracketViewport');
   const board=document.getElementById('bracketBoard');
@@ -4244,6 +4363,7 @@ function bindBracketMobileView571(){
 
   setBracketZoom(getBracketZoom(),{save:false});
   stage5929BindBracketZoomDelegation();
+  stage5931BindBracketImageView();
 
   // 5.9.29: zoom buttons use persistent delegated handler so mobile re-render cannot detach them.
 
@@ -15579,3 +15699,5 @@ console.info('[230MATCH] 5.9.27 stabilization · main redraw/reset clears all pl
 console.info('[230MATCH] 5.9.28 stabilization · prelim result uses in-app confirmation; fresh prelim score preview resets correctly');
 
 console.info('[230MATCH] 5.9.29 stabilization · mobile bracket vertical page scroll + horizontal pan + delegated zoom buttons');
+
+console.info('[230MATCH] 5.9.31 stabilization · fixed scroll guides removed + full bracket image preview/save');

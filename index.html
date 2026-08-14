@@ -2316,6 +2316,81 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
 }
 </style>
 
+
+<style id="stage5931BracketFullImageView">
+.stage5930-scroll-edge,
+.stage5929-vertical-scroll-guide{
+  display:none!important;
+}
+.stage5931-bracket-image-btn{
+  min-height:38px!important;
+  white-space:nowrap!important;
+  font-weight:900!important;
+}
+.stage5931-bracket-image-dialog{
+  width:min(96vw,1500px)!important;
+  height:min(94vh,1100px)!important;
+  max-width:none!important;
+  max-height:none!important;
+  padding:0!important;
+  border:0!important;
+  border-radius:16px!important;
+  overflow:hidden!important;
+  background:#f4f7fb!important;
+  box-shadow:0 25px 80px rgba(15,23,42,.32)!important;
+}
+.stage5931-bracket-image-dialog::backdrop{background:rgba(15,23,42,.72)!important}
+.stage5931-dialog-head{
+  display:flex!important;
+  align-items:flex-start!important;
+  justify-content:space-between!important;
+  gap:12px!important;
+  padding:14px 16px!important;
+  background:#102b55!important;
+  color:#fff!important;
+}
+.stage5931-dialog-head small{display:block!important;margin-bottom:2px!important;color:#93c5fd!important;font-size:9px!important;font-weight:950!important;letter-spacing:.08em!important}
+.stage5931-dialog-head h2{margin:0!important;color:#fff!important;font-size:20px!important}
+.stage5931-dialog-head p{margin:3px 0 0!important;color:#dbeafe!important;font-size:11px!important}
+.stage5931-image-viewport{
+  height:calc(100% - 132px)!important;
+  overflow:auto!important;
+  padding:12px!important;
+  background:#dce5f0!important;
+  -webkit-overflow-scrolling:touch!important;
+}
+.stage5931-bracket-image-sheet{
+  width:max-content!important;
+  min-width:100%!important;
+  margin:0 auto!important;
+  padding:12px!important;
+  background:#fff!important;
+  box-sizing:border-box!important;
+}
+.stage5931-bracket-image-sheet .live-bracket-print-viewport{overflow:visible!important}
+.stage5931-bracket-image-sheet .print-live-bracket-board{zoom:1!important;transform:none!important;width:max-content!important}
+.stage5931-dialog-actions{
+  display:flex!important;
+  justify-content:flex-end!important;
+  gap:8px!important;
+  padding:10px 14px!important;
+  border-top:1px solid #cbd5e1!important;
+  background:#fff!important;
+}
+.stage5931-image-empty{padding:30px!important;text-align:center!important;color:#64748b!important;font-weight:800!important}
+
+@media(max-width:760px){
+  .stage5931-bracket-image-btn{min-height:44px!important;width:auto!important;font-size:12px!important}
+  .stage5931-bracket-image-dialog{width:100vw!important;height:100dvh!important;border-radius:0!important}
+  .stage5931-dialog-head{padding:12px!important}
+  .stage5931-dialog-head h2{font-size:17px!important}
+  .stage5931-dialog-head p{font-size:10px!important}
+  .stage5931-image-viewport{height:calc(100dvh - 122px)!important;padding:6px!important}
+  .stage5931-bracket-image-sheet{padding:6px!important}
+  .stage5931-dialog-actions{position:sticky!important;bottom:0!important;z-index:3!important}
+}
+</style>
+
 </head>
 <body>
   <header class="topbar">
@@ -3538,12 +3613,11 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
             <button id="bracketZoomResetBtn" type="button" class="btn btn-light"><span id="bracketZoomLabel">100%</span></button>
             <button id="bracketZoomInBtn" type="button" class="btn btn-light" aria-label="대진표 확대">＋</button>
           </div>
+          <button id="stage5931BracketImageBtn" type="button" class="btn btn-primary stage5931-bracket-image-btn">🖼 전체 대진 이미지</button>
           <small>모바일에서도 − / 100% / ＋ 버튼 또는 두 손가락으로 확대·축소할 수 있습니다.</small>
         </div>
-        <div class="stage595-bracket-scroll-hint stage5929-mobile-scroll-hint"><strong>모바일 조작</strong><span>↕ 세로 스크롤: 대진표 좌·우 가장자리</span><span>↔ 좌·우: 대진표 이동</span><span>− / ＋: 확대·축소</span></div>
+        <div class="stage595-bracket-scroll-hint stage5929-mobile-scroll-hint"><strong>모바일 조작</strong><span>↕ 세로 스크롤은 대진표 좌·우 여백에서</span><span>↔ 좌·우: 대진표 이동</span><span>− / ＋: 확대·축소</span></div>
         <div id="bracketViewport" class="bracket-viewport">
-          <div class="stage5930-scroll-edge stage5930-scroll-edge-left" aria-hidden="true"><span>↕ 위아래 스크롤</span></div>
-          <div class="stage5930-scroll-edge stage5930-scroll-edge-right" aria-hidden="true"><span>↕ 위아래 스크롤</span></div>
           <div id="bracketBoard" class="bracket-board empty-state"><p>생성된 대진이 없습니다.</p></div>
         </div>
       </section>
@@ -4345,7 +4419,7 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=59290"></script>
+  <script type="module" src="./assets/js/app.js?v=59310"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
@@ -5462,6 +5536,25 @@ body[data-role="viewer"] #prelimCourtOperationGrid [data-prelim-court-status]{di
         <button type="button" id="stage590PerformanceSkip" class="btn btn-light">전체 결과 바로 보기</button>
       </div>
       <div id="stage590PerformanceList" class="stage590-performance-list"></div>
+    </div>
+  </dialog>
+
+
+  <dialog id="stage5931BracketImageDialog" class="stage5931-bracket-image-dialog">
+    <div class="stage5931-dialog-head">
+      <div>
+        <small>FULL BRACKET IMAGE</small>
+        <h2>전체 본선 대진표</h2>
+        <p>현재 대진표 전체를 한 화면으로 확인하고 PNG 이미지로 저장할 수 있습니다.</p>
+      </div>
+      <button type="button" class="icon-button" data-stage5931-close aria-label="닫기">×</button>
+    </div>
+    <div id="stage5931BracketImageViewport" class="stage5931-image-viewport">
+      <div class="stage5931-image-empty">대진 이미지를 준비 중입니다.</div>
+    </div>
+    <div class="stage5931-dialog-actions">
+      <button type="button" class="btn btn-light" data-stage5931-close>닫기</button>
+      <button id="stage5931SaveBracketPngBtn" type="button" class="btn btn-primary">PNG 저장</button>
     </div>
   </dialog>
 
