@@ -34,10 +34,24 @@ function venueQueue(state,venueId){
 function setUnifiedStatus(state,id,status,court=null){
   const item=findUnifiedMatch(state,id);if(!item)return;
   const now=new Date().toISOString();
+  const previousStatus=String(item.match.status||'');
   item.match.status=status;
   if(status==='playing'){
-    item.match.startedAt=item.match.startedAt||now;
+    // 5.9.9: 대기/대기1에서 새로 시합중으로 승격되는 경기는 반드시 0분부터 시작.
+    // 이미 playing 상태인 경기를 코트만 이동하는 경우에는 기존 startedAt을 유지한다.
+    if(previousStatus!=='playing'){
+      item.match.startedAt=now;
+      item.match.elapsedMinutes=0;
+      item.match.estimatedRemainingMinutes=0;
+      item.match.effectiveStartedAt=null;
+      item.match.estimatedEndAt=null;
+      item.match.timeClockPending=false;
+    }else if(!item.match.startedAt){
+      item.match.startedAt=now;
+    }
     item.match.waitStartedAt=null;
+    item.match.waitElapsedMinutes=0;
+    item.match.estimatedWaitMinutes=0;
   }else if(['court_wait1','venue_shared_queue','shared_queue','queued'].includes(status)){
     item.match.waitStartedAt=item.match.waitStartedAt||now;
   }
@@ -188,7 +202,7 @@ function fillUnifiedMainSlotsStable(state,venueId=null){
     if(id){
       court.playing=id;
       const item=findUnifiedMatch(state,id);
-      if(item?.match)item.match.startedAt=item.match.startedAt||new Date().toISOString();
+      if(item?.match&&item.match.status==='playing'&&!item.match.startedAt)item.match.startedAt=new Date().toISOString();
     }
   }
 
@@ -471,3 +485,5 @@ export function moveUnifiedCourtMatchFlexible(state,{matchId,targetCourtId,mode=
   refreshUnifiedCourtStatuses(state,court);
   return{court,item,shifted};
 }
+
+console.info('[230MATCH] unified-court-engine 5.9.9 · new playing transition resets match clock');

@@ -15,7 +15,7 @@ import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactD
 import{render,teamText}from'./ui.js?v=5701';
 import{ensureAuditState,runStateAudit,runPrelimSimulation,runFullSimulation,applyAuditResult}from'./audit-engine.js?v=332012';
 import{earlyMainStats,markResolvedMainMatchesReady,canAssignEarlyMain,ensureEarlyMainSettings,autoAssignResolvedMain}from'./early-main-engine.js?v=332012';
-import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=7133';
+import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=5990';
 import{ensureMainDrawLifecycle,beginMainDraw,completeMainDraw,failMainDraw,resetMainDraw,hasAuthorizedMainDraw,mainDrawStatus,clearMainPlacement,repairMainDrawAuthorization}from'./main-draw-lifecycle-engine.js?v=3501';
 import{shouldUseLinkedDraw,linkedDrawNeedsRepair,rebuildLinkedDraw,hasStartedMainMatches}from'./linked-draw-guard-engine.js?v=332012';
 import{ensureVenueSettings,ensureVenueQueues,venuePreset,buildVenueCourts,prelimVenues,mainVenues}from'./venue-engine.js?v=332012';
@@ -2435,6 +2435,27 @@ function stage5526ReconnectRealtime(reason='실시간 재연결'){
     });
 }
 
+function stage599EnsureFreshPlayingClock(court,previousPlayingId){
+  if(!court?.playing)return;
+  const id=String(court.playing);
+  if(id===String(previousPlayingId||''))return;
+  const u=findUnifiedMatch(state,id);
+  const m=u?.match||findMatch(state.draw,id)||findPrelimMatch(state,id);
+  if(!m||m.status!=='playing')return;
+  // Engine should already reset it. This is a safety net for any external/legacy promotion route.
+  const now=Date.now(),started=new Date(m.startedAt||0).getTime();
+  if(!Number.isFinite(started)||started<=0||Math.abs(now-started)>15000){
+    m.startedAt=new Date(now).toISOString();
+  }
+  m.elapsedMinutes=0;
+  m.estimatedRemainingMinutes=0;
+  m.effectiveStartedAt=null;
+  m.estimatedEndAt=null;
+  m.timeClockPending=false;
+  m.waitStartedAt=null;
+  m.waitElapsedMinutes=0;
+  m.estimatedWaitMinutes=0;
+}
 async function confirmResult(event){
   event.preventDefault();
   const id=$('resultMatchId').value;
@@ -2460,6 +2481,7 @@ async function confirmResult(event){
   if(isUnifiedCourt){
     if(autoAssignmentOn){
       advanceUnifiedCourt(state,sourceCourt.id,id);
+      stage599EnsureFreshPlayingClock(sourceCourt,beforePlaying);
       enqueueReadyMainToUnifiedCourts(state);
     }else if(sourceCourt.playing===id){
       // 수동 운영 중에는 완료 경기만 비우고 대기1/추가대기를 자동 승격시키지 않는다.
@@ -3240,12 +3262,20 @@ function stage555MarkCourtSlot(matchId,status,court){
   const u=findUnifiedMatch(state,matchId);
   const m=u?.match||findMatch(state.draw,matchId)||findPrelimMatch(state,matchId);
   if(!m)return;
+  const previousStatus=String(m.status||'');
   m.status=status;
   m.courtId=court?.id||null;
   m.prelimCourtId=u?.type==='prelim'?(court?.id||null):m.prelimCourtId;
   m.court=court?.name||m.court||null;
   m.courtName=court?.name||m.courtName||null;
-  if(status==='playing')m.startedAt=m.startedAt||new Date().toISOString();
+  if(status==='playing'){
+    if(previousStatus!=='playing'){
+      m.startedAt=new Date().toISOString();
+      m.elapsedMinutes=0;m.estimatedRemainingMinutes=0;
+      m.effectiveStartedAt=null;m.estimatedEndAt=null;m.timeClockPending=false;
+    }else if(!m.startedAt)m.startedAt=new Date().toISOString();
+    m.waitStartedAt=null;m.waitElapsedMinutes=0;m.estimatedWaitMinutes=0;
+  }
   if(status==='court_wait1')m.waitStartedAt=m.waitStartedAt||new Date().toISOString();
 }
 function stage555CompactSourceCourt(source,unified){
@@ -3484,7 +3514,17 @@ function assignPrelimSharedQueue557(matchId,courtId){
   const id=String(matchId||''),court=(state.prelim?.courts||[]).find(c=>String(c.id)===String(courtId)),m=findPrelimMatch(state,id);
   if(!m||!court){notice('예선 공용대기 경기 또는 코트를 찾지 못했습니다.','error');return;}
   state.prelim.manualSharedQueue=(state.prelim.manualSharedQueue||[]).filter(x=>String(x)!==id);
-  if(!court.playing){court.playing=id;m.status='playing';m.startedAt=m.startedAt||new Date().toISOString();}
+  if(!court.playing){
+    court.playing=id;
+    const previousStatus=String(m.status||'');
+    m.status='playing';
+    if(previousStatus!=='playing'){
+      m.startedAt=new Date().toISOString();
+      m.elapsedMinutes=0;m.estimatedRemainingMinutes=0;
+      m.effectiveStartedAt=null;m.estimatedEndAt=null;m.timeClockPending=false;
+    }else if(!m.startedAt)m.startedAt=new Date().toISOString();
+    m.waitStartedAt=null;m.waitElapsedMinutes=0;m.estimatedWaitMinutes=0;
+  }
   else if(!court.wait1){court.wait1=id;m.status='court_wait1';m.waitStartedAt=m.waitStartedAt||new Date().toISOString();}
   else{court.queue=Array.isArray(court.queue)?court.queue:[];court.queue.push(id);m.status='ready';m.waitStartedAt=m.waitStartedAt||new Date().toISOString();}
   m.prelimCourtId=court.id;m.courtId=court.id;m.court=court.name;m.courtName=court.name;
@@ -11198,8 +11238,8 @@ console.info('[230MATCH] 34.4.2 ready · main wait1 refill and shared queue elap
         syncLinkedDraw({silent:true});const newly=Object.values(state.draw?.rounds||{}).flat().filter(x=>x.isPlayIn&&!beforePlayIns.has(x.id)&&x.teamA&&!x.teamA.placeholder&&x.teamB&&!x.teamB.placeholder);const priority=newly.filter(x=>involved.has(x.teamA?.id)||involved.has(x.teamB?.id));
         if(!correcting){if(useUnifiedCourts(state))enqueueReadyMainToUnifiedCourts(state,{priorityMatchIds:(priority.length?priority:newly).map(x=>x.id)});else autoAssignResolvedMain(state,{findMatch,queueReadyMatches,refillCourt});}
       }else{
-        const sourceCourt=[...(state.prelim?.courts||[]),...(state.courts||[])].find(c=>c.playing===id);saved=submitResult(state,{matchId:id,winnerId,scoreA,scoreB});saved.resultType=type;saved.resultTypeLabel=TYPE_LABELS[type];verifyAndRepairMainFlow(state,{sourceMatchId:id});
-        if(!correcting&&sourceCourt&&(state.prelim?.courts||[]).some(c=>c.id===sourceCourt.id)){advanceUnifiedCourt(state,sourceCourt.id,id);enqueueReadyMainToUnifiedCourts(state);}
+        const sourceCourt=[...(state.prelim?.courts||[]),...(state.courts||[])].find(c=>c.playing===id),previousPlayingId=sourceCourt?.playing||null;saved=submitResult(state,{matchId:id,winnerId,scoreA,scoreB});saved.resultType=type;saved.resultTypeLabel=TYPE_LABELS[type];verifyAndRepairMainFlow(state,{sourceMatchId:id});
+        if(!correcting&&sourceCourt&&(state.prelim?.courts||[]).some(c=>c.id===sourceCourt.id)){advanceUnifiedCourt(state,sourceCourt.id,id);stage599EnsureFreshPlayingClock(sourceCourt,previousPlayingId);enqueueReadyMainToUnifiedCourts(state);}
       }
       saved.enteredByPlayer=true;saved.enteredByUid=currentAuthUser?.uid||'';saved.enteredByName=authUserLabel();saved.enteredAt=new Date().toISOString();recordAudit(saved,isPrelim,correcting);
       const playerFinal=!isPrelim&&!match.nextMatchId;
@@ -15119,3 +15159,5 @@ console.info('[230MATCH] 5.9.6 ready · current tournament editor exposes status
 console.info('[230MATCH] 5.9.7 ready · status in visible tournament editor + clock lock beside court auto assignment');
 
 console.info('[230MATCH] 5.9.8 ready · bracket connector auto-refit + robust wait/start auto SMS transition watch');
+
+console.info('[230MATCH] 5.9.9 ready · wait1-to-playing clock always starts fresh at 0 minutes');
