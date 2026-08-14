@@ -4421,66 +4421,171 @@ function stage5932BuildBracketSvg(){
 }
 
 
-async function stage5936DownloadBracketPng({source='direct'}={}){
-  const payload=stage5932BuildBracketSvg();
-  if(!payload){
-    notice('저장할 본선 대진표가 없습니다.','error');
-    return false;
+
+let __stage5937Html2CanvasPromise=null;
+function stage5937LoadHtml2Canvas(){
+  if(typeof window.html2canvas==='function')return Promise.resolve(window.html2canvas);
+  if(__stage5937Html2CanvasPromise)return __stage5937Html2CanvasPromise;
+
+  __stage5937Html2CanvasPromise=new Promise((resolve,reject)=>{
+    const existing=document.querySelector('script[data-stage5937-html2canvas]');
+    if(existing){
+      existing.addEventListener('load',()=>typeof window.html2canvas==='function'?resolve(window.html2canvas):reject(new Error('html2canvas unavailable')),{once:true});
+      existing.addEventListener('error',()=>reject(new Error('html2canvas load failed')),{once:true});
+      return;
+    }
+
+    const script=document.createElement('script');
+    script.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+    script.async=true;
+    script.crossOrigin='anonymous';
+    script.referrerPolicy='no-referrer';
+    script.dataset.stage5937Html2canvas='1';
+    script.onload=()=>typeof window.html2canvas==='function'
+      ?resolve(window.html2canvas)
+      :reject(new Error('html2canvas unavailable'));
+    script.onerror=()=>reject(new Error('html2canvas load failed'));
+    document.head.appendChild(script);
+  }).catch(error=>{
+    __stage5937Html2CanvasPromise=null;
+    throw error;
+  });
+
+  return __stage5937Html2CanvasPromise;
+}
+
+function stage5937CaptureScale(width,height){
+  const pixels=Math.max(1,width*height);
+  const maxPixels=42_000_000;
+  const maxScale=2.4;
+  const minScale=1;
+  return Math.max(minScale,Math.min(maxScale,Math.sqrt(maxPixels/pixels)));
+}
+
+async function stage5937BuildCaptureClone(){
+  const source=document.getElementById('bracketBoard');
+  if(!source||source.classList.contains('empty-state')||!source.querySelector('.round-column'))return null;
+
+  // 현재 화면의 연결선 계산을 먼저 확정한다.
+  try{window.__redrawBracketConnectors?.('capture-before');}catch(_e){}
+  await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+  if(document.fonts?.ready){
+    try{await document.fonts.ready;}catch(_e){}
   }
 
-  let svgUrl='';
+  const width=Math.max(source.scrollWidth,source.offsetWidth,1);
+  const height=Math.max(source.scrollHeight,source.offsetHeight,1);
+  const wrapper=document.createElement('div');
+  wrapper.className='stage5937-capture-wrapper';
+  wrapper.style.cssText=`position:fixed;left:-100000px;top:0;width:${width}px;height:${height}px;overflow:visible;background:#fff;pointer-events:none;z-index:-2147483647;`;
+
+  const clone=source.cloneNode(true);
+  // #bracketBoard 기반 기존 CSS를 그대로 받기 위해 clone id를 유지한다.
+  clone.classList.remove('bracket-fullscreen','is-dragging');
+  clone.style.zoom='1';
+  clone.style.transform='none';
+  clone.style.transformOrigin='top left';
+  clone.style.width=`${width}px`;
+  clone.style.minWidth=`${width}px`;
+  clone.style.maxWidth='none';
+  clone.style.height=`${height}px`;
+  clone.style.maxHeight='none';
+  clone.style.overflow='visible';
+  clone.dataset.bracketZoom='1';
+  clone.querySelectorAll('[id]').forEach(el=>{
+    if(el!==clone)el.removeAttribute('id');
+  });
+
+  // 캡처 순간에는 시합중 animation의 중간 opacity가 찍히지 않도록 상태색을 고정한다.
+  const captureStyle=document.createElement('style');
+  captureStyle.textContent=`
+    #bracketBoard{zoom:1!important;transform:none!important;overflow:visible!important;max-width:none!important;max-height:none!important}
+    #bracketBoard .match-card.is-playing{animation:none!important;opacity:1!important}
+    #bracketBoard *{animation-play-state:paused!important}
+  `;
+  wrapper.appendChild(captureStyle);
+  wrapper.appendChild(clone);
+  document.body.appendChild(wrapper);
+
+  await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+  return{source,wrapper,clone,width,height};
+}
+
+function stage5937DownloadCanvas(canvas,source='direct'){
+  return new Promise((resolve,reject)=>{
+    canvas.toBlob(blob=>{
+      if(!blob){reject(new Error('PNG blob failed'));return;}
+      const url=URL.createObjectURL(blob);
+      const link=document.createElement('a');
+      const tournament=String(state.tournament?.name||'230MATCH')
+        .replace(/[\\/:*?"<>|]+/g,'_')
+        .replace(/\s+/g,'_');
+      link.href=url;
+      link.download=`${tournament}_현재화면전체본선대진표_${new Date().toISOString().slice(0,10)}.png`;
+      link.style.display='none';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),3000);
+      notice(source==='print-center'
+        ?'출력센터 본선 대진표를 현재 화면과 같은 모양으로 저장했습니다.'
+        :'현재 대진표 전체를 고화질 PNG로 저장했습니다.','success');
+      resolve(true);
+    },'image/png',1);
+  });
+}
+
+async function stage5937CaptureVisibleBracketPng({source='direct'}={}){
+  let capture=null;
   try{
-    svgUrl=URL.createObjectURL(new Blob([payload.svg],{type:'image/svg+xml;charset=utf-8'}));
-    const img=new Image();
-    img.decoding='async';
+    const html2canvas=await stage5937LoadHtml2Canvas();
+    capture=await stage5937BuildCaptureClone();
+    if(!capture){
+      notice('저장할 본선 대진표가 없습니다.','error');
+      return false;
+    }
 
-    await new Promise((resolve,reject)=>{
-      img.onload=resolve;
-      img.onerror=()=>reject(new Error('SVG load failed'));
-      img.src=svgUrl;
+    const {clone,width,height}=capture;
+    const scale=stage5937CaptureScale(width,height);
+    const canvas=await html2canvas(clone,{
+      backgroundColor:'#ffffff',
+      scale,
+      width,
+      height,
+      windowWidth:width,
+      windowHeight:height,
+      scrollX:0,
+      scrollY:0,
+      useCORS:true,
+      allowTaint:false,
+      logging:false,
+      imageTimeout:12000,
+      removeContainer:true,
+      onclone:doc=>{
+        const board=doc.getElementById('bracketBoard');
+        if(board){
+          board.style.zoom='1';
+          board.style.transform='none';
+          board.style.overflow='visible';
+          board.style.width=`${width}px`;
+          board.style.height=`${height}px`;
+        }
+      }
     });
 
-    const maxWidth=4200;
-    const scale=Math.min(2,maxWidth/payload.width);
-    const canvas=document.createElement('canvas');
-    canvas.width=Math.max(1,Math.round(payload.width*scale));
-    canvas.height=Math.max(1,Math.round(payload.height*scale));
-
-    const ctx=canvas.getContext('2d',{alpha:false});
-    if(!ctx)throw new Error('Canvas context unavailable');
-    ctx.fillStyle='#ffffff';
-    ctx.fillRect(0,0,canvas.width,canvas.height);
-    ctx.drawImage(img,0,0,canvas.width,canvas.height);
-
-    const blob=await new Promise((resolve,reject)=>{
-      canvas.toBlob(result=>result?resolve(result):reject(new Error('PNG blob failed')),'image/png',1);
-    });
-
-    URL.revokeObjectURL(svgUrl);svgUrl='';
-
-    const downloadUrl=URL.createObjectURL(blob);
-    const link=document.createElement('a');
-    const tournament=String(state.tournament?.name||'230MATCH')
-      .replace(/[\\/:*?"<>|]+/g,'_')
-      .replace(/\s+/g,'_');
-    link.href=downloadUrl;
-    link.download=`${tournament}_전체본선대진표_${new Date().toISOString().slice(0,10)}.png`;
-    link.style.display='none';
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    setTimeout(()=>URL.revokeObjectURL(downloadUrl),2500);
-
-    notice(source==='print-center'
-      ?'출력센터 본선 대진표 PNG를 저장했습니다.'
-      :'전체 본선 대진표 PNG를 저장했습니다.','success');
-    return true;
+    return await stage5937DownloadCanvas(canvas,source);
   }catch(error){
-    if(svgUrl)URL.revokeObjectURL(svgUrl);
-    console.error('[5.9.36 bracket PNG]',error);
-    notice('대진표 PNG 저장에 실패했습니다. 다시 시도해 주세요.','error');
+    console.error('[5.9.37 visible bracket capture]',error);
+    notice('현재 대진표 캡처 저장에 실패했습니다. 인터넷 연결 후 다시 시도해 주세요.','error');
     return false;
+  }finally{
+    try{capture?.wrapper?.remove();}catch(_e){}
   }
+}
+
+async function stage5936DownloadBracketPng({source='direct'}={}){
+  // 5.9.37: 저장용 별도 SVG를 사용하지 않고 실제 화면 대진표 DOM을 캡처한다.
+  return stage5937CaptureVisibleBracketPng({source});
 }
 
 function stage5932SetPreview(payload){
@@ -4498,22 +4603,6 @@ function stage5931OpenBracketImageView(){
 }
 async function stage5931SaveBracketImagePng(){
   return stage5936DownloadBracketPng({source:'direct'});
-}
-
-function stage5936BindPrintCenterBracketPng(){
-  if(document.documentElement.dataset.stage5936PrintBracketBound==='1')return;
-  document.documentElement.dataset.stage5936PrintBracketBound='1';
-
-  document.addEventListener('click',event=>{
-    const button=event.target.closest?.(
-      '#saveBracketPngBtn,#printBracketPngBtn,#downloadBracketPngBtn,'+
-      '[data-export-bracket-png],[data-save-bracket-png],[data-print-bracket-png]'
-    );
-    if(!button)return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    stage5936DownloadBracketPng({source:'print-center'});
-  },true);
 }
 
 function stage5931BindBracketImageView(){
@@ -4587,7 +4676,6 @@ function bindBracketMobileView571(){
   setBracketZoom(getBracketZoom(),{save:false});
   stage5929BindBracketZoomDelegation();
   stage5931BindBracketImageView();
-  stage5936BindPrintCenterBracketPng();
 
   // 5.9.29: zoom buttons use persistent delegated handler so mobile re-render cannot detach them.
 
@@ -7666,7 +7754,7 @@ async function saveRichPrintPreviewPng(doc){
   img.onload=()=>{const maxW=2600,scale=Math.min(2,maxW/width),canvas=document.createElement('canvas');canvas.width=Math.round(width*scale);canvas.height=Math.round(height*scale);const ctx=canvas.getContext('2d');ctx.scale(scale,scale);ctx.fillStyle='#fff';ctx.fillRect(0,0,width,height);ctx.drawImage(img,0,0);URL.revokeObjectURL(url);canvas.toBlob(blob=>{if(!blob){notice('이미지 생성에 실패했습니다.','error');return;}const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`230MATCH_${doc.label.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.png`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);notice('출력 미리보기 그대로 PNG 이미지를 저장했습니다.','success');},'image/png');};
   img.onerror=()=>{URL.revokeObjectURL(url);notice('이미지 변환에 실패했습니다. 인쇄/PDF 저장을 이용해 주세요.','error');};img.src=url;
 }
-function savePrintPng(){const doc=buildPrintDocument(),title=doc.label;if(doc.target==='bracket'||doc.target==='prelim-assignment'){saveRichPrintPreviewPng(doc);return;}const lines=[];if(doc.target==='participants'){(state.teams||[]).forEach((t,i)=>lines.push(`${i+1}. ${printTeam(t)} · ${t.club||t.affiliation||''} · ${t.status==='reserve'?'후보':'참가'}`));}else if(doc.target==='results'){const p=currentPodium();lines.push(`우승: ${p.champion||'미확정'}`,`준우승: ${p.runnerUp||'미확정'}`,`공동 3위: ${(p.thirds||[]).join(' · ')||'미확정'}`);}else if(doc.target==='bracket'){portalMainMatches().forEach((m,i)=>lines.push(`${m.roundName||m.round||'본선'} ${i+1}: ${printTeam(m.teamA)} vs ${printTeam(m.teamB)}${m.status==='completed'?` · ${printTeam(m.winner)} 승`:''}`));}else if(doc.target==='prelim'||doc.target==='prelim-assignment'){(state.prelim?.groups||[]).forEach((g,i)=>lines.push(`${g.name||`${i+1}조`} · ${g.courtName||'코트 미정'}: ${(g.teams||[]).map(printTeam).join(' / ')}`));}else{const courts=state.unifiedCourts||state.courts||[];(Array.isArray(courts)?courts:Object.values(courts||{})).forEach((c,i)=>lines.push(`${c.name||`${i+1}번 코트`}: ${c.playingMatch?`${printTeam(c.playingMatch.teamA)} vs ${printTeam(c.playingMatch.teamB)}`:'대기'}`));}const width=1600,pad=80,lineH=42;const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');ctx.font='26px sans-serif';let wrapped=[];for(const line of lines.length?lines:['표시할 자료가 없습니다.'])wrapped.push(...wrapCanvasText(ctx,line,width-pad*2));canvas.width=width;canvas.height=Math.max(1000,260+wrapped.length*lineH+pad);ctx.fillStyle='#ffffff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.fillStyle='#10264a';ctx.fillRect(0,0,canvas.width,150);ctx.fillStyle='#ffffff';ctx.font='bold 46px sans-serif';ctx.fillText(title,pad,75);ctx.font='25px sans-serif';ctx.fillText(`${state.tournament?.name||'230MATCH 대회'} · ${state.tournament?.division||''}`,pad,120);ctx.fillStyle='#111827';ctx.font='26px sans-serif';let y=215;for(const line of wrapped){ctx.fillText(line,pad,y);y+=lineH;}canvas.toBlob(blob=>{if(!blob){notice('이미지 생성에 실패했습니다.','error');return;}const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`230MATCH_${title.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.png`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);notice('PNG 이미지를 저장했습니다.','success');},'image/png');}
+function savePrintPng(){const doc=buildPrintDocument(),title=doc.label;if(doc.target==='bracket'){stage5937CaptureVisibleBracketPng({source:'print-center'});return;}if(doc.target==='prelim-assignment'){saveRichPrintPreviewPng(doc);return;}const lines=[];if(doc.target==='participants'){(state.teams||[]).forEach((t,i)=>lines.push(`${i+1}. ${printTeam(t)} · ${t.club||t.affiliation||''} · ${t.status==='reserve'?'후보':'참가'}`));}else if(doc.target==='results'){const p=currentPodium();lines.push(`우승: ${p.champion||'미확정'}`,`준우승: ${p.runnerUp||'미확정'}`,`공동 3위: ${(p.thirds||[]).join(' · ')||'미확정'}`);}else if(doc.target==='bracket'){portalMainMatches().forEach((m,i)=>lines.push(`${m.roundName||m.round||'본선'} ${i+1}: ${printTeam(m.teamA)} vs ${printTeam(m.teamB)}${m.status==='completed'?` · ${printTeam(m.winner)} 승`:''}`));}else if(doc.target==='prelim'||doc.target==='prelim-assignment'){(state.prelim?.groups||[]).forEach((g,i)=>lines.push(`${g.name||`${i+1}조`} · ${g.courtName||'코트 미정'}: ${(g.teams||[]).map(printTeam).join(' / ')}`));}else{const courts=state.unifiedCourts||state.courts||[];(Array.isArray(courts)?courts:Object.values(courts||{})).forEach((c,i)=>lines.push(`${c.name||`${i+1}번 코트`}: ${c.playingMatch?`${printTeam(c.playingMatch.teamA)} vs ${printTeam(c.playingMatch.teamB)}`:'대기'}`));}const width=1600,pad=80,lineH=42;const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');ctx.font='26px sans-serif';let wrapped=[];for(const line of lines.length?lines:['표시할 자료가 없습니다.'])wrapped.push(...wrapCanvasText(ctx,line,width-pad*2));canvas.width=width;canvas.height=Math.max(1000,260+wrapped.length*lineH+pad);ctx.fillStyle='#ffffff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.fillStyle='#10264a';ctx.fillRect(0,0,canvas.width,150);ctx.fillStyle='#ffffff';ctx.font='bold 46px sans-serif';ctx.fillText(title,pad,75);ctx.font='25px sans-serif';ctx.fillText(`${state.tournament?.name||'230MATCH 대회'} · ${state.tournament?.division||''}`,pad,120);ctx.fillStyle='#111827';ctx.font='26px sans-serif';let y=215;for(const line of wrapped){ctx.fillText(line,pad,y);y+=lineH;}canvas.toBlob(blob=>{if(!blob){notice('이미지 생성에 실패했습니다.','error');return;}const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`230MATCH_${title.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.png`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);notice('PNG 이미지를 저장했습니다.','success');},'image/png');}
 function bindPrintCenter(){['printTargetSelect','printPaperSelect','printOrientationSelect','printToneSelect','printScaleSelect','labelStatusSelect','labelContentSelect','labelCopySelect'].forEach(id=>document.getElementById(id)?.addEventListener('change',renderPrintPreview));document.getElementById('refreshPrintPreviewBtn')?.addEventListener('click',renderPrintPreview);document.getElementById('printDocumentBtn')?.addEventListener('click',printSelectedDocument);document.getElementById('savePrintImageBtn')?.addEventListener('click',savePrintPng);}
 
 
@@ -15971,3 +16059,5 @@ console.info('[230MATCH] 5.9.34 · polished compact SVG bracket layout');
 console.info('[230MATCH] 5.9.35 · refined poster-style bracket image');
 
 console.info('[230MATCH] 5.9.36 · zoom buttons hardened + one direct SVG->PNG path for bracket exports');
+
+console.info('[230MATCH] 5.9.37 final · bracket PNG captures the live bracket DOM at high resolution');

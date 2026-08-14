@@ -2533,6 +2533,15 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
 }
 </style>
 
+
+<style id="stage5937VisibleBracketCapture">
+/* 5.9.37 — 저장은 실제 대진표 DOM을 캡처. 별도 preview dialog는 사용하지 않음. */
+#stage5931BracketImageDialog{display:none!important}
+.stage5937-capture-wrapper{
+  contain:layout style paint!important;
+}
+</style>
+
 </head>
 <body>
   <header class="topbar">
@@ -3755,7 +3764,7 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
             <button id="bracketZoomResetBtn" type="button" class="btn btn-light"><span id="bracketZoomLabel">100%</span></button>
             <button id="bracketZoomInBtn" type="button" class="btn btn-light" aria-label="대진표 확대">＋</button>
           </div>
-          <button id="stage5931BracketImageBtn" type="button" class="btn btn-primary stage5931-bracket-image-btn">🖼 전체 대진 PNG 저장</button>
+          <button id="stage5931BracketImageBtn" type="button" class="btn btn-primary stage5931-bracket-image-btn">🖼 현재 대진표 전체 저장</button>
           <small>모바일에서도 − / 100% / ＋ 버튼 또는 두 손가락으로 확대·축소할 수 있습니다.</small>
         </div>
         <div class="stage595-bracket-scroll-hint stage5929-mobile-scroll-hint"><strong>모바일 조작</strong><span>↕ 세로 스크롤은 대진표 좌·우 여백에서</span><span>↔ 좌·우: 대진표 이동</span><span>− / ＋: 확대·축소</span></div>
@@ -4561,7 +4570,7 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=59360"></script>
+  <script type="module" src="./assets/js/app.js?v=59370"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
