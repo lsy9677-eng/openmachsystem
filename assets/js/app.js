@@ -7717,8 +7717,8 @@ function printLabelsHtml(){
 function printCourtsHtml(){const courts=state.unifiedCourts||state.courts||[];const rows=Array.isArray(courts)?courts:Object.values(courts||{});return printHeader('코트별 경기 현황')+(rows.length?`<table class="print-table"><thead><tr><th>코트</th><th>시합중</th><th>대기 1</th><th>상태</th></tr></thead><tbody>${rows.map((c,i)=>{const playing=c.playingMatch||c.playing||c.currentMatch,wait=(c.waiting||c.queue||[])[0]||c.wait1;return `<tr><td>${printEscape(c.name||c.courtName||`${i+1}번 코트`)}</td><td>${playing?`${printEscape(printTeam(playing.teamA))} vs ${printEscape(printTeam(playing.teamB))}`:'-'}</td><td>${wait?`${printEscape(printTeam(wait.teamA))} vs ${printEscape(printTeam(wait.teamB))}`:'-'}</td><td>${c.paused?'일시정지':'운영중'}</td></tr>`}).join('')}</tbody></table>`:'<div class="print-empty">설정된 코트가 없습니다.</div>');}
 function printResultsHtml(){const p=currentPodium(),pre=state.prelim?.matches||[],main=portalMainMatches();return printHeader('최종 입상 결과표')+`<div class="print-podium"><div><span>🏆 우승</span><b>${printEscape(p.champion||'미확정')}</b></div><div><span>🥈 준우승</span><b>${printEscape(p.runnerUp||'미확정')}</b></div><div><span>🥉 공동 3위</span><b>${printEscape((p.thirds||[]).join(' · ')||'미확정')}</b></div></div><table class="print-table"><tbody><tr><th>예선 완료</th><td>${pre.filter(x=>x.status==='completed').length} / ${pre.length}</td></tr><tr><th>본선 완료</th><td>${main.filter(x=>x.status==='completed').length} / ${main.length}</td></tr><tr><th>대회 상태</th><td>${state.tournament?.completedAt?'종료':'진행 중'}</td></tr></tbody></table>`;}
 function buildPrintDocument(){const target=document.getElementById('printTargetSelect')?.value||'prelim',paper=document.getElementById('printPaperSelect')?.value||'a4',orientation=document.getElementById('printOrientationSelect')?.value||'portrait',tone=document.getElementById('printToneSelect')?.value||'color',scale=document.getElementById('printScaleSelect')?.value||'normal';const map={prelim:printPrelimHtml,'prelim-assignment':printPrelimAssignmentHtml,bracket:printBracketHtml,participants:printParticipantsHtml,labels:printLabelsHtml,courts:printCourtsHtml,results:printResultsHtml};const labels={prelim:'예선 조편성·순위표','prelim-assignment':'시합 전 조편성·코트 배정표',bracket:'본선 가지형 대진표',participants:'참가자 명단',labels:'참가자 라벨지',courts:'코트별 경기 현황',results:'최종 입상 결과표'};const body=(map[target]||printPrelimHtml)();const isLabels=target==='labels';return {target,label:labels[target],paper,orientation,tone,scale,html:`<article class="print-sheet paper-${paper} ${orientation} ${tone} scale-${scale} ${isLabels?'label-print-sheet':''} ${target==='prelim-assignment'?'assignment-print-sheet':''} ${target==='bracket'?'bracket-tree-print-sheet':''}">${body}${isLabels?'':`<footer class="print-footer">230MATCH · ${printEscape(BUILD_LABEL)}</footer>`}</article>`};}
-function renderPrintPreview(){const preview=document.getElementById('printPreview');if(!preview)return;const target=document.getElementById('printTargetSelect')?.value||'prelim';const options=document.getElementById('labelPrintOptions');if(options)options.hidden=target!=='labels';const paper=document.getElementById('printPaperSelect'),orientation=document.getElementById('printOrientationSelect'),scale=document.getElementById('printScaleSelect');if(paper)paper.value='a4';if(target==='labels'){if(orientation)orientation.value='portrait';}else if(target==='prelim-assignment'){if(orientation)orientation.value='landscape';if(scale)scale.value='small';}else if(target==='bracket'){if(orientation)orientation.value='landscape';if(scale)scale.value='small';}const doc=buildPrintDocument();preview.innerHTML=doc.html;const summary=document.getElementById('printPreviewSummary');if(summary)summary.textContent=target==='labels'?`${doc.label} · 12×40mm · A4 세로 · ${document.getElementById('labelStatusSelect')?.selectedOptions?.[0]?.textContent||''}`:`${doc.label} · ${doc.paper.toUpperCase()} · ${doc.orientation==='landscape'?'가로':'세로'} · ${doc.tone==='mono'?'흑백':'컬러'}`;}
-function printSelectedDocument(){const doc=buildPrintDocument();let root=document.getElementById('printOutputRoot');if(!root){root=document.createElement('div');root.id='printOutputRoot';document.body.appendChild(root);}root.innerHTML=doc.html;document.body.classList.add('printing-output');const cleanup=()=>{document.body.classList.remove('printing-output');root.innerHTML='';window.removeEventListener('afterprint',cleanup);};window.addEventListener('afterprint',cleanup);setTimeout(()=>window.print(),80);}
+function renderPrintPreview(){const preview=document.getElementById('printPreview');if(!preview)return;const target=document.getElementById('printTargetSelect')?.value||'prelim';const options=document.getElementById('labelPrintOptions');if(options)options.hidden=target!=='labels';const paper=document.getElementById('printPaperSelect'),orientation=document.getElementById('printOrientationSelect'),scale=document.getElementById('printScaleSelect');if(paper)paper.value='a4';if(target==='labels'){if(orientation)orientation.value='portrait';}else if(target==='prelim-assignment'){if(orientation)orientation.value='landscape';if(scale)scale.value='small';}else if(target==='bracket'){if(orientation)orientation.value='landscape';if(scale)scale.value='small';}const doc=buildPrintDocument();preview.innerHTML=doc.html;if(target==='bracket')window.__stage5940SyncClonedBracketConnectors?.(preview);const summary=document.getElementById('printPreviewSummary');if(summary)summary.textContent=target==='labels'?`${doc.label} · 12×40mm · A4 세로 · ${document.getElementById('labelStatusSelect')?.selectedOptions?.[0]?.textContent||''}`:`${doc.label} · ${doc.paper.toUpperCase()} · ${doc.orientation==='landscape'?'가로':'세로'} · ${doc.tone==='mono'?'흑백':'컬러'}`;}
+function printSelectedDocument(){const doc=buildPrintDocument();let root=document.getElementById('printOutputRoot');if(!root){root=document.createElement('div');root.id='printOutputRoot';document.body.appendChild(root);}root.innerHTML=doc.html;document.body.classList.add('printing-output');const cleanup=()=>{document.body.classList.remove('printing-output');root.innerHTML='';window.removeEventListener('afterprint',cleanup);};window.addEventListener('afterprint',cleanup);if(doc.target==='bracket')window.__stage5940SyncClonedBracketConnectors?.(root,()=>setTimeout(()=>window.print(),60));else setTimeout(()=>window.print(),80);}
 function wrapCanvasText(ctx,text,maxWidth){const words=String(text||'').split(/\s+/),lines=[];let line='';for(const word of words){const test=line?`${line} ${word}`:word;if(ctx.measureText(test).width>maxWidth&&line){lines.push(line);line=word;}else line=test;}if(line)lines.push(line);return lines;}
 async function saveRichPrintPreviewPng(doc){
   renderPrintPreview();await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
@@ -11730,7 +11730,8 @@ console.info('[230MATCH] 34.4.2 ready · main wait1 refill and shared queue elap
 (function stage3532UseExistingBracketForPrint(){
   function cleanBracketClone(source){
     const clone=source.cloneNode(true);
-    clone.id='printLiveBracketBoard';
+    // 5.9.40: id를 바꾸면 #bracketBoard로 스코프된 라운드 색상·완료 스타일·체크마크 CSS가
+    // 전부 안 먹는다. PNG 캡처 클론과 마찬가지로 id는 그대로 유지한다.
     clone.classList.remove('empty-state','bracket-focus-mode','bracket-fullscreen');
     clone.classList.add('print-live-bracket-board');
     clone.querySelectorAll('.is-filtered-out,.is-round-filtered-out').forEach(el=>el.classList.remove('is-filtered-out','is-round-filtered-out'));
@@ -11739,6 +11740,18 @@ console.info('[230MATCH] 34.4.2 ready · main wait1 refill and shared queue elap
     });
     return clone;
   }
+
+  // 5.9.40: 출력센터 미리보기는 열 너비가 실제 화면과 다르게 강제되므로(print-live-bracket-board CSS),
+  // 클론에 그대로 복사된 연결선 좌표는 어긋난다. 삽입 뒤 레이아웃이 잡히면 같은 연결선 계산을
+  // 클론 기준으로 다시 돌려서 화면과 항상 같은 모양이 되도록 한다.
+  function stage5940SyncClonedBracketConnectors(container,done){
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      const board=container?.querySelector?.('.print-live-bracket-board');
+      try{window.__redrawBracketConnectorsForBoard?.(board);}catch(_e){}
+      if(done)done();
+    }));
+  }
+  window.__stage5940SyncClonedBracketConnectors=stage5940SyncClonedBracketConnectors;
 
   printBracketHtml=window.printBracketHtml=function(){
     const source=document.getElementById('bracketBoard');
@@ -15057,8 +15070,7 @@ function stage7152CompactCourtCards(){
     }catch(_e){return 0;}
   }
   function visible(el){return !!(el&&el.getClientRects&&el.getClientRects().length&&!el.hidden);}
-  function draw(){
-    const board=document.getElementById('bracketBoard');
+  function drawBoard(board){
     if(!board||board.classList.contains('empty-state'))return;
     const columns=[...board.querySelectorAll(':scope > .round-column')];
     if(columns.length<2)return;
@@ -15117,6 +15129,9 @@ function stage7152CompactCourtCards(){
       });
     }
   }
+  function draw(){
+    drawBoard(document.getElementById('bracketBoard'));
+  }
   function schedule(){
     if(rafId)cancelAnimationFrame(rafId);
     rafId=requestAnimationFrame(()=>{rafId=requestAnimationFrame(draw);});
@@ -15129,6 +15144,7 @@ function stage7152CompactCourtCards(){
     if(reason)document.getElementById('bracketBoard')?.setAttribute('data-connector-refit',reason);
   }
   window.__redrawBracketConnectors=refit;
+  window.__redrawBracketConnectorsForBoard=function(board){try{drawBoard(board);}catch(_e){}};
   let resizeObserver=null;
   function bindBoardObserver(){
     const board=document.getElementById('bracketBoard');
@@ -15998,3 +16014,5 @@ console.info('[230MATCH] 5.9.37 final · bracket PNG captures the live bracket D
 console.info('[230MATCH] 5.9.38 final stabilization · print-center capture unified + winner branches emphasized');
 
 console.info('[230MATCH] 5.9.39 final · winner-path highlight drawn inside connector redraw (never wiped) + print center bracket reverted to live board renderer (no more separate SVG poster)');
+
+console.info('[230MATCH] 5.9.40 final · print center clone keeps #bracketBoard id (round colors/completed styling/checkmarks now apply) + connector lines recomputed for the clone\'s own layout before preview/print');
