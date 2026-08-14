@@ -1851,6 +1851,99 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
 }
 </style>
 
+
+<style id="stage5923MainResultConfirmStyle">
+.stage5923-result-confirm-dialog{
+  width:min(92vw,520px)!important;
+}
+.stage5923-kicker{
+  margin:0 0 3px!important;
+  color:#2563eb!important;
+  font-size:10px!important;
+  font-weight:950!important;
+  letter-spacing:.08em!important;
+}
+.stage5923-result-confirm-body{
+  display:grid;
+  gap:11px;
+  padding:8px 2px 4px;
+}
+.stage5923-round{
+  width:max-content;
+  max-width:100%;
+  padding:4px 9px;
+  border-radius:999px;
+  background:#eef2ff;
+  color:#4338ca;
+  font-size:11px;
+  font-weight:950;
+}
+.stage5923-score{
+  display:grid;
+  grid-template-columns:1fr auto 1fr;
+  gap:10px;
+  align-items:center;
+  padding:15px 12px;
+  border:1px solid #cbd5e1;
+  border-radius:12px;
+  background:#f8fafc;
+  text-align:center;
+}
+.stage5923-score strong{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  color:#0f172a;
+  font-size:13px;
+}
+.stage5923-score b{
+  color:#dc2626;
+  font-size:22px;
+  font-weight:950;
+  white-space:nowrap;
+}
+.stage5923-winner{
+  padding:10px 12px;
+  border:1px solid #bbf7d0;
+  border-radius:10px;
+  background:#f0fdf4;
+  color:#166534;
+  font-size:12px;
+}
+.stage5923-winner strong{
+  margin-left:6px;
+  font-size:14px;
+  font-weight:950;
+}
+.stage5923-winner span{
+  display:inline-flex;
+  margin-left:7px;
+  padding:2px 6px;
+  border-radius:999px;
+  background:#dcfce7;
+  font-size:10px;
+  font-weight:900;
+}
+.stage5923-warning{
+  padding:8px 10px;
+  border:1px solid #fbbf24;
+  border-radius:9px;
+  background:#fffbeb;
+  color:#92400e;
+  font-size:11px;
+  font-weight:800;
+  line-height:1.45;
+}
+.stage5923-question{
+  margin:2px 0 0;
+  color:#0f172a;
+  font-size:14px;
+  font-weight:950;
+  text-align:center;
+}
+</style>
+
 </head>
 <body>
   <header class="topbar">
@@ -3879,7 +3972,7 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=59220"></script>
+  <script type="module" src="./assets/js/app.js?v=59230"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">

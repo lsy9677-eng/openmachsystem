@@ -2610,6 +2610,91 @@ function stage599EnsureFreshPlayingClock(court,previousPlayingId){
   m.waitElapsedMinutes=0;
   m.estimatedWaitMinutes=0;
 }
+
+let __stage5923MainConfirmResolver=null;
+function stage5923EnsureMainResultConfirmDialog(){
+  let dialog=document.getElementById('stage5923MainResultConfirmDialog');
+  if(dialog)return dialog;
+
+  dialog=document.createElement('dialog');
+  dialog.id='stage5923MainResultConfirmDialog';
+  dialog.className='modal stage5923-result-confirm-dialog';
+  dialog.innerHTML=`
+    <div class="modal-head">
+      <div><p class="stage5923-kicker">MAIN DRAW RESULT</p><h2>본선 경기 결과 확인</h2></div>
+      <button type="button" class="icon-button" data-stage5923-cancel aria-label="닫기">×</button>
+    </div>
+    <div class="stage5923-result-confirm-body">
+      <div id="stage5923ResultRound" class="stage5923-round"></div>
+      <div id="stage5923ResultScore" class="stage5923-score"></div>
+      <div id="stage5923ResultWinner" class="stage5923-winner"></div>
+      <div id="stage5923ResultWarning" class="stage5923-warning" hidden></div>
+      <p class="stage5923-question">이 결과를 확정할까요?</p>
+    </div>
+    <menu>
+      <button type="button" class="btn btn-light" data-stage5923-cancel>취소</button>
+      <button type="button" class="btn btn-primary" data-stage5923-confirm>결과 확정</button>
+    </menu>`;
+
+  const finish=value=>{
+    const resolve=__stage5923MainConfirmResolver;
+    __stage5923MainConfirmResolver=null;
+    try{dialog.close();}catch(_e){}
+    if(resolve)resolve(Boolean(value));
+  };
+  dialog.addEventListener('click',event=>{
+    if(event.target.closest?.('[data-stage5923-confirm]')){finish(true);return;}
+    if(event.target.closest?.('[data-stage5923-cancel]')){finish(false);}
+  });
+  dialog.addEventListener('cancel',event=>{event.preventDefault();finish(false);});
+  dialog.addEventListener('close',()=>{
+    if(__stage5923MainConfirmResolver){
+      const resolve=__stage5923MainConfirmResolver;
+      __stage5923MainConfirmResolver=null;
+      resolve(false);
+    }
+  });
+  document.body.appendChild(dialog);
+  return dialog;
+}
+function stage5923MainRoundLabel(match){
+  const size=Number(match?.roundSize||0);
+  if(size===2)return '결승';
+  if(size===4)return '준결승';
+  return size?`${size}강`:'본선';
+}
+function stage5923ConfirmMainResult(match,{scoreA,scoreB,winnerId,resultTypeLabel='',warning=''}={}){
+  if(!match)return Promise.resolve(false);
+  const dialog=stage5923EnsureMainResultConfirmDialog();
+
+  // 이미 확인창이 열려 있으면 중복 저장 흐름을 만들지 않는다.
+  if(dialog.open||__stage5923MainConfirmResolver)return Promise.resolve(false);
+
+  const teamA=resultDialogTeamName(match.teamA);
+  const teamB=resultDialogTeamName(match.teamB);
+  const winner=String(winnerId)===String(match.teamA?.id)?teamA:teamB;
+  const round=stage5923MainRoundLabel(match);
+
+  dialog.querySelector('#stage5923ResultRound').textContent=`${round} · ${match.id||''}`;
+  dialog.querySelector('#stage5923ResultScore').innerHTML=`<strong>${escapeHtml(teamA)}</strong><b>${Number(scoreA)} : ${Number(scoreB)}</b><strong>${escapeHtml(teamB)}</strong>`;
+  dialog.querySelector('#stage5923ResultWinner').innerHTML=`승리팀 <strong>${escapeHtml(winner)}</strong>${resultTypeLabel?`<span>${escapeHtml(resultTypeLabel)}</span>`:''}`;
+
+  const warningEl=dialog.querySelector('#stage5923ResultWarning');
+  if(warning){
+    warningEl.textContent=warning;
+    warningEl.hidden=false;
+  }else{
+    warningEl.textContent='';
+    warningEl.hidden=true;
+  }
+
+  return new Promise(resolve=>{
+    __stage5923MainConfirmResolver=resolve;
+    dialog.showModal();
+    requestAnimationFrame(()=>dialog.querySelector('[data-stage5923-confirm]')?.focus());
+  });
+}
+
 async function confirmResult(event){
   event.preventDefault();
   const id=$('resultMatchId').value;
@@ -2620,7 +2705,13 @@ async function confirmResult(event){
   if(correcting){
     const typed=prompt('확정된 결과를 수정하려면 “결과수정”을 입력하세요.','');
     if(typed!=='결과수정'){notice('결과 수정을 취소했습니다.','error');return;}
-  }else if(!confirm(`${resultDialogTeamName(before.teamA)} ${scoreA} : ${scoreB} ${resultDialogTeamName(before.teamB)}\n\n승리팀: ${resultDialogTeamName(scoreA>scoreB?before.teamA:before.teamB)}\n이 결과를 확정할까요?`))return;
+  }else{
+    const confirmed=await stage5923ConfirmMainResult(before,{
+      scoreA,scoreB,winnerId,
+      resultTypeLabel:STAGE340_EXCEPTION_LABELS[stage340ResultMeta('').resultType]||'일반 경기'
+    });
+    if(!confirmed)return;
+  }
   autoRecovery(correcting?'확정 경기 결과 수정 전':'경기 결과 입력 전');
   const history=ensureResultChangeHistory();
   const beforeSnapshot={status:before.status||'waiting',winner:before.winner?teamText(before.winner):'',scoreA:Number(before.scoreA||0),scoreB:Number(before.scoreB||0)};
@@ -11472,8 +11563,17 @@ console.info('[230MATCH] 34.4.2 ready · main wait1 refill and shared queue elap
     const safety=correcting?playerResultCorrectionSafety(match,isPrelim):{ok:true,warning:''};
     if(!safety.ok)return notice(safety.message||'현재 이 경기 결과는 참가자가 수정할 수 없습니다.','error');
     const summary=`${portalTeam(match.teamA)} ${scoreA} : ${scoreB} ${portalTeam(match.teamB)}${type!=='normal'?` · ${TYPE_LABELS[type]}`:''}`;
-    const warning=safety.warning?`\n\n⚠ ${safety.warning}`:'';
-    if(!confirm(`${summary}${warning}\n\n이 결과를 ${correcting?'수정':'저장'}할까요?`))return;
+    const warningText=safety.warning?`⚠ ${safety.warning}`:'';
+    if(isPrelim){
+      if(!confirm(`${summary}${warningText?`\n\n${warningText}`:''}\n\n이 결과를 ${correcting?'수정':'저장'}할까요?`))return;
+    }else{
+      const confirmed=await stage5923ConfirmMainResult(match,{
+        scoreA,scoreB,winnerId,
+        resultTypeLabel:type!=='normal'?TYPE_LABELS[type]:'일반 경기',
+        warning:warningText
+      });
+      if(!confirmed)return;
+    }
     try{
       autoRecovery(correcting?'선수 경기 결과 수정 전':'선수 경기 결과 입력 전');
       let saved;
@@ -15419,3 +15519,5 @@ console.info('[230MATCH] 5.9.18 · held shared-queue cards stay visible and auto
 console.info('[230MATCH] 5.9.20 stabilization · hold display forced from heldMatches after every render');
 
 console.info('[230MATCH] 5.9.22 stabilization · exactly one hold reason block per shared-queue card');
+
+console.info('[230MATCH] 5.9.23 stabilization · every main-draw result save passes one shared in-app confirmation gate');
