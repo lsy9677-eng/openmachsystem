@@ -1282,7 +1282,14 @@ function autoSmsEventKey(kind,matchId,p){return[kind,matchId,p?.court||'',p?.slo
 function autoSmsRecent(value,seconds=20){const t=value?new Date(value).getTime():0;return Number.isFinite(t)&&t>0&&(Date.now()-t)<=seconds*1000;}
 function queueAutoSmsEvent(kind,match,placement){
   ensureMessagingState(state);if(!Array.isArray(state.messaging.smsApprovalHistory))state.messaging.smsApprovalHistory=[];
-  const key=autoSmsEventKey(kind,match.id,placement);if(state.messaging.smsApprovalHistory.some(x=>x.key===key))return{queued:false,duplicate:true};
+  const key=autoSmsEventKey(kind,match.id,placement);
+  const previous=state.messaging.smsApprovalHistory.find(x=>x.key===key);
+  // 같은 경기/코트의 즉시 중복 감지는 막되, 복구·재배정 테스트 등으로 실제 전환이 다시 발생하면
+  // 영구적으로 차단하지 않는다. 2분 이내 동일 이벤트만 중복으로 본다.
+  if(previous){
+    const pt=new Date(previous.updatedAt||previous.createdAt||0).getTime();
+    if(Number.isFinite(pt)&&pt>0&&(Date.now()-pt)<120000)return{queued:false,duplicate:true};
+  }
   const recipients=smsMatchRecipients(match);
   if(!recipients.length){
     const teamLabel=`${smsTeamName(match?.teamA)} vs ${smsTeamName(match?.teamB)}`;
@@ -3810,7 +3817,8 @@ function setBracketZoom(value,{save=true}={}){
   }
   if(label)label.textContent=`${Math.round(zoom*100)}%`;
   if(save){try{localStorage.setItem(BRACKET_ZOOM_KEY,String(zoom));}catch(_e){}}
-  setTimeout(()=>{try{window.dispatchEvent(new Event('resize'));}catch(_e){}},30);
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{try{window.__redrawBracketConnectors?.('zoom');}catch(_e){}}));
+  setTimeout(()=>{try{window.dispatchEvent(new Event('resize'));window.__redrawBracketConnectors?.('zoom-settled');}catch(_e){}},80);
   return zoom;
 }
 function bindBracketMobileView571(){
@@ -3938,7 +3946,10 @@ function bindBracketMobileView571(){
     }
   };
   viewport.ontouchend=e=>{
-    if((e.touches?.length||0)<2)pinchStartDistance=0;
+    if((e.touches?.length||0)<2){
+      pinchStartDistance=0;
+      requestAnimationFrame(()=>requestAnimationFrame(()=>window.__redrawBracketConnectors?.('pinch-end')));
+    }
     if((e.touches?.length||0)===0)singleDragging=false;
   };
 }
@@ -10054,7 +10065,8 @@ console.info('[230MATCH] 34.4.2 ready · main wait1 refill and shared queue elap
     }
     const s=state.messaging?.settings||{},rt=ensureRuntime(),phones=validPhoneCount(),pending=pendingCount();
     const enabled=s.autoSmsApprovalEnabled===true;
-    host.innerHTML=`<div class="stage3520-sms-main"><strong>자동 문자 ${enabled?'ON':'OFF'}</strong><span>연락처 ${phones}개 · 승인 대기 ${pending}건</span><small>${esc(rt.lastResult||'코트 이동을 감지하면 발송 전 승인창이 표시됩니다.')}</small></div><div class="stage3520-sms-actions"><button type="button" class="btn btn-light" data-s3520-test>현재 코트 문자 시험</button><button type="button" class="btn btn-light" data-s3520-settings>문자 설정</button></div>`;
+    const waitOn=s.autoSmsCourtWaiting!==false,startOn=s.autoSmsMatchStart!==false;
+    host.innerHTML=`<div class="stage3520-sms-main"><strong>자동 문자 ${enabled?'ON':'OFF'}</strong><span>대기진입 ${waitOn?'ON':'OFF'} · 경기시작 ${startOn?'ON':'OFF'} · 연락처 ${phones}개 · 승인 대기 ${pending}건</span><small>${esc(rt.lastResult||'코트 이동을 감지하면 발송 전 승인창이 표시됩니다.')}</small></div><div class="stage3520-sms-actions"><button type="button" class="btn btn-light" data-s3520-test>현재 코트 문자 시험</button><button type="button" class="btn btn-light" data-s3520-settings>문자 설정</button></div>`;
     host.querySelector('[data-s3520-test]')?.addEventListener('click',stage3520Preview);
     host.querySelector('[data-s3520-settings]')?.addEventListener('click',()=>navigatePortalView?.('messages',{pushHistory:true}));
   }
@@ -10128,8 +10140,29 @@ console.info('[230MATCH] 34.4.2 ready · main wait1 refill and shared queue elap
     console.info('[230MATCH] 35.2.1 ready · simplified SMS settings and short Aligo templates active');
   }
   const oldCommit3520=commit;commit=function(message){const r=oldCommit3520(message);setTimeout(renderStatus,0);return r;};
-  window.addEventListener('hashchange',()=>setTimeout(renderStatus,50));
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,0),{once:true});else setTimeout(install,0);
+
+  // 5.9.8: 코트 상태가 commit 경로 밖/다른 운영 모듈에서 바뀌어도
+  // 대기1 진입·경기 시작 전환을 놓치지 않도록 가벼운 보조 감지기를 둔다.
+  // 동일 이벤트는 smsApprovalHistory key로 기존 queueAutoSmsEvent가 중복 차단한다.
+  let stage598SmsWatchTimer=null;
+  function stage598StartSmsTransitionWatch(){
+    if(stage598SmsWatchTimer)return;
+    stage598SmsWatchTimer=setInterval(()=>{
+      try{
+        const s=state.messaging?.settings||{};
+        if(s.autoSmsApprovalEnabled!==true||!canOperate())return;
+        if(document.hidden)return;
+        detectAutoSmsEvents();
+      }catch(error){
+        console.warn('[230MATCH] 5.9.8 auto SMS transition watch failed',error);
+      }
+    },1000);
+  }
+  window.__stage598CheckAutoSmsNow=()=>{try{detectAutoSmsEvents();}catch(_e){}};
+  window.addEventListener('hashchange',()=>{setTimeout(renderStatus,50);setTimeout(()=>window.__stage598CheckAutoSmsNow?.(),80);});
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(()=>window.__stage598CheckAutoSmsNow?.(),80);});
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{setTimeout(install,0);setTimeout(stage598StartSmsTransitionWatch,200);},{once:true});
+  else {setTimeout(install,0);setTimeout(stage598StartSmsTransitionWatch,200);}
 })();
 
 
@@ -14239,9 +14272,21 @@ function stage7152CompactCourtCards(){
     svg.setAttribute('viewBox',`0 0 ${width} ${height}`);
     svg.replaceChildren();
     const br=board.getBoundingClientRect();
+    // 5.9.8: CSS zoom/pinch 이후 getBoundingClientRect()는 화면 배율이 적용된 좌표다.
+    // SVG viewBox는 대진표의 논리 좌표계를 쓰므로 실제 화면 배율을 역산해 같은 좌표계로 맞춘다.
+    const logicalW=Math.max(Number(board.offsetWidth||0),1);
+    const logicalH=Math.max(Number(board.offsetHeight||0),1);
+    const scaleX=br.width>0?br.width/logicalW:1;
+    const scaleY=br.height>0?br.height/logicalH:scaleX;
+    const sx=Number.isFinite(scaleX)&&scaleX>0?scaleX:1;
+    const sy=Number.isFinite(scaleY)&&scaleY>0?scaleY:sx;
     const point=(el)=>{
       const r=el.getBoundingClientRect();
-      return {x1:r.right-br.left+board.scrollLeft,y:(r.top+r.bottom)/2-br.top+board.scrollTop,x2:r.left-br.left+board.scrollLeft};
+      return {
+        x1:(r.right-br.left)/sx+board.scrollLeft,
+        y:(((r.top+r.bottom)/2)-br.top)/sy+board.scrollTop,
+        x2:(r.left-br.left)/sx+board.scrollLeft
+      };
     };
     for(let i=0;i<columns.length-1;i++){
       const current=[...columns[i].querySelectorAll('.round-match-stack > .match-card')].filter(visible);
@@ -14264,15 +14309,31 @@ function stage7152CompactCourtCards(){
     if(rafId)cancelAnimationFrame(rafId);
     rafId=requestAnimationFrame(()=>{rafId=requestAnimationFrame(draw);});
   }
+  function refit(reason=''){
+    schedule();
+    // zoom/layout 적용이 한 프레임 늦게 확정되는 브라우저까지 보정
+    setTimeout(schedule,50);
+    setTimeout(schedule,140);
+    if(reason)document.getElementById('bracketBoard')?.setAttribute('data-connector-refit',reason);
+  }
+  window.__redrawBracketConnectors=refit;
+  let resizeObserver=null;
   function bindBoardObserver(){
     const board=document.getElementById('bracketBoard');
     if(!board)return;
     if(observer)observer.disconnect();
     observer=new MutationObserver(schedule);
     observer.observe(board,{childList:true,subtree:true,attributes:true,attributeFilter:['class','hidden','style']});
-    schedule();
+    if(resizeObserver)resizeObserver.disconnect();
+    if(typeof ResizeObserver!=='undefined'){
+      resizeObserver=new ResizeObserver(()=>schedule());
+      resizeObserver.observe(board);
+      board.querySelectorAll(':scope > .round-column').forEach(col=>resizeObserver.observe(col));
+    }
+    refit('bind');
   }
-  window.addEventListener('resize',schedule,{passive:true});
+  window.addEventListener('resize',()=>refit('resize'),{passive:true});
+  window.addEventListener('orientationchange',()=>setTimeout(()=>refit('orientation'),120),{passive:true});
   document.addEventListener('click',e=>{
     if(e.target.closest?.('[data-view="bracket"], [data-portal-go="bracket"], #bracketFullscreenBtn'))setTimeout(()=>{bindBoardObserver();schedule();},100);
   });
@@ -15056,3 +15117,5 @@ console.info('[230MATCH] 5.9.5 ready · bracket scroll works from main canvas wi
 console.info('[230MATCH] 5.9.6 ready · current tournament editor exposes status + official clock controls at top');
 
 console.info('[230MATCH] 5.9.7 ready · status in visible tournament editor + clock lock beside court auto assignment');
+
+console.info('[230MATCH] 5.9.8 ready · bracket connector auto-refit + robust wait/start auto SMS transition watch');
