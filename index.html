@@ -2542,6 +2542,23 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
 }
 </style>
 
+
+<style id="stage5938WinnerPathAndPrintUnify">
+/* 5.9.38 — 승리팀이 올라간 가지는 더 진하고 굵게 */
+#bracketBoard svg .stage5938-winner-path-overlay path{
+  stroke:#1d4ed8!important;
+  stroke-width:4.2!important;
+  opacity:.96!important;
+  filter:drop-shadow(0 0 1px rgba(29,78,216,.22));
+}
+/* 캡처 복제본에서도 동일하게 유지 */
+.stage5937-capture-wrapper #bracketBoard svg .stage5938-winner-path-overlay path{
+  stroke:#1d4ed8!important;
+  stroke-width:4.2!important;
+  opacity:.96!important;
+}
+</style>
+
 </head>
 <body>
   <header class="topbar">
@@ -4570,7 +4587,7 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=59370"></script>
+  <script type="module" src="./assets/js/app.js?v=59380"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
@@ -5689,26 +5706,6 @@ body[data-role="viewer"] #prelimCourtOperationGrid [data-prelim-court-status]{di
       <div id="stage590PerformanceList" class="stage590-performance-list"></div>
     </div>
   </dialog>
-
-
-  <dialog id="stage5931BracketImageDialog" class="stage5931-bracket-image-dialog">
-    <div class="stage5931-dialog-head">
-      <div>
-        <small>FULL BRACKET IMAGE</small>
-        <h2>전체 본선 대진표</h2>
-        <p>현재 대진표 전체를 한 화면으로 확인하고 PNG 이미지로 저장할 수 있습니다.</p>
-      </div>
-      <button type="button" class="icon-button" data-stage5931-close aria-label="닫기">×</button>
-    </div>
-    <div id="stage5931BracketImageViewport" class="stage5931-image-viewport">
-      <div class="stage5931-image-empty">대진 이미지를 준비 중입니다.</div>
-    </div>
-    <div class="stage5931-dialog-actions">
-      <button type="button" class="btn btn-light" data-stage5931-close>닫기</button>
-      <button id="stage5931SaveBracketPngBtn" type="button" class="btn btn-primary">PNG 저장</button>
-    </div>
-  </dialog>
-
 </body>
 </html>
 <style id="stage3210Styles">
