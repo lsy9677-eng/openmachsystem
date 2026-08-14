@@ -4156,6 +4156,9 @@ function clampBracketZoom(value){
   return Math.max(.65,Math.min(1.75,Math.round(n*20)/20));
 }
 function getBracketZoom(){
+  const board=document.getElementById('bracketBoard');
+  const live=Number(board?.dataset?.bracketZoom);
+  if(Number.isFinite(live)&&live>0)return clampBracketZoom(live);
   try{return clampBracketZoom(localStorage.getItem(BRACKET_ZOOM_KEY)||1);}catch(_e){return 1;}
 }
 function setBracketZoom(value,{save=true}={}){
@@ -4172,6 +4175,26 @@ function setBracketZoom(value,{save=true}={}){
   setTimeout(()=>{try{window.dispatchEvent(new Event('resize'));window.__redrawBracketConnectors?.('zoom-settled');}catch(_e){}},80);
   return zoom;
 }
+
+function stage5929BindBracketZoomDelegation(){
+  if(document.documentElement.dataset.stage5929ZoomDelegated==='1')return;
+  document.documentElement.dataset.stage5929ZoomDelegated='1';
+
+  document.addEventListener('click',event=>{
+    const button=event.target.closest?.('#bracketZoomOutBtn,#bracketZoomResetBtn,#bracketZoomInBtn');
+    if(!button)return;
+    event.preventDefault();
+    event.stopPropagation();
+
+    const current=getBracketZoom();
+    if(button.id==='bracketZoomOutBtn')setBracketZoom(current-.10);
+    else if(button.id==='bracketZoomInBtn')setBracketZoom(current+.10);
+    else setBracketZoom(1);
+
+    requestAnimationFrame(()=>window.__redrawBracketConnectors?.('mobile-zoom-button'));
+  },true);
+}
+
 function bindBracketMobileView571(){
   const viewport=document.getElementById('bracketViewport');
   const board=document.getElementById('bracketBoard');
@@ -4220,13 +4243,9 @@ function bindBracketMobileView571(){
   }
 
   setBracketZoom(getBracketZoom(),{save:false});
+  stage5929BindBracketZoomDelegation();
 
-  const minus=document.getElementById('bracketZoomOutBtn');
-  const plus=document.getElementById('bracketZoomInBtn');
-  const reset=document.getElementById('bracketZoomResetBtn');
-  if(minus)minus.onclick=()=>setBracketZoom(getBracketZoom()-.1);
-  if(plus)plus.onclick=()=>setBracketZoom(getBracketZoom()+.1);
-  if(reset)reset.onclick=()=>setBracketZoom(1);
+  // 5.9.29: zoom buttons use persistent delegated handler so mobile re-render cannot detach them.
 
   const roundButtons=document.getElementById('bracketRoundButtons');
   if(roundButtons&&!roundButtons.dataset.stage573Delegated){
@@ -4261,7 +4280,8 @@ function bindBracketMobileView571(){
     };
   }
 
-  // Mobile two-finger pinch changes bracket scale without zooming unrelated UI.
+  // 5.9.29 mobile gesture split:
+  // vertical drag = normal page scroll / horizontal drag = bracket pan / 2 fingers = bracket pinch zoom.
   let pinchStartDistance=0,pinchStartZoom=1;
   const distance=touches=>{
     if(!touches||touches.length<2)return 0;
@@ -4269,20 +4289,28 @@ function bindBracketMobileView571(){
     const dy=touches[0].clientY-touches[1].clientY;
     return Math.hypot(dx,dy);
   };
-  let singleStartX=0,singleStartScrollLeft=0,singleDragging=false;
+
+  let singleStartX=0,singleStartY=0,singleStartScrollLeft=0;
+  let singleDragging=false,singleAxis='';
+
   viewport.ontouchstart=e=>{
     if(e.touches?.length===2){
       pinchStartDistance=distance(e.touches);
       pinchStartZoom=getBracketZoom();
       singleDragging=false;
+      singleAxis='';
       return;
     }
     if(e.touches?.length===1){
-      singleStartX=e.touches[0].clientX;
+      const t=e.touches[0];
+      singleStartX=t.clientX;
+      singleStartY=t.clientY;
       singleStartScrollLeft=viewport.scrollLeft;
       singleDragging=true;
+      singleAxis='';
     }
   };
+
   viewport.ontouchmove=e=>{
     if(e.touches?.length===2&&pinchStartDistance){
       e.preventDefault();
@@ -4290,18 +4318,39 @@ function bindBracketMobileView571(){
       setBracketZoom(pinchStartZoom*ratio);
       return;
     }
+
     if(e.touches?.length===1&&singleDragging){
-      // 카드/텍스트 위에서도 손가락 이동량을 viewport 가로스크롤로 직접 반영한다.
-      const dx=e.touches[0].clientX-singleStartX;
-      viewport.scrollLeft=singleStartScrollLeft-dx;
+      const t=e.touches[0];
+      const dx=t.clientX-singleStartX;
+      const dy=t.clientY-singleStartY;
+
+      if(!singleAxis&&(Math.abs(dx)>7||Math.abs(dy)>7)){
+        // Need a clear directional lead so diagonal vertical page scroll is not stolen.
+        singleAxis=Math.abs(dx)>Math.abs(dy)*1.15?'x':'y';
+      }
+
+      if(singleAxis==='x'){
+        e.preventDefault();
+        viewport.scrollLeft=singleStartScrollLeft-dx;
+      }
+      // y-axis intentionally does nothing: browser/page owns the vertical scroll.
     }
   };
+
   viewport.ontouchend=e=>{
     if((e.touches?.length||0)<2){
       pinchStartDistance=0;
       requestAnimationFrame(()=>requestAnimationFrame(()=>window.__redrawBracketConnectors?.('pinch-end')));
     }
-    if((e.touches?.length||0)===0)singleDragging=false;
+    if((e.touches?.length||0)===0){
+      singleDragging=false;
+      singleAxis='';
+    }
+  };
+  viewport.ontouchcancel=()=>{
+    pinchStartDistance=0;
+    singleDragging=false;
+    singleAxis='';
   };
 }
 window.__bindBracketMobileView571=bindBracketMobileView571;
@@ -15528,3 +15577,5 @@ console.info('[230MATCH] 5.9.25 stabilization · hold feature retired; legacy he
 console.info('[230MATCH] 5.9.27 stabilization · main redraw/reset clears all placement residue; unplaced ready shows 대진 대기');
 
 console.info('[230MATCH] 5.9.28 stabilization · prelim result uses in-app confirmation; fresh prelim score preview resets correctly');
+
+console.info('[230MATCH] 5.9.29 stabilization · mobile bracket vertical page scroll + horizontal pan + delegated zoom buttons');

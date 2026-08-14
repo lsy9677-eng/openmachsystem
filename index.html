@@ -2139,6 +2139,119 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
 }
 </style>
 
+
+<style id="stage5929MobileBracketNavigation">
+/* 5.9.29 모바일 본선 대진표 조작 안정화 */
+.stage5929-vertical-scroll-guide{display:none}
+
+@media(max-width:760px){
+  .stage5929-mobile-scroll-hint{
+    position:sticky;
+    top:62px;
+    z-index:18;
+    display:flex!important;
+    align-items:center;
+    justify-content:center;
+    gap:7px;
+    flex-wrap:wrap;
+    margin:6px 0 8px!important;
+    padding:8px 9px!important;
+    border:2px solid #2563eb!important;
+    border-radius:10px!important;
+    background:rgba(239,246,255,.96)!important;
+    color:#1e3a8a!important;
+    box-shadow:0 3px 10px rgba(37,99,235,.13);
+    font-size:10.5px!important;
+    font-weight:850!important;
+  }
+  .stage5929-mobile-scroll-hint strong{
+    padding:2px 6px;
+    border-radius:999px;
+    background:#2563eb;
+    color:#fff;
+  }
+  .stage5929-mobile-scroll-hint span{
+    white-space:nowrap;
+  }
+
+  #bracketViewport{
+    position:relative!important;
+    overflow-x:auto!important;
+    /* viewport height is content-driven; vertical movement belongs to page */
+    max-height:none!important;
+    touch-action:pan-y pinch-zoom!important;
+    -webkit-overflow-scrolling:touch!important;
+    overscroll-behavior-x:contain;
+    scrollbar-width:thin;
+    scrollbar-color:#2563eb #dbeafe;
+  }
+  #bracketViewport::-webkit-scrollbar{
+    height:13px!important;
+  }
+  #bracketViewport::-webkit-scrollbar-track{
+    background:#dbeafe!important;
+    border-radius:999px!important;
+  }
+  #bracketViewport::-webkit-scrollbar-thumb{
+    background:#2563eb!important;
+    border:2px solid #dbeafe!important;
+    border-radius:999px!important;
+  }
+
+  #bracketBoard,
+  #bracketBoard .round-column,
+  #bracketBoard .match-card{
+    touch-action:pan-y!important;
+  }
+
+  .stage5929-vertical-scroll-guide{
+    display:flex;
+    position:sticky;
+    right:3px;
+    top:42vh;
+    float:right;
+    width:24px;
+    height:88px;
+    margin-left:-24px;
+    z-index:19;
+    pointer-events:none;
+    align-items:center;
+    justify-content:center;
+    border-radius:999px;
+    background:rgba(15,23,42,.78);
+    box-shadow:0 3px 10px rgba(15,23,42,.22);
+  }
+  .stage5929-vertical-scroll-guide span{
+    writing-mode:vertical-rl;
+    color:#fff;
+    font-size:9px;
+    line-height:1;
+    font-weight:950;
+    letter-spacing:.06em;
+  }
+
+  .bracket-mobile-tools{
+    position:sticky;
+    top:106px;
+    z-index:17;
+    background:rgba(255,255,255,.96)!important;
+    border:1px solid #bfdbfe!important;
+    box-shadow:0 3px 10px rgba(30,64,175,.10);
+  }
+  .bracket-zoom-buttons button{
+    min-width:48px!important;
+    min-height:44px!important;
+    font-size:18px!important;
+    touch-action:manipulation!important;
+  }
+  #bracketZoomResetBtn{
+    min-width:72px!important;
+    font-size:13px!important;
+    font-weight:950!important;
+  }
+}
+</style>
+
 </head>
 <body>
   <header class="topbar">
@@ -3361,10 +3474,10 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
             <button id="bracketZoomResetBtn" type="button" class="btn btn-light"><span id="bracketZoomLabel">100%</span></button>
             <button id="bracketZoomInBtn" type="button" class="btn btn-light" aria-label="대진표 확대">＋</button>
           </div>
-          <small>모바일에서는 두 손가락으로도 확대·축소할 수 있습니다.</small>
+          <small>모바일에서도 − / 100% / ＋ 버튼 또는 두 손가락으로 확대·축소할 수 있습니다.</small>
         </div>
-        <div class="stage595-bracket-scroll-hint">↔ 대진표 위에서 마우스 휠·드래그 또는 손가락으로 좌우 이동할 수 있습니다.</div>
-        <div id="bracketViewport" class="bracket-viewport">
+        <div class="stage595-bracket-scroll-hint stage5929-mobile-scroll-hint"><strong>모바일 조작</strong><span>↕ 위·아래: 페이지 스크롤</span><span>↔ 좌·우: 대진표 이동</span><span>− / ＋: 대진표 확대·축소</span></div>
+        <div id="bracketViewport" class="bracket-viewport"><div class="stage5929-vertical-scroll-guide" aria-hidden="true"><span>↕ SCROLL</span></div>
           <div id="bracketBoard" class="bracket-board empty-state"><p>생성된 대진이 없습니다.</p></div>
         </div>
       </section>
@@ -4166,7 +4279,7 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=59280"></script>
+  <script type="module" src="./assets/js/app.js?v=59290"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
