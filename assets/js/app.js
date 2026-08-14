@@ -6,8 +6,8 @@ import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,del
 import{prepareTeams,generateDraw,allMatches,findMatch,generateLinkedDrawSlots,syncLinkedDrawQualifiers}from'./bracket-engine-v5000.js?v=5000';
 import{ensureDrawMeta,canModifyDraw,createDrawWithMethod,lockDraw,unlockDrawForDevelopment,clearDrawHistory}from'./draw-method-engine.js?v=332012';
 import{buildCourts,assignInitial,queueReadyMatches,refillCourt}from'./court-engine.js?v=332012';
-import{submitResult}from'./result-engine.js?v=332012';
-import{ensurePrelimState,generatePrelim,assignPrelimCourts,findPrelimMatch,submitPrelimResult,resetPrelim,autoFitPrelimGroups,swapActiveReserveTeam,isPrelimLocked,lockPrelim,unlockPrelim}from'./prelim-engine.js?v=3511';
+import{submitResult}from'./result-engine.js?v=5800';
+import{ensurePrelimState,generatePrelim,assignPrelimCourts,findPrelimMatch,submitPrelimResult,resetPrelim,autoFitPrelimGroups,swapActiveReserveTeam,isPrelimLocked,lockPrelim,unlockPrelim}from'./prelim-engine.js?v=5800';
 import{downloadJson}from'./recovery.js?v=332012';
 import{ensureTimeState,calculateTimeMetrics}from'./time-engine-v5000.js?v=5000';
 import{ensureMessagingState,generatePlayingMessages,generateWait1Messages,generateCurrentCourtMessages,generateCurrentWaitMessages,generateAllTimeMessages,markMessageSent,deleteMessage,clearSentMessages,markAllSent,smsUri,refreshMessageContacts,mergePendingDuplicates,getMessageHistory}from'./message-engine.js?v=3521';
@@ -1793,9 +1793,125 @@ function releaseHeldMatch(matchId){
   if(venueId){if(!Array.isArray(state.venueQueues[venueId]))state.venueQueues[venueId]=[];state.venueQueues[venueId].push(matchId);m.status='venue_shared_queue';m.venueId=venueId;}
   commit(`본선 경기 보류 해제 · ${matchId}`);notice('보류를 해제하고 공용대기 맨 뒤로 복귀했습니다.','success');
 }
+
+function stage580PlacementAudit(){
+  const placements=[];
+  const add=(id,where)=>{
+    const key=String(id||'').trim();
+    if(key)placements.push({id:key,where});
+  };
+  const unified=useUnifiedCourts(state);
+  const courts=unified?(state.prelim?.courts||[]):(state.courts||[]);
+  for(const court of courts){
+    add(court.playing,`${court.name||court.id}:시합중`);
+    add(court.wait1,`${court.name||court.id}:대기1`);
+    const reserve=unified?(court.queue||[]):[...(court.queue||[]),...(court.manualQueue||[])];
+    reserve.forEach((id,i)=>add(id,`${court.name||court.id}:대기${i+2}`));
+  }
+  for(const [venueId,q] of Object.entries(state.venueQueues||{})){
+    (q||[]).forEach((id,i)=>add(id,`${venueId}:공용대기${i+1}`));
+  }
+  (state.sharedQueue||[]).forEach((id,i)=>add(id,`공용대기${i+1}`));
+  (state.prelim?.manualSharedQueue||[]).forEach((id,i)=>add(id,`예선공용대기${i+1}`));
+
+  const map=new Map();
+  for(const p of placements){
+    if(!map.has(p.id))map.set(p.id,[]);
+    map.get(p.id).push(p.where);
+  }
+  const duplicates=[...map.entries()].filter(([,where])=>where.length>1).map(([id,where])=>({id,where}));
+  const completed=placements.filter(p=>{
+    const m=findMatch(state.draw,p.id)||findPrelimMatch(state,p.id);
+    return m?.status==='completed';
+  });
+  return {unified,placements,duplicates,completed};
+}
+
+function stage580RepairBeforeResume(){
+  const notes=[];
+  try{
+    const g=stage5513GuardPrelimManualSharedQueue();
+    if(g?.removed)notes.push(`예선 공용대기 중복 ${g.removed}건`);
+  }catch(_e){}
+  try{
+    const flow=verifyAndRepairMainFlow(state,{});
+    const n=Number(flow?.propagated||0)+Number(flow?.statusFixed||0);
+    if(n)notes.push(`본선 연결 ${n}건`);
+  }catch(_e){}
+  if(useUnifiedCourts(state)){
+    try{
+      const q=reconcileUnifiedMainQueues(state);
+      const n=Number(q?.totalRemoved||q?.removed||0);
+      if(n)notes.push(`본선 큐 ${n}건`);
+    }catch(_e){}
+    try{
+      const p=reconcilePrelimCourtReservations(state);
+      const n=Number(p?.added||0)+Number(p?.returnedMain||0);
+      if(n)notes.push(`예선 예약열 ${n}건`);
+    }catch(_e){}
+  }
+  return notes;
+}
+
+function stage580ResumeAutoAssignment(){
+  if(!requireOperator('자동배정 재개'))return;
+  ensureOperatorState();
+  if(state.operation.autoAssignmentEnabled)return;
+  if(!confirm('현재 수동 배치를 기준으로 정합성을 검사한 뒤 자동배정을 재개할까요?\n\n시합중·대기1·관리자 지정 위치는 초기화하지 않습니다.'))return;
+
+  autoRecovery('수동 운영 → 자동배정 재개 전');
+  const repaired=stage580RepairBeforeResume();
+  const audit=stage580PlacementAudit();
+  if(audit.duplicates.length||audit.completed.length){
+    state.operation.autoAssignmentEnabled=false;
+    state.operation.manualOperationMode=true;
+    commit(`자동배정 재개 보류 · 중복 ${audit.duplicates.length}건 · 완료경기 잔존 ${audit.completed.length}건`);
+    const first=audit.duplicates[0];
+    const detail=first?`${first.id}: ${first.where.join(' / ')}`:(audit.completed[0]?`${audit.completed[0].id}: ${audit.completed[0].where}`:'');
+    notice(`자동배정을 재개하지 않았습니다. 배치 정합성 오류 ${audit.duplicates.length+audit.completed.length}건을 먼저 확인해 주세요.${detail?` · ${detail}`:''}`,'error');
+    renderOperatorControls();
+    return;
+  }
+
+  state.operation.autoAssignmentEnabled=true;
+  state.operation.manualOperationMode=false;
+  markResolvedMainMatchesReady(state);
+
+  let assigned=0;
+  if(useUnifiedCourts(state)){
+    const result=enqueueReadyMainToUnifiedCourts(state);
+    assigned=Number(result?.assigned||0);
+  }else{
+    queueReadyMatches(state,id=>findMatch(state.draw,id));
+  }
+  calculateTimeMetrics(state);
+  commit(`정합성 확인 후 자동배정 재개 · 정리 ${repaired.length}항목 · 신규배정 ${assigned}경기`);
+  notice(`현재 수동 배치를 유지한 채 자동배정을 재개했습니다.${repaired.length?` 정합성 정리: ${repaired.join(', ')}.`:''}`,'success');
+  renderOperatorControls();
+}
+
+function stage580PauseAutoAssignment(){
+  if(!requireOperator('수동 운영 전환'))return;
+  ensureOperatorState();
+  if(state.operation.autoAssignmentEnabled===false)return;
+  autoRecovery('자동배정 → 수동 운영 전');
+  state.operation.autoAssignmentEnabled=false;
+  state.operation.manualOperationMode=true;
+  commit('수동 운영 모드 시작 · 자동 코트배정 OFF');
+  notice('수동 운영 모드입니다. 결과 입력 후에도 코트·대기열이 자동 이동하지 않습니다. 카드의 “이동” 버튼으로 직접 배치하세요.','success');
+  renderOperatorControls();
+}
+function stage580ToggleAutoAssignment(){
+  ensureOperatorState();
+  if(state.operation.autoAssignmentEnabled===false)stage580ResumeAutoAssignment();
+  else stage580PauseAutoAssignment();
+}
+
 function renderOperatorControls(){
   ensureOperatorState();
-  const toggle=$('globalAutoAssignToggle');if(toggle){toggle.textContent=state.operation.autoAssignmentEnabled?'전체 자동배정 ON':'전체 자동배정 OFF';toggle.className=`btn ${state.operation.autoAssignmentEnabled?'btn-primary':'btn-danger-outline'}`;}
+  const manual=state.operation.autoAssignmentEnabled===false;
+  const toggle=$('globalAutoAssignToggle');if(toggle){toggle.textContent=manual?'정합성 확인 후 자동배정 재개':'자동배정 ON · 수동운영 전환';toggle.className=`btn ${manual?'btn-warning':'btn-primary'}`;}
+  const banner=$('manualOperationBanner');if(banner){banner.hidden=!manual;banner.innerHTML=manual?'<strong>🛠 수동 운영 중</strong><span>결과 입력 후에도 코트·대기열은 자동 이동하지 않습니다. 경기 카드의 <b>이동</b> 버튼으로 직접 배치하세요.</span>':'';}
   const count=$('heldMatchCount');if(count)count.textContent=String(state.operation.heldMatches.length);
   const list=$('heldMatchList');if(list){list.innerHTML=state.operation.heldMatches.length?state.operation.heldMatches.map(x=>{const m=findMatch(state.draw,x.matchId);return`<article class="held-match-item"><div><b>${m?`${teamText(m.teamA)} vs ${teamText(m.teamB)}`:x.matchId}</b><span>${x.reason} · ${new Date(x.heldAt).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})}</span></div><button class="btn btn-light" data-release-held="${x.matchId}">보류 해제</button></article>`}).join(''):'<div class="empty-state"><p>보류된 본선 경기가 없습니다.</p></div>';list.querySelectorAll('[data-release-held]').forEach(b=>b.onclick=()=>releaseHeldMatch(b.dataset.releaseHeld));}
 }
@@ -2128,9 +2244,18 @@ async function confirmResult(event){
   history.unshift({id:`rh-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,at:new Date().toISOString(),matchId:id,teamA:teamText(m.teamA),teamB:teamText(m.teamB),scoreA:Number(m.scoreA),scoreB:Number(m.scoreB),winner:teamText(m.winner),corrected:correcting,before:beforeSnapshot});
   state.operation.resultChangeHistory=history.slice(0,100);
   const flowReport=verifyAndRepairMainFlow(state,{sourceMatchId:id});
+  const autoAssignmentOn=state.operation?.autoAssignmentEnabled!==false;
   const isUnifiedCourt=Boolean(sourceCourt&&(state.prelim?.courts||[]).some(c=>c.id===sourceCourt.id));
-  if(isUnifiedCourt){advanceUnifiedCourt(state,sourceCourt.id,id);enqueueReadyMainToUnifiedCourts(state);}
-  if(sourceCourt&&state.messaging.settings.autoMessageEnabled&&state.messaging.settings.onQueueMove){if(sourceCourt.playing&&sourceCourt.playing!==beforePlaying)generatePlayingMessages(state,sourceCourt.playing,sourceCourt.name);if(sourceCourt.wait1&&sourceCourt.wait1!==beforeWait1)generateWait1Messages(state,sourceCourt.wait1,sourceCourt.name)}
+  if(isUnifiedCourt){
+    if(autoAssignmentOn){
+      advanceUnifiedCourt(state,sourceCourt.id,id);
+      enqueueReadyMainToUnifiedCourts(state);
+    }else if(sourceCourt.playing===id){
+      // 수동 운영 중에는 완료 경기만 비우고 대기1/추가대기를 자동 승격시키지 않는다.
+      sourceCourt.playing=null;
+    }
+  }
+  if(autoAssignmentOn&&sourceCourt&&state.messaging.settings.autoMessageEnabled&&state.messaging.settings.onQueueMove){if(sourceCourt.playing&&sourceCourt.playing!==beforePlaying)generatePlayingMessages(state,sourceCourt.playing,sourceCourt.name);if(sourceCourt.wait1&&sourceCourt.wait1!==beforeWait1)generateWait1Messages(state,sourceCourt.wait1,sourceCourt.name)}
   let completionReport={completed:false,champion:null};
   if(isFinalMatch){
     // 5.6.3: 결승 결과를 먼저 저장한다. 종료 플래그가 먼저 생기면 commit()이 읽기전용으로 판단해 결승 저장을 거부한다.
@@ -2148,7 +2273,7 @@ async function confirmResult(event){
     await stage5526PushCriticalState('본선 결과');
   }
   $('resultDialog').close();
-  const flowText=completionReport.completed?` 대회가 종료되었습니다. 우승 ${teamText(completionReport.champion)}.`:(flowReport.nextMatchId?(flowReport.nextReady?' 다음 라운드 경기가 확정되어 자동 대기열에 연결됩니다.':' 다음 라운드는 상대 결과를 기다립니다.'):' 최종 경기 결과가 반영되었습니다.');
+  const flowText=completionReport.completed?` 대회가 종료되었습니다. 우승 ${teamText(completionReport.champion)}.`:(!autoAssignmentOn?' 수동 운영 중이므로 다음 코트 이동은 관리자가 직접 선택합니다.':(flowReport.nextMatchId?(flowReport.nextReady?' 다음 라운드 경기가 확정되어 자동 대기열에 연결됩니다.':' 다음 라운드는 상대 결과를 기다립니다.'):' 최종 경기 결과가 반영되었습니다.'));
   notice(`결과와 대진표·코트 큐를 동기화했습니다.${flowText}${flowReport.propagated||flowReport.statusFixed?` 연결 보정 ${flowReport.propagated+flowReport.statusFixed}건.`:''}`,'success');
 }
 function refreshQueue(){
@@ -2254,8 +2379,9 @@ function confirmPrelimResult(event){
   const involvedTeamIds=new Set([pendingMatch?.teamA?.id,pendingMatch?.teamB?.id].filter(Boolean));
   const beforeResolvedPlayIns=new Set(Object.values(state.draw?.rounds||{}).flat().filter(x=>x.isPlayIn&&x.teamA&&!x.teamA.placeholder&&x.teamB&&!x.teamB.placeholder).map(x=>x.id));
   const m=submitPrelimResult(state,{matchId:$('prelimResultMatchId').value,winnerId,scoreA,scoreB});const meta340=stage340ResultMeta('prelim');m.resultType=meta340.resultType;m.resultTypeLabel=STAGE340_EXCEPTION_LABELS[meta340.resultType]||'일반 경기';
+  const autoAssignmentOn=state.operation?.autoAssignmentEnabled!==false;
   const stage5513Guard=stage5513GuardPrelimManualSharedQueue();
-  const stage558Shared=stage558AutoPromotePrelimManualSharedQueue();
+  const stage558Shared=autoAssignmentOn?stage558AutoPromotePrelimManualSharedQueue():{assigned:0,remaining:(state.prelim?.manualSharedQueue||[]).length};
   stage5513GuardPrelimManualSharedQueue();
   const syncResult=syncLinkedDraw({silent:true});
   const newlyResolvedPlayIns=Object.values(state.draw?.rounds||{}).flat().filter(x=>x.isPlayIn&&!beforeResolvedPlayIns.has(x.id)&&x.teamA&&!x.teamA.placeholder&&x.teamB&&!x.teamB.placeholder);
@@ -2263,12 +2389,14 @@ function confirmPrelimResult(event){
   // 중요: 예선 결과 직후 확정된 본선 경기를 종료 코트의 시합중 자리에 직접 삽입하지 않습니다.
   // submitPrelimResult()가 먼저 기존 예선 대기1을 시합중으로, 추가대기를 대기1로 원자 승격한 뒤,
   // 본선은 남은 빈 시합중 또는 빈 대기1에만 배정됩니다.
-  const autoResult=useUnifiedCourts(state)?enqueueReadyMainToUnifiedCourts(state,{priorityMatchIds:newlyResolvedPlayIns.map(x=>x.id)}):autoAssignResolvedMain(state,{findMatch,queueReadyMatches,refillCourt});
+  const autoResult=autoAssignmentOn
+    ?(useUnifiedCourts(state)?enqueueReadyMainToUnifiedCourts(state,{priorityMatchIds:newlyResolvedPlayIns.map(x=>x.id)}):autoAssignResolvedMain(state,{findMatch,queueReadyMatches,refillCourt}))
+    :{assigned:0,reason:'manual-mode'};
   if((autoResult.assigned===true||Number(autoResult.assigned)>0)&&state.messaging.settings.autoMessageEnabled){generateCurrentCourtMessages(state);generateCurrentWaitMessages(state);}
   commit(`예선 결과 확정 · ${m.id} · 승리 ${teamText(m.winner)} · ${m.scoreA}:${m.scoreB}${stage558Shared.assigned?` · 예선 공용대기 자동승격 ${stage558Shared.assigned}경기`:''}${syncResult.changes.length?` · 본선 자동반영 ${syncResult.changes.length}팀`:''}${newlyResolvedPlayIns.length?` · 본선 신규확정 ${newlyResolvedPlayIns.length}경기`:''}${autoResult.assigned?' · 빈 자리 본선 자동배정':''}`);
   void stage5526PushCriticalState('예선 결과');
   $('prelimResultDialog').close();
-  prelimNotice(autoResult.assigned?'예선 대기열을 먼저 승격한 뒤 남은 빈 자리만 본선으로 채웠습니다.':autoResult.reason==='no-courts'?'본선 팀은 확정됐습니다. 최초 본선 코트배정을 실행하면 운영이 시작됩니다.':'예선 순위와 진출팀을 다시 계산했습니다. 확정된 본선 경기는 예선 예약열 뒤의 빈 자리에서만 배정됩니다.','success');
+  prelimNotice(!autoAssignmentOn?'결과는 확정했습니다. 수동 운영 중이므로 대기1·추가대기·본선 코트배정은 자동으로 움직이지 않습니다.':(autoResult.assigned?'예선 대기열을 먼저 승격한 뒤 남은 빈 자리만 본선으로 채웠습니다.':autoResult.reason==='no-courts'?'본선 팀은 확정됐습니다. 최초 본선 코트배정을 실행하면 운영이 시작됩니다.':'예선 순위와 진출팀을 다시 계산했습니다. 확정된 본선 경기는 예선 예약열 뒤의 빈 자리에서만 배정됩니다.'),'success');
 }
 function resetPrelimOnly(){
   if(!requireAdmin('예선 초기화'))return;
@@ -2638,6 +2766,37 @@ function reorderQueue(venueId,matchId,direction){
   calculateTimeMetrics(state);
   commit(`공용대기 순서 변경 · ${venueId} · ${direction==='up'?'위로':'아래로'}`);
 }
+
+function stage580OptionButtons(select,root,{onSelect=null}={}){
+  if(!select||!root)return;
+  const current=String(select.value||'');
+  root.innerHTML=[...select.options].map(opt=>{
+    const disabled=opt.disabled||!String(opt.value||'');
+    const active=String(opt.value)===current;
+    return `<button type="button" class="stage580-choice ${active?'active':''}" data-stage580-value="${String(opt.value).replace(/"/g,'&quot;')}" ${disabled?'disabled':''}>${opt.textContent}</button>`;
+  }).join('');
+  root.querySelectorAll('[data-stage580-value]').forEach(btn=>{
+    btn.onclick=()=>{
+      select.value=btn.dataset.stage580Value;
+      root.querySelectorAll('.stage580-choice').forEach(x=>x.classList.toggle('active',x===btn));
+      select.dispatchEvent(new Event('change',{bubbles:true}));
+      if(onSelect)onSelect(select.value);
+    };
+  });
+}
+function stage580RenderTransferButtons(){
+  const target=$('courtTransferTargetSelect');
+  const mode=$('courtTransferMode');
+  stage580OptionButtons(target,$('courtTransferTargetButtons'),{onSelect:()=>{
+    refreshCourtTransferPositions();
+    stage580OptionButtons($('courtTransferMode'),$('courtTransferPositionButtons'));
+  }});
+  stage580OptionButtons(mode,$('courtTransferPositionButtons'));
+}
+function stage580RenderManualAssignButtons(){
+  stage580OptionButtons($('manualAssignCourtSelect'),$('manualAssignCourtButtons'));
+}
+
 function openQueueMove(sourceVenueId,matchId){
   const m=findMatch(state.draw,matchId);if(!m)return;
   $('queueMoveSourceVenueId').value=sourceVenueId;
@@ -2687,6 +2846,7 @@ function openManualAssign(venueId,matchId){
     info.textContent='현재 이 구장의 모든 코트에 시합중과 대기1 경기가 배정되어 있습니다. 경기 결과가 입력되어 자리가 비면 배정할 수 있습니다.';
     confirm.disabled=true;
   }
+  stage580RenderManualAssignButtons();
   $('manualCourtAssignDialog').showModal();
 }
 function confirmManualAssign(event){
@@ -2742,6 +2902,7 @@ function openUnifiedCourtTransfer(sourceCourtId,sourceSlot){
     const values=[...$('courtTransferMode').options].map(o=>o.value);
     $('courtTransferMode').value=values.includes('manual-bottom')?'manual-bottom':(values.includes('insert-reserve-'+((source.queue?.length||source.manualQueue?.length||0)))?'insert-reserve-'+((source.queue?.length||source.manualQueue?.length||0)):$('courtTransferMode').value);
   }
+  stage580RenderTransferButtons();
   $('courtTransferDialog').showModal();
 }
 function openCourtTransfer(sourceCourtId,sourceSlot){
@@ -2760,6 +2921,7 @@ function openCourtTransfer(sourceCourtId,sourceSlot){
     const values=[...$('courtTransferMode').options].map(o=>o.value);
     $('courtTransferMode').value=values.includes('manual-bottom')?'manual-bottom':(values.includes('insert-reserve-'+((source.queue?.length||source.manualQueue?.length||0)))?'insert-reserve-'+((source.queue?.length||source.manualQueue?.length||0)):$('courtTransferMode').value);
   }
+  stage580RenderTransferButtons();
   $('courtTransferDialog').showModal();
 }
 
@@ -2785,6 +2947,7 @@ function refreshCourtTransferPositions(){
   select.innerHTML=opts.map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
   // 5.5.11 safety default: never insert into playing/wait1 unless the operator explicitly chooses it.
   select.value='manual-bottom';
+  if($('courtTransferPositionButtons'))stage580OptionButtons(select,$('courtTransferPositionButtons'));
 }
 
 function stage555RemoveFromAllMainQueues(matchId){
@@ -3648,7 +3811,7 @@ function exportPrelimPilotReport(){if(!prelimPilotReport){notice('먼저 예선 
   };
   if($('operationGoBracketBtn'))$('operationGoBracketBtn').onclick=()=>openView('bracket');
   if($('quickAuditBtn'))$('quickAuditBtn').onclick=()=>executeAuditAction(runAllAudit,'전체 운영 점검');
-  if($('globalAutoAssignToggle'))$('globalAutoAssignToggle').onclick=()=>{ensureOperatorState();autoRecovery('자동배정 설정 변경 전');state.operation.autoAssignmentEnabled=!state.operation.autoAssignmentEnabled;commit(`전체 자동배정 ${state.operation.autoAssignmentEnabled?'재개':'일시정지'}`);notice(state.operation.autoAssignmentEnabled?'전체 자동배정을 재개했습니다.':'전체 자동배정을 일시정지했습니다. 현재 시합과 대기1은 유지됩니다.','success');};
+  if($('globalAutoAssignToggle'))$('globalAutoAssignToggle').onclick=stage580ToggleAutoAssignment;
   if($('runStateAuditBtn'))$('runStateAuditBtn').onclick=()=>executeAuditAction(runCurrentAudit,'현재 상태 점검');
   if($('runPrelimSimulationBtn'))$('runPrelimSimulationBtn').onclick=()=>executeAuditAction(runPrelimSimulationAudit,'예선 복제 모의운영');
   if($('runFullSimulationBtn'))$('runFullSimulationBtn').onclick=()=>executeAuditAction(runSimulationAudit,'본선 복제 모의대회');
@@ -13955,7 +14118,7 @@ console.info('[230MATCH] 5.4.31 ready · Stage35.4-4 closed tournament snapshot/
 
 /* 230MATCH 5.5.5 · court transfer to venue shared queue */
 document.addEventListener('change',event=>{
-  if(event.target?.id==='courtTransferTargetSelect')refreshCourtTransferPositions();
+  if(event.target?.id==='courtTransferTargetSelect'){refreshCourtTransferPositions();stage580RenderTransferButtons();}
 });
 console.info('[230MATCH] 5.5.5 ready · court → shared queue transfer');
 
@@ -14255,3 +14418,5 @@ console.info('[230MATCH] 5.7.1 ready · bracket mobile zoom + round buttons + fi
 
 
 console.info('[230MATCH] 5.7.4 ready · bracket swipe anywhere + blue active round buttons');
+
+console.info('[230MATCH] 5.8.0 ready · stable manual operation mode + button move UI + safe auto resume');

@@ -220,7 +220,15 @@ export function submitPrelimResult(state,{matchId,winnerId,scoreA,scoreB}){
   const wasCompleted=match.status==='completed';
   match.winner=clone(winner);match.loser=clone(loser);match.scoreA=Number(scoreA);match.scoreB=Number(scoreB);
   match.status='completed';match.completedAt=new Date().toISOString();
-  if(!wasCompleted&&match.prelimCourtId)advancePrelimCourt(state,match.prelimCourtId,match);
+  if(!wasCompleted&&match.prelimCourtId){
+    if(state.operation?.autoAssignmentEnabled===false){
+      const court=state.prelim?.courts?.find(c=>c.id===match.prelimCourtId);
+      resolveNextPrelimMatch(state,match);
+      if(court?.playing===match.id)court.playing=null;
+    }else{
+      advancePrelimCourt(state,match.prelimCourtId,match);
+    }
+  }
   recalculateStandings(state);
   return match;
 }
@@ -273,3 +281,5 @@ export function resetPrelim(state){
   state.prelim.linkedDraw={active:false,drawSize:0,slots:[],createdAt:null,lastSyncedAt:null};
   state.prelim.lock={locked:false,lockedAt:null,lockedBy:'',snapshot:null};
 }
+
+console.info('[230MATCH] prelim-engine 5.8.0 · manual mode keeps wait1/queue fixed after result');

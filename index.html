@@ -701,6 +701,34 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
 }
 </style>
 
+
+<style id="stage580ManualOperationUi">
+.stage580-manual-banner{
+  margin-top:10px;padding:10px 12px;border:2px solid #f59e0b;border-radius:12px;background:#fff7ed;color:#9a3412;
+  display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;font-size:12px
+}
+.stage580-manual-banner[hidden]{display:none!important}
+.stage580-manual-banner strong{font-size:13px;white-space:nowrap}
+.stage580-choice-section{display:grid;gap:7px}
+.stage580-choice-section>strong{font-size:12px;color:#334155}
+.stage580-choice-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.stage580-position-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+.stage580-choice{
+  min-height:42px;padding:8px;border:1.5px solid #cbd5e1;border-radius:10px;background:#fff;color:#334155;
+  font:inherit;font-size:12px;font-weight:900;cursor:pointer;line-height:1.25
+}
+.stage580-choice:hover{border-color:#60a5fa;background:#eff6ff}
+.stage580-choice.active{background:#2563eb!important;border-color:#1d4ed8!important;color:#fff!important;box-shadow:0 3px 10px rgba(37,99,235,.22)}
+.stage580-choice:disabled{opacity:.45;cursor:not-allowed}
+.stage580-select-fallback{position:absolute!important;left:-10000px!important;width:1px!important;height:1px!important;overflow:hidden!important}
+.compact-move-btn{min-width:48px!important;font-weight:900!important}
+@media(max-width:680px){
+  .stage580-choice-grid,.stage580-position-grid{grid-template-columns:1fr 1fr}
+  .stage580-choice{min-height:46px;font-size:12px}
+  .stage580-manual-banner{position:sticky;top:6px;z-index:30}
+}
+</style>
+
 </head>
 <body>
   <header class="topbar">
@@ -1367,7 +1395,8 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
       <section class="panel operator-control-panel operation-courts-section" aria-label="운영자 제어" data-operator-only="true">
         <div class="operator-control-main">
           <div><strong>운영자 제어</strong><span>자동배정을 잠시 멈춰도 현재 시합과 대기1은 유지됩니다.</span></div>
-          <div class="operator-control-actions"><button id="globalAutoAssignToggle" type="button" class="btn btn-primary">전체 자동배정 ON</button><span class="badge badge-muted-dark">보류 <b id="heldMatchCount">0</b>경기</span><button id="saveRecoveryBtnInline" type="button" class="btn btn-light">현재 복구점 저장</button></div>
+          <div class="operator-control-actions"><button id="globalAutoAssignToggle" type="button" class="btn btn-primary">자동배정 ON · 수동운영 전환</button><span class="badge badge-muted-dark">보류 <b id="heldMatchCount">0</b>경기</span><button id="saveRecoveryBtnInline" type="button" class="btn btn-light">현재 복구점 저장</button></div>
+          <div id="manualOperationBanner" class="stage580-manual-banner" hidden></div>
         </div>
         <details class="held-match-details"><summary>보류 경기 보기</summary><div id="heldMatchList" class="held-match-list"></div></details>
       </section>
@@ -2203,8 +2232,8 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
         <input id="courtTransferSourceCourtId" type="hidden">
         <input id="courtTransferSourceSlot" type="hidden">
         <p id="courtTransferMatchLabel" class="modal-match"></p>
-        <label><span>이동할 코트</span><select id="courtTransferTargetSelect"></select></label>
-        <label><span>삽입할 위치</span><select id="courtTransferMode"></select></label>
+        <div class="stage580-choice-section"><strong>① 이동할 곳 선택</strong><div id="courtTransferTargetButtons" class="stage580-choice-grid"></div><label class="stage580-select-fallback"><span>이동할 코트</span><select id="courtTransferTargetSelect"></select></label></div>
+        <div class="stage580-choice-section"><strong>② 들어갈 자리 선택</strong><div id="courtTransferPositionButtons" class="stage580-choice-grid stage580-position-grid"></div><label class="stage580-select-fallback"><span>삽입할 위치</span><select id="courtTransferMode"></select></label></div>
         <div id="courtTransferInfo" class="notice info">시합중·대기1·예비대기 어느 위치에도 넣을 수 있습니다. 이미 카드가 있으면 해당 카드와 뒤 카드가 한 단계씩 밀립니다. 사용중지 코트에도 관리자가 수동 배치할 수 있습니다.</div>
       </div>
       <menu><button value="cancel" class="btn btn-light">취소</button><button id="confirmCourtTransferBtn" value="default" class="btn btn-primary">이동</button></menu>
@@ -2218,7 +2247,7 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
         <input id="manualAssignMatchId" type="hidden">
         <input id="manualAssignVenueId" type="hidden">
         <p id="manualAssignMatchLabel" class="modal-match"></p>
-        <label><span>배정 가능한 코트</span><select id="manualAssignCourtSelect"></select></label>
+        <div class="stage580-choice-section"><strong>배정할 자리 선택</strong><div id="manualAssignCourtButtons" class="stage580-choice-grid"></div><label class="stage580-select-fallback"><span>배정 가능한 코트</span><select id="manualAssignCourtSelect"></select></label></div>
         <div id="manualAssignInfo" class="notice info">같은 구장의 빈코트 또는 빈 대기1 자리만 표시됩니다.</div>
       </div>
       <menu><button value="cancel" class="btn btn-light">취소</button><button id="confirmManualAssignBtn" value="default" class="btn btn-primary">코트배정</button></menu>
@@ -2717,7 +2746,7 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=5704"></script>
+  <script type="module" src="./assets/js/app.js?v=5800"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">

@@ -16,9 +16,11 @@ export function submitResult(state,{matchId,winnerId,scoreA,scoreB}){
     if(match.nextSlot===1)next.teamA=winner;else next.teamB=winner;
     if(next.teamA&&next.teamB&&next.status!=='completed')next.status='ready';
   }
-  if(!unified){
+  if(!unified && state.operation?.autoAssignmentEnabled!==false){
     refillCourt(state,sourceCourt,id=>findMatch(state.draw,id));
     queueReadyMatches(state,id=>findMatch(state.draw,id));
   }
   return match;
 }
+
+console.info('[230MATCH] result-engine 5.8.0 · manual mode blocks automatic court promotion');
