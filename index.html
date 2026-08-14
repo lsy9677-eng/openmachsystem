@@ -819,6 +819,25 @@ body.tournament-completed-admin #view-operation textarea{
 .stage587-status-preview b{color:#1d4ed8}
 </style>
 
+
+<style id="stage590DrawPerformanceCss">
+.stage590-performance-modal{width:min(760px,94vw);border:0;border-radius:20px;overflow:hidden}
+.stage590-performance-modal .modal-head p{margin:4px 0 0;font-size:12px;color:#dbeafe}
+.stage590-performance-body{display:grid;gap:14px;padding:18px}
+.stage590-performance-stage{position:relative;min-height:210px;display:grid;place-items:center;align-content:center;gap:10px;border-radius:18px;background:linear-gradient(145deg,#0b2348,#173f78);color:#fff;overflow:hidden}
+.stage590-performance-ring{position:absolute;width:150px;height:150px;border:10px solid rgba(255,255,255,.16);border-top-color:#fbbf24;border-right-color:#60a5fa;border-radius:50%}
+.stage590-performance-ring.spinning{animation:stage590spin .7s linear infinite}
+@keyframes stage590spin{to{transform:rotate(360deg)}}
+.stage590-performance-name{position:relative;z-index:2;max-width:80%;text-align:center;font-size:24px;font-weight:1000;text-shadow:0 2px 8px rgba(0,0,0,.25)}
+.stage590-performance-progress{position:relative;z-index:2;font-weight:900;color:#bfdbfe}
+.stage590-performance-list{max-height:310px;overflow:auto;display:grid;gap:7px}
+.stage590-performance-row{display:grid;grid-template-columns:auto 1fr;gap:8px 10px;align-items:center;padding:9px 11px;border:1px solid #dbe4f0;border-radius:10px;background:#fff}
+.stage590-performance-row b{color:#1d4ed8}.stage590-performance-row small{grid-column:2;color:#64748b}
+.stage590-performance-row.accent{border-color:#a78bfa;background:#f5f3ff}
+#stage590PrelimPerformanceBtn,#stage590MainPerformanceBtn,#stage590SeedPerformanceBtn,#stage590SlotPerformanceBtn,#stage590FinalPerformanceBtn{font-weight:900}
+@media(max-width:640px){.stage590-performance-name{font-size:19px}.stage590-performance-stage{min-height:180px}.stage590-performance-actions{display:grid;grid-template-columns:1fr}}
+</style>
+
 </head>
 <body>
   <header class="topbar">
@@ -2836,7 +2855,7 @@ body.tournament-completed-admin #view-operation textarea{
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=5807"></script>
+  <script type="module" src="./assets/js/app.js?v=5900"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
@@ -3936,6 +3955,26 @@ body[data-role="viewer"] #prelimCourtOperationGrid [data-prelim-court-status]{di
   }
 }
 </style>
+
+  <dialog id="stage590DrawPerformanceDialog" class="modal stage590-performance-modal">
+    <div class="modal-head">
+      <div><h2 id="stage590PerformanceTitle">추첨 퍼포먼스</h2><p id="stage590PerformanceSubtitle">실제 결과는 먼저 확정됩니다.</p></div>
+      <button type="button" id="stage590PerformanceClose" class="icon-button" aria-label="닫기">×</button>
+    </div>
+    <div class="stage590-performance-body">
+      <div class="stage590-performance-stage">
+        <div class="stage590-performance-ring"></div>
+        <div id="stage590PerformanceName" class="stage590-performance-name">결과 확정 완료</div>
+        <div id="stage590PerformanceProgress" class="stage590-performance-progress">0 / 0</div>
+      </div>
+      <div class="button-row stage590-performance-actions">
+        <button type="button" id="stage590PerformanceStart" class="btn btn-primary">공개 시작</button>
+        <button type="button" id="stage590PerformanceSkip" class="btn btn-light">전체 결과 바로 보기</button>
+      </div>
+      <div id="stage590PerformanceList" class="stage590-performance-list"></div>
+    </div>
+  </dialog>
+
 </body>
 </html>
 <style id="stage3210Styles">

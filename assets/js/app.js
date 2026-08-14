@@ -1942,6 +1942,144 @@ async function readTeamFile(file){
   const data=JSON.parse(await file.text());state.teams=prepareTeams(data,128);ensureContacts(state);commit(`JSON 명단 ${state.teams.length}팀 불러오기`);notice(`${state.teams.length}팀을 불러왔습니다.`,'success');
 }
 
+
+let stage590PerformanceTimer=null;
+function stage590TeamLabel(team){
+  if(!team)return 'BYE';
+  return resultDialogTeamName?.(team)||team.name||team.teamName||'참가팀';
+}
+function stage590OpenPerformance({title='추첨 퍼포먼스',subtitle='',items=[],highlight=''}={}){
+  const dialog=document.getElementById('stage590DrawPerformanceDialog');
+  if(!dialog)return;
+  clearInterval(stage590PerformanceTimer);
+  const titleEl=document.getElementById('stage590PerformanceTitle');
+  const subEl=document.getElementById('stage590PerformanceSubtitle');
+  const nameEl=document.getElementById('stage590PerformanceName');
+  const progress=document.getElementById('stage590PerformanceProgress');
+  const list=document.getElementById('stage590PerformanceList');
+  if(titleEl)titleEl.textContent=title;
+  if(subEl)subEl.textContent=subtitle;
+  if(nameEl)nameEl.textContent='결과 확정 완료';
+  if(progress)progress.textContent=`0 / ${items.length}`;
+  if(list)list.innerHTML='';
+  dialog._stage590Items=items;
+  dialog._stage590Highlight=highlight;
+  dialog.showModal();
+}
+function stage590StartPerformance(){
+  const dialog=document.getElementById('stage590DrawPerformanceDialog');
+  if(!dialog)return;
+  const items=Array.isArray(dialog._stage590Items)?dialog._stage590Items:[];
+  const nameEl=document.getElementById('stage590PerformanceName');
+  const progress=document.getElementById('stage590PerformanceProgress');
+  const list=document.getElementById('stage590PerformanceList');
+  const ring=dialog.querySelector('.stage590-performance-ring');
+  clearInterval(stage590PerformanceTimer);
+  ring?.classList.add('spinning');
+  let i=0;
+  const reveal=()=>{
+    if(i>=items.length){
+      clearInterval(stage590PerformanceTimer);
+      ring?.classList.remove('spinning');
+      if(nameEl)nameEl.textContent='공개 완료';
+      if(progress)progress.textContent=`${items.length} / ${items.length}`;
+      return;
+    }
+    const item=items[i++];
+    if(nameEl)nameEl.textContent=item.title||item.label||String(item);
+    if(progress)progress.textContent=`${i} / ${items.length}`;
+    if(list){
+      const row=document.createElement('div');
+      row.className='stage590-performance-row';
+      if(item.accent)row.classList.add('accent');
+      row.innerHTML=`<b>${i}.</b><span>${escapeHtml(item.title||item.label||String(item))}</span>${item.detail?`<small>${escapeHtml(item.detail)}</small>`:''}`;
+      list.appendChild(row);
+      list.scrollTop=list.scrollHeight;
+    }
+  };
+  reveal();
+  stage590PerformanceTimer=setInterval(reveal,Math.max(180,Math.min(650,Math.round(8500/Math.max(1,items.length)))));
+}
+function stage590SkipPerformance(){
+  const dialog=document.getElementById('stage590DrawPerformanceDialog');
+  if(!dialog)return;
+  clearInterval(stage590PerformanceTimer);
+  const items=Array.isArray(dialog._stage590Items)?dialog._stage590Items:[];
+  const list=document.getElementById('stage590PerformanceList');
+  const nameEl=document.getElementById('stage590PerformanceName');
+  const progress=document.getElementById('stage590PerformanceProgress');
+  dialog.querySelector('.stage590-performance-ring')?.classList.remove('spinning');
+  if(list)list.innerHTML=items.map((item,i)=>`<div class="stage590-performance-row ${item.accent?'accent':''}"><b>${i+1}.</b><span>${escapeHtml(item.title||item.label||String(item))}</span>${item.detail?`<small>${escapeHtml(item.detail)}</small>`:''}</div>`).join('');
+  if(nameEl)nameEl.textContent='공개 완료';
+  if(progress)progress.textContent=`${items.length} / ${items.length}`;
+}
+function stage590PrelimPerformance(){
+  try{
+    const before=state.prelim?.drawAudit?.checksum||'';
+    createPrelim(); // 실제 결과를 먼저 확정·commit
+    const after=state.prelim?.drawAudit?.checksum||'';
+    if(!after||after===before&&!(state.prelim?.groups||[]).length)return;
+    const items=(state.prelim?.groups||[]).map(g=>({
+      title:`${g.groupNo}조`,
+      detail:(g.teams||[]).map(stage590TeamLabel).join(' · ')
+    }));
+    stage590OpenPerformance({
+      title:'예선 조추첨 공개',
+      subtitle:`결과는 이미 확정·저장되었습니다 · 체크섬 ${after}`,
+      items
+    });
+  }catch(e){prelimNotice(e.message||String(e),'error');}
+}
+function stage590MainItems(){
+  const first=state.draw?.rounds?.[state.draw?.size]||[];
+  return first.map((m,i)=>{
+    const a=stage590TeamLabel(m.teamA),b=stage590TeamLabel(m.teamB);
+    const seed=Boolean(m.teamA?.seed||m.teamB?.seed||m.teamA?.rank||m.teamB?.rank);
+    return {title:`${i+1}번 대진`,detail:`${a}  vs  ${b}`,accent:seed};
+  });
+}
+function stage590RunMainPerformance(method='instant'){
+  if(shouldUseLinkedDraw(state))throw new Error('예선 진행 대회는 아래 “슬롯/최종 본선 퍼포먼스”를 사용하세요.');
+  pullSettings();
+  const check=canModifyDraw(state);if(!check.ok&&state.draw.size)throw new Error(check.reason);
+  autoRecovery(`본선 ${method==='seeded'?'시드 ':''}퍼포먼스 추첨 직전`);
+  state.settings.drawMethod=method;
+  state.draw=createDrawWithMethod(state,state.teams,state.settings.drawSize,{method,byePriority:state.settings.byePriority});
+  state.courts=[];state.sharedQueue=[];
+  commit(`${state.draw.size}강 ${method==='seeded'?'시드 분산':'일반'} 퍼포먼스 추첨 확정 · 체크섬 ${state.drawMeta?.checksum||'-'}`);
+  const items=stage590MainItems();
+  stage590OpenPerformance({
+    title:method==='seeded'?'본선 시드 퍼포먼스 공개':'본선 퍼포먼스 공개',
+    subtitle:`실제 대진은 이미 확정·저장되었습니다 · 체크섬 ${state.drawMeta?.checksum||'-'}`,
+    items
+  });
+  notice('추첨 결과를 먼저 확정했습니다. 퍼포먼스 화면은 확정 결과만 공개합니다.','success');
+}
+function stage590WrapExistingDraw(targetId,title){
+  const target=document.getElementById(targetId);
+  if(!target){notice('추첨 기능을 찾지 못했습니다.','error');return;}
+  const before=JSON.stringify({
+    size:state.draw?.size||0,
+    explicit:state.draw?.stage3441Explicit||'',
+    at:state.draw?.stage3441DrawAt||state.prelim?.linkedDraw?.createdAt||''
+  });
+  target.click(); // 기존 검증/확정/저장 로직 그대로 실행
+  setTimeout(()=>{
+    const after=JSON.stringify({
+      size:state.draw?.size||0,
+      explicit:state.draw?.stage3441Explicit||'',
+      at:state.draw?.stage3441DrawAt||state.prelim?.linkedDraw?.createdAt||''
+    });
+    if(after===before)return; // 취소 또는 실패
+    const items=stage590MainItems();
+    stage590OpenPerformance({
+      title,
+      subtitle:'실제 추첨은 기존 엔진에서 먼저 확정·저장되었습니다. 아래 화면은 공개용입니다.',
+      items
+    });
+  },120);
+}
+
 function runDrawMethod(method){
   $('drawMethod').value=method;
   state.settings.drawMethod=method;
@@ -1959,41 +2097,53 @@ function generate(){
   notice(`${state.draw.size}강 대진을 생성했습니다. 코트배정을 실행하세요.`,'success');
 }
 
-let rouletteTimer=null,roulettePreparedTeams=[];
+let rouletteTimer=null,roulettePreparedTeams=[],rouletteCommitted=false;
 function openRoulette(){
   if(shouldUseLinkedDraw(state))throw new Error('예선 진행 대회는 일반 본선 추첨이 아니라 “예선 슬롯으로 본선 선추첨”을 사용하세요.');
   if(state.teams.length<2)throw new Error('최소 2팀이 필요합니다.');
   roulettePreparedTeams=[...state.teams];
-  $('rouletteTeamName').textContent='추첨 준비';
+  rouletteCommitted=false;
+  $('rouletteTeamName').textContent='추첨 준비 · 시작을 누르면 결과가 먼저 확정됩니다';
   $('rouletteProgress').textContent=`0 / ${roulettePreparedTeams.length}`;
   $('rouletteResultList').innerHTML='';
   $('rouletteDialog').showModal();
 }
 function startRoulette(){
+  if(rouletteCommitted)return;
   clearInterval(rouletteTimer);
+  autoRecovery('본선 룰렛 퍼포먼스 추첨 직전');
+  // 공정성: 애니메이션 전에 실제 결과를 한 번만 확정하고 저장한다.
+  state.draw=createDrawWithMethod(state,state.teams,state.settings.drawSize,{method:'roulette',byePriority:state.settings.byePriority});
+  state.courts=[];state.sharedQueue=[];
+  rouletteCommitted=true;
+  commit(`${state.draw.size}강 룰렛 퍼포먼스 결과 선확정 · 체크섬 ${state.drawMeta?.checksum||'-'}`);
+  const actual=(state.draw.rounds[state.draw.size]||[]).flatMap(m=>[m.teamA,m.teamB]).filter(Boolean);
+  roulettePreparedTeams=actual.length?actual:[...state.teams];
   const ring=$('rouletteDialog').querySelector('.roulette-ring');ring.classList.add('spinning');
   let ticks=0;
   rouletteTimer=setInterval(()=>{
-    const team=roulettePreparedTeams[Math.floor(Math.random()*roulettePreparedTeams.length)];
-    $('rouletteTeamName').textContent=teamText(team);
+    const team=roulettePreparedTeams[ticks%roulettePreparedTeams.length];
+    $('rouletteTeamName').textContent=stage590TeamLabel(team);
     ticks++;
     $('rouletteProgress').textContent=`${Math.min(ticks,roulettePreparedTeams.length)} / ${roulettePreparedTeams.length}`;
-    if(ticks>=Math.min(roulettePreparedTeams.length,36)){
+    if(ticks>=roulettePreparedTeams.length){
       clearInterval(rouletteTimer);ring.classList.remove('spinning');finishRoulette();
     }
-  },90);
+  },Math.max(90,Math.min(280,Math.round(6500/Math.max(1,roulettePreparedTeams.length)))));
 }
 function finishRoulette(){
   if(shouldUseLinkedDraw(state))throw new Error('예선 진행 대회는 일반 본선 추첨이 아니라 “예선 슬롯으로 본선 선추첨”을 사용하세요.');
-  state.draw=createDrawWithMethod(state,state.teams,state.settings.drawSize,{method:'roulette',byePriority:state.settings.byePriority});
-  state.courts=[];state.sharedQueue=[];
+  if(!rouletteCommitted){
+    startRoulette();
+    return;
+  }
+  clearInterval(rouletteTimer);
+  $('rouletteDialog').querySelector('.roulette-ring')?.classList.remove('spinning');
   const first=state.draw.rounds[state.draw.size]||[];
-  $('rouletteResultList').innerHTML=first.slice(0,12).map((m,i)=>`<div>${i+1}. ${teamText(m.teamA)} vs ${teamText(m.teamB)}</div>`).join('');
-  $('rouletteTeamName').textContent='추첨 완료';
-  $('rouletteProgress').textContent=`${state.teams.length}팀 배치 완료`;
-  commit(`${state.draw.size}강 룰렛 추첨 · ${allMatches(state.draw).length}경기`);
-  notice('룰렛 추첨을 완료했습니다.','success');
-  setTimeout(()=>$('rouletteDialog').close(),900);
+  $('rouletteResultList').innerHTML=first.slice(0,16).map((m,i)=>`<div>${i+1}. ${stage590TeamLabel(m.teamA)} vs ${stage590TeamLabel(m.teamB)}</div>`).join('');
+  $('rouletteTeamName').textContent='공개 완료';
+  $('rouletteProgress').textContent=`결과 선확정 · ${state.drawMeta?.checksum||'-'}`;
+  notice('이미 확정된 추첨 결과 공개를 완료했습니다.','success');
 }
 function reshuffle(){
   if(shouldUseLinkedDraw(state))throw new Error('예선 진행 대회는 일반 본선 추첨이 아니라 “예선 슬롯으로 본선 선추첨”을 사용하세요.');
@@ -2355,15 +2505,59 @@ function selectReserveSwap(teamId){
   }catch(e){prelimNotice(e.message,'error');}
 }
 
+function stage590SecureShuffle(list){
+  const arr=[...(list||[])];
+  const randomIndex=max=>{
+    if(max<=1)return 0;
+    try{
+      const range=0x100000000-(0x100000000%max);
+      const buf=new Uint32Array(1);
+      let n;
+      do{crypto.getRandomValues(buf);n=buf[0];}while(n>=range);
+      return n%max;
+    }catch(_e){return Math.floor(Math.random()*max);}
+  };
+  for(let i=arr.length-1;i>0;i--){
+    const j=randomIndex(i+1);
+    [arr[i],arr[j]]=[arr[j],arr[i]];
+  }
+  return arr;
+}
+function stage590SimpleChecksum(text=''){
+  let h=2166136261;
+  for(let i=0;i<text.length;i++){h^=text.charCodeAt(i);h=Math.imul(h,16777619);}
+  return (h>>>0).toString(16).padStart(8,'0');
+}
+function stage590GenerateFairPrelim(){
+  const activeCount=Math.max(2,Number(state.prelim?.settings?.activeTeamCount)||state.teams.length);
+  const original=[...(state.teams||[])];
+  const active=original.slice(0,activeCount);
+  const reserve=original.slice(activeCount);
+  const shuffled=stage590SecureShuffle(active);
+  state.teams=[...shuffled,...reserve];
+  let result;
+  try{result=generatePrelim(state,state.prelim.settings);}
+  finally{state.teams=original;}
+  const signature=(state.prelim?.groups||[]).map(g=>`${g.groupNo}:${(g.teams||[]).map(t=>t.id||t.name).join(',')}`).join('|');
+  state.prelim.drawAudit={
+    method:'secure-shuffle',
+    drawnAt:new Date().toISOString(),
+    checksum:stage590SimpleChecksum(signature),
+    teamCount:activeCount,
+    groupCount:(state.prelim?.groups||[]).length
+  };
+  return result;
+}
 function createPrelim(){
   assertPrelimUnlocked('조편성 생성');
   pullPrelimSettings();
-  const result=generatePrelim(state,state.prelim.settings);
+  autoRecovery('예선 조추첨 직전');
+  const result=stage590GenerateFairPrelim();
   if(state.draw?.size&&!state.prelim.linkedDraw?.active&&!hasStartedMainMatches(state)){
     state.draw={size:0,rounds:{}};state.courts=[];state.sharedQueue=[];
   }
-  commit(`예선 조편성 생성 · ${result.groups}조 · ${result.matches}경기 · ${result.teams}팀`);
-  prelimNotice(`${result.groups}개 조와 ${result.matches}경기를 생성했습니다.`,'success');
+  commit(`예선 공정 추첨 · ${result.groups}조 · ${result.matches}경기 · ${result.teams}팀 · 체크섬 ${state.prelim?.drawAudit?.checksum||'-'}`);
+  prelimNotice(`${result.groups}개 조를 추첨했습니다. 결과 체크섬 ${state.prelim?.drawAudit?.checksum||'-'}.`,'success');
 }
 function assignPrelim(){
   assertPrelimUnlocked('코트배정');
@@ -3754,7 +3948,7 @@ function exportPrelimPilotReport(){if(!prelimPilotReport){notice('먼저 예선 
   if($('unlockConfirmText'))$('unlockConfirmText').oninput=()=>{$('confirmDrawUnlockBtn').disabled=$('unlockConfirmText').value.trim()!=='잠금해제';};
   if($('confirmDrawUnlockBtn'))$('confirmDrawUnlockBtn').onclick=confirmDrawUnlock;
   if($('startRouletteBtn'))$('startRouletteBtn').onclick=startRoulette;$('skipRouletteBtn').onclick=finishRoulette;
-  if($('cancelRouletteBtn'))$('cancelRouletteBtn').onclick=()=>{clearInterval(rouletteTimer);$('rouletteDialog').close();};
+  if($('cancelRouletteBtn'))$('cancelRouletteBtn').onclick=()=>{clearInterval(rouletteTimer);$('rouletteDialog').close();if(rouletteCommitted)notice('퍼포먼스 화면만 닫았습니다. 이미 확정된 추첨 결과는 유지됩니다.','info');};
   if($('clearDrawHistoryBtn'))$('clearDrawHistoryBtn').onclick=()=>{clearDrawHistory(state);commit('본선 추첨 기록 삭제');};
   if($('assignCourtsBtn'))$('assignCourtsBtn').onclick=()=>{try{assign();}catch(e){notice(e.message,'error');}};
   if($('refreshQueueBtn'))$('refreshQueueBtn').onclick=refreshQueue;if($('resetBtn'))$('resetBtn').onclick=hardReset;
@@ -14581,3 +14775,50 @@ console.info('[230MATCH] 5.8.5 ready · tournament display status unified across
 console.info('[230MATCH] 5.8.6 ready · home tournament cards show configured tournament status beside selection badge');
 
 console.info('[230MATCH] 5.8.7 ready · tournament status supports reliable auto judgement and admin manual override');
+
+
+(function stage590InstallPerformanceButtons(){
+  function addButton(id,label,afterId,handler,className='btn btn-gold'){
+    if(document.getElementById(id))return;
+    const after=document.getElementById(afterId);
+    if(!after)return;
+    const b=document.createElement('button');b.type='button';b.id=id;b.className=className;b.textContent=label;
+    b.addEventListener('click',handler);
+    after.insertAdjacentElement('afterend',b);
+  }
+  function install(){
+    addButton('stage590PrelimPerformanceBtn','예선 퍼포먼스 추첨','generatePrelimBtn',stage590PrelimPerformance,'btn btn-gold');
+    addButton('stage590MainPerformanceBtn','일반 퍼포먼스 추첨','instantDrawBtn',()=>{try{stage590RunMainPerformance('instant')}catch(e){notice(e.message,'error')}} ,'btn btn-gold');
+    addButton('stage590SeedPerformanceBtn','시드 퍼포먼스 추첨','seededDrawBtn',()=>{try{stage590RunMainPerformance('seeded')}catch(e){notice(e.message,'error')}} ,'btn btn-purple');
+
+    const slot=document.getElementById('stage3441SlotDraw');
+    if(slot&&!document.getElementById('stage590SlotPerformanceBtn')){
+      const b=document.createElement('button');b.id='stage590SlotPerformanceBtn';b.type='button';b.className='btn btn-gold';b.textContent='슬롯 퍼포먼스 추첨';
+      b.onclick=()=>stage590WrapExistingDraw('stage3441SlotDraw','본선 슬롯 퍼포먼스 공개');
+      slot.insertAdjacentElement('afterend',b);
+    }
+    const final=document.getElementById('stage3441FinalDraw');
+    if(final&&!document.getElementById('stage590FinalPerformanceBtn')){
+      const b=document.createElement('button');b.id='stage590FinalPerformanceBtn';b.type='button';b.className='btn btn-gold';b.textContent='최종 본선 퍼포먼스';
+      b.onclick=()=>stage590WrapExistingDraw('stage3441FinalDraw','최종 본선 퍼포먼스 공개');
+      final.insertAdjacentElement('afterend',b);
+    }
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{setTimeout(install,100);setTimeout(install,800)},{once:true});
+  else{setTimeout(install,100);setTimeout(install,800);}
+  window.addEventListener('hashchange',()=>setTimeout(install,120));
+  const observer=new MutationObserver(()=>install());
+  document.addEventListener('DOMContentLoaded',()=>observer.observe(document.body,{childList:true,subtree:true}),{once:true});
+})();
+
+
+setTimeout(()=>{
+  const d=document.getElementById('stage590DrawPerformanceDialog');
+  const start=document.getElementById('stage590PerformanceStart');
+  const skip=document.getElementById('stage590PerformanceSkip');
+  const close=document.getElementById('stage590PerformanceClose');
+  if(start)start.onclick=stage590StartPerformance;
+  if(skip)skip.onclick=stage590SkipPerformance;
+  if(close)close.onclick=()=>{clearInterval(stage590PerformanceTimer);d?.close();notice('퍼포먼스 화면만 닫았습니다. 이미 확정된 추첨 결과는 유지됩니다.','info');};
+},0);
+console.info('[230MATCH] 5.9.0 ready · fair draw results are committed before performance reveal');
