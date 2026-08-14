@@ -896,6 +896,73 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
 }
 </style>
 
+
+<style id="stage595BracketScrollUsability">
+.stage595-bracket-scroll-hint{
+  position:sticky;
+  left:0;
+  z-index:6;
+  margin:0 0 6px;
+  padding:7px 10px;
+  border:1px solid #cbd5e1;
+  border-radius:8px;
+  background:#f8fafc;
+  color:#475569;
+  font-size:11px;
+  font-weight:800;
+}
+#bracketViewport{
+  overflow-x:scroll!important;
+  overflow-y:auto!important;
+  scrollbar-gutter:stable both-edges;
+  cursor:grab;
+  padding-bottom:16px!important;
+}
+#bracketViewport.is-dragging{
+  cursor:grabbing!important;
+  user-select:none!important;
+}
+#bracketViewport::-webkit-scrollbar{
+  height:16px!important;
+  width:12px!important;
+}
+#bracketViewport::-webkit-scrollbar-track{
+  background:#e2e8f0!important;
+  border-radius:999px!important;
+}
+#bracketViewport::-webkit-scrollbar-thumb{
+  background:#64748b!important;
+  border:3px solid #e2e8f0!important;
+  border-radius:999px!important;
+}
+#bracketViewport::-webkit-scrollbar-thumb:hover{
+  background:#334155!important;
+}
+#bracketViewport{
+  scrollbar-width:auto;
+  scrollbar-color:#64748b #e2e8f0;
+}
+#bracketBoard,
+#bracketBoard .round-column,
+#bracketBoard .match-card{
+  cursor:inherit;
+}
+@media(max-width:760px){
+  .stage595-bracket-scroll-hint{
+    font-size:10px;
+    padding:6px 8px;
+  }
+  #bracketViewport{
+    -webkit-overflow-scrolling:touch!important;
+    touch-action:pan-x pan-y!important;
+    cursor:default;
+  }
+  #bracketViewport::-webkit-scrollbar{
+    height:12px!important;
+  }
+}
+</style>
+
 </head>
 <body>
   <header class="topbar">
@@ -2121,6 +2188,7 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
           </div>
           <small>모바일에서는 두 손가락으로도 확대·축소할 수 있습니다.</small>
         </div>
+        <div class="stage595-bracket-scroll-hint">↔ 대진표 위에서 마우스 휠·드래그 또는 손가락으로 좌우 이동할 수 있습니다.</div>
         <div id="bracketViewport" class="bracket-viewport">
           <div id="bracketBoard" class="bracket-board empty-state"><p>생성된 대진이 없습니다.</p></div>
         </div>
@@ -2923,7 +2991,7 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=5940"></script>
+  <script type="module" src="./assets/js/app.js?v=5950"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">

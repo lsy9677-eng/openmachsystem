@@ -3799,6 +3799,48 @@ function bindBracketMobileView571(){
   const board=document.getElementById('bracketBoard');
   if(!viewport||!board)return;
 
+  // 5.9.5: 대진표 본문 어디서든 마우스/트랙패드로 가로 이동 가능.
+  if(viewport.dataset.stage595DesktopScroll!=='1'){
+    viewport.dataset.stage595DesktopScroll='1';
+
+    viewport.addEventListener('wheel',e=>{
+      if(e.ctrlKey)return; // 브라우저 확대/축소는 방해하지 않음
+      const delta=Math.abs(e.deltaX)>Math.abs(e.deltaY)?e.deltaX:e.deltaY;
+      if(!delta)return;
+      const canScroll=viewport.scrollWidth>viewport.clientWidth+2;
+      if(!canScroll)return;
+      e.preventDefault();
+      viewport.scrollLeft+=delta;
+    },{passive:false});
+
+    let dragging=false,startX=0,startLeft=0,moved=false;
+    viewport.addEventListener('mousedown',e=>{
+      if(e.button!==0)return;
+      if(e.target.closest('button,a,input,select,textarea,[role="button"]'))return;
+      dragging=true;moved=false;
+      startX=e.clientX;
+      startLeft=viewport.scrollLeft;
+      viewport.classList.add('is-dragging');
+    });
+    window.addEventListener('mousemove',e=>{
+      if(!dragging)return;
+      const dx=e.clientX-startX;
+      if(Math.abs(dx)>3)moved=true;
+      viewport.scrollLeft=startLeft-dx;
+    });
+    window.addEventListener('mouseup',()=>{
+      if(!dragging)return;
+      dragging=false;
+      viewport.classList.remove('is-dragging');
+    });
+    viewport.addEventListener('click',e=>{
+      if(!moved)return;
+      moved=false;
+      e.preventDefault();
+      e.stopPropagation();
+    },true);
+  }
+
   setBracketZoom(getBracketZoom(),{save:false});
 
   const minus=document.getElementById('bracketZoomOutBtn');
@@ -14964,3 +15006,5 @@ document.addEventListener('click',e=>{
 console.info('[230MATCH] 5.9.3 ready · operator local UI scale + official-start-gated court clock');
 
 console.info('[230MATCH] 5.9.4 ready · bracket-safe scale + opt-in official clock gate + live 30s time badges');
+
+console.info('[230MATCH] 5.9.5 ready · bracket scroll works from main canvas with visible horizontal scrollbar');
