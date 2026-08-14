@@ -4196,86 +4196,227 @@ function stage5929BindBracketZoomDelegation(){
 }
 
 
-function stage5931CollectPageCss(){
-  let css='';
-  for(const sheet of [...document.styleSheets]){
-    try{css+=[...sheet.cssRules].map(rule=>rule.cssText).join('\n');}catch(_e){}
-  }
-  return css;
+
+let __stage5932BracketSvgUrl='';
+let __stage5932BracketSvgPayload=null;
+
+function stage5932Xml(value){
+  return String(value??'').replace(/[&<>"']/g,ch=>({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'
+  }[ch]));
 }
-function stage5931BracketImageDocumentHtml(){
-  const source=document.getElementById('bracketBoard');
-  if(!source||source.classList.contains('empty-state')||!source.querySelector('.round-column'))return '';
-  return `<article class="print-sheet bracket-tree-print-sheet stage5931-bracket-image-sheet">${printBracketHtml()}</article>`;
+function stage5932RoundLabel(size){
+  const n=Number(size||0);
+  if(n===2)return '결승';
+  if(n===4)return '준결승';
+  return n?`${n}강`:'본선';
+}
+function stage5932RoundColor(size){
+  const n=Number(size||0);
+  if(n===64)return '#2f73d9';
+  if(n===32)return '#6b55c9';
+  if(n===16)return '#a64bc1';
+  if(n===8)return '#d76a21';
+  if(n===4)return '#c83143';
+  if(n===2)return '#c69111';
+  return '#4773b8';
+}
+function stage5932TeamName(team){
+  return String(resultDialogTeamName(team)||'TBD').trim()||'TBD';
+}
+function stage5932MatchStatus(match){
+  if(match?.status==='completed'){
+    return{label:'완료',fill:'#475569',text:'#ffffff',kind:'completed'};
+  }
+  const placement=liveMatchPlacement(match);
+  if(placement?.kind==='playing')return{label:'시합중',fill:'#dc2626',text:'#ffffff',kind:'playing'};
+  if(placement?.kind==='wait1')return{label:'대기1',fill:'#d98b00',text:'#ffffff',kind:'wait1'};
+  if(placement?.kind==='shared')return{label:'공용대기',fill:'#6d4cc7',text:'#ffffff',kind:'shared'};
+  return{label:'대진 대기',fill:'#6987a7',text:'#ffffff',kind:'waiting'};
+}
+function stage5932WinnerSide(match){
+  if(match?.status!=='completed')return '';
+  if(match?.winnerId){
+    if(String(match.winnerId)===String(match.teamA?.id))return 'A';
+    if(String(match.winnerId)===String(match.teamB?.id))return 'B';
+  }
+  const a=Number(match?.scoreA),b=Number(match?.scoreB);
+  if(Number.isFinite(a)&&Number.isFinite(b)&&a!==b)return a>b?'A':'B';
+  return '';
+}
+function stage5932BuildBracketSvg(){
+  const rounds=state.draw?.rounds||{};
+  const sizes=Object.keys(rounds).map(Number).filter(n=>Number.isFinite(n)&&n>=2).sort((x,y)=>y-x);
+  if(!sizes.length)return null;
+
+  const firstSize=sizes[0];
+  const firstMatches=Array.isArray(rounds[firstSize])?rounds[firstSize]:[];
+  if(!firstMatches.length)return null;
+
+  const cardW=250;
+  const cardH=82;
+  const colGap=94;
+  const stepX=cardW+colGap;
+  const headerH=92;
+  const rowStep=104;
+  const left=44;
+  const top=headerH+42;
+  const right=44;
+  const bottom=54;
+
+  const centersBySize={};
+  centersBySize[firstSize]=firstMatches.map((_,i)=>top+i*rowStep+cardH/2);
+
+  for(let sIndex=1;sIndex<sizes.length;sIndex++){
+    const prevSize=sizes[sIndex-1];
+    const size=sizes[sIndex];
+    const matches=Array.isArray(rounds[size])?rounds[size]:[];
+    const prevCenters=centersBySize[prevSize]||[];
+    centersBySize[size]=matches.map((_,i)=>{
+      const a=prevCenters[i*2];
+      const b=prevCenters[i*2+1];
+      if(Number.isFinite(a)&&Number.isFinite(b))return(a+b)/2;
+      if(Number.isFinite(a))return a;
+      return top+i*rowStep*(2**sIndex)+cardH/2;
+    });
+  }
+
+  const width=left + sizes.length*cardW + Math.max(0,sizes.length-1)*colGap + right;
+  const height=Math.max(900, top + Math.max(1,firstMatches.length-1)*rowStep + cardH + bottom);
+
+  let lines='';
+  for(let i=0;i<sizes.length-1;i++){
+    const fromSize=sizes[i];
+    const toSize=sizes[i+1];
+    const from=centersBySize[fromSize]||[];
+    const to=centersBySize[toSize]||[];
+    const x1=left+i*stepX+cardW;
+    const x2=left+(i+1)*stepX;
+    const mid=x1+colGap/2;
+    for(let j=0;j<to.length;j++){
+      const yA=from[j*2],yB=from[j*2+1],yT=to[j];
+      if(Number.isFinite(yA)){
+        lines+=`<path d="M${x1} ${yA} H${mid} V${yT} H${x2}" fill="none" stroke="#87a8d8" stroke-width="2"/>`;
+      }
+      if(Number.isFinite(yB)){
+        lines+=`<path d="M${x1} ${yB} H${mid}" fill="none" stroke="#87a8d8" stroke-width="2"/>`;
+      }
+    }
+  }
+
+  let cols='';
+  sizes.forEach((size,colIndex)=>{
+    const matches=Array.isArray(rounds[size])?rounds[size]:[];
+    const color=stage5932RoundColor(size);
+    const x=left+colIndex*stepX;
+    const label=stage5932RoundLabel(size);
+
+    cols+=`<g>
+      <rect x="${x}" y="28" width="${cardW}" height="44" rx="10" fill="${color}"/>
+      <text x="${x+14}" y="56" fill="#fff" font-size="19" font-weight="800">${stage5932Xml(label)}</text>
+    </g>`;
+
+    matches.forEach((m,index)=>{
+      const center=(centersBySize[size]||[])[index] ?? (top+index*rowStep+cardH/2);
+      const y=center-cardH/2;
+      const status=stage5932MatchStatus(m);
+      const winner=stage5932WinnerSide(m);
+      const teamA=stage5932TeamName(m?.teamA);
+      const teamB=stage5932TeamName(m?.teamB);
+      const scoreA=Number.isFinite(Number(m?.scoreA))?Number(m.scoreA):'';
+      const scoreB=Number.isFinite(Number(m?.scoreB))?Number(m.scoreB):'';
+      const completed=m?.status==='completed';
+
+      const bodyFill=completed?'#e2e8f0':'#f8fbff';
+      const border=completed?'#94a3b8':color;
+      const rowAFill=winner==='A'?'#d9eadf':'transparent';
+      const rowBFill=winner==='B'?'#d9eadf':'transparent';
+      const matchNo=String(m?.matchNo||index+1);
+
+      cols+=`<g>
+        <rect x="${x}" y="${y}" width="${cardW}" height="${cardH}" rx="10" fill="${bodyFill}" stroke="${border}" stroke-width="2"/>
+        <rect x="${x}" y="${y}" width="5" height="${cardH}" rx="3" fill="${color}"/>
+        <text x="${x+12}" y="${y+18}" fill="#334155" font-size="11" font-weight="800">${stage5932Xml(matchNo)}경기</text>
+        <rect x="${x+cardW-72}" y="${y+7}" width="62" height="21" rx="10" fill="${status.fill}"/>
+        <text x="${x+cardW-41}" y="${y+21.5}" text-anchor="middle" fill="${status.text}" font-size="10" font-weight="800">${stage5932Xml(status.label)}</text>
+
+        <rect x="${x+8}" y="${y+31}" width="${cardW-16}" height="22" rx="4" fill="${rowAFill}"/>
+        <rect x="${x+8}" y="${y+55}" width="${cardW-16}" height="22" rx="4" fill="${rowBFill}"/>
+
+        <text x="${x+13}" y="${y+46}" fill="#1f2937" font-size="12" font-weight="${winner==='A'?'800':'600'}">${stage5932Xml(teamA.slice(0,28))}</text>
+        <text x="${x+13}" y="${y+70}" fill="#1f2937" font-size="12" font-weight="${winner==='B'?'800':'600'}">${stage5932Xml(teamB.slice(0,28))}</text>
+        ${completed?`<text x="${x+cardW-16}" y="${y+46}" text-anchor="end" fill="#334155" font-size="12" font-weight="800">${stage5932Xml(scoreA)}</text>
+        <text x="${x+cardW-16}" y="${y+70}" text-anchor="end" fill="#334155" font-size="12" font-weight="800">${stage5932Xml(scoreB)}</text>`:''}
+      </g>`;
+    });
+  });
+
+  const tournament=stage5932Xml(state.tournament?.name||'230MATCH 본선 대진표');
+  const date=stage5932Xml(state.tournament?.date||'');
+  const venue=stage5932Xml(state.tournament?.venue||state.tournament?.location||'');
+
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+    <rect width="100%" height="100%" fill="#ffffff"/>
+    <text x="${left}" y="22" fill="#0f2a50" font-size="20" font-weight="900">${tournament}</text>
+    <text x="${width-right}" y="22" text-anchor="end" fill="#64748b" font-size="11">${date}${date&&venue?' · ':''}${venue}</text>
+    ${lines}
+    ${cols}
+  </svg>`;
+
+  return{svg,width,height};
+}
+function stage5932SetPreview(payload){
+  const viewport=document.getElementById('stage5931BracketImageViewport');
+  if(!viewport)return;
+  if(__stage5932BracketSvgUrl){URL.revokeObjectURL(__stage5932BracketSvgUrl);__stage5932BracketSvgUrl='';}
+  __stage5932BracketSvgPayload=payload;
+  __stage5932BracketSvgUrl=URL.createObjectURL(new Blob([payload.svg],{type:'image/svg+xml;charset=utf-8'}));
+  viewport.innerHTML=`<img class="stage5932-bracket-svg-preview" alt="전체 본선 대진표" src="${__stage5932BracketSvgUrl}">`;
+  viewport.scrollTo({left:0,top:0});
 }
 function stage5931OpenBracketImageView(){
   const dialog=document.getElementById('stage5931BracketImageDialog');
-  const viewport=document.getElementById('stage5931BracketImageViewport');
-  if(!dialog||!viewport)return;
-
-  const html=stage5931BracketImageDocumentHtml();
-  if(!html){notice('전체보기할 본선 대진표가 없습니다.','error');return;}
-
-  viewport.innerHTML=html;
+  if(!dialog)return;
+  const payload=stage5932BuildBracketSvg();
+  if(!payload){notice('전체보기할 본선 대진표가 없습니다.','error');return;}
+  stage5932SetPreview(payload);
   if(!dialog.open)dialog.showModal();
-
-  requestAnimationFrame(()=>{
-    const board=viewport.querySelector('.print-live-bracket-board');
-    if(board){
-      board.style.zoom='1';
-      board.style.transform='none';
-    }
-    viewport.scrollTo({left:0,top:0});
-  });
 }
 async function stage5931SaveBracketImagePng(){
-  const dialog=document.getElementById('stage5931BracketImageDialog');
-  const sheet=dialog?.querySelector('.stage5931-bracket-image-sheet');
-  if(!sheet){notice('저장할 전체 대진 이미지가 없습니다.','error');return;}
+  const payload=__stage5932BracketSvgPayload||stage5932BuildBracketSvg();
+  if(!payload){notice('저장할 전체 대진 이미지가 없습니다.','error');return;}
 
   const button=document.getElementById('stage5931SaveBracketPngBtn');
-  if(button){button.disabled=true;button.textContent='이미지 만드는 중…';}
+  if(button){button.disabled=true;button.textContent='PNG 만드는 중…';}
 
-  let sourceUrl='';
+  let svgUrl='';
   try{
-    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
-    const clone=sheet.cloneNode(true);
-    const rect=sheet.getBoundingClientRect();
-    const width=Math.max(1400,Math.round(sheet.scrollWidth||rect.width||1800));
-    const height=Math.max(900,Math.round(sheet.scrollHeight||rect.height||1100));
-    const css=stage5931CollectPageCss();
-
-    const xhtml=`<div xmlns="http://www.w3.org/1999/xhtml" style="width:${width}px;background:#fff;padding:0;margin:0"><style>${css}
-      .stage5931-bracket-image-sheet{width:${width}px!important;max-width:none!important;margin:0!important;background:#fff!important}
-      .stage5931-bracket-image-sheet .print-live-bracket-board{zoom:1!important;transform:none!important}
-    </style>${clone.outerHTML}</div>`;
-    const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><foreignObject width="100%" height="100%">${xhtml}</foreignObject></svg>`;
-    sourceUrl=URL.createObjectURL(new Blob([svg],{type:'image/svg+xml;charset=utf-8'}));
+    svgUrl=URL.createObjectURL(new Blob([payload.svg],{type:'image/svg+xml;charset=utf-8'}));
     const img=new Image();
 
-    const blob=await new Promise((resolve,reject)=>{
-      img.onload=()=>{
-        try{
-          const maxW=3200;
-          const scale=Math.min(2,maxW/width);
-          const canvas=document.createElement('canvas');
-          canvas.width=Math.max(1,Math.round(width*scale));
-          canvas.height=Math.max(1,Math.round(height*scale));
-          const ctx=canvas.getContext('2d');
-          ctx.scale(scale,scale);
-          ctx.fillStyle='#fff';
-          ctx.fillRect(0,0,width,height);
-          ctx.drawImage(img,0,0);
-          canvas.toBlob(result=>result?resolve(result):reject(new Error('PNG blob failed')),'image/png');
-        }catch(error){reject(error);}
-      };
-      img.onerror=()=>reject(new Error('SVG image load failed'));
-      img.src=sourceUrl;
+    await new Promise((resolve,reject)=>{
+      img.onload=resolve;
+      img.onerror=()=>reject(new Error('SVG load failed'));
+      img.src=svgUrl;
     });
 
-    URL.revokeObjectURL(sourceUrl);sourceUrl='';
+    const maxWidth=3600;
+    const scale=Math.min(2,maxWidth/payload.width);
+    const canvas=document.createElement('canvas');
+    canvas.width=Math.max(1,Math.round(payload.width*scale));
+    canvas.height=Math.max(1,Math.round(payload.height*scale));
+    const ctx=canvas.getContext('2d');
+    ctx.fillStyle='#fff';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.drawImage(img,0,0,canvas.width,canvas.height);
 
-    const downloadUrl=URL.createObjectURL(blob);
+    const png=await new Promise((resolve,reject)=>{
+      canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('PNG blob failed')),'image/png');
+    });
+
+    URL.revokeObjectURL(svgUrl);svgUrl='';
+
+    const downloadUrl=URL.createObjectURL(png);
     const link=document.createElement('a');
     const tournament=String(state.tournament?.name||'230MATCH').replace(/[\\/:*?"<>|]+/g,'_').replace(/\s+/g,'_');
     link.href=downloadUrl;
@@ -4286,13 +4427,14 @@ async function stage5931SaveBracketImagePng(){
     setTimeout(()=>URL.revokeObjectURL(downloadUrl),1500);
     notice('전체 본선 대진표 PNG 이미지를 저장했습니다.','success');
   }catch(error){
-    if(sourceUrl)URL.revokeObjectURL(sourceUrl);
-    console.error('[5.9.31 bracket image]',error);
-    notice('대진 이미지 저장에 실패했습니다. 출력 센터의 PNG 저장을 이용해 주세요.','error');
+    if(svgUrl)URL.revokeObjectURL(svgUrl);
+    console.error('[5.9.32 bracket PNG]',error);
+    notice('PNG 저장에 실패했습니다. 다시 시도해 주세요.','error');
   }finally{
     if(button){button.disabled=false;button.textContent='PNG 저장';}
   }
 }
+
 function stage5931BindBracketImageView(){
   if(document.documentElement.dataset.stage5931BracketImageBound==='1')return;
   document.documentElement.dataset.stage5931BracketImageBound='1';
@@ -11007,13 +11149,10 @@ console.info('[230MATCH] 34.4.2 ready · main wait1 refill and shared queue elap
       return;
     }
     if(doc.target==='bracket'){
-      renderPrintPreview();
-      await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
-      const svg=getPreviewBracketSvg();
-      if(!svg)throw new Error('가지형 대진표 SVG를 찾지 못했습니다.');
-      const size=getSvgSize(svg);
-      await svgMarkupToPng(svg,size.width,size.height,`230MATCH_${doc.label.replace(/\s+/g,'_')}_${date}.png`);
-      notice('본선 가지형 대진표 PNG 이미지를 저장했습니다.','success');
+      const asset=stage5932BuildBracketSvg();
+      if(!asset)throw new Error('생성된 본선 대진표가 없습니다.');
+      await svgMarkupToPng(asset.svg,asset.width,asset.height,`230MATCH_${doc.label.replace(/\s+/g,'_')}_${date}.png`);
+      notice('본선 전체 대진표 PNG 이미지를 저장했습니다.','success');
       return;
     }
     return savePrintPng();
@@ -15701,3 +15840,46 @@ console.info('[230MATCH] 5.9.28 stabilization · prelim result uses in-app confi
 console.info('[230MATCH] 5.9.29 stabilization · mobile bracket vertical page scroll + horizontal pan + delegated zoom buttons');
 
 console.info('[230MATCH] 5.9.31 stabilization · fixed scroll guides removed + full bracket image preview/save');
+
+console.info('[230MATCH] 5.9.32 stabilization · bracket full image uses pure SVG renderer; no foreignObject/print clone');
+
+
+/* 230MATCH 5.9.33 · output center bracket uses same pure SVG renderer as full-image view */
+(function stage5933UnifyPrintCenterBracketSvg(){
+  function bracketPrintHtml5933(){
+    const payload=stage5932BuildBracketSvg();
+    if(!payload)return printHeader('본선 대진표')+'<div class="print-empty">생성된 본선 대진표가 없습니다.</div>';
+    const svg=payload.svg.replace('<svg xmlns="http://www.w3.org/2000/svg"',`<svg class="bracket-print-svg stage5933-print-bracket-svg" xmlns="http://www.w3.org/2000/svg"`);
+    return printHeader('본선 대진표')+
+      '<div class="bracket-print-note stage5933-print-note">현재 본선 대진표와 동일한 순수 SVG 방식으로 출력합니다. 팀명·점수·진행 상태를 포함합니다.</div>'+
+      `<div class="stage5933-print-bracket-wrap">${svg}</div>`;
+  }
+
+  printBracketHtml=window.printBracketHtml=bracketPrintHtml5933;
+
+  // Old save handlers query .bracket-print-svg. Since the preview now contains the same pure SVG,
+  // they export this SVG rather than the old DOM-cloned bracket.
+  function refreshIfBracket(){
+    const target=document.getElementById('printTargetSelect');
+    if(target?.value!=='bracket')return;
+    try{renderPrintPreview();}catch(error){console.error('[5.9.33 print preview]',error);}
+  }
+
+  function patchLabel(){
+    const option=document.querySelector('#printTargetSelect option[value="bracket"]');
+    if(option)option.textContent='본선 대진표 · 전체 SVG';
+  }
+
+  function activate(){
+    patchLabel();
+    refreshIfBracket();
+  }
+
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(activate,1800),{once:true});
+  else setTimeout(activate,1800);
+  window.addEventListener('hashchange',()=>{if(location.hash.includes('print'))setTimeout(activate,350);});
+  document.addEventListener('change',event=>{
+    if(event.target?.id==='printTargetSelect'&&event.target.value==='bracket')setTimeout(refreshIfBracket,0);
+  });
+  console.info('[230MATCH] 5.9.33 stabilization · print center bracket unified with pure SVG renderer');
+})();
