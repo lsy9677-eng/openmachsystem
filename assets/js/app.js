@@ -4600,120 +4600,8 @@ function stage5931BindBracketImageView(){
     if(event.target.closest?.('#stage5931BracketImageBtn')){
       event.preventDefault();
       stage5937CaptureVisibleBracketPng({source:'direct'});
-      return;
-    }
-    if(event.target.closest?.('#stage5931SaveBracketPngBtn')){
-      event.preventDefault();
-      stage5931SaveBracketImagePng();
-      return;
-    }
-    if(event.target.closest?.('[data-stage5931-close]')){
-      document.getElementById('stage5931BracketImageDialog')?.close();
     }
   },true);
-}
-
-
-function stage5938WinnerIds(){
-  const ids=new Set();
-  if(!state.draw?.rounds)return ids;
-  for(const match of allMatches(state.draw)){
-    if(!match||match.status!=='completed'||!match.winnerId)continue;
-    ids.add(String(match.id));
-  }
-  return ids;
-}
-
-function stage5938HighlightWinnerBranches(){
-  const board=document.getElementById('bracketBoard');
-  if(!board||!state.draw?.rounds)return;
-
-  // Existing connector redraw remains the source of geometry.
-  try{window.__redrawBracketConnectors?.('winner-path');}catch(_e){}
-
-  const completedWinnerIds=stage5938WinnerIds();
-
-  // Clear previous overlay only; never mutate base connector geometry.
-  board.querySelectorAll('.stage5938-winner-path-overlay').forEach(el=>el.remove());
-
-  const svg=board.querySelector('svg.bracket-connectors,svg[data-bracket-connectors],svg');
-  if(!svg)return;
-
-  // We reuse rendered connector path geometry. For each completed match card,
-  // find its outgoing connector segment by nearest path start-point to card right-center.
-  const svgRect=svg.getBoundingClientRect();
-  const boardRect=board.getBoundingClientRect();
-  const paths=[...svg.querySelectorAll('path')];
-  if(!paths.length)return;
-
-  const ns='http://www.w3.org/2000/svg';
-  const overlay=document.createElementNS(ns,'g');
-  overlay.setAttribute('class','stage5938-winner-path-overlay');
-  overlay.setAttribute('pointer-events','none');
-
-  const used=new Set();
-
-  board.querySelectorAll('.match-card[data-match-id],.match-card[data-id],.match-card').forEach(card=>{
-    const id=String(card.dataset.matchId||card.dataset.id||'');
-    if(!id||!completedWinnerIds.has(id))return;
-
-    const rect=card.getBoundingClientRect();
-    const targetX=rect.right-svgRect.left;
-    const targetY=rect.top+rect.height/2-svgRect.top;
-
-    let best=null,bestDist=Infinity,bestIndex=-1;
-    paths.forEach((path,idx)=>{
-      if(used.has(idx))return;
-      try{
-        const len=path.getTotalLength();
-        if(!len)return;
-        const p0=path.getPointAtLength(0);
-        const p1=path.getPointAtLength(Math.min(10,len));
-        const d=Math.min(
-          Math.hypot(p0.x-targetX,p0.y-targetY),
-          Math.hypot(p1.x-targetX,p1.y-targetY)
-        );
-        if(d<bestDist){bestDist=d;best=path;bestIndex=idx;}
-      }catch(_e){}
-    });
-
-    // Keep threshold generous enough for zoom/transform differences, but not arbitrary.
-    if(best&&bestDist<55){
-      used.add(bestIndex);
-      const clone=best.cloneNode(true);
-      clone.removeAttribute('class');
-      clone.setAttribute('fill','none');
-      clone.setAttribute('stroke','#1d4ed8');
-      clone.setAttribute('stroke-width','4.2');
-      clone.setAttribute('stroke-linecap','round');
-      clone.setAttribute('stroke-linejoin','round');
-      clone.setAttribute('opacity','0.96');
-      clone.setAttribute('vector-effect','non-scaling-stroke');
-      overlay.appendChild(clone);
-    }
-  });
-
-  if(overlay.childNodes.length)svg.appendChild(overlay);
-}
-
-function stage5938ScheduleWinnerBranches(){
-  requestAnimationFrame(()=>requestAnimationFrame(()=>stage5938HighlightWinnerBranches()));
-}
-
-function stage5938BindWinnerBranchRefresh(){
-  if(document.documentElement.dataset.stage5938WinnerBranchBound==='1')return;
-  document.documentElement.dataset.stage5938WinnerBranchBound='1';
-
-  document.addEventListener('click',event=>{
-    if(event.target.closest?.('[data-round-size],#bracketZoomOutBtn,#bracketZoomResetBtn,#bracketZoomInBtn')){
-      stage5938ScheduleWinnerBranches();
-  stage5938BindWinnerBranchRefresh();
-    }
-  });
-
-  window.addEventListener('hashchange',()=>{
-    if(location.hash.includes('bracket'))stage5938ScheduleWinnerBranches();
-  });
 }
 
 
@@ -4889,7 +4777,6 @@ function bind(){
   if($('bracketResetViewBtn'))$('bracketResetViewBtn').onclick=resetBracketView;
   if($('bracketFullscreenBtn'))$('bracketFullscreenBtn').onclick=toggleBracketFullscreen;
   bindBracketMobileView571();
-  stage5938ScheduleWinnerBranches();
   document.addEventListener('keydown',event=>{if(event.key==='Escape'&&document.body.classList.contains('bracket-fullscreen-open'))setBracketFullscreen(false);});
 
 
@@ -15223,6 +15110,9 @@ function stage7152CompactCourtCards(){
         const mid=a.x1+gap/2;
         const path=document.createElementNS(SVG_NS,'path');
         path.setAttribute('d',`M ${a.x1.toFixed(1)} ${a.y.toFixed(1)} H ${mid.toFixed(1)} V ${b.y.toFixed(1)} H ${b.x2.toFixed(1)}`);
+        // 5.9.39: 완료된 경기(승자가 다음 라운드로 올라간 연결선)는 굵고 진하게.
+        // 연결선을 그리는 이 시점에 카드를 이미 알고 있으므로 좌표 추측 없이 바로 표시한다.
+        if(card.classList.contains('completed'))path.classList.add('stage5938-winner-path');
         svg.appendChild(path);
       });
     }
@@ -16068,30 +15958,19 @@ console.info('[230MATCH] 5.9.31 stabilization · fixed scroll guides removed + f
 console.info('[230MATCH] 5.9.32 stabilization · bracket full image uses pure SVG renderer; no foreignObject/print clone');
 
 
-/* 230MATCH 5.9.33 · output center bracket uses same pure SVG renderer as full-image view */
-(function stage5933UnifyPrintCenterBracketSvg(){
-  function bracketPrintHtml5933(){
-    const payload=stage5932BuildBracketSvg();
-    if(!payload)return printHeader('본선 대진표')+'<div class="print-empty">생성된 본선 대진표가 없습니다.</div>';
-    const svg=payload.svg.replace('<svg xmlns="http://www.w3.org/2000/svg"',`<svg class="bracket-print-svg stage5933-print-bracket-svg" xmlns="http://www.w3.org/2000/svg"`);
-    return printHeader('본선 대진표')+
-      '<div class="bracket-print-note stage5933-print-note">현재 본선 대진표와 동일한 순수 SVG 방식으로 출력합니다. 팀명·점수·진행 상태를 포함합니다.</div>'+
-      `<div class="stage5933-print-bracket-wrap">${svg}</div>`;
-  }
-
-  printBracketHtml=window.printBracketHtml=bracketPrintHtml5933;
-
-  // Old save handlers query .bracket-print-svg. Since the preview now contains the same pure SVG,
-  // they export this SVG rather than the old DOM-cloned bracket.
+/* 230MATCH 5.9.39 · output center bracket view now stays on the live DOM renderer
+   (stage 35.4.2 printBracketHtml, same board as the 대진표 screen / PNG capture).
+   5.9.33 used to overwrite it with the old abstract SVG poster — removed. */
+(function stage5939KeepLivePrintBracket(){
   function refreshIfBracket(){
     const target=document.getElementById('printTargetSelect');
     if(target?.value!=='bracket')return;
-    try{renderPrintPreview();}catch(error){console.error('[5.9.33 print preview]',error);}
+    try{renderPrintPreview();}catch(error){console.error('[5.9.39 print preview]',error);}
   }
 
   function patchLabel(){
     const option=document.querySelector('#printTargetSelect option[value="bracket"]');
-    if(option)option.textContent='본선 대진표 · 전체 SVG';
+    if(option)option.textContent='본선 대진표 그대로 출력';
   }
 
   function activate(){
@@ -16105,7 +15984,7 @@ console.info('[230MATCH] 5.9.32 stabilization · bracket full image uses pure SV
   document.addEventListener('change',event=>{
     if(event.target?.id==='printTargetSelect'&&event.target.value==='bracket')setTimeout(refreshIfBracket,0);
   });
-  console.info('[230MATCH] 5.9.33 stabilization · print center bracket unified with pure SVG renderer');
+  console.info('[230MATCH] 5.9.39 stabilization · print center bracket view unified with live bracket screen (SVG poster override removed)');
 })();
 
 console.info('[230MATCH] 5.9.34 · polished compact SVG bracket layout');
@@ -16117,3 +15996,5 @@ console.info('[230MATCH] 5.9.36 · zoom buttons hardened + one direct SVG->PNG p
 console.info('[230MATCH] 5.9.37 final · bracket PNG captures the live bracket DOM at high resolution');
 
 console.info('[230MATCH] 5.9.38 final stabilization · print-center capture unified + winner branches emphasized');
+
+console.info('[230MATCH] 5.9.39 final · winner-path highlight drawn inside connector redraw (never wiped) + print center bracket reverted to live board renderer (no more separate SVG poster)');
