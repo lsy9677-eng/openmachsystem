@@ -9,7 +9,7 @@ import{buildCourts,assignInitial,queueReadyMatches,refillCourt}from'./court-engi
 import{submitResult}from'./result-engine.js?v=5800';
 import{ensurePrelimState,generatePrelim,assignPrelimCourts,findPrelimMatch,submitPrelimResult,resetPrelim,autoFitPrelimGroups,swapActiveReserveTeam,isPrelimLocked,lockPrelim,unlockPrelim}from'./prelim-engine.js?v=5800';
 import{downloadJson}from'./recovery.js?v=332012';
-import{ensureTimeState,calculateTimeMetrics}from'./time-engine-v5000.js?v=5000';
+import{ensureTimeState,calculateTimeMetrics}from'./time-engine-v5000.js?v=5930';
 import{ensureMessagingState,generatePlayingMessages,generateWait1Messages,generateCurrentCourtMessages,generateCurrentWaitMessages,generateAllTimeMessages,markMessageSent,deleteMessage,clearSentMessages,markAllSent,smsUri,refreshMessageContacts,mergePendingDuplicates,getMessageHistory}from'./message-engine.js?v=3521';
 import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactData,importContactData}from'./contact-engine-v5000.js?v=5000';
 import{render,teamText}from'./ui.js?v=5701';
@@ -893,6 +893,7 @@ function applyRoleUI(){
     if(!el.hasAttribute('data-admin-only')&&!el.hasAttribute('data-operator-only'))el.hidden=false;
   });
   try{applyTournamentReadOnlyUi();}catch(_e){}
+  try{stage593ApplyUiScale();}catch(_e){}
 }
 if(hasAuthorizedMainDraw(state)&&state?.mainDrawLifecycle?.mode==='slot'&&linkedDrawNeedsRepair(state)&&!hasStartedMainMatches(state)){
   try{
@@ -1175,12 +1176,25 @@ function smsFormatClock(date){
   try{return date.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',hour12:false}).replace('24:','00:');}
   catch(_e){return'';}
 }
+function stage593OfficialStartMs(){
+  const date=String(state?.portal?.guide?.date||'').trim();
+  const time=String(state?.portal?.guide?.startTime||'').trim();
+  if(!date||!time)return 0;
+  const d=new Date(`${date}T${time.length===5?time+':00':time}`);
+  return Number.isFinite(d.getTime())?d.getTime():0;
+}
+function stage593EffectiveMatchStartMs(match){
+  const assigned=match?.startedAt?new Date(match.startedAt).getTime():Date.now();
+  const safe=Number.isFinite(assigned)?assigned:Date.now();
+  const official=stage593OfficialStartMs();
+  return official?Math.max(safe,official):safe;
+}
 function smsPlayingRemainingMinutes(court){
   const slot=smsConfiguredMatchMinutes();
   const matchId=String(court?.playing||'');
   if(!matchId)return 0;
   const match=findAnyMatchById(matchId);
-  const started=match?.startedAt?new Date(match.startedAt).getTime():0;
+  const started=match?.startedAt?stage593EffectiveMatchStartMs(match):0;
   if(!started||!Number.isFinite(started))return slot;
   const elapsed=Math.max(0,Math.floor((Date.now()-started)/60000));
   return Math.max(0,slot-elapsed);
@@ -1200,7 +1214,10 @@ function smsExpectedClock(matchId,placement={}){
   }
   let minutes=0;
   if(court){
-    if(String(court.playing||'')===id)return smsFormatClock(new Date());
+    if(String(court.playing||'')===id){
+      const m=findAnyMatchById(id),start=m?stage593EffectiveMatchStartMs(m):Date.now();
+      return smsFormatClock(new Date(Math.max(Date.now(),start)));
+    }
     minutes=smsPlayingRemainingMinutes(court);
     if(String(court.wait1||'')===id)return smsFormatClock(new Date(Date.now()+minutes*60000));
     const local=[...(court.queue||[]),...(court.manualQueue||[])];
@@ -8047,7 +8064,7 @@ function stage329EnsureEditor(){
         <small><b>자동 판단</b>: 현재 경기 데이터로 접수중·시합중·시합완료를 판단합니다. <b>직접 선택</b>: 관리자가 선택한 상태를 우선 표시합니다. 표시 상태를 바꿔도 경기 결과·대진 데이터는 변경하지 않습니다.</small>
       </div>
       <label><span>대회일</span><input id="stage329Date" type="date"></label>
-      <label><span>시작 시간</span><input id="stage329StartTime" type="time"></label>
+      <label class="stage593-official-start"><span>공식 경기 시작 시간</span><input id="stage329StartTime" type="time"><small>코트를 미리 배정해도 이 시각 전에는 경기 진행시간이 흐르지 않습니다.</small></label>
       <label class="stage329-span-2"><span>장소</span><input id="stage329Venue"></label>
       <label><span>참가 정원</span><input id="stage329Capacity" type="number" min="1"></label>
       <label><span>본선 규모</span><select id="stage329DrawSize"><option value="32">32강</option><option value="64">64강</option><option value="128">128강</option></select></label>
@@ -8076,6 +8093,43 @@ function stage329EnsureEditor(){
   dialog.addEventListener('click',e=>{if(e.target===dialog)dialog.close();});
   dialog.querySelector('form').addEventListener('submit',stage329SaveTournamentEdit);
   return dialog;
+}
+
+
+const STAGE593_UI_SCALE_KEY='230match-operator-ui-scale-v593';
+const STAGE593_UI_SCALES={compact:.96,default:1.06,large:1.12};
+function stage593UiScaleChoice(){
+  try{
+    const v=localStorage.getItem(STAGE593_UI_SCALE_KEY)||'default';
+    return Object.prototype.hasOwnProperty.call(STAGE593_UI_SCALES,v)?v:'default';
+  }catch(_e){return'default';}
+}
+function stage593ApplyUiScale(){
+  const choice=stage593UiScaleChoice();
+  const active=typeof canOperate==='function'&&canOperate();
+  const scale=active?STAGE593_UI_SCALES[choice]:1;
+  document.documentElement.style.setProperty('--stage593-ui-scale',String(scale));
+  document.body?.classList.toggle('stage593-operator-scale-active',active&&scale!==1);
+  document.querySelectorAll('[data-stage593-scale]').forEach(btn=>{
+    const on=btn.dataset.stage593Scale===choice;
+    btn.classList.toggle('active',on);
+    btn.setAttribute('aria-pressed',String(on));
+  });
+}
+function stage593BindUiScale(){
+  document.querySelectorAll('[data-stage593-scale]').forEach(btn=>{
+    if(btn.dataset.stage593Bound==='1')return;
+    btn.dataset.stage593Bound='1';
+    btn.addEventListener('click',()=>{
+      if(!(typeof canOperate==='function'&&canOperate()))return;
+      const value=btn.dataset.stage593Scale;
+      if(!Object.prototype.hasOwnProperty.call(STAGE593_UI_SCALES,value))return;
+      try{localStorage.setItem(STAGE593_UI_SCALE_KEY,value);}catch(_e){}
+      stage593ApplyUiScale();
+      notice(`운영 화면 글자 크기를 ${btn.textContent.trim()}로 변경했습니다. 이 브라우저에만 적용됩니다.`,'success');
+    });
+  });
+  stage593ApplyUiScale();
 }
 
 function stage583NormalizeDisplayStatus(value){
@@ -14877,3 +14931,11 @@ console.info('[230MATCH] 5.9.0 ready · fair draw results are committed before p
 console.info('[230MATCH] 5.9.1 ready · admin immediate participant deletion removes private/public Firebase registration docs first');
 
 console.info('[230MATCH] 5.9.2 ready · tournament cards use configured capacity consistently');
+
+document.addEventListener('DOMContentLoaded',()=>setTimeout(stage593BindUiScale,80),{once:true});
+setTimeout(stage593BindUiScale,0);
+document.addEventListener('click',e=>{
+  if(e.target.closest?.('#roleAdminBtn,[data-role],[data-admin-login],[data-operator-login]'))setTimeout(stage593ApplyUiScale,100);
+},true);
+
+console.info('[230MATCH] 5.9.3 ready · operator local UI scale + official-start-gated court clock');

@@ -838,6 +838,45 @@ body.tournament-completed-admin #view-operation textarea{
 @media(max-width:640px){.stage590-performance-name{font-size:19px}.stage590-performance-stage{min-height:180px}.stage590-performance-actions{display:grid;grid-template-columns:1fr}}
 </style>
 
+
+<style id="stage593OperatorUiAndClock">
+:root{--stage593-ui-scale:1}
+body.stage593-operator-scale-active main.app-shell{
+  zoom:var(--stage593-ui-scale);
+}
+body.stage593-operator-scale-active dialog.modal,
+body.stage593-operator-scale-active dialog[id]{
+  zoom:var(--stage593-ui-scale);
+}
+.stage593-ui-scale-card{
+  display:flex;align-items:center;justify-content:space-between;gap:14px;
+  margin:10px 0;padding:12px 14px;border:1px solid #cbd5e1;border-radius:12px;background:#f8fafc
+}
+.stage593-ui-scale-card>div:first-child{display:grid;gap:3px}
+.stage593-ui-scale-card strong{font-size:13px}
+.stage593-ui-scale-card small{font-size:11px;color:#64748b}
+.stage593-ui-scale-buttons{display:flex;gap:6px;flex-wrap:wrap}
+.stage593-ui-scale-buttons button{
+  min-height:38px;padding:7px 12px;border:1.5px solid #cbd5e1;border-radius:9px;background:#fff;
+  color:#334155;font:inherit;font-size:12px;font-weight:900;cursor:pointer
+}
+.stage593-ui-scale-buttons button.active,
+.stage593-ui-scale-buttons button[aria-pressed="true"]{
+  background:#2563eb!important;border-color:#1d4ed8!important;color:#fff!important
+}
+.stage593-official-start{display:grid;gap:5px}
+.stage593-official-start small{font-size:11px;color:#1d4ed8;line-height:1.35}
+.time-badge.scheduled,.match-time.scheduled,[class*="time"].scheduled{color:#1d4ed8!important}
+@media(max-width:760px){
+  .stage593-ui-scale-card{align-items:flex-start;flex-direction:column}
+  .stage593-ui-scale-buttons{width:100%;display:grid;grid-template-columns:repeat(3,1fr)}
+  /* 모바일 운영 화면은 레이아웃 파손을 줄이기 위해 확대 상한을 낮춘다. */
+  body.stage593-operator-scale-active main.app-shell,
+  body.stage593-operator-scale-active dialog.modal,
+  body.stage593-operator-scale-active dialog[id]{zoom:min(var(--stage593-ui-scale),1.06)}
+}
+</style>
+
 </head>
 <body>
   <header class="topbar">
@@ -2073,6 +2112,16 @@ body.tournament-completed-admin #view-operation textarea{
       <section class="panel compact-settings-page">
         <div class="section-head"><div><h2>현재 대회 관리</h2><p>대회 설정은 대회 목록의 현재 대회 카드 또는 아래 버튼에서 편집합니다.</p></div><button type="button" class="btn btn-primary" data-stage3210-open-edit>현재 대회 편집</button></div>
         <div id="stage3210SettingsSummary" class="notice info">현재 대회의 기본정보·요강·예선·본선·구장·코트를 한 화면에서 관리합니다.</div>
+
+        <section id="stage593OperatorUiScale" class="stage593-ui-scale-card" data-operator-only="true">
+          <div><strong>운영 화면 글자 크기</strong><small>이 브라우저에만 저장됩니다. 일반 사용자 화면과 대회 데이터에는 영향을 주지 않습니다.</small></div>
+          <div class="stage593-ui-scale-buttons" role="group" aria-label="운영 화면 글자 크기">
+            <button type="button" data-stage593-scale="compact">작게</button>
+            <button type="button" data-stage593-scale="default">기본 · 권장</button>
+            <button type="button" data-stage593-scale="large">크게</button>
+          </div>
+        </section>
+
         <div class="notice success"><strong>자동 저장·동기화 사용 중</strong><br>Firebase 상세 연결 화면은 숨겼으며 내부 자동 동기화는 계속 유지됩니다.</div>
         <div class="button-row">
           <button type="button" class="btn btn-secondary" data-settings-view="entry-admin">참가 신청·승인</button>
@@ -2855,7 +2904,7 @@ body.tournament-completed-admin #view-operation textarea{
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=5902"></script>
+  <script type="module" src="./assets/js/app.js?v=5930"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
