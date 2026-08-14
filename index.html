@@ -1477,6 +1477,69 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
 }
 </style>
 
+
+<style id="stage5916FullCardPlayingBlink">
+/* 5.9.16 — 시합중은 외곽선만이 아니라 카드 전체가 깜빡인다.
+   transform/size/position 변경 없음 → connector 좌표 영향 없음. */
+
+/* 5.9.15 외곽선 전용 blink 제거 */
+#bracketBoard .match-card.is-playing::after{
+  content:none!important;
+  display:none!important;
+  animation:none!important;
+}
+
+/* 카드 전체 배경/테두리/그림자의 밝기만 변화 */
+@keyframes stage5916FullCardBlink{
+  0%,100%{
+    background:#fff0f0;
+    border-color:#ef4444;
+    outline-color:rgba(220,38,38,.32);
+    box-shadow:0 2px 8px rgba(127,29,29,.12);
+  }
+  50%{
+    background:#ffd2d2;
+    border-color:#b91c1c;
+    outline-color:rgba(185,28,28,.85);
+    box-shadow:0 0 0 4px rgba(239,68,68,.20),0 7px 18px rgba(127,29,29,.26);
+  }
+}
+#bracketBoard .match-card.is-playing{
+  animation:stage5916FullCardBlink 1.15s ease-in-out infinite!important;
+  border-width:2px!important;
+  outline:2px solid rgba(220,38,38,.38)!important;
+  outline-offset:1px!important;
+}
+#bracketBoard .match-card.is-playing header{
+  background:rgba(255,225,225,.88)!important;
+}
+#bracketBoard .match-card.is-playing .match-team{
+  background:rgba(255,240,240,.72)!important;
+}
+#bracketBoard .match-card.is-playing .bracket-live-placement{
+  background:#ffdede!important;
+  border-color:#ef7777!important;
+  color:#991b1b!important;
+  font-weight:950!important;
+}
+
+/* 완료는 깜빡임보다 완료 톤다운이 항상 우선 */
+#bracketBoard .match-card.completed{
+  animation:none!important;
+}
+#bracketBoard .match-card.completed::after{
+  content:none!important;
+  display:none!important;
+}
+
+@media(prefers-reduced-motion:reduce){
+  #bracketBoard .match-card.is-playing{
+    animation:none!important;
+    background:#ffdede!important;
+  }
+}
+</style>
+
 </head>
 <body>
   <header class="topbar">
@@ -3505,7 +3568,7 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=59120"></script>
+  <script type="module" src="./assets/js/app.js?v=59160"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">

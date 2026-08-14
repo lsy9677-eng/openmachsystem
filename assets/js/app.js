@@ -4547,9 +4547,11 @@ function liveMatchPlacement(match){
     const hasScore=Number.isFinite(a)&&Number.isFinite(b);
     return{label:hasScore?`경기 완료 · ${a} : ${b}`:'경기 완료',kind:'completed',scoreA:hasScore?a:null,scoreB:hasScore?b:null};
   }
-  if(match.status==='playing')return{label:`${match.court||'코트 확인중'} · 시합중`,kind:'playing'};
-  if(match.status==='court_wait1')return{label:`${match.court||'코트 확인중'} · 대기1`,kind:'wait1'};
-  if(match.status==='venue_shared_queue'||match.status==='shared_queue')return{label:'공용대기 · 순번 확인중',kind:'shared'};
+  // 5.9.16 안정화: 시합중/대기1/공용대기는 실제 court/queue 배치가 단일 진실원천이다.
+  // match.status만 playing으로 남아 있어도 실제 배치가 없으면 시합중으로 표시하지 않는다.
+  if(['playing','court_wait1','venue_shared_queue','shared_queue','court_manual_queue','queued'].includes(String(match.status||''))){
+    return{label:'코트 배정 확인 필요',kind:'waiting',staleStatus:String(match.status||'')};
+  }
   if(match.status==='ready')return{label:'코트 배정 대기',kind:'waiting'};
   return{label:match.court?`${match.court} · 경기 예정`:'대진 대기',kind:'waiting'};
 }
@@ -4570,6 +4572,26 @@ function decorateBracketLivePlacements(){
       const match=byId.get(matchId)||findMatch(state.draw,matchId);
       if(!match)return;
       const placement=liveMatchPlacement(match);
+
+      // 5.9.16: 대진표의 색/깜빡임/상단 상태도 실제 배치 기준으로만 맞춘다.
+      // 저장된 match.status는 건드리지 않고 DOM 표현만 교정한다.
+      const activeClasses=['is-playing','is-wait1','is-shared-wait','is-manual-wait','is-ready'];
+      activeClasses.forEach(cls=>card.classList.remove(cls));
+      if(placement.kind==='playing')card.classList.add('is-playing');
+      else if(placement.kind==='wait1')card.classList.add('is-wait1');
+      else if(placement.kind==='shared')card.classList.add('is-shared-wait');
+      else if(placement.kind==='waiting')card.classList.add('is-ready');
+
+      const statusLabel=card.querySelector('.match-status-label');
+      if(statusLabel){
+        if(placement.kind==='playing')statusLabel.textContent='시합중';
+        else if(placement.kind==='wait1')statusLabel.textContent='대기1';
+        else if(placement.kind==='shared')statusLabel.textContent='공용대기';
+        else if(placement.kind==='completed')statusLabel.textContent='완료';
+        else if(placement.staleStatus)statusLabel.textContent='배정 확인';
+        else if(match.status==='ready')statusLabel.textContent='배정 대기';
+      }
+
       let badge=card.querySelector('.bracket-court-label');
       if(!badge){
         badge=document.createElement('div');
@@ -15235,3 +15257,5 @@ console.info('[230MATCH] 5.9.8 ready · bracket connector auto-refit + robust wa
 console.info('[230MATCH] 5.9.9 ready · wait1-to-playing clock always starts fresh at 0 minutes');
 
 console.info('[230MATCH] 5.9.12 stabilization · bracket placement uses match-id only + recovery snapshot preview');
+
+console.info('[230MATCH] 5.9.16 stabilization · bracket active state follows actual court placement only');
