@@ -12,7 +12,7 @@ import{downloadJson}from'./recovery.js?v=332012';
 import{ensureTimeState,calculateTimeMetrics,timeInfo}from'./time-engine-v5000.js?v=5940';
 import{ensureMessagingState,generatePlayingMessages,generateWait1Messages,generateCurrentCourtMessages,generateCurrentWaitMessages,generateAllTimeMessages,markMessageSent,deleteMessage,clearSentMessages,markAllSent,smsUri,refreshMessageContacts,mergePendingDuplicates,getMessageHistory}from'./message-engine.js?v=3521';
 import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactData,importContactData}from'./contact-engine-v5000.js?v=5000';
-import{render,teamText}from'./ui.js?v=59180';
+import{render,teamText}from'./ui.js?v=59240';
 import{ensureAuditState,runStateAudit,runPrelimSimulation,runFullSimulation,applyAuditResult}from'./audit-engine.js?v=332012';
 import{earlyMainStats,markResolvedMainMatchesReady,canAssignEarlyMain,ensureEarlyMainSettings,autoAssignResolvedMain}from'./early-main-engine.js?v=332012';
 import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=59180';
@@ -1599,76 +1599,6 @@ function stage5521RepairMissingCourtStructure(){
   }
 }
 
-function stage5920DecorateHeldQueueCards(){
-  const heldList=Array.isArray(state.operation?.heldMatches)?state.operation.heldMatches:[];
-  const heldMap=new Map(heldList.map(x=>[String(x?.matchId||''),x]));
-
-  // 5.9.22 안정화: 예전 decorator가 queue 외의 data-main-match-id DOM까지 건드린 흔적 제거.
-  document.querySelectorAll('[data-main-match-id]:not(.queue-card):not(.operation-queue-card) .stage5920-hold-badge,[data-main-match-id]:not(.queue-card):not(.operation-queue-card) .stage5920-hold-reason').forEach(el=>el.remove());
-  document.querySelectorAll('[data-main-match-id]:not(.queue-card):not(.operation-queue-card)').forEach(el=>{
-    el.classList.remove('stage5920-held-card');
-    el.removeAttribute('data-held');
-  });
-
-  // 공용대기 카드만 보류 UI 대상으로 삼는다.
-  document.querySelectorAll('.queue-card[data-main-match-id],.operation-queue-card[data-main-match-id]').forEach(card=>{
-    const id=String(card.dataset.mainMatchId||'');
-    if(!id)return;
-
-    const held=heldMap.get(id);
-    const match=findMatch(state.draw,id);
-    const isHeld=Boolean(held||match?.status==='held'||match?.holdReason);
-
-    // 매 렌더마다 기존 보류 UI를 전부 제거하고 정확히 한 번만 다시 만든다.
-    card.querySelectorAll('.stage5920-hold-badge,.stage5920-hold-reason').forEach(el=>el.remove());
-
-    card.classList.toggle('stage5920-held-card',isHeld);
-    card.setAttribute('data-held',isHeld?'true':'false');
-
-    const btn=card.querySelector('[data-hold-main]');
-
-    if(isHeld){
-      const badge=document.createElement('span');
-      badge.className='stage5920-hold-badge';
-      badge.textContent='보류';
-      const num=card.querySelector('.num');
-      if(num?.nextSibling)num.parentNode.insertBefore(badge,num.nextSibling);
-      else card.prepend(badge);
-
-      const reason=String(held?.reason||match?.holdReason||'운영자 보류').trim()||'운영자 보류';
-      const reasonEl=document.createElement('div');
-      reasonEl.className='stage5920-hold-reason';
-      reasonEl.innerHTML=`<strong>보류 사유</strong><span>${escapeHtml(reason)}</span><em>자동배정 제외 · 해제 전까지 현재 대기 위치 유지</em>`;
-      const actions=card.querySelector('.queue-card-actions');
-      if(actions)card.insertBefore(reasonEl,actions);
-      else card.appendChild(reasonEl);
-
-      if(btn){
-        btn.textContent='보류 해제';
-        btn.classList.remove('btn-danger-outline');
-        btn.classList.add('btn-warning','stage5920-release-btn');
-        btn.title='보류를 해제하고 자동배정 대상으로 복귀';
-      }
-
-      card.querySelectorAll('[data-manual-assign],[data-admin-queue],[data-queue-move],[data-op-queue-move]').forEach(actionBtn=>{
-        actionBtn.disabled=true;
-        actionBtn.title='보류 해제 후 배정/이동할 수 있습니다.';
-      });
-    }else{
-      if(btn){
-        btn.textContent='보류';
-        btn.classList.remove('btn-warning','stage5920-release-btn');
-        btn.classList.add('btn-danger-outline');
-        btn.title='이 경기를 보류하고 자동배정에서 제외';
-      }
-      card.querySelectorAll('[data-manual-assign],[data-admin-queue],[data-queue-move],[data-op-queue-move]').forEach(actionBtn=>{
-        actionBtn.disabled=false;
-        if(actionBtn.title==='보류 해제 후 배정/이동할 수 있습니다.')actionBtn.removeAttribute('title');
-      });
-    }
-  });
-}
-
 function renderCommittedState6400(){
   const view=document.body?.dataset.currentView||'home';
   const courtRepair=(view==='operation'||view==='settings'||view==='bracket')?stage5521RepairMissingCourtStructure():{repaired:false};
@@ -1677,7 +1607,6 @@ function renderCommittedState6400(){
   }
   if(CORE_RENDER_VIEWS_6400.has(view)){
     render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus,holdMainMatch,releaseHeldMatch});
-    requestAnimationFrame(()=>stage5920DecorateHeldQueueCards());
     if(view==='operation'||view==='settings'||view==='roster')renderOperatorControls();
     if(view==='bracket'){
       decorateBracketLivePlacements();
@@ -1946,7 +1875,6 @@ function holdMainMatch(matchId){
   m.court=null;m.courtId=null;
 
   commit(`본선 경기 보류 · ${matchId} · ${reason}`);
-  requestAnimationFrame(()=>stage5920DecorateHeldQueueCards());
   notice('보류 표시를 유지한 채 공용대기에 남겼습니다. 보류 해제 전까지 자동배정에서 제외됩니다.','success');
 }
 function releaseHeldMatch(matchId){
@@ -1986,7 +1914,6 @@ function releaseHeldMatch(matchId){
   }
 
   commit(`본선 경기 보류 해제 · ${matchId}`);
-  requestAnimationFrame(()=>stage5920DecorateHeldQueueCards());
   notice('보류를 해제했습니다. 현재 공용대기 위치에서 다시 자동배정 대상이 됩니다.','success');
 }
 
@@ -15521,3 +15448,5 @@ console.info('[230MATCH] 5.9.20 stabilization · hold display forced from heldMa
 console.info('[230MATCH] 5.9.22 stabilization · exactly one hold reason block per shared-queue card');
 
 console.info('[230MATCH] 5.9.23 stabilization · every main-draw result save passes one shared in-app confirmation gate');
+
+console.info('[230MATCH] 5.9.24 stabilization · hold UI rendered once by ui.js; DOM decorator removed');
