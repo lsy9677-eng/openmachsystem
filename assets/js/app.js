@@ -3405,6 +3405,15 @@ function bindBracketMobileView571(){
       const round=String(btn.dataset.bracketRound||'all');
       updateBracketView('round',round);
 
+      // 5.7.4: 렌더 후 현재 선택 라운드를 파란 활성 상태로 명확히 표시.
+      requestAnimationFrame(()=>{
+        document.querySelectorAll('#bracketRoundButtons [data-bracket-round]').forEach(node=>{
+          const active=String(node.dataset.bracketRound||'all')===round;
+          node.classList.toggle('active',active);
+          node.setAttribute('aria-pressed',String(active));
+        });
+      });
+
       // updateBracketView()가 버튼/컬럼 DOM을 다시 그린 뒤 새 DOM 기준으로 이동한다.
       requestAnimationFrame(()=>requestAnimationFrame(()=>{
         const currentViewport=document.getElementById('bracketViewport');
@@ -3428,20 +3437,36 @@ function bindBracketMobileView571(){
     const dy=touches[0].clientY-touches[1].clientY;
     return Math.hypot(dx,dy);
   };
+  let singleStartX=0,singleStartScrollLeft=0,singleDragging=false;
   viewport.ontouchstart=e=>{
     if(e.touches?.length===2){
       pinchStartDistance=distance(e.touches);
       pinchStartZoom=getBracketZoom();
+      singleDragging=false;
+      return;
+    }
+    if(e.touches?.length===1){
+      singleStartX=e.touches[0].clientX;
+      singleStartScrollLeft=viewport.scrollLeft;
+      singleDragging=true;
     }
   };
   viewport.ontouchmove=e=>{
-    if(e.touches?.length!==2||!pinchStartDistance)return;
-    e.preventDefault();
-    const ratio=distance(e.touches)/pinchStartDistance;
-    setBracketZoom(pinchStartZoom*ratio);
+    if(e.touches?.length===2&&pinchStartDistance){
+      e.preventDefault();
+      const ratio=distance(e.touches)/pinchStartDistance;
+      setBracketZoom(pinchStartZoom*ratio);
+      return;
+    }
+    if(e.touches?.length===1&&singleDragging){
+      // 카드/텍스트 위에서도 손가락 이동량을 viewport 가로스크롤로 직접 반영한다.
+      const dx=e.touches[0].clientX-singleStartX;
+      viewport.scrollLeft=singleStartScrollLeft-dx;
+    }
   };
   viewport.ontouchend=e=>{
     if((e.touches?.length||0)<2)pinchStartDistance=0;
+    if((e.touches?.length||0)===0)singleDragging=false;
   };
 }
 window.__bindBracketMobileView571=bindBracketMobileView571;
@@ -14228,4 +14253,5 @@ console.info('[230MATCH] 5.7.0 STABLE · centralized shortcuts / role persistenc
 console.info('[230MATCH] 5.7.1 ready · bracket mobile zoom + round buttons + final visibility fix');
 
 
-console.info('[230MATCH] 5.7.3 ready · bracket round buttons use persistent event delegation');
+
+console.info('[230MATCH] 5.7.4 ready · bracket swipe anywhere + blue active round buttons');

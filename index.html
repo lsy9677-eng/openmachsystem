@@ -663,6 +663,44 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
 }
 </style>
 
+
+<style id="stage574BracketRoundActiveBlue">
+#bracketRoundButtons .bracket-round-btn{
+  transition:background-color .15s ease,border-color .15s ease,color .15s ease,box-shadow .15s ease,transform .05s ease;
+}
+#bracketRoundButtons .bracket-round-btn.active,
+#bracketRoundButtons .bracket-round-btn[aria-pressed="true"]{
+  background:#2563eb!important;
+  border-color:#1d4ed8!important;
+  color:#fff!important;
+  box-shadow:0 3px 10px rgba(37,99,235,.28)!important;
+  font-weight:1000!important;
+}
+#bracketRoundButtons .bracket-round-btn:active{
+  transform:translateY(1px);
+}
+@media(max-width:760px){
+  #bracketViewport{
+    overflow-x:auto!important;
+    overflow-y:auto!important;
+    -webkit-overflow-scrolling:touch!important;
+    touch-action:pan-x pan-y!important;
+    cursor:grab;
+  }
+  #bracketViewport:active{cursor:grabbing}
+  #bracketBoard,
+  #bracketBoard .round-column,
+  #bracketBoard .match-card{
+    touch-action:pan-x pan-y!important;
+  }
+  #bracketBoard .round-column,
+  #bracketBoard .match-card{
+    user-select:none;
+    -webkit-user-select:none;
+  }
+}
+</style>
+
 </head>
 <body>
   <header class="topbar">
@@ -2679,7 +2717,7 @@ body.tournament-readonly #view-operation input:not([type="search"]),body.tournam
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=5703"></script>
+  <script type="module" src="./assets/js/app.js?v=5704"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
