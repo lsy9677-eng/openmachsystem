@@ -1979,6 +1979,74 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
 }
 </style>
 
+
+<style id="stage5925HoldFeatureRemoved">
+/* 5.9.25 — 보류 기능 제거. 과거 캐시/DOM 흔적까지 숨김. */
+[data-hold-main],
+[data-release-held],
+.held-match-details,
+.held-match-list,
+.held-match-item,
+.stage5918-hold-badge,
+.stage5918-held-time,
+.stage5918-held-queue-card .stage5924-hold-reason,
+.stage5920-hold-badge,
+.stage5920-hold-reason,
+.stage5924-hold-reason,
+.stage5920-release-btn,
+.stage5920-held-card{
+  display:none!important;
+}
+</style>
+
+
+<style id="stage5926RestoreBracketCardSticker">
+/* 5.9.26 — 대진표 카드 왼쪽 작은 단계색 스티커만 복원.
+   라운드 전체 높이 세로선은 계속 제거 상태 유지. */
+
+/* 혹시 남아 있는 컬럼 전체 세로선은 계속 차단 */
+#bracketBoard .round-column::before{
+  content:none!important;
+  display:none!important;
+}
+
+/* 카드별 작은 단계색 스티커 */
+#bracketBoard .match-card[data-round-size]{
+  position:relative!important;
+}
+
+#bracketBoard .match-card[data-round-size]::before{
+  content:""!important;
+  display:block!important;
+  position:absolute!important;
+  left:0!important;
+  top:10px!important;
+  bottom:10px!important;
+  width:4px!important;
+  border-radius:0 4px 4px 0!important;
+  background:var(--stage5926-card-sticker,#64748b)!important;
+  pointer-events:none!important;
+  z-index:4!important;
+}
+
+/* 라운드별 카드 스티커 색 */
+#bracketBoard .match-card[data-round-size="128"]{--stage5926-card-sticker:#3b82f6}
+#bracketBoard .match-card[data-round-size="64"]{--stage5926-card-sticker:#1677d2}
+#bracketBoard .match-card[data-round-size="32"]{--stage5926-card-sticker:#7257c8}
+#bracketBoard .match-card[data-round-size="16"]{--stage5926-card-sticker:#a855c7}
+#bracketBoard .match-card[data-round-size="8"]{--stage5926-card-sticker:#d66b44}
+#bracketBoard .match-card[data-round-size="4"]{--stage5926-card-sticker:#c12d3c}
+#bracketBoard .match-card[data-round-size="2"]{--stage5926-card-sticker:#c48b00}
+
+/* 완료/시합중 상태 표시보다 스티커가 과하게 튀지 않게 유지 */
+#bracketBoard .match-card.completed::before{
+  opacity:.55!important;
+}
+#bracketBoard .match-card.is-playing::before{
+  opacity:1!important;
+}
+</style>
+
 </head>
 <body>
   <header class="topbar">
@@ -2645,10 +2713,9 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
       <section class="panel operator-control-panel operation-courts-section" aria-label="운영자 제어" data-operator-only="true">
         <div class="operator-control-main">
           <div><strong>운영자 제어</strong><span>자동배정을 잠시 멈춰도 현재 시합과 대기1은 유지됩니다.</span></div>
-          <div class="operator-control-actions"><button id="globalAutoAssignToggle" type="button" class="btn btn-primary">자동배정 ON · 수동운영 전환</button><button id="stage597ClockGateToggle" type="button" class="btn btn-light">시간 잠금 OFF</button><span class="badge badge-muted-dark">보류 <b id="heldMatchCount">0</b>경기</span><button id="saveRecoveryBtnInline" type="button" class="btn btn-light">현재 복구점 저장</button></div>
+          <div class="operator-control-actions"><button id="globalAutoAssignToggle" type="button" class="btn btn-primary">자동배정 ON · 수동운영 전환</button><button id="stage597ClockGateToggle" type="button" class="btn btn-light">시간 잠금 OFF</button><button id="saveRecoveryBtnInline" type="button" class="btn btn-light">현재 복구점 저장</button></div>
           <div id="manualOperationBanner" class="stage580-manual-banner" hidden></div>
         </div>
-        <details class="held-match-details"><summary>보류 경기 보기</summary><div id="heldMatchList" class="held-match-list"></div></details>
       </section>
 
       <section id="stage342SimpleSetupHub" class="panel stage342-simple-hub operation-setup-section" data-admin-only="true">
@@ -4007,7 +4074,7 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=59240"></script>
+  <script type="module" src="./assets/js/app.js?v=59270"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">

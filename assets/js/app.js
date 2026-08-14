@@ -12,10 +12,10 @@ import{downloadJson}from'./recovery.js?v=332012';
 import{ensureTimeState,calculateTimeMetrics,timeInfo}from'./time-engine-v5000.js?v=5940';
 import{ensureMessagingState,generatePlayingMessages,generateWait1Messages,generateCurrentCourtMessages,generateCurrentWaitMessages,generateAllTimeMessages,markMessageSent,deleteMessage,clearSentMessages,markAllSent,smsUri,refreshMessageContacts,mergePendingDuplicates,getMessageHistory}from'./message-engine.js?v=3521';
 import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactData,importContactData}from'./contact-engine-v5000.js?v=5000';
-import{render,teamText}from'./ui.js?v=59240';
+import{render,teamText}from'./ui.js?v=59250';
 import{ensureAuditState,runStateAudit,runPrelimSimulation,runFullSimulation,applyAuditResult}from'./audit-engine.js?v=332012';
 import{earlyMainStats,markResolvedMainMatchesReady,canAssignEarlyMain,ensureEarlyMainSettings,autoAssignResolvedMain}from'./early-main-engine.js?v=332012';
-import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=59180';
+import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=59250';
 import{ensureMainDrawLifecycle,beginMainDraw,completeMainDraw,failMainDraw,resetMainDraw,hasAuthorizedMainDraw,mainDrawStatus,clearMainPlacement,repairMainDrawAuthorization}from'./main-draw-lifecycle-engine.js?v=3501';
 import{shouldUseLinkedDraw,linkedDrawNeedsRepair,rebuildLinkedDraw,hasStartedMainMatches}from'./linked-draw-guard-engine.js?v=332012';
 import{ensureVenueSettings,ensureVenueQueues,venuePreset,buildVenueCourts,prelimVenues,mainVenues}from'./venue-engine.js?v=332012';
@@ -542,7 +542,7 @@ async function importFullBackup(file){
   if(!next?.tournament||!Array.isArray(next.teams))throw new Error('230MATCH 전체 백업 형식이 아닙니다.');
   await saveRecovery(state,'백업 불러오기 직전 자동 복구점');
   state=normalizeV5RuntimeState(structuredClone(next));
-  ensurePortalState();ensurePrelimState(state);ensureTimeState(state);ensureDrawMeta(state);ensureMessagingState(state);ensureContacts(state);ensureAuditState(state);ensureEarlyMainSettings(state);ensureVenueSettings(state);ensureVenueQueues(state);ensureCourtStatuses(state);ensureCourtManualQueues(state);ensurePrelimCourtStatuses(state);ensureOperatorState();
+  ensurePortalState();ensurePrelimState(state);ensureTimeState(state);ensureDrawMeta(state);ensureMessagingState(state);ensureContacts(state);ensureAuditState(state);ensureEarlyMainSettings(state);ensureVenueSettings(state);ensureVenueQueues(state);ensureCourtStatuses(state);ensureCourtManualQueues(state);ensurePrelimCourtStatuses(state);ensureOperatorState();stage5925RetireLegacyHoldFeature();
   saveState(state);
   location.reload();
 }
@@ -767,7 +767,114 @@ function ensurePortalState(){
 }
 ensurePortalState();ensurePrelimState(state);ensureTimeState(state);ensureDrawMeta(state);ensureMessagingState(state);ensureContacts(state);ensureAuditState(state);ensureEarlyMainSettings(state);ensureVenueSettings(state);ensureVenueQueues(state);ensureCourtStatuses(state);ensureCourtManualQueues(state);ensurePrelimCourtStatuses(state);
 function ensureOperatorState(){if(!state.operation||typeof state.operation!=='object')state.operation={};if(state.operation.autoAssignmentEnabled===undefined)state.operation.autoAssignmentEnabled=true;if(!Array.isArray(state.operation.heldMatches))state.operation.heldMatches=[];}
-ensureOperatorState();
+
+
+function stage5927ClearMainOperationResidue({normalizeMatchStatus=false}={}){
+  // 본선 재추첨/초기화 전용: 과거 코트·공용대기·보류 잔존값만 제거한다.
+  state.courts=[];
+  state.sharedQueue=[];
+  state.venueQueues={};
+
+  if(state.operation&&typeof state.operation==='object'){
+    state.operation.heldMatches=[];
+  }
+
+  if(normalizeMatchStatus&&state.draw?.rounds){
+    for(const match of allMatches(state.draw)){
+      if(!match||match.status==='completed')continue;
+
+      match.court=null;
+      match.courtId=null;
+      match.courtName=null;
+      match.waitStartedAt=null;
+      match.waitElapsedMinutes=0;
+      match.estimatedWaitMinutes=0;
+      delete match.holdReason;
+
+      // 실제 팀이 모두 확정된 1회전 경기는 'ready' 상태 자체는 유지하되,
+      // 대진표에서는 실제 배치 전까지 '대진 대기'로 표시한다.
+      if(['playing','court_wait1','venue_shared_queue','shared_queue','court_manual_queue','queued','held'].includes(String(match.status||''))){
+        const aReal=Boolean(match.teamA&&!match.teamA.placeholder);
+        const bReal=Boolean(match.teamB&&!match.teamB.placeholder);
+        match.status=(aReal&&bReal)?'ready':'waiting_slots';
+      }
+    }
+  }
+}
+
+function stage5925RetireLegacyHoldFeature(){
+  if(!state?.operation||!Array.isArray(state.operation.heldMatches)||!state.operation.heldMatches.length)return false;
+  state.venueQueues=state.venueQueues&&typeof state.venueQueues==='object'?state.venueQueues:{};
+  state.sharedQueue=Array.isArray(state.sharedQueue)?state.sharedQueue:[];
+
+  let changed=false;
+  const held=state.operation.heldMatches.slice();
+
+  for(const item of held){
+    const id=String(item?.matchId||'');
+    if(!id)continue;
+    const m=findMatch(state.draw,id);
+    const location=item?.location||{};
+    let restored=false;
+
+    if(location.type==='venueQueue'&&location.venueId){
+      const venueId=String(location.venueId);
+      if(!Array.isArray(state.venueQueues[venueId]))state.venueQueues[venueId]=[];
+      const q=state.venueQueues[venueId];
+      if(!q.some(x=>String(x)===id)){
+        const at=Math.min(Math.max(0,Number(location.index)||0),q.length);
+        q.splice(at,0,id);
+      }
+      if(m){m.status='venue_shared_queue';m.venueId=venueId;}
+      restored=true;
+    }else if(location.type==='sharedQueue'){
+      if(!state.sharedQueue.some(x=>String(x)===id)){
+        const at=Math.min(Math.max(0,Number(location.index)||0),state.sharedQueue.length);
+        state.sharedQueue.splice(at,0,id);
+      }
+      if(m)m.status='shared_queue';
+      restored=true;
+    }
+
+    // 5.9.18 이후 보류는 이미 큐에 남아 있었으므로 실제 현재 큐를 우선 인정.
+    if(!restored){
+      for(const [venueId,q] of Object.entries(state.venueQueues)){
+        if((q||[]).some(x=>String(x)===id)){
+          if(m){m.status='venue_shared_queue';m.venueId=venueId;}
+          restored=true;break;
+        }
+      }
+    }
+    if(!restored&&state.sharedQueue.some(x=>String(x)===id)){
+      if(m)m.status='shared_queue';
+      restored=true;
+    }
+
+    // 아주 오래된 보류점에 위치정보도 없다면 기본 구장 공용대기 뒤로 안전 복귀.
+    if(!restored){
+      const venueId=String(item?.venueId||Object.keys(state.venueQueues)[0]||state.prelim?.courts?.[0]?.venueId||'');
+      if(venueId){
+        if(!Array.isArray(state.venueQueues[venueId]))state.venueQueues[venueId]=[];
+        if(!state.venueQueues[venueId].some(x=>String(x)===id))state.venueQueues[venueId].push(id);
+        if(m){m.status='venue_shared_queue';m.venueId=venueId;}
+      }else{
+        if(!state.sharedQueue.some(x=>String(x)===id))state.sharedQueue.push(id);
+        if(m)m.status='shared_queue';
+      }
+    }
+
+    if(m){
+      delete m.holdReason;
+      if(!m.waitStartedAt)m.waitStartedAt=item?.previousWaitStartedAt||new Date().toISOString();
+    }
+    changed=true;
+  }
+
+  state.operation.heldMatches=[];
+  return changed;
+}
+
+ensureOperatorState();stage5925RetireLegacyHoldFeature();
 const stage3500LifecycleInit=ensureMainDrawLifecycle(state);
 if(stage3500LifecycleInit.migrated){try{saveState(state);}catch(_e){}}
 const ROLE_KEY='230match-v3-session-role';
@@ -1522,7 +1629,7 @@ async function archiveLegacySummaryAndReset(){
     next.portal.tournamentArchives=[tournamentRecord,...previousTournaments.filter(x=>String(x?.sourceTournamentId||'')!==sourceId&&String(x?.id||'')!==tournamentRecord.id)];
     next.portal.participantArchives=[participantRecord,...previousParticipants.filter(x=>String(x?.sourceTournamentId||'')!==sourceId&&String(x?.id||'')!==participantRecord.id)];
     next.updatedAt=new Date().toISOString();
-    state=normalizeV5RuntimeState(next);ensurePortalState();ensureOperatorState();ensureContacts(state);commit(`${archive.name} 요약 보관 후 새 대회 시작`);
+    state=normalizeV5RuntimeState(next);ensurePortalState();ensureOperatorState();stage5925RetireLegacyHoldFeature();ensureContacts(state);commit(`${archive.name} 요약 보관 후 새 대회 시작`);
     try{disconnectCloudSync();}catch(_e){}
     legacyActionStatus('모던배의 참가팀·8강·입상 결과·선택한 결과사진을 보관하고 새 대회 상태로 초기화했습니다.','success');
     navigatePortalView('results',{pushHistory:true});
@@ -1606,7 +1713,7 @@ function renderCommittedState6400(){
     __stage5521CourtRepairPersisted=true;
   }
   if(CORE_RENDER_VIEWS_6400.has(view)){
-    render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus,holdMainMatch,releaseHeldMatch});
+    render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus});
     if(view==='operation'||view==='settings'||view==='roster')renderOperatorControls();
     if(view==='bracket'){
       decorateBracketLivePlacements();
@@ -1724,10 +1831,10 @@ function applySynchronizedState(nextState,source='동기화'){
       }
     }catch(error){console.warn('[230MATCH] URL 부서 적용 실패',error);}
   }
-  ensurePrelimState(state);ensureTimeState(state);ensureDrawMeta(state);ensureMessagingState(state);ensureContacts(state);ensureAuditState(state);ensureEarlyMainSettings(state);ensureVenueSettings(state);ensureVenueQueues(state);ensureCourtStatuses(state);ensureCourtManualQueues(state);ensurePrelimCourtStatuses(state);ensureOperatorState();
+  ensurePrelimState(state);ensureTimeState(state);ensureDrawMeta(state);ensureMessagingState(state);ensureContacts(state);ensureAuditState(state);ensureEarlyMainSettings(state);ensureVenueSettings(state);ensureVenueQueues(state);ensureCourtStatuses(state);ensureCourtManualQueues(state);ensurePrelimCourtStatuses(state);ensureOperatorState();stage5925RetireLegacyHoldFeature();
   if(state.settings.autoTimeEnabled)calculateTimeMetrics(state);
   syncInputs();syncPrelimInputs();safePersistState(`${source} 상태`);
-  render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus,holdMainMatch,releaseHeldMatch});
+  render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus});
   updateSetupProgress();renderOperatorControls();applyRoleUI();renderPortalViewFast(document.body?.dataset.currentView||'home');renderDivisionWorkspaceBar();applyTournamentReadOnlyUi();refreshSyncAccessMode();flashSaved();
   notice(`${source} 상태를 반영했습니다.`,'success');
 }
@@ -1797,126 +1904,6 @@ function autoRecovery(label){
     saveRecovery(state,`자동 · ${label}`,{kind:critical?'critical-auto':'auto'});
   }catch(error){console.warn('자동 복구점 저장 실패',error);}
 }
-function locateAndRemoveMainMatch(matchId){
-  let location=null;
-  for(const c of state.prelim?.courts||[]){
-    if(c.playing===matchId)return{blocked:true,reason:'시합 중인 경기는 보류할 수 없습니다.'};
-    if(c.wait1===matchId){location={type:'wait1',courtId:c.id,venueId:c.venueId};c.wait1=null;}
-    c.queue=Array.isArray(c.queue)?c.queue:[];
-    const qi=c.queue.indexOf(matchId);if(qi>=0){location={type:'courtQueue',courtId:c.id,venueId:c.venueId,index:qi};c.queue.splice(qi,1);}
-    c.manualQueue=Array.isArray(c.manualQueue)?c.manualQueue:[];
-    const mi=c.manualQueue.indexOf(matchId);if(mi>=0){location={type:'manualQueue',courtId:c.id,venueId:c.venueId,index:mi};c.manualQueue.splice(mi,1);}
-  }
-  for(const [venueId,q] of Object.entries(state.venueQueues||{})){
-    const i=q.indexOf(matchId);if(i>=0){location={type:'venueQueue',venueId,index:i};q.splice(i,1);}
-  }
-  const si=(state.sharedQueue||[]).indexOf(matchId);if(si>=0){location={type:'sharedQueue',index:si};state.sharedQueue.splice(si,1);}
-  return{blocked:false,location};
-}
-function stage5918FindSharedQueueLocation(matchId){
-  const id=String(matchId||'');
-  for(const [venueId,q] of Object.entries(state.venueQueues||{})){
-    const index=(q||[]).findIndex(x=>String(x)===id);
-    if(index>=0)return{type:'venueQueue',venueId,index};
-  }
-  const sharedIndex=(state.sharedQueue||[]).findIndex(x=>String(x)===id);
-  if(sharedIndex>=0)return{type:'sharedQueue',index:sharedIndex};
-  return null;
-}
-function stage5918QueueStillContains(matchId,location){
-  const id=String(matchId||'');
-  if(location?.type==='venueQueue')return (state.venueQueues?.[location.venueId]||[]).some(x=>String(x)===id);
-  if(location?.type==='sharedQueue')return (state.sharedQueue||[]).some(x=>String(x)===id);
-  return false;
-}
-function stage5918RestoreQueuePosition(matchId,held){
-  const id=String(matchId||'');
-  const location=held?.location||{};
-  if(location.type==='venueQueue'){
-    if(!Array.isArray(state.venueQueues?.[location.venueId])){
-      state.venueQueues=state.venueQueues||{};
-      state.venueQueues[location.venueId]=[];
-    }
-    const q=state.venueQueues[location.venueId];
-    if(!q.some(x=>String(x)===id))q.splice(Math.min(Math.max(0,Number(location.index)||0),q.length),0,matchId);
-    return{type:'venueQueue',venueId:location.venueId};
-  }
-  if(location.type==='sharedQueue'){
-    state.sharedQueue=Array.isArray(state.sharedQueue)?state.sharedQueue:[];
-    if(!state.sharedQueue.some(x=>String(x)===id))state.sharedQueue.splice(Math.min(Math.max(0,Number(location.index)||0),state.sharedQueue.length),0,matchId);
-    return{type:'sharedQueue'};
-  }
-  return null;
-}
-function holdMainMatch(matchId){
-  if(!requireOperator('경기 운영'))return;
-  const m=findMatch(state.draw,matchId);if(!m)return;
-  ensureOperatorState();
-
-  const existing=state.operation.heldMatches.find(x=>String(x.matchId)===String(matchId));
-  if(existing){releaseHeldMatch(matchId);return;}
-
-  const location=stage5918FindSharedQueueLocation(matchId);
-  if(!location){notice('공용대기에 있는 경기만 보류할 수 있습니다.','error');return;}
-
-  const reason=prompt('보류 사유를 입력하세요.','선수 도착 지연')||'운영자 보류';
-  autoRecovery(`경기 보류 전 · ${matchId}`);
-
-  state.operation.heldMatches.push({
-    matchId,reason,heldAt:new Date().toISOString(),location,
-    previousStatus:m.status,
-    previousWaitStartedAt:m.waitStartedAt||null,
-    venueId:m.venueId||location.venueId||null
-  });
-
-  // 큐에서는 빼지 않는다. 화면 위치를 유지하고 자동배정만 제외한다.
-  m.status='held';
-  m.holdReason=reason;
-  m.court=null;m.courtId=null;
-
-  commit(`본선 경기 보류 · ${matchId} · ${reason}`);
-  notice('보류 표시를 유지한 채 공용대기에 남겼습니다. 보류 해제 전까지 자동배정에서 제외됩니다.','success');
-}
-function releaseHeldMatch(matchId){
-  if(!requireOperator('경기 운영'))return;
-  ensureOperatorState();
-  const index=state.operation.heldMatches.findIndex(x=>String(x.matchId)===String(matchId));if(index<0)return;
-  autoRecovery(`경기 보류 해제 전 · ${matchId}`);
-  const held=state.operation.heldMatches.splice(index,1)[0];
-  const m=findMatch(state.draw,matchId);if(!m)return;
-
-  let location=held.location;
-  if(!stage5918QueueStillContains(matchId,location)){
-    const restored=stage5918RestoreQueuePosition(matchId,held);
-    if(restored)location={...location,...restored};
-  }
-
-  delete m.holdReason;
-  m.waitStartedAt=held.previousWaitStartedAt||new Date().toISOString();
-
-  if(location?.type==='venueQueue'){
-    m.status='venue_shared_queue';
-    m.venueId=location.venueId||held.venueId||m.venueId;
-  }else if(location?.type==='sharedQueue'){
-    m.status='shared_queue';
-  }else{
-    // 구버전 보류 데이터 호환: 위치 정보가 없으면 기존 방식대로 공용대기 뒤에 복귀.
-    const venueId=held.venueId||Object.keys(state.venueQueues||{})[0]||state.prelim?.courts?.[0]?.venueId;
-    if(venueId){
-      if(!Array.isArray(state.venueQueues[venueId]))state.venueQueues[venueId]=[];
-      if(!state.venueQueues[venueId].includes(matchId))state.venueQueues[venueId].push(matchId);
-      m.status='venue_shared_queue';m.venueId=venueId;
-    }else{
-      state.sharedQueue=Array.isArray(state.sharedQueue)?state.sharedQueue:[];
-      if(!state.sharedQueue.includes(matchId))state.sharedQueue.push(matchId);
-      m.status='shared_queue';
-    }
-  }
-
-  commit(`본선 경기 보류 해제 · ${matchId}`);
-  notice('보류를 해제했습니다. 현재 공용대기 위치에서 다시 자동배정 대상이 됩니다.','success');
-}
-
 function stage580PlacementAudit(){
   const placements=[];
   const add=(id,where)=>{
@@ -1978,7 +1965,7 @@ function stage580RepairBeforeResume(){
 
 function stage580ResumeAutoAssignment(){
   if(!requireOperator('자동배정 재개'))return;
-  ensureOperatorState();
+  ensureOperatorState();stage5925RetireLegacyHoldFeature();
   if(state.operation.autoAssignmentEnabled)return;
   if(!confirm('현재 수동 배치를 기준으로 정합성을 검사한 뒤 자동배정을 재개할까요?\n\n시합중·대기1·관리자 지정 위치는 초기화하지 않습니다.'))return;
 
@@ -2015,7 +2002,7 @@ function stage580ResumeAutoAssignment(){
 
 function stage580PauseAutoAssignment(){
   if(!requireOperator('수동 운영 전환'))return;
-  ensureOperatorState();
+  ensureOperatorState();stage5925RetireLegacyHoldFeature();
   if(state.operation.autoAssignmentEnabled===false)return;
   autoRecovery('자동배정 → 수동 운영 전');
   state.operation.autoAssignmentEnabled=false;
@@ -2025,7 +2012,7 @@ function stage580PauseAutoAssignment(){
   renderOperatorControls();
 }
 function stage580ToggleAutoAssignment(){
-  ensureOperatorState();
+  ensureOperatorState();stage5925RetireLegacyHoldFeature();
   if(state.operation.autoAssignmentEnabled===false)stage580ResumeAutoAssignment();
   else stage580PauseAutoAssignment();
 }
@@ -2044,7 +2031,7 @@ function stage597ToggleClockGate(){
 }
 
 function renderOperatorControls(){
-  ensureOperatorState();
+  ensureOperatorState();stage5925RetireLegacyHoldFeature();
   const manual=state.operation.autoAssignmentEnabled===false;
   const toggle=$('globalAutoAssignToggle');if(toggle){toggle.textContent=manual?'정합성 확인 후 자동배정 재개':'자동배정 ON · 수동운영 전환';toggle.className=`btn ${manual?'btn-warning':'btn-primary'}`;}
   const clock=$('stage597ClockGateToggle');if(clock){
@@ -2054,8 +2041,6 @@ function renderOperatorControls(){
     clock.title=on?'공식 시작시간 전까지 미리 배정한 경기의 진행시간을 멈춥니다.':'코트 배정 즉시 진행시간을 계산합니다.';
   }
   const banner=$('manualOperationBanner');if(banner){banner.hidden=!manual;banner.innerHTML=manual?'<strong>🛠 수동 운영 중</strong><span>결과 입력 후에도 코트·대기열은 자동 이동하지 않습니다. 경기 카드의 <b>이동</b> 버튼으로 직접 배치하세요.</span>':'';}
-  const count=$('heldMatchCount');if(count)count.textContent=String(state.operation.heldMatches.length);
-  const list=$('heldMatchList');if(list){list.innerHTML=state.operation.heldMatches.length?state.operation.heldMatches.map(x=>{const m=findMatch(state.draw,x.matchId);return`<article class="held-match-item"><div><b>${m?`${teamText(m.teamA)} vs ${teamText(m.teamB)}`:x.matchId}</b><span>${x.reason} · ${new Date(x.heldAt).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})}</span></div><button class="btn btn-light" data-release-held="${x.matchId}">보류 해제</button></article>`}).join(''):'<div class="empty-state"><p>보류된 본선 경기가 없습니다.</p></div>';list.querySelectorAll('[data-release-held]').forEach(b=>b.onclick=()=>releaseHeldMatch(b.dataset.releaseHeld));}
 }
 function notice(message,type='info'){$('noticeBar').className=`notice ${type}`;$('noticeBar').textContent=message;}
 function flashSaved(){$('saveStateBadge').textContent='자동 저장됨';setTimeout(()=>$('saveStateBadge').textContent='자동 저장 ON',1200);}
@@ -2170,7 +2155,7 @@ function stage590RunMainPerformance(method='instant'){
   autoRecovery(`본선 ${method==='seeded'?'시드 ':''}퍼포먼스 추첨 직전`);
   state.settings.drawMethod=method;
   state.draw=createDrawWithMethod(state,state.teams,state.settings.drawSize,{method,byePriority:state.settings.byePriority});
-  state.courts=[];state.sharedQueue=[];
+  stage5927ClearMainOperationResidue({normalizeMatchStatus:true});
   commit(`${state.draw.size}강 ${method==='seeded'?'시드 분산':'일반'} 퍼포먼스 추첨 확정 · 체크섬 ${state.drawMeta?.checksum||'-'}`);
   const items=stage590MainItems();
   stage590OpenPerformance({
@@ -2217,7 +2202,7 @@ function generate(){
   const check=canModifyDraw(state);if(!check.ok&&state.draw.size)throw new Error(check.reason);
   if(state.settings.drawMethod==='roulette'){openRoulette();return;}
   state.draw=createDrawWithMethod(state,state.teams,state.settings.drawSize,{method:state.settings.drawMethod,byePriority:state.settings.byePriority});
-  state.courts=[];state.sharedQueue=[];
+  stage5927ClearMainOperationResidue({normalizeMatchStatus:true});
   commit(`${state.draw.size}강 ${state.settings.drawMethod==='seeded'?'시드 분산':'즉시'} 추첨 · ${allMatches(state.draw).length}경기`);
   notice(`${state.draw.size}강 대진을 생성했습니다. 코트배정을 실행하세요.`,'success');
 }
@@ -2239,7 +2224,7 @@ function startRoulette(){
   autoRecovery('본선 룰렛 퍼포먼스 추첨 직전');
   // 공정성: 애니메이션 전에 실제 결과를 한 번만 확정하고 저장한다.
   state.draw=createDrawWithMethod(state,state.teams,state.settings.drawSize,{method:'roulette',byePriority:state.settings.byePriority});
-  state.courts=[];state.sharedQueue=[];
+  stage5927ClearMainOperationResidue({normalizeMatchStatus:true});
   rouletteCommitted=true;
   commit(`${state.draw.size}강 룰렛 퍼포먼스 결과 선확정 · 체크섬 ${state.drawMeta?.checksum||'-'}`);
   const actual=(state.draw.rounds[state.draw.size]||[]).flatMap(m=>[m.teamA,m.teamB]).filter(Boolean);
@@ -2281,7 +2266,7 @@ function reshuffle(){
   autoRecovery('본선 재추첨 직전');
   if(state.settings.drawMethod==='roulette'){openRoulette();return;}
   state.draw=createDrawWithMethod(state,state.teams,state.settings.drawSize,{method:state.settings.drawMethod,byePriority:state.settings.byePriority});
-  state.courts=[];state.sharedQueue=[];
+  stage5927ClearMainOperationResidue({normalizeMatchStatus:true});
   commit(`본선 재추첨 · ${state.settings.drawMethod} · 체크섬 ${state.drawMeta.checksum}`);
   notice('복구점을 저장한 뒤 본선 대진을 다시 추첨했습니다.','success');
 }
@@ -2319,7 +2304,7 @@ function confirmDrawUnlock(event){
 }
 
 function assign(){
-  pullSettings();ensureOperatorState();
+  pullSettings();ensureOperatorState();stage5925RetireLegacyHoldFeature();
   if(!hasAuthorizedMainDraw(state))throw new Error('본선 추첨을 먼저 실행하세요. 본선 미추첨 상태에서는 공용대기와 코트배정을 만들 수 없습니다.');
   if(!state.operation.autoAssignmentEnabled){notice('전체 자동배정이 일시정지되어 있습니다. 수동 배정은 코트·공용대기 카드에서 진행할 수 있습니다.','error');return;}
   autoRecovery('본선 코트배정 전');
@@ -2348,7 +2333,7 @@ function assign(){
   notice('예선 코트가 없어 본선 전용 코트로 배정했습니다.','success');
 }
 function ensureResultChangeHistory(){
-  ensureOperatorState();
+  ensureOperatorState();stage5925RetireLegacyHoldFeature();
   if(!Array.isArray(state.operation.resultChangeHistory))state.operation.resultChangeHistory=[];
   return state.operation.resultChangeHistory;
 }
@@ -3031,7 +3016,7 @@ let timeTimer=null;
 function refreshTimeEngine({save=false,renderNow=false}={}){
   if(state.settings.autoTimeEnabled)calculateTimeMetrics(state);
   if(save)safePersistState('시간 정보 갱신');
-  if(renderNow)render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus,holdMainMatch,releaseHeldMatch});
+  if(renderNow)render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus});
 }
 function stage594RefreshVisibleTimeBadges(){
   if(!state.settings?.autoTimeEnabled)return;
@@ -3896,14 +3881,14 @@ function updateBracketView(key,value){
     state.ui.bracketView.activeOnly=false;
   }
   saveState(state);
-  render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus,holdMainMatch,releaseHeldMatch});
+  render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus});
   if(key==='round')setTimeout(bindBracketMobileView571,0);
 }
 function resetBracketView(){
   state.ui=state.ui||{};
   state.ui.bracketView={round:'all',status:'all',venue:'all',density:'comfortable',activeOnly:false};
   saveState(state);
-  render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus,holdMainMatch,releaseHeldMatch});
+  render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus});
 }
 function setBracketFullscreen(open){
   const board=$('bracketBoard'),button=$('bracketFullscreenBtn');
@@ -4381,7 +4366,7 @@ function exportPrelimPilotReport(){if(!prelimPilotReport){notice('먼저 예선 
     if(!requireTypedConfirmation('전체 백업 복원','복원'))return;
     autoRecovery('전체 백업 불러오기 전');
     state=structuredClone(next);
-    ensureOperatorState();ensureContacts(state);
+    ensureOperatorState();stage5925RetireLegacyHoldFeature();ensureContacts(state);
     commit(`대회 전체 백업 복원 · ${next.tournament?.name||'이름 없음'}`);
     notice('대회 전체 백업을 복원했습니다.','success');
   }
@@ -4401,7 +4386,7 @@ function exportPrelimPilotReport(){if(!prelimPilotReport){notice('먼저 예선 
   if($('exportJsonBtn'))$('exportJsonBtn').onclick=exportFullBackup;
   if($('stateBackupInput'))$('stateBackupInput').onchange=async event=>{const input=event.currentTarget;await importFullBackup(input.files?.[0]);input.value='';};
   if($('exportResultsCsvBtn'))$('exportResultsCsvBtn').onclick=exportResultsCsv;
-  if($('saveRecoveryBtn'))$('saveRecoveryBtn').onclick=async()=>{const item=saveRecovery(state,`${state.tournament.name} · ${state.tournament.division}`,{kind:'manual'});const result=await item.ready;if(result?.saved){log(`로컬 복구점 저장 · ${item.label}`);}saveState(state);render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus,holdMainMatch,releaseHeldMatch});renderOperatorControls();if(result?.saved)notice(`수동 복구점을 저장했습니다. 수동 ${result.manualCount||1}/12 · 자동 ${result.autoCount||0}/24 · 전체 ${result.count||1}/36개를 보관합니다.`,'success');else notice('로컬 복구점 저장에 실패했습니다. 전체 백업 JSON도 함께 저장해 주세요.','warning');};
+  if($('saveRecoveryBtn'))$('saveRecoveryBtn').onclick=async()=>{const item=saveRecovery(state,`${state.tournament.name} · ${state.tournament.division}`,{kind:'manual'});const result=await item.ready;if(result?.saved){log(`로컬 복구점 저장 · ${item.label}`);}saveState(state);render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus});renderOperatorControls();if(result?.saved)notice(`수동 복구점을 저장했습니다. 수동 ${result.manualCount||1}/12 · 자동 ${result.autoCount||0}/24 · 전체 ${result.count||1}/36개를 보관합니다.`,'success');else notice('로컬 복구점 저장에 실패했습니다. 전체 백업 JSON도 함께 저장해 주세요.','warning');};
   if($('saveRecoveryBtnInline'))$('saveRecoveryBtnInline').onclick=()=>$('saveRecoveryBtn').click();
   if($('openRecoveryBtn'))$('openRecoveryBtn').onclick=showRecoveries;$('closeRecoveryBtn').onclick=()=>$('recoveryDialog').close();
   if($('clearLogsBtn'))$('clearLogsBtn').onclick=()=>{state.logs=[];commit();};
@@ -4456,10 +4441,10 @@ function exportPrelimPilotReport(){if(!prelimPilotReport){notice('먼저 예선 
     setTimeout(()=>{setValue('templatePlaying',shortTemplates.playing);setValue('templateWait1',shortTemplates.wait1);setValue('templateShared',shortTemplates.shared);},0);
     notice('단문 기본값으로 변경했습니다.','success');
   };
-  if($('messageStatusFilter'))$('messageStatusFilter').onchange=()=>render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus,holdMainMatch,releaseHeldMatch});
+  if($('messageStatusFilter'))$('messageStatusFilter').onchange=()=>render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus});
 
-  if($('rosterSearch'))$('rosterSearch').oninput=()=>render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus,holdMainMatch,releaseHeldMatch});
-  if($('rosterPhoneFilter'))$('rosterPhoneFilter').onchange=()=>render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus,holdMainMatch,releaseHeldMatch});
+  if($('rosterSearch'))$('rosterSearch').oninput=()=>render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus});
+  if($('rosterPhoneFilter'))$('rosterPhoneFilter').onchange=()=>render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus});
   ['contactEditPlayer1Phone','contactEditPlayer2Phone'].forEach(id=>{if($(id))$(id).oninput=validateContactInput;});
   if($('saveContactBtn'))$('saveContactBtn').onclick=saveContact;
   if($('refreshMessagePhonesBtn'))$('refreshMessagePhonesBtn').onclick=reconnectMessagePhones;
@@ -4724,8 +4709,8 @@ function liveMatchPlacement(match){
   if(['playing','court_wait1','venue_shared_queue','shared_queue','court_manual_queue','queued'].includes(String(match.status||''))){
     return{label:'코트 배정 확인 필요',kind:'waiting',staleStatus:String(match.status||'')};
   }
-  if(match.status==='ready')return{label:'코트 배정 대기',kind:'waiting'};
-  return{label:match.court?`${match.court} · 경기 예정`:'대진 대기',kind:'waiting'};
+  if(match.status==='ready')return{label:'대진 대기',kind:'draw_waiting'};
+  return{label:match.court?`${match.court} · 경기 예정`:'대진 대기',kind:'draw_waiting'};
 }
 function decorateBracketLivePlacements(){
   const board=document.getElementById('bracketBoard');
@@ -4760,8 +4745,9 @@ function decorateBracketLivePlacements(){
         else if(placement.kind==='wait1')statusLabel.textContent='대기1';
         else if(placement.kind==='shared')statusLabel.textContent='공용대기';
         else if(placement.kind==='completed')statusLabel.textContent='완료';
+        else if(placement.kind==='draw_waiting')statusLabel.textContent='대진 대기';
         else if(placement.staleStatus)statusLabel.textContent='배정 확인';
-        else if(match.status==='ready')statusLabel.textContent='배정 대기';
+        else if(match.status==='ready')statusLabel.textContent='대진 대기';
       }
 
       let badge=card.querySelector('.bracket-court-label');
@@ -4811,7 +4797,7 @@ function myMatchRoundLabel(match,isPrelim){
   if(isPrelim)return `${Number(match.groupNo||0)}조 ${Number(match.matchNo||0)}경기`;
   const id=String(match.id||'');const found=id.match(/^r(\d+)_/);return found?`${found[1]}강`:'본선 경기';
 }
-function myMatchStatusText(match){if(!match)return'대기';if(match.status==='completed')return'완료';if(match.status==='playing')return'시합중';if(match.status==='court_wait1')return'코트 대기1';if(match.status==='venue_shared_queue'||match.status==='shared_queue')return'공용대기';if(match.status==='ready')return'배정 대기';return'대기';}
+function myMatchStatusText(match){if(!match)return'대기';if(match.status==='completed')return'완료';if(match.status==='playing')return'시합중';if(match.status==='court_wait1')return'코트 대기1';if(match.status==='venue_shared_queue'||match.status==='shared_queue')return'공용대기';if(match.status==='ready')return'대진 대기';return'대기';}
 function renderMyMatchTeam(team){
   const root=document.getElementById('myMatchResult');if(!root)return;
   const teamLabel=portalTeam(team);const teamKey=myMatchTeamKey(team);
@@ -6305,7 +6291,7 @@ async function downloadRecoveryBundle(){
 }
 async function handleBackupManagerClick(event){
   const restore=event.target.closest?.('[data-backup-restore]');
-  if(restore){if(!requireAdmin('복구점 복원'))return;const item=await getRecovery(restore.dataset.backupRestore);if(!item)return notice('복구점을 찾을 수 없습니다.','error');if(!confirm(`현재 상태를 자동 저장한 뒤 “${item.label}” 상태로 복원할까요?`))return;if(!requireTypedConfirmation('복구점 복원','복원'))return;autoRecovery('관리 화면 복원 직전');state=normalizeV5RuntimeState(structuredClone(item.state));ensurePortalState();ensureOperatorState();ensureContacts(state);commit(`복구점 복원 · ${item.label}`);notice('복구점 상태로 복원했습니다.','success');await renderBackupRecoveryManager();return;}
+  if(restore){if(!requireAdmin('복구점 복원'))return;const item=await getRecovery(restore.dataset.backupRestore);if(!item)return notice('복구점을 찾을 수 없습니다.','error');if(!confirm(`현재 상태를 자동 저장한 뒤 “${item.label}” 상태로 복원할까요?`))return;if(!requireTypedConfirmation('복구점 복원','복원'))return;autoRecovery('관리 화면 복원 직전');state=normalizeV5RuntimeState(structuredClone(item.state));ensurePortalState();ensureOperatorState();stage5925RetireLegacyHoldFeature();ensureContacts(state);commit(`복구점 복원 · ${item.label}`);notice('복구점 상태로 복원했습니다.','success');await renderBackupRecoveryManager();return;}
   const download=event.target.closest?.('[data-backup-download]');
   if(download){const item=await getRecovery(download.dataset.backupDownload);if(!item)return notice('복구점을 찾을 수 없습니다.','error');downloadJson(recoveryFileName(item.label),{format:'230MATCH_V3_FULL_BACKUP',schemaVersion:2,archiveSchema:'230match-archive-v1',archiveCount:(state.portal?.archives||[]).length,appBuild:BUILD_LABEL,exportedAt:new Date().toISOString(),sourceRecovery:{label:item.label,createdAt:item.createdAt},state:item.state});return;}
   const del=event.target.closest?.('[data-backup-delete]');
@@ -6387,7 +6373,7 @@ async function stage3543RestoreAsNew(entry){
   registry.tournaments.push({id,name,division:String(ws.tournament?.division||entry.division||''),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),snapshot:null,restoredFrom:String(entry.raw?.tournamentId||entry.workspace?.tournament?.id||'')});
   registry.activeTournamentId=id;registry.noActiveTournament=false;ws.multiTournament=registry;
   window.__230matchLocalMutationUntil=Date.now()+15000;state=ws;
-  ensurePortalState();ensurePrelimState(state);ensureTimeState(state);ensureDrawMeta(state);ensureMessagingState(state);ensureContacts(state);ensureAuditState(state);ensureEarlyMainSettings(state);ensureVenueSettings(state);ensureVenueQueues(state);ensureCourtStatuses(state);ensureCourtManualQueues(state);ensurePrelimCourtStatuses(state);ensureOperatorState();
+  ensurePortalState();ensurePrelimState(state);ensureTimeState(state);ensureDrawMeta(state);ensureMessagingState(state);ensureContacts(state);ensureAuditState(state);ensureEarlyMainSettings(state);ensureVenueSettings(state);ensureVenueQueues(state);ensureCourtStatuses(state);ensureCourtManualQueues(state);ensurePrelimCourtStatuses(state);ensureOperatorState();stage5925RetireLegacyHoldFeature();
   try{syncCurrentTournamentRuntime();}catch(_e){}saveState(state);
   let cloud='';try{await pushStateNow(state);cloud=' 서버 저장 완료.';}catch(error){cloud=` 서버 저장 실패: ${error?.message||error}`;}
   await recovery.ready.catch(()=>null);notice(`${name}을 새 대회로 복원했습니다.${cloud}`,cloud.includes('실패')?'warning':'success');setTimeout(()=>location.reload(),450);
@@ -6409,7 +6395,7 @@ async function stage3543RestoreCurrent(entry){
   ws.auth=keepAuth;ws.sync=keepSync;if(Object.keys(keepOperatorAccess).length)ws.operatorAccess=keepOperatorAccess;
   const rec=ws.multiTournament.tournaments?.find(r=>String(r?.id)===currentId);if(rec){rec.name=oldName;rec.division=String(ws.tournament?.division||rec.division||'');rec.updatedAt=new Date().toISOString();rec.snapshot=null;}
   window.__230matchLocalMutationUntil=Date.now()+15000;state=ws;
-  ensurePortalState();ensurePrelimState(state);ensureTimeState(state);ensureDrawMeta(state);ensureMessagingState(state);ensureContacts(state);ensureAuditState(state);ensureEarlyMainSettings(state);ensureVenueSettings(state);ensureVenueQueues(state);ensureCourtStatuses(state);ensureCourtManualQueues(state);ensurePrelimCourtStatuses(state);ensureOperatorState();
+  ensurePortalState();ensurePrelimState(state);ensureTimeState(state);ensureDrawMeta(state);ensureMessagingState(state);ensureContacts(state);ensureAuditState(state);ensureEarlyMainSettings(state);ensureVenueSettings(state);ensureVenueQueues(state);ensureCourtStatuses(state);ensureCourtManualQueues(state);ensurePrelimCourtStatuses(state);ensureOperatorState();stage5925RetireLegacyHoldFeature();
   try{syncCurrentTournamentRuntime();}catch(_e){}saveState(state);
   let cloud='';try{await pushStateNow(state);cloud=' 서버 저장 완료.';}catch(error){cloud=` 서버 저장 실패: ${error?.message||error}`;}
   await recovery.ready.catch(()=>null);notice(`현재 대회를 백업 상태로 복구했습니다.${cloud}`,cloud.includes('실패')?'warning':'success');setTimeout(()=>location.reload(),450);
@@ -7073,10 +7059,10 @@ async function deleteCurrentTournamentSafely(){
       next.auth=keepAuth;next.operator=keepOperator;next.sync=keepSync;
       state=next;
     }
-    ensurePortalState();ensurePrelimState(state);ensureTimeState(state);ensureDrawMeta(state);ensureMessagingState(state);ensureContacts(state);ensureAuditState(state);ensureEarlyMainSettings(state);ensureVenueSettings(state);ensureVenueQueues(state);ensureCourtStatuses(state);ensureCourtManualQueues(state);ensurePrelimCourtStatuses(state);ensureOperatorState();
+    ensurePortalState();ensurePrelimState(state);ensureTimeState(state);ensureDrawMeta(state);ensureMessagingState(state);ensureContacts(state);ensureAuditState(state);ensureEarlyMainSettings(state);ensureVenueSettings(state);ensureVenueQueues(state);ensureCourtStatuses(state);ensureCourtManualQueues(state);ensurePrelimCourtStatuses(state);ensureOperatorState();stage5925RetireLegacyHoldFeature();
     await deleteTournamentNow(activeId,state);
     saveState(state);syncInputs();syncPrelimInputs();renderVenueSettingsEditor();
-    render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus,holdMainMatch,releaseHeldMatch});
+    render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus});
     renderOperatorControls();applyRoleUI();renderPortalViews();renderTournamentLifecycleManager();renderDivisionWorkspaceBar();
     notice('현재 대회를 삭제했습니다.','success');
   }catch(error){notice(`대회 삭제 실패: ${error?.message||error}`,'error');}
@@ -7292,7 +7278,7 @@ async function createNewTournamentFromManager(options={}){
   }
   next.multiTournament.activeTournamentId=newTournamentId;
   window.__230matchLocalMutationUntil=Date.now()+15000;
-  state=normalizeV5RuntimeState(next);ensurePortalState();ensurePrelimState(state);ensureTimeState(state);ensureDrawMeta(state);ensureMessagingState(state);ensureContacts(state);ensureAuditState(state);ensureEarlyMainSettings(state);ensureVenueSettings(state);ensureVenueQueues(state);ensureCourtStatuses(state);ensureCourtManualQueues(state);ensurePrelimCourtStatuses(state);ensureOperatorState();
+  state=normalizeV5RuntimeState(next);ensurePortalState();ensurePrelimState(state);ensureTimeState(state);ensureDrawMeta(state);ensureMessagingState(state);ensureContacts(state);ensureAuditState(state);ensureEarlyMainSettings(state);ensureVenueSettings(state);ensureVenueQueues(state);ensureCourtStatuses(state);ensureCourtManualQueues(state);ensurePrelimCourtStatuses(state);ensureOperatorState();stage5925RetireLegacyHoldFeature();
   try{syncCurrentTournamentRuntime();}catch(_e){}
   saveState(state);
   // 생성 직후 서버에 먼저 확정 저장한 뒤 화면을 갱신합니다.
@@ -7306,7 +7292,7 @@ async function createNewTournamentFromManager(options={}){
       cloudMessage=` Firebase 업로드는 실패했습니다: ${error?.message||error}`;
     }
   }
-  syncInputs();syncPrelimInputs();renderVenueSettingsEditor();render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus,holdMainMatch,releaseHeldMatch});renderOperatorControls();applyRoleUI();renderPortalViews();renderTournamentLifecycleManager();renderDivisionWorkspaceBar();
+  syncInputs();syncPrelimInputs();renderVenueSettingsEditor();render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus});renderOperatorControls();applyRoleUI();renderPortalViews();renderTournamentLifecycleManager();renderDivisionWorkspaceBar();
   notice(`새 대회를 생성했습니다.${result?.saved?' 이전 상태는 자동 복구점에 저장했습니다.':''}${cloudMessage}`,cloudMessage.includes('실패')?'warning':'success');return true;
 }
 function resetTournamentScope(scope){
@@ -7321,7 +7307,7 @@ function resetTournamentScope(scope){
   if(scope==='prelim'){
     state.prelim={...structuredClone(fresh.prelim),settings:structuredClone(state.prelim?.settings||fresh.prelim.settings)};
   }else if(scope==='main'){
-    state.draw=structuredClone(fresh.draw);state.drawMeta=structuredClone(fresh.drawMeta);state.courts=[];state.sharedQueue=[];state.venueQueues={};delete state.completion;delete state.tournament.completedAt;
+    state.draw=structuredClone(fresh.draw);state.drawMeta=structuredClone(fresh.drawMeta);stage5927ClearMainOperationResidue({normalizeMatchStatus:false});delete state.completion;delete state.tournament.completedAt;
   }else if(scope==='courts'){
     state.courts=[];state.sharedQueue=[];state.venueQueues={};if(state.prelim){state.prelim.courts=[];(state.prelim.matches||[]).forEach(m=>{if(m.status!=='completed'){m.courtId=null;m.court=null;m.waitStartedAt=null;}});}for(const m of allMatches(state.draw||{rounds:{}})){if(m.status!=='completed'){m.courtId=null;m.court=null;m.waitStartedAt=null;}}
   }else if(scope==='applications'){
@@ -7792,7 +7778,7 @@ document.getElementById('saveAuthSettingsBtn')?.addEventListener('click',saveAut
 loadAuthSettingsPanel();renderAuthStatus();startAuth((user,role,error,profile)=>{if(error)notice('간편로그인 연결 오류: '+(error.message||error),'error');applyAuthenticatedRole(user,role,profile);renderNotificationStatus();});
 
 prepareRecoveryStorage().catch(error=>console.warn('로컬 복구점 저장소 준비 실패',error));
-syncInputs();syncPrelimInputs();bind();bindPortal();void startGlobalNoticeSync();setTimeout(()=>void startRegistrationCloudSync(),500);setTimeout(()=>void startPublicRegistrationSync(),650);bindPrintCenter();bindParticipantManager();bindEntryApplications();bindPublicParticipantRecords();bindResultArchive();bindTournamentLifecycleManager();bindBackupRecoveryManager();bindNotificationCenter();bindTournamentReadiness();bindAcceptanceCenter();bindRehearsalCenter();bindPerformanceCenter();bindDiagnosticsCenter();window.addEventListener('popstate',()=>navigatePortalView(location.hash.replace(/^#/, '')||'home',{focus:false}));initialPortalView();renderVenueSettingsEditor();calculateTimeMetrics(state);render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus,holdMainMatch,releaseHeldMatch});if(canOperate()){renderOperatorControls();updateSetupProgress();autoSmsSnapshot=buildAutoSmsSnapshot();installUnifiedMoveControlGuard();ensureUnifiedCourtMoveControls();}applyRoleUI();renderPortalViewFast(document.body?.dataset.currentView||'home');decorateBracketLivePlacements();renderStage331OperationDashboard();restartTimeTimer();startClockTicker();
+syncInputs();syncPrelimInputs();bind();bindPortal();void startGlobalNoticeSync();setTimeout(()=>void startRegistrationCloudSync(),500);setTimeout(()=>void startPublicRegistrationSync(),650);bindPrintCenter();bindParticipantManager();bindEntryApplications();bindPublicParticipantRecords();bindResultArchive();bindTournamentLifecycleManager();bindBackupRecoveryManager();bindNotificationCenter();bindTournamentReadiness();bindAcceptanceCenter();bindRehearsalCenter();bindPerformanceCenter();bindDiagnosticsCenter();window.addEventListener('popstate',()=>navigatePortalView(location.hash.replace(/^#/, '')||'home',{focus:false}));initialPortalView();renderVenueSettingsEditor();calculateTimeMetrics(state);render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus});if(canOperate()){renderOperatorControls();updateSetupProgress();autoSmsSnapshot=buildAutoSmsSnapshot();installUnifiedMoveControlGuard();ensureUnifiedCourtMoveControls();}applyRoleUI();renderPortalViewFast(document.body?.dataset.currentView||'home');decorateBracketLivePlacements();renderStage331OperationDashboard();restartTimeTimer();startClockTicker();
 loadSyncPanel();startStateSync({getState:()=>state,applyRemoteState:next=>applySynchronizedState(next,'다른 기기'),onStatus:updateSyncPanel,canWrite:()=>isAdmin()||((!tournamentReadOnly()||__closedCloudWriteBypass)&&isOperator()),accessMode:()=>isAdmin()?'operator':(tournamentReadOnly()?'viewer':(canOperate()?'operator':'viewer'))});syncAccessStarted=true;
 const buildStageLabel=document.getElementById('buildStageLabel');
 window.closeAutoSmsDialog=closeAutoSmsDialog;window.approveAutoSmsAligo=approveAutoSmsAligo;window.approveAutoSmsPhone=approveAutoSmsPhone;window.copyAutoSms=copyAutoSms;window.previewCurrentCourtSms=previewCurrentCourtSms;
@@ -9055,7 +9041,7 @@ function applyDivisionSnapshot(record){
   const managed=new Set();state.multiDivision.divisions.forEach(d=>Object.keys(d.snapshot||{}).forEach(k=>{if(k!=='portal')managed.add(k);}));managed.forEach(key=>delete state[key]);
   Object.entries(record.snapshot||{}).forEach(([key,value])=>{if(key!=='portal')state[key]=divisionClone(value);});
   state.portal={...globalPortal,...divisionClone(record.snapshot.portal||{})};state.tournament={...preservedTournament,division:record.name};state.multiDivision.activeDivisionId=record.id;
-  ensurePortalState();ensurePrelimState(state);ensureTimeState(state);ensureDrawMeta(state);ensureMessagingState(state);ensureContacts(state);ensureAuditState(state);ensureEarlyMainSettings(state);ensureVenueSettings(state);ensureVenueQueues(state);ensureCourtStatuses(state);ensureCourtManualQueues(state);ensurePrelimCourtStatuses(state);ensureOperatorState();ensureMainDrawLifecycle(state);return true;
+  ensurePortalState();ensurePrelimState(state);ensureTimeState(state);ensureDrawMeta(state);ensureMessagingState(state);ensureContacts(state);ensureAuditState(state);ensureEarlyMainSettings(state);ensureVenueSettings(state);ensureVenueQueues(state);ensureCourtStatuses(state);ensureCourtManualQueues(state);ensurePrelimCourtStatuses(state);ensureOperatorState();stage5925RetireLegacyHoldFeature();ensureMainDrawLifecycle(state);return true;
 }
 async function switchDivisionWorkspace(id,{view='home'}={}){
   ensureMultiDivisionRuntime();
@@ -9853,7 +9839,7 @@ let refreshDivisionEditorPanel = window.refreshDivisionEditorPanel || (()=>{});
   }
   const oldCommit=commit;
   commit=function(message){const result=oldCommit(message);setTimeout(showCourtPolicyState,0);return result;};
-  setTimeout(()=>{if(useUnifiedCourts(state)){const repair=reconcilePrelimCourtReservations(state);if(repair.added||repair.returnedMain){safePersistState('코트별 예선 예약열 복구');render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus,holdMainMatch,releaseHeldMatch});}}showCourtPolicyState();autoSmsSnapshot=buildAutoSmsSnapshot();},0);
+  setTimeout(()=>{if(useUnifiedCourts(state)){const repair=reconcilePrelimCourtReservations(state);if(repair.added||repair.returnedMain){safePersistState('코트별 예선 예약열 복구');render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus});}}showCourtPolicyState();autoSmsSnapshot=buildAutoSmsSnapshot();},0);
   const label=document.getElementById('buildStageLabel');if(label){label.textContent='230MATCH 34.3.9 · 코트별 예선 예약열·본선 병행배정';label.title='Version 34.3.9';}
   document.documentElement.dataset.build='3439';
   console.info('[230MATCH] 34.3.9 ready · court-reserved prelim queue and concurrent main allocation active');
@@ -9952,7 +9938,7 @@ let refreshDivisionEditorPanel = window.refreshDivisionEditorPanel || (()=>{});
     const fresh=initialState();
     state.draw=structuredClone(fresh.draw);state.drawMeta=structuredClone(fresh.drawMeta);
     state.prelim=state.prelim||{};state.prelim.linkedDraw={active:false,slots:[],createdAt:null,lastSyncedAt:null,userInitiated:false};
-    state.courts=[];state.sharedQueue=[];state.venueQueues={};
+    stage5927ClearMainOperationResidue({normalizeMatchStatus:false});
     delete state.completion;delete state.tournament?.completedAt;
     try{ensureVenueQueues(state);ensureCourtStatuses(state);ensureCourtManualQueues(state)}catch(_e){}
     commit('본선만 초기화 · 예선 결과 유지');
@@ -9971,7 +9957,7 @@ let refreshDivisionEditorPanel = window.refreshDivisionEditorPanel || (()=>{});
     state.draw=createRankAwareFinalDraw(qualifiers,size);
     state.draw.stage3441Explicit='final';state.draw.stage3441DrawAt=new Date().toISOString();
     state.prelim.linkedDraw={active:false,slots:[],createdAt:null,lastSyncedAt:null,userInitiated:false,finalDrawAt:new Date().toISOString()};
-    state.courts=[];state.sharedQueue=[];state.venueQueues={};
+    stage5927ClearMainOperationResidue({normalizeMatchStatus:true});
     commit(`최종 본선 추첨 · ${qualifiers.length}팀 · ${size}강`);
     notice?.('최종 본선 대진을 생성했습니다. 검토 후 본선 코트배정과 본선 확정을 진행하세요.','success');
     refresh();
@@ -11950,7 +11936,7 @@ console.info('[230MATCH] 34.4.2 ready · main wait1 refill and shared queue elap
       }
     }
     // 완료 결과가 사라졌으므로 본선 운영 큐는 재배정 전 상태로 정리합니다. 대진 자체는 유지됩니다.
-    state.courts=[];state.sharedQueue=[];state.venueQueues={};
+    stage5927ClearMainOperationResidue({normalizeMatchStatus:true});
     delete state.completion;if(state.tournament)delete state.tournament.completedAt;
     commit('본선 경기결과만 초기화 · 추첨 대진 유지');
     renderTournamentLifecycleManager();
@@ -12157,7 +12143,7 @@ async function deleteTournamentById(id){
       nextState.auth=keepAuth;nextState.operator=keepOperator;nextState.sync=keepSync;state=nextState;
     }
   }
-  ensurePortalState();ensurePrelimState(state);ensureTimeState(state);ensureDrawMeta(state);ensureMessagingState(state);ensureContacts(state);ensureAuditState(state);ensureEarlyMainSettings(state);ensureVenueSettings(state);ensureVenueQueues(state);ensureCourtStatuses(state);ensureCourtManualQueues(state);ensurePrelimCourtStatuses(state);ensureOperatorState();
+  ensurePortalState();ensurePrelimState(state);ensureTimeState(state);ensureDrawMeta(state);ensureMessagingState(state);ensureContacts(state);ensureAuditState(state);ensureEarlyMainSettings(state);ensureVenueSettings(state);ensureVenueQueues(state);ensureCourtStatuses(state);ensureCourtManualQueues(state);ensurePrelimCourtStatuses(state);ensureOperatorState();stage5925RetireLegacyHoldFeature();
   saveState(state);syncInputs?.();syncPrelimInputs?.();renderPortalViews();renderDivisionWorkspaceBar();renderTournamentList();renderHomeTournamentCards?.();
   notice(`${name} 대회와 해당 대회의 운영 데이터를 모두 삭제했습니다.`,'success');
 }
@@ -15443,10 +15429,11 @@ console.info('[230MATCH] 5.9.16 stabilization · bracket active state follows ac
 
 console.info('[230MATCH] 5.9.18 · held shared-queue cards stay visible and auto-assignment skips them');
 
-console.info('[230MATCH] 5.9.20 stabilization · hold display forced from heldMatches after every render');
 
-console.info('[230MATCH] 5.9.22 stabilization · exactly one hold reason block per shared-queue card');
 
 console.info('[230MATCH] 5.9.23 stabilization · every main-draw result save passes one shared in-app confirmation gate');
 
-console.info('[230MATCH] 5.9.24 stabilization · hold UI rendered once by ui.js; DOM decorator removed');
+
+console.info('[230MATCH] 5.9.25 stabilization · hold feature retired; legacy held matches auto-return to shared queue');
+
+console.info('[230MATCH] 5.9.27 stabilization · main redraw/reset clears all placement residue; unplaced ready shows 대진 대기');

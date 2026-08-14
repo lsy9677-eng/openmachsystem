@@ -171,21 +171,13 @@ function takeSharedMain(state,court,status='court_wait1'){
   if(state.operation?.autoAssignmentEnabled===false)return null;
   const q=venueQueue(state,court.venueId||'venue-default');
 
-  // 5.9.18 안정화:
-  // 보류 경기는 공용대기 배열에서 제거하지 않는다.
-  // 자동배정 후보를 찾을 때만 건너뛰므로 화면 순서와 원래 위치가 유지된다.
   for(let i=0;i<q.length;){
     const id=q[i];
     const item=findUnifiedMatch(state,id);
     if(!item||item.type!=='main'||item.match?.status==='completed'){
       q.splice(i,1);continue;
     }
-    const held=item.match?.status==='held'||state.operation?.heldMatches?.some(x=>String(x.matchId)===String(id));
-    if(held){i++;continue;}
-
-    // 이미 어느 코트에 올라간 잘못된 중복만 공용대기에서 제거.
     if(placementOf(state,id)){q.splice(i,1);continue;}
-
     q.splice(i,1);
     setUnifiedStatus(state,id,status,court);
     return id;
@@ -384,7 +376,7 @@ export function enqueueReadyMainToUnifiedCourts(state,{priorityMatchIds=[]}={}){
   const incompletePlayIns=playIns.filter(m=>m.status!=='completed');
   const prioritySet=new Set(priorityMatchIds||[]);
   const ready=all.filter(m=>
-    m.status==='ready'&&!state.operation?.heldMatches?.some(x=>x.matchId===m.id)&&
+    m.status==='ready'&&
     m.teamA&&!m.teamA.placeholder&&m.teamB&&!m.teamB.placeholder&&!occupied.has(m.id)
   );
 
@@ -500,3 +492,5 @@ export function moveUnifiedCourtMatchFlexible(state,{matchId,targetCourtId,mode=
 console.info('[230MATCH] unified-court-engine 5.9.9 · new playing transition resets match clock');
 
 console.info('[230MATCH] unified-court-engine 5.9.18 · held queue entries are visible but skipped by auto assignment');
+
+console.info('[230MATCH] unified-court-engine 5.9.25 · hold exception removed; shared queue is plain FIFO');
