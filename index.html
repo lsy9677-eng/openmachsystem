@@ -1038,6 +1038,165 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
 }
 </style>
 
+
+<style id="stage5910BracketStatusVisibility">
+/* 230MATCH 5.9.10
+   대진표 상태 가독성 전용 패치.
+   로직/좌표/크기 계산은 변경하지 않고 색상·테두리·그림자만 강화한다. */
+
+/* 라운드별 고유 단계색 — 카드 크기/배치에는 영향 없음 */
+#bracketBoard .match-card[data-round-size="128"]{--stage5910-round-accent:#3b82f6}
+#bracketBoard .match-card[data-round-size="64"]{--stage5910-round-accent:#1677d2}
+#bracketBoard .match-card[data-round-size="32"]{--stage5910-round-accent:#7257c8}
+#bracketBoard .match-card[data-round-size="16"]{--stage5910-round-accent:#c28416}
+#bracketBoard .match-card[data-round-size="8"]{--stage5910-round-accent:#d66b44}
+#bracketBoard .match-card[data-round-size="4"]{--stage5910-round-accent:#9a4fbd}
+#bracketBoard .match-card[data-round-size="2"]{--stage5910-round-accent:#c48b00}
+
+#bracketBoard .match-card[data-round-size]{
+  border-width:2px!important;
+  box-shadow:
+    inset 5px 0 0 var(--stage5910-round-accent,#64748b),
+    0 2px 7px rgba(15,23,42,.10)!important;
+}
+#bracketBoard .match-card[data-round-size] header{
+  font-weight:900!important;
+  color:#26364d!important;
+}
+#bracketBoard .match-card[data-round-size] .match-team{
+  font-weight:800!important;
+  color:#23344d!important;
+}
+
+/* 상태 문구 자체를 pill 형태로 만들어 배경색과 관계없이 읽히게 함 */
+#bracketBoard .match-status-label{
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  min-height:22px!important;
+  padding:2px 8px!important;
+  border-radius:999px!important;
+  font-size:10px!important;
+  line-height:1!important;
+  font-weight:950!important;
+  letter-spacing:.02em!important;
+  border:1px solid #cbd5e1!important;
+  background:#f1f5f9!important;
+  color:#334155!important;
+}
+
+/* 시합중: 가장 강하게 */
+#bracketBoard .match-card.is-playing{
+  border-color:#e34a4a!important;
+  outline:2px solid rgba(220,38,38,.32)!important;
+  outline-offset:1px!important;
+  box-shadow:
+    inset 5px 0 0 #dc2626,
+    0 0 0 3px rgba(239,68,68,.10),
+    0 5px 14px rgba(127,29,29,.16)!important;
+}
+#bracketBoard .match-card.is-playing .match-status-label{
+  background:#c81e1e!important;
+  border-color:#a91515!important;
+  color:#fff!important;
+  text-shadow:0 1px 1px rgba(0,0,0,.20)!important;
+}
+#bracketBoard .match-card.is-playing .bracket-live-placement{
+  background:#ffe3e3!important;
+  border:2px solid #ef7a7a!important;
+  color:#9f1717!important;
+  font-weight:950!important;
+}
+
+/* 대기1 */
+#bracketBoard .match-card.is-wait1{
+  border-color:#d6a223!important;
+  box-shadow:
+    inset 5px 0 0 #d49a12,
+    0 4px 11px rgba(146,104,11,.13)!important;
+}
+#bracketBoard .match-card.is-wait1 .match-status-label{
+  background:#d99000!important;
+  border-color:#b87900!important;
+  color:#fff!important;
+}
+#bracketBoard .match-card.is-wait1 .bracket-live-placement{
+  background:#fff1bd!important;
+  border:2px solid #e2b53f!important;
+  color:#7a4b00!important;
+  font-weight:950!important;
+}
+
+/* 공용대기 */
+#bracketBoard .match-card.is-shared-wait{
+  border-color:#7c63c7!important;
+  box-shadow:
+    inset 5px 0 0 #7055bd,
+    0 4px 11px rgba(80,55,150,.12)!important;
+}
+#bracketBoard .match-card.is-shared-wait .match-status-label{
+  background:#6650ae!important;
+  border-color:#533e98!important;
+  color:#fff!important;
+}
+
+/* 배정 대기 */
+#bracketBoard .match-card.is-ready .match-status-label,
+#bracketBoard .match-card.is-placeholder .match-status-label{
+  background:#2463a7!important;
+  border-color:#174f8c!important;
+  color:#fff!important;
+}
+
+/* 경기 완료: 시합중과 다른 방향으로 확실히 구분 */
+#bracketBoard .match-card.completed{
+  border-color:#23935a!important;
+  outline:2px solid rgba(22,163,74,.22)!important;
+  outline-offset:1px!important;
+  box-shadow:
+    inset 6px 0 0 #168647,
+    0 0 0 3px rgba(34,197,94,.08),
+    0 5px 13px rgba(20,83,45,.13)!important;
+}
+#bracketBoard .match-card.completed .match-status-label{
+  background:#08783f!important;
+  border-color:#056333!important;
+  color:#fff!important;
+}
+#bracketBoard .match-card.completed .bracket-live-placement,
+#bracketBoard .bracket-live-placement[data-placement-kind="completed"]{
+  background:#d9f6e5!important;
+  border:2px solid #75c898!important;
+  color:#075f31!important;
+  font-weight:950!important;
+}
+#bracketBoard .match-card.completed .match-team.winner{
+  background:#dff5e7!important;
+  color:#075f31!important;
+  font-weight:950!important;
+}
+#bracketBoard .match-card.completed .match-team.winner::before{
+  content:"✓";
+  display:inline-block;
+  margin-right:4px;
+  color:#08783f;
+  font-weight:950;
+}
+
+/* 모바일에서도 상태 배지를 너무 작게 줄이지 않음 */
+@media(max-width:700px){
+  #bracketBoard .match-status-label{
+    min-height:20px!important;
+    padding:2px 6px!important;
+    font-size:9.5px!important;
+  }
+  #bracketBoard .bracket-live-placement{
+    font-size:10px!important;
+    font-weight:950!important;
+  }
+}
+</style>
+
 </head>
 <body>
   <header class="topbar">
