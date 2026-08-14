@@ -1393,6 +1393,90 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
 }
 </style>
 
+
+<style id="stage5914RemoveRoundVerticalLines">
+/* 5.9.14 — 라운드 전체 높이 색 세로선 제거.
+   라운드 구분은 상단 헤더 색만 사용하고, 카드에는 경기 상태 강조만 유지한다. */
+
+#bracketBoard .round-column::before{
+  content:none!important;
+  display:none!important;
+}
+
+/* 5.9.10/5.9.13에서 남아 있을 수 있는 카드 왼쪽 단계색도 제거 */
+#bracketBoard .match-card[data-round-size]{
+  box-shadow:0 2px 7px rgba(15,23,42,.10)!important;
+}
+
+/* 시합중 pulse는 유지 */
+#bracketBoard .match-card.is-playing{
+  animation:stage5913PlayingPulse 1.45s ease-in-out infinite!important;
+}
+
+/* 완료 카드 톤다운도 유지 */
+#bracketBoard .match-card.completed{
+  background:#d8dee7!important;
+  border-color:#6b7280!important;
+  outline:2px solid rgba(71,85,105,.30)!important;
+  outline-offset:1px!important;
+  box-shadow:0 3px 10px rgba(15,23,42,.14)!important;
+  filter:saturate(.68);
+}
+</style>
+
+
+<style id="stage5915PlayingBlinkFix">
+/* 5.9.15 — 시합중 깜빡임 전용 CSS.
+   기존 box-shadow !important와 충돌하지 않도록 별도 ::after 레이어만 애니메이션한다. */
+
+#bracketBoard .match-card.is-playing{
+  position:relative!important;
+  overflow:visible!important;
+}
+
+#bracketBoard .match-card.is-playing::after{
+  content:"";
+  position:absolute;
+  inset:-3px;
+  border:3px solid #ef4444;
+  border-radius:12px;
+  pointer-events:none;
+  z-index:5;
+  opacity:.20;
+  box-shadow:0 0 0 1px rgba(220,38,38,.15),0 0 10px rgba(239,68,68,.20);
+  animation:stage5915PlayingBlink 1.15s ease-in-out infinite;
+}
+
+@keyframes stage5915PlayingBlink{
+  0%,100%{
+    opacity:.18;
+    box-shadow:0 0 0 1px rgba(220,38,38,.10),0 0 6px rgba(239,68,68,.14);
+  }
+  50%{
+    opacity:1;
+    box-shadow:0 0 0 4px rgba(220,38,38,.18),0 0 16px rgba(239,68,68,.45);
+  }
+}
+
+/* 기존 5.9.13 카드 자체 pulse는 중복 방지를 위해 끈다 */
+#bracketBoard .match-card.is-playing{
+  animation:none!important;
+}
+
+/* 완료 카드가 동시에 playing 클래스를 잘못 가진 경우 완료 표시가 우선 */
+#bracketBoard .match-card.completed::after{
+  content:none!important;
+  display:none!important;
+}
+
+@media(prefers-reduced-motion:reduce){
+  #bracketBoard .match-card.is-playing::after{
+    animation:none;
+    opacity:.75;
+  }
+}
+</style>
+
 </head>
 <body>
   <header class="topbar">
