@@ -1540,6 +1540,150 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
 }
 </style>
 
+
+<style id="stage5917BracketMetaAndFullCardBlink">
+/* 5.9.17 — 대진표 표시 전용 안정화 CSS
+   1) 경기 예정/상태 문구를 카드 하단 안쪽에 고정
+   2) 시합중 카드 전체에 반투명 pulse overlay 적용
+   JS/코트/결과/시간/문자 로직 변경 없음 */
+
+/* 경기 예정 문구가 카드 아래로 삐져나오지 않도록 카드 내부 하단에 고정 */
+#bracketBoard .round-match-stack>.match-card{
+  position:relative!important;
+  box-sizing:border-box!important;
+  overflow:hidden!important;
+  padding-bottom:19px!important;
+}
+
+#bracketBoard .round-match-stack>.match-card .match-meta{
+  position:absolute!important;
+  left:8px!important;
+  right:8px!important;
+  bottom:4px!important;
+  margin:0!important;
+  padding:0!important;
+  min-height:0!important;
+  max-width:calc(100% - 16px)!important;
+  line-height:1.15!important;
+  font-size:9.5px!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  color:#94a3b8!important;
+  z-index:4!important;
+}
+
+/* 5.9.16 카드 본체 animation은 !important 배경 규칙에 막히므로 끈다 */
+#bracketBoard .match-card.is-playing{
+  animation:none!important;
+  position:relative!important;
+}
+
+/* 카드 전체 면적을 덮는 pulse layer */
+#bracketBoard .match-card.is-playing::after{
+  content:""!important;
+  display:block!important;
+  position:absolute!important;
+  inset:0!important;
+  border-radius:inherit!important;
+  background:rgba(239,68,68,.08)!important;
+  box-shadow:inset 0 0 0 2px rgba(220,38,38,.36)!important;
+  opacity:.28;
+  pointer-events:none!important;
+  z-index:2!important;
+  animation:stage5917WholeCardPulse 1.10s ease-in-out infinite!important;
+}
+
+/* 실제 내용은 pulse layer 위에 유지 */
+#bracketBoard .match-card.is-playing > *{
+  position:relative;
+  z-index:3;
+}
+
+@keyframes stage5917WholeCardPulse{
+  0%,100%{
+    opacity:.22;
+    background:rgba(239,68,68,.07);
+    box-shadow:inset 0 0 0 2px rgba(220,38,38,.28),0 0 5px rgba(239,68,68,.10);
+  }
+  50%{
+    opacity:1;
+    background:rgba(239,68,68,.24);
+    box-shadow:inset 0 0 0 3px rgba(185,28,28,.82),0 0 15px rgba(239,68,68,.40);
+  }
+}
+
+/* 완료 카드는 절대 pulse 하지 않음 */
+#bracketBoard .match-card.completed::after{
+  content:none!important;
+  display:none!important;
+  animation:none!important;
+}
+
+/* compact/mobile에서도 경기 예정은 카드 안쪽 유지 */
+#bracketBoard.bracket-compact .round-match-stack>.match-card{
+  padding-bottom:15px!important;
+}
+#bracketBoard.bracket-compact .round-match-stack>.match-card .match-meta{
+  bottom:2px!important;
+  font-size:8.5px!important;
+}
+
+@media(max-width:700px){
+  #bracketBoard .round-match-stack>.match-card{
+    padding-bottom:17px!important;
+  }
+  #bracketBoard .round-match-stack>.match-card .match-meta{
+    left:6px!important;
+    right:6px!important;
+    bottom:3px!important;
+    max-width:calc(100% - 12px)!important;
+    font-size:9px!important;
+  }
+}
+
+@media(prefers-reduced-motion:reduce){
+  #bracketBoard .match-card.is-playing::after{
+    animation:none!important;
+    opacity:.65!important;
+    background:rgba(239,68,68,.17)!important;
+  }
+}
+</style>
+
+
+<style id="stage5918HeldQueueVisible">
+.stage5918-held-queue-card{
+  position:relative!important;
+  border:2px solid #f59e0b!important;
+  background:#fff7df!important;
+  box-shadow:0 0 0 3px rgba(245,158,11,.10),0 3px 10px rgba(146,64,14,.10)!important;
+}
+.stage5918-hold-badge{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:22px;
+  padding:2px 8px;
+  border-radius:999px;
+  background:#b45309;
+  color:#fff;
+  font-size:10px;
+  font-weight:950;
+}
+.stage5918-held-queue-card>em{color:#92400e!important;font-weight:800!important}
+.stage5918-held-time{
+  background:#ffedd5!important;
+  border-color:#fdba74!important;
+  color:#9a3412!important;
+  font-weight:950!important;
+}
+.stage5918-held-queue-card button:disabled{
+  opacity:.45!important;
+  cursor:not-allowed!important;
+}
+</style>
+
 </head>
 <body>
   <header class="topbar">
@@ -3568,7 +3712,7 @@ body.stage593-operator-scale-active main.app-shell > .mode-tabs{
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=59160"></script>
+  <script type="module" src="./assets/js/app.js?v=59180"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">

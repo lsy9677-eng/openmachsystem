@@ -12,10 +12,10 @@ import{downloadJson}from'./recovery.js?v=332012';
 import{ensureTimeState,calculateTimeMetrics,timeInfo}from'./time-engine-v5000.js?v=5940';
 import{ensureMessagingState,generatePlayingMessages,generateWait1Messages,generateCurrentCourtMessages,generateCurrentWaitMessages,generateAllTimeMessages,markMessageSent,deleteMessage,clearSentMessages,markAllSent,smsUri,refreshMessageContacts,mergePendingDuplicates,getMessageHistory}from'./message-engine.js?v=3521';
 import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactData,importContactData}from'./contact-engine-v5000.js?v=5000';
-import{render,teamText}from'./ui.js?v=5701';
+import{render,teamText}from'./ui.js?v=59180';
 import{ensureAuditState,runStateAudit,runPrelimSimulation,runFullSimulation,applyAuditResult}from'./audit-engine.js?v=332012';
 import{earlyMainStats,markResolvedMainMatchesReady,canAssignEarlyMain,ensureEarlyMainSettings,autoAssignResolvedMain}from'./early-main-engine.js?v=332012';
-import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=5990';
+import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=59180';
 import{ensureMainDrawLifecycle,beginMainDraw,completeMainDraw,failMainDraw,resetMainDraw,hasAuthorizedMainDraw,mainDrawStatus,clearMainPlacement,repairMainDrawAuthorization}from'./main-draw-lifecycle-engine.js?v=3501';
 import{shouldUseLinkedDraw,linkedDrawNeedsRepair,rebuildLinkedDraw,hasStartedMainMatches}from'./linked-draw-guard-engine.js?v=332012';
 import{ensureVenueSettings,ensureVenueQueues,venuePreset,buildVenueCourts,prelimVenues,mainVenues}from'./venue-engine.js?v=332012';
@@ -1812,28 +1812,108 @@ function locateAndRemoveMainMatch(matchId){
   const si=(state.sharedQueue||[]).indexOf(matchId);if(si>=0){location={type:'sharedQueue',index:si};state.sharedQueue.splice(si,1);}
   return{blocked:false,location};
 }
+function stage5918FindSharedQueueLocation(matchId){
+  const id=String(matchId||'');
+  for(const [venueId,q] of Object.entries(state.venueQueues||{})){
+    const index=(q||[]).findIndex(x=>String(x)===id);
+    if(index>=0)return{type:'venueQueue',venueId,index};
+  }
+  const sharedIndex=(state.sharedQueue||[]).findIndex(x=>String(x)===id);
+  if(sharedIndex>=0)return{type:'sharedQueue',index:sharedIndex};
+  return null;
+}
+function stage5918QueueStillContains(matchId,location){
+  const id=String(matchId||'');
+  if(location?.type==='venueQueue')return (state.venueQueues?.[location.venueId]||[]).some(x=>String(x)===id);
+  if(location?.type==='sharedQueue')return (state.sharedQueue||[]).some(x=>String(x)===id);
+  return false;
+}
+function stage5918RestoreQueuePosition(matchId,held){
+  const id=String(matchId||'');
+  const location=held?.location||{};
+  if(location.type==='venueQueue'){
+    if(!Array.isArray(state.venueQueues?.[location.venueId])){
+      state.venueQueues=state.venueQueues||{};
+      state.venueQueues[location.venueId]=[];
+    }
+    const q=state.venueQueues[location.venueId];
+    if(!q.some(x=>String(x)===id))q.splice(Math.min(Math.max(0,Number(location.index)||0),q.length),0,matchId);
+    return{type:'venueQueue',venueId:location.venueId};
+  }
+  if(location.type==='sharedQueue'){
+    state.sharedQueue=Array.isArray(state.sharedQueue)?state.sharedQueue:[];
+    if(!state.sharedQueue.some(x=>String(x)===id))state.sharedQueue.splice(Math.min(Math.max(0,Number(location.index)||0),state.sharedQueue.length),0,matchId);
+    return{type:'sharedQueue'};
+  }
+  return null;
+}
 function holdMainMatch(matchId){
   if(!requireOperator('경기 운영'))return;
   const m=findMatch(state.draw,matchId);if(!m)return;
   ensureOperatorState();
-  if(state.operation.heldMatches.some(x=>x.matchId===matchId))return;
+
+  const existing=state.operation.heldMatches.find(x=>String(x.matchId)===String(matchId));
+  if(existing){releaseHeldMatch(matchId);return;}
+
+  const location=stage5918FindSharedQueueLocation(matchId);
+  if(!location){notice('공용대기에 있는 경기만 보류할 수 있습니다.','error');return;}
+
   const reason=prompt('보류 사유를 입력하세요.','선수 도착 지연')||'운영자 보류';
   autoRecovery(`경기 보류 전 · ${matchId}`);
-  const removed=locateAndRemoveMainMatch(matchId);if(removed.blocked){notice(removed.reason,'error');return;}
-  state.operation.heldMatches.push({matchId,reason,heldAt:new Date().toISOString(),location:removed.location,previousStatus:m.status,venueId:m.venueId||removed.location?.venueId||null});
-  m.status='held';m.holdReason=reason;m.waitStartedAt=null;m.court=null;m.courtId=null;
-  commit(`본선 경기 보류 · ${matchId} · ${reason}`);notice('경기를 보류했습니다. 자동배정 대상에서 제외됩니다.','success');
+
+  state.operation.heldMatches.push({
+    matchId,reason,heldAt:new Date().toISOString(),location,
+    previousStatus:m.status,
+    previousWaitStartedAt:m.waitStartedAt||null,
+    venueId:m.venueId||location.venueId||null
+  });
+
+  // 큐에서는 빼지 않는다. 화면 위치를 유지하고 자동배정만 제외한다.
+  m.status='held';
+  m.holdReason=reason;
+  m.court=null;m.courtId=null;
+
+  commit(`본선 경기 보류 · ${matchId} · ${reason}`);
+  notice('보류 표시를 유지한 채 공용대기에 남겼습니다. 보류 해제 전까지 자동배정에서 제외됩니다.','success');
 }
 function releaseHeldMatch(matchId){
   if(!requireOperator('경기 운영'))return;
   ensureOperatorState();
-  const index=state.operation.heldMatches.findIndex(x=>x.matchId===matchId);if(index<0)return;
+  const index=state.operation.heldMatches.findIndex(x=>String(x.matchId)===String(matchId));if(index<0)return;
   autoRecovery(`경기 보류 해제 전 · ${matchId}`);
-  const held=state.operation.heldMatches.splice(index,1)[0];const m=findMatch(state.draw,matchId);if(!m)return;
-  delete m.holdReason;m.status='ready';m.waitStartedAt=new Date().toISOString();
-  const venueId=held.venueId||Object.keys(state.venueQueues||{})[0]||state.prelim?.courts?.[0]?.venueId;
-  if(venueId){if(!Array.isArray(state.venueQueues[venueId]))state.venueQueues[venueId]=[];state.venueQueues[venueId].push(matchId);m.status='venue_shared_queue';m.venueId=venueId;}
-  commit(`본선 경기 보류 해제 · ${matchId}`);notice('보류를 해제하고 공용대기 맨 뒤로 복귀했습니다.','success');
+  const held=state.operation.heldMatches.splice(index,1)[0];
+  const m=findMatch(state.draw,matchId);if(!m)return;
+
+  let location=held.location;
+  if(!stage5918QueueStillContains(matchId,location)){
+    const restored=stage5918RestoreQueuePosition(matchId,held);
+    if(restored)location={...location,...restored};
+  }
+
+  delete m.holdReason;
+  m.waitStartedAt=held.previousWaitStartedAt||new Date().toISOString();
+
+  if(location?.type==='venueQueue'){
+    m.status='venue_shared_queue';
+    m.venueId=location.venueId||held.venueId||m.venueId;
+  }else if(location?.type==='sharedQueue'){
+    m.status='shared_queue';
+  }else{
+    // 구버전 보류 데이터 호환: 위치 정보가 없으면 기존 방식대로 공용대기 뒤에 복귀.
+    const venueId=held.venueId||Object.keys(state.venueQueues||{})[0]||state.prelim?.courts?.[0]?.venueId;
+    if(venueId){
+      if(!Array.isArray(state.venueQueues[venueId]))state.venueQueues[venueId]=[];
+      if(!state.venueQueues[venueId].includes(matchId))state.venueQueues[venueId].push(matchId);
+      m.status='venue_shared_queue';m.venueId=venueId;
+    }else{
+      state.sharedQueue=Array.isArray(state.sharedQueue)?state.sharedQueue:[];
+      if(!state.sharedQueue.includes(matchId))state.sharedQueue.push(matchId);
+      m.status='shared_queue';
+    }
+  }
+
+  commit(`본선 경기 보류 해제 · ${matchId}`);
+  notice('보류를 해제했습니다. 현재 공용대기 위치에서 다시 자동배정 대상이 됩니다.','success');
 }
 
 function stage580PlacementAudit(){
@@ -15259,3 +15339,5 @@ console.info('[230MATCH] 5.9.9 ready · wait1-to-playing clock always starts fre
 console.info('[230MATCH] 5.9.12 stabilization · bracket placement uses match-id only + recovery snapshot preview');
 
 console.info('[230MATCH] 5.9.16 stabilization · bracket active state follows actual court placement only');
+
+console.info('[230MATCH] 5.9.18 · held shared-queue cards stay visible and auto-assignment skips them');
