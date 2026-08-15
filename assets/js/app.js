@@ -16111,3 +16111,5 @@ console.info('[230MATCH] 5.9.43 HOTFIX · duplicate async syntax fixed');
 console.info('[230MATCH] 5.9.44 · entry application form +/- toggle uses persistent delegated click handler');
 
 console.info('[230MATCH] 5.9.45 · bracket connector self-redraw loop blocked; hidden board redraw suspended');
+
+console.info('[230MATCH] 5.9.46 · full repo integration of 5.9.45 mobile/main-thread stability fix');
