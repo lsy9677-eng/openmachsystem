@@ -6057,6 +6057,23 @@ function toggleEntryFormCollapse(){
   if(entryFormUserOpened)setTimeout(()=>document.getElementById('entryPlayer1Name')?.focus(),40);
 }
 
+
+function stage5944BindEntryFormToggle(){
+  if(document.documentElement.dataset.stage5944EntryToggleBound==='1')return;
+  document.documentElement.dataset.stage5944EntryToggleBound='1';
+
+  document.addEventListener('click',event=>{
+    const button=event.target.closest?.('#entryFormCollapseToggle');
+    if(!button)return;
+
+    // 직접 addEventListener가 붙었거나 나중에 붙더라도 이 경로 하나만 실행한다.
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    toggleEntryFormCollapse();
+  },true);
+}
+stage5944BindEntryFormToggle();
+
 function renderEntrySelfManager(){
   const root=document.getElementById('entrySelfManagerList'),count=document.getElementById('entrySelfManagerCount');
   if(!root)return;
@@ -6581,7 +6598,7 @@ function bindEntryApplications(){
     const showAll=e.target.closest?.('[data-entry-show-all]');if(showAll){const type=showAll.dataset.entryShowAll;const rows=simpleRegistrationRows().filter(a=>type==='reserve'?a.status==='reserve':a.status==='approved').sort((a,b)=>String(a.createdAt||'').localeCompare(String(b.createdAt||'')));const root=document.getElementById(type==='reserve'?'entryPublicReserveList':'entryPublicApprovedList');if(root){root.innerHTML=rows.map((a,index)=>`<article class="entry-public-team-row"><span class="entry-public-order">${index+1}</span><div><strong>${portalEscape(a.teamName||'팀명 미등록')}</strong><small>${portalEscape(a.affiliation||'소속 미등록')} · ${a.paid?'입금완료':'미입금'}</small></div>${type==='reserve'?`<span class="badge badge-warning">후보 ${index+1}</span>`:'<span class="badge badge-safe">참가</span>'}</article>`).join('');}return;}const division=e.target.closest?.('[data-entry-open-division]');if(division){switchDivisionWorkspace(String(division.dataset.entryOpenDivision||''),{view:'entry'});return;}});
   }
   const bindOnce=(id,event,handler)=>{const el=document.getElementById(id);if(el&&!el.dataset.entrySelfBound){el.dataset.entrySelfBound='1';el.addEventListener(event,handler);}};
-  bindOnce('entryFormCollapseToggle','click',toggleEntryFormCollapse);
+  // 5.9.44: entry form toggle is owned by persistent delegated handler.
   bindOnce('entryAdminNotifySaveBtn','click',saveRegistrationAdminNotifySetting);
   bindOnce('entrySelfEditCloseBtn','click',()=>document.getElementById('entrySelfEditDialog')?.close());
   bindOnce('entrySelfEditCancelBtn','click',()=>document.getElementById('entrySelfEditDialog')?.close());
@@ -16070,3 +16087,5 @@ console.info('[230MATCH] 5.9.41 final · winner-path now traces only the survivi
 console.info('[230MATCH] 5.9.42 · print-center bracket save directly uses stage5937 live bracket capture');
 
 console.info('[230MATCH] 5.9.43 HOTFIX · duplicate async syntax fixed');
+
+console.info('[230MATCH] 5.9.44 · entry application form +/- toggle uses persistent delegated click handler');
