@@ -15198,8 +15198,15 @@ function stage7152CompactCourtCards(){
     drawBoard(document.getElementById('bracketBoard'));
   }
   function schedule(){
+    const board=document.getElementById('bracketBoard');
+    // 5.9.45: 숨겨진 대진표 때문에 앱 전체 메인 스레드가 계속 재계산되지 않게 한다.
+    // 대진표가 실제로 화면에 보일 때만 connector redraw를 예약한다.
+    if(!board||!board.getClientRects?.().length)return;
     if(rafId)cancelAnimationFrame(rafId);
-    rafId=requestAnimationFrame(()=>{rafId=requestAnimationFrame(draw);});
+    rafId=requestAnimationFrame(()=>{rafId=requestAnimationFrame(()=>{
+      rafId=0;
+      draw();
+    });});
   }
   function refit(reason=''){
     schedule();
@@ -15215,7 +15222,20 @@ function stage7152CompactCourtCards(){
     const board=document.getElementById('bracketBoard');
     if(!board)return;
     if(observer)observer.disconnect();
-    observer=new MutationObserver(schedule);
+    observer=new MutationObserver(mutations=>{
+      // 5.9.45: connector SVG가 자기 자신을 다시 그리면서 발생한 mutation은 무시한다.
+      // 실제 카드/라운드 DOM 변화만 connector 재계산 사유로 인정한다.
+      const meaningful=mutations.some(m=>{
+        const target=m.target?.nodeType===1?m.target:m.target?.parentElement;
+        if(target?.closest?.('.stage7154-bracket-connectors'))return false;
+        if(m.type==='childList'){
+          const changed=[...m.addedNodes,...m.removedNodes].filter(n=>n?.nodeType===1);
+          if(changed.length && changed.every(n=>n.matches?.('.stage7154-bracket-connectors')||n.closest?.('.stage7154-bracket-connectors')))return false;
+        }
+        return true;
+      });
+      if(meaningful)schedule();
+    });
     observer.observe(board,{childList:true,subtree:true,attributes:true,attributeFilter:['class','hidden','style']});
     if(resizeObserver)resizeObserver.disconnect();
     if(typeof ResizeObserver!=='undefined'){
@@ -16089,3 +16109,5 @@ console.info('[230MATCH] 5.9.42 · print-center bracket save directly uses stage
 console.info('[230MATCH] 5.9.43 HOTFIX · duplicate async syntax fixed');
 
 console.info('[230MATCH] 5.9.44 · entry application form +/- toggle uses persistent delegated click handler');
+
+console.info('[230MATCH] 5.9.45 · bracket connector self-redraw loop blocked; hidden board redraw suspended');
