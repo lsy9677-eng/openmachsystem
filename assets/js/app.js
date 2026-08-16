@@ -4589,6 +4589,49 @@ async function stage5936DownloadBracketPng({source='direct'}={}){
 }
 
 
+async function stage5948CaptureBracketExactlyLikeDirect(){
+  const currentView=String(document.body.dataset.currentView||'print');
+  const currentHash=location.hash;
+  const currentScrollY=window.scrollY||0;
+  const bracketView=document.getElementById('view-bracket');
+  const printView=document.getElementById('view-print');
+
+  // 이미 본선 대진표 화면이면 기존 정상 저장 경로를 그대로 사용한다.
+  if(currentView==='bracket' && bracketView?.classList.contains('active')){
+    return stage5937CaptureVisibleBracketPng({source:'print-center'});
+  }
+
+  let result=false;
+  try{
+    // 출력센터의 숨겨진 bracketBoard를 캡처하지 않는다.
+    // 실제 "본선 대진표" 화면을 활성화하고 그 화면의 레이아웃을 확정한 뒤 캡처한다.
+    navigatePortalView('bracket',{pushHistory:false,replaceHistory:false,focus:false});
+
+    // 라운드 필터/카드/연결선이 실제 대진표 화면 기준으로 안정화될 시간을 준다.
+    try{decorateBracketLivePlacements?.();}catch(_e){}
+    try{bindBracketMobileView571?.();}catch(_e){}
+    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+    try{window.__redrawBracketConnectors?.('print-center-exact-direct');}catch(_e){}
+    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+
+    // 본선 대진표 화면의 "현재 대진표 전체 저장"과 동일한 캡처 함수.
+    result=await stage5937CaptureVisibleBracketPng({source:'print-center'});
+    return result;
+  }finally{
+    // 사용자가 있던 출력센터 화면으로 복귀한다.
+    const restore=currentView && document.getElementById(`view-${currentView}`)?currentView:'print';
+    navigatePortalView(restore,{pushHistory:false,replaceHistory:false,focus:false});
+
+    // URL hash는 저장 버튼 클릭 전 상태를 유지한다.
+    if(currentHash && location.hash!==currentHash){
+      try{history.replaceState(history.state,'',currentHash);}catch(_e){}
+    }
+
+    requestAnimationFrame(()=>window.scrollTo({top:currentScrollY,behavior:'auto'}));
+  }
+}
+
+
 
 
 
@@ -7750,7 +7793,7 @@ async function saveRichPrintPreviewPng(doc){
   img.onload=()=>{const maxW=2600,scale=Math.min(2,maxW/width),canvas=document.createElement('canvas');canvas.width=Math.round(width*scale);canvas.height=Math.round(height*scale);const ctx=canvas.getContext('2d');ctx.scale(scale,scale);ctx.fillStyle='#fff';ctx.fillRect(0,0,width,height);ctx.drawImage(img,0,0);URL.revokeObjectURL(url);canvas.toBlob(blob=>{if(!blob){notice('이미지 생성에 실패했습니다.','error');return;}const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`230MATCH_${doc.label.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.png`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);notice('출력 미리보기 그대로 PNG 이미지를 저장했습니다.','success');},'image/png');};
   img.onerror=()=>{URL.revokeObjectURL(url);notice('이미지 변환에 실패했습니다. 인쇄/PDF 저장을 이용해 주세요.','error');};img.src=url;
 }
-function savePrintPng(){const doc=buildPrintDocument(),title=doc.label;if(doc.target==='bracket'){stage5937CaptureVisibleBracketPng({source:'print-center'});return;}if(doc.target==='prelim-assignment'){saveRichPrintPreviewPng(doc);return;}const lines=[];if(doc.target==='participants'){(state.teams||[]).forEach((t,i)=>lines.push(`${i+1}. ${printTeam(t)} · ${t.club||t.affiliation||''} · ${t.status==='reserve'?'후보':'참가'}`));}else if(doc.target==='results'){const p=currentPodium();lines.push(`우승: ${p.champion||'미확정'}`,`준우승: ${p.runnerUp||'미확정'}`,`공동 3위: ${(p.thirds||[]).join(' · ')||'미확정'}`);}else if(doc.target==='bracket'){portalMainMatches().forEach((m,i)=>lines.push(`${m.roundName||m.round||'본선'} ${i+1}: ${printTeam(m.teamA)} vs ${printTeam(m.teamB)}${m.status==='completed'?` · ${printTeam(m.winner)} 승`:''}`));}else if(doc.target==='prelim'||doc.target==='prelim-assignment'){(state.prelim?.groups||[]).forEach((g,i)=>lines.push(`${g.name||`${i+1}조`} · ${g.courtName||'코트 미정'}: ${(g.teams||[]).map(printTeam).join(' / ')}`));}else{const courts=state.unifiedCourts||state.courts||[];(Array.isArray(courts)?courts:Object.values(courts||{})).forEach((c,i)=>lines.push(`${c.name||`${i+1}번 코트`}: ${c.playingMatch?`${printTeam(c.playingMatch.teamA)} vs ${printTeam(c.playingMatch.teamB)}`:'대기'}`));}const width=1600,pad=80,lineH=42;const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');ctx.font='26px sans-serif';let wrapped=[];for(const line of lines.length?lines:['표시할 자료가 없습니다.'])wrapped.push(...wrapCanvasText(ctx,line,width-pad*2));canvas.width=width;canvas.height=Math.max(1000,260+wrapped.length*lineH+pad);ctx.fillStyle='#ffffff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.fillStyle='#10264a';ctx.fillRect(0,0,canvas.width,150);ctx.fillStyle='#ffffff';ctx.font='bold 46px sans-serif';ctx.fillText(title,pad,75);ctx.font='25px sans-serif';ctx.fillText(`${state.tournament?.name||'230MATCH 대회'} · ${state.tournament?.division||''}`,pad,120);ctx.fillStyle='#111827';ctx.font='26px sans-serif';let y=215;for(const line of wrapped){ctx.fillText(line,pad,y);y+=lineH;}canvas.toBlob(blob=>{if(!blob){notice('이미지 생성에 실패했습니다.','error');return;}const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`230MATCH_${title.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.png`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);notice('PNG 이미지를 저장했습니다.','success');},'image/png');}
+function savePrintPng(){const doc=buildPrintDocument(),title=doc.label;if(doc.target==='bracket'){void stage5948CaptureBracketExactlyLikeDirect();return;}if(doc.target==='prelim-assignment'){saveRichPrintPreviewPng(doc);return;}const lines=[];if(doc.target==='participants'){(state.teams||[]).forEach((t,i)=>lines.push(`${i+1}. ${printTeam(t)} · ${t.club||t.affiliation||''} · ${t.status==='reserve'?'후보':'참가'}`));}else if(doc.target==='results'){const p=currentPodium();lines.push(`우승: ${p.champion||'미확정'}`,`준우승: ${p.runnerUp||'미확정'}`,`공동 3위: ${(p.thirds||[]).join(' · ')||'미확정'}`);}else if(doc.target==='bracket'){portalMainMatches().forEach((m,i)=>lines.push(`${m.roundName||m.round||'본선'} ${i+1}: ${printTeam(m.teamA)} vs ${printTeam(m.teamB)}${m.status==='completed'?` · ${printTeam(m.winner)} 승`:''}`));}else if(doc.target==='prelim'||doc.target==='prelim-assignment'){(state.prelim?.groups||[]).forEach((g,i)=>lines.push(`${g.name||`${i+1}조`} · ${g.courtName||'코트 미정'}: ${(g.teams||[]).map(printTeam).join(' / ')}`));}else{const courts=state.unifiedCourts||state.courts||[];(Array.isArray(courts)?courts:Object.values(courts||{})).forEach((c,i)=>lines.push(`${c.name||`${i+1}번 코트`}: ${c.playingMatch?`${printTeam(c.playingMatch.teamA)} vs ${printTeam(c.playingMatch.teamB)}`:'대기'}`));}const width=1600,pad=80,lineH=42;const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');ctx.font='26px sans-serif';let wrapped=[];for(const line of lines.length?lines:['표시할 자료가 없습니다.'])wrapped.push(...wrapCanvasText(ctx,line,width-pad*2));canvas.width=width;canvas.height=Math.max(1000,260+wrapped.length*lineH+pad);ctx.fillStyle='#ffffff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.fillStyle='#10264a';ctx.fillRect(0,0,canvas.width,150);ctx.fillStyle='#ffffff';ctx.font='bold 46px sans-serif';ctx.fillText(title,pad,75);ctx.font='25px sans-serif';ctx.fillText(`${state.tournament?.name||'230MATCH 대회'} · ${state.tournament?.division||''}`,pad,120);ctx.fillStyle='#111827';ctx.font='26px sans-serif';let y=215;for(const line of wrapped){ctx.fillText(line,pad,y);y+=lineH;}canvas.toBlob(blob=>{if(!blob){notice('이미지 생성에 실패했습니다.','error');return;}const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`230MATCH_${title.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.png`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);notice('PNG 이미지를 저장했습니다.','success');},'image/png');}
 function bindPrintCenter(){['printTargetSelect','printPaperSelect','printOrientationSelect','printToneSelect','printScaleSelect','labelStatusSelect','labelContentSelect','labelCopySelect'].forEach(id=>document.getElementById(id)?.addEventListener('change',renderPrintPreview));document.getElementById('refreshPrintPreviewBtn')?.addEventListener('click',renderPrintPreview);document.getElementById('printDocumentBtn')?.addEventListener('click',printSelectedDocument);document.getElementById('savePrintImageBtn')?.addEventListener('click',savePrintPng);}
 
 
@@ -14522,7 +14565,7 @@ console.info('[230MATCH] 71.3.3 ready · classic direct SMS rebuild');
       // 출력센터의 본선 대진표 저장은 미리보기 렌더를 거치지 않고
       // 본선 대진표 화면에서 이미 검증된 동일 캡처 함수를 직접 사용한다.
       if(target==='bracket'){
-        await stage5937CaptureVisibleBracketPng({source:'print-center'});
+        await stage5948CaptureBracketExactlyLikeDirect();
         return;
       }
 
@@ -16113,3 +16156,5 @@ console.info('[230MATCH] 5.9.44 · entry application form +/- toggle uses persis
 console.info('[230MATCH] 5.9.45 · bracket connector self-redraw loop blocked; hidden board redraw suspended');
 
 console.info('[230MATCH] 5.9.46 · full repo integration of 5.9.45 mobile/main-thread stability fix');
+
+console.info('[230MATCH] 5.9.48 · print-center bracket PNG activates real bracket view, then uses the same stage5937 capture');
