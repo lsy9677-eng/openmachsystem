@@ -16158,3 +16158,236 @@ console.info('[230MATCH] 5.9.45 · bracket connector self-redraw loop blocked; h
 console.info('[230MATCH] 5.9.46 · full repo integration of 5.9.45 mobile/main-thread stability fix');
 
 console.info('[230MATCH] 5.9.48 · print-center bracket PNG activates real bracket view, then uses the same stage5937 capture');
+
+
+/* 230MATCH 5.9.50 · read-only tournament data integrity checker */
+(()=>{
+  const safe=v=>Array.isArray(v)?v:[];
+  const str=v=>String(v??'').trim();
+
+  function setCard(id,status,text){
+    const el=document.getElementById(id);
+    if(!el)return;
+    el.className=`stage7117-healthcheck-card ${status}`;
+    const span=el.querySelector('span');
+    if(span)span.textContent=text;
+  }
+
+  function mainMatches(){
+    try{
+      if(typeof allMatches==='function'){
+        const rows=allMatches(state.draw);
+        if(Array.isArray(rows))return rows.filter(Boolean);
+      }
+    }catch(_e){}
+    return Object.values(state.draw?.rounds||{}).flat().filter(Boolean);
+  }
+
+  function prelimMatches(){
+    return safe(state.prelim?.matches).filter(Boolean);
+  }
+
+  function everyMatch(){
+    return [...prelimMatches(),...mainMatches()];
+  }
+
+  function matchIdOf(x){
+    if(!x)return'';
+    if(typeof x==='string'||typeof x==='number')return str(x);
+    return str(x.matchId||x.id||x.match?.id||x.gameId||'');
+  }
+
+  function completed(m){
+    const status=str(m?.status).toLowerCase();
+    return Boolean(
+      ['completed','done','finished','complete'].includes(status) ||
+      m?.winnerId || m?.winner?.id
+    );
+  }
+
+  function inspectDraw(){
+    const ms=mainMatches();
+    const ids=ms.map(m=>str(m?.id)).filter(Boolean);
+    const seen=new Set(),dup=[];
+    for(const id of ids){
+      if(seen.has(id))dup.push(id);
+      seen.add(id);
+    }
+
+    let missingId=0,orphanNext=0;
+    for(const m of ms){
+      if(!str(m?.id))missingId++;
+      const next=str(m?.nextMatchId);
+      if(next && !seen.has(next))orphanNext++;
+    }
+
+    const problems=dup.length+missingId+orphanNext;
+    return problems
+      ? {status:'bad',text:`문제 ${problems}`,detail:`본선 경기 ${ms.length}건 · 중복 ID ${dup.length} · ID 누락 ${missingId} · 존재하지 않는 nextMatchId ${orphanNext}`}
+      : {status:'ok',text:`${ms.length}경기 정상`,detail:`본선 경기 ${ms.length}건 · 중복 ID/ID 누락/고아 nextMatchId 없음`};
+  }
+
+  function collectQueueRefs(){
+    const refs=[];
+    const push=(source,item)=>{
+      const id=matchIdOf(item);
+      if(id)refs.push({source,id,item});
+    };
+
+    safe(state.sharedQueue).forEach(x=>push('sharedQueue',x));
+    safe(state.prelim?.sharedQueue).forEach(x=>push('prelim.sharedQueue',x));
+
+    const venueQueues=state.venueQueues||{};
+    if(Array.isArray(venueQueues)){
+      venueQueues.forEach(x=>push('venueQueues',x));
+    }else if(venueQueues&&typeof venueQueues==='object'){
+      Object.entries(venueQueues).forEach(([key,list])=>safe(list).forEach(x=>push(`venueQueues.${key}`,x)));
+    }
+
+    const prelimVenue=state.prelim?.venueQueues||{};
+    if(Array.isArray(prelimVenue)){
+      prelimVenue.forEach(x=>push('prelim.venueQueues',x));
+    }else if(prelimVenue&&typeof prelimVenue==='object'){
+      Object.entries(prelimVenue).forEach(([key,list])=>safe(list).forEach(x=>push(`prelim.venueQueues.${key}`,x)));
+    }
+
+    const scanCourts=(source,courts)=>{
+      safe(courts).forEach((court,ci)=>{
+        ['match','currentMatch','playing','wait1','waiting','queue'].forEach(key=>{
+          const v=court?.[key];
+          if(Array.isArray(v))v.forEach(x=>push(`${source}[${ci}].${key}`,x));
+          else if(v)push(`${source}[${ci}].${key}`,v);
+        });
+      });
+    };
+    scanCourts('courts',state.courts);
+    scanCourts('prelim.courts',state.prelim?.courts);
+
+    return refs;
+  }
+
+  function inspectQueues(){
+    const all=everyMatch();
+    const valid=new Set(all.map(m=>str(m?.id)).filter(Boolean));
+    const done=new Set(all.filter(completed).map(m=>str(m?.id)).filter(Boolean));
+    const refs=collectQueueRefs();
+
+    const orphan=refs.filter(r=>!valid.has(r.id));
+    const completedStillQueued=refs.filter(r=>done.has(r.id));
+
+    const keyCounts=new Map();
+    refs.forEach(r=>{
+      const key=`${r.source}|${r.id}`;
+      keyCounts.set(key,(keyCounts.get(key)||0)+1);
+    });
+    const dupRefs=[...keyCounts.values()].filter(n=>n>1).reduce((sum,n)=>sum+n-1,0);
+
+    const problems=orphan.length+completedStillQueued.length;
+    const status=problems?'bad':dupRefs?'warn':'ok';
+    const text=problems?`문제 ${problems}`:dupRefs?`중복참조 ${dupRefs}`:`${refs.length}건 정상`;
+    return {
+      status,text,
+      detail:`대기열/코트 참조 ${refs.length}건 · 존재하지 않는 경기 참조 ${orphan.length} · 완료경기 잔여 참조 ${completedStillQueued.length} · 동일 위치 중복참조 ${dupRefs}`
+    };
+  }
+
+  function inspectStatuses(){
+    const all=everyMatch();
+    const terminal=Boolean(state.tournament?.completed||state.tournament?.status==='completed'||state.completed);
+    const liveStatuses=new Set(['playing','wait1','waiting','shared','queued','assigned']);
+    const stale=all.filter(m=>completed(m)&&liveStatuses.has(str(m?.status).toLowerCase()));
+    const terminalLive=terminal
+      ? all.filter(m=>!completed(m)&&liveStatuses.has(str(m?.status).toLowerCase()))
+      : [];
+
+    const problems=stale.length+terminalLive.length;
+    return problems
+      ? {status:'warn',text:`확인 ${problems}`,detail:`완료 경기인데 진행/대기 상태 ${stale.length}건 · 대회 완료 상태인데 진행/대기 경기 ${terminalLive.length}건`}
+      : {status:'ok',text:'상태 정상',detail:`완료/진행/대기 상태 충돌 없음 · 대회 완료 여부 ${terminal?'완료':'진행/준비'}`};
+  }
+
+  function inspectLegacy(){
+    let heldCount=0,holdReasonCount=0,legacyQueueCount=0;
+
+    heldCount+=safe(state.heldMatches).length;
+    heldCount+=safe(state.prelim?.heldMatches).length;
+
+    everyMatch().forEach(m=>{
+      if(str(m?.holdReason)||str(m?.heldReason)||m?.held===true)holdReasonCount++;
+    });
+
+    ['mainQueue','waitQueue','waitingQueue','legacyQueue'].forEach(key=>{
+      legacyQueueCount+=safe(state?.[key]).length;
+      legacyQueueCount+=safe(state.prelim?.[key]).length;
+    });
+
+    const total=heldCount+holdReasonCount+legacyQueueCount;
+    return total
+      ? {status:'warn',text:`잔여 ${total}`,detail:`heldMatches ${heldCount}건 · 경기 hold 필드 ${holdReasonCount}건 · legacy queue 계열 ${legacyQueueCount}건`}
+      : {status:'ok',text:'잔여 없음',detail:'hold/held 및 legacy queue 계열 잔여 데이터 없음'};
+  }
+
+  function inspectScale(){
+    const prelim=prelimMatches().length;
+    const main=mainMatches().length;
+    const teams=safe(state.teams).length;
+    const apps=safe(state.portal?.applications).length;
+    const refs=collectQueueRefs().length;
+    const total=prelim+main+teams+apps+refs;
+
+    let status='ok',text='정상 범위';
+    if(total>1500){status='warn';text='데이터 큼';}
+    if(total>3000){status='bad';text='과다 데이터';}
+
+    return {
+      status,text,
+      detail:`예선 경기 ${prelim} · 본선 경기 ${main} · 참가팀 ${teams} · 참가신청 ${apps} · 대기/코트 참조 ${refs} · 합계 지표 ${total}`
+    };
+  }
+
+  function run(){
+    const items=[
+      ['stage5950DrawCheck',inspectDraw()],
+      ['stage5950QueueCheck',inspectQueues()],
+      ['stage5950StatusCheck',inspectStatuses()],
+      ['stage5950LegacyCheck',inspectLegacy()],
+      ['stage5950ScaleCheck',inspectScale()]
+    ];
+
+    let bad=0,warn=0;
+    items.forEach(([id,r])=>{
+      setCard(id,r.status,r.text);
+      if(r.status==='bad')bad++;
+      else if(r.status==='warn')warn++;
+    });
+
+    const overall=document.getElementById('stage5950IntegrityOverall');
+    if(overall){
+      overall.className=`badge ${bad?'badge-danger':warn?'badge-warning':'badge-safe'}`;
+      overall.textContent=bad?`문제 ${bad}`:warn?`확인 ${warn}`:'정상';
+    }
+
+    const detail=document.getElementById('stage5950IntegrityDetail');
+    if(detail)detail.innerHTML=items.map(([,r],i)=>`${i+1}. ${r.detail}`).join('<br>');
+
+    window.__stage5950LastIntegrity=items;
+    return{bad,warn,items};
+  }
+
+  document.addEventListener('click',event=>{
+    if(event.target.closest?.('#stage5950RunIntegrityCheck')){
+      run();
+      return;
+    }
+    if(event.target.closest?.('#stage5950ToggleIntegrityDetail')){
+      const detail=document.getElementById('stage5950IntegrityDetail');
+      if(!detail)return;
+      if(!window.__stage5950LastIntegrity)run();
+      detail.hidden=!detail.hidden;
+    }
+  });
+
+  window.__run230MatchDataIntegrityCheck=run;
+  console.info('[230MATCH] 5.9.50 ready · read-only tournament data integrity checker');
+})();
+

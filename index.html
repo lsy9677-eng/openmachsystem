@@ -2700,6 +2700,25 @@ svg.stage7154-bracket-connectors path.stage5938-winner-path{
           </div>
           <div id="stage7117HealthDetail" class="stage7117-healthcheck-detail" hidden></div>
         </section>
+
+        <section id="stage5950DataIntegrityCheck" class="stage7117-healthcheck" data-admin-only="true">
+          <div class="stage7117-healthcheck-head">
+            <strong>대회 데이터 정합성 점검</strong>
+            <span id="stage5950IntegrityOverall" class="badge badge-warning">점검 전</span>
+          </div>
+          <div class="stage7117-healthcheck-grid">
+            <div id="stage5950DrawCheck" class="stage7117-healthcheck-card"><b>대진 구조</b><span>확인 전</span></div>
+            <div id="stage5950QueueCheck" class="stage7117-healthcheck-card"><b>대기열 참조</b><span>확인 전</span></div>
+            <div id="stage5950StatusCheck" class="stage7117-healthcheck-card"><b>경기 상태</b><span>확인 전</span></div>
+            <div id="stage5950LegacyCheck" class="stage7117-healthcheck-card"><b>레거시 잔여</b><span>확인 전</span></div>
+            <div id="stage5950ScaleCheck" class="stage7117-healthcheck-card"><b>데이터 규모</b><span>확인 전</span></div>
+          </div>
+          <div class="stage7117-healthcheck-actions">
+            <button id="stage5950RunIntegrityCheck" type="button" class="btn btn-light btn-small">데이터 점검</button>
+            <button id="stage5950ToggleIntegrityDetail" type="button" class="btn btn-light btn-small">상세 보기</button>
+          </div>
+          <div id="stage5950IntegrityDetail" class="stage7117-healthcheck-detail" hidden></div>
+        </section>
         <div class="stage3212-public-actions stage5415-member-quick">
           <button type="button" data-portal-go="entry"><span>📝</span><b>참가 신청</b><small id="stage3212EntryCount">접수 현황 확인</small></button>
           <button type="button" data-portal-go="my-match"><span>🔎</span><b>내 경기</b><small>내 경기·대기 순서</small></button>
@@ -4583,7 +4602,7 @@ svg.stage7154-bracket-connectors path.stage5938-winner-path{
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=59490"></script>
+  <script type="module" src="./assets/js/app.js?v=59500"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
