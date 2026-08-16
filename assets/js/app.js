@@ -15828,13 +15828,28 @@ console.info('[230MATCH] 5.5.20 stable baseline · 5.5.17+ main queue auto-repai
     observer.observe(document.body,{childList:true,subtree:true});
     window.addEventListener('hashchange',()=>setTimeout(run,80));
     setInterval(()=>{
+      if(document.body?.dataset.currentView==='operation')run();
+    },3000);
+  }
+
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});
+  else start();
+
+  console.info('[230MATCH] 5.5.22 ready · display-only main shared queue dedupe + admin center singleton');
+})();
+
+
+/* 230MATCH 5.5.23 · 코트현황/공용대기 단계별 색상 데코레이터
+   DOM 표시만 변경하며 state/큐/배정 엔진을 수정하지 않는다. */
+(function stage5523RoundColorDecorator(){
   const ROUND_CLASSES=[
-    'stage5523-round-64','stage5523-round-32','stage5523-round-16',
-    'stage5523-round-8','stage5523-round-4','stage5523-round-2'
+    'stage5523-round-prelim','stage5523-round-64','stage5523-round-32',
+    'stage5523-round-16','stage5523-round-8','stage5523-round-4','stage5523-round-2'
   ];
 
   function classify(text){
-    const t=String(text||'');
+    const t=String(text||'').replace(/\s+/g,' ');
+    if(/예선/.test(t) && !/(64|32|16|8|4|2)\s*강/.test(t)) return {cls:'stage5523-round-prelim',label:'예선'};
     if(/64\s*강/.test(t)) return {cls:'stage5523-round-64',label:'64강'};
     if(/32\s*강/.test(t)) return {cls:'stage5523-round-32',label:'32강'};
     if(/16\s*강/.test(t)) return {cls:'stage5523-round-16',label:'16강'};
@@ -15847,47 +15862,27 @@ console.info('[230MATCH] 5.5.20 stable baseline · 5.5.17+ main queue auto-repai
   function apply(el){
     if(!el)return;
     const info=classify(el.textContent);
+    for(const cls of ROUND_CLASSES)el.classList.remove(cls);
+    el.querySelectorAll(':scope > .stage5523-round-badge').forEach(x=>x.remove());
+    if(!info)return;
+    el.classList.add(info.cls);
 
-    // 5.9.47: 이미 같은 라운드 클래스면 DOM을 건드리지 않는다.
-    const current=ROUND_CLASSES.find(cls=>el.classList.contains(cls))||'';
-    const wanted=info?.cls||'';
-    if(current!==wanted){
-      ROUND_CLASSES.forEach(cls=>el.classList.remove(cls));
-      if(wanted)el.classList.add(wanted);
-    }
-
-    const isShared=Boolean(el.closest('#operationSharedQueue,#operationPrelimSharedQueue'));
-    const badge=el.querySelector(':scope > .stage5523-round-badge');
-
-    if(!info || !isShared){
-      if(badge)badge.remove();
-      return;
-    }
-
-    const head=el.querySelector('.queue-match strong, strong, h3, h4') || el.firstElementChild;
-    const headAlreadyShows=Boolean(head && String(head.textContent||'').includes(info.label));
-
-    if(headAlreadyShows){
-      if(badge)badge.remove();
-      return;
-    }
-
-    if(badge){
-      if(badge.textContent!==info.label)badge.textContent=info.label;
-      return;
-    }
-
-    if(head){
-      const next=document.createElement('span');
-      next.className='stage5523-round-badge';
-      next.textContent=info.label;
-      head.insertAdjacentElement('afterend',next);
+    // 공용대기 카드에서 라운드 문구가 잘 안 보이는 경우만 작은 배지를 추가.
+    if(el.closest('#operationSharedQueue')){
+      const head=el.querySelector('.queue-match strong, strong, h3, h4') || el.firstElementChild;
+      if(head && !String(head.textContent||'').includes(info.label)){
+        const badge=document.createElement('span');
+        badge.className='stage5523-round-badge';
+        badge.textContent=info.label;
+        head.insertAdjacentElement('afterend',badge);
+      }
     }
   }
 
   function decorateCourtGrid(root){
     if(!root)return;
-    root.querySelectorAll('.prelim-court-slot,.prelim-extra-item').forEach(apply);
+    root.querySelectorAll('.prelim-court-slot').forEach(apply);
+    root.querySelectorAll('.prelim-extra-item').forEach(apply);
   }
 
   function decorateShared(root){
@@ -15910,33 +15905,17 @@ console.info('[230MATCH] 5.5.20 stable baseline · 5.5.17+ main queue auto-repai
     pending=true;
     requestAnimationFrame(run);
   }
-
   function start(){
     run();
-
-    // 5.9.47: document.body 전체 감시를 제거한다.
-    // 라운드 색상이 실제로 필요한 코트/공용대기 DOM만 감시한다.
-    const roots=[
-      document.getElementById('operationUnifiedCourtGrid'),
-      document.getElementById('prelimCourtOperationGrid'),
-      document.getElementById('operationSharedQueue'),
-      document.getElementById('operationPrelimSharedQueue')
-    ].filter(Boolean);
-
     const observer=new MutationObserver(schedule);
-    roots.forEach(root=>observer.observe(root,{
-      childList:true,
-      subtree:true,
-      characterData:true
-    }));
-
+    observer.observe(document.body,{childList:true,subtree:true,characterData:true});
     window.addEventListener('hashchange',()=>setTimeout(run,80));
   }
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});
   else start();
 
-  console.info('[230MATCH] 5.9.47 · round color observer scoped to court/queue only; body-wide mutation loop removed');
+  console.info('[230MATCH] 5.5.23 ready · court/shared round color coding (display only)');
 })();
 
 console.info('[230MATCH] 5.5.24 ready · court round color CSS priority fixed; operation logic untouched');
@@ -16134,5 +16113,3 @@ console.info('[230MATCH] 5.9.44 · entry application form +/- toggle uses persis
 console.info('[230MATCH] 5.9.45 · bracket connector self-redraw loop blocked; hidden board redraw suspended');
 
 console.info('[230MATCH] 5.9.46 · full repo integration of 5.9.45 mobile/main-thread stability fix');
-
-console.info('[230MATCH] 5.9.47 MOBILE STABILITY · body-wide round-color MutationObserver removed');
