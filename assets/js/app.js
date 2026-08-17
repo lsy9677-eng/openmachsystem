@@ -1746,6 +1746,14 @@ function renderCommittedState6400(){
   }
   if(['home','tournaments','operation','prelim-public','entry','bracket'].includes(view))renderDivisionWorkspaceBar();
   if(view==='settings')updateSetupProgress();
+
+  // 5.9.52: 표시 전용 후처리는 전체 body observer 대신 실제 render 직후 한 번만 실행.
+  if(view==='operation'){
+    requestAnimationFrame(()=>{
+      try{window.__stage5522DisplayCleanup?.();}catch(_e){}
+      try{window.__stage5523RoundRefresh?.();}catch(_e){}
+    });
+  }
 }
 let __tournamentWriteBypass=false;
 let __closedCloudWriteBypass=false;
@@ -10695,8 +10703,15 @@ console.info('[230MATCH] 34.4.2 ready · main wait1 refill and shared queue elap
   function tone(type){return type==='success'?'success':type==='error'?'error':type==='warning'?'warning':'info';}
   function title(type){return type==='success'?'처리 완료':type==='error'?'오류 발생':type==='warning'?'확인 필요':'실행 안내';}
   function ensureCenter(){
-    let root=byId('adminActionCenter3443');
-    if(root)return root;
+    // 5.9.52: 관리자 상태창은 생성 단계에서부터 반드시 1개만 유지한다.
+    const centers=[...document.querySelectorAll('#adminActionCenter3443, .admin-action-center-3443')];
+    let root=centers.find(node=>node.id==='adminActionCenter3443')||centers[0]||null;
+    if(root){
+      if(root.id!=='adminActionCenter3443')root.id='adminActionCenter3443';
+      root.classList.add('admin-action-center-3443');
+      centers.forEach(node=>{if(node!==root)node.remove();});
+      return root;
+    }
     root=document.createElement('aside');root.id='adminActionCenter3443';root.className='admin-action-center-3443';root.hidden=true;
     root.innerHTML=`
       <div class="aac-head">
@@ -15895,18 +15910,26 @@ console.info('[230MATCH] 5.5.20 stable baseline · 5.5.17+ main queue auto-repai
 
   function start(){
     run();
-    observer=new MutationObserver(schedule);
-    observer.observe(document.body,{childList:true,subtree:true});
+
+    // 5.9.52: document.body 전체 MutationObserver 제거.
+    // 실제 화면 전환/운영 동작/렌더 직후에만 표시 정리를 예약한다.
     window.addEventListener('hashchange',()=>setTimeout(run,80));
-    setInterval(()=>{
-      if(document.body?.dataset.currentView==='operation')run();
-    },3000);
+    window.addEventListener('pageshow',()=>setTimeout(run,80));
+    document.addEventListener('click',event=>{
+      if(!event.target.closest?.(
+        '[data-portal-go="operation"],[data-operation-section],[data-main-result],[data-prelim-result],'+
+        '[data-op-queue-up],[data-op-queue-down],[data-op-queue-move],[data-manual-assign],'+
+        '[data-unified-transfer],[data-prelim-court-status]'
+      ))return;
+      setTimeout(schedule,180);
+    },true);
   }
 
+  window.__stage5522DisplayCleanup=run;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});
   else start();
 
-  console.info('[230MATCH] 5.5.22 ready · display-only main shared queue dedupe + admin center singleton');
+  console.info('[230MATCH] 5.9.52 · stage5522 body observer removed; cleanup is render/event driven');
 })();
 
 
@@ -15933,27 +15956,47 @@ console.info('[230MATCH] 5.5.20 stable baseline · 5.5.17+ main queue auto-repai
   function apply(el){
     if(!el)return;
     const info=classify(el.textContent);
-    for(const cls of ROUND_CLASSES)el.classList.remove(cls);
-    el.querySelectorAll(':scope > .stage5523-round-badge').forEach(x=>x.remove());
-    if(!info)return;
-    el.classList.add(info.cls);
+    const current=ROUND_CLASSES.find(cls=>el.classList.contains(cls))||'';
+    const wanted=info?.cls||'';
 
-    // 공용대기 카드에서 라운드 문구가 잘 안 보이는 경우만 작은 배지를 추가.
-    if(el.closest('#operationSharedQueue')){
-      const head=el.querySelector('.queue-match strong, strong, h3, h4') || el.firstElementChild;
-      if(head && !String(head.textContent||'').includes(info.label)){
-        const badge=document.createElement('span');
-        badge.className='stage5523-round-badge';
-        badge.textContent=info.label;
-        head.insertAdjacentElement('afterend',badge);
-      }
+    // 이미 올바른 라운드 클래스면 class mutation을 다시 만들지 않는다.
+    if(current!==wanted){
+      ROUND_CLASSES.forEach(cls=>el.classList.remove(cls));
+      if(wanted)el.classList.add(wanted);
+    }
+
+    const isShared=Boolean(el.closest('#operationSharedQueue,#operationPrelimSharedQueue'));
+    const badge=el.querySelector(':scope > .stage5523-round-badge');
+
+    if(!info||!isShared){
+      if(badge)badge.remove();
+      return;
+    }
+
+    const head=el.querySelector('.queue-match strong, strong, h3, h4')||el.firstElementChild;
+    const alreadyVisible=Boolean(head&&String(head.textContent||'').includes(info.label));
+
+    if(alreadyVisible){
+      if(badge)badge.remove();
+      return;
+    }
+
+    if(badge){
+      if(badge.textContent!==info.label)badge.textContent=info.label;
+      return;
+    }
+
+    if(head){
+      const next=document.createElement('span');
+      next.className='stage5523-round-badge';
+      next.textContent=info.label;
+      head.insertAdjacentElement('afterend',next);
     }
   }
 
   function decorateCourtGrid(root){
     if(!root)return;
-    root.querySelectorAll('.prelim-court-slot').forEach(apply);
-    root.querySelectorAll('.prelim-extra-item').forEach(apply);
+    root.querySelectorAll('.prelim-court-slot,.prelim-extra-item').forEach(apply);
   }
 
   function decorateShared(root){
@@ -15966,27 +16009,47 @@ console.info('[230MATCH] 5.5.20 stable baseline · 5.5.17+ main queue auto-repai
   let pending=false;
   function run(){
     pending=false;
+    if(document.body?.dataset.currentView!=='operation')return;
     decorateCourtGrid(document.getElementById('operationUnifiedCourtGrid'));
     decorateCourtGrid(document.getElementById('prelimCourtOperationGrid'));
     decorateShared(document.getElementById('operationSharedQueue'));
     decorateShared(document.getElementById('operationPrelimSharedQueue'));
   }
+
   function schedule(){
     if(pending)return;
     pending=true;
     requestAnimationFrame(run);
   }
+
   function start(){
     run();
+
+    // 5.9.52: body 전체가 아니라 실제 코트/공용대기 영역만 감시.
+    // attributes는 감시하지 않아 class 변경이 observer를 다시 깨우지 않는다.
+    const roots=[
+      document.getElementById('operationUnifiedCourtGrid'),
+      document.getElementById('prelimCourtOperationGrid'),
+      document.getElementById('operationSharedQueue'),
+      document.getElementById('operationPrelimSharedQueue')
+    ].filter(Boolean);
+
     const observer=new MutationObserver(schedule);
-    observer.observe(document.body,{childList:true,subtree:true,characterData:true});
-    window.addEventListener('hashchange',()=>setTimeout(run,80));
+    roots.forEach(root=>observer.observe(root,{
+      childList:true,
+      subtree:true,
+      characterData:true
+    }));
+
+    window.addEventListener('hashchange',()=>setTimeout(schedule,80));
+    window.addEventListener('pageshow',()=>setTimeout(schedule,80));
   }
 
+  window.__stage5523RoundRefresh=schedule;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});
   else start();
 
-  console.info('[230MATCH] 5.5.23 ready · court/shared round color coding (display only)');
+  console.info('[230MATCH] 5.9.52 · round decorator scoped and idempotent; body observer removed');
 })();
 
 console.info('[230MATCH] 5.5.24 ready · court round color CSS priority fixed; operation logic untouched');
@@ -16066,8 +16129,12 @@ console.info('[230MATCH] 5.8.7 ready · tournament status supports reliable auto
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{setTimeout(install,100);setTimeout(install,800)},{once:true});
   else{setTimeout(install,100);setTimeout(install,800);}
   window.addEventListener('hashchange',()=>setTimeout(install,120));
-  const observer=new MutationObserver(()=>install());
-  document.addEventListener('DOMContentLoaded',()=>observer.observe(document.body,{childList:true,subtree:true}),{once:true});
+  window.addEventListener('pageshow',()=>setTimeout(install,120));
+  document.addEventListener('click',event=>{
+    if(!event.target.closest?.('[data-operation-section],[data-settings-action],#stage342MainDetails,#stage342PrelimDetails'))return;
+    setTimeout(install,120);
+  },true);
+  console.info('[230MATCH] 5.9.52 · stage590 performance button body observer removed');
 })();
 
 
@@ -16421,3 +16488,5 @@ console.info('[230MATCH] 5.9.48 · print-center bracket PNG activates real brack
 
 
 console.info('[230MATCH] 5.9.51 · main reset/redraw clears main IDs from unified prelim courts before re-assignment');
+
+console.info('[230MATCH] 5.9.52 STRUCTURAL STABILITY · body-wide DOM observers removed from display decorators');
