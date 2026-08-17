@@ -190,7 +190,11 @@ async function writeCurrentTournament(source,{force=false}={}){
     const room=roomSnap.exists()?(roomSnap.data()||{}):{};
     const remoteRevision=Number(room.revision||0);
     const remoteClientId=String(room.lastWriterClientId||'');
-    if(remoteRevision>dirtyBaseRevision && remoteClientId && remoteClientId!==CLIENT_ID){
+    // 5.9.56: room의 revision은 전체 플랫폼 공유 카운터라, 다른 대회의 저장만으로도
+    // remoteRevision이 앞서갈 수 있다. 실제로 '같은 대회'에 대한 최신 저장일 때만 차단한다.
+    const remoteWrittenId=String(room.lastWrittenTournamentId||'');
+    const sameOrUnknownTournament=!remoteWrittenId||remoteWrittenId===id;
+    if(sameOrUnknownTournament && remoteRevision>dirtyBaseRevision && remoteClientId && remoteClientId!==CLIENT_ID){
       syncConflict={
         active:true,
         localBaseRevision:dirtyBaseRevision,
@@ -215,7 +219,7 @@ async function writeCurrentTournament(source,{force=false}={}){
     workspaceChunks:newIds,workspaceEncoding:encoded.encoding,workspaceOriginalBytes:encoded.originalBytes,workspaceStoredBytes:encoded.storedBytes,workspaceDigest:d,publicDigest,
     workspaceJson:api.deleteField(),workspace:api.deleteField(),lastWriterUid:rt.user.uid,lastWriterEmail:rt.user.email||'',lastWriterClientId:CLIENT_ID,serverUpdatedAt:api.serverTimestamp()
   },{merge:true});
-  const roomUpdate={schemaVersion:8,roomId:ROOM_ID,revision:api.increment(1),lastWriterUid:rt.user.uid,lastWriterEmail:rt.user.email||'',lastWriterClientId:CLIENT_ID,serverUpdatedAt:api.serverTimestamp()};
+  const roomUpdate={schemaVersion:8,roomId:ROOM_ID,revision:api.increment(1),lastWriterUid:rt.user.uid,lastWriterEmail:rt.user.email||'',lastWriterClientId:CLIENT_ID,lastWrittenTournamentId:id,serverUpdatedAt:api.serverTimestamp()};
   if(publicChanged)roomUpdate.publicRevision=api.increment(1);
   batch.set(roomRef(),roomUpdate,{merge:true});
   await batch.commit();knownChunkIds.set(id,newIds);lastSavedDigest=d;lastKnownRoomRevision++;dirtyBaseRevision=lastKnownRoomRevision;syncConflict=null;if(publicChanged){lastSavedPublicDigest=publicDigest;lastKnownPublicRevision++;}lastWriterUid=rt.user.uid;lastWriterClientId=CLIENT_ID;localStorage.setItem('230match-v7-active-tournament',id);scheduleCache();return true;
@@ -251,7 +255,13 @@ async function handleRoomSnapshot(snap){
   // 일반 회원은 관리자 전용 변경으로 publicRevision이 그대로면 아무 데이터도 다시 읽지 않는다.
   if(relevantRevision&&relevantRevision<=knownRevision)return;
   const remoteClientId=String(room.lastWriterClientId||'');
-  if(!viewer && dirtyGeneration>0 && remoteClientId && remoteClientId!==CLIENT_ID){
+  // 5.9.56: room 문서는 이 플랫폼 전체(다른 사용자의 다른 대회 포함)가 공유하는
+  // 단일 카운터다. 그동안은 무관한 대회의 저장까지 매번 재조회+전체 재렌더링을
+  // 시도했고, 진행자에게는 엉뚱하게 '동시 편집 감지' 경고까지 띄웠다.
+  // 이번 저장이 실제로 지금 보고 있는 대회(targetId)에 대한 것인지 먼저 확인한다.
+  const writtenId=String(room.lastWrittenTournamentId||'');
+  const relevantToMe=!writtenId||!targetId||writtenId===targetId;
+  if(!viewer && relevantToMe && dirtyGeneration>0 && remoteClientId && remoteClientId!==CLIENT_ID){
     syncConflict={active:true,localBaseRevision:dirtyBaseRevision,remoteRevision:revision,remoteWriterUid:writer,remoteWriterEmail:String(room.lastWriterEmail||''),remoteClientId,detectedAt:new Date().toISOString()};
     status('동시 편집 감지','warning','다른 진행자의 저장이 감지되었습니다. 현재 입력을 자동으로 덮어쓰지 않았습니다.');
     return;
@@ -260,6 +270,7 @@ async function handleRoomSnapshot(snap){
   else lastKnownRoomRevision=Math.max(lastKnownRoomRevision,relevantRevision);
   if(remoteClientId===CLIENT_ID&&!viewer)return;
   if(!targetId)return;
+  if(!relevantToMe)return;
   try{
     const current=getStateFn(),registry=current?.multiTournament?.tournaments||[],bundle=await readOneTournament(targetId,registry);
     if(bundle)applyState(bundle.state,'remote');
@@ -290,3 +301,4 @@ export async function deleteTournamentNow(tournamentId){if(!canWriteFn())throw n
 
 console.info('[230MATCH] sync-engine 5.6.4 · stable Firestore + stale-client write blocked even from revision 0');
 console.info('[230MATCH] sync-engine 5.9.53 · rapid consecutive room snapshots are now debounced (450ms) so only the latest is applied — prevents viewer-side UI freeze during bursts of operator updates on large/progressed divisions');
+console.info('[230MATCH] sync-engine 5.9.56 · room revision is a platform-wide shared counter across ALL tournaments/users; every write anywhere used to force every connected client to refetch+re-render its own active tournament regardless of relevance, and could even trigger a false "concurrent edit" warning. Writes now tag lastWrittenTournamentId; unrelated writes are skipped entirely.');
