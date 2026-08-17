@@ -770,10 +770,33 @@ function ensureOperatorState(){if(!state.operation||typeof state.operation!=='ob
 
 
 function stage5927ClearMainOperationResidue({normalizeMatchStatus=false}={}){
-  // 본선 재추첨/초기화 전용: 과거 코트·공용대기·보류 잔존값만 제거한다.
+  // 본선 재추첨/초기화 전용:
+  // 예선 코트 구조는 유지하되, 그 안에 남아 있는 "본선 경기 배치"만 정확히 제거한다.
+  const mainIds=new Set();
+  try{
+    for(const match of allMatches(state.draw||{rounds:{}})){
+      if(match?.id)mainIds.add(String(match.id));
+    }
+  }catch(_e){}
+
+  // 구형 본선 전용 코트 상태는 초기화.
   state.courts=[];
   state.sharedQueue=[];
   state.venueQueues={};
+
+  // 중요: 통합 운영은 state.prelim.courts를 실제 코트로 사용한다.
+  // 예선 경기 ID는 그대로 두고, 현재 본선 대진 ID만 playing/wait1/queue에서 제거한다.
+  for(const court of (state.prelim?.courts||[])){
+    if(!court)continue;
+    if(court.playing&&mainIds.has(String(court.playing)))court.playing=null;
+    if(court.wait1&&mainIds.has(String(court.wait1)))court.wait1=null;
+    if(Array.isArray(court.queue)){
+      court.queue=court.queue.filter(id=>!mainIds.has(String(id)));
+    }
+    if(Array.isArray(court.manualQueue)){
+      court.manualQueue=court.manualQueue.filter(id=>!mainIds.has(String(id)));
+    }
+  }
 
   if(state.operation&&typeof state.operation==='object'){
     state.operation.heldMatches=[];
@@ -791,8 +814,7 @@ function stage5927ClearMainOperationResidue({normalizeMatchStatus=false}={}){
       match.estimatedWaitMinutes=0;
       delete match.holdReason;
 
-      // 실제 팀이 모두 확정된 1회전 경기는 'ready' 상태 자체는 유지하되,
-      // 대진표에서는 실제 배치 전까지 '대진 대기'로 표시한다.
+      // 재배정 대상이 될 수 있는 확정 경기 상태를 ready로 되돌린다.
       if(['playing','court_wait1','venue_shared_queue','shared_queue','court_manual_queue','queued','held'].includes(String(match.status||''))){
         const aReal=Boolean(match.teamA&&!match.teamA.placeholder);
         const bReal=Boolean(match.teamB&&!match.teamB.placeholder);
@@ -2319,6 +2341,12 @@ function assign(){
       commit(`확정 본선 코트배정 확인 · 신규 0경기 · 운영중/대기1 ${active}경기 · 공용대기 ${queued}경기 · 큐정리 ${repaired}건`);
       notice(`새로 배정할 경기가 없습니다. 확정 경기는 이미 자동 배정되어 있습니다. 현재 코트·대기1 ${active}경기, 공용대기 ${queued}경기입니다.${result.pendingPlayIns?` 미완료 똥통 ${result.pendingPlayIns}경기는 확정되는 즉시 최우선 배정됩니다.`:''}${repaired?` 중복·무효 큐 ${repaired}건을 자동 정리했습니다.`:''}`,'success');
       return;
+    }
+    const stage5951ReadyUnplaced=Object.values(state.draw?.rounds||{}).flat().filter(m=>
+      m?.status==='ready'&&m.teamA&&!m.teamA.placeholder&&m.teamB&&!m.teamB.placeholder
+    ).length;
+    if(stage5951ReadyUnplaced){
+      console.warn(`[230MATCH] 5.9.51 · 본선 코트배정 후 미배치 ready 경기 ${stage5951ReadyUnplaced}건`);
     }
     commit(`예선·본선 통합 코트배정 · 신규 본선 ${result.assigned}경기 · 큐정리 ${repaired}건`);
     notice(`확정 본선 ${result.assigned}경기를 배정했습니다.${result.prioritizedPlayIns?` 똥통 ${result.prioritizedPlayIns}경기를 최우선으로 배치했습니다.`:''}${result.pendingPlayIns?` 아직 미확정인 똥통 ${result.pendingPlayIns}경기는 확정 즉시 우선 배정됩니다.`:''}${repaired?` 중복·무효 큐 ${repaired}건을 자동 정리했습니다.`:''}`,'success');
@@ -16391,3 +16419,5 @@ console.info('[230MATCH] 5.9.48 · print-center bracket PNG activates real brack
   console.info('[230MATCH] 5.9.50 ready · read-only tournament data integrity checker');
 })();
 
+
+console.info('[230MATCH] 5.9.51 · main reset/redraw clears main IDs from unified prelim courts before re-assignment');
