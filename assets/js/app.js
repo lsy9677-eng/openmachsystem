@@ -1757,6 +1757,14 @@ function currentTournamentArchiveRecord(){
   return rows.find(x=>String(x?.tournamentId||'')===tid)||null;
 }
 function tournamentReadOnly(){
+  // 5.9.57: 종료된 대회 읽기전용 강제를 사용자 요청으로 비활성화.
+  // 이 함수 하나가 (1) 읽기전용 배너/차단 UI, (2) 비관리자 쓰기 차단(commit 가드),
+  // (3) 종료 시 진행자 권한이 조용히 viewer로 강등되는 동기화 접근모드까지 전부
+  // 제어하고 있어서, 여기 한 곳만 고치면 전부 정상 권한대로 동작한다.
+  // 이전 동작이 다시 필요하면 아래 return false를 원래 조건식으로 되돌리면 된다.
+  return false;
+}
+function tournamentReadOnlyLegacyCheck(){
   return Boolean(state?.completion?.readOnly||state?.completion?.completedAt||state?.operation?.readOnly||state?.operation?.tournamentCompletedAt||state?.tournament?.completedAt);
 }
 function restoreClosedTournamentSnapshot(){
@@ -16511,3 +16519,5 @@ console.info('[230MATCH] 5.9.52 · viewer remote sync renders only current publi
 console.info('[230MATCH] 5.9.53 · merged: operation partial-render now also refreshes prelim group/court grids (renderPrelim), round-badge decorator no longer self-loops, admin-only performance-button observer skipped entirely for members, duplicate bracket decorate call removed');
 
 console.info('[230MATCH] 5.9.54 · public/admin registration listeners (tournament-wide, fire on every entry-application write) now debounced 450ms same as room sync; admin division auto-repair no longer rewrites the same doc every snapshot');
+
+console.info('[230MATCH] 5.9.57 · tournamentReadOnly() disabled: found the actual freeze cause — a capture-phase global click listener that swallowed clicks (preventDefault+stopImmediatePropagation) on any non-admin, non-excluded button while viewing a closed division on operation/bracket/entry/prelim/roster/settings. Bottom quick-bar and header logout/settings buttons were not on its exclusion list, so they were silently blocked; top nav tabs survived only because they use data-view/data-portal-go, which were excluded. Read-only banner/write-lock/sync-downgrade are now off too since they all keyed off the same function.');
