@@ -12,7 +12,7 @@ import{downloadJson}from'./recovery.js?v=332012';
 import{ensureTimeState,calculateTimeMetrics,timeInfo}from'./time-engine-v5000.js?v=5940';
 import{ensureMessagingState,generatePlayingMessages,generateWait1Messages,generateCurrentCourtMessages,generateCurrentWaitMessages,generateAllTimeMessages,markMessageSent,deleteMessage,clearSentMessages,markAllSent,smsUri,refreshMessageContacts,mergePendingDuplicates,getMessageHistory}from'./message-engine.js?v=3521';
 import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactData,importContactData}from'./contact-engine-v5000.js?v=5000';
-import{render,teamText}from'./ui.js?v=59250';
+import{render,renderViewerRemote,teamText}from'./ui.js?v=59520';
 import{ensureAuditState,runStateAudit,runPrelimSimulation,runFullSimulation,applyAuditResult}from'./audit-engine.js?v=332012';
 import{earlyMainStats,markResolvedMainMatchesReady,canAssignEarlyMain,ensureEarlyMainSettings,autoAssignResolvedMain}from'./early-main-engine.js?v=332012';
 import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=59250';
@@ -1728,24 +1728,6 @@ function stage5521RepairMissingCourtStructure(){
   }
 }
 
-
-let __stage5952PostRenderQueued=false;
-function stage5952SchedulePostRenderWork(viewName=document.body?.dataset.currentView||''){
-  if(__stage5952PostRenderQueued)return;
-  __stage5952PostRenderQueued=true;
-  requestAnimationFrame(()=>{
-    __stage5952PostRenderQueued=false;
-    const view=String(viewName||document.body?.dataset.currentView||'');
-    try{window.__stage5522DisplayIntegrityRun?.();}catch(error){console.warn('[5.9.52] display integrity',error);}
-    if(view==='operation'){
-      try{window.__stage5523RoundColorRun?.();}catch(error){console.warn('[5.9.52] round color',error);}
-    }
-    if(view==='settings'){
-      try{window.__stage590InstallPerformanceButtons?.();}catch(error){console.warn('[5.9.52] performance buttons',error);}
-    }
-  });
-}
-
 function renderCommittedState6400(){
   const view=document.body?.dataset.currentView||'home';
   const courtRepair=(view==='operation'||view==='settings'||view==='bracket')?stage5521RepairMissingCourtStructure():{repaired:false};
@@ -1764,8 +1746,6 @@ function renderCommittedState6400(){
   }
   if(['home','tournaments','operation','prelim-public','entry','bracket'].includes(view))renderDivisionWorkspaceBar();
   if(view==='settings')updateSetupProgress();
-
-  stage5952SchedulePostRenderWork(view);
 }
 let __tournamentWriteBypass=false;
 let __closedCloudWriteBypass=false;
@@ -1876,8 +1856,28 @@ function applySynchronizedState(nextState,source='동기화'){
   ensurePrelimState(state);ensureTimeState(state);ensureDrawMeta(state);ensureMessagingState(state);ensureContacts(state);ensureAuditState(state);ensureEarlyMainSettings(state);ensureVenueSettings(state);ensureVenueQueues(state);ensureCourtStatuses(state);ensureCourtManualQueues(state);ensurePrelimCourtStatuses(state);ensureOperatorState();stage5925RetireLegacyHoldFeature();
   if(state.settings.autoTimeEnabled)calculateTimeMetrics(state);
   syncInputs();syncPrelimInputs();safePersistState(`${source} 상태`);
-  render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus});
-  updateSetupProgress();renderOperatorControls();applyRoleUI();renderPortalViewFast(document.body?.dataset.currentView||'home');renderDivisionWorkspaceBar();applyTournamentReadOnlyUi();refreshSyncAccessMode();flashSaved();
+  const stage5952View=document.body?.dataset.currentView||'home';
+  const stage5952ViewerRemote=!canOperate()&&source==='다른 기기';
+  const stage5952Handlers={openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus};
+
+  if(stage5952ViewerRemote){
+    // 5.9.52: 일반회원은 운영자 변경을 받을 때 현재 보이는 화면만 갱신한다.
+    // 관리자/운영자의 로컬 commit/render 경로는 전혀 변경하지 않는다.
+    renderViewerRemote(state,stage5952Handlers,stage5952View);
+    renderPortalViewFast(stage5952View);
+    if(stage5952View==='bracket'){
+      decorateBracketLivePlacements();
+      setTimeout(bindBracketMobileView571,0);
+    }
+    if(stage5952View==='my-match')setTimeout(v3252AutoMyMatch,0);
+  }else{
+    render(state,stage5952Handlers);
+    updateSetupProgress();
+    renderOperatorControls();
+    renderPortalViewFast(stage5952View);
+  }
+
+  applyRoleUI();renderDivisionWorkspaceBar();applyTournamentReadOnlyUi();refreshSyncAccessMode();flashSaved();
   notice(`${source} 상태를 반영했습니다.`,'success');
 }
 let stage3510LastSyncFeedback='';
@@ -8119,7 +8119,6 @@ function navigatePortalView(name,{pushHistory=false,replaceHistory=false,focus=t
   else if(replaceHistory&&location.hash!==hash)history.replaceState({portalView:target},'',hash);
 
   renderPortalViewFast(target);
-  stage5952SchedulePostRenderWork(target);
   if(target==='home'){
     setTimeout(showEligibleHomePopup,120);
     if(typeof window.__refresh230MatchHomeSms==='function')setTimeout(window.__refresh230MatchHomeSms,80);
@@ -10717,12 +10716,7 @@ console.info('[230MATCH] 34.4.2 ready · main wait1 refill and shared queue elap
   function title(type){return type==='success'?'처리 완료':type==='error'?'오류 발생':type==='warning'?'확인 필요':'실행 안내';}
   function ensureCenter(){
     let root=byId('adminActionCenter3443');
-    if(root){
-      const admin=adminVisible();
-      root.hidden=!admin;
-      root.style.pointerEvents=admin?'':'none';
-      return root;
-    }
+    if(root)return root;
     root=document.createElement('aside');root.id='adminActionCenter3443';root.className='admin-action-center-3443';root.hidden=true;
     root.innerHTML=`
       <div class="aac-head">
@@ -15809,6 +15803,7 @@ console.info('[230MATCH] 5.5.20 stable baseline · 5.5.17+ main queue auto-repai
 */
 (function stage5522DisplayOnlyIntegrity(){
   let queued=false;
+  let observer=null;
 
   function normalized(value){
     return String(value||'').replace(/\s+/g,' ').trim();
@@ -15816,7 +15811,10 @@ console.info('[230MATCH] 5.5.20 stable baseline · 5.5.17+ main queue auto-repai
 
   function explicitMatchKey(item){
     if(!item)return'';
-    const attrs=['data-match-id','data-queue-match-id','data-main-match-id','data-shared-match-id','data-match','data-id'];
+    const attrs=[
+      'data-match-id','data-queue-match-id','data-main-match-id',
+      'data-shared-match-id','data-match','data-id'
+    ];
     for(const name of attrs){
       const value=item.getAttribute?.(name);
       if(value)return `id:${value}`;
@@ -15841,16 +15839,21 @@ console.info('[230MATCH] 5.5.20 stable baseline · 5.5.17+ main queue auto-repai
       .replace(/\b\d+\s*분\b/g,'')
       .trim();
     if(strong)return `text:${strong}|${small}`;
+
+    // 최후 fallback: 순번/버튼 문구처럼 변할 수 있는 부분은 제거한다.
     let txt=normalized(item.textContent);
-    txt=txt.replace(/^\s*\d+\s*/,'')
+    txt=txt
+      .replace(/^\s*\d+\s*/,'')
       .replace(/(?:▲|▼|위로|아래로|수동\s*배정|긴급\s*수동배정|구장\s*이동|보류)/g,'')
-      .replace(/\s+/g,' ').trim();
+      .replace(/\s+/g,' ')
+      .trim();
     return txt?`text:${txt}`:'';
   }
 
   function mainSharedItems(root){
     const direct=[...root.querySelectorAll('.shared-queue-item')];
     if(direct.length)return direct;
+    // 구형 UI 호환: 공용대기 보드 안의 반복 카드 후보
     return [...root.querySelectorAll('article, .queue-item, .venue-queue-item')].filter(el=>{
       const t=normalized(el.textContent);
       return t && (el.querySelector('button,select') || /vs|대기|경기/.test(t));
@@ -15866,8 +15869,8 @@ console.info('[230MATCH] 5.5.20 stable baseline · 5.5.17+ main queue auto-repai
       const key=explicitMatchKey(item)||semanticMatchKey(item);
       if(!key)continue;
       if(seen.has(key)){
-        if(!item.hidden)item.hidden=true;
-        if(item.dataset.stage5522Duplicate!=='1')item.dataset.stage5522Duplicate='1';
+        item.hidden=true;
+        item.dataset.stage5522Duplicate='1';
         hidden++;
       }else{
         seen.add(key);
@@ -15877,16 +15880,17 @@ console.info('[230MATCH] 5.5.20 stable baseline · 5.5.17+ main queue auto-repai
         }
       }
     }
+
+    // 숫자는 "화면에 실제 보이는 고유 카드" 기준으로만 보정한다.
     const visible=mainSharedItems(root).filter(x=>!x.hidden).length;
     const count=document.getElementById('operationSharedQueueCount');
-    const next=`${visible}경기`;
-    if(count&&count.textContent!==next)count.textContent=next;
+    if(count && visible>=0)count.textContent=`${visible}경기`;
     return hidden;
   }
 
   function keepSingleAdminCenter(){
     const nodes=[...document.querySelectorAll('#adminActionCenter3443, .admin-action-center-3443')];
-    if(!nodes.length)return 0;
+    if(nodes.length<=1)return 0;
     const keep=nodes.find(x=>x.id==='adminActionCenter3443')||nodes[0];
     let removed=0;
     for(const node of nodes){
@@ -15894,21 +15898,13 @@ console.info('[230MATCH] 5.5.20 stable baseline · 5.5.17+ main queue auto-repai
       node.remove();
       removed++;
     }
-    // 일반회원에서는 관리자 실행 상태 위젯이 화면/포인터에 관여하지 않는다.
-    try{
-      const admin=typeof isAdmin==='function'&&isAdmin();
-      keep.hidden=!admin;
-      keep.style.pointerEvents=admin?'':'none';
-    }catch(_e){}
     return removed;
   }
 
   function run(){
     queued=false;
-    if(document.body?.dataset.currentView==='operation'){
-      try{dedupeMainSharedDisplay();}catch(e){console.error('[5.9.52] shared display dedupe',e);}
-    }
-    try{keepSingleAdminCenter();}catch(e){console.error('[5.9.52] admin center singleton',e);}
+    try{dedupeMainSharedDisplay();}catch(e){console.error('[5.5.22] shared display dedupe',e);}
+    try{keepSingleAdminCenter();}catch(e){console.error('[5.5.22] admin center singleton',e);}
   }
 
   function schedule(){
@@ -15917,14 +15913,21 @@ console.info('[230MATCH] 5.5.20 stable baseline · 5.5.17+ main queue auto-repai
     requestAnimationFrame(run);
   }
 
-  window.__stage5522DisplayIntegrityRun=run;
-  window.__stage5522DisplayIntegritySchedule=schedule;
+  function start(){
+    run();
+    observer=new MutationObserver(schedule);
+    observer.observe(document.body,{childList:true,subtree:true});
+    window.addEventListener('hashchange',()=>setTimeout(run,80));
+    setInterval(()=>{
+      if(document.body?.dataset.currentView==='operation')run();
+    },3000);
+  }
 
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(run,0),{once:true});
-  else setTimeout(run,0);
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});
+  else start();
 
-  console.info('[230MATCH] 5.9.52 · stage5522 global observer/polling removed; render-driven only');
-})()
+  console.info('[230MATCH] 5.5.22 ready · display-only main shared queue dedupe + admin center singleton');
+})();
 
 
 /* 230MATCH 5.5.23 · 코트현황/공용대기 단계별 색상 데코레이터
@@ -15950,41 +15953,27 @@ console.info('[230MATCH] 5.5.20 stable baseline · 5.5.17+ main queue auto-repai
   function apply(el){
     if(!el)return;
     const info=classify(el.textContent);
-    const current=ROUND_CLASSES.find(cls=>el.classList.contains(cls))||'';
-    const wanted=info?.cls||'';
-    if(current!==wanted){
-      ROUND_CLASSES.forEach(cls=>el.classList.remove(cls));
-      if(wanted)el.classList.add(wanted);
-    }
+    for(const cls of ROUND_CLASSES)el.classList.remove(cls);
+    el.querySelectorAll(':scope > .stage5523-round-badge').forEach(x=>x.remove());
+    if(!info)return;
+    el.classList.add(info.cls);
 
-    const isShared=Boolean(el.closest('#operationSharedQueue,#operationPrelimSharedQueue'));
-    const badge=el.querySelector(':scope > .stage5523-round-badge');
-    if(!info||!isShared){
-      if(badge)badge.remove();
-      return;
-    }
-
-    const head=el.querySelector('.queue-match strong, strong, h3, h4')||el.firstElementChild;
-    const already=Boolean(head&&String(head.textContent||'').includes(info.label));
-    if(already){
-      if(badge)badge.remove();
-      return;
-    }
-    if(badge){
-      if(badge.textContent!==info.label)badge.textContent=info.label;
-      return;
-    }
-    if(head){
-      const next=document.createElement('span');
-      next.className='stage5523-round-badge';
-      next.textContent=info.label;
-      head.insertAdjacentElement('afterend',next);
+    // 공용대기 카드에서 라운드 문구가 잘 안 보이는 경우만 작은 배지를 추가.
+    if(el.closest('#operationSharedQueue')){
+      const head=el.querySelector('.queue-match strong, strong, h3, h4') || el.firstElementChild;
+      if(head && !String(head.textContent||'').includes(info.label)){
+        const badge=document.createElement('span');
+        badge.className='stage5523-round-badge';
+        badge.textContent=info.label;
+        head.insertAdjacentElement('afterend',badge);
+      }
     }
   }
 
   function decorateCourtGrid(root){
     if(!root)return;
-    root.querySelectorAll('.prelim-court-slot,.prelim-extra-item').forEach(apply);
+    root.querySelectorAll('.prelim-court-slot').forEach(apply);
+    root.querySelectorAll('.prelim-extra-item').forEach(apply);
   }
 
   function decorateShared(root){
@@ -15997,7 +15986,6 @@ console.info('[230MATCH] 5.5.20 stable baseline · 5.5.17+ main queue auto-repai
   let pending=false;
   function run(){
     pending=false;
-    if(document.body?.dataset.currentView!=='operation')return;
     decorateCourtGrid(document.getElementById('operationUnifiedCourtGrid'));
     decorateCourtGrid(document.getElementById('prelimCourtOperationGrid'));
     decorateShared(document.getElementById('operationSharedQueue'));
@@ -16008,15 +15996,18 @@ console.info('[230MATCH] 5.5.20 stable baseline · 5.5.17+ main queue auto-repai
     pending=true;
     requestAnimationFrame(run);
   }
+  function start(){
+    run();
+    const observer=new MutationObserver(schedule);
+    observer.observe(document.body,{childList:true,subtree:true,characterData:true});
+    window.addEventListener('hashchange',()=>setTimeout(run,80));
+  }
 
-  window.__stage5523RoundColorRun=run;
-  window.__stage5523RoundColorSchedule=schedule;
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});
+  else start();
 
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(run,0),{once:true});
-  else setTimeout(run,0);
-
-  console.info('[230MATCH] 5.9.52 · stage5523 body/character observer removed; render-driven only');
-})()
+  console.info('[230MATCH] 5.5.23 ready · court/shared round color coding (display only)');
+})();
 
 console.info('[230MATCH] 5.5.24 ready · court round color CSS priority fixed; operation logic untouched');
 
@@ -16075,7 +16066,6 @@ console.info('[230MATCH] 5.8.7 ready · tournament status supports reliable auto
     after.insertAdjacentElement('afterend',b);
   }
   function install(){
-    if(typeof isAdmin==='function'&&!isAdmin())return;
     addButton('stage590PrelimPerformanceBtn','예선 퍼포먼스 추첨','generatePrelimBtn',stage590PrelimPerformance,'btn btn-gold');
     addButton('stage590MainPerformanceBtn','일반 퍼포먼스 추첨','instantDrawBtn',()=>{try{stage590RunMainPerformance('instant')}catch(e){notice(e.message,'error')}} ,'btn btn-gold');
     addButton('stage590SeedPerformanceBtn','시드 퍼포먼스 추첨','seededDrawBtn',()=>{try{stage590RunMainPerformance('seeded')}catch(e){notice(e.message,'error')}} ,'btn btn-purple');
@@ -16096,7 +16086,8 @@ console.info('[230MATCH] 5.8.7 ready · tournament status supports reliable auto
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{setTimeout(install,100);setTimeout(install,800)},{once:true});
   else{setTimeout(install,100);setTimeout(install,800);}
   window.addEventListener('hashchange',()=>setTimeout(install,120));
-  window.__stage590InstallPerformanceButtons=install;
+  const observer=new MutationObserver(()=>install());
+  document.addEventListener('DOMContentLoaded',()=>observer.observe(document.body,{childList:true,subtree:true}),{once:true});
 })();
 
 
@@ -16451,4 +16442,4 @@ console.info('[230MATCH] 5.9.48 · print-center bracket PNG activates real brack
 
 console.info('[230MATCH] 5.9.51 · main reset/redraw clears main IDs from unified prelim courts before re-assignment');
 
-console.info('[230MATCH] 5.9.52 ROOT STABILITY · all document.body MutationObservers removed; member/mobile render load bounded');
+console.info('[230MATCH] 5.9.52 · viewer remote sync renders only current public view; operator/local render path unchanged');

@@ -36,6 +36,25 @@ function renderLinkedDrawModeGuard(state){
   }
 }
 
+export function renderViewerRemote(state,handlers,view='home'){
+  const target=String(view||'home');
+
+  // 일반회원 원격 갱신은 숨겨진 관리자/설정/로그/대진 DOM 전체를 다시 만들지 않는다.
+  // 화면 이동 시 app.js의 renderPortalViewFast() 또는 아래 live view 렌더가 최신 state로 그린다.
+  if(target==='operation'){
+    renderOperationUnified(state,handlers);
+    return 'operation';
+  }
+  if(target==='bracket'){
+    renderBracket(state);
+    return 'bracket';
+  }
+
+  // 나머지 공개 포털 화면(home, prelim-public, entry, tournaments, records 등)은
+  // app.js의 renderPortalViewFast()가 현재 화면만 갱신한다.
+  return target;
+}
+
 export function render(state,handlers){
   const matches=allMatches(state.draw);
   const completed=matches.filter(m=>m.status==='completed').length;
