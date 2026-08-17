@@ -42,6 +42,10 @@ export function renderViewerRemote(state,handlers,view='home'){
   // 일반회원 원격 갱신은 숨겨진 관리자/설정/로그/대진 DOM 전체를 다시 만들지 않는다.
   // 화면 이동 시 app.js의 renderPortalViewFast() 또는 아래 live view 렌더가 최신 state로 그린다.
   if(target==='operation'){
+    // 5.9.53: renderOperationUnified()는 #prelimGroupGrid(→#operationPrelimGroupGrid로 복사)와
+    // #prelimCourtOperationGrid를 직접 그리지 않고 renderPrelim()이 그려놓은 걸 재사용한다.
+    // renderPrelim을 먼저 불러야 예선 조편성/예선 코트 운영 패널이 굳지 않는다.
+    renderPrelim(state,handlers);
     renderOperationUnified(state,handlers);
     return 'operation';
   }

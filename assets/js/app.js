@@ -12,7 +12,7 @@ import{downloadJson}from'./recovery.js?v=332012';
 import{ensureTimeState,calculateTimeMetrics,timeInfo}from'./time-engine-v5000.js?v=5940';
 import{ensureMessagingState,generatePlayingMessages,generateWait1Messages,generateCurrentCourtMessages,generateCurrentWaitMessages,generateAllTimeMessages,markMessageSent,deleteMessage,clearSentMessages,markAllSent,smsUri,refreshMessageContacts,mergePendingDuplicates,getMessageHistory}from'./message-engine.js?v=3521';
 import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactData,importContactData}from'./contact-engine-v5000.js?v=5000';
-import{render,teamText}from'./ui.js?v=59250';
+import{render,renderViewerRemote,teamText}from'./ui.js?v=59530';
 import{ensureAuditState,runStateAudit,runPrelimSimulation,runFullSimulation,applyAuditResult}from'./audit-engine.js?v=332012';
 import{earlyMainStats,markResolvedMainMatchesReady,canAssignEarlyMain,ensureEarlyMainSettings,autoAssignResolvedMain}from'./early-main-engine.js?v=332012';
 import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=59250';
@@ -1856,8 +1856,26 @@ function applySynchronizedState(nextState,source='동기화'){
   ensurePrelimState(state);ensureTimeState(state);ensureDrawMeta(state);ensureMessagingState(state);ensureContacts(state);ensureAuditState(state);ensureEarlyMainSettings(state);ensureVenueSettings(state);ensureVenueQueues(state);ensureCourtStatuses(state);ensureCourtManualQueues(state);ensurePrelimCourtStatuses(state);ensureOperatorState();stage5925RetireLegacyHoldFeature();
   if(state.settings.autoTimeEnabled)calculateTimeMetrics(state);
   syncInputs();syncPrelimInputs();safePersistState(`${source} 상태`);
-  render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus});
-  updateSetupProgress();renderOperatorControls();applyRoleUI();renderPortalViewFast(document.body?.dataset.currentView||'home');renderDivisionWorkspaceBar();applyTournamentReadOnlyUi();refreshSyncAccessMode();flashSaved();
+  const stage5952View=document.body?.dataset.currentView||'home';
+  const stage5952ViewerRemote=!canOperate()&&source==='다른 기기';
+  const stage5952Handlers={openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus};
+
+  if(stage5952ViewerRemote){
+    // 5.9.52: 일반회원은 운영자 변경을 받을 때 현재 보이는 화면만 갱신한다.
+    // 관리자/운영자의 로컬 commit/render 경로는 전혀 변경하지 않는다.
+    renderViewerRemote(state,stage5952Handlers,stage5952View);
+    // 5.9.53: 'bracket'일 때 decorateBracketLivePlacements/bindBracketMobileView571은
+    // renderPortalViewFast() 안에서 이미 실행되므로 여기서 다시 부르지 않는다(중복 제거).
+    renderPortalViewFast(stage5952View);
+    if(stage5952View==='my-match')setTimeout(v3252AutoMyMatch,0);
+  }else{
+    render(state,stage5952Handlers);
+    updateSetupProgress();
+    renderOperatorControls();
+    renderPortalViewFast(stage5952View);
+  }
+
+  applyRoleUI();renderDivisionWorkspaceBar();applyTournamentReadOnlyUi();refreshSyncAccessMode();flashSaved();
   notice(`${source} 상태를 반영했습니다.`,'success');
 }
 let stage3510LastSyncFeedback='';
@@ -15934,7 +15952,9 @@ console.info('[230MATCH] 5.5.20 stable baseline · 5.5.17+ main queue auto-repai
     if(!el)return;
     const info=classify(el.textContent);
 
-    // 5.9.52: 같은 라운드 상태라면 DOM을 다시 만들지 않는다.
+    // 5.9.53: 같은 라운드 상태면 DOM을 다시 만들지 않는다.
+    // (예전엔 매번 classList/배지를 지웠다가 다시 만들어서, 이 변화 자체가
+    //  아래 MutationObserver를 다시 깨우는 자기 재트리거 루프를 만들었다.)
     const currentClass=ROUND_CLASSES.find(cls=>el.classList.contains(cls))||'';
     const wantedClass=info?.cls||'';
     if(currentClass!==wantedClass){
@@ -16026,7 +16046,7 @@ console.info('[230MATCH] 5.5.20 stable baseline · 5.5.17+ main queue auto-repai
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});
   else start();
 
-  console.info('[230MATCH] 5.5.23 ready · court/shared round color coding (display only)');
+  console.info('[230MATCH] 5.9.53 · round-badge decorator now idempotent + self-mutation filtered (member freeze root fix)');
 })();
 
 console.info('[230MATCH] 5.5.24 ready · court round color CSS priority fixed; operation logic untouched');
@@ -16107,6 +16127,9 @@ console.info('[230MATCH] 5.8.7 ready · tournament status supports reliable auto
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{setTimeout(install,100);setTimeout(install,800)},{once:true});
   else{setTimeout(install,100);setTimeout(install,800);}
   window.addEventListener('hashchange',()=>{if(canOperate())setTimeout(install,120);});
+  // 5.9.53: 일반회원은 이 관리자 전용 기능을 아예 관찰하지 않는다.
+  // document.body 전체(subtree:true)를 감시하는 observer라서, 관리자 화면에 없는
+  // 버튼 하나 때문에 앱 전체 DOM 변화마다 계속 깨어나던 것을 막는다.
   const observer=new MutationObserver(()=>{if(canOperate())install();});
   document.addEventListener('DOMContentLoaded',()=>observer.observe(document.body,{childList:true,subtree:true}),{once:true});
 })();
@@ -16463,4 +16486,6 @@ console.info('[230MATCH] 5.9.48 · print-center bracket PNG activates real brack
 
 console.info('[230MATCH] 5.9.51 · main reset/redraw clears main IDs from unified prelim courts before re-assignment');
 
-console.info('[230MATCH] 5.9.52 · member freeze root fix: idempotent shared-queue decorator + member skips admin draw observer');
+console.info('[230MATCH] 5.9.52 · viewer remote sync renders only current public view; operator/local render path unchanged');
+
+console.info('[230MATCH] 5.9.53 · merged: operation partial-render now also refreshes prelim group/court grids (renderPrelim), round-badge decorator no longer self-loops, admin-only performance-button observer skipped entirely for members, duplicate bracket decorate call removed');
