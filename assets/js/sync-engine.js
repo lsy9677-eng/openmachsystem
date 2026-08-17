@@ -25,6 +25,11 @@ const CACHE_STORE='workspaces';
 let api=null,db=null;
 let getStateFn=()=>null,applyRemoteFn=()=>{},statusFn=()=>{},canWriteFn=()=>false,accessModeFn=()=> 'viewer';
 let unsubscribeRoom=null,saveTimer=null,cacheTimer=null,pushInFlight=false,applyingRemote=false;
+// 5.9.53: 운영자가 연속으로 여러 번 저장하면(부서 진행 중 점수 연속 입력 등) 일반회원 화면에서
+// 원격 스냅샷마다 매번 즉시 전체 재렌더링이 일어나 메인 스레드가 막히는 문제가 있었다.
+// 짧은 시간 안에 여러 번 들어오면 마지막 스냅샷 하나만 처리하도록 묶는다(디바운스).
+let snapshotDebounceTimer=null,latestPendingSnap=null;
+const SNAPSHOT_DEBOUNCE=450;
 const CLIENT_ID=sessionStorage.getItem('230match-sync-client-id')||((crypto?.randomUUID?.()||('client-'+Date.now()+'-'+Math.random().toString(36).slice(2))));
 sessionStorage.setItem('230match-sync-client-id',CLIENT_ID);
 let dirtyGeneration=0,dirtyBaseRevision=0,lastSavedDigest='',lastSavedPublicDigest='',lastAppliedDigest='',lastKnownRoomRevision=0,lastKnownPublicRevision=0,lastWriterUid='',lastWriterClientId='';
@@ -227,6 +232,16 @@ async function flush(){
 }
 function schedule(){if(applyingRemote)return;const state=getStateFn();if(!activeIdOf(state)||!isRealTournament(state))return;if(!dirtyGeneration)dirtyBaseRevision=lastKnownRoomRevision;dirtyGeneration++;queueFlush(SAVE_DEBOUNCE);status('저장 대기','info','입력이 끝난 뒤 유휴 시간에 현재 대회만 저장합니다.');}
 function onSaved(){schedule();}
+function queueRoomSnapshot(snap){
+  latestPendingSnap=snap;
+  if(snapshotDebounceTimer)return;
+  snapshotDebounceTimer=setTimeout(()=>{
+    snapshotDebounceTimer=null;
+    const next=latestPendingSnap;
+    latestPendingSnap=null;
+    if(next)void handleRoomSnapshot(next);
+  },SNAPSHOT_DEBOUNCE);
+}
 async function handleRoomSnapshot(snap){
   if(!snap.exists())return;
   const room=snap.data()||{},rt=await runtime(),writer=String(room.lastWriterUid||''),revision=Number(room.revision||0),publicRevision=Number(room.publicRevision||revision||0),targetId=String(activeIdOf(getStateFn())||'');
@@ -252,8 +267,8 @@ async function handleRoomSnapshot(snap){
 }
 
 export function startStateSync({getState,applyRemoteState,onStatus,canWrite,accessMode}={}){getStateFn=getState||getStateFn;applyRemoteFn=applyRemoteState||applyRemoteFn;statusFn=onStatus||statusFn;canWriteFn=canWrite||canWriteFn;accessModeFn=accessMode||accessModeFn;window.addEventListener('230match:state-saved',onSaved);const cfg=saveSyncSettings(getSyncSettings());if(cfg.enabled)connectCloudSync().catch(e=>status('클라우드 연결 실패','warning',e?.message||String(e)));}
-export async function connectCloudSync(){disconnectCloudSync(false);await ensureDb();const routeId=String(new URLSearchParams(location.search).get('tournament')||'');const remoteBundle=await readInitialBundle(),requested=String(routeId||localStorage.getItem('230match-v7-active-tournament')||remoteBundle?.state?.multiTournament?.activeTournamentId||''),cached=await readCachedState(requested);let chosen=chooseInitial(cached,remoteBundle?.state||null);if(cached&&chosen===cached&&remoteBundle?.state)chosen=mergeRemoteRegistry(chosen,remoteBundle.state);if(chosen){applyState(chosen,cached&&chosen===cached?'cache':'firebase');if(cached&&chosen===cached&&canWriteFn())schedule();}unsubscribeRoom=api.onSnapshot(roomRef(),snap=>{void handleRoomSnapshot(snap);},e=>status('실시간 연결 오류','warning',e?.message||String(e)));status('실시간 연결','success',accessModeFn()==='viewer'?'일반 회원 경량 모드: 현재 대회의 공개 변화만 실시간 반영하고 관리자 전용 변경·과거 대회는 다시 읽지 않습니다.':'운영자 모드: 현재 대회 운영 변경을 실시간 반영하고 과거 대회는 지연 로딩합니다.');return true;}
-export function disconnectCloudSync(show=true){clearTimeout(saveTimer);clearTimeout(cacheTimer);saveTimer=cacheTimer=null;dirtyGeneration=0;dirtyBaseRevision=lastKnownRoomRevision;if(unsubscribeRoom)unsubscribeRoom();unsubscribeRoom=null;/* Firestore 인스턴스는 유지: 저장 중 재연결이 db를 null로 만드는 경쟁조건 방지 */if(show)status('클라우드 연결 해제','info','로컬 화면은 유지됩니다.');}
+export async function connectCloudSync(){disconnectCloudSync(false);await ensureDb();const routeId=String(new URLSearchParams(location.search).get('tournament')||'');const remoteBundle=await readInitialBundle(),requested=String(routeId||localStorage.getItem('230match-v7-active-tournament')||remoteBundle?.state?.multiTournament?.activeTournamentId||''),cached=await readCachedState(requested);let chosen=chooseInitial(cached,remoteBundle?.state||null);if(cached&&chosen===cached&&remoteBundle?.state)chosen=mergeRemoteRegistry(chosen,remoteBundle.state);if(chosen){applyState(chosen,cached&&chosen===cached?'cache':'firebase');if(cached&&chosen===cached&&canWriteFn())schedule();}unsubscribeRoom=api.onSnapshot(roomRef(),snap=>{queueRoomSnapshot(snap);},e=>status('실시간 연결 오류','warning',e?.message||String(e)));status('실시간 연결','success',accessModeFn()==='viewer'?'일반 회원 경량 모드: 현재 대회의 공개 변화만 실시간 반영하고 관리자 전용 변경·과거 대회는 다시 읽지 않습니다.':'운영자 모드: 현재 대회 운영 변경을 실시간 반영하고 과거 대회는 지연 로딩합니다.');return true;}
+export function disconnectCloudSync(show=true){clearTimeout(saveTimer);clearTimeout(cacheTimer);clearTimeout(snapshotDebounceTimer);saveTimer=cacheTimer=snapshotDebounceTimer=null;latestPendingSnap=null;dirtyGeneration=0;dirtyBaseRevision=lastKnownRoomRevision;if(unsubscribeRoom)unsubscribeRoom();unsubscribeRoom=null;/* Firestore 인스턴스는 유지: 저장 중 재연결이 db를 null로 만드는 경쟁조건 방지 */if(show)status('클라우드 연결 해제','info','로컬 화면은 유지됩니다.');}
 export async function prepareCriticalCloudWrite(){clearTimeout(saveTimer);saveTimer=null;autoSaveBlockedUntil=0;const started=Date.now();while(pushInFlight&&Date.now()-started<12000)await new Promise(r=>setTimeout(r,80));if(pushInFlight)throw new Error('이전 서버 저장이 아직 끝나지 않았습니다.');return true;}
 export async function pushStateNow(state=getStateFn()){if(!canWriteFn())throw new Error('관리자 또는 진행자만 클라우드에 저장할 수 있습니다.');await prepareCriticalCloudWrite();await ensureDb();pushInFlight=true;try{const saved=await writeCurrentTournament(state);if(!saved)throw new Error('유효한 현재 대회가 없어 저장하지 않았습니다.');dirtyGeneration=0;status('클라우드 저장 완료','success','현재 대회를 Firestore 안전 조각으로 저장했습니다.');return true;}finally{pushInFlight=false;}}
 export async function loadTournamentNow(tournamentId,registry=[]){await ensureDb();const id=safeId(tournamentId);const cached=await readCachedState(id);if(cached){try{localStorage.setItem('230match-v7-active-tournament',id);}catch(_e){};return{state:cached,raw:null,source:'cache'};}const bundle=await readOneTournament(id,registry);if(bundle?.state){try{localStorage.setItem('230match-v7-active-tournament',id);}catch(_e){};lastSavedDigest=String(bundle.raw?.workspaceDigest||'');lastSavedPublicDigest=String(bundle.raw?.publicDigest||'');scheduleCache();}return bundle;}
@@ -274,3 +289,4 @@ export async function testCloudConnection(){await ensureDb();const room=await ap
 export async function deleteTournamentNow(tournamentId){if(!canWriteFn())throw new Error('관리자만 대회를 삭제할 수 있습니다.');await prepareCriticalCloudWrite();await ensureDb();const id=safeId(tournamentId),snap=await api.getDoc(tournamentRef(id)),chunks=Array.isArray(snap.data()?.workspaceChunks)?snap.data().workspaceChunks:[];const batch=api.writeBatch(db);chunks.forEach(cid=>batch.delete(tournamentRef(cid)));batch.delete(tournamentRef(id));await batch.commit();knownChunkIds.delete(id);const remaining=await api.getDocs(tournamentsCollection()),parents=parentRowsFromSnaps(remaining),nextId=parents.find(r=>r.id!==id)?.id||'';await api.setDoc(roomRef(),{activeTournamentId:nextId,revision:api.increment(1),lastWriterUid:(await runtime({requireUser:true})).user.uid,serverUpdatedAt:api.serverTimestamp()},{merge:true});return true;}
 
 console.info('[230MATCH] sync-engine 5.6.4 · stable Firestore + stale-client write blocked even from revision 0');
+console.info('[230MATCH] sync-engine 5.9.53 · rapid consecutive room snapshots are now debounced (450ms) so only the latest is applied — prevents viewer-side UI freeze during bursts of operator updates on large/progressed divisions');

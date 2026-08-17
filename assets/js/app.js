@@ -12,7 +12,7 @@ import{downloadJson}from'./recovery.js?v=332012';
 import{ensureTimeState,calculateTimeMetrics,timeInfo}from'./time-engine-v5000.js?v=5940';
 import{ensureMessagingState,generatePlayingMessages,generateWait1Messages,generateCurrentCourtMessages,generateCurrentWaitMessages,generateAllTimeMessages,markMessageSent,deleteMessage,clearSentMessages,markAllSent,smsUri,refreshMessageContacts,mergePendingDuplicates,getMessageHistory}from'./message-engine.js?v=3521';
 import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactData,importContactData}from'./contact-engine-v5000.js?v=5000';
-import{render,renderViewerRemote,teamText}from'./ui.js?v=59530';
+import{render,renderViewerRemote,teamText}from'./ui.js?v=59540';
 import{ensureAuditState,runStateAudit,runPrelimSimulation,runFullSimulation,applyAuditResult}from'./audit-engine.js?v=332012';
 import{earlyMainStats,markResolvedMainMatchesReady,canAssignEarlyMain,ensureEarlyMainSettings,autoAssignResolvedMain}from'./early-main-engine.js?v=332012';
 import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=59250';
@@ -26,7 +26,7 @@ import{ensureCourtStatuses,pauseCourt,resumeCourt}from'./court-status-engine.js?
 import{ensureCourtManualQueues,assignToCourtManualQueue,moveCourtMatchFlexible,returnManualQueueItemToVenue,reorderCourtManualQueue}from'./court-manual-queue-engine.js?v=332012';
 import{reorderPrelimQueue as reorderPrelimQueueItem,movePrelimQueuedMatch,returnPrelimWait1ToQueue}from'./prelim-queue-control-engine.js?v=332012';
 import{ensurePrelimCourtStatuses,pausePrelimCourt,resumePrelimCourt}from'./prelim-court-status-engine.js?v=332012';
-import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7214';
+import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7215';
 import{verifyAndRepairMainFlow}from'./main-flow-integrity-engine.js?v=332012';
 import{finalizeTournamentCompletion}from'./tournament-completion-engine.js?v=332012';
 import{ensureTournamentIdentity,validateTournamentForArchive,createTournamentArchive,archiveListItem,archiveBackupPayload}from'./archive-engine.js?v=354101';
@@ -5708,6 +5708,22 @@ function renderRegistrationSummaryEverywhere(){
   const cta=document.querySelector('.legacy-entry-cta[data-portal-go="entry"]');if(cta)cta.textContent=`참가 신청 (${text})`;
   const nav=document.querySelector('.mode-tabs [data-view="entry"]');if(nav)nav.innerHTML=`참가 신청 <span class="entry-nav-count">(${text})</span>`;
 }
+// 5.9.54: 참가신청 실시간 리스너는 대회 전체(부서 구분 없이) 단위 쿼리라서,
+// 방(room) 동기화에 적용한 것과 같은 방식으로, 짧은 시간에 여러 번 오면
+// 마지막 것만 처리하도록 묶어서 메인 스레드가 연속으로 막히는 것을 막는다.
+const stage5954FixedDivisionIds=new Set();
+function stage5954DebounceSnapshot(handler,ms=450){
+  let timer=null,latest=null;
+  return snap=>{
+    latest=snap;
+    if(timer)return;
+    timer=setTimeout(()=>{
+      timer=null;
+      const next=latest;latest=null;
+      handler(next);
+    },ms);
+  };
+}
 async function startPublicRegistrationSync({force=false}={}){
   try{
     const rt=await registrationRuntime(),ctx=registrationContext();if(!ctx.tournamentId)return;
@@ -5715,14 +5731,14 @@ async function startPublicRegistrationSync({force=false}={}){
     if(!force&&publicRegistrationUnsubscribe&&publicRegistrationKey===key)return;
     publicRegistrationUnsubscribe?.();publicRegistrationKey=key;
     const q=rt.api.query(rt.api.collection(rt.db,PUBLIC_REGISTRATION_COLLECTION),rt.api.where('tournamentId','==',ctx.tournamentId));
-    publicRegistrationUnsubscribe=rt.api.onSnapshot(q,snap=>{
+    publicRegistrationUnsubscribe=rt.api.onSnapshot(q,stage5954DebounceSnapshot(snap=>{
       publicRegistrationRows=snap.docs.map(doc=>({id:doc.id,...doc.data()}));publicRegistrationReady=true;
       renderRegistrationSummaryEverywhere();
       try{window.__updateTodayTournamentDashboard?.();}catch(_e){}
       if(document.body?.dataset.currentView==='entry')renderApplicationPortal();
       if(document.body?.dataset.currentView==='home')renderHomeFast();
       try{renderVisibleDivisionBar?.();}catch(_e){}
-    },error=>{publicRegistrationReady=false;console.warn('[230MATCH] 공개 참가현황 연결 실패',error);});
+    }),error=>{publicRegistrationReady=false;console.warn('[230MATCH] 공개 참가현황 연결 실패',error);});
   }catch(error){publicRegistrationReady=false;console.warn('[230MATCH] 공개 참가현황 시작 실패',error);}
 }
 async function backfillPublicRegistrationMirrors(){
@@ -5884,7 +5900,7 @@ async function startRegistrationCloudSync({force=false}={}){
   const q=canOperate()
     ? rt.api.query(collectionRef,rt.api.where('tournamentId','==',ctx.tournamentId))
     : rt.api.query(collectionRef,rt.api.where('ownerUid','==',currentAuthUser.uid));
-  registrationCloudUnsubscribe=rt.api.onSnapshot(q,snap=>{
+  registrationCloudUnsubscribe=rt.api.onSnapshot(q,stage5954DebounceSnapshot(snap=>{
     const stage354OperatorDocs=snap.docs.map(doc=>({id:doc.id,...doc.data()}));
     // 진행자 요청은 별도 관리자 알림 컬렉션에서 동기화한다. 구버전 문서가 남아 있으면 요청 목록에만 병합한다.
     const legacyOperatorRequests=stage354OperatorDocs.filter(row=>String(row?.recordType||'')==='operator_request');
@@ -5898,11 +5914,15 @@ async function startRegistrationCloudSync({force=false}={}){
     try{window.renderOperatorAccessManager?.();}catch(_e){}
     const ctx=registrationContext();
     if(canOperate()&&ctx.divisionId){
+      // 5.9.54: 이번 스냅샷에서 이미 고친 문서는 stage5954FixedDivisionIds에 남겨,
+      // 그 문서의 반영 스냅샷이 다시 돌아와도 같은 조건에 다시 걸려 재작성하지 않게 한다.
       registrationCloudRows.filter(row=>
         String(row.tournamentId||'')===String(ctx.tournamentId||'') &&
         String(row.tournamentDivision||row.divisionName||'').trim()===String(ctx.divisionName||'').trim() &&
-        String(row.divisionId||'')!==String(ctx.divisionId)
+        String(row.divisionId||'')!==String(ctx.divisionId) &&
+        !stage5954FixedDivisionIds.has(String(row.id||''))
       ).forEach(row=>{
+        stage5954FixedDivisionIds.add(String(row.id||''));
         const fixed={...row,divisionId:ctx.divisionId,tournamentDivision:ctx.divisionName,updatedAt:new Date().toISOString()};
         saveRegistrationCloud(fixed).catch(error=>console.warn('[230MATCH] 구 참가신청 부서 연결 복구 실패',error));
       });
@@ -5911,7 +5931,7 @@ async function startRegistrationCloudSync({force=false}={}){
     setTimeout(()=>void backfillPublicRegistrationMirrors(),120);
     if(document.body?.dataset.currentView==='entry'){renderApplicationPortal();lookupPublicApplication();}
     if(document.body?.dataset.currentView==='home')renderHomeFast();
-  },error=>{
+  }),error=>{
     registrationCloudReady=false;
     console.error('[230MATCH] 참가신청 실시간 연결 실패',error);
     notice(`참가신청 불러오기 실패: ${error?.message||error}`,'error');
@@ -16489,3 +16509,5 @@ console.info('[230MATCH] 5.9.51 · main reset/redraw clears main IDs from unifie
 console.info('[230MATCH] 5.9.52 · viewer remote sync renders only current public view; operator/local render path unchanged');
 
 console.info('[230MATCH] 5.9.53 · merged: operation partial-render now also refreshes prelim group/court grids (renderPrelim), round-badge decorator no longer self-loops, admin-only performance-button observer skipped entirely for members, duplicate bracket decorate call removed');
+
+console.info('[230MATCH] 5.9.54 · public/admin registration listeners (tournament-wide, fire on every entry-application write) now debounced 450ms same as room sync; admin division auto-repair no longer rewrites the same doc every snapshot');
