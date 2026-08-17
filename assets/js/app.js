@@ -12,7 +12,7 @@ import{downloadJson}from'./recovery.js?v=332012';
 import{ensureTimeState,calculateTimeMetrics,timeInfo}from'./time-engine-v5000.js?v=5940';
 import{ensureMessagingState,generatePlayingMessages,generateWait1Messages,generateCurrentCourtMessages,generateCurrentWaitMessages,generateAllTimeMessages,markMessageSent,deleteMessage,clearSentMessages,markAllSent,smsUri,refreshMessageContacts,mergePendingDuplicates,getMessageHistory}from'./message-engine.js?v=3521';
 import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactData,importContactData}from'./contact-engine-v5000.js?v=5000';
-import{render,renderViewerRemote,teamText}from'./ui.js?v=59520';
+import{render,teamText}from'./ui.js?v=59250';
 import{ensureAuditState,runStateAudit,runPrelimSimulation,runFullSimulation,applyAuditResult}from'./audit-engine.js?v=332012';
 import{earlyMainStats,markResolvedMainMatchesReady,canAssignEarlyMain,ensureEarlyMainSettings,autoAssignResolvedMain}from'./early-main-engine.js?v=332012';
 import{useUnifiedCourts,prelimPriorityActive,enqueueReadyMainToUnifiedCourts,advanceUnifiedCourt,reconcileUnifiedMainQueues,findUnifiedMatch,moveUnifiedCourtMatchFlexible,reconcilePrelimCourtReservations}from'./unified-court-engine.js?v=59250';
@@ -1856,28 +1856,8 @@ function applySynchronizedState(nextState,source='동기화'){
   ensurePrelimState(state);ensureTimeState(state);ensureDrawMeta(state);ensureMessagingState(state);ensureContacts(state);ensureAuditState(state);ensureEarlyMainSettings(state);ensureVenueSettings(state);ensureVenueQueues(state);ensureCourtStatuses(state);ensureCourtManualQueues(state);ensurePrelimCourtStatuses(state);ensureOperatorState();stage5925RetireLegacyHoldFeature();
   if(state.settings.autoTimeEnabled)calculateTimeMetrics(state);
   syncInputs();syncPrelimInputs();safePersistState(`${source} 상태`);
-  const stage5952View=document.body?.dataset.currentView||'home';
-  const stage5952ViewerRemote=!canOperate()&&source==='다른 기기';
-  const stage5952Handlers={openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus};
-
-  if(stage5952ViewerRemote){
-    // 5.9.52: 일반회원은 운영자 변경을 받을 때 현재 보이는 화면만 갱신한다.
-    // 관리자/운영자의 로컬 commit/render 경로는 전혀 변경하지 않는다.
-    renderViewerRemote(state,stage5952Handlers,stage5952View);
-    renderPortalViewFast(stage5952View);
-    if(stage5952View==='bracket'){
-      decorateBracketLivePlacements();
-      setTimeout(bindBracketMobileView571,0);
-    }
-    if(stage5952View==='my-match')setTimeout(v3252AutoMyMatch,0);
-  }else{
-    render(state,stage5952Handlers);
-    updateSetupProgress();
-    renderOperatorControls();
-    renderPortalViewFast(stage5952View);
-  }
-
-  applyRoleUI();renderDivisionWorkspaceBar();applyTournamentReadOnlyUi();refreshSyncAccessMode();flashSaved();
+  render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus});
+  updateSetupProgress();renderOperatorControls();applyRoleUI();renderPortalViewFast(document.body?.dataset.currentView||'home');renderDivisionWorkspaceBar();applyTournamentReadOnlyUi();refreshSyncAccessMode();flashSaved();
   notice(`${source} 상태를 반영했습니다.`,'success');
 }
 let stage3510LastSyncFeedback='';
@@ -15953,21 +15933,47 @@ console.info('[230MATCH] 5.5.20 stable baseline · 5.5.17+ main queue auto-repai
   function apply(el){
     if(!el)return;
     const info=classify(el.textContent);
-    for(const cls of ROUND_CLASSES)el.classList.remove(cls);
-    el.querySelectorAll(':scope > .stage5523-round-badge').forEach(x=>x.remove());
-    if(!info)return;
-    el.classList.add(info.cls);
+
+    // 5.9.52: 같은 라운드 상태라면 DOM을 다시 만들지 않는다.
+    const currentClass=ROUND_CLASSES.find(cls=>el.classList.contains(cls))||'';
+    const wantedClass=info?.cls||'';
+    if(currentClass!==wantedClass){
+      for(const cls of ROUND_CLASSES)el.classList.remove(cls);
+      if(wantedClass)el.classList.add(wantedClass);
+    }
+
+    const badge=el.querySelector(':scope > .stage5523-round-badge');
+
+    if(!info){
+      if(badge)badge.remove();
+      return;
+    }
 
     // 공용대기 카드에서 라운드 문구가 잘 안 보이는 경우만 작은 배지를 추가.
     if(el.closest('#operationSharedQueue')){
       const head=el.querySelector('.queue-match strong, strong, h3, h4') || el.firstElementChild;
-      if(head && !String(head.textContent||'').includes(info.label)){
-        const badge=document.createElement('span');
-        badge.className='stage5523-round-badge';
-        badge.textContent=info.label;
-        head.insertAdjacentElement('afterend',badge);
+      const headHasLabel=Boolean(head && String(head.textContent||'').includes(info.label));
+
+      if(headHasLabel){
+        if(badge)badge.remove();
+        return;
       }
+
+      if(badge){
+        if(badge.textContent!==info.label)badge.textContent=info.label;
+        return;
+      }
+
+      if(head){
+        const next=document.createElement('span');
+        next.className='stage5523-round-badge';
+        next.textContent=info.label;
+        head.insertAdjacentElement('afterend',next);
+      }
+      return;
     }
+
+    if(badge)badge.remove();
   }
 
   function decorateCourtGrid(root){
@@ -15998,7 +16004,21 @@ console.info('[230MATCH] 5.5.20 stable baseline · 5.5.17+ main queue auto-repai
   }
   function start(){
     run();
-    const observer=new MutationObserver(schedule);
+    const observer=new MutationObserver(mutations=>{
+      const meaningful=mutations.some(m=>{
+        const target=m.target?.nodeType===1?m.target:m.target?.parentElement;
+        if(target?.closest?.('.stage5523-round-badge'))return false;
+        if(m.type==='childList'){
+          const changed=[...m.addedNodes,...m.removedNodes].filter(n=>n?.nodeType===1);
+          if(changed.length && changed.every(n=>
+            n.matches?.('.stage5523-round-badge') ||
+            n.closest?.('.stage5523-round-badge')
+          ))return false;
+        }
+        return true;
+      });
+      if(meaningful)schedule();
+    });
     observer.observe(document.body,{childList:true,subtree:true,characterData:true});
     window.addEventListener('hashchange',()=>setTimeout(run,80));
   }
@@ -16066,6 +16086,7 @@ console.info('[230MATCH] 5.8.7 ready · tournament status supports reliable auto
     after.insertAdjacentElement('afterend',b);
   }
   function install(){
+    if(!canOperate())return;
     addButton('stage590PrelimPerformanceBtn','예선 퍼포먼스 추첨','generatePrelimBtn',stage590PrelimPerformance,'btn btn-gold');
     addButton('stage590MainPerformanceBtn','일반 퍼포먼스 추첨','instantDrawBtn',()=>{try{stage590RunMainPerformance('instant')}catch(e){notice(e.message,'error')}} ,'btn btn-gold');
     addButton('stage590SeedPerformanceBtn','시드 퍼포먼스 추첨','seededDrawBtn',()=>{try{stage590RunMainPerformance('seeded')}catch(e){notice(e.message,'error')}} ,'btn btn-purple');
@@ -16085,8 +16106,8 @@ console.info('[230MATCH] 5.8.7 ready · tournament status supports reliable auto
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{setTimeout(install,100);setTimeout(install,800)},{once:true});
   else{setTimeout(install,100);setTimeout(install,800);}
-  window.addEventListener('hashchange',()=>setTimeout(install,120));
-  const observer=new MutationObserver(()=>install());
+  window.addEventListener('hashchange',()=>{if(canOperate())setTimeout(install,120);});
+  const observer=new MutationObserver(()=>{if(canOperate())install();});
   document.addEventListener('DOMContentLoaded',()=>observer.observe(document.body,{childList:true,subtree:true}),{once:true});
 })();
 
@@ -16442,4 +16463,4 @@ console.info('[230MATCH] 5.9.48 · print-center bracket PNG activates real brack
 
 console.info('[230MATCH] 5.9.51 · main reset/redraw clears main IDs from unified prelim courts before re-assignment');
 
-console.info('[230MATCH] 5.9.52 · viewer remote sync renders only current public view; operator/local render path unchanged');
+console.info('[230MATCH] 5.9.52 · member freeze root fix: idempotent shared-queue decorator + member skips admin draw observer');
