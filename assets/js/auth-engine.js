@@ -20,7 +20,26 @@ export async function roleForUser(user){if(!user)return'viewer';const cfg=getAut
 function cleanAuthHash(){const url=new URL(location.href);const params=new URLSearchParams((url.hash||'').replace(/^#/,''));const authKeys=['customToken','provider','socialName','socialEmail','socialPhone','socialProviderId','error'];if(!authKeys.some(k=>params.has(k)))return;history.replaceState(null,'',`${url.pathname}${url.search}#home`)}
 async function handleCustomTokenReturn(){if(returnHandled)return null;returnHandled=true;let raw='';try{raw=sessionStorage.getItem('230match-v3-pending-auth-hash')||INITIAL_AUTH_HASH||location.hash||''}catch(_e){raw=INITIAL_AUTH_HASH||location.hash||''}const hash=new URLSearchParams(String(raw).replace(/^#/,''));const token=hash.get('customToken');const error=hash.get('error');if(error){try{sessionStorage.removeItem('230match-v3-pending-auth-hash')}catch(_e){}cleanAuthHash();throw new Error(decodeURIComponent(error))}if(!token)return null;const provider=hash.get('provider')||'social';const a=await loadApi();await ensureAuth();const cred=await a.signInWithCustomToken(auth,token);await ensureProfile(cred.user,provider);try{sessionStorage.removeItem('230match-v3-pending-auth-hash')}catch(_e){}cleanAuthHash();return cred.user}
 export async function startAuth(onChange){try{const a=await loadApi();await ensureAuth();await handleCustomTokenReturn();if(unsubscribe)unsubscribe();unsubscribe=a.onAuthStateChanged(auth,async user=>{const role=user?await roleForUser(user):'viewer';const profile=user?await ensureProfile(user):null;onChange?.(user,role,null,profile)});return true}catch(error){onChange?.(null,'viewer',error,null);return false}}
-export async function signInGoogle(){const a=await loadApi();await ensureAuth();const provider=new a.GoogleAuthProvider();provider.setCustomParameters({prompt:'select_account'});try{return await a.signInWithPopup(auth,provider)}catch(error){const code=String(error?.code||error?.message||'');if(/popup-blocked|popup-closed|cancelled-popup|operation-not-supported/i.test(code)){await a.signInWithRedirect(auth,provider);return null}throw error}}
+export async function signInGoogle(){
+  const a=await loadApi();await ensureAuth();
+  const provider=new a.GoogleAuthProvider();provider.setCustomParameters({prompt:'select_account'});
+  // 5.9.55: Cross-Origin-Opener-Policy 헤더가 있으면 팝업 로그인 내부의 window.closed
+  // 감지(popup.ts)가 브라우저에 의해 막혀서, signInWithPopup이 성공도 실패도 하지
+  // 않고 영영 끝나지 않을 수 있다. 일정 시간 안에 응답이 없으면 리다이렉트 방식으로
+  // 자동 전환해서, 로그인 이후 화면 전체가 먹통이 되는 상황을 막는다.
+  try{
+    return await Promise.race([
+      a.signInWithPopup(auth,provider),
+      new Promise((_,reject)=>setTimeout(()=>reject(new Error('popup-timeout')),8000))
+    ]);
+  }catch(error){
+    const code=String(error?.code||error?.message||'');
+    if(/popup-blocked|popup-closed|cancelled-popup|operation-not-supported|popup-timeout/i.test(code)){
+      await a.signInWithRedirect(auth,provider);return null;
+    }
+    throw error;
+  }
+}
 export async function signOutSocial(){const a=await loadApi();await ensureAuth();return a.signOut(auth)}
 export function beginExternalLogin(provider){const cfg=getAuthConfig();const base=provider==='kakao'?(cfg.kakaoLoginUrl||DEFAULT_ENDPOINTS.kakaoLoginUrl):(cfg.naverLoginUrl||DEFAULT_ENDPOINTS.naverLoginUrl);const returnUrl=`${location.origin}${location.pathname}${location.search}`;const url=new URL(base,location.origin);url.searchParams.set('returnUrl',returnUrl);location.href=url.toString()}
 export async function getCurrentProfile(){await ensureAuth();return auth?.currentUser?readProfile(auth.currentUser):null}
