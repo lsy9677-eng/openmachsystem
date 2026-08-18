@@ -6475,7 +6475,7 @@ function entrySmsTemplate(kind,item){
   const sender=state.messaging?.settings?.senderName||'230MATCH';
   const event=item.tournamentName||state.tournament?.name||'현재 대회';
   const fee=state.portal?.guide?.fee||'';
-  if(kind==='payment')return `[${sender}] ${smsApplicationTeamName(item)}님, ${event} 참가비 입금이 확인되었습니다.${fee?` 참가비 ${fee}.`:''} 참가 확정 명단을 확인해 주세요.`;
+  if(kind==='payment')return `${event} 참가비 ${fee||'6만원'} 입금 확인, 정상 등록되었습니다. 감사합니다.`;
   if(kind==='promote')return `[${sender}] ${smsApplicationTeamName(item)}님, ${event} 후보에서 일반 참가팀으로 승격되었습니다. 대회 일정과 준비사항을 확인해 주세요.`;
   if(kind==='approve')return `[${sender}] ${smsApplicationTeamName(item)}님, ${event} 참가 신청이 승인되었습니다.${item.paid?' 참가비 입금도 확인되었습니다.':' 참가비 입금 확인 후 최종 참가가 확정됩니다.'}`;
   if(kind==='reserve')return `[${sender}] ${smsApplicationTeamName(item)}님, ${event} 후보팀으로 접수되었습니다. 후보 순번은 ${reserveApplicationOrder(item)||'-'}번이며, 승격 시 다시 안내드리겠습니다.`;
