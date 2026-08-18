@@ -18240,3 +18240,149 @@ console.info('[230MATCH] 5.9.65 · registration counts use one authoritative cur
   window.stage5976SelfLinkRecoveredRegistration=selfLinkRecovered;
   console.info('[230MATCH] 5.9.76 ready · isolated mobile brand + recovered applicant self-link');
 })();
+
+
+/* 230MATCH 5.9.77 · exact recovered-account repair + definitive mobile brand replacement
+   - 사용자 Firebase users에서 확인한 실제 UID/전화번호로 복구팀 1건만 정확히 연결한다.
+   - 대표 ownerUid는 정원호 네이버 계정으로 고정하고 두 선수 전화번호를 복원한다.
+   - 현재 참가팀 객체가 존재할 때는 해당 팀의 owner/contact 메타만 동기화한다.
+   - 모바일 브랜드 영역은 기존 자식을 통째로 교체해 잔존 brand-mark/pseudo 표시를 제거한다. */
+(function stage5977ExactRecoveryAndMobileBrand(){
+  const WON_UID='naver:9D2DVbPRpdmEONjfKEHKrsZJMEBuM8XmiGxSzyqm-5A';
+  const WON_PHONE='01099922850';
+  const KIM_UID='kakao:4931528330';
+  const KIM_PHONE='01075207917';
+  const MOBILE_STYLE='stage5977MobileBrandHardStyle';
+  const norm=v=>String(v||'').replace(/\s+/g,'').replace(/[()]/g,'').toLowerCase();
+  const digits=v=>String(v||'').replace(/\D/g,'');
+  function isTarget(row){
+    const s=norm([row?.teamName,row?.displayName,row?.pairName,(row?.players||[]).map(p=>p?.name).join('/')].filter(Boolean).join('/'));
+    return s.includes('정원호')&&s.includes('김길온');
+  }
+  function isCurrentTarget(row){
+    if(!isTarget(row))return false;
+    try{return registrationBelongsToCurrentDivision(row);}catch(_e){return true;}
+  }
+
+  function installMobileStyle(){
+    if(document.getElementById(MOBILE_STYLE))return;
+    const s=document.createElement('style');
+    s.id=MOBILE_STYLE;
+    s.textContent=`
+      @media(max-width:720px){
+        .app-header .logo::before,.app-header .logo::after{content:none!important;display:none!important;}
+        .app-header .logo{
+          display:flex!important;align-items:center!important;gap:9px!important;
+          min-width:150px!important;width:auto!important;height:48px!important;
+          margin:0!important;padding:0!important;overflow:visible!important;
+          position:relative!important;left:auto!important;right:auto!important;top:auto!important;
+          transform:none!important;white-space:nowrap!important;
+        }
+        .app-header .logo .stage5977-brand{
+          display:flex!important;align-items:center!important;gap:9px!important;
+          min-width:0!important;margin:0!important;padding:0!important;overflow:visible!important;
+        }
+        .app-header .logo .stage5977-brand-logo{
+          display:block!important;width:42px!important;height:42px!important;
+          min-width:42px!important;max-width:42px!important;min-height:42px!important;max-height:42px!important;
+          flex:0 0 42px!important;object-fit:contain!important;object-position:center!important;
+          margin:0!important;padding:0!important;position:static!important;transform:none!important;
+          border:0!important;border-radius:10px!important;clip:auto!important;clip-path:none!important;
+        }
+        .app-header .logo .stage5977-brand-copy{display:flex!important;flex-direction:column!important;justify-content:center!important;line-height:1.05!important;min-width:0!important;}
+        .app-header .logo .stage5977-brand-title{display:block!important;color:#fff!important;font-size:16px!important;font-weight:900!important;letter-spacing:-.25px!important;line-height:1.1!important;}
+        .app-header .logo .stage5977-brand-sub{display:block!important;color:#cbd5e1!important;font-size:10px!important;font-weight:600!important;margin-top:4px!important;line-height:1!important;}
+      }
+      @media(max-width:390px){
+        .app-header .logo{min-width:142px!important;height:46px!important;gap:8px!important;}
+        .app-header .logo .stage5977-brand-logo{width:40px!important;height:40px!important;min-width:40px!important;max-width:40px!important;min-height:40px!important;max-height:40px!important;flex-basis:40px!important;}
+        .app-header .logo .stage5977-brand-title{font-size:15px!important;}
+        .app-header .logo .stage5977-brand-sub{font-size:9px!important;}
+      }
+    `;
+    document.head.appendChild(s);
+  }
+  function replaceMobileBrand(){
+    try{
+      if(window.innerWidth>720)return;
+      installMobileStyle();
+      const logo=document.querySelector('.app-header .logo');
+      if(!logo)return;
+      if(logo.dataset.stage5977==='1' && logo.querySelector('.stage5977-brand'))return;
+      logo.innerHTML=`<div class="stage5977-brand"><img class="stage5977-brand-logo" src="/logo-230.png?v=5977" alt="230MATCH"><span class="stage5977-brand-copy"><strong class="stage5977-brand-title">230MATCH</strong><span class="stage5977-brand-sub">테니스 시합관리</span></span></div>`;
+      const img=logo.querySelector('.stage5977-brand-logo');
+      if(img)img.onerror=function(){this.onerror=null;this.src='/icon-192.png?v=5977';};
+      logo.dataset.stage5977='1';
+    }catch(e){console.warn('[5.9.77] 모바일 브랜드 교체 실패',e);}
+  }
+
+  let repairing=false;
+  async function exactRepair(){
+    if(repairing||!currentAuthUser)return false;
+    try{if(!canOperate())return false;}catch(_e){return false;}
+    const rows=[...(registrationCloudRows||[]),...((state?.portal?.applications)||[])];
+    const row=rows.find(isCurrentTarget);
+    if(!row)return false;
+    const players=(row.players||[]).map(p=>({...p}));
+    const ensurePlayer=(name,phone,uid)=>{
+      let p=players.find(x=>norm(x?.name)===norm(name));
+      if(!p){p={name,club:'',phone:''};players.push(p);}
+      p.phone=phone;
+      p.uid=uid;
+      p.userUid=uid;
+      p.memberUid=uid;
+    };
+    ensurePlayer('정원호',WON_PHONE,WON_UID);
+    ensurePlayer('김길온',KIM_PHONE,KIM_UID);
+    const now=new Date().toISOString();
+    const next={...row,
+      players,
+      ownerUid:WON_UID,
+      phone:WON_PHONE,
+      representativeIndex:0,
+      representativeName:'정원호',
+      updatedAt:now,
+      recoveryLinkedAt:now,
+      recoveryLinkedExact:true,
+      recoveryOwnerSource:'users/'+WON_UID,
+      recoveryPartnerSource:'users/'+KIM_UID,
+      adminMemo:String(row.adminMemo||'').replace(/\s*·?\s*연락처 확인 필요/g,'').trim()||'5.9.77 누락 참가신청 계정·연락처 복구 완료'
+    };
+    const already=String(row.ownerUid||'')===WON_UID && digits(row.phone)===WON_PHONE &&
+      players.some(p=>norm(p.name)===norm('정원호')&&digits(p.phone)===WON_PHONE) &&
+      players.some(p=>norm(p.name)===norm('김길온')&&digits(p.phone)===KIM_PHONE);
+    if(already){
+      try{await simpleSyncTeam?.(next);}catch(_e){}
+      return true;
+    }
+    repairing=true;
+    try{
+      const saved=await saveRegistrationCloud(next);
+      try{
+        const arr=state?.portal?.applications||[];
+        const i=arr.findIndex(r=>String(r?.id)===String(saved?.id||row.id));
+        if(i>=0)arr[i]=saved;
+      }catch(_e){}
+      try{await simpleSyncTeam?.(saved);}catch(e){console.warn('[5.9.77] 참가팀 연락처/소유자 동기화 보류',e);}
+      try{renderApplicationPortal?.();renderRegistrationSummaryEverywhere?.();renderParticipantManager?.();}catch(_e){}
+      console.info('[5.9.77] 정원호/김길온 복구 완료',{ownerUid:WON_UID,wonPhone:WON_PHONE,kimUid:KIM_UID,kimPhone:KIM_PHONE});
+      try{notice?.('정원호 / 김길온 참가신청의 계정과 연락처를 복구했습니다.','success');}catch(_e){}
+      return true;
+    }catch(e){console.error('[5.9.77] 정확 복구 실패',e);return false;}
+    finally{repairing=false;}
+  }
+
+  function kick(){
+    replaceMobileBrand();
+    [250,900,2200,5000].forEach(ms=>setTimeout(replaceMobileBrand,ms));
+    [1600,4500,9000].forEach(ms=>setTimeout(()=>void exactRepair(),ms));
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',kick,{once:true});else kick();
+  window.addEventListener('pageshow',()=>{setTimeout(replaceMobileBrand,100);setTimeout(()=>void exactRepair(),1200);});
+  window.addEventListener('resize',()=>{if(innerWidth<=720)setTimeout(replaceMobileBrand,0);},{passive:true});
+  const mo=new MutationObserver(()=>{if(innerWidth<=720)setTimeout(replaceMobileBrand,0);});
+  try{mo.observe(document.documentElement,{childList:true,subtree:true});}catch(_e){}
+  window.stage5977ExactRecoveredRegistrationRepair=exactRepair;
+  window.stage5977ReplaceMobileBrand=replaceMobileBrand;
+  console.info('[230MATCH] 5.9.77 ready · exact recovered account/phone repair + definitive mobile brand replacement');
+})();
