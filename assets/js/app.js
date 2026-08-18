@@ -18112,3 +18112,131 @@ console.info('[230MATCH] 5.9.65 · registration counts use one authoritative cur
   window.stage5975HardResetMobileLogo=hardResetLogo;
   console.info('[230MATCH] 5.9.75 ready · mobile logo hard reset + one-time missing registration restore');
 })();
+
+/* 230MATCH 5.9.76 · mobile brand replacement + recovered applicant self-link
+   - 5.9.75의 14팀 복구 상태는 그대로 유지한다.
+   - 모바일에서는 기존 로고 자식들을 숨기고 독립 브랜드 DOM을 사용한다.
+   - 복구팀 정원호/김길온 중 실제 로그인 회원의 프로필 이름·전화번호·UID만 1회 연결한다.
+   - 관리자/운영자 로그인에서는 계정 자동연결을 하지 않는다. */
+(function stage5976MobileBrandAndRecoveredOwnerLink(){
+  const STYLE_ID='stage5976MobileBrandStyle';
+  const BRAND_CLASS='stage5976-mobile-brand';
+  function installStyle(){
+    if(document.getElementById(STYLE_ID))return;
+    const s=document.createElement('style');
+    s.id=STYLE_ID;
+    s.textContent=`
+      .${BRAND_CLASS}{display:none;}
+      @media (max-width:720px){
+        .app-header .logo > :not(.${BRAND_CLASS}){display:none!important;}
+        .app-header .logo{
+          display:flex!important;align-items:center!important;min-width:0!important;width:auto!important;
+          overflow:visible!important;margin:0!important;padding:0!important;transform:none!important;
+        }
+        .app-header .logo .${BRAND_CLASS}{
+          display:flex!important;align-items:center!important;gap:9px!important;min-width:0!important;
+          margin:0!important;padding:0!important;transform:none!important;overflow:visible!important;
+        }
+        .app-header .logo .${BRAND_CLASS}__icon{
+          width:42px!important;height:42px!important;min-width:42px!important;min-height:42px!important;
+          max-width:42px!important;max-height:42px!important;flex:0 0 42px!important;
+          display:block!important;border-radius:10px!important;
+          background-image:url('./logo-230.png?v=5976')!important;
+          background-repeat:no-repeat!important;background-position:center!important;background-size:contain!important;
+          overflow:hidden!important;box-sizing:border-box!important;
+        }
+        .app-header .logo .${BRAND_CLASS}__copy{
+          display:flex!important;flex-direction:column!important;justify-content:center!important;
+          min-width:0!important;line-height:1.08!important;white-space:nowrap!important;
+        }
+        .app-header .logo .${BRAND_CLASS}__title{
+          color:#fff!important;font-size:16px!important;font-weight:900!important;letter-spacing:-.2px!important;
+        }
+        .app-header .logo .${BRAND_CLASS}__sub{
+          color:#c7d2e5!important;font-size:10px!important;font-weight:600!important;margin-top:4px!important;
+        }
+      }
+      @media (max-width:390px){
+        .app-header .logo .${BRAND_CLASS}__icon{
+          width:40px!important;height:40px!important;min-width:40px!important;min-height:40px!important;
+          max-width:40px!important;max-height:40px!important;flex-basis:40px!important;
+        }
+        .app-header .logo .${BRAND_CLASS}__title{font-size:15px!important;}
+        .app-header .logo .${BRAND_CLASS}__sub{font-size:9px!important;}
+      }
+    `;
+    document.head.appendChild(s);
+  }
+  function installBrand(){
+    try{
+      installStyle();
+      const logo=document.querySelector('.app-header .logo');
+      if(!logo)return;
+      let brand=logo.querySelector('.'+BRAND_CLASS);
+      if(!brand){
+        brand=document.createElement('div');
+        brand.className=BRAND_CLASS;
+        brand.innerHTML=`<span class="${BRAND_CLASS}__icon" aria-hidden="true"></span><span class="${BRAND_CLASS}__copy"><strong class="${BRAND_CLASS}__title">230MATCH</strong><span class="${BRAND_CLASS}__sub">테니스 시합관리</span></span>`;
+        logo.appendChild(brand);
+      }
+    }catch(e){console.warn('[5.9.76] 모바일 브랜드 교체 실패',e);}
+  }
+
+  const digits=v=>String(v||'').replace(/\D/g,'');
+  const cleanName=v=>String(v||'').replace(/\s+/g,'').replace(/[()]/g,'').toLowerCase();
+  function isRecoveredTarget(row){
+    const text=cleanName([row?.teamName,row?.displayName,row?.pairName,(row?.players||[]).map(p=>p?.name).join('/')].filter(Boolean).join('/'));
+    return text.includes('정원호')&&text.includes('김길온');
+  }
+  let linking=false;
+  async function selfLinkRecovered(){
+    if(linking||!currentAuthUser)return false;
+    try{if(canOperate())return false;}catch(_e){}
+    const profile=(typeof v3252ProfileDefaults==='function'?v3252ProfileDefaults():{name:'',phone:''})||{};
+    const myName=cleanName(profile.name||currentAuthUser?.appProfile?.name||currentAuthUser?.displayName||'');
+    if(!['정원호','김길온'].includes(myName))return false;
+    const myPhone=digits(profile.phone||currentAuthUser?.appProfile?.phone||currentAuthUser?.appProfile?.mobile||'');
+    const uid=String(currentAuthUser.uid||'');
+    if(!uid)return false;
+    const rows=[...(registrationCloudRows||[]),...(state?.portal?.applications||[])];
+    const row=rows.find(isRecoveredTarget);
+    if(!row)return false;
+    const currentOwner=String(row.ownerUid||'');
+    const placeholder=!currentOwner||currentOwner==='recovered-missing-registration-5975'||currentOwner.startsWith('recovered-');
+    const ps=(row.players||[]).map(p=>({...p}));
+    let changed=false;
+    ps.forEach(p=>{
+      if(cleanName(p?.name)===myName&&myPhone&&digits(p?.phone)!==myPhone){p.phone=myPhone;changed=true;}
+    });
+    const next={...row,players:ps,updatedAt:new Date().toISOString(),recoveryLinkedAt:new Date().toISOString()};
+    if(placeholder){next.ownerUid=uid;changed=true;}
+    if(cleanName(next.representativeName)===myName&&myPhone&&digits(next.phone)!==myPhone){next.phone=myPhone;changed=true;}
+    if(!changed)return true;
+    linking=true;
+    try{
+      const saved=await saveRegistrationCloud(next);
+      try{
+        const i=(state?.portal?.applications||[]).findIndex(r=>String(r?.id)===String(saved?.id||row.id));
+        if(i>=0)state.portal.applications[i]=saved;
+      }catch(_e){}
+      console.info('[5.9.76] 복구 참가신청 계정 연결 완료',myName,{uidLinked:placeholder,phoneLinked:!!myPhone});
+      try{notice?.('복구된 참가신청이 현재 로그인 계정과 연결되었습니다.','success');}catch(_e){}
+      try{renderApplicationPortal?.();}catch(_e){}
+      return true;
+    }catch(e){
+      console.warn('[5.9.76] 복구 참가신청 계정 연결 실패',e);
+      return false;
+    }finally{linking=false;}
+  }
+  function kick(){
+    installBrand();
+    setTimeout(installBrand,300);setTimeout(installBrand,1500);setTimeout(installBrand,4000);
+    setTimeout(()=>void selfLinkRecovered(),1800);setTimeout(()=>void selfLinkRecovered(),6500);
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',kick,{once:true});else kick();
+  window.addEventListener('pageshow',()=>{setTimeout(installBrand,200);setTimeout(()=>void selfLinkRecovered(),1400);});
+  window.addEventListener('resize',()=>{if(innerWidth<=720)setTimeout(installBrand,0);},{passive:true});
+  window.stage5976InstallMobileBrand=installBrand;
+  window.stage5976SelfLinkRecoveredRegistration=selfLinkRecovered;
+  console.info('[230MATCH] 5.9.76 ready · isolated mobile brand + recovered applicant self-link');
+})();
