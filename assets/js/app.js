@@ -17086,3 +17086,214 @@ console.info('[230MATCH] 5.9.61 ready · player history archive self-heal only; 
   `;document.head.appendChild(style);
 })();
 console.info('[230MATCH] 5.9.63 ready · roster display/sort only; live registration and match state untouched');
+
+
+/* 230MATCH 5.9.64 · 참가목록 재정리 + 관리자 자동 SMS 재점검
+   - 화면 표시와 신규 신청 성공 후 관리자 SMS 후처리만 변경
+   - 참가신청/참가팀/예선/코트/본선 운영 데이터 구조는 변경하지 않음 */
+
+(function stage5964CompactRosterFix(){
+  if(document.getElementById('stage5964CompactRosterFixStyle'))return;
+  const style=document.createElement('style');
+  style.id='stage5964CompactRosterFixStyle';
+  style.textContent=`
+    /* 일반 참가자용 참가팀 목록: 한 팀 = 한 줄 중심 */
+    #entryPublicApprovedList .entry-public-team-row.stage5963-compact,
+    #entryPublicReserveList .entry-public-team-row.stage5963-compact{
+      display:grid!important;
+      grid-template-columns:34px minmax(0,1fr) auto!important;
+      align-items:center!important;
+      gap:7px!important;
+      min-height:54px!important;
+      padding:7px 10px!important;
+      margin:0 0 5px!important;
+      border-radius:10px!important;
+    }
+    #entryPublicApprovedList .entry-public-team-row .badge-safe{display:none!important;}
+    #entryPublicReserveList .entry-public-team-row .badge-warning{
+      grid-column:3!important;grid-row:2!important;
+      justify-self:end!important;margin:0!important;
+      min-height:23px!important;padding:2px 7px!important;font-size:.68rem!important;
+    }
+    .entry-public-team-row .stage5963-team-main{
+      display:block!important;min-width:0!important;
+    }
+    .entry-public-team-row .stage5963-team-main strong{
+      display:block!important;font-size:.92rem!important;line-height:1.2!important;margin:0!important;
+    }
+    .entry-public-team-row .stage5963-team-main small{
+      display:block!important;font-size:.73rem!important;line-height:1.25!important;margin-top:2px!important;
+      overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;
+    }
+    .entry-public-team-row .entry-list-payment{
+      grid-column:3!important;grid-row:1!important;
+      min-height:25px!important;padding:3px 8px!important;font-size:.7rem!important;
+    }
+    .entry-public-team-row .entry-public-order{
+      width:27px!important;height:27px!important;min-width:27px!important;font-size:.78rem!important;
+    }
+
+    /* 관리자 신청 목록: 정보 1블록 + 상태 + 버튼 1줄 */
+    #entryAdminList .entry-admin-row.stage5963-admin-compact{
+      display:grid!important;
+      grid-template-columns:30px minmax(0,1fr) auto!important;
+      grid-template-rows:auto auto!important;
+      align-items:center!important;
+      gap:5px 8px!important;
+      min-height:0!important;
+      padding:8px 10px!important;
+      margin-bottom:5px!important;
+      border-radius:10px!important;
+    }
+    #entryAdminList .stage5963-admin-no{
+      grid-column:1!important;grid-row:1!important;
+      width:26px!important;height:26px!important;font-size:.72rem!important;
+    }
+    #entryAdminList .entry-main{
+      grid-column:2!important;grid-row:1!important;min-width:0!important;
+    }
+    #entryAdminList .entry-main strong{
+      display:block!important;font-size:.9rem!important;line-height:1.2!important;margin:0!important;
+    }
+    #entryAdminList .entry-main span,
+    #entryAdminList .entry-main small{
+      display:inline!important;font-size:.7rem!important;line-height:1.25!important;color:#64748b!important;margin-right:6px!important;
+    }
+    #entryAdminList .stage5964-statebox{
+      grid-column:3!important;grid-row:1!important;
+      display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:5px!important;white-space:nowrap!important;
+    }
+    #entryAdminList .entry-status,
+    #entryAdminList .entry-payment{
+      min-height:24px!important;padding:2px 7px!important;font-size:.68rem!important;line-height:1!important;
+    }
+    #entryAdminList .entry-payment-wrap{
+      display:flex!important;align-items:center!important;gap:4px!important;margin:0!important;
+    }
+    #entryAdminList .entry-payment-time{display:none!important;}
+    #entryAdminList .entry-actions{
+      grid-column:2/4!important;grid-row:2!important;
+      display:flex!important;align-items:center!important;justify-content:flex-start!important;gap:5px!important;
+      flex-wrap:wrap!important;margin:0!important;padding:0!important;
+    }
+    #entryAdminList .entry-actions .btn{
+      width:auto!important;min-width:0!important;min-height:29px!important;height:29px!important;
+      padding:3px 8px!important;font-size:.69rem!important;line-height:1!important;border-radius:7px!important;
+      margin:0!important;flex:0 0 auto!important;
+    }
+    #entryAdminList .entry-actions .entry-sms-target-select{
+      width:116px!important;min-width:116px!important;max-width:116px!important;height:29px!important;
+      padding:2px 20px 2px 7px!important;font-size:.68rem!important;border-radius:7px!important;margin:0!important;flex:0 0 116px!important;
+    }
+    #entryAdminList .cancel-request-box{
+      grid-column:2/4!important;grid-row:3!important;margin:2px 0 0!important;padding:6px 8px!important;font-size:.7rem!important;
+    }
+
+    /* 참가팀 관리도 과도한 세로 확장을 막음 */
+    #participantRosterList .participant-row.stage5963-participant-compact{
+      display:grid!important;grid-template-columns:32px minmax(0,1fr) auto auto!important;
+      align-items:center!important;gap:6px!important;min-height:52px!important;padding:7px 9px!important;margin-bottom:5px!important;
+    }
+    #participantRosterList .participant-info strong{font-size:.9rem!important;line-height:1.2!important;}
+    #participantRosterList .participant-info span{font-size:.72rem!important;line-height:1.2!important;}
+    #participantRosterList .participant-payment,
+    #participantRosterList .participant-status{min-height:24px!important;padding:2px 7px!important;font-size:.68rem!important;}
+    #participantRosterList .participant-actions{
+      grid-column:2/5!important;display:flex!important;gap:5px!important;margin-top:0!important;
+    }
+    #participantRosterList .participant-actions .btn{
+      width:auto!important;min-height:27px!important;height:27px!important;padding:3px 8px!important;font-size:.67rem!important;flex:0 0 auto!important;
+    }
+
+    @media(max-width:760px){
+      #entryPublicApprovedList .entry-public-team-row.stage5963-compact,
+      #entryPublicReserveList .entry-public-team-row.stage5963-compact{min-height:50px!important;padding:6px 8px!important;}
+      #entryAdminList .entry-admin-row.stage5963-admin-compact{
+        grid-template-columns:28px minmax(0,1fr) auto!important;padding:7px 8px!important;
+      }
+      #entryAdminList .entry-main span,#entryAdminList .entry-main small{font-size:.67rem!important;}
+      #entryAdminList .entry-actions{gap:4px!important;}
+      #entryAdminList .entry-actions .btn{height:28px!important;min-height:28px!important;padding:3px 7px!important;font-size:.66rem!important;}
+      #entryAdminList .entry-actions .entry-sms-target-select{width:108px!important;min-width:108px!important;max-width:108px!important;height:28px!important;font-size:.65rem!important;flex-basis:108px!important;}
+      #participantRosterList .participant-row.stage5963-participant-compact{grid-template-columns:28px minmax(0,1fr) auto auto!important;padding:6px 8px!important;}
+    }
+  `;
+  document.head.appendChild(style);
+
+  function tidy(){
+    document.querySelectorAll('#entryAdminList .entry-admin-row').forEach(row=>{
+      const status=row.querySelector(':scope > .entry-status');
+      const payment=row.querySelector(':scope > .entry-payment-wrap');
+      if((status||payment)&&!row.querySelector(':scope > .stage5964-statebox')){
+        const box=document.createElement('div');box.className='stage5964-statebox';
+        if(status)box.appendChild(status);if(payment)box.appendChild(payment);
+        const main=row.querySelector(':scope > .entry-main');
+        if(main)main.after(box);else row.prepend(box);
+      }
+    });
+  }
+  window.stage5964TidyRoster=tidy;
+  const run=()=>requestAnimationFrame(tidy);
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',run,{once:true});else run();
+})();
+
+// 5.9.64 · 관리자 자동 신청문자: 일반회원 기기에서 공통번호 로딩 지연까지 보완
+async function stage5964ResolveAdminSmsPhone(){
+  const digits=v=>String(v||'').replace(/\D/g,'');
+  const valid=v=>/^01\d{8,9}$/.test(digits(v));
+  let phone='';
+  try{phone=digits(registrationAdminNotifyPhone?.()||'');}catch(_e){}
+  if(valid(phone))return phone;
+  try{
+    const rt=await getAuthRuntime();
+    if(rt?.db&&rt?.api){
+      const snap=await rt.api.getDoc(rt.api.doc(rt.db,'matchRoomsV7','230match-production'));
+      const room=snap.exists()?(snap.data()||{}):{};
+      phone=digits(room.globalAdminContactPhone||room.adminContactPhone||'');
+      if(valid(phone)){
+        window.__230matchGlobalAdminPhone=phone;
+        try{localStorage.setItem('230match-home-admin-sms-phone-v1',phone);}catch(_e){}
+        return phone;
+      }
+    }
+  }catch(error){console.warn('[5.9.64] 공통 관리자 번호 1회 조회 실패',error);}
+  return '';
+}
+
+notifyAdminNewRegistrationAligo=async function(item){
+  // 신규 신청 저장 성공 뒤에만 호출되는 후처리. 실패해도 신청 데이터에는 영향 없음.
+  try{
+    if(!item?.id)return false;
+    const receiptKey=`230match-registration-admin-sms:${String(item.id)}`;
+    try{if(localStorage.getItem(receiptKey)==='sent')return true;}catch(_e){}
+    const adminPhone=await stage5964ResolveAdminSmsPhone();
+    if(!adminPhone){console.warn('[5.9.64] 관리자 자동 알림문자 미발송: 공통 관리자 번호를 찾지 못함');return false;}
+    const players=typeof entryApplicationPlayers==='function'?entryApplicationPlayers(item):[];
+    const names=(players||[]).map(p=>String(p?.name||'').trim()).filter(Boolean);
+    const team=(names.length?names.join('/'):String(item.teamName||'').replace(/\s*\/\s*/g,'/')).trim();
+    const body=`[230MATCH] ${team} 신청완료`;
+    await sendAligoSmsV3([{name:'관리자',phone:adminPhone}],body,{source:'registration_admin_auto',kind:'registration',registrationId:String(item.id),title:'230MATCH 참가신청'});
+    try{localStorage.setItem(receiptKey,'sent');}catch(_e){}
+    console.info('[5.9.64] 관리자 신청 알림 SMS 발송 완료',String(item.id));
+    return true;
+  }catch(error){
+    console.warn('[5.9.64] 관리자 신청 알림 SMS 실패 — 참가신청은 유지됨',error);
+    return false;
+  }
+};
+
+// 최종 render wrapper들까지 실행된 뒤 레이아웃만 정리한다.
+const stage5964BaseRenderApplicationPortal=renderApplicationPortal;
+renderApplicationPortal=function(){
+  const result=stage5964BaseRenderApplicationPortal.apply(this,arguments);
+  requestAnimationFrame(()=>window.stage5964TidyRoster?.());
+  return result;
+};
+const stage5964BaseRenderParticipantManager=renderParticipantManager;
+renderParticipantManager=function(){
+  const result=stage5964BaseRenderParticipantManager.apply(this,arguments);
+  requestAnimationFrame(()=>window.stage5964TidyRoster?.());
+  return result;
+};
+
+console.info('[230MATCH] 5.9.64 ready · roster UI re-compacted + admin registration SMS fallback checked; live match data untouched');
