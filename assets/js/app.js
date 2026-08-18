@@ -13312,7 +13312,7 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
           const active=String(d.id)===activeId;
           const admin=typeof isAdmin==='function'&&isAdmin();
           const quick=active?`<div class="division-v6003-quick" data-v6003-quick-wrap>
-            ${(()=>{const rs=registrationPublicSummary(),rt=`${rs.active}/${rs.capacity}`;return admin?`<button type="button" data-v6003-go="entry">참가 접수 (${rt})</button><button type="button" data-v6003-go="roster">참가팀</button><button type="button" data-v6003-go="prelim-public">예선</button><button type="button" data-v6003-go="operation">코트</button><button type="button" data-v6003-go="bracket">본선</button><button type="button" data-v6003-more>${window.__divisionV6003MoreOpen?'접기':'더보기'}</button>`:`<button type="button" data-v6003-go="entry">참가 신청 (${rt})</button><button type="button" data-v6003-go="my-match">내 경기</button><button type="button" data-v6003-go="prelim-public">예선 현황</button><button type="button" data-v6003-go="operation">코트 현황</button><button type="button" data-v6003-go="bracket">본선 대진표</button>`;})()}
+            ${(()=>{const rs=registrationPublicSummary(),rt=`${rs.active}/${rs.capacity}`;return admin?`<button type="button" data-v6003-go="entry">참가 접수 (${rt})</button><button type="button" data-v6003-go="prelim-public">예선</button><button type="button" data-v6003-go="operation">코트</button><button type="button" data-v6003-go="bracket">본선</button><button type="button" data-v6003-more>${window.__divisionV6003MoreOpen?'접기':'더보기'}</button>`:`<button type="button" data-v6003-go="entry">참가 신청 (${rt})</button><button type="button" data-v6003-go="my-match">내 경기</button><button type="button" data-v6003-go="prelim-public">예선 현황</button><button type="button" data-v6003-go="operation">코트 현황</button><button type="button" data-v6003-go="bracket">본선 대진표</button>`;})()}
             ${admin?`<div class="division-v6003-more" ${window.__divisionV6003MoreOpen?'':'hidden'}><button type="button" data-v6003-go="messages">문자 센터</button><button type="button" data-v6003-go="print">출력 센터</button><button type="button" data-v6003-edit>부서 설정</button></div>`:''}
           </div>`:'';
           return `<div class="division-v6002-card ${active?'active':''}" data-v6002-division="${esc(d.id)}" role="button" tabindex="0">
@@ -17579,4 +17579,42 @@ console.info('[230MATCH] 5.9.65 · registration counts use one authoritative cur
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{bind();setTimeout(bind,300);});else{bind();setTimeout(bind,300);}
   window.stage5967RenderBulkSms=renderPreview;
   console.info('[230MATCH] 5.9.67 ready · current tournament/division bulk SMS added; display/send only, no match-data writes');
+})();
+
+
+/* 5.9.69 · 레거시 '확정 참가팀·연락처' 화면 정리
+   - 연락처 수정은 참가 신청·승인에서만 관리한다.
+   - 현재 접수/입금/예선/코트/본선 데이터는 수정하지 않는다.
+   - 기존 연락처/테스트 데이터도 삭제하지 않고 화면 진입만 제거한다. */
+(function stage5969RetireLegacyRosterView(){
+  const hideLegacyRosterLinks=()=>{
+    document.querySelectorAll('[data-settings-view="roster"],[data-portal-go="roster"],[data-view="roster"],[data-v6003-go="roster"]').forEach(el=>{
+      try{el.hidden=true;el.style.display='none';el.setAttribute('aria-hidden','true');}catch(_e){}
+    });
+    const view=document.getElementById('view-roster');
+    if(view){view.hidden=true;view.style.display='none';view.setAttribute('aria-hidden','true');}
+  };
+  const redirectLegacyRoster=()=>{
+    try{
+      const active=document.querySelector('#view-roster.active,#view-roster.is-active');
+      const hash=String(location.hash||'').toLowerCase();
+      const search=String(location.search||'').toLowerCase();
+      if(active||hash.includes('roster')||/[?&](view|portalview)=roster(?:&|$)/.test(search)){
+        if(typeof navigatePortalView==='function') navigatePortalView(isAdminUser?.()?'entry-admin':'entry',{focus:false});
+      }
+    }catch(_e){}
+  };
+  const apply=()=>{hideLegacyRosterLinks();redirectLegacyRoster();};
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',apply,{once:true}); else apply();
+  window.addEventListener('pageshow',()=>setTimeout(apply,0));
+  const observer=new MutationObserver(()=>hideLegacyRosterLinks());
+  try{observer.observe(document.documentElement,{childList:true,subtree:true});}catch(_e){}
+  // 기존 저장된 주소/버튼에서 roster로 진입하려는 경우 참가신청 관리로 되돌린다.
+  document.addEventListener('click',ev=>{
+    const btn=ev.target?.closest?.('[data-settings-view="roster"],[data-portal-go="roster"],[data-view="roster"],[data-v6003-go="roster"]');
+    if(!btn)return;
+    ev.preventDefault();ev.stopPropagation();
+    try{if(typeof navigatePortalView==='function')navigatePortalView('entry-admin',{focus:false});}catch(_e){}
+  },true);
+  console.info('[230MATCH] 5.9.69 ready · legacy contact-roster UI retired; contact edits stay in registration admin');
 })();
