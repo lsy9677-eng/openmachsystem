@@ -16730,3 +16730,97 @@ console.info('[230MATCH] 5.9.57 · tournamentReadOnly() disabled: found the actu
   window.addEventListener('hashchange',()=>setTimeout(refresh,100));
   console.info('[230MATCH] 5.9.56 ready · personal participation history, archive-on-close only');
 })();
+
+
+/* 5.9.58 · 제1회 모던배 개인 참가기록 1회 복구
+   - 기존 state에 이미 보관된 resultArchives / legacyTournamentSummaries의 teamNames만 사용
+   - 별도 Firestore 읽기/실시간 리스너 없음
+   - 관리자가 버튼을 눌렀을 때 participantArchives에 딱 한 번 저장 */
+(function stage5958ModernCupParticipantBackfill(){
+  const esc=v=>typeof portalEscape==='function'?portalEscape(String(v??'')):String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  function modernCandidate(){
+    ensurePortalState?.();
+    const rows=[
+      ...(Array.isArray(state?.portal?.resultArchives)?state.portal.resultArchives:[]),
+      ...(Array.isArray(state?.portal?.legacyTournamentSummaries)?state.portal.legacyTournamentSummaries:[])
+    ];
+    return rows.find(a=>{
+      const n=String(a?.name||a?.tournament?.name||'');
+      const teams=Array.isArray(a?.teamNames)?a.teamNames:[];
+      return teams.length>0 && /(모던|modern)/i.test(n);
+    })||null;
+  }
+  function existingModernParticipantArchive(){
+    return (state?.portal?.participantArchives||[]).find(a=>{
+      const n=String(a?.name||'');
+      return /(모던|modern)/i.test(n) && ((Array.isArray(a?.players)&&a.players.length)||(Array.isArray(a?.teamNames)&&a.teamNames.length));
+    })||null;
+  }
+  function buildFromLegacy(src){
+    const teamNames=[...new Set((src?.teamNames||[]).map(x=>String(x||'').trim()).filter(Boolean))];
+    const tournamentName=String(src?.name||src?.tournament?.name||'제1회 모던배');
+    const division=String(src?.division||src?.tournament?.division||'');
+    const date=String(src?.date||src?.tournament?.date||'');
+    const archivedAt=String(src?.archivedAt||new Date().toISOString());
+    const sourceTournamentId=String(src?.sourceTournamentId||src?.tournamentId||src?.id||'modern-cup');
+    const players=[];
+    teamNames.forEach((teamName,index)=>{
+      const fake={id:`modern-backfill-${index}`,name:teamName,affiliation:''};
+      const names=participantRecordPlayers(fake).map(stage5956CleanPlayerName).filter(Boolean);
+      names.forEach(name=>players.push({
+        name,club:'',tournamentId:sourceTournamentId,tournamentName,division,date,archivedAt,
+        applicationId:'',applicationStatus:'approved',appliedAt:'',approvedAt:'',paidAt:'',paid:false,
+        participated:true,reserve:false,cancelled:false,teamId:'',teamName,
+        partnerNames:names.filter(x=>x!==name),source:'legacy-modern-backfill'
+      }));
+    });
+    return {
+      id:`participants-modern-backfill-${sourceTournamentId}`,
+      schema:'230match-player-history-v2',tournamentId:sourceTournamentId,sourceTournamentId,
+      name:tournamentName,division,date,archivedAt,updatedAt:new Date().toISOString(),
+      teamNames,players,source:'legacy-modern-backfill-5958'
+    };
+  }
+  function refreshButton(){
+    const host=document.querySelector('#view-participants .section-head .button-row') || document.querySelector('#view-participants .section-head');
+    if(!host||document.getElementById('stage5958ModernBackfillBtn'))return;
+    const btn=document.createElement('button');
+    btn.type='button';btn.id='stage5958ModernBackfillBtn';btn.className='btn btn-light';btn.setAttribute('data-admin-only','true');
+    btn.textContent='모던배 참가자 1회 복구';
+    btn.addEventListener('click',()=>{
+      if(!requireAdmin('모던배 참가자 기록 1회 복구'))return;
+      const existing=existingModernParticipantArchive();
+      if(existing){notice(`이미 모던배 참가 기록이 있습니다. ${Array.isArray(existing.players)?existing.players.length:'기존'}명 기록을 유지합니다.`,'info');renderPublicParticipantRecords?.();return;}
+      const src=modernCandidate();
+      if(!src){notice('현재 보관 데이터에서 모던배 참가팀 명단(teamNames)을 찾지 못했습니다. 모던배 대회 기록이 실제로 남아 있는지 먼저 확인해 주세요.','error');return;}
+      const record=buildFromLegacy(src);
+      if(!record.players.length){notice('모던배 팀명은 찾았지만 개인 이름으로 변환할 참가자가 없습니다.','error');return;}
+      if(!confirm(`${record.name} 참가팀 ${record.teamNames.length}팀을 개인 ${record.players.length}명 기록으로 1회 복구할까요?\n\n기존 보관 데이터를 이용하므로 추가 실시간 조회는 하지 않습니다.`))return;
+      state.portal.participantArchives=Array.isArray(state.portal.participantArchives)?state.portal.participantArchives:[];
+      state.portal.participantArchives.unshift(record);
+      state.portal=state.portal||{};
+      state.portal.migrations={...(state.portal.migrations||{}),modernParticipantBackfill5958:{done:true,at:new Date().toISOString(),sourceId:record.sourceTournamentId,players:record.players.length}};
+      try{commit('5.9.58 · 모던배 개인 참가기록 1회 복구');}catch(e){saveState(state);}
+      renderPublicParticipantRecords?.();
+      refreshButtonState();
+      notice(`${record.name} 참가 기록을 개인 ${record.players.length}명으로 복구했습니다.`,'success');
+    });
+    host.appendChild(btn);
+    refreshButtonState();
+  }
+  function refreshButtonState(){
+    const btn=document.getElementById('stage5958ModernBackfillBtn');if(!btn)return;
+    const existing=existingModernParticipantArchive();
+    if(existing){btn.textContent='모던배 참가기록 복구 완료';btn.disabled=true;btn.title='이미 개인 참가 기록이 존재합니다.';}
+  }
+  function run(){
+    if(document.body?.dataset?.currentView==='participants'||location.hash==='#participants')refreshButton();
+    else refreshButton();
+  }
+  document.addEventListener('click',e=>{
+    if(e.target.closest?.('[data-view="participants"],[data-portal-go="participants"]'))setTimeout(run,100);
+  });
+  window.addEventListener('hashchange',()=>setTimeout(run,100));
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(run,300),{once:true});else setTimeout(run,300);
+  console.info('[230MATCH] 5.9.58 ready · Modern Cup participant history one-time backfill, no extra live reads');
+})();
