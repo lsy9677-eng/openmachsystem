@@ -7677,6 +7677,110 @@ function tournamentArchiveRows(){
   const legacy=(state.portal?.tournamentArchives||[]).filter(x=>!modern.some(m=>m.id===x.id));
   return [...active,...modern,...legacy];
 }
+// 5.9.56 · 대회 종료 시 1회만 개인별 참가/신청 기록 스냅샷 생성
+function stage5956CleanPlayerName(value){
+  return String(value||'').replace(/\s*\([^)]*\)\s*/g,' ').replace(/\s*\[[^\]]*\]\s*/g,' ').replace(/\s+/g,' ').trim();
+}
+function stage5956PlayerObjectsFromTeam(team){
+  const rows=[team?.player1,team?.player2,team?.p1,team?.p2,...(Array.isArray(team?.players)?team.players:[]),...(Array.isArray(team?.individualPlayers)?team.individualPlayers:[])];
+  const out=[];
+  rows.forEach(p=>{
+    const name=stage5956CleanPlayerName(typeof p==='string'?p:(p?.name||p?.playerName||p?.displayName||''));
+    if(!name)return;
+    const club=String(typeof p==='object'?(p?.club||p?.affiliation||''):'').trim();
+    if(!out.some(x=>x.name===name))out.push({name,club});
+  });
+  if(out.length)return out.slice(0,2);
+  return participantRecordPlayers(team).map(name=>({name:stage5956CleanPlayerName(name),club:String(team?.affiliation||team?.club||'').trim()})).filter(x=>x.name).slice(0,2);
+}
+function stage5956PlayerObjectsFromApplication(app){
+  const rows=Array.isArray(app?.players)?app.players:[];
+  const out=rows.map(p=>({
+    name:stage5956CleanPlayerName(typeof p==='string'?p:(p?.name||p?.playerName||p?.displayName||'')),
+    club:String(typeof p==='object'?(p?.club||p?.affiliation||''):'').trim()
+  })).filter(x=>x.name);
+  if(out.length)return out.slice(0,2);
+  const fake={name:String(app?.teamName||''),affiliation:String(app?.affiliation||'')};
+  return participantRecordPlayers(fake).map(name=>({name:stage5956CleanPlayerName(name),club:String(app?.affiliation||'').trim()})).filter(x=>x.name).slice(0,2);
+}
+function stage5956NormalizeApplicationStatus(status){
+  const s=String(status||'').toLowerCase();
+  if(['approved','active','accepted'].includes(s))return 'approved';
+  if(['reserve','wait','waiting'].includes(s))return 'reserve';
+  if(['cancelled','canceled','refund_completed','deleted','delete_requested'].includes(s))return 'cancelled';
+  if(['rejected','declined'].includes(s))return 'rejected';
+  return s||'applied';
+}
+function stage5956BuildParticipantArchive(archive){
+  ensurePortalState();
+  const tid=String(archive?.tournamentId||state?.tournament?.id||state?.multiTournament?.activeTournamentId||'');
+  const tournamentName=String(archive?.tournament?.name||state?.tournament?.name||'종료 대회');
+  const division=String(archive?.tournament?.division||state?.tournament?.division||'');
+  const date=String(archive?.tournament?.date||state?.tournament?.date||state?.portal?.guide?.date||'');
+  const archivedAt=String(archive?.archivedAt||new Date().toISOString());
+  const teams=Array.isArray(state?.teams)?state.teams:[];
+  const teamByRegistration=new Map();
+  teams.forEach(t=>{if(t?.registrationId)teamByRegistration.set(String(t.registrationId),t);});
+  const activeIds=new Set((state?.prelim?.activeTeams||[]).map(t=>String(t?.id||t)));
+  const reserveIds=new Set((state?.prelim?.reserveTeams||[]).map(t=>String(t?.id||t)));
+  const applications=(state?.portal?.applications||[]).filter(a=>{
+    const atid=String(a?.tournamentId||'');
+    return !atid||!tid||atid===tid;
+  });
+  const playerRows=[];
+  const seenHistory=new Set();
+  function addHistory(player,history){
+    const name=stage5956CleanPlayerName(player?.name);
+    if(!name)return;
+    const key=[name,history.applicationId||'',history.teamId||'',history.teamName||'',history.applicationStatus||''].join('|');
+    if(seenHistory.has(key))return;seenHistory.add(key);
+    playerRows.push({name,club:String(player?.club||history.club||'').trim(),...history});
+  }
+  applications.forEach(app=>{
+    const linked=teamByRegistration.get(String(app?.id||''))||teams.find(t=>String(t?.registrationId||'')===String(app?.id||''));
+    const appStatus=stage5956NormalizeApplicationStatus(app?.status);
+    const participated=Boolean(linked&&(activeIds.has(String(linked.id))||(!reserveIds.has(String(linked.id))&&appStatus==='approved')));
+    const reserve=Boolean(linked&&reserveIds.has(String(linked.id)))||appStatus==='reserve';
+    const players=stage5956PlayerObjectsFromApplication(app);
+    players.forEach(player=>addHistory(player,{
+      tournamentId:tid,tournamentName,division,date,archivedAt,
+      applicationId:String(app?.id||''),applicationStatus:appStatus,
+      appliedAt:String(app?.createdAt||app?.submittedAt||''),approvedAt:String(app?.approvedAt||''),paidAt:String(app?.paidAt||''),paid:Boolean(app?.paid),
+      participated,reserve,cancelled:['cancelled','rejected'].includes(appStatus),
+      teamId:String(linked?.id||''),teamName:String(app?.teamName||linked?.name||''),club:String(app?.affiliation||''),
+      partnerNames:players.filter(x=>x.name!==player.name).map(x=>x.name)
+    }));
+  });
+  // 수기 등록 등 신청서가 없는 실제 참가팀도 누락되지 않게 종료 시 한 번 포함한다.
+  teams.forEach(team=>{
+    const appId=String(team?.registrationId||'');
+    if(appId&&applications.some(a=>String(a?.id||'')===appId))return;
+    const reserve=reserveIds.has(String(team?.id));
+    const participated=activeIds.has(String(team?.id))||!reserve;
+    const players=stage5956PlayerObjectsFromTeam(team);
+    players.forEach(player=>addHistory(player,{
+      tournamentId:tid,tournamentName,division,date,archivedAt,
+      applicationId:'',applicationStatus:reserve?'reserve':'approved',appliedAt:'',approvedAt:'',paidAt:'',paid:false,
+      participated,reserve,cancelled:false,teamId:String(team?.id||''),teamName:String(team?.name||team?.teamName||''),club:String(team?.affiliation||team?.club||''),
+      partnerNames:players.filter(x=>x.name!==player.name).map(x=>x.name)
+    }));
+  });
+  return {
+    id:`participants-${tid||archive?.archiveId||Date.now()}`,
+    schema:'230match-player-history-v2',tournamentId:tid,sourceTournamentId:tid,
+    name:tournamentName,division,date,archivedAt,updatedAt:archivedAt,
+    teamNames:[...new Set(teams.map(t=>String(t?.name||t?.teamName||'')).filter(Boolean))],
+    players:playerRows
+  };
+}
+function stage5956SaveParticipantArchiveOnce(archive){
+  const record=stage5956BuildParticipantArchive(archive);
+  state.portal.participantArchives=Array.isArray(state.portal.participantArchives)?state.portal.participantArchives:[];
+  const key=String(record.tournamentId||record.sourceTournamentId||record.id);
+  state.portal.participantArchives=state.portal.participantArchives.filter(x=>String(x?.tournamentId||x?.sourceTournamentId||x?.id)!==key);
+  state.portal.participantArchives.unshift(record);
+  return record;
+}
 function archiveCurrentTournament(){
   if(!requireAdmin('현재 대회 종료·보관'))return;
   if(tournamentReadOnly()){notice('이미 종료·보관된 대회입니다.','warning');return;}
@@ -7706,7 +7810,9 @@ function archiveCurrentTournament(){
   Object.assign(state.operation,{tournamentCompletedAt:completedAt,archiveId:archive.archiveId,readOnly:true,autoAssignmentEnabled:false});
   state.portal.tournamentArchives=(state.portal.tournamentArchives||[]).filter(x=>String(x.sourceTournamentId||x.tournamentId||'')!==String(archive.tournamentId));
   state.portal.tournamentArchives.unshift(archiveListItem(archive));
-  withTournamentWriteBypass(()=>commit(`Stage35.4-1 대회 종료·최종 스냅샷 · ${archive.tournament.name}`));
+  // 5.9.56: 실시간 누적 대신 종료 버튼을 누르는 이 순간에만 개인별 참가/신청 이력을 1회 생성한다.
+  stage5956SaveParticipantArchiveOnce(archive);
+  withTournamentWriteBypass(()=>commit(`Stage35.4-1 대회 종료·최종 스냅샷+개인 참가이력 · ${archive.tournament.name}`));
   applyTournamentReadOnlyUi();refreshSyncAccessMode();try{stage354RefreshGrantedRole?.({quiet:false});}catch(_e){}renderTournamentList();
   downloadJson(`${safeFilePart(archive.tournament.name)}-${safeFilePart(archive.tournament.division||'전체')}-최종기록.json`,archiveBackupPayload(archive));
   notice('대회를 종료했습니다. 최종 스냅샷을 보관하고 현재 대회를 읽기 전용으로 잠갔습니다.','success');
@@ -16521,3 +16627,106 @@ console.info('[230MATCH] 5.9.53 · merged: operation partial-render now also ref
 console.info('[230MATCH] 5.9.54 · public/admin registration listeners (tournament-wide, fire on every entry-application write) now debounced 450ms same as room sync; admin division auto-repair no longer rewrites the same doc every snapshot');
 
 console.info('[230MATCH] 5.9.57 · tournamentReadOnly() disabled: found the actual freeze cause — a capture-phase global click listener that swallowed clicks (preventDefault+stopImmediatePropagation) on any non-admin, non-excluded button while viewing a closed division on operation/bracket/entry/prelim/roster/settings. Bottom quick-bar and header logout/settings buttons were not on its exclusion list, so they were silently blocked; top nav tabs survived only because they use data-view/data-portal-go, which were excluded. Read-only banner/write-lock/sync-downgrade are now off too since they all keyed off the same function.');
+
+
+/* 5.9.56 · 개인 이름 기준 참가 기록 + 클릭 상세 + 종료시 1회 스냅샷 전용 */
+(function stage5956PersonalParticipationHistory(){
+  const esc=v=>typeof portalEscape==='function'?portalEscape(String(v??'')):String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const clean=stage5956CleanPlayerName;
+  function legacyRowsFromArchive(a){
+    const names=Array.isArray(a?.teamNames)?a.teamNames:[];
+    return names.flatMap((teamName,index)=>{
+      const fake={id:`legacy-${index}`,name:String(teamName||''),affiliation:''};
+      const players=participantRecordPlayers(fake).map(clean).filter(Boolean);
+      return players.map(name=>({name,club:'',tournamentId:String(a?.tournamentId||a?.sourceTournamentId||''),tournamentName:String(a?.name||'보관 대회'),division:String(a?.division||''),date:String(a?.date||''),archivedAt:String(a?.archivedAt||''),applicationStatus:'approved',participated:true,reserve:false,cancelled:false,teamName:String(teamName||''),partnerNames:players.filter(x=>x!==name)}));
+    });
+  }
+  function allHistoryRows(){
+    const archives=[...(state.portal?.participantArchives||[])].sort((a,b)=>String(b?.archivedAt||'').localeCompare(String(a?.archivedAt||'')));
+    return archives.flatMap(a=>Array.isArray(a?.players)&&a.players.length?a.players.map(x=>({...x,tournamentName:x.tournamentName||a.name||'보관 대회',division:x.division||a.division||'',date:x.date||a.date||'',archivedAt:x.archivedAt||a.archivedAt||''})):legacyRowsFromArchive(a));
+  }
+  function personalRows(){
+    const byName=new Map();
+    allHistoryRows().forEach(h=>{
+      const name=clean(h?.name);if(!name)return;
+      const key=name.replace(/\s+/g,'').toLowerCase();
+      if(!byName.has(key))byName.set(key,{player:name,histories:[],clubs:new Set(),teams:new Set()});
+      const row=byName.get(key);row.histories.push(h);if(h.club)row.clubs.add(String(h.club));if(h.teamName)row.teams.add(String(h.teamName));
+    });
+    return [...byName.values()].map(row=>{
+      const histories=row.histories.sort((a,b)=>String(b.date||b.archivedAt||'').localeCompare(String(a.date||a.archivedAt||'')));
+      const participatedCount=histories.filter(h=>h.participated).length;
+      const appliedCount=histories.length;
+      const reserveCount=histories.filter(h=>h.reserve).length;
+      const last=histories[0]||{};
+      return {player:row.player,histories,clubs:[...row.clubs],teams:[...row.teams],participatedCount,appliedCount,reserveCount,last,status:participatedCount?'active':reserveCount?'reserve':'applied'};
+    }).sort((a,b)=>a.player.localeCompare(b.player,'ko'));
+  }
+  publicParticipantRows=function(){return personalRows();};
+  function statusLabel(h){
+    if(h.cancelled)return '신청 취소';
+    if(h.reserve)return '후보';
+    if(h.participated)return '대회 참가';
+    if(h.applicationStatus==='rejected')return '신청 반려';
+    return '참가 신청';
+  }
+  function ensureDialog(){
+    if(document.getElementById('stage5956PlayerHistoryDialog'))return;
+    const dlg=document.createElement('dialog');dlg.id='stage5956PlayerHistoryDialog';dlg.className='stage5956-player-dialog';
+    dlg.innerHTML='<div class="stage5956-dialog-head"><div><strong id="stage5956PlayerHistoryName">선수 기록</strong><span id="stage5956PlayerHistorySummary"></span></div><button type="button" class="btn btn-light btn-small" data-stage5956-close>닫기</button></div><div id="stage5956PlayerHistoryBody"></div>';
+    document.body.appendChild(dlg);
+    dlg.addEventListener('click',e=>{if(e.target===dlg||e.target.closest('[data-stage5956-close]'))dlg.close();});
+  }
+  function openHistory(name){
+    ensureDialog();const row=personalRows().find(x=>x.player===name);if(!row)return;
+    const dlg=document.getElementById('stage5956PlayerHistoryDialog');
+    document.getElementById('stage5956PlayerHistoryName').textContent=`${row.player} 참가 기록`;
+    document.getElementById('stage5956PlayerHistorySummary').textContent=`신청 ${row.appliedCount}회 · 실제 참가 ${row.participatedCount}회`;
+    document.getElementById('stage5956PlayerHistoryBody').innerHTML=row.histories.map(h=>{
+      const when=h.date||((h.archivedAt&&String(h.archivedAt).slice(0,10))||'날짜 미등록');
+      const partner=(h.partnerNames||[]).filter(Boolean).join(' · ');
+      return `<article class="stage5956-history-card"><div class="stage5956-history-top"><div><strong>${esc(h.tournamentName||'대회명 미등록')}</strong><span>${esc(h.division||'부서 미등록')} · ${esc(when)}</span></div><b class="stage5956-history-state ${h.participated?'joined':h.reserve?'reserve':h.cancelled?'cancelled':'applied'}">${esc(statusLabel(h))}</b></div><div class="stage5956-history-meta">${h.teamName?`<span><b>당시 팀</b> ${esc(h.teamName)}</span>`:''}${partner?`<span><b>파트너</b> ${esc(partner)}</span>`:''}${h.club?`<span><b>소속</b> ${esc(h.club)}</span>`:''}${h.appliedAt?`<span><b>신청일</b> ${esc(String(h.appliedAt).slice(0,10))}</span>`:''}${h.paid?'<span><b>입금</b> 확인</span>':''}</div></article>`;
+    }).join('')||'<div class="portal-empty">상세 기록이 없습니다.</div>';
+    dlg.showModal();
+  }
+  renderPublicParticipantRecords=function(){
+    const root=document.getElementById('publicParticipantList');if(!root)return;
+    const query=String(document.getElementById('publicParticipantSearch')?.value||'').trim().toLowerCase();
+    const filter=document.getElementById('publicParticipantStatus')?.value||'all';
+    const rows=personalRows();
+    const visible=rows.filter(row=>{
+      if(filter==='active'&&!row.participatedCount)return false;
+      if(filter==='reserve'&&!row.reserveCount)return false;
+      const hay=[row.player,...row.clubs,...row.teams,...row.histories.map(h=>`${h.tournamentName||''} ${h.division||''}`)].join(' ').toLowerCase();
+      return !query||hay.includes(query);
+    });
+    const setText=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+    setText('publicParticipantCount',`전체 ${rows.length}명`);setText('publicParticipantTotal',`${rows.length}명`);
+    setText('publicParticipantActive',`${rows.filter(r=>r.participatedCount).length}명`);setText('publicParticipantReserve',`${rows.filter(r=>r.reserveCount).length}명`);setText('publicParticipantVisible',`${visible.length}명`);
+    const stats=document.querySelector('#view-participants .participant-record-stats');
+    const statLabels=document.querySelectorAll('#view-participants .participant-record-stats span');
+    if(statLabels[1])statLabels[1].textContent='대회 참가자';if(statLabels[2])statLabels[2].textContent='후보 경험';
+    const guide=document.getElementById('publicParticipantGuide');if(guide)guide.textContent=query?`“${query}” 개인 기록 검색 결과 ${visible.length}명입니다.`:'대회가 끝날 때 한 번 저장된 개인별 참가·신청 기록입니다. 이름을 누르면 상세 이력을 확인할 수 있습니다.';
+    const select=document.getElementById('publicParticipantStatus');if(select){const opts=[...select.options];if(opts[0])opts[0].textContent='전체 기록';if(opts[1])opts[1].textContent='실제 참가';if(opts[2])opts[2].textContent='후보 경험';}
+    root.innerHTML=visible.map((row,idx)=>`<button type="button" class="public-participant-card stage5956-person-card" data-stage5956-player="${esc(row.player)}"><div class="participant-record-number">${idx+1}</div><div class="participant-record-main"><strong>${esc(row.player)}</strong><span>${row.last?.tournamentName?`최근 ${esc(row.last.tournamentName)}`:'대회 기록'}</span><small>신청 ${row.appliedCount}회 · 실제 참가 ${row.participatedCount}회${row.reserveCount?` · 후보 ${row.reserveCount}회`:''}</small></div><span class="stage5956-open-detail">기록 보기 ›</span></button>`).join('')||'<div class="portal-empty">저장된 개인 참가 기록이 없습니다. 대회 종료·보관 시 자동으로 생성됩니다.</div>';
+  };
+  exportPublicParticipantsCsv=function(){
+    if(!requireOperator('참가자 CSV 저장'))return;
+    const escCsv=value=>`"${String(value??'').replaceAll('"','""')}"`;
+    const lines=[['선수명','신청횟수','실제참가횟수','후보횟수','최근대회'].map(escCsv).join(',')];
+    personalRows().forEach(row=>lines.push([row.player,row.appliedCount,row.participatedCount,row.reserveCount,row.last?.tournamentName||''].map(escCsv).join(',')));
+    const blob=new Blob(['\ufeff'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`230MATCH_개인참가기록_${new Date().toISOString().slice(0,10)}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  };
+  document.addEventListener('click',e=>{const card=e.target.closest?.('[data-stage5956-player]');if(card){e.preventDefault();openHistory(card.dataset.stage5956Player);}});
+  const style=document.createElement('style');style.id='stage5956PersonalHistoryStyle';style.textContent=`
+    .stage5956-person-card{width:100%;text-align:left;border:1px solid #dbe4ef;background:#fff;cursor:pointer;font:inherit;color:inherit}.stage5956-person-card:hover{border-color:#2563eb;box-shadow:0 5px 18px rgba(37,99,235,.10)}
+    .stage5956-open-detail{margin-left:auto;color:#2563eb;font-weight:900;white-space:nowrap}.stage5956-player-dialog{width:min(720px,calc(100vw - 24px));max-height:82vh;border:0;border-radius:18px;padding:0;box-shadow:0 24px 70px rgba(15,23,42,.28)}.stage5956-player-dialog::backdrop{background:rgba(15,23,42,.48)}
+    .stage5956-dialog-head{position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:18px 20px;background:#fff;border-bottom:1px solid #e2e8f0}.stage5956-dialog-head>div{display:grid;gap:3px}.stage5956-dialog-head strong{font-size:1.12rem}.stage5956-dialog-head span{font-size:.82rem;color:#64748b}
+    #stage5956PlayerHistoryBody{padding:16px;display:grid;gap:10px;background:#f8fafc}.stage5956-history-card{padding:14px;border:1px solid #e2e8f0;border-radius:14px;background:#fff}.stage5956-history-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.stage5956-history-top>div{display:grid;gap:3px}.stage5956-history-top span{font-size:.8rem;color:#64748b}.stage5956-history-state{font-size:.74rem;border-radius:999px;padding:5px 9px;white-space:nowrap;background:#eef2f7;color:#475569}.stage5956-history-state.joined{background:#dcfce7;color:#166534}.stage5956-history-state.reserve{background:#fef3c7;color:#92400e}.stage5956-history-state.cancelled{background:#fee2e2;color:#991b1b}.stage5956-history-state.applied{background:#dbeafe;color:#1d4ed8}.stage5956-history-meta{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:10px;font-size:.8rem;color:#475569}.stage5956-history-meta b{color:#0f172a}
+    @media(max-width:680px){.stage5956-player-dialog{max-height:88vh}.stage5956-dialog-head{padding:14px}.stage5956-history-top{display:grid}.stage5956-history-state{justify-self:start}.stage5956-open-detail{font-size:.78rem}}
+  `;document.head.appendChild(style);
+  function refresh(){try{if(document.getElementById('view-participants')?.classList.contains('active')||location.hash.includes('participants'))renderPublicParticipantRecords();}catch(_e){}}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(refresh,500),{once:true});else setTimeout(refresh,500);
+  window.addEventListener('hashchange',()=>setTimeout(refresh,100));
+  console.info('[230MATCH] 5.9.56 ready · personal participation history, archive-on-close only');
+})();
