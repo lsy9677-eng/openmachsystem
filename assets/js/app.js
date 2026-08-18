@@ -5587,8 +5587,13 @@ function renderParticipantManager(){
   const teams=(state.teams||[]).filter(t=>!query||myMatchNormalize(`${portalTeam(t)} ${t.affiliation||''}`).includes(query));
   const active=(state.prelim?.activeTeams||[]).length||Math.min(Number(state.prelim?.settings?.activeTeamCount||0),state.teams.length);
   const reserve=Math.max(0,state.teams.length-active);
-  const summary=document.getElementById('participantRosterSummary');if(summary)summary.textContent=`전체 ${state.teams.length}팀 · 참가 ${active}팀 · 후보 ${reserve}팀`;
-  root.innerHTML=teams.map((team,index)=>{const status=participantStatus(team);const contact=getTeamContact(state,team)||{};return `<article class="participant-row"><div class="participant-order">${(state.teams||[]).findIndex(t=>String(t.id)===String(team.id))+1}</div><div class="participant-info"><strong>${portalEscape(portalTeam(team))}</strong><span>${portalEscape(team.affiliation||'소속 없음')}${contact.phone?` · ${portalEscape(contact.phone)}`:''}</span></div><span class="participant-status ${status}">${status==='active'?'참가':'후보'}</span><div class="participant-actions"><button type="button" class="btn btn-light" data-participant-edit="${portalEscape(team.id)}">수정</button><button type="button" class="btn btn-danger-outline" data-participant-delete="${portalEscape(team.id)}">삭제</button></div></article>`;}).join('')||'<div class="portal-empty">조건에 맞는 참가팀이 없습니다.</div>';
+  // 입금상태는 참가팀 객체에 쓰지 않고 기존 참가신청 기록에서 화면 표시용으로만 조회한다.
+  const registrationRows=typeof simpleRegistrationRows==='function'?simpleRegistrationRows():[];
+  const registrationForTeam=team=>registrationRows.find(a=>String(a?.id||'')===String(team?.registrationId||'')||myMatchNormalize(a?.teamName||'')===myMatchNormalize(portalTeam(team)));
+  const paidTeams=(state.teams||[]).filter(team=>{const a=registrationForTeam(team);return Boolean(a&&(a.paid===true||a.paymentStatus==='paid'));}).length;
+  const paymentWaiting=Math.max(0,state.teams.length-paidTeams);
+  const summary=document.getElementById('participantRosterSummary');if(summary)summary.textContent=`전체 ${state.teams.length}팀 · 참가 ${active}팀 · 후보 ${reserve}팀 · 입금 ${paidTeams}팀 · 입금대기 ${paymentWaiting}팀`;
+  root.innerHTML=teams.map((team,index)=>{const status=participantStatus(team);const contact=getTeamContact(state,team)||{};const application=registrationForTeam(team);const paid=Boolean(application&&(application.paid===true||application.paymentStatus==='paid'));return `<article class="participant-row ${paid?'payment-paid':'payment-wait'}"><div class="participant-order">${(state.teams||[]).findIndex(t=>String(t.id)===String(team.id))+1}</div><div class="participant-info"><strong>${portalEscape(portalTeam(team))}</strong><span>${portalEscape(team.affiliation||'소속 없음')}${contact.phone?` · ${portalEscape(contact.phone)}`:''}</span></div><span class="participant-payment ${paid?'paid':'waiting'}">${paid?'✓ 입금':'⏳ 입금대기'}</span><span class="participant-status ${status}">${status==='active'?'참가':'후보'}</span><div class="participant-actions"><button type="button" class="btn btn-light" data-participant-edit="${portalEscape(team.id)}">수정</button><button type="button" class="btn btn-danger-outline" data-participant-delete="${portalEscape(team.id)}">삭제</button></div></article>`;}).join('')||'<div class="portal-empty">조건에 맞는 참가팀이 없습니다.</div>';
 }
 function saveParticipant(){
   if(!requireAdmin('참가팀 관리'))return;
@@ -6039,16 +6044,16 @@ function renderEntryDivisionAdminOverview(){
   const current=rows.find(r=>r.current);
   root.innerHTML=`<div class="entry-admin-division-overview-head">
     <div><strong>전체 부서 참가신청 현황</strong><span>현재 부서와 다른 부서의 승인 대기도 함께 확인합니다.</span></div>
-    <span>전체 미입금 <b>${totalPending}건</b></span>
+    <span>전체 입금대기 <b>${totalPending}건</b></span>
   </div>
   <div class="entry-admin-division-cards">${rows.map(r=>`<article class="entry-admin-division-card ${r.current?'current':''} ${r.pending?'pending':''}">
-    <div><strong>${portalEscape(r.name)}${r.current?' · 현재':''}</strong><small>미입금 ${r.pending} · 참가 ${r.approved} · 후보 ${r.reserve}</small></div>
+    <div><strong>${portalEscape(r.name)}${r.current?' · 현재':''}</strong><small>입금대기 ${r.pending} · 참가 ${r.approved} · 후보 ${r.reserve}</small></div>
     ${r.current?'<span class="badge badge-safe">현재 부서</span>':`<button type="button" class="btn btn-light btn-small" data-entry-open-division="${portalEscape(r.id)}">이 부서 열기</button>`}
   </article>`).join('')}</div>`;
   const badge=document.getElementById('entryPendingCount');
   if(badge){
     const currentPending=current?.pending||0;
-    badge.textContent=totalPending===currentPending?`미입금 ${currentPending}건`:`현재 미입금 ${currentPending}건 · 전체부서 ${totalPending}건`;
+    badge.textContent=totalPending===currentPending?`입금대기 ${currentPending}건`:`현재 입금대기 ${currentPending}건 · 전체부서 ${totalPending}건`;
   }
 }
 
@@ -6099,7 +6104,7 @@ async function submitPublicApplication(){
   }}
   notice(item.status==='reserve'?`정원 초과로 후보 ${simpleRegistrationReserveOrder(item)}번에 자동 등록되었습니다.`:(item.paymentStatus==='checking'?'참가 신청이 접수되었습니다. 입금 확인 요청도 함께 표시됩니다.':'참가 신청이 접수되었습니다. 입금 확인만 남았습니다.'),'success');
   entryFormManualExpanded=false;entryFormUserOpened=false;renderEntryFormCollapseState();
-  if(!canOperate())setTimeout(()=>void openAdminNoticeSms('registration',item,{ask:true}),180);
+  if(!canOperate())setTimeout(()=>void notifyAdminNewRegistrationAligo(item),180);
   }catch(error){
     console.error('[230MATCH] 참가 신청 처리 오류',error);
     notice(`참가 신청 처리 중 오류가 발생했습니다: ${error?.message||error}`,'error');
@@ -6325,7 +6330,8 @@ async function persistRegistrationAdminMutation(item,label='참가신청 변경'
 
 function entryPaymentLabel(item){
   const status=item.paymentStatus||(item.paid?'paid':'unpaid');
-  return status==='paid'?'입금 완료':status==='refunded'?'환불 완료':status==='checking'?'입금 확인 중':'미입금';
+  // 5.9.62: 데이터 상태값은 그대로 유지하고 화면 표기만 단순화한다.
+  return status==='paid'?'입금':status==='refunded'?'환불 완료':'입금대기';
 }
 function entryPaymentClass(item){const s=item.paymentStatus||(item.paid?'paid':'unpaid');return s==='paid'?'paid':s==='refunded'?'refunded':s==='checking'?'checking':'unpaid';}
 function entryDateTime(value){if(!value)return '';try{return new Date(value).toLocaleString('ko-KR');}catch(_e){return String(value)}}
@@ -6386,6 +6392,22 @@ function registrationAdminNoticeBody(kind,item){
 상태: ${item.status==='reserve'?`후보 ${simpleRegistrationReserveOrder(item)}번`:'참가'}
 입금상태: ${entryPaymentLabel(item)}${item.memo?`\n전달사항: ${item.memo}`:''}`;
 }
+async function notifyAdminNewRegistrationAligo(item){
+  // 5.9.62: 일반회원 신규 접수 저장 성공 후 관리자에게만 조용히 1건 발송.
+  // 접수/참가팀/예선/본선 상태는 읽기·수정하지 않는다. 문자 실패도 접수 성공을 되돌리지 않는다.
+  try{
+    const adminPhone=registrationAdminNotifyPhone();
+    if(!validatePhone(adminPhone)){console.warn('[5.9.62] 관리자 자동 알림문자 미발송: 관리자 번호 없음');return false;}
+    const team=smsApplicationTeamName(item).replace(/\s*\/\s*/g,'/').trim();
+    const body=`[230MATCH] ${team} 신청완료`;
+    await sendAligoSmsV3([{name:'관리자',phone:adminPhone}],body,{source:'registration_admin_auto',kind:'registration',title:'230MATCH 참가신청'});
+    return true;
+  }catch(error){
+    console.warn('[5.9.62] 관리자 자동 알림문자 실패',error);
+    return false;
+  }
+}
+
 async function openAdminNoticeSms(kind,item,{ask=true}={}){
   const adminPhone=registrationAdminNotifyPhone();
   if(!validatePhone(adminPhone)){
@@ -6477,7 +6499,7 @@ function renderApplicationPortal(){
   const paidCount=document.getElementById('entryPublicPaidCount');if(paidCount)paidCount.textContent=`${paidRows.length}팀`;
   const publicRows=(rows,type)=>{
     const visible=rows.slice(0,6);
-    const cards=visible.map((a,index)=>`<article class="entry-public-team-row"><span class="entry-public-order">${index+1}</span><div><strong>${portalEscape(a.teamName||'팀명 미등록')}</strong><small>${portalEscape(a.affiliation||'소속 미등록')} · ${a.paid?'입금완료':'미입금'}</small></div>${type==='reserve'?`<span class="badge badge-warning">후보 ${index+1}</span>`:'<span class="badge badge-safe">참가</span>'}</article>`).join('');
+    const cards=visible.map((a,index)=>`<article class="entry-public-team-row ${a.paid?'payment-paid':'payment-wait'}"><span class="entry-public-order">${index+1}</span><div><strong>${portalEscape(a.teamName||'팀명 미등록')}</strong><small>${portalEscape(a.affiliation||'소속 미등록')} · ${a.paid?'입금':'입금대기'}</small></div><span class="entry-list-payment ${a.paid?'paid':'waiting'}">${a.paid?'✓ 입금':'⏳ 입금대기'}</span>${type==='reserve'?`<span class="badge badge-warning">후보 ${index+1}</span>`:'<span class="badge badge-safe">참가</span>'}</article>`).join('');
     return cards+(rows.length>6?`<div class="entry-public-more-row"><button type="button" class="btn btn-light btn-small" data-entry-show-all="${type}">전체 ${rows.length}팀 보기</button></div>`:'')||`<div class="portal-empty">${type==='reserve'?'후보팀이':'참가팀이'} 없습니다.</div>`;
   };
   const approvedRoot=document.getElementById('entryPublicApprovedList');if(approvedRoot)approvedRoot.innerHTML=publicRows(approved,'approved');
@@ -6493,7 +6515,7 @@ function renderApplicationPortal(){
       (entryAdminQuickFilter==='reserve'&&a.status==='reserve')||
       (entryAdminQuickFilter==='cancel'&&a.cancelRequestStatus==='requested');
     const rows=applications.filter(a=>(filter==='all'||a.status===filter)&&quickMatch(a)).sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
-    const badge=document.getElementById('entryPendingCount');if(badge)badge.textContent=`미입금 ${unpaid.length}건`;
+    const badge=document.getElementById('entryPendingCount');if(badge)badge.textContent=`입금대기 ${unpaid.length}건`;
     const setQuick=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=String(v);};
     setQuick('entryQuickAll',applications.length);
     setQuick('entryQuickUnpaid',unpaid.length);
@@ -6502,12 +6524,12 @@ function renderApplicationPortal(){
     setQuick('entryQuickCancel',cancelRequestedRows.length);
     document.querySelectorAll('[data-entry-quick-filter]').forEach(btn=>btn.classList.toggle('active',btn.dataset.entryQuickFilter===entryAdminQuickFilter));
     renderRegistrationAdminNotifySetting();
-    const toolbar=document.querySelector('#view-entry .entry-admin-toolbar');if(toolbar)toolbar.dataset.summary=`전체 ${applications.length}건 · 미입금 ${unpaid.length}건 · 입금완료 ${paidRows.length}건 · 후보 ${reserve.length}건 · 취소요청 ${cancelRequestedRows.length}건`;
+    const toolbar=document.querySelector('#view-entry .entry-admin-toolbar');if(toolbar)toolbar.dataset.summary=`전체 ${applications.length}건 · 입금대기 ${unpaid.length}건 · 입금 ${paidRows.length}건 · 후보 ${reserve.length}건 · 취소요청 ${cancelRequestedRows.length}건`;
     admin.innerHTML=rows.map(a=>{
       const reserveNo=simpleRegistrationReserveOrder(a);
       const paymentTime=a.paidAt?`<small class="entry-payment-time">입금확인 ${portalEscape(entryDateTime(a.paidAt))}${a.paymentConfirmedByName?` · ${portalEscape(a.paymentConfirmedByName)}`:''}</small>`:'<small class="entry-payment-time">아직 입금확인 전</small>';
       const cancelBox=a.cancelRequestStatus==='requested'?`<div class="cancel-request-box"><strong>취소 신청</strong><br>사유 ${portalEscape(a.cancelReason||'-')}<br>환불계좌 ${portalEscape(a.refundBank||'')} ${portalEscape(a.refundAccount||'')} · ${portalEscape(a.refundAccountHolder||'')}<div class="cancel-request-actions"><button class="btn btn-danger-outline btn-small" data-entry-cancel-approve="${a.id}">취소 승인${a.paid?'·환불완료':''}</button><button class="btn btn-light btn-small" data-entry-cancel-reject="${a.id}">취소 반려</button></div></div>`:'';
-      return `<article class="entry-admin-row simple-registration"><div class="entry-main"><strong>${portalEscape(a.teamName)}</strong><span>${portalEscape(a.tournamentName||state.tournament?.name||'현재 대회')}${a.tournamentDivision?` (${portalEscape(a.tournamentDivision)})`:''} · ${portalEscape(a.affiliation||'소속 없음')} · ${portalEscape(a.phone)}</span><small>${new Date(a.createdAt).toLocaleString('ko-KR')}${a.memo?` · ${portalEscape(a.memo)}`:''}</small></div><span class="entry-status ${applicationStatusClass(a.status)}">${a.status==='reserve'?`후보 ${reserveNo}번`:a.status==='cancelled'?'취소 완료':'참가'}</span><div class="entry-payment-wrap"><span class="entry-payment ${entryPaymentClass(a)}">${entryPaymentLabel(a)}</span>${paymentTime}</div><div class="entry-actions">${['approved','reserve'].includes(a.status)?`<button class="btn btn-small entry-payment-button ${a.paid?'paid':'unpaid'}" data-entry-payment="${a.id}">${a.paid?'✓ 입금완료':'입금확인'}</button>`:''}${a.paid&&['approved','reserve'].includes(a.status)?`<button class="btn btn-light btn-small" data-entry-payment-sms="${a.id}">입금완료 문자</button>`:''}<button class="btn btn-light btn-small" data-entry-sms="${a.id}">일반 문자</button></div>${cancelBox}</article>`;
+      return `<article class="entry-admin-row simple-registration ${a.paid?'payment-paid':'payment-wait'}"><div class="entry-main"><strong>${portalEscape(a.teamName)}</strong><span>${portalEscape(a.tournamentName||state.tournament?.name||'현재 대회')}${a.tournamentDivision?` (${portalEscape(a.tournamentDivision)})`:''} · ${portalEscape(a.affiliation||'소속 없음')} · ${portalEscape(a.phone)}</span><small>${new Date(a.createdAt).toLocaleString('ko-KR')}${a.memo?` · ${portalEscape(a.memo)}`:''}</small></div><span class="entry-status ${applicationStatusClass(a.status)}">${a.status==='reserve'?`후보 ${reserveNo}번`:a.status==='cancelled'?'취소 완료':'참가'}</span><div class="entry-payment-wrap"><span class="entry-payment ${entryPaymentClass(a)}">${entryPaymentLabel(a)}</span>${paymentTime}</div><div class="entry-actions">${['approved','reserve'].includes(a.status)?`<button class="btn btn-small entry-payment-button ${a.paid?'paid':'unpaid'}" data-entry-payment="${a.id}">${a.paid?'✓ 입금완료':'입금확인'}</button>`:''}${a.paid&&['approved','reserve'].includes(a.status)?`<button class="btn btn-light btn-small" data-entry-payment-sms="${a.id}">입금완료 문자</button>`:''}<button class="btn btn-light btn-small" data-entry-sms="${a.id}">일반 문자</button></div>${cancelBox}</article>`;
     }).join('')||'<div class="portal-empty">조건에 맞는 참가 신청이 없습니다.</div>';
     renderEntryDivisionAdminOverview();
   }
@@ -6746,7 +6768,7 @@ function bindEntryApplications(){
     const paymentSms=e.target.closest?.('[data-entry-payment-sms]');if(paymentSms){const item=simpleRegistrationRows().find(a=>String(a.id)===String(paymentSms.dataset.entryPaymentSms));if(item)openEntrySmsDialog('payment',item);return;}
     const paymentNotice=e.target.closest?.('[data-entry-payment-notice]');if(paymentNotice){void notifyRegistrationPaymentToAdmin(String(paymentNotice.dataset.entryPaymentNotice||''));return;}
     const adminNotice=e.target.closest?.('[data-entry-admin-notice]');if(adminNotice){const item=(registrationCloudReady?registrationCloudRows:simpleRegistrationRows()).find(a=>String(a.id)===String(adminNotice.dataset.entryId));if(item)void openAdminNoticeSms(String(adminNotice.dataset.entryAdminNotice||'registration'),item,{ask:true});return;}
-    const showAll=e.target.closest?.('[data-entry-show-all]');if(showAll){const type=showAll.dataset.entryShowAll;const rows=simpleRegistrationRows().filter(a=>type==='reserve'?a.status==='reserve':a.status==='approved').sort((a,b)=>String(a.createdAt||'').localeCompare(String(b.createdAt||'')));const root=document.getElementById(type==='reserve'?'entryPublicReserveList':'entryPublicApprovedList');if(root){root.innerHTML=rows.map((a,index)=>`<article class="entry-public-team-row"><span class="entry-public-order">${index+1}</span><div><strong>${portalEscape(a.teamName||'팀명 미등록')}</strong><small>${portalEscape(a.affiliation||'소속 미등록')} · ${a.paid?'입금완료':'미입금'}</small></div>${type==='reserve'?`<span class="badge badge-warning">후보 ${index+1}</span>`:'<span class="badge badge-safe">참가</span>'}</article>`).join('');}return;}const division=e.target.closest?.('[data-entry-open-division]');if(division){switchDivisionWorkspace(String(division.dataset.entryOpenDivision||''),{view:'entry'});return;}});
+    const showAll=e.target.closest?.('[data-entry-show-all]');if(showAll){const type=showAll.dataset.entryShowAll;const rows=simpleRegistrationRows().filter(a=>type==='reserve'?a.status==='reserve':a.status==='approved').sort((a,b)=>String(a.createdAt||'').localeCompare(String(b.createdAt||'')));const root=document.getElementById(type==='reserve'?'entryPublicReserveList':'entryPublicApprovedList');if(root){root.innerHTML=rows.map((a,index)=>`<article class="entry-public-team-row ${a.paid?'payment-paid':'payment-wait'}"><span class="entry-public-order">${index+1}</span><div><strong>${portalEscape(a.teamName||'팀명 미등록')}</strong><small>${portalEscape(a.affiliation||'소속 미등록')} · ${a.paid?'입금':'입금대기'}</small></div><span class="entry-list-payment ${a.paid?'paid':'waiting'}">${a.paid?'✓ 입금':'⏳ 입금대기'}</span>${type==='reserve'?`<span class="badge badge-warning">후보 ${index+1}</span>`:'<span class="badge badge-safe">참가</span>'}</article>`).join('');}return;}const division=e.target.closest?.('[data-entry-open-division]');if(division){switchDivisionWorkspace(String(division.dataset.entryOpenDivision||''),{view:'entry'});return;}});
   }
   const bindOnce=(id,event,handler)=>{const el=document.getElementById(id);if(el&&!el.dataset.entrySelfBound){el.dataset.entrySelfBound='1';el.addEventListener(event,handler);}};
   // 5.9.44: entry form toggle is owned by persistent delegated handler.
@@ -16916,6 +16938,46 @@ console.info('[230MATCH] 5.9.61 ready · player history archive self-heal only; 
     .stage5960-recovery-action{padding:7px 9px;border-radius:8px;background:#fff7ed;color:#9a3412}
     .stage5912-recovery-summary{margin-top:8px!important;padding:8px 10px!important;border-radius:9px!important;background:#eff6ff!important;color:#0f3b70!important;font-weight:800!important}
     .stage5960-recovery-card.legacy-system .stage5960-recovery-action{display:none}
+  `;
+  document.head.appendChild(style);
+})();
+
+
+// 5.9.62 · 입금/입금대기 시각 구분 — 화면 전용, 운영 데이터 변경 없음
+(function stage5962PaymentVisualStyle(){
+  if(document.getElementById('stage5962PaymentVisualStyle'))return;
+  const style=document.createElement('style');
+  style.id='stage5962PaymentVisualStyle';
+  style.textContent=`
+    .entry-public-team-row.payment-paid,
+    .entry-admin-row.payment-paid,
+    .participant-row.payment-paid{
+      background:#ecfdf5!important;
+      border-color:#86efac!important;
+      box-shadow:inset 5px 0 0 #22c55e!important;
+    }
+    .entry-public-team-row.payment-wait,
+    .entry-admin-row.payment-wait,
+    .participant-row.payment-wait{
+      background:#fff8e7!important;
+      border-color:#f6c453!important;
+      box-shadow:inset 5px 0 0 #f59e0b!important;
+    }
+    .entry-list-payment,.participant-payment{
+      display:inline-flex!important;align-items:center!important;justify-content:center!important;
+      min-height:30px!important;padding:5px 10px!important;border-radius:999px!important;
+      font-size:.78rem!important;font-weight:900!important;white-space:nowrap!important;
+    }
+    .entry-list-payment.paid,.participant-payment.paid,
+    .entry-payment.paid{background:#dcfce7!important;color:#166534!important;border:1px solid #86efac!important;}
+    .entry-list-payment.waiting,.participant-payment.waiting,
+    .entry-payment.unpaid,.entry-payment.checking{background:#fef3c7!important;color:#92400e!important;border:1px solid #f6c453!important;}
+    @media(max-width:700px){
+      .entry-list-payment,.participant-payment{font-size:.72rem!important;padding:4px 8px!important;min-height:28px!important;}
+      .entry-public-team-row.payment-paid,.entry-public-team-row.payment-wait,
+      .entry-admin-row.payment-paid,.entry-admin-row.payment-wait,
+      .participant-row.payment-paid,.participant-row.payment-wait{box-shadow:inset 4px 0 0 currentColor!important;}
+    }
   `;
   document.head.appendChild(style);
 })();
