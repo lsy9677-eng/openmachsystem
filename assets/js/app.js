@@ -5833,6 +5833,7 @@ async function backfillPublicRegistrationMirrors(){
 }
 
 let registrationCloudRows=[];
+let registrationTrashRows=[];
 let registrationCloudUnsubscribe=null;
 let registrationCloudKey='';
 let registrationCloudReady=false;
@@ -5919,7 +5920,9 @@ async function saveRegistrationCloud(item){
   });
   const ref=rt.api.doc(rt.db,REGISTRATION_COLLECTION,row.id);
   await rt.api.setDoc(ref,row,{merge:true});
-  try{await savePublicRegistrationMirror(row);}catch(error){console.warn('[230MATCH] 공개 참가현황 저장 실패',error);}
+  if(row?.trashed!==true&&row?.deletedToTrash!==true){
+    try{await savePublicRegistrationMirror(row);}catch(error){console.warn('[230MATCH] 공개 참가현황 저장 실패',error);}
+  }
   const idx=registrationCloudRows.findIndex(x=>x.id===row.id);
   if(idx>=0)registrationCloudRows[idx]=row;else registrationCloudRows.unshift(row);
   registrationCloudReady=true;
@@ -5931,16 +5934,95 @@ async function removeRegistrationCloud(id){
   const rt=await registrationRuntime();
   const key=String(id||'');
   if(!key)throw new Error('삭제할 참가신청 ID가 없습니다.');
-  // 5.9.1: 관리자 즉시 삭제는 비공개 신청 + 공개 참가현황을 함께 제거한다.
-  // 둘 중 하나라도 남으면 onSnapshot이 삭제된 팀을 다시 화면에 살릴 수 있다.
-  await rt.api.deleteDoc(rt.api.doc(rt.db,REGISTRATION_COLLECTION,key));
-  await rt.api.deleteDoc(rt.api.doc(rt.db,PUBLIC_REGISTRATION_COLLECTION,key));
+  const source=registrationCloudRows.find(x=>String(x.id)===key)
+    ||(state.portal?.applications||[]).find(x=>String(x.id)===key);
+  if(!source)throw new Error('휴지통으로 이동할 참가신청을 찾지 못했습니다.');
+
+  // 5.9.80: private registration is retained intact and only marked as trashed.
+  const trashedAt=new Date().toISOString();
+  const trashRow=registrationNormalize({
+    ...structuredClone(source),
+    trashed:true,
+    deletedToTrash:true,
+    trashedAt,
+    deletedAt:trashedAt,
+    trashedByUid:String(currentAuthUser?.uid||''),
+    trashedByName:String(authUserLabel?.()||'관리자'),
+    updatedAt:trashedAt
+  });
+  await rt.api.setDoc(rt.api.doc(rt.db,REGISTRATION_COLLECTION,key),trashRow,{merge:true});
+
+  // Public participant view must hide the deleted application immediately.
+  try{await rt.api.deleteDoc(rt.api.doc(rt.db,PUBLIC_REGISTRATION_COLLECTION,key));}
+  catch(error){console.warn('[230MATCH] 휴지통 이동 공개미러 제거 경고',error);}
+
   registrationCloudRows=registrationCloudRows.filter(x=>String(x.id)!==key);
+  registrationTrashRows=[trashRow,...registrationTrashRows.filter(x=>String(x.id)!==key)];
   publicRegistrationRows=publicRegistrationRows.filter(x=>String(x.id)!==key);
   registrationCloudReady=true;publicRegistrationReady=true;
   mirrorRegistrationRowsToCurrentDivision();
   renderRegistrationSummaryEverywhere();
   return true;
+}
+
+async function stage5980RestoreRegistrationFromTrash(id){
+  if(!requireAdmin('참가신청 휴지통 복구'))return false;
+  const key=String(id||'');
+  const item=registrationTrashRows.find(x=>String(x.id)===key);
+  if(!item)return notice('휴지통에서 해당 참가신청을 찾을 수 없습니다.','error'),false;
+  if(!confirm(`${item.teamName||'이 참가팀'} 신청을 원래 상태로 복구할까요?\n이름·전화번호·UID·입금상태·신청시간을 그대로 복원합니다.`))return false;
+
+  const restored=registrationNormalize({
+    ...structuredClone(item),
+    trashed:false,
+    deletedToTrash:false,
+    trashedAt:'',
+    deletedAt:'',
+    trashedByUid:'',
+    trashedByName:'',
+    restoredAt:new Date().toISOString(),
+    restoredByUid:String(currentAuthUser?.uid||''),
+    restoredByName:String(authUserLabel?.()||'관리자'),
+    updatedAt:new Date().toISOString()
+  });
+  try{
+    const saved=await saveRegistrationCloud(restored);
+    registrationTrashRows=registrationTrashRows.filter(x=>String(x.id)!==key);
+    const localIdx=(state.portal?.applications||[]).findIndex(x=>String(x.id)===key);
+    if(localIdx>=0)state.portal.applications[localIdx]=structuredClone(saved);
+    else state.portal.applications.unshift(structuredClone(saved));
+    try{await simpleSyncTeam(saved);}catch(error){console.warn('[230MATCH] 휴지통 복구 참가팀 동기화 경고',error);}
+    try{syncCurrentDivisionRuntime?.();safePersistState('참가신청 휴지통 복구');}catch(_e){}
+    renderApplicationPortal();renderParticipantManager?.();lookupPublicApplication();renderRegistrationSummaryEverywhere();
+    stage5980RenderTrashDialog();
+    notice(`${saved.teamName||'참가팀'} 신청을 휴지통에서 복구했습니다.`,'success');
+    return true;
+  }catch(error){
+    console.error('[230MATCH] 참가신청 휴지통 복구 실패',error);
+    notice(`휴지통 복구 실패: ${error?.message||error}`,'error');
+    return false;
+  }
+}
+
+async function stage5980PermanentlyDeleteRegistration(id){
+  if(!requireAdmin('참가신청 영구삭제'))return false;
+  const key=String(id||'');
+  const item=registrationTrashRows.find(x=>String(x.id)===key);
+  if(!item)return notice('휴지통에서 해당 참가신청을 찾을 수 없습니다.','error'),false;
+  if(prompt(`${item.teamName||'이 참가팀'}의 신청 원본을 Firebase에서도 영구 삭제합니다.\n되돌릴 수 없습니다.\n계속하려면 “영구삭제”를 입력하세요.`,'')!=='영구삭제')return false;
+  try{
+    const rt=await registrationRuntime();
+    await rt.api.deleteDoc(rt.api.doc(rt.db,REGISTRATION_COLLECTION,key));
+    try{await rt.api.deleteDoc(rt.api.doc(rt.db,PUBLIC_REGISTRATION_COLLECTION,key));}catch(_e){}
+    registrationTrashRows=registrationTrashRows.filter(x=>String(x.id)!==key);
+    stage5980RenderTrashDialog();
+    stage5980InstallTrashButton();
+    notice(`${item.teamName||'참가신청'}을 영구 삭제했습니다.`,'success');
+    return true;
+  }catch(error){
+    notice(`영구삭제 실패: ${error?.message||error}`,'error');
+    return false;
+  }
 }
 function registrationProfilePhone(){
   const p=currentAuthUser?.appProfile||{},d=p.registrationDefaults||{};
@@ -5983,7 +6065,9 @@ async function startRegistrationCloudSync({force=false}={}){
       legacyOperatorRequests.forEach(row=>merged.set(String(row.id||''),row));
       window.__stage354OperatorRequestRows=[...merged.values()];
     }
-    registrationCloudRows=stage354OperatorDocs.filter(row=>String(row?.recordType||'')!=='operator_request').map(row=>registrationNormalize(row));
+    const stage5980RegistrationDocs=stage354OperatorDocs.filter(row=>String(row?.recordType||'')!=='operator_request').map(row=>registrationNormalize(row));
+    registrationTrashRows=stage5980RegistrationDocs.filter(row=>row?.trashed===true||row?.deletedToTrash===true);
+    registrationCloudRows=stage5980RegistrationDocs.filter(row=>row?.trashed!==true&&row?.deletedToTrash!==true);
     registrationCloudReady=true;
     try{window.renderOperatorAccessManager?.();}catch(_e){}
     const ctx=registrationContext();
@@ -9149,19 +9233,22 @@ function stage3264AdminEditApplicationPromptLegacy(id){
   item.teamName=item.players.map(p=>p.name).join(' / ');item.affiliation=item.players.map(p=>p.club).join(' / ');item.updatedAt=new Date().toISOString();
   stage3264SyncApplicationTeam(item);commit(`관리자 참가 신청 수정 · ${item.teamName}`);renderApplicationPortal();renderParticipantManager();lookupPublicApplication();notice('참가 신청과 참가팀 정보를 수정했습니다.','success');
 }
-async function stage3264DeleteApplication(id,label='바로 삭제'){
-  if(!requireAdmin('참가 신청 삭제'))return;
+async function stage3264DeleteApplication(id,label='휴지통 이동'){
+  if(!requireAdmin('참가 신청 휴지통 이동'))return;
   const item=stage3264FindApplication(id);if(!item)return;
-  if(!confirm(`${item.teamName} 참가 신청을 ${label}할까요?\n승인·후보 명단과 Firebase 참가현황에서도 즉시 제거됩니다.`))return;
-  const key=String(id||'');
   const team=stage3264ApplicationTeam(item);
-  autoRecovery(`참가팀 ${label} 직전 · ${item.teamName}`);
+  if(team){
+    const started=(state.prelim?.matches||[]).some(m=>['playing','completed'].includes(String(m?.status||''))&&(String(m?.teamA?.id||'')===String(team.id||'')||String(m?.teamB?.id||'')===String(team.id||'')));
+    if(started){notice('이미 시작되거나 완료된 예선 경기에 포함된 팀은 휴지통으로 이동할 수 없습니다. 참가정보 수정 기능을 사용하세요.','error');return;}
+  }
+  if(!confirm(`${item.teamName} 참가 신청을 휴지통으로 이동할까요?\n\n현재 참가명단과 공개 참가현황에서는 사라지지만, 신청 원본·전화번호·UID·입금상태·신청시간은 Firebase에 그대로 보관되어 언제든 복구할 수 있습니다.`))return;
+  const key=String(id||'');
+  autoRecovery(`참가팀 휴지통 이동 직전 · ${item.teamName}`);
   try{
-    // 클라우드 문서를 먼저 삭제한다. 실패했는데 로컬만 지우면 실시간 리스너가 다시 살리기 때문이다.
     await removeRegistrationCloud(key);
   }catch(error){
-    console.error('[230MATCH] 관리자 참가팀 즉시 삭제 실패',error);
-    notice(`참가팀 삭제에 실패했습니다. Firebase 데이터는 유지했습니다: ${error?.message||error}`,'error');
+    console.error('[230MATCH] 관리자 참가팀 휴지통 이동 실패',error);
+    notice(`휴지통 이동에 실패했습니다. 기존 참가신청은 그대로 유지했습니다: ${error?.message||error}`,'error');
     return;
   }
   if(team){
@@ -9174,10 +9261,11 @@ async function stage3264DeleteApplication(id,label='바로 삭제'){
   }
   state.portal.applications=(state.portal.applications||[]).filter(row=>String(row.id)!==key);
   try{syncCurrentDivisionRuntime?.();}catch(_e){}
-  commit(`관리자 참가 신청 ${label} · ${item.teamName}`);
-  try{await stage5526PushCriticalState?.('관리자 참가팀 삭제');}catch(error){console.warn('[230MATCH] 참가팀 삭제 state push 경고',error);}
+  commit(`관리자 참가 신청 휴지통 이동 · ${item.teamName}`);
+  try{await stage5526PushCriticalState?.('관리자 참가팀 휴지통 이동');}catch(error){console.warn('[230MATCH] 참가팀 휴지통 이동 state push 경고',error);}
   renderApplicationPortal();renderParticipantManager();lookupPublicApplication();renderRegistrationSummaryEverywhere();
-  notice(`${item.teamName} 참가팀을 즉시 삭제했습니다.`,'success');
+  stage5980InstallTrashButton();
+  notice(`${item.teamName} 참가신청을 휴지통으로 이동했습니다. 언제든 복구할 수 있습니다.`,'success');
 }
 const stage3264BaseRenderApplications=renderApplicationPortal;
 renderApplicationPortal=function(){
@@ -9189,7 +9277,7 @@ renderApplicationPortal=function(){
     if(item.status==='delete_requested'){
       let b=row.querySelector('[data-entry-admin-delete]');if(!b){b=document.createElement('button');b.type='button';b.className='btn btn-danger-outline btn-small';b.dataset.entryAdminDelete=id;actions.appendChild(b);}b.textContent='삭제 승인';
     }
-    if(!row.querySelector('[data-entry-admin-force-delete]')){const b=document.createElement('button');b.type='button';b.className='btn btn-danger-outline btn-small';b.dataset.entryAdminForceDelete=id;b.textContent='바로 삭제';actions.appendChild(b);}
+    if(!row.querySelector('[data-entry-admin-force-delete]')){const b=document.createElement('button');b.type='button';b.className='btn btn-danger-outline btn-small';b.dataset.entryAdminForceDelete=id;b.textContent='휴지통';b.title='신청 원본은 보관하고 현재 참가명단에서만 제거합니다.';actions.appendChild(b);}
   });
 };
 const stage3264BaseLookup=lookupPublicApplication;
@@ -9198,7 +9286,7 @@ v3252DeleteRequest=function(id){return cancelEntryApplication(id);};
 document.addEventListener('click',e=>{
   const edit=e.target.closest?.('[data-entry-admin-edit]');if(edit){e.preventDefault();e.stopImmediatePropagation();stage3264AdminEditApplication(edit.dataset.entryAdminEdit);return;}
   const approve=e.target.closest?.('[data-entry-admin-delete]');if(approve){e.preventDefault();e.stopImmediatePropagation();void stage3264DeleteApplication(approve.dataset.entryAdminDelete,'삭제 승인');return;}
-  const force=e.target.closest?.('[data-entry-admin-force-delete]');if(force){e.preventDefault();e.stopImmediatePropagation();void stage3264DeleteApplication(force.dataset.entryAdminForceDelete,'바로 삭제');}
+  const force=e.target.closest?.('[data-entry-admin-force-delete]');if(force){e.preventDefault();e.stopImmediatePropagation();void stage3264DeleteApplication(force.dataset.entryAdminForceDelete,'휴지통 이동');}
 },true);
 
 function stage3264GuideFor(item){return item?.guide||{date:item?.date||'',venue:item?.venue||'',fee:item?.fee||'',detail:item?.detail||'',bank:'',account:'',paymentNote:'',imageDataUrl:'',imageName:'',imageType:''};}
@@ -18052,3 +18140,102 @@ console.info('[230MATCH] 5.9.78 ready · original index header logo; runtime log
    - 회원정보 변경 전 이름+전화번호를 users.matchIdentityAliases에 최대 5개 보존
    - 참가신청/입금/예선/코트/본선 데이터는 자동 변경하지 않음 */
 console.info('[230MATCH] 5.9.79 ready · exact UID or name+phone My Match identity');
+
+
+/* 230MATCH 5.9.80 · registration recycle bin
+   - 앞으로 관리자 삭제는 matchRegistrationsV1 문서를 지우지 않고 trashed=true로 보관한다.
+   - 공개 미러/현재 참가팀만 제외하며 휴지통에서 정확한 원본을 복구할 수 있다.
+   - 기존 활성 신청/입금/예선/코트/본선은 자동 수정하지 않는다. */
+(function stage5980RegistrationTrash(){
+  const esc=v=>typeof portalEscape==='function'?portalEscape(String(v??'')):String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  function rows(){
+    const ctx=registrationContext();
+    return (registrationTrashRows||[]).filter(row=>{
+      if(String(row?.tournamentId||'')!==String(ctx.tournamentId||''))return false;
+      const did=String(row?.divisionId||''),dname=String(row?.tournamentDivision||row?.divisionName||'').trim();
+      if(did&&String(ctx.divisionId||'')&&did===String(ctx.divisionId))return true;
+      if(dname&&String(ctx.divisionName||'').trim()&&dname===String(ctx.divisionName).trim())return true;
+      return !did&&(state.multiDivision?.divisions||[]).length<=1;
+    }).sort((a,b)=>String(b.trashedAt||b.deletedAt||'').localeCompare(String(a.trashedAt||a.deletedAt||'')));
+  }
+  window.stage5980TrashRowsCurrentDivision=rows;
+
+  function ensureDialog(){
+    let d=document.getElementById('stage5980RegistrationTrashDialog');
+    if(d)return d;
+    d=document.createElement('dialog');
+    d.id='stage5980RegistrationTrashDialog';
+    d.className='stage5980-trash-dialog';
+    d.innerHTML=`<div class="stage5980-trash-shell">
+      <div class="stage5980-trash-head">
+        <div><strong>🗑 참가신청 휴지통</strong><span>현재 대회 · 현재 부서에서 삭제한 신청만 표시합니다.</span></div>
+        <button type="button" class="btn btn-light btn-small" data-stage5980-trash-close>닫기</button>
+      </div>
+      <div class="stage5980-trash-note">복구하면 신청번호·선수정보·전화번호·로그인 UID·입금상태·신청시간이 그대로 돌아옵니다. 영구삭제는 복구할 수 없습니다.</div>
+      <div id="stage5980RegistrationTrashList" class="stage5980-trash-list"></div>
+    </div>`;
+    document.body.appendChild(d);
+    d.addEventListener('click',e=>{
+      if(e.target===d)d.close();
+      const close=e.target.closest?.('[data-stage5980-trash-close]');if(close){d.close();return;}
+      const restore=e.target.closest?.('[data-stage5980-trash-restore]');if(restore){void stage5980RestoreRegistrationFromTrash(restore.dataset.stage5980TrashRestore);return;}
+      const purge=e.target.closest?.('[data-stage5980-trash-purge]');if(purge){void stage5980PermanentlyDeleteRegistration(purge.dataset.stage5980TrashPurge);}
+    });
+    const style=document.createElement('style');
+    style.id='stage5980TrashStyle';
+    style.textContent=`
+      .stage5980-trash-dialog{width:min(760px,94vw);max-height:86vh;border:0;border-radius:18px;padding:0;box-shadow:0 24px 70px rgba(15,35,70,.28)}
+      .stage5980-trash-dialog::backdrop{background:rgba(15,23,42,.42)}
+      .stage5980-trash-shell{background:#fff;padding:18px}
+      .stage5980-trash-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;border-bottom:1px solid #e5e7eb;padding-bottom:12px}
+      .stage5980-trash-head>div{display:flex;flex-direction:column;gap:3px}.stage5980-trash-head strong{font-size:18px;color:#10264a}.stage5980-trash-head span{font-size:12px;color:#64748b}
+      .stage5980-trash-note{margin:12px 0;padding:10px 12px;border-radius:12px;background:#fff7ed;color:#9a3412;font-size:12px;font-weight:700}
+      .stage5980-trash-list{display:grid;gap:9px;max-height:58vh;overflow:auto}
+      .stage5980-trash-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;border:1px solid #dbe4f0;border-radius:14px;padding:12px;background:#fff}
+      .stage5980-trash-row strong{display:block;color:#172554;margin-bottom:3px}.stage5980-trash-row small{display:block;color:#64748b;line-height:1.45}
+      .stage5980-trash-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+      .stage5980-trash-button{margin-left:auto}
+      @media(max-width:640px){.stage5980-trash-row{grid-template-columns:1fr}.stage5980-trash-actions{justify-content:flex-start}.stage5980-trash-dialog{width:96vw}.stage5980-trash-shell{padding:14px}}
+    `;
+    document.head.appendChild(style);
+    return d;
+  }
+
+  window.stage5980RenderTrashDialog=function(){
+    const d=ensureDialog(),root=d.querySelector('#stage5980RegistrationTrashList');if(!root)return;
+    const list=rows();
+    root.innerHTML=list.length?list.map(item=>{
+      const players=typeof entryApplicationPlayers==='function'?entryApplicationPlayers(item):[];
+      const playerPhones=players.map(p=>`${p.name||''} ${p.phone||''}`).filter(Boolean).join(' · ');
+      const when=entryDateTime?.(item.trashedAt||item.deletedAt||item.updatedAt)||'';
+      const payment=typeof entryPaymentLabel==='function'?entryPaymentLabel(item):(item.paid?'입금':'입금대기');
+      return `<article class="stage5980-trash-row"><div><strong>${esc(item.teamName||'팀명 없음')}</strong><small>${esc(item.affiliation||'소속 없음')} · ${esc(payment)} · 삭제 ${esc(when)}</small><small>${esc(playerPhones||item.phone||'전화번호 없음')}</small></div><div class="stage5980-trash-actions"><button type="button" class="btn btn-primary btn-small" data-stage5980-trash-restore="${esc(item.id)}">복구</button><button type="button" class="btn btn-danger-outline btn-small" data-stage5980-trash-purge="${esc(item.id)}">영구삭제</button></div></article>`;
+    }).join(''):'<div class="portal-empty">현재 대회·부서의 휴지통이 비어 있습니다.</div>';
+    stage5980InstallTrashButton();
+  };
+
+  window.stage5980InstallTrashButton=function(){
+    if(!canOperate?.())return;
+    const toolbar=document.querySelector('#view-entry .entry-admin-toolbar');if(!toolbar)return;
+    let b=toolbar.querySelector('[data-stage5980-open-trash]');
+    if(!b){b=document.createElement('button');b.type='button';b.className='btn btn-light btn-small stage5980-trash-button';b.dataset.stage5980OpenTrash='1';toolbar.appendChild(b);}
+    const n=rows().length;b.textContent=`🗑 휴지통 ${n?`(${n})`:''}`;b.title='삭제한 참가신청 원본을 확인하고 복구합니다.';
+  };
+
+  document.addEventListener('click',e=>{
+    const b=e.target.closest?.('[data-stage5980-open-trash]');if(!b)return;
+    e.preventDefault();e.stopPropagation();
+    if(!requireAdmin('참가신청 휴지통'))return;
+    const d=ensureDialog();stage5980RenderTrashDialog();if(typeof d.showModal==='function')d.showModal();else d.setAttribute('open','');
+  },true);
+
+  const baseRender=renderApplicationPortal;
+  renderApplicationPortal=function(){
+    const r=baseRender.apply(this,arguments);
+    setTimeout(stage5980InstallTrashButton,0);
+    return r;
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(stage5980InstallTrashButton,900),{once:true});
+  else setTimeout(stage5980InstallTrashButton,900);
+  console.info('[230MATCH] 5.9.80 ready · registration recycle bin / restore / permanent delete');
+})();
