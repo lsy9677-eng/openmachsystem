@@ -17705,18 +17705,12 @@ console.info('[230MATCH] 5.9.65 · registration counts use one authoritative cur
         repairedKey=key;
         return true;
       }
+      // 5.9.73: 실제 접수 중에는 공개 미러를 자동 삭제하지 않는다.
+      // 공개에는 있고 관리자 원본에는 없는 행이 실제 신청일 가능성을 배제할 수 없으므로 진단만 남긴다.
       for(const row of orphans){
-        try{
-          await rt.api.deleteDoc(rt.api.doc(rt.db,PUBLIC_REGISTRATION_COLLECTION,String(row.id)));
-          publicRegistrationRows=publicRegistrationRows.filter(x=>String(x?.id||'')!==String(row.id));
-          console.warn('[5.9.71] 공개 참가현황 고아 미러 제거',row.teamName||row.id,row.id);
-        }catch(error){
-          console.warn('[5.9.71] 공개 참가현황 고아 미러 제거 실패',row.id,error);
-        }
+        console.warn('[5.9.73] 공개/원본 불일치 감지 · 자동삭제 안 함',row.teamName||row.id,row.id);
       }
       publicRegistrationReady=true;
-      try{renderRegistrationSummaryEverywhere?.();}catch(_e){}
-      try{if(document.body?.dataset.currentView==='entry')renderApplicationPortal?.();}catch(_e){}
       repairedKey=key;
       return true;
     }catch(error){
@@ -17858,4 +17852,107 @@ console.info('[230MATCH] 5.9.65 · registration counts use one authoritative cur
   else setTimeout(apply,0);
   window.addEventListener('resize',()=>{if(innerWidth<=720) normalizeLogo();},{passive:true});
   console.info('[230MATCH] 5.9.72 ready · mobile header logo fixed-size contain; UI-only');
+})();
+
+
+/* 230MATCH 5.9.73 · 관리자 참가신청 서버 원본 강제 최신화 + 공개/원본 차이 진단 (READ-ONLY)
+   - 현재 대회 matchRegistrationsV1을 getDocs로 직접 재조회해 stale listener 상태를 교정한다.
+   - 참가신청/입금/팀/예선/본선 데이터에는 쓰지 않는다.
+   - 공개 미러와 원본 차이는 삭제하지 않고 관리자에게만 표시한다. */
+(function stage5973CanonicalRegistrationRefresh(){
+  let running=false;
+  let lastRunAt=0;
+  const MIN_GAP=3500;
+
+  function activeRows5973(rows){
+    return (rows||[]).filter(r=>String(r?.recordType||'')!=='operator_request');
+  }
+  function currentRows5973(rows){
+    return activeRows5973(rows).filter(r=>{
+      try{return registrationBelongsToCurrentDivision(r);}catch(_e){return false;}
+    });
+  }
+  function keyset5973(rows){return new Set((rows||[]).map(r=>String(r?.id||'')).filter(Boolean));}
+
+  function installMismatchBanner5973(info){
+    try{
+      const host=document.querySelector('#view-entry .entry-admin-toolbar')||document.getElementById('entryAdminList')?.parentElement;
+      if(!host)return;
+      let el=document.getElementById('stage5973RegistrationIntegrityBanner');
+      if(!el){
+        el=document.createElement('div');
+        el.id='stage5973RegistrationIntegrityBanner';
+        el.style.cssText='margin:8px 0;padding:9px 12px;border-radius:10px;font-size:.76rem;font-weight:800;line-height:1.5;border:1px solid #fdba74;background:#fff7ed;color:#9a3412;';
+        host.insertAdjacentElement('afterend',el);
+      }
+      if(!info||!info.mismatch){el.remove();return;}
+      const names=(info.publicOnly||[]).map(r=>String(r?.teamName||r?.id||'')).filter(Boolean);
+      const pnames=(info.privateOnly||[]).map(r=>String(r?.teamName||r?.id||'')).filter(Boolean);
+      el.innerHTML=`⚠️ 참가신청 데이터 차이 확인 · 관리자 원본 <b>${info.privateCount}팀</b> / 공개 현황 <b>${info.publicCount}팀</b>${names.length?`<br>공개에만 표시: ${names.map(portalEscape).join(', ')}`:''}${pnames.length?`<br>원본에만 표시: ${pnames.map(portalEscape).join(', ')}`:''}<br><span style="font-weight:600">자동 삭제하지 않습니다. 원본을 다시 확인한 뒤 처리합니다.</span>`;
+    }catch(_e){}
+  }
+
+  async function refresh5973({force=false}={}){
+    try{
+      if(running||!currentAuthUser||!canOperate())return false;
+      const now=Date.now();if(!force&&now-lastRunAt<MIN_GAP)return false;
+      const ctx=registrationContext?.();
+      const tid=String(ctx?.tournamentId||'');if(!tid)return false;
+      running=true;lastRunAt=now;
+      const rt=await registrationRuntime();
+      if(typeof rt?.api?.getDocs!=='function')return false;
+      const privateQ=rt.api.query(rt.api.collection(rt.db,REGISTRATION_COLLECTION),rt.api.where('tournamentId','==',tid));
+      const publicQ=rt.api.query(rt.api.collection(rt.db,PUBLIC_REGISTRATION_COLLECTION),rt.api.where('tournamentId','==',tid));
+      const [privateSnap,publicSnap]=await Promise.all([rt.api.getDocs(privateQ),rt.api.getDocs(publicQ)]);
+      if(privateSnap?.metadata?.fromCache===true){
+        console.warn('[5.9.73] 관리자 원본 서버 조회가 캐시입니다. 기존 화면을 유지합니다.');
+        return false;
+      }
+      const privateAll=activeRows5973(privateSnap.docs.map(doc=>registrationNormalize({id:doc.id,...doc.data()})));
+      // 서버 직접 조회 결과를 관리자 참가신청 메모리의 기준값으로 사용한다.
+      registrationCloudRows=privateAll;
+      registrationCloudReady=true;
+      try{mirrorRegistrationRowsToCurrentDivision();}catch(_e){}
+      try{renderRegistrationSummaryEverywhere();}catch(_e){}
+      try{if(document.body?.dataset.currentView==='entry')renderApplicationPortal();}catch(_e){}
+      try{if(document.body?.dataset.currentView==='home')renderHomeFast();}catch(_e){}
+      try{renderVisibleDivisionBar?.();}catch(_e){}
+
+      const privateCurrent=currentRows5973(privateAll);
+      const publicAll=publicSnap.docs.map(doc=>({id:doc.id,...doc.data()});
+      const publicCurrent=publicAll.filter(r=>{try{return publicRegistrationBelongsToCurrentDivision(r);}catch(_e){return false;}});
+      // 공개 미러도 서버 응답으로 화면 메모리를 최신화하되 데이터 쓰기는 하지 않는다.
+      if(publicSnap?.metadata?.fromCache!==true){
+        publicRegistrationRows=publicAll;
+        publicRegistrationReady=true;
+      }
+      const privIds=keyset5973(privateCurrent),pubIds=keyset5973(publicCurrent);
+      const publicOnly=publicCurrent.filter(r=>!privIds.has(String(r?.id||'')));
+      const privateOnly=privateCurrent.filter(r=>!pubIds.has(String(r?.id||'')));
+      const info={privateCount:privateCurrent.filter(r=>r.status==='approved').length,publicCount:publicCurrent.filter(r=>r.status==='approved').length,publicOnly,privateOnly};
+      info.mismatch=Boolean(publicOnly.length||privateOnly.length||info.privateCount!==info.publicCount);
+      installMismatchBanner5973(info);
+      if(info.mismatch){
+        console.warn('[5.9.73] 참가신청 공개/관리자 원본 차이',info);
+      }else{
+        console.info(`[5.9.73] 참가신청 서버 원본 확인 완료 · 현재부서 ${info.privateCount}팀`);
+      }
+      return true;
+    }catch(error){
+      console.warn('[5.9.73] 참가신청 서버 원본 강제 최신화 실패',error);
+      return false;
+    }finally{running=false;}
+  }
+
+  window.stage5973RefreshCanonicalRegistration=refresh5973;
+  const schedule=()=>{
+    setTimeout(()=>void refresh5973({force:true}),1200);
+    setTimeout(()=>void refresh5973({force:true}),5200);
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',schedule,{once:true});else schedule();
+  window.addEventListener('pageshow',()=>setTimeout(()=>void refresh5973({force:true}),1500));
+  document.addEventListener('click',e=>{
+    if(e.target?.closest?.('[data-view="entry"],[data-portal-go="entry"],[data-v6003-go="entry"]'))setTimeout(()=>void refresh5973({force:true}),500);
+  },true);
+  console.info('[230MATCH] 5.9.73 ready · admin registration server refresh + mismatch diagnostics; no registration writes');
 })();
