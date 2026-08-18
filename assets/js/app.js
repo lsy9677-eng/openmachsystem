@@ -17649,3 +17649,139 @@ console.info('[230MATCH] 5.9.65 · registration counts use one authoritative cur
   },true);
   console.info('[230MATCH] 5.9.69 ready · legacy contact-roster UI retired; contact edits stay in registration admin');
 })();
+
+
+/* 230MATCH 5.9.71 · 참가신청 원본/공개미러 정합성 + 관리자 신청SMS 재시도
+   - 운영 원본(matchRegistrationsV1)은 절대 삭제/수정하지 않는다.
+   - 관리자 인증 상태에서 서버 조회로 원본에 없는 공개 미러 고아 문서만 제거한다.
+   - 신규 신청 관리자 SMS는 알리고 결과코드까지 확인하고 최대 3회 재시도한다. */
+(function stage5971RegistrationIntegrity(){
+  let repairing=false;
+  let repairedKey='';
+
+  const sleep5971=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+  const ageMs5971=row=>{
+    const raw=String(row?.updatedAt||row?.createdAt||'');
+    const t=Date.parse(raw);
+    return Number.isFinite(t)?Date.now()-t:Number.POSITIVE_INFINITY;
+  };
+
+  async function repairPublicMirror5971({force=false}={}){
+    try{
+      if(repairing||!currentAuthUser||!canOperate())return false;
+      const ctx=registrationContext?.();
+      const tid=String(ctx?.tournamentId||'');
+      if(!tid)return false;
+      const key=`${tid}|${String(currentAuthUser?.uid||'')}`;
+      if(!force&&repairedKey===key)return true;
+      repairing=true;
+      const rt=await registrationRuntime();
+      if(typeof rt?.api?.getDocs!=='function'){
+        console.warn('[5.9.71] getDocs 미지원 · 공개 미러 정합성 검사를 건너뜁니다.');
+        return false;
+      }
+      const privateQ=rt.api.query(rt.api.collection(rt.db,REGISTRATION_COLLECTION),rt.api.where('tournamentId','==',tid));
+      const publicQ=rt.api.query(rt.api.collection(rt.db,PUBLIC_REGISTRATION_COLLECTION),rt.api.where('tournamentId','==',tid));
+      const [privateSnap,publicSnap]=await Promise.all([rt.api.getDocs(privateQ),rt.api.getDocs(publicQ)]);
+      if(privateSnap?.metadata?.fromCache===true||publicSnap?.metadata?.fromCache===true){
+        console.warn('[5.9.71] 캐시 조회 상태 · 공개 미러 자동정리를 수행하지 않습니다.');
+        return false;
+      }
+      const canonical=new Set();
+      privateSnap.docs.forEach(doc=>{
+        const row={id:doc.id,...doc.data()};
+        if(String(row?.recordType||'')==='operator_request')return;
+        canonical.add(String(doc.id));
+      });
+      const orphans=[];
+      publicSnap.docs.forEach(doc=>{
+        if(canonical.has(String(doc.id)))return;
+        const row={id:doc.id,...doc.data()};
+        // 신규 저장 직후의 극단적 타이밍을 피하기 위해 5분 이상 지난 미러만 정리한다.
+        if(ageMs5971(row)<5*60*1000)return;
+        orphans.push(row);
+      });
+      if(!orphans.length){
+        repairedKey=key;
+        return true;
+      }
+      for(const row of orphans){
+        try{
+          await rt.api.deleteDoc(rt.api.doc(rt.db,PUBLIC_REGISTRATION_COLLECTION,String(row.id)));
+          publicRegistrationRows=publicRegistrationRows.filter(x=>String(x?.id||'')!==String(row.id));
+          console.warn('[5.9.71] 공개 참가현황 고아 미러 제거',row.teamName||row.id,row.id);
+        }catch(error){
+          console.warn('[5.9.71] 공개 참가현황 고아 미러 제거 실패',row.id,error);
+        }
+      }
+      publicRegistrationReady=true;
+      try{renderRegistrationSummaryEverywhere?.();}catch(_e){}
+      try{if(document.body?.dataset.currentView==='entry')renderApplicationPortal?.();}catch(_e){}
+      repairedKey=key;
+      return true;
+    }catch(error){
+      console.warn('[5.9.71] 참가신청 공개 미러 정합성 검사 실패',error);
+      return false;
+    }finally{
+      repairing=false;
+    }
+  }
+
+  function aligoAccepted5971(data){
+    if(data==null)return false;
+    if(data.success===false||data.ok===false)return false;
+    const code=data.result_code??data.resultCode??data.code??data.aligo?.result_code??data.aligo?.resultCode;
+    if(code!==undefined&&code!==null&&String(code).trim()!=='')return String(code).trim()==='1'||String(code).trim()==='200';
+    return true;
+  }
+
+  notifyAdminNewRegistrationAligo=async function(item){
+    try{
+      if(!item?.id)return false;
+      const receiptKey=`230match-registration-admin-sms:${String(item.id)}`;
+      try{if(localStorage.getItem(receiptKey)==='sent')return true;}catch(_e){}
+      const adminPhone=await stage5964ResolveAdminSmsPhone();
+      if(!adminPhone){
+        console.warn('[5.9.71] 관리자 자동 신청문자 미발송: 관리자 번호 없음',String(item.id));
+        return false;
+      }
+      const players=typeof entryApplicationPlayers==='function'?entryApplicationPlayers(item):[];
+      const names=(players||[]).map(p=>String(p?.name||'').trim()).filter(Boolean);
+      const team=(names.length?names.join('/'):String(item.teamName||'').replace(/\s*\/\s*/g,'/')).trim();
+      const body=`[230MATCH] ${team} 신청완료`;
+      const waits=[0,2500,8000];
+      let lastError=null;
+      for(let attempt=0;attempt<waits.length;attempt++){
+        if(waits[attempt])await sleep5971(waits[attempt]);
+        try{
+          const result=await sendAligoSmsV3([{name:'관리자',phone:adminPhone}],body,{source:'registration_admin_auto',kind:'registration',registrationId:String(item.id),attempt:attempt+1,title:'230MATCH 참가신청'});
+          if(!aligoAccepted5971(result))throw new Error(`알리고 결과 확인 실패${result?.result_code?` (${result.result_code})`:''}`);
+          try{localStorage.setItem(receiptKey,'sent');}catch(_e){}
+          console.info(`[5.9.71] 관리자 신청 알림 SMS 발송 완료 · ${attempt+1}차`,String(item.id));
+          return true;
+        }catch(error){
+          lastError=error;
+          console.warn(`[5.9.71] 관리자 신청 알림 SMS ${attempt+1}차 실패`,String(item.id),error);
+        }
+      }
+      console.error('[5.9.71] 관리자 신청 알림 SMS 최종 실패',String(item.id),lastError);
+      return false;
+    }catch(error){
+      console.warn('[5.9.71] 관리자 신청 알림 SMS 처리 실패 — 참가신청은 유지됨',error);
+      return false;
+    }
+  };
+
+  window.stage5971RepairPublicRegistrationMirror=repairPublicMirror5971;
+  const schedule=()=>{
+    setTimeout(()=>void repairPublicMirror5971(),1800);
+    setTimeout(()=>void repairPublicMirror5971(),6500);
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',schedule,{once:true});else schedule();
+  window.addEventListener('pageshow',()=>setTimeout(()=>void repairPublicMirror5971(),2200));
+  document.addEventListener('click',e=>{
+    if(e.target?.closest?.('[data-view="entry"],[data-portal-go="entry"],[data-v6003-go="entry"]'))setTimeout(()=>void repairPublicMirror5971(),1200);
+  },true);
+
+  console.info('[230MATCH] 5.9.71 ready · canonical registration/public mirror consistency + admin SMS 3-attempt retry; operational match data untouched');
+})();
