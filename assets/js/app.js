@@ -17705,12 +17705,11 @@ console.info('[230MATCH] 5.9.65 · registration counts use one authoritative cur
         repairedKey=key;
         return true;
       }
-      // 5.9.73: 실제 접수 중에는 공개 미러를 자동 삭제하지 않는다.
-      // 공개에는 있고 관리자 원본에는 없는 행이 실제 신청일 가능성을 배제할 수 없으므로 진단만 남긴다.
+      // 5.9.74 SAFETY: 실제 접수 중에는 공개 참가현황 미러를 자동 삭제하지 않는다.
+      // private/public 불일치는 진단만 하고 어떠한 registration 문서도 수정/삭제하지 않는다.
       for(const row of orphans){
-        console.warn('[5.9.73] 공개/원본 불일치 감지 · 자동삭제 안 함',row.teamName||row.id,row.id);
+        console.warn('[5.9.74] 공개/관리자 참가신청 불일치 감지 · 자동정리 중단',row.teamName||row.id,row.id);
       }
-      publicRegistrationReady=true;
       repairedKey=key;
       return true;
     }catch(error){
@@ -17855,104 +17854,66 @@ console.info('[230MATCH] 5.9.65 · registration counts use one authoritative cur
 })();
 
 
-/* 230MATCH 5.9.73 · 관리자 참가신청 서버 원본 강제 최신화 + 공개/원본 차이 진단 (READ-ONLY)
-   - 현재 대회 matchRegistrationsV1을 getDocs로 직접 재조회해 stale listener 상태를 교정한다.
-   - 참가신청/입금/팀/예선/본선 데이터에는 쓰지 않는다.
-   - 공개 미러와 원본 차이는 삭제하지 않고 관리자에게만 표시한다. */
-(function stage5973CanonicalRegistrationRefresh(){
+/* 230MATCH 5.9.74 · 참가신청 정합성 안전모드
+   - 5.9.71의 공개 미러 자동삭제를 완전히 중단한다.
+   - 관리자/공개 데이터는 각각 기존 소스를 유지하며 서로 덮어쓰지 않는다.
+   - 차이는 READ-ONLY 진단만 수행한다. */
+(function stage5974RegistrationIntegritySafeMode(){
   let running=false;
-  let lastRunAt=0;
-  const MIN_GAP=3500;
-
-  function activeRows5973(rows){
-    return (rows||[]).filter(r=>String(r?.recordType||'')!=='operator_request');
+  let lastSig='';
+  function esc(v){try{return portalEscape(String(v??''));}catch(_e){return String(v??'').replace(/[&<>\"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[m]||m));}}
+  function approvedCurrentPrivate(rows){
+    return (rows||[]).filter(r=>String(r?.recordType||'')!=='operator_request' && r?.status==='approved' && (()=>{try{return registrationBelongsToCurrentDivision(r);}catch(_e){return false;}})());
   }
-  function currentRows5973(rows){
-    return activeRows5973(rows).filter(r=>{
-      try{return registrationBelongsToCurrentDivision(r);}catch(_e){return false;}
-    });
+  function approvedCurrentPublic(rows){
+    return (rows||[]).filter(r=>r?.status==='approved' && (()=>{try{return publicRegistrationBelongsToCurrentDivision(r);}catch(_e){return false;}})());
   }
-  function keyset5973(rows){return new Set((rows||[]).map(r=>String(r?.id||'')).filter(Boolean));}
-
-  function installMismatchBanner5973(info){
+  function teamLabel(r){return String(r?.teamName||r?.displayName||r?.pairName||r?.names||r?.id||'').trim();}
+  function ids(rows){return new Set((rows||[]).map(r=>String(r?.id||'')).filter(Boolean));}
+  function show(info){
     try{
-      const host=document.querySelector('#view-entry .entry-admin-toolbar')||document.getElementById('entryAdminList')?.parentElement;
-      if(!host)return;
-      let el=document.getElementById('stage5973RegistrationIntegrityBanner');
+      const root=document.getElementById('view-entry')||document.body;
+      let el=document.getElementById('stage5974IntegrityNotice');
+      if(!info?.mismatch){ if(el) el.remove(); return; }
+      if(!currentAuthUser || !canOperate()){ if(el) el.remove(); return; }
       if(!el){
-        el=document.createElement('div');
-        el.id='stage5973RegistrationIntegrityBanner';
-        el.style.cssText='margin:8px 0;padding:9px 12px;border-radius:10px;font-size:.76rem;font-weight:800;line-height:1.5;border:1px solid #fdba74;background:#fff7ed;color:#9a3412;';
-        host.insertAdjacentElement('afterend',el);
+        el=document.createElement('div'); el.id='stage5974IntegrityNotice';
+        el.style.cssText='margin:10px 18px;padding:10px 12px;border:1px solid #f59e0b;border-radius:12px;background:#fff7ed;color:#92400e;font-size:.78rem;line-height:1.55;font-weight:700;';
+        const host=document.querySelector('#view-entry .entry-admin-toolbar')||document.querySelector('#view-entry .portal-section')||root.firstElementChild;
+        if(host?.parentNode) host.parentNode.insertBefore(el,host.nextSibling); else root.prepend(el);
       }
-      if(!info||!info.mismatch){el.remove();return;}
-      const names=(info.publicOnly||[]).map(r=>String(r?.teamName||r?.id||'')).filter(Boolean);
-      const pnames=(info.privateOnly||[]).map(r=>String(r?.teamName||r?.id||'')).filter(Boolean);
-      el.innerHTML=`⚠️ 참가신청 데이터 차이 확인 · 관리자 원본 <b>${info.privateCount}팀</b> / 공개 현황 <b>${info.publicCount}팀</b>${names.length?`<br>공개에만 표시: ${names.map(portalEscape).join(', ')}`:''}${pnames.length?`<br>원본에만 표시: ${pnames.map(portalEscape).join(', ')}`:''}<br><span style="font-weight:600">자동 삭제하지 않습니다. 원본을 다시 확인한 뒤 처리합니다.</span>`;
+      const a=(info.publicOnly||[]).map(teamLabel).filter(Boolean);
+      const b=(info.privateOnly||[]).map(teamLabel).filter(Boolean);
+      el.innerHTML=`⚠️ 참가신청 원본과 공개현황이 다릅니다. 관리자 ${info.privateCount}팀 / 공개 ${info.publicCount}팀`+
+        `${a.length?`<br>공개에만 있음: <b>${a.map(esc).join(', ')}</b>`:''}`+
+        `${b.length?`<br>관리자에만 있음: <b>${b.map(esc).join(', ')}</b>`:''}`+
+        `<br><span style="font-weight:600">안전모드: 자동 삭제·복사·덮어쓰기를 하지 않습니다.</span>`;
     }catch(_e){}
   }
-
-  async function refresh5973({force=false}={}){
+  async function diagnose(){
+    if(running||!currentAuthUser||!canOperate())return;
+    running=true;
     try{
-      if(running||!currentAuthUser||!canOperate())return false;
-      const now=Date.now();if(!force&&now-lastRunAt<MIN_GAP)return false;
-      const ctx=registrationContext?.();
-      const tid=String(ctx?.tournamentId||'');if(!tid)return false;
-      running=true;lastRunAt=now;
       const rt=await registrationRuntime();
-      if(typeof rt?.api?.getDocs!=='function')return false;
-      const privateQ=rt.api.query(rt.api.collection(rt.db,REGISTRATION_COLLECTION),rt.api.where('tournamentId','==',tid));
-      const publicQ=rt.api.query(rt.api.collection(rt.db,PUBLIC_REGISTRATION_COLLECTION),rt.api.where('tournamentId','==',tid));
-      const [privateSnap,publicSnap]=await Promise.all([rt.api.getDocs(privateQ),rt.api.getDocs(publicQ)]);
-      if(privateSnap?.metadata?.fromCache===true){
-        console.warn('[5.9.73] 관리자 원본 서버 조회가 캐시입니다. 기존 화면을 유지합니다.');
-        return false;
-      }
-      const privateAll=activeRows5973(privateSnap.docs.map(doc=>registrationNormalize({id:doc.id,...doc.data()})));
-      // 서버 직접 조회 결과를 관리자 참가신청 메모리의 기준값으로 사용한다.
-      registrationCloudRows=privateAll;
-      registrationCloudReady=true;
-      try{mirrorRegistrationRowsToCurrentDivision();}catch(_e){}
-      try{renderRegistrationSummaryEverywhere();}catch(_e){}
-      try{if(document.body?.dataset.currentView==='entry')renderApplicationPortal();}catch(_e){}
-      try{if(document.body?.dataset.currentView==='home')renderHomeFast();}catch(_e){}
-      try{renderVisibleDivisionBar?.();}catch(_e){}
-
-      const privateCurrent=currentRows5973(privateAll);
-      const publicAll=publicSnap.docs.map(doc=>({id:doc.id,...doc.data()});
-      const publicCurrent=publicAll.filter(r=>{try{return publicRegistrationBelongsToCurrentDivision(r);}catch(_e){return false;}});
-      // 공개 미러도 서버 응답으로 화면 메모리를 최신화하되 데이터 쓰기는 하지 않는다.
-      if(publicSnap?.metadata?.fromCache!==true){
-        publicRegistrationRows=publicAll;
-        publicRegistrationReady=true;
-      }
-      const privIds=keyset5973(privateCurrent),pubIds=keyset5973(publicCurrent);
-      const publicOnly=publicCurrent.filter(r=>!privIds.has(String(r?.id||'')));
-      const privateOnly=privateCurrent.filter(r=>!pubIds.has(String(r?.id||'')));
-      const info={privateCount:privateCurrent.filter(r=>r.status==='approved').length,publicCount:publicCurrent.filter(r=>r.status==='approved').length,publicOnly,privateOnly};
-      info.mismatch=Boolean(publicOnly.length||privateOnly.length||info.privateCount!==info.publicCount);
-      installMismatchBanner5973(info);
-      if(info.mismatch){
-        console.warn('[5.9.73] 참가신청 공개/관리자 원본 차이',info);
-      }else{
-        console.info(`[5.9.73] 참가신청 서버 원본 확인 완료 · 현재부서 ${info.privateCount}팀`);
-      }
-      return true;
-    }catch(error){
-      console.warn('[5.9.73] 참가신청 서버 원본 강제 최신화 실패',error);
-      return false;
-    }finally{running=false;}
+      const ctx=registrationContext?.(); const tid=String(ctx?.tournamentId||''); if(!tid)return;
+      if(typeof rt?.api?.getDocs!=='function')return;
+      const pq=rt.api.query(rt.api.collection(rt.db,REGISTRATION_COLLECTION),rt.api.where('tournamentId','==',tid));
+      const uq=rt.api.query(rt.api.collection(rt.db,PUBLIC_REGISTRATION_COLLECTION),rt.api.where('tournamentId','==',tid));
+      const [ps,us]=await Promise.all([rt.api.getDocs(pq),rt.api.getDocs(uq)]);
+      const priv=approvedCurrentPrivate(ps.docs.map(d=>registrationNormalize({id:d.id,...d.data()})));
+      const pub=approvedCurrentPublic(us.docs.map(d=>({id:d.id,...d.data()})));
+      const pi=ids(priv),ui=ids(pub);
+      const info={privateCount:priv.length,publicCount:pub.length,publicOnly:pub.filter(r=>!pi.has(String(r?.id||''))),privateOnly:priv.filter(r=>!ui.has(String(r?.id||'')))};
+      info.mismatch=!!(info.privateCount!==info.publicCount||info.publicOnly.length||info.privateOnly.length);
+      const sig=JSON.stringify([info.privateCount,info.publicCount,info.publicOnly.map(r=>r.id),info.privateOnly.map(r=>r.id)]);
+      if(sig!==lastSig){lastSig=sig; if(info.mismatch)console.warn('[5.9.74] 참가신청 정합성 차이 · 진단만 수행',info); else console.info('[5.9.74] 참가신청 정합성 정상',info.privateCount);}
+      show(info);
+    }catch(e){console.warn('[5.9.74] 참가신청 정합성 진단 실패',e);}finally{running=false;}
   }
-
-  window.stage5973RefreshCanonicalRegistration=refresh5973;
-  const schedule=()=>{
-    setTimeout(()=>void refresh5973({force:true}),1200);
-    setTimeout(()=>void refresh5973({force:true}),5200);
-  };
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',schedule,{once:true});else schedule();
-  window.addEventListener('pageshow',()=>setTimeout(()=>void refresh5973({force:true}),1500));
-  document.addEventListener('click',e=>{
-    if(e.target?.closest?.('[data-view="entry"],[data-portal-go="entry"],[data-v6003-go="entry"]'))setTimeout(()=>void refresh5973({force:true}),500);
-  },true);
-  console.info('[230MATCH] 5.9.73 ready · admin registration server refresh + mismatch diagnostics; no registration writes');
+  window.stage5974DiagnoseRegistration=diagnose;
+  const kick=()=>{setTimeout(diagnose,1500);setTimeout(diagnose,7000);};
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',kick,{once:true}); else kick();
+  window.addEventListener('pageshow',()=>setTimeout(diagnose,1800));
+  document.addEventListener('click',e=>{if(e.target?.closest?.('[data-view="entry"],[data-portal-go="entry"],[data-v6003-go="entry"]'))setTimeout(diagnose,700);},true);
+  console.info('[230MATCH] 5.9.74 ready · registration integrity safe mode; no auto delete/copy/overwrite');
 })();
