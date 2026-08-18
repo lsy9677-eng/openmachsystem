@@ -17779,81 +17779,6 @@ console.info('[230MATCH] 5.9.65 · registration counts use one authoritative cur
   console.info('[230MATCH] 5.9.71 ready · canonical registration/public mirror consistency + admin SMS 3-attempt retry; operational match data untouched');
 })();
 
-/* 230MATCH 5.9.72 · mobile header logo crop fix (UI-only) */
-(function stage5972MobileHeaderLogoFix(){
-  const STYLE_ID='stage5972MobileHeaderLogoFixStyle';
-  function installStyle(){
-    if(document.getElementById(STYLE_ID)) return;
-    const style=document.createElement('style');
-    style.id=STYLE_ID;
-    style.textContent=`
-      @media (max-width:720px){
-        .app-header .logo,
-        .app-header .brand,
-        .app-header .header-brand{
-          min-width:0!important;
-          overflow:visible!important;
-        }
-        .app-header .header-brand-icon,
-        .app-header .brand-mark img,
-        .app-header .brand-logo,
-        .app-header img[alt="230MATCH"]{
-          width:44px!important;
-          height:44px!important;
-          min-width:44px!important;
-          min-height:44px!important;
-          max-width:44px!important;
-          max-height:44px!important;
-          flex:0 0 44px!important;
-          object-fit:contain!important;
-          object-position:center!important;
-          display:block!important;
-          overflow:visible!important;
-        }
-        .app-header .logo-text,
-        .app-header .brand-copy{
-          min-width:0!important;
-          flex:1 1 auto!important;
-        }
-      }
-      @media (max-width:420px){
-        .app-header .header-brand-icon,
-        .app-header .brand-mark img,
-        .app-header .brand-logo,
-        .app-header img[alt="230MATCH"]{
-          width:42px!important;
-          height:42px!important;
-          min-width:42px!important;
-          min-height:42px!important;
-          max-width:42px!important;
-          max-height:42px!important;
-          flex-basis:42px!important;
-        }
-      }
-    `;
-    document.head.appendChild(style);
-  }
-  function normalizeLogo(){
-    const imgs=[
-      ...document.querySelectorAll('.app-header .header-brand-icon'),
-      ...document.querySelectorAll('.app-header .brand-mark img'),
-      ...document.querySelectorAll('.app-header .brand-logo'),
-      ...document.querySelectorAll('.app-header img[alt="230MATCH"]')
-    ];
-    [...new Set(imgs)].forEach(img=>{
-      img.style.objectFit='contain';
-      img.style.objectPosition='center';
-      img.style.flexShrink='0';
-    });
-  }
-  function apply(){installStyle();normalizeLogo();}
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(apply,0),{once:true});
-  else setTimeout(apply,0);
-  window.addEventListener('resize',()=>{if(innerWidth<=720) normalizeLogo();},{passive:true});
-  console.info('[230MATCH] 5.9.72 ready · mobile header logo fixed-size contain; UI-only');
-})();
-
-
 /* 230MATCH 5.9.74 · 참가신청 정합성 안전모드
    - 5.9.71의 공개 미러 자동삭제를 완전히 중단한다.
    - 관리자/공개 데이터는 각각 기존 소스를 유지하며 서로 덮어쓰지 않는다.
@@ -17918,114 +17843,10 @@ console.info('[230MATCH] 5.9.65 · registration counts use one authoritative cur
   console.info('[230MATCH] 5.9.74 ready · registration integrity safe mode; no auto delete/copy/overwrite');
 })();
 
-/* 230MATCH 5.9.75 · mobile logo hard reset + one-time missing registration restore
-   - UI: 모바일 헤더 로고를 실제 logo-230.png로 강제 고정한다.
-   - DATA: 제1회 230스포츠미디어배 현재 부서에서 누락된 정원호/김길온 신청만 1회 복구한다.
-   - 마지막 확인 공개명단 기준: 참가 승인 / 입금대기. 전화번호는 확인 근거가 없어 빈값 유지. */
+/* 230MATCH 5.9.75 · one-time missing registration restore
+   - 제1회 230스포츠미디어배 현재 부서에서 누락된 정원호/김길온 신청 복구 로직만 유지.
+   - 헤더 로고는 5.9.78부터 index.html 원본 구조가 담당한다. */
 (function stage5975FastRecovery(){
-  const LOGO_STYLE_ID='stage5975MobileLogoHardReset';
-  function installLogoStyle(){
-    if(document.getElementById(LOGO_STYLE_ID))return;
-    const s=document.createElement('style');
-    s.id=LOGO_STYLE_ID;
-    s.textContent=`
-      @media (max-width:720px){
-        .app-header{overflow:visible!important;}
-        .app-header .header-top{
-          overflow:visible!important;
-          padding-left:14px!important;
-          padding-right:10px!important;
-        }
-        .app-header .logo{
-          display:flex!important;
-          align-items:center!important;
-          gap:9px!important;
-          width:auto!important;
-          min-width:0!important;
-          max-width:none!important;
-          overflow:visible!important;
-          margin:0!important;
-          padding:0!important;
-          transform:none!important;
-          position:relative!important;
-          left:auto!important;
-        }
-        .app-header .logo > img.header-brand-icon,
-        .app-header .logo > img[alt="230MATCH"],
-        .app-header .header-brand-icon{
-          position:static!important;
-          inset:auto!important;
-          left:auto!important;
-          right:auto!important;
-          top:auto!important;
-          bottom:auto!important;
-          transform:none!important;
-          translate:none!important;
-          margin:0!important;
-          padding:0!important;
-          width:42px!important;
-          height:42px!important;
-          min-width:42px!important;
-          min-height:42px!important;
-          max-width:42px!important;
-          max-height:42px!important;
-          flex:0 0 42px!important;
-          display:block!important;
-          object-fit:contain!important;
-          object-position:center!important;
-          overflow:visible!important;
-          clip:auto!important;
-          clip-path:none!important;
-          border-radius:10px!important;
-          box-sizing:border-box!important;
-        }
-        .app-header .logo-text{
-          min-width:0!important;
-          width:auto!important;
-          overflow:visible!important;
-          margin:0!important;
-          transform:none!important;
-        }
-      }
-    `;
-    document.head.appendChild(s);
-  }
-  function hardResetLogo(){
-    try{
-      installLogoStyle();
-      const logo=document.querySelector('.app-header .logo');
-      if(!logo)return;
-      let img=logo.querySelector('img.header-brand-icon, img[alt="230MATCH"]');
-      if(!img){
-        img=document.createElement('img');
-        img.className='header-brand-icon';
-        img.alt='230MATCH';
-        logo.insertBefore(img,logo.firstChild);
-      }
-      const wanted='./logo-230.png?v=5975';
-      if(!String(img.getAttribute('src')||'').includes('logo-230.png')) img.setAttribute('src',wanted);
-      img.onerror=function(){
-        this.onerror=null;
-        this.src='./icon-192.png?v=5975';
-      };
-      ['position','inset','left','right','top','bottom','transform','translate','margin','padding','clip','clip-path'].forEach(k=>{
-        const v=(k==='position')?'static':(k==='transform'||k==='translate')?'none':(k==='clip-path')?'none':(k==='clip')?'auto':(k==='margin'||k==='padding')?'0':'auto';
-        try{img.style.setProperty(k,v,'important');}catch(_e){}
-      });
-      img.style.setProperty('width','42px','important');
-      img.style.setProperty('height','42px','important');
-      img.style.setProperty('min-width','42px','important');
-      img.style.setProperty('min-height','42px','important');
-      img.style.setProperty('max-width','42px','important');
-      img.style.setProperty('max-height','42px','important');
-      img.style.setProperty('object-fit','contain','important');
-      img.style.setProperty('object-position','center','important');
-      logo.style.setProperty('overflow','visible','important');
-      logo.style.setProperty('transform','none','important');
-      logo.style.setProperty('margin','0','important');
-    }catch(e){console.warn('[5.9.75] 모바일 로고 강제복구 실패',e);}
-  }
-
   function normName(v){return String(v||'').replace(/\s+/g,'').replace(/[()]/g,'').toLowerCase();}
   function isTargetTeam(row){
     const text=normName([row?.teamName,row?.displayName,row?.pairName,(row?.players||[]).map(p=>p?.name).join('/')].filter(Boolean).join('/'));
@@ -18097,162 +17918,25 @@ console.info('[230MATCH] 5.9.65 · registration counts use one authoritative cur
   }
 
   function kick(){
-    hardResetLogo();
-    setTimeout(hardResetLogo,500);
-    setTimeout(hardResetLogo,2200);
     setTimeout(()=>void restoreMissingTeam(),1800);
     setTimeout(()=>void restoreMissingTeam(),6500);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',kick,{once:true}); else kick();
-  window.addEventListener('pageshow',()=>{setTimeout(hardResetLogo,300);setTimeout(()=>void restoreMissingTeam(),1500);});
-  window.addEventListener('resize',()=>{if(innerWidth<=720)setTimeout(hardResetLogo,0);},{passive:true});
-  const mo=new MutationObserver(()=>{if(innerWidth<=720)hardResetLogo();});
-  try{mo.observe(document.documentElement,{childList:true,subtree:true});}catch(_e){}
+  window.addEventListener('pageshow',()=>setTimeout(()=>void restoreMissingTeam(),1500));
   window.stage5975RestoreMissingRegistration=restoreMissingTeam;
-  window.stage5975HardResetMobileLogo=hardResetLogo;
-  console.info('[230MATCH] 5.9.75 ready · mobile logo hard reset + one-time missing registration restore');
+  console.info('[230MATCH] 5.9.75 data recovery retained · no runtime logo mutation');
 })();
 
-/* 230MATCH 5.9.76 · mobile brand replacement + recovered applicant self-link
-   - 5.9.75의 14팀 복구 상태는 그대로 유지한다.
-   - 모바일에서는 기존 로고 자식들을 숨기고 독립 브랜드 DOM을 사용한다.
-   - 복구팀 정원호/김길온 중 실제 로그인 회원의 프로필 이름·전화번호·UID만 1회 연결한다.
-   - 관리자/운영자 로그인에서는 계정 자동연결을 하지 않는다. */
-(function stage5976MobileBrandAndRecoveredOwnerLink(){
-  const STYLE_ID='stage5976MobileBrandStyle';
-  const BRAND_CLASS='stage5976-mobile-brand';
-  function installStyle(){
-    if(document.getElementById(STYLE_ID))return;
-    const s=document.createElement('style');
-    s.id=STYLE_ID;
-    s.textContent=`
-      .${BRAND_CLASS}{display:none;}
-      @media (max-width:720px){
-        .app-header .logo > :not(.${BRAND_CLASS}){display:none!important;}
-        .app-header .logo{
-          display:flex!important;align-items:center!important;min-width:0!important;width:auto!important;
-          overflow:visible!important;margin:0!important;padding:0!important;transform:none!important;
-        }
-        .app-header .logo .${BRAND_CLASS}{
-          display:flex!important;align-items:center!important;gap:9px!important;min-width:0!important;
-          margin:0!important;padding:0!important;transform:none!important;overflow:visible!important;
-        }
-        .app-header .logo .${BRAND_CLASS}__icon{
-          width:42px!important;height:42px!important;min-width:42px!important;min-height:42px!important;
-          max-width:42px!important;max-height:42px!important;flex:0 0 42px!important;
-          display:block!important;border-radius:10px!important;
-          background-image:url('./logo-230.png?v=5976')!important;
-          background-repeat:no-repeat!important;background-position:center!important;background-size:contain!important;
-          overflow:hidden!important;box-sizing:border-box!important;
-        }
-        .app-header .logo .${BRAND_CLASS}__copy{
-          display:flex!important;flex-direction:column!important;justify-content:center!important;
-          min-width:0!important;line-height:1.08!important;white-space:nowrap!important;
-        }
-        .app-header .logo .${BRAND_CLASS}__title{
-          color:#fff!important;font-size:16px!important;font-weight:900!important;letter-spacing:-.2px!important;
-        }
-        .app-header .logo .${BRAND_CLASS}__sub{
-          color:#c7d2e5!important;font-size:10px!important;font-weight:600!important;margin-top:4px!important;
-        }
-      }
-      @media (max-width:390px){
-        .app-header .logo .${BRAND_CLASS}__icon{
-          width:40px!important;height:40px!important;min-width:40px!important;min-height:40px!important;
-          max-width:40px!important;max-height:40px!important;flex-basis:40px!important;
-        }
-        .app-header .logo .${BRAND_CLASS}__title{font-size:15px!important;}
-        .app-header .logo .${BRAND_CLASS}__sub{font-size:9px!important;}
-      }
-    `;
-    document.head.appendChild(s);
-  }
-  function installBrand(){
-    try{
-      installStyle();
-      const logo=document.querySelector('.app-header .logo');
-      if(!logo)return;
-      let brand=logo.querySelector('.'+BRAND_CLASS);
-      if(!brand){
-        brand=document.createElement('div');
-        brand.className=BRAND_CLASS;
-        brand.innerHTML=`<span class="${BRAND_CLASS}__icon" aria-hidden="true"></span><span class="${BRAND_CLASS}__copy"><strong class="${BRAND_CLASS}__title">230MATCH</strong><span class="${BRAND_CLASS}__sub">테니스 시합관리</span></span>`;
-        logo.appendChild(brand);
-      }
-    }catch(e){console.warn('[5.9.76] 모바일 브랜드 교체 실패',e);}
-  }
-
-  const digits=v=>String(v||'').replace(/\D/g,'');
-  const cleanName=v=>String(v||'').replace(/\s+/g,'').replace(/[()]/g,'').toLowerCase();
-  function isRecoveredTarget(row){
-    const text=cleanName([row?.teamName,row?.displayName,row?.pairName,(row?.players||[]).map(p=>p?.name).join('/')].filter(Boolean).join('/'));
-    return text.includes('정원호')&&text.includes('김길온');
-  }
-  let linking=false;
-  async function selfLinkRecovered(){
-    if(linking||!currentAuthUser)return false;
-    try{if(canOperate())return false;}catch(_e){}
-    const profile=(typeof v3252ProfileDefaults==='function'?v3252ProfileDefaults():{name:'',phone:''})||{};
-    const myName=cleanName(profile.name||currentAuthUser?.appProfile?.name||currentAuthUser?.displayName||'');
-    if(!['정원호','김길온'].includes(myName))return false;
-    const myPhone=digits(profile.phone||currentAuthUser?.appProfile?.phone||currentAuthUser?.appProfile?.mobile||'');
-    const uid=String(currentAuthUser.uid||'');
-    if(!uid)return false;
-    const rows=[...(registrationCloudRows||[]),...(state?.portal?.applications||[])];
-    const row=rows.find(isRecoveredTarget);
-    if(!row)return false;
-    const currentOwner=String(row.ownerUid||'');
-    const placeholder=!currentOwner||currentOwner==='recovered-missing-registration-5975'||currentOwner.startsWith('recovered-');
-    const ps=(row.players||[]).map(p=>({...p}));
-    let changed=false;
-    ps.forEach(p=>{
-      if(cleanName(p?.name)===myName&&myPhone&&digits(p?.phone)!==myPhone){p.phone=myPhone;changed=true;}
-    });
-    const next={...row,players:ps,updatedAt:new Date().toISOString(),recoveryLinkedAt:new Date().toISOString()};
-    if(placeholder){next.ownerUid=uid;changed=true;}
-    if(cleanName(next.representativeName)===myName&&myPhone&&digits(next.phone)!==myPhone){next.phone=myPhone;changed=true;}
-    if(!changed)return true;
-    linking=true;
-    try{
-      const saved=await saveRegistrationCloud(next);
-      try{
-        const i=(state?.portal?.applications||[]).findIndex(r=>String(r?.id)===String(saved?.id||row.id));
-        if(i>=0)state.portal.applications[i]=saved;
-      }catch(_e){}
-      console.info('[5.9.76] 복구 참가신청 계정 연결 완료',myName,{uidLinked:placeholder,phoneLinked:!!myPhone});
-      try{notice?.('복구된 참가신청이 현재 로그인 계정과 연결되었습니다.','success');}catch(_e){}
-      try{renderApplicationPortal?.();}catch(_e){}
-      return true;
-    }catch(e){
-      console.warn('[5.9.76] 복구 참가신청 계정 연결 실패',e);
-      return false;
-    }finally{linking=false;}
-  }
-  function kick(){
-    installBrand();
-    setTimeout(installBrand,300);setTimeout(installBrand,1500);setTimeout(installBrand,4000);
-    setTimeout(()=>void selfLinkRecovered(),1800);setTimeout(()=>void selfLinkRecovered(),6500);
-  }
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',kick,{once:true});else kick();
-  window.addEventListener('pageshow',()=>{setTimeout(installBrand,200);setTimeout(()=>void selfLinkRecovered(),1400);});
-  window.addEventListener('resize',()=>{if(innerWidth<=720)setTimeout(installBrand,0);},{passive:true});
-  window.stage5976InstallMobileBrand=installBrand;
-  window.stage5976SelfLinkRecoveredRegistration=selfLinkRecovered;
-  console.info('[230MATCH] 5.9.76 ready · isolated mobile brand + recovered applicant self-link');
-})();
-
-
-/* 230MATCH 5.9.77 · exact recovered-account repair + definitive mobile brand replacement
-   - 사용자 Firebase users에서 확인한 실제 UID/전화번호로 복구팀 1건만 정확히 연결한다.
+/* 230MATCH 5.9.77 · exact recovered-account repair
+   - Firebase users에서 확인한 실제 UID/전화번호로 복구팀 1건만 정확히 연결한다.
    - 대표 ownerUid는 정원호 네이버 계정으로 고정하고 두 선수 전화번호를 복원한다.
    - 현재 참가팀 객체가 존재할 때는 해당 팀의 owner/contact 메타만 동기화한다.
-   - 모바일 브랜드 영역은 기존 자식을 통째로 교체해 잔존 brand-mark/pseudo 표시를 제거한다. */
+   - 헤더 로고는 5.9.78부터 index.html 원본 구조에서 처리한다. */
 (function stage5977ExactRecoveryAndMobileBrand(){
   const WON_UID='naver:9D2DVbPRpdmEONjfKEHKrsZJMEBuM8XmiGxSzyqm-5A';
   const WON_PHONE='01099922850';
   const KIM_UID='kakao:4931528330';
   const KIM_PHONE='01075207917';
-  const MOBILE_STYLE='stage5977MobileBrandHardStyle';
   const norm=v=>String(v||'').replace(/\s+/g,'').replace(/[()]/g,'').toLowerCase();
   const digits=v=>String(v||'').replace(/\D/g,'');
   function isTarget(row){
@@ -18264,57 +17948,6 @@ console.info('[230MATCH] 5.9.65 · registration counts use one authoritative cur
     try{return registrationBelongsToCurrentDivision(row);}catch(_e){return true;}
   }
 
-  function installMobileStyle(){
-    if(document.getElementById(MOBILE_STYLE))return;
-    const s=document.createElement('style');
-    s.id=MOBILE_STYLE;
-    s.textContent=`
-      @media(max-width:720px){
-        .app-header .logo::before,.app-header .logo::after{content:none!important;display:none!important;}
-        .app-header .logo{
-          display:flex!important;align-items:center!important;gap:9px!important;
-          min-width:150px!important;width:auto!important;height:48px!important;
-          margin:0!important;padding:0!important;overflow:visible!important;
-          position:relative!important;left:auto!important;right:auto!important;top:auto!important;
-          transform:none!important;white-space:nowrap!important;
-        }
-        .app-header .logo .stage5977-brand{
-          display:flex!important;align-items:center!important;gap:9px!important;
-          min-width:0!important;margin:0!important;padding:0!important;overflow:visible!important;
-        }
-        .app-header .logo .stage5977-brand-logo{
-          display:block!important;width:42px!important;height:42px!important;
-          min-width:42px!important;max-width:42px!important;min-height:42px!important;max-height:42px!important;
-          flex:0 0 42px!important;object-fit:contain!important;object-position:center!important;
-          margin:0!important;padding:0!important;position:static!important;transform:none!important;
-          border:0!important;border-radius:10px!important;clip:auto!important;clip-path:none!important;
-        }
-        .app-header .logo .stage5977-brand-copy{display:flex!important;flex-direction:column!important;justify-content:center!important;line-height:1.05!important;min-width:0!important;}
-        .app-header .logo .stage5977-brand-title{display:block!important;color:#fff!important;font-size:16px!important;font-weight:900!important;letter-spacing:-.25px!important;line-height:1.1!important;}
-        .app-header .logo .stage5977-brand-sub{display:block!important;color:#cbd5e1!important;font-size:10px!important;font-weight:600!important;margin-top:4px!important;line-height:1!important;}
-      }
-      @media(max-width:390px){
-        .app-header .logo{min-width:142px!important;height:46px!important;gap:8px!important;}
-        .app-header .logo .stage5977-brand-logo{width:40px!important;height:40px!important;min-width:40px!important;max-width:40px!important;min-height:40px!important;max-height:40px!important;flex-basis:40px!important;}
-        .app-header .logo .stage5977-brand-title{font-size:15px!important;}
-        .app-header .logo .stage5977-brand-sub{font-size:9px!important;}
-      }
-    `;
-    document.head.appendChild(s);
-  }
-  function replaceMobileBrand(){
-    try{
-      if(window.innerWidth>720)return;
-      installMobileStyle();
-      const logo=document.querySelector('.app-header .logo');
-      if(!logo)return;
-      if(logo.dataset.stage5977==='1' && logo.querySelector('.stage5977-brand'))return;
-      logo.innerHTML=`<div class="stage5977-brand"><img class="stage5977-brand-logo" src="/logo-230.png?v=5977" alt="230MATCH"><span class="stage5977-brand-copy"><strong class="stage5977-brand-title">230MATCH</strong><span class="stage5977-brand-sub">테니스 시합관리</span></span></div>`;
-      const img=logo.querySelector('.stage5977-brand-logo');
-      if(img)img.onerror=function(){this.onerror=null;this.src='/icon-192.png?v=5977';};
-      logo.dataset.stage5977='1';
-    }catch(e){console.warn('[5.9.77] 모바일 브랜드 교체 실패',e);}
-  }
 
   let repairing=false;
   async function exactRepair(){
@@ -18373,16 +18006,15 @@ console.info('[230MATCH] 5.9.65 · registration counts use one authoritative cur
   }
 
   function kick(){
-    replaceMobileBrand();
-    [250,900,2200,5000].forEach(ms=>setTimeout(replaceMobileBrand,ms));
     [1600,4500,9000].forEach(ms=>setTimeout(()=>void exactRepair(),ms));
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',kick,{once:true});else kick();
-  window.addEventListener('pageshow',()=>{setTimeout(replaceMobileBrand,100);setTimeout(()=>void exactRepair(),1200);});
-  window.addEventListener('resize',()=>{if(innerWidth<=720)setTimeout(replaceMobileBrand,0);},{passive:true});
-  const mo=new MutationObserver(()=>{if(innerWidth<=720)setTimeout(replaceMobileBrand,0);});
-  try{mo.observe(document.documentElement,{childList:true,subtree:true});}catch(_e){}
+  window.addEventListener('pageshow',()=>setTimeout(()=>void exactRepair(),1200));
   window.stage5977ExactRecoveredRegistrationRepair=exactRepair;
-  window.stage5977ReplaceMobileBrand=replaceMobileBrand;
-  console.info('[230MATCH] 5.9.77 ready · exact recovered account/phone repair + definitive mobile brand replacement');
+  console.info('[230MATCH] 5.9.77 exact account/phone repair retained · no runtime logo mutation');
 })();
+
+
+/* 230MATCH 5.9.78 · original header ownership
+   헤더/로고는 index.html 원본 DOM/CSS에서만 관리하며 app.js는 로고 DOM을 변경하지 않는다. */
+console.info('[230MATCH] 5.9.78 ready · original index header logo; runtime logo patches removed');

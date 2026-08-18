@@ -2556,39 +2556,55 @@ svg.stage7154-bracket-connectors path.stage5938-winner-path{
 </style>
 
 
-<style id="stage5955UseExistingLogo230">
-/* 5.9.55 · GitHub 기존 logo-230.png 사용 */
-.brand{display:flex!important;align-items:center!important;gap:12px!important;}
-.brand .brand-mark{
-  width:48px!important;
-  min-width:48px!important;
-  height:48px!important;
-  border-radius:12px!important;
-  overflow:hidden!important;
-  display:flex!important;
-  align-items:center!important;
-  justify-content:center!important;
-  padding:0!important;
-  background:transparent!important;
-  border:0!important;
-  box-shadow:0 4px 14px rgba(15,23,42,.18)!important;
+<style id="baseHeaderBrandLogoFix">
+/* 230MATCH 5.9.78 — 원본 헤더 브랜드 구조 정리
+   런타임 JS 교체 없이 index.html 자체에서 앱 아이콘을 사용한다. */
+.topbar .brand{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-width:0;
 }
-.brand .brand-mark img{
-  width:100%!important;
-  height:100%!important;
-  display:block!important;
-  object-fit:cover!important;
-  border-radius:12px!important;
+.topbar .brand > .brand-mark.brand-logo-img{
+  display:block !important;
+  width:44px !important;
+  height:44px !important;
+  min-width:44px !important;
+  min-height:44px !important;
+  max-width:44px !important;
+  max-height:44px !important;
+  flex:0 0 44px !important;
+  padding:0 !important;
+  margin:0 !important;
+  object-fit:contain !important;
+  object-position:center !important;
+  border-radius:12px !important;
+  overflow:hidden !important;
+  line-height:0 !important;
+  font-size:0 !important;
+  text-indent:-9999px !important;
+  box-sizing:border-box !important;
+  background:#10264a !important;
 }
-@media (max-width:700px){
-  .brand{gap:10px!important;}
-  .brand .brand-mark{
-    width:42px!important;
-    min-width:42px!important;
-    height:42px!important;
-    border-radius:10px!important;
+.topbar .brand > .brand-mark.brand-logo-img::before,
+.topbar .brand > .brand-mark.brand-logo-img::after{
+  content:none !important;
+  display:none !important;
+}
+.topbar .brand > div{
+  min-width:0;
+}
+@media(max-width:720px){
+  .topbar .brand{gap:9px !important;}
+  .topbar .brand > .brand-mark.brand-logo-img{
+    width:40px !important;
+    height:40px !important;
+    min-width:40px !important;
+    min-height:40px !important;
+    max-width:40px !important;
+    max-height:40px !important;
+    flex-basis:40px !important;
   }
-  .brand .brand-mark img{border-radius:10px!important;}
 }
 </style>
 
@@ -2596,7 +2612,7 @@ svg.stage7154-bracket-connectors path.stage5938-winner-path{
 <body>
   <header class="topbar">
     <div class="brand">
-      <div class="brand-mark"><img src="./logo-230.png" alt="230MATCH 로고"></div>
+      <img class="brand-mark brand-logo-img" src="./icon-192.png?v=59780" alt="230MATCH">
       <div>
         <strong>230MATCH</strong>
         <span>테니스 시합관리</span>
@@ -4639,7 +4655,7 @@ svg.stage7154-bracket-connectors path.stage5938-winner-path{
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=59570"></script>
+  <script type="module" src="./assets/js/app.js?v=59780"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
