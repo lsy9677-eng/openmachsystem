@@ -8873,6 +8873,31 @@ document.addEventListener('DOMContentLoaded',()=>setTimeout(bindEntrySmsDialog,0
 
 // Stage 32.5.2 · member profile, SMS target, delete request
 function v3252ProfileDefaults(){const p=currentAuthUser?.appProfile||{};const d=p.registrationDefaults||{};return{name:String(d.name||p.name||currentAuthUser?.displayName||''),club:String(d.club||p.club||p.affiliation||''),phone:String(d.phone||p.phone||p.mobile||'').replace(/\D/g,'')};}
+function v3252ProfileIdentityPairs(){
+  const p=currentAuthUser?.appProfile||{},d=v3252ProfileDefaults();
+  const rows=[{name:d.name,phone:d.phone},...(Array.isArray(p.matchIdentityAliases)?p.matchIdentityAliases:[])];
+  const seen=new Set();
+  return rows.map(x=>({name:String(x?.name||'').trim(),phone:String(x?.phone||'').replace(/\D/g,'')}))
+    .filter(x=>x.name&&x.phone.length>=10)
+    .filter(x=>{const k=`${myMatchNormalize(x.name)}|${x.phone}`;if(seen.has(k))return false;seen.add(k);return true;});
+}
+function v3252TeamIdentityPairs(team){
+  const players=Array.isArray(team?.players)?team.players:[];
+  const phones=Array.isArray(team?.playerPhones)?team.playerPhones:[];
+  const out=players.map((p,i)=>({name:String(p?.name||''),phone:String(p?.phone||phones[i]||'').replace(/\D/g,'')}));
+  [
+    [team?.player1Name,team?.player1Phone],
+    [team?.player2Name,team?.player2Phone],
+    [team?.nameA,team?.player1Phone],
+    [team?.nameB,team?.player2Phone]
+  ].forEach(([name,phone])=>{if(name||phone)out.push({name:String(name||''),phone:String(phone||'').replace(/\D/g,'')});});
+  const seen=new Set();
+  return out.filter(x=>x.name&&x.phone.length>=10).filter(x=>{const k=`${myMatchNormalize(x.name)}|${x.phone}`;if(seen.has(k))return false;seen.add(k);return true;});
+}
+function v3252ExactIdentityMatch(team){
+  const mine=v3252ProfileIdentityPairs(),members=v3252TeamIdentityPairs(team);
+  return mine.some(me=>members.some(p=>myMatchNormalize(p.name)===myMatchNormalize(me.name)&&p.phone===me.phone));
+}
 async function v3252SaveProfile(players,representative){if(!currentAuthUser)return;try{const mine=players.find(p=>myMatchNormalize(p.name)===myMatchNormalize(authUserLabel()))||representative;const rt=await getAuthRuntime();if(!rt?.db||!rt?.user)return;await rt.api.setDoc(rt.api.doc(rt.db,'users',rt.user.uid),{name:mine.name||authUserLabel(),phone:mine.phone||'',club:mine.club||'',registrationDefaults:{name:mine.name||'',phone:mine.phone||'',club:mine.club||''},updatedAt:new Date().toISOString()},{merge:true});currentAuthUser.appProfile={...(currentAuthUser.appProfile||{}),name:mine.name||authUserLabel(),phone:mine.phone||'',club:mine.club||'',registrationDefaults:{name:mine.name||'',phone:mine.phone||'',club:mine.club||''}};}catch(e){console.warn('[32.5.2] profile save failed',e)}}
 function v3252AutofillEntry(){if(!currentAuthUser||entryEditingId)return;const d=v3252ProfileDefaults();[['entryPlayer1Name',d.name],['entryPlayer1Club',d.club],['entryPlayer1Phone',d.phone]].forEach(([id,v])=>{const el=document.getElementById(id);if(el&&!el.value&&v)el.value=v;});}
 function v3252Recipients(item){
@@ -8890,25 +8915,24 @@ function v3252DeleteRequest(id){const item=simpleRegistrationRows().find(a=>a.id
 function v3252AdminDelete(id){if(!requireAdmin('참가 신청 삭제'))return;const item=simpleRegistrationRows().find(a=>a.id===id);if(!item)return;if(!confirm(`${item.teamName} 참가 신청을 최종 삭제할까요?`))return;state.portal.applications=state.portal.applications.filter(a=>a.id!==id);commit(`참가 신청 관리자 삭제 · ${item.teamName}`);renderApplicationPortal();lookupPublicApplication();notice('참가 신청을 삭제했습니다.','success');}
 function v3252AutoMyMatch(){
   if(!currentAuthUser)return;
-  const profile=currentAuthUser.appProfile||{};
-  const phone=String(v3252ProfileDefaults().phone||'').replace(/\D/g,'');
-  const name=myMatchNormalize(profile.name||currentAuthUser.displayName||'');
   const uid=String(currentAuthUser.uid||'');
-  const scored=myMatchUniqueTeams().map(team=>{
-    let score=0;
-    if(uid&&String(team.ownerUid||team.applicationOwnerUid||'')===uid)score+=100;
-    const contact=String(getTeamContact(state,team)?.phone||'').replace(/\D/g,'');
-    const phones=[contact,...(team.playerPhones||[]),...(team.players||[]).map(p=>p?.phone)].map(x=>String(x||'').replace(/\D/g,'')).filter(Boolean);
-    if(phone&&phones.includes(phone))score+=60;
-    const names=[...(team.players||[]).map(p=>p?.name),team.player1Name,team.player2Name,team.nameA,team.nameB].map(myMatchNormalize).filter(Boolean);
-    if(name&&names.includes(name))score+=30;
-    return{team,score};
-  }).filter(x=>x.score>0).sort((a,b)=>b.score-a.score||portalTeam(a.team).localeCompare(portalTeam(b.team),'ko'));
-  if(!scored.length)return;
-  const best=scored[0];
-  const input=document.getElementById('myMatchSearchInput');if(input)input.value=portalTeam(best.team);
-  renderMyMatchTeam(best.team);
-  const guide=document.getElementById('myMatchSearchGuide');if(guide)guide.textContent=scored.length>1?'로그인 정보와 가장 잘 일치하는 본인 팀을 먼저 표시했습니다. 다른 팀은 검색할 수 있습니다.':'로그인 정보와 일치하는 본인 경기를 자동 표시했습니다. 다른 선수·팀도 검색할 수 있습니다.';
+  const teams=myMatchUniqueTeams();
+  const uidMatches=uid?teams.filter(team=>String(team?.ownerUid||team?.applicationOwnerUid||'')===uid):[];
+  const exactMatches=teams.filter(team=>v3252ExactIdentityMatch(team));
+  const ordered=[...uidMatches,...exactMatches].filter((team,index,arr)=>arr.indexOf(team)===index);
+  if(!ordered.length){
+    const guide=document.getElementById('myMatchSearchGuide');
+    if(guide)guide.textContent='로그인한 이름과 전화번호가 모두 일치하는 참가팀이 없습니다. 참가정보를 확인하거나 직접 검색해 주세요.';
+    return;
+  }
+  const team=ordered[0];
+  const input=document.getElementById('myMatchSearchInput');if(input)input.value=portalTeam(team);
+  const choices=document.getElementById('myMatchTeamChoices');if(choices){choices.innerHTML='';choices._teams=[];}
+  renderMyMatchTeam(team);
+  const guide=document.getElementById('myMatchSearchGuide');
+  if(guide)guide.textContent=uidMatches.includes(team)
+    ?'로그인 계정과 연결된 본인 경기를 자동 표시했습니다.'
+    :'회원정보의 이름과 전화번호가 모두 일치하여 본인 경기를 자동 표시했습니다.';
 }
 const v3252OriginalSubmit=submitPublicApplication;submitPublicApplication=function(){const before=(state.portal?.applications||[]).length;const data=entryApplicationPlayersFromForm();const result=v3252OriginalSubmit.apply(this,arguments);if((state.portal?.applications||[]).length>before)v3252SaveProfile(data.players,data.representative);return result;};
 const v3252OriginalEdit=editEntryApplication;
@@ -12215,10 +12239,7 @@ console.info('[230MATCH] 34.4.2 ready · main wait1 refill and shared queue elap
     if(canOperate())return{ok:true,reason:'operator'};
     const uid=String(currentAuthUser.uid||'');
     if(uid&&[team.ownerUid,team.applicationOwnerUid].some(v=>String(v||'')===uid))return{ok:true,reason:'uid'};
-    const profilePhone=normalizePhone(v3252ProfileDefaults().phone);
-    const contactPhone=normalizePhone(getTeamContact(state,team)?.phone);
-    const phones=[contactPhone,...(team.playerPhones||[]),...(team.players||[]).map(p=>p?.phone),team.player1Phone,team.player2Phone].map(normalizePhone).filter(Boolean);
-    if(profilePhone&&phones.includes(profilePhone))return{ok:true,reason:'phone'};
+    try{if(v3252ExactIdentityMatch(team))return{ok:true,reason:'name_phone'};}catch(_e){}
     return{ok:false,reason:'unverified'};
   }
   function matchById(id,isPrelim){return isPrelim?findPrelimMatch(state,id):findMatch(state.draw,id)}
@@ -12462,8 +12483,14 @@ console.info('[230MATCH] 34.4.2 ready · main wait1 refill and shared queue elap
     e.preventDefault();if(!currentAuthUser)return;
     const name=String(document.getElementById('stage3561Name').value||'').trim(),phone=digits(document.getElementById('stage3561Phone').value),club=String(document.getElementById('stage3561Club').value||'').trim(),career=document.getElementById('stage3561Career').value,gender=document.getElementById('stage3561Gender').value,birthYear=document.getElementById('stage3561BirthYear').value;
     if(!name||phone.length<10||!club||!career||!gender||!birthYear||!document.getElementById('stage3561Agree').checked)return notice('필수정보와 개인정보 동의를 모두 확인하세요.','error');
-    const data={name,phone,club,career,gender,birthYear,profileCompleted:true,profileCompletedAt:now(),registrationDefaults:{name,phone,club},updatedAt:now()};
-    try{const rt=await getAuthRuntime();if(!rt?.db||!rt?.user)throw new Error('회원정보 저장소 연결 실패');await rt.api.setDoc(rt.api.doc(rt.db,'users',rt.user.uid),data,{merge:true});currentAuthUser.appProfile={...(currentAuthUser.appProfile||{}),...data};document.getElementById('stage3561ProfileDialog').close();renderAuthStatus();v3252AutofillEntry?.();notice('정식 회원등록이 완료되었습니다.','success');if(document.body?.dataset.currentView==='my-match')setTimeout(v3252AutoMyMatch,100);}catch(err){notice(`회원정보 저장 실패: ${err?.message||err}`,'error')}
+    const prev=currentAuthUser?.appProfile||{},prevDefaults=prev.registrationDefaults||{};
+    const prevName=String(prevDefaults.name||prev.name||currentAuthUser?.displayName||'').trim();
+    const prevPhone=digits(prevDefaults.phone||prev.phone||prev.mobile||'');
+    const aliases=Array.isArray(prev.matchIdentityAliases)?prev.matchIdentityAliases.map(x=>({name:String(x?.name||'').trim(),phone:digits(x?.phone||'')})):[];
+    if(prevName&&prevPhone.length>=10&&(myMatchNormalize(prevName)!==myMatchNormalize(name)||prevPhone!==phone))aliases.unshift({name:prevName,phone:prevPhone});
+    const aliasSeen=new Set(),matchIdentityAliases=aliases.filter(x=>x.name&&x.phone.length>=10).filter(x=>{const k=`${myMatchNormalize(x.name)}|${x.phone}`;if(aliasSeen.has(k))return false;aliasSeen.add(k);return true;}).slice(0,5);
+    const data={name,phone,club,career,gender,birthYear,profileCompleted:true,profileCompletedAt:now(),registrationDefaults:{name,phone,club},matchIdentityAliases,updatedAt:now()};
+    try{const rt=await getAuthRuntime();if(!rt?.db||!rt?.user)throw new Error('회원정보 저장소 연결 실패');await rt.api.setDoc(rt.api.doc(rt.db,'users',rt.user.uid),data,{merge:true});currentAuthUser.appProfile={...(currentAuthUser.appProfile||{}),...data};document.getElementById('stage3561ProfileDialog').close();renderAuthStatus();v3252AutofillEntry?.();notice('회원정보를 저장했습니다. 내 경기 본인확인 정보도 함께 갱신되었습니다.','success');if(document.body?.dataset.currentView==='my-match')setTimeout(v3252AutoMyMatch,100);}catch(err){notice(`회원정보 저장 실패: ${err?.message||err}`,'error')}
   }
   const originalApply=applyAuthenticatedRole;applyAuthenticatedRole=function(user,role='viewer',profile=null){originalApply.apply(this,arguments);if(user)setTimeout(showProfileDialog,250)};
 
@@ -18018,3 +18045,10 @@ console.info('[230MATCH] 5.9.65 · registration counts use one authoritative cur
 /* 230MATCH 5.9.78 · original header ownership
    헤더/로고는 index.html 원본 DOM/CSS에서만 관리하며 app.js는 로고 DOM을 변경하지 않는다. */
 console.info('[230MATCH] 5.9.78 ready · original index header logo; runtime logo patches removed');
+
+
+/* 230MATCH 5.9.79 · exact My Match identity
+   - 자동 내 경기: ownerUid 또는 같은 선수의 이름+전화번호 동시일치만 본인 확정
+   - 회원정보 변경 전 이름+전화번호를 users.matchIdentityAliases에 최대 5개 보존
+   - 참가신청/입금/예선/코트/본선 데이터는 자동 변경하지 않음 */
+console.info('[230MATCH] 5.9.79 ready · exact UID or name+phone My Match identity');
