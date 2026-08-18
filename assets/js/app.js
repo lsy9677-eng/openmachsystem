@@ -17903,13 +17903,24 @@ console.info('[230MATCH] 5.9.65 · registration counts use one authoritative cur
   let lastSig='';
   function esc(v){try{return portalEscape(String(v??''));}catch(_e){return String(v??'').replace(/[&<>\"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[m]||m));}}
   function approvedCurrentPrivate(rows){
-    return (rows||[]).filter(r=>String(r?.recordType||'')!=='operator_request' && r?.status==='approved' && (()=>{try{return registrationBelongsToCurrentDivision(r);}catch(_e){return false;}})());
+    return (rows||[]).filter(r=>
+      String(r?.recordType||'')!=='operator_request' &&
+      r?.trashed!==true && r?.deletedToTrash!==true &&
+      r?.status==='approved' &&
+      (()=>{try{return registrationBelongsToCurrentDivision(r);}catch(_e){return false;}})()
+    );
   }
   function approvedCurrentPublic(rows){
     return (rows||[]).filter(r=>r?.status==='approved' && (()=>{try{return publicRegistrationBelongsToCurrentDivision(r);}catch(_e){return false;}})());
   }
   function teamLabel(r){return String(r?.teamName||r?.displayName||r?.pairName||r?.names||r?.id||'').trim();}
+  function identityKey(r){
+    const names=(Array.isArray(r?.players)?r.players.map(p=>String(p?.name||'').trim()).filter(Boolean):[]);
+    const raw=names.length?names.join('/'):teamLabel(r);
+    return String(raw||'').replace(/\s+/g,'').replace(/[()]/g,'').toLowerCase();
+  }
   function ids(rows){return new Set((rows||[]).map(r=>String(r?.id||'')).filter(Boolean));}
+  function identities(rows){return new Set((rows||[]).map(identityKey).filter(Boolean));}
   function show(info){
     try{
       const root=document.getElementById('view-entry')||document.body;
@@ -17942,8 +17953,13 @@ console.info('[230MATCH] 5.9.65 · registration counts use one authoritative cur
       const [ps,us]=await Promise.all([rt.api.getDocs(pq),rt.api.getDocs(uq)]);
       const priv=approvedCurrentPrivate(ps.docs.map(d=>registrationNormalize({id:d.id,...d.data()})));
       const pub=approvedCurrentPublic(us.docs.map(d=>({id:d.id,...d.data()})));
-      const pi=ids(priv),ui=ids(pub);
-      const info={privateCount:priv.length,publicCount:pub.length,publicOnly:pub.filter(r=>!pi.has(String(r?.id||''))),privateOnly:priv.filter(r=>!ui.has(String(r?.id||'')))};
+      const pi=ids(priv),ui=ids(pub),pk=identities(priv),uk=identities(pub);
+      const info={
+        privateCount:priv.length,
+        publicCount:pub.length,
+        publicOnly:pub.filter(r=>!pi.has(String(r?.id||''))&&!pk.has(identityKey(r))),
+        privateOnly:priv.filter(r=>!ui.has(String(r?.id||''))&&!uk.has(identityKey(r)))
+      };
       info.mismatch=!!(info.privateCount!==info.publicCount||info.publicOnly.length||info.privateOnly.length);
       const sig=JSON.stringify([info.privateCount,info.publicCount,info.publicOnly.map(r=>r.id),info.privateOnly.map(r=>r.id)]);
       if(sig!==lastSig){lastSig=sig; if(info.mismatch)console.warn('[5.9.74] 참가신청 정합성 차이 · 진단만 수행',info); else console.info('[5.9.74] 참가신청 정합성 정상',info.privateCount);}
@@ -18238,4 +18254,106 @@ console.info('[230MATCH] 5.9.79 ready · exact UID or name+phone My Match identi
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(stage5980InstallTrashButton,900),{once:true});
   else setTimeout(stage5980InstallTrashButton,900);
   console.info('[230MATCH] 5.9.80 ready · registration recycle bin / restore / permanent delete');
+})();
+
+
+/* 230MATCH 5.9.81 · canonical registration repair
+   정원호/김길온 복구팀에 한해 공개 문서는 있으나 관리자 원본 문서가 없는 경우에만
+   동일 document id로 matchRegistrationsV1 원본을 1회 재생성한다.
+   기존 정상 신청, 입금, 예선, 코트, 본선은 변경하지 않는다. */
+(function stage5981CanonicalRecoveredRegistrationRepair(){
+  const WON_UID='naver:9D2DVbPRpdmEONjfKEHKrsZJMEBuM8XmiGxSzyqm-5A';
+  const WON_PHONE='01099922850';
+  const KIM_UID='kakao:4931528330';
+  const KIM_PHONE='01075207917';
+  const norm=v=>String(v||'').replace(/\s+/g,'').replace(/[()]/g,'').toLowerCase();
+  function isTarget(r){
+    const names=(Array.isArray(r?.players)?r.players.map(p=>p?.name).filter(Boolean).join('/'):'');
+    const s=norm([r?.teamName,r?.displayName,r?.pairName,names].filter(Boolean).join('/'));
+    return s.includes('정원호')&&s.includes('김길온');
+  }
+  function activeTarget(r){
+    if(!isTarget(r)||r?.trashed===true||r?.deletedToTrash===true||String(r?.status||'')!=='approved')return false;
+    try{return registrationBelongsToCurrentDivision(r);}catch(_e){return false;}
+  }
+  let running=false,done=false;
+  async function repair(){
+    if(running||done||!currentAuthUser)return false;
+    try{if(!canOperate())return false;}catch(_e){return false;}
+    const ctx=registrationContext?.();
+    if(!ctx?.tournamentId)return false;
+    running=true;
+    try{
+      const rt=await registrationRuntime();
+      if(typeof rt?.api?.getDocs!=='function')return false;
+      const pq=rt.api.query(rt.api.collection(rt.db,REGISTRATION_COLLECTION),rt.api.where('tournamentId','==',String(ctx.tournamentId)));
+      const uq=rt.api.query(rt.api.collection(rt.db,PUBLIC_REGISTRATION_COLLECTION),rt.api.where('tournamentId','==',String(ctx.tournamentId)));
+      const [ps,us]=await Promise.all([rt.api.getDocs(pq),rt.api.getDocs(uq)]);
+      const priv=ps.docs.map(d=>registrationNormalize({id:d.id,...d.data()}));
+      const pub=us.docs.map(d=>({id:d.id,...d.data()}));
+      const existing=priv.find(activeTarget);
+      if(existing){done=true;return true;}
+      const publicTarget=pub.find(r=>{
+        if(!isTarget(r)||String(r?.status||'')!=='approved')return false;
+        try{return publicRegistrationBelongsToCurrentDivision(r);}catch(_e){return false;}
+      });
+      if(!publicTarget)return false;
+
+      // Best available recovered source already visible in admin/local state.
+      const source=[...(registrationCloudRows||[]),...(state?.portal?.applications||[])].find(activeTarget)||{};
+      const now=new Date().toISOString();
+      const players=[
+        {name:'정원호',club:String(source?.players?.find?.(p=>norm(p?.name)===norm('정원호'))?.club||'김해불나비/롯데'),phone:WON_PHONE,uid:WON_UID,userUid:WON_UID,memberUid:WON_UID},
+        {name:'김길온',club:String(source?.players?.find?.(p=>norm(p?.name)===norm('김길온'))?.club||'김해불나비'),phone:KIM_PHONE,uid:KIM_UID,userUid:KIM_UID,memberUid:KIM_UID}
+      ];
+      const canonical=registrationNormalize({
+        ...source,
+        ...publicTarget,
+        id:String(publicTarget.id),
+        tournamentId:String(ctx.tournamentId),
+        tournamentName:String(source?.tournamentName||state?.tournament?.name||''),
+        divisionId:String(publicTarget.divisionId||source?.divisionId||ctx.divisionId||''),
+        tournamentDivision:String(publicTarget.divisionName||source?.tournamentDivision||ctx.divisionName||''),
+        teamName:'정원호 / 김길온',
+        affiliation:String(source?.affiliation||'김해불나비/롯데 / 김해불나비'),
+        players,
+        representativeIndex:0,
+        representativeName:'정원호',
+        ownerUid:WON_UID,
+        phone:WON_PHONE,
+        status:'approved',
+        paid:Boolean(source?.paid??publicTarget?.paid),
+        paymentStatus:String(source?.paymentStatus||publicTarget?.paymentStatus||((source?.paid??publicTarget?.paid)?'paid':'unpaid')),
+        createdAt:String(source?.createdAt||publicTarget?.createdAt||'2026-08-18T20:00:00+09:00'),
+        approvedAt:String(source?.approvedAt||source?.createdAt||publicTarget?.createdAt||'2026-08-18T20:00:00+09:00'),
+        trashed:false,
+        deletedToTrash:false,
+        canonicalRepair5981:true,
+        canonicalRepairAt:now,
+        updatedAt:now,
+        adminMemo:String(source?.adminMemo||'5.9.81 공개현황 기준 관리자 원본 정합성 복구')
+      });
+
+      await rt.api.setDoc(rt.api.doc(rt.db,REGISTRATION_COLLECTION,canonical.id),canonical,{merge:true});
+
+      // Refresh only registration snapshots; no match-state writes.
+      const i=registrationCloudRows.findIndex(r=>String(r.id)===String(canonical.id));
+      if(i>=0)registrationCloudRows[i]=canonical; else registrationCloudRows.push(canonical);
+      const li=(state?.portal?.applications||[]).findIndex(r=>isTarget(r));
+      if(li>=0)state.portal.applications[li]=canonical;
+      try{renderApplicationPortal?.();renderRegistrationSummaryEverywhere?.();}catch(_e){}
+      done=true;
+      console.info('[5.9.81] 정원호/김길온 관리자 원본 정합성 복구 완료',canonical.id);
+      setTimeout(()=>void window.stage5974DiagnoseRegistration?.(),500);
+      return true;
+    }catch(e){
+      console.error('[5.9.81] 관리자 원본 정합성 복구 실패',e);
+      return false;
+    }finally{running=false;}
+  }
+  window.stage5981RepairCanonicalRecoveredRegistration=repair;
+  const kick=()=>{setTimeout(()=>void repair(),1600);setTimeout(()=>void repair(),6500);};
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',kick,{once:true});else kick();
+  window.addEventListener('pageshow',()=>setTimeout(()=>void repair(),1800));
+  console.info('[230MATCH] 5.9.81 ready · canonical recovered registration repair + trash-aware integrity diagnostic');
 })();
