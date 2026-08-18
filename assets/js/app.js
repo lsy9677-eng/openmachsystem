@@ -5734,13 +5734,32 @@ function publicRegistrationBelongsToCurrentDivision(row){
 function publicRegistrationRowsForCurrentDivision(){
   return publicRegistrationRows.filter(publicRegistrationBelongsToCurrentDivision);
 }
+function stage5965LocalRegistrationRowsForCurrentDivision(){
+  const ctx=registrationContext();
+  const rows=Array.isArray(state.portal?.applications)?state.portal.applications:[];
+  return rows.filter(row=>{
+    const tid=String(row?.tournamentId||ctx.tournamentId||'');
+    if(tid!==String(ctx.tournamentId||''))return false;
+    const did=String(row?.divisionId||''),dname=String(row?.tournamentDivision||row?.divisionName||'').trim();
+    if(did&&ctx.divisionId&&did===String(ctx.divisionId))return true;
+    if(dname&&ctx.divisionName&&dname===String(ctx.divisionName).trim())return true;
+    if(!did&&(state.multiDivision?.divisions||[]).length<=1)return true;
+    return false;
+  });
+}
+function stage5965RegistrationDisplayRows(){
+  // 5.9.65: 화면 숫자의 원본을 하나로 고정한다.
+  // 관리자/진행자는 비공개 Firebase 현재부서 신청이 기준값이고,
+  // 일반회원은 공개 미러가 기준값이다. 로컬은 연결 전 최초 화면의 임시 fallback일 뿐이다.
+  if(canOperate()&&registrationCloudReady)return registrationRowsForCurrentDivision();
+  if(publicRegistrationReady)return publicRegistrationRowsForCurrentDivision();
+  const local=stage5965LocalRegistrationRowsForCurrentDivision();
+  if(local.length)return local;
+  if(canOperate()&&registrationCloudReady)return registrationRowsForCurrentDivision();
+  return [];
+}
 function registrationPublicSummary(){
-  const publicRows=publicRegistrationReady?publicRegistrationRowsForCurrentDivision():[];
-  const cloudRows=registrationCloudReady?registrationRowsForCurrentDivision():[];
-  const localRows=Array.isArray(state.portal?.applications)?state.portal.applications:[];
-  // 초기 진입 시 공개 미러가 아직 0건이어도 이미 로드된 참가신청을 0/64로 덮지 않습니다.
-  const candidates=[publicRows,cloudRows,localRows].filter(rows=>Array.isArray(rows));
-  const rows=candidates.sort((a,b)=>b.length-a.length)[0]||[];
+  const rows=stage5965RegistrationDisplayRows();
   return {
     rows,
     active:rows.filter(a=>a.status==='approved').length,
@@ -6527,9 +6546,7 @@ function stage5963EnsureSortControls(){
 function renderApplicationPortal(){
   ensurePortalState();void startPublicRegistrationSync();renderEntryTournamentSelect();renderEntryPaymentInfo();renderEntryLoginGate();renderEntrySelfManager();renderEntryFormCollapseState();
   const privateApplications=[...simpleRegistrationRows()];
-  const publicMirror=[...(publicRegistrationReady?publicRegistrationRowsForCurrentDivision():[])];
-  const localApplications=[...(state.portal?.applications||[])];
-  const publicApplications=[publicMirror,privateApplications,localApplications].sort((a,b)=>b.length-a.length)[0]||[];
+  const publicApplications=[...stage5965RegistrationDisplayRows()];
   const applications=canOperate()?privateApplications:publicApplications;
   stage5963EnsureSortControls();
   const approvedBase=applications.filter(a=>a.status==='approved');
@@ -17297,3 +17314,5 @@ renderParticipantManager=function(){
 };
 
 console.info('[230MATCH] 5.9.64 ready · roster UI re-compacted + admin registration SMS fallback checked; live match data untouched');
+
+console.info('[230MATCH] 5.9.65 · registration counts use one authoritative current-division source; no registration or match data writes added');
