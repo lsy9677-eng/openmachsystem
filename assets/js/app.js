@@ -17785,3 +17785,77 @@ console.info('[230MATCH] 5.9.65 · registration counts use one authoritative cur
 
   console.info('[230MATCH] 5.9.71 ready · canonical registration/public mirror consistency + admin SMS 3-attempt retry; operational match data untouched');
 })();
+
+/* 230MATCH 5.9.72 · mobile header logo crop fix (UI-only) */
+(function stage5972MobileHeaderLogoFix(){
+  const STYLE_ID='stage5972MobileHeaderLogoFixStyle';
+  function installStyle(){
+    if(document.getElementById(STYLE_ID)) return;
+    const style=document.createElement('style');
+    style.id=STYLE_ID;
+    style.textContent=`
+      @media (max-width:720px){
+        .app-header .logo,
+        .app-header .brand,
+        .app-header .header-brand{
+          min-width:0!important;
+          overflow:visible!important;
+        }
+        .app-header .header-brand-icon,
+        .app-header .brand-mark img,
+        .app-header .brand-logo,
+        .app-header img[alt="230MATCH"]{
+          width:44px!important;
+          height:44px!important;
+          min-width:44px!important;
+          min-height:44px!important;
+          max-width:44px!important;
+          max-height:44px!important;
+          flex:0 0 44px!important;
+          object-fit:contain!important;
+          object-position:center!important;
+          display:block!important;
+          overflow:visible!important;
+        }
+        .app-header .logo-text,
+        .app-header .brand-copy{
+          min-width:0!important;
+          flex:1 1 auto!important;
+        }
+      }
+      @media (max-width:420px){
+        .app-header .header-brand-icon,
+        .app-header .brand-mark img,
+        .app-header .brand-logo,
+        .app-header img[alt="230MATCH"]{
+          width:42px!important;
+          height:42px!important;
+          min-width:42px!important;
+          min-height:42px!important;
+          max-width:42px!important;
+          max-height:42px!important;
+          flex-basis:42px!important;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+  function normalizeLogo(){
+    const imgs=[
+      ...document.querySelectorAll('.app-header .header-brand-icon'),
+      ...document.querySelectorAll('.app-header .brand-mark img'),
+      ...document.querySelectorAll('.app-header .brand-logo'),
+      ...document.querySelectorAll('.app-header img[alt="230MATCH"]')
+    ];
+    [...new Set(imgs)].forEach(img=>{
+      img.style.objectFit='contain';
+      img.style.objectPosition='center';
+      img.style.flexShrink='0';
+    });
+  }
+  function apply(){installStyle();normalizeLogo();}
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(apply,0),{once:true});
+  else setTimeout(apply,0);
+  window.addEventListener('resize',()=>{if(innerWidth<=720) normalizeLogo();},{passive:true});
+  console.info('[230MATCH] 5.9.72 ready · mobile header logo fixed-size contain; UI-only');
+})();
