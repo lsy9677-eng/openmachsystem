@@ -1706,8 +1706,7 @@ function stage5521RepairMissingCourtStructure(){
     }
     if(!skeleton.length)return {repaired:false,reason:'cannot-build'};
 
-    try{if(!__stage5521CourtRepairPersisted)saveRecovery(state,'5.5.21 코트 구조 복구 직전');}catch(_e){}
-
+    /* 5.9.60: 런타임 self-heal은 운영 복구점으로 남기지 않는다. */
     state.prelim=state.prelim||{};
     state.prelim.courts=skeleton.map((c,index)=>({
       ...c,
@@ -1948,8 +1947,12 @@ function pullSettings(){
 
 function autoRecovery(label){
   try{
-    const critical=/결승|경기 결과|결과 입력|결과 수정|자동배정|초기화|복구|복원|설정 변경|세부정보 수정|공통정보 변경|본선 재추첨|코트배정|대회 시작/.test(String(label||''));
-    saveRecovery(state,`자동 · ${label}`,{kind:critical?'critical-auto':'auto'});
+    const clean=String(label||'상태 변경 직전').trim();
+    const critical=/결승|경기 결과|결과 입력|결과 수정|자동배정|초기화|복구|복원|설정 변경|세부정보 수정|공통정보 변경|본선 재추첨|코트배정|대회 시작/.test(clean);
+    const tournament=String(state.tournament?.name||'현재 대회').trim();
+    const division=String(state.tournament?.division||state.portal?.currentDivisionName||'').trim();
+    const scoped=division?`${tournament} · ${division} · ${clean}`:`${tournament} · ${clean}`;
+    saveRecovery(state,scoped,{kind:critical?'critical-auto':'auto'});
   }catch(error){console.warn('자동 복구점 저장 실패',error);}
 }
 function stage580PlacementAudit(){
@@ -3132,15 +3135,46 @@ function stage5912RecoverySnapshot(stateSnapshot){
     ?`최근 완료 · ${stage5912SnapshotMatchName(latest)}${Number.isFinite(Number(latest.scoreA))&&Number.isFinite(Number(latest.scoreB))?` · ${latest.scoreA}:${latest.scoreB}`:''}`
     :'최근 완료 경기 없음';
 
-  return{teams,completed,totalMain:mainReal.length,playing:playing.length,wait1:wait1.length,shared,placements,latestText,updatedAt:s.updatedAt||''};
+  const prelimMatches=[];
+  if(Array.isArray(s.prelim?.matches))prelimMatches.push(...s.prelim.matches);
+  if(!prelimMatches.length){
+    for(const g of (s.prelim?.groups||[]))for(const m of (g?.matches||[]))if(m)prelimMatches.push(m);
+  }
+  const seenPrelim=new Set();
+  const prelimReal=prelimMatches.filter(m=>{const id=String(m?.id||'');if(!m||!id||seenPrelim.has(id))return false;seenPrelim.add(id);return true;});
+  const prelimCompleted=prelimReal.filter(m=>m.status==='completed'||m.winnerId||m.winner).length;
+  const tournamentName=String(s.tournament?.name||'대회명 없음').trim();
+  const divisionName=String(s.tournament?.division||s.portal?.currentDivisionName||s.currentDivisionName||'부서 없음').trim();
+  let lastAction='';
+  const logs=Array.isArray(s.logs)?s.logs:[];
+  if(logs.length){
+    const last=logs[logs.length-1];
+    if(typeof last==='string')lastAction=last;
+    else if(last&&typeof last==='object')lastAction=String(last.message||last.label||last.text||last.action||last.detail||'');
+  }
+  return{teams,completed,totalMain:mainReal.length,prelimCompleted,totalPrelim:prelimReal.length,playing:playing.length,wait1:wait1.length,shared,placements,latestText,updatedAt:s.updatedAt||'',tournamentName,divisionName,lastAction};
 }
-function stage5912RecoveryPreviewHtml(stateSnapshot){
+function stage5912RecoveryPreviewHtml(stateSnapshot,createdAt=''){
   const x=stage5912RecoverySnapshot(stateSnapshot);
   const esc=typeof escapeHtml==='function'?escapeHtml:(v=>String(v??'').replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch])));
-  const summary=`참가 ${x.teams}팀 · 본선완료 ${x.completed}/${x.totalMain} · 시합중 ${x.playing} · 대기1 ${x.wait1} · 공용대기 ${x.shared}`;
+  const summary=`참가 ${x.teams}팀 · 예선 ${x.prelimCompleted}/${x.totalPrelim} 완료 · 본선 ${x.completed}/${x.totalMain} 완료 · 시합중 ${x.playing} · 대기1 ${x.wait1} · 공용대기 ${x.shared}`;
   const placementHtml=x.placements.length?x.placements.map(v=>`<li>${esc(v)}</li>`).join(''):'<li>코트 배정 경기 없음</li>';
-  const updated=x.updatedAt?`<div class="stage5912-recovery-updated">상태 저장시각 ${new Date(x.updatedAt).toLocaleString('ko-KR')}</div>`:'';
-  return `<div class="stage5912-recovery-summary">${esc(summary)}</div><details class="stage5912-recovery-details"><summary>이 복구점 내용 보기</summary><div>${esc(x.latestText)}</div><ul>${placementHtml}</ul>${updated}</details>`;
+  const created=createdAt?`<div class="stage5960-recovery-time"><b>복구점 생성</b> ${new Date(createdAt).toLocaleString('ko-KR')}</div>`:'';
+  const updated=x.updatedAt?`<div class="stage5912-recovery-updated"><b>상태 최종 변경</b> ${new Date(x.updatedAt).toLocaleString('ko-KR')}</div>`:'';
+  const action=x.lastAction?`<div class="stage5960-recovery-action"><b>직전 작업</b> ${esc(x.lastAction)}</div>`:'';
+  return `<div class="stage5960-recovery-context"><b>${esc(x.tournamentName)}</b><span> · ${esc(x.divisionName)}</span></div>${created}<div class="stage5912-recovery-summary">${esc(summary)}</div>${action}<details class="stage5912-recovery-details"><summary>경기·코트 상세 보기</summary><div>${esc(x.latestText)}</div><ul>${placementHtml}</ul>${updated}</details>`;
+}
+function stage5960RecoveryDisplayLabel(item){
+  const raw=String(item?.label||'이름 없는 복구점').trim();
+  if(/5\.5\.21\s*코트 구조 복구 직전/.test(raw))return '구버전 시스템 보정 · 코트 구조 점검';
+  return raw;
+}
+function stage5960RecoveryKind(item){
+  const raw=String(item?.label||'');
+  if(/5\.5\.21\s*코트 구조 복구 직전/.test(raw))return {text:'구버전 시스템',cls:'legacy-system'};
+  if(item?.kind==='manual')return {text:'수동',cls:'manual'};
+  if(item?.kind==='critical-auto')return {text:'중요 자동',cls:'critical'};
+  return {text:'자동',cls:'auto'};
 }
 
 async function showRecoveries(){
@@ -3148,7 +3182,7 @@ async function showRecoveries(){
   root.innerHTML='<div class="empty-state"><p>로컬 복구점을 불러오는 중입니다.</p></div>';
   $('recoveryDialog').showModal();
   const list=await getRecoveries();
-  root.innerHTML=list.length?list.map(x=>{const kind=x.kind==='manual'?'수동':x.kind==='critical-auto'?'중요 자동':'자동';return `<article class="recovery-item"><div class="stage5912-recovery-main"><b>[${kind}] ${escapeHtml(x.label||'이름 없는 복구점')}</b><small>${new Date(x.createdAt).toLocaleString('ko-KR')} · 이 브라우저 로컬 저장</small>${stage5912RecoveryPreviewHtml(x.state)}</div><button class="btn btn-primary" data-restore="${x.id}">복구</button><button class="btn btn-danger-outline" data-delete="${x.id}">삭제</button></article>`;}).join(''):'<div class="empty-state"><p>저장된 로컬 복구점이 없습니다.</p></div>';
+  root.innerHTML=list.length?list.map(x=>{const kind=stage5960RecoveryKind(x),label=stage5960RecoveryDisplayLabel(x);return `<article class="recovery-item stage5960-recovery-card ${kind.cls}"><div class="stage5912-recovery-main"><b><span class="stage5960-kind">${escapeHtml(kind.text)}</span> ${escapeHtml(label)}</b>${stage5912RecoveryPreviewHtml(x.state,x.createdAt)}</div><button class="btn btn-primary" data-restore="${x.id}">복구</button><button class="btn btn-danger-outline" data-delete="${x.id}">삭제</button></article>`;}).join(''):'<div class="empty-state"><p>저장된 로컬 복구점이 없습니다.</p></div>';
   root.querySelectorAll('[data-restore]').forEach(b=>b.onclick=async()=>{if(!requireAdmin('복구점 복원'))return;const item=await getRecovery(b.dataset.restore);if(!item)return;if(!confirm(`현재 상태를 별도 복구점으로 저장한 뒤 “${item.label}” 상태로 되돌릴까요?`))return;if(!requireTypedConfirmation('복구점 복원','복원'))return;autoRecovery('복구점 복원 직전');state=structuredClone(item.state);commit(`로컬 복구점 복원 · ${item.label}`);$('recoveryDialog').close();});
   root.querySelectorAll('[data-delete]').forEach(b=>b.onclick=async()=>{if(!requireAdmin('복구점 삭제'))return;if(!confirm('선택한 복구점을 삭제할까요? 삭제한 복구점은 되돌릴 수 없습니다.'))return;await deleteRecovery(b.dataset.delete);await showRecoveries();});
 }
@@ -6951,7 +6985,7 @@ async function renderBackupRecoveryManager(){
     const critical=item.kind==='critical-auto'||(!inferredManual&&/결승|경기 결과|결과 입력|결과 수정|자동배정|초기화|복구|복원|설정 변경|세부정보 수정|공통정보 변경|본선 재추첨|코트배정|대회 시작/.test(String(item.label||'')));
     const typeLabel=inferredManual?'수동':critical?'중요 자동':'자동';
     const typeClass=inferredManual?'badge-safe':critical?'badge-warning':'badge-muted';
-    return `<article class="backup-recovery-card"><div><h4><span class="badge ${typeClass}">${typeLabel}</span> ${escapeHtml(item.label||'이름 없는 복구점')}</h4><p>${new Date(item.createdAt).toLocaleString('ko-KR')} · ${escapeHtml(item.state?.tournament?.name||'대회명 없음')} · ${formatBytes(new Blob([JSON.stringify(item.state||{})]).size)}</p>${stage5912RecoveryPreviewHtml(item.state)}</div><div class="button-row"><button type="button" class="btn btn-primary" data-backup-restore="${item.id}">복원</button><button type="button" class="btn btn-light" data-backup-download="${item.id}">파일 저장</button><button type="button" class="btn btn-danger-outline" data-backup-delete="${item.id}">삭제</button></div></article>`;
+    return `<article class="backup-recovery-card"><div><h4><span class="badge ${typeClass}">${typeLabel}</span> ${escapeHtml(item.label||'이름 없는 복구점')}</h4><p>${new Date(item.createdAt).toLocaleString('ko-KR')} · ${escapeHtml(item.state?.tournament?.name||'대회명 없음')} · ${formatBytes(new Blob([JSON.stringify(item.state||{})]).size)}</p>${stage5912RecoveryPreviewHtml(item.state,item.createdAt)}</div><div class="button-row"><button type="button" class="btn btn-primary" data-backup-restore="${item.id}">복원</button><button type="button" class="btn btn-light" data-backup-download="${item.id}">파일 저장</button><button type="button" class="btn btn-danger-outline" data-backup-delete="${item.id}">삭제</button></div></article>`;
   }).join(''):'<div class="portal-empty">저장된 복구점이 없습니다.</div>';
 }
 async function createNamedRecovery(){
@@ -16858,4 +16892,25 @@ console.info('[230MATCH] 5.9.57 · tournamentReadOnly() disabled: found the actu
   window.addEventListener('hashchange',()=>setTimeout(run,250));
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',schedule,{once:true});else schedule();
   console.info('[230MATCH] 5.9.59 ready · Modern Cup data/test-teams-100.json auto-once import, no restore button');
+})();
+
+
+/* 230MATCH 5.9.60 · 복구점 타임라인 가독성 */
+(function stage5960RecoveryTimelineStyle(){
+  if(document.getElementById('stage5960RecoveryTimelineStyle'))return;
+  const style=document.createElement('style');
+  style.id='stage5960RecoveryTimelineStyle';
+  style.textContent=`
+    .stage5960-recovery-card{border-left:5px solid #94a3b8!important}
+    .stage5960-recovery-card.critical{border-left-color:#dc2626!important}
+    .stage5960-recovery-card.manual{border-left-color:#2563eb!important}
+    .stage5960-recovery-card.legacy-system{border-left-color:#cbd5e1!important;opacity:.78}
+    .stage5960-kind{display:inline-flex;align-items:center;padding:3px 8px;margin-right:6px;border-radius:999px;background:#e2e8f0;color:#334155;font-size:.75rem;font-weight:900}
+    .stage5960-recovery-context{margin-top:8px;font-size:.92rem;color:#0f2747}
+    .stage5960-recovery-time,.stage5912-recovery-updated,.stage5960-recovery-action{margin-top:5px;font-size:.82rem;color:#64748b}
+    .stage5960-recovery-action{padding:7px 9px;border-radius:8px;background:#fff7ed;color:#9a3412}
+    .stage5912-recovery-summary{margin-top:8px!important;padding:8px 10px!important;border-radius:9px!important;background:#eff6ff!important;color:#0f3b70!important;font-weight:800!important}
+    .stage5960-recovery-card.legacy-system .stage5960-recovery-action{display:none}
+  `;
+  document.head.appendChild(style);
 })();
