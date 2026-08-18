@@ -17917,3 +17917,198 @@ console.info('[230MATCH] 5.9.65 · registration counts use one authoritative cur
   document.addEventListener('click',e=>{if(e.target?.closest?.('[data-view="entry"],[data-portal-go="entry"],[data-v6003-go="entry"]'))setTimeout(diagnose,700);},true);
   console.info('[230MATCH] 5.9.74 ready · registration integrity safe mode; no auto delete/copy/overwrite');
 })();
+
+/* 230MATCH 5.9.75 · mobile logo hard reset + one-time missing registration restore
+   - UI: 모바일 헤더 로고를 실제 logo-230.png로 강제 고정한다.
+   - DATA: 제1회 230스포츠미디어배 현재 부서에서 누락된 정원호/김길온 신청만 1회 복구한다.
+   - 마지막 확인 공개명단 기준: 참가 승인 / 입금대기. 전화번호는 확인 근거가 없어 빈값 유지. */
+(function stage5975FastRecovery(){
+  const LOGO_STYLE_ID='stage5975MobileLogoHardReset';
+  function installLogoStyle(){
+    if(document.getElementById(LOGO_STYLE_ID))return;
+    const s=document.createElement('style');
+    s.id=LOGO_STYLE_ID;
+    s.textContent=`
+      @media (max-width:720px){
+        .app-header{overflow:visible!important;}
+        .app-header .header-top{
+          overflow:visible!important;
+          padding-left:14px!important;
+          padding-right:10px!important;
+        }
+        .app-header .logo{
+          display:flex!important;
+          align-items:center!important;
+          gap:9px!important;
+          width:auto!important;
+          min-width:0!important;
+          max-width:none!important;
+          overflow:visible!important;
+          margin:0!important;
+          padding:0!important;
+          transform:none!important;
+          position:relative!important;
+          left:auto!important;
+        }
+        .app-header .logo > img.header-brand-icon,
+        .app-header .logo > img[alt="230MATCH"],
+        .app-header .header-brand-icon{
+          position:static!important;
+          inset:auto!important;
+          left:auto!important;
+          right:auto!important;
+          top:auto!important;
+          bottom:auto!important;
+          transform:none!important;
+          translate:none!important;
+          margin:0!important;
+          padding:0!important;
+          width:42px!important;
+          height:42px!important;
+          min-width:42px!important;
+          min-height:42px!important;
+          max-width:42px!important;
+          max-height:42px!important;
+          flex:0 0 42px!important;
+          display:block!important;
+          object-fit:contain!important;
+          object-position:center!important;
+          overflow:visible!important;
+          clip:auto!important;
+          clip-path:none!important;
+          border-radius:10px!important;
+          box-sizing:border-box!important;
+        }
+        .app-header .logo-text{
+          min-width:0!important;
+          width:auto!important;
+          overflow:visible!important;
+          margin:0!important;
+          transform:none!important;
+        }
+      }
+    `;
+    document.head.appendChild(s);
+  }
+  function hardResetLogo(){
+    try{
+      installLogoStyle();
+      const logo=document.querySelector('.app-header .logo');
+      if(!logo)return;
+      let img=logo.querySelector('img.header-brand-icon, img[alt="230MATCH"]');
+      if(!img){
+        img=document.createElement('img');
+        img.className='header-brand-icon';
+        img.alt='230MATCH';
+        logo.insertBefore(img,logo.firstChild);
+      }
+      const wanted='./logo-230.png?v=5975';
+      if(!String(img.getAttribute('src')||'').includes('logo-230.png')) img.setAttribute('src',wanted);
+      img.onerror=function(){
+        this.onerror=null;
+        this.src='./icon-192.png?v=5975';
+      };
+      ['position','inset','left','right','top','bottom','transform','translate','margin','padding','clip','clip-path'].forEach(k=>{
+        const v=(k==='position')?'static':(k==='transform'||k==='translate')?'none':(k==='clip-path')?'none':(k==='clip')?'auto':(k==='margin'||k==='padding')?'0':'auto';
+        try{img.style.setProperty(k,v,'important');}catch(_e){}
+      });
+      img.style.setProperty('width','42px','important');
+      img.style.setProperty('height','42px','important');
+      img.style.setProperty('min-width','42px','important');
+      img.style.setProperty('min-height','42px','important');
+      img.style.setProperty('max-width','42px','important');
+      img.style.setProperty('max-height','42px','important');
+      img.style.setProperty('object-fit','contain','important');
+      img.style.setProperty('object-position','center','important');
+      logo.style.setProperty('overflow','visible','important');
+      logo.style.setProperty('transform','none','important');
+      logo.style.setProperty('margin','0','important');
+    }catch(e){console.warn('[5.9.75] 모바일 로고 강제복구 실패',e);}
+  }
+
+  function normName(v){return String(v||'').replace(/\s+/g,'').replace(/[()]/g,'').toLowerCase();}
+  function isTargetTeam(row){
+    const text=normName([row?.teamName,row?.displayName,row?.pairName,(row?.players||[]).map(p=>p?.name).join('/')].filter(Boolean).join('/'));
+    return text.includes('정원호')&&text.includes('김길온');
+  }
+  function currentTournamentName(){
+    return String(state?.tournament?.name||state?.tournament?.title||state?.multiTournament?.tournaments?.find?.(t=>String(t?.id)===String(registrationContext?.().tournamentId||''))?.name||'');
+  }
+  let restoring=false;
+  async function restoreMissingTeam(){
+    if(restoring)return false;
+    if(!currentAuthUser||!canOperate())return false;
+    const ctx=registrationContext?.();
+    if(!ctx?.tournamentId)return false;
+    const tname=currentTournamentName();
+    if(!/230\s*스포츠\s*미디어배/i.test(tname.replace(/제\s*1회/g,'')) && !String(tname).includes('230스포츠미디어배'))return false;
+    const allPrivate=[...(registrationCloudRows||[]),...(state?.portal?.applications||[])];
+    const allPublic=[...(publicRegistrationRows||[])];
+    if(allPrivate.some(isTargetTeam)||allPublic.some(isTargetTeam))return true;
+    restoring=true;
+    try{
+      const restoredAt=new Date().toISOString();
+      const createdAt='2026-08-18T20:00:00+09:00';
+      const row={
+        id:`recovered-5975-${String(ctx.tournamentId).replace(/[^a-zA-Z0-9_-]/g,'').slice(-24)}-${String(ctx.divisionId||'default').replace(/[^a-zA-Z0-9_-]/g,'').slice(-16)}`,
+        code:'RECOVERED-11',
+        tournamentId:String(ctx.tournamentId),
+        tournamentName:tname,
+        tournamentDivision:String(ctx.divisionName||''),
+        divisionId:String(ctx.divisionId||''),
+        teamName:'정원호 / 김길온',
+        affiliation:'김해불나비/롯데 / 김해불나비',
+        phone:'',
+        memo:'',
+        players:[
+          {name:'정원호',club:'김해불나비/롯데',phone:''},
+          {name:'김길온',club:'김해불나비',phone:''}
+        ],
+        representativeIndex:0,
+        representativeName:'정원호',
+        ownerUid:'recovered-missing-registration-5975',
+        smsTargetMode:'both',
+        status:'approved',
+        paid:false,
+        paymentStatus:'unpaid',
+        createdAt,
+        approvedAt:createdAt,
+        updatedAt:restoredAt,
+        adminMemo:'5.9.75 누락 참가신청 복원 · 기존 공개명단 기준 · 연락처 확인 필요',
+        recoverySource:'public_roster_screenshot_2026-08-18',
+        recoveredAt:restoredAt
+      };
+      const saved=await saveRegistrationCloud(row);
+      if(!(state?.portal?.applications||[]).some(r=>String(r?.id)===String(saved?.id))){
+        state.portal.applications.unshift(saved);
+      }
+      try{renderApplicationPortal?.();}catch(_e){}
+      try{renderRegistrationSummaryEverywhere?.();}catch(_e){}
+      try{window.__updateTodayTournamentDashboard?.();}catch(_e){}
+      try{renderHomeFast?.();}catch(_e){}
+      try{localStorage.setItem(`230match:5975:recovered:${ctx.tournamentId}:${ctx.divisionId}`,'1');}catch(_e){}
+      console.warn('[5.9.75] 누락 참가팀 복원 완료 · 정원호 / 김길온 · 입금대기 · 연락처 확인 필요');
+      try{notice?.('누락 참가팀 정원호 / 김길온을 복원했습니다. 연락처는 참가접수에서 확인·수정해 주세요.','success');}catch(_e){}
+      return true;
+    }catch(e){
+      console.error('[5.9.75] 누락 참가팀 복원 실패',e);
+      return false;
+    }finally{restoring=false;}
+  }
+
+  function kick(){
+    hardResetLogo();
+    setTimeout(hardResetLogo,500);
+    setTimeout(hardResetLogo,2200);
+    setTimeout(()=>void restoreMissingTeam(),1800);
+    setTimeout(()=>void restoreMissingTeam(),6500);
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',kick,{once:true}); else kick();
+  window.addEventListener('pageshow',()=>{setTimeout(hardResetLogo,300);setTimeout(()=>void restoreMissingTeam(),1500);});
+  window.addEventListener('resize',()=>{if(innerWidth<=720)setTimeout(hardResetLogo,0);},{passive:true});
+  const mo=new MutationObserver(()=>{if(innerWidth<=720)hardResetLogo();});
+  try{mo.observe(document.documentElement,{childList:true,subtree:true});}catch(_e){}
+  window.stage5975RestoreMissingRegistration=restoreMissingTeam;
+  window.stage5975HardResetMobileLogo=hardResetLogo;
+  console.info('[230MATCH] 5.9.75 ready · mobile logo hard reset + one-time missing registration restore');
+})();
