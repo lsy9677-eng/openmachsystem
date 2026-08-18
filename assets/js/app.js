@@ -16785,7 +16785,9 @@ console.info('[230MATCH] 5.9.57 · tournamentReadOnly() disabled: found the actu
   }
   function isDone(){
     const p=portal();
-    if(p.migrations?.modernParticipantData5959?.done)return true;
+    // 5.9.61: migration 플래그만 남고 실제 개인 기록이 사라진 경우를 완료로 보지 않는다.
+    // 실제 source archive + players가 존재할 때만 완료 처리한다.
+    // 현재 접수/참가팀/예선/본선 운영 데이터는 읽거나 변경하지 않는다.
     return p.participantArchives.some(a=>String(a?.source||'')===SOURCE && Array.isArray(a?.players) && a.players.length);
   }
   function modernMeta(){
@@ -16893,6 +16895,9 @@ console.info('[230MATCH] 5.9.57 · tournamentReadOnly() disabled: found the actu
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',schedule,{once:true});else schedule();
   console.info('[230MATCH] 5.9.59 ready · Modern Cup data/test-teams-100.json auto-once import, no restore button');
 })();
+
+/* 5.9.61 · 모던배 개인기록 self-heal: 완료 플래그만 있고 실제 archive가 없으면 1회 재생성 */
+console.info('[230MATCH] 5.9.61 ready · player history archive self-heal only; live tournament state untouched');
 
 
 /* 230MATCH 5.9.60 · 복구점 타임라인 가독성 */
