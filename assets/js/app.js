@@ -17527,9 +17527,38 @@ console.info('[230MATCH] 5.9.65 · registration counts use one authoritative cur
     const c=ctx(),chosen=selectedTeams(),rcpts=recipients(),body=String(document.getElementById('stage5967BulkBody')?.value||'');
     const b=bytes(body),type=b<=90?'SMS(단문)':'LMS(장문)';
     const context=document.getElementById('stage5967BulkContext');if(context)context.textContent=`${c.tournamentName} · ${c.divisionName}`;
-    const summary=document.getElementById('stage5967BulkSummary');if(summary)summary.innerHTML=`대상 <b>${chosen.length}팀</b> · 실제 수신 <b>${rcpts.length}명</b> · 중복번호 자동 제외 · <b>${b}B · ${type}</b>`;
+    const summary=document.getElementById('stage5967BulkSummary');if(summary){const batchCount=Math.max(1,Math.ceil(rcpts.length/30));summary.innerHTML=`대상 <b>${chosen.length}팀</b> · 실제 수신 <b>${rcpts.length}명</b> · 중복번호 자동 제외 · <b>${b}B · ${type}</b> · 휴대폰 <b>${rcpts.length?batchCount:0}회(최대 30명씩)</b>`;}
     const list=document.getElementById('stage5967BulkRecipients');if(list)list.innerHTML=rcpts.length?rcpts.map((r,i)=>`<span>${i+1}. ${esc(r.name)} <small>${esc(r.phone)}</small></span>`).join(''):'<em>발송 가능한 연락처가 없습니다.</em>';
     const send=document.getElementById('stage5967BulkSend');if(send)send.disabled=!rcpts.length||!body.trim();
+    const phoneSend=document.getElementById('stage5970BulkPhoneSend');if(phoneSend){phoneSend.disabled=!rcpts.length||!body.trim();updatePhoneBatchButton5970(phoneSend,rcpts,body,c);}
+  }
+  const PHONE_BATCH_KEY='230match_bulk_phone_batch_v5970';
+  function phoneBatchSignature5970(rcpts,body,c){
+    const text=[c.tournamentId,c.divisionId,document.getElementById('stage5967BulkTarget')?.value||'',document.getElementById('stage5967BulkRecipientMode')?.value||'',body,rcpts.map(r=>r.phone).join(',')].join('|');
+    let h=2166136261;for(let i=0;i<text.length;i++){h^=text.charCodeAt(i);h=Math.imul(h,16777619);}return String(h>>>0);
+  }
+  function readPhoneBatch5970(){try{return JSON.parse(sessionStorage.getItem(PHONE_BATCH_KEY)||'null');}catch(_e){return null;}}
+  function writePhoneBatch5970(v){try{sessionStorage.setItem(PHONE_BATCH_KEY,JSON.stringify(v));}catch(_e){}}
+  function updatePhoneBatchButton5970(btn,rcpts,body,c){
+    if(!btn)return;const total=Math.ceil(rcpts.length/30);if(!total){btn.textContent='휴대폰 문자앱 보내기';return;}
+    const sig=phoneBatchSignature5970(rcpts,body,c),saved=readPhoneBatch5970();
+    if(saved&&saved.sig===sig&&Number(saved.next||0)>0&&Number(saved.next||0)<total){btn.textContent=`휴대폰 문자앱 다음 ${Number(saved.next)+1}/${total}차`;}
+    else if(saved&&saved.sig===sig&&Number(saved.next||0)>=total){btn.textContent=`휴대폰 문자앱 완료 (${total}차)`;}
+    else btn.textContent=`휴대폰 문자앱 보내기 (${total}차)`;
+  }
+  function sendBulkByPhone5970(){
+    if(!requireOperator('현재 부서 단체문자'))return;
+    const ua=navigator.userAgent||'';if(!/Android|iPhone|iPad|iPod/i.test(ua))return notice('휴대폰 문자앱 발송은 휴대폰에서 이용해 주세요.','warning');
+    const c=ctx(),rcpts=recipients(),body=String(document.getElementById('stage5967BulkBody')?.value||'').trim();
+    if(!body)return notice('단체문자 내용을 입력하세요.','error');if(!rcpts.length)return notice('선택한 대상에 발송 가능한 연락처가 없습니다.','error');
+    const total=Math.ceil(rcpts.length/30),sig=phoneBatchSignature5970(rcpts,body,c),saved=readPhoneBatch5970();let index=(saved&&saved.sig===sig)?Number(saved.next||0):0;
+    if(index>=total){if(!confirm(`30명씩 ${total}차 발송이 모두 열렸습니다. 처음부터 다시 시작할까요?`))return;index=0;}
+    const start=index*30,batch=rcpts.slice(start,start+30),phones=batch.map(r=>r.phone).filter(Boolean);if(!phones.length)return notice('이번 차수에 유효한 연락처가 없습니다.','error');
+    if(!confirm(`${c.tournamentName} · ${c.divisionName}\n휴대폰 문자앱 ${index+1}/${total}차를 엽니다.\n이번 대상 ${phones.length}명 (최대 30명)\n\n문자앱에서 수신번호와 내용을 확인한 뒤 전송 버튼을 눌러 주세요.`))return;
+    writePhoneBatch5970({sig,next:index+1,total,updatedAt:Date.now()});
+    const btn=document.getElementById('stage5970BulkPhoneSend');updatePhoneBatchButton5970(btn,rcpts,body,c);
+    const smsUrl='sms:'+phones.join(',')+'?body='+encodeURIComponent(body);
+    try{window.location.href=smsUrl;}catch(e){notice('휴대폰 문자앱을 열지 못했습니다. 다시 시도해 주세요.','error');}
   }
   async function sendBulk(){
     if(!requireOperator('현재 부서 단체문자'))return;
@@ -17550,7 +17579,7 @@ console.info('[230MATCH] 5.9.65 · registration counts use one authoritative cur
     const view=document.getElementById('view-messages');if(!view||document.getElementById('stage5967BulkSmsPanel'))return;
     const host=view.querySelector('.sms-center-panel')||view.querySelector('.panel')||view;
     const panel=document.createElement('section');panel.id='stage5967BulkSmsPanel';panel.className='stage5967-bulk-panel';
-    panel.innerHTML=`<div class="stage5967-bulk-head"><div><small>CURRENT DIVISION BULK SMS</small><h3>현재 부서 단체문자</h3><p id="stage5967BulkContext">현재 대회 · 현재 부서</p></div><span>알리고</span></div>
+    panel.innerHTML=`<div class="stage5967-bulk-head"><div><small>CURRENT DIVISION BULK SMS</small><h3>현재 부서 단체문자</h3><p id="stage5967BulkContext">현재 대회 · 현재 부서</p></div><span>알리고 · 휴대폰</span></div>
       <div class="stage5967-bulk-controls">
         <label><span>발송 대상</span><select id="stage5967BulkTarget"><option value="active">확정 참가팀 전체</option><option value="paid">입금팀</option><option value="waiting">입금대기팀</option><option value="reserve">후보팀</option></select></label>
         <label><span>수신 방식</span><select id="stage5967BulkRecipientMode"><option value="representative">대표 연락처만</option><option value="both">두 선수 모두</option></select></label>
@@ -17558,12 +17587,13 @@ console.info('[230MATCH] 5.9.65 · registration counts use one authoritative cur
       <label class="stage5967-bulk-message"><span>문자 내용</span><textarea id="stage5967BulkBody" rows="4" maxlength="1000" placeholder="현재 부서 참가자에게 보낼 공지 내용을 입력하세요."></textarea></label>
       <div id="stage5967BulkSummary" class="stage5967-bulk-summary"></div>
       <details class="stage5967-bulk-details"><summary>실제 수신자 확인</summary><div id="stage5967BulkRecipients" class="stage5967-bulk-recipients"></div></details>
-      <div class="stage5967-bulk-actions"><button type="button" class="btn btn-light" id="stage5967BulkRefresh">대상 다시 확인</button><button type="button" class="btn btn-primary" id="stage5967BulkSend">알리고 단체발송</button></div>
-      <p class="stage5967-bulk-note">현재 선택된 대회·부서의 연락처만 읽어 발송 대상을 만듭니다. 참가신청·입금·예선·본선·코트 데이터는 변경하지 않습니다.</p>`;
+      <div class="stage5967-bulk-actions"><button type="button" class="btn btn-light" id="stage5967BulkRefresh">대상 다시 확인</button><button type="button" class="btn btn-secondary" id="stage5970BulkPhoneSend">휴대폰 문자앱 보내기</button><button type="button" class="btn btn-primary" id="stage5967BulkSend">알리고 단체발송</button></div>
+      <p class="stage5967-bulk-note">현재 선택된 대회·부서의 연락처만 읽어 발송 대상을 만듭니다. 알리고 또는 휴대폰 문자앱(최대 30명씩)으로 보낼 수 있습니다. 참가신청·입금·예선·본선·코트 데이터는 변경하지 않습니다.</p>`;
     const head=host.querySelector('.section-head');if(head)head.insertAdjacentElement('afterend',panel);else host.prepend(panel);
     ['stage5967BulkTarget','stage5967BulkRecipientMode'].forEach(id=>document.getElementById(id)?.addEventListener('change',renderPreview));
     document.getElementById('stage5967BulkBody')?.addEventListener('input',renderPreview);
     document.getElementById('stage5967BulkRefresh')?.addEventListener('click',renderPreview);
+    document.getElementById('stage5970BulkPhoneSend')?.addEventListener('click',sendBulkByPhone5970);
     document.getElementById('stage5967BulkSend')?.addEventListener('click',sendBulk);
     renderPreview();
   }
@@ -17572,13 +17602,14 @@ console.info('[230MATCH] 5.9.65 · registration counts use one authoritative cur
     .stage5967-bulk-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}.stage5967-bulk-head small{font-size:10px;font-weight:900;letter-spacing:.08em;color:#64748b}.stage5967-bulk-head h3{margin:2px 0;font-size:18px}.stage5967-bulk-head p{margin:0;color:#64748b;font-size:12px}.stage5967-bulk-head>span{padding:5px 10px;border-radius:999px;background:#dcfce7;color:#166534;font-weight:900;font-size:12px}
     .stage5967-bulk-controls{display:grid;grid-template-columns:1fr 1fr;gap:10px}.stage5967-bulk-controls label,.stage5967-bulk-message{display:grid;gap:5px}.stage5967-bulk-controls label>span,.stage5967-bulk-message>span{font-size:12px;font-weight:800;color:#334155}.stage5967-bulk-controls select,.stage5967-bulk-message textarea{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:10px;padding:9px 10px;background:#fff}.stage5967-bulk-message{margin-top:10px}.stage5967-bulk-message textarea{resize:vertical;min-height:88px}
     .stage5967-bulk-summary{margin-top:10px;padding:9px 11px;border-radius:10px;background:#f8fafc;color:#334155;font-size:12px}.stage5967-bulk-details{margin-top:8px;border:1px solid #e2e8f0;border-radius:10px;padding:8px 10px}.stage5967-bulk-details summary{cursor:pointer;font-size:12px;font-weight:800}.stage5967-bulk-recipients{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:4px 10px;margin-top:8px;max-height:180px;overflow:auto}.stage5967-bulk-recipients span{font-size:11px;padding:4px 0;border-bottom:1px dashed #e2e8f0}.stage5967-bulk-recipients small{color:#64748b}.stage5967-bulk-recipients em{font-size:12px;color:#94a3b8}
-    .stage5967-bulk-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}.stage5967-bulk-note{margin:9px 0 0;font-size:10px;line-height:1.5;color:#64748b}
-    @media(max-width:700px){.stage5967-bulk-panel{padding:12px;margin:10px 0 14px}.stage5967-bulk-controls{grid-template-columns:1fr}.stage5967-bulk-actions{display:grid;grid-template-columns:1fr 1fr}.stage5967-bulk-actions .btn{width:100%}.stage5967-bulk-recipients{grid-template-columns:1fr}}
+    .stage5967-bulk-actions{display:grid;grid-template-columns:auto auto auto;justify-content:end;gap:8px;margin-top:10px}.stage5967-bulk-note{margin:9px 0 0;font-size:10px;line-height:1.5;color:#64748b}
+    @media(max-width:700px){.stage5967-bulk-panel{padding:12px;margin:10px 0 14px}.stage5967-bulk-controls{grid-template-columns:1fr}.stage5967-bulk-actions{display:grid;grid-template-columns:1fr}.stage5967-bulk-actions .btn{width:100%}.stage5967-bulk-recipients{grid-template-columns:1fr}}
   `;document.head.appendChild(css);
   function bind(){ensurePanel();document.querySelectorAll('[data-settings-view="messages"],[data-portal-go="messages"],[data-view="messages"]').forEach(btn=>{if(btn.__stage5967)return;btn.__stage5967=true;btn.addEventListener('click',()=>setTimeout(()=>{ensurePanel();renderPreview();},80));});}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{bind();setTimeout(bind,300);});else{bind();setTimeout(bind,300);}
   window.stage5967RenderBulkSms=renderPreview;
   console.info('[230MATCH] 5.9.67 ready · current tournament/division bulk SMS added; display/send only, no match-data writes');
+  console.info('[230MATCH] 5.9.70 ready · mobile SMS app bulk batches max 30 recipients');
 })();
 
 
