@@ -17316,3 +17316,267 @@ renderParticipantManager=function(){
 console.info('[230MATCH] 5.9.64 ready · roster UI re-compacted + admin registration SMS fallback checked; live match data untouched');
 
 console.info('[230MATCH] 5.9.65 · registration counts use one authoritative current-division source; no registration or match data writes added');
+
+
+/* 5.9.66 · 확정 참가팀 연락처를 현재 대회 + 현재 부서로만 제한
+   - 과거 테스트 명단/다른 대회/다른 부서 연락처를 삭제하지 않는다.
+   - 현재 접수/입금/예선/본선 데이터에는 쓰지 않는다.
+   - view-roster 화면만 현재 state.teams 기준으로 다시 렌더한다. */
+(function stage5966ScopedContactRoster(){
+  const esc5966=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  const digits5966=v=>String(v||'').replace(/\D/g,'');
+  let painting=false;
+
+  function currentCtx5966(){
+    return {
+      tournamentId:String(state?.multiTournament?.activeTournamentId||state?.tournament?.id||'').trim(),
+      divisionId:String(state?.multiDivision?.activeDivisionId||'').trim(),
+      tournamentName:String(state?.tournament?.name||'현재 대회').trim(),
+      divisionName:String(state?.tournament?.division||state?.multiDivision?.divisions?.find?.(d=>String(d?.id||'')===String(state?.multiDivision?.activeDivisionId||''))?.name||'현재 부서').trim()
+    };
+  }
+
+  function belongsCurrent5966(team,ctx){
+    if(!team||typeof team!=='object')return false;
+    const tid=String(team.tournamentId||team.tid||'').trim();
+    const did=String(team.divisionId||team.divId||'').trim();
+    const dname=String(team.divisionName||team.division||'').trim();
+    // state.teams 자체가 현재 부서 스냅샷이므로 범위표시가 없는 구형 팀은 현재팀으로 허용.
+    if(tid&&ctx.tournamentId&&tid!==ctx.tournamentId)return false;
+    if(did&&ctx.divisionId&&did!==ctx.divisionId)return false;
+    if(!did&&dname&&ctx.divisionName&&dname!==ctx.divisionName)return false;
+    return true;
+  }
+
+  function currentTeams5966(){
+    const ctx=currentCtx5966();
+    return (Array.isArray(state?.teams)?state.teams:[]).filter(t=>belongsCurrent5966(t,ctx));
+  }
+
+  function contactData5966(team){
+    let c={};
+    try{c=getTeamContact(state,team)||{};}catch(_e){}
+    const players=typeof contactEditPlayers==='function'?contactEditPlayers(team):[];
+    const phones=(players||[]).map(p=>digits5966(p?.phone)).filter(Boolean);
+    const rep=digits5966(c?.phone||team?.phone||team?.mobile||'');
+    return {c,players,phones,rep,hasPhone:Boolean(rep||phones.length)};
+  }
+
+  function rowHtml5966(team,index){
+    const info=contactData5966(team);
+    const names=String(team?.name||'이름 없음');
+    const club=String(team?.affiliation||team?.club||'').trim();
+    const status=String(team?.status||'active')==='reserve'?'후보':'참가';
+    const phoneText=info.rep || info.phones.join(' / ') || '연락처 없음';
+    const manager=String(info.c?.manager||'').trim();
+    return `<article class="contact-roster-item stage5966-contact-row" data-stage5966-team="${esc5966(team?.id||'')}">
+      <div class="contact-roster-main">
+        <strong>${index+1}. ${esc5966(names)}</strong>
+        <span>${esc5966(club||'소속 없음')} · ${esc5966(status)}</span>
+        <small>${esc5966(phoneText)}${manager?` · 대표 ${esc5966(manager)}`:''}</small>
+      </div>
+      <button type="button" class="btn btn-light btn-small" data-stage5966-edit="${esc5966(team?.id||'')}">수정</button>
+    </article>`;
+  }
+
+  function renderScopedRoster5966(){
+    if(painting)return;
+    const view=document.getElementById('view-roster');
+    const root=document.getElementById('contactRosterList');
+    if(!view||!root)return;
+    painting=true;
+    try{
+      const ctx=currentCtx5966();
+      const teams=currentTeams5966();
+      const q=String(document.getElementById('rosterSearch')?.value||'').trim().toLowerCase();
+      const filter=String(document.getElementById('rosterPhoneFilter')?.value||'all');
+      const decorated=teams.map((team,index)=>({team,index,info:contactData5966(team)}));
+      const visible=decorated.filter(({team,info})=>{
+        if(filter==='has-phone'&&!info.hasPhone)return false;
+        if(filter==='no-phone'&&info.hasPhone)return false;
+        if(!q)return true;
+        const hay=[team?.name,team?.affiliation,team?.club,info.rep,...info.phones,info.c?.manager].join(' ').toLowerCase();
+        return hay.includes(q);
+      });
+      const phoneCount=decorated.filter(x=>x.info.hasPhone).length;
+      const noPhone=Math.max(0,teams.length-phoneCount);
+      const set=(id,text)=>{const el=document.getElementById(id);if(el)el.textContent=text;};
+      set('rosterTotalTeams',`${teams.length}팀`);
+      set('rosterPhoneCount',`${phoneCount}팀`);
+      set('rosterNoPhoneCount',`${noPhone}팀`);
+      set('rosterVisibleCount',`${visible.length}팀 표시`);
+      const title=view.querySelector('.section-head h2');
+      const desc=view.querySelector('.section-head p');
+      if(title)title.textContent='확정 참가팀 연락처';
+      if(desc)desc.textContent=`${ctx.tournamentName} · ${ctx.divisionName}의 현재 참가/후보팀만 표시합니다.`;
+      root.classList.toggle('empty-state',visible.length===0);
+      root.innerHTML=visible.length?visible.map(({team,index})=>rowHtml5966(team,index)).join(''):'<p>현재 대회·현재 부서에 조건과 일치하는 참가팀이 없습니다.</p>';
+      root.querySelectorAll('[data-stage5966-edit]').forEach(btn=>btn.onclick=()=>{try{openContactEdit(btn.dataset.stage5966Edit);}catch(e){console.warn('[5.9.66] contact edit',e);}});
+    }finally{painting=false;}
+  }
+
+  function bind5966(){
+    const s=document.getElementById('rosterSearch');
+    const f=document.getElementById('rosterPhoneFilter');
+    if(s&&!s.__stage5966){s.__stage5966=true;s.addEventListener('input',()=>setTimeout(renderScopedRoster5966,0));}
+    if(f&&!f.__stage5966){f.__stage5966=true;f.addEventListener('change',()=>setTimeout(renderScopedRoster5966,0));}
+    const view=document.getElementById('view-roster');
+    if(view&&!view.__stage5966){
+      view.__stage5966=true;
+      new MutationObserver(()=>{if(!painting&&view.classList.contains('active'))setTimeout(renderScopedRoster5966,0);}).observe(view,{attributes:true,attributeFilter:['class']});
+    }
+    document.querySelectorAll('[data-settings-view="roster"],[data-portal-go="roster"]').forEach(btn=>{
+      if(btn.__stage5966)return;btn.__stage5966=true;btn.addEventListener('click',()=>setTimeout(renderScopedRoster5966,80));
+    });
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{bind5966();setTimeout(renderScopedRoster5966,250);});
+  else{bind5966();setTimeout(renderScopedRoster5966,250);}
+  window.stage5966RenderScopedContactRoster=renderScopedRoster5966;
+  console.info('[230MATCH] 5.9.66 ready · contact roster scoped to active tournament/division, display-only');
+})();
+
+
+/* 5.9.67 · 현재 대회/현재 부서 단체문자
+   - 5.9.66의 현재 state.teams 범위 원칙을 그대로 사용한다.
+   - 참가/입금/예선/본선/코트 상태에는 쓰지 않는다.
+   - 현재 부서 연락처를 읽어 알리고 수신자 배열만 구성한다. */
+(function stage5967CurrentDivisionBulkSms(){
+  const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  const digits=v=>String(v||'').replace(/\D/g,'');
+  const norm=v=>String(v||'').toLowerCase().replace(/[\s·ㆍ,()\-_/]/g,'');
+
+  function ctx(){
+    return {
+      tournamentId:String(state?.multiTournament?.activeTournamentId||state?.tournament?.id||'').trim(),
+      divisionId:String(state?.multiDivision?.activeDivisionId||'').trim(),
+      tournamentName:String(state?.tournament?.name||'현재 대회').trim(),
+      divisionName:String(state?.tournament?.division||state?.multiDivision?.divisions?.find?.(d=>String(d?.id||'')===String(state?.multiDivision?.activeDivisionId||''))?.name||'현재 부서').trim()
+    };
+  }
+  function belongs(team,c){
+    if(!team||typeof team!=='object')return false;
+    const tid=String(team.tournamentId||team.tid||'').trim();
+    const did=String(team.divisionId||team.divId||'').trim();
+    const dname=String(team.divisionName||team.division||'').trim();
+    if(tid&&c.tournamentId&&tid!==c.tournamentId)return false;
+    if(did&&c.divisionId&&did!==c.divisionId)return false;
+    if(!did&&dname&&c.divisionName&&dname!==c.divisionName)return false;
+    return true;
+  }
+  function teams(){const c=ctx();return (Array.isArray(state?.teams)?state.teams:[]).filter(t=>belongs(t,c));}
+  function apps(){
+    try{
+      if(typeof registrationRowsForCurrentDivision==='function')return registrationRowsForCurrentDivision()||[];
+      if(typeof stage5965RegistrationDisplayRows==='function')return stage5965RegistrationDisplayRows()||[];
+      if(typeof simpleRegistrationRows==='function')return simpleRegistrationRows()||[];
+    }catch(_e){}
+    return [];
+  }
+  function appFor(team,rows){
+    return rows.find(a=>String(a?.id||'')===String(team?.registrationId||''))
+      ||rows.find(a=>norm(a?.teamName||'')===norm(team?.name||''))
+      ||null;
+  }
+  function status(team){try{return typeof participantStatus==='function'?participantStatus(team):(String(team?.status||'active')==='reserve'?'reserve':'active');}catch(_e){return String(team?.status||'active')==='reserve'?'reserve':'active';}}
+  function paid(team,row){return Boolean(row&&(row.paid===true||String(row.paymentStatus||'')==='paid'));}
+
+  function playerRows(team,row){
+    let teamPlayers=[];try{teamPlayers=typeof contactEditPlayers==='function'?contactEditPlayers(team):[];}catch(_e){}
+    let appPlayers=[];try{appPlayers=row&&typeof entryApplicationPlayers==='function'?entryApplicationPlayers(row):[];}catch(_e){}
+    const names=String(team?.name||row?.teamName||'').split(/\s*\/\s*/);
+    return [0,1].map(i=>({
+      name:String(teamPlayers?.[i]?.name||appPlayers?.[i]?.name||names[i]||`선수 ${i+1}`).trim(),
+      phone:digits(teamPlayers?.[i]?.phone||appPlayers?.[i]?.phone||'')
+    }));
+  }
+  function repRecipient(team,row,players){
+    let contact={};try{contact=getTeamContact(state,team)||{};}catch(_e){}
+    let repIndex=Number(team?.representativeIndex??row?.representativeIndex??0);if(repIndex!==1)repIndex=0;
+    const contactPhone=digits(contact?.phone||team?.phone||row?.phone||'');
+    if(contactPhone){
+      const matched=players.find(p=>p.phone===contactPhone);
+      return {name:matched?.name||String(row?.representativeName||team?.name||'대표').trim(),phone:contactPhone};
+    }
+    const p=players[repIndex]?.phone?players[repIndex]:players.find(x=>x.phone);
+    return p?{name:p.name,phone:p.phone}:null;
+  }
+  function selectedTeams(){
+    const target=document.getElementById('stage5967BulkTarget')?.value||'active';
+    const rows=apps();
+    return teams().map(team=>({team,row:appFor(team,rows)})).filter(({team,row})=>{
+      const s=status(team),p=paid(team,row);
+      if(target==='paid')return s==='active'&&p;
+      if(target==='waiting')return s==='active'&&!p;
+      if(target==='reserve')return s==='reserve';
+      return s==='active';
+    });
+  }
+  function recipients(){
+    const mode=document.getElementById('stage5967BulkRecipientMode')?.value||'representative';
+    const out=[];
+    for(const {team,row} of selectedTeams()){
+      const ps=playerRows(team,row);
+      const add=r=>{const phone=digits(r?.phone);if(phone.length<10)return;if(out.some(x=>x.phone===phone))return;out.push({name:String(r?.name||team?.name||'수신자').trim(),phone,teamName:String(team?.name||'')});};
+      if(mode==='both')ps.forEach(add);else add(repRecipient(team,row,ps));
+    }
+    return out;
+  }
+  function bytes(text){try{return new Blob([String(text||'')]).size;}catch(_e){return String(text||'').length*2;}}
+  function renderPreview(){
+    const panel=document.getElementById('stage5967BulkSmsPanel');if(!panel)return;
+    const c=ctx(),chosen=selectedTeams(),rcpts=recipients(),body=String(document.getElementById('stage5967BulkBody')?.value||'');
+    const b=bytes(body),type=b<=90?'SMS(단문)':'LMS(장문)';
+    const context=document.getElementById('stage5967BulkContext');if(context)context.textContent=`${c.tournamentName} · ${c.divisionName}`;
+    const summary=document.getElementById('stage5967BulkSummary');if(summary)summary.innerHTML=`대상 <b>${chosen.length}팀</b> · 실제 수신 <b>${rcpts.length}명</b> · 중복번호 자동 제외 · <b>${b}B · ${type}</b>`;
+    const list=document.getElementById('stage5967BulkRecipients');if(list)list.innerHTML=rcpts.length?rcpts.map((r,i)=>`<span>${i+1}. ${esc(r.name)} <small>${esc(r.phone)}</small></span>`).join(''):'<em>발송 가능한 연락처가 없습니다.</em>';
+    const send=document.getElementById('stage5967BulkSend');if(send)send.disabled=!rcpts.length||!body.trim();
+  }
+  async function sendBulk(){
+    if(!requireOperator('현재 부서 단체문자'))return;
+    const c=ctx(),rcpts=recipients(),body=String(document.getElementById('stage5967BulkBody')?.value||'').trim();
+    if(!body)return notice('단체문자 내용을 입력하세요.','error');
+    if(!rcpts.length)return notice('선택한 대상에 발송 가능한 연락처가 없습니다.','error');
+    const b=bytes(body),type=b<=90?'SMS 단문':'LMS 장문';
+    if(!confirm(`${c.tournamentName} · ${c.divisionName}\n${rcpts.length}명에게 ${type}을 알리고로 발송할까요?\n\n발송 후 취소할 수 없습니다.`))return;
+    const typed=prompt('실제 단체발송을 확인하려면 “발송”을 입력하세요.','');if(typed!=='발송')return notice('단체문자 발송을 취소했습니다.','info');
+    const btn=document.getElementById('stage5967BulkSend');if(btn){btn.disabled=true;btn.textContent='발송 중...';}
+    try{
+      await sendAligoSmsV3(rcpts,body,{source:'current_division_bulk',kind:'bulk',title:'230MATCH 단체공지',tournamentId:c.tournamentId,divisionId:c.divisionId,divisionName:c.divisionName});
+      notice(`현재 부서 단체문자 ${rcpts.length}명 발송 요청이 완료되었습니다.`,'success');
+    }catch(e){notice(`단체문자 발송 실패: ${e?.message||e}`,'error');}
+    finally{if(btn){btn.textContent='알리고 단체발송';renderPreview();}}
+  }
+  function ensurePanel(){
+    const view=document.getElementById('view-messages');if(!view||document.getElementById('stage5967BulkSmsPanel'))return;
+    const host=view.querySelector('.sms-center-panel')||view.querySelector('.panel')||view;
+    const panel=document.createElement('section');panel.id='stage5967BulkSmsPanel';panel.className='stage5967-bulk-panel';
+    panel.innerHTML=`<div class="stage5967-bulk-head"><div><small>CURRENT DIVISION BULK SMS</small><h3>현재 부서 단체문자</h3><p id="stage5967BulkContext">현재 대회 · 현재 부서</p></div><span>알리고</span></div>
+      <div class="stage5967-bulk-controls">
+        <label><span>발송 대상</span><select id="stage5967BulkTarget"><option value="active">확정 참가팀 전체</option><option value="paid">입금팀</option><option value="waiting">입금대기팀</option><option value="reserve">후보팀</option></select></label>
+        <label><span>수신 방식</span><select id="stage5967BulkRecipientMode"><option value="representative">대표 연락처만</option><option value="both">두 선수 모두</option></select></label>
+      </div>
+      <label class="stage5967-bulk-message"><span>문자 내용</span><textarea id="stage5967BulkBody" rows="4" maxlength="1000" placeholder="현재 부서 참가자에게 보낼 공지 내용을 입력하세요."></textarea></label>
+      <div id="stage5967BulkSummary" class="stage5967-bulk-summary"></div>
+      <details class="stage5967-bulk-details"><summary>실제 수신자 확인</summary><div id="stage5967BulkRecipients" class="stage5967-bulk-recipients"></div></details>
+      <div class="stage5967-bulk-actions"><button type="button" class="btn btn-light" id="stage5967BulkRefresh">대상 다시 확인</button><button type="button" class="btn btn-primary" id="stage5967BulkSend">알리고 단체발송</button></div>
+      <p class="stage5967-bulk-note">현재 선택된 대회·부서의 연락처만 읽어 발송 대상을 만듭니다. 참가신청·입금·예선·본선·코트 데이터는 변경하지 않습니다.</p>`;
+    const head=host.querySelector('.section-head');if(head)head.insertAdjacentElement('afterend',panel);else host.prepend(panel);
+    ['stage5967BulkTarget','stage5967BulkRecipientMode'].forEach(id=>document.getElementById(id)?.addEventListener('change',renderPreview));
+    document.getElementById('stage5967BulkBody')?.addEventListener('input',renderPreview);
+    document.getElementById('stage5967BulkRefresh')?.addEventListener('click',renderPreview);
+    document.getElementById('stage5967BulkSend')?.addEventListener('click',sendBulk);
+    renderPreview();
+  }
+  const css=document.createElement('style');css.id='stage5967BulkSmsCss';css.textContent=`
+    .stage5967-bulk-panel{margin:14px 0 18px;padding:16px;border:1px solid #cbd5e1;border-radius:16px;background:#fff;box-shadow:0 4px 14px rgba(15,23,42,.05)}
+    .stage5967-bulk-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}.stage5967-bulk-head small{font-size:10px;font-weight:900;letter-spacing:.08em;color:#64748b}.stage5967-bulk-head h3{margin:2px 0;font-size:18px}.stage5967-bulk-head p{margin:0;color:#64748b;font-size:12px}.stage5967-bulk-head>span{padding:5px 10px;border-radius:999px;background:#dcfce7;color:#166534;font-weight:900;font-size:12px}
+    .stage5967-bulk-controls{display:grid;grid-template-columns:1fr 1fr;gap:10px}.stage5967-bulk-controls label,.stage5967-bulk-message{display:grid;gap:5px}.stage5967-bulk-controls label>span,.stage5967-bulk-message>span{font-size:12px;font-weight:800;color:#334155}.stage5967-bulk-controls select,.stage5967-bulk-message textarea{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:10px;padding:9px 10px;background:#fff}.stage5967-bulk-message{margin-top:10px}.stage5967-bulk-message textarea{resize:vertical;min-height:88px}
+    .stage5967-bulk-summary{margin-top:10px;padding:9px 11px;border-radius:10px;background:#f8fafc;color:#334155;font-size:12px}.stage5967-bulk-details{margin-top:8px;border:1px solid #e2e8f0;border-radius:10px;padding:8px 10px}.stage5967-bulk-details summary{cursor:pointer;font-size:12px;font-weight:800}.stage5967-bulk-recipients{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:4px 10px;margin-top:8px;max-height:180px;overflow:auto}.stage5967-bulk-recipients span{font-size:11px;padding:4px 0;border-bottom:1px dashed #e2e8f0}.stage5967-bulk-recipients small{color:#64748b}.stage5967-bulk-recipients em{font-size:12px;color:#94a3b8}
+    .stage5967-bulk-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}.stage5967-bulk-note{margin:9px 0 0;font-size:10px;line-height:1.5;color:#64748b}
+    @media(max-width:700px){.stage5967-bulk-panel{padding:12px;margin:10px 0 14px}.stage5967-bulk-controls{grid-template-columns:1fr}.stage5967-bulk-actions{display:grid;grid-template-columns:1fr 1fr}.stage5967-bulk-actions .btn{width:100%}.stage5967-bulk-recipients{grid-template-columns:1fr}}
+  `;document.head.appendChild(css);
+  function bind(){ensurePanel();document.querySelectorAll('[data-settings-view="messages"],[data-portal-go="messages"],[data-view="messages"]').forEach(btn=>{if(btn.__stage5967)return;btn.__stage5967=true;btn.addEventListener('click',()=>setTimeout(()=>{ensurePanel();renderPreview();},80));});}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{bind();setTimeout(bind,300);});else{bind();setTimeout(bind,300);}
+  window.stage5967RenderBulkSms=renderPreview;
+  console.info('[230MATCH] 5.9.67 ready · current tournament/division bulk SMS added; display/send only, no match-data writes');
+})();
