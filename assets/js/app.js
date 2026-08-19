@@ -18357,3 +18357,178 @@ console.info('[230MATCH] 5.9.79 ready · exact UID or name+phone My Match identi
   window.addEventListener('pageshow',()=>setTimeout(()=>void repair(),1800));
   console.info('[230MATCH] 5.9.81 ready · canonical recovered registration repair + trash-aware integrity diagnostic');
 })();
+
+
+/* 230MATCH 5.9.82 · current registration roster cleanup
+   - 현재 대회+현재 부서 Firebase 참가신청(approved/reserve)만 state.teams의 정본으로 사용
+   - 과거 테스트 명단/다른 대회 팀은 제거
+   - 경기/조편성/본선이 이미 생성된 상태에서는 자동 정리하지 않음
+   - 참가신청 원본/입금상태/Firebase 신청 문서는 수정하지 않음 */
+(function stage5982CurrentRegistrationRosterCleanup(){
+  let running=false,done=false;
+
+  const norm=v=>typeof myMatchNormalize==='function'
+    ?myMatchNormalize(String(v||''))
+    :String(v||'').replace(/\s+/g,'').toLowerCase();
+
+  function currentApps(){
+    if(!registrationCloudReady)return [];
+    let rows=[];
+    try{rows=registrationRowsForCurrentDivision();}catch(_e){rows=[];}
+    return (rows||[])
+      .filter(a=>a?.trashed!==true&&a?.deletedToTrash!==true&&['approved','reserve'].includes(String(a?.status||'')))
+      .sort((a,b)=>{
+        const sa=a.status==='approved'?0:1,sb=b.status==='approved'?0:1;
+        if(sa!==sb)return sa-sb;
+        return String(a?.createdAt||'').localeCompare(String(b?.createdAt||''));
+      });
+  }
+
+  function tournamentHasGeneratedCompetition(){
+    const prelimMatches=(state?.prelim?.matches||[]).length;
+    const prelimGroups=(state?.prelim?.groups||[]).length;
+    const mainMatches=(()=>{
+      try{return portalMainMatches?.().length||0;}catch(_e){return 0;}
+    })();
+    return prelimMatches>0||prelimGroups>0||mainMatches>0;
+  }
+
+  function buildTeamFromApp(app,index,existing){
+    const base=existing
+      ?{...existing}
+      :participantNormalizedTeam({id:crypto.randomUUID(),name:app.teamName,affiliation:app.affiliation},index);
+
+    const players=entryApplicationPlayers(app);
+    base.name=String(app.teamName||base.name||'').trim();
+    base.affiliation=String(app.affiliation||base.affiliation||'').trim();
+    base.registrationId=String(app.id||'');
+    base.players=players;
+    base.playerPhones=players.map(p=>String(p?.phone||'').replace(/\D/g,'')).filter(Boolean);
+    base.representativeIndex=Number(app.representativeIndex||0);
+    base.smsTargetMode=app.smsTargetMode==='representative'?'representative':'both';
+    base.ownerUid=String(app.ownerUid||'');
+    base.rank=index+1;
+    base.status=app.status==='reserve'?'reserve':'active';
+    return base;
+  }
+
+  async function cleanup({manual=false}={}){
+    if(running||done)return false;
+    if(!currentAuthUser)return false;
+    try{if(!canOperate())return false;}catch(_e){return false;}
+    if(!registrationCloudReady)return false;
+
+    const apps=currentApps();
+    if(!apps.length)return false;
+
+    const current=(state.teams||[]);
+    const validIds=new Set(apps.map(a=>String(a.id||'')).filter(Boolean));
+    const validNames=new Set(apps.map(a=>norm(a.teamName)).filter(Boolean));
+    const extras=current.filter(t=>{
+      const rid=String(t?.registrationId||'');
+      if(rid&&validIds.has(rid))return false;
+      return !validNames.has(norm(portalTeam?.(t)||t?.name||t?.teamName||''));
+    });
+
+    // 이미 정확히 맞으면 아무것도 하지 않는다.
+    if(!extras.length&&current.length===apps.length){
+      done=true;
+      return true;
+    }
+
+    // 예선/본선 구조가 만들어졌다면 팀 삭제가 대진에 영향을 줄 수 있으므로 자동 중단.
+    if(tournamentHasGeneratedCompetition()){
+      if(manual)notice(`현재 참가신청 ${apps.length}팀과 운영 명단 ${current.length}팀이 다르지만 예선/본선 구조가 이미 생성되어 자동 정리를 중단했습니다. 경기 구조를 확인한 뒤 정리해야 합니다.`,'warning');
+      console.warn('[5.9.82] roster cleanup skipped: competition structure already generated', {apps:apps.length,teams:current.length,extras:extras.length});
+      return false;
+    }
+
+    if(manual){
+      const ok=confirm(
+        `현재 참가신청 ${apps.length}팀만 참가자 명단에 남기고\n`+
+        `현재 접수에 없는 ${extras.length}팀을 제거할까요?\n\n`+
+        `참가신청·전화번호·입금상태는 삭제하지 않습니다.\n`+
+        `테스트/과거 팀만 운영 명단(state.teams)에서 정리합니다.`
+      );
+      if(!ok)return false;
+    }
+
+    running=true;
+    try{
+      try{autoRecovery?.(`현재 참가접수 ${apps.length}팀 기준 테스트 명단 정리 직전`);}catch(_e){}
+
+      const byReg=new Map(current.filter(t=>t?.registrationId).map(t=>[String(t.registrationId),t]));
+      const byName=new Map(current.map(t=>[norm(portalTeam?.(t)||t?.name||t?.teamName||''),t]));
+
+      const next=apps.map((a,index)=>{
+        const existing=byReg.get(String(a.id||''))||byName.get(norm(a.teamName));
+        return buildTeamFromApp(a,index,existing);
+      });
+
+      state.teams=next;
+
+      // 아직 조편성 전이므로 참가/후보 스냅샷도 현재 신청 상태와 동일하게 정리.
+      if(state.prelim){
+        const approvedIds=new Set(apps.filter(a=>a.status==='approved').map(a=>String(a.id)));
+        state.prelim.activeTeams=next.filter(t=>approvedIds.has(String(t.registrationId)));
+        state.prelim.reserveTeams=next.filter(t=>!approvedIds.has(String(t.registrationId)));
+      }
+
+      next.forEach((team,index)=>{
+        const app=apps[index];
+        const rep=team.players?.[team.representativeIndex]||team.players?.[0];
+        try{setTeamContact(state,team,{phone:rep?.phone||app?.phone||'',manager:rep?.name||app?.representativeName||''});}catch(_e){}
+      });
+
+      try{syncCurrentDivisionRuntime?.();}catch(_e){}
+      try{commit?.(`5.9.82 현재 참가접수 ${apps.length}팀 기준 테스트 명단 정리`);}catch(_e){try{safePersistState?.('현재 참가접수 기준 명단 정리');}catch(__e){}}
+      try{await stage5526PushCriticalState?.('현재 참가접수 기준 테스트 명단 정리');}catch(e){console.warn('[5.9.82] room sync warning',e);}
+
+      try{
+        renderParticipantManager?.();
+        renderApplicationPortal?.();
+        renderRegistrationSummaryEverywhere?.();
+        renderPrintPreview?.();
+      }catch(_e){}
+
+      done=true;
+      console.info('[5.9.82] current registration roster cleanup complete', {
+        kept:apps.length, removed:extras.length, before:current.length, after:state.teams.length
+      });
+      notice(`참가자 명단을 현재 참가접수 ${apps.length}팀 기준으로 정리했습니다. 테스트/과거 ${extras.length}팀을 제거했습니다.`,'success');
+      return true;
+    }catch(e){
+      console.error('[5.9.82] roster cleanup failed',e);
+      notice(`참가자 명단 정리 실패: ${e?.message||e}`,'error');
+      return false;
+    }finally{
+      running=false;
+    }
+  }
+
+  // 라이브 대회에서는 테스트 100팀 불러오기 실수 방지.
+  function disableLiveSampleButton(){
+    const btn=document.getElementById('loadSampleBtn');
+    if(!btn)return;
+    const name=String(state?.tournament?.name||'');
+    const isTest=/테스트|test/i.test(name);
+    if(!isTest){
+      btn.disabled=true;
+      btn.hidden=true;
+      btn.title='실제 대회에서는 테스트 명단 불러오기가 비활성화됩니다.';
+    }
+  }
+
+  window.stage5982CleanupRosterToCurrentRegistrations=()=>cleanup({manual:true});
+
+  function schedule(){
+    disableLiveSampleButton();
+    // 관리자에서 현재 참가신청이 로드된 뒤 1회 자동 정리.
+    setTimeout(()=>void cleanup({manual:false}),1800);
+    setTimeout(()=>void cleanup({manual:false}),5500);
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',schedule,{once:true});
+  else schedule();
+  window.addEventListener('pageshow',()=>setTimeout(schedule,700));
+  console.info('[230MATCH] 5.9.82 ready · current registration roster is canonical; legacy test teams removed pre-draw only');
+})();
