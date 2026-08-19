@@ -9,9 +9,6 @@ import{buildCourts,assignInitial,queueReadyMatches,refillCourt}from'./court-engi
 import{submitResult}from'./result-engine.js?v=5800';
 import{ensurePrelimState,generatePrelim,assignPrelimCourts,findPrelimMatch,submitPrelimResult,resetPrelim,autoFitPrelimGroups,swapActiveReserveTeam,isPrelimLocked,lockPrelim,unlockPrelim}from'./prelim-engine.js?v=5800';
 import{downloadJson}from'./recovery.js?v=332012';
-import{noticeBodyHtml,initNoticeLinksStyle}from'./modules/notice-links.js?v=5100';
-import{initCheerMusic}from'./modules/cheer-music.js?v=5100';
-import{initBackupCenter}from'./modules/backup-center.js?v=5100';
 import{ensureTimeState,calculateTimeMetrics,timeInfo}from'./time-engine-v5000.js?v=5940';
 import{ensureMessagingState,generatePlayingMessages,generateWait1Messages,generateCurrentCourtMessages,generateCurrentWaitMessages,generateAllTimeMessages,markMessageSent,deleteMessage,clearSentMessages,markAllSent,smsUri,refreshMessageContacts,mergePendingDuplicates,getMessageHistory}from'./message-engine.js?v=3521';
 import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactData,importContactData}from'./contact-engine-v5000.js?v=5000';
@@ -7529,7 +7526,7 @@ function renderPortalViews(){
   renderRegistrationSummaryEverywhere();
   const posts=visibleBoardPosts({admin:isAdmin()});const publicPosts=visibleBoardPosts();
   const home=document.getElementById('homeNoticeList');if(home)home.innerHTML=publicPosts.slice(0,4).map(p=>`<button type="button" class="portal-list-item notice-home-item" data-portal-go="board"><strong>${p.important?'🚨 ':p.pinned?'📌 ':''}${portalEscape(p.title)}</strong><div class="portal-meta">${new Date(p.updatedAt||p.createdAt).toLocaleDateString('ko-KR')}</div></button>`).join('')||'<div class="portal-empty">등록된 공지가 없습니다.</div>';
-  const board=document.getElementById('boardPostList');if(board)board.innerHTML=posts.map(p=>{const status=boardPostStatus(p);const statusText=status==='scheduled'?'게시 예정':status==='expired'?'게시 종료':'게시 중';const popupPeriod=(p.popupStartAt||p.popupEndAt)?`<div class="portal-meta notice-period">팝업기간 · ${p.popupStartAt?new Date(p.popupStartAt).toLocaleString('ko-KR'):'즉시'} ~ ${p.popupEndAt?new Date(p.popupEndAt).toLocaleString('ko-KR'):'계속'}</div>`:'';const postImage=stage6109ImageSrc(p);const image=postImage?`<div class="portal-board-image-wrap"><img class="portal-board-image" src="${postImage}" alt="${portalEscape(p.title)} 공지 이미지" loading="lazy" data-notice-image-view="${portalEscape(p.id)}" title="눌러서 크게 보기"><div class="portal-board-image-actions"><button type="button" class="btn btn-light btn-small" data-notice-image-view="${portalEscape(p.id)}">🔍 크게 보기</button><button type="button" class="btn btn-light btn-small" data-notice-image-download="${portalEscape(p.id)}">⬇ 이미지 다운로드</button></div></div>`:'';return `<article class="portal-board-item ${p.important?'important':''}"><div class="portal-meta notice-meta-row"><span>${p.pinned?'상단 고정 · ':''}${new Date(p.updatedAt||p.createdAt).toLocaleString('ko-KR')}</span><span class="notice-status ${status}">${statusText}${p.popup?' · 홈 팝업':''}</span></div><h3>${p.important?'🚨 ':''}${portalEscape(p.title)}</h3>${image}${p.body?`<div class="portal-board-body">${noticeBodyHtml(p.body)}</div>`:''}${p.startAt||p.endAt?`<div class="portal-meta notice-period">게시기간 · ${p.startAt?new Date(p.startAt).toLocaleString('ko-KR'):'즉시'} ~ ${p.endAt?new Date(p.endAt).toLocaleString('ko-KR'):'계속'}</div>`:''}${popupPeriod}${isAdmin()?`<div class="portal-board-actions"><button type="button" class="btn btn-light" data-board-edit="${p.id}">수정</button><button type="button" class="btn btn-danger-outline" data-board-delete="${p.id}">삭제</button></div>`:''}</article>`;}).join('')||'<div class="portal-empty">등록된 게시물이 없습니다.</div>';
+  const board=document.getElementById('boardPostList');if(board)board.innerHTML=posts.map(p=>{const status=boardPostStatus(p);const statusText=status==='scheduled'?'게시 예정':status==='expired'?'게시 종료':'게시 중';const popupPeriod=(p.popupStartAt||p.popupEndAt)?`<div class="portal-meta notice-period">팝업기간 · ${p.popupStartAt?new Date(p.popupStartAt).toLocaleString('ko-KR'):'즉시'} ~ ${p.popupEndAt?new Date(p.popupEndAt).toLocaleString('ko-KR'):'계속'}</div>`:'';const postImage=stage6109ImageSrc(p);const image=postImage?`<div class="portal-board-image-wrap"><img class="portal-board-image" src="${postImage}" alt="${portalEscape(p.title)} 공지 이미지" loading="lazy" data-notice-image-view="${portalEscape(p.id)}" title="눌러서 크게 보기"><div class="portal-board-image-actions"><button type="button" class="btn btn-light btn-small" data-notice-image-view="${portalEscape(p.id)}">🔍 크게 보기</button><button type="button" class="btn btn-light btn-small" data-notice-image-download="${portalEscape(p.id)}">⬇ 이미지 다운로드</button></div></div>`:'';return `<article class="portal-board-item ${p.important?'important':''}"><div class="portal-meta notice-meta-row"><span>${p.pinned?'상단 고정 · ':''}${new Date(p.updatedAt||p.createdAt).toLocaleString('ko-KR')}</span><span class="notice-status ${status}">${statusText}${p.popup?' · 홈 팝업':''}</span></div><h3>${p.important?'🚨 ':''}${portalEscape(p.title)}</h3>${image}${p.body?`<div class="portal-board-body">${stage5989NoticeBodyHtml(p.body)}</div>`:''}${p.startAt||p.endAt?`<div class="portal-meta notice-period">게시기간 · ${p.startAt?new Date(p.startAt).toLocaleString('ko-KR'):'즉시'} ~ ${p.endAt?new Date(p.endAt).toLocaleString('ko-KR'):'계속'}</div>`:''}${popupPeriod}${isAdmin()?`<div class="portal-board-actions"><button type="button" class="btn btn-light" data-board-edit="${p.id}">수정</button><button type="button" class="btn btn-danger-outline" data-board-delete="${p.id}">삭제</button></div>`:''}</article>`;}).join('')||'<div class="portal-empty">등록된 게시물이 없습니다.</div>';
   renderBoardFast();
   const summary=document.getElementById('homeCourtSummary');if(summary){const rows=courts.filter(c=>c.playing||c.wait1).slice(0,12);summary.innerHTML=rows.map(c=>{const play=findUnifiedMatch(state,c.playing)||findPrelimMatch(state,c.playing)||findMatch(state.draw,c.playing);const wait=findUnifiedMatch(state,c.wait1)||findPrelimMatch(state,c.wait1)||findMatch(state.draw,c.wait1);return `<article class="portal-court-item"><strong>${portalEscape(c.name||c.id)}</strong><div>시합중 · ${play?portalEscape(portalTeam(play.teamA))+' vs '+portalEscape(portalTeam(play.teamB)):'없음'}</div><div class="portal-meta">대기1 · ${wait?portalEscape(portalTeam(wait.teamA))+' vs '+portalEscape(portalTeam(wait.teamB)):'없음'}</div></article>`;}).join('')||'<div class="portal-empty">현재 배정된 경기가 없습니다.</div>';}
   renderResultArchive();
@@ -7831,7 +7828,7 @@ async function saveBoardPost(){
 function popupDismissKey(post){return `230match-notice-dismiss-${post.id}-${new Date().toISOString().slice(0,10)}`;}
 function popupPostStatus(post,now=Date.now()){const start=post.popupStartAt?new Date(post.popupStartAt).getTime():(post.startAt?new Date(post.startAt).getTime():0),end=post.popupEndAt?new Date(post.popupEndAt).getTime():(post.endAt?new Date(post.endAt).getTime():0);if(start&&start>now)return 'scheduled';if(end&&end<now)return 'expired';return 'active';}
 function closeHomeNoticePopup(){const dialog=document.getElementById('homeNoticePopup');const id=dialog?.dataset.postId;if(id&&document.getElementById('homeNoticePopupDismiss')?.checked)localStorage.setItem(popupDismissKey({id}),'1');if(dialog?.open)dialog.close();}
-function showEligibleHomePopup(){if(document.body.dataset.currentView!=='home')return;const post=visibleBoardPosts().find(p=>p.popup&&popupPostStatus(p)==='active'&&!localStorage.getItem(popupDismissKey(p)));const dialog=document.getElementById('homeNoticePopup');if(!post||!dialog||dialog.open)return;dialog.dataset.postId=post.id;document.getElementById('homeNoticePopupBadge').textContent=post.important?'중요 공지':'대회 공지';document.getElementById('homeNoticePopupTitle').textContent=post.title;const body=document.getElementById('homeNoticePopupBody');if(body){body.innerHTML=post.body?noticeBodyHtml(post.body):'';body.hidden=!post.body;}const img=document.getElementById('homeNoticePopupImage');if(img){const postImage=stage6109ImageSrc(post);img.hidden=!postImage;if(postImage)img.src=postImage;else img.removeAttribute('src');}document.getElementById('homeNoticePopupDismiss').checked=false;dialog.showModal();}
+function showEligibleHomePopup(){if(document.body.dataset.currentView!=='home')return;const post=visibleBoardPosts().find(p=>p.popup&&popupPostStatus(p)==='active'&&!localStorage.getItem(popupDismissKey(p)));const dialog=document.getElementById('homeNoticePopup');if(!post||!dialog||dialog.open)return;dialog.dataset.postId=post.id;document.getElementById('homeNoticePopupBadge').textContent=post.important?'중요 공지':'대회 공지';document.getElementById('homeNoticePopupTitle').textContent=post.title;const body=document.getElementById('homeNoticePopupBody');if(body){body.innerHTML=post.body?stage5989NoticeBodyHtml(post.body):'';body.hidden=!post.body;}const img=document.getElementById('homeNoticePopupImage');if(img){const postImage=stage6109ImageSrc(post);img.hidden=!postImage;if(postImage)img.src=postImage;else img.removeAttribute('src');}document.getElementById('homeNoticePopupDismiss').checked=false;dialog.showModal();}
 function renderPopupManager(){const root=document.getElementById('popupManagerList');if(!root)return;const rows=[...globalPosts()].sort((a,b)=>String(b.updatedAt||b.createdAt).localeCompare(String(a.updatedAt||a.createdAt)));root.innerHTML=rows.map(p=>{const st=popupPostStatus(p),label=st==='scheduled'?'예정':st==='expired'?'종료':'현재';return `<article class="popup-manager-item" data-popup-manager-id="${p.id}"><div class="popup-manager-item-head"><div><strong>${portalEscape(p.title)}</strong><div class="portal-meta">${p.popup?'홈 팝업 ON':'홈 팝업 OFF'} · ${label}</div></div>${stage6109ImageSrc(p)?`<img class="popup-manager-thumb" src="${stage6109ImageSrc(p)}" alt="공지 이미지">`:''}</div><div class="popup-manager-controls"><label class="form-check"><input type="checkbox" data-popup-enabled ${p.popup?'checked':''}><span>홈 팝업 표시</span></label><label><span>팝업 시작</span><input type="datetime-local" data-popup-start value="${boardDateValue(p.popupStartAt)}"></label><label><span>팝업 종료</span><input type="datetime-local" data-popup-end value="${boardDateValue(p.popupEndAt)}"></label><button type="button" class="btn btn-primary btn-small" data-popup-save>저장</button></div></article>`;}).join('')||'<div class="portal-empty">등록된 공지가 없습니다. 먼저 공지사항을 작성하세요.</div>';}
 function openPopupManager(){if(!requireAdmin('홈 팝업 관리'))return;renderPopupManager();document.getElementById('popupManagerDialog')?.showModal();}
 function closePopupManager(){const d=document.getElementById('popupManagerDialog');if(d?.open)d.close();}
@@ -8379,7 +8376,7 @@ function renderHomeFast(){
 }
 let boardSelectedPostId='';
 function boardNoticeTime(post){return new Date(post?.updatedAt||post?.createdAt||0).getTime()||0;}
-function noticeBodyHtml(value){
+function stage5989NoticeBodyHtml(value){
   const escaped=portalEscape(String(value||''));
   const linked=escaped.replace(/https?:\/\/[^\s<]+/gi,(url)=>{
     let href=url,trail='';
@@ -8394,7 +8391,7 @@ function boardFullPostHtml(p,{latest=false}={}){
   const popupPeriod=(p.popupStartAt||p.popupEndAt)?`<div class="portal-meta notice-period">팝업기간 · ${p.popupStartAt?new Date(p.popupStartAt).toLocaleString('ko-KR'):'즉시'} ~ ${p.popupEndAt?new Date(p.popupEndAt).toLocaleString('ko-KR'):'계속'}</div>`:'';
   const postImage=stage6109ImageSrc(p);
   const image=postImage?`<div class="portal-board-image-wrap"><img class="portal-board-image" src="${postImage}" alt="${portalEscape(p.title)} 공지 이미지" loading="lazy" data-notice-image-view="${portalEscape(p.id)}" title="눌러서 크게 보기"><div class="portal-board-image-actions"><button type="button" class="btn btn-light btn-small" data-notice-image-view="${portalEscape(p.id)}">🔍 크게 보기</button><button type="button" class="btn btn-light btn-small" data-notice-image-download="${portalEscape(p.id)}">⬇ 이미지 다운로드</button></div></div>`:'';
-  return `<article id="boardSelectedNotice" class="portal-board-item notice-featured ${p.important?'important':''}"><div class="notice-featured-label">${latest?'최신 공지':'공지 상세'}</div><div class="portal-meta notice-meta-row"><span>${p.pinned?'📌 상단 고정 · ':''}${new Date(p.updatedAt||p.createdAt).toLocaleString('ko-KR')}</span><span class="notice-status ${status}">${statusText}${p.popup?' · 홈 팝업':''}</span></div><h3>${p.important?'🚨 ':''}${portalEscape(p.title)}</h3>${image}${p.body?`<div class="portal-board-body">${noticeBodyHtml(p.body)}</div>`:''}${p.startAt||p.endAt?`<div class="portal-meta notice-period">게시기간 · ${p.startAt?new Date(p.startAt).toLocaleString('ko-KR'):'즉시'} ~ ${p.endAt?new Date(p.endAt).toLocaleString('ko-KR'):'계속'}</div>`:''}${popupPeriod}${isAdmin()?`<div class="portal-board-actions"><button type="button" class="btn btn-light" data-board-edit="${p.id}">수정</button><button type="button" class="btn btn-danger-outline" data-board-delete="${p.id}">삭제</button></div>`:''}</article>`;
+  return `<article id="boardSelectedNotice" class="portal-board-item notice-featured ${p.important?'important':''}"><div class="notice-featured-label">${latest?'최신 공지':'공지 상세'}</div><div class="portal-meta notice-meta-row"><span>${p.pinned?'📌 상단 고정 · ':''}${new Date(p.updatedAt||p.createdAt).toLocaleString('ko-KR')}</span><span class="notice-status ${status}">${statusText}${p.popup?' · 홈 팝업':''}</span></div><h3>${p.important?'🚨 ':''}${portalEscape(p.title)}</h3>${image}${p.body?`<div class="portal-board-body">${stage5989NoticeBodyHtml(p.body)}</div>`:''}${p.startAt||p.endAt?`<div class="portal-meta notice-period">게시기간 · ${p.startAt?new Date(p.startAt).toLocaleString('ko-KR'):'즉시'} ~ ${p.endAt?new Date(p.endAt).toLocaleString('ko-KR'):'계속'}</div>`:''}${popupPeriod}${isAdmin()?`<div class="portal-board-actions"><button type="button" class="btn btn-light" data-board-edit="${p.id}">수정</button><button type="button" class="btn btn-danger-outline" data-board-delete="${p.id}">삭제</button></div>`:''}</article>`;
 }
 function boardNoticeListHtml(posts,selectedId){
   const rest=posts.filter(p=>String(p.id)!==String(selectedId));
@@ -18537,28 +18534,645 @@ console.info('[230MATCH] 5.9.79 ready · exact UID or name+phone My Match identi
 })();
 
 
-/* 230MATCH 5.10.0 · Stage 1 modular split
-   Stable peripheral modules moved out of app.js:
-   - modules/backup-center.js
-   - modules/cheer-music.js
-   - modules/notice-links.js */
-initNoticeLinksStyle();
-initCheerMusic();
-initBackupCenter({
-  getState:()=>state,
-  registrationContext,
-  registrationRuntime,
-  REGISTRATION_COLLECTION,
-  PUBLIC_REGISTRATION_COLLECTION,
-  getRecoveries,
-  requireAdmin,
-  downloadJson,
-  saveRecovery,
-  notice,
-  exportFullBackup,
-  downloadRecoveryBundle,
-  navigatePortalView,
-  renderBackupRecoveryManager,
-  buildLabel:typeof BUILD_LABEL!=='undefined'?BUILD_LABEL:''
-});
-console.info('[230MATCH] 5.10.0 ready · stage1 stable modules split');
+/* 230MATCH 5.9.83 · direct safe backup center
+   - 설정 > 백업·복구를 누르면 별도 관리창을 즉시 연다.
+   - 현재 대회 전체 안전백업은 읽기 전용: 운영 state + 참가신청 원본 + 공개현황 + 휴지통.
+   - Firebase/운영 데이터에는 어떤 쓰기도 하지 않는다. */
+(function stage5983DirectSafeBackupCenter(){
+  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const clone=v=>{try{return structuredClone(v);}catch(_e){return JSON.parse(JSON.stringify(v));}};
+  const safePart=v=>String(v||'230MATCH').replace(/[\\/:*?"<>|]+/g,'-').replace(/\s+/g,' ').trim().slice(0,80)||'230MATCH';
+
+  function context(){
+    let c={};
+    try{c=registrationContext()||{};}catch(_e){}
+    return {
+      tournamentId:String(c.tournamentId||state?.tournament?.id||''),
+      tournamentName:String(c.tournamentName||state?.tournament?.name||'현재대회'),
+      divisionId:String(c.divisionId||state?.multiDivision?.activeDivisionId||''),
+      divisionName:String(c.divisionName||state?.tournament?.division||'')
+    };
+  }
+  function belongs(row,ctx){
+    if(String(row?.tournamentId||'')!==ctx.tournamentId)return false;
+    const did=String(row?.divisionId||'');
+    const dn=String(row?.tournamentDivision||row?.divisionName||'').trim();
+    if(ctx.divisionId&&did)return did===ctx.divisionId;
+    if(ctx.divisionName&&dn)return dn===ctx.divisionName.trim();
+    return true;
+  }
+  async function readCurrentRegistrationCollections(){
+    const ctx=context(),rt=await registrationRuntime();
+    if(!rt?.db||!rt?.api)throw new Error('Firebase 참가신청 저장소에 연결할 수 없습니다.');
+    const [privateSnap,publicSnap]=await Promise.all([
+      rt.api.getDocs(rt.api.query(rt.api.collection(rt.db,REGISTRATION_COLLECTION),rt.api.where('tournamentId','==',ctx.tournamentId))),
+      rt.api.getDocs(rt.api.query(rt.api.collection(rt.db,PUBLIC_REGISTRATION_COLLECTION),rt.api.where('tournamentId','==',ctx.tournamentId)))
+    ]);
+    const privateAll=privateSnap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>belongs(r,ctx));
+    const publicRows=publicSnap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>belongs(r,ctx));
+    const trashRows=privateAll.filter(r=>r?.trashed===true||r?.deletedToTrash===true);
+    const activePrivate=privateAll.filter(r=>r?.trashed!==true&&r?.deletedToTrash!==true);
+    return {ctx,privateAll,activePrivate,publicRows,trashRows};
+  }
+
+  async function downloadSafeBackup(){
+    if(!requireAdmin('현재 대회 전체 안전백업'))return;
+    const btn=document.querySelector('[data-stage5983-safe-backup]');
+    const old=btn?.textContent||'';
+    if(btn){btn.disabled=true;btn.textContent='백업 만드는 중...';}
+    try{
+      const data=await readCurrentRegistrationCollections();
+      const recoveries=await getRecoveries().catch(()=>[]);
+      const payload={
+        format:'230MATCH_CURRENT_TOURNAMENT_SAFE_BACKUP',
+        schemaVersion:1,
+        backupCenterVersion:'5.9.83',
+        appBuild:typeof BUILD_LABEL!=='undefined'?BUILD_LABEL:'',
+        exportedAt:new Date().toISOString(),
+        tournamentId:data.ctx.tournamentId,
+        tournamentName:data.ctx.tournamentName,
+        divisionId:data.ctx.divisionId,
+        divisionName:data.ctx.divisionName,
+        counts:{
+          stateTeams:Array.isArray(state?.teams)?state.teams.length:0,
+          registrationActive:data.activePrivate.length,
+          registrationTrash:data.trashRows.length,
+          publicRows:data.publicRows.length,
+          localRecoveries:recoveries.length
+        },
+        currentState:clone(state),
+        firebase:{
+          matchRegistrationsV1:clone(data.privateAll),
+          activeRegistrations:clone(data.activePrivate),
+          trashRegistrations:clone(data.trashRows),
+          matchRegistrationPublicV1:clone(data.publicRows)
+        },
+        localRecoveryIndex:recoveries.map(r=>({
+          id:r.id,label:r.label,createdAt:r.createdAt,kind:r.kind||''
+        }))
+      };
+      downloadJson(
+        `${safePart(data.ctx.tournamentName)}-${safePart(data.ctx.divisionName||'전체')}-전체안전백업-${new Date().toISOString().slice(0,10)}-${Date.now()}.json`,
+        payload
+      );
+      notice(`현재 대회 전체 안전백업을 저장했습니다. 참가신청 ${data.activePrivate.length}건 · 휴지통 ${data.trashRows.length}건 · 공개현황 ${data.publicRows.length}건이 포함되었습니다.`,'success');
+      renderInfo().catch(()=>{});
+    }catch(e){
+      console.error('[5.9.83] safe backup failed',e);
+      notice(`전체 안전백업 실패: ${e?.message||e}`,'error');
+    }finally{
+      if(btn){btn.disabled=false;btn.textContent=old||'현재 대회 전체 안전백업';}
+    }
+  }
+
+  async function createRecoveryNow(){
+    if(!requireAdmin('현재 상태 복구점 저장'))return;
+    try{
+      const item=saveRecovery(state,`${state.tournament?.name||'현재 대회'} · 수동 안전복구점`,{kind:'manual'});
+      const result=await item.ready;
+      if(result?.saved)notice(`현재 상태 복구점을 저장했습니다. 전체 ${result.count||1}개 보관 중입니다.`,'success');
+      else notice('로컬 복구점 저장에 실패했습니다. JSON 안전백업을 이용해 주세요.','warning');
+      await renderInfo();
+    }catch(e){notice(`복구점 저장 실패: ${e?.message||e}`,'error');}
+  }
+
+  function ensureDialog(){
+    let d=document.getElementById('stage5983BackupCenter');
+    if(d)return d;
+    d=document.createElement('dialog');
+    d.id='stage5983BackupCenter';
+    d.className='stage5983-backup-center';
+    d.innerHTML=`
+      <div class="stage5983-shell">
+        <div class="stage5983-head">
+          <div><strong>💾 백업·복구 관리</strong><span>현재 대회의 중요한 데이터를 파일과 복구점으로 안전하게 보관합니다.</span></div>
+          <button type="button" class="btn btn-light btn-small" data-stage5983-close>닫기</button>
+        </div>
+        <section class="stage5983-primary">
+          <div>
+            <b>현재 대회 전체 안전백업</b>
+            <p>운영 상태 + 참가신청 원본 + 공개 참가현황 + 휴지통을 한 JSON 파일로 저장합니다.</p>
+          </div>
+          <button type="button" class="btn btn-primary" data-stage5983-safe-backup>현재 대회 전체 안전백업</button>
+        </section>
+        <div id="stage5983BackupInfo" class="stage5983-info">현재 상태를 확인하는 중입니다.</div>
+        <section class="stage5983-actions">
+          <button type="button" class="btn btn-light" data-stage5983-state-json>전체 상태 JSON 저장</button>
+          <button type="button" class="btn btn-light" data-stage5983-recovery>현재 상태 복구점 저장</button>
+          <button type="button" class="btn btn-light" data-stage5983-recovery-bundle>복구점 묶음 파일 저장</button>
+          <button type="button" class="btn btn-light" data-stage5983-existing-manager>기존 상세 백업관리 보기</button>
+        </section>
+        <div class="stage5983-note">안전백업 버튼은 Firebase를 읽어서 파일로 저장만 합니다. 현재 참가접수·입금·예선·코트·본선 데이터는 변경하지 않습니다.</div>
+      </div>`;
+    document.body.appendChild(d);
+
+    const style=document.createElement('style');
+    style.id='stage5983BackupCenterStyle';
+    style.textContent=`
+      .stage5983-backup-center{width:min(760px,95vw);max-height:88vh;border:0;border-radius:20px;padding:0;box-shadow:0 25px 80px rgba(15,35,70,.30)}
+      .stage5983-backup-center::backdrop{background:rgba(15,23,42,.46)}
+      .stage5983-shell{padding:20px;background:#fff;color:#172554}
+      .stage5983-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;border-bottom:1px solid #dbe4f0;padding-bottom:14px}
+      .stage5983-head>div{display:flex;flex-direction:column;gap:4px}.stage5983-head strong{font-size:20px}.stage5983-head span{font-size:12px;color:#64748b}
+      .stage5983-primary{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:16px 0;padding:16px;border:2px solid #2563eb;border-radius:16px;background:#eff6ff}
+      .stage5983-primary b{font-size:16px;color:#1e3a8a}.stage5983-primary p{margin:5px 0 0;font-size:12px;color:#475569;line-height:1.5}
+      .stage5983-info{padding:12px 14px;border-radius:12px;background:#f8fafc;border:1px solid #e2e8f0;font-size:13px;line-height:1.7}
+      .stage5983-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+      .stage5983-note{margin-top:14px;padding:10px 12px;border-radius:12px;background:#ecfdf5;color:#166534;font-size:12px;font-weight:700;line-height:1.5}
+      @media(max-width:640px){.stage5983-shell{padding:14px}.stage5983-primary{display:block}.stage5983-primary button{width:100%;margin-top:12px}.stage5983-actions .btn{width:100%}}
+    `;
+    document.head.appendChild(style);
+
+    d.addEventListener('click',e=>{
+      if(e.target===d||e.target.closest?.('[data-stage5983-close]')){d.close();return;}
+      if(e.target.closest?.('[data-stage5983-safe-backup]')){void downloadSafeBackup();return;}
+      if(e.target.closest?.('[data-stage5983-state-json]')){if(requireAdmin('전체 상태 JSON 저장'))exportFullBackup();return;}
+      if(e.target.closest?.('[data-stage5983-recovery]')){void createRecoveryNow();return;}
+      if(e.target.closest?.('[data-stage5983-recovery-bundle]')){void downloadRecoveryBundle();return;}
+      if(e.target.closest?.('[data-stage5983-existing-manager]')){
+        d.close();
+        navigatePortalView('settings',{pushHistory:true});
+        setTimeout(()=>{
+          const section=document.querySelector('.backup-recovery-manager');
+          if(section){
+            section.hidden=false;
+            section.style.display='';
+            section.scrollIntoView({behavior:'smooth',block:'start'});
+            section.classList.add('settings-target-flash');
+            setTimeout(()=>section.classList.remove('settings-target-flash'),1800);
+            try{renderBackupRecoveryManager();}catch(_e){}
+          }else notice('기존 상세 백업관리 영역을 찾지 못했습니다. 위 안전백업 기능은 정상 사용할 수 있습니다.','warning');
+        },180);
+      }
+    });
+    return d;
+  }
+
+  async function renderInfo(){
+    const el=document.getElementById('stage5983BackupInfo');if(!el)return;
+    try{
+      const data=await readCurrentRegistrationCollections();
+      const rs=await getRecoveries().catch(()=>[]);
+      el.innerHTML=`<b>${esc(data.ctx.tournamentName)}</b> · ${esc(data.ctx.divisionName||'부서 미설정')}<br>`+
+        `운영 참가팀 <b>${Array.isArray(state?.teams)?state.teams.length:0}팀</b> · `+
+        `참가신청 원본 <b>${data.activePrivate.length}건</b> · 공개현황 <b>${data.publicRows.length}건</b> · `+
+        `휴지통 <b>${data.trashRows.length}건</b> · 로컬 복구점 <b>${rs.length}개</b>`;
+    }catch(e){
+      el.textContent=`현재 상태 확인 중 일부 Firebase 정보를 읽지 못했습니다: ${e?.message||e}`;
+    }
+  }
+
+  window.stage5983OpenBackupCenter=function(){
+    if(!requireAdmin('백업·복구 관리'))return;
+    const d=ensureDialog();
+    if(typeof d.showModal==='function'){if(!d.open)d.showModal();}else d.setAttribute('open','');
+    void renderInfo();
+  };
+
+  console.info('[230MATCH] 5.9.83 ready · direct safe backup center');
+})();
+
+
+/* 230MATCH 5.9.84 · cheer music player
+   - 공지사항에서 사용자가 직접 눌렀을 때만 재생
+   - assets/audio/01.mp3 ~ 20.mp3 자동 탐색 후 순차 연속 재생
+   - 운영/Firebase 데이터 쓰기 없음 */
+(function stage5984CheerMusicPlayer(){
+  const BASE='./assets/audio/';
+  const MAX_TRACKS=20;
+  const KNOWN_TITLES={1:'코트위의 우리',2:'테린이의 꿈 (랩 ver.)',3:'(국화부) 그게 뭐라고'};
+  const LYRICS={1:`아침 햇살 코트 위로
+오늘의 승부가 시작돼
+
+몇 번째 경기인지 몰라도
+다시 라켓을 꽉 쥐고
+땀에 젖은 두 발 끝으로
+또 한 번 공을 쫓아가
+
+한 점 한 점 쌓아온 시간
+여기까지 온 이유
+숨이 차도 눈은 그대로
+마지막 공을 바라봐
+
+한 점 더, 한 걸음 더
+끝까지 버텨내는 거야
+수많은 공을 넘어서
+마지막 코트에 서는 순간
+
+한 점 더, 한 번만 더
+심장은 아직 뛰고 있어
+오늘의 마지막 승리자
+그 이름이 우승이 된다
+
+아침부터 여덟 번째 game
+다리는 무거워도 focus는 same
+흐르는 땀, 흔들리는 breath
+그래도 다시 준비, reset
+
+One more point, one more shot
+여기까지 왔으면 멈추지 마
+끝까지 버틴 그 시간이
+마지막 한 점을 만든다
+
+한 점 더, 한 걸음 더
+끝까지 달려온 우리
+마지막 공이 떨어지는 순간
+모든 시간이 빛이 된다
+
+한 점 더, 한 번만 더
+오늘을 기억해
+수많은 승부 끝에 남은
+단 하나의 이름
+우승`,2:`오늘도 코트 한쪽에서
+라켓을 꼭 쥐고 기다려
+저 고수들 게임 끝나기만
+한참을 바라보고 있네
+
+“다음에 한 번 같이 쳐요”
+그 말만 벌써 몇 번째인지
+결국 우리 테린이끼리
+또 웃으며 공을 넘긴다
+
+짧은 공 하나에도 뛰고
+아웃된 공에도 웃지만
+어제보다 한 발 더 가면
+그걸로 충분한 거야
+
+나도 언젠가 날아오를 거야
+저 높은 코트 위를 자유롭게
+지금은 서툴고 조금 느려도
+내 꿈까지 느린 건 아니야
+
+오늘도 또 시합에 나가
+지고 또 배우고 돌아와도
+한 포인트씩 쌓인 시간들이
+언젠가 나를 고수로 만들 거야
+
+포핸드 네트, 백핸드 아웃
+서브는 왜 또 더블 폴트
+고수들 코트 슬쩍 봤다가
+눈 마주치면 다시 뒤로
+
+“한 게임 같이 치실래요?”
+대답은 항상 “다음에요”
+그래도 난 기죽지 않아
+내일은 오늘보다 나을 테니까
+
+졌어? 괜찮아, 하나 배웠어
+털렸어? 그래도 끝까지 뛰었어
+랭킹보다 중요한 건
+어제의 나를 넘는 것
+
+오늘도 가방 메고 시합장으로
+한 경기 더, 한 걸음 앞으로
+언젠가 누가 날 바라보며 말해
+“저 사람, 진짜 고수네”
+
+그날이 오면 나도 먼저
+서툰 누군가에게 손 내밀 거야
+나도 그 마음을 알고 있으니까
+같이 한 게임 하자고
+
+나도 언젠가 날아오를 거야
+두려움 없이 코트 위를 달려
+오늘의 서러운 이 순간까지
+그날엔 웃으며 말할 거야
+
+나는 아직 테린이지만
+꿈은 벌써 코트 끝을 넘었어
+지고 또 지고 다시 일어나
+마침내 나도 날아오를 거야
+
+오늘도 한 게임 더
+내 꿈에 한 걸음 더`,3:`처음 라켓 잡던 그날부터
+마음속에 품은 이름 하나
+어딜 가도 모두 인정해 주는
+여자 테니스의 꽃 국화부
+
+랭킹 개나리 접수하려 해도
+눈 깜짝할 새 마감돼 버리고
+겨우 시합장에 이름을 올리면
+아홉 경기가 나를 기다리네
+
+국화부, 그게 뭐라고
+그게 뭐라고
+온종일 뛰고 또 뛰게 하나
+
+한 게임 이기고
+한 게임 버티며
+결승까지 가야 꽃을 다는데
+
+국화부, 그게 뭐라고
+그게 뭐라고
+져도 다음 시합 또 찾아가네
+
+다리가 풀려도
+라켓을 들고
+오늘도 국화를 꿈꾸는 나
+
+새벽부터 시합장에 도착해
+긴장하며 대진표를 바라봐
+첫 경기는 몸이 아직 안 풀리고
+두 번째는 벌써 숨이 차오르네
+
+강한 상대 만나 게임이 꼬여도
+파트너와 서로를 다독이면서
+한 포인트 한 포인트 쌓다 보면
+어느새 또 다음 코트로 간다
+
+접수 오픈, 손가락 준비
+새로 고침 누르다 마감이라니
+겨우 성공, 이제 시작
+예선부터 본선까지 숨 돌릴 틈 없지
+
+첫 게임, 두 게임, 세 게임, 네 게임
+이기고 또 뛰어, 다시 다음 게임
+다섯, 여섯, 일곱, 여덟
+아홉 번째 승부에 국화가 피네
+
+다리는 후들, 얼굴은 빨개
+그래도 마음만은 아직도 팔팔해
+“국화부 되면 뭐가 달라져?”
+말은 그렇게 해도 부럽긴 하네
+
+누가 봐도 인정하는 그 이름
+가방에 달고 싶은 작은 배지
+오늘의 패배도 내일의 연습
+나는 또 한 걸음 가까이 가지
+
+가끔은 내가 왜 이러나 싶어
+테니스가 뭐라고 울고 웃는지
+그만할까 마음을 내려놓으면
+국화 배지가 다시 눈에 들어와
+
+국화부, 그게 뭐라고
+그게 뭐라고
+아홉 게임을 버티게 하나
+
+조금 부족해도
+조금 느리더라도
+언젠가는 나도 꽃을 달 거야
+
+국화부, 그게 뭐라고
+그게 국화부라고
+모든 걸 가진 듯 행복할 거야
+
+그날이 와도 난
+먼저 손 내밀며
+테린이 마음을 잊지 않을 거야
+
+오늘도 완벽하진 않았지만
+국화부에 한 걸음 더 가까워졌네
+
+국화부, 그게 뭐라고
+그게 바로 국화부라고`};
+  let tracks=[{no:1,src:`${BASE}01.mp3`,title:KNOWN_TITLES[1]}];
+  let discovered=false,discovering=null,currentIndex=0;
+
+  const pad=n=>String(n).padStart(2,'0');
+  async function exists(url){
+    try{
+      const r=await fetch(url,{method:'HEAD',cache:'no-store'});
+      return r.ok;
+    }catch(_e){return false;}
+  }
+  async function discoverTracks(){
+    if(discovered)return tracks;
+    if(discovering)return discovering;
+    discovering=(async()=>{
+      const found=[{no:1,src:`${BASE}01.mp3`,title:KNOWN_TITLES[1]}];
+      const checks=[];
+      for(let n=2;n<=MAX_TRACKS;n++)checks.push((async()=>({n,ok:await exists(`${BASE}${pad(n)}.mp3`)}))());
+      const result=await Promise.all(checks);
+      result.filter(x=>x.ok).sort((a,b)=>a.n-b.n).forEach(({n})=>found.push({no:n,src:`${BASE}${pad(n)}.mp3`,title:KNOWN_TITLES[n]||`230MATCH 응원가 ${pad(n)}`}));
+      tracks=found;discovered=true;discovering=null;
+      renderPlaylist();updateCount();
+      return tracks;
+    })();
+    return discovering;
+  }
+
+  function ensureAudio(){
+    let a=document.getElementById('stage5984CheerAudio');
+    if(a)return a;
+    a=document.createElement('audio');
+    a.id='stage5984CheerAudio';
+    a.preload='metadata';
+    a.volume=.75;
+    a.addEventListener('ended',()=>next(true));
+    a.addEventListener('play',updateUi);
+    a.addEventListener('pause',updateUi);
+    a.addEventListener('timeupdate',updateProgress);
+    a.addEventListener('loadedmetadata',updateProgress);
+    document.body.appendChild(a);
+    return a;
+  }
+  function load(index,{play=false}={}){
+    if(!tracks.length)return;
+    currentIndex=(index+tracks.length)%tracks.length;
+    const t=tracks[currentIndex],a=ensureAudio();
+    const full=new URL(t.src,location.href).href;
+    if(a.src!==full)a.src=t.src;
+    updateUi();renderPlaylist();renderLyrics();
+    if(play)a.play().catch(()=>{});
+  }
+  function next(auto=false){
+    if(!tracks.length)return;
+    load((currentIndex+1)%tracks.length,{play:true});
+  }
+  function prev(){if(tracks.length)load((currentIndex-1+tracks.length)%tracks.length,{play:true});}
+  function toggle(){
+    const a=ensureAudio();
+    if(!a.src)load(currentIndex);
+    if(a.paused)a.play().catch(()=>{});else a.pause();
+  }
+  function fmt(sec){if(!Number.isFinite(sec))return '0:00';const m=Math.floor(sec/60),s=Math.floor(sec%60);return `${m}:${String(s).padStart(2,'0')}`;}
+  function updateProgress(){
+    const a=ensureAudio(),p=document.querySelector('[data-stage5984-progress]'),time=document.querySelector('[data-stage5984-time]');
+    if(p)p.value=a.duration?Math.min(100,(a.currentTime/a.duration)*100):0;
+    if(time)time.textContent=`${fmt(a.currentTime)} / ${fmt(a.duration)}`;
+  }
+  function updateCount(){const el=document.querySelector('[data-stage5984-track-count]');if(el)el.textContent=`${tracks.length}곡`;}
+  function updateUi(){
+    const a=ensureAudio(),t=tracks[currentIndex]||tracks[0];
+    document.querySelectorAll('[data-stage5984-play]').forEach(b=>b.textContent=a.paused?'▶ 재생':'⏸ 일시정지');
+    const title=document.querySelector('[data-stage5984-title]');if(title)title.textContent=t?.title||'230MATCH 응원가';
+    const no=document.querySelector('[data-stage5984-no]');if(no)no.textContent=t?`${pad(t.no)}번 곡`:'';
+  }
+  function renderPlaylist(){
+    const root=document.querySelector('[data-stage5984-list]');if(!root)return;
+    root.innerHTML=tracks.map((t,i)=>`<button type="button" class="stage5984-track ${i===currentIndex?'active':''}" data-stage5984-track="${i}"><span>${pad(t.no)}</span><strong>${String(t.title).replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]))}</strong>${i===currentIndex?'<em>재생목록</em>':''}</button>`).join('');
+  }
+
+  function renderLyrics(){
+    const d=document.getElementById('stage5984CheerDialog');
+    if(!d)return;
+    const box=d.querySelector('[data-stage5985-lyrics]');
+    const text=d.querySelector('[data-stage5985-lyrics-text]');
+    const title=d.querySelector('[data-stage5985-lyrics-title]');
+    const btn=d.querySelector('[data-stage5985-lyrics-toggle]');
+    if(!box||!text||!title||!btn)return;
+    const t=tracks[currentIndex]||tracks[0];
+    const lyrics=LYRICS[t?.no]||'';
+    title.textContent=t?.title||'230MATCH 응원가';
+    text.textContent=lyrics||'등록된 가사가 없습니다.';
+    btn.disabled=!lyrics;
+    if(!lyrics){
+      box.hidden=true;
+      btn.textContent='📖 가사 없음';
+    }else{
+      btn.textContent=box.hidden?'📖 가사 보기':'📕 가사 닫기';
+    }
+  }
+  function toggleLyrics(){
+    const d=document.getElementById('stage5984CheerDialog');
+    const box=d?.querySelector('[data-stage5985-lyrics]');
+    if(!box)return;
+    box.hidden=!box.hidden;
+    renderLyrics();
+    if(!box.hidden)setTimeout(()=>box.scrollIntoView({behavior:'smooth',block:'nearest'}),30);
+  }
+
+  function ensureDialog(){
+    let d=document.getElementById('stage5984CheerDialog');if(d)return d;
+    d=document.createElement('dialog');d.id='stage5984CheerDialog';d.className='stage5984-cheer-dialog';
+    d.innerHTML=`<div class="stage5984-player"><div class="stage5984-head"><div><b>🎵 230MATCH 응원가</b><span data-stage5984-track-count>1곡</span></div><button type="button" class="btn btn-light btn-small" data-stage5984-close>닫기</button></div><div class="stage5984-now"><small data-stage5984-no>01번 곡</small><strong data-stage5984-title>코트위의 우리</strong><div class="stage5984-controls"><button type="button" class="btn btn-light" data-stage5984-prev>⏮ 이전</button><button type="button" class="btn btn-primary" data-stage5984-play>▶ 재생</button><button type="button" class="btn btn-light" data-stage5984-next>다음 ⏭</button><button type="button" class="btn btn-light" data-stage5985-lyrics-toggle>📖 가사 보기</button></div><input type="range" min="0" max="100" value="0" data-stage5984-progress aria-label="재생 위치"><div class="stage5984-sub"><span data-stage5984-time>0:00 / 0:00</span><label>🔊 <input type="range" min="0" max="100" value="75" data-stage5984-volume aria-label="음량"></label></div></div><div class="stage5984-list-head"><strong>재생 목록</strong><span>곡이 끝나면 다음 곡이 자동 재생됩니다.</span></div><div class="stage5984-list" data-stage5984-list></div><div class="stage5985-lyrics" data-stage5985-lyrics hidden><div class="stage5985-lyrics-head"><strong>📖 가사</strong><span data-stage5985-lyrics-title>코트위의 우리</span></div><pre data-stage5985-lyrics-text></pre></div><div class="stage5984-note">새 응원가는 <code>assets/audio/02.mp3</code>, <code>03.mp3</code> 순서로 추가하면 자동으로 이어집니다. 가사는 곡별로 앱에 연결할 수 있습니다.</div></div>`;
+    document.body.appendChild(d);
+    const st=document.createElement('style');st.id='stage5984CheerStyle';st.textContent=`
+      .stage5984-music-card{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;margin:0 0 14px;border:1px solid #bfdbfe;border-radius:16px;background:linear-gradient(135deg,#eff6ff,#fff)}
+      .stage5984-music-card b{display:block;color:#1e3a8a;font-size:15px}.stage5984-music-card span{display:block;color:#64748b;font-size:12px;margin-top:3px}
+      .stage5984-cheer-dialog{width:min(620px,94vw);max-height:88vh;border:0;border-radius:20px;padding:0;box-shadow:0 24px 70px rgba(15,35,70,.28)}.stage5984-cheer-dialog::backdrop{background:rgba(15,23,42,.45)}
+      .stage5984-player{padding:18px;background:#fff;color:#172554}.stage5984-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;border-bottom:1px solid #e2e8f0;padding-bottom:12px}.stage5984-head>div{display:flex;flex-direction:column;gap:3px}.stage5984-head b{font-size:19px}.stage5984-head span{font-size:12px;color:#64748b}
+      .stage5984-now{padding:18px 4px 12px;text-align:center}.stage5984-now small{display:block;color:#64748b}.stage5984-now strong{display:block;font-size:22px;margin:5px 0 14px;color:#10264a}.stage5984-controls{display:flex;justify-content:center;gap:8px;flex-wrap:wrap}.stage5984-now input[type=range]{width:100%;margin-top:14px}.stage5984-sub{display:flex;justify-content:space-between;gap:12px;align-items:center;font-size:12px;color:#64748b}.stage5984-sub label{display:flex;align-items:center;gap:5px}.stage5984-sub label input{width:110px;margin:0}
+      .stage5984-list-head{display:flex;justify-content:space-between;gap:10px;align-items:end;border-top:1px solid #e2e8f0;padding-top:12px}.stage5984-list-head span{font-size:11px;color:#64748b}.stage5984-list{display:grid;gap:6px;margin-top:8px;max-height:240px;overflow:auto}.stage5984-track{display:grid;grid-template-columns:34px 1fr auto;align-items:center;gap:8px;width:100%;border:1px solid #e2e8f0;background:#fff;border-radius:11px;padding:9px 10px;text-align:left;cursor:pointer}.stage5984-track.active{border-color:#2563eb;background:#eff6ff}.stage5984-track span{font-size:11px;color:#64748b}.stage5984-track strong{font-size:13px;color:#172554}.stage5984-track em{font-style:normal;font-size:10px;color:#2563eb;font-weight:800}.stage5984-note{margin-top:10px;padding:9px 10px;border-radius:10px;background:#f8fafc;color:#64748b;font-size:11px;line-height:1.5}.stage5985-lyrics{margin-top:12px;border:1px solid #dbeafe;border-radius:14px;background:#f8fbff;overflow:hidden}.stage5985-lyrics-head{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px 12px;background:#eff6ff;border-bottom:1px solid #dbeafe}.stage5985-lyrics-head strong{font-size:13px;color:#1e3a8a}.stage5985-lyrics-head span{font-size:11px;color:#64748b}.stage5985-lyrics pre{margin:0;padding:14px;white-space:pre-wrap;word-break:keep-all;font-family:inherit;font-size:13px;line-height:1.75;color:#334155;max-height:320px;overflow:auto;text-align:left}
+      @media(max-width:640px){.stage5984-music-card{align-items:flex-start;flex-direction:column}.stage5984-music-card .btn{width:100%}.stage5984-player{padding:14px}.stage5984-now strong{font-size:19px}.stage5984-sub{align-items:flex-start;flex-direction:column}.stage5984-sub label{width:100%}.stage5984-sub label input{flex:1}}
+    `;document.head.appendChild(st);
+    d.addEventListener('click',e=>{
+      if(e.target===d||e.target.closest?.('[data-stage5984-close]')){d.close();return;}
+      if(e.target.closest?.('[data-stage5984-play]')){toggle();return;}
+      if(e.target.closest?.('[data-stage5984-next]')){next();return;}
+      if(e.target.closest?.('[data-stage5984-prev]')){prev();return;}
+      if(e.target.closest?.('[data-stage5985-lyrics-toggle]')){toggleLyrics();return;}
+      const tr=e.target.closest?.('[data-stage5984-track]');if(tr){load(Number(tr.dataset.stage5984Track),{play:true});return;}
+    });
+    d.querySelector('[data-stage5984-progress]')?.addEventListener('input',e=>{const a=ensureAudio();if(a.duration)a.currentTime=a.duration*(Number(e.target.value)/100);});
+    d.querySelector('[data-stage5984-volume]')?.addEventListener('input',e=>{ensureAudio().volume=Number(e.target.value)/100;});
+    renderPlaylist();updateUi();renderLyrics();return d;
+  }
+
+  async function openPlayer({autoplay=false}={}){
+    const d=ensureDialog();if(typeof d.showModal==='function'){if(!d.open)d.showModal();}else d.setAttribute('open','');
+    await discoverTracks();load(currentIndex,{play:autoplay});
+  }
+  function insertBoardCard(){
+    const board=document.getElementById('boardPostList');if(!board||board.querySelector('[data-stage5984-board-card]'))return;
+    const card=document.createElement('section');card.className='stage5984-music-card';card.dataset.stage5984BoardCard='1';
+    card.innerHTML=`<div><b>🎵 230MATCH 응원가</b><span>코트 위의 열정, 230MATCH 음악을 들어보세요.</span></div><button type="button" class="btn btn-primary" data-stage5984-open>🎵 응원가 듣기</button>`;
+    board.prepend(card);
+  }
+  const baseRender=renderBoardFast;
+  renderBoardFast=function(){const r=baseRender.apply(this,arguments);setTimeout(insertBoardCard,0);return r;};
+  document.addEventListener('click',e=>{const b=e.target.closest?.('[data-stage5984-open]');if(!b)return;e.preventDefault();e.stopPropagation();void openPlayer({autoplay:true});},true);
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{if(document.body?.dataset.currentView==='board')insertBoardCard();},800),{once:true});
+  else setTimeout(()=>{if(document.body?.dataset.currentView==='board')insertBoardCard();},800);
+  window.stage5984OpenCheerMusic=()=>openPlayer({autoplay:false});
+  console.info('[230MATCH] 5.9.84 ready · user-triggered cheer music playlist');
+})();
+
+/* 230MATCH 5.9.85 · lyrics viewer for cheer music */
+console.info('[230MATCH] 5.9.85 ready · cheer music lyrics viewer');
+
+
+/* 230MATCH 5.9.86 · home recent notice cheer button
+   - 홈 > 최근 공지 영역에 응원가 듣기 버튼을 항상 표시
+   - 음악 재생 기능만 호출하며 운영/Firebase 데이터 쓰기 없음 */
+(function stage5986HomeCheerButton(){
+  function insertHomeMusicButton(){
+    const home=document.getElementById('homeNoticeList');
+    if(!home||home.querySelector('[data-stage5986-home-music]'))return;
+    const btn=document.createElement('button');
+    btn.type='button';
+    btn.className='portal-list-item notice-home-item stage5986-home-music';
+    btn.dataset.stage5986HomeMusic='1';
+    btn.dataset.stage5984Open='1';
+    btn.innerHTML='<strong>🎵 230MATCH 응원가 듣기</strong><div class="portal-meta">코트위의 우리 · 가사 보기</div><span class="stage5986-playmark">▶</span>';
+    home.prepend(btn);
+  }
+
+  if(!document.getElementById('stage5986HomeCheerStyle')){
+    const st=document.createElement('style');
+    st.id='stage5986HomeCheerStyle';
+    st.textContent=`
+      #homeNoticeList .stage5986-home-music{position:relative;width:100%;border:1px solid #bfdbfe!important;background:linear-gradient(135deg,#eff6ff,#ffffff)!important;color:#1e3a8a!important;text-align:left;cursor:pointer}
+      #homeNoticeList .stage5986-home-music strong{color:#1e3a8a!important}
+      #homeNoticeList .stage5986-home-music .portal-meta{padding-right:28px}
+      #homeNoticeList .stage5986-playmark{position:absolute;right:14px;top:50%;transform:translateY(-50%);display:grid;place-items:center;width:26px;height:26px;border-radius:999px;background:#2563eb;color:#fff;font-size:11px;font-weight:900}
+      #homeNoticeList .stage5986-home-music:active{transform:translateY(1px)}
+    `;
+    document.head.appendChild(st);
+  }
+
+  const baseHome=renderHomeFast;
+  renderHomeFast=function(){
+    const r=baseHome.apply(this,arguments);
+    setTimeout(insertHomeMusicButton,0);
+    return r;
+  };
+
+  let observer=null;
+  function watchHomeNotice(){
+    const home=document.getElementById('homeNoticeList');
+    if(!home)return;
+    insertHomeMusicButton();
+    if(observer)return;
+    observer=new MutationObserver(()=>{
+      if(document.body?.dataset.currentView==='home')setTimeout(insertHomeMusicButton,0);
+    });
+    observer.observe(home,{childList:true});
+  }
+
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(watchHomeNotice,500),{once:true});
+  else setTimeout(watchHomeNotice,500);
+  window.addEventListener('pageshow',()=>setTimeout(()=>{watchHomeNotice();if(document.body?.dataset.currentView==='home')insertHomeMusicButton();},300));
+  console.info('[230MATCH] 5.9.86 ready · home recent notice cheer button');
+})();
+
+/* 230MATCH 5.9.87 · lyrics scope/runtime fix */
+console.info('[230MATCH] 5.9.87 ready · cheer lyrics scope fixed');
+
+/* 230MATCH 5.9.88 · second cheer song + lyrics */
+console.info('[230MATCH] 5.9.88 ready · track 02 and lyrics added');
+
+
+/* 230MATCH 5.9.89 · clickable notice URLs */
+(function stage5989NoticeLinksStyle(){
+  if(document.getElementById('stage5989NoticeLinksStyle'))return;
+  const st=document.createElement('style');
+  st.id='stage5989NoticeLinksStyle';
+  st.textContent=`
+    .portal-board-body .notice-auto-link{color:#0b57d0;text-decoration:underline;text-underline-offset:2px;word-break:break-all;font-weight:700}
+    .portal-board-body .notice-auto-link:visited{color:#5b21b6}
+  `;
+  document.head.appendChild(st);
+})();
+console.info('[230MATCH] 5.9.89 ready · notice URLs are clickable links');
+
+/* 230MATCH 5.9.90 · third cheer song + lyrics */
+console.info('[230MATCH] 5.9.90 ready · track 03 and lyrics added');
+
+/* 230MATCH 5.9.91 · track 03 title rename */
+console.info('[230MATCH] 5.9.91 ready · track 03 title renamed');
+
+
+/* 230MATCH 5.9.92 · clickable links in home notice popup */
+(function stage5992PopupLinkStyle(){
+  if(document.getElementById('stage5992PopupLinkStyle'))return;
+  const st=document.createElement('style');
+  st.id='stage5992PopupLinkStyle';
+  st.textContent=`
+    #homeNoticePopupBody .notice-auto-link{color:#0b57d0;text-decoration:underline;text-underline-offset:2px;word-break:break-all;font-weight:800}
+    #homeNoticePopupBody .notice-auto-link:visited{color:#5b21b6}
+  `;
+  document.head.appendChild(st);
+})();
+console.info('[230MATCH] 5.9.92 ready · home popup URLs are clickable links');
