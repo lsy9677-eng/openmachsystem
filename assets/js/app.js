@@ -14,6 +14,7 @@ import{initCheerMusic}from'./modules/cheer-music.js?v=5102';
 import{initBackupCenter}from'./modules/backup-center.js?v=5100';
 import{createSmsOpsModule}from'./modules/sms-ops.js?v=5103';
 import{createAligoSender}from'./modules/aligo-client.js?v=5104';
+import{createRegistrationSmsModule}from'./modules/registration-sms.js?v=5105';
 import{ensureTimeState,calculateTimeMetrics,timeInfo}from'./time-engine-v5000.js?v=5940';
 import{ensureMessagingState,generatePlayingMessages,generateWait1Messages,generateCurrentCourtMessages,generateCurrentWaitMessages,generateAllTimeMessages,markMessageSent,deleteMessage,clearSentMessages,markAllSent,smsUri,refreshMessageContacts,mergePendingDuplicates,getMessageHistory}from'./message-engine.js?v=3521';
 import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactData,importContactData}from'./contact-engine-v5000.js?v=5000';
@@ -6560,35 +6561,32 @@ async function openAdminNoticeSms(kind,item,{ask=true}={}){
   }
 }
 
-function entrySmsTemplate(kind,item){
-  const sender=state.messaging?.settings?.senderName||'230MATCH';
-  const event=item.tournamentName||state.tournament?.name||'현재 대회';
-  const fee=state.portal?.guide?.fee||'';
-  if(kind==='payment')return `${event} 참가비 ${fee||'6만원'} 입금 확인, 정상 등록되었습니다. 감사합니다.`;
-  if(kind==='promote')return `[${sender}] ${smsApplicationTeamName(item)}님, ${event} 후보에서 일반 참가팀으로 승격되었습니다. 대회 일정과 준비사항을 확인해 주세요.`;
-  if(kind==='approve')return `[${sender}] ${smsApplicationTeamName(item)}님, ${event} 참가 신청이 승인되었습니다.${item.paid?' 참가비 입금도 확인되었습니다.':' 참가비 입금 확인 후 최종 참가가 확정됩니다.'}`;
-  if(kind==='reserve')return `[${sender}] ${smsApplicationTeamName(item)}님, ${event} 후보팀으로 접수되었습니다. 후보 순번은 ${reserveApplicationOrder(item)||'-'}번이며, 승격 시 다시 안내드리겠습니다.`;
-  if(kind==='reject')return `[${sender}] ${smsApplicationTeamName(item)}님, ${event} 참가 신청이 반려되었습니다.${item.adminMemo?` 사유: ${item.adminMemo}`:''}`;
-  if(kind==='refund')return `[${sender}] ${smsApplicationTeamName(item)}님, ${event} 참가비 환불 처리가 완료되었습니다.`;
-  return `[${sender}] ${smsApplicationTeamName(item)}님, ${event} 참가 신청 안내입니다.`;
-}
-function entrySmsMessage(kind,item){return entrySmsTemplate(kind,item);}
-let entrySmsItem=null;
-function openEntrySmsDialog(kind,item){
-  if(!item||!validatePhone(String(item.phone||'').replace(/\D/g,''))){notice('문자 받을 연락처가 없습니다.','error');return;}
-  entrySmsItem={kind,item};
-  const d=document.getElementById('entrySmsDialog');if(!d)return;
-  const titles={payment:'💳 입금완료 문자 확인',promote:'⬆️ 후보 승격 문자 확인',approve:'✅ 참가승인 문자 확인',reserve:'⏳ 후보등록 문자 확인',reject:'❌ 반려 문자 확인',refund:'↩️ 환불완료 문자 확인'};
-  document.getElementById('entrySmsTitle').textContent=titles[kind]||'참가 신청 문자 확인';
-  document.getElementById('entrySmsTarget').textContent=`${item.teamName} · ${item.phone}`;
-  document.getElementById('entrySmsBody').value=entrySmsTemplate(kind,item);
-  if(typeof d.showModal==='function')d.showModal();else d.setAttribute('open','');
-}
-function closeEntrySmsDialog(){const d=document.getElementById('entrySmsDialog');if(d?.open)d.close();else d?.removeAttribute('open');entrySmsItem=null;}
-async function sendEntrySmsAligo(){if(!entrySmsItem)return;const body=document.getElementById('entrySmsBody')?.value?.trim()||'';try{await sendAligoSmsV3([{name:entrySmsItem.item.teamName,phone:entrySmsItem.item.phone}],body,{source:'registration',kind:entrySmsItem.kind,title:'230MATCH 참가 안내'});entrySmsItem.item.smsHistory=entrySmsItem.item.smsHistory||[];entrySmsItem.item.smsHistory.unshift({kind:entrySmsItem.kind,channel:'aligo',sentAt:new Date().toISOString(),body});commit(`참가 안내 문자 발송 · ${entrySmsItem.item.teamName}`);notice('알리고 문자를 발송했습니다.','success');closeEntrySmsDialog();renderApplicationPortal();}catch(e){notice(`문자 발송 실패: ${e.message||e}`,'error');}}
-function sendEntrySmsPhone(){if(!entrySmsItem)return;const body=document.getElementById('entrySmsBody')?.value?.trim()||'',phone=String(entrySmsItem.item.phone||'').replace(/\D/g,'');if(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||''))location.href=`sms:${phone}?body=${encodeURIComponent(body)}`;else navigator.clipboard?.writeText(`${phone}\n\n${body}`);entrySmsItem.item.smsHistory=entrySmsItem.item.smsHistory||[];entrySmsItem.item.smsHistory.unshift({kind:entrySmsItem.kind,channel:'phone',sentAt:new Date().toISOString(),body});commit(`참가 안내 문자앱 열기 · ${entrySmsItem.item.teamName}`);notice('문자앱을 열거나 내용을 복사했습니다.','success');closeEntrySmsDialog();}
-async function copyEntrySms(){if(!entrySmsItem)return;const body=document.getElementById('entrySmsBody')?.value?.trim()||'';await navigator.clipboard.writeText(`${entrySmsItem.item.phone}\n\n${body}`);notice('번호와 문구를 복사했습니다.','success');}
-function bindEntrySmsDialog(){document.getElementById('entrySmsCloseBtn')?.addEventListener('click',closeEntrySmsDialog);document.getElementById('entrySmsSkipBtn')?.addEventListener('click',closeEntrySmsDialog);document.getElementById('entrySmsAligoBtn')?.addEventListener('click',sendEntrySmsAligo);document.getElementById('entrySmsPhoneBtn')?.addEventListener('click',sendEntrySmsPhone);document.getElementById('entrySmsCopyBtn')?.addEventListener('click',copyEntrySms);}
+const {
+  entrySmsTemplate,
+  entrySmsMessage,
+  entrySmsDialogPlayers,
+  renderEntrySmsRecipientEditor,
+  currentEntrySmsRecipients,
+  syncEntrySmsTargetText,
+  selectEntrySmsRecipients,
+  openEntrySmsDialog,
+  closeEntrySmsDialog,
+  sendEntrySmsAligo,
+  sendEntrySmsPhone,
+  copyEntrySms,
+  bindEntrySmsDialog
+}=createRegistrationSmsModule({
+  getState:()=>state,
+  smsApplicationTeamName,
+  reserveApplicationOrder,
+  entryApplicationPlayers,
+  validatePhone,
+  portalEscape,
+  sendAligoSmsV3,
+  commit,
+  notice,
+  renderApplications:()=>renderApplicationPortal()
+});
 function entryActiveCount(){return (state.portal?.applications||[]).filter(a=>a.status==='approved').length;}
 function entryCapacity(){return Math.max(0,Number(state.tournament?.capacity||state.settings?.activeTeamCount||0));}
 function suggestReservePromotion(){
@@ -9024,72 +9022,6 @@ editEntryApplication=function(id){
     return;
   }
   return v3252OriginalEdit(id);
-};
-function entrySmsDialogPlayers(item){
-  const players=entryApplicationPlayers(item).map((p,index)=>({index,name:String(p.name||`선수 ${index+1}`),phone:String(p.phone||'').replace(/\D/g,'')}));
-  const repIndex=Number(item?.representativeIndex||0)===1?1:0;
-  return players.map(p=>({...p,representative:p.index===repIndex}));
-}
-function renderEntrySmsRecipientEditor(item,mode){
-  const root=document.getElementById('entrySmsRecipientEditor');if(!root)return;
-  const players=entrySmsDialogPlayers(item);const actualMode=mode==='representative'?'representative':'both';
-  root.innerHTML=players.map(p=>`<label class="entry-sms-recipient-row"><input type="checkbox" data-entry-sms-recipient="${p.index}" ${actualMode==='both'||p.representative?'checked':''}><input type="text" data-entry-sms-name="${p.index}" value="${portalEscape(p.name)}" aria-label="수신자 이름"><input type="tel" inputmode="numeric" data-entry-sms-phone="${p.index}" value="${portalEscape(p.phone)}" aria-label="수신자 전화번호">${p.representative?'<small>대표</small>':''}</label>`).join('');
-  syncEntrySmsTargetText();
-}
-function currentEntrySmsRecipients(){
-  const root=document.getElementById('entrySmsRecipientEditor');if(!root)return[];
-  const list=[];
-  root.querySelectorAll('[data-entry-sms-recipient]').forEach(check=>{
-    if(!check.checked)return;
-    const index=check.dataset.entrySmsRecipient;
-    const phone=String(root.querySelector(`[data-entry-sms-phone="${index}"]`)?.value||'').replace(/\D/g,'');
-    const name=String(root.querySelector(`[data-entry-sms-name="${index}"]`)?.value||`선수 ${Number(index)+1}`).trim();
-    if(validatePhone(phone)?.ok&&!list.some(x=>x.phone===phone))list.push({name,phone,index:Number(index)});
-  });
-  return list;
-}
-function syncEntrySmsTargetText(){
-  const item=entrySmsItem?.item,recipients=currentEntrySmsRecipients(),target=document.getElementById('entrySmsTarget');if(!target)return;
-  target.textContent=recipients.length?`${recipients.length}명 · ${recipients.map(p=>`${p.name} ${p.phone}`).join(' / ')}`:'수신번호를 선택하세요.';
-}
-function selectEntrySmsRecipients(mode){
-  const root=document.getElementById('entrySmsRecipientEditor');if(!root||!entrySmsItem)return;
-  const repIndex=Number(entrySmsItem.item?.representativeIndex||0)===1?1:0;
-  root.querySelectorAll('[data-entry-sms-recipient]').forEach(check=>{check.checked=mode==='both'||Number(check.dataset.entrySmsRecipient)===repIndex;});
-  syncEntrySmsTargetText();
-}
-openEntrySmsDialog=function(kind,item){
-  entrySmsItem={kind,item};
-  const d=document.getElementById('entrySmsDialog');if(!d)return;
-  document.getElementById('entrySmsTitle').textContent=({approve:'참가 승인 문자',reserve:'후보 등록 문자',promote:'일반 참가 승격 문자',payment:'입금 완료 문자',reject:'신청 반려 문자',refund:'환불 완료 문자'})[kind]||'참가 신청 문자 확인';
-  document.getElementById('entrySmsBody').value=entrySmsMessage(kind,item);
-  renderEntrySmsRecipientEditor(item,item?.smsTargetMode==='representative'?'representative':'both');
-  document.getElementById('entrySmsSelectBothBtn').onclick=()=>selectEntrySmsRecipients('both');
-  document.getElementById('entrySmsSelectRepresentativeBtn').onclick=()=>selectEntrySmsRecipients('representative');
-  document.getElementById('entrySmsRecipientEditor').oninput=syncEntrySmsTargetText;
-  document.getElementById('entrySmsRecipientEditor').onchange=syncEntrySmsTargetText;
-  d.showModal();
-};
-sendEntrySmsAligo=async function(){
-  if(!entrySmsItem)return;const body=document.getElementById('entrySmsBody')?.value?.trim()||'',recipients=currentEntrySmsRecipients();
-  if(!recipients.length)return notice('문자 받을 선수를 한 명 이상 선택하세요.','error');
-  try{
-    await sendAligoSmsV3(recipients,body,{source:'registration',kind:entrySmsItem.kind,title:'230MATCH 참가 안내'});
-    entrySmsItem.item.smsHistory=entrySmsItem.item.smsHistory||[];entrySmsItem.item.smsHistory.unshift({kind:entrySmsItem.kind,channel:'aligo',sentAt:new Date().toISOString(),body,recipients});
-    commit(`참가 안내 문자 발송 · ${entrySmsItem.item.teamName} · ${recipients.length}명`);notice(`알리고 문자를 ${recipients.length}명에게 발송했습니다.`,'success');closeEntrySmsDialog();renderApplicationPortal();
-  }catch(e){notice(`문자 발송 실패: ${e.message||e}`,'error')}
-};
-sendEntrySmsPhone=function(){
-  if(!entrySmsItem)return;const body=document.getElementById('entrySmsBody')?.value?.trim()||'',recipients=currentEntrySmsRecipients();
-  if(!recipients.length)return notice('문자 받을 선수를 한 명 이상 선택하세요.','error');
-  const phones=recipients.map(x=>x.phone);
-  if(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||''))location.href=`sms:${phones.join(',')}?body=${encodeURIComponent(body)}`;else navigator.clipboard?.writeText(`${phones.join('\n')}\n\n${body}`);
-  entrySmsItem.item.smsHistory=entrySmsItem.item.smsHistory||[];entrySmsItem.item.smsHistory.unshift({kind:entrySmsItem.kind,channel:'phone',sentAt:new Date().toISOString(),body,recipients});
-  commit(`참가 안내 문자앱 열기 · ${entrySmsItem.item.teamName} · ${recipients.length}명`);notice(`문자앱 수신자 ${recipients.length}명을 준비했습니다.`,'success');closeEntrySmsDialog();
-};
-copyEntrySms=async function(){
-  if(!entrySmsItem)return;const body=document.getElementById('entrySmsBody')?.value?.trim()||'',recipients=currentEntrySmsRecipients();
-  await navigator.clipboard.writeText(`${recipients.map(x=>`${x.name} ${x.phone}`).join('\n')}\n\n${body}`);notice('선택한 수신자와 문구를 복사했습니다.','success');
 };
 const v3252RenderApplications=renderApplicationPortal;renderApplicationPortal=function(){v3252RenderApplications.apply(this,arguments);document.querySelectorAll('.entry-admin-row').forEach(row=>{const sms=row.querySelector('[data-entry-sms]');if(!sms)return;const id=sms.dataset.entrySms;const item=simpleRegistrationRows().find(a=>a.id===id);if(!item)return;if(!row.querySelector('[data-entry-sms-mode]')){const sel=document.createElement('select');sel.className='entry-sms-target-select';sel.dataset.entrySmsMode=id;sel.innerHTML=`<option value="both">두 선수 모두</option><option value="representative">대표전화만</option>`;sel.value=item.smsTargetMode==='representative'?'representative':'both';sms.before(sel)}if(item.status==='delete_requested'&&!row.querySelector('[data-entry-admin-delete]')){const b=document.createElement('button');b.type='button';b.className='btn btn-danger-outline btn-small';b.dataset.entryAdminDelete=id;b.textContent='삭제 승인';row.querySelector('.entry-actions')?.appendChild(b)}});setTimeout(v3252AutofillEntry,0)};
 document.addEventListener('change',e=>{const sel=e.target.closest?.('[data-entry-sms-mode]');if(!sel)return;const item=(state.portal?.applications||[]).find(a=>a.id===sel.dataset.entrySmsMode);if(item){item.smsTargetMode=sel.value==='representative'?'representative':'both';commit(`문자 수신대상 설정 · ${item.teamName}`)}});
@@ -18567,3 +18499,6 @@ console.info('[230MATCH] 5.10.3 ready · sms ops module split');
 
 /* 230MATCH 5.10.4 · Stage 2B Aligo transport module split */
 console.info('[230MATCH] 5.10.4 ready · aligo transport module split');
+
+/* 230MATCH 5.10.5 · Stage 2C registration SMS UI module split */
+console.info('[230MATCH] 5.10.5 ready · registration sms UI module split');
