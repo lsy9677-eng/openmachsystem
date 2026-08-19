@@ -10697,25 +10697,6 @@ let refreshDivisionEditorPanel = window.refreshDivisionEditorPanel || (()=>{});
     const v=snapshotValues(rec);
     return `<div class="s6001-division-form" data-division-id="${esc(rec.id)}"><div class="s6001-grid"><label>부서명<input id="s6001DivName" value="${esc(v.name)}"></label><label>참가 정원<input id="s6001Capacity" type="number" min="1" value="${v.capacity}"></label><label>본선 규모<select id="s6001DrawSize"><option value="32" ${v.drawSize===32?'selected':''}>32강</option><option value="64" ${v.drawSize===64?'selected':''}>64강</option><option value="128" ${v.drawSize===128?'selected':''}>128강</option></select></label><label>조당 본선 진출팀<input id="s6001Qualifiers" type="number" min="1" max="3" value="${v.qualifiers}"></label><label>2팀조 수<input id="s6001TwoGroups" type="number" min="0" value="${v.twoGroups}"></label><label>경기시간(분)<input id="s6001Minutes" type="number" min="10" value="${v.minutes}"></label></div><div class="s6001-venue-title"><div><h4>구장·사용 코트</h4><p>실제로 사용할 코트 번호만 체크합니다.</p></div><button type="button" class="btn btn-light" data-s6001-add-venue>+ 구장 추가</button></div><div id="s6001VenueList">${v.venues.map(venueCard).join('')}</div><div class="s6001-local-actions"><button type="button" class="btn btn-danger-outline" data-s6001-delete-division ${divisions().length<=1?'disabled':''}>부서 삭제</button><button type="button" class="btn btn-light" data-s6001-apply-division>이 부서 변경 적용</button></div><p id="s6001DivisionMessage" class="s6001-message"></p></div>`;
   }
-  function renderLyrics(){
-    const box=document.querySelector('[data-stage5985-lyrics]');
-    const text=document.querySelector('[data-stage5985-lyrics-text]');
-    const title=document.querySelector('[data-stage5985-lyrics-title]');
-    const btn=document.querySelector('[data-stage5985-lyrics-toggle]');
-    if(!box||!text||!title||!btn)return;
-    const t=tracks[currentIndex]||tracks[0];
-    const lyrics=LYRICS[t?.no]||'';
-    title.textContent=t?.title||'230MATCH 응원가';
-    text.textContent=lyrics||'등록된 가사가 없습니다.';
-    btn.disabled=!lyrics;
-    if(!lyrics){box.hidden=true;btn.textContent='📖 가사 없음';}
-    else if(box.hidden)btn.textContent='📖 가사 보기';
-    else btn.textContent='📕 가사 닫기';
-  }
-  function toggleLyrics(){
-    const box=document.querySelector('[data-stage5985-lyrics]');if(!box)return;
-    box.hidden=!box.hidden;renderLyrics();
-  }
   function ensureDialog(){
     document.getElementById('stage6001TournamentEditor')?.remove();
     const d=document.createElement('dialog');d.id='stage6001TournamentEditor';d.className='s6001-dialog';
@@ -18871,6 +18852,35 @@ One more point, one more shot
     root.innerHTML=tracks.map((t,i)=>`<button type="button" class="stage5984-track ${i===currentIndex?'active':''}" data-stage5984-track="${i}"><span>${pad(t.no)}</span><strong>${String(t.title).replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]))}</strong>${i===currentIndex?'<em>재생목록</em>':''}</button>`).join('');
   }
 
+  function renderLyrics(){
+    const d=document.getElementById('stage5984CheerDialog');
+    if(!d)return;
+    const box=d.querySelector('[data-stage5985-lyrics]');
+    const text=d.querySelector('[data-stage5985-lyrics-text]');
+    const title=d.querySelector('[data-stage5985-lyrics-title]');
+    const btn=d.querySelector('[data-stage5985-lyrics-toggle]');
+    if(!box||!text||!title||!btn)return;
+    const t=tracks[currentIndex]||tracks[0];
+    const lyrics=LYRICS[t?.no]||'';
+    title.textContent=t?.title||'230MATCH 응원가';
+    text.textContent=lyrics||'등록된 가사가 없습니다.';
+    btn.disabled=!lyrics;
+    if(!lyrics){
+      box.hidden=true;
+      btn.textContent='📖 가사 없음';
+    }else{
+      btn.textContent=box.hidden?'📖 가사 보기':'📕 가사 닫기';
+    }
+  }
+  function toggleLyrics(){
+    const d=document.getElementById('stage5984CheerDialog');
+    const box=d?.querySelector('[data-stage5985-lyrics]');
+    if(!box)return;
+    box.hidden=!box.hidden;
+    renderLyrics();
+    if(!box.hidden)setTimeout(()=>box.scrollIntoView({behavior:'smooth',block:'nearest'}),30);
+  }
+
   function ensureDialog(){
     let d=document.getElementById('stage5984CheerDialog');if(d)return d;
     d=document.createElement('dialog');d.id='stage5984CheerDialog';d.className='stage5984-cheer-dialog';
@@ -18974,3 +18984,6 @@ console.info('[230MATCH] 5.9.85 ready · cheer music lyrics viewer');
   window.addEventListener('pageshow',()=>setTimeout(()=>{watchHomeNotice();if(document.body?.dataset.currentView==='home')insertHomeMusicButton();},300));
   console.info('[230MATCH] 5.9.86 ready · home recent notice cheer button');
 })();
+
+/* 230MATCH 5.9.87 · lyrics scope/runtime fix */
+console.info('[230MATCH] 5.9.87 ready · cheer lyrics scope fixed');
