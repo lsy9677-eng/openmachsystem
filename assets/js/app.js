@@ -13,6 +13,7 @@ import{noticeBodyHtml,initNoticeLinksStyle}from'./modules/notice-links.js?v=5100
 import{initCheerMusic}from'./modules/cheer-music.js?v=5102';
 import{initBackupCenter}from'./modules/backup-center.js?v=5100';
 import{createSmsOpsModule}from'./modules/sms-ops.js?v=5103';
+import{createAligoSender}from'./modules/aligo-client.js?v=5104';
 import{ensureTimeState,calculateTimeMetrics,timeInfo}from'./time-engine-v5000.js?v=5940';
 import{ensureMessagingState,generatePlayingMessages,generateWait1Messages,generateCurrentCourtMessages,generateCurrentWaitMessages,generateAllTimeMessages,markMessageSent,deleteMessage,clearSentMessages,markAllSent,smsUri,refreshMessageContacts,mergePendingDuplicates,getMessageHistory}from'./message-engine.js?v=3521';
 import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactData,importContactData}from'./contact-engine-v5000.js?v=5000';
@@ -1479,15 +1480,16 @@ function showNextAutoSmsDialog(){
   d.__smsItem=item;d.showModal();
 }
 function closeAutoSmsDialog(status='skipped'){const d=document.getElementById('autoSmsApprovalDialog');const item=d?.__smsItem;if(item)markAutoSmsHistory(item.key,status);if(d?.open)d.close();if(d)d.__smsItem=null;autoSmsDialogOpen=false;setTimeout(showNextAutoSmsDialog,60);}
-async function sendAligoSmsV3(recipients,msg,meta={}){
-  msg=smsResolveDynamicBody(smsStripAffiliations(msg),meta?.matchId||'',meta?.placement||{});
-  const list=[];for(const r of recipients||[]){const phone=smsDigits(r.phone);if(phone.length>=9&&!list.some(x=>x.phone===phone))list.push({name:r.name||'수신자',phone});}if(!list.length)throw new Error('문자 받을 번호가 없습니다.');
-  const receivers=list.map(x=>x.phone),body=String(msg||'').trim();const type=new Blob([body]).size>90?'LMS':'SMS';
-  const payload={receivers,receiver:receivers[0],recipients:list,targets:list,phones:receivers,to:receivers,msg:body,body,message:body,content:body,type,title:String(meta.title||'230MATCH 문자').slice(0,40),meta:{app:'230MATCH',version:'stage31.68',...meta}};
-  const res=await fetch(ALIGO_PROXY_URL,{method:'POST',mode:'cors',headers:{'Content-Type':'application/json','x-api-key':ALIGO_CLIENT_KEY},credentials:'omit',body:JSON.stringify(payload)});const raw=await res.text();let data;try{data=JSON.parse(raw)}catch{data={raw}};
-  if(!res.ok||data.success===false||data.ok===false)throw new Error(data.message||data.error||data.aligo?.message||raw||`HTTP ${res.status}`);return data;
-}
-async function approveAutoSmsAligo(){const d=document.getElementById('autoSmsApprovalDialog'),item=d?.__smsItem;if(!item||item.noPhone)return;const body=document.getElementById('autoSmsApprovalBody').value.trim();try{notice('알리고 문자 발송 중...','info');await sendAligoSmsV3(item.recipients,body,{source:'court_auto_approval',kind:item.kind,matchId:item.matchId,title:'230MATCH 경기 안내'});markAutoSmsHistory(item.key,'sent-aligo');notice(`알리고 문자 ${item.recipients.length}명 발송 완료`,'success');closeAutoSmsDialog('sent-aligo');}catch(e){notice(`알리고 발송 실패: ${e.message||e}`,'error');}}
+const sendAligoSmsV3=createAligoSender({
+  proxyUrl:ALIGO_PROXY_URL,
+  clientKey:ALIGO_CLIENT_KEY,
+  normalizePhone:smsDigits,
+  prepareBody:(msg,meta={})=>smsResolveDynamicBody(
+    smsStripAffiliations(msg),
+    meta?.matchId||'',
+    meta?.placement||{}
+  )
+});async function approveAutoSmsAligo(){const d=document.getElementById('autoSmsApprovalDialog'),item=d?.__smsItem;if(!item||item.noPhone)return;const body=document.getElementById('autoSmsApprovalBody').value.trim();try{notice('알리고 문자 발송 중...','info');await sendAligoSmsV3(item.recipients,body,{source:'court_auto_approval',kind:item.kind,matchId:item.matchId,title:'230MATCH 경기 안내'});markAutoSmsHistory(item.key,'sent-aligo');notice(`알리고 문자 ${item.recipients.length}명 발송 완료`,'success');closeAutoSmsDialog('sent-aligo');}catch(e){notice(`알리고 발송 실패: ${e.message||e}`,'error');}}
 function approveAutoSmsPhone(){const d=document.getElementById('autoSmsApprovalDialog'),item=d?.__smsItem;if(!item||item.noPhone)return;const body=document.getElementById('autoSmsApprovalBody').value.trim(),phones=item.recipients.map(x=>smsDigits(x.phone)).filter(Boolean);if(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||''))location.href=`sms:${phones.join(',')}?body=${encodeURIComponent(body)}`;else navigator.clipboard?.writeText(`${phones.join('\n')}\n\n${body}`);markAutoSmsHistory(item.key,'opened-phone');notice('문자앱을 열거나 번호와 내용을 복사했습니다.','success');closeAutoSmsDialog('opened-phone');}
 async function copyAutoSms(){const d=document.getElementById('autoSmsApprovalDialog'),item=d?.__smsItem;if(!item||item.noPhone)return;const body=document.getElementById('autoSmsApprovalBody').value.trim();await navigator.clipboard.writeText(`${item.recipients.map(x=>`${x.name} ${x.phone}`).join('\n')}\n\n${body}`);notice('수신자와 문자 내용을 복사했습니다.','success');}
 function previewCurrentCourtSms(){if(!requireOperator('자동 문자 점검'))return;autoSmsSnapshot=null;detectAutoSmsEvents();const cur=buildAutoSmsSnapshot();for(const [id,p] of Object.entries(cur.placements)){const m=findAnyMatchById(id);if(m){queueAutoSmsEvent(p.slot==='playing'?'start':'waiting',m,p);return;}}notice('현재 코트에 배정된 경기가 없습니다.','info');}
@@ -18562,3 +18564,6 @@ console.info('[230MATCH] 5.10.2 ready · cheer entry style bootstrap');
 
 /* 230MATCH 5.10.3 · Stage 2A SMS operations module split */
 console.info('[230MATCH] 5.10.3 ready · sms ops module split');
+
+/* 230MATCH 5.10.4 · Stage 2B Aligo transport module split */
+console.info('[230MATCH] 5.10.4 ready · aligo transport module split');
