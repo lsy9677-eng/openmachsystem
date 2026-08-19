@@ -18740,7 +18740,7 @@ console.info('[230MATCH] 5.9.79 ready · exact UID or name+phone My Match identi
 (function stage5984CheerMusicPlayer(){
   const BASE='./assets/audio/';
   const MAX_TRACKS=20;
-  const KNOWN_TITLES={1:'코트위의 우리',2:'테린이의 꿈 (랩 ver.)'};
+  const KNOWN_TITLES={1:'코트위의 우리',2:'테린이의 꿈 (랩 ver.)',3:'(국화부) 그게 뭐라고'};
   const LYRICS={1:`아침 햇살 코트 위로
 오늘의 승부가 시작돼
 
@@ -18844,7 +18844,88 @@ One more point, one more shot
 마침내 나도 날아오를 거야
 
 오늘도 한 게임 더
-내 꿈에 한 걸음 더`};
+내 꿈에 한 걸음 더`,3:`처음 라켓 잡던 그날부터
+마음속에 품은 이름 하나
+어딜 가도 모두 인정해 주는
+여자 테니스의 꽃 국화부
+
+랭킹 개나리 접수하려 해도
+눈 깜짝할 새 마감돼 버리고
+겨우 시합장에 이름을 올리면
+아홉 경기가 나를 기다리네
+
+국화부, 그게 뭐라고
+그게 뭐라고
+온종일 뛰고 또 뛰게 하나
+
+한 게임 이기고
+한 게임 버티며
+결승까지 가야 꽃을 다는데
+
+국화부, 그게 뭐라고
+그게 뭐라고
+져도 다음 시합 또 찾아가네
+
+다리가 풀려도
+라켓을 들고
+오늘도 국화를 꿈꾸는 나
+
+새벽부터 시합장에 도착해
+긴장하며 대진표를 바라봐
+첫 경기는 몸이 아직 안 풀리고
+두 번째는 벌써 숨이 차오르네
+
+강한 상대 만나 게임이 꼬여도
+파트너와 서로를 다독이면서
+한 포인트 한 포인트 쌓다 보면
+어느새 또 다음 코트로 간다
+
+접수 오픈, 손가락 준비
+새로 고침 누르다 마감이라니
+겨우 성공, 이제 시작
+예선부터 본선까지 숨 돌릴 틈 없지
+
+첫 게임, 두 게임, 세 게임, 네 게임
+이기고 또 뛰어, 다시 다음 게임
+다섯, 여섯, 일곱, 여덟
+아홉 번째 승부에 국화가 피네
+
+다리는 후들, 얼굴은 빨개
+그래도 마음만은 아직도 팔팔해
+“국화부 되면 뭐가 달라져?”
+말은 그렇게 해도 부럽긴 하네
+
+누가 봐도 인정하는 그 이름
+가방에 달고 싶은 작은 배지
+오늘의 패배도 내일의 연습
+나는 또 한 걸음 가까이 가지
+
+가끔은 내가 왜 이러나 싶어
+테니스가 뭐라고 울고 웃는지
+그만할까 마음을 내려놓으면
+국화 배지가 다시 눈에 들어와
+
+국화부, 그게 뭐라고
+그게 뭐라고
+아홉 게임을 버티게 하나
+
+조금 부족해도
+조금 느리더라도
+언젠가는 나도 꽃을 달 거야
+
+국화부, 그게 뭐라고
+그게 국화부라고
+모든 걸 가진 듯 행복할 거야
+
+그날이 와도 난
+먼저 손 내밀며
+테린이 마음을 잊지 않을 거야
+
+오늘도 완벽하진 않았지만
+국화부에 한 걸음 더 가까워졌네
+
+국화부, 그게 뭐라고
+그게 바로 국화부라고`};
   let tracks=[{no:1,src:`${BASE}01.mp3`,title:KNOWN_TITLES[1]}];
   let discovered=false,discovering=null,currentIndex=0;
 
@@ -19075,3 +19156,9 @@ console.info('[230MATCH] 5.9.88 ready · track 02 and lyrics added');
   document.head.appendChild(st);
 })();
 console.info('[230MATCH] 5.9.89 ready · notice URLs are clickable links');
+
+/* 230MATCH 5.9.90 · third cheer song + lyrics */
+console.info('[230MATCH] 5.9.90 ready · track 03 and lyrics added');
+
+/* 230MATCH 5.9.91 · track 03 title rename */
+console.info('[230MATCH] 5.9.91 ready · track 03 title renamed');
