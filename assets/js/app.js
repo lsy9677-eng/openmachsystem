@@ -18721,3 +18721,135 @@ console.info('[230MATCH] 5.9.79 ready · exact UID or name+phone My Match identi
 
   console.info('[230MATCH] 5.9.83 ready · direct safe backup center');
 })();
+
+
+/* 230MATCH 5.9.84 · cheer music player
+   - 공지사항에서 사용자가 직접 눌렀을 때만 재생
+   - assets/audio/01.mp3 ~ 20.mp3 자동 탐색 후 순차 연속 재생
+   - 운영/Firebase 데이터 쓰기 없음 */
+(function stage5984CheerMusicPlayer(){
+  const BASE='./assets/audio/';
+  const MAX_TRACKS=20;
+  const KNOWN_TITLES={1:'코트위의 우리'};
+  let tracks=[{no:1,src:`${BASE}01.mp3`,title:KNOWN_TITLES[1]}];
+  let discovered=false,discovering=null,currentIndex=0;
+
+  const pad=n=>String(n).padStart(2,'0');
+  async function exists(url){
+    try{
+      const r=await fetch(url,{method:'HEAD',cache:'no-store'});
+      return r.ok;
+    }catch(_e){return false;}
+  }
+  async function discoverTracks(){
+    if(discovered)return tracks;
+    if(discovering)return discovering;
+    discovering=(async()=>{
+      const found=[{no:1,src:`${BASE}01.mp3`,title:KNOWN_TITLES[1]}];
+      const checks=[];
+      for(let n=2;n<=MAX_TRACKS;n++)checks.push((async()=>({n,ok:await exists(`${BASE}${pad(n)}.mp3`)}))());
+      const result=await Promise.all(checks);
+      result.filter(x=>x.ok).sort((a,b)=>a.n-b.n).forEach(({n})=>found.push({no:n,src:`${BASE}${pad(n)}.mp3`,title:KNOWN_TITLES[n]||`230MATCH 응원가 ${pad(n)}`}));
+      tracks=found;discovered=true;discovering=null;
+      renderPlaylist();updateCount();
+      return tracks;
+    })();
+    return discovering;
+  }
+
+  function ensureAudio(){
+    let a=document.getElementById('stage5984CheerAudio');
+    if(a)return a;
+    a=document.createElement('audio');
+    a.id='stage5984CheerAudio';
+    a.preload='metadata';
+    a.volume=.75;
+    a.addEventListener('ended',()=>next(true));
+    a.addEventListener('play',updateUi);
+    a.addEventListener('pause',updateUi);
+    a.addEventListener('timeupdate',updateProgress);
+    a.addEventListener('loadedmetadata',updateProgress);
+    document.body.appendChild(a);
+    return a;
+  }
+  function load(index,{play=false}={}){
+    if(!tracks.length)return;
+    currentIndex=(index+tracks.length)%tracks.length;
+    const t=tracks[currentIndex],a=ensureAudio();
+    const full=new URL(t.src,location.href).href;
+    if(a.src!==full)a.src=t.src;
+    updateUi();renderPlaylist();
+    if(play)a.play().catch(()=>{});
+  }
+  function next(auto=false){
+    if(!tracks.length)return;
+    load((currentIndex+1)%tracks.length,{play:true});
+  }
+  function prev(){if(tracks.length)load((currentIndex-1+tracks.length)%tracks.length,{play:true});}
+  function toggle(){
+    const a=ensureAudio();
+    if(!a.src)load(currentIndex);
+    if(a.paused)a.play().catch(()=>{});else a.pause();
+  }
+  function fmt(sec){if(!Number.isFinite(sec))return '0:00';const m=Math.floor(sec/60),s=Math.floor(sec%60);return `${m}:${String(s).padStart(2,'0')}`;}
+  function updateProgress(){
+    const a=ensureAudio(),p=document.querySelector('[data-stage5984-progress]'),time=document.querySelector('[data-stage5984-time]');
+    if(p)p.value=a.duration?Math.min(100,(a.currentTime/a.duration)*100):0;
+    if(time)time.textContent=`${fmt(a.currentTime)} / ${fmt(a.duration)}`;
+  }
+  function updateCount(){const el=document.querySelector('[data-stage5984-track-count]');if(el)el.textContent=`${tracks.length}곡`;}
+  function updateUi(){
+    const a=ensureAudio(),t=tracks[currentIndex]||tracks[0];
+    document.querySelectorAll('[data-stage5984-play]').forEach(b=>b.textContent=a.paused?'▶ 재생':'⏸ 일시정지');
+    const title=document.querySelector('[data-stage5984-title]');if(title)title.textContent=t?.title||'230MATCH 응원가';
+    const no=document.querySelector('[data-stage5984-no]');if(no)no.textContent=t?`${pad(t.no)}번 곡`:'';
+  }
+  function renderPlaylist(){
+    const root=document.querySelector('[data-stage5984-list]');if(!root)return;
+    root.innerHTML=tracks.map((t,i)=>`<button type="button" class="stage5984-track ${i===currentIndex?'active':''}" data-stage5984-track="${i}"><span>${pad(t.no)}</span><strong>${String(t.title).replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]))}</strong>${i===currentIndex?'<em>재생목록</em>':''}</button>`).join('');
+  }
+
+  function ensureDialog(){
+    let d=document.getElementById('stage5984CheerDialog');if(d)return d;
+    d=document.createElement('dialog');d.id='stage5984CheerDialog';d.className='stage5984-cheer-dialog';
+    d.innerHTML=`<div class="stage5984-player"><div class="stage5984-head"><div><b>🎵 230MATCH 응원가</b><span data-stage5984-track-count>1곡</span></div><button type="button" class="btn btn-light btn-small" data-stage5984-close>닫기</button></div><div class="stage5984-now"><small data-stage5984-no>01번 곡</small><strong data-stage5984-title>코트위의 우리</strong><div class="stage5984-controls"><button type="button" class="btn btn-light" data-stage5984-prev>⏮ 이전</button><button type="button" class="btn btn-primary" data-stage5984-play>▶ 재생</button><button type="button" class="btn btn-light" data-stage5984-next>다음 ⏭</button></div><input type="range" min="0" max="100" value="0" data-stage5984-progress aria-label="재생 위치"><div class="stage5984-sub"><span data-stage5984-time>0:00 / 0:00</span><label>🔊 <input type="range" min="0" max="100" value="75" data-stage5984-volume aria-label="음량"></label></div></div><div class="stage5984-list-head"><strong>재생 목록</strong><span>곡이 끝나면 다음 곡이 자동 재생됩니다.</span></div><div class="stage5984-list" data-stage5984-list></div><div class="stage5984-note">새 응원가는 <code>assets/audio/02.mp3</code>, <code>03.mp3</code> 순서로 추가하면 자동으로 이어집니다.</div></div>`;
+    document.body.appendChild(d);
+    const st=document.createElement('style');st.id='stage5984CheerStyle';st.textContent=`
+      .stage5984-music-card{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;margin:0 0 14px;border:1px solid #bfdbfe;border-radius:16px;background:linear-gradient(135deg,#eff6ff,#fff)}
+      .stage5984-music-card b{display:block;color:#1e3a8a;font-size:15px}.stage5984-music-card span{display:block;color:#64748b;font-size:12px;margin-top:3px}
+      .stage5984-cheer-dialog{width:min(620px,94vw);max-height:88vh;border:0;border-radius:20px;padding:0;box-shadow:0 24px 70px rgba(15,35,70,.28)}.stage5984-cheer-dialog::backdrop{background:rgba(15,23,42,.45)}
+      .stage5984-player{padding:18px;background:#fff;color:#172554}.stage5984-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;border-bottom:1px solid #e2e8f0;padding-bottom:12px}.stage5984-head>div{display:flex;flex-direction:column;gap:3px}.stage5984-head b{font-size:19px}.stage5984-head span{font-size:12px;color:#64748b}
+      .stage5984-now{padding:18px 4px 12px;text-align:center}.stage5984-now small{display:block;color:#64748b}.stage5984-now strong{display:block;font-size:22px;margin:5px 0 14px;color:#10264a}.stage5984-controls{display:flex;justify-content:center;gap:8px;flex-wrap:wrap}.stage5984-now input[type=range]{width:100%;margin-top:14px}.stage5984-sub{display:flex;justify-content:space-between;gap:12px;align-items:center;font-size:12px;color:#64748b}.stage5984-sub label{display:flex;align-items:center;gap:5px}.stage5984-sub label input{width:110px;margin:0}
+      .stage5984-list-head{display:flex;justify-content:space-between;gap:10px;align-items:end;border-top:1px solid #e2e8f0;padding-top:12px}.stage5984-list-head span{font-size:11px;color:#64748b}.stage5984-list{display:grid;gap:6px;margin-top:8px;max-height:240px;overflow:auto}.stage5984-track{display:grid;grid-template-columns:34px 1fr auto;align-items:center;gap:8px;width:100%;border:1px solid #e2e8f0;background:#fff;border-radius:11px;padding:9px 10px;text-align:left;cursor:pointer}.stage5984-track.active{border-color:#2563eb;background:#eff6ff}.stage5984-track span{font-size:11px;color:#64748b}.stage5984-track strong{font-size:13px;color:#172554}.stage5984-track em{font-style:normal;font-size:10px;color:#2563eb;font-weight:800}.stage5984-note{margin-top:10px;padding:9px 10px;border-radius:10px;background:#f8fafc;color:#64748b;font-size:11px;line-height:1.5}
+      @media(max-width:640px){.stage5984-music-card{align-items:flex-start;flex-direction:column}.stage5984-music-card .btn{width:100%}.stage5984-player{padding:14px}.stage5984-now strong{font-size:19px}.stage5984-sub{align-items:flex-start;flex-direction:column}.stage5984-sub label{width:100%}.stage5984-sub label input{flex:1}}
+    `;document.head.appendChild(st);
+    d.addEventListener('click',e=>{
+      if(e.target===d||e.target.closest?.('[data-stage5984-close]')){d.close();return;}
+      if(e.target.closest?.('[data-stage5984-play]')){toggle();return;}
+      if(e.target.closest?.('[data-stage5984-next]')){next();return;}
+      if(e.target.closest?.('[data-stage5984-prev]')){prev();return;}
+      const tr=e.target.closest?.('[data-stage5984-track]');if(tr){load(Number(tr.dataset.stage5984Track),{play:true});return;}
+    });
+    d.querySelector('[data-stage5984-progress]')?.addEventListener('input',e=>{const a=ensureAudio();if(a.duration)a.currentTime=a.duration*(Number(e.target.value)/100);});
+    d.querySelector('[data-stage5984-volume]')?.addEventListener('input',e=>{ensureAudio().volume=Number(e.target.value)/100;});
+    renderPlaylist();updateUi();return d;
+  }
+
+  async function openPlayer({autoplay=false}={}){
+    const d=ensureDialog();if(typeof d.showModal==='function'){if(!d.open)d.showModal();}else d.setAttribute('open','');
+    await discoverTracks();load(currentIndex,{play:autoplay});
+  }
+  function insertBoardCard(){
+    const board=document.getElementById('boardPostList');if(!board||board.querySelector('[data-stage5984-board-card]'))return;
+    const card=document.createElement('section');card.className='stage5984-music-card';card.dataset.stage5984BoardCard='1';
+    card.innerHTML=`<div><b>🎵 230MATCH 응원가</b><span>코트 위의 열정, 230MATCH 음악을 들어보세요.</span></div><button type="button" class="btn btn-primary" data-stage5984-open>🎵 응원가 듣기</button>`;
+    board.prepend(card);
+  }
+  const baseRender=renderBoardFast;
+  renderBoardFast=function(){const r=baseRender.apply(this,arguments);setTimeout(insertBoardCard,0);return r;};
+  document.addEventListener('click',e=>{const b=e.target.closest?.('[data-stage5984-open]');if(!b)return;e.preventDefault();e.stopPropagation();void openPlayer({autoplay:true});},true);
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{if(document.body?.dataset.currentView==='board')insertBoardCard();},800),{once:true});
+  else setTimeout(()=>{if(document.body?.dataset.currentView==='board')insertBoardCard();},800);
+  window.stage5984OpenCheerMusic=()=>openPlayer({autoplay:false});
+  console.info('[230MATCH] 5.9.84 ready · user-triggered cheer music playlist');
+})();
