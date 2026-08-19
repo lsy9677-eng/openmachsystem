@@ -7828,7 +7828,7 @@ async function saveBoardPost(){
 function popupDismissKey(post){return `230match-notice-dismiss-${post.id}-${new Date().toISOString().slice(0,10)}`;}
 function popupPostStatus(post,now=Date.now()){const start=post.popupStartAt?new Date(post.popupStartAt).getTime():(post.startAt?new Date(post.startAt).getTime():0),end=post.popupEndAt?new Date(post.popupEndAt).getTime():(post.endAt?new Date(post.endAt).getTime():0);if(start&&start>now)return 'scheduled';if(end&&end<now)return 'expired';return 'active';}
 function closeHomeNoticePopup(){const dialog=document.getElementById('homeNoticePopup');const id=dialog?.dataset.postId;if(id&&document.getElementById('homeNoticePopupDismiss')?.checked)localStorage.setItem(popupDismissKey({id}),'1');if(dialog?.open)dialog.close();}
-function showEligibleHomePopup(){if(document.body.dataset.currentView!=='home')return;const post=visibleBoardPosts().find(p=>p.popup&&popupPostStatus(p)==='active'&&!localStorage.getItem(popupDismissKey(p)));const dialog=document.getElementById('homeNoticePopup');if(!post||!dialog||dialog.open)return;dialog.dataset.postId=post.id;document.getElementById('homeNoticePopupBadge').textContent=post.important?'중요 공지':'대회 공지';document.getElementById('homeNoticePopupTitle').textContent=post.title;const body=document.getElementById('homeNoticePopupBody');if(body){body.innerHTML=post.body?portalEscape(post.body).replace(/\n/g,'<br>'):'';body.hidden=!post.body;}const img=document.getElementById('homeNoticePopupImage');if(img){const postImage=stage6109ImageSrc(post);img.hidden=!postImage;if(postImage)img.src=postImage;else img.removeAttribute('src');}document.getElementById('homeNoticePopupDismiss').checked=false;dialog.showModal();}
+function showEligibleHomePopup(){if(document.body.dataset.currentView!=='home')return;const post=visibleBoardPosts().find(p=>p.popup&&popupPostStatus(p)==='active'&&!localStorage.getItem(popupDismissKey(p)));const dialog=document.getElementById('homeNoticePopup');if(!post||!dialog||dialog.open)return;dialog.dataset.postId=post.id;document.getElementById('homeNoticePopupBadge').textContent=post.important?'중요 공지':'대회 공지';document.getElementById('homeNoticePopupTitle').textContent=post.title;const body=document.getElementById('homeNoticePopupBody');if(body){body.innerHTML=post.body?stage5989NoticeBodyHtml(post.body):'';body.hidden=!post.body;}const img=document.getElementById('homeNoticePopupImage');if(img){const postImage=stage6109ImageSrc(post);img.hidden=!postImage;if(postImage)img.src=postImage;else img.removeAttribute('src');}document.getElementById('homeNoticePopupDismiss').checked=false;dialog.showModal();}
 function renderPopupManager(){const root=document.getElementById('popupManagerList');if(!root)return;const rows=[...globalPosts()].sort((a,b)=>String(b.updatedAt||b.createdAt).localeCompare(String(a.updatedAt||a.createdAt)));root.innerHTML=rows.map(p=>{const st=popupPostStatus(p),label=st==='scheduled'?'예정':st==='expired'?'종료':'현재';return `<article class="popup-manager-item" data-popup-manager-id="${p.id}"><div class="popup-manager-item-head"><div><strong>${portalEscape(p.title)}</strong><div class="portal-meta">${p.popup?'홈 팝업 ON':'홈 팝업 OFF'} · ${label}</div></div>${stage6109ImageSrc(p)?`<img class="popup-manager-thumb" src="${stage6109ImageSrc(p)}" alt="공지 이미지">`:''}</div><div class="popup-manager-controls"><label class="form-check"><input type="checkbox" data-popup-enabled ${p.popup?'checked':''}><span>홈 팝업 표시</span></label><label><span>팝업 시작</span><input type="datetime-local" data-popup-start value="${boardDateValue(p.popupStartAt)}"></label><label><span>팝업 종료</span><input type="datetime-local" data-popup-end value="${boardDateValue(p.popupEndAt)}"></label><button type="button" class="btn btn-primary btn-small" data-popup-save>저장</button></div></article>`;}).join('')||'<div class="portal-empty">등록된 공지가 없습니다. 먼저 공지사항을 작성하세요.</div>';}
 function openPopupManager(){if(!requireAdmin('홈 팝업 관리'))return;renderPopupManager();document.getElementById('popupManagerDialog')?.showModal();}
 function closePopupManager(){const d=document.getElementById('popupManagerDialog');if(d?.open)d.close();}
@@ -19162,3 +19162,17 @@ console.info('[230MATCH] 5.9.90 ready · track 03 and lyrics added');
 
 /* 230MATCH 5.9.91 · track 03 title rename */
 console.info('[230MATCH] 5.9.91 ready · track 03 title renamed');
+
+
+/* 230MATCH 5.9.92 · clickable links in home notice popup */
+(function stage5992PopupLinkStyle(){
+  if(document.getElementById('stage5992PopupLinkStyle'))return;
+  const st=document.createElement('style');
+  st.id='stage5992PopupLinkStyle';
+  st.textContent=`
+    #homeNoticePopupBody .notice-auto-link{color:#0b57d0;text-decoration:underline;text-underline-offset:2px;word-break:break-all;font-weight:800}
+    #homeNoticePopupBody .notice-auto-link:visited{color:#5b21b6}
+  `;
+  document.head.appendChild(st);
+})();
+console.info('[230MATCH] 5.9.92 ready · home popup URLs are clickable links');
