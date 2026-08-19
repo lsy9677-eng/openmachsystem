@@ -53,9 +53,31 @@ async function openPlayer({autoplay=false}={}){const d=ensureDialog();if(typeof 
 function insertBoardCard(){const board=document.getElementById('boardPostList');if(!board||board.querySelector('[data-stage5984-board-card]'))return;const card=document.createElement('section');card.className='stage5984-music-card';card.dataset.stage5984BoardCard='1';card.innerHTML=`<div><b>🎵 230MATCH 응원가</b><span>코트 위의 열정, 230MATCH 음악을 들어보세요.</span></div><button type="button" class="btn btn-primary" data-stage5984-open>🎵 응원가 듣기</button>`;board.prepend(card);}
 function insertHomeMusicButton(){const home=document.getElementById('homeNoticeList');if(!home||home.querySelector('[data-stage5986-home-music]'))return;const btn=document.createElement('button');btn.type='button';btn.className='portal-list-item notice-home-item stage5986-home-music';btn.dataset.stage5986HomeMusic='1';btn.dataset.stage5984Open='1';btn.innerHTML='<strong>🎵 230MATCH 응원가 듣기</strong><div class="portal-meta">코트위의 우리 · 가사 보기</div><span class="stage5986-playmark">▶</span>';home.prepend(btn);}
 function watch(selector,decorate){const attach=()=>{const el=document.querySelector(selector);if(!el)return false;decorate();const mo=new MutationObserver(()=>setTimeout(decorate,0));mo.observe(el,{childList:true});observers.push(mo);return true;};if(!attach())setTimeout(attach,800);}
+function ensureEntryStyles(){
+  if(document.getElementById('stage5984EntryStyle'))return;
+  const st=document.createElement('style');
+  st.id='stage5984EntryStyle';
+  st.textContent=`
+    .stage5984-music-card{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;margin:0 0 14px;border:1px solid #bfdbfe;border-radius:16px;background:linear-gradient(135deg,#eff6ff,#fff)}
+    .stage5984-music-card b{display:block;color:#1e3a8a;font-size:15px}
+    .stage5984-music-card span{display:block;color:#64748b;font-size:12px;margin-top:3px}
+    #homeNoticeList .stage5986-home-music{display:block;position:relative;width:100%;padding:13px 46px 13px 14px!important;border:1px solid #bfdbfe!important;border-radius:14px!important;background:linear-gradient(135deg,#eff6ff,#ffffff)!important;color:#1e3a8a!important;text-align:left!important;cursor:pointer!important;box-shadow:0 1px 0 rgba(37,99,235,.04)}
+    #homeNoticeList .stage5986-home-music strong{display:block;color:#1e3a8a!important;font-size:15px;font-weight:900}
+    #homeNoticeList .stage5986-home-music .portal-meta{margin-top:3px;color:#64748b!important;padding-right:6px}
+    #homeNoticeList .stage5986-playmark{position:absolute;right:14px;top:50%;transform:translateY(-50%);display:grid;place-items:center;width:28px;height:28px;border-radius:999px;background:#173a6c;color:#fff;font-size:12px;font-weight:900;line-height:1}
+    #homeNoticeList .stage5986-home-music:hover{border-color:#93c5fd!important;background:linear-gradient(135deg,#eaf3ff,#fff)!important}
+    #homeNoticeList .stage5986-home-music:active{transform:translateY(1px)}
+    @media(max-width:640px){.stage5984-music-card{align-items:flex-start;flex-direction:column}.stage5984-music-card .btn{width:100%}}
+  `;
+  document.head.appendChild(st);
+}
+
 export function initCheerMusic(){
+  ensureEntryStyles();
   window.stage5984OpenCheerMusic=()=>openPlayer({autoplay:false});
   document.addEventListener('click',e=>{const b=e.target.closest?.('[data-stage5984-open]');if(!b)return;e.preventDefault();e.stopPropagation();void openPlayer({autoplay:true});},true);
   const start=()=>{watch('#boardPostList',insertBoardCard);watch('#homeNoticeList',insertHomeMusicButton);};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 }
+
+// 5.10.2: home/board cheer entry styles load before player dialog opens.
