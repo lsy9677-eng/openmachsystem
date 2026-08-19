@@ -18730,7 +18730,7 @@ console.info('[230MATCH] 5.9.79 ready · exact UID or name+phone My Match identi
 (function stage5984CheerMusicPlayer(){
   const BASE='./assets/audio/';
   const MAX_TRACKS=20;
-  const KNOWN_TITLES={1:'코트위의 우리'};
+  const KNOWN_TITLES={1:'코트위의 우리',2:'테린이의 꿈 (랩 ver.)'};
   const LYRICS={1:`아침 햇살 코트 위로
 오늘의 승부가 시작돼
 
@@ -18773,7 +18773,68 @@ One more point, one more shot
 오늘을 기억해
 수많은 승부 끝에 남은
 단 하나의 이름
-우승`};
+우승`,2:`오늘도 코트 한쪽에서
+라켓을 꼭 쥐고 기다려
+저 고수들 게임 끝나기만
+한참을 바라보고 있네
+
+“다음에 한 번 같이 쳐요”
+그 말만 벌써 몇 번째인지
+결국 우리 테린이끼리
+또 웃으며 공을 넘긴다
+
+짧은 공 하나에도 뛰고
+아웃된 공에도 웃지만
+어제보다 한 발 더 가면
+그걸로 충분한 거야
+
+나도 언젠가 날아오를 거야
+저 높은 코트 위를 자유롭게
+지금은 서툴고 조금 느려도
+내 꿈까지 느린 건 아니야
+
+오늘도 또 시합에 나가
+지고 또 배우고 돌아와도
+한 포인트씩 쌓인 시간들이
+언젠가 나를 고수로 만들 거야
+
+포핸드 네트, 백핸드 아웃
+서브는 왜 또 더블 폴트
+고수들 코트 슬쩍 봤다가
+눈 마주치면 다시 뒤로
+
+“한 게임 같이 치실래요?”
+대답은 항상 “다음에요”
+그래도 난 기죽지 않아
+내일은 오늘보다 나을 테니까
+
+졌어? 괜찮아, 하나 배웠어
+털렸어? 그래도 끝까지 뛰었어
+랭킹보다 중요한 건
+어제의 나를 넘는 것
+
+오늘도 가방 메고 시합장으로
+한 경기 더, 한 걸음 앞으로
+언젠가 누가 날 바라보며 말해
+“저 사람, 진짜 고수네”
+
+그날이 오면 나도 먼저
+서툰 누군가에게 손 내밀 거야
+나도 그 마음을 알고 있으니까
+같이 한 게임 하자고
+
+나도 언젠가 날아오를 거야
+두려움 없이 코트 위를 달려
+오늘의 서러운 이 순간까지
+그날엔 웃으며 말할 거야
+
+나는 아직 테린이지만
+꿈은 벌써 코트 끝을 넘었어
+지고 또 지고 다시 일어나
+마침내 나도 날아오를 거야
+
+오늘도 한 게임 더
+내 꿈에 한 걸음 더`};
   let tracks=[{no:1,src:`${BASE}01.mp3`,title:KNOWN_TITLES[1]}];
   let discovered=false,discovering=null,currentIndex=0;
 
@@ -18987,3 +19048,6 @@ console.info('[230MATCH] 5.9.85 ready · cheer music lyrics viewer');
 
 /* 230MATCH 5.9.87 · lyrics scope/runtime fix */
 console.info('[230MATCH] 5.9.87 ready · cheer lyrics scope fixed');
+
+/* 230MATCH 5.9.88 · second cheer song + lyrics */
+console.info('[230MATCH] 5.9.88 ready · track 02 and lyrics added');
