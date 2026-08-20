@@ -10,7 +10,7 @@ import{submitResult}from'./result-engine.js?v=5800';
 import{ensurePrelimState,generatePrelim,assignPrelimCourts,findPrelimMatch,submitPrelimResult,resetPrelim,autoFitPrelimGroups,swapActiveReserveTeam,isPrelimLocked,lockPrelim,unlockPrelim}from'./prelim-engine.js?v=5800';
 import{downloadJson}from'./recovery.js?v=332012';
 import{noticeBodyHtml,initNoticeLinksStyle}from'./modules/notice-links.js?v=5100';
-import{initCheerMusic}from'./modules/cheer-music.js?v=5102';
+import{initCheerMusic}from'./modules/cheer-music.js?v=5106';
 import{initBackupCenter}from'./modules/backup-center.js?v=5100';
 import{createSmsOpsModule}from'./modules/sms-ops.js?v=5103';
 import{createAligoSender}from'./modules/aligo-client.js?v=5104';
@@ -18502,3 +18502,6 @@ console.info('[230MATCH] 5.10.4 ready · aligo transport module split');
 
 /* 230MATCH 5.10.5 · Stage 2C registration SMS UI module split */
 console.info('[230MATCH] 5.10.5 ready · registration sms UI module split');
+
+/* 230MATCH 5.10.6 · track 03 lyrics update only */
+console.info('[230MATCH] 5.10.6 ready · track 03 lyrics updated');
