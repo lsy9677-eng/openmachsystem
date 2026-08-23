@@ -11,7 +11,7 @@ import{ensurePrelimState,generatePrelim,assignPrelimCourts,findPrelimMatch,submi
 import{downloadJson}from'./recovery.js?v=332012';
 import{noticeBodyHtml,initNoticeLinksStyle}from'./modules/notice-links.js?v=5100';
 import{initCheerMusic}from'./modules/cheer-music.js?v=5106';
-import{initBackupCenter}from'./modules/backup-center.js?v=5100';
+import{initBackupCenter}from'./modules/backup-center.js?v=5107';
 import{createSmsOpsModule}from'./modules/sms-ops.js?v=5103';
 import{createAligoSender}from'./modules/aligo-client.js?v=5104';
 import{createRegistrationSmsModule}from'./modules/registration-sms.js?v=5105';
@@ -18484,6 +18484,7 @@ initBackupCenter({
   downloadRecoveryBundle,
   navigatePortalView,
   renderBackupRecoveryManager,
+  restoreStateSnapshot:stage5107RestoreStateSnapshot,
   buildLabel:typeof BUILD_LABEL!=='undefined'?BUILD_LABEL:''
 });
 console.info('[230MATCH] 5.10.0 ready · stage1 stable modules split');
@@ -18503,5 +18504,36 @@ console.info('[230MATCH] 5.10.4 ready · aligo transport module split');
 /* 230MATCH 5.10.5 · Stage 2C registration SMS UI module split */
 console.info('[230MATCH] 5.10.5 ready · registration sms UI module split');
 
+
+async function stage5107RestoreStateSnapshot(nextState,meta={}){
+  if(!nextState||typeof nextState!=='object'||!nextState.tournament||!Array.isArray(nextState.teams)){
+    throw new Error('복원할 운영 상태 형식이 올바르지 않습니다.');
+  }
+  const label=String(meta?.label||nextState.tournament?.name||'안전백업');
+  const recovery=saveRecovery(state,`${state.tournament?.name||'현재 대회'} · 파일 전체복원 직전`,{kind:'manual'});
+  try{await recovery?.ready;}catch(_e){}
+  state=normalizeV5RuntimeState(structuredClone(nextState));
+  ensurePortalState();
+  ensurePrelimState(state);
+  ensureTimeState(state);
+  ensureDrawMeta(state);
+  ensureMessagingState(state);
+  ensureContacts(state);
+  ensureAuditState(state);
+  ensureEarlyMainSettings(state);
+  ensureVenueSettings(state);
+  ensureVenueQueues(state);
+  ensureCourtStatuses(state);
+  ensureCourtManualQueues(state);
+  ensurePrelimCourtStatuses(state);
+  ensureOperatorState();
+  stage5925RetireLegacyHoldFeature();
+  commit(`안전백업 파일 전체 상태 복원 · ${label}`);
+  return true;
+}
+
 /* 230MATCH 5.10.6 · track 03 lyrics update only */
 console.info('[230MATCH] 5.10.6 ready · track 03 lyrics updated');
+
+/* 230MATCH 5.10.7 · safe backup restore UI */
+console.info('[230MATCH] 5.10.7 ready · safe backup restore available');
