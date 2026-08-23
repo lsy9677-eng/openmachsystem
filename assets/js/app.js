@@ -18659,3 +18659,83 @@ console.info('[230MATCH] 5.10.7 ready · safe backup restore available');
   console.info('[230MATCH] 5.10.8 ready · settings simplified');
 })();
 
+
+
+/* 230MATCH 5.10.9 · screen settings inside admin settings hub
+   화면 설정은 관리자 설정 시트에서 바로 조절합니다.
+   localStorage/UI CSS만 변경하며 대회 데이터는 변경하지 않습니다. */
+(function stage5109AdminHubScreenSettings(){
+  function ensure(){
+    const hub=document.querySelector('#adminSettingsHub .simplified-settings-hub');
+    if(!hub)return;
+
+    let group=hub.querySelector('.stage5109-screen-settings');
+    if(!group){
+      group=document.createElement('section');
+      group.className='settings-hub-group stage5109-screen-settings';
+      group.innerHTML=`
+        <h3>화면 설정</h3>
+        <div class="stage5109-scale-card">
+          <div class="stage5109-scale-text">
+            <strong>운영 화면 글자 크기</strong>
+            <small>이 브라우저에만 적용되며 대회 데이터에는 영향을 주지 않습니다.</small>
+          </div>
+          <div class="stage5109-scale-buttons" role="group" aria-label="운영 화면 글자 크기">
+            <button type="button" data-stage593-scale="compact">작게</button>
+            <button type="button" data-stage593-scale="default">기본·권장</button>
+            <button type="button" data-stage593-scale="large">크게</button>
+          </div>
+        </div>`;
+
+      const groups=hub.querySelectorAll(':scope > .settings-hub-group');
+      const first=groups[0]||null;
+      if(first&&first.nextSibling)hub.insertBefore(group,first.nextSibling);
+      else hub.appendChild(group);
+    }
+
+    try{stage593BindUiScale();}catch(_e){}
+    try{stage593ApplyUiScale();}catch(_e){}
+  }
+
+  if(!document.getElementById('stage5109ScreenSettingsStyle')){
+    const st=document.createElement('style');
+    st.id='stage5109ScreenSettingsStyle';
+    st.textContent=`
+      #adminSettingsHub .stage5109-screen-settings .stage5109-scale-card{
+        display:flex;align-items:center;justify-content:space-between;gap:12px;
+        padding:12px;border:1px solid #d8e3f0;border-radius:14px;background:#f8fbff
+      }
+      #adminSettingsHub .stage5109-scale-text{display:flex;flex-direction:column;gap:3px}
+      #adminSettingsHub .stage5109-scale-text strong{font-size:14px;color:#183a64}
+      #adminSettingsHub .stage5109-scale-text small{font-size:11px;color:#6b7d93;line-height:1.45}
+      #adminSettingsHub .stage5109-scale-buttons{display:flex;gap:7px;flex-wrap:wrap}
+      #adminSettingsHub .stage5109-scale-buttons button{
+        min-width:74px;padding:9px 11px;border:1px solid #c6d5e7;border-radius:10px;
+        background:#fff;color:#183a64;font-weight:800;cursor:pointer
+      }
+      #adminSettingsHub .stage5109-scale-buttons button.active{
+        border-color:#2563eb;background:#2563eb;color:#fff
+      }
+      @media(max-width:640px){
+        #adminSettingsHub .stage5109-scale-card{align-items:stretch;flex-direction:column}
+        #adminSettingsHub .stage5109-scale-buttons{display:grid;grid-template-columns:repeat(3,1fr)}
+        #adminSettingsHub .stage5109-scale-buttons button{min-width:0}
+      }
+    `;
+    document.head.appendChild(st);
+  }
+
+  const run=()=>setTimeout(ensure,0);
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',run,{once:true});
+  else run();
+
+  document.addEventListener('click',e=>{
+    if(e.target.closest?.('#openAdminSettingsHubBtn,#mobileSettingsBtn,[data-stage565-home-settings]')){
+      setTimeout(ensure,60);
+    }
+  },true);
+  window.addEventListener('pageshow',run);
+
+  console.info('[230MATCH] 5.10.9 ready · screen settings in admin hub');
+})();
+
