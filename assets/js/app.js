@@ -11,7 +11,7 @@ import{ensurePrelimState,generatePrelim,assignPrelimCourts,findPrelimMatch,submi
 import{downloadJson}from'./recovery.js?v=332012';
 import{noticeBodyHtml,initNoticeLinksStyle}from'./modules/notice-links.js?v=5100';
 import{initCheerMusic}from'./modules/cheer-music.js?v=5106';
-import{initBackupCenter}from'./modules/backup-center.js?v=5107';
+import{initBackupCenter}from'./modules/backup-center.js?v=5108';
 import{createSmsOpsModule}from'./modules/sms-ops.js?v=5103';
 import{createAligoSender}from'./modules/aligo-client.js?v=5104';
 import{createRegistrationSmsModule}from'./modules/registration-sms.js?v=5105';
@@ -9680,7 +9680,7 @@ async function stage3210SaveTournamentEdit(e){
 function stage3210RenderSettingsSummary(){const el=document.getElementById('stage3210SettingsSummary');if(!el)return;ensureVenueSettings(state);const pre=prelimVenues(state).map(v=>`${v.name} ${v.courtCount}면`).join(' + '),main=mainVenues(state).map(v=>`${v.name} ${v.courtCount}면`).join(' + ');const configured=stage583NormalizeDisplayStatus(state.tournament?.displayStatus||'auto'),applied=stage587TournamentDisplayStatus(state),clock=state.settings?.officialStartClockEnabled===true?'ON':'OFF',start=state.portal?.guide?.startTime||'-';el.innerHTML=`<strong>${stage329Esc(state.tournament?.name||'현재 대회')}</strong><br><b>상태</b> ${stage329Esc(tournamentStatusLabel(applied))}${configured==='auto'?' (자동)':' (관리자 지정)'} · <b>사전 코트배정 시간 잠금</b> ${clock}${clock==='ON'?` · 공식 시작 ${stage329Esc(start)}`:''}<br>예선 ${stage329Esc(pre)}<br>본선 ${stage329Esc(main)}`;}
 stage329OpenTournamentEdit=stage3210OpenTournamentEdit;
 document.addEventListener('click',e=>{const b=e.target.closest?.('[data-stage3210-open-edit]');if(b){e.preventDefault();stage3210OpenTournamentEdit();}},true);
-function stage3210CleanSettings(){document.querySelectorAll('.auth-settings-section,#firebaseLiveSyncSection,.draw-history-section,.feature-roadmap,.venue-settings-section').forEach(el=>{el.hidden=true;el.remove?.();});document.querySelectorAll('[data-settings-action="firebase-sync"],[data-settings-action="prelim-pilot"],[data-settings-action="stage326-pilot"]').forEach(el=>el.remove());const tab=document.querySelector('[data-view="settings"]');if(tab)tab.textContent='현재 대회 관리';stage3210RenderSettingsSummary();}
+function stage3210CleanSettings(){document.querySelectorAll('.auth-settings-section,#firebaseLiveSyncSection,.draw-history-section,.feature-roadmap,.venue-settings-section').forEach(el=>{el.hidden=true;el.remove?.();});document.querySelectorAll('[data-settings-action="firebase-sync"],[data-settings-action="prelim-pilot"],[data-settings-action="stage326-pilot"]').forEach(el=>el.remove());const tab=document.querySelector('[data-view="settings"]');if(tab)tab.textContent='설정';stage3210RenderSettingsSummary();}
 function stage3210Init(){stage3210CleanSettings();stage3210EnsureEditor();}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',stage3210Init);else stage3210Init();
 void 0;
@@ -18484,6 +18484,7 @@ initBackupCenter({
   downloadRecoveryBundle,
   navigatePortalView,
   renderBackupRecoveryManager,
+  showRecoveries,
   restoreStateSnapshot:stage5107RestoreStateSnapshot,
   buildLabel:typeof BUILD_LABEL!=='undefined'?BUILD_LABEL:''
 });
@@ -18537,3 +18538,124 @@ console.info('[230MATCH] 5.10.6 ready · track 03 lyrics updated');
 
 /* 230MATCH 5.10.7 · safe backup restore UI */
 console.info('[230MATCH] 5.10.7 ready · safe backup restore available');
+
+
+/* 230MATCH 5.10.8 · simplify Settings
+   설정 화면에서는 운영 글자 크기만 남기고 중복 "현재 대회 관리" UI를 숨깁니다.
+   대회 편집/참가/경기 데이터 로직은 변경하지 않습니다. */
+(function stage5108SimplifySettings(){
+  function smallestScaleBlock(settings){
+    const buttons=[...settings.querySelectorAll('[data-stage593-scale]')];
+    if(!buttons.length)return null;
+    let node=buttons[0];
+    while(node&&node!==settings){
+      if(/운영 화면 글자 크기/.test(String(node.textContent||'')) &&
+         node.querySelectorAll?.('[data-stage593-scale]').length>=buttons.length){
+        return node;
+      }
+      node=node.parentElement;
+    }
+    // 제목 텍스트가 다른 노드에 있어도 세 버튼이 묶인 가장 작은 부모를 사용.
+    node=buttons[0].parentElement;
+    while(node&&node!==settings){
+      if(node.querySelectorAll?.('[data-stage593-scale]').length>=buttons.length)return node;
+      node=node.parentElement;
+    }
+    return null;
+  }
+
+  function redundantManagementCard(settings){
+    const summary=document.getElementById('stage3210SettingsSummary');
+    if(!summary||!settings.contains(summary))return null;
+
+    // 화면 전체가 아니라 "현재 대회 관리"를 감싸는 가장 가까운 카드만 찾습니다.
+    const preferred=summary.closest('.portal-card,.settings-card,.admin-card,.panel,.card,article,section');
+    if(preferred&&preferred!==settings)return preferred;
+
+    // 클래스가 없는 구형 마크업 대비: summary에서 settings 직전 자식까지 상승.
+    let node=summary;
+    while(node?.parentElement&&node.parentElement!==settings)node=node.parentElement;
+    return node!==summary?node:null;
+  }
+
+  function ensureScaleCard(settings){
+    let card=document.getElementById('stage5108UiScaleCard');
+    const block=smallestScaleBlock(settings);
+    if(!block&&!card)return null;
+
+    if(!card){
+      card=document.createElement('section');
+      card.id='stage5108UiScaleCard';
+      card.className='stage5108-settings-card';
+      card.innerHTML='<div class="stage5108-settings-head"><div><h2>화면 설정</h2><p>운영 화면에서 사용하는 글자 크기만 조절합니다.</p></div></div><div class="stage5108-scale-slot"></div>';
+
+      const workspace=document.getElementById('divisionWorkspaceBar');
+      if(workspace&&workspace.parentElement===settings)workspace.insertAdjacentElement('afterend',card);
+      else settings.prepend(card);
+    }
+
+    const slot=card.querySelector('.stage5108-scale-slot');
+    if(block&&slot&&!card.contains(block))slot.appendChild(block);
+
+    return card;
+  }
+
+  function apply(){
+    const settings=document.getElementById('view-settings');
+    if(!settings)return;
+
+    const card=ensureScaleCard(settings);
+    const redundant=redundantManagementCard(settings);
+    if(redundant&&redundant!==card){
+      redundant.hidden=true;
+      redundant.style.display='none';
+      redundant.setAttribute('aria-hidden','true');
+    }
+
+    // 중복 바로가기/편집 버튼이 다른 컨테이너에 남는 경우도 설정 화면에서만 숨깁니다.
+    settings.querySelectorAll('[data-stage3210-open-edit],[data-settings-view="entry"],[data-settings-view="operation"]').forEach(el=>{
+      if(card?.contains(el))return;
+      el.hidden=true;
+      el.style.display='none';
+    });
+
+    // 구형 버튼은 data 속성이 없을 수 있으므로 표시 글자로도 제한적으로 정리.
+    settings.querySelectorAll('button,a').forEach(el=>{
+      const text=String(el.textContent||'').replace(/\s+/g,' ').trim();
+      if(['현재 대회 편집','참가 신청·승인','경기 운영'].includes(text)){
+        el.hidden=true;
+        el.style.display='none';
+      }
+    });
+
+    // 탭 명칭도 중복 의미를 없애고 "설정"으로 통일.
+    document.querySelectorAll('[data-view="settings"]').forEach(tab=>{tab.textContent='설정';});
+
+    try{stage593BindUiScale();}catch(_e){}
+  }
+
+  if(!document.getElementById('stage5108SettingsStyle')){
+    const st=document.createElement('style');
+    st.id='stage5108SettingsStyle';
+    st.textContent=`
+      #stage5108UiScaleCard{max-width:920px;margin:14px auto;padding:18px;border:1px solid #cbd9ea;border-radius:18px;background:#fff;box-shadow:0 8px 22px rgba(15,35,70,.05)}
+      #stage5108UiScaleCard .stage5108-settings-head h2{margin:0;color:#10264a;font-size:20px}
+      #stage5108UiScaleCard .stage5108-settings-head p{margin:5px 0 14px;color:#64748b;font-size:12px}
+      #stage5108UiScaleCard .stage5108-scale-slot>*{margin:0!important}
+      @media(max-width:700px){#stage5108UiScaleCard{margin:10px 8px;padding:14px}}
+    `;
+    document.head.appendChild(st);
+  }
+
+  const run=()=>setTimeout(apply,0);
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',run,{once:true});
+  else run();
+  window.addEventListener('hashchange',()=>{if(location.hash==='#settings')run();});
+  window.addEventListener('pageshow',run);
+  document.addEventListener('click',e=>{
+    if(e.target.closest?.('[data-view="settings"],[data-mobile-view="settings"],[data-stage565-home-settings]'))setTimeout(apply,80);
+  },true);
+
+  console.info('[230MATCH] 5.10.8 ready · settings simplified');
+})();
+
