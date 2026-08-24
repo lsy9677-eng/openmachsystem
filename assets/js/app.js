@@ -18799,7 +18799,10 @@ console.info('[230MATCH] 5.10.7 ready · safe backup restore available');
     }
 
     const reset=tools.querySelector('[data-stage51010-reset]');
-    if(reset)reset.textContent=`${Math.round(getBracketZoom()*100)}%`;
+    if(reset){
+      const nextLabel=`${Math.round(getBracketZoom()*100)}%`;
+      if(reset.textContent!==nextLabel)reset.textContent=nextLabel;
+    }
   }
 
   if(!document.getElementById('stage51010BracketStyle')){
@@ -18868,10 +18871,25 @@ console.info('[230MATCH] 5.10.7 ready · safe backup restore available');
   window.addEventListener('hashchange',()=>{if(location.hash==='#bracket')setTimeout(run,80);});
   window.addEventListener('pageshow',run);
 
-  const mo=new MutationObserver(()=>{if(document.getElementById('bracketViewport'))ensureTools();});
-  if(document.body)mo.observe(document.body,{childList:true,subtree:true});
-  else document.addEventListener('DOMContentLoaded',()=>mo.observe(document.body,{childList:true,subtree:true}),{once:true});
+  let observer=null,observerQueued=false;
+  const attachObserver=()=>{
+    const host=document.getElementById('view-bracket');
+    if(!host||observer)return;
+    observer=new MutationObserver(()=>{
+      if(observerQueued)return;
+      observerQueued=true;
+      requestAnimationFrame(()=>{
+        observerQueued=false;
+        if(document.getElementById('bracketViewport'))ensureTools();
+      });
+    });
+    observer.observe(host,{childList:true,subtree:true});
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',attachObserver,{once:true});
+  else attachObserver();
 
-  console.info('[230MATCH] 5.10.10 ready · mobile bracket navigation/zoom improved');
+  console.info('[230MATCH] 5.10.11 ready · mobile bracket navigation/zoom improved · observer freeze fixed');
 })();
 
+
+/* 230MATCH 5.10.11 · bracket observer freeze fix */
