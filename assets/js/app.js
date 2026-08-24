@@ -4247,7 +4247,7 @@ function startTournamentOperation(){
 const BRACKET_ZOOM_KEY='230match-bracket-zoom-v571';
 function clampBracketZoom(value){
   const n=Number(value)||1;
-  return Math.max(.65,Math.min(1.75,Math.round(n*20)/20));
+  return Math.max(.55,Math.min(2,Math.round(n*20)/20));
 }
 function getBracketZoom(){
   const board=document.getElementById('bracketBoard');
@@ -4752,11 +4752,17 @@ function bindBracketMobileView571(){
     viewport.dataset.stage595DesktopScroll='1';
 
     viewport.addEventListener('wheel',e=>{
-      if(e.ctrlKey)return; // 브라우저 확대/축소는 방해하지 않음
-      const delta=Math.abs(e.deltaX)>Math.abs(e.deltaY)?e.deltaX:e.deltaY;
-      if(!delta)return;
+      if(e.ctrlKey)return; // 브라우저/트랙패드 확대·축소는 방해하지 않음
       const canScroll=viewport.scrollWidth>viewport.clientWidth+2;
       if(!canScroll)return;
+
+      // 일반 세로 휠은 문서 상하 스크롤에 그대로 맡긴다.
+      // 트랙패드의 실제 가로 제스처 또는 Shift+휠만 대진표 좌우 이동으로 사용한다.
+      const horizontal=Math.abs(e.deltaX)>Math.abs(e.deltaY)*1.05;
+      if(!horizontal&&!e.shiftKey)return;
+
+      const delta=horizontal?e.deltaX:e.deltaY;
+      if(!delta)return;
       e.preventDefault();
       viewport.scrollLeft+=delta;
     },{passive:false});
@@ -4830,12 +4836,17 @@ function bindBracketMobileView571(){
 
   // 5.9.29 mobile gesture split:
   // vertical drag = normal page scroll / horizontal drag = bracket pan / 2 fingers = bracket pinch zoom.
-  let pinchStartDistance=0,pinchStartZoom=1;
+  let pinchStartDistance=0,pinchStartZoom=1,pinchAnchorLogicalX=0;
   const distance=touches=>{
     if(!touches||touches.length<2)return 0;
     const dx=touches[0].clientX-touches[1].clientX;
     const dy=touches[0].clientY-touches[1].clientY;
     return Math.hypot(dx,dy);
+  };
+  const midpointX=touches=>{
+    if(!touches||touches.length<2)return viewport.clientWidth/2;
+    const rect=viewport.getBoundingClientRect();
+    return ((touches[0].clientX+touches[1].clientX)/2)-rect.left;
   };
 
   let singleStartX=0,singleStartY=0,singleStartScrollLeft=0;
@@ -4845,6 +4856,8 @@ function bindBracketMobileView571(){
     if(e.touches?.length===2){
       pinchStartDistance=distance(e.touches);
       pinchStartZoom=getBracketZoom();
+      const midX=midpointX(e.touches);
+      pinchAnchorLogicalX=(viewport.scrollLeft+midX)/Math.max(.01,pinchStartZoom);
       singleDragging=false;
       singleAxis='';
       return;
@@ -4863,7 +4876,10 @@ function bindBracketMobileView571(){
     if(e.touches?.length===2&&pinchStartDistance){
       e.preventDefault();
       const ratio=distance(e.touches)/pinchStartDistance;
-      setBracketZoom(pinchStartZoom*ratio);
+      const nextZoom=setBracketZoom(pinchStartZoom*ratio,{save:false});
+      const midX=midpointX(e.touches);
+      // 두 손가락 중심에 있던 대진 위치가 확대/축소 후에도 같은 곳에 남도록 보정한다.
+      viewport.scrollLeft=Math.max(0,pinchAnchorLogicalX*nextZoom-midX);
       return;
     }
 
@@ -4872,22 +4888,23 @@ function bindBracketMobileView571(){
       const dx=t.clientX-singleStartX;
       const dy=t.clientY-singleStartY;
 
-      if(!singleAxis&&(Math.abs(dx)>7||Math.abs(dy)>7)){
-        // Need a clear directional lead so diagonal vertical page scroll is not stolen.
-        singleAxis=Math.abs(dx)>Math.abs(dy)*1.15?'x':'y';
+      if(!singleAxis&&(Math.abs(dx)>5||Math.abs(dy)>5)){
+        // 세로 스크롤은 최대한 페이지에 양보하고, 가로 의도가 분명할 때만 대진표를 움직인다.
+        singleAxis=Math.abs(dx)>Math.abs(dy)*1.08?'x':'y';
       }
 
       if(singleAxis==='x'){
         e.preventDefault();
         viewport.scrollLeft=singleStartScrollLeft-dx;
       }
-      // y-axis intentionally does nothing: browser/page owns the vertical scroll.
+      // y축은 브라우저가 담당하므로 대진표 위에서도 자연스럽게 페이지 상하 이동 가능.
     }
   };
 
   viewport.ontouchend=e=>{
-    if((e.touches?.length||0)<2){
+    if((e.touches?.length||0)<2&&pinchStartDistance){
       pinchStartDistance=0;
+      setBracketZoom(getBracketZoom(),{save:true});
       requestAnimationFrame(()=>requestAnimationFrame(()=>window.__redrawBracketConnectors?.('pinch-end')));
     }
     if((e.touches?.length||0)===0){
@@ -4896,6 +4913,7 @@ function bindBracketMobileView571(){
     }
   };
   viewport.ontouchcancel=()=>{
+    if(pinchStartDistance)setBracketZoom(getBracketZoom(),{save:true});
     pinchStartDistance=0;
     singleDragging=false;
     singleAxis='';
@@ -18737,5 +18755,123 @@ console.info('[230MATCH] 5.10.7 ready · safe backup restore available');
   window.addEventListener('pageshow',run);
 
   console.info('[230MATCH] 5.10.9 ready · screen settings in admin hub');
+})();
+
+
+
+/* 230MATCH 5.10.10 · mobile bracket navigation/zoom usability */
+(function stage51010BracketMobileUX(){
+  function fitBracketToWidth(){
+    const viewport=document.getElementById('bracketViewport');
+    const board=document.getElementById('bracketBoard');
+    if(!viewport||!board)return;
+    const logicalWidth=Math.max(Number(board.offsetWidth||board.scrollWidth||1),1);
+    const available=Math.max(viewport.clientWidth-12,1);
+    const fit=clampBracketZoom(available/logicalWidth);
+    setBracketZoom(fit);
+    viewport.scrollTo({left:0,behavior:'smooth'});
+  }
+
+  function ensureTools(){
+    const viewport=document.getElementById('bracketViewport');
+    const board=document.getElementById('bracketBoard');
+    if(!viewport||!board)return;
+
+    viewport.classList.add('stage51010-bracket-viewport');
+
+    let tools=document.getElementById('stage51010BracketTools');
+    if(!tools){
+      tools=document.createElement('div');
+      tools.id='stage51010BracketTools';
+      tools.className='stage51010-bracket-tools';
+      tools.innerHTML=`
+        <div class="stage51010-bracket-help">
+          <strong>본선 대진표</strong>
+          <span>한 손가락 좌우 이동 · 위아래는 페이지 스크롤 · 두 손가락 확대/축소</span>
+        </div>
+        <div class="stage51010-bracket-actions">
+          <button type="button" data-stage51010-zoom="-1" aria-label="대진표 축소">−</button>
+          <button type="button" data-stage51010-fit>화면맞춤</button>
+          <button type="button" data-stage51010-reset>100%</button>
+          <button type="button" data-stage51010-zoom="1" aria-label="대진표 확대">＋</button>
+        </div>`;
+      viewport.insertAdjacentElement('beforebegin',tools);
+    }
+
+    const reset=tools.querySelector('[data-stage51010-reset]');
+    if(reset)reset.textContent=`${Math.round(getBracketZoom()*100)}%`;
+  }
+
+  if(!document.getElementById('stage51010BracketStyle')){
+    const st=document.createElement('style');
+    st.id='stage51010BracketStyle';
+    st.textContent=`
+      #bracketViewport.stage51010-bracket-viewport{
+        overflow-x:auto!important;
+        overflow-y:visible!important;
+        -webkit-overflow-scrolling:touch;
+        overscroll-behavior-x:contain;
+        touch-action:pan-y pinch-zoom;
+        scroll-behavior:smooth;
+        scrollbar-width:auto;
+      }
+      #bracketViewport.stage51010-bracket-viewport::-webkit-scrollbar{height:10px}
+      #bracketViewport.stage51010-bracket-viewport::-webkit-scrollbar-thumb{background:#9fb2ca;border-radius:999px}
+      #stage51010BracketTools{
+        display:flex;align-items:center;justify-content:space-between;gap:10px;
+        margin:8px 0;padding:10px 11px;border:1px solid #cad9eb;border-radius:12px;background:#f7faff
+      }
+      #stage51010BracketTools .stage51010-bracket-help{display:flex;flex-direction:column;gap:2px;min-width:0}
+      #stage51010BracketTools .stage51010-bracket-help strong{font-size:13px;color:#163b69}
+      #stage51010BracketTools .stage51010-bracket-help span{font-size:11px;color:#64748b}
+      #stage51010BracketTools .stage51010-bracket-actions{display:flex;gap:6px;flex:none}
+      #stage51010BracketTools button{
+        min-height:34px;padding:7px 10px;border:1px solid #b9cbe0;border-radius:9px;background:#fff;
+        color:#173a6c;font-weight:900;cursor:pointer
+      }
+      #stage51010BracketTools button:active{transform:translateY(1px)}
+      @media(max-width:760px){
+        #stage51010BracketTools{position:sticky;top:4px;z-index:20;align-items:stretch;flex-direction:column;padding:8px;background:rgba(247,250,255,.96);backdrop-filter:blur(5px)}
+        #stage51010BracketTools .stage51010-bracket-help span{font-size:10px}
+        #stage51010BracketTools .stage51010-bracket-actions{display:grid;grid-template-columns:42px 1fr 58px 42px;width:100%}
+        #stage51010BracketTools button{min-height:38px;padding:7px 5px}
+        #bracketViewport.stage51010-bracket-viewport{padding-bottom:8px}
+      }
+    `;
+    document.head.appendChild(st);
+  }
+
+  document.addEventListener('click',e=>{
+    const z=e.target.closest?.('[data-stage51010-zoom]');
+    if(z){
+      e.preventDefault();
+      setBracketZoom(getBracketZoom()+(Number(z.dataset.stage51010Zoom)>0?.10:-.10));
+      ensureTools();
+      return;
+    }
+    if(e.target.closest?.('[data-stage51010-fit]')){
+      e.preventDefault();
+      fitBracketToWidth();
+      setTimeout(ensureTools,80);
+      return;
+    }
+    if(e.target.closest?.('[data-stage51010-reset]')){
+      e.preventDefault();
+      setBracketZoom(1);
+      setTimeout(ensureTools,80);
+    }
+  },true);
+
+  const run=()=>setTimeout(()=>{ensureTools();try{bindBracketMobileView571();}catch(_e){}},0);
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',run,{once:true});
+  else run();
+  window.addEventListener('hashchange',()=>{if(location.hash==='#bracket')setTimeout(run,80);});
+  window.addEventListener('pageshow',run);
+
+  const mo=new MutationObserver(()=>{if(document.getElementById('bracketViewport'))ensureTools();});
+  if(document.body)mo.observe(document.body,{childList:true,subtree:true});
+  else document.addEventListener('DOMContentLoaded',()=>mo.observe(document.body,{childList:true,subtree:true}),{once:true});
+
+  console.info('[230MATCH] 5.10.10 ready · mobile bracket navigation/zoom improved');
 })();
 
