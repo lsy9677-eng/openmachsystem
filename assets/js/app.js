@@ -5627,23 +5627,71 @@ function renderParticipantManager(){
   const summary=document.getElementById('participantRosterSummary');if(summary)summary.textContent=`전체 ${state.teams.length}팀 · 참가 ${active}팀 · 후보 ${reserve}팀 · 입금 ${paidTeams}팀 · 입금대기 ${paymentWaiting}팀`;
   root.innerHTML=teams.map((team,index)=>{const status=participantStatus(team);const contact=getTeamContact(state,team)||{};const application=registrationForTeam(team);const paid=Boolean(application&&(application.paid===true||application.paymentStatus==='paid'));const fixedNo=(state.teams||[]).findIndex(t=>String(t.id)===String(team.id))+1;return `<article class="participant-row stage5963-participant-compact ${paid?'payment-paid':'payment-wait'}"><div class="participant-order">${fixedNo}</div><div class="participant-info"><strong>${portalEscape(portalTeam(team))}</strong><span>${portalEscape(team.affiliation||'소속 없음')}${contact.phone?` · ${portalEscape(contact.phone)}`:''}</span></div><span class="participant-payment ${paid?'paid':'waiting'}">${paid?'✓ 입금':'⏳ 입금대기'}</span><span class="participant-status ${status}">${status==='active'?'참가':'후보'}</span><div class="participant-actions"><button type="button" class="btn btn-light btn-small" data-participant-edit="${portalEscape(team.id)}">수정</button><button type="button" class="btn btn-danger-outline btn-small" data-participant-delete="${portalEscape(team.id)}">삭제</button></div></article>`;}).join('')||'<div class="portal-empty">조건에 맞는 참가팀이 없습니다.</div>';
 }
-function saveParticipant(){
+async function saveParticipant(){
   if(!requireAdmin('참가팀 관리'))return;
-  const name=String(document.getElementById('participantTeamName')?.value||'').trim();const affiliation=String(document.getElementById('participantAffiliation')?.value||'').trim();const phone=String(document.getElementById('participantPhone')?.value||'').replace(/[^0-9]/g,'');const status=document.getElementById('participantStatus')?.value||'active';
-  if(!name){notice('팀명 또는 선수 이름을 입력하세요.','error');return;}
-  if(phone&&!validatePhone(phone)){notice('휴대전화 번호 형식을 확인하세요.','error');return;}
-  if(participantEditingId){
-    const current=(state.teams||[]).find(t=>String(t.id)===String(participantEditingId));if(!current)return;
-    const next=participantNormalizedTeam({...current,name,affiliation});participantReplaceSnapshot(current.id,next);if(phone)setTeamContact(state,next,{phone});
-    if(status!==participantStatus(current)){if((state.prelim?.groups||[]).length){notice('조편성 후 참가·후보 상태 변경은 후보 교체 기능을 사용하세요.','error');return;}participantReorderByStatus(next,status);}
-    commit(`참가팀 수정 · ${name}`);notice('참가팀 정보를 수정했습니다.','success');
-  }else{
-    if(state.teams.length>=128){notice('최대 128팀까지 등록할 수 있습니다.','error');return;}
-    const team=participantNormalizedTeam({id:crypto.randomUUID(),name,affiliation},state.teams.length);participantReorderByStatus(team,status);if(phone)setTeamContact(state,team,{phone});
-    if((state.prelim?.groups||[]).length)notice('새 팀을 등록했습니다. 기존 조편성에는 자동 반영되지 않으므로 재편성 또는 후보 교체가 필요합니다.','info');else notice('참가팀을 등록했습니다.','success');
-    commit(`참가팀 등록 · ${name}`);
+  const name=String(document.getElementById('participantTeamName')?.value||'').trim();
+  const affiliation=String(document.getElementById('participantAffiliation')?.value||'').trim();
+  const phone=String(document.getElementById('participantPhone')?.value||'').replace(/[^0-9]/g,'');
+  const status=document.getElementById('participantStatus')?.value||'active';
+  if(!name)return notice('팀명 또는 선수 이름을 입력하세요.','error');
+  if(phone&&!validatePhone(phone))return notice('휴대전화 번호 형식을 확인하세요.','error');
+
+  if(!participantEditingId){
+    if(state.teams.length>=128)return notice('최대 128팀까지 등록할 수 있습니다.','error');
+    const team=participantNormalizedTeam({id:crypto.randomUUID(),name,affiliation},state.teams.length);
+    participantReorderByStatus(team,status);if(phone)setTeamContact(state,team,{phone});
+    if((state.prelim?.groups||[]).length)notice('새 팀을 등록했습니다. 기존 조편성에는 자동 반영되지 않으므로 재편성 또는 후보 교체가 필요합니다.','info');
+    else notice('참가팀을 등록했습니다.','success');
+    commit(`참가팀 등록 · ${name}`);clearParticipantForm();renderParticipantManager();return;
   }
-  clearParticipantForm();renderParticipantManager();
+
+  const current=(state.teams||[]).find(t=>String(t.id)===String(participantEditingId));
+  if(!current)return;
+  const before=structuredClone(current);
+  const beforeName=portalTeam(current);
+  const rows=typeof simpleRegistrationRows==='function'?simpleRegistrationRows():[];
+  const linked=rows.find(a=>String(a?.id||'')===String(current.registrationId||''))
+    ||rows.find(a=>String(a?.ownerUid||'')&&String(a.ownerUid)===String(current.ownerUid||''))
+    ||rows.find(a=>myMatchNormalize(a?.teamName||'')===myMatchNormalize(beforeName));
+
+  if(status!==participantStatus(current)&&(state.prelim?.groups||[]).length){
+    return notice('조편성 후 참가·후보 상태 변경은 후보 교체 기능을 사용하세요.','error');
+  }
+
+  const next=participantNormalizedTeam({...current,name,affiliation});
+  participantReplaceSnapshot(current.id,next);
+  const live=(state.teams||[]).find(t=>String(t.id)===String(current.id))||next;
+  if(phone)setTeamContact(state,live,{phone});
+
+  try{
+    if(linked){
+      const reg=structuredClone(linked);
+      reg.teamName=name;reg.affiliation=affiliation;if(phone)reg.phone=phone;
+      const names=name.split(/\s*\/\s*/).map(x=>x.trim()).filter(Boolean);
+      const clubs=affiliation.split(/\s*\/\s*/).map(x=>x.trim()).filter(Boolean);
+      if(Array.isArray(reg.players)&&reg.players.length>=2){
+        reg.players=reg.players.map((p,i)=>({...p,
+          name:names.length===2?(names[i]||p?.name||''):(p?.name||''),
+          club:clubs.length>=2?(clubs[i]||p?.club||''):(clubs[0]||p?.club||''),
+          phone:i===Number(reg.representativeIndex||0)&&phone?phone:String(p?.phone||'').replace(/\D/g,'')
+        }));
+        reg.representativeName=reg.players[Number(reg.representativeIndex||0)]?.name||reg.representativeName;
+      }
+      reg.updatedAt=new Date().toISOString();
+      const saved=await saveRegistrationCloud(reg);
+      const i=(state.portal?.applications||[]).findIndex(a=>String(a?.id)===String(saved.id));
+      if(i>=0)state.portal.applications[i]=structuredClone(saved);
+      else state.portal?.applications?.unshift?.(structuredClone(saved));
+    }
+    if(status!==participantStatus(before))participantReorderByStatus(live,status);
+    commit(`참가팀 수정 · ${name}`);
+    try{syncCurrentDivisionRuntime?.();safePersistState('관리자 참가팀 수정');}catch(_e){}
+    clearParticipantForm();renderParticipantManager();renderApplicationPortal?.();lookupPublicApplication?.();renderRegistrationSummaryEverywhere?.();
+    notice(linked?'참가팀과 참가신청 원본을 함께 수정했습니다.':'참가팀 정보를 수정했습니다.','success');
+  }catch(error){
+    participantReplaceSnapshot(current.id,before);renderParticipantManager();
+    notice(`수정 저장 실패: ${error?.message||error}`,'error');
+  }
 }
 function editParticipant(id){if(!requireAdmin('참가팀 관리'))return;const team=(state.teams||[]).find(t=>String(t.id)===String(id));if(!team)return;participantEditingId=team.id;document.getElementById('participantTeamName').value=team.name||'';document.getElementById('participantAffiliation').value=team.affiliation||'';document.getElementById('participantPhone').value=getTeamContact(state,team)?.phone||'';document.getElementById('participantStatus').value=participantStatus(team);document.getElementById('participantSaveBtn').textContent='수정 저장';document.getElementById('participantCancelEditBtn').hidden=false;document.getElementById('participantTeamName').focus();}
 function deleteParticipant(id){
@@ -9301,26 +9349,46 @@ function stage3264AdminEditApplication(id){
   const feedback=document.getElementById('entryAdminEditFeedback');if(feedback){feedback.hidden=true;feedback.textContent=''}
   const d=document.getElementById('entryAdminEditDialog');if(typeof d?.showModal==='function')d.showModal();else d?.setAttribute('open','');
 }
-function stage3265SaveAdminEdit(){
+async function stage3265SaveAdminEdit(){
   if(!requireAdmin('참가 신청 수정'))return;
-  const id=document.getElementById('entryAdminEditId')?.value;const item=stage3264FindApplication(id);if(!item)return notice('수정할 신청을 찾을 수 없습니다.','error');
+  const id=document.getElementById('entryAdminEditId')?.value;
+  const item=stage3264FindApplication(id);if(!item)return notice('수정할 신청을 찾을 수 없습니다.','error');
   const val=id=>String(document.getElementById(id)?.value||'').trim();
-  const players=[{name:val('entryAdminEditP1Name'),club:val('entryAdminEditP1Club'),phone:val('entryAdminEditP1Phone').replace(/\D/g,'')},{name:val('entryAdminEditP2Name'),club:val('entryAdminEditP2Club'),phone:val('entryAdminEditP2Phone').replace(/\D/g,'')}];
-  const feedback=document.getElementById('entryAdminEditFeedback');
-  const fail=(msg,id)=>{if(feedback){feedback.hidden=false;feedback.className='notice error';feedback.textContent=msg}document.getElementById(id)?.focus();};
+  const players=[
+    {name:val('entryAdminEditP1Name'),club:val('entryAdminEditP1Club'),phone:val('entryAdminEditP1Phone').replace(/\D/g,'')},
+    {name:val('entryAdminEditP2Name'),club:val('entryAdminEditP2Club'),phone:val('entryAdminEditP2Phone').replace(/\D/g,'')}
+  ];
+  const fb=document.getElementById('entryAdminEditFeedback');
+  const fail=(msg,id)=>{if(fb){fb.hidden=false;fb.className='notice error';fb.textContent=msg;}document.getElementById(id)?.focus();};
   for(let i=0;i<2;i++){if(!players[i].name)return fail(`선수 ${i+1} 이름을 입력하세요.`,`entryAdminEditP${i+1}Name`);if(!players[i].club)return fail(`선수 ${i+1} 클럽을 입력하세요.`,`entryAdminEditP${i+1}Club`);if(!validatePhone(players[i].phone))return fail(`선수 ${i+1} 전화번호를 확인하세요.`,`entryAdminEditP${i+1}Phone`);}
-  const representativeIndex=document.getElementById('entryAdminRep2')?.checked?1:0;
-  const oldStatus=item.status;item.players=players;item.representativeIndex=representativeIndex;item.representativeName=players[representativeIndex].name;item.phone=players[representativeIndex].phone;
-  item.teamName=players.map(x=>x.name).join(' / ');item.affiliation=players.map(x=>x.club).join(' / ');item.smsTargetMode=val('entryAdminSmsMode')==='both'?'both':'representative';
-  item.status=val('entryAdminStatus')||'pending';item.memo=val('entryAdminMemo');item.adminMemo=val('entryAdminAdminMemo');
-  const paymentStatus=val('entryAdminPaymentStatus')||'unpaid', at=val('entryAdminPaymentAt');item.paymentStatus=paymentStatus;item.paid=paymentStatus==='paid';
-  if(paymentStatus==='paid'){item.paidAt=at?new Date(at).toISOString():(item.paidAt||new Date().toISOString());item.refundedAt='';}
-  else if(paymentStatus==='refunded'){item.refundedAt=at?new Date(at).toISOString():(item.refundedAt||new Date().toISOString());item.paid=false;}
-  else {item.paidAt='';if(paymentStatus!=='refunded')item.refundedAt='';}
-  item.updatedAt=new Date().toISOString();if(item.status==='approved'||item.status==='reserve')item.approvedAt=item.approvedAt||item.updatedAt;
-  stage3264SyncApplicationTeam(item);
-  if(oldStatus!==item.status){const team=stage3264ApplicationTeam(item);if(team)participantReorderByStatus(team,item.status==='reserve'?'reserve':'active');}
-  commit(`관리자 참가 신청 전체 수정 · ${item.teamName}`);stage3265CloseAdminEdit();renderApplicationPortal();renderParticipantManager();lookupPublicApplication();notice('전체 항목을 수정했습니다.','success');
+  const next=structuredClone(item),oldStatus=item.status;
+  const rep=document.getElementById('entryAdminRep2')?.checked?1:0;
+  next.players=players;next.representativeIndex=rep;next.representativeName=players[rep].name;next.phone=players[rep].phone;
+  next.teamName=players.map(x=>x.name).join(' / ');next.affiliation=players.map(x=>x.club).join(' / ');
+  next.smsTargetMode=val('entryAdminSmsMode')==='both'?'both':'representative';next.status=val('entryAdminStatus')||'pending';
+  next.memo=val('entryAdminMemo');next.adminMemo=val('entryAdminAdminMemo');
+  const ps=val('entryAdminPaymentStatus')||'unpaid',at=val('entryAdminPaymentAt');next.paymentStatus=ps;next.paid=ps==='paid';
+  if(ps==='paid'){next.paidAt=at?new Date(at).toISOString():(next.paidAt||new Date().toISOString());next.refundedAt='';}
+  else if(ps==='refunded'){next.refundedAt=at?new Date(at).toISOString():(next.refundedAt||new Date().toISOString());next.paid=false;}
+  else{next.paidAt='';if(ps!=='refunded')next.refundedAt='';}
+  next.updatedAt=new Date().toISOString();if(['approved','reserve'].includes(next.status))next.approvedAt=next.approvedAt||next.updatedAt;
+
+  const btn=document.getElementById('entryAdminEditSaveBtn'),oldText=btn?.textContent||'수정 저장';
+  if(btn){btn.disabled=true;btn.textContent='저장 중...';}
+  try{
+    const saved=await saveRegistrationCloud(next);
+    const i=(state.portal?.applications||[]).findIndex(a=>String(a?.id)===String(saved.id));
+    if(i>=0)state.portal.applications[i]=structuredClone(saved);else state.portal?.applications?.unshift?.(structuredClone(saved));
+    await simpleSyncTeam(saved);stage3264SyncApplicationTeam(saved);
+    if(oldStatus!==saved.status){const team=stage3264ApplicationTeam(saved);if(team)participantReorderByStatus(team,saved.status==='reserve'?'reserve':'active');}
+    try{syncCurrentDivisionRuntime?.();safePersistState('관리자 참가신청 수정');}catch(_e){}
+    commit(`관리자 참가 신청 전체 수정 · ${saved.teamName}`);
+    stage3265CloseAdminEdit();renderApplicationPortal();renderParticipantManager();lookupPublicApplication();renderRegistrationSummaryEverywhere?.();
+    notice('참가신청 원본과 참가자 목록을 함께 수정했습니다.','success');
+  }catch(error){
+    if(fb){fb.hidden=false;fb.className='notice error';fb.textContent=`저장 실패: ${error?.message||error}`;}
+    notice(`참가신청 수정 저장 실패: ${error?.message||error}`,'error');
+  }finally{if(btn){btn.disabled=false;btn.textContent=oldText;}}
 }
 function stage3265BindAdminEdit(){
   document.getElementById('entryAdminEditCloseBtn')?.addEventListener('click',stage3265CloseAdminEdit);
@@ -18893,3 +18961,33 @@ console.info('[230MATCH] 5.10.7 ready · safe backup restore available');
 
 
 /* 230MATCH 5.10.11 · bracket observer freeze fix */
+
+/* 230MATCH 5.10.12 · admin/self participant edit synchronization */
+(function stage51012ParticipantEditAccess(){
+  function ownEditableRows(){
+    if(!currentAuthUser)return[];
+    const ctx=registrationContext?.()||{},rows=registrationCloudReady?registrationCloudRows:(state.portal?.applications||[]);
+    return (rows||[]).filter(r=>String(r?.ownerUid||'')===String(currentAuthUser.uid||'')&&
+      String(r?.tournamentId||ctx.tournamentId||'')===String(ctx.tournamentId||'')&&
+      ['approved','reserve'].includes(String(r?.status||''))&&r?.cancelRequestStatus!=='requested'&&
+      (!r?.divisionId||!ctx.divisionId||String(r.divisionId)===String(ctx.divisionId)||String(r?.tournamentDivision||r?.divisionName||'').trim()===String(ctx.divisionName||'').trim()));
+  }
+  function openOwnEdit(){
+    if(!currentAuthUser)return notice('로그인 후 본인 참가정보를 수정할 수 있습니다.','error');
+    const rows=ownEditableRows();if(!rows.length)return notice('현재 계정으로 수정 가능한 참가신청이 없습니다.','info');
+    closeAdminSettingsHub?.();navigatePortalView('entry',{pushHistory:true});
+    if(rows.length===1)setTimeout(()=>editEntryApplication(rows[0].id),120);
+    else setTimeout(()=>{renderEntrySelfManager?.();document.getElementById('entrySelfManagerList')?.scrollIntoView({behavior:'smooth',block:'start'});notice('수정할 본인 참가신청을 선택하세요.','info');},120);
+  }
+  function install(){
+    const hub=document.querySelector('#adminSettingsHub .simplified-settings-hub');if(!hub||hub.querySelector('[data-settings-action="own-registration-edit"]'))return;
+    const groups=[...hub.querySelectorAll(':scope > .settings-hub-group')],account=groups.find(g=>/계정/.test(String(g.querySelector('h3')?.textContent||'')))||groups.at(-1);if(!account)return;
+    const grid=account.querySelector('.settings-hub-grid')||account,b=document.createElement('button');
+    b.type='button';b.dataset.settingsAction='own-registration-edit';b.innerHTML='내 참가정보 수정<small>본인 신청 선수명·클럽·전화번호 수정</small>';grid.prepend(b);
+  }
+  document.addEventListener('click',e=>{const b=e.target.closest?.('[data-settings-action="own-registration-edit"]');if(!b)return;e.preventDefault();e.stopPropagation();openOwnEdit();},true);
+  const run=()=>setTimeout(install,0);if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',run,{once:true});else run();
+  document.addEventListener('click',e=>{if(e.target.closest?.('#openAdminSettingsHubBtn,#mobileSettingsBtn,[data-stage565-home-settings]'))setTimeout(install,70);},true);
+  window.addEventListener('pageshow',run);
+  console.info('[230MATCH] 5.10.12 ready · admin/self participant edit synchronized');
+})();
