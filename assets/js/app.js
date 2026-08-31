@@ -9821,7 +9821,7 @@ renderTournamentList=function(){stage329BaseTournamentRender.apply(this,argument
 document.addEventListener('click',e=>{const b=e.target.closest?.('[data-stage329-edit-tournament]');if(b){e.preventDefault();e.stopImmediatePropagation();stage329OpenTournamentEdit();}},true);
 function stage329OrganizeMobileMore(){
   const grid=document.querySelector('#mobileMoreSheet .mobile-more-grid');if(!grid||grid.dataset.stage329==='1')return;grid.dataset.stage329='1';
-  const buttons=[...grid.children];const map={};buttons.forEach(b=>{map[b.dataset.portalGo||b.id]=b;});grid.innerHTML='';
+  const buttons=[...grid.children].filter(b=>String(b.dataset?.portalGo||'')!=='roster'&&!/참가팀\s*관리/.test(String(b.textContent||'')));const map={};buttons.forEach(b=>{map[b.dataset.portalGo||b.id]=b;});grid.innerHTML='';
   const addHead=t=>{const h=document.createElement('div');h.className='stage329-mobile-head';h.textContent=t;grid.appendChild(h);};
   addHead('현재 대회');['tournaments','operation','prelim-public','board'].forEach(k=>map[k]&&grid.appendChild(map[k]));
   addHead('지난 기록·자료');['records','participants','print'].forEach(k=>map[k]&&grid.appendChild(map[k]));
@@ -17914,7 +17914,7 @@ console.info('[230MATCH] 5.9.65 · registration counts use one authoritative cur
       const hash=String(location.hash||'').toLowerCase();
       const search=String(location.search||'').toLowerCase();
       if(active||hash.includes('roster')||/[?&](view|portalview)=roster(?:&|$)/.test(search)){
-        if(typeof navigatePortalView==='function') navigatePortalView(isAdminUser?.()?'entry-admin':'entry',{focus:false});
+        if(typeof navigatePortalView==='function') navigatePortalView('entry',{focus:false});
       }
     }catch(_e){}
   };
@@ -17928,7 +17928,7 @@ console.info('[230MATCH] 5.9.65 · registration counts use one authoritative cur
     const btn=ev.target?.closest?.('[data-settings-view="roster"],[data-portal-go="roster"],[data-view="roster"],[data-v6003-go="roster"]');
     if(!btn)return;
     ev.preventDefault();ev.stopPropagation();
-    try{if(typeof navigatePortalView==='function')navigatePortalView('entry-admin',{focus:false});}catch(_e){}
+    try{if(typeof navigatePortalView==='function')navigatePortalView('entry',{focus:false});}catch(_e){}
   },true);
   console.info('[230MATCH] 5.9.69 ready · legacy contact-roster UI retired; contact edits stay in registration admin');
 })();
@@ -19172,3 +19172,63 @@ console.info('[230MATCH] 5.10.13 ready · registration/print roster status clari
 console.info('[230MATCH] 5.10.14 ready · reserve popup, promotion SMS, separated unpaid bulk targets');
 
 console.info('[230MATCH] 5.10.15 ready · rejected frees slot, next reserve promotes, print numbering continuous');
+
+
+/* 230MATCH 5.10.17 · mobile more-sheet cleanup
+   - 시트의 중복 '참가팀 관리' 항목 제거
+   - 참가신청/승인 관리는 기존 참가신청 화면에서 통합 관리
+   - 시트의 설정 버튼은 관리자 설정 팝업을 직접 연다
+   - 데이터 쓰기 없음 */
+(function stage51017CleanMobileMoreSheet(){
+  function removeLegacyRosterItem(){
+    const sheet=document.getElementById('mobileMoreSheet');
+    if(!sheet)return;
+    const selectors=[
+      '[data-settings-view="roster"]',
+      '[data-portal-go="roster"]',
+      '[data-view="roster"]',
+      '[data-v6003-go="roster"]'
+    ];
+    sheet.querySelectorAll(selectors.join(',')).forEach(el=>el.remove());
+
+    sheet.querySelectorAll('.mobile-more-grid > button,.mobile-more-grid > a,.mobile-more-grid > [role="button"]').forEach(el=>{
+      const text=String(el.textContent||'').replace(/\s+/g,' ').trim();
+      if(text==='참가팀 관리'||text.startsWith('참가팀 관리 '))el.remove();
+    });
+  }
+
+  function openSettingsFromSheet(ev){
+    ev?.preventDefault?.();
+    ev?.stopImmediatePropagation?.();
+    try{closeMobileMoreMenu?.();}catch(_e){}
+    setTimeout(()=>{try{openAdminSettingsHub?.();}catch(_e){}},60);
+  }
+
+  document.addEventListener('click',ev=>{
+    const target=ev.target;
+    if(target?.closest?.('#mobileMoreBtn')){
+      removeLegacyRosterItem();
+      return;
+    }
+
+    const settings=target?.closest?.(
+      '#mobileMoreSheet #mobileSettingsBtn,'+
+      '#mobileMoreSheet [data-matchday-quick-view="settings-hub"],'+
+      '#mobileMoreSheet [data-stage565-home-settings],'+
+      '#mobileMoreSheet [data-settings-hub-open]'
+    );
+    if(settings){
+      openSettingsFromSheet(ev);
+      return;
+    }
+  },true);
+
+  const apply=()=>removeLegacyRosterItem();
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',apply,{once:true});
+  else apply();
+  window.addEventListener('pageshow',apply);
+
+  window.stage51017CleanMobileMoreSheet=removeLegacyRosterItem;
+  console.info('[230MATCH] 5.10.17 ready · redundant mobile participant-management item removed');
+})();
+
