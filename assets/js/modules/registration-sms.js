@@ -1,4 +1,4 @@
-// 230MATCH stable module · registration-sms.js · 5.10.5
+// 230MATCH stable module · registration-sms.js · 5.10.14
 // 참가신청 문자 확인창/수신자 선택/알리고·문자앱 발송 UI.
 // 참가신청 저장, 입금 처리, 승인/취소 상태 자체는 이 모듈이 변경하지 않습니다.
 
@@ -26,9 +26,9 @@ export function createRegistrationSmsModule(api){
     const fee=state.portal?.guide?.fee||'';
 
     if(kind==='payment')return `${event} 참가비 ${fee||'6만원'} 입금 확인, 정상 등록되었습니다. 감사합니다.`;
-    if(kind==='promote')return `[${sender}] ${smsApplicationTeamName(item)}님, ${event} 후보에서 일반 참가팀으로 승격되었습니다. 대회 일정과 준비사항을 확인해 주세요.`;
+    if(kind==='promote')return `[${sender}] ${smsApplicationTeamName(item)}님, ${event} 후보에서 정상 참가팀으로 승격되었습니다. 이제 참가비 ${fee||'6만원'}을 입금해 주세요. 입금 확인 후 최종 참가가 확정됩니다.`;
     if(kind==='approve')return `[${sender}] ${smsApplicationTeamName(item)}님, ${event} 참가 신청이 승인되었습니다.${item?.paid?' 참가비 입금도 확인되었습니다.':' 참가비 입금 확인 후 최종 참가가 확정됩니다.'}`;
-    if(kind==='reserve')return `[${sender}] ${smsApplicationTeamName(item)}님, ${event} 후보팀으로 접수되었습니다. 후보 순번은 ${reserveApplicationOrder(item)||'-'}번이며, 승격 시 다시 안내드리겠습니다.`;
+    if(kind==='reserve')return `[${sender}] ${smsApplicationTeamName(item)}님, ${event} 정원 마감으로 후보 ${reserveApplicationOrder(item)||'-'}번에 등록되었습니다. 취소팀 발생 시 순서대로 개별 연락드립니다. 후보 상태에서는 참가비를 입금하지 마세요.`;
     if(kind==='reject')return `[${sender}] ${smsApplicationTeamName(item)}님, ${event} 참가 신청이 반려되었습니다.${item?.adminMemo?` 사유: ${item.adminMemo}`:''}`;
     if(kind==='refund')return `[${sender}] ${smsApplicationTeamName(item)}님, ${event} 참가비 환불 처리가 완료되었습니다.`;
     return `[${sender}] ${smsApplicationTeamName(item)}님, ${event} 참가 신청 안내입니다.`;

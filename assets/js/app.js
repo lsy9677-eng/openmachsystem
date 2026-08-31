@@ -14,7 +14,7 @@ import{initCheerMusic}from'./modules/cheer-music.js?v=5106';
 import{initBackupCenter}from'./modules/backup-center.js?v=5108';
 import{createSmsOpsModule}from'./modules/sms-ops.js?v=5103';
 import{createAligoSender}from'./modules/aligo-client.js?v=5104';
-import{createRegistrationSmsModule}from'./modules/registration-sms.js?v=5105';
+import{createRegistrationSmsModule}from'./modules/registration-sms.js?v=51014';
 import{ensureTimeState,calculateTimeMetrics,timeInfo}from'./time-engine-v5000.js?v=5940';
 import{ensureMessagingState,generatePlayingMessages,generateWait1Messages,generateCurrentCourtMessages,generateCurrentWaitMessages,generateAllTimeMessages,markMessageSent,deleteMessage,clearSentMessages,markAllSent,smsUri,refreshMessageContacts,mergePendingDuplicates,getMessageHistory}from'./message-engine.js?v=3521';
 import{ensureContacts,getTeamContact,setTeamContact,validatePhone,exportContactData,importContactData}from'./contact-engine-v5000.js?v=5000';
@@ -6247,6 +6247,34 @@ function renderEntryDivisionAdminOverview(){
   }
 }
 
+
+function stage51014EnsureReserveRegistrationDialog(){
+  let d=document.getElementById('stage51014ReserveRegistrationDialog');
+  if(d)return d;
+  d=document.createElement('dialog');d.id='stage51014ReserveRegistrationDialog';d.className='stage51014-reserve-dialog';
+  d.innerHTML=`<div class="stage51014-reserve-card"><div class="stage51014-reserve-icon">후보</div><h2>후보팀으로 등록되었습니다</h2><div id="stage51014ReserveRegistrationMessage" class="stage51014-reserve-message"></div><div class="stage51014-reserve-notice"><strong>참가비는 아직 입금하지 마세요.</strong><span>정상 참가팀으로 승격되면 문자로 개별 안내드립니다.</span></div><button type="button" class="btn btn-primary" data-stage51014-reserve-close>확인</button></div>`;
+  document.body.appendChild(d);
+  d.querySelector('[data-stage51014-reserve-close]')?.addEventListener('click',()=>d.close());
+  d.addEventListener('click',e=>{if(e.target===d)d.close();});
+  if(!document.getElementById('stage51014ReserveRegistrationStyle')){
+    const st=document.createElement('style');st.id='stage51014ReserveRegistrationStyle';st.textContent=`
+      .stage51014-reserve-dialog{width:min(92vw,460px);border:0;border-radius:20px;padding:0;box-shadow:0 28px 80px rgba(15,23,42,.34)}
+      .stage51014-reserve-dialog::backdrop{background:rgba(15,23,42,.58)}
+      .stage51014-reserve-card{padding:24px;text-align:center}.stage51014-reserve-icon{display:inline-flex;align-items:center;justify-content:center;height:34px;padding:0 14px;border-radius:999px;background:#fff7ed;color:#b45309;font-size:12px;font-weight:900}
+      .stage51014-reserve-card h2{margin:12px 0 10px;color:#172554;font-size:22px}.stage51014-reserve-message{padding:13px;border-radius:12px;background:#f8fafc;color:#334155;font-size:14px;line-height:1.7}.stage51014-reserve-message b{color:#b45309}
+      .stage51014-reserve-notice{display:flex;flex-direction:column;gap:4px;margin:12px 0 16px;padding:12px;border:1px solid #fed7aa;border-radius:12px;background:#fff7ed}.stage51014-reserve-notice strong{color:#9a3412;font-size:14px}.stage51014-reserve-notice span{color:#7c2d12;font-size:12px}.stage51014-reserve-card .btn{width:100%;min-height:44px}`;
+    document.head.appendChild(st);
+  }
+  return d;
+}
+function stage51014ShowReserveRegistrationPopup(item){
+  if(!item||String(item.status||'')!=='reserve')return;
+  const d=stage51014EnsureReserveRegistrationDialog(),capacity=simpleRegistrationCapacity(),reserveNo=simpleRegistrationReserveOrder(item)||1;
+  const msg=d.querySelector('#stage51014ReserveRegistrationMessage');
+  if(msg)msg.innerHTML=`정원 <b>${capacity}팀</b> 접수가 완료되어<br><b>후보 ${reserveNo}번</b>으로 등록되었습니다.<br>취소팀이 발생하면 후보 순번대로 개별 연락드립니다.`;
+  if(typeof d.showModal==='function'&&!d.open)d.showModal();
+}
+
 async function submitPublicApplication(){
   if(!requireEntryLogin())return;
   ensurePortalState();
@@ -6290,9 +6318,10 @@ async function submitPublicApplication(){
   try{const saved=await saveRegistrationCloud(item);Object.assign(item,saved);}catch(error){notice(`참가 신청 저장 실패: ${error?.message||error}`,'error');return;}if(!(state.portal.applications||[]).some(a=>a.id===item.id))state.portal.applications.unshift(item);try{syncCurrentDivisionRuntime();safePersistState('참가 신청 접수');}catch(_e){}renderApplicationPortal();clearEntryApplicationForm();
   const receipt=document.getElementById('entryApplicationReceipt');if(receipt){receipt.hidden=false;{
     const guide=entrySelectedPaymentGuide(),payAccount=[guide?.bank,guide?.account].filter(Boolean).join(' '),payFee=guide?.fee||'';
-    receipt.innerHTML=`<strong>${item.status==='reserve'?'후보팀으로 접수되었습니다.':'참가 신청이 접수되었습니다.'}</strong><span>${item.status==='reserve'?`후보 ${simpleRegistrationReserveOrder(item)}번`:item.paymentStatus==='checking'?'입금 확인 요청 상태입니다. 관리자 확인 후 입금완료로 표시됩니다.':'입금 확인 후 입금완료로 표시됩니다.'}</span>${payAccount||payFee?`<span>참가비 ${portalEscape(payFee||'미설정')} · ${portalEscape(payAccount||'계좌 미설정')}</span>`:''}`;
+    receipt.innerHTML=`<strong>${item.status==='reserve'?'후보팀으로 접수되었습니다.':'참가 신청이 접수되었습니다.'}</strong><span>${item.status==='reserve'?`후보 ${simpleRegistrationReserveOrder(item)}번 · 취소팀 발생 시 순서대로 개별 연락드립니다.`:item.paymentStatus==='checking'?'입금 확인 요청 상태입니다. 관리자 확인 후 입금완료로 표시됩니다.':'입금 확인 후 입금완료로 표시됩니다.'}</span>${item.status==='reserve'?'<span><b>후보팀은 참가비를 입금하지 마세요.</b> 정상 참가팀 승격 후 문자로 안내드립니다.</span>':(payAccount||payFee?`<span>참가비 ${portalEscape(payFee||'미설정')} · ${portalEscape(payAccount||'계좌 미설정')}</span>`:'')}`;
   }}
   notice(item.status==='reserve'?`정원 초과로 후보 ${simpleRegistrationReserveOrder(item)}번에 자동 등록되었습니다.`:(item.paymentStatus==='checking'?'참가 신청이 접수되었습니다. 입금 확인 요청도 함께 표시됩니다.':'참가 신청이 접수되었습니다. 입금 확인만 남았습니다.'),'success');
+  if(item.status==='reserve')setTimeout(()=>stage51014ShowReserveRegistrationPopup(item),80);
   entryFormManualExpanded=false;entryFormUserOpened=false;renderEntryFormCollapseState();
   if(!canOperate())setTimeout(()=>void notifyAdminNewRegistrationAligo(item),180);
   }catch(error){
@@ -6500,8 +6529,10 @@ async function simplePromoteNextReserve(){
   if(rows.filter(a=>a.status==='approved').length>=simpleRegistrationCapacity())return null;
   const next=rows.filter(a=>a.status==='reserve').sort((a,b)=>String(a.createdAt||'').localeCompare(String(b.createdAt||'')))[0];
   if(!next)return null;
-  next.status='approved';next.approvedAt=new Date().toISOString();next.updatedAt=next.approvedAt;next.adminMemo='정원 발생으로 후보에서 자동 참가 전환되었습니다.';
-  await saveRegistrationCloud(next);await simpleSyncTeam(next);return next;
+  next.status='approved';next.approvedAt=new Date().toISOString();next.updatedAt=next.approvedAt;next.adminMemo='정원 발생으로 후보에서 정상 참가팀으로 자동 승격되었습니다.';
+  const saved=await saveRegistrationCloud(next);Object.assign(next,saved);await simpleSyncTeam(next);
+  try{await window.stage51014SendPromotionSms?.(next);}catch(error){console.warn('[5.10.14] 후보 승격 자동문자 실패',error);}
+  return next;
 }
 async function toggleEntryPayment(id){
   if(!requireAdmin('입금 확인'))return;
@@ -6660,6 +6691,21 @@ const {
   notice,
   renderApplications:()=>renderApplicationPortal()
 });
+async function stage51014SendPromotionSms(item){
+  if(!item||String(item.status||'')!=='approved'||item.promotionSmsAt)return Boolean(item?.promotionSmsAt);
+  const ps=entryApplicationPlayers(item).map((p,index)=>({name:String(p?.name||`선수 ${index+1}`),phone:String(p?.phone||'').replace(/\D/g,''),index})).filter(p=>validatePhone(p.phone));
+  const repIndex=Number(item?.representativeIndex||0)===1?1:0;
+  const recipients=(item?.smsTargetMode==='representative'?[ps.find(p=>p.index===repIndex)||ps[0]].filter(Boolean):ps).filter((p,i,arr)=>p?.phone&&arr.findIndex(x=>x.phone===p.phone)===i);
+  if(!recipients.length)return false;
+  const body=entrySmsTemplate('promote',item);
+  await sendAligoSmsV3(recipients,body,{source:'registration_auto_promotion',kind:'promote',title:'230MATCH 후보 승격 안내',registrationId:String(item.id||'')});
+  item.promotionSmsAt=new Date().toISOString();item.promotionSmsRecipients=recipients.map(r=>({name:r.name,phone:r.phone}));
+  item.smsHistory=Array.isArray(item.smsHistory)?item.smsHistory:[];item.smsHistory.unshift({kind:'promote',channel:'aligo-auto',sentAt:item.promotionSmsAt,body,recipients:item.promotionSmsRecipients});
+  try{await saveRegistrationCloud(item);}catch(error){console.warn('[5.10.14] 승격문자 발송기록 저장 경고',error);}
+  return true;
+}
+window.stage51014SendPromotionSms=stage51014SendPromotionSms;
+
 function entryActiveCount(){return (state.portal?.applications||[]).filter(a=>a.status==='approved').length;}
 function entryCapacity(){return Math.max(0,Number(state.tournament?.capacity||state.settings?.activeTeamCount||0));}
 function suggestReservePromotion(){
@@ -8250,18 +8296,20 @@ function printBracketHtml(){
 }
 function stage51013PrintRegistrationRows(){
   const source=typeof simpleRegistrationRows==='function'?[...simpleRegistrationRows()]:[...(state.portal?.applications||[])];
-  const current=source.filter(a=>['approved','reserve'].includes(String(a?.status||'')));
   const seq=stage5963SequenceMap(source);
-  const approved=stage5963SortByCreated(current.filter(a=>a.status==='approved'),'number');
-  const reserve=stage5963SortByCreated(current.filter(a=>a.status==='reserve'),'number');
-  return {source,seq,approved,reserve};
+  const approved=stage5963SortByCreated(source.filter(a=>a.status==='approved'),'number');
+  const reserve=stage5963SortByCreated(source.filter(a=>a.status==='reserve'),'number');
+  const rejected=stage5963SortByCreated(source.filter(a=>a.status==='rejected'),'number');
+  return {source,seq,approved,reserve,rejected};
 }
-function stage51013PrintParticipantTable(rows,seq,{reserve=false}={}){
-  if(!rows.length)return `<div class="print-empty">${reserve?'후보팀이':'참가 승인팀이'} 없습니다.</div>`;
-  return `<table class="print-table stage51013-participant-print"><thead><tr><th class="center">신청순번</th><th>팀·선수명</th><th>소속</th><th>입금</th><th>상태</th></tr></thead><tbody>${rows.map((a,i)=>{
-    const no=seq.get(String(a.id||''))||'-';
+function stage51013PrintParticipantTable(rows,seq,{kind='approved'}={}){
+  const emptyLabel=kind==='reserve'?'후보팀이':kind==='rejected'?'반려팀이':'참가 승인팀이';
+  if(!rows.length)return `<div class="print-empty">${emptyLabel} 없습니다.</div>`;
+  const numberLabel=kind==='reserve'?'후보번호':kind==='rejected'?'원신청순번':'참가번호';
+  return `<table class="print-table stage51013-participant-print"><thead><tr><th class="center">${numberLabel}</th><th>팀·선수명</th><th>소속</th><th>입금</th><th>상태</th></tr></thead><tbody>${rows.map((a,i)=>{
+    const no=kind==='rejected'?(seq.get(String(a.id||''))||'-'):(i+1);
     const paid=a.paid===true||a.paymentStatus==='paid';
-    const status=reserve?`후보 ${i+1}`:'참가 승인';
+    const status=kind==='reserve'?`후보 ${i+1}`:kind==='rejected'?'반려':'참가 승인';
     return `<tr><td class="center">${no}</td><td>${printEscape(a.teamName||'팀명 미등록')}</td><td>${printEscape(a.affiliation||'')}</td><td>${paid?'입금':'미입금'}</td><td>${status}</td></tr>`;
   }).join('')}</tbody></table>`;
 }
@@ -8270,9 +8318,10 @@ function printParticipantsHtml(){
   const approvedPaid=data.approved.filter(a=>a.paid===true||a.paymentStatus==='paid').length;
   const reservePaid=data.reserve.filter(a=>a.paid===true||a.paymentStatus==='paid').length;
   return printHeader('참가자 명단')+
-    `<div class="stage51013-print-summary">참가 승인 <b>${data.approved.length}팀</b> · 입금 ${approvedPaid} / 미입금 ${data.approved.length-approvedPaid} · 후보 <b>${data.reserve.length}팀</b> · 입금 ${reservePaid} / 미입금 ${data.reserve.length-reservePaid}</div>`+
-    `<section class="stage51013-print-section approved"><h2>참가 승인팀 · ${data.approved.length}팀</h2>${stage51013PrintParticipantTable(data.approved,data.seq)}</section>`+
-    `<section class="stage51013-print-section reserve"><h2>후보팀 · ${data.reserve.length}팀</h2>${stage51013PrintParticipantTable(data.reserve,data.seq,{reserve:true})}</section>`;
+    `<div class="stage51013-print-summary">참가번호는 최종 승인팀 기준 <b>1~${data.approved.length}번</b> 연속번호입니다. · 참가 승인 <b>${data.approved.length}팀</b> (입금 ${approvedPaid} / 미입금 ${data.approved.length-approvedPaid}) · 후보 <b>${data.reserve.length}팀</b> (입금 ${reservePaid} / 미입금 ${data.reserve.length-reservePaid}) · 반려 ${data.rejected.length}팀</div>`+
+    `<section class="stage51013-print-section approved"><h2>참가 승인팀 · ${data.approved.length}팀</h2>${stage51013PrintParticipantTable(data.approved,data.seq,{kind:'approved'})}</section>`+
+    `<section class="stage51013-print-section reserve"><h2>후보팀 · ${data.reserve.length}팀</h2>${stage51013PrintParticipantTable(data.reserve,data.seq,{kind:'reserve'})}</section>`+
+    `${data.rejected.length?`<section class="stage51013-print-section rejected"><h2>반려팀 · ${data.rejected.length}팀</h2>${stage51013PrintParticipantTable(data.rejected,data.seq,{kind:'rejected'})}</section>`:''}`;
 }
 function printLabelsHtml(){
   const status=document.getElementById('labelStatusSelect')?.value||'active';
@@ -8303,7 +8352,7 @@ async function saveRichPrintPreviewPng(doc){
   img.onload=()=>{const maxW=2600,scale=Math.min(2,maxW/width),canvas=document.createElement('canvas');canvas.width=Math.round(width*scale);canvas.height=Math.round(height*scale);const ctx=canvas.getContext('2d');ctx.scale(scale,scale);ctx.fillStyle='#fff';ctx.fillRect(0,0,width,height);ctx.drawImage(img,0,0);URL.revokeObjectURL(url);canvas.toBlob(blob=>{if(!blob){notice('이미지 생성에 실패했습니다.','error');return;}const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`230MATCH_${doc.label.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.png`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);notice('출력 미리보기 그대로 PNG 이미지를 저장했습니다.','success');},'image/png');};
   img.onerror=()=>{URL.revokeObjectURL(url);notice('이미지 변환에 실패했습니다. 인쇄/PDF 저장을 이용해 주세요.','error');};img.src=url;
 }
-function savePrintPng(){const doc=buildPrintDocument(),title=doc.label;if(doc.target==='bracket'){void stage5948CaptureBracketExactlyLikeDirect();return;}if(doc.target==='prelim-assignment'){saveRichPrintPreviewPng(doc);return;}const lines=[];if(doc.target==='participants'){const d=stage51013PrintRegistrationRows();lines.push(`[참가 승인팀 ${d.approved.length}팀]`);d.approved.forEach(a=>lines.push(`${d.seq.get(String(a.id||''))||'-'}. ${a.teamName||''} · ${a.affiliation||''} · ${(a.paid===true||a.paymentStatus==='paid')?'입금':'미입금'} · 참가 승인`));lines.push('',`[후보팀 ${d.reserve.length}팀]`);d.reserve.forEach((a,i)=>lines.push(`${d.seq.get(String(a.id||''))||'-'}. ${a.teamName||''} · ${a.affiliation||''} · ${(a.paid===true||a.paymentStatus==='paid')?'입금':'미입금'} · 후보 ${i+1}`));}else if(doc.target==='results'){const p=currentPodium();lines.push(`우승: ${p.champion||'미확정'}`,`준우승: ${p.runnerUp||'미확정'}`,`공동 3위: ${(p.thirds||[]).join(' · ')||'미확정'}`);}else if(doc.target==='bracket'){portalMainMatches().forEach((m,i)=>lines.push(`${m.roundName||m.round||'본선'} ${i+1}: ${printTeam(m.teamA)} vs ${printTeam(m.teamB)}${m.status==='completed'?` · ${printTeam(m.winner)} 승`:''}`));}else if(doc.target==='prelim'||doc.target==='prelim-assignment'){(state.prelim?.groups||[]).forEach((g,i)=>lines.push(`${g.name||`${i+1}조`} · ${g.courtName||'코트 미정'}: ${(g.teams||[]).map(printTeam).join(' / ')}`));}else{const courts=state.unifiedCourts||state.courts||[];(Array.isArray(courts)?courts:Object.values(courts||{})).forEach((c,i)=>lines.push(`${c.name||`${i+1}번 코트`}: ${c.playingMatch?`${printTeam(c.playingMatch.teamA)} vs ${printTeam(c.playingMatch.teamB)}`:'대기'}`));}const width=1600,pad=80,lineH=42;const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');ctx.font='26px sans-serif';let wrapped=[];for(const line of lines.length?lines:['표시할 자료가 없습니다.'])wrapped.push(...wrapCanvasText(ctx,line,width-pad*2));canvas.width=width;canvas.height=Math.max(1000,260+wrapped.length*lineH+pad);ctx.fillStyle='#ffffff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.fillStyle='#10264a';ctx.fillRect(0,0,canvas.width,150);ctx.fillStyle='#ffffff';ctx.font='bold 46px sans-serif';ctx.fillText(title,pad,75);ctx.font='25px sans-serif';ctx.fillText(`${state.tournament?.name||'230MATCH 대회'} · ${state.tournament?.division||''}`,pad,120);ctx.fillStyle='#111827';ctx.font='26px sans-serif';let y=215;for(const line of wrapped){ctx.fillText(line,pad,y);y+=lineH;}canvas.toBlob(blob=>{if(!blob){notice('이미지 생성에 실패했습니다.','error');return;}const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`230MATCH_${title.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.png`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);notice('PNG 이미지를 저장했습니다.','success');},'image/png');}
+function savePrintPng(){const doc=buildPrintDocument(),title=doc.label;if(doc.target==='bracket'){void stage5948CaptureBracketExactlyLikeDirect();return;}if(doc.target==='prelim-assignment'){saveRichPrintPreviewPng(doc);return;}const lines=[];if(doc.target==='participants'){const d=stage51013PrintRegistrationRows();lines.push(`[참가 승인팀 ${d.approved.length}팀 · 참가번호 1~${d.approved.length}]`);d.approved.forEach((a,i)=>lines.push(`${i+1}. ${a.teamName||''} · ${a.affiliation||''} · ${(a.paid===true||a.paymentStatus==='paid')?'입금':'미입금'} · 참가 승인`));lines.push('',`[후보팀 ${d.reserve.length}팀 · 후보번호 1~${d.reserve.length}]`);d.reserve.forEach((a,i)=>lines.push(`${i+1}. ${a.teamName||''} · ${a.affiliation||''} · ${(a.paid===true||a.paymentStatus==='paid')?'입금':'미입금'} · 후보 ${i+1}`));if(d.rejected.length){lines.push('',`[반려팀 ${d.rejected.length}팀]`);d.rejected.forEach(a=>lines.push(`${d.seq.get(String(a.id||''))||'-'}. ${a.teamName||''} · ${a.affiliation||''} · 반려`));}}else if(doc.target==='results'){const p=currentPodium();lines.push(`우승: ${p.champion||'미확정'}`,`준우승: ${p.runnerUp||'미확정'}`,`공동 3위: ${(p.thirds||[]).join(' · ')||'미확정'}`);}else if(doc.target==='bracket'){portalMainMatches().forEach((m,i)=>lines.push(`${m.roundName||m.round||'본선'} ${i+1}: ${printTeam(m.teamA)} vs ${printTeam(m.teamB)}${m.status==='completed'?` · ${printTeam(m.winner)} 승`:''}`));}else if(doc.target==='prelim'||doc.target==='prelim-assignment'){(state.prelim?.groups||[]).forEach((g,i)=>lines.push(`${g.name||`${i+1}조`} · ${g.courtName||'코트 미정'}: ${(g.teams||[]).map(printTeam).join(' / ')}`));}else{const courts=state.unifiedCourts||state.courts||[];(Array.isArray(courts)?courts:Object.values(courts||{})).forEach((c,i)=>lines.push(`${c.name||`${i+1}번 코트`}: ${c.playingMatch?`${printTeam(c.playingMatch.teamA)} vs ${printTeam(c.playingMatch.teamB)}`:'대기'}`));}const width=1600,pad=80,lineH=42;const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');ctx.font='26px sans-serif';let wrapped=[];for(const line of lines.length?lines:['표시할 자료가 없습니다.'])wrapped.push(...wrapCanvasText(ctx,line,width-pad*2));canvas.width=width;canvas.height=Math.max(1000,260+wrapped.length*lineH+pad);ctx.fillStyle='#ffffff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.fillStyle='#10264a';ctx.fillRect(0,0,canvas.width,150);ctx.fillStyle='#ffffff';ctx.font='bold 46px sans-serif';ctx.fillText(title,pad,75);ctx.font='25px sans-serif';ctx.fillText(`${state.tournament?.name||'230MATCH 대회'} · ${state.tournament?.division||''}`,pad,120);ctx.fillStyle='#111827';ctx.font='26px sans-serif';let y=215;for(const line of wrapped){ctx.fillText(line,pad,y);y+=lineH;}canvas.toBlob(blob=>{if(!blob){notice('이미지 생성에 실패했습니다.','error');return;}const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`230MATCH_${title.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.png`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);notice('PNG 이미지를 저장했습니다.','success');},'image/png');}
 function bindPrintCenter(){['printTargetSelect','printPaperSelect','printOrientationSelect','printToneSelect','printScaleSelect','labelStatusSelect','labelContentSelect','labelCopySelect'].forEach(id=>document.getElementById(id)?.addEventListener('change',renderPrintPreview));document.getElementById('refreshPrintPreviewBtn')?.addEventListener('click',renderPrintPreview);document.getElementById('printDocumentBtn')?.addEventListener('click',printSelectedDocument);document.getElementById('savePrintImageBtn')?.addEventListener('click',savePrintPng);}
 
 
@@ -9264,6 +9313,29 @@ function stage3264SyncApplicationTeam(item){
   team.players=structuredClone(entryApplicationPlayers(item));team.playerPhones=team.players.map(p=>p.phone).filter(Boolean);
   team.phone=item.phone;setTeamContact(state,team,{phone:item.phone});
 }
+function stage51015RejectCanFreeSlot(item){
+  const team=stage3264ApplicationTeam(item);
+  if(!team)return {ok:true,team:null};
+  if((state.prelim?.groups||[]).length){
+    return {ok:false,team,reason:'예선 조편성이 이미 생성되어 있어 참가팀을 반려 처리할 수 없습니다. 조편성 전 참가접수 단계에서 처리해 주세요.'};
+  }
+  return {ok:true,team};
+}
+function stage51015RemoveTeamFromRoster(team){
+  if(!team)return;
+  const id=String(team.id||'');
+  state.teams=(state.teams||[]).filter(t=>String(t.id||'')!==id);
+  if(state.prelim){
+    state.prelim.activeTeams=(state.prelim.activeTeams||[]).filter(t=>String(t.id||'')!==id);
+    state.prelim.reserveTeams=(state.prelim.reserveTeams||[]).filter(t=>String(t.id||'')!==id);
+  }
+  if(state.contacts?.teams&&id)delete state.contacts.teams[id];
+}
+async function stage51015PromoteAfterRejected(){
+  const promoted=await simplePromoteNextReserve();
+  return promoted||null;
+}
+
 function stage3264AdminEditApplicationPromptLegacy(id){
   if(!requireAdmin('참가 신청 수정'))return;
   const item=stage3264FindApplication(id);if(!item)return;
@@ -9415,12 +9487,26 @@ async function stage3265SaveAdminEdit(){
   const fb=document.getElementById('entryAdminEditFeedback');
   const fail=(msg,id)=>{if(fb){fb.hidden=false;fb.className='notice error';fb.textContent=msg;}document.getElementById(id)?.focus();};
   for(let i=0;i<2;i++){if(!players[i].name)return fail(`선수 ${i+1} 이름을 입력하세요.`,`entryAdminEditP${i+1}Name`);if(!players[i].club)return fail(`선수 ${i+1} 클럽을 입력하세요.`,`entryAdminEditP${i+1}Club`);if(!validatePhone(players[i].phone))return fail(`선수 ${i+1} 전화번호를 확인하세요.`,`entryAdminEditP${i+1}Phone`);}
-  const next=structuredClone(item),oldStatus=item.status;
+
+  const next=structuredClone(item),oldStatus=String(item.status||'pending');
   const rep=document.getElementById('entryAdminRep2')?.checked?1:0;
   next.players=players;next.representativeIndex=rep;next.representativeName=players[rep].name;next.phone=players[rep].phone;
   next.teamName=players.map(x=>x.name).join(' / ');next.affiliation=players.map(x=>x.club).join(' / ');
   next.smsTargetMode=val('entryAdminSmsMode')==='both'?'both':'representative';next.status=val('entryAdminStatus')||'pending';
   next.memo=val('entryAdminMemo');next.adminMemo=val('entryAdminAdminMemo');
+
+  const rejecting=next.status==='rejected'&&oldStatus!=='rejected';
+  let rejectTarget={ok:true,team:null};
+  if(rejecting){
+    rejectTarget=stage51015RejectCanFreeSlot(item);
+    if(!rejectTarget.ok)return fail(rejectTarget.reason,'entryAdminStatus');
+    if(!confirm(`${item.teamName} 팀을 반려 처리할까요?\n\n현재 참가명단에서 제외되고 빈자리가 생기면 후보 1번이 자동으로 정상 참가팀으로 승격됩니다.`))return;
+    next.rejectedAt=new Date().toISOString();
+    next.rejectedByUid=String(currentAuthUser?.uid||'');
+    next.rejectedByName=String(authUserLabel?.()||'관리자');
+    next.adminMemo=next.adminMemo||'입금 마감일까지 미입금으로 반려 처리되었습니다.';
+  }
+
   const ps=val('entryAdminPaymentStatus')||'unpaid',at=val('entryAdminPaymentAt');next.paymentStatus=ps;next.paid=ps==='paid';
   if(ps==='paid'){next.paidAt=at?new Date(at).toISOString():(next.paidAt||new Date().toISOString());next.refundedAt='';}
   else if(ps==='refunded'){next.refundedAt=at?new Date(at).toISOString():(next.refundedAt||new Date().toISOString());next.paid=false;}
@@ -9433,12 +9519,24 @@ async function stage3265SaveAdminEdit(){
     const saved=await saveRegistrationCloud(next);
     const i=(state.portal?.applications||[]).findIndex(a=>String(a?.id)===String(saved.id));
     if(i>=0)state.portal.applications[i]=structuredClone(saved);else state.portal?.applications?.unshift?.(structuredClone(saved));
-    await simpleSyncTeam(saved);stage3264SyncApplicationTeam(saved);
-    if(oldStatus!==saved.status){const team=stage3264ApplicationTeam(saved);if(team)participantReorderByStatus(team,saved.status==='reserve'?'reserve':'active');}
-    try{syncCurrentDivisionRuntime?.();safePersistState('관리자 참가신청 수정');}catch(_e){}
-    commit(`관리자 참가 신청 전체 수정 · ${saved.teamName}`);
+
+    let promoted=null;
+    if(rejecting){
+      stage51015RemoveTeamFromRoster(rejectTarget.team);
+      promoted=await stage51015PromoteAfterRejected();
+    }else{
+      await simpleSyncTeam(saved);
+      stage3264SyncApplicationTeam(saved);
+      if(oldStatus!==saved.status){const team=stage3264ApplicationTeam(saved);if(team)participantReorderByStatus(team,saved.status==='reserve'?'reserve':'active');}
+    }
+
+    try{syncCurrentDivisionRuntime?.();safePersistState(rejecting?'참가팀 반려 및 후보 승격':'관리자 참가신청 수정');}catch(_e){}
+    commit(rejecting?`참가팀 반려 · ${saved.teamName}${promoted?` · 후보 승격 ${promoted.teamName}`:''}`:`관리자 참가 신청 전체 수정 · ${saved.teamName}`);
+
     stage3265CloseAdminEdit();renderApplicationPortal();renderParticipantManager();lookupPublicApplication();renderRegistrationSummaryEverywhere?.();
-    notice('참가신청 원본과 참가자 목록을 함께 수정했습니다.','success');
+    if(rejecting){
+      notice(promoted?`${saved.teamName} 반려 완료 · 후보 ${promoted.teamName} 팀이 정상 참가팀으로 자동 승격되었습니다.`:`${saved.teamName} 반려 완료 · 현재 승격할 후보팀이 없습니다.`,'success');
+    }else notice('참가신청 원본과 참가자 목록을 함께 수정했습니다.','success');
   }catch(error){
     if(fb){fb.hidden=false;fb.className='notice error';fb.textContent=`저장 실패: ${error?.message||error}`;}
     notice(`참가신청 수정 저장 실패: ${error?.message||error}`,'error');
@@ -17689,7 +17787,9 @@ console.info('[230MATCH] 5.9.65 · registration counts use one authoritative cur
     return teams().map(team=>({team,row:appFor(team,rows)})).filter(({team,row})=>{
       const s=status(team),p=paid(team,row);
       if(target==='paid')return s==='active'&&p;
-      if(target==='waiting')return s==='active'&&!p;
+      if(target==='waiting'||target==='active-unpaid')return s==='active'&&!p;
+      if(target==='reserve-unpaid')return s==='reserve'&&!p;
+      if(target==='reserve-paid')return s==='reserve'&&p;
       if(target==='reserve')return s==='reserve';
       return s==='active';
     });
@@ -17764,14 +17864,14 @@ console.info('[230MATCH] 5.9.65 · registration counts use one authoritative cur
     const panel=document.createElement('section');panel.id='stage5967BulkSmsPanel';panel.className='stage5967-bulk-panel';
     panel.innerHTML=`<div class="stage5967-bulk-head"><div><small>CURRENT DIVISION BULK SMS</small><h3>현재 부서 단체문자</h3><p id="stage5967BulkContext">현재 대회 · 현재 부서</p></div><span>알리고 · 휴대폰</span></div>
       <div class="stage5967-bulk-controls">
-        <label><span>발송 대상</span><select id="stage5967BulkTarget"><option value="active">확정 참가팀 전체</option><option value="paid">입금팀</option><option value="waiting">입금대기팀</option><option value="reserve">후보팀</option></select></label>
+        <label><span>발송 대상</span><select id="stage5967BulkTarget"><option value="active">정상 참가팀 전체</option><option value="paid">정상 참가팀 · 입금완료</option><option value="active-unpaid">정상 참가팀 · 미입금</option><option value="reserve">후보팀 전체</option><option value="reserve-unpaid">후보팀 · 미입금</option><option value="reserve-paid">후보팀 · 입금완료</option></select></label>
         <label><span>수신 방식</span><select id="stage5967BulkRecipientMode"><option value="representative">대표 연락처만</option><option value="both">두 선수 모두</option></select></label>
       </div>
       <label class="stage5967-bulk-message"><span>문자 내용</span><textarea id="stage5967BulkBody" rows="4" maxlength="1000" placeholder="현재 부서 참가자에게 보낼 공지 내용을 입력하세요."></textarea></label>
       <div id="stage5967BulkSummary" class="stage5967-bulk-summary"></div>
       <details class="stage5967-bulk-details"><summary>실제 수신자 확인</summary><div id="stage5967BulkRecipients" class="stage5967-bulk-recipients"></div></details>
       <div class="stage5967-bulk-actions"><button type="button" class="btn btn-light" id="stage5967BulkRefresh">대상 다시 확인</button><button type="button" class="btn btn-secondary" id="stage5970BulkPhoneSend">휴대폰 문자앱 보내기</button><button type="button" class="btn btn-primary" id="stage5967BulkSend">알리고 단체발송</button></div>
-      <p class="stage5967-bulk-note">현재 선택된 대회·부서의 연락처만 읽어 발송 대상을 만듭니다. 알리고 또는 휴대폰 문자앱(최대 30명씩)으로 보낼 수 있습니다. 참가신청·입금·예선·본선·코트 데이터는 변경하지 않습니다.</p>`;
+      <p class="stage5967-bulk-note">현재 선택된 대회·부서만 대상으로 합니다. 입금 안내는 반드시 ‘정상 참가팀 · 미입금’을 선택하세요. 후보팀 미입금은 별도 선택되며 후보에게 입금을 독촉하지 않습니다. 참가신청·입금·예선·본선·코트 데이터는 변경하지 않습니다.</p>`;
     const head=host.querySelector('.section-head');if(head)head.insertAdjacentElement('afterend',panel);else host.prepend(panel);
     ['stage5967BulkTarget','stage5967BulkRecipientMode'].forEach(id=>document.getElementById(id)?.addEventListener('change',renderPreview));
     document.getElementById('stage5967BulkBody')?.addEventListener('input',renderPreview);
@@ -19061,10 +19161,14 @@ console.info('[230MATCH] 5.10.7 ready · safe backup restore available');
     .stage51013-print-section{margin-top:12px;break-inside:avoid}
     .stage51013-print-section h2{margin:0;padding:7px 9px;font-size:13px;border:1px solid #cbd5e1;border-bottom:0}
     .stage51013-print-section.approved h2{background:#ecfdf5}
-    .stage51013-print-section.reserve h2{background:#fff7ed}
+    .stage51013-print-section.reserve h2{background:#fff7ed}.stage51013-print-section.rejected h2{background:#fef2f2;color:#991b1b}
     .stage51013-participant-print td:last-child{font-weight:800}
     @media(max-width:700px){.stage51013-entry-breakdown{grid-template-columns:1fr}.stage51013-break-card{padding:9px 10px}}
   `;document.head.appendChild(st);
 })();
 console.info('[230MATCH] 5.10.13 ready · registration/print roster status clarified');
 
+
+console.info('[230MATCH] 5.10.14 ready · reserve popup, promotion SMS, separated unpaid bulk targets');
+
+console.info('[230MATCH] 5.10.15 ready · rejected frees slot, next reserve promotes, print numbering continuous');
