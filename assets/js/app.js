@@ -5038,8 +5038,11 @@ function bindBracketMobileView571(){
     };
   }
 
-  // 5.9.29 mobile gesture split:
-  // vertical drag = normal page scroll / horizontal drag = bracket pan / 2 fingers = bracket pinch zoom.
+  // 5.10.21 mobile gesture:
+  // 한 손가락은 브라우저 기본 스크롤을 그대로 사용한다.
+  // - 좌우: 대진표 자체 가로 스크롤
+  // - 상하: 페이지 세로 스크롤
+  // 강제 축 판정/scrollLeft 조작을 없애 사선 드래그도 자연스럽게 처리한다.
   let pinchStartDistance=0,pinchStartZoom=1,pinchAnchorLogicalX=0;
   const distance=touches=>{
     if(!touches||touches.length<2)return 0;
@@ -5053,56 +5056,22 @@ function bindBracketMobileView571(){
     return ((touches[0].clientX+touches[1].clientX)/2)-rect.left;
   };
 
-  let singleStartX=0,singleStartY=0,singleStartScrollLeft=0;
-  let singleDragging=false,singleAxis='';
-
   viewport.ontouchstart=e=>{
-    if(e.touches?.length===2){
-      pinchStartDistance=distance(e.touches);
-      pinchStartZoom=getBracketZoom();
-      const midX=midpointX(e.touches);
-      pinchAnchorLogicalX=(viewport.scrollLeft+midX)/Math.max(.01,pinchStartZoom);
-      singleDragging=false;
-      singleAxis='';
-      return;
-    }
-    if(e.touches?.length===1){
-      const t=e.touches[0];
-      singleStartX=t.clientX;
-      singleStartY=t.clientY;
-      singleStartScrollLeft=viewport.scrollLeft;
-      singleDragging=true;
-      singleAxis='';
-    }
+    if(e.touches?.length!==2)return;
+    pinchStartDistance=distance(e.touches);
+    pinchStartZoom=getBracketZoom();
+    const midX=midpointX(e.touches);
+    pinchAnchorLogicalX=(viewport.scrollLeft+midX)/Math.max(.01,pinchStartZoom);
   };
 
   viewport.ontouchmove=e=>{
-    if(e.touches?.length===2&&pinchStartDistance){
-      e.preventDefault();
-      const ratio=distance(e.touches)/pinchStartDistance;
-      const nextZoom=setBracketZoom(pinchStartZoom*ratio,{save:false});
-      const midX=midpointX(e.touches);
-      // 두 손가락 중심에 있던 대진 위치가 확대/축소 후에도 같은 곳에 남도록 보정한다.
-      viewport.scrollLeft=Math.max(0,pinchAnchorLogicalX*nextZoom-midX);
-      return;
-    }
-
-    if(e.touches?.length===1&&singleDragging){
-      const t=e.touches[0];
-      const dx=t.clientX-singleStartX;
-      const dy=t.clientY-singleStartY;
-
-      if(!singleAxis&&(Math.abs(dx)>5||Math.abs(dy)>5)){
-        // 세로 스크롤은 최대한 페이지에 양보하고, 가로 의도가 분명할 때만 대진표를 움직인다.
-        singleAxis=Math.abs(dx)>Math.abs(dy)*1.08?'x':'y';
-      }
-
-      if(singleAxis==='x'){
-        e.preventDefault();
-        viewport.scrollLeft=singleStartScrollLeft-dx;
-      }
-      // y축은 브라우저가 담당하므로 대진표 위에서도 자연스럽게 페이지 상하 이동 가능.
-    }
+    // 한 손가락은 절대 preventDefault 하지 않음: 네이티브 가로/세로 스크롤에 맡긴다.
+    if(e.touches?.length!==2||!pinchStartDistance)return;
+    e.preventDefault();
+    const ratio=distance(e.touches)/pinchStartDistance;
+    const nextZoom=setBracketZoom(pinchStartZoom*ratio,{save:false});
+    const midX=midpointX(e.touches);
+    viewport.scrollLeft=Math.max(0,pinchAnchorLogicalX*nextZoom-midX);
   };
 
   viewport.ontouchend=e=>{
@@ -5111,16 +5080,10 @@ function bindBracketMobileView571(){
       setBracketZoom(getBracketZoom(),{save:true});
       requestAnimationFrame(()=>requestAnimationFrame(()=>window.__redrawBracketConnectors?.('pinch-end')));
     }
-    if((e.touches?.length||0)===0){
-      singleDragging=false;
-      singleAxis='';
-    }
   };
   viewport.ontouchcancel=()=>{
     if(pinchStartDistance)setBracketZoom(getBracketZoom(),{save:true});
     pinchStartDistance=0;
-    singleDragging=false;
-    singleAxis='';
   };
 }
 window.__bindBracketMobileView571=bindBracketMobileView571;
@@ -19255,7 +19218,7 @@ console.info('[230MATCH] 5.10.7 ready · safe backup restore available');
       tools.innerHTML=`
         <div class="stage51010-bracket-help">
           <strong>본선 대진표</strong>
-          <span>한 손가락 좌우 이동 · 위아래는 페이지 스크롤 · 두 손가락 확대/축소</span>
+          <span>한 손가락으로 좌우·상하 자연스럽게 이동 · 확대/축소는 상단 버튼 사용</span>
         </div>
         <div class="stage51010-bracket-actions">
           <button type="button" data-stage51010-zoom="-1" aria-label="대진표 축소">−</button>
@@ -19282,9 +19245,11 @@ console.info('[230MATCH] 5.10.7 ready · safe backup restore available');
         overflow-y:visible!important;
         -webkit-overflow-scrolling:touch;
         overscroll-behavior-x:contain;
-        touch-action:pan-y pinch-zoom;
-        scroll-behavior:smooth;
+        overscroll-behavior-y:auto;
+        touch-action:pan-x pan-y;
+        scroll-behavior:auto;
         scrollbar-width:auto;
+        scrollbar-gutter:stable;
       }
       #bracketViewport.stage51010-bracket-viewport::-webkit-scrollbar{height:10px}
       #bracketViewport.stage51010-bracket-viewport::-webkit-scrollbar-thumb{background:#9fb2ca;border-radius:999px}
@@ -19503,3 +19468,18 @@ console.info('[230MATCH] 5.10.19 ready · print center court status reads prelim
 
 /* 230MATCH 5.10.20 · auto SMS event dismissal persistence */
 console.info('[230MATCH] 5.10.20 ready · sent/dismissed auto-SMS events stay handled across refresh; new event keys still notify');
+
+/* 230MATCH 5.10.21 · bracket natural scroll */
+(function stage51021BracketNaturalScroll(){
+  const apply=()=>{
+    const viewport=document.getElementById('bracketViewport');
+    if(!viewport)return;
+    viewport.classList.add('stage51021-natural-scroll');
+    viewport.style.webkitOverflowScrolling='touch';
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(apply,80),{once:true});
+  else setTimeout(apply,80);
+  window.addEventListener('hashchange',()=>{if(location.hash==='#bracket')setTimeout(apply,100);});
+  window.addEventListener('pageshow',()=>setTimeout(apply,80));
+  console.info('[230MATCH] 5.10.21 ready · bracket native horizontal/vertical scrolling');
+})();
