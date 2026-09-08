@@ -1423,12 +1423,56 @@ function buildAutoSmsSnapshot(){
 }
 function autoSmsEventKey(kind,matchId,p){return[kind,matchId,p?.court||'',p?.slot||'',p?.position||0].join('|');}
 function autoSmsRecent(value,seconds=20){const t=value?new Date(value).getTime():0;return Number.isFinite(t)&&t>0&&(Date.now()-t)<=seconds*1000;}
+
+const STAGE51020_AUTO_SMS_HANDLED_KEY='230match-auto-sms-handled-v51020';
+function stage51020SmsScopeKey(key){
+  return [
+    String(state?.tournament?.id||state?.multiTournament?.activeTournamentId||'current'),
+    String(state?.multiDivision?.activeDivisionId||state?.tournament?.division||'division'),
+    String(key||'')
+  ].join('::');
+}
+function stage51020ReadHandledSms(){
+  try{
+    const raw=JSON.parse(localStorage.getItem(STAGE51020_AUTO_SMS_HANDLED_KEY)||'{}');
+    return raw&&typeof raw==='object'&&!Array.isArray(raw)?raw:{};
+  }catch(_e){return{};}
+}
+function stage51020WriteHandledSms(map){
+  try{
+    const entries=Object.entries(map||{}).sort((a,b)=>String(b[1]?.at||'').localeCompare(String(a[1]?.at||''))).slice(0,600);
+    localStorage.setItem(STAGE51020_AUTO_SMS_HANDLED_KEY,JSON.stringify(Object.fromEntries(entries)));
+  }catch(_e){}
+}
+function stage51020RememberHandledSms(key,status){
+  const terminal=new Set(['dismissed','skipped','sent-aligo','opened-phone']);
+  if(!terminal.has(String(status||'')))return;
+  const map=stage51020ReadHandledSms(),scope=stage51020SmsScopeKey(key);
+  map[scope]={status:String(status),at:new Date().toISOString()};
+  stage51020WriteHandledSms(map);
+}
+function stage51020HandledSmsStatus(key){
+  const terminal=new Set(['dismissed','skipped','sent-aligo','opened-phone']);
+  const scope=stage51020SmsScopeKey(key),local=stage51020ReadHandledSms()[scope];
+  if(local&&terminal.has(String(local.status||'')))return String(local.status);
+  const item=(state.messaging?.smsApprovalHistory||[]).find(x=>x?.key===key&&terminal.has(String(x?.status||'')));
+  if(item){
+    stage51020RememberHandledSms(key,item.status);
+    return String(item.status);
+  }
+  return '';
+}
 function queueAutoSmsEvent(kind,match,placement){
   ensureMessagingState(state);if(!Array.isArray(state.messaging.smsApprovalHistory))state.messaging.smsApprovalHistory=[];
   const key=autoSmsEventKey(kind,match.id,placement);
   const previous=state.messaging.smsApprovalHistory.find(x=>x.key===key);
-  // 같은 경기/코트의 즉시 중복 감지는 막되, 복구·재배정 테스트 등으로 실제 전환이 다시 발생하면
-  // 영구적으로 차단하지 않는다. 2분 이내 동일 이벤트만 중복으로 본다.
+  // 5.10.20: 같은 이벤트를 이미 발송했거나 사용자가 '이번만 건너뛰기/닫기'로 확인한 경우
+  // 새로고침 뒤에도 다시 승인창을 띄우지 않는다.
+  const handledStatus=stage51020HandledSmsStatus(key);
+  if(handledStatus)return{queued:false,duplicate:true,handled:true,status:handledStatus};
+
+  // 아직 처리되지 않은 pending/no-phone 이벤트만 짧은 시간 동안 즉시 중복 감지를 막는다.
+  // 실제로 다른 코트/다른 순서/다른 경기로 이동하면 event key가 바뀌므로 새 승인창이 뜬다.
   if(previous){
     const pt=new Date(previous.updatedAt||previous.createdAt||0).getTime();
     if(Number.isFinite(pt)&&pt>0&&(Date.now()-pt)<120000)return{queued:false,duplicate:true};
@@ -1473,7 +1517,7 @@ function detectAutoSmsEvents(){
   autoSmsSnapshot=current;
   if(missing.length){const unique=[...new Set(missing)];notice(`자동 문자 미생성 · 연락처 없는 경기 ${unique.length}건: ${unique.slice(0,2).join(' / ')}${unique.length>2?' 외':''}`,'error');}
 }
-function markAutoSmsHistory(key,status,detail=''){const item=state.messaging?.smsApprovalHistory?.find(x=>x.key===key);if(item){item.status=status;item.detail=detail;item.updatedAt=new Date().toISOString();safePersistState('자동 문자 처리');}}
+function markAutoSmsHistory(key,status,detail=''){const item=state.messaging?.smsApprovalHistory?.find(x=>x.key===key);if(item){item.status=status;item.detail=detail;item.updatedAt=new Date().toISOString();}stage51020RememberHandledSms(key,status);safePersistState('자동 문자 처리');}
 function showNextAutoSmsDialog(){
   if(autoSmsDialogOpen||!autoSmsDialogQueue.length)return;const item=autoSmsDialogQueue.shift();const d=document.getElementById('autoSmsApprovalDialog');if(!d)return;autoSmsDialogOpen=true;d.dataset.eventKey=item.key;
   const title=document.getElementById('autoSmsApprovalTitle'),target=document.getElementById('autoSmsApprovalTarget'),body=document.getElementById('autoSmsApprovalBody');
@@ -1484,11 +1528,11 @@ function showNextAutoSmsDialog(){
   }else{
     title.textContent=({start:'🎾 시합 시작 문자 확인',waiting:'⏳ 코트 대기 문자 확인',changed:'🔄 코트·순서 변경 문자 확인',complete:'✅ 경기 완료 문자 확인'})[item.kind]||'문자 확인';
     target.textContent=`${item.recipients.length}명 · ${item.recipients.map(x=>`${x.name} ${x.phone}`).join(' / ')}`;body.value=smsStripAffiliations(item.body);
-    sendButtons.forEach(b=>b.disabled=false);if(skip)skip.textContent='이번만 건너뛰기';
+    sendButtons.forEach(b=>b.disabled=false);if(skip){skip.textContent='이번 이벤트 닫기';skip.title='이 경기의 현재 코트/순서 이벤트는 새로고침해도 다시 표시하지 않습니다.';}
   }
   d.__smsItem=item;d.showModal();
 }
-function closeAutoSmsDialog(status='skipped'){const d=document.getElementById('autoSmsApprovalDialog');const item=d?.__smsItem;if(item)markAutoSmsHistory(item.key,status);if(d?.open)d.close();if(d)d.__smsItem=null;autoSmsDialogOpen=false;setTimeout(showNextAutoSmsDialog,60);}
+function closeAutoSmsDialog(status='dismissed'){const d=document.getElementById('autoSmsApprovalDialog');const item=d?.__smsItem;if(item)markAutoSmsHistory(item.key,status);if(d?.open)d.close();if(d)d.__smsItem=null;autoSmsDialogOpen=false;setTimeout(showNextAutoSmsDialog,60);}
 const sendAligoSmsV3=createAligoSender({
   proxyUrl:ALIGO_PROXY_URL,
   clientKey:ALIGO_CLIENT_KEY,
@@ -11806,10 +11850,10 @@ console.info('[230MATCH] 34.4.2 ready · main wait1 refill and shared queue elap
     setRuntime(`승인창 표시 중 · ${eventTitle(item.kind)}`,eventTitle(item.kind));renderStatus();
   };
   const originalClose=closeAutoSmsDialog;
-  closeAutoSmsDialog=function stage3520CloseAutoSmsDialog(status='skipped'){
+  closeAutoSmsDialog=function stage3520CloseAutoSmsDialog(status='dismissed'){
     const item=byId('autoSmsApprovalDialog')?.__smsItem;
     originalClose(status);
-    const result=({skipped:'이번 문자 건너뜀','sent-aligo':'알리고 발송 완료','opened-phone':'문자앱 열기 완료','no-phone':'연락처 없음'})[status]||status;
+    const result=({dismissed:'이번 이벤트 알림 닫음',skipped:'이번 문자 건너뜀','sent-aligo':'알리고 발송 완료','opened-phone':'문자앱 열기 완료','no-phone':'연락처 없음'})[status]||status;
     setRuntime(`${eventTitle(item?.kind)} · ${result}`,eventTitle(item?.kind));renderStatus();
   };
 
@@ -19456,3 +19500,6 @@ console.info('[230MATCH] 5.10.15 ready · rejected frees slot, next reserve prom
   `;document.head.appendChild(st);
 })();
 console.info('[230MATCH] 5.10.19 ready · print center court status reads prelim/current court queues');
+
+/* 230MATCH 5.10.20 · auto SMS event dismissal persistence */
+console.info('[230MATCH] 5.10.20 ready · sent/dismissed auto-SMS events stay handled across refresh; new event keys still notify');
