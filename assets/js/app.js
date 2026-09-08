@@ -5663,7 +5663,7 @@ function renderPublicPrelimGroups(){
       ${standings.map((standing,index)=>{const rank=Number(standing.rank||index+1);const qualified=Boolean(standing.qualified)||((prelim.settings?.qualifiersPerGroup||state.settings?.qualifiersPerGroup||2)>=rank&&groupComplete);return `<tr class="${qualified?'qualifier':''}"><td>${rank}</td><td>${portalTeamNameHtml(standing.team)}${qualified?'<span class="public-qualified-chip">본선권</span>':''}</td><td>${Number(standing.wins||0)}</td><td>${Number(standing.losses||0)}</td><td>${Number(standing.diff||0)>0?'+':''}${Number(standing.diff||0)}</td></tr>`;}).join('')}
       </tbody></table>
       <div class="prelim-match-list public-match-list">
-      ${groupMatches.map(match=>{const status=publicPrelimStatusLabel(match.status);const score=match.status==='completed'?`${Number(match.scoreA||0)} : ${Number(match.scoreB||0)}`:'';const winner=match.status==='completed'&&match.winner?`승리 ${portalEscape(portalTeamNamesOnly(match.winner))}`:'';return `<div class="prelim-match public-prelim-match ${portalEscape(match.status||'waiting')}"><div class="prelim-match-top"><span>${Number(match.matchNo||0)}경기</span><span>${portalEscape(match.court||group.court||'-')} · <b>${status}</b></span></div><strong>${portalTeamNameHtml(match.teamA)} <span>vs</span> ${portalTeamNameHtml(match.teamB)}</strong><div class="public-match-result">${score?`<b>${score}</b>${winner?`<span>${winner}</span>`:''}`:'<span>결과 대기</span>'}</div></div>`;}).join('')||'<div class="portal-empty">경기표가 아직 생성되지 않았습니다.</div>'}
+      ${groupMatches.map(match=>{const status=publicPrelimStatusLabel(match.status);const score=match.status==='completed'?`${Number(match.scoreA||0)} : ${Number(match.scoreB||0)}`:'';const winner=match.status==='completed'&&match.winner?`승리 ${portalEscape(portalTeamNamesOnly(match.winner))}`:'';return `<div class="prelim-match public-prelim-match ${portalEscape(match.status||'waiting')}" data-prelim-public-match-id="${portalEscape(match.id||'')}"><div class="prelim-match-top"><span>${Number(match.matchNo||0)}경기</span><span>${portalEscape(match.court||group.court||'-')} · <b>${status}</b></span></div><strong>${portalTeamNameHtml(match.teamA)} <span>vs</span> ${portalTeamNameHtml(match.teamB)}</strong><div class="public-match-result">${score?`<b>${score}</b>${winner?`<span>${winner}</span>`:''}`:'<span>결과 대기</span>'}</div></div>`;}).join('')||'<div class="portal-empty">경기표가 아직 생성되지 않았습니다.</div>'}
       </div>
     </article>`;
   }).join('');
@@ -5803,7 +5803,10 @@ function decorateBracketLivePlacements(){
 function myMatchPlacement(match){return liveMatchPlacement(match);}
 function myMatchRoundLabel(match,isPrelim){
   if(isPrelim)return `${Number(match.groupNo||0)}조 ${Number(match.matchNo||0)}경기`;
-  const id=String(match.id||'');const found=id.match(/^r(\d+)_/);return found?`${found[1]}강`:'본선 경기';
+  const id=String(match.id||'');const found=id.match(/^r(\d+)_/);
+  if(!found)return'본선 경기';
+  const size=Number(found[1]||0);
+  return size===2?'결승':size===4?'준결승':`${size}강`;
 }
 function myMatchStatusText(match){if(!match)return'대기';if(match.status==='completed')return'완료';if(match.status==='playing')return'시합중';if(match.status==='court_wait1')return'코트 대기1';if(match.status==='venue_shared_queue'||match.status==='shared_queue')return'공용대기';if(match.status==='ready')return'대진 대기';return'대기';}
 function renderMyMatchTeam(team){
@@ -12970,10 +12973,22 @@ function stage51022RestoreMainDraft({quiet=false}={}){
   const normalizePhone=v=>String(v||'').replace(/\D/g,'');
   const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   function ownership(team){
-    if(!currentAuthUser||!team)return{ok:false,reason:'login'};
+    if(!team)return{ok:false,reason:'missing'};
     if(canOperate())return{ok:true,reason:'operator'};
+    if(!currentAuthUser)return{ok:false,reason:'login'};
     const uid=String(currentAuthUser.uid||'');
     if(uid&&[team.ownerUid,team.applicationOwnerUid].some(v=>String(v||'')===uid))return{ok:true,reason:'uid'};
+
+    // 팀 객체에 ownerUid가 빠져 있어도 참가신청 registrationId가 같은 계정이면 본인 경기로 인정.
+    try{
+      const rid=String(team.registrationId||team.applicationId||'');
+      if(uid&&rid){
+        const row=(typeof simpleRegistrationRows==='function'?simpleRegistrationRows():[]).find(a=>String(a?.id||'')===rid);
+        if(row&&String(row.ownerUid||'')===uid)return{ok:true,reason:'registration_uid'};
+      }
+    }catch(_e){}
+
+    // 마지막 보조 확인은 이름+전화번호가 모두 정확히 일치하는 경우만 허용.
     try{if(v3252ExactIdentityMatch(team))return{ok:true,reason:'name_phone'};}catch(_e){}
     return{ok:false,reason:'unverified'};
   }
@@ -13159,7 +13174,7 @@ function stage51022RestoreMainDraft({quiet=false}={}){
         const sourceCourt=[...(state.prelim?.courts||[]),...(state.courts||[])].find(c=>c.playing===id),previousPlayingId=sourceCourt?.playing||null;saved=submitResult(state,{matchId:id,winnerId,scoreA,scoreB});saved.resultType=type;saved.resultTypeLabel=TYPE_LABELS[type];verifyAndRepairMainFlow(state,{sourceMatchId:id});
         if(!correcting&&sourceCourt&&(state.prelim?.courts||[]).some(c=>c.id===sourceCourt.id)){advanceUnifiedCourt(state,sourceCourt.id,id);stage599EnsureFreshPlayingClock(sourceCourt,previousPlayingId);enqueueReadyMainToUnifiedCourts(state);}
       }
-      saved.enteredByPlayer=true;saved.enteredByUid=currentAuthUser?.uid||'';saved.enteredByName=authUserLabel();saved.enteredAt=new Date().toISOString();recordAudit(saved,isPrelim,correcting);
+      saved.enteredByPlayer=!canOperate();saved.enteredByOperator=canOperate();saved.enteredByUid=currentAuthUser?.uid||'';saved.enteredByName=authUserLabel();saved.enteredAt=new Date().toISOString();recordAudit(saved,isPrelim,correcting);
       const playerFinal=!isPrelim&&!match.nextMatchId;
       commit(`${playerFinal?'결승 결과 확정':'선수 결과 '+(correcting?'수정':'입력')} · ${saved.id} · ${saved.scoreA}:${saved.scoreB}${type!=='normal'?` · ${TYPE_LABELS[type]}`:''}`);
       if(playerFinal){
@@ -13175,7 +13190,59 @@ function stage51022RestoreMainDraft({quiet=false}={}){
     }catch(error){console.error('[35.6.0] player result failed',error);notice(`결과 저장 실패: ${error?.message||error}`,'error')}
   }
   const originalRender=renderMyMatchTeam;renderMyMatchTeam=function(team){originalRender.apply(this,arguments);setTimeout(()=>decorate(team),0)};
-  const originalPublic=renderPublicPrelimGroups;renderPublicPrelimGroups=function(){originalPublic.apply(this,arguments);const matches=(state.prelim?.groups||[]).flatMap(g=>(state.prelim?.matches||[]).filter(m=>m.groupId===g.id||Number(m.groupNo)===Number(g.groupNo)));document.querySelectorAll('.public-prelim-match').forEach((node,i)=>{const m=matches[i],label=scoreLabel(m);if(label&&!node.querySelector('.stage3560-result-type'))node.querySelector('.public-match-result')?.insertAdjacentHTML('beforeend',`<span class="stage3560-result-type">${esc(label)}</span>`)});};
+  const originalPublic=renderPublicPrelimGroups;renderPublicPrelimGroups=function(){
+    originalPublic.apply(this,arguments);
+    const matchMap=new Map((state.prelim?.matches||[]).map(m=>[String(m?.id||''),m]));
+    document.querySelectorAll('.public-prelim-match').forEach(node=>{
+      const id=String(node.dataset.prelimPublicMatchId||'');
+      const m=matchMap.get(id);if(!m)return;
+
+      const label=scoreLabel(m);
+      if(label&&!node.querySelector('.stage3560-result-type')){
+        node.querySelector('.public-match-result')?.insertAdjacentHTML('beforeend',`<span class="stage3560-result-type">${esc(label)}</span>`);
+      }
+
+      const resolved=Boolean(m.teamA&&m.teamB&&!m.teamA.placeholder&&!m.teamB.placeholder);
+      const ownA=ownership(m.teamA),ownB=ownership(m.teamB);
+      const eligible=resolved&&(canOperate()||ownA.ok||ownB.ok);
+      if(eligible&&!node.querySelector('[data-player-result-open]')){
+        const button=document.createElement('button');
+        button.type='button';
+        button.className='btn btn-primary btn-small stage3560-public-prelim-result';
+        button.dataset.playerResultOpen=String(m.id||'');
+        button.dataset.playerResultPrelim='1';
+        button.textContent=m.status==='completed'?(canOperate()?'결과 수정':'내 경기 결과 수정'):(canOperate()?'결과 입력':'내 경기 결과 입력');
+
+        if(m.status==='completed'){
+          const safety=playerResultCorrectionSafety(m,true);
+          button.title=safety.ok?(safety.warning||'예선 경기 결과를 수정합니다.'):(safety.message||'현재 수정할 수 없습니다.');
+          if(!safety.ok&&!canOperate()){button.disabled=true;button.textContent='결과 수정 잠김';}
+        }else{
+          button.title=canOperate()?'관리자/진행자 예선 결과 입력':'로그인된 본인 경기 결과 입력';
+        }
+        node.appendChild(button);
+      }
+    });
+
+    const root=document.getElementById('publicPrelimGroupGrid');
+    if(root&&!document.getElementById('stage51030PrelimResultGuide')){
+      const guide=document.createElement('div');
+      guide.id='stage51030PrelimResultGuide';
+      guide.className='stage51030-prelim-result-guide';
+      guide.textContent=canOperate()
+        ?'관리자·진행자는 예선 현황에서 모든 경기 결과를 바로 입력·수정할 수 있습니다.'
+        :currentAuthUser
+          ?'로그인된 본인 경기에는 “내 경기 결과 입력” 버튼이 표시됩니다.'
+          :'로그인하면 본인 예선 경기에서 직접 결과를 입력할 수 있습니다.';
+      root.parentElement?.insertBefore(guide,root);
+    }else if(document.getElementById('stage51030PrelimResultGuide')){
+      document.getElementById('stage51030PrelimResultGuide').textContent=canOperate()
+        ?'관리자·진행자는 예선 현황에서 모든 경기 결과를 바로 입력·수정할 수 있습니다.'
+        :currentAuthUser
+          ?'로그인된 본인 경기에는 “내 경기 결과 입력” 버튼이 표시됩니다.'
+          :'로그인하면 본인 예선 경기에서 직접 결과를 입력할 수 있습니다.';
+    }
+  };
   document.addEventListener('click',event=>{const openBtn=event.target.closest?.('[data-player-result-open]');if(openBtn){event.preventDefault();event.stopPropagation();open(openBtn.dataset.playerResultOpen,openBtn.dataset.playerResultPrelim==='1');return}const winner=event.target.closest?.('[data-stage3560-winner]');if(winner){const type=document.getElementById('stage3560Type').value||'normal';document.getElementById('stage3560WinnerSide').value=winner.dataset.stage3560Winner;if(type!=='normal'){document.getElementById('stage3560ScoreA').value=winner.dataset.stage3560Winner==='A'?6:0;document.getElementById('stage3560ScoreB').value=winner.dataset.stage3560Winner==='B'?6:0;}syncDialog();return}if(event.target.closest?.('[data-stage3560-close]'))document.getElementById('stage3560ResultDialog')?.close();},true);
   document.addEventListener('change',event=>{if(event.target?.id!=='stage3560Type')return;const type=event.target.value;if(type!=='normal'){document.getElementById('stage3560ScoreA').value='';document.getElementById('stage3560ScoreB').value='';}syncDialog();});
   document.addEventListener('submit',event=>{if(event.target?.id==='stage3560ResultForm')submit(event)},true);
@@ -19954,4 +20021,26 @@ console.info('[230MATCH] 5.10.27 ready · Firestore write-loop guard + non-mutat
   window.addEventListener('pageshow',run);
   document.addEventListener('click',()=>requestAnimationFrame(run),true);
   console.info('[230MATCH] 5.10.29 ready · 2강→결승 / 4강→준결승 display labels');
+})();
+
+/* 230MATCH 5.10.30 · prelim public/self result entry */
+(function stage51030PrelimResultAccess(){
+  if(!document.getElementById('stage51030PrelimResultStyle')){
+    const st=document.createElement('style');st.id='stage51030PrelimResultStyle';st.textContent=`
+      .stage3560-public-prelim-result{width:100%;margin-top:9px;min-height:38px}
+      .stage51030-prelim-result-guide{margin:0 0 12px;padding:10px 12px;border:1px solid #cfe0f4;border-radius:12px;background:#f5f9ff;color:#315071;font-size:12px;font-weight:700;line-height:1.5}
+      @media(max-width:640px){.stage3560-public-prelim-result{min-height:42px;font-size:13px}}
+    `;document.head.appendChild(st);
+  }
+
+  const refresh=()=>{
+    if(document.body?.dataset.currentView==='prelim-public'){
+      try{renderPublicPrelimGroups();}catch(_e){}
+    }
+    if(document.body?.dataset.currentView==='my-match'&&currentAuthUser){
+      try{setTimeout(v3252AutoMyMatch,0)}catch(_e){}
+    }
+  };
+  window.addEventListener('pageshow',()=>setTimeout(refresh,80));
+  console.info('[230MATCH] 5.10.30 ready · prelim public admin/self result buttons + my-match ownership audit');
 })();
