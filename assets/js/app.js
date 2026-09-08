@@ -1797,7 +1797,8 @@ function renderCommittedState6400(){
     if(view==='operation'||view==='settings'||view==='roster')renderOperatorControls();
     if(view==='bracket'){
       decorateBracketLivePlacements();
-      setTimeout(bindBracketMobileView571,0);
+      stage51023ApplyBracketPublicationGate();
+      setTimeout(()=>{bindBracketMobileView571();stage51023ApplyBracketPublicationGate();},0);
     }
   }else{
     renderPortalViewFast(view);
@@ -2545,6 +2546,7 @@ function confirmDrawLock(event){
   event.preventDefault();
   if(!$('drawLockConfirmCheck').checked)return;
   lockDraw(state);
+  stage51022ClearMainDraft();
   commit(`본선 대진 잠금 · 체크섬 ${state.drawMeta.checksum}`);
   $('drawLockDialog').close();
   notice('본선 대진을 잠갔습니다. 재추첨은 차단되고 경기 운영은 계속할 수 있습니다.','success');
@@ -4834,6 +4836,10 @@ function stage5937DownloadCanvas(canvas,source='direct'){
 }
 
 async function stage5937CaptureVisibleBracketPng({source='direct'}={}){
+  if(!stage51023PublicMainVisible()){
+    notice('본선 대진표는 운영자가 본선 확정 후 공개합니다.','info');
+    return false;
+  }
   let capture=null;
   try{
     const html2canvas=await stage5937LoadHtml2Canvas();
@@ -5492,7 +5498,61 @@ function portalTeamNameHtml(value){
   if(!affiliation)return `<span class="prelim-name-only">${portalEscape(names)}</span>`;
   return `<button type="button" class="prelim-name-only has-affiliation" data-prelim-affiliation="${portalEscape(affiliation)}" title="${portalEscape(affiliation)}" aria-label="${portalEscape(names)} 소속 ${portalEscape(affiliation)}">${portalEscape(names)}</button>`;
 }
-function portalMainMatches(){try{return allMatches(state.draw||{rounds:{}})||[];}catch(_error){return[];}}
+
+/* 230MATCH 5.10.23 · main draw publication gate
+   운영자/관리자: 추첨 직후 임시 대진 검토 가능
+   일반 참가자: 본선 확정(잠금) 이후에만 공식 대진 공개 */
+function stage51023MainDrawPublished(){
+  return Boolean(state?.drawMeta?.locked===true||state?.settings?.drawLocked===true);
+}
+function stage51023CanViewDraftMainDraw(){
+  try{return typeof canOperate==='function'&&canOperate();}catch(_e){return false;}
+}
+function stage51023PublicMainVisible(){
+  return stage51023CanViewDraftMainDraw()||stage51023MainDrawPublished();
+}
+function stage51023ApplyBracketPublicationGate(){
+  const view=document.getElementById('view-bracket');
+  if(!view)return;
+  const allowed=stage51023PublicMainVisible();
+  let noticeBox=document.getElementById('stage51023BracketPrivateNotice');
+
+  if(!noticeBox){
+    noticeBox=document.createElement('section');
+    noticeBox.id='stage51023BracketPrivateNotice';
+    noticeBox.className='notice info stage51023-bracket-private-notice';
+    noticeBox.innerHTML='<strong>본선 대진표 준비 중</strong><span>본선 추첨은 완료되어도 운영자가 <b>본선 확정</b>을 누르기 전까지 참가자에게 공개되지 않습니다.</span>';
+    const viewport=document.getElementById('bracketViewport');
+    (viewport?.parentElement||view).insertBefore(noticeBox,viewport||view.firstChild);
+  }
+
+  noticeBox.hidden=allowed;
+
+  const privateTargets=[
+    document.getElementById('bracketViewport'),
+    document.getElementById('stage51010BracketTools'),
+    document.getElementById('bracketRoundButtons'),
+    document.getElementById('bracketCourtSyncPanel'),
+    document.getElementById('bracketFilterPanel')
+  ].filter(Boolean);
+
+  privateTargets.forEach(el=>{
+    if(allowed){
+      if(el.dataset.stage51023Hidden==='1'){
+        el.hidden=false;
+        delete el.dataset.stage51023Hidden;
+      }
+    }else{
+      el.hidden=true;
+      el.dataset.stage51023Hidden='1';
+    }
+  });
+
+  view.dataset.mainPublished=stage51023MainDrawPublished()?'1':'0';
+  view.dataset.mainDraftVisible=stage51023CanViewDraftMainDraw()?'1':'0';
+}
+
+function portalMainMatches(){if(!stage51023PublicMainVisible())return[];try{return allMatches(state.draw||{rounds:{}})||[];}catch(_error){return[];}}
 function portalCourtRows(){return [...(state.prelim?.courts||[]),...(state.courts||[])];}
 function publicPrelimStatusLabel(status){
   return ({playing:'시합중',court_wait1:'대기1',queued:'추가대기',waiting_dependency:'상대 확정 대기',waiting_previous:'이전 경기 대기',completed:'완료'})[status]||'대기';
@@ -8439,6 +8499,7 @@ function printPrelimAssignmentHtml(){
   return printHeader('시합 전 조편성·코트 배정표')+`<div class="assignment-summary"><b>${groups.length}개 조 · ${(state.teams||[]).length}팀</b><span>본인 조와 배정 코트를 확인해 주세요.</span></div><div class="assignment-grid">${cards}</div>`;
 }
 function printBracketHtml(){
+  if(!stage51023PublicMainVisible())return printHeader('본선 가지형 대진표')+'<div class="print-empty">본선 대진표는 운영자가 본선 확정 후 공개합니다.</div>';
   const draw=state.draw;
   if(!draw?.rounds||!draw?.size)return printHeader('본선 가지형 대진표')+'<div class="print-empty">생성된 본선 대진표가 없습니다.</div>';
   const sizes=Object.keys(draw.rounds).map(Number).filter(Boolean).sort((a,b)=>b-a);
@@ -8797,7 +8858,8 @@ function renderPortalViewFast(target){
     if(target==='settings'){stage3210RenderSettingsSummary();return;}
     if(target==='bracket'){
       decorateBracketLivePlacements();
-      setTimeout(bindBracketMobileView571,0);
+      stage51023ApplyBracketPublicationGate();
+      setTimeout(()=>{bindBracketMobileView571();stage51023ApplyBracketPublicationGate();},0);
       return;
     }
     // operation/home/my-match/settings already have live DOM maintained by state renders.
@@ -11338,7 +11400,7 @@ let refreshDivisionEditorPanel = window.refreshDivisionEditorPanel || (()=>{});
     stage5927ClearMainOperationResidue({normalizeMatchStatus:false});
     delete state.completion;delete state.tournament?.completedAt;
     try{ensureVenueQueues(state);ensureCourtStatuses(state);ensureCourtManualQueues(state)}catch(_e){}
-    commit('본선만 초기화 · 예선 결과 유지');
+    stage51022ClearMainDraft();commit('본선만 초기화 · 예선 결과 유지');
     notice?.('본선 슬롯·대진·코트배정을 초기화했습니다. 예선 결과는 유지됩니다.','success');
     refresh();
   }
@@ -11355,7 +11417,7 @@ let refreshDivisionEditorPanel = window.refreshDivisionEditorPanel || (()=>{});
     state.draw.stage3441Explicit='final';state.draw.stage3441DrawAt=new Date().toISOString();
     state.prelim.linkedDraw={active:false,slots:[],createdAt:null,lastSyncedAt:null,userInitiated:false,finalDrawAt:new Date().toISOString()};
     stage5927ClearMainOperationResidue({normalizeMatchStatus:true});
-    commit(`최종 본선 추첨 · ${qualifiers.length}팀 · ${size}강`);
+    commit(`최종 본선 추첨 · ${qualifiers.length}팀 · ${size}강`);stage51022StoreMainDraft('final');
     notice?.('최종 본선 대진을 생성했습니다. 검토 후 본선 코트배정과 본선 확정을 진행하세요.','success');
     refresh();
   }
@@ -11607,6 +11669,105 @@ console.info('[230MATCH] 34.4.2 ready · main wait1 refill and shared queue elap
 
 
 
+
+/* 230MATCH 5.10.22 · unconfirmed main-draw draft persistence
+   추첨 직후 결과는 '확정' 전이어도 현재 대회/부서별 임시 대진으로 보존한다.
+   확정/초기화 전에는 새로고침·화면이동·오래된 원격상태 반영으로 사라지지 않게 한다. */
+const STAGE51022_MAIN_DRAFT_KEY='230match-main-draw-draft-v51022';
+function stage51022MainDraftScope(){
+  return [
+    String(state?.tournament?.id||state?.multiTournament?.activeTournamentId||state?.tournament?.name||'current'),
+    String(state?.multiDivision?.activeDivisionId||state?.tournament?.division||'division')
+  ].join('::');
+}
+function stage51022ReadDraftMap(){
+  try{
+    const raw=JSON.parse(localStorage.getItem(STAGE51022_MAIN_DRAFT_KEY)||'{}');
+    return raw&&typeof raw==='object'&&!Array.isArray(raw)?raw:{};
+  }catch(_e){return{};}
+}
+function stage51022WriteDraftMap(map){
+  try{
+    const entries=Object.entries(map||{}).sort((a,b)=>String(b[1]?.savedAt||'').localeCompare(String(a[1]?.savedAt||''))).slice(0,20);
+    localStorage.setItem(STAGE51022_MAIN_DRAFT_KEY,JSON.stringify(Object.fromEntries(entries)));
+  }catch(_e){}
+}
+function stage51022MainMatchCount(draw=state?.draw){
+  try{return typeof allMatches==='function'?allMatches(draw||{rounds:{}}).length:0}catch(_e){return 0}
+}
+function stage51022MainHasStarted(){
+  try{return typeof hasStartedMainMatches==='function'&&hasStartedMainMatches(state)}catch(_e){}
+  try{return allMatches(state.draw||{rounds:{}}).some(m=>['playing','completed'].includes(String(m?.status||'')))}catch(_e){return false}
+}
+function stage51022StoreMainDraft(kind='draft'){
+  try{
+    if(!state?.draw||!stage51022MainMatchCount())return false;
+    if(state?.drawMeta?.locked||state?.settings?.drawLocked)return false;
+    const map=stage51022ReadDraftMap();
+    map[stage51022MainDraftScope()]={
+      version:1,
+      kind:String(kind||'draft'),
+      savedAt:new Date().toISOString(),
+      tournamentId:String(state?.tournament?.id||state?.multiTournament?.activeTournamentId||''),
+      tournamentName:String(state?.tournament?.name||''),
+      divisionId:String(state?.multiDivision?.activeDivisionId||''),
+      divisionName:String(state?.tournament?.division||''),
+      draw:structuredClone(state.draw),
+      drawMeta:structuredClone(state.drawMeta||{}),
+      linkedDraw:structuredClone(state?.prelim?.linkedDraw||{}),
+      mainDrawLifecycle:structuredClone(state?.mainDrawLifecycle||{})
+    };
+    stage51022WriteDraftMap(map);
+    return true;
+  }catch(error){
+    console.warn('[5.10.22] 본선 임시추첨 저장 실패',error);
+    return false;
+  }
+}
+function stage51022ClearMainDraft(){
+  const map=stage51022ReadDraftMap(),scope=stage51022MainDraftScope();
+  if(Object.prototype.hasOwnProperty.call(map,scope)){
+    delete map[scope];
+    stage51022WriteDraftMap(map);
+  }
+}
+function stage51022DraftForCurrent(){
+  const draft=stage51022ReadDraftMap()[stage51022MainDraftScope()];
+  if(!draft||!draft.draw)return null;
+  const age=Date.now()-Date.parse(String(draft.savedAt||''));
+  if(!Number.isFinite(age)||age<0||age>1000*60*60*24*14)return null;
+  return draft;
+}
+function stage51022RestoreMainDraft({quiet=false}={}){
+  try{
+    const draft=stage51022DraftForCurrent();
+    if(!draft)return false;
+    if(state?.drawMeta?.locked||state?.settings?.drawLocked)return false;
+    if(stage51022MainHasStarted())return false;
+
+    const currentCount=stage51022MainMatchCount();
+    const currentAuthorized=(()=>{try{return hasAuthorizedMainDraw(state)}catch(_e){return false}})();
+
+    // 이미 정상 추첨이 남아 있으면 덮어쓰지 않는다.
+    if(currentCount&&currentAuthorized)return false;
+
+    // 비어 있거나 라이프사이클 인증만 유실된 상태만 임시추첨으로 복구한다.
+    state.draw=structuredClone(draft.draw);
+    state.drawMeta=structuredClone(draft.drawMeta||{});
+    state.prelim=state.prelim||{};
+    state.prelim.linkedDraw=structuredClone(draft.linkedDraw||{});
+    state.mainDrawLifecycle=structuredClone(draft.mainDrawLifecycle||{});
+    try{ensureMainDrawLifecycle(state);repairMainDrawAuthorization(state)}catch(_e){}
+    try{syncCurrentDivisionRuntime?.()}catch(_e){}
+    try{safePersistState('본선 임시추첨 복구')}catch(_e){}
+    if(!quiet)try{notice('확정 전 본선 추첨 결과를 복구했습니다. 확정 또는 본선 초기화 전까지 유지됩니다.','success')}catch(_e){}
+    return true;
+  }catch(error){
+    console.warn('[5.10.22] 본선 임시추첨 복구 실패',error);
+    return false;
+  }
+}
+
 /* Stage 35.0.0 · rebuilt explicit main-draw lifecycle */
 (function stage3500RebuiltMainLifecycle(){
   const $=id=>document.getElementById(id);
@@ -11638,7 +11799,7 @@ console.info('[230MATCH] 34.4.2 ready · main wait1 refill and shared queue elap
       completeMainDraw(state,'slot');
       repairMainDrawAuthorization(state);
       if(!hasAuthorizedMainDraw(state))throw new Error('슬롯 본선 추첨은 생성됐지만 실행 인증 상태를 저장하지 못했습니다. 다시 시도해 주세요.');
-      commit('사용자 실행 · 예선 중 슬롯 본선 추첨 완료 · 코트배정 활성');
+      commit('사용자 실행 · 예선 중 슬롯 본선 추첨 완료 · 코트배정 활성');stage51022StoreMainDraft('slot');
       feedback('슬롯 본선 추첨을 완료했습니다. 실제 팀이 확정된 경기부터 공용대기와 코트배정이 가능합니다.','success','본선 슬롯 추첨');
     }catch(error){failMainDraw(state);commit('본선 슬롯 추첨 실패 상태 정리');feedback(error?.message||String(error),'error','본선 슬롯 추첨');}
     refresh();
@@ -11656,7 +11817,7 @@ console.info('[230MATCH] 34.4.2 ready · main wait1 refill and shared queue elap
       state.draw=createRankAwareFinalDraw(qualifiers,size);
       state.prelim.linkedDraw={active:false,slots:[],createdAt:null,lastSyncedAt:null,userInitiated:false,finalDrawAt:new Date().toISOString()};
       completeMainDraw(state,'final');
-      commit(`사용자 실행 · 최종 본선 추첨 · ${qualifiers.length}팀 · ${size}강`);
+      commit(`사용자 실행 · 최종 본선 추첨 · ${qualifiers.length}팀 · ${size}강`);stage51022StoreMainDraft('final');
       feedback('최종 본선 추첨을 완료했습니다. 이제 본선 코트배정을 실행할 수 있습니다.','success','최종 본선 추첨');
     }catch(error){failMainDraw(state);commit('최종 본선 추첨 실패 상태 정리');feedback(error?.message||String(error),'error','최종 본선 추첨');}
     refresh();
@@ -11665,7 +11826,7 @@ console.info('[230MATCH] 34.4.2 ready · main wait1 refill and shared queue elap
     if(!requireAdmin('본선 초기화'))return;
     if(prompt('예선 데이터는 유지하고 본선만 초기화합니다. “본선초기화”를 입력하세요.','')!=='본선초기화')return;
     try{saveRecovery(state,`${state.tournament?.name||'대회'} · 본선 초기화 전`);}catch(_e){}
-    resetMainDraw(state);commit('본선 생명주기 초기화 · 미추첨 상태');feedback('본선 대진·공용대기·코트배정을 모두 지웠습니다. 예선 데이터는 유지됩니다.','success','본선 초기화');refresh();
+    resetMainDraw(state);stage51022ClearMainDraft();commit('본선 생명주기 초기화 · 미추첨 상태');feedback('본선 대진·공용대기·코트배정을 모두 지웠습니다. 예선 데이터는 유지됩니다.','success','본선 초기화');refresh();
   }
   function install(){
     ensureMainDrawLifecycle(state);
@@ -11675,6 +11836,7 @@ console.info('[230MATCH] 34.4.2 ready · main wait1 refill and shared queue elap
     bindFresh('stage3441Assign',()=>{repairMainDrawAuthorization(state);if(!hasAuthorizedMainDraw(state)){feedback('본선 추첨 실행 기록을 확인하지 못했습니다. 슬롯 추첨을 완료했다면 상태 복구를 다시 시도해 주세요.','error','본선 코트배정');return;}const b=$('assignCourtsBtn');b?b.click():feedback('본선 코트배정 기능을 찾지 못했습니다.','error','본선 코트배정');});
     bindFresh('stage3441Lock',()=>{if(!hasAuthorizedMainDraw(state)){feedback('본선 미추첨 상태에서는 본선을 확정할 수 없습니다.','error','본선 확정');return;}const b=$('lockDrawBtn');b?b.click():feedback('본선 확정 기능을 찾지 못했습니다.','error','본선 확정');});
     bindFresh('stage3441Reset',resetOnly);
+    stage51022RestoreMainDraft({quiet:true});
     clearMainPlacement(state,{clearDraw:false});
     refresh();
   }
@@ -19482,4 +19644,80 @@ console.info('[230MATCH] 5.10.20 ready · sent/dismissed auto-SMS events stay ha
   window.addEventListener('hashchange',()=>{if(location.hash==='#bracket')setTimeout(apply,100);});
   window.addEventListener('pageshow',()=>setTimeout(apply,80));
   console.info('[230MATCH] 5.10.21 ready · bracket native horizontal/vertical scrolling');
+})();
+
+/* 230MATCH 5.10.22 · protect unconfirmed bracket across refresh/remote sync */
+(function stage51022InstallMainDraftGuard(){
+  const originalApply=typeof applySynchronizedState==='function'?applySynchronizedState:null;
+  if(originalApply&&!originalApply.__stage51022){
+    const wrapped=function(nextState,source='동기화'){
+      // 현재 임시 추첨을 먼저 백업한 뒤 원격 상태를 적용한다.
+      try{stage51022StoreMainDraft(state?.mainDrawLifecycle?.mode||state?.draw?.stage3441Explicit||'draft')}catch(_e){}
+      const result=originalApply.apply(this,arguments);
+      // 원격 상태가 확정 전 대진을 잃은 오래된 상태라면 같은 대회/부서의 임시 추첨만 복구한다.
+      setTimeout(()=>{
+        try{
+          if(stage51022RestoreMainDraft({quiet:true})){
+            const view=document.body?.dataset?.currentView||'';
+            if(view==='bracket'){
+              try{renderPortalViewFast?.('bracket')}catch(_e){}
+              try{decorateBracketLivePlacements?.()}catch(_e){}
+            }
+          }
+        }catch(_e){}
+      },0);
+      return result;
+    };
+    wrapped.__stage51022=true;
+    applySynchronizedState=wrapped;
+  }
+
+  const restore=()=>{
+    try{
+      if(stage51022RestoreMainDraft({quiet:true})){
+        const view=document.body?.dataset?.currentView||'';
+        if(view==='bracket'){
+          try{renderPortalViewFast?.('bracket')}catch(_e){}
+          try{decorateBracketLivePlacements?.()}catch(_e){}
+        }
+      }
+    }catch(_e){}
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(restore,180),{once:true});
+  else setTimeout(restore,180);
+  window.addEventListener('pageshow',()=>setTimeout(restore,120));
+  console.info('[230MATCH] 5.10.22 ready · unconfirmed main draw persists until confirm/reset');
+})();
+
+/* 230MATCH 5.10.23 · publish main draw only after confirmation */
+(function stage51023InstallMainPublicationGate(){
+  const apply=()=>{try{stage51023ApplyBracketPublicationGate();}catch(_e){}};
+
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(apply,120),{once:true});
+  else setTimeout(apply,120);
+
+  window.addEventListener('pageshow',()=>setTimeout(apply,80));
+  window.addEventListener('hashchange',()=>setTimeout(apply,80));
+
+  document.addEventListener('click',event=>{
+    if(event.target.closest?.('#lockDrawBtn,#confirmDrawLockBtn,#unlockDrawBtn,#confirmDrawUnlockBtn,[data-portal-go="bracket"],[data-view="bracket"],[data-mobile-view="bracket"]')){
+      setTimeout(apply,80);
+      setTimeout(apply,250);
+    }
+  },true);
+
+  const style=document.createElement('style');
+  style.id='stage51023MainPublicationStyle';
+  style.textContent=`
+    .stage51023-bracket-private-notice{
+      display:grid;gap:7px;margin:14px 0;padding:18px 20px;border-radius:14px;
+      text-align:center
+    }
+    .stage51023-bracket-private-notice strong{font-size:18px}
+    .stage51023-bracket-private-notice span{font-size:13px;line-height:1.55}
+    .stage51023-bracket-private-notice[hidden]{display:none!important}
+  `;
+  document.head.appendChild(style);
+
+  console.info('[230MATCH] 5.10.23 ready · draft main draw private; public after main confirmation');
 })();
