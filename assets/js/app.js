@@ -13036,8 +13036,8 @@ function stage51022RestoreMainDraft({quiet=false}={}){
   }
   function installDialog(){
     if(document.getElementById('stage3560ResultDialog'))return;
-    document.body.insertAdjacentHTML('beforeend',`<dialog id="stage3560ResultDialog" class="stage3560-dialog"><form method="dialog" id="stage3560ResultForm"><div class="stage3560-head"><div><p>PLAYER RESULT</p><h3 id="stage3560Title">경기 결과 입력</h3></div><button type="button" data-stage3560-close aria-label="닫기">×</button></div><div id="stage3560MatchInfo" class="stage3560-match-info"></div><label class="stage3560-label">결과 유형<select id="stage3560Type"><option value="normal">일반 경기</option><option value="retired">기권</option><option value="injury">부상</option><option value="walkover">노쇼</option></select></label><div class="stage3560-score-grid"><button type="button" class="stage3560-team" data-stage3560-winner="A"><span id="stage3560TeamA">A팀</span><input id="stage3560ScoreA" type="number" min="0" max="6" inputmode="numeric" aria-label="A팀 점수"></button><span class="stage3560-colon">:</span><button type="button" class="stage3560-team" data-stage3560-winner="B"><span id="stage3560TeamB">B팀</span><input id="stage3560ScoreB" type="number" min="0" max="6" inputmode="numeric" aria-label="B팀 점수"></button></div><p id="stage3560Guide" class="stage3560-guide">일반 경기는 양 팀 스코어를 입력하세요.</p><div class="stage3560-actions"><button type="button" class="btn btn-secondary" data-stage3560-close>취소</button><button type="submit" class="btn btn-primary">결과 저장</button></div><input type="hidden" id="stage3560MatchId"><input type="hidden" id="stage3560IsPrelim"><input type="hidden" id="stage3560WinnerSide"></form></dialog>`);
-    const style=document.createElement('style');style.id='stage3560Style';style.textContent=`.stage3560-result-button{width:100%;margin-top:10px}.stage3560-result-type{display:inline-flex;margin-left:7px;padding:2px 7px;border-radius:999px;background:rgba(245,158,11,.16);font-size:11px;font-weight:800}.stage3560-verify-note{margin-top:14px;padding:10px 12px;border-radius:10px;background:rgba(100,116,139,.1);font-size:12px;color:#64748b}.stage3560-dialog{width:min(92vw,460px);border:0;border-radius:18px;padding:0;box-shadow:0 24px 80px rgba(15,23,42,.28)}.stage3560-dialog::backdrop{background:rgba(15,23,42,.45)}#stage3560ResultForm{padding:18px}.stage3560-head{display:flex;justify-content:space-between;align-items:flex-start}.stage3560-head p{margin:0;color:#2563eb;font-size:11px;font-weight:900;letter-spacing:.08em}.stage3560-head h3{margin:3px 0 0}.stage3560-head>button{border:0;background:transparent;font-size:28px;line-height:1}.stage3560-match-info{margin:14px 0;padding:11px;border-radius:12px;background:#f8fafc;font-weight:800}.stage3560-label{display:grid;gap:6px;font-size:12px;font-weight:800}.stage3560-label select{height:42px;border:1px solid #cbd5e1;border-radius:10px;padding:0 10px;background:white}.stage3560-score-grid{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:stretch;margin-top:14px}.stage3560-team{border:1px solid #cbd5e1;border-radius:14px;background:white;padding:10px 8px;display:grid;gap:8px;text-align:center}.stage3560-team.is-winner{border-color:#2563eb;background:#eff6ff}.stage3560-team span{font-size:13px;font-weight:800}.stage3560-team input{width:100%;height:52px;border:0;border-radius:10px;background:#f1f5f9;text-align:center;font-size:26px;font-weight:900}.stage3560-colon{align-self:center;font-size:26px;font-weight:900}.stage3560-guide{font-size:12px;color:#64748b;margin:10px 0 0}.stage3560-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}@media(max-width:560px){.stage3560-dialog{width:calc(100vw - 24px)}.stage3560-team span{font-size:12px}.stage3560-result-button{min-height:42px}}`;
+    document.body.insertAdjacentHTML('beforeend',`<dialog id="stage3560ResultDialog" class="stage3560-dialog"><form method="dialog" id="stage3560ResultForm"><div class="stage3560-head"><div><p>PLAYER RESULT</p><h3 id="stage3560Title">경기 결과 입력</h3></div><button type="button" data-stage3560-close aria-label="닫기">×</button></div><div id="stage3560MatchInfo" class="stage3560-match-info"></div><label class="stage3560-label">결과 유형<select id="stage3560Type"><option value="normal">일반 경기</option><option value="retired">기권</option><option value="injury">부상</option><option value="walkover">노쇼</option></select></label><div class="stage3560-score-grid"><div class="stage3560-team" data-stage3560-team-side="A"><span id="stage3560TeamA">A팀</span><input id="stage3560ScoreA" type="number" min="0" max="6" inputmode="numeric" aria-label="A팀 점수"><small>이 팀이 졌다면 점수</small><div class="stage3560-loser-scores" data-stage3560-loser-side="A">${[0,1,2,3,4,5].map(n=>`<button type="button" data-stage3560-loser-score="${n}">${n}</button>`).join('')}</div></div><span class="stage3560-colon">:</span><div class="stage3560-team" data-stage3560-team-side="B"><span id="stage3560TeamB">B팀</span><input id="stage3560ScoreB" type="number" min="0" max="6" inputmode="numeric" aria-label="B팀 점수"><small>이 팀이 졌다면 점수</small><div class="stage3560-loser-scores" data-stage3560-loser-side="B">${[0,1,2,3,4,5].map(n=>`<button type="button" data-stage3560-loser-score="${n}">${n}</button>`).join('')}</div></div></div><p id="stage3560Guide" class="stage3560-guide">진 팀의 게임스코어 0~5만 누르세요. 이긴 팀은 6점으로 자동 입력됩니다.</p><div class="stage3560-actions"><button type="button" class="btn btn-secondary" data-stage3560-close>취소</button><button type="submit" class="btn btn-primary">결과 저장</button></div><input type="hidden" id="stage3560MatchId"><input type="hidden" id="stage3560IsPrelim"><input type="hidden" id="stage3560WinnerSide"></form></dialog>`);
+    const style=document.createElement('style');style.id='stage3560Style';style.textContent=`.stage3560-result-button{width:100%;margin-top:10px}.stage3560-result-type{display:inline-flex;margin-left:7px;padding:2px 7px;border-radius:999px;background:rgba(245,158,11,.16);font-size:11px;font-weight:800}.stage3560-verify-note{margin-top:14px;padding:10px 12px;border-radius:10px;background:rgba(100,116,139,.1);font-size:12px;color:#64748b}.stage3560-dialog{width:min(92vw,460px);border:0;border-radius:18px;padding:0;box-shadow:0 24px 80px rgba(15,23,42,.28)}.stage3560-dialog::backdrop{background:rgba(15,23,42,.45)}#stage3560ResultForm{padding:18px}.stage3560-head{display:flex;justify-content:space-between;align-items:flex-start}.stage3560-head p{margin:0;color:#2563eb;font-size:11px;font-weight:900;letter-spacing:.08em}.stage3560-head h3{margin:3px 0 0}.stage3560-head>button{border:0;background:transparent;font-size:28px;line-height:1}.stage3560-match-info{margin:14px 0;padding:11px;border-radius:12px;background:#f8fafc;font-weight:800}.stage3560-label{display:grid;gap:6px;font-size:12px;font-weight:800}.stage3560-label select{height:42px;border:1px solid #cbd5e1;border-radius:10px;padding:0 10px;background:white}.stage3560-score-grid{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:stretch;margin-top:14px}.stage3560-team{border:1px solid #cbd5e1;border-radius:14px;background:white;padding:10px 8px;display:grid;gap:8px;text-align:center}.stage3560-team.is-winner{border-color:#2563eb;background:#eff6ff}.stage3560-team.is-loser{border-color:#f59e0b;background:#fffbeb}.stage3560-team span{font-size:13px;font-weight:800}.stage3560-team input{width:100%;height:52px;border:0;border-radius:10px;background:#f1f5f9;text-align:center;font-size:26px;font-weight:900}.stage3560-team small{font-size:10px;color:#64748b;font-weight:800}.stage3560-loser-scores{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}.stage3560-loser-scores button{min-height:34px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;font-size:15px;font-weight:900;cursor:pointer}.stage3560-loser-scores button.is-selected{border-color:#f59e0b;background:#fef3c7;color:#92400e}.stage3560-colon{align-self:center;font-size:26px;font-weight:900}.stage3560-guide{font-size:12px;color:#64748b;margin:10px 0 0}.stage3560-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}@media(max-width:560px){.stage3560-dialog{width:calc(100vw - 24px)}.stage3560-team span{font-size:12px}.stage3560-result-button{min-height:42px}}`;
     document.head.appendChild(style);
   }
   function open(id,isPrelim){
@@ -13052,10 +13052,56 @@ function stage51022RestoreMainDraft({quiet=false}={}){
     syncDialog();document.getElementById('stage3560ResultDialog').showModal();
   }
   window.__openPlayerSelfResult=(id,isPrelim=false)=>open(String(id||''),Boolean(isPrelim));
+  function stage51032ApplyLoserScore(side,value){
+    const a=document.getElementById('stage3560ScoreA');
+    const b=document.getElementById('stage3560ScoreB');
+    const winner=document.getElementById('stage3560WinnerSide');
+    const n=Number(value);
+    if(!a||!b||!winner||!Number.isInteger(n)||n<0||n>5)return;
+    if(side==='A'){a.value=String(n);b.value='6';winner.value='B';}
+    else{b.value=String(n);a.value='6';winner.value='A';}
+    syncDialog();
+  }
+  function stage51032AutoCompleteFromInput(side){
+    const type=document.getElementById('stage3560Type')?.value||'normal';
+    if(type!=='normal')return;
+    const a=document.getElementById('stage3560ScoreA');
+    const b=document.getElementById('stage3560ScoreB');
+    const edited=side==='A'?a:b,other=side==='A'?b:a;
+    const winner=document.getElementById('stage3560WinnerSide');
+    if(!edited||!other||!winner)return;
+    if(edited.value===''){syncDialog();return;}
+    const n=Number(edited.value);
+    if(Number.isInteger(n)&&n>=0&&n<=5){
+      other.value='6';
+      winner.value=side==='A'?'B':'A';
+    }else if(n===6){
+      const otherN=Number(other.value);
+      if(Number.isInteger(otherN)&&otherN>=0&&otherN<=5)winner.value=side;
+    }
+    syncDialog();
+  }
   function syncDialog(){
-    const type=document.getElementById('stage3560Type')?.value||'normal';const side=document.getElementById('stage3560WinnerSide')?.value||'';
-    document.querySelectorAll('[data-stage3560-winner]').forEach(b=>b.classList.toggle('is-winner',b.dataset.stage3560Winner===side));
-    const guide=document.getElementById('stage3560Guide');if(guide)guide.textContent=type==='normal'?'일반 경기는 양 팀 스코어를 입력하세요. 한 팀은 6점이어야 합니다.':`${TYPE_LABELS[type]} 경기는 승리팀을 누르면 6:0으로 자동 입력됩니다.`;
+    const type=document.getElementById('stage3560Type')?.value||'normal';
+    const winnerSide=document.getElementById('stage3560WinnerSide')?.value||'';
+    const a=document.getElementById('stage3560ScoreA'),b=document.getElementById('stage3560ScoreB');
+    document.querySelectorAll('[data-stage3560-team-side]').forEach(box=>{
+      const side=box.dataset.stage3560TeamSide;
+      box.classList.toggle('is-winner',winnerSide===side);
+      box.classList.toggle('is-loser',Boolean(winnerSide)&&winnerSide!==side);
+    });
+    document.querySelectorAll('[data-stage3560-loser-score]').forEach(btn=>{
+      const wrap=btn.closest('[data-stage3560-loser-side]');
+      const side=wrap?.dataset.stage3560LoserSide||'';
+      const current=side==='A'?a?.value:b?.value;
+      const loser=winnerSide&&(winnerSide!==side);
+      btn.classList.toggle('is-selected',Boolean(loser)&&String(current)===String(btn.dataset.stage3560LoserScore));
+      btn.disabled=type!=='normal';
+    });
+    const guide=document.getElementById('stage3560Guide');
+    if(guide)guide.textContent=type==='normal'
+      ?'진 팀의 게임스코어 0~5만 누르세요. 이긴 팀은 6점으로 자동 입력됩니다.'
+      :`${TYPE_LABELS[type]} 경기는 승리팀을 선택하면 6:0으로 자동 입력됩니다.`;
   }
   function recordAudit(match,isPrelim,correcting){
     state.operation=state.operation||{};state.operation.playerResultHistory=state.operation.playerResultHistory||[];
@@ -13243,8 +13289,34 @@ function stage51022RestoreMainDraft({quiet=false}={}){
           :'로그인하면 본인 예선 경기에서 직접 결과를 입력할 수 있습니다.';
     }
   };
-  document.addEventListener('click',event=>{const openBtn=event.target.closest?.('[data-player-result-open]');if(openBtn){event.preventDefault();event.stopPropagation();open(openBtn.dataset.playerResultOpen,openBtn.dataset.playerResultPrelim==='1');return}const winner=event.target.closest?.('[data-stage3560-winner]');if(winner){const type=document.getElementById('stage3560Type').value||'normal';document.getElementById('stage3560WinnerSide').value=winner.dataset.stage3560Winner;if(type!=='normal'){document.getElementById('stage3560ScoreA').value=winner.dataset.stage3560Winner==='A'?6:0;document.getElementById('stage3560ScoreB').value=winner.dataset.stage3560Winner==='B'?6:0;}syncDialog();return}if(event.target.closest?.('[data-stage3560-close]'))document.getElementById('stage3560ResultDialog')?.close();},true);
-  document.addEventListener('change',event=>{if(event.target?.id!=='stage3560Type')return;const type=event.target.value;if(type!=='normal'){document.getElementById('stage3560ScoreA').value='';document.getElementById('stage3560ScoreB').value='';}syncDialog();});
+  document.addEventListener('click',event=>{
+    const openBtn=event.target.closest?.('[data-player-result-open]');
+    if(openBtn){event.preventDefault();event.stopPropagation();open(openBtn.dataset.playerResultOpen,openBtn.dataset.playerResultPrelim==='1');return}
+
+    const loserScore=event.target.closest?.('[data-stage3560-loser-score]');
+    if(loserScore){
+      event.preventDefault();event.stopPropagation();
+      const wrap=loserScore.closest('[data-stage3560-loser-side]');
+      stage51032ApplyLoserScore(wrap?.dataset.stage3560LoserSide,loserScore.dataset.stage3560LoserScore);
+      return;
+    }
+
+    const teamBox=event.target.closest?.('[data-stage3560-team-side]');
+    if(teamBox&&document.getElementById('stage3560Type')?.value!=='normal'){
+      const side=teamBox.dataset.stage3560TeamSide;
+      document.getElementById('stage3560WinnerSide').value=side;
+      document.getElementById('stage3560ScoreA').value=side==='A'?6:0;
+      document.getElementById('stage3560ScoreB').value=side==='B'?6:0;
+      syncDialog();return;
+    }
+
+    if(event.target.closest?.('[data-stage3560-close]'))document.getElementById('stage3560ResultDialog')?.close();
+  },true);
+  document.addEventListener('input',event=>{
+    if(event.target?.id==='stage3560ScoreA')stage51032AutoCompleteFromInput('A');
+    else if(event.target?.id==='stage3560ScoreB')stage51032AutoCompleteFromInput('B');
+  });
+  document.addEventListener('change',event=>{if(event.target?.id!=='stage3560Type')return;const type=event.target.value;if(type!=='normal'){document.getElementById('stage3560ScoreA').value='';document.getElementById('stage3560ScoreB').value='';document.getElementById('stage3560WinnerSide').value='';}syncDialog();});
   document.addEventListener('submit',event=>{if(event.target?.id==='stage3560ResultForm')submit(event)},true);
   const applyBuild=()=>{installDialog();const label=document.getElementById('buildStageLabel');if(label){label.textContent='230MATCH 35.6.0 · 선수 본인 경기 결과 입력';label.title='Version 35.6.0';}document.documentElement.dataset.build='3560';};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(applyBuild,0),{once:true});else setTimeout(applyBuild,0);
@@ -20041,3 +20113,6 @@ console.info('[230MATCH] 5.10.27 ready · Firestore write-loop guard + non-mutat
 
 /* 230MATCH 5.10.31 · console stability */
 console.info('[230MATCH] 5.10.31 ready · guarded startTime reads + registration Firestore scans limited to entry view');
+
+/* 230MATCH 5.10.32 · player/self quick loser-score entry */
+console.info('[230MATCH] 5.10.32 ready · prelim-public/my-match loser score 0~5 => winner auto 6');
