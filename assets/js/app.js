@@ -1311,13 +1311,18 @@ function smsFormatClock(date){
   try{return date.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',hour12:false}).replace('24:','00:');}
   catch(_e){return'';}
 }
-function stage593OfficialStartMs(){
-  if(state?.settings?.officialStartClockEnabled!==true)return 0;
+function stage593ScheduledStartMs(){
   const date=String(state?.portal?.guide?.date||'').trim();
   const time=String(state?.portal?.guide?.startTime||'').trim();
   if(!date||!time)return 0;
   const d=new Date(`${date}T${time.length===5?time+':00':time}`);
   return Number.isFinite(d.getTime())?d.getTime():0;
+}
+function stage593OfficialStartMs(){
+  const actual=Date.parse(String(state?.operation?.eventClockStartAt||''));
+  if(Number.isFinite(actual)&&actual>0)return actual;
+  if(state?.settings?.officialStartClockEnabled!==true)return 0;
+  return stage593ScheduledStartMs();
 }
 function stage593EffectiveMatchStartMs(match){
   const assigned=match?.startedAt?new Date(match.startedAt).getTime():Date.now();
@@ -1339,6 +1344,9 @@ function smsExpectedClock(matchId,placement={}){
   const id=String(matchId||'');
   if(!id)return'';
   const slot=smsConfiguredMatchMinutes();
+  const locked=state?.settings?.officialStartClockEnabled===true&&!state?.operation?.eventClockStartAt;
+  const scheduled=stage593ScheduledStartMs();
+  const baseMs=locked&&scheduled?scheduled:Date.now();
   const courts=[...(state.prelim?.courts||[]),...(state.courts||[])];
   let court=courts.find(c=>String(c.id||'')===String(placement.courtId||''))||
             courts.find(c=>String(c.name||'')===String(placement.court||''));
@@ -1351,16 +1359,16 @@ function smsExpectedClock(matchId,placement={}){
   let minutes=0;
   if(court){
     if(String(court.playing||'')===id){
-      const m=findAnyMatchById(id),start=m?stage593EffectiveMatchStartMs(m):Date.now();
-      return smsFormatClock(new Date(Math.max(Date.now(),start)));
+      const m=findAnyMatchById(id),start=m?stage593EffectiveMatchStartMs(m):baseMs;
+      return smsFormatClock(new Date(locked&&scheduled?scheduled:Math.max(Date.now(),start)));
     }
     minutes=smsPlayingRemainingMinutes(court);
-    if(String(court.wait1||'')===id)return smsFormatClock(new Date(Date.now()+minutes*60000));
+    if(String(court.wait1||'')===id)return smsFormatClock(new Date(baseMs+minutes*60000));
     const local=[...(court.queue||[]),...(court.manualQueue||[])];
     const idx=local.findIndex(x=>String(x)===id);
     if(idx>=0){
       minutes += (court.wait1?slot:0) + idx*slot;
-      return smsFormatClock(new Date(Date.now()+minutes*60000));
+      return smsFormatClock(new Date(baseMs+minutes*60000));
     }
   }
   // 본선 구장 공용대기: 해당 구장 코트들의 "다음 빈자리"를 간단히 시뮬레이션한다.
@@ -2074,18 +2082,168 @@ function stage580ToggleAutoAssignment(){
   if(state.operation.autoAssignmentEnabled===false)stage580ResumeAutoAssignment();
   else stage580PauseAutoAssignment();
 }
+
+function stage51018AllMatches(){
+  const rows=[];
+  try{rows.push(...(state.prelim?.matches||[]));}catch(_e){}
+  try{rows.push(...(allMatches(state.draw)||[]));}catch(_e){}
+  const seen=new Set();
+  return rows.filter((m,index)=>{
+    if(!m||typeof m!=='object')return false;
+    const key=String(m.id||`${m.groupId||''}-${m.matchNo||''}-${index}`);
+    if(seen.has(key))return false;
+    seen.add(key);
+    return true;
+  });
+}
+function stage51018RebaseActiveClocks(iso){
+  const waitingStatuses=new Set(['court_wait1','ready','queued','waiting','shared','court_manual_queue','venue_shared_queue']);
+  for(const m of stage51018AllMatches()){
+    const status=String(m.status||'');
+    if(status==='playing'){
+      m.startedAt=iso;
+      m.elapsedMinutes=0;
+      m.estimatedRemainingMinutes=0;
+      m.effectiveStartedAt=null;
+      m.estimatedEndAt=null;
+      m.timeClockPending=false;
+    }else if(waitingStatuses.has(status)){
+      m.waitStartedAt=iso;
+      m.waitElapsedMinutes=0;
+      m.estimatedWaitMinutes=0;
+    }
+  }
+}
+function stage51018MaintainLockedClock(){
+  if(state?.settings?.officialStartClockEnabled!==true||state?.operation?.eventClockStartAt)return;
+  const scheduled=stage593ScheduledStartMs();
+  if(!scheduled||Date.now()<scheduled)return;
+  const iso=new Date().toISOString();
+  for(const m of stage51018AllMatches()){
+    const status=String(m.status||'');
+    if(status==='playing'){
+      m.startedAt=iso;
+      m.elapsedMinutes=0;
+      m.estimatedRemainingMinutes=0;
+      m.effectiveStartedAt=null;
+      m.estimatedEndAt=null;
+      m.timeClockPending=true;
+    }else if(['court_wait1','ready','queued','waiting','shared','court_manual_queue','venue_shared_queue'].includes(status)){
+      m.waitStartedAt=iso;
+      m.waitElapsedMinutes=0;
+      m.estimatedWaitMinutes=0;
+    }
+  }
+}
+function stage51018ClockStatus(){
+  const locked=state?.settings?.officialStartClockEnabled===true;
+  const actual=String(state?.operation?.eventClockStartAt||'');
+  return {locked,actual,running:!locked&&!!actual,test:!locked&&!actual};
+}
+function stage51018StartCompetitionClock(){
+  if(!requireOperator('대회 시간 시작'))return;
+  ensureOperatorState();
+  ensureTimeState(state);
+  const scheduled=state.portal?.guide?.startTime||'미설정';
+  if(!confirm(`대회 시간을 지금부터 시작할까요?\n\n공식 시작시간: ${scheduled}\n현재 시각부터 경기 진행시간과 대기시간이 실제로 흐르기 시작합니다.`))return;
+  autoRecovery('대회 시간 시작 전');
+  const iso=new Date().toISOString();
+  state.operation=state.operation||{};
+  state.operation.eventClockStartAt=iso;
+  state.operation.eventClockMode='running';
+  state.settings.officialStartClockEnabled=false;
+  stage51018RebaseActiveClocks(iso);
+  calculateTimeMetrics(state);
+  commit(`대회 시간 시작 · ${new Date(iso).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})}`);
+  renderOperatorControls();
+  try{stage594RefreshVisibleTimeBadges();}catch(_e){}
+  notice('대회 시간 시작 · 지금부터 경기 진행시간과 대기시간이 흐릅니다.','success');
+}
+function stage51018RelockCompetitionClock(){
+  if(!requireOperator('대회 시간 다시 잠금'))return;
+  ensureOperatorState();
+  ensureTimeState(state);
+  if(!confirm('대회 시간을 다시 잠글까요?\n\n경기 배치와 결과는 그대로 두고 진행시간·대기시간 계산만 다시 멈춥니다.'))return;
+  autoRecovery('대회 시간 다시 잠금 전');
+  state.operation=state.operation||{};
+  state.operation.eventClockStartAt='';
+  state.operation.eventClockMode='locked';
+  state.settings.officialStartClockEnabled=true;
+  const scheduled=stage593ScheduledStartMs();
+  const base=scheduled&&scheduled>Date.now()?new Date(scheduled).toISOString():new Date().toISOString();
+  stage51018RebaseActiveClocks(base);
+  calculateTimeMetrics(state);
+  commit('대회 시간 다시 잠금');
+  renderOperatorControls();
+  try{stage594RefreshVisibleTimeBadges();}catch(_e){}
+  const start=state.portal?.guide?.startTime||'미설정';
+  notice(`시간 다시 잠금 · 공식 시작 ${start} 기준으로 대기하며, '대회 시간 시작' 전까지 시간은 흐르지 않습니다.`,'success');
+}
+function stage51018EnsureClockActionButton(){
+  const anchor=document.getElementById('stage597ClockGateToggle');
+  if(!anchor?.parentElement)return null;
+  let btn=document.getElementById('stage51018CompetitionClockBtn');
+  if(!btn){
+    btn=document.createElement('button');
+    btn.type='button';
+    btn.id='stage51018CompetitionClockBtn';
+    btn.className='btn btn-primary';
+    anchor.insertAdjacentElement('afterend',btn);
+    btn.addEventListener('click',()=>{
+      const s=stage51018ClockStatus();
+      if(s.locked)stage51018StartCompetitionClock();
+      else if(s.running)stage51018RelockCompetitionClock();
+    });
+  }
+  return btn;
+}
+function stage51018RenderClockAction(){
+  const btn=stage51018EnsureClockActionButton();
+  if(!btn)return;
+  const s=stage51018ClockStatus();
+  if(s.locked){
+    btn.hidden=false;
+    btn.disabled=false;
+    btn.textContent='▶ 대회 시간 시작';
+    btn.className='btn btn-primary';
+    btn.title='실제 경기 시작 시 누르면 현재 시각부터 진행시간·대기시간이 흐릅니다.';
+  }else if(s.running){
+    btn.hidden=false;
+    btn.disabled=false;
+    btn.textContent='🔒 시간 다시 잠금';
+    btn.className='btn btn-warning';
+  }else{
+    btn.hidden=true;
+    btn.disabled=true;
+  }
+}
+function stage51018DisplayElapsedMinutes(match){
+  if(state?.settings?.officialStartClockEnabled===true&&!state?.operation?.eventClockStartAt)return 0;
+  const started=Date.parse(String(match?.startedAt||''));
+  return Number.isFinite(started)?Math.max(0,Math.floor((Date.now()-started)/60000)):0;
+}
+
 function stage597ToggleClockGate(){
   if(!requireOperator('코트 시간 잠금 변경'))return;
   ensureTimeState(state);
+  ensureOperatorState();
   const next=!(state.settings?.officialStartClockEnabled===true);
   autoRecovery('코트 시간 잠금 변경 전');
+  state.operation=state.operation||{};
+  state.operation.eventClockStartAt='';
+  state.operation.eventClockMode=next?'locked':'test';
   state.settings.officialStartClockEnabled=next;
+  if(next){
+    const scheduled=stage593ScheduledStartMs();
+    const base=scheduled&&scheduled>Date.now()?new Date(scheduled).toISOString():new Date().toISOString();
+    stage51018RebaseActiveClocks(base);
+  }
   calculateTimeMetrics(state);
   commit(`코트 시간 잠금 ${next?'ON':'OFF'}`);
   renderOperatorControls();
   try{stage594RefreshVisibleTimeBadges();}catch(_e){}
   const start=state.portal?.guide?.startTime||'미설정';
-  notice(next?`시간 잠금 ON · 공식 시작 ${start} 전까지 미리 배정된 경기의 진행시간을 멈춥니다.`:'시간 잠금 OFF · 코트 배정 시각부터 진행시간을 계산합니다.','success');
+  notice(next?`시간 잠금 ON · 코트배정은 유지하고 공식 시작 ${start} 기준으로 시간을 멈춥니다. 실제 시작할 때 '대회 시간 시작'을 누르세요.`:'시간 잠금 OFF · 테스트 모드로 현재시간 기준 진행/대기시간이 계속 흐릅니다.','success');
 }
 
 function renderOperatorControls(){
@@ -2098,6 +2256,7 @@ function renderOperatorControls(){
     clock.className=`btn ${on?'btn-warning':'btn-light'}`;
     clock.title=on?'공식 시작시간 전까지 미리 배정한 경기의 진행시간을 멈춥니다.':'코트 배정 즉시 진행시간을 계산합니다.';
   }
+  stage51018RenderClockAction();
   const banner=$('manualOperationBanner');if(banner){banner.hidden=!manual;banner.innerHTML=manual?'<strong>🛠 수동 운영 중</strong><span>결과 입력 후에도 코트·대기열은 자동 이동하지 않습니다. 경기 카드의 <b>이동</b> 버튼으로 직접 배치하세요.</span>':'';}
 }
 function notice(message,type='info'){$('noticeBar').className=`notice ${type}`;$('noticeBar').textContent=message;}
@@ -3202,6 +3361,7 @@ function refreshTimeEngine({save=false,renderNow=false}={}){
 }
 function stage594RefreshVisibleTimeBadges(){
   if(!state.settings?.autoTimeEnabled)return;
+  stage51018MaintainLockedClock();
   calculateTimeMetrics(state);
   document.querySelectorAll('[data-time-match]').forEach(node=>{
     const id=String(node.dataset.timeMatch||'');
@@ -9915,7 +10075,7 @@ async function stage3210SaveTournamentEdit(e){
     commit(`현재 대회 설정 수정 · ${name}`);const editDialog=document.getElementById('stage3210TournamentEditDialog');editDialog?.close();renderPortalViews();renderTournamentList();renderVenueSettingsEditor();notice('현재 대회의 기본정보와 예선·본선 구장·코트 설정을 저장했습니다.','success');stage3210RenderSettingsSummary();
   }catch(err){msg.textContent=`저장 실패: ${err?.message||err}`;msg.className='stage329-edit-message error';}
 }
-function stage3210RenderSettingsSummary(){const el=document.getElementById('stage3210SettingsSummary');if(!el)return;ensureVenueSettings(state);const pre=prelimVenues(state).map(v=>`${v.name} ${v.courtCount}면`).join(' + '),main=mainVenues(state).map(v=>`${v.name} ${v.courtCount}면`).join(' + ');const configured=stage583NormalizeDisplayStatus(state.tournament?.displayStatus||'auto'),applied=stage587TournamentDisplayStatus(state),clock=state.settings?.officialStartClockEnabled===true?'ON':'OFF',start=state.portal?.guide?.startTime||'-';el.innerHTML=`<strong>${stage329Esc(state.tournament?.name||'현재 대회')}</strong><br><b>상태</b> ${stage329Esc(tournamentStatusLabel(applied))}${configured==='auto'?' (자동)':' (관리자 지정)'} · <b>사전 코트배정 시간 잠금</b> ${clock}${clock==='ON'?` · 공식 시작 ${stage329Esc(start)}`:''}<br>예선 ${stage329Esc(pre)}<br>본선 ${stage329Esc(main)}`;}
+function stage3210RenderSettingsSummary(){const el=document.getElementById('stage3210SettingsSummary');if(!el)return;ensureVenueSettings(state);const pre=prelimVenues(state).map(v=>`${v.name} ${v.courtCount}면`).join(' + '),main=mainVenues(state).map(v=>`${v.name} ${v.courtCount}면`).join(' + ');const configured=stage583NormalizeDisplayStatus(state.tournament?.displayStatus||'auto'),applied=stage587TournamentDisplayStatus(state),clockState=stage51018ClockStatus(),clock=clockState.locked?'잠금':clockState.running?'실시간 진행':'테스트 흐름',start=state.portal?.guide?.startTime||'-';el.innerHTML=`<strong>${stage329Esc(state.tournament?.name||'현재 대회')}</strong><br><b>상태</b> ${stage329Esc(tournamentStatusLabel(applied))}${configured==='auto'?' (자동)':' (관리자 지정)'} · <b>대회 시간</b> ${clock}${clockState.locked?` · 공식 시작 ${stage329Esc(start)}`:''}<br>예선 ${stage329Esc(pre)}<br>본선 ${stage329Esc(main)}`;}
 stage329OpenTournamentEdit=stage3210OpenTournamentEdit;
 document.addEventListener('click',e=>{const b=e.target.closest?.('[data-stage3210-open-edit]');if(b){e.preventDefault();stage3210OpenTournamentEdit();}},true);
 function stage3210CleanSettings(){document.querySelectorAll('.auth-settings-section,#firebaseLiveSyncSection,.draw-history-section,.feature-roadmap,.venue-settings-section').forEach(el=>{el.hidden=true;el.remove?.();});document.querySelectorAll('[data-settings-action="firebase-sync"],[data-settings-action="prelim-pilot"],[data-settings-action="stage326-pilot"]').forEach(el=>el.remove());const tab=document.querySelector('[data-view="settings"]');if(tab)tab.textContent='설정';stage3210RenderSettingsSummary();}
@@ -13993,7 +14153,7 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
     try{const u=findUnifiedMatch(state,id);if(u?.match)return u.match;}catch(_e){}
     try{return findPrelimMatch(state,id)||findMatch(state.draw,id)||null;}catch(_e){return null;}
   };
-  const elapsed=m=>m?.startedAt?Math.max(0,Math.floor((Date.now()-new Date(m.startedAt).getTime())/60000)):0;
+  const elapsed=m=>stage51018DisplayElapsedMinutes(m);
   const courtIdFromCard=card=>{
     const direct=card.querySelector('[data-unified-transfer]')?.dataset.unifiedTransfer;
     if(direct)return direct;
@@ -19232,3 +19392,13 @@ console.info('[230MATCH] 5.10.15 ready · rejected frees slot, next reserve prom
   console.info('[230MATCH] 5.10.17 ready · redundant mobile participant-management item removed');
 })();
 
+
+/* 230MATCH 5.10.18 · competition clock gate */
+(function stage51018InitCompetitionClock(){
+  const init=()=>{try{stage51018RenderClockAction();stage51018MaintainLockedClock();}catch(_e){}};
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(init,120),{once:true});
+  else setTimeout(init,120);
+  window.addEventListener('pageshow',()=>setTimeout(init,80));
+  setInterval(()=>{if(document.hidden)return;try{stage51018MaintainLockedClock();}catch(_e){}},30000);
+  console.info('[230MATCH] 5.10.18 ready · preassigned court clock lock + manual competition start');
+})();
