@@ -5044,53 +5044,52 @@ function bindBracketMobileView571(){
     };
   }
 
-  // 5.10.21 mobile gesture:
-  // 한 손가락은 브라우저 기본 스크롤을 그대로 사용한다.
-  // - 좌우: 대진표 자체 가로 스크롤
-  // - 상하: 페이지 세로 스크롤
-  // 강제 축 판정/scrollLeft 조작을 없애 사선 드래그도 자연스럽게 처리한다.
-  let pinchStartDistance=0,pinchStartZoom=1,pinchAnchorLogicalX=0;
-  const distance=touches=>{
-    if(!touches||touches.length<2)return 0;
-    const dx=touches[0].clientX-touches[1].clientX;
-    const dy=touches[0].clientY-touches[1].clientY;
-    return Math.hypot(dx,dy);
-  };
-  const midpointX=touches=>{
-    if(!touches||touches.length<2)return viewport.clientWidth/2;
-    const rect=viewport.getBoundingClientRect();
-    return ((touches[0].clientX+touches[1].clientX)/2)-rect.left;
-  };
+  // 5.10.25 mobile gesture:
+  // 세로는 브라우저 기본 페이지 스크롤에 맡기고,
+  // 가로 의도가 분명할 때만 대진표 scrollLeft를 RAF로 갱신한다.
+  // 기존 touchmove + preventDefault 조합을 제거해 버벅임과 좌우 미동작을 줄인다.
+  if(viewport.dataset.stage51025PointerPan!=='1'){
+    viewport.dataset.stage51025PointerPan='1';
+    let active=false,pointerId=null,startX=0,startY=0,startLeft=0,axis='',raf=0,pendingLeft=0;
 
-  viewport.ontouchstart=e=>{
-    if(e.touches?.length!==2)return;
-    pinchStartDistance=distance(e.touches);
-    pinchStartZoom=getBracketZoom();
-    const midX=midpointX(e.touches);
-    pinchAnchorLogicalX=(viewport.scrollLeft+midX)/Math.max(.01,pinchStartZoom);
-  };
+    const applyLeft=()=>{
+      raf=0;
+      viewport.scrollLeft=pendingLeft;
+    };
 
-  viewport.ontouchmove=e=>{
-    // 한 손가락은 절대 preventDefault 하지 않음: 네이티브 가로/세로 스크롤에 맡긴다.
-    if(e.touches?.length!==2||!pinchStartDistance)return;
-    e.preventDefault();
-    const ratio=distance(e.touches)/pinchStartDistance;
-    const nextZoom=setBracketZoom(pinchStartZoom*ratio,{save:false});
-    const midX=midpointX(e.touches);
-    viewport.scrollLeft=Math.max(0,pinchAnchorLogicalX*nextZoom-midX);
-  };
+    viewport.addEventListener('pointerdown',e=>{
+      if(e.pointerType==='mouse'&&e.button!==0)return;
+      if(e.target.closest?.('button,a,input,select,textarea,[role="button"]'))return;
+      active=true;pointerId=e.pointerId;startX=e.clientX;startY=e.clientY;startLeft=viewport.scrollLeft;axis='';
+    },{passive:true});
 
-  viewport.ontouchend=e=>{
-    if((e.touches?.length||0)<2&&pinchStartDistance){
-      pinchStartDistance=0;
-      setBracketZoom(getBracketZoom(),{save:true});
-      requestAnimationFrame(()=>requestAnimationFrame(()=>window.__redrawBracketConnectors?.('pinch-end')));
-    }
-  };
-  viewport.ontouchcancel=()=>{
-    if(pinchStartDistance)setBracketZoom(getBracketZoom(),{save:true});
-    pinchStartDistance=0;
-  };
+    viewport.addEventListener('pointermove',e=>{
+      if(!active||e.pointerId!==pointerId)return;
+      const dx=e.clientX-startX,dy=e.clientY-startY;
+      if(!axis&&(Math.abs(dx)>7||Math.abs(dy)>7)){
+        axis=Math.abs(dx)>Math.abs(dy)*1.15?'x':'y';
+        if(axis==='x'){
+          try{viewport.setPointerCapture?.(pointerId)}catch(_e){}
+          viewport.classList.add('is-dragging');
+        }
+      }
+      if(axis!=='x')return;
+      pendingLeft=Math.max(0,startLeft-dx);
+      if(!raf)raf=requestAnimationFrame(applyLeft);
+    },{passive:true});
+
+    const finish=e=>{
+      if(!active)return;
+      if(pointerId!==null&&e?.pointerId!=null&&e.pointerId!==pointerId)return;
+      active=false;axis='';viewport.classList.remove('is-dragging');
+      try{if(pointerId!==null&&viewport.hasPointerCapture?.(pointerId))viewport.releasePointerCapture(pointerId)}catch(_e){}
+      pointerId=null;
+      if(raf){cancelAnimationFrame(raf);raf=0;viewport.scrollLeft=pendingLeft;}
+    };
+    viewport.addEventListener('pointerup',finish,{passive:true});
+    viewport.addEventListener('pointercancel',finish,{passive:true});
+    viewport.addEventListener('lostpointercapture',finish,{passive:true});
+  }
 }
 window.__bindBracketMobileView571=bindBracketMobileView571;
 
@@ -8857,9 +8856,12 @@ function renderPortalViewFast(target){
     if(target==='print'){renderPrintPreview();return;}
     if(target==='settings'){stage3210RenderSettingsSummary();return;}
     if(target==='bracket'){
-      decorateBracketLivePlacements();
       stage51023ApplyBracketPublicationGate();
-      setTimeout(()=>{bindBracketMobileView571();stage51023ApplyBracketPublicationGate();},0);
+      requestAnimationFrame(()=>{
+        try{decorateBracketLivePlacements();}catch(_e){}
+        bindBracketMobileView571();
+        stage51023ApplyBracketPublicationGate();
+      });
       return;
     }
     // operation/home/my-match/settings already have live DOM maintained by state renders.
@@ -14592,12 +14594,15 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
   });
   const oldDecorate=window.decorateBracketLivePlacements||null;
   const tick=()=>{
-    if(document.body?.dataset.currentView==='bracket'){
+    const view=document.body?.dataset.currentView||'';
+    if(view==='bracket'){
       try{decorateBracketLivePlacements();}catch(_e){}
+      audit();
+    }else if(view==='operation'){
+      audit();
     }
-    audit();
   };
-  setInterval(tick,2500);
+  setInterval(tick,5000);
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(tick,350),{once:true});else setTimeout(tick,350);
   console.info('[230MATCH] 71.3.3 ready · classic direct SMS rebuild');
 })();
@@ -19408,7 +19413,7 @@ console.info('[230MATCH] 5.10.7 ready · safe backup restore available');
       tools.innerHTML=`
         <div class="stage51010-bracket-help">
           <strong>본선 대진표</strong>
-          <span>한 손가락으로 좌우·상하 자연스럽게 이동 · 확대/축소는 상단 버튼 사용</span>
+          <span>좌우 드래그로 대진표 이동 · 위아래는 페이지 스크롤 · 확대/축소는 상단 버튼</span>
         </div>
         <div class="stage51010-bracket-actions">
           <button type="button" data-stage51010-zoom="-1" aria-label="대진표 축소">−</button>
@@ -19436,10 +19441,9 @@ console.info('[230MATCH] 5.10.7 ready · safe backup restore available');
         -webkit-overflow-scrolling:touch;
         overscroll-behavior-x:contain;
         overscroll-behavior-y:auto;
-        touch-action:pan-x pan-y;
+        touch-action:pan-y;
         scroll-behavior:auto;
         scrollbar-width:auto;
-        scrollbar-gutter:stable;
       }
       #bracketViewport.stage51010-bracket-viewport::-webkit-scrollbar{height:10px}
       #bracketViewport.stage51010-bracket-viewport::-webkit-scrollbar-thumb{background:#9fb2ca;border-radius:999px}
@@ -19752,3 +19756,20 @@ console.info('[230MATCH] 5.10.20 ready · sent/dismissed auto-SMS events stay ha
 
 /* 230MATCH 5.10.24 · auto SMS real-transition re-notification */
 console.info('[230MATCH] 5.10.24 ready · dismissed event stays hidden after refresh; genuine later court transition gets a fresh SMS approval event');
+
+/* 230MATCH 5.10.25 · bracket horizontal pan/performance */
+(function stage51025BracketPanFinish(){
+  if(!document.getElementById('stage51025BracketPanStyle')){
+    const st=document.createElement('style');
+    st.id='stage51025BracketPanStyle';
+    st.textContent=`
+      #bracketViewport.stage51010-bracket-viewport{cursor:grab;contain:layout paint}
+      #bracketViewport.stage51010-bracket-viewport.is-dragging{cursor:grabbing;user-select:none}
+      @media (pointer:coarse){
+        #bracketViewport.stage51010-bracket-viewport{cursor:auto}
+      }
+    `;
+    document.head.appendChild(st);
+  }
+  console.info('[230MATCH] 5.10.25 ready · bracket horizontal pointer pan + lighter live audit');
+})();
