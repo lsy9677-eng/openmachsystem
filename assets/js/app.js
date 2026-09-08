@@ -4470,9 +4470,11 @@ function setBracketZoom(value,{save=true}={}){
     board.dataset.bracketZoom=String(zoom);
   }
   if(label)label.textContent=`${Math.round(zoom*100)}%`;
-  if(save){try{localStorage.setItem(BRACKET_ZOOM_KEY,String(zoom));}catch(_e){}}
-  requestAnimationFrame(()=>requestAnimationFrame(()=>{try{window.__redrawBracketConnectors?.('zoom');}catch(_e){}}));
-  setTimeout(()=>{try{window.dispatchEvent(new Event('resize'));window.__redrawBracketConnectors?.('zoom-settled');}catch(_e){}},80);
+  if(save){
+    try{localStorage.setItem(BRACKET_ZOOM_KEY,String(zoom));}catch(_e){}
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{try{window.__redrawBracketConnectors?.('zoom');}catch(_e){}}));
+    setTimeout(()=>{try{window.dispatchEvent(new Event('resize'));window.__redrawBracketConnectors?.('zoom-settled');}catch(_e){}},80);
+  }
   return zoom;
 }
 
@@ -5044,51 +5046,116 @@ function bindBracketMobileView571(){
     };
   }
 
-  // 5.10.25 mobile gesture:
-  // 세로는 브라우저 기본 페이지 스크롤에 맡기고,
-  // 가로 의도가 분명할 때만 대진표 scrollLeft를 RAF로 갱신한다.
-  // 기존 touchmove + preventDefault 조합을 제거해 버벅임과 좌우 미동작을 줄인다.
-  if(viewport.dataset.stage51025PointerPan!=='1'){
-    viewport.dataset.stage51025PointerPan='1';
-    let active=false,pointerId=null,startX=0,startY=0,startLeft=0,axis='',raf=0,pendingLeft=0;
+  // 5.10.26 mobile gesture:
+  // 브라우저의 축 판정에 맡기지 않고 대진표 영역에서 직접 제스처를 처리한다.
+  // 한 손가락 가로 = 대진표 이동 / 세로 = 페이지 이동 / 두 손가락 = 핀치 줌.
+  if(viewport.dataset.stage51026Gesture!=='1'){
+    viewport.dataset.stage51026Gesture='1';
+    const points=new Map();
+    let mode='',lastX=0,lastY=0,startDist=0,startZoom=1,pinchMidX=0,pinchLogicalX=0;
+    let panRaf=0,pendingScrollLeft=viewport.scrollLeft,pendingPageY=window.scrollY;
 
-    const applyLeft=()=>{
-      raf=0;
-      viewport.scrollLeft=pendingLeft;
+    const pointList=()=>[...points.values()];
+    const dist=()=>{
+      const p=pointList();if(p.length<2)return 0;
+      return Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y);
+    };
+    const midX=()=>{
+      const p=pointList();if(p.length<2)return viewport.clientWidth/2;
+      const rect=viewport.getBoundingClientRect();
+      return ((p[0].x+p[1].x)/2)-rect.left;
+    };
+    const applyPan=()=>{
+      panRaf=0;
+      if(mode==='x')viewport.scrollLeft=pendingScrollLeft;
+      else if(mode==='y')window.scrollTo(window.scrollX,pendingPageY);
+    };
+    const queuePan=()=>{
+      if(!panRaf)panRaf=requestAnimationFrame(applyPan);
+    };
+    const resetSingle=()=>{
+      const p=pointList()[0];
+      if(!p)return;
+      lastX=p.x;lastY=p.y;
+      mode='';
     };
 
     viewport.addEventListener('pointerdown',e=>{
-      if(e.pointerType==='mouse'&&e.button!==0)return;
+      if(e.pointerType==='mouse')return; // desktop mouse drag is handled above.
       if(e.target.closest?.('button,a,input,select,textarea,[role="button"]'))return;
-      active=true;pointerId=e.pointerId;startX=e.clientX;startY=e.clientY;startLeft=viewport.scrollLeft;axis='';
-    },{passive:true});
+      points.set(e.pointerId,{x:e.clientX,y:e.clientY});
+      try{viewport.setPointerCapture?.(e.pointerId)}catch(_e){}
+      if(points.size===1){
+        lastX=e.clientX;lastY=e.clientY;mode='';
+        pendingScrollLeft=viewport.scrollLeft;
+        pendingPageY=window.scrollY;
+      }else if(points.size===2){
+        mode='pinch';
+        startDist=Math.max(1,dist());
+        startZoom=getBracketZoom();
+        pinchMidX=midX();
+        pinchLogicalX=(viewport.scrollLeft+pinchMidX)/Math.max(.01,startZoom);
+        viewport.classList.add('is-dragging');
+      }
+      e.preventDefault();
+    },{passive:false});
 
     viewport.addEventListener('pointermove',e=>{
-      if(!active||e.pointerId!==pointerId)return;
-      const dx=e.clientX-startX,dy=e.clientY-startY;
-      if(!axis&&(Math.abs(dx)>7||Math.abs(dy)>7)){
-        axis=Math.abs(dx)>Math.abs(dy)*1.15?'x':'y';
-        if(axis==='x'){
-          try{viewport.setPointerCapture?.(pointerId)}catch(_e){}
-          viewport.classList.add('is-dragging');
+      if(e.pointerType==='mouse'||!points.has(e.pointerId))return;
+      points.set(e.pointerId,{x:e.clientX,y:e.clientY});
+
+      if(points.size>=2){
+        if(mode!=='pinch'){
+          mode='pinch';
+          startDist=Math.max(1,dist());
+          startZoom=getBracketZoom();
+          pinchMidX=midX();
+          pinchLogicalX=(viewport.scrollLeft+pinchMidX)/Math.max(.01,startZoom);
         }
+        const ratio=dist()/Math.max(1,startDist);
+        const next=setBracketZoom(startZoom*ratio,{save:false});
+        const currentMid=midX();
+        viewport.scrollLeft=Math.max(0,pinchLogicalX*next-currentMid);
+        viewport.classList.add('is-dragging');
+        e.preventDefault();
+        return;
       }
-      if(axis!=='x')return;
-      pendingLeft=Math.max(0,startLeft-dx);
-      if(!raf)raf=requestAnimationFrame(applyLeft);
-    },{passive:true});
+
+      const dx=e.clientX-lastX,dy=e.clientY-lastY;
+      if(!mode&&(Math.abs(dx)>2||Math.abs(dy)>2)){
+        mode=Math.abs(dx)>=Math.abs(dy)*1.05?'x':'y';
+        if(mode==='x')viewport.classList.add('is-dragging');
+      }
+
+      if(mode==='x'){
+        pendingScrollLeft=Math.max(0,viewport.scrollLeft-dx);
+        queuePan();
+      }else if(mode==='y'){
+        pendingPageY=Math.max(0,window.scrollY-dy);
+        queuePan();
+      }
+      lastX=e.clientX;lastY=e.clientY;
+      e.preventDefault();
+    },{passive:false});
 
     const finish=e=>{
-      if(!active)return;
-      if(pointerId!==null&&e?.pointerId!=null&&e.pointerId!==pointerId)return;
-      active=false;axis='';viewport.classList.remove('is-dragging');
-      try{if(pointerId!==null&&viewport.hasPointerCapture?.(pointerId))viewport.releasePointerCapture(pointerId)}catch(_e){}
-      pointerId=null;
-      if(raf){cancelAnimationFrame(raf);raf=0;viewport.scrollLeft=pendingLeft;}
+      if(e.pointerType==='mouse'||!points.has(e.pointerId))return;
+      points.delete(e.pointerId);
+      try{if(viewport.hasPointerCapture?.(e.pointerId))viewport.releasePointerCapture(e.pointerId)}catch(_e){}
+      if(mode==='pinch'&&points.size<2){
+        setBracketZoom(getBracketZoom(),{save:true});
+      }
+      if(points.size===1){
+        resetSingle();
+      }else if(points.size===0){
+        mode='';
+        viewport.classList.remove('is-dragging');
+        if(panRaf){cancelAnimationFrame(panRaf);panRaf=0;applyPan();}
+      }
+      e.preventDefault();
     };
-    viewport.addEventListener('pointerup',finish,{passive:true});
-    viewport.addEventListener('pointercancel',finish,{passive:true});
-    viewport.addEventListener('lostpointercapture',finish,{passive:true});
+    viewport.addEventListener('pointerup',finish,{passive:false});
+    viewport.addEventListener('pointercancel',finish,{passive:false});
   }
 }
 window.__bindBracketMobileView571=bindBracketMobileView571;
@@ -19413,7 +19480,7 @@ console.info('[230MATCH] 5.10.7 ready · safe backup restore available');
       tools.innerHTML=`
         <div class="stage51010-bracket-help">
           <strong>본선 대진표</strong>
-          <span>좌우 드래그로 대진표 이동 · 위아래는 페이지 스크롤 · 확대/축소는 상단 버튼</span>
+          <span>한 손가락 좌우=대진표 이동 · 위아래=페이지 이동 · 두 손가락=핀치 줌</span>
         </div>
         <div class="stage51010-bracket-actions">
           <button type="button" data-stage51010-zoom="-1" aria-label="대진표 축소">−</button>
@@ -19441,7 +19508,7 @@ console.info('[230MATCH] 5.10.7 ready · safe backup restore available');
         -webkit-overflow-scrolling:touch;
         overscroll-behavior-x:contain;
         overscroll-behavior-y:auto;
-        touch-action:pan-y;
+        touch-action:none;
         scroll-behavior:auto;
         scrollbar-width:auto;
       }
@@ -19773,3 +19840,6 @@ console.info('[230MATCH] 5.10.24 ready · dismissed event stays hidden after ref
   }
   console.info('[230MATCH] 5.10.25 ready · bracket horizontal pointer pan + lighter live audit');
 })();
+
+/* 230MATCH 5.10.26 · robust mobile bracket gestures */
+console.info('[230MATCH] 5.10.26 ready · full manual touch routing: horizontal pan / vertical page scroll / pinch zoom');
