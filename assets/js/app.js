@@ -1421,7 +1421,7 @@ function buildAutoSmsSnapshot(){
   const completed={};for(const m of [...(state.prelim?.matches||[]),...(typeof allMatches==='function'?allMatches(state):[])])completed[m.id]=m.status==='completed';
   return{placements,completed};
 }
-function autoSmsEventKey(kind,matchId,p){return[kind,matchId,p?.court||'',p?.slot||'',p?.position||0].join('|');}
+function autoSmsEventKey(kind,matchId,p){return[kind,matchId,p?.court||'',p?.slot||'',p?.position||0,p?.eventToken||''].join('|');}
 function autoSmsRecent(value,seconds=20){const t=value?new Date(value).getTime():0;return Number.isFinite(t)&&t>0&&(Date.now()-t)<=seconds*1000;}
 
 const STAGE51020_AUTO_SMS_HANDLED_KEY='230match-auto-sms-handled-v51020';
@@ -11917,10 +11917,32 @@ function stage51022RestoreMainDraft({quiet=false}={}){
     const s=state.messaging?.settings||{},rt=ensureRuntime(),phones=validPhoneCount(),pending=pendingCount();
     const enabled=s.autoSmsApprovalEnabled===true;
     const waitOn=s.autoSmsCourtWaiting!==false,startOn=s.autoSmsMatchStart!==false;
-    host.innerHTML=`<div class="stage3520-sms-main"><strong>자동 문자 ${enabled?'ON':'OFF'}</strong><span>대기진입 ${waitOn?'ON':'OFF'} · 경기시작 ${startOn?'ON':'OFF'} · 연락처 ${phones}개 · 승인 대기 ${pending}건</span><small>${esc(rt.lastResult||'코트 이동을 감지하면 발송 전 승인창이 표시됩니다.')}</small></div><div class="stage3520-sms-actions"><button type="button" class="btn btn-light" data-s3520-test>현재 코트 문자 시험</button><button type="button" class="btn btn-light" data-s3520-settings>문자 설정</button></div>`;
+    host.innerHTML=`<div class="stage3520-sms-main"><strong>자동 문자 ${enabled?'ON':'OFF'}</strong><span>대기진입 ${waitOn?'ON':'OFF'} · 경기시작 ${startOn?'ON':'OFF'} · 연락처 ${phones}개 · 승인 대기 ${pending}건</span><small>${esc(rt.lastResult||'코트 이동을 감지하면 발송 전 승인창이 표시됩니다.')}</small></div><div class="stage3520-sms-actions"><button type="button" class="btn btn-light" data-s3520-test>현재 코트 문자 시험</button><button type="button" class="btn btn-light" data-s3520-reset>테스트 이력 초기화</button><button type="button" class="btn btn-light" data-s3520-settings>문자 설정</button></div>`;
     host.querySelector('[data-s3520-test]')?.addEventListener('click',stage3520Preview);
+    host.querySelector('[data-s3520-reset]')?.addEventListener('click',stage51024ResetAutoSmsTestHistory);
     host.querySelector('[data-s3520-settings]')?.addEventListener('click',()=>navigatePortalView?.('messages',{pushHistory:true}));
   }
+
+  function stage51024ResetAutoSmsTestHistory(){
+    if(!requireOperator('자동 문자 테스트 이력 초기화'))return;
+    if(!confirm('자동 문자 승인/건너뛰기 테스트 이력만 초기화할까요?\n경기·코트·대기열·결과 데이터는 변경하지 않습니다.'))return;
+    try{localStorage.removeItem(STAGE51020_AUTO_SMS_HANDLED_KEY)}catch(_e){}
+    ensureMessagingState(state);
+    state.messaging.smsApprovalHistory=[];
+    autoSmsDialogQueue.length=0;
+    if(autoSmsDialogOpen){
+      const d=byId('autoSmsApprovalDialog');
+      if(d?.open)d.close();
+      if(d)d.__smsItem=null;
+      autoSmsDialogOpen=false;
+    }
+    autoSmsSnapshot=buildAutoSmsSnapshot();
+    safePersistState('자동 문자 테스트 이력 초기화');
+    setRuntime('자동 문자 테스트 이력을 초기화했습니다. 다음 실제 코트 이동부터 새 승인창이 표시됩니다.');
+    renderStatus();
+    notice('자동 문자 테스트 이력을 초기화했습니다. 경기·코트 데이터는 그대로입니다.','success');
+  }
+
   function stage3520Preview(){
     if(!requireOperator('자동 문자 승인창 시험'))return;
     const cur=buildAutoSmsSnapshot();
@@ -11940,16 +11962,22 @@ function stage51022RestoreMainDraft({quiet=false}={}){
     const s=state.messaging?.settings||{};
     if(s.autoSmsApprovalEnabled!==true||!canOperate()){autoSmsSnapshot=current;renderStatus();return;}
     const events=[];
+    const transitionBatchToken=`${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
     for(const [id,p] of Object.entries(current.placements)){
       const before=autoSmsSnapshot.placements[id],m=findAnyMatchById(id);if(!m)continue;
       const moved=!before||before.court!==p.court||before.slot!==p.slot||before.position!==p.position;
       if(!moved)continue;
-      if(p.slot==='playing'&&s.autoSmsMatchStart!==false)events.push({kind:'start',m,p,rank:0});
-      else if(p.slot==='wait1'&&s.autoSmsCourtWaiting!==false)events.push({kind:'waiting',m,p,rank:1});
-      else if(s.autoSmsCourtChanged!==false)events.push({kind:'changed',m,p:{...p,slotLabel:p.slot==='queue'?`대기 ${p.position||2}번`:'대기 위치'},rank:2});
+      const eventToken=`${transitionBatchToken}-${String(id)}-${String(before?.court||'none')}-${String(before?.slot||'none')}-${String(before?.position||0)}`;
+      const nextPlacement={...p,eventToken};
+      if(p.slot==='playing'&&s.autoSmsMatchStart!==false)events.push({kind:'start',m,p:nextPlacement,rank:0});
+      else if(p.slot==='wait1'&&s.autoSmsCourtWaiting!==false)events.push({kind:'waiting',m,p:nextPlacement,rank:1});
+      else if(s.autoSmsCourtChanged!==false)events.push({kind:'changed',m,p:{...nextPlacement,slotLabel:p.slot==='queue'?`대기 ${p.position||2}번`:'대기 위치'},rank:2});
     }
     if(s.autoSmsMatchComplete===true){
-      for(const [id,done] of Object.entries(current.completed))if(done&&!autoSmsSnapshot.completed[id]){const m=findAnyMatchById(id);if(m)events.push({kind:'complete',m,p:current.placements[id]||{},rank:3});}
+      for(const [id,done] of Object.entries(current.completed))if(done&&!autoSmsSnapshot.completed[id]){
+        const m=findAnyMatchById(id);
+        if(m)events.push({kind:'complete',m,p:{...(current.placements[id]||{}),eventToken:`${transitionBatchToken}-${String(id)}-complete`},rank:3});
+      }
     }
     events.sort((a,b)=>a.rank-b.rank||String(a.p.court||'').localeCompare(String(b.p.court||''),'ko')||Number(a.p.position||0)-Number(b.p.position||0));
     lastBatch=events;
@@ -11957,7 +11985,7 @@ function stage51022RestoreMainDraft({quiet=false}={}){
     for(const e of events){const r=queueAutoSmsEvent(e.kind,e.m,e.p);if(r?.queued)queued++;else if(r?.noPhone)missing++;else if(r?.duplicate)duplicates++;}
     autoSmsSnapshot=current;
     if(events.length){
-      const parts=[];if(queued)parts.push(`승인창 ${queued}건`);if(missing)parts.push(`연락처 없음 ${missing}건`);if(duplicates)parts.push(`중복 제외 ${duplicates}건`);
+      const parts=[];if(queued)parts.push(`승인창 ${queued}건`);if(missing)parts.push(`연락처 없음 ${missing}건`);if(duplicates)parts.push(`이미 처리된 동일 이벤트 ${duplicates}건`);
       const msg=`코트 이동 ${events.length}건 감지 · ${parts.join(' · ')||'처리할 문자 없음'}`;
       setRuntime(msg,events.map(e=>eventTitle(e.kind)).join(' → '));
       actionFeedback(msg,missing?'warning':'success','자동 문자 감지');
@@ -19721,3 +19749,6 @@ console.info('[230MATCH] 5.10.20 ready · sent/dismissed auto-SMS events stay ha
 
   console.info('[230MATCH] 5.10.23 ready · draft main draw private; public after main confirmation');
 })();
+
+/* 230MATCH 5.10.24 · auto SMS real-transition re-notification */
+console.info('[230MATCH] 5.10.24 ready · dismissed event stays hidden after refresh; genuine later court transition gets a fresh SMS approval event');
