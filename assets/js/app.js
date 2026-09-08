@@ -16978,6 +16978,18 @@ console.info('[230MATCH] 5.5.20 stable baseline · 5.5.17+ main queue auto-repai
 
   function apply(el){
     if(!el)return;
+
+    // 5.10.29: 운영 코트 카드의 라운드 표시는 2강/4강 대신 결승/준결승으로 통일한다.
+    // 경기 데이터(roundSize)는 건드리지 않고 화면 문구만 변경한다.
+    el.querySelectorAll('span,small,b,strong,em').forEach(node=>{
+      if(node.children.length)return;
+      const raw=String(node.textContent||'').trim();
+      if(raw==='2강')node.textContent='결승';
+      else if(raw==='본선 2강')node.textContent='본선 결승';
+      else if(raw==='4강')node.textContent='준결승';
+      else if(raw==='본선 4강')node.textContent='본선 준결승';
+    });
+
     const info=classify(el.textContent);
 
     // 5.9.53: 같은 라운드 상태면 DOM을 다시 만들지 않는다.
@@ -19923,4 +19935,23 @@ console.info('[230MATCH] 5.10.27 ready · Firestore write-loop guard + non-mutat
 
   window.__stage51028EnforceFinalDrawLock=enforceUi;
   console.info('[230MATCH] 5.10.28 ready · confirmed main draw immutable until full main reset');
+})();
+
+/* 230MATCH 5.10.29 · final round display label */
+(function stage51029FinalRoundLabel(){
+  function normalize(root=document){
+    root.querySelectorAll?.('.prelim-court-slot span,.prelim-court-slot small,.prelim-court-slot b,.prelim-court-slot strong,.prelim-extra-item span,.prelim-extra-item small,.shared-queue-item span,.shared-queue-item small').forEach(node=>{
+      if(node.children.length)return;
+      const t=String(node.textContent||'').trim();
+      if(t==='2강')node.textContent='결승';
+      else if(t==='본선 2강')node.textContent='본선 결승';
+      else if(t==='4강')node.textContent='준결승';
+      else if(t==='본선 4강')node.textContent='본선 준결승';
+    });
+  }
+  const run=()=>normalize(document);
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',run,{once:true});else run();
+  window.addEventListener('pageshow',run);
+  document.addEventListener('click',()=>requestAnimationFrame(run),true);
+  console.info('[230MATCH] 5.10.29 ready · 2강→결승 / 4강→준결승 display labels');
 })();
