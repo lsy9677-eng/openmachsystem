@@ -548,7 +548,7 @@ async function importFullBackup(file){
   if(!next?.tournament||!Array.isArray(next.teams))throw new Error('230MATCH 전체 백업 형식이 아닙니다.');
   await saveRecovery(state,'백업 불러오기 직전 자동 복구점');
   state=normalizeV5RuntimeState(structuredClone(next));
-  ensurePortalState();ensurePrelimState(state);ensureTimeState(state);ensureDrawMeta(state);ensureMessagingState(state);ensureContacts(state);ensureAuditState(state);ensureEarlyMainSettings(state);ensureVenueSettings(state);ensureVenueQueues(state);ensureCourtStatuses(state);ensureCourtManualQueues(state);ensurePrelimCourtStatuses(state);ensureOperatorState();stage5925RetireLegacyHoldFeature();
+  ensurePortalState();if(!state.portal||typeof state.portal!=='object')state.portal={};if(!state.portal.guide||typeof state.portal.guide!=='object')state.portal.guide={startTime:'09:00'};else if(!state.portal.guide.startTime)state.portal.guide.startTime='09:00';ensurePrelimState(state);ensureTimeState(state);ensureDrawMeta(state);ensureMessagingState(state);ensureContacts(state);ensureAuditState(state);ensureEarlyMainSettings(state);ensureVenueSettings(state);ensureVenueQueues(state);ensureCourtStatuses(state);ensureCourtManualQueues(state);ensurePrelimCourtStatuses(state);ensureOperatorState();stage5925RetireLegacyHoldFeature();
   saveState(state);
   location.reload();
 }
@@ -714,8 +714,16 @@ async function startGlobalNoticeSync(){
       if(!snap.exists())return;
       const room=snap.data()||{};
       if(room.globalNoticeBoard||room.globalTicker)applyGlobalNoticeState({posts:room.globalNoticeBoard||[],ticker:room.globalTicker||{},updatedAt:room.globalNoticeUpdatedAt||''});
-    },error=>console.warn('[230MATCH] 전체 공지 실시간 연결 실패',error));
-  }catch(error){console.warn('[230MATCH] 전체 공지 불러오기 실패 · 로컬 캐시 사용',error);}
+    },error=>{
+      const code=String(error?.code||'');
+      if(code==='permission-denied')console.info('[230MATCH] 전체 공지 실시간 권한 없음 · 로컬 캐시로 계속 표시');
+      else console.warn('[230MATCH] 전체 공지 실시간 연결 실패',error);
+    });
+  }catch(error){
+    const code=String(error?.code||'');
+    if(code==='permission-denied')console.info('[230MATCH] 전체 공지 읽기 권한 없음 · 로컬 캐시 사용');
+    else console.warn('[230MATCH] 전체 공지 불러오기 실패 · 로컬 캐시 사용',error);
+  }
   renderGlobalAlertTicker();
 }
 function renderGlobalAlertTicker(){
@@ -8909,19 +8917,67 @@ function boardFullPostHtml(p,{latest=false}={}){
   return `<article id="boardSelectedNotice" class="portal-board-item notice-featured ${p.important?'important':''}"><div class="notice-featured-label">${latest?'최신 공지':'공지 상세'}</div><div class="portal-meta notice-meta-row"><span>${p.pinned?'📌 상단 고정 · ':''}${new Date(p.updatedAt||p.createdAt).toLocaleString('ko-KR')}</span><span class="notice-status ${status}">${statusText}${p.popup?' · 홈 팝업':''}</span></div><h3>${p.important?'🚨 ':''}${portalEscape(p.title)}</h3>${image}${p.body?`<div class="portal-board-body">${noticeBodyHtml(p.body)}</div>`:''}${p.startAt||p.endAt?`<div class="portal-meta notice-period">게시기간 · ${p.startAt?new Date(p.startAt).toLocaleString('ko-KR'):'즉시'} ~ ${p.endAt?new Date(p.endAt).toLocaleString('ko-KR'):'계속'}</div>`:''}${popupPeriod}${isAdmin()?`<div class="portal-board-actions"><button type="button" class="btn btn-light" data-board-edit="${p.id}">수정</button><button type="button" class="btn btn-danger-outline" data-board-delete="${p.id}">삭제</button></div>`:''}</article>`;
 }
 function boardNoticeListHtml(posts,selectedId){
-  const rest=posts.filter(p=>String(p.id)!==String(selectedId));
-  if(!rest.length)return '';
-  return `<section class="notice-archive-list"><div class="notice-archive-head"><strong>지난 공지</strong><span>${rest.length}개</span></div>${rest.map(p=>`<button type="button" class="notice-archive-row" data-board-open-post="${portalEscape(p.id)}"><span class="notice-archive-title">${p.important?'🚨 ':p.pinned?'📌 ':''}${portalEscape(p.title)}</span><span class="notice-archive-date">${new Date(p.updatedAt||p.createdAt).toLocaleDateString('ko-KR')}</span><span class="notice-archive-arrow">›</span></button>`).join('')}</section>`;
+  if(!posts.length)return '<div class="portal-empty">검색 결과가 없습니다.</div>';
+  return `<section class="stage51033-notice-list">
+    <div class="stage51033-list-head"><strong>공지 목록</strong><span>${posts.length}개</span></div>
+    <div class="stage51033-list-rows">
+      ${posts.map(p=>{
+        const status=boardPostStatus(p);
+        const active=String(p.id)===String(selectedId);
+        const badge=p.important?'<b class="stage51033-important">중요</b>':p.pinned?'<b class="stage51033-pinned">고정</b>':'';
+        const date=new Date(p.updatedAt||p.createdAt).toLocaleDateString('ko-KR');
+        const preview=String(p.body||'').replace(/\s+/g,' ').trim().slice(0,54);
+        return `<button type="button" class="stage51033-notice-row ${active?'selected':''} ${p.important?'important':''}" data-board-open-post="${portalEscape(p.id)}">
+          <span class="stage51033-row-badge">${badge}</span>
+          <span class="stage51033-row-main"><strong>${portalEscape(p.title)}</strong>${preview?`<small>${portalEscape(preview)}${String(p.body||'').length>54?'…':''}</small>`:''}</span>
+          <span class="stage51033-row-date">${portalEscape(date)}</span>
+          <span class="stage51033-row-status ${status}">${status==='scheduled'?'예정':status==='expired'?'종료':'게시중'}</span>
+          <span class="stage51033-row-arrow">›</span>
+        </button>`;
+      }).join('')}
+    </div>
+  </section>`;
 }
+let stage51033BoardQuery='';
 function renderBoardFast(){
   ensurePortalState();
   renderGlobalTickerEditor();
-  const posts=[...visibleBoardPosts({admin:isAdmin()})].sort((a,b)=>boardNoticeTime(b)-boardNoticeTime(a));
+
+  const all=[...visibleBoardPosts({admin:isAdmin()})].sort((a,b)=>{
+    const ai=Number(Boolean(a.important)),bi=Number(Boolean(b.important));
+    if(ai!==bi)return bi-ai;
+    const ap=Number(Boolean(a.pinned)),bp=Number(Boolean(b.pinned));
+    if(ap!==bp)return bp-ap;
+    return boardNoticeTime(b)-boardNoticeTime(a);
+  });
+
   const board=document.getElementById('boardPostList');if(!board)return;
-  if(!posts.length){boardSelectedPostId='';board.innerHTML='<div class="portal-empty">등록된 게시물이 없습니다.</div>';return;}
-  if(!posts.some(p=>String(p.id)===String(boardSelectedPostId)))boardSelectedPostId=String(posts[0].id||'');
-  const selected=posts.find(p=>String(p.id)===String(boardSelectedPostId))||posts[0];
-  board.innerHTML=boardFullPostHtml(selected,{latest:String(selected.id)===String(posts[0].id)})+boardNoticeListHtml(posts,selected.id);
+  const q=String(stage51033BoardQuery||'').trim().toLocaleLowerCase('ko-KR');
+  const posts=q?all.filter(p=>`${p.title||''} ${p.body||''}`.toLocaleLowerCase('ko-KR').includes(q)):all;
+
+  if(!all.length){
+    boardSelectedPostId='';
+    board.innerHTML='<div class="portal-empty">등록된 게시물이 없습니다.</div>';
+    return;
+  }
+
+  if(posts.length&&!posts.some(p=>String(p.id)===String(boardSelectedPostId))){
+    boardSelectedPostId=String(posts[0].id||'');
+  }
+  const selected=posts.find(p=>String(p.id)===String(boardSelectedPostId))||null;
+
+  board.innerHTML=`
+    <section class="stage51033-board-tools">
+      <div class="stage51033-board-title"><strong>공지사항</strong><span>전체 ${all.length}개${all.filter(p=>p.important).length?` · 중요 ${all.filter(p=>p.important).length}개`:''}</span></div>
+      <label class="stage51033-search">
+        <span aria-hidden="true">🔎</span>
+        <input id="stage51033BoardSearch" type="search" placeholder="공지 제목·내용 검색" value="${portalEscape(stage51033BoardQuery)}" autocomplete="off">
+        ${stage51033BoardQuery?'<button type="button" data-stage51033-search-clear aria-label="검색 지우기">×</button>':''}
+      </label>
+    </section>
+    ${boardNoticeListHtml(posts,selected?.id||'')}
+    ${selected?`<section class="stage51033-detail-wrap"><div class="stage51033-detail-head"><strong>선택한 공지 상세</strong><button type="button" class="btn btn-light btn-small" data-stage51033-detail-close>상세 닫기</button></div>${boardFullPostHtml(selected,{latest:String(selected.id)===String(all[0]?.id)})}</section>`:(q?'<div class="portal-empty">검색 결과가 없습니다.</div>':'')}
+  `;
 }
 
 function renderPortalViewFast(target){
@@ -9275,7 +9331,37 @@ function bindPortal(){
   document.getElementById('myMatchSearchInput')?.addEventListener('input',()=>{const value=document.getElementById('myMatchSearchInput')?.value||'';if(myMatchNormalize(value).length>=2)searchMyMatch();});
   document.getElementById('myMatchClearBtn')?.addEventListener('click',()=>{const input=document.getElementById('myMatchSearchInput');if(input)input.value='';const choices=document.getElementById('myMatchTeamChoices');if(choices)choices.innerHTML='';const result=document.getElementById('myMatchResult');if(result){result.className='my-match-result empty-state';result.innerHTML='<p>검색할 선수 이름이나 팀명을 입력하세요.</p>';}const guide=document.getElementById('myMatchSearchGuide');if(guide)guide.textContent='두 글자 이상 입력하면 일치하는 팀을 보여줍니다.';});
   document.getElementById('homeNoticePopupClose')?.addEventListener('click',closeHomeNoticePopup);document.getElementById('homeNoticePopupConfirm')?.addEventListener('click',closeHomeNoticePopup);document.getElementById('homeNoticePopupBoard')?.addEventListener('click',()=>{closeHomeNoticePopup();navigatePortalView('board',{pushHistory:true});});
-  document.addEventListener('click',e=>{const boardOpen=e.target.closest?.('[data-board-open-post]');if(boardOpen){e.preventDefault();boardSelectedPostId=String(boardOpen.dataset.boardOpenPost||'');renderBoardFast();setTimeout(()=>document.getElementById('boardSelectedNotice')?.scrollIntoView({behavior:'smooth',block:'start'}),20);return;}const directGuide=e.target.closest?.('#guideImageDownload,[data-direct-guide-download]');if(directGuide){e.preventDefault();const src=directGuide.dataset.directImageSrc||'';const name=directGuide.dataset.directImageName||'230MATCH_대회요강.jpg';void directImageDownload(src,name,'요강 이미지').then(ok=>{if(ok)notice('요강 이미지를 바로 저장했습니다.','success');});return;}const noticeView=e.target.closest?.('[data-notice-image-view]');if(noticeView){e.preventDefault();openNoticeImageViewer(noticeView.dataset.noticeImageView);return;}const noticeDownload=e.target.closest?.('[data-notice-image-download]');if(noticeDownload){e.preventDefault();downloadNoticeImageById(noticeDownload.dataset.noticeImageDownload);return;}const portal=e.target.closest?.('[data-portal-go]');if(portal&&!portal.dataset.portalBound){navigatePortalView(portal.dataset.portalGo,{pushHistory:true});return;}const choice=e.target.closest?.('[data-my-match-index]');if(choice){const teams=document.getElementById('myMatchTeamChoices')?._teams||[];const team=teams[Number(choice.dataset.myMatchIndex)];if(team)renderMyMatchTeam(team);return;}const edit=e.target.closest?.('[data-board-edit]');if(edit&&isAdmin()){const post=globalPosts().find(p=>p.id===edit.dataset.boardEdit);if(post)openBoardPostEditor(post);return;}const btn=e.target.closest?.('[data-board-delete]');if(!btn||!isAdmin())return;if(!confirm('이 게시물을 삭제할까요?'))return;const deleting=globalPosts().find(p=>p.id===btn.dataset.boardDelete);if(deleting?.imageStoragePath)deleteManagedImage(deleting.imageStoragePath);globalNoticeState.posts=globalPosts().filter(p=>p.id!==btn.dataset.boardDelete);mirrorGlobalPostsToState();cacheGlobalNoticeState();saveGlobalNoticeCloud('전체 공지 삭제').then(()=>notice('공지를 삭제했습니다.','success')).catch(error=>notice(`공지 삭제 저장 실패: ${error?.message||error}`,'error'));renderBoardFast();renderPopupManager();renderHomeFast();});
+  
+document.addEventListener('input',e=>{
+  if(e.target?.id!=='stage51033BoardSearch')return;
+  const input=e.target;
+  stage51033BoardQuery=String(input.value||'');
+  const pos=input.selectionStart;
+  renderBoardFast();
+  const next=document.getElementById('stage51033BoardSearch');
+  if(next){
+    next.focus({preventScroll:true});
+    try{next.setSelectionRange(pos,pos)}catch(_e){}
+  }
+});
+document.addEventListener('click',e=>{
+  if(e.target.closest?.('[data-stage51033-search-clear]')){
+    e.preventDefault();
+    stage51033BoardQuery='';
+    renderBoardFast();
+    setTimeout(()=>document.getElementById('stage51033BoardSearch')?.focus(),0);
+    return;
+  }
+  if(e.target.closest?.('[data-stage51033-detail-close]')){
+    e.preventDefault();
+    boardSelectedPostId='';
+    const detail=document.querySelector('.stage51033-detail-wrap');
+    if(detail)detail.remove();
+    document.querySelectorAll('.stage51033-notice-row.selected').forEach(x=>x.classList.remove('selected'));
+  }
+});
+
+document.addEventListener('click',e=>{const boardOpen=e.target.closest?.('[data-board-open-post]');if(boardOpen){e.preventDefault();boardSelectedPostId=String(boardOpen.dataset.boardOpenPost||'');renderBoardFast();setTimeout(()=>document.querySelector('.stage51033-detail-wrap')?.scrollIntoView({behavior:'smooth',block:'start'}),20);return;}const directGuide=e.target.closest?.('#guideImageDownload,[data-direct-guide-download]');if(directGuide){e.preventDefault();const src=directGuide.dataset.directImageSrc||'';const name=directGuide.dataset.directImageName||'230MATCH_대회요강.jpg';void directImageDownload(src,name,'요강 이미지').then(ok=>{if(ok)notice('요강 이미지를 바로 저장했습니다.','success');});return;}const noticeView=e.target.closest?.('[data-notice-image-view]');if(noticeView){e.preventDefault();openNoticeImageViewer(noticeView.dataset.noticeImageView);return;}const noticeDownload=e.target.closest?.('[data-notice-image-download]');if(noticeDownload){e.preventDefault();downloadNoticeImageById(noticeDownload.dataset.noticeImageDownload);return;}const portal=e.target.closest?.('[data-portal-go]');if(portal&&!portal.dataset.portalBound){navigatePortalView(portal.dataset.portalGo,{pushHistory:true});return;}const choice=e.target.closest?.('[data-my-match-index]');if(choice){const teams=document.getElementById('myMatchTeamChoices')?._teams||[];const team=teams[Number(choice.dataset.myMatchIndex)];if(team)renderMyMatchTeam(team);return;}const edit=e.target.closest?.('[data-board-edit]');if(edit&&isAdmin()){const post=globalPosts().find(p=>p.id===edit.dataset.boardEdit);if(post)openBoardPostEditor(post);return;}const btn=e.target.closest?.('[data-board-delete]');if(!btn||!isAdmin())return;if(!confirm('이 게시물을 삭제할까요?'))return;const deleting=globalPosts().find(p=>p.id===btn.dataset.boardDelete);if(deleting?.imageStoragePath)deleteManagedImage(deleting.imageStoragePath);globalNoticeState.posts=globalPosts().filter(p=>p.id!==btn.dataset.boardDelete);mirrorGlobalPostsToState();cacheGlobalNoticeState();saveGlobalNoticeCloud('전체 공지 삭제').then(()=>notice('공지를 삭제했습니다.','success')).catch(error=>notice(`공지 삭제 저장 실패: ${error?.message||error}`,'error'));renderBoardFast();renderPopupManager();renderHomeFast();});
 }
 
 window.addEventListener('pagehide',()=>{try{safePersistState('페이지 종료 전');}catch(_error){}});
@@ -20116,3 +20202,37 @@ console.info('[230MATCH] 5.10.31 ready · guarded startTime reads + registration
 
 /* 230MATCH 5.10.32 · player/self quick loser-score entry */
 console.info('[230MATCH] 5.10.32 ready · prelim-public/my-match loser score 0~5 => winner auto 6');
+
+/* 230MATCH 5.10.33 · notice board list/search UX + console fallback */
+(function stage51033NoticeBoardUi(){
+  if(!document.getElementById('stage51033NoticeBoardStyle')){
+    const st=document.createElement('style');
+    st.id='stage51033NoticeBoardStyle';
+    st.textContent=`
+      .stage51033-board-tools{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
+      .stage51033-board-title{display:flex;align-items:baseline;gap:8px}.stage51033-board-title strong{font-size:20px}.stage51033-board-title span{font-size:12px;color:#64748b}
+      .stage51033-search{display:flex;align-items:center;gap:7px;width:min(420px,100%);padding:0 10px;border:1px solid #cbd5e1;border-radius:11px;background:#fff}
+      .stage51033-search input{flex:1;min-width:0;height:42px;border:0;outline:0;background:transparent;font-size:14px}
+      .stage51033-search button{border:0;background:transparent;font-size:22px;color:#64748b;cursor:pointer}
+      .stage51033-notice-list{border:1px solid #d8e1ec;border-radius:14px;overflow:hidden;background:#fff}
+      .stage51033-list-head{display:flex;justify-content:space-between;padding:10px 14px;background:#f8fafc;border-bottom:1px solid #e2e8f0;font-size:13px}
+      .stage51033-list-rows{display:grid}
+      .stage51033-notice-row{display:grid;grid-template-columns:52px minmax(0,1fr) 90px 58px 20px;align-items:center;gap:8px;width:100%;padding:11px 12px;border:0;border-bottom:1px solid #eef2f7;background:#fff;text-align:left;cursor:pointer}
+      .stage51033-notice-row:last-child{border-bottom:0}.stage51033-notice-row:hover,.stage51033-notice-row.selected{background:#f3f7ff}
+      .stage51033-notice-row.important{background:#fffaf0}.stage51033-notice-row.important.selected{background:#fff3d6}
+      .stage51033-row-badge b{display:inline-flex;justify-content:center;min-width:38px;padding:3px 6px;border-radius:999px;font-size:11px}
+      .stage51033-important{background:#fee2e2;color:#b91c1c}.stage51033-pinned{background:#e0ecff;color:#1d4ed8}
+      .stage51033-row-main{display:grid;gap:3px;min-width:0}.stage51033-row-main strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}.stage51033-row-main small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#64748b;font-size:11px}
+      .stage51033-row-date,.stage51033-row-status{font-size:11px;color:#64748b;text-align:center}.stage51033-row-status.active{color:#047857;font-weight:800}
+      .stage51033-row-arrow{font-size:22px;color:#94a3b8;text-align:right}
+      .stage51033-detail-wrap{margin-top:16px}.stage51033-detail-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+      @media(max-width:680px){
+        .stage51033-board-tools{display:grid}.stage51033-search{width:100%}
+        .stage51033-notice-row{grid-template-columns:44px minmax(0,1fr) 68px 18px}
+        .stage51033-row-status{display:none}.stage51033-row-date{font-size:10px}
+      }
+    `;
+    document.head.appendChild(st);
+  }
+  console.info('[230MATCH] 5.10.33 ready · notice list/search/important badge + permission fallback');
+})();
