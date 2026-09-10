@@ -8903,8 +8903,39 @@ function renderHomeFast(){
   setText('homePlayingCourts',courts.filter(x=>x.playing).length);
   const waiting=courts.reduce((n,x)=>n+(x.wait1?1:0)+(x.queue?.length||0)+(x.manualQueue?.length||0),0)+(state.sharedQueue?.length||0)+Object.values(state.venueQueues||{}).reduce((n,q)=>n+(q?.length||0),0);
   setText('homeWaitingMatches',waiting);
-  const home=document.getElementById('homeNoticeList'),posts=visibleBoardPosts();
-  if(home)home.innerHTML=posts.slice(0,4).map(p=>`<button type="button" class="portal-list-item notice-home-item" data-portal-go="board"><strong>${p.important?'🚨 ':p.pinned?'📌 ':''}${portalEscape(p.title)}</strong><div class="portal-meta">${new Date(p.updatedAt||p.createdAt).toLocaleDateString('ko-KR')}</div></button>`).join('')||'<div class="portal-empty">등록된 공지가 없습니다.</div>';
+  const home=document.getElementById('homeNoticeList');
+  const posts=[...visibleBoardPosts()].sort((a,b)=>{
+    const ai=Number(Boolean(a.important)),bi=Number(Boolean(b.important));
+    if(ai!==bi)return bi-ai;
+    const ap=Number(Boolean(a.pinned)),bp=Number(Boolean(b.pinned));
+    if(ap!==bp)return bp-ap;
+    return boardNoticeTime(b)-boardNoticeTime(a);
+  });
+  if(home){
+    const visible=posts.slice(0,4);
+    home.innerHTML=visible.length?`
+      <div class="stage51036-home-notice-list">
+        ${visible.map((p,index)=>{
+          const badges=[
+            p.important?'<b class="stage51033-important">중요</b>':'',
+            p.pinned?'<b class="stage51033-pinned">고정</b>':''
+          ].filter(Boolean).join('');
+          const preview=String(p.body||'').replace(/\s+/g,' ').trim().slice(0,42);
+          return `<button type="button" class="stage51036-home-notice-row ${p.important?'important':''}" data-home-board-post="${portalEscape(p.id)}">
+            <span class="stage51036-home-no">${index+1}</span>
+            <span class="stage51036-home-badges">${badges}</span>
+            <span class="stage51036-home-main">
+              <strong>${portalEscape(p.title)}</strong>
+              ${preview?`<small>${portalEscape(preview)}${String(p.body||'').length>42?'…':''}</small>`:''}
+            </span>
+            <span class="stage51036-home-date">${new Date(p.updatedAt||p.createdAt).toLocaleDateString('ko-KR')}</span>
+            <span class="stage51036-home-arrow">›</span>
+          </button>`;
+        }).join('')}
+      </div>
+      <button type="button" class="btn btn-light stage51036-home-all-notices" data-portal-go="board">전체 공지 보기${posts.length>visible.length?` (${posts.length})`:''}</button>
+    `:'<div class="portal-empty">등록된 공지가 없습니다.</div>';
+  }
 }
 let boardSelectedPostId='';
 function boardNoticeTime(post){return new Date(post?.updatedAt||post?.createdAt||0).getTime()||0;}
@@ -9364,6 +9395,19 @@ document.addEventListener('click',e=>{
     document.querySelectorAll('.stage51033-notice-row.selected').forEach(x=>x.classList.remove('selected'));
   }
 });
+
+
+document.addEventListener('click',e=>{
+  const homePost=e.target.closest?.('[data-home-board-post]');
+  if(!homePost)return;
+  e.preventDefault();e.stopPropagation();
+  boardSelectedPostId=String(homePost.dataset.homeBoardPost||'');
+  navigatePortalView('board',{pushHistory:true,focus:false});
+  setTimeout(()=>{
+    try{renderBoardFast();}catch(_e){}
+    document.querySelector('.stage51033-detail-wrap')?.scrollIntoView({behavior:'smooth',block:'start'});
+  },30);
+},true);
 
 document.addEventListener('click',e=>{const boardOpen=e.target.closest?.('[data-board-open-post]');if(boardOpen){e.preventDefault();boardSelectedPostId=String(boardOpen.dataset.boardOpenPost||'');renderBoardFast();setTimeout(()=>document.querySelector('.stage51033-detail-wrap')?.scrollIntoView({behavior:'smooth',block:'start'}),20);return;}const directGuide=e.target.closest?.('#guideImageDownload,[data-direct-guide-download]');if(directGuide){e.preventDefault();const src=directGuide.dataset.directImageSrc||'';const name=directGuide.dataset.directImageName||'230MATCH_대회요강.jpg';void directImageDownload(src,name,'요강 이미지').then(ok=>{if(ok)notice('요강 이미지를 바로 저장했습니다.','success');});return;}const noticeView=e.target.closest?.('[data-notice-image-view]');if(noticeView){e.preventDefault();openNoticeImageViewer(noticeView.dataset.noticeImageView);return;}const noticeDownload=e.target.closest?.('[data-notice-image-download]');if(noticeDownload){e.preventDefault();downloadNoticeImageById(noticeDownload.dataset.noticeImageDownload);return;}const portal=e.target.closest?.('[data-portal-go]');if(portal&&!portal.dataset.portalBound){navigatePortalView(portal.dataset.portalGo,{pushHistory:true});return;}const choice=e.target.closest?.('[data-my-match-index]');if(choice){const teams=document.getElementById('myMatchTeamChoices')?._teams||[];const team=teams[Number(choice.dataset.myMatchIndex)];if(team)renderMyMatchTeam(team);return;}const edit=e.target.closest?.('[data-board-edit]');if(edit&&isAdmin()){const post=globalPosts().find(p=>p.id===edit.dataset.boardEdit);if(post)openBoardPostEditor(post);return;}const btn=e.target.closest?.('[data-board-delete]');if(!btn||!isAdmin())return;if(!confirm('이 게시물을 삭제할까요?'))return;const deleting=globalPosts().find(p=>p.id===btn.dataset.boardDelete);if(deleting?.imageStoragePath)deleteManagedImage(deleting.imageStoragePath);globalNoticeState.posts=globalPosts().filter(p=>p.id!==btn.dataset.boardDelete);mirrorGlobalPostsToState();cacheGlobalNoticeState();saveGlobalNoticeCloud('전체 공지 삭제').then(()=>notice('공지를 삭제했습니다.','success')).catch(error=>notice(`공지 삭제 저장 실패: ${error?.message||error}`,'error'));renderBoardFast();renderPopupManager();renderHomeFast();});
 }
@@ -20250,4 +20294,38 @@ console.info('[230MATCH] 5.10.34 ready · notice numbers + important/pinned badg
 /* 230MATCH 5.10.35 · vertical notice badges */
 (function stage51035VerticalNoticeBadges(){
   console.info('[230MATCH] 5.10.35 ready · 중요/고정 배지 세로 배치로 제목 공간 확대');
+})();
+
+/* 230MATCH 5.10.36 · compact home notice list */
+(function stage51036HomeNoticeList(){
+  if(!document.getElementById('stage51036HomeNoticeStyle')){
+    const st=document.createElement('style');
+    st.id='stage51036HomeNoticeStyle';
+    st.textContent=`
+      .stage51036-home-notice-list{display:grid;border:1px solid #d8e1ec;border-radius:13px;overflow:hidden;background:#fff}
+      .stage51036-home-notice-row{display:grid;grid-template-columns:30px 42px minmax(0,1fr) 78px 18px;align-items:center;gap:7px;width:100%;padding:9px 10px;border:0;border-bottom:1px solid #edf2f7;background:#fff;text-align:left;cursor:pointer}
+      .stage51036-home-notice-row:last-child{border-bottom:0}
+      .stage51036-home-notice-row:hover{background:#f8fbff}
+      .stage51036-home-notice-row.important{background:#fff8e6}
+      .stage51036-home-notice-row.important:hover{background:#fff2cd}
+      .stage51036-home-no{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:7px;background:#f1f5f9;color:#475569;font-size:11px;font-weight:900}
+      .stage51036-home-notice-row.important .stage51036-home-no{background:#fde7b0;color:#92400e}
+      .stage51036-home-badges{display:flex;flex-direction:column;align-items:flex-start;gap:2px}
+      .stage51036-home-badges b{display:inline-flex;align-items:center;justify-content:center;min-width:30px;padding:2px 4px;border-radius:999px;font-size:9px;line-height:1.2;white-space:nowrap}
+      .stage51036-home-main{display:grid;gap:2px;min-width:0}
+      .stage51036-home-main strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
+      .stage51036-home-main small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#64748b;font-size:10px}
+      .stage51036-home-date{font-size:10px;color:#64748b;text-align:center;white-space:nowrap}
+      .stage51036-home-arrow{font-size:20px;color:#94a3b8;text-align:right}
+      .stage51036-home-all-notices{width:100%;margin-top:8px;min-height:38px}
+      @media(max-width:640px){
+        .stage51036-home-notice-row{grid-template-columns:28px 36px minmax(0,1fr) 18px;padding:9px 7px;gap:5px}
+        .stage51036-home-date{display:none}
+        .stage51036-home-main strong{font-size:12px}
+        .stage51036-home-main small{font-size:9px}
+      }
+    `;
+    document.head.appendChild(st);
+  }
+  console.info('[230MATCH] 5.10.36 ready · home notices show top 4 compact list + direct detail + all notices');
 })();
