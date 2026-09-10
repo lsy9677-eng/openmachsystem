@@ -3185,6 +3185,7 @@ async function confirmPrelimResult(event){
   const confirmed=await stage5928ConfirmPrelimResult(pendingMatch,{scoreA,scoreB,winnerId,resultTypeLabel});
   if(!confirmed)return false;
 
+  autoRecovery('예선 경기 결과 입력 전');
   const sourceCourtId=pendingMatch?.prelimCourtId||null;
   const involvedTeamIds=new Set([pendingMatch?.teamA?.id,pendingMatch?.teamB?.id].filter(Boolean));
   const beforeResolvedPlayIns=new Set(Object.values(state.draw?.rounds||{}).flat().filter(x=>x.isPlayIn&&x.teamA&&!x.teamA.placeholder&&x.teamB&&!x.teamB.placeholder).map(x=>x.id));
@@ -4201,6 +4202,7 @@ function confirmCourtTransfer(event){
   const source=unified?(state.prelim?.courts||[]).find(c=>c.id===sourceId):state.courts.find(c=>c.id===sourceId);
   const matchId=unified?unifiedSourceMatchId(source,sourceSlot):sourceTransferMatchId(source,sourceSlot);
   const targetValue=$('courtTransferTargetSelect').value;
+  autoRecovery(`코트 이동 전 · ${source?.name||sourceId}`);
   if(targetValue==='__venue_shared__'){
     const result=stage555MoveToVenueSharedQueue({unified,source,sourceSlot,matchId});
     calculateTimeMetrics(state);commit(`경기 공용대기 이동 · ${source?.name||sourceId} · ${matchId}`);
@@ -4371,6 +4373,7 @@ function confirmPrelimMove(event){
   const sourceCourtId=$('prelimMoveSourceCourtId').value;
   const matchId=$('prelimMoveMatchId').value;
   const targetCourtId=$('prelimMoveTargetCourt').value;
+  autoRecovery(`예선 코트 이동 전 · ${sourceCourtId}`);
   if(targetCourtId==='__prelim_shared__'){
     const source=(state.prelim?.courts||[]).find(c=>String(c.id)===String(sourceCourtId));
     const result=stage555MoveToVenueSharedQueue({unified:true,source,sourceSlot:'prelim-manual',matchId});
@@ -4390,6 +4393,7 @@ function confirmPrelimMove(event){
   prelimNotice(`${result.match.groupNo}조 ${result.match.matchNo}경기를 ${result.target.name}으로 이동했습니다.`,'success');
 }
 function returnPrelimWait1(courtId){
+  autoRecovery(`예선 대기1 이동 전 · ${courtId}`);
   const matchId=returnPrelimWait1ToQueue(state,{courtId});
   commit(`예선 대기1 추가대기 복귀 · ${matchId}`);
   prelimNotice('대기1 경기를 해당 코트 추가대기 맨 앞으로 이동했습니다.','success');
@@ -20328,4 +20332,242 @@ console.info('[230MATCH] 5.10.34 ready · notice numbers + important/pinned badg
     document.head.appendChild(st);
   }
   console.info('[230MATCH] 5.10.36 ready · home notices show top 4 compact list + direct detail + all notices');
+})();
+
+/* 230MATCH 5.10.37 · same-day emergency operational recovery
+   - recent safe recovery points only
+   - admin only
+   - registrations / notices / account data are preserved
+   - if main draw is finalized, only snapshots with the same finalized checksum are eligible */
+(function stage51037EmergencyRecovery(){
+  const clone=v=>{try{return structuredClone(v)}catch(_e){return JSON.parse(JSON.stringify(v))}};
+  const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+
+  function currentScope(){
+    return {
+      tournamentId:String(state?.tournament?.id||state?.multiTournament?.activeTournamentId||''),
+      tournamentName:String(state?.tournament?.name||''),
+      divisionId:String(state?.multiDivision?.activeDivisionId||''),
+      divisionName:String(state?.tournament?.division||state?.portal?.currentDivisionName||'')
+    };
+  }
+  function sameScope(item){
+    const s=item?.state||{},cur=currentScope();
+    const tid=String(s?.tournament?.id||s?.multiTournament?.activeTournamentId||'');
+    const tname=String(s?.tournament?.name||'');
+    const did=String(s?.multiDivision?.activeDivisionId||'');
+    const dname=String(s?.tournament?.division||s?.portal?.currentDivisionName||'');
+    if(cur.tournamentId&&tid&&cur.tournamentId!==tid)return false;
+    if(!cur.tournamentId&&cur.tournamentName&&tname&&cur.tournamentName!==tname)return false;
+    if(cur.divisionId&&did&&cur.divisionId!==did)return false;
+    if(!cur.divisionId&&cur.divisionName&&dname&&cur.divisionName!==dname)return false;
+    return true;
+  }
+  function snapshotIntegrity(s){
+    const placements=[],matchMap=new Map();
+    try{for(const m of (s.prelim?.matches||[]))if(m?.id)matchMap.set(String(m.id),m)}catch(_e){}
+    try{for(const m of allMatches(s.draw||{rounds:{}}))if(m?.id)matchMap.set(String(m.id),m)}catch(_e){}
+
+    const add=(id,where)=>{
+      id=String(id||'');if(id)placements.push({id,where});
+    };
+    const courts=[
+      ...(Array.isArray(s.prelim?.courts)?s.prelim.courts:[]),
+      ...(Array.isArray(s.courts)?s.courts:[])
+    ];
+    for(const c of courts){
+      add(c?.playing,`${c?.name||c?.id||'코트'} 시합중`);
+      add(c?.wait1,`${c?.name||c?.id||'코트'} 대기1`);
+      (c?.queue||[]).forEach((id,i)=>add(id,`${c?.name||c?.id||'코트'} 대기${i+2}`));
+      (c?.manualQueue||[]).forEach((id,i)=>add(id,`${c?.name||c?.id||'코트'} 수동대기${i+2}`));
+    }
+    for(const [vid,q] of Object.entries(s.venueQueues||{}))(q||[]).forEach((id,i)=>add(id,`${vid} 공용${i+1}`));
+    (s.sharedQueue||[]).forEach((id,i)=>add(id,`공용대기${i+1}`));
+    (s.prelim?.manualSharedQueue||[]).forEach((id,i)=>add(id,`예선공용${i+1}`));
+
+    const byId=new Map();
+    for(const p of placements){
+      if(!byId.has(p.id))byId.set(p.id,[]);
+      byId.get(p.id).push(p.where);
+    }
+    const duplicates=[...byId.entries()].filter(([,where])=>where.length>1);
+    const completedQueued=placements.filter(p=>String(matchMap.get(p.id)?.status||'')==='completed');
+    return {ok:duplicates.length===0&&completedQueued.length===0,duplicates,completedQueued};
+  }
+  function finalizedCompatible(item){
+    const currentFinal=state?.mainDrawFinalLock?.locked===true||state?.drawMeta?.locked===true||state?.settings?.drawLocked===true;
+    if(!currentFinal)return true;
+    const currentChecksum=String(state?.mainDrawFinalLock?.checksum||state?.drawMeta?.checksum||'');
+    const snap=item?.state||{};
+    const snapLocked=Boolean(snap?.mainDrawFinalLock?.locked===true||snap?.drawMeta?.locked===true||snap?.settings?.drawLocked===true);
+    const snapChecksum=String(snap?.mainDrawFinalLock?.checksum||snap?.drawMeta?.checksum||'');
+    return Boolean(snapLocked&&currentChecksum&&snapChecksum&&currentChecksum===snapChecksum);
+  }
+  function todayOrRecent(item){
+    const t=Date.parse(String(item?.createdAt||''));
+    if(!Number.isFinite(t))return false;
+    // 당일 운영을 우선하되 자정 전후 대회를 고려해 최대 24시간 범위.
+    return Date.now()-t<=24*60*60*1000;
+  }
+  async function candidates(){
+    const rows=await getRecoveries();
+    return rows
+      .filter(x=>sameScope(x)&&todayOrRecent(x)&&finalizedCompatible(x))
+      .map(x=>({...x,__integrity:snapshotIntegrity(x.state)}))
+      .filter(x=>x.__integrity.ok)
+      .slice(0,5);
+  }
+
+  function ensureDialog(){
+    let d=document.getElementById('stage51037EmergencyDialog');
+    if(d)return d;
+    d=document.createElement('dialog');
+    d.id='stage51037EmergencyDialog';
+    d.className='stage51037-emergency-dialog';
+    d.innerHTML=`
+      <div class="stage51037-head">
+        <div><p>EMERGENCY RECOVERY</p><h2>최근 정상상태로 복구</h2></div>
+        <button type="button" data-stage51037-close aria-label="닫기">×</button>
+      </div>
+      <div class="stage51037-warning">
+        <strong>경기 운영 상태만 되돌립니다.</strong>
+        <span>참가신청·입금상태·공지·회원정보는 현재 상태를 그대로 유지합니다. 본선 확정 후에는 같은 확정 대진의 복구점만 표시됩니다.</span>
+      </div>
+      <div id="stage51037EmergencyList"></div>`;
+    document.body.appendChild(d);
+    d.addEventListener('click',e=>{
+      if(e.target.closest?.('[data-stage51037-close]'))d.close();
+      const btn=e.target.closest?.('[data-stage51037-restore]');
+      if(btn)void restore(btn.dataset.stage51037Restore);
+    });
+    return d;
+  }
+
+  async function open(){
+    if(!requireAdmin('당일 비상복구'))return;
+    const d=ensureDialog(),root=d.querySelector('#stage51037EmergencyList');
+    root.innerHTML='<div class="portal-empty">최근 정상 복구점을 확인하는 중입니다.</div>';
+    if(!d.open)d.showModal();
+    const list=await candidates();
+    if(!list.length){
+      root.innerHTML='<div class="portal-empty">현재 대회·부서에서 사용할 수 있는 최근 24시간 정상 복구점이 없습니다.</div>';
+      return;
+    }
+    root.innerHTML=list.map((item,index)=>{
+      const snap=stage5912RecoverySnapshot(item.state);
+      return `<article class="stage51037-recovery-row">
+        <div class="stage51037-no">${index+1}</div>
+        <div class="stage51037-main">
+          <strong>${esc(stage5960RecoveryDisplayLabel(item))}</strong>
+          <span>${new Date(item.createdAt).toLocaleString('ko-KR')}</span>
+          <small>예선 ${snap.prelimCompleted}/${snap.totalPrelim} · 본선 ${snap.completed}/${snap.totalMain} · 시합중 ${snap.playing} · 대기1 ${snap.wait1} · 공용대기 ${snap.shared}</small>
+          ${snap.placements?.length?`<em>${esc(snap.placements.slice(0,2).join(' / '))}${snap.placements.length>2?' 외':''}</em>`:''}
+        </div>
+        <button type="button" class="btn btn-primary btn-small" data-stage51037-restore="${esc(item.id)}">이 상태로 복구</button>
+      </article>`;
+    }).join('');
+  }
+
+  async function restore(id){
+    if(!requireAdmin('당일 비상복구'))return;
+    const item=await getRecovery(id);
+    if(!item||!sameScope(item)||!finalizedCompatible(item))return notice('현재 대회에서 사용할 수 없는 복구점입니다.','error');
+    const integrity=snapshotIntegrity(item.state);
+    if(!integrity.ok)return notice('중복배정 또는 완료경기 잔존이 있는 복구점이라 안전복구를 중단했습니다.','error');
+
+    const snap=stage5912RecoverySnapshot(item.state);
+    const msg=`${new Date(item.createdAt).toLocaleString('ko-KR')} 상태로 경기 운영을 되돌릴까요?\n\n예선 ${snap.prelimCompleted}/${snap.totalPrelim} · 본선 ${snap.completed}/${snap.totalMain}\n시합중 ${snap.playing} · 대기1 ${snap.wait1}\n\n참가신청·입금·공지·회원정보는 현재 상태를 유지합니다.`;
+    if(!confirm(msg))return;
+    if(!requireTypedConfirmation('당일 비상복구','복구'))return;
+
+    // 복구 직전 전체 상태를 별도 자동 복구점으로 남긴다.
+    autoRecovery('당일 비상복구 직전');
+
+    const source=item.state||{};
+    const keepFinal=clone(state.mainDrawFinalLock||null);
+    const finalLocked=Boolean(state?.mainDrawFinalLock?.locked===true||state?.drawMeta?.locked===true||state?.settings?.drawLocked===true);
+
+    // 운영 핵심만 복원. 참가신청/공지/회원/문자 처리이력 등은 건드리지 않는다.
+    state.prelim=clone(source.prelim||{});
+    state.draw=clone(source.draw||{rounds:{}});
+    state.courts=clone(source.courts||[]);
+    state.sharedQueue=clone(source.sharedQueue||[]);
+    state.venueQueues=clone(source.venueQueues||{});
+    state.completion=clone(source.completion||{});
+    state.drawMeta=clone(source.drawMeta||state.drawMeta||{});
+
+    state.operation=state.operation||{};
+    const srcOp=source.operation||{};
+    ['autoAssignmentEnabled','heldMatches','eventClockStartAt','eventClockMode'].forEach(key=>{
+      if(Object.prototype.hasOwnProperty.call(srcOp,key))state.operation[key]=clone(srcOp[key]);
+    });
+
+    if(finalLocked){
+      state.mainDrawFinalLock=keepFinal;
+      state.settings=state.settings||{};
+      state.settings.drawLocked=true;
+      state.drawMeta=state.drawMeta||{};
+      state.drawMeta.locked=true;
+      if(keepFinal?.checksum)state.drawMeta.checksum=keepFinal.checksum;
+    }
+
+    try{ensurePortalState();ensureOperatorState();ensureTimeState(state);ensureVenueQueues(state);ensureCourtStatuses(state);ensurePrelimCourtStatuses(state)}catch(_e){}
+    try{syncCurrentDivisionRuntime?.()}catch(_e){}
+    calculateTimeMetrics(state);
+    commit(`당일 비상복구 · ${stage5960RecoveryDisplayLabel(item)}`);
+    try{await stage5526PushCriticalState('당일 비상복구')}catch(_e){}
+    try{render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus})}catch(_e){}
+    try{renderOperatorControls();renderPortalViews();}catch(_e){}
+    dClose();
+    notice('최근 정상 운영상태로 복구했습니다. 참가신청·입금·공지·회원정보는 유지되었습니다.','success');
+  }
+
+  function dClose(){try{document.getElementById('stage51037EmergencyDialog')?.close()}catch(_e){}}
+
+  function installButton(){
+    if(!isAdmin())return;
+    if(document.getElementById('stage51037EmergencyBtn'))return;
+    const view=document.getElementById('view-operation');
+    if(!view)return;
+    const btn=document.createElement('button');
+    btn.type='button';
+    btn.id='stage51037EmergencyBtn';
+    btn.className='btn btn-danger-outline stage51037-emergency-btn';
+    btn.textContent='↩ 최근 정상상태로 복구';
+    btn.title='최근 24시간의 정상 자동복구점 중 하나를 선택해 경기 운영 상태만 되돌립니다.';
+    btn.addEventListener('click',open);
+
+    const heading=view.querySelector('h1,h2');
+    if(heading?.parentElement)heading.parentElement.appendChild(btn);
+    else view.prepend(btn);
+  }
+
+  if(!document.getElementById('stage51037EmergencyStyle')){
+    const st=document.createElement('style');
+    st.id='stage51037EmergencyStyle';
+    st.textContent=`
+      .stage51037-emergency-btn{margin-left:8px}
+      .stage51037-emergency-dialog{width:min(94vw,760px);max-height:86vh;border:0;border-radius:18px;padding:0;box-shadow:0 24px 80px rgba(15,23,42,.28)}
+      .stage51037-emergency-dialog::backdrop{background:rgba(15,23,42,.48)}
+      .stage51037-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;padding:18px 20px 10px}
+      .stage51037-head p{margin:0;color:#b91c1c;font-size:10px;font-weight:900;letter-spacing:.08em}.stage51037-head h2{margin:3px 0 0}
+      .stage51037-head button{border:0;background:transparent;font-size:28px;cursor:pointer}
+      .stage51037-warning{display:grid;gap:4px;margin:0 18px 12px;padding:11px 12px;border-radius:12px;background:#fff7ed;color:#9a3412;font-size:12px}
+      #stage51037EmergencyList{display:grid;gap:8px;padding:0 18px 18px;overflow:auto;max-height:62vh}
+      .stage51037-recovery-row{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:10px;align-items:center;padding:11px;border:1px solid #dbe4ef;border-radius:12px;background:#fff}
+      .stage51037-no{display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:8px;background:#eef2ff;font-weight:900}
+      .stage51037-main{display:grid;gap:3px;min-width:0}.stage51037-main strong{font-size:13px}.stage51037-main span,.stage51037-main small{font-size:11px;color:#64748b}.stage51037-main em{font-size:10px;color:#475569;font-style:normal;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      @media(max-width:640px){.stage51037-recovery-row{grid-template-columns:26px minmax(0,1fr)}.stage51037-recovery-row .btn{grid-column:1/-1;width:100%}.stage51037-emergency-btn{margin:8px 0 0;width:100%}}
+    `;
+    document.head.appendChild(st);
+  }
+
+  const install=()=>setTimeout(installButton,80);
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
+  window.addEventListener('pageshow',install);
+  window.addEventListener('hashchange',()=>{if(location.hash==='#operation')install()});
+  document.addEventListener('click',e=>{if(e.target.closest?.('[data-portal-go="operation"],[data-view="operation"],[data-mobile-view="operation"]'))install()},true);
+
+  window.stage51037OpenEmergencyRecovery=open;
+  console.info('[230MATCH] 5.10.37 ready · admin same-day safe operational recovery (last 5 normal points)');
 })();
