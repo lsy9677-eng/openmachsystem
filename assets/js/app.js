@@ -8921,14 +8921,18 @@ function boardNoticeListHtml(posts,selectedId){
   return `<section class="stage51033-notice-list">
     <div class="stage51033-list-head"><strong>공지 목록</strong><span>${posts.length}개</span></div>
     <div class="stage51033-list-rows">
-      ${posts.map(p=>{
+      ${posts.map((p,index)=>{
         const status=boardPostStatus(p);
         const active=String(p.id)===String(selectedId);
-        const badge=p.important?'<b class="stage51033-important">중요</b>':p.pinned?'<b class="stage51033-pinned">고정</b>':'';
+        const badges=[
+          p.important?'<b class="stage51033-important">중요</b>':'',
+          p.pinned?'<b class="stage51033-pinned">고정</b>':''
+        ].filter(Boolean).join('');
         const date=new Date(p.updatedAt||p.createdAt).toLocaleDateString('ko-KR');
         const preview=String(p.body||'').replace(/\s+/g,' ').trim().slice(0,54);
         return `<button type="button" class="stage51033-notice-row ${active?'selected':''} ${p.important?'important':''}" data-board-open-post="${portalEscape(p.id)}">
-          <span class="stage51033-row-badge">${badge}</span>
+          <span class="stage51034-row-no">${index+1}</span>
+          <span class="stage51033-row-badge">${badges}</span>
           <span class="stage51033-row-main"><strong>${portalEscape(p.title)}</strong>${preview?`<small>${portalEscape(preview)}${String(p.body||'').length>54?'…':''}</small>`:''}</span>
           <span class="stage51033-row-date">${portalEscape(date)}</span>
           <span class="stage51033-row-status ${status}">${status==='scheduled'?'예정':status==='expired'?'종료':'게시중'}</span>
@@ -20217,10 +20221,13 @@ console.info('[230MATCH] 5.10.32 ready · prelim-public/my-match loser score 0~5
       .stage51033-notice-list{border:1px solid #d8e1ec;border-radius:14px;overflow:hidden;background:#fff}
       .stage51033-list-head{display:flex;justify-content:space-between;padding:10px 14px;background:#f8fafc;border-bottom:1px solid #e2e8f0;font-size:13px}
       .stage51033-list-rows{display:grid}
-      .stage51033-notice-row{display:grid;grid-template-columns:52px minmax(0,1fr) 90px 58px 20px;align-items:center;gap:8px;width:100%;padding:11px 12px;border:0;border-bottom:1px solid #eef2f7;background:#fff;text-align:left;cursor:pointer}
-      .stage51033-notice-row:last-child{border-bottom:0}.stage51033-notice-row:hover,.stage51033-notice-row.selected{background:#f3f7ff}
-      .stage51033-notice-row.important{background:#fffaf0}.stage51033-notice-row.important.selected{background:#fff3d6}
-      .stage51033-row-badge b{display:inline-flex;justify-content:center;min-width:38px;padding:3px 6px;border-radius:999px;font-size:11px}
+      .stage51033-notice-row{display:grid;grid-template-columns:34px 82px minmax(0,1fr) 90px 58px 20px;align-items:center;gap:8px;width:100%;padding:11px 12px;border:0;border-bottom:1px solid #eef2f7;background:#fff;text-align:left;cursor:pointer;transition:background-color .12s ease,box-shadow .12s ease}
+      .stage51033-notice-row:last-child{border-bottom:0}.stage51033-notice-row:hover{background:#f8fbff}.stage51033-notice-row.selected{background:#eef5ff;box-shadow:inset 3px 0 0 #2563eb}
+      .stage51033-notice-row.important{background:#fff8e6}.stage51033-notice-row.important:hover{background:#fff3d2}.stage51033-notice-row.important.selected{background:#ffedc2;box-shadow:inset 3px 0 0 #f59e0b}
+      .stage51034-row-no{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;border-radius:8px;background:#f1f5f9;color:#475569;font-size:12px;font-weight:900}
+      .stage51033-notice-row.important .stage51034-row-no{background:#fde7b0;color:#92400e}
+      .stage51033-row-badge{display:flex;align-items:center;gap:4px;min-width:0}
+      .stage51033-row-badge b{display:inline-flex;justify-content:center;min-width:36px;padding:3px 6px;border-radius:999px;font-size:11px;white-space:nowrap}
       .stage51033-important{background:#fee2e2;color:#b91c1c}.stage51033-pinned{background:#e0ecff;color:#1d4ed8}
       .stage51033-row-main{display:grid;gap:3px;min-width:0}.stage51033-row-main strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}.stage51033-row-main small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#64748b;font-size:11px}
       .stage51033-row-date,.stage51033-row-status{font-size:11px;color:#64748b;text-align:center}.stage51033-row-status.active{color:#047857;font-weight:800}
@@ -20228,11 +20235,14 @@ console.info('[230MATCH] 5.10.32 ready · prelim-public/my-match loser score 0~5
       .stage51033-detail-wrap{margin-top:16px}.stage51033-detail-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
       @media(max-width:680px){
         .stage51033-board-tools{display:grid}.stage51033-search{width:100%}
-        .stage51033-notice-row{grid-template-columns:44px minmax(0,1fr) 68px 18px}
-        .stage51033-row-status{display:none}.stage51033-row-date{font-size:10px}
+        .stage51033-notice-row{grid-template-columns:30px 66px minmax(0,1fr) 62px 18px;padding:10px 8px;gap:6px}
+        .stage51033-row-status{display:none}.stage51033-row-date{font-size:10px}.stage51033-row-badge b{min-width:30px;padding:3px 4px;font-size:10px}.stage51034-row-no{min-width:24px;height:24px;font-size:11px}
       }
     `;
     document.head.appendChild(st);
   }
   console.info('[230MATCH] 5.10.33 ready · notice list/search/important badge + permission fallback');
 })();
+
+/* 230MATCH 5.10.34 · notice list numbering/priority emphasis */
+console.info('[230MATCH] 5.10.34 ready · notice numbers + important/pinned badges + stronger important background');
