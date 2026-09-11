@@ -21925,22 +21925,60 @@ console.info('[230MATCH] 5.10.61 ready · admin participant replacement with own
     prelimNotice(`조편성을 변경했습니다. ${description} · 코트 배정을 다시 동기화했습니다.`,'success');
     fill(d);renderPreview(d);
   }
+  function adminAccountPreviewingMember(){
+    try{return document.body?.dataset?.adminAccount==='true'&&document.body?.dataset?.adminPreview==='member';}catch(_e){return false;}
+  }
   function open(){
-    if(!requireAdmin('예선 조편성 수정'))return;
-    if(!groups().length){prelimNotice('먼저 예선 조추첨을 진행하세요.','warning');return;}
-    if(hasStarted()){prelimNotice('예선 경기가 이미 시작되어 조편성 수정이 잠겼습니다.','error');return;}
-    const d=buildDialog();fill(d);d.showModal();
+    try{
+      if(adminAccountPreviewingMember()){
+        prelimNotice('현재 일반 보기 상태입니다. 일반 보기를 해제한 뒤 조편성 수동조정을 사용하세요.','info');
+        return;
+      }
+      if(!requireAdmin('예선 조편성 수정'))return;
+      if(!groups().length){prelimNotice('먼저 예선 조추첨을 진행하세요.','warning');return;}
+      if(hasStarted()){prelimNotice('예선 경기가 이미 시작되어 조편성 수정이 잠겼습니다.','error');return;}
+      const d=buildDialog();fill(d);
+      if(typeof d.showModal==='function'){
+        if(!d.open)d.showModal();
+      }else{
+        d.setAttribute('open','');
+      }
+      setTimeout(()=>d.querySelector('#stage51062SourceTeam')?.focus(),30);
+    }catch(err){
+      console.error('[230MATCH 5.10.63] 조편성 수동조정 열기 실패',err);
+      prelimNotice(`조편성 수동조정 창을 열지 못했습니다. ${err?.message||'화면을 새로고침한 뒤 다시 시도하세요.'}`,'error');
+    }
+  }
+  function syncButtonVisibility(){
+    const btn=document.getElementById('stage51062OpenGroupEditor');if(!btn)return;
+    const adminMode=(typeof isAdmin==='function'&&isAdmin());
+    btn.hidden=!adminMode;
+    btn.disabled=!adminMode||!groups().length||hasStarted();
+    btn.title=!adminMode?'관리자 보기에서만 사용할 수 있습니다.':!groups().length?'예선 조추첨 후 사용할 수 있습니다.':hasStarted()?'예선 경기 시작 후에는 조편성을 변경할 수 없습니다.':'예선 조편성을 이동하거나 팀끼리 맞교환합니다.';
   }
   function injectButton(){
-    const anchor=document.getElementById('assignPrelimCourtsBtn')||document.getElementById('generatePrelimBtn');if(!anchor||document.getElementById('stage51062OpenGroupEditor'))return;
-    const btn=document.createElement('button');btn.type='button';btn.id='stage51062OpenGroupEditor';btn.className='btn btn-light';btn.textContent='조편성 수동조정';btn.dataset.adminOnly='true';btn.onclick=open;
-    const host=anchor.parentElement;host?.appendChild(btn);
+    const anchor=document.getElementById('assignPrelimCourtsBtn')||document.getElementById('generatePrelimBtn');if(!anchor){return;}
+    let btn=document.getElementById('stage51062OpenGroupEditor');
+    if(!btn){
+      btn=document.createElement('button');btn.type='button';btn.id='stage51062OpenGroupEditor';btn.className='btn btn-light';btn.textContent='조편성 수동조정';btn.dataset.adminOnly='true';
+      const host=anchor.parentElement;host?.appendChild(btn);
+    }
+    btn.onclick=(e)=>{e.preventDefault();e.stopPropagation();open();};
+    syncButtonVisibility();
   }
-  const run=()=>setTimeout(injectButton,80);
+  const run=()=>setTimeout(()=>{injectButton();syncButtonVisibility();},80);
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',run,{once:true});else run();
   window.addEventListener('pageshow',run);window.addEventListener('hashchange',run);
-  const mo=new MutationObserver(()=>{if(!document.getElementById('stage51062OpenGroupEditor'))injectButton();});
+  document.addEventListener('click',e=>{
+    const btn=e.target?.closest?.('#stage51062OpenGroupEditor');if(!btn)return;
+    e.preventDefault();e.stopPropagation();open();
+  },true);
+  document.addEventListener('click',e=>{
+    if(e.target?.closest?.('#roleViewerBtn,[data-operation-section],[data-portal-go="operation"]'))setTimeout(()=>{injectButton();syncButtonVisibility();},40);
+  },true);
+  const mo=new MutationObserver(()=>{if(!document.getElementById('stage51062OpenGroupEditor'))injectButton();else syncButtonVisibility();});
   try{mo.observe(document.body,{childList:true,subtree:true});}catch(_e){}
   window.stage51062OpenPrelimGroupEditor=open;
 })();
 console.info('[230MATCH] 5.10.62 ready · admin prelim group manual move/swap after court assignment');
+console.info('[230MATCH] 5.10.63 ready · prelim group editor button click/modal reliability fix');
