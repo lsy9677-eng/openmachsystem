@@ -8807,8 +8807,14 @@ function stage51038FieldPageSvg(plan,page,slots){
   const topY=150;
   const roundSpace=(slotTop-topY)/(localDepth||1);
   const parts=[];
-  const pairLeft=(page.index%2===0);
-  const edgeRoundTags=[];
+
+  const pushStemLabel=(x,y1,y2,label,tone='#64748b',size=10.5)=>{
+    if(!label||!Number.isFinite(x)||!Number.isFinite(y1)||!Number.isFinite(y2))return;
+    const len=Math.abs(y2-y1);
+    if(len<26)return;
+    const cy=(y1+y2)/2;
+    parts.push(`<text x="${x}" y="${cy}" text-anchor="middle" dominant-baseline="middle" font-size="${size}" font-weight="900" fill="${tone}" opacity="0.95" transform="rotate(-90 ${x} ${cy})">${printEscape(label)}</text>`);
+  };
 
   parts.push(`<text x="${W/2}" y="37" text-anchor="middle" font-size="27" font-weight="900" fill="#10264a">${printEscape(state.tournament?.name||'230MATCH 대회')} · 본선 현장용 대진표</text>`);
   const joinNote=plan.total===2
@@ -8819,7 +8825,7 @@ function stage51038FieldPageSvg(plan,page,slots){
       :'왼쪽 접합 (3장과 연결)');
   parts.push(`<text x="${W/2}" y="67" text-anchor="middle" font-size="16" font-weight="700" fill="#53657d">${printEscape(state.tournament?.division||'')} · ${page.index+1}/${plan.total}장 · 슬롯 ${page.start+1}~${page.end} · ${joinNote}</text>`);
 
-  // Bottom participant slots and vertical guides.
+  // 하단 이름 기입 영역: 슬롯 번호, 예선 조/순위, 팀명만 표시하고 라운드 표시는 넣지 않는다.
   for(let i=0;i<count;i++){
     const abs=page.start+i, x=i*slotW, cx=x+slotW/2;
     const entry=slots[abs]||{};
@@ -8842,41 +8848,28 @@ function stage51038FieldPageSvg(plan,page,slots){
     parts.push(`<line x1="${cx}" y1="${slotTop}" x2="${cx}" y2="${slotTop-roundSpace+5}" stroke="${bye?'#c7ced7':'#97a6b8'}" stroke-width="1.6"/>`);
   }
 
-  // Bottom label.
-  const baseRoundLabel=`${stage51038FieldRoundLabel(plan.size)} 시작`;
-  edgeRoundTags.push({label:baseRoundLabel,y:slotTop-10,emphasis:true});
-
-  // Upward bracket + handwriting lines.
+  // 가지 내부 세로축 전체에 현재 라운드를 반복 표시한다.
   for(let r=1;r<=localDepth;r++){
     const group=2**r;
     const groups=count/group;
     const y=slotTop-roundSpace*r;
     const prevY=slotTop-roundSpace*(r-1);
-    const globalRemain=plan.size/(2**r);
+    const currentRoundLabel=stage51038FieldRoundLabel(plan.size/(2**(r-1)));
     for(let g=0;g<groups;g++){
       const start=g*group;
       const lcx=(start+group/4)*slotW;
       const rcx=(start+group*3/4)*slotW;
       const mid=(lcx+rcx)/2;
       parts.push(`<path d="M ${lcx} ${prevY} V ${y+15} H ${mid} V ${y} M ${rcx} ${prevY} V ${y+15} H ${mid}" fill="none" stroke="#8b98aa" stroke-width="1.8"/>`);
-      if(r<localDepth)parts.push(`<line x1="${mid}" y1="${y}" x2="${mid}" y2="${y-roundSpace+15}" stroke="#8b98aa" stroke-width="1.8"/>`);
+      if(r<localDepth){
+        const nextStemTop=y-roundSpace+15;
+        parts.push(`<line x1="${mid}" y1="${y}" x2="${mid}" y2="${nextStemTop}" stroke="#8b98aa" stroke-width="1.8"/>`);
+        pushStemLabel(mid, y, nextStemTop, currentRoundLabel, '#64748b', currentRoundLabel==='128강'?9.2:10.2);
+      }
     }
-    const label=globalRemain===1?'우승팀':globalRemain===2?'결승':globalRemain===4?'준결승':stage51038FieldRoundLabel(globalRemain);
-    const labelTone=globalRemain<=2?'#9a6700':'#64748b';
-    edgeRoundTags.push({label,y:y-10,emphasis:globalRemain<=4,tone:labelTone});
   }
 
-  // Edge round labels near the sheet separation point. The final sheet also mirrors them on the right edge.
-  const roundRailRight=page.index===plan.pages.length-1?true:pairLeft;
-  const roundRailX=roundRailRight?W-16:16;
-  const roundRailAnchor=roundRailRight?'end':'start';
-  edgeRoundTags.forEach((tag,idx)=>{
-    const fontSize=idx===0?13:12;
-    const tone=tag.tone||(tag.emphasis?'#17365f':'#64748b');
-    parts.push(`<text x="${roundRailX}" y="${tag.y}" text-anchor="${roundRailAnchor}" font-size="${fontSize}" font-weight="900" fill="${tone}">${printEscape(tag.label)}</text>`);
-  });
-
-  // Connected physical sheets: the branches continue through the paper seams to the real final.
+  // 연결부 상단 라운드와 최종 입상 정보.
   const rootX=W/2;
   const semifinalY=112;
   const finalY=78;
@@ -8891,25 +8884,27 @@ function stage51038FieldPageSvg(plan,page,slots){
   const writeLine=(value,len='________________')=>value?printEscape(short(value)):len;
 
   if(plan.size===64){
-    // 1장과 2장의 각 32슬롯 우승자가 접합부에서 결승을 치르고 위로 우승팀이 이어진다.
     const seamX=page.index===0?W:0;
     parts.push(`<path d="M ${rootX} ${topY} V ${semifinalY} H ${seamX}" fill="none" stroke="#7b8798" stroke-width="2.5"/>`);
+    pushStemLabel(rootX, topY, semifinalY, '4강', '#64748b', 10.8);
     if(page.index===1){
       parts.push(`<line x1="0" y1="${semifinalY}" x2="0" y2="${crownY+6}" stroke="#17365f" stroke-width="3"/>`);
+      pushStemLabel(16, semifinalY, crownY+6, '결승', '#9a6700', 11);
       parts.push(`<text x="18" y="${crownY}" text-anchor="start" font-size="15" font-weight="900" fill="#9a6700">🏆 우승팀 · ${writeLine(officialChampion,'_______________')}</text>`);
     }
   }else if(plan.size>=128){
-    // 각 32슬롯 장 → 4강 진출. 1-2장, 3-4장이 각각 준결승으로 연결된다.
     const semifinalSeamX=page.index%2===0?W:0;
     parts.push(`<path d="M ${rootX} ${topY} V ${semifinalY} H ${semifinalSeamX}" fill="none" stroke="#7b8798" stroke-width="2.5"/>`);
+    pushStemLabel(rootX, topY, semifinalY, '8강', '#64748b', 10.8);
 
-    // 1-2장 준결승 승자는 2장 상단을 지나 2-3장 중앙 접합부의 결승으로 이동.
     if(page.index===1){
       parts.push(`<path d="M 0 ${semifinalY} V ${finalY} H ${W}" fill="none" stroke="#17365f" stroke-width="2.8"/>`);
+      pushStemLabel(16, semifinalY, finalY, '4강', '#64748b', 10.8);
     }
-    // 3-4장 준결승 승자는 3장 상단을 지나 같은 중앙 접합부로 이동.
     if(page.index===2){
       parts.push(`<path d="M ${W} ${semifinalY} V ${finalY} H 0 V ${crownY+6}" fill="none" stroke="#17365f" stroke-width="2.8"/>`);
+      pushStemLabel(W-16, semifinalY, finalY, '4강', '#64748b', 10.8);
+      pushStemLabel(16, finalY, crownY+6, '결승', '#9a6700', 11);
       parts.push(`<text x="18" y="${crownY}" text-anchor="start" font-size="15" font-weight="900" fill="#9a6700">🏆 우승팀 · ${writeLine(officialChampion,'_______________')}</text>`);
     }
   }
@@ -21404,3 +21399,5 @@ console.info('[230MATCH] 5.10.45 ready · clean connected final bracket + auto p
 console.info('[230MATCH] 5.10.46 ready · field bracket blanks until confirmed + admin prize signature sheet');
 
 console.info('[230MATCH] 5.10.47 ready · prize amounts + tax/net columns + detailed calculation guide');
+
+console.info('[230MATCH] 5.10.48 ready · field bracket inner vertical round labels + side labels removed');
