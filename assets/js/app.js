@@ -9035,14 +9035,18 @@ function stage51047AmountForPlace(place,amounts){
 }
 function stage51047TaxEstimate(gross,enabled=true){
   gross=Math.max(0,Number(gross)||0);
-  if(!enabled||!gross)return {gross,expense:0,taxable:0,incomeTax:0,localTax:0,totalTax:0,net:gross,effectiveRate:0};
-  // 안내용 자동계산: 필요경비 80% 적용 상금 가정.
+  if(!enabled||!gross)return {gross,expense:0,taxable:0,incomeTax:0,localTax:0,totalTax:0,net:gross,effectiveRate:0,taxFreeMinimum:false};
+  // 안내용 자동계산: 다수가 순위 경쟁하는 대회 상금의 필요경비 80% 적용 가정.
   const expense=Math.floor(gross*0.80);
   const taxable=Math.max(0,gross-expense);
+  // 소득세법상 기타소득 과세최저한: 건별 기타소득금액이 5만원 이하이면 소득세를 과세하지 않음.
+  if(taxable<=50000){
+    return {gross,expense,taxable,incomeTax:0,localTax:0,totalTax:0,net:gross,effectiveRate:0,taxFreeMinimum:true};
+  }
   const incomeTax=Math.floor(taxable*0.20);
   const localTax=Math.floor(incomeTax*0.10);
   const totalTax=incomeTax+localTax;
-  return {gross,expense,taxable,incomeTax,localTax,totalTax,net:Math.max(0,gross-totalTax),effectiveRate:gross?totalTax/gross:0};
+  return {gross,expense,taxable,incomeTax,localTax,totalTax,net:Math.max(0,gross-totalTax),effectiveRate:gross?totalTax/gross:0,taxFreeMinimum:false};
 }
 function stage51047Money(v){
   v=Number(v)||0;
@@ -9075,10 +9079,10 @@ function printPrizeSignatureHtml(){
   const calcEnabled=amounts.autoTax;
   const showAdminGuide=stage51053ShowAdminGuide();
   const calcNote=calcEnabled
-    ?`자동계산 금액은 복식 2인 균등 분배를 가정한 예상액입니다. 실제 지급·신고 금액이 다르면 현장에서 직접 수정하세요.`
+    ?`자동계산 금액은 복식 2인 균등 분배를 가정한 예상액입니다. 개인별 기타소득금액(상금-필요경비)이 5만원 이하이면 과세최저한으로 원천징수액을 0원 처리합니다. 실제 지급·신고 금액이 다르면 현장에서 직접 수정하세요.`
     :`자동계산을 사용하지 않습니다. 상금액·공제액·실지급액은 현장에서 직접 기재하세요.`;
   const adminNote=calcEnabled
-    ?`관리자 참고: 팀 상금 총액을 2인 기준으로 반씩 나눈 뒤, 각 개인 금액에 대해 필요경비 80% 공제 가정 → 기타소득금액 20% × 소득세 20% → 지방소득세는 소득세의 10%로 계산합니다. 따라서 1인 지급액 기준 실효세율은 통상 약 4.4%입니다.`
+    ?`관리자 참고: 팀 상금 총액을 2인 기준으로 반씩 나눈 뒤 각 개인 지급액에 필요경비 80%를 적용합니다. 이때 개인별 기타소득금액이 5만원 이하이면 과세최저한으로 원천징수하지 않고, 5만원을 초과하면 기타소득금액의 20% 소득세와 그 소득세의 10% 지방소득세를 계산합니다.`
     :`관리자 참고: 자동계산이 꺼져 있으므로 세액·실지급액은 대회 운영자가 직접 확인 후 기재하세요.`;
   const safeRows=(rows.length?rows:[{place:'-',name:'',gross:0}]);
   const rowHtml=safeRows.map((row,idx)=>{
@@ -9094,9 +9098,9 @@ function printPrizeSignatureHtml(){
       `<td class="stage51053-cell-pad">${stage51053Dual(line,line,'stage51053-left')}</td>`+
       `<td class="stage51053-cell-pad">${stage51053Dual(line,line,'stage51053-left')}</td>`+
       `<td class="stage51053-cell-pad center">${stage51053Dual(grossTop?`<span class="stage51053-money">${stage51047Money(grossTop)}</span>`:line,grossBottom?`<span class="stage51053-money">${stage51047Money(grossBottom)}</span>`:line,'stage51053-mid')}</td>`+
-      `<td class="stage51053-cell-pad center">${stage51053Dual(grossTop&&calcEnabled?`<span class="stage51053-money">${stage51047Money(taxTop.incomeTax)}</span>`:line,grossBottom&&calcEnabled?`<span class="stage51053-money">${stage51047Money(taxBottom.incomeTax)}</span>`:line,'stage51053-mid')}</td>`+
-      `<td class="stage51053-cell-pad center">${stage51053Dual(grossTop&&calcEnabled?`<span class="stage51053-money">${stage51047Money(taxTop.localTax)}</span>`:line,grossBottom&&calcEnabled?`<span class="stage51053-money">${stage51047Money(taxBottom.localTax)}</span>`:line,'stage51053-mid')}</td>`+
-      `<td class="stage51053-cell-pad center">${stage51053Dual(grossTop&&calcEnabled?`<span class="stage51053-money">${stage51047Money(taxTop.totalTax)}</span>`:line,grossBottom&&calcEnabled?`<span class="stage51053-money">${stage51047Money(taxBottom.totalTax)}</span>`:line,'stage51053-mid')}</td>`+
+      `<td class="stage51053-cell-pad center">${stage51053Dual(grossTop&&calcEnabled?`<span class="stage51053-money">${taxTop.incomeTax?stage51047Money(taxTop.incomeTax):'0원'}</span>${taxTop.taxFreeMinimum?'<span class="stage51053-sub">과세최저한</span>':''}`:line,grossBottom&&calcEnabled?`<span class="stage51053-money">${taxBottom.incomeTax?stage51047Money(taxBottom.incomeTax):'0원'}</span>${taxBottom.taxFreeMinimum?'<span class="stage51053-sub">과세최저한</span>':''}`:line,'stage51053-mid')}</td>`+
+      `<td class="stage51053-cell-pad center">${stage51053Dual(grossTop&&calcEnabled?`<span class="stage51053-money">${taxTop.localTax?stage51047Money(taxTop.localTax):'0원'}</span>`:line,grossBottom&&calcEnabled?`<span class="stage51053-money">${taxBottom.localTax?stage51047Money(taxBottom.localTax):'0원'}</span>`:line,'stage51053-mid')}</td>`+
+      `<td class="stage51053-cell-pad center">${stage51053Dual(grossTop&&calcEnabled?`<span class="stage51053-money">${taxTop.totalTax?stage51047Money(taxTop.totalTax):'0원'}</span>`:line,grossBottom&&calcEnabled?`<span class="stage51053-money">${taxBottom.totalTax?stage51047Money(taxBottom.totalTax):'0원'}</span>`:line,'stage51053-mid')}</td>`+
       `<td class="stage51053-cell-pad center">${stage51053Dual(grossTop&&calcEnabled?`<span class="stage51053-money">${stage51047Money(taxTop.net)}</span>`:line,grossBottom&&calcEnabled?`<span class="stage51053-money">${stage51047Money(taxBottom.net)}</span>`:line,'stage51053-mid')}</td>`+
       `<td class="stage51053-cell-pad">${stage51053Dual(line,line,'stage51053-mid')}</td>`+
       `<td class="stage51053-cell-pad">${stage51053Dual(consent,consent,'stage51053-consent')}</td>`+
@@ -9106,7 +9110,7 @@ function printPrizeSignatureHtml(){
   return printHeader('입상자 상금 수령·개인정보 제공 동의 서명부')+
     `<div class="stage51046-signature-wrap">`+
       `<div class="stage51053-signature-mininote"><b>필수 안내</b> · 본 서명부는 상금 지급, 세무 신고, 개인정보 수집·이용 동의 확인용입니다. 수령인은 본인 칸에 직접 작성·서명해 주세요. ${printEscape(calcNote)}</div>`+
-      `${showAdminGuide?`<div class="stage51046-signature-notice"><b>관리자 상세 안내</b><br>${printEscape(adminNote)}<br><b>참고</b>: 공동3위도 실제 상금 지급 대상이면 원칙적으로 같은 계산 구조를 적용합니다. 다만 지급 방식과 세무 기준에 따라 실제 세액은 달라질 수 있습니다.</div>`:''}`+
+      `${showAdminGuide?`<div class="stage51046-signature-notice"><b>관리자 상세 안내</b><br>${printEscape(adminNote)}<br><b>참고</b>: 공동3위도 같은 계산 구조를 적용하되, 개인별 기타소득금액이 5만원 이하이면 과세최저한으로 원천징수하지 않습니다. 다만 실제 지급 단위와 세무 기준에 따라 달라질 수 있습니다.</div>`:''}`+
       `<div class="stage51046-signature-meta"><div><b>선택 입상구분</b><br>${printEscape(summary)}</div><div><b>대회명</b><br>${printEscape(state.tournament?.name||'230MATCH 대회')}</div><div><b>부서</b><br>${printEscape(state.tournament?.division||'부서 미설정')}</div></div>`+
       `<table class="stage51046-signature-table"><colgroup>`+
         `<col style="width:28px">`+
@@ -9135,7 +9139,7 @@ function printPrizeSignatureHtml(){
         `<th>서명</th>`+
         `<th>동의</th>`+
       `</tr></thead><tbody>${rowHtml}</tbody></table>`+
-      `${showAdminGuide?`<div class="stage51046-footnote"><b>관리자 참고</b><ol><li><b>복식 2인 기준</b>: 각 행은 같은 팀 선수 2명이 상·하 칸에 각각 작성하도록 구성했습니다. 금액도 2명 기준 균등 분배로 자동 계산합니다.</li><li><b>공동3위 세금</b>: 공동3위도 상금 지급이면 일반적으로 같은 기타소득 원천징수 구조로 계산합니다.</li><li><b>최종 확인</b>: 비거주자 여부, 소액부징수, 지급 성격 등에 따라 실제 세액은 달라질 수 있으므로 지급 전 최종 확인이 필요합니다.</li></ol></div>`:`<div class="stage51046-footnote"><b>간단 안내</b> · 자동계산 금액은 예상치이며, 실제 지급 금액이 다르면 현장에서 수정하여 사용하세요.</div>`}`+
+      `${showAdminGuide?`<div class="stage51046-footnote"><b>관리자 참고</b><ol><li><b>복식 2인 기준</b>: 각 행은 같은 팀 선수 2명이 상·하 칸에 각각 작성하도록 구성했습니다. 금액도 2명 기준 균등 분배로 자동 계산합니다.</li><li><b>과세최저한</b>: 개인별 건별 기타소득금액(상금-필요경비)이 5만원 이하이면 소득세를 과세하지 않습니다. 예: 팀당 20만원을 2명이 10만원씩 수령하면 필요경비 80% 적용 후 기타소득금액은 1인 2만원이므로 원천징수 0원으로 계산합니다.</li><li><b>최종 확인</b>: 비거주자 여부, 소액부징수, 지급 성격 등에 따라 실제 세액은 달라질 수 있으므로 지급 전 최종 확인이 필요합니다.</li></ol></div>`:`<div class="stage51046-footnote"><b>간단 안내</b> · 자동계산 금액은 예상치이며, 실제 지급 금액이 다르면 현장에서 수정하여 사용하세요.</div>`}`+
     `</div>`;
 }
 
@@ -9164,10 +9168,10 @@ function printPrizeSignatureHtml(){
         <label><input type="checkbox" id="stage51046PrizeRunnerUp" checked> 준우승</label>
         <label><input type="checkbox" id="stage51046PrizeThirds" checked> 공동 3위</label>
         <label><input type="checkbox" id="stage51046PrizeQuarterfinals"> 8강</label>
-        <label>우승 상금(원)<input type="number" id="stage51047PrizeChampionAmount" min="0" step="1000" inputmode="numeric" placeholder="예: 900000"></label>
-        <label>준우승 상금(원)<input type="number" id="stage51047PrizeRunnerAmount" min="0" step="1000" inputmode="numeric" placeholder="예: 400000"></label>
-        <label>공동3위 1명당(원)<input type="number" id="stage51047PrizeThirdAmount" min="0" step="1000" inputmode="numeric" placeholder="예: 200000"></label>
-        <label>8강 1명당(원)<input type="number" id="stage51047PrizeQuarterAmount" min="0" step="1000" inputmode="numeric" placeholder="선택"></label>
+        <label>우승 팀상금 총액(원)<input type="number" id="stage51047PrizeChampionAmount" min="0" step="1000" inputmode="numeric" placeholder="예: 900000"></label>
+        <label>준우승 팀상금 총액(원)<input type="number" id="stage51047PrizeRunnerAmount" min="0" step="1000" inputmode="numeric" placeholder="예: 400000"></label>
+        <label>공동3위 팀당 총액(원)<input type="number" id="stage51047PrizeThirdAmount" min="0" step="1000" inputmode="numeric" placeholder="예: 200000"></label>
+        <label>8강 팀당 총액(원)<input type="number" id="stage51047PrizeQuarterAmount" min="0" step="1000" inputmode="numeric" placeholder="선택"></label>
         <label><input type="checkbox" id="stage51047TaxAutoCalc" checked> 기타소득 원천징수 예상액 자동계산</label>
         <label><input type="checkbox" id="stage51053AdminGuidePrint"> 관리자 상세 설명도 함께 인쇄</label>
         <small>선수용 필수 안내는 항상 인쇄됩니다. 관리자 참고용 상세 설명은 위 체크를 켰을 때만 추가 인쇄됩니다.</small>`;
@@ -21439,3 +21443,5 @@ console.info('[230MATCH] 5.10.49 ready · field bracket horizontal round labels 
 console.info('[230MATCH] 5.10.50 ready · field bracket label fine-tuning + signature column rebalance');
 console.info('[230MATCH] 5.10.51 ready · field stem overshoot cleanup + prize signature A4 landscape print');
 console.info('[230MATCH] 5.10.53 ready · prize signature column rebalance + optional admin guide print');
+
+console.info('[230MATCH] 5.10.54 ready · prize tax minimum threshold (기타소득금액 5만원 이하 비과세)');
