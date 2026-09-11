@@ -21820,6 +21820,8 @@ console.info('[230MATCH] 5.10.61 ready · admin participant replacement with own
     return v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(v));
   }
   function hasStarted(){
+    // 조편성/코트 배정만으로 생성되는 대기시각(waitStartedAt)은 실제 경기 시작으로 보지 않는다.
+    // 실제 경기중·완료, 시작/완료시각, 승자, 점수 입력이 있을 때만 수동조정을 잠근다.
     return matches().some(m=>m?.status==='playing'||m?.status==='completed'||m?.winner||m?.winnerId||m?.startedAt||m?.completedAt||hasScoreValue(m?.scoreA)||hasScoreValue(m?.scoreB));
   }
   function ensureStyle(){
@@ -21986,3 +21988,4 @@ console.info('[230MATCH] 5.10.61 ready · admin participant replacement with own
 console.info('[230MATCH] 5.10.62 ready · admin prelim group manual move/swap after court assignment');
 console.info('[230MATCH] 5.10.63 ready · prelim group editor button click/modal reliability fix');
 console.info('[230MATCH] 5.10.64 ready · prelim group editor false-start lock fix (null score safe)');
+console.info('[230MATCH] 5.10.65 ready · prelim group editor repeat-use fix (waiting timestamp no longer locks editor)');
