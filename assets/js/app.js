@@ -8808,12 +8808,13 @@ function stage51038FieldPageSvg(plan,page,slots){
   const roundSpace=(slotTop-topY)/(localDepth||1);
   const parts=[];
 
-  const pushStemLabel=(x,y1,y2,label,tone='#64748b',size=10.5)=>{
-    if(!label||!Number.isFinite(x)||!Number.isFinite(y1)||!Number.isFinite(y2))return;
-    const len=Math.abs(y2-y1);
-    if(len<26)return;
-    const cy=(y1+y2)/2;
-    parts.push(`<text x="${x}" y="${cy}" text-anchor="middle" dominant-baseline="middle" font-size="${size}" font-weight="900" fill="${tone}" opacity="0.95" transform="rotate(-90 ${x} ${cy})">${printEscape(label)}</text>`);
+  const pushRoundLabel=(x1,x2,y,label,tone='#64748b',size=10.8)=>{
+    if(!label||!Number.isFinite(x1)||!Number.isFinite(x2)||!Number.isFinite(y))return;
+    const width=Math.abs(x2-x1);
+    if(width<42)return;
+    const cx=(x1+x2)/2;
+    const ty=y+16;
+    parts.push(`<text x="${cx}" y="${ty}" text-anchor="middle" font-size="${size}" font-weight="900" fill="${tone}" opacity="0.98" paint-order="stroke" stroke="rgba(255,255,255,0.92)" stroke-width="3" stroke-linejoin="round">${printEscape(label)}</text>`);
   };
 
   parts.push(`<text x="${W/2}" y="37" text-anchor="middle" font-size="27" font-weight="900" fill="#10264a">${printEscape(state.tournament?.name||'230MATCH 대회')} · 본선 현장용 대진표</text>`);
@@ -8837,9 +8838,6 @@ function stage51038FieldPageSvg(plan,page,slots){
     const stroke=entry.blank?'#aeb9c7':bye?'#cbd5e1':unresolved?'#d8a928':'#90a9c8';
     parts.push(`<rect x="${x+1}" y="${slotTop}" width="${Math.max(4,slotW-2)}" height="${slotBottom-slotTop}" fill="${fill}" stroke="${stroke}" stroke-width="1"/>`);
     parts.push(`<text x="${cx}" y="${slotTop+13}" text-anchor="middle" font-size="9" font-weight="800" fill="#64748b">${abs+1}</text>`);
-    if(meta.label && !unresolved && !entry.blank){
-      parts.push(`<text x="${cx}" y="${slotBottom-7}" text-anchor="middle" font-size="7.5" font-weight="800" fill="#7c8da3" transform="rotate(-90 ${cx} ${slotBottom-7})">${printEscape(meta.label)}</text>`);
-    }
     if(name){
       parts.push(`<text x="${cx}" y="${(slotTop+slotBottom)/2}" text-anchor="middle" dominant-baseline="middle" font-size="${unresolved?11:10}" font-weight="900" fill="${unresolved?'#9a6700':'#17365f'}" transform="rotate(-90 ${cx} ${(slotTop+slotBottom)/2})">${printEscape(name)}</text>`);
     }else if(entry.blank){
@@ -8848,7 +8846,7 @@ function stage51038FieldPageSvg(plan,page,slots){
     parts.push(`<line x1="${cx}" y1="${slotTop}" x2="${cx}" y2="${slotTop-roundSpace+5}" stroke="${bye?'#c7ced7':'#97a6b8'}" stroke-width="1.6"/>`);
   }
 
-  // 가지 내부 세로축 전체에 현재 라운드를 반복 표시한다.
+  // 각 라운드 표시는 세로선이 아니라, 두 세로선 사이 가로선 바로 아래에 가로 텍스트로 표시한다.
   for(let r=1;r<=localDepth;r++){
     const group=2**r;
     const groups=count/group;
@@ -8860,11 +8858,12 @@ function stage51038FieldPageSvg(plan,page,slots){
       const lcx=(start+group/4)*slotW;
       const rcx=(start+group*3/4)*slotW;
       const mid=(lcx+rcx)/2;
-      parts.push(`<path d="M ${lcx} ${prevY} V ${y+15} H ${mid} V ${y} M ${rcx} ${prevY} V ${y+15} H ${mid}" fill="none" stroke="#8b98aa" stroke-width="1.8"/>`);
+      const connectorY=y+15;
+      parts.push(`<path d="M ${lcx} ${prevY} V ${connectorY} H ${mid} V ${y} M ${rcx} ${prevY} V ${connectorY} H ${mid}" fill="none" stroke="#8b98aa" stroke-width="1.8"/>`);
+      pushRoundLabel(lcx, rcx, connectorY, currentRoundLabel, '#64748b', currentRoundLabel==='128강'?9.4:(currentRoundLabel==='64강'?10.1:10.9));
       if(r<localDepth){
         const nextStemTop=y-roundSpace+15;
         parts.push(`<line x1="${mid}" y1="${y}" x2="${mid}" y2="${nextStemTop}" stroke="#8b98aa" stroke-width="1.8"/>`);
-        pushStemLabel(mid, y, nextStemTop, currentRoundLabel, '#64748b', currentRoundLabel==='128강'?9.2:10.2);
       }
     }
   }
@@ -8886,25 +8885,22 @@ function stage51038FieldPageSvg(plan,page,slots){
   if(plan.size===64){
     const seamX=page.index===0?W:0;
     parts.push(`<path d="M ${rootX} ${topY} V ${semifinalY} H ${seamX}" fill="none" stroke="#7b8798" stroke-width="2.5"/>`);
-    pushStemLabel(rootX, topY, semifinalY, '4강', '#64748b', 10.8);
     if(page.index===1){
+      pushRoundLabel(0, rootX, semifinalY, '결승', '#9a6700', 11.4);
       parts.push(`<line x1="0" y1="${semifinalY}" x2="0" y2="${crownY+6}" stroke="#17365f" stroke-width="3"/>`);
-      pushStemLabel(16, semifinalY, crownY+6, '결승', '#9a6700', 11);
       parts.push(`<text x="18" y="${crownY}" text-anchor="start" font-size="15" font-weight="900" fill="#9a6700">🏆 우승팀 · ${writeLine(officialChampion,'_______________')}</text>`);
     }
   }else if(plan.size>=128){
     const semifinalSeamX=page.index%2===0?W:0;
     parts.push(`<path d="M ${rootX} ${topY} V ${semifinalY} H ${semifinalSeamX}" fill="none" stroke="#7b8798" stroke-width="2.5"/>`);
-    pushStemLabel(rootX, topY, semifinalY, '8강', '#64748b', 10.8);
 
     if(page.index===1){
       parts.push(`<path d="M 0 ${semifinalY} V ${finalY} H ${W}" fill="none" stroke="#17365f" stroke-width="2.8"/>`);
-      pushStemLabel(16, semifinalY, finalY, '4강', '#64748b', 10.8);
+      pushRoundLabel(0, W, finalY, '준결승', '#64748b', 11);
     }
     if(page.index===2){
       parts.push(`<path d="M ${W} ${semifinalY} V ${finalY} H 0 V ${crownY+6}" fill="none" stroke="#17365f" stroke-width="2.8"/>`);
-      pushStemLabel(W-16, semifinalY, finalY, '4강', '#64748b', 10.8);
-      pushStemLabel(16, finalY, crownY+6, '결승', '#9a6700', 11);
+      pushRoundLabel(0, W, finalY, '결승', '#9a6700', 11.4);
       parts.push(`<text x="18" y="${crownY}" text-anchor="start" font-size="15" font-weight="900" fill="#9a6700">🏆 우승팀 · ${writeLine(officialChampion,'_______________')}</text>`);
     }
   }
@@ -8957,21 +8953,24 @@ function printFieldBracketHtml(){
     .stage51046-signature-options label{display:flex;align-items:center;gap:6px;font-size:12px;color:#334155}
     .stage51046-signature-options input[type="number"]{min-width:0;width:100%;max-width:150px;min-height:34px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;background:#fff}
     .stage51046-signature-options small{grid-column:1/-1;font-size:10px;line-height:1.45;color:#64748b}
-    .stage51046-signature-wrap{display:grid;gap:10px}
-    .stage51046-signature-notice{padding:10px 12px;border:1px solid #d7e1ee;border-radius:10px;background:#f8fbff;font-size:11px;line-height:1.55;color:#334155}
+    .stage51046-signature-wrap{display:grid;gap:8px;padding:2mm 1.5mm 0}
+    .stage51046-signature-notice{padding:8px 10px;border:1px solid #d7e1ee;border-radius:10px;background:#f8fbff;font-size:10.2px;line-height:1.45;color:#334155}
     .stage51046-signature-notice b{color:#17365f}
-    .stage51046-signature-meta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;font-size:11px;color:#334155}
-    .stage51046-signature-meta div{padding:8px 10px;border:1px solid #d7e1ee;border-radius:10px;background:#fbfdff}
-    .stage51046-signature-table{width:100%;border-collapse:collapse;font-size:8.7px;table-layout:fixed}
-    .stage51046-signature-table b{font-size:9px}
-    .stage51046-signature-table th,.stage51046-signature-table td{border:1px solid #94a3b8;padding:6px 5px;vertical-align:middle;word-break:break-word}
+    .stage51046-signature-meta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;font-size:10.2px;color:#334155}
+    .stage51046-signature-meta div{padding:7px 9px;border:1px solid #d7e1ee;border-radius:10px;background:#fbfdff}
+    .stage51046-signature-table{width:100%;border-collapse:collapse;font-size:8.15px;table-layout:fixed}
+    .stage51046-signature-table b{font-size:8.55px}
+    .stage51046-signature-table th,.stage51046-signature-table td{border:1px solid #94a3b8;padding:5px 4px;vertical-align:middle;word-break:keep-all;line-height:1.26}
     .stage51046-signature-table th{background:#eff6ff;color:#17365f;font-weight:900}
     .stage51046-signature-table td.center,.stage51046-signature-table th.center{text-align:center}
-    .stage51046-signature-line{display:block;height:16px;border-bottom:1px solid #cbd5e1}
+    .stage51050-sign-cell .stage51046-signature-line{height:18px}
+    .stage51050-addr-cell .stage51046-signature-line{height:18px}
+    .stage51050-rrn-cell .stage51046-signature-line{height:18px}
+    .stage51046-signature-line{display:block;height:14px;border-bottom:1px solid #cbd5e1}
     .stage51046-consent-cell{font-size:9.8px;line-height:1.35}
-    .stage51046-footnote{font-size:10px;line-height:1.5;color:#475569}
-    .stage51046-footnote ol{margin:6px 0 0 18px;padding:0}
-    .stage51046-footnote li{margin:2px 0}
+    .stage51046-footnote{font-size:9.4px;line-height:1.36;color:#475569}
+    .stage51046-footnote ol{margin:5px 0 0 16px;padding:0}
+    .stage51046-footnote li{margin:1px 0}
   `;
   document.head.appendChild(st);
 })();
@@ -9066,32 +9065,45 @@ function printPrizeSignatureHtml(){
     `<div class="stage51046-signature-wrap">`+
       `<div class="stage51046-signature-notice"><b>상금 지급·세무 안내</b><br>${printEscape(calcNote)}<br><b>중요:</b> 본 자동계산은 ‘불특정 다수가 순위 경쟁하는 대회의 상금’으로 보아 필요경비 80%가 인정되는 경우를 가정한 <b>예상치</b>입니다. 실제 적용 여부는 대회 참가자 범위와 지급 성격 등 사실관계에 따라 달라질 수 있습니다.</div>`+
       `<div class="stage51046-signature-meta"><div><b>선택 입상구분</b><br>${printEscape(summary)}</div><div><b>대회명</b><br>${printEscape(state.tournament?.name||'230MATCH 대회')}</div><div><b>부서</b><br>${printEscape(state.tournament?.division||'부서 미설정')}</div></div>`+
-      `<table class="stage51046-signature-table"><thead><tr>`+
-        `<th class="center" style="width:32px">번호</th>`+
-        `<th class="center" style="width:56px">입상</th>`+
-        `<th style="width:90px">수령인 성명/팀</th>`+
-        `<th style="width:108px">주민등록번호</th>`+
+      `<table class="stage51046-signature-table"><colgroup>`+
+        `<col style="width:30px">`+
+        `<col style="width:54px">`+
+        `<col style="width:88px">`+
+        `<col style="width:110px">`+
+        `<col style="width:118px">`+
+        `<col style="width:62px">`+
+        `<col style="width:57px">`+
+        `<col style="width:53px">`+
+        `<col style="width:59px">`+
+        `<col style="width:66px">`+
+        `<col style="width:66px">`+
+        `<col style="width:82px">`+
+      `</colgroup><thead><tr>`+
+        `<th class="center">번호</th>`+
+        `<th class="center">입상</th>`+
+        `<th>수령인<br>성명/팀</th>`+
+        `<th>주민등록<br>번호</th>`+
         `<th>주소</th>`+
-        `<th class="center" style="width:68px">상금액</th>`+
-        `<th class="center" style="width:68px">소득세</th>`+
-        `<th class="center" style="width:64px">지방세</th>`+
-        `<th class="center" style="width:70px">공제합계</th>`+
-        `<th class="center" style="width:76px">실지급액</th>`+
-        `<th class="center" style="width:52px">서명</th>`+
-        `<th style="width:82px">동의</th>`+
+        `<th class="center">상금액</th>`+
+        `<th class="center">소득세</th>`+
+        `<th class="center">지방세</th>`+
+        `<th class="center">공제<br>합계</th>`+
+        `<th class="center">실지급<br>액</th>`+
+        `<th class="center">서명</th>`+
+        `<th>동의</th>`+
       `</tr></thead><tbody>`+
       `${(rows.length?rows:[{place:'-',name:'',gross:0,tax:stage51047TaxEstimate(0,false)}]).map((row,idx)=>`<tr>`+
         `<td class="center">${idx+1}</td>`+
         `<td class="center">${printEscape(row.place||'-')}</td>`+
         `<td>${row.name?`<b>${printEscape(row.name)}</b>`:'<span class="stage51046-signature-line"></span>'}</td>`+
-        `<td><span class="stage51046-signature-line"></span></td>`+
-        `<td><span class="stage51046-signature-line"></span></td>`+
+        `<td class="stage51050-rrn-cell"><span class="stage51046-signature-line"></span></td>`+
+        `<td class="stage51050-addr-cell"><span class="stage51046-signature-line"></span></td>`+
         `<td class="center">${row.gross?stage51047Money(row.gross):'<span class="stage51046-signature-line"></span>'}</td>`+
         `<td class="center">${row.gross&&calcEnabled?stage51047Money(row.tax.incomeTax):'<span class="stage51046-signature-line"></span>'}</td>`+
         `<td class="center">${row.gross&&calcEnabled?stage51047Money(row.tax.localTax):'<span class="stage51046-signature-line"></span>'}</td>`+
         `<td class="center">${row.gross&&calcEnabled?stage51047Money(row.tax.totalTax):'<span class="stage51046-signature-line"></span>'}</td>`+
         `<td class="center">${row.gross&&calcEnabled?stage51047Money(row.tax.net):'<span class="stage51046-signature-line"></span>'}</td>`+
-        `<td><span class="stage51046-signature-line"></span></td>`+
+        `<td class="stage51050-sign-cell"><span class="stage51046-signature-line"></span></td>`+
         `<td class="stage51046-consent-cell">□ 동의<br><span style="color:#64748b">상금 지급·세무 신고 목적 개인정보 수집·이용</span></td>`+
       `</tr>`).join('')}`+
       `</tbody></table>`+
@@ -21401,3 +21413,5 @@ console.info('[230MATCH] 5.10.46 ready · field bracket blanks until confirmed +
 console.info('[230MATCH] 5.10.47 ready · prize amounts + tax/net columns + detailed calculation guide');
 
 console.info('[230MATCH] 5.10.48 ready · field bracket inner vertical round labels + side labels removed');
+console.info('[230MATCH] 5.10.49 ready · field bracket horizontal round labels + compact signature sheet margins');
+console.info('[230MATCH] 5.10.50 ready · field bracket label fine-tuning + signature column rebalance');
