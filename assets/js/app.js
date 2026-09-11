@@ -21816,8 +21816,11 @@ console.info('[230MATCH] 5.10.61 ready · admin participant replacement with own
   function teamLabel(t){return String(t?.name||t?.teamName||t?.displayName||t?.playerName||t?.club||'이름 없음');}
   function groups(){return Array.isArray(state?.prelim?.groups)?state.prelim.groups:[];}
   function matches(){return Array.isArray(state?.prelim?.matches)?state.prelim.matches:[];}
+  function hasScoreValue(v){
+    return v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(v));
+  }
   function hasStarted(){
-    return matches().some(m=>m?.status==='playing'||m?.status==='completed'||m?.winner||m?.winnerId||m?.startedAt||m?.completedAt||Number.isFinite(Number(m?.scoreA))||Number.isFinite(Number(m?.scoreB)));
+    return matches().some(m=>m?.status==='playing'||m?.status==='completed'||m?.winner||m?.winnerId||m?.startedAt||m?.completedAt||hasScoreValue(m?.scoreA)||hasScoreValue(m?.scoreB));
   }
   function ensureStyle(){
     if(document.getElementById(STYLE_ID))return;
@@ -21982,3 +21985,4 @@ console.info('[230MATCH] 5.10.61 ready · admin participant replacement with own
 })();
 console.info('[230MATCH] 5.10.62 ready · admin prelim group manual move/swap after court assignment');
 console.info('[230MATCH] 5.10.63 ready · prelim group editor button click/modal reliability fix');
+console.info('[230MATCH] 5.10.64 ready · prelim group editor false-start lock fix (null score safe)');
