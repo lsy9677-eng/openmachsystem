@@ -8812,7 +8812,7 @@ function stage51038FieldPageSvg(plan,page,slots){
   parts.push(`<text x="${W/2}" y="67" text-anchor="middle" font-size="16" font-weight="700" fill="#53657d">${printEscape(state.tournament?.division||'')} · A3 가로 · ${page.index+1}/${plan.total}장 · 슬롯 ${page.start+1}~${page.end}</text>`);
 
   // guide
-  parts.push(`<text x="26" y="104" font-size="14" font-weight="800" fill="#64748b">아래 1회전 팀명 → 위로 진행 · 승리팀 이름을 빈 선에 적고 굵은 매직으로 승리 경로를 따라 표시</text>`);
+  parts.push(`<text x="26" y="104" font-size="14" font-weight="800" fill="#64748b">아래 1회전 팀명 → 위로 진행 · 승리팀의 진행 경로를 굵은 매직으로 선만 따라 표시</text>`);
   if(plan.size===64){
     parts.push(`<rect x="${W-430}" y="86" width="400" height="56" rx="8" fill="#fff8e1" stroke="#d6a928" stroke-width="1.5"/>`);
     parts.push(`<text x="${W-414}" y="108" font-size="13" font-weight="900" fill="#8a6500">결승 기록</text>`);
@@ -8864,8 +8864,6 @@ function stage51038FieldPageSvg(plan,page,slots){
       const rcx=(start+group*3/4)*slotW;
       const mid=(lcx+rcx)/2;
       parts.push(`<path d="M ${lcx} ${prevY} V ${y+15} H ${rcx} M ${rcx} ${prevY} V ${y+15} H ${mid} V ${y}" fill="none" stroke="#8b98aa" stroke-width="1.8"/>`);
-      const writeW=Math.min(180,Math.max(44,group*slotW*.34));
-      parts.push(`<line x1="${mid-writeW/2}" y1="${y}" x2="${mid+writeW/2}" y2="${y}" stroke="#334155" stroke-width="2.1"/>`);
       if(r<localDepth)parts.push(`<line x1="${mid}" y1="${y}" x2="${mid}" y2="${y-roundSpace+15}" stroke="#8b98aa" stroke-width="1.8"/>`);
     }
     const label=globalRemain===1?'우승팀':globalRemain===2?'결승 진출팀':globalRemain===4?'4강 진출팀':stage51038FieldRoundLabel(globalRemain);
@@ -8875,9 +8873,8 @@ function stage51038FieldPageSvg(plan,page,slots){
   // Strong top destination line.
   const topRemain=plan.size/count;
   const topLabel=topRemain===1?'우승팀':topRemain===2?'결승 진출팀':topRemain===4?'4강 진출팀':`${topRemain}강 진출팀`;
-  parts.push(`<rect x="${W/2-145}" y="${topY-42}" width="290" height="54" rx="8" fill="#fffdf4" stroke="#c79a24" stroke-width="2"/>`);
-  parts.push(`<text x="${W/2}" y="${topY-21}" text-anchor="middle" font-size="13" font-weight="900" fill="#8a6500">${topLabel}</text>`);
-  parts.push(`<line x1="${W/2-112}" y1="${topY-4}" x2="${W/2+112}" y2="${topY-4}" stroke="#9a6700" stroke-width="2.3"/>`);
+  parts.push(`<rect x="${W/2-145}" y="${topY-42}" width="290" height="40" rx="8" fill="#fffdf4" stroke="#c79a24" stroke-width="2"/>`);
+  parts.push(`<text x="${W/2}" y="${topY-19}" text-anchor="middle" font-size="13" font-weight="900" fill="#8a6500">${topLabel}</text>`);
 
   return `<section class="stage51038-field-page">
     <svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="현장용 본선 대진표 ${page.index+1}장">${parts.join('')}</svg>
@@ -8908,7 +8905,7 @@ function buildPrintDocument(){
   let orientation=document.getElementById('printOrientationSelect')?.value||'portrait';
   const tone=document.getElementById('printToneSelect')?.value||'color';
   let scale=document.getElementById('printScaleSelect')?.value||'normal';
-  if(target==='bracket-field'){paper='a3';orientation='landscape';scale='normal';}
+  if(target==='bracket-field'){paper=(paper==='a3'?'a3':'a4');orientation='landscape';scale='normal';}
   const map={prelim:printPrelimHtml,'prelim-assignment':printPrelimAssignmentHtml,bracket:printBracketHtml,'bracket-field':printFieldBracketHtml,participants:printParticipantsHtml,labels:printLabelsHtml,courts:printCourtsHtml,results:printResultsHtml};
   const labels={prelim:'예선 조편성·순위표','prelim-assignment':'시합 전 조편성·코트 배정표',bracket:'본선 대진표 그대로 출력','bracket-field':'본선 현장용 수기 대진표',participants:'참가자 명단',labels:'참가자 라벨지',courts:'코트별 경기 현황',results:'최종 입상 결과표'};
   const body=(map[target]||printPrelimHtml)();
@@ -8916,8 +8913,8 @@ function buildPrintDocument(){
   const specialClass=target==='prelim-assignment'?'assignment-print-sheet':target==='bracket'?'bracket-tree-print-sheet':target==='bracket-field'?'stage51038-field-print-sheet':'';
   return {target,label:labels[target],paper,orientation,tone,scale,html:`<article class="print-sheet paper-${paper} ${orientation} ${tone} scale-${scale} ${isLabels?'label-print-sheet':''} ${specialClass}">${body}${isLabels||target==='bracket-field'?'':`<footer class="print-footer">230MATCH · ${printEscape(BUILD_LABEL)}</footer>`}</article>`};
 }
-function renderPrintPreview(){const preview=document.getElementById('printPreview');if(!preview)return;const target=document.getElementById('printTargetSelect')?.value||'prelim';const options=document.getElementById('labelPrintOptions');if(options)options.hidden=target!=='labels';const paper=document.getElementById('printPaperSelect'),orientation=document.getElementById('printOrientationSelect'),scale=document.getElementById('printScaleSelect');if(paper)paper.value='a4';if(target==='labels'){if(orientation)orientation.value='portrait';}else if(target==='prelim-assignment'){if(orientation)orientation.value='landscape';if(scale)scale.value='small';}else if(target==='bracket'){if(orientation)orientation.value='landscape';if(scale)scale.value='small';}else if(target==='bracket-field'){if(paper)paper.value='a3';if(orientation)orientation.value='landscape';if(scale)scale.value='normal';}const doc=buildPrintDocument();preview.innerHTML=doc.html;if(target==='bracket')window.__stage5940SyncClonedBracketConnectors?.(preview);const summary=document.getElementById('printPreviewSummary');if(summary)summary.textContent=target==='labels'?`${doc.label} · 12×40mm · A4 세로 · ${document.getElementById('labelStatusSelect')?.selectedOptions?.[0]?.textContent||''}`:target==='bracket-field'?`${doc.label} · A3 가로 · ${stage51038FieldPagePlan().total}장 · ${stage51040FieldMode()==='current'?'실제 대진':'테스트 빈 양식'}`:`${doc.label} · ${doc.paper.toUpperCase()} · ${doc.orientation==='landscape'?'가로':'세로'} · ${doc.tone==='mono'?'흑백':'컬러'}`;}
-function printSelectedDocument(){const doc=buildPrintDocument();let root=document.getElementById('printOutputRoot');if(!root){root=document.createElement('div');root.id='printOutputRoot';document.body.appendChild(root);}root.innerHTML=doc.html;document.body.classList.add('printing-output');let pageStyle=null;if(doc.target==='bracket-field'){pageStyle=document.createElement('style');pageStyle.id='stage51038FieldPageRule';pageStyle.textContent='@media print{@page{size:A3 landscape;margin:5mm}}';document.head.appendChild(pageStyle);}const cleanup=()=>{document.body.classList.remove('printing-output');root.innerHTML='';pageStyle?.remove();window.removeEventListener('afterprint',cleanup);};window.addEventListener('afterprint',cleanup);if(doc.target==='bracket')window.__stage5940SyncClonedBracketConnectors?.(root,()=>setTimeout(()=>window.print(),60));else setTimeout(()=>window.print(),80);}
+function renderPrintPreview(){const preview=document.getElementById('printPreview');if(!preview)return;const target=document.getElementById('printTargetSelect')?.value||'prelim';const options=document.getElementById('labelPrintOptions');if(options)options.hidden=target!=='labels';const paper=document.getElementById('printPaperSelect'),orientation=document.getElementById('printOrientationSelect'),scale=document.getElementById('printScaleSelect');if(paper)paper.value='a4';if(target==='labels'){if(orientation)orientation.value='portrait';}else if(target==='prelim-assignment'){if(orientation)orientation.value='landscape';if(scale)scale.value='small';}else if(target==='bracket'){if(orientation)orientation.value='landscape';if(scale)scale.value='small';}else if(target==='bracket-field'){if(orientation)orientation.value='landscape';if(scale)scale.value='normal';}const doc=buildPrintDocument();preview.innerHTML=doc.html;if(target==='bracket')window.__stage5940SyncClonedBracketConnectors?.(preview);const summary=document.getElementById('printPreviewSummary');if(summary)summary.textContent=target==='labels'?`${doc.label} · 12×40mm · A4 세로 · ${document.getElementById('labelStatusSelect')?.selectedOptions?.[0]?.textContent||''}`:target==='bracket-field'?`${doc.label} · ${doc.paper.toUpperCase()} 가로 · ${stage51038FieldPagePlan().total}장 · ${stage51040FieldMode()==='current'?'실제 대진':'테스트 빈 양식'}`:`${doc.label} · ${doc.paper.toUpperCase()} · ${doc.orientation==='landscape'?'가로':'세로'} · ${doc.tone==='mono'?'흑백':'컬러'}`;}
+function printSelectedDocument(){const doc=buildPrintDocument();let root=document.getElementById('printOutputRoot');if(!root){root=document.createElement('div');root.id='printOutputRoot';document.body.appendChild(root);}root.innerHTML=doc.html;document.body.classList.add('printing-output');let pageStyle=null;if(doc.target==='bracket-field'){pageStyle=document.createElement('style');pageStyle.id='stage51038FieldPageRule';pageStyle.textContent=`@media print{@page{size:${doc.paper==='a3'?'A3':'A4'} landscape;margin:5mm}}`;document.head.appendChild(pageStyle);}const cleanup=()=>{document.body.classList.remove('printing-output');root.innerHTML='';pageStyle?.remove();window.removeEventListener('afterprint',cleanup);};window.addEventListener('afterprint',cleanup);if(doc.target==='bracket')window.__stage5940SyncClonedBracketConnectors?.(root,()=>setTimeout(()=>window.print(),60));else setTimeout(()=>window.print(),80);}
 function wrapCanvasText(ctx,text,maxWidth){const words=String(text||'').split(/\s+/),lines=[];let line='';for(const word of words){const test=line?`${line} ${word}`:word;if(ctx.measureText(test).width>maxWidth&&line){lines.push(line);line=word;}else line=test;}if(line)lines.push(line);return lines;}
 async function saveRichPrintPreviewPng(doc){
   renderPrintPreview();await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
@@ -20813,7 +20810,7 @@ console.info('[230MATCH] 5.10.34 ready · notice numbers + important/pinned badg
       @media print{
         body.printing-output #printOutputRoot .stage51038-field-print-sheet{padding:0!important;margin:0!important;background:#fff!important;box-shadow:none!important;width:auto!important;min-height:0!important}
         body.printing-output #printOutputRoot .stage51038-field-pages{display:block!important}
-        body.printing-output #printOutputRoot .stage51038-field-page{width:410mm!important;height:287mm!important;aspect-ratio:auto!important;border:0!important;box-shadow:none!important;margin:0!important;break-after:page!important;page-break-after:always!important}
+        body.printing-output #printOutputRoot .stage51038-field-page{width:100%!important;height:auto!important;aspect-ratio:420/297!important;border:0!important;box-shadow:none!important;margin:0!important;break-after:page!important;page-break-after:always!important}
         body.printing-output #printOutputRoot .stage51038-field-page:last-child{break-after:auto!important;page-break-after:auto!important}
         body.printing-output #printOutputRoot .stage51038-field-page svg{width:100%!important;height:100%!important}
       }
@@ -20876,4 +20873,36 @@ console.info('[230MATCH] 5.10.39 ready · 128드로 현장용 A3 4장 + 4번째 
   window.addEventListener('pageshow',run);
   window.addEventListener('hashchange',()=>{if(location.hash.includes('print'))run()});
   console.info('[230MATCH] 5.10.40 ready · field bracket group/rank placeholders + blank 64/128 test forms');
+})();
+
+/* 230MATCH 5.10.41 · clean branch-only field bracket + A3/A4 landscape selection */
+(function stage51041BracketPaperAndLineCleanup(){
+  function sync(){
+    const target=document.getElementById('printTargetSelect');
+    const paper=document.getElementById('printPaperSelect');
+    const orientation=document.getElementById('printOrientationSelect');
+    const noteId='stage51041BracketPaperNote';
+    let note=document.getElementById(noteId);
+    const isBracket=['bracket','bracket-field'].includes(target?.value||'');
+    if(isBracket && orientation)orientation.value='landscape';
+    if(!note && target){
+      note=document.createElement('small');
+      note.id=noteId;
+      note.style.cssText='display:block;margin-top:5px;color:#64748b;font-size:10px;line-height:1.35';
+      const host=paper?.closest('label')||paper?.parentElement||target.parentElement;
+      host?.appendChild(note);
+    }
+    if(note){
+      note.hidden=!isBracket;
+      if(isBracket)note.textContent=`본선 대진표는 ${paper?.value?.toUpperCase?.()||'A4'} 가로 출력 · A3/A4 선택 가능`;
+    }
+  }
+  const run=()=>setTimeout(sync,40);
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',run,{once:true});else run();
+  window.addEventListener('pageshow',run);
+  window.addEventListener('hashchange',()=>{if(location.hash.includes('print'))run()});
+  document.addEventListener('change',e=>{
+    if(['printTargetSelect','printPaperSelect','printOrientationSelect'].includes(e.target?.id||''))setTimeout(sync,0);
+  },true);
+  console.info('[230MATCH] 5.10.41 ready · field bracket branch-only + A3/A4 landscape print selectable');
 })();
