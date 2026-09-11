@@ -18074,11 +18074,13 @@ console.info('[230MATCH] 5.8.7 ready · tournament status supports reliable auto
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{setTimeout(install,100);setTimeout(install,800)},{once:true});
   else{setTimeout(install,100);setTimeout(install,800);}
   window.addEventListener('hashchange',()=>{if(canOperate())setTimeout(install,120);});
-  // 5.9.53: 일반회원은 이 관리자 전용 기능을 아예 관찰하지 않는다.
-  // document.body 전체(subtree:true)를 감시하는 observer라서, 관리자 화면에 없는
-  // 버튼 하나 때문에 앱 전체 DOM 변화마다 계속 깨어나던 것을 막는다.
-  const observer=new MutationObserver(()=>{if(canOperate())install();});
-  document.addEventListener('DOMContentLoaded',()=>observer.observe(document.body,{childList:true,subtree:true}),{once:true});
+  window.addEventListener('pageshow',()=>{if(canOperate())setTimeout(install,120);});
+  // 5.10.68: body 전체 MutationObserver 제거. 관리자 운영/본선 화면 진입 시에만 버튼을 재설치한다.
+  // 데이터/추첨 로직은 건드리지 않고 DOM 감시 비용만 줄인다.
+  document.addEventListener('click',e=>{
+    if(!canOperate())return;
+    if(e.target?.closest?.('[data-portal-go="operation"],[data-view="operation"],[data-mobile-view="operation"],[data-portal-go="bracket"],[data-view="bracket"],#generatePrelimBtn,#instantDrawBtn,#seededDrawBtn'))setTimeout(install,80);
+  },true);
 })();
 
 
@@ -19328,10 +19330,10 @@ console.info('[230MATCH] 5.9.65 · registration counts use one authoritative cur
     }catch(_e){}
   };
   const apply=()=>{hideLegacyRosterLinks();redirectLegacyRoster();};
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',apply,{once:true}); else apply();
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>{apply();setTimeout(apply,500);},{once:true}); else {apply();setTimeout(apply,500);}
   window.addEventListener('pageshow',()=>setTimeout(apply,0));
-  const observer=new MutationObserver(()=>hideLegacyRosterLinks());
-  try{observer.observe(document.documentElement,{childList:true,subtree:true});}catch(_e){}
+  window.addEventListener('hashchange',()=>setTimeout(apply,0));
+  // 5.10.68: 전체 document MutationObserver 제거. 레거시 메뉴는 화면 진입 시에만 정리한다.
   // 기존 저장된 주소/버튼에서 roster로 진입하려는 경우 참가신청 관리로 되돌린다.
   document.addEventListener('click',ev=>{
     const btn=ev.target?.closest?.('[data-settings-view="roster"],[data-portal-go="roster"],[data-view="roster"],[data-v6003-go="roster"]');
@@ -20853,7 +20855,10 @@ console.info('[230MATCH] 5.10.27 ready · Firestore write-loop guard + non-mutat
   const run=()=>normalize(document);
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',run,{once:true});else run();
   window.addEventListener('pageshow',run);
-  document.addEventListener('click',()=>requestAnimationFrame(run),true);
+  // 5.10.68: 모든 클릭마다 문서 전체를 훑던 스캔 제거. 관련 화면/결과 동작에서만 갱신한다.
+  document.addEventListener('click',e=>{
+    if(e.target?.closest?.('[data-portal-go="operation"],[data-view="operation"],[data-mobile-view="operation"],[data-portal-go="bracket"],[data-view="bracket"],[data-main-result],[data-prelim-result],#confirmDrawLockBtn'))requestAnimationFrame(run);
+  },true);
   console.info('[230MATCH] 5.10.29 ready · 2강→결승 / 4강→준결승 display labels');
 })();
 
@@ -22010,7 +22015,19 @@ console.info('[230MATCH] 5.10.61 ready · admin participant replacement with own
   document.addEventListener('click',e=>{
     if(e.target?.closest?.('#roleViewerBtn,[data-operation-section],[data-portal-go="operation"]'))setTimeout(()=>{injectButton();syncButtonVisibility();},40);
   },true);
-  const mo=new MutationObserver(()=>{if(!document.getElementById('stage51062OpenGroupEditor'))injectButton();else syncButtonVisibility();});
+  // 5.10.68: document.body 전체 변화마다 hasStarted()까지 재계산하던 observer 제거.
+  // 운영 화면에서 예선 준비 버튼 영역이 실제로 바뀐 경우에만 짧게 재동기화한다.
+  let stage51062SyncQueued=false;
+  const mo=new MutationObserver(mutations=>{
+    if(stage51062SyncQueued)return;
+    const relevant=mutations.some(m=>{
+      const nodes=[...m.addedNodes,...m.removedNodes].filter(n=>n?.nodeType===1);
+      return nodes.some(n=>n.matches?.('#generatePrelimBtn,#assignPrelimCourtsBtn,#stage51062OpenGroupEditor,[data-operation-section]')||n.querySelector?.('#generatePrelimBtn,#assignPrelimCourtsBtn,#stage51062OpenGroupEditor,[data-operation-section]'));
+    });
+    if(!relevant)return;
+    stage51062SyncQueued=true;
+    setTimeout(()=>{stage51062SyncQueued=false;try{injectButton();syncButtonVisibility();}catch(_e){}},80);
+  });
   try{mo.observe(document.body,{childList:true,subtree:true});}catch(_e){}
   window.stage51062OpenPrelimGroupEditor=open;
 })();
@@ -22021,3 +22038,5 @@ console.info('[230MATCH] 5.10.65 ready · prelim group editor repeat-use fix (wa
 console.info('[230MATCH] 5.10.66 ready · repeat group edit hard fix: court assignment playing/start markers ignored + fresh modal each use');
 
 console.info('[230MATCH] 5.10.67 ready · prelim group move supports exact target position');
+
+console.info('[230MATCH] 5.10.68 ready · performance guard: broad DOM observers/click scans reduced; match data logic unchanged');
