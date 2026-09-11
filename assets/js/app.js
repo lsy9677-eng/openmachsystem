@@ -21806,3 +21806,141 @@ console.info('[230MATCH] 5.10.59 ready · 예선/본선 확정(공개) 버튼명
 console.info('[230MATCH] 5.10.60 ready · 예선 추첨 전 확정(공개) 버튼 비활성 + 안내');
 
 console.info('[230MATCH] 5.10.61 ready · admin participant replacement with ownership disconnect + audit history');
+
+/* 230MATCH 5.10.62 · admin prelim group manual arrangement after court assignment */
+(function stage51062PrelimGroupManualEditor(){
+  const STYLE_ID='stage51062PrelimGroupEditorStyle';
+  const DIALOG_ID='stage51062PrelimGroupEditorDialog';
+  function esc(v){return String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
+  function teamKey(t){return String(t?.id||t?.registrationId||t?.phone||t?.name||'');}
+  function teamLabel(t){return String(t?.name||t?.teamName||t?.displayName||t?.playerName||t?.club||'이름 없음');}
+  function groups(){return Array.isArray(state?.prelim?.groups)?state.prelim.groups:[];}
+  function matches(){return Array.isArray(state?.prelim?.matches)?state.prelim.matches:[];}
+  function hasStarted(){
+    return matches().some(m=>m?.status==='playing'||m?.status==='completed'||m?.winner||m?.winnerId||m?.startedAt||m?.completedAt||Number.isFinite(Number(m?.scoreA))||Number.isFinite(Number(m?.scoreB)));
+  }
+  function ensureStyle(){
+    if(document.getElementById(STYLE_ID))return;
+    const st=document.createElement('style');st.id=STYLE_ID;st.textContent=`
+      .stage51062-group-tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+      .stage51062-dialog{width:min(760px,calc(100vw - 24px));max-height:88vh}
+      .stage51062-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+      .stage51062-field{display:grid;gap:6px}.stage51062-field label{font-weight:800;color:#17365f;font-size:12px}
+      .stage51062-field select{width:100%;min-height:42px;border:1px solid #cbd5e1;border-radius:10px;padding:0 10px;background:#fff}
+      .stage51062-help{padding:10px 12px;border:1px solid #d7e1ee;border-radius:10px;background:#f8fbff;color:#475569;font-size:12px;line-height:1.55;margin:10px 0}
+      .stage51062-preview{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:7px;max-height:280px;overflow:auto;padding:2px}
+      .stage51062-card{border:1px solid #d7e1ee;border-radius:10px;padding:8px;background:#fff}.stage51062-card b{display:block;color:#17365f;margin-bottom:5px}.stage51062-card span{display:block;font-size:11px;line-height:1.45;color:#475569;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .stage51062-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+      @media(max-width:640px){.stage51062-grid{grid-template-columns:1fr}.stage51062-preview{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    `;document.head.appendChild(st);
+  }
+  function buildDialog(){
+    let d=document.getElementById(DIALOG_ID);if(d)return d;
+    ensureStyle();d=document.createElement('dialog');d.id=DIALOG_ID;d.className='modal stage51062-dialog';
+    d.innerHTML=`<form method="dialog" class="modal-card">
+      <div class="modal-head"><div><strong>예선 조편성 수동 조정</strong><small>코트 배정 후에도 경기 시작 전까지 조편성을 정리할 수 있습니다.</small></div><button value="cancel" class="icon-btn" aria-label="닫기">×</button></div>
+      <div class="modal-body">
+        <div class="stage51062-help"><b>순서 이동</b>은 선택한 팀을 목표 조의 첫 위치로 옮기고, 그 사이 팀들이 한 자리씩 자동으로 당겨지거나 밀립니다. <b>팀 맞교환</b>은 두 팀의 자리만 서로 바꿉니다. 조 개수·조별 팀 수·코트 배정 기준은 유지합니다.</div>
+        <div class="stage51062-grid">
+          <div class="stage51062-field"><label>변경할 팀</label><select id="stage51062SourceTeam"></select></div>
+          <div class="stage51062-field"><label>변경 방식</label><select id="stage51062Mode"><option value="move">순서 이동 · 중간 팀 자동 당김</option><option value="swap">다른 팀과 위치 맞교환</option></select></div>
+          <div class="stage51062-field" id="stage51062MoveWrap"><label>이동할 조</label><select id="stage51062TargetGroup"></select></div>
+          <div class="stage51062-field" id="stage51062SwapWrap" hidden><label>맞교환할 팀</label><select id="stage51062TargetTeam"></select></div>
+        </div>
+        <div id="stage51062Status" class="stage51062-help">팀을 선택하고 이동 또는 맞교환 방식을 지정하세요.</div>
+        <div id="stage51062Preview" class="stage51062-preview"></div>
+      </div>
+      <div class="modal-actions stage51062-actions"><button value="cancel" class="btn btn-light">취소</button><button type="button" id="stage51062Apply" class="btn btn-primary">조편성 변경 적용</button></div>
+    </form>`;
+    document.body.appendChild(d);
+    d.querySelector('#stage51062Mode').onchange=()=>syncMode(d);
+    d.querySelector('#stage51062SourceTeam').onchange=()=>{fillTargetTeams(d);updateStatus(d)};
+    d.querySelector('#stage51062TargetGroup').onchange=()=>updateStatus(d);
+    d.querySelector('#stage51062TargetTeam').onchange=()=>updateStatus(d);
+    d.querySelector('#stage51062Apply').onclick=()=>applyChange(d);
+    return d;
+  }
+  function flatSlots(){
+    const out=[];groups().forEach((g,gi)=>(g.teams||[]).forEach((t,si)=>out.push({g,gi,si,t,key:teamKey(t)})));return out;
+  }
+  function fill(d){
+    const gs=groups(),slots=flatSlots(),src=d.querySelector('#stage51062SourceTeam'),tg=d.querySelector('#stage51062TargetGroup');
+    src.innerHTML=slots.map(x=>`<option value="${esc(x.key)}">${esc(x.g.groupNo||x.gi+1)}조 · ${esc(teamLabel(x.t))}</option>`).join('');
+    tg.innerHTML=gs.map((g,i)=>`<option value="${i}">${esc(g.groupNo||i+1)}조</option>`).join('');
+    fillTargetTeams(d);renderPreview(d);syncMode(d);updateStatus(d);
+  }
+  function fillTargetTeams(d){
+    const srcKey=d.querySelector('#stage51062SourceTeam')?.value||'';
+    d.querySelector('#stage51062TargetTeam').innerHTML=flatSlots().filter(x=>x.key!==srcKey).map(x=>`<option value="${esc(x.key)}">${esc(x.g.groupNo||x.gi+1)}조 · ${esc(teamLabel(x.t))}</option>`).join('');
+  }
+  function syncMode(d){
+    const swap=d.querySelector('#stage51062Mode').value==='swap';d.querySelector('#stage51062MoveWrap').hidden=swap;d.querySelector('#stage51062SwapWrap').hidden=!swap;updateStatus(d);
+  }
+  function renderPreview(d){
+    d.querySelector('#stage51062Preview').innerHTML=groups().map((g,i)=>`<article class="stage51062-card"><b>${esc(g.groupNo||i+1)}조 · ${esc(g.court||g.courtName||'코트 미배정')}</b>${(g.teams||[]).map((t,j)=>`<span>${j+1}. ${esc(teamLabel(t))}</span>`).join('')}</article>`).join('');
+  }
+  function updateStatus(d){
+    const slots=flatSlots(),srcKey=d.querySelector('#stage51062SourceTeam')?.value||'',src=slots.find(x=>x.key===srcKey),mode=d.querySelector('#stage51062Mode')?.value;
+    const box=d.querySelector('#stage51062Status');if(!src){box.textContent='변경할 팀을 선택하세요.';return;}
+    if(mode==='swap'){
+      const target=slots.find(x=>x.key===d.querySelector('#stage51062TargetTeam')?.value);box.textContent=target?`${src.g.groupNo||src.gi+1}조 ${teamLabel(src.t)} ↔ ${target.g.groupNo||target.gi+1}조 ${teamLabel(target.t)} 위치를 맞교환합니다.`:'맞교환할 팀을 선택하세요.';
+    }else{
+      const gi=Number(d.querySelector('#stage51062TargetGroup')?.value||0),g=groups()[gi];box.textContent=g?`${src.g.groupNo||src.gi+1}조 ${teamLabel(src.t)} 팀을 ${g.groupNo||gi+1}조 첫 자리로 이동합니다. 사이 팀은 순서대로 한 자리씩 자동 이동합니다.`:'';
+    }
+  }
+  function rebindMatches(){
+    const all=matches();
+    groups().forEach((g,gi)=>{
+      const teams=Array.isArray(g.teams)?g.teams:[];
+      const gm=all.filter(m=>String(m?.groupId||'')===String(g?.id||'')||Number(m?.groupNo)===Number(g?.groupNo||gi+1)).sort((a,b)=>Number(a?.matchNo||0)-Number(b?.matchNo||0));
+      const pairs=teams.length===2?[[0,1]]:teams.length===3?[[0,1],[0,2],[1,2]]:[];
+      pairs.forEach((pair,i)=>{const m=gm[i];if(!m)return;m.teamA=teams[pair[0]];m.teamB=teams[pair[1]];m.winner=null;m.winnerId=null;m.scoreA=null;m.scoreB=null;m.status='waiting';m.startedAt=null;m.completedAt=null;m.waitStartedAt=null;});
+      g.standings=[];
+    });
+    if(state.prelim){state.prelim.qualifiers=[];state.prelim.swapSelection=null;}
+  }
+  function applyChange(d){
+    if(!requireAdmin('예선 조편성 수정'))return;
+    if(!groups().length){prelimNotice('먼저 예선 조추첨을 진행하세요.','warning');return;}
+    if(hasStarted()){prelimNotice('이미 시작되거나 결과가 입력된 예선 경기가 있어 조편성을 변경할 수 없습니다. 경기 시작 전까지만 가능합니다.','error');return;}
+    if(window.stage51058BeforePrelimRevision&&!window.stage51058BeforePrelimRevision('예선 조편성 수동 수정'))return;
+    const slots=flatSlots(),srcKey=d.querySelector('#stage51062SourceTeam')?.value||'',srcIndex=slots.findIndex(x=>x.key===srcKey);if(srcIndex<0)return;
+    const mode=d.querySelector('#stage51062Mode').value;
+    autoRecovery('예선 조편성 수동 수정 직전');
+    const ordered=slots.map(x=>x.t);
+    let description='';
+    if(mode==='swap'){
+      const targetKey=d.querySelector('#stage51062TargetTeam')?.value||'',targetIndex=slots.findIndex(x=>x.key===targetKey);if(targetIndex<0||targetIndex===srcIndex){prelimNotice('맞교환할 다른 팀을 선택하세요.','warning');return;}
+      const a=ordered[srcIndex],b=ordered[targetIndex];ordered[srcIndex]=b;ordered[targetIndex]=a;description=`${teamLabel(a)} ↔ ${teamLabel(b)} 맞교환`;
+    }else{
+      const targetGroupIndex=Math.max(0,Math.min(groups().length-1,Number(d.querySelector('#stage51062TargetGroup').value||0)));
+      const targetFlatIndex=slots.findIndex(x=>x.gi===targetGroupIndex);if(targetFlatIndex<0)return;
+      const moving=ordered.splice(srcIndex,1)[0];let insertIndex=targetFlatIndex;if(srcIndex<targetFlatIndex)insertIndex=Math.max(0,targetFlatIndex-1);ordered.splice(insertIndex,0,moving);description=`${teamLabel(moving)} → ${groups()[targetGroupIndex].groupNo||targetGroupIndex+1}조 순서 이동`;
+    }
+    let cursor=0;groups().forEach(g=>{const count=(g.teams||[]).length;g.teams=ordered.slice(cursor,cursor+count);cursor+=count;});
+    rebindMatches();
+    try{assignPrelimCourts(state);}catch(err){console.warn('[230MATCH 5.10.62] court rebind warning',err);}
+    if(state.prelim){state.prelim.manualGroupEditedAt=new Date().toISOString();state.prelim.manualGroupEditNote=description;}
+    commit(`예선 조편성 수동 수정 · ${description}`);
+    prelimNotice(`조편성을 변경했습니다. ${description} · 코트 배정을 다시 동기화했습니다.`,'success');
+    fill(d);renderPreview(d);
+  }
+  function open(){
+    if(!requireAdmin('예선 조편성 수정'))return;
+    if(!groups().length){prelimNotice('먼저 예선 조추첨을 진행하세요.','warning');return;}
+    if(hasStarted()){prelimNotice('예선 경기가 이미 시작되어 조편성 수정이 잠겼습니다.','error');return;}
+    const d=buildDialog();fill(d);d.showModal();
+  }
+  function injectButton(){
+    const anchor=document.getElementById('assignPrelimCourtsBtn')||document.getElementById('generatePrelimBtn');if(!anchor||document.getElementById('stage51062OpenGroupEditor'))return;
+    const btn=document.createElement('button');btn.type='button';btn.id='stage51062OpenGroupEditor';btn.className='btn btn-light';btn.textContent='조편성 수동조정';btn.dataset.adminOnly='true';btn.onclick=open;
+    const host=anchor.parentElement;host?.appendChild(btn);
+  }
+  const run=()=>setTimeout(injectButton,80);
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',run,{once:true});else run();
+  window.addEventListener('pageshow',run);window.addEventListener('hashchange',run);
+  const mo=new MutationObserver(()=>{if(!document.getElementById('stage51062OpenGroupEditor'))injectButton();});
+  try{mo.observe(document.body,{childList:true,subtree:true});}catch(_e){}
+  window.stage51062OpenPrelimGroupEditor=open;
+})();
+console.info('[230MATCH] 5.10.62 ready · admin prelim group manual move/swap after court assignment');
