@@ -21503,9 +21503,17 @@ console.info('[230MATCH] 5.10.55 ready · 주민번호는 원천징수 대상자
     const target=['viewer','operator','admin'].includes(role)?role:'viewer';
     if(target==='viewer'){
       if(isAuthenticatedAdminAccount()){
-        setActualRole('viewer');
-        document.body.dataset.adminPreview='member';
-        notice('일반 회원 보기로 전환했습니다. 관리자 계정은 유지되며 관리자 보기로 바로 돌아갈 수 있습니다.','success');
+        // 관리자에게는 '일반 보기' 버튼 하나만 제공한다.
+        // 현재 관리자 화면이면 일반 보기로, 이미 일반 보기면 버튼 해제처럼 관리자 화면으로 복귀한다.
+        if(isAdmin()){
+          setActualRole('viewer');
+          document.body.dataset.adminPreview='member';
+          notice('일반 보기로 전환했습니다. 다시 누르면 관리자 화면으로 돌아갑니다.','success');
+        }else{
+          setActualRole('admin');
+          document.body.dataset.adminPreview='admin';
+          notice('일반 보기를 해제하고 관리자 화면으로 돌아왔습니다.','success');
+        }
         return true;
       }
       // 일반회원은 별도 역할 전환 기능이 필요 없다.
@@ -21551,16 +21559,16 @@ console.info('[230MATCH] 5.10.55 ready · 주민번호는 원천징수 대상자
     const viewerBtn=document.getElementById('roleViewerBtn');
     if(viewerBtn){
       viewerBtn.hidden=!adminAccount;
-      viewerBtn.textContent='일반회원 보기';
+      viewerBtn.textContent='일반 보기';
       viewerBtn.classList.toggle('active',memberPreview);
-      viewerBtn.title='관리자 계정으로 일반 회원 화면을 확인합니다.';
+      viewerBtn.setAttribute('aria-pressed',memberPreview?'true':'false');
+      viewerBtn.title=memberPreview?'현재 일반회원 화면 확인 중 · 다시 누르면 관리자 화면으로 복귀':'일반회원 화면을 확인하려면 누르세요';
     }
     const adminBtn=document.getElementById('roleAdminBtn');
     if(adminBtn){
-      adminBtn.hidden=!adminAccount;
-      adminBtn.textContent='관리자 보기';
-      adminBtn.classList.toggle('active',adminMode);
-      adminBtn.title='인증된 관리자 계정에서만 사용할 수 있습니다.';
+      // 별도의 '관리자 보기' 버튼은 없앤다. 일반 보기 버튼을 다시 누르면 관리자 화면으로 복귀한다.
+      adminBtn.hidden=true;
+      adminBtn.classList.remove('active');
     }
     const operatorBtn=document.getElementById('roleOperatorBtn');
     if(operatorBtn)operatorBtn.hidden=true;
@@ -21574,7 +21582,8 @@ console.info('[230MATCH] 5.10.55 ready · 주민번호는 원천징수 대상자
   window.stage51056AuthSafety={
     isAuthenticatedAdminAccount,
     isAuthenticatedOperatorAccount,
-    version:'5.10.56'
+    version:'5.10.57'
   };
 })();
 console.info('[230MATCH] 5.10.56 ready · authenticated admin only + admin/member preview toggle + PIN privilege removal');
+console.info('[230MATCH] 5.10.57 ready · single 일반 보기 toggle button for authenticated admin');
