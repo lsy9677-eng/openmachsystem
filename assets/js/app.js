@@ -8952,23 +8952,29 @@ function printFieldBracketHtml(){
     .stage51046-signature-options label{display:flex;align-items:center;gap:6px;font-size:12px;color:#334155}
     .stage51046-signature-options input[type="number"]{min-width:0;width:100%;max-width:150px;min-height:34px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;background:#fff}
     .stage51046-signature-options small{grid-column:1/-1;font-size:10px;line-height:1.45;color:#64748b}
-    .stage51046-signature-wrap{display:grid;gap:8px;padding:2mm 1.5mm 0}
-    .stage51046-signature-notice{padding:8px 10px;border:1px solid #d7e1ee;border-radius:10px;background:#f8fbff;font-size:10.2px;line-height:1.45;color:#334155}
+    .stage51046-signature-wrap{display:grid;gap:7px;padding:2mm 1.5mm 0}
+    .stage51046-signature-notice{padding:7px 10px;border:1px solid #d7e1ee;border-radius:10px;background:#f8fbff;font-size:9.9px;line-height:1.42;color:#334155}
     .stage51046-signature-notice b{color:#17365f}
-    .stage51046-signature-meta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;font-size:10.2px;color:#334155}
+    .stage51053-signature-mininote{padding:6px 10px;border:1px solid #d9e2ef;border-radius:10px;background:#fff;font-size:9.6px;line-height:1.4;color:#475569}
+    .stage51046-signature-meta{display:grid;grid-template-columns:1.1fr 1.15fr .75fr;gap:6px;font-size:10px;color:#334155}
     .stage51046-signature-meta div{padding:7px 9px;border:1px solid #d7e1ee;border-radius:10px;background:#fbfdff}
-    .stage51046-signature-table{width:100%;border-collapse:collapse;font-size:8.15px;table-layout:fixed}
-    .stage51046-signature-table b{font-size:8.55px}
-    .stage51046-signature-table th,.stage51046-signature-table td{border:1px solid #94a3b8;padding:5px 4px;vertical-align:middle;word-break:keep-all;line-height:1.26}
-    .stage51046-signature-table th{background:#eff6ff;color:#17365f;font-weight:900}
+    .stage51046-signature-table{width:100%;border-collapse:collapse;font-size:7.8px;table-layout:fixed}
+    .stage51046-signature-table b{font-size:8.15px}
+    .stage51046-signature-table th,.stage51046-signature-table td{border:1px solid #94a3b8;padding:3px 3px;vertical-align:middle;word-break:keep-all;line-height:1.18}
+    .stage51046-signature-table th{background:#eff6ff;color:#17365f;font-weight:900;text-align:center}
     .stage51046-signature-table td.center,.stage51046-signature-table th.center{text-align:center}
-    .stage51050-sign-cell .stage51046-signature-line{height:18px}
-    .stage51050-addr-cell .stage51046-signature-line{height:18px}
-    .stage51050-rrn-cell .stage51046-signature-line{height:18px}
-    .stage51046-signature-line{display:block;height:14px;border-bottom:1px solid #cbd5e1}
-    .stage51046-consent-cell{font-size:9.8px;line-height:1.35}
-    .stage51046-footnote{font-size:9.4px;line-height:1.36;color:#475569}
-    .stage51046-footnote ol{margin:5px 0 0 16px;padding:0}
+    .stage51053-cell-pad{padding:0 !important}
+    .stage51053-dual{display:grid;grid-template-rows:1fr 1fr;min-height:88px;height:88px}
+    .stage51053-dual>div{position:relative;display:flex;align-items:flex-end;justify-content:center;padding:4px 5px 6px;min-height:0}
+    .stage51053-dual>div+div{border-top:1px solid #cbd5e1}
+    .stage51053-dual.stage51053-left>div{justify-content:flex-start}
+    .stage51053-dual.stage51053-mid>div{justify-content:center}
+    .stage51053-dual.stage51053-consent>div{align-items:flex-start;justify-content:flex-start;padding-top:5px;padding-bottom:3px;font-size:8.8px;line-height:1.2}
+    .stage51053-dual-line{display:block;width:100%;height:0;border-bottom:1px solid #cbd5e1}
+    .stage51053-money{font-weight:700;white-space:nowrap;font-size:8.2px}
+    .stage51053-sub{display:block;font-size:7px;color:#64748b;margin-top:1px}
+    .stage51046-footnote{font-size:8.9px;line-height:1.33;color:#475569}
+    .stage51046-footnote ol{margin:6px 0 0 18px;padding:0}
     .stage51046-footnote li{margin:1px 0}
   `;
   document.head.appendChild(st);
@@ -9042,6 +9048,18 @@ function stage51047Money(v){
   v=Number(v)||0;
   return v?`${Math.round(v).toLocaleString('ko-KR')}원`:'';
 }
+function stage51053ShowAdminGuide(){
+  return document.getElementById('stage51053AdminGuidePrint')?.checked===true;
+}
+function stage51053SplitByTwo(total){
+  total=Math.max(0,Math.round(Number(total)||0));
+  const top=Math.floor(total/2);
+  const bottom=Math.max(0,total-top);
+  return [top,bottom];
+}
+function stage51053Dual(topHtml,bottomHtml,cls=''){
+  return `<div class="stage51053-dual ${cls}"><div>${topHtml||''}</div><div>${bottomHtml||''}</div></div>`;
+}
 function stage51047PrizeRows(){
   const amounts=stage51047PrizeAmounts();
   return stage51046SignatureRows().map(row=>{
@@ -9051,70 +9069,73 @@ function stage51047PrizeRows(){
 }
 function printPrizeSignatureHtml(){
   const rows=stage51047PrizeRows();
-  const selected=stage51046SelectedPrizeGroups();
   const amounts=stage51047PrizeAmounts();
   const payoutSummary=rows.reduce((acc,row)=>{acc[row.place]=(acc[row.place]||0)+1;return acc;},{});
   const summary=Object.entries(payoutSummary).map(([k,v])=>`${k} ${v}명`).join(' · ')||'선택된 입상 구분 없음';
   const calcEnabled=amounts.autoTax;
+  const showAdminGuide=stage51053ShowAdminGuide();
   const calcNote=calcEnabled
-    ?`자동계산 기준: 지급총액 × 필요경비 80% 공제 → 기타소득금액(20%) × 소득세 20% → 지방소득세는 소득세의 10%. 따라서 요건을 충족하는 경우 통상 지급총액 대비 약 4.4%가 원천징수되는 구조입니다.`
-    :`자동계산을 사용하지 않습니다. 상금액·원천징수액·실지급액은 현장에서 직접 기재하세요.`;
+    ?`자동계산 금액은 복식 2인 균등 분배를 가정한 예상액입니다. 실제 지급·신고 금액이 다르면 현장에서 직접 수정하세요.`
+    :`자동계산을 사용하지 않습니다. 상금액·공제액·실지급액은 현장에서 직접 기재하세요.`;
+  const adminNote=calcEnabled
+    ?`관리자 참고: 팀 상금 총액을 2인 기준으로 반씩 나눈 뒤, 각 개인 금액에 대해 필요경비 80% 공제 가정 → 기타소득금액 20% × 소득세 20% → 지방소득세는 소득세의 10%로 계산합니다. 따라서 1인 지급액 기준 실효세율은 통상 약 4.4%입니다.`
+    :`관리자 참고: 자동계산이 꺼져 있으므로 세액·실지급액은 대회 운영자가 직접 확인 후 기재하세요.`;
+  const safeRows=(rows.length?rows:[{place:'-',name:'',gross:0}]);
+  const rowHtml=safeRows.map((row,idx)=>{
+    const [grossTop,grossBottom]=stage51053SplitByTwo(row.gross||0);
+    const taxTop=stage51047TaxEstimate(grossTop,calcEnabled);
+    const taxBottom=stage51047TaxEstimate(grossBottom,calcEnabled);
+    const line='<span class="stage51053-dual-line"></span>';
+    const consent='□ 동의<br><span style="color:#64748b">상금 지급·세무 신고 목적 개인정보 수집·이용</span>';
+    return `<tr>`+
+      `<td class="center">${idx+1}</td>`+
+      `<td class="center">${printEscape(row.place||'-')}</td>`+
+      `<td class="stage51053-cell-pad">${stage51053Dual(line,line,'stage51053-left')}</td>`+
+      `<td class="stage51053-cell-pad">${stage51053Dual(line,line,'stage51053-left')}</td>`+
+      `<td class="stage51053-cell-pad">${stage51053Dual(line,line,'stage51053-left')}</td>`+
+      `<td class="stage51053-cell-pad center">${stage51053Dual(grossTop?`<span class="stage51053-money">${stage51047Money(grossTop)}</span>`:line,grossBottom?`<span class="stage51053-money">${stage51047Money(grossBottom)}</span>`:line,'stage51053-mid')}</td>`+
+      `<td class="stage51053-cell-pad center">${stage51053Dual(grossTop&&calcEnabled?`<span class="stage51053-money">${stage51047Money(taxTop.incomeTax)}</span>`:line,grossBottom&&calcEnabled?`<span class="stage51053-money">${stage51047Money(taxBottom.incomeTax)}</span>`:line,'stage51053-mid')}</td>`+
+      `<td class="stage51053-cell-pad center">${stage51053Dual(grossTop&&calcEnabled?`<span class="stage51053-money">${stage51047Money(taxTop.localTax)}</span>`:line,grossBottom&&calcEnabled?`<span class="stage51053-money">${stage51047Money(taxBottom.localTax)}</span>`:line,'stage51053-mid')}</td>`+
+      `<td class="stage51053-cell-pad center">${stage51053Dual(grossTop&&calcEnabled?`<span class="stage51053-money">${stage51047Money(taxTop.totalTax)}</span>`:line,grossBottom&&calcEnabled?`<span class="stage51053-money">${stage51047Money(taxBottom.totalTax)}</span>`:line,'stage51053-mid')}</td>`+
+      `<td class="stage51053-cell-pad center">${stage51053Dual(grossTop&&calcEnabled?`<span class="stage51053-money">${stage51047Money(taxTop.net)}</span>`:line,grossBottom&&calcEnabled?`<span class="stage51053-money">${stage51047Money(taxBottom.net)}</span>`:line,'stage51053-mid')}</td>`+
+      `<td class="stage51053-cell-pad">${stage51053Dual(line,line,'stage51053-mid')}</td>`+
+      `<td class="stage51053-cell-pad">${stage51053Dual(consent,consent,'stage51053-consent')}</td>`+
+    `</tr>`;
+  }).join('');
 
   return printHeader('입상자 상금 수령·개인정보 제공 동의 서명부')+
     `<div class="stage51046-signature-wrap">`+
-      `<div class="stage51046-signature-notice"><b>상금 지급·세무 안내</b><br>${printEscape(calcNote)}<br><b>중요:</b> 본 자동계산은 ‘불특정 다수가 순위 경쟁하는 대회의 상금’으로 보아 필요경비 80%가 인정되는 경우를 가정한 <b>예상치</b>입니다. 실제 적용 여부는 대회 참가자 범위와 지급 성격 등 사실관계에 따라 달라질 수 있습니다.</div>`+
+      `<div class="stage51053-signature-mininote"><b>필수 안내</b> · 본 서명부는 상금 지급, 세무 신고, 개인정보 수집·이용 동의 확인용입니다. 수령인은 본인 칸에 직접 작성·서명해 주세요. ${printEscape(calcNote)}</div>`+
+      `${showAdminGuide?`<div class="stage51046-signature-notice"><b>관리자 상세 안내</b><br>${printEscape(adminNote)}<br><b>참고</b>: 공동3위도 실제 상금 지급 대상이면 원칙적으로 같은 계산 구조를 적용합니다. 다만 지급 방식과 세무 기준에 따라 실제 세액은 달라질 수 있습니다.</div>`:''}`+
       `<div class="stage51046-signature-meta"><div><b>선택 입상구분</b><br>${printEscape(summary)}</div><div><b>대회명</b><br>${printEscape(state.tournament?.name||'230MATCH 대회')}</div><div><b>부서</b><br>${printEscape(state.tournament?.division||'부서 미설정')}</div></div>`+
       `<table class="stage51046-signature-table"><colgroup>`+
-        `<col style="width:30px">`+
+        `<col style="width:28px">`+
         `<col style="width:54px">`+
-        `<col style="width:88px">`+
-        `<col style="width:110px">`+
-        `<col style="width:118px">`+
-        `<col style="width:62px">`+
-        `<col style="width:57px">`+
-        `<col style="width:53px">`+
-        `<col style="width:59px">`+
+        `<col style="width:98px">`+
+        `<col style="width:126px">`+
+        `<col style="width:146px">`+
+        `<col style="width:64px">`+
+        `<col style="width:60px">`+
+        `<col style="width:56px">`+
+        `<col style="width:60px">`+
         `<col style="width:66px">`+
-        `<col style="width:66px">`+
-        `<col style="width:82px">`+
+        `<col style="width:70px">`+
+        `<col style="width:86px">`+
       `</colgroup><thead><tr>`+
-        `<th class="center">번호</th>`+
-        `<th class="center">입상</th>`+
+        `<th>번호</th>`+
+        `<th>입상</th>`+
         `<th>수령인<br>성명/팀</th>`+
         `<th>주민등록<br>번호</th>`+
         `<th>주소</th>`+
-        `<th class="center">상금액</th>`+
-        `<th class="center">소득세</th>`+
-        `<th class="center">지방세</th>`+
-        `<th class="center">공제<br>합계</th>`+
-        `<th class="center">실지급<br>액</th>`+
-        `<th class="center">서명</th>`+
+        `<th>상금액<br><span class="stage51053-sub">1인 기준</span></th>`+
+        `<th>소득세<br><span class="stage51053-sub">1인 기준</span></th>`+
+        `<th>지방세<br><span class="stage51053-sub">1인 기준</span></th>`+
+        `<th>공제<br>합계</th>`+
+        `<th>실지급<br>액</th>`+
+        `<th>서명</th>`+
         `<th>동의</th>`+
-      `</tr></thead><tbody>`+
-      `${(rows.length?rows:[{place:'-',name:'',gross:0,tax:stage51047TaxEstimate(0,false)}]).map((row,idx)=>`<tr>`+
-        `<td class="center">${idx+1}</td>`+
-        `<td class="center">${printEscape(row.place||'-')}</td>`+
-        `<td>${row.name?`<b>${printEscape(row.name)}</b>`:'<span class="stage51046-signature-line"></span>'}</td>`+
-        `<td class="stage51050-rrn-cell"><span class="stage51046-signature-line"></span></td>`+
-        `<td class="stage51050-addr-cell"><span class="stage51046-signature-line"></span></td>`+
-        `<td class="center">${row.gross?stage51047Money(row.gross):'<span class="stage51046-signature-line"></span>'}</td>`+
-        `<td class="center">${row.gross&&calcEnabled?stage51047Money(row.tax.incomeTax):'<span class="stage51046-signature-line"></span>'}</td>`+
-        `<td class="center">${row.gross&&calcEnabled?stage51047Money(row.tax.localTax):'<span class="stage51046-signature-line"></span>'}</td>`+
-        `<td class="center">${row.gross&&calcEnabled?stage51047Money(row.tax.totalTax):'<span class="stage51046-signature-line"></span>'}</td>`+
-        `<td class="center">${row.gross&&calcEnabled?stage51047Money(row.tax.net):'<span class="stage51046-signature-line"></span>'}</td>`+
-        `<td class="stage51050-sign-cell"><span class="stage51046-signature-line"></span></td>`+
-        `<td class="stage51046-consent-cell">□ 동의<br><span style="color:#64748b">상금 지급·세무 신고 목적 개인정보 수집·이용</span></td>`+
-      `</tr>`).join('')}`+
-      `</tbody></table>`+
-      `<div class="stage51046-footnote"><b>계산 및 개인정보 안내</b><ol>`+
-        `<li><b>상금액</b>: 입상자에게 지급하기로 한 총액입니다. 복식 팀 상금을 두 사람에게 각각 나누어 지급하면 실제 수령인별 금액을 기준으로 별도 작성하는 것이 안전합니다.</li>`+
-        `<li><b>필요경비</b>: 불특정 다수가 순위 경쟁하는 대회의 상금에 해당하는 경우 지급총액의 80%가 필요경비로 인정될 수 있습니다.</li>`+
-        `<li><b>소득세</b>: 필요경비를 차감한 기타소득금액에 일반 기타소득 원천징수세율 20%를 적용합니다.</li>`+
-        `<li><b>지방소득세</b>: 원천징수 소득세의 10%를 별도로 특별징수하는 구조입니다.</li>`+
-        `<li><b>실지급액</b>: 상금액에서 소득세와 지방소득세를 차감한 금액입니다. 필요경비 80% 적용 대상이면 단순 계산상 총 지급액의 약 95.6%가 됩니다.</li>`+
-        `<li><b>주민등록번호·주소·동의</b>: 원천징수 및 지급명세서 작성 등 세무처리에 필요한 경우 수집합니다. 본 서명부의 동의란은 지급·세무 신고 목적의 개인정보 수집·이용 확인용입니다.</li>`+
-        `<li>소액부징수, 비거주자 여부, 사업소득 해당 여부, 대회 상금의 성격 등에 따라 실제 세액은 달라질 수 있으므로 최종 신고 시 세무 기준을 확인하세요.</li>`+
-      `</ol></div>`+
+      `</tr></thead><tbody>${rowHtml}</tbody></table>`+
+      `${showAdminGuide?`<div class="stage51046-footnote"><b>관리자 참고</b><ol><li><b>복식 2인 기준</b>: 각 행은 같은 팀 선수 2명이 상·하 칸에 각각 작성하도록 구성했습니다. 금액도 2명 기준 균등 분배로 자동 계산합니다.</li><li><b>공동3위 세금</b>: 공동3위도 상금 지급이면 일반적으로 같은 기타소득 원천징수 구조로 계산합니다.</li><li><b>최종 확인</b>: 비거주자 여부, 소액부징수, 지급 성격 등에 따라 실제 세액은 달라질 수 있으므로 지급 전 최종 확인이 필요합니다.</li></ol></div>`:`<div class="stage51046-footnote"><b>간단 안내</b> · 자동계산 금액은 예상치이며, 실제 지급 금액이 다르면 현장에서 수정하여 사용하세요.</div>`}`+
     `</div>`;
 }
 
@@ -9148,7 +9169,8 @@ function printPrizeSignatureHtml(){
         <label>공동3위 1명당(원)<input type="number" id="stage51047PrizeThirdAmount" min="0" step="1000" inputmode="numeric" placeholder="예: 200000"></label>
         <label>8강 1명당(원)<input type="number" id="stage51047PrizeQuarterAmount" min="0" step="1000" inputmode="numeric" placeholder="선택"></label>
         <label><input type="checkbox" id="stage51047TaxAutoCalc" checked> 기타소득 원천징수 예상액 자동계산</label>
-        <small>자동계산은 불특정 다수가 순위 경쟁하는 대회의 상금으로서 필요경비 80%가 인정되는 경우를 가정합니다. 실제 세무처리는 대회 성격·수령인·지급방식에 따라 달라질 수 있으므로 지급 전 확인하세요.</small>`;
+        <label><input type="checkbox" id="stage51053AdminGuidePrint"> 관리자 상세 설명도 함께 인쇄</label>
+        <small>선수용 필수 안내는 항상 인쇄됩니다. 관리자 참고용 상세 설명은 위 체크를 켰을 때만 추가 인쇄됩니다.</small>`;
       const host=select.closest('label')?.parentElement||select.parentElement;
       host?.appendChild(wrap);
       wrap.querySelectorAll('input').forEach(input=>{
@@ -21416,3 +21438,4 @@ console.info('[230MATCH] 5.10.48 ready · field bracket inner vertical round lab
 console.info('[230MATCH] 5.10.49 ready · field bracket horizontal round labels + compact signature sheet margins');
 console.info('[230MATCH] 5.10.50 ready · field bracket label fine-tuning + signature column rebalance');
 console.info('[230MATCH] 5.10.51 ready · field stem overshoot cleanup + prize signature A4 landscape print');
+console.info('[230MATCH] 5.10.53 ready · prize signature column rebalance + optional admin guide print');
