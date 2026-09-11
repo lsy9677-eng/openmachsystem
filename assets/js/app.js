@@ -8700,13 +8700,42 @@ function printCourtsHtml(){
 }
 function printResultsHtml(){const p=currentPodium(),pre=state.prelim?.matches||[],main=portalMainMatches();return printHeader('최종 입상 결과표')+`<div class="print-podium"><div><span>🏆 우승</span><b>${printEscape(p.champion||'미확정')}</b></div><div><span>🥈 준우승</span><b>${printEscape(p.runnerUp||'미확정')}</b></div><div><span>🥉 공동 3위</span><b>${printEscape((p.thirds||[]).join(' · ')||'미확정')}</b></div></div><table class="print-table"><tbody><tr><th>예선 완료</th><td>${pre.filter(x=>x.status==='completed').length} / ${pre.length}</td></tr><tr><th>본선 완료</th><td>${main.filter(x=>x.status==='completed').length} / ${main.length}</td></tr><tr><th>대회 상태</th><td>${state.tournament?.completedAt?'종료':'진행 중'}</td></tr></tbody></table>`;}
 
-function stage51038FieldTeamName(team){
-  if(!team||team.placeholder)return 'BYE';
+function stage51040FieldMode(){
+  return document.getElementById('stage51040FieldModeSelect')?.value||'current';
+}
+function stage51040FieldRequestedSize(){
+  const mode=stage51040FieldMode();
+  if(mode==='blank64')return 64;
+  if(mode==='blank128')return 128;
+  return Number(state.draw?.size)||Number(state.settings?.drawSize)||0;
+}
+function stage51040FieldGroupRank(team){
+  if(!team)return {group:0,rank:0,label:''};
+  let group=0,rank=0;
+  try{group=Number(mainDrawGroupNo(team)||0);rank=Number(mainDrawGroupRank(team)||0);}catch(_e){}
+  if(!group){
+    const txt=`${team?.name||''} ${team?.label||''} ${team?.placeholderKey||''}`;
+    const m=txt.match(/(?:group|g)[-_ ]?(\d+)/i)||txt.match(/(\d+)\s*조/);
+    if(m)group=Number(m[1]);
+  }
+  if(!rank){
+    const txt=`${team?.name||''} ${team?.label||''} ${team?.placeholderKey||''}`;
+    const m=txt.match(/(?:rank|r)[-_ ]?(\d+)/i)||txt.match(/(\d+)\s*위/);
+    if(m)rank=Number(m[1]);
+  }
+  return {group,rank,label:group&&rank?`${group}조 ${rank}위`:''};
+}
+function stage51038FieldTeamName(team,{blank=false}={}){
+  if(blank)return '';
+  if(!team)return '';
+  const meta=stage51040FieldGroupRank(team);
+  if(team.placeholder)return meta.label||String(team.label||team.name||'예선 순위 대기').trim();
   let value='';
   try{value=portalTeamNamesOnly(team)||'';}catch(_e){}
   if(!value){try{value=printTeam(team)||'';}catch(_e){}}
   value=String(value||'').replace(/\s+/g,' ').trim();
-  return value.length>18?`${value.slice(0,17)}…`:value||'BYE';
+  if(!value&&meta.label)return meta.label;
+  return value.length>18?`${value.slice(0,17)}…`:value;
 }
 function stage51038FieldRoundLabel(size){
   const n=Number(size)||0;
@@ -8716,19 +8745,23 @@ function stage51038FieldRoundLabel(size){
   return `${n}강`;
 }
 function stage51038FieldSlots(){
+  const mode=stage51040FieldMode();
+  const size=stage51040FieldRequestedSize();
+  if(mode==='blank64'||mode==='blank128'){
+    return Array.from({length:size},(_,i)=>({team:null,match:null,side:'',blank:true,slotNo:i+1}));
+  }
   const draw=state.draw||{};
-  const size=Number(draw.size)||0;
   const first=(draw.rounds?.[size]||[]);
   const slots=[];
   for(const m of first){
-    slots.push({team:m?.teamA||null,match:m,side:'A'});
-    slots.push({team:m?.teamB||null,match:m,side:'B'});
+    slots.push({team:m?.teamA||null,match:m,side:'A',blank:false});
+    slots.push({team:m?.teamB||null,match:m,side:'B',blank:false});
   }
-  while(slots.length<size)slots.push({team:null,match:null,side:''});
+  while(slots.length<size)slots.push({team:null,match:null,side:'',blank:false});
   return slots.slice(0,size);
 }
 function stage51038FieldPagePlan(){
-  const size=Number(state.draw?.size)||0;
+  const size=stage51040FieldRequestedSize();
   if(!size)return {size:0,chunk:0,pages:[],finalPage:false,total:0};
   const chunk=size>=64?32:size;
   const count=Math.max(1,Math.ceil(size/chunk));
@@ -8795,11 +8828,23 @@ function stage51038FieldPageSvg(plan,page,slots){
   // Bottom participant slots and vertical guides.
   for(let i=0;i<count;i++){
     const abs=page.start+i, x=i*slotW, cx=x+slotW/2;
-    const entry=slots[abs]||{}, name=stage51038FieldTeamName(entry.team);
-    const bye=name==='BYE';
-    parts.push(`<rect x="${x+1}" y="${slotTop}" width="${Math.max(4,slotW-2)}" height="${slotBottom-slotTop}" fill="${bye?'#f3f4f6':'#f8fbff'}" stroke="${bye?'#cbd5e1':'#90a9c8'}" stroke-width="1"/>`);
+    const entry=slots[abs]||{};
+    const meta=stage51040FieldGroupRank(entry.team);
+    const name=stage51038FieldTeamName(entry.team,{blank:Boolean(entry.blank)});
+    const unresolved=Boolean(entry.team?.placeholder);
+    const bye=!entry.blank && String(name).toUpperCase()==='BYE';
+    const fill=entry.blank?'#ffffff':bye?'#f3f4f6':unresolved?'#fff8e6':'#f8fbff';
+    const stroke=entry.blank?'#aeb9c7':bye?'#cbd5e1':unresolved?'#d8a928':'#90a9c8';
+    parts.push(`<rect x="${x+1}" y="${slotTop}" width="${Math.max(4,slotW-2)}" height="${slotBottom-slotTop}" fill="${fill}" stroke="${stroke}" stroke-width="1"/>`);
     parts.push(`<text x="${cx}" y="${slotTop+13}" text-anchor="middle" font-size="9" font-weight="800" fill="#64748b">${abs+1}</text>`);
-    parts.push(`<text x="${cx}" y="${(slotTop+slotBottom)/2}" text-anchor="middle" dominant-baseline="middle" font-size="${bye?11:10}" font-weight="${bye?700:900}" fill="${bye?'#a0a8b3':'#17365f'}" transform="rotate(-90 ${cx} ${(slotTop+slotBottom)/2})">${printEscape(name)}</text>`);
+    if(meta.label && !unresolved && !entry.blank){
+      parts.push(`<text x="${cx}" y="${slotBottom-7}" text-anchor="middle" font-size="7.5" font-weight="800" fill="#7c8da3" transform="rotate(-90 ${cx} ${slotBottom-7})">${printEscape(meta.label)}</text>`);
+    }
+    if(name){
+      parts.push(`<text x="${cx}" y="${(slotTop+slotBottom)/2}" text-anchor="middle" dominant-baseline="middle" font-size="${unresolved?11:10}" font-weight="900" fill="${unresolved?'#9a6700':'#17365f'}" transform="rotate(-90 ${cx} ${(slotTop+slotBottom)/2})">${printEscape(name)}</text>`);
+    }else if(entry.blank){
+      parts.push(`<line x1="${cx}" y1="${slotTop+28}" x2="${cx}" y2="${slotBottom-20}" stroke="#c4ccd6" stroke-width="1" stroke-dasharray="5,5"/>`);
+    }
     parts.push(`<line x1="${cx}" y1="${slotTop}" x2="${cx}" y2="${slotTop-roundSpace+5}" stroke="${bye?'#c7ced7':'#97a6b8'}" stroke-width="1.6"/>`);
   }
 
@@ -8840,13 +8885,21 @@ function stage51038FieldPageSvg(plan,page,slots){
   </section>`;
 }
 function printFieldBracketHtml(){
-  if(!stage51023PublicMainVisible())return printHeader('본선 현장용 수기 대진표')+'<div class="print-empty">본선 확정 후 현장용 대진표를 출력할 수 있습니다.</div>';
+  const mode=stage51040FieldMode();
+  const blank=mode==='blank64'||mode==='blank128';
   const plan=stage51038FieldPagePlan();
-  if(!plan.size)return printHeader('본선 현장용 수기 대진표')+'<div class="print-empty">생성된 본선 대진표가 없습니다.</div>';
+  if(!plan.size)return printHeader('본선 현장용 수기 대진표')+'<div class="print-empty">본선 규모를 설정하거나 테스트 64/128 빈 양식을 선택하세요.</div>';
+  if(!blank){
+    const hasFirstRound=Array.isArray(state.draw?.rounds?.[plan.size])&&state.draw.rounds[plan.size].length>0;
+    if(!hasFirstRound)return printHeader('본선 현장용 수기 대진표')+'<div class="print-empty">아직 본선 슬롯 대진이 생성되지 않았습니다. 예선 슬롯 본선 선추첨을 만들면 “몇 조 몇 위” 자리가 먼저 표시됩니다.</div>';
+  }
   const slots=stage51038FieldSlots();
   const pages=plan.pages.map(p=>stage51038FieldPageSvg(plan,p,slots)).join('');
   const final=plan.finalPage?stage51038FieldQuarterFinalPage(plan):'';
-  return `<div class="stage51038-field-intro no-print"><strong>현장용 수기 대진표</strong><span>${plan.size}드로 · A3 가로 ${plan.total}장 · 아래에서 위로 진행 · 첫 대진 팀명은 자동 표시, 이후 승리팀은 매직으로 기입${plan.size>=128?' · 4번째 장에 4강 이후 최종 기록란 포함':''}</span></div><div class="stage51038-field-pages">${pages}${final}</div>`;
+  const guide=blank
+    ?`테스트 빈 양식 · ${plan.size}드로 · A3 가로 ${plan.total}장`
+    :`실제 대진 · 예선 진행 중에는 “몇 조 몇 위” 표시 → 진출팀 확정 시 실제 이름 + 작은 조/순위 표시`;
+  return `<div class="stage51038-field-intro no-print"><strong>현장용 수기 대진표</strong><span>${guide} · 아래에서 위로 진행${plan.size>=128?' · 4번째 장에 4강 이후 최종 기록란 포함':''}</span></div><div class="stage51038-field-pages">${pages}${final}</div>`;
 }
 
 function buildPrintDocument(){
@@ -8863,7 +8916,7 @@ function buildPrintDocument(){
   const specialClass=target==='prelim-assignment'?'assignment-print-sheet':target==='bracket'?'bracket-tree-print-sheet':target==='bracket-field'?'stage51038-field-print-sheet':'';
   return {target,label:labels[target],paper,orientation,tone,scale,html:`<article class="print-sheet paper-${paper} ${orientation} ${tone} scale-${scale} ${isLabels?'label-print-sheet':''} ${specialClass}">${body}${isLabels||target==='bracket-field'?'':`<footer class="print-footer">230MATCH · ${printEscape(BUILD_LABEL)}</footer>`}</article>`};
 }
-function renderPrintPreview(){const preview=document.getElementById('printPreview');if(!preview)return;const target=document.getElementById('printTargetSelect')?.value||'prelim';const options=document.getElementById('labelPrintOptions');if(options)options.hidden=target!=='labels';const paper=document.getElementById('printPaperSelect'),orientation=document.getElementById('printOrientationSelect'),scale=document.getElementById('printScaleSelect');if(paper)paper.value='a4';if(target==='labels'){if(orientation)orientation.value='portrait';}else if(target==='prelim-assignment'){if(orientation)orientation.value='landscape';if(scale)scale.value='small';}else if(target==='bracket'){if(orientation)orientation.value='landscape';if(scale)scale.value='small';}else if(target==='bracket-field'){if(paper)paper.value='a3';if(orientation)orientation.value='landscape';if(scale)scale.value='normal';}const doc=buildPrintDocument();preview.innerHTML=doc.html;if(target==='bracket')window.__stage5940SyncClonedBracketConnectors?.(preview);const summary=document.getElementById('printPreviewSummary');if(summary)summary.textContent=target==='labels'?`${doc.label} · 12×40mm · A4 세로 · ${document.getElementById('labelStatusSelect')?.selectedOptions?.[0]?.textContent||''}`:target==='bracket-field'?`${doc.label} · A3 가로 · ${stage51038FieldPagePlan().total}장 · 현장 수기용`:`${doc.label} · ${doc.paper.toUpperCase()} · ${doc.orientation==='landscape'?'가로':'세로'} · ${doc.tone==='mono'?'흑백':'컬러'}`;}
+function renderPrintPreview(){const preview=document.getElementById('printPreview');if(!preview)return;const target=document.getElementById('printTargetSelect')?.value||'prelim';const options=document.getElementById('labelPrintOptions');if(options)options.hidden=target!=='labels';const paper=document.getElementById('printPaperSelect'),orientation=document.getElementById('printOrientationSelect'),scale=document.getElementById('printScaleSelect');if(paper)paper.value='a4';if(target==='labels'){if(orientation)orientation.value='portrait';}else if(target==='prelim-assignment'){if(orientation)orientation.value='landscape';if(scale)scale.value='small';}else if(target==='bracket'){if(orientation)orientation.value='landscape';if(scale)scale.value='small';}else if(target==='bracket-field'){if(paper)paper.value='a3';if(orientation)orientation.value='landscape';if(scale)scale.value='normal';}const doc=buildPrintDocument();preview.innerHTML=doc.html;if(target==='bracket')window.__stage5940SyncClonedBracketConnectors?.(preview);const summary=document.getElementById('printPreviewSummary');if(summary)summary.textContent=target==='labels'?`${doc.label} · 12×40mm · A4 세로 · ${document.getElementById('labelStatusSelect')?.selectedOptions?.[0]?.textContent||''}`:target==='bracket-field'?`${doc.label} · A3 가로 · ${stage51038FieldPagePlan().total}장 · ${stage51040FieldMode()==='current'?'실제 대진':'테스트 빈 양식'}`:`${doc.label} · ${doc.paper.toUpperCase()} · ${doc.orientation==='landscape'?'가로':'세로'} · ${doc.tone==='mono'?'흑백':'컬러'}`;}
 function printSelectedDocument(){const doc=buildPrintDocument();let root=document.getElementById('printOutputRoot');if(!root){root=document.createElement('div');root.id='printOutputRoot';document.body.appendChild(root);}root.innerHTML=doc.html;document.body.classList.add('printing-output');let pageStyle=null;if(doc.target==='bracket-field'){pageStyle=document.createElement('style');pageStyle.id='stage51038FieldPageRule';pageStyle.textContent='@media print{@page{size:A3 landscape;margin:5mm}}';document.head.appendChild(pageStyle);}const cleanup=()=>{document.body.classList.remove('printing-output');root.innerHTML='';pageStyle?.remove();window.removeEventListener('afterprint',cleanup);};window.addEventListener('afterprint',cleanup);if(doc.target==='bracket')window.__stage5940SyncClonedBracketConnectors?.(root,()=>setTimeout(()=>window.print(),60));else setTimeout(()=>window.print(),80);}
 function wrapCanvasText(ctx,text,maxWidth){const words=String(text||'').split(/\s+/),lines=[];let line='';for(const word of words){const test=line?`${line} ${word}`:word;if(ctx.measureText(test).width>maxWidth&&line){lines.push(line);line=word;}else line=test;}if(line)lines.push(line);return lines;}
 async function saveRichPrintPreviewPng(doc){
@@ -8880,7 +8933,7 @@ async function saveRichPrintPreviewPng(doc){
   img.onerror=()=>{URL.revokeObjectURL(url);notice('이미지 변환에 실패했습니다. 인쇄/PDF 저장을 이용해 주세요.','error');};img.src=url;
 }
 function savePrintPng(){const doc=buildPrintDocument(),title=doc.label;if(doc.target==='bracket'){void stage5948CaptureBracketExactlyLikeDirect();return;}if(doc.target==='bracket-field'||doc.target==='prelim-assignment'){saveRichPrintPreviewPng(doc);return;}const lines=[];if(doc.target==='participants'){const d=stage51013PrintRegistrationRows();lines.push(`[참가 승인팀 ${d.approved.length}팀 · 참가번호 1~${d.approved.length}]`);d.approved.forEach((a,i)=>lines.push(`${i+1}. ${a.teamName||''} · ${a.affiliation||''} · ${(a.paid===true||a.paymentStatus==='paid')?'입금':'미입금'} · 참가 승인`));lines.push('',`[후보팀 ${d.reserve.length}팀 · 후보번호 1~${d.reserve.length}]`);d.reserve.forEach((a,i)=>lines.push(`${i+1}. ${a.teamName||''} · ${a.affiliation||''} · ${(a.paid===true||a.paymentStatus==='paid')?'입금':'미입금'} · 후보 ${i+1}`));if(d.rejected.length){lines.push('',`[반려팀 ${d.rejected.length}팀]`);d.rejected.forEach(a=>lines.push(`${d.seq.get(String(a.id||''))||'-'}. ${a.teamName||''} · ${a.affiliation||''} · 반려`));}}else if(doc.target==='results'){const p=currentPodium();lines.push(`우승: ${p.champion||'미확정'}`,`준우승: ${p.runnerUp||'미확정'}`,`공동 3위: ${(p.thirds||[]).join(' · ')||'미확정'}`);}else if(doc.target==='bracket'){portalMainMatches().forEach((m,i)=>lines.push(`${m.roundName||m.round||'본선'} ${i+1}: ${printTeam(m.teamA)} vs ${printTeam(m.teamB)}${m.status==='completed'?` · ${printTeam(m.winner)} 승`:''}`));}else if(doc.target==='prelim'||doc.target==='prelim-assignment'){(state.prelim?.groups||[]).forEach((g,i)=>lines.push(`${g.name||`${i+1}조`} · ${g.courtName||'코트 미정'}: ${(g.teams||[]).map(printTeam).join(' / ')}`));}else{const courts=state.unifiedCourts||state.courts||[];(Array.isArray(courts)?courts:Object.values(courts||{})).forEach((c,i)=>lines.push(`${c.name||`${i+1}번 코트`}: ${c.playingMatch?`${printTeam(c.playingMatch.teamA)} vs ${printTeam(c.playingMatch.teamB)}`:'대기'}`));}const width=1600,pad=80,lineH=42;const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');ctx.font='26px sans-serif';let wrapped=[];for(const line of lines.length?lines:['표시할 자료가 없습니다.'])wrapped.push(...wrapCanvasText(ctx,line,width-pad*2));canvas.width=width;canvas.height=Math.max(1000,260+wrapped.length*lineH+pad);ctx.fillStyle='#ffffff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.fillStyle='#10264a';ctx.fillRect(0,0,canvas.width,150);ctx.fillStyle='#ffffff';ctx.font='bold 46px sans-serif';ctx.fillText(title,pad,75);ctx.font='25px sans-serif';ctx.fillText(`${state.tournament?.name||'230MATCH 대회'} · ${state.tournament?.division||''}`,pad,120);ctx.fillStyle='#111827';ctx.font='26px sans-serif';let y=215;for(const line of wrapped){ctx.fillText(line,pad,y);y+=lineH;}canvas.toBlob(blob=>{if(!blob){notice('이미지 생성에 실패했습니다.','error');return;}const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`230MATCH_${title.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.png`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);notice('PNG 이미지를 저장했습니다.','success');},'image/png');}
-function bindPrintCenter(){['printTargetSelect','printPaperSelect','printOrientationSelect','printToneSelect','printScaleSelect','labelStatusSelect','labelContentSelect','labelCopySelect'].forEach(id=>document.getElementById(id)?.addEventListener('change',renderPrintPreview));document.getElementById('refreshPrintPreviewBtn')?.addEventListener('click',renderPrintPreview);document.getElementById('printDocumentBtn')?.addEventListener('click',printSelectedDocument);document.getElementById('savePrintImageBtn')?.addEventListener('click',savePrintPng);}
+function bindPrintCenter(){['printTargetSelect','printPaperSelect','printOrientationSelect','printToneSelect','printScaleSelect','labelStatusSelect','labelContentSelect','labelCopySelect','stage51040FieldModeSelect'].forEach(id=>document.getElementById(id)?.addEventListener('change',renderPrintPreview));document.getElementById('refreshPrintPreviewBtn')?.addEventListener('click',renderPrintPreview);document.getElementById('printDocumentBtn')?.addEventListener('click',printSelectedDocument);document.getElementById('savePrintImageBtn')?.addEventListener('click',savePrintPng);}
 
 
 function tournamentTemplateSummary(template){
@@ -20776,3 +20829,51 @@ console.info('[230MATCH] 5.10.34 ready · notice numbers + important/pinned badg
 
 /* 230MATCH 5.10.39 · 128 draw field print reduced to 4 A3 sheets */
 console.info('[230MATCH] 5.10.39 ready · 128드로 현장용 A3 4장 + 4번째 장 최종기록란');
+
+/* 230MATCH 5.10.40 · field bracket source labels + blank 64/128 test print */
+(function stage51040FieldBracketSourceAndTest(){
+  function syncVisibility(){
+    const wrap=document.getElementById('stage51040FieldModeWrap');
+    if(wrap)wrap.hidden=(document.getElementById('printTargetSelect')?.value!=='bracket-field');
+  }
+  function install(){
+    const target=document.getElementById('printTargetSelect');
+    if(!target)return;
+    let wrap=document.getElementById('stage51040FieldModeWrap');
+    if(!wrap){
+      wrap=document.createElement('label');
+      wrap.id='stage51040FieldModeWrap';
+      wrap.className='stage51040-field-mode-wrap';
+      wrap.innerHTML=`<span>현장용 출력 데이터</span><select id="stage51040FieldModeSelect">
+        <option value="current">현재 대진 / 예선순위 자리 표시</option>
+        <option value="blank64">테스트 빈 양식 · 64드로 (A3 2장)</option>
+        <option value="blank128">테스트 빈 양식 · 128드로 (A3 4장)</option>
+      </select><small>실제 모드: 예선 진행 중에는 각 슬롯에 몇 조 몇 위인지, 진출팀 확정 후에는 팀명과 작은 조·순위를 표시합니다.</small>`;
+      const parent=target.closest('label')?.parentElement||target.parentElement;
+      parent?.appendChild(wrap);
+      wrap.querySelector('select')?.addEventListener('change',()=>{try{renderPrintPreview()}catch(_e){}});
+    }
+    if(!target.dataset.stage51040Bound){
+      target.dataset.stage51040Bound='1';
+      target.addEventListener('change',syncVisibility);
+    }
+    syncVisibility();
+  }
+  if(!document.getElementById('stage51040FieldModeStyle')){
+    const st=document.createElement('style');
+    st.id='stage51040FieldModeStyle';
+    st.textContent=`
+      .stage51040-field-mode-wrap{display:grid;gap:5px;min-width:230px}
+      .stage51040-field-mode-wrap span{font-size:12px;font-weight:800;color:#334155}
+      .stage51040-field-mode-wrap select{min-height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 9px;background:#fff}
+      .stage51040-field-mode-wrap small{max-width:360px;font-size:10px;line-height:1.35;color:#64748b}
+      .stage51040-field-mode-wrap[hidden]{display:none!important}
+    `;
+    document.head.appendChild(st);
+  }
+  const run=()=>setTimeout(()=>{install();try{if(document.getElementById('printTargetSelect')?.value==='bracket-field')renderPrintPreview()}catch(_e){}},50);
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',run,{once:true});else run();
+  window.addEventListener('pageshow',run);
+  window.addEventListener('hashchange',()=>{if(location.hash.includes('print'))run()});
+  console.info('[230MATCH] 5.10.40 ready · field bracket group/rank placeholders + blank 64/128 test forms');
+})();
