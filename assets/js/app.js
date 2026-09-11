@@ -3416,7 +3416,13 @@ async function showRecoveries(){
   root.innerHTML='<div class="empty-state"><p>로컬 복구점을 불러오는 중입니다.</p></div>';
   $('recoveryDialog').showModal();
   const list=await getRecoveries();
-  root.innerHTML=list.length?list.map(x=>{const kind=stage5960RecoveryKind(x),label=stage5960RecoveryDisplayLabel(x);return `<article class="recovery-item stage5960-recovery-card ${kind.cls}"><div class="stage5912-recovery-main"><b><span class="stage5960-kind">${escapeHtml(kind.text)}</span> ${escapeHtml(label)}</b>${stage5912RecoveryPreviewHtml(x.state,x.createdAt)}</div><button class="btn btn-primary" data-restore="${x.id}">복구</button><button class="btn btn-danger-outline" data-delete="${x.id}">삭제</button></article>`;}).join(''):'<div class="empty-state"><p>저장된 로컬 복구점이 없습니다.</p></div>';
+  const card=x=>{const kind=stage5960RecoveryKind(x),label=stage5960RecoveryDisplayLabel(x);return `<article class="recovery-item stage5960-recovery-card ${kind.cls}"><div class="stage5912-recovery-main"><b><span class="stage5960-kind">${escapeHtml(kind.text)}</span> ${escapeHtml(label)}</b>${stage5912RecoveryPreviewHtml(x.state,x.createdAt)}</div><button class="btn btn-primary" data-restore="${x.id}">복구</button><button class="btn btn-danger-outline" data-delete="${x.id}">삭제</button></article>`;};
+  if(!list.length)root.innerHTML='<div class="empty-state"><p>저장된 로컬 복구점이 없습니다.</p></div>';
+  else{
+    const manual=list.filter(x=>stage5960RecoveryKind(x).cls==='manual');
+    const automatic=list.filter(x=>stage5960RecoveryKind(x).cls!=='manual');
+    root.innerHTML=`${manual.length?`<section class="stage51058-recovery-manual"><h3>직접 저장한 복구점 ${manual.length}개</h3>${manual.map(card).join('')}</section>`:''}${automatic.length?`<details class="stage51058-auto-recoveries"><summary>자동 저장 복구점 ${automatic.length}개 · 눌러서 펼치기</summary><div class="stage51058-auto-recovery-list">${automatic.map(card).join('')}</div></details>`:''}`;
+  }
   root.querySelectorAll('[data-restore]').forEach(b=>b.onclick=async()=>{if(!requireAdmin('복구점 복원'))return;const item=await getRecovery(b.dataset.restore);if(!item)return;if(!confirm(`현재 상태를 별도 복구점으로 저장한 뒤 “${item.label}” 상태로 되돌릴까요?`))return;if(!requireTypedConfirmation('복구점 복원','복원'))return;autoRecovery('복구점 복원 직전');state=structuredClone(item.state);commit(`로컬 복구점 복원 · ${item.label}`);$('recoveryDialog').close();});
   root.querySelectorAll('[data-delete]').forEach(b=>b.onclick=async()=>{if(!requireAdmin('복구점 삭제'))return;if(!confirm('선택한 복구점을 삭제할까요? 삭제한 복구점은 되돌릴 수 없습니다.'))return;await deleteRecovery(b.dataset.delete);await showRecoveries();});
 }
@@ -5298,8 +5304,8 @@ function exportPrelimPilotReport(){if(!prelimPilotReport){notice('먼저 예선 
   if($('timeRefreshSeconds'))$('timeRefreshSeconds').onchange=()=>{pullSettings();commit(`진행시간 갱신주기 ${state.settings.timeRefreshSeconds}초`);restartTimeTimer();};
   if($('confirmResultBtn'))$('confirmResultBtn').onclick=confirmResult;
   if($('autoFitPrelimBtn'))$('autoFitPrelimBtn').onclick=()=>{try{autoFitPrelim();}catch(e){prelimNotice(e.message,'error');}};
-  if($('generatePrelimBtn'))$('generatePrelimBtn').onclick=()=>{try{createPrelim();}catch(e){prelimNotice(e.message,'error');}};
-  if($('assignPrelimCourtsBtn'))$('assignPrelimCourtsBtn').onclick=()=>{try{assignPrelim();}catch(e){prelimNotice(e.message,'error');}};
+  if($('generatePrelimBtn'))$('generatePrelimBtn').onclick=()=>{try{if(window.stage51058BeforePrelimRevision&&!window.stage51058BeforePrelimRevision('예선 재추첨'))return;createPrelim();}catch(e){prelimNotice(e.message,'error');}};
+  if($('assignPrelimCourtsBtn'))$('assignPrelimCourtsBtn').onclick=()=>{try{if(window.stage51058BeforePrelimRevision&&!window.stage51058BeforePrelimRevision('예선 코트 재배정'))return;assignPrelim();}catch(e){prelimNotice(e.message,'error');}};
   if($('swapReserveBtn'))$('swapReserveBtn').onclick=()=>{
     reserveSwapMode=!reserveSwapMode;
     if(!reserveSwapMode){pendingActiveSwapId=null;state.prelim.swapSelection=null;}
@@ -5652,6 +5658,16 @@ function renderPublicPrelimGroups(){
   const root=document.getElementById('publicPrelimGroupGrid');
   const summary=document.getElementById('publicPrelimSummary');
   if(!root)return;
+  const canView=typeof window.stage51058CanViewPrelim==='function'?window.stage51058CanViewPrelim():true;
+  if(!canView){
+    const pub=state.prelimPublication||{};
+    const when=pub.publishAt?new Date(pub.publishAt):null;
+    const whenText=when&&!Number.isNaN(when.getTime())?when.toLocaleString('ko-KR'):'공개시간 미정';
+    root.className='prelim-group-grid empty-state';
+    root.innerHTML=`<div class="stage51058-public-wait"><strong>예선 조편성·대진표 공개 전입니다.</strong><p>${pub.confirmed?`공개 예정: <b>${portalEscape(whenText)}</b>`:'운영자가 예선 대진을 준비하고 있습니다.'}</p></div>`;
+    if(summary)summary.textContent=pub.confirmed?`예선 공개예약 · ${whenText}`:'예선 대진 준비 중';
+    return;
+  }
   const prelim=state.prelim||{};
   const groups=Array.isArray(prelim.groups)?prelim.groups:[];
   const matches=Array.isArray(prelim.matches)?prelim.matches:[];
@@ -5824,7 +5840,8 @@ function myMatchStatusText(match){if(!match)return'대기';if(match.status==='co
 function renderMyMatchTeam(team){
   const root=document.getElementById('myMatchResult');if(!root)return;
   const teamLabel=portalTeam(team);const teamKey=myMatchTeamKey(team);
-  const prelim=state.prelim||{};const group=(prelim.groups||[]).find(g=>(g.teams||[]).some(t=>myMatchTeamKey(t)===teamKey));
+  const prelimVisible=typeof window.stage51058CanViewPrelim==='function'?window.stage51058CanViewPrelim():true;
+  const prelim=prelimVisible?(state.prelim||{}):{groups:[],matches:[],settings:state.prelim?.settings||{}};const group=(prelim.groups||[]).find(g=>(g.teams||[]).some(t=>myMatchTeamKey(t)===teamKey));
   const standing=(group?.standings||[]).find(s=>myMatchTeamKey(s.team)===teamKey);
   const prelimMatches=(prelim.matches||[]).filter(m=>myMatchContainsTeam(m,team)).sort((a,b)=>Number(a.matchNo||0)-Number(b.matchNo||0));
   const mainMatches=portalMainMatches().filter(m=>myMatchContainsTeam(m,team)).sort((a,b)=>{const ar=Number(String(a.id||'').match(/^r(\d+)_/)?.[1]||0),br=Number(String(b.id||'').match(/^r(\d+)_/)?.[1]||0);return br-ar;});
@@ -8580,8 +8597,9 @@ function archiveCurrentResult(){archiveCurrentTournament();}
 function printEscape(value){return String(value??'').replace(/[&<>'"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));}
 function printTeam(value){if(!value)return '미정';if(typeof value==='string')return value;try{return teamText(value)||value.name||value.teamName||'미정';}catch(_error){return value.name||value.teamName||'미정';}}
 function printHeader(title){const t=state.tournament||{},guide=state.portal?.guide||{};return `<header class="print-title"><h1>${printEscape(title)}</h1><p>${printEscape(t.name||'230MATCH 대회')} ${t.division?`· ${printEscape(t.division)}`:''}</p></header><div class="print-meta"><span>${guide.date?`대회일 ${printEscape(guide.date)}`:''}${guide.venue?` · ${printEscape(guide.venue)}`:''}</span><span>출력 ${new Date().toLocaleString('ko-KR')}</span></div>`;}
-function printPrelimHtml(){const groups=state.prelim?.groups||[],matches=state.prelim?.matches||[];if(!groups.length)return printHeader('예선 조편성·순위표')+'<div class="print-empty">생성된 예선 조편성이 없습니다.</div>';const cards=groups.map((g,idx)=>{const teams=g.teams||g.teamIds?.map(id=>(state.teams||[]).find(t=>t.id===id)).filter(Boolean)||[];const standings=g.standings||state.prelim?.standings?.[g.id]||[];const gm=matches.filter(m=>m.groupId===g.id);return `<article class="print-card"><h3>${printEscape(g.name||`${idx+1}조`)} ${g.courtName?`· ${printEscape(g.courtName)}`:''}</h3><table class="print-table"><thead><tr><th>순위</th><th>팀</th><th class="center">승</th><th class="center">패</th></tr></thead><tbody>${teams.map((t,i)=>{const row=standings.find?.(x=>x.teamId===t?.id)||standings[i]||{};return `<tr><td class="center">${row.rank||i+1}</td><td>${printEscape(printTeam(t))}</td><td class="center">${row.wins??'-'}</td><td class="center">${row.losses??'-'}</td></tr>`}).join('')}</tbody></table><div style="margin-top:7px">${gm.map(m=>`${printEscape(printTeam(m.teamA))} vs ${printEscape(printTeam(m.teamB))}${m.status==='completed'?` · ${m.scoreA??''}:${m.scoreB??''}`:''}`).join('<br>')}</div></article>`}).join('');return printHeader('예선 조편성·순위표')+`<div class="print-grid">${cards}</div>`;}
+function printPrelimHtml(){if(typeof window.stage51058CanViewPrelim==='function'&&!window.stage51058CanViewPrelim())return printHeader('예선 조편성·순위표')+'<div class="print-empty">예선 조편성·대진표는 아직 공개 전입니다.</div>';const groups=state.prelim?.groups||[],matches=state.prelim?.matches||[];if(!groups.length)return printHeader('예선 조편성·순위표')+'<div class="print-empty">생성된 예선 조편성이 없습니다.</div>';const cards=groups.map((g,idx)=>{const teams=g.teams||g.teamIds?.map(id=>(state.teams||[]).find(t=>t.id===id)).filter(Boolean)||[];const standings=g.standings||state.prelim?.standings?.[g.id]||[];const gm=matches.filter(m=>m.groupId===g.id);return `<article class="print-card"><h3>${printEscape(g.name||`${idx+1}조`)} ${g.courtName?`· ${printEscape(g.courtName)}`:''}</h3><table class="print-table"><thead><tr><th>순위</th><th>팀</th><th class="center">승</th><th class="center">패</th></tr></thead><tbody>${teams.map((t,i)=>{const row=standings.find?.(x=>x.teamId===t?.id)||standings[i]||{};return `<tr><td class="center">${row.rank||i+1}</td><td>${printEscape(printTeam(t))}</td><td class="center">${row.wins??'-'}</td><td class="center">${row.losses??'-'}</td></tr>`}).join('')}</tbody></table><div style="margin-top:7px">${gm.map(m=>`${printEscape(printTeam(m.teamA))} vs ${printEscape(printTeam(m.teamB))}${m.status==='completed'?` · ${m.scoreA??''}:${m.scoreB??''}`:''}`).join('<br>')}</div></article>`}).join('');return printHeader('예선 조편성·순위표')+`<div class="print-grid">${cards}</div>`;}
 function printPrelimAssignmentHtml(){
+  if(typeof window.stage51058CanViewPrelim==='function'&&!window.stage51058CanViewPrelim())return printHeader('시합 전 조편성·코트 배정표')+'<div class="print-empty">예선 조편성·대진표는 아직 공개 전입니다.</div>';
   const groups=state.prelim?.groups||[],matches=state.prelim?.matches||[];
   if(!groups.length)return printHeader('시합 전 조편성·코트 배정표')+'<div class="print-empty">생성된 예선 조편성이 없습니다.</div>';
   const cards=groups.map((g,idx)=>{
@@ -11163,10 +11181,10 @@ window.addEventListener('DOMContentLoaded',()=>{try{const hash=(location.hash||'
       move(child,mainTarget);
     });
 
-    rename('lockPrelimBtn','예선 확정');
+    rename('lockPrelimBtn','예선 확정(공개)');
     rename('unlockPrelimBtn','예선 잠금 해제');
     rename('resetPrelimBtn','예선 초기화');
-    rename('lockDrawBtn','본선 확정');
+    rename('lockDrawBtn','본선 확정(공개)');
     rename('unlockDrawBtn','본선 잠금 해제');
     rename('reshuffleDrawBtn','본선 재추첨');
     rename('resetBtn','전체 초기화');
@@ -11177,11 +11195,15 @@ window.addEventListener('DOMContentLoaded',()=>{try{const hash=(location.hash||'
     const dangerIds=['unlockPrelimBtn','resetPrelimBtn','reshuffleDrawBtn','unlockDrawBtn','resetBtn'];
     dangerIds.forEach(id=>move(document.getElementById(id),manageTarget));
     const recovery=document.getElementById('saveRecoveryBtnInline');
-    if(recovery){recovery.textContent='복구점 저장';move(recovery,manageTarget);}
-    const restore=document.createElement('button');
-    restore.type='button';restore.className='btn btn-light';restore.textContent='복구 열기';
-    restore.addEventListener('click',()=>window.stage5983OpenBackupCenter?.());
-    manageTarget.appendChild(restore);
+    if(recovery)recovery.hidden=true;
+    const existingRecovery=document.getElementById('stage51058BackupCenterLink');
+    if(!existingRecovery){
+      const restore=document.createElement('button');
+      restore.id='stage51058BackupCenterLink';restore.type='button';restore.className='btn btn-light';restore.textContent='백업·복구 센터';
+      restore.title='복구점 저장·복원은 백업·복구 센터에서 관리합니다.';
+      restore.addEventListener('click',()=>window.stage5983OpenBackupCenter?.());
+      manageTarget.appendChild(restore);
+    }
 
     // Primary actions first, secondary settings below.
     const prelimRow=prelimTarget.querySelector('.button-row');
@@ -12093,7 +12115,7 @@ let refreshDivisionEditorPanel = window.refreshDivisionEditorPanel || (()=>{});
     const linkedBtn=moveControl('generateLinkedDrawBtn',actions);if(linkedBtn)linkedBtn.textContent='본선 추첨';
     const syncBtn=moveControl('syncLinkedDrawBtn',actions);if(syncBtn)syncBtn.textContent='확정팀 반영';
     const assignBtn=moveControl('assignCourtsBtn',actions);if(assignBtn)assignBtn.textContent='본선 코트배정';
-    const lockBtn=moveControl('lockDrawBtn',actions);if(lockBtn)lockBtn.textContent='본선 확정';
+    const lockBtn=moveControl('lockDrawBtn',actions);if(lockBtn)lockBtn.textContent='본선 확정(공개)';
     const advanced=byId('stage3440AdvancedActions');
     ['instantDrawBtn','rouletteDrawBtn','seededDrawBtn'].forEach(id=>moveControl(id,advanced));
     const advBox=byId('stage3440AdvancedDraw');if(advBox)advBox.hidden=linked;
@@ -12197,7 +12219,7 @@ let refreshDivisionEditorPanel = window.refreshDivisionEditorPanel || (()=>{});
         <button type="button" id="stage3441FinalDraw" class="btn btn-primary">최종 본선 추첨</button>
         <button type="button" id="stage3441Sync" class="btn btn-light">확정팀 반영</button>
         <button type="button" id="stage3441Assign" class="btn btn-light">본선 코트배정</button>
-        <button type="button" id="stage3441Lock" class="btn btn-primary">본선 확정</button>
+        <button type="button" id="stage3441Lock" class="btn btn-primary">본선 확정(공개)</button>
         <button type="button" id="stage3441Reset" class="btn btn-danger-outline">본선 초기화</button>
       </div>`;
     $('stage3441SlotDraw').onclick=()=>{const b=$('generateLinkedDrawBtn');if(!b){notice?.('슬롯 선추첨 기능을 찾지 못했습니다.','error');return;}markSlotDraw();b.click();};
@@ -12351,7 +12373,7 @@ console.info('[230MATCH] 34.4.2 ready · main wait1 refill and shared queue elap
       panel=document.createElement('section');panel.id='stage3443PrelimLockPanel';panel.className='stage3443-prelim-lock-panel';
       panel.innerHTML=`
         <div class="p-lock-copy"><b id="stage3443PrelimLockTitle">예선 확정 상태</b><span id="stage3443PrelimLockDetail"></span></div>
-        <div class="p-lock-actions"><button type="button" id="stage3443PrelimLockBtn" class="btn btn-primary">예선 확정·잠금</button><button type="button" id="stage3443PrelimUnlockBtn" class="btn btn-danger-outline">예선 잠금 해제</button></div>`;
+        <div class="p-lock-actions"><button type="button" id="stage3443PrelimLockBtn" class="btn btn-primary">예선 결과 확정·잠금</button><button type="button" id="stage3443PrelimUnlockBtn" class="btn btn-danger-outline">예선 잠금 해제</button></div>`;
       host.prepend(panel);
       byId('stage3443PrelimLockBtn').addEventListener('click',()=>{
         if(typeof requireAdmin==='function'&&!requireAdmin('예선 확정·잠금'))return;
@@ -21587,3 +21609,104 @@ console.info('[230MATCH] 5.10.55 ready · 주민번호는 원천징수 대상자
 })();
 console.info('[230MATCH] 5.10.56 ready · authenticated admin only + admin/member preview toggle + PIN privilege removal');
 console.info('[230MATCH] 5.10.57 ready · single 일반 보기 toggle button for authenticated admin');
+
+
+/* 230MATCH 5.10.58 · prelim confirm -> scheduled publication + recovery center cleanup */
+(function stage51058PrelimScheduledPublication(){
+  const byId=id=>document.getElementById(id);
+  const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  function isPrivileged(){return currentRole==='admin'||currentRole==='operator';}
+  function pub(){
+    if(!state.prelimPublication||typeof state.prelimPublication!=='object')state.prelimPublication={confirmed:false,confirmedAt:null,publishAt:null,publishedAt:null};
+    return state.prelimPublication;
+  }
+  function isPublished(){
+    const p=pub();if(!p.confirmed)return false;
+    if(p.publishedAt)return true;
+    const t=p.publishAt?new Date(p.publishAt).getTime():0;
+    return Boolean(t&&Number.isFinite(t)&&Date.now()>=t);
+  }
+  window.stage51058CanViewPrelim=()=>isPrivileged()||isPublished();
+  function localInputValue(iso){
+    if(!iso)return'';const d=new Date(iso);if(Number.isNaN(d.getTime()))return'';
+    const pad=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+  function clearConfirmation(reason='예선 확정 취소'){
+    const p=pub();p.confirmed=false;p.confirmedAt=null;p.publishAt=null;p.publishedAt=null;
+    commit(reason);
+  }
+  window.stage51058BeforePrelimRevision=function(action='예선 수정'){
+    const p=pub();if(!p.confirmed)return true;
+    const live=isPublished();
+    const msg=live
+      ?`예선 조편성·대진표가 이미 참가자에게 공개되었습니다.\n\n${action}을 계속하면 공개된 내용이 바뀝니다. 정말 수정할까요?`
+      :`예선 대진이 확정되어 공개예약 단계입니다.\n\n${action}을 계속하면 현재 확정과 공개예약이 취소됩니다. 계속할까요?`;
+    if(!confirm(msg))return false;
+    try{saveRecovery(state,`${state.tournament?.name||'현재 대회'} · ${action} 전 자동 복구점`,{kind:'critical-auto'});}catch(_e){}
+    clearConfirmation(`${action}을 위한 예선 공개확정 취소`);
+    notice('예선 공개확정을 취소했습니다. 수정 후 다시 예선 확정과 공개시간을 설정하세요.','warning');
+    return true;
+  };
+  function confirmDraft(){
+    if(!requireAdmin('예선 대진 확정'))return;
+    const groups=state.prelim?.groups||[],matches=state.prelim?.matches||[];
+    if(!groups.length||!matches.length){notice('예선 조추첨과 경기표를 먼저 생성하세요.','warning');return;}
+    if(!confirm(`현재 예선 ${groups.length}개 조 · ${matches.length}경기를 공개 예정 대진으로 확정할까요?\n\n확정 후 공개시간을 예약할 수 있습니다.`))return;
+    try{saveRecovery(state,`${state.tournament?.name||'현재 대회'} · 예선 공개확정 직전`,{kind:'critical-auto'});}catch(_e){}
+    const p=pub();p.confirmed=true;p.confirmedAt=new Date().toISOString();p.publishAt=null;p.publishedAt=null;
+    commit(`예선 공개대진 확정 · ${groups.length}조 · ${matches.length}경기`);
+    notice('예선 대진을 확정했습니다. 이제 공개시간을 설정하세요.','success');refresh();
+  }
+  function saveSchedule(){
+    if(!requireAdmin('예선 공개예약'))return;
+    const p=pub();if(!p.confirmed){notice('먼저 예선 대진을 확정하세요.','warning');return;}
+    const input=byId('stage51058PublishAt');const raw=String(input?.value||'');if(!raw){notice('공개할 날짜와 시간을 입력하세요.','warning');return;}
+    const d=new Date(raw);if(Number.isNaN(d.getTime())){notice('공개시간 형식이 올바르지 않습니다.','error');return;}
+    if(d.getTime()<=Date.now()){notice('예약 공개시간은 현재보다 이후로 설정하세요. 즉시 공개하려면 즉시 공개 버튼을 사용하세요.','warning');return;}
+    p.publishAt=d.toISOString();p.publishedAt=null;
+    commit(`예선 공개예약 · ${d.toLocaleString('ko-KR')}`);
+    notice(`예선 공개시간을 ${d.toLocaleString('ko-KR')}로 예약했습니다.`,'success');refresh();
+  }
+  function publishNow(){
+    if(!requireAdmin('예선 즉시 공개'))return;const p=pub();if(!p.confirmed){notice('먼저 예선 대진을 확정하세요.','warning');return;}
+    if(!confirm('현재 확정된 예선 조편성·대진표를 지금 참가자에게 공개할까요?'))return;
+    const now=new Date().toISOString();p.publishAt=now;p.publishedAt=now;commit('예선 조편성·대진표 즉시 공개');notice('예선 조편성·대진표를 공개했습니다.','success');refresh();renderPublicPrelimGroups?.();
+  }
+  function cancelConfirmed(){
+    if(!requireAdmin('예선 확정 취소'))return;const p=pub();if(!p.confirmed)return;
+    const live=isPublished();if(!confirm(live?'이미 공개된 예선입니다. 확정을 취소하고 수정 단계로 돌아갈까요?':'예선 확정과 공개예약을 취소하고 다시 수정할까요?'))return;
+    try{saveRecovery(state,`${state.tournament?.name||'현재 대회'} · 예선 확정 취소 직전`,{kind:'critical-auto'});}catch(_e){}
+    clearConfirmation('예선 공개확정 취소');notice('수정 단계로 돌아왔습니다. 수정 후 다시 확정하세요.','warning');refresh();
+  }
+  function ensurePanel(){
+    const host=byId('stage342PrelimContent')||byId('unifiedPrelimSetup');if(!host)return null;
+    const old=byId('stage3443PrelimLockPanel');if(old)old.hidden=true;
+    let panel=byId('stage51058PrelimPublishPanel');if(panel)return panel;
+    panel=document.createElement('section');panel.id='stage51058PrelimPublishPanel';panel.className='stage51058-prelim-publish';
+    panel.innerHTML=`<div class="stage51058-pub-copy"><b id="stage51058PubTitle">예선 공개 준비</b><span id="stage51058PubDetail"></span></div><div class="stage51058-pub-controls"><button type="button" class="btn btn-primary" id="stage51058ConfirmBtn">예선 확정(공개)</button><label id="stage51058ScheduleWrap" hidden>공개시간 <input type="datetime-local" id="stage51058PublishAt"></label><button type="button" class="btn btn-primary" id="stage51058ScheduleBtn" hidden>예약 저장</button><button type="button" class="btn btn-light" id="stage51058NowBtn" hidden>즉시 공개</button><button type="button" class="btn btn-danger-outline" id="stage51058CancelBtn" hidden>확정 취소·수정</button></div>`;
+    host.prepend(panel);
+    byId('stage51058ConfirmBtn')?.addEventListener('click',confirmDraft);byId('stage51058ScheduleBtn')?.addEventListener('click',saveSchedule);byId('stage51058NowBtn')?.addEventListener('click',publishNow);byId('stage51058CancelBtn')?.addEventListener('click',cancelConfirmed);
+    return panel;
+  }
+  function refresh(){
+    const panel=ensurePanel();if(!panel)return;panel.hidden=currentRole!=='admin';
+    const p=pub(),groups=state.prelim?.groups?.length||0,matches=state.prelim?.matches?.length||0,live=isPublished();
+    const title=byId('stage51058PubTitle'),detail=byId('stage51058PubDetail');
+    const confirmBtn=byId('stage51058ConfirmBtn'),scheduleWrap=byId('stage51058ScheduleWrap'),scheduleBtn=byId('stage51058ScheduleBtn'),nowBtn=byId('stage51058NowBtn'),cancelBtn=byId('stage51058CancelBtn'),input=byId('stage51058PublishAt');
+    if(!p.confirmed){if(title)title.textContent='예선 추첨·검토 단계';if(detail)detail.textContent=`${groups}조 · ${matches}경기 · 확정 전에는 재추첨 가능`;}
+    else if(live){if(title)title.textContent='예선 공개 중';if(detail)detail.textContent=`참가자에게 공개됨${p.publishAt?` · ${new Date(p.publishAt).toLocaleString('ko-KR')}`:''}`;}
+    else if(p.publishAt){if(title)title.textContent='예선 공개예약 완료';if(detail)detail.textContent=`${new Date(p.publishAt).toLocaleString('ko-KR')} 자동 공개 예정`;}
+    else{if(title)title.textContent='예선 확정 완료 · 공개시간 설정';if(detail)detail.textContent='대진은 확정되었습니다. 예약시간 또는 즉시 공개를 선택하세요.';}
+    if(confirmBtn)confirmBtn.hidden=p.confirmed;if(scheduleWrap)scheduleWrap.hidden=!p.confirmed||live;if(scheduleBtn)scheduleBtn.hidden=!p.confirmed||live;if(nowBtn)nowBtn.hidden=!p.confirmed||live;if(cancelBtn)cancelBtn.hidden=!p.confirmed;
+    if(input&&document.activeElement!==input)input.value=localInputValue(p.publishAt);
+  }
+  const style=document.createElement('style');style.id='stage51058Style';style.textContent=`.stage51058-prelim-publish{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:14px 16px;margin:0 0 14px;border:1px solid #9db8df;border-radius:14px;background:#f6faff}.stage51058-pub-copy{display:grid;gap:4px}.stage51058-pub-copy span{color:#5b6c82;font-size:12px}.stage51058-pub-controls{display:flex;gap:8px;align-items:end;flex-wrap:wrap}.stage51058-pub-controls label{display:grid;gap:4px;font-size:11px;color:#64748b}.stage51058-pub-controls input{min-height:40px;border:1px solid #cbd5e1;border-radius:9px;padding:0 8px;background:#fff}.stage51058-public-wait{padding:26px 18px;text-align:center}.stage51058-public-wait strong{display:block;font-size:18px;color:#17365f}.stage51058-public-wait p{margin:8px 0 0;color:#64748b}.stage51058-auto-recoveries{margin-top:12px;border:1px solid #d7e2f2;border-radius:14px;background:#f8fbff;overflow:hidden}.stage51058-auto-recoveries>summary{cursor:pointer;padding:13px 15px;font-weight:800;color:#17365f}.stage51058-auto-recovery-list{padding:0 10px 10px}.stage51058-recovery-manual>h3{font-size:13px;color:#334155;margin:8px 0}@media(max-width:720px){.stage51058-prelim-publish{align-items:stretch;flex-direction:column}.stage51058-pub-controls>*{flex:1}.stage51058-pub-controls label{flex-basis:100%}.stage51058-pub-controls input{width:100%}}`;
+  if(!byId('stage51058Style'))document.head.appendChild(style);
+  let wasPublic=isPublished();setInterval(()=>{const nowPublic=isPublished();if(nowPublic!==wasPublic){wasPublic=nowPublic;refresh();try{if(document.body?.dataset.currentView==='prelim-public')renderPublicPrelimGroups();}catch(_e){}try{renderMyMatch?.();}catch(_e){}}},15000);
+  const ready=()=>{refresh();setTimeout(refresh,300);};if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ready,{once:true});else ready();
+  document.addEventListener('click',e=>{if(e.target.closest?.('[data-operation-section],[data-portal-go="operation"]'))setTimeout(refresh,30);},true);
+  const oldCommit=commit;commit=function(message){const r=oldCommit(message);setTimeout(refresh,0);return r;};
+  window.stage51058RefreshPrelimPublication=refresh;
+})();
+console.info('[230MATCH] 5.10.58 ready · 예선 확정→예약공개 + 복구센터 통합 + 자동복구점 접기/펼치기');
+console.info('[230MATCH] 5.10.59 ready · 예선/본선 확정(공개) 버튼명 명확화');
