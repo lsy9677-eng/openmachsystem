@@ -21456,3 +21456,125 @@ console.info('[230MATCH] 5.10.53 ready · prize signature column rebalance + opt
 
 console.info('[230MATCH] 5.10.54 ready · prize tax minimum threshold (기타소득금액 5만원 이하 비과세)');
 console.info('[230MATCH] 5.10.55 ready · 주민번호는 원천징수 대상자만 작성하는 최종 서명부 양식');
+
+/* 230MATCH 5.10.56 · authenticated-admin safety gate / no PIN privilege escalation */
+(function stage51056AuthenticatedAdminSafety(){
+  const originalApplyRoleUI=applyRoleUI;
+  const originalApplyAuthenticatedRole=applyAuthenticatedRole;
+
+  function authenticatedBaseRole(){
+    try{return String(stage354AuthBaseRole||'viewer');}catch(_e){return currentAuthUser?String(currentRole||'viewer'):'viewer';}
+  }
+  function isAuthenticatedAdminAccount(){
+    return !!currentAuthUser && authenticatedBaseRole()==='admin';
+  }
+  function isAuthenticatedOperatorAccount(){
+    if(!currentAuthUser)return false;
+    try{return stage354ResolveRole(authenticatedBaseRole())==='operator';}catch(_e){return authenticatedBaseRole()==='operator';}
+  }
+  function setActualRole(next){
+    const before=currentRole;
+    currentRole=next;
+    setManualRoleOverride('');
+    sessionStorage.setItem(ROLE_KEY,currentRole);
+    applyRoleUI();
+    renderAuthStatus();
+    if(before!==currentRole)refreshSyncAccessMode();
+    try{renderPortalViews?.();}catch(_e){}
+    try{renderOperatorControls?.();}catch(_e){}
+  }
+
+  // 과거 PIN/수동 권한 흔적은 더 이상 관리자·진행자 권한 근거로 사용하지 않는다.
+  try{
+    localStorage.removeItem(ADMIN_PIN_KEY);
+    localStorage.removeItem(OPERATOR_PIN_KEY);
+    sessionStorage.removeItem(MANUAL_ROLE_OVERRIDE_KEY);
+    manualRoleOverride='';
+    if(!currentAuthUser){currentRole='viewer';sessionStorage.setItem(ROLE_KEY,'viewer');}
+  }catch(_e){}
+
+  applyAuthenticatedRole=function(user,role='viewer',profile=null){
+    // 로그인 공급자/계정 판정 결과만 신뢰한다. 예전 PIN 세션 승격은 폐기한다.
+    setManualRoleOverride('');
+    return originalApplyAuthenticatedRole(user,role,profile);
+  };
+
+  setRole=function(role){
+    const target=['viewer','operator','admin'].includes(role)?role:'viewer';
+    if(target==='viewer'){
+      if(isAuthenticatedAdminAccount()){
+        setActualRole('viewer');
+        document.body.dataset.adminPreview='member';
+        notice('일반 회원 보기로 전환했습니다. 관리자 계정은 유지되며 관리자 보기로 바로 돌아갈 수 있습니다.','success');
+        return true;
+      }
+      // 일반회원은 별도 역할 전환 기능이 필요 없다.
+      if(currentRole!=='viewer')setActualRole('viewer');
+      return true;
+    }
+    if(target==='admin'){
+      if(!currentAuthUser){openSocialLogin();notice('관리자 계정으로 로그인해 주세요. PIN 관리자 로그인은 사용하지 않습니다.','info');return false;}
+      if(!isAuthenticatedAdminAccount()){
+        notice('현재 로그인 계정에는 관리자 권한이 없습니다. 관리자 지정 계정으로 로그인해 주세요.','error');
+        return false;
+      }
+      setActualRole('admin');
+      document.body.dataset.adminPreview='admin';
+      notice('관리자 보기로 전환했습니다.','success');
+      return true;
+    }
+    // 진행자는 PIN이 아니라 계정 + 관리자가 부여한 진행자 권한으로만 활성화한다.
+    if(!currentAuthUser){openSocialLogin();notice('진행자 계정으로 로그인해 주세요.','info');return false;}
+    if(!isAuthenticatedOperatorAccount()){
+      notice('진행자 권한이 부여된 계정이 아닙니다. 관리자 설정에서 진행자 권한을 부여해 주세요.','error');
+      return false;
+    }
+    setActualRole('operator');
+    notice('진행자 권한으로 전환했습니다.','success');
+    return true;
+  };
+
+  changeAdminPin=function(){
+    notice('PIN 관리자/진행자 로그인은 보안상 폐지되었습니다. 관리자·진행자는 지정된 로그인 계정으로 인증합니다.','info');
+    return false;
+  };
+
+  applyRoleUI=function(){
+    originalApplyRoleUI();
+    const adminAccount=isAuthenticatedAdminAccount();
+    const adminMode=isAdmin();
+    const memberPreview=adminAccount&&!adminMode;
+    if(document.body){
+      document.body.dataset.adminAccount=adminAccount?'true':'false';
+      document.body.dataset.adminPreview=memberPreview?'member':(adminMode?'admin':'none');
+    }
+    const viewerBtn=document.getElementById('roleViewerBtn');
+    if(viewerBtn){
+      viewerBtn.hidden=!adminAccount;
+      viewerBtn.textContent='일반회원 보기';
+      viewerBtn.classList.toggle('active',memberPreview);
+      viewerBtn.title='관리자 계정으로 일반 회원 화면을 확인합니다.';
+    }
+    const adminBtn=document.getElementById('roleAdminBtn');
+    if(adminBtn){
+      adminBtn.hidden=!adminAccount;
+      adminBtn.textContent='관리자 보기';
+      adminBtn.classList.toggle('active',adminMode);
+      adminBtn.title='인증된 관리자 계정에서만 사용할 수 있습니다.';
+    }
+    const operatorBtn=document.getElementById('roleOperatorBtn');
+    if(operatorBtn)operatorBtn.hidden=true;
+    const pinBtn=document.getElementById('changeAdminPinBtn');
+    if(pinBtn)pinBtn.hidden=true;
+    document.querySelectorAll('[data-admin-login],[data-operator-login]').forEach(el=>{el.hidden=true;});
+  };
+
+  // 초기 화면에서도 기존 PIN 버튼/수동 승격 UI가 보이지 않도록 즉시 동기화한다.
+  try{applyRoleUI();renderAuthStatus();}catch(_e){}
+  window.stage51056AuthSafety={
+    isAuthenticatedAdminAccount,
+    isAuthenticatedOperatorAccount,
+    version:'5.10.56'
+  };
+})();
+console.info('[230MATCH] 5.10.56 ready · authenticated admin only + admin/member preview toggle + PIN privilege removal');
