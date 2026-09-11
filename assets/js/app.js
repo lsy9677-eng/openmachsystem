@@ -21820,9 +21820,10 @@ console.info('[230MATCH] 5.10.61 ready · admin participant replacement with own
     return v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(v));
   }
   function hasStarted(){
-    // 조편성/코트 배정만으로 생성되는 대기시각(waitStartedAt)은 실제 경기 시작으로 보지 않는다.
-    // 실제 경기중·완료, 시작/완료시각, 승자, 점수 입력이 있을 때만 수동조정을 잠근다.
-    return matches().some(m=>m?.status==='playing'||m?.status==='completed'||m?.winner||m?.winnerId||m?.startedAt||m?.completedAt||hasScoreValue(m?.scoreA)||hasScoreValue(m?.scoreB));
+    // 중요: 코트 자동배정/재배정 과정에서 status='playing' 또는 startedAt이 자동으로 잡힐 수 있다.
+    // 이것만으로 실제 경기가 시작됐다고 판단하면 첫 수동조정 뒤 두 번째부터 버튼이 잠기는 문제가 생긴다.
+    // 수동조정 잠금은 실제 경기결과 흔적(완료/승자/점수)이 생겼을 때만 적용한다.
+    return matches().some(m=>m?.status==='completed'||m?.winner||m?.winnerId||m?.completedAt||hasScoreValue(m?.scoreA)||hasScoreValue(m?.scoreB));
   }
   function ensureStyle(){
     if(document.getElementById(STYLE_ID))return;
@@ -21863,6 +21864,7 @@ console.info('[230MATCH] 5.10.61 ready · admin participant replacement with own
     d.querySelector('#stage51062TargetGroup').onchange=()=>updateStatus(d);
     d.querySelector('#stage51062TargetTeam').onchange=()=>updateStatus(d);
     d.querySelector('#stage51062Apply').onclick=()=>applyChange(d);
+    d.addEventListener('close',()=>{setTimeout(()=>{try{if(!d.open&&d.isConnected)d.remove();}catch(_e){}},0);},{once:true});
     return d;
   }
   function flatSlots(){
@@ -21907,7 +21909,7 @@ console.info('[230MATCH] 5.10.61 ready · admin participant replacement with own
   function applyChange(d){
     if(!requireAdmin('예선 조편성 수정'))return;
     if(!groups().length){prelimNotice('먼저 예선 조추첨을 진행하세요.','warning');return;}
-    if(hasStarted()){prelimNotice('이미 시작되거나 결과가 입력된 예선 경기가 있어 조편성을 변경할 수 없습니다. 경기 시작 전까지만 가능합니다.','error');return;}
+    if(hasStarted()){prelimNotice('이미 경기결과가 입력된 예선 경기가 있어 조편성을 변경할 수 없습니다.','error');return;}
     if(window.stage51058BeforePrelimRevision&&!window.stage51058BeforePrelimRevision('예선 조편성 수동 수정'))return;
     const slots=flatSlots(),srcKey=d.querySelector('#stage51062SourceTeam')?.value||'',srcIndex=slots.findIndex(x=>x.key===srcKey);if(srcIndex<0)return;
     const mode=d.querySelector('#stage51062Mode').value;
@@ -21928,7 +21930,10 @@ console.info('[230MATCH] 5.10.61 ready · admin participant replacement with own
     if(state.prelim){state.prelim.manualGroupEditedAt=new Date().toISOString();state.prelim.manualGroupEditNote=description;}
     commit(`예선 조편성 수동 수정 · ${description}`);
     prelimNotice(`조편성을 변경했습니다. ${description} · 코트 배정을 다시 동기화했습니다.`,'success');
-    fill(d);renderPreview(d);
+    // 적용 후 창을 완전히 닫고 제거한다. 다음 수동조정 때 새 창을 만들도록 해 반복 사용 시 dialog 상태가 남지 않게 한다.
+    try{if(d?.open)d.close();}catch(_e){}
+    try{d?.remove();}catch(_e){}
+    setTimeout(()=>{try{injectButton();syncButtonVisibility();}catch(_e){}},60);
   }
   function adminAccountPreviewingMember(){
     try{return document.body?.dataset?.adminAccount==='true'&&document.body?.dataset?.adminPreview==='member';}catch(_e){return false;}
@@ -21941,7 +21946,7 @@ console.info('[230MATCH] 5.10.61 ready · admin participant replacement with own
       }
       if(!requireAdmin('예선 조편성 수정'))return;
       if(!groups().length){prelimNotice('먼저 예선 조추첨을 진행하세요.','warning');return;}
-      if(hasStarted()){prelimNotice('예선 경기가 이미 시작되어 조편성 수정이 잠겼습니다.','error');return;}
+      if(hasStarted()){prelimNotice('예선 경기결과가 이미 입력되어 조편성 수정이 잠겼습니다.','error');return;}
       const d=buildDialog();fill(d);
       if(typeof d.showModal==='function'){
         if(!d.open)d.showModal();
@@ -21959,7 +21964,7 @@ console.info('[230MATCH] 5.10.61 ready · admin participant replacement with own
     const adminMode=(typeof isAdmin==='function'&&isAdmin());
     btn.hidden=!adminMode;
     btn.disabled=!adminMode||!groups().length||hasStarted();
-    btn.title=!adminMode?'관리자 보기에서만 사용할 수 있습니다.':!groups().length?'예선 조추첨 후 사용할 수 있습니다.':hasStarted()?'예선 경기 시작 후에는 조편성을 변경할 수 없습니다.':'예선 조편성을 이동하거나 팀끼리 맞교환합니다.';
+    btn.title=!adminMode?'관리자 보기에서만 사용할 수 있습니다.':!groups().length?'예선 조추첨 후 사용할 수 있습니다.':hasStarted()?'예선 경기결과 입력 후에는 조편성을 변경할 수 없습니다.':'예선 조편성을 이동하거나 팀끼리 맞교환합니다.';
   }
   function injectButton(){
     const anchor=document.getElementById('assignPrelimCourtsBtn')||document.getElementById('generatePrelimBtn');if(!anchor){return;}
@@ -21989,3 +21994,4 @@ console.info('[230MATCH] 5.10.62 ready · admin prelim group manual move/swap af
 console.info('[230MATCH] 5.10.63 ready · prelim group editor button click/modal reliability fix');
 console.info('[230MATCH] 5.10.64 ready · prelim group editor false-start lock fix (null score safe)');
 console.info('[230MATCH] 5.10.65 ready · prelim group editor repeat-use fix (waiting timestamp no longer locks editor)');
+console.info('[230MATCH] 5.10.66 ready · repeat group edit hard fix: court assignment playing/start markers ignored + fresh modal each use');
