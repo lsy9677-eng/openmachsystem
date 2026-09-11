@@ -21693,14 +21693,26 @@ console.info('[230MATCH] 5.10.57 ready · single 일반 보기 toggle button for
     const p=pub(),groups=state.prelim?.groups?.length||0,matches=state.prelim?.matches?.length||0,live=isPublished();
     const title=byId('stage51058PubTitle'),detail=byId('stage51058PubDetail');
     const confirmBtn=byId('stage51058ConfirmBtn'),scheduleWrap=byId('stage51058ScheduleWrap'),scheduleBtn=byId('stage51058ScheduleBtn'),nowBtn=byId('stage51058NowBtn'),cancelBtn=byId('stage51058CancelBtn'),input=byId('stage51058PublishAt');
-    if(!p.confirmed){if(title)title.textContent='예선 추첨·검토 단계';if(detail)detail.textContent=`${groups}조 · ${matches}경기 · 확정 전에는 재추첨 가능`;}
+    if(!p.confirmed){
+      if(title)title.textContent='예선 추첨·검토 단계';
+      if(detail)detail.textContent=(groups>0&&matches>0)?`${groups}조 · ${matches}경기 · 확정 전에는 재추첨 가능`:'예선 조추첨과 경기표 생성 후 예선 확정(공개)을 사용할 수 있습니다.';
+    }
     else if(live){if(title)title.textContent='예선 공개 중';if(detail)detail.textContent=`참가자에게 공개됨${p.publishAt?` · ${new Date(p.publishAt).toLocaleString('ko-KR')}`:''}`;}
     else if(p.publishAt){if(title)title.textContent='예선 공개예약 완료';if(detail)detail.textContent=`${new Date(p.publishAt).toLocaleString('ko-KR')} 자동 공개 예정`;}
     else{if(title)title.textContent='예선 확정 완료 · 공개시간 설정';if(detail)detail.textContent='대진은 확정되었습니다. 예약시간 또는 즉시 공개를 선택하세요.';}
-    if(confirmBtn)confirmBtn.hidden=p.confirmed;if(scheduleWrap)scheduleWrap.hidden=!p.confirmed||live;if(scheduleBtn)scheduleBtn.hidden=!p.confirmed||live;if(nowBtn)nowBtn.hidden=!p.confirmed||live;if(cancelBtn)cancelBtn.hidden=!p.confirmed;
+    if(confirmBtn){
+      confirmBtn.hidden=p.confirmed;
+      const readyToConfirm=groups>0&&matches>0;
+      confirmBtn.disabled=!p.confirmed&&!readyToConfirm;
+      confirmBtn.setAttribute('aria-disabled',String(!p.confirmed&&!readyToConfirm));
+      confirmBtn.title=!p.confirmed&&!readyToConfirm?'예선 조추첨과 경기표 생성 후 확정(공개)할 수 있습니다.':'';
+      if(!p.confirmed&&!readyToConfirm)confirmBtn.textContent='예선 확정(공개) · 추첨 후 가능';
+      else confirmBtn.textContent='예선 확정(공개)';
+    }
+    if(scheduleWrap)scheduleWrap.hidden=!p.confirmed||live;if(scheduleBtn)scheduleBtn.hidden=!p.confirmed||live;if(nowBtn)nowBtn.hidden=!p.confirmed||live;if(cancelBtn)cancelBtn.hidden=!p.confirmed;
     if(input&&document.activeElement!==input)input.value=localInputValue(p.publishAt);
   }
-  const style=document.createElement('style');style.id='stage51058Style';style.textContent=`.stage51058-prelim-publish{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:14px 16px;margin:0 0 14px;border:1px solid #9db8df;border-radius:14px;background:#f6faff}.stage51058-pub-copy{display:grid;gap:4px}.stage51058-pub-copy span{color:#5b6c82;font-size:12px}.stage51058-pub-controls{display:flex;gap:8px;align-items:end;flex-wrap:wrap}.stage51058-pub-controls label{display:grid;gap:4px;font-size:11px;color:#64748b}.stage51058-pub-controls input{min-height:40px;border:1px solid #cbd5e1;border-radius:9px;padding:0 8px;background:#fff}.stage51058-public-wait{padding:26px 18px;text-align:center}.stage51058-public-wait strong{display:block;font-size:18px;color:#17365f}.stage51058-public-wait p{margin:8px 0 0;color:#64748b}.stage51058-auto-recoveries{margin-top:12px;border:1px solid #d7e2f2;border-radius:14px;background:#f8fbff;overflow:hidden}.stage51058-auto-recoveries>summary{cursor:pointer;padding:13px 15px;font-weight:800;color:#17365f}.stage51058-auto-recovery-list{padding:0 10px 10px}.stage51058-recovery-manual>h3{font-size:13px;color:#334155;margin:8px 0}@media(max-width:720px){.stage51058-prelim-publish{align-items:stretch;flex-direction:column}.stage51058-pub-controls>*{flex:1}.stage51058-pub-controls label{flex-basis:100%}.stage51058-pub-controls input{width:100%}}`;
+  const style=document.createElement('style');style.id='stage51058Style';style.textContent=`.stage51058-prelim-publish{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:14px 16px;margin:0 0 14px;border:1px solid #9db8df;border-radius:14px;background:#f6faff}.stage51058-pub-copy{display:grid;gap:4px}.stage51058-pub-copy span{color:#5b6c82;font-size:12px}.stage51058-pub-controls{display:flex;gap:8px;align-items:end;flex-wrap:wrap}.stage51058-pub-controls label{display:grid;gap:4px;font-size:11px;color:#64748b}.stage51058-pub-controls input{min-height:40px;border:1px solid #cbd5e1;border-radius:9px;padding:0 8px;background:#fff}.stage51058-pub-controls button:disabled{opacity:.48;cursor:not-allowed;filter:grayscale(.25)}.stage51058-public-wait{padding:26px 18px;text-align:center}.stage51058-public-wait strong{display:block;font-size:18px;color:#17365f}.stage51058-public-wait p{margin:8px 0 0;color:#64748b}.stage51058-auto-recoveries{margin-top:12px;border:1px solid #d7e2f2;border-radius:14px;background:#f8fbff;overflow:hidden}.stage51058-auto-recoveries>summary{cursor:pointer;padding:13px 15px;font-weight:800;color:#17365f}.stage51058-auto-recovery-list{padding:0 10px 10px}.stage51058-recovery-manual>h3{font-size:13px;color:#334155;margin:8px 0}@media(max-width:720px){.stage51058-prelim-publish{align-items:stretch;flex-direction:column}.stage51058-pub-controls>*{flex:1}.stage51058-pub-controls label{flex-basis:100%}.stage51058-pub-controls input{width:100%}}`;
   if(!byId('stage51058Style'))document.head.appendChild(style);
   let wasPublic=isPublished();setInterval(()=>{const nowPublic=isPublished();if(nowPublic!==wasPublic){wasPublic=nowPublic;refresh();try{if(document.body?.dataset.currentView==='prelim-public')renderPublicPrelimGroups();}catch(_e){}try{renderMyMatch?.();}catch(_e){}}},15000);
   const ready=()=>{refresh();setTimeout(refresh,300);};if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ready,{once:true});else ready();
@@ -21710,3 +21722,4 @@ console.info('[230MATCH] 5.10.57 ready · single 일반 보기 toggle button for
 })();
 console.info('[230MATCH] 5.10.58 ready · 예선 확정→예약공개 + 복구센터 통합 + 자동복구점 접기/펼치기');
 console.info('[230MATCH] 5.10.59 ready · 예선/본선 확정(공개) 버튼명 명확화');
+console.info('[230MATCH] 5.10.60 ready · 예선 추첨 전 확정(공개) 버튼 비활성 + 안내');
