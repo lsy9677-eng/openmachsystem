@@ -21846,11 +21846,12 @@ console.info('[230MATCH] 5.10.61 ready · admin participant replacement with own
     d.innerHTML=`<form method="dialog" class="modal-card">
       <div class="modal-head"><div><strong>예선 조편성 수동 조정</strong><small>코트 배정 후에도 경기 시작 전까지 조편성을 정리할 수 있습니다.</small></div><button value="cancel" class="icon-btn" aria-label="닫기">×</button></div>
       <div class="modal-body">
-        <div class="stage51062-help"><b>순서 이동</b>은 선택한 팀을 목표 조의 첫 위치로 옮기고, 그 사이 팀들이 한 자리씩 자동으로 당겨지거나 밀립니다. <b>팀 맞교환</b>은 두 팀의 자리만 서로 바꿉니다. 조 개수·조별 팀 수·코트 배정 기준은 유지합니다.</div>
+        <div class="stage51062-help"><b>순서 이동</b>은 목표 조와 <b>그 조의 자리번호</b>까지 지정합니다. 예: 10조 2번 팀 → 15조 1번 자리. 선택한 팀이 그 자리에 들어가고, 사이 팀들은 한 자리씩 자동으로 당겨지거나 밀립니다. <b>팀 맞교환</b>은 두 팀의 자리만 서로 바꿉니다. 조 개수·조별 팀 수·코트 배정 기준은 유지합니다.</div>
         <div class="stage51062-grid">
           <div class="stage51062-field"><label>변경할 팀</label><select id="stage51062SourceTeam"></select></div>
-          <div class="stage51062-field"><label>변경 방식</label><select id="stage51062Mode"><option value="move">순서 이동 · 중간 팀 자동 당김</option><option value="swap">다른 팀과 위치 맞교환</option></select></div>
-          <div class="stage51062-field" id="stage51062MoveWrap"><label>이동할 조</label><select id="stage51062TargetGroup"></select></div>
+          <div class="stage51062-field"><label>변경 방식</label><select id="stage51062Mode"><option value="move">순서 이동 · 지정 자리로 이동</option><option value="swap">다른 팀과 위치 맞교환</option></select></div>
+          <div class="stage51062-field" id="stage51062MoveGroupWrap"><label>이동할 조</label><select id="stage51062TargetGroup"></select></div>
+          <div class="stage51062-field" id="stage51062MovePositionWrap"><label>이동할 조의 자리</label><select id="stage51062TargetPosition"></select></div>
           <div class="stage51062-field" id="stage51062SwapWrap" hidden><label>맞교환할 팀</label><select id="stage51062TargetTeam"></select></div>
         </div>
         <div id="stage51062Status" class="stage51062-help">팀을 선택하고 이동 또는 맞교환 방식을 지정하세요.</div>
@@ -21861,7 +21862,8 @@ console.info('[230MATCH] 5.10.61 ready · admin participant replacement with own
     document.body.appendChild(d);
     d.querySelector('#stage51062Mode').onchange=()=>syncMode(d);
     d.querySelector('#stage51062SourceTeam').onchange=()=>{fillTargetTeams(d);updateStatus(d)};
-    d.querySelector('#stage51062TargetGroup').onchange=()=>updateStatus(d);
+    d.querySelector('#stage51062TargetGroup').onchange=()=>{fillTargetPositions(d);updateStatus(d)};
+    d.querySelector('#stage51062TargetPosition').onchange=()=>updateStatus(d);
     d.querySelector('#stage51062TargetTeam').onchange=()=>updateStatus(d);
     d.querySelector('#stage51062Apply').onclick=()=>applyChange(d);
     d.addEventListener('close',()=>{setTimeout(()=>{try{if(!d.open&&d.isConnected)d.remove();}catch(_e){}},0);},{once:true});
@@ -21872,16 +21874,28 @@ console.info('[230MATCH] 5.10.61 ready · admin participant replacement with own
   }
   function fill(d){
     const gs=groups(),slots=flatSlots(),src=d.querySelector('#stage51062SourceTeam'),tg=d.querySelector('#stage51062TargetGroup');
-    src.innerHTML=slots.map(x=>`<option value="${esc(x.key)}">${esc(x.g.groupNo||x.gi+1)}조 · ${esc(teamLabel(x.t))}</option>`).join('');
+    src.innerHTML=slots.map(x=>`<option value="${esc(x.key)}">${esc(x.g.groupNo||x.gi+1)}조 ${x.si+1}번 · ${esc(teamLabel(x.t))}</option>`).join('');
     tg.innerHTML=gs.map((g,i)=>`<option value="${i}">${esc(g.groupNo||i+1)}조</option>`).join('');
-    fillTargetTeams(d);renderPreview(d);syncMode(d);updateStatus(d);
+    fillTargetPositions(d);fillTargetTeams(d);renderPreview(d);syncMode(d);updateStatus(d);
+  }
+  function fillTargetPositions(d){
+    const gi=Math.max(0,Math.min(groups().length-1,Number(d.querySelector('#stage51062TargetGroup')?.value||0)));
+    const g=groups()[gi],sel=d.querySelector('#stage51062TargetPosition');if(!sel)return;
+    const count=Math.max(1,Array.isArray(g?.teams)?g.teams.length:0);
+    const previous=Math.max(1,Number(sel.value||1));
+    sel.innerHTML=Array.from({length:count},(_,i)=>`<option value="${i}">${i+1}번 자리</option>`).join('');
+    sel.value=String(Math.min(count,previous)-1);
   }
   function fillTargetTeams(d){
     const srcKey=d.querySelector('#stage51062SourceTeam')?.value||'';
-    d.querySelector('#stage51062TargetTeam').innerHTML=flatSlots().filter(x=>x.key!==srcKey).map(x=>`<option value="${esc(x.key)}">${esc(x.g.groupNo||x.gi+1)}조 · ${esc(teamLabel(x.t))}</option>`).join('');
+    d.querySelector('#stage51062TargetTeam').innerHTML=flatSlots().filter(x=>x.key!==srcKey).map(x=>`<option value="${esc(x.key)}">${esc(x.g.groupNo||x.gi+1)}조 ${x.si+1}번 · ${esc(teamLabel(x.t))}</option>`).join('');
   }
   function syncMode(d){
-    const swap=d.querySelector('#stage51062Mode').value==='swap';d.querySelector('#stage51062MoveWrap').hidden=swap;d.querySelector('#stage51062SwapWrap').hidden=!swap;updateStatus(d);
+    const swap=d.querySelector('#stage51062Mode').value==='swap';
+    d.querySelector('#stage51062MoveGroupWrap').hidden=swap;
+    d.querySelector('#stage51062MovePositionWrap').hidden=swap;
+    d.querySelector('#stage51062SwapWrap').hidden=!swap;
+    updateStatus(d);
   }
   function renderPreview(d){
     d.querySelector('#stage51062Preview').innerHTML=groups().map((g,i)=>`<article class="stage51062-card"><b>${esc(g.groupNo||i+1)}조 · ${esc(g.court||g.courtName||'코트 미배정')}</b>${(g.teams||[]).map((t,j)=>`<span>${j+1}. ${esc(teamLabel(t))}</span>`).join('')}</article>`).join('');
@@ -21892,7 +21906,9 @@ console.info('[230MATCH] 5.10.61 ready · admin participant replacement with own
     if(mode==='swap'){
       const target=slots.find(x=>x.key===d.querySelector('#stage51062TargetTeam')?.value);box.textContent=target?`${src.g.groupNo||src.gi+1}조 ${teamLabel(src.t)} ↔ ${target.g.groupNo||target.gi+1}조 ${teamLabel(target.t)} 위치를 맞교환합니다.`:'맞교환할 팀을 선택하세요.';
     }else{
-      const gi=Number(d.querySelector('#stage51062TargetGroup')?.value||0),g=groups()[gi];box.textContent=g?`${src.g.groupNo||src.gi+1}조 ${teamLabel(src.t)} 팀을 ${g.groupNo||gi+1}조 첫 자리로 이동합니다. 사이 팀은 순서대로 한 자리씩 자동 이동합니다.`:'';
+      const gi=Number(d.querySelector('#stage51062TargetGroup')?.value||0),g=groups()[gi];
+      const pos=Math.max(0,Number(d.querySelector('#stage51062TargetPosition')?.value||0));
+      box.textContent=g?`${src.g.groupNo||src.gi+1}조 ${src.si+1}번 ${teamLabel(src.t)} 팀을 ${g.groupNo||gi+1}조 ${pos+1}번 자리로 이동합니다. 사이 팀들은 순서대로 한 자리씩 자동 이동합니다.`:'';
     }
   }
   function rebindMatches(){
@@ -21920,9 +21936,17 @@ console.info('[230MATCH] 5.10.61 ready · admin participant replacement with own
       const targetKey=d.querySelector('#stage51062TargetTeam')?.value||'',targetIndex=slots.findIndex(x=>x.key===targetKey);if(targetIndex<0||targetIndex===srcIndex){prelimNotice('맞교환할 다른 팀을 선택하세요.','warning');return;}
       const a=ordered[srcIndex],b=ordered[targetIndex];ordered[srcIndex]=b;ordered[targetIndex]=a;description=`${teamLabel(a)} ↔ ${teamLabel(b)} 맞교환`;
     }else{
-      const targetGroupIndex=Math.max(0,Math.min(groups().length-1,Number(d.querySelector('#stage51062TargetGroup').value||0)));
-      const targetFlatIndex=slots.findIndex(x=>x.gi===targetGroupIndex);if(targetFlatIndex<0)return;
-      const moving=ordered.splice(srcIndex,1)[0];let insertIndex=targetFlatIndex;if(srcIndex<targetFlatIndex)insertIndex=Math.max(0,targetFlatIndex-1);ordered.splice(insertIndex,0,moving);description=`${teamLabel(moving)} → ${groups()[targetGroupIndex].groupNo||targetGroupIndex+1}조 순서 이동`;
+      const gs=groups();
+      const targetGroupIndex=Math.max(0,Math.min(gs.length-1,Number(d.querySelector('#stage51062TargetGroup').value||0)));
+      const targetGroup=gs[targetGroupIndex];
+      const targetPosition=Math.max(0,Math.min(Math.max(0,(targetGroup?.teams||[]).length-1),Number(d.querySelector('#stage51062TargetPosition').value||0)));
+      let targetFlatIndex=0;for(let i=0;i<targetGroupIndex;i++)targetFlatIndex+=(gs[i]?.teams||[]).length;targetFlatIndex+=targetPosition;
+      const moving=ordered.splice(srcIndex,1)[0];
+      // targetFlatIndex는 '변경 후 최종 자리' 기준이다. source가 앞쪽에 있어도 별도로 -1 하지 않는다.
+      // 예: 10조 팀을 15조 2번으로 보내면 정확히 15조 2번 자리에 들어가고 사이 팀들이 한 칸씩 당겨진다.
+      const insertIndex=Math.max(0,Math.min(ordered.length,targetFlatIndex));
+      ordered.splice(insertIndex,0,moving);
+      description=`${teamLabel(moving)} → ${targetGroup?.groupNo||targetGroupIndex+1}조 ${targetPosition+1}번 자리 이동`;
     }
     let cursor=0;groups().forEach(g=>{const count=(g.teams||[]).length;g.teams=ordered.slice(cursor,cursor+count);cursor+=count;});
     rebindMatches();
@@ -21995,3 +22019,5 @@ console.info('[230MATCH] 5.10.63 ready · prelim group editor button click/modal
 console.info('[230MATCH] 5.10.64 ready · prelim group editor false-start lock fix (null score safe)');
 console.info('[230MATCH] 5.10.65 ready · prelim group editor repeat-use fix (waiting timestamp no longer locks editor)');
 console.info('[230MATCH] 5.10.66 ready · repeat group edit hard fix: court assignment playing/start markers ignored + fresh modal each use');
+
+console.info('[230MATCH] 5.10.67 ready · prelim group move supports exact target position');
