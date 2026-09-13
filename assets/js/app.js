@@ -8154,7 +8154,7 @@ function renderPortalViews(){
   renderRegistrationSummaryEverywhere();
   const posts=visibleBoardPosts({admin:isAdmin()});const publicPosts=visibleBoardPosts();
   const home=document.getElementById('homeNoticeList');if(home)home.innerHTML=publicPosts.slice(0,4).map(p=>`<button type="button" class="portal-list-item notice-home-item" data-portal-go="board"><strong>${p.important?'🚨 ':p.pinned?'📌 ':''}${portalEscape(p.title)}</strong><div class="portal-meta">${new Date(p.updatedAt||p.createdAt).toLocaleDateString('ko-KR')}</div></button>`).join('')||'<div class="portal-empty">등록된 공지가 없습니다.</div>';
-  const board=document.getElementById('boardPostList');if(board)board.innerHTML=posts.map(p=>{const status=boardPostStatus(p);const statusText=status==='scheduled'?'게시 예정':status==='expired'?'게시 종료':'게시 중';const popupPeriod=(p.popupStartAt||p.popupEndAt)?`<div class="portal-meta notice-period">팝업기간 · ${p.popupStartAt?new Date(p.popupStartAt).toLocaleString('ko-KR'):'즉시'} ~ ${p.popupEndAt?new Date(p.popupEndAt).toLocaleString('ko-KR'):'계속'}</div>`:'';const postImage=stage6109ImageSrc(p);const image=postImage?`<div class="portal-board-image-wrap"><img class="portal-board-image" src="${postImage}" alt="${portalEscape(p.title)} 공지 이미지" loading="lazy" data-notice-image-view="${portalEscape(p.id)}" title="눌러서 크게 보기"><div class="portal-board-image-actions"><button type="button" class="btn btn-light btn-small" data-notice-image-view="${portalEscape(p.id)}">🔍 크게 보기</button><button type="button" class="btn btn-light btn-small" data-notice-image-download="${portalEscape(p.id)}">⬇ 이미지 다운로드</button></div></div>`:'';return `<article class="portal-board-item ${p.important?'important':''}"><div class="portal-meta notice-meta-row"><span>${p.pinned?'상단 고정 · ':''}${new Date(p.updatedAt||p.createdAt).toLocaleString('ko-KR')}</span><span class="notice-status ${status}">${statusText}${p.popup?' · 홈 팝업':''}</span></div><h3>${p.important?'🚨 ':''}${portalEscape(p.title)}</h3>${image}${p.body?`<div class="portal-board-body">${noticeBodyHtml(p.body)}</div>`:''}${p.startAt||p.endAt?`<div class="portal-meta notice-period">게시기간 · ${p.startAt?new Date(p.startAt).toLocaleString('ko-KR'):'즉시'} ~ ${p.endAt?new Date(p.endAt).toLocaleString('ko-KR'):'계속'}</div>`:''}${popupPeriod}${isAdmin()?`<div class="portal-board-actions"><button type="button" class="btn btn-light" data-board-edit="${p.id}">수정</button><button type="button" class="btn btn-danger-outline" data-board-delete="${p.id}">삭제</button></div>`:''}</article>`;}).join('')||'<div class="portal-empty">등록된 게시물이 없습니다.</div>';
+  const board=document.getElementById('boardPostList');if(board)board.innerHTML=posts.map(p=>{const status=boardPostStatus(p);const statusText=status==='scheduled'?'게시 예정':status==='expired'?'게시 종료':'게시 중';const popupPeriod=(p.popupStartAt||p.popupEndAt)?`<div class="portal-meta notice-period">팝업기간 · ${p.popupStartAt?new Date(p.popupStartAt).toLocaleString('ko-KR'):'즉시'} ~ ${p.popupEndAt?new Date(p.popupEndAt).toLocaleString('ko-KR'):'계속'}</div>`:'';const postImage=stage6109ImageSrc(p);const image=postImage?`<div class="portal-board-image-wrap"><img class="portal-board-image" src="${postImage}" alt="${portalEscape(p.title)} 공지 이미지" loading="lazy" data-notice-image-view="${portalEscape(p.id)}" title="눌러서 크게 보기"><div class="portal-board-image-actions"><button type="button" class="btn btn-light btn-small" data-notice-image-view="${portalEscape(p.id)}">🔍 크게 보기</button><button type="button" class="btn btn-light btn-small" data-notice-image-download="${portalEscape(p.id)}" data-notice-download-src="${portalEscape(postImage)}" data-notice-download-name="${portalEscape(stage51082NoticeImageFileName(p))}">⬇ 이미지 다운로드</button></div></div>`:'';return `<article class="portal-board-item ${p.important?'important':''}"><div class="portal-meta notice-meta-row"><span>${p.pinned?'상단 고정 · ':''}${new Date(p.updatedAt||p.createdAt).toLocaleString('ko-KR')}</span><span class="notice-status ${status}">${statusText}${p.popup?' · 홈 팝업':''}</span></div><h3>${p.important?'🚨 ':''}${portalEscape(p.title)}</h3>${image}${p.body?`<div class="portal-board-body">${noticeBodyHtml(p.body)}</div>`:''}${p.startAt||p.endAt?`<div class="portal-meta notice-period">게시기간 · ${p.startAt?new Date(p.startAt).toLocaleString('ko-KR'):'즉시'} ~ ${p.endAt?new Date(p.endAt).toLocaleString('ko-KR'):'계속'}</div>`:''}${popupPeriod}${isAdmin()?`<div class="portal-board-actions"><button type="button" class="btn btn-light" data-board-edit="${p.id}">수정</button><button type="button" class="btn btn-danger-outline" data-board-delete="${p.id}">삭제</button></div>`:''}</article>`;}).join('')||'<div class="portal-empty">등록된 게시물이 없습니다.</div>';
   renderBoardFast();
   const summary=document.getElementById('homeCourtSummary');if(summary){const rows=courts.filter(c=>c.playing||c.wait1).slice(0,12);summary.innerHTML=rows.map(c=>{const play=findUnifiedMatch(state,c.playing)||findPrelimMatch(state,c.playing)||findMatch(state.draw,c.playing);const wait=findUnifiedMatch(state,c.wait1)||findPrelimMatch(state,c.wait1)||findMatch(state.draw,c.wait1);return `<article class="portal-court-item"><strong>${portalEscape(c.name||c.id)}</strong><div>시합중 · ${play?portalEscape(portalTeam(play.teamA))+' vs '+portalEscape(portalTeam(play.teamB)):'없음'}</div><div class="portal-meta">대기1 · ${wait?portalEscape(portalTeam(wait.teamA))+' vs '+portalEscape(portalTeam(wait.teamB)):'없음'}</div></article>`;}).join('')||'<div class="portal-empty">현재 배정된 경기가 없습니다.</div>';}
   renderResultArchive();
@@ -8246,13 +8246,25 @@ async function directImageDownload(src,filename,label='이미지'){
     }
   }
 }
-async function downloadNoticeImageById(postId){
-  const post=(state.portal?.posts||[]).find(p=>String(p.id)===String(postId));
-  const src=post?stage6109ImageSrc(post):'';
+function stage51082NoticePostById(postId){
+  const id=String(postId||'');
+  return (typeof globalPosts==='function'?globalPosts():[]).find(p=>String(p?.id||'')===id)
+    ||(state.portal?.posts||[]).find(p=>String(p?.id||'')===id)
+    ||null;
+}
+function stage51082NoticeImageFileName(post){
+  const type=String(post?.imageType||'').toLowerCase();
+  const ext=type.includes('png')?'png':type.includes('webp')?'webp':type.includes('gif')?'gif':'jpg';
+  return safeImageDownloadName(post?.imageName||`${post?.title||'공지이미지'}.${ext}`);
+}
+async function downloadNoticeImageById(postId,directSrc='',directName=''){
+  const post=stage51082NoticePostById(postId);
+  const src=directSrc||(post?stage6109ImageSrc(post):'');
   if(!src)return notice('다운로드할 공지 이미지를 찾지 못했습니다.','error');
-  const filename=safeImageDownloadName(post.imageName||`${post.title||'공지이미지'}.jpg`);
+  const filename=safeImageDownloadName(directName||(post?stage51082NoticeImageFileName(post):'230MATCH_공지이미지.jpg'));
+  notice('공지 이미지를 저장하는 중입니다. 잠시만 기다려주세요.','success');
   const ok=await directImageDownload(src,filename,'공지 이미지');
-  if(ok)notice('공지 이미지를 바로 저장했습니다.','success');
+  if(ok)notice('공지 이미지를 저장했습니다.','success');
 }
 
 function renderTournamentGuide(){
@@ -8474,8 +8486,16 @@ function stage51081EnsurePopupImageDownload(post,postImage=''){
   }
   const hasImage=Boolean(post&&postImage);
   btn.hidden=!hasImage;
-  if(hasImage){btn.dataset.noticeImageDownload=String(post.id||'');btn.title='공지에 첨부된 대진표 이미지를 바로 저장합니다.';}
-  else delete btn.dataset.noticeImageDownload;
+  if(hasImage){
+    btn.dataset.noticeImageDownload=String(post.id||'');
+    btn.dataset.noticeDownloadSrc=postImage;
+    btn.dataset.noticeDownloadName=stage51082NoticeImageFileName(post);
+    btn.title='공지에 첨부된 대진표 이미지를 바로 저장합니다.';
+  }else{
+    delete btn.dataset.noticeImageDownload;
+    delete btn.dataset.noticeDownloadSrc;
+    delete btn.dataset.noticeDownloadName;
+  }
 }
 function showEligibleHomePopup(){
   if(document.body.dataset.currentView!=='home')return;
@@ -9747,7 +9767,7 @@ function boardFullPostHtml(p,{latest=false}={}){
   const status=boardPostStatus(p),statusText=status==='scheduled'?'게시 예정':status==='expired'?'게시 종료':'게시 중';
   const popupPeriod=(p.popupStartAt||p.popupEndAt)?`<div class="portal-meta notice-period">팝업기간 · ${p.popupStartAt?new Date(p.popupStartAt).toLocaleString('ko-KR'):'즉시'} ~ ${p.popupEndAt?new Date(p.popupEndAt).toLocaleString('ko-KR'):'계속'}</div>`:'';
   const postImage=stage6109ImageSrc(p);
-  const image=postImage?`<div class="portal-board-image-wrap"><img class="portal-board-image" src="${postImage}" alt="${portalEscape(p.title)} 공지 이미지" loading="lazy" data-notice-image-view="${portalEscape(p.id)}" title="눌러서 크게 보기"><div class="portal-board-image-actions"><button type="button" class="btn btn-light btn-small" data-notice-image-view="${portalEscape(p.id)}">🔍 크게 보기</button><button type="button" class="btn btn-light btn-small" data-notice-image-download="${portalEscape(p.id)}">⬇ 이미지 다운로드</button></div></div>`:'';
+  const image=postImage?`<div class="portal-board-image-wrap"><img class="portal-board-image" src="${postImage}" alt="${portalEscape(p.title)} 공지 이미지" loading="lazy" data-notice-image-view="${portalEscape(p.id)}" title="눌러서 크게 보기"><div class="portal-board-image-actions"><button type="button" class="btn btn-light btn-small" data-notice-image-view="${portalEscape(p.id)}">🔍 크게 보기</button><button type="button" class="btn btn-light btn-small" data-notice-image-download="${portalEscape(p.id)}" data-notice-download-src="${portalEscape(postImage)}" data-notice-download-name="${portalEscape(stage51082NoticeImageFileName(p))}">⬇ 이미지 다운로드</button></div></div>`:'';
   return `<article id="boardSelectedNotice" class="portal-board-item notice-featured ${p.important?'important':''}"><div class="notice-featured-label">${latest?'최신 공지':'공지 상세'}</div><div class="portal-meta notice-meta-row"><span>${p.pinned?'📌 상단 고정 · ':''}${new Date(p.updatedAt||p.createdAt).toLocaleString('ko-KR')}</span><span class="notice-status ${status}">${statusText}${p.popup?' · 홈 팝업':''}</span></div><h3>${p.important?'🚨 ':''}${portalEscape(p.title)}</h3>${image}${p.body?`<div class="portal-board-body">${noticeBodyHtml(p.body)}</div>`:''}${p.startAt||p.endAt?`<div class="portal-meta notice-period">게시기간 · ${p.startAt?new Date(p.startAt).toLocaleString('ko-KR'):'즉시'} ~ ${p.endAt?new Date(p.endAt).toLocaleString('ko-KR'):'계속'}</div>`:''}${popupPeriod}${isAdmin()?`<div class="portal-board-actions"><button type="button" class="btn btn-light" data-board-edit="${p.id}">수정</button><button type="button" class="btn btn-danger-outline" data-board-delete="${p.id}">삭제</button></div>`:''}</article>`;
 }
 function boardNoticeListHtml(posts,selectedId){
@@ -10212,7 +10232,17 @@ document.addEventListener('click',e=>{
   },30);
 },true);
 
-document.addEventListener('click',e=>{const boardOpen=e.target.closest?.('[data-board-open-post]');if(boardOpen){e.preventDefault();boardSelectedPostId=String(boardOpen.dataset.boardOpenPost||'');renderBoardFast();setTimeout(()=>document.querySelector('.stage51033-detail-wrap')?.scrollIntoView({behavior:'smooth',block:'start'}),20);return;}const directGuide=e.target.closest?.('#guideImageDownload,[data-direct-guide-download]');if(directGuide){e.preventDefault();const src=directGuide.dataset.directImageSrc||'';const name=directGuide.dataset.directImageName||'230MATCH_대회요강.jpg';void directImageDownload(src,name,'요강 이미지').then(ok=>{if(ok)notice('요강 이미지를 바로 저장했습니다.','success');});return;}const noticeView=e.target.closest?.('[data-notice-image-view]');if(noticeView){e.preventDefault();openNoticeImageViewer(noticeView.dataset.noticeImageView);return;}const noticeDownload=e.target.closest?.('[data-notice-image-download]');if(noticeDownload){e.preventDefault();downloadNoticeImageById(noticeDownload.dataset.noticeImageDownload);return;}const portal=e.target.closest?.('[data-portal-go]');if(portal&&!portal.dataset.portalBound){navigatePortalView(portal.dataset.portalGo,{pushHistory:true});return;}const choice=e.target.closest?.('[data-my-match-index]');if(choice){const teams=document.getElementById('myMatchTeamChoices')?._teams||[];const team=teams[Number(choice.dataset.myMatchIndex)];if(team)renderMyMatchTeam(team);return;}const edit=e.target.closest?.('[data-board-edit]');if(edit&&isAdmin()){const post=globalPosts().find(p=>p.id===edit.dataset.boardEdit);if(post)openBoardPostEditor(post);return;}const btn=e.target.closest?.('[data-board-delete]');if(!btn||!isAdmin())return;if(!confirm('이 게시물을 삭제할까요?'))return;const deleting=globalPosts().find(p=>p.id===btn.dataset.boardDelete);if(deleting?.imageStoragePath)deleteManagedImage(deleting.imageStoragePath);globalNoticeState.posts=globalPosts().filter(p=>p.id!==btn.dataset.boardDelete);mirrorGlobalPostsToState();cacheGlobalNoticeState();saveGlobalNoticeCloud('전체 공지 삭제').then(()=>notice('공지를 삭제했습니다.','success')).catch(error=>notice(`공지 삭제 저장 실패: ${error?.message||error}`,'error'));renderBoardFast();renderPopupManager();renderHomeFast();});
+// 5.10.82 · notice image download capture rescue: works even if a view-specific listener stops bubbling.
+document.addEventListener('click',e=>{
+  const btn=e.target?.closest?.('[data-notice-image-download]');
+  if(!btn||btn.dataset.stage51082Handled==='1')return;
+  btn.dataset.stage51082Handled='1';
+  e.preventDefault();
+  e.stopPropagation();
+  void downloadNoticeImageById(btn.dataset.noticeImageDownload,btn.dataset.noticeDownloadSrc||'',btn.dataset.noticeDownloadName||'').finally(()=>{delete btn.dataset.stage51082Handled;});
+},true);
+
+document.addEventListener('click',e=>{const boardOpen=e.target.closest?.('[data-board-open-post]');if(boardOpen){e.preventDefault();boardSelectedPostId=String(boardOpen.dataset.boardOpenPost||'');renderBoardFast();setTimeout(()=>document.querySelector('.stage51033-detail-wrap')?.scrollIntoView({behavior:'smooth',block:'start'}),20);return;}const directGuide=e.target.closest?.('#guideImageDownload,[data-direct-guide-download]');if(directGuide){e.preventDefault();const src=directGuide.dataset.directImageSrc||'';const name=directGuide.dataset.directImageName||'230MATCH_대회요강.jpg';void directImageDownload(src,name,'요강 이미지').then(ok=>{if(ok)notice('요강 이미지를 바로 저장했습니다.','success');});return;}const noticeView=e.target.closest?.('[data-notice-image-view]');if(noticeView){e.preventDefault();openNoticeImageViewer(noticeView.dataset.noticeImageView);return;}const noticeDownload=e.target.closest?.('[data-notice-image-download]');if(noticeDownload){e.preventDefault();void downloadNoticeImageById(noticeDownload.dataset.noticeImageDownload,noticeDownload.dataset.noticeDownloadSrc||'',noticeDownload.dataset.noticeDownloadName||'');return;}const portal=e.target.closest?.('[data-portal-go]');if(portal&&!portal.dataset.portalBound){navigatePortalView(portal.dataset.portalGo,{pushHistory:true});return;}const choice=e.target.closest?.('[data-my-match-index]');if(choice){const teams=document.getElementById('myMatchTeamChoices')?._teams||[];const team=teams[Number(choice.dataset.myMatchIndex)];if(team)renderMyMatchTeam(team);return;}const edit=e.target.closest?.('[data-board-edit]');if(edit&&isAdmin()){const post=globalPosts().find(p=>p.id===edit.dataset.boardEdit);if(post)openBoardPostEditor(post);return;}const btn=e.target.closest?.('[data-board-delete]');if(!btn||!isAdmin())return;if(!confirm('이 게시물을 삭제할까요?'))return;const deleting=globalPosts().find(p=>p.id===btn.dataset.boardDelete);if(deleting?.imageStoragePath)deleteManagedImage(deleting.imageStoragePath);globalNoticeState.posts=globalPosts().filter(p=>p.id!==btn.dataset.boardDelete);mirrorGlobalPostsToState();cacheGlobalNoticeState();saveGlobalNoticeCloud('전체 공지 삭제').then(()=>notice('공지를 삭제했습니다.','success')).catch(error=>notice(`공지 삭제 저장 실패: ${error?.message||error}`,'error'));renderBoardFast();renderPopupManager();renderHomeFast();});
 }
 
 // 5.10.81: 예약 공지/홈 팝업 공개 시각을 열린 화면에서도 자동 반영한다.
@@ -23034,4 +23064,4 @@ console.info('[230MATCH] 5.10.79 ready · member self-edit names propagate to pr
 })();
 console.info('[230MATCH] 5.10.80 ready · public court status gated by prelim scheduled-publication time');
 
-console.log('[230MATCH] 5.10.81 ready · scheduled notices + popup image direct download');
+console.log('[230MATCH] 5.10.82 ready · robust notice image download + capture handler');
