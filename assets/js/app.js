@@ -22369,7 +22369,82 @@ console.info('[230MATCH] 5.10.71 ready · field bracket HQ PNG capture fix');
   window.addEventListener('pageshow',run);
   document.addEventListener('click',e=>{if(e.target?.closest?.('[data-portal-go="operation"],[data-view="operation"],[data-mobile-view="operation"],[data-player-result-open]'))run()},true);
   // MutationObserver 대신 운영 화면에서만 저빈도 갱신해 실시간 기록을 놓치지 않으면서 렌더 부하를 제한한다.
-  setInterval(()=>{if(operationViewIsVisible()&&canOperate())renderPanel()},2000);
+  setInterval(()=>{if(operationViewIsVisible()&&canOperate())renderPanel()},10000);
   window.stage51073RenderPlayerResultAudit=renderPanel;
   console.info('[230MATCH] 5.10.74 ready · participant result audit panel always-visible operation placement');
+})();
+
+
+/* 230MATCH 5.10.75 · global participant-result indicator + 10s audit refresh */
+(function stage51075GlobalPlayerResultIndicator(){
+  const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  let initialized=false,lastNewestId='';
+  function rows(){
+    const all=Array.isArray(state?.operation?.playerResultHistory)?state.operation.playerResultHistory:[];
+    return all.filter(r=>r?.enteredByPlayer===true).slice(0,50);
+  }
+  function ensureUi(){
+    if(!canOperate()){
+      document.getElementById('stage51075PlayerResultBadge')?.remove();
+      document.getElementById('stage51075PlayerResultDrawer')?.remove();
+      return null;
+    }
+    let badge=document.getElementById('stage51075PlayerResultBadge');
+    if(!badge){
+      badge=document.createElement('button');
+      badge.type='button';badge.id='stage51075PlayerResultBadge';badge.className='stage51075-result-badge';
+      badge.setAttribute('aria-label','참가자 직접 입력 결과 확인');
+      document.body.appendChild(badge);
+      badge.addEventListener('click',()=>{
+        const drawer=ensureDrawer();
+        if(drawer)drawer.classList.toggle('open');
+        render();
+      });
+    }
+    return badge;
+  }
+  function ensureDrawer(){
+    if(!canOperate())return null;
+    let drawer=document.getElementById('stage51075PlayerResultDrawer');
+    if(drawer)return drawer;
+    drawer=document.createElement('aside');drawer.id='stage51075PlayerResultDrawer';drawer.className='stage51075-result-drawer';
+    drawer.innerHTML='<div class="stage51075-drawer-head"><div><strong>참가자 직접 입력 결과</strong><span>입력 즉시 공식 반영 · 관리자 확인용 기록</span></div><button type="button" class="stage51075-close" aria-label="닫기">×</button></div><div class="stage51075-summary"></div><div class="stage51075-list"></div>';
+    document.body.appendChild(drawer);
+    drawer.querySelector('.stage51075-close')?.addEventListener('click',()=>drawer.classList.remove('open'));
+    return drawer;
+  }
+  function render(){
+    const badge=ensureUi();if(!badge)return;
+    const list=rows();const newest=list[0]?.id||'';
+    const recent30=list.filter(r=>Date.now()-new Date(r.at||0).getTime()<=30*60*1000).length;
+    badge.innerHTML=`<span class="dot ${recent30?'hot':''}"></span><span>참가자 입력</span><b>${recent30}</b>`;
+    badge.title=`참가자 직접 입력 결과 · 최근 30분 ${recent30}건`;
+    if(initialized&&newest&&lastNewestId&&newest!==lastNewestId){
+      const r=list[0];
+      notice(`참가자 결과 반영 · ${r.isPrelim?'예선':'본선'} · ${r.scoreA}:${r.scoreB}`,'success');
+      badge.classList.add('pulse');setTimeout(()=>badge.classList.remove('pulse'),1800);
+    }
+    if(newest)lastNewestId=newest;initialized=true;
+    const drawer=document.getElementById('stage51075PlayerResultDrawer');
+    if(drawer){
+      const sum=drawer.querySelector('.stage51075-summary');
+      const box=drawer.querySelector('.stage51075-list');
+      if(sum)sum.innerHTML=`<b>최근 30분 ${recent30}건</b><span> · 전체 기록 ${list.length}건</span><small>10초마다 새 기록을 확인합니다.</small>`;
+      if(box)box.innerHTML=list.length?list.slice(0,20).map(r=>`<div class="stage51075-row"><span class="kind">${r.isPrelim?'예선':'본선'}</span><div class="main"><strong>${esc(r.teamA||'')} <em>${Number(r.scoreA)} : ${Number(r.scoreB)}</em> ${esc(r.teamB||'')}</strong><small>${esc(r.enteredByName||'참가자')} · ${r.corrected?'결과 수정':'결과 입력'}${r.matchId?` · ${esc(r.matchId)}`:''}</small></div><time>${r.at?new Date(r.at).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}):''}</time></div>`).join(''):'<div class="stage51075-empty">참가자가 직접 입력한 결과가 아직 없습니다.</div>';
+    }
+  }
+  if(!document.getElementById('stage51075Style')){
+    const st=document.createElement('style');st.id='stage51075Style';st.textContent=`
+      .stage51075-result-badge{position:fixed;z-index:2147483000;right:18px;top:190px;display:flex;align-items:center;gap:7px;min-height:42px;padding:8px 12px;border:1px solid #93c5fd;border-radius:999px;background:#fff;color:#0f2a55;font-weight:900;box-shadow:0 8px 24px rgba(15,23,42,.18);cursor:pointer}.stage51075-result-badge .dot{width:9px;height:9px;border-radius:50%;background:#94a3b8}.stage51075-result-badge .dot.hot{background:#ef4444}.stage51075-result-badge b{min-width:22px;padding:2px 6px;border-radius:999px;background:#e0f2fe;color:#075985;text-align:center}.stage51075-result-badge.pulse{animation:stage51075Pulse .45s ease-in-out 4}@keyframes stage51075Pulse{50%{transform:scale(1.08);box-shadow:0 0 0 8px rgba(239,68,68,.12)}}
+      .stage51075-result-drawer{position:fixed;z-index:2147483001;right:18px;top:244px;width:min(520px,calc(100vw - 28px));max-height:min(620px,calc(100vh - 270px));display:none;overflow:hidden;border:1px solid #cbd5e1;border-radius:16px;background:#fff;box-shadow:0 18px 50px rgba(15,23,42,.28)}.stage51075-result-drawer.open{display:block}.stage51075-drawer-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:14px 15px;background:#0f2a55;color:#fff}.stage51075-drawer-head>div{display:grid;gap:3px}.stage51075-drawer-head strong{font-size:15px}.stage51075-drawer-head span{font-size:11px;opacity:.82}.stage51075-close{border:0;background:transparent;color:#fff;font-size:26px;line-height:1;cursor:pointer}.stage51075-summary{display:flex;align-items:center;gap:4px;flex-wrap:wrap;padding:10px 13px;border-bottom:1px solid #e2e8f0;font-size:12px}.stage51075-summary small{margin-left:auto;color:#64748b}.stage51075-list{max-height:480px;overflow:auto}.stage51075-row{display:grid;grid-template-columns:44px minmax(0,1fr) 58px;gap:8px;align-items:center;padding:10px 12px;border-bottom:1px solid #eef2f7}.stage51075-row .kind{font-size:10px;font-weight:900;text-align:center;padding:4px 5px;border-radius:7px;background:#eef2ff;color:#3730a3}.stage51075-row .main{display:grid;gap:3px;min-width:0}.stage51075-row .main strong{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.stage51075-row .main em{font-style:normal;color:#1d4ed8}.stage51075-row .main small,.stage51075-row time{font-size:10px;color:#64748b}.stage51075-row time{text-align:right}.stage51075-empty{padding:28px 14px;text-align:center;color:#64748b;font-size:12px}
+      @media(max-width:760px){.stage51075-result-badge{right:10px;top:auto;bottom:88px}.stage51075-result-drawer{right:10px;top:auto;bottom:140px;max-height:65vh}.stage51075-summary small{width:100%;margin-left:0}}
+    `;document.head.appendChild(st);
+  }
+  const run=()=>setTimeout(render,120);
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',run,{once:true});else run();
+  window.addEventListener('pageshow',run);window.addEventListener('hashchange',run);
+  document.addEventListener('click',e=>{if(e.target?.closest?.('[data-player-result-open],[data-portal-go],[data-view],[data-mobile-view]'))setTimeout(render,180)},true);
+  setInterval(render,10000);
+  window.stage51075RenderPlayerResultIndicator=render;
+  console.info('[230MATCH] 5.10.75 ready · global participant result indicator + 10s audit refresh');
 })();
