@@ -8385,7 +8385,12 @@ function openBoardPostEditor(post=null){if(!requireAdmin(post?'공지 수정':'�
 async function saveBoardPost(){
   if(!requireAdmin('전체 공지 저장'))return;
   const value=id=>String(document.getElementById(id)?.value||'').trim();
-  const editId=value('boardPostEditId'),title=value('boardPostTitle'),body=value('boardPostBody'),startAt=value('boardPostStartAt'),endAt=value('boardPostEndAt'),popupStartAt=value('boardPostPopupStartAt'),popupEndAt=value('boardPostPopupEndAt');
+  const editId=value('boardPostEditId'),title=value('boardPostTitle'),body=value('boardPostBody'),startAt=value('boardPostStartAt'),endAt=value('boardPostEndAt');
+  let popupStartAt=value('boardPostPopupStartAt'),popupEndAt=value('boardPostPopupEndAt');
+  const popupEnabled=Boolean(document.getElementById('boardPostPopup')?.checked);
+  // 5.10.81: 홈 팝업 시작시간을 따로 비워두면 공지 게시 시작시간과 동일하게 예약한다.
+  // 관리자가 11:00 게시로 저장하면 일반회원 공지 목록과 홈 팝업이 모두 11:00 이후 공개된다.
+  if(popupEnabled&&!popupStartAt&&startAt)popupStartAt=startAt;
   if(!title||(!body&&!stage4108PendingNoticeImage)){notice('제목과 내용 또는 이미지를 입력하세요.','error');return;}
   if(startAt&&endAt&&new Date(startAt)>=new Date(endAt)){notice('게시 종료는 게시 시작보다 뒤여야 합니다.','error');return;}
   if(popupStartAt&&popupEndAt&&new Date(popupStartAt)>=new Date(popupEndAt)){notice('팝업 종료는 팝업 시작보다 뒤여야 합니다.','error');return;}
@@ -8419,7 +8424,7 @@ async function saveBoardPost(){
     title,body,
     pinned:Boolean(document.getElementById('boardPostPinned')?.checked),
     important:Boolean(document.getElementById('boardPostImportant')?.checked),
-    popup:Boolean(document.getElementById('boardPostPopup')?.checked),
+    popup:popupEnabled,
     startAt,endAt,popupStartAt,popupEndAt,
     imageUrl:imageUrl&&!String(imageUrl).startsWith('data:')?imageUrl:'',
     imageStoragePath,imageDataUrl,
@@ -8456,7 +8461,37 @@ async function saveBoardPost(){
 function popupDismissKey(post){return `230match-notice-dismiss-${post.id}-${new Date().toISOString().slice(0,10)}`;}
 function popupPostStatus(post,now=Date.now()){const start=post.popupStartAt?new Date(post.popupStartAt).getTime():(post.startAt?new Date(post.startAt).getTime():0),end=post.popupEndAt?new Date(post.popupEndAt).getTime():(post.endAt?new Date(post.endAt).getTime():0);if(start&&start>now)return 'scheduled';if(end&&end<now)return 'expired';return 'active';}
 function closeHomeNoticePopup(){const dialog=document.getElementById('homeNoticePopup');const id=dialog?.dataset.postId;if(id&&document.getElementById('homeNoticePopupDismiss')?.checked)localStorage.setItem(popupDismissKey({id}),'1');if(dialog?.open)dialog.close();}
-function showEligibleHomePopup(){if(document.body.dataset.currentView!=='home')return;const post=visibleBoardPosts().find(p=>p.popup&&popupPostStatus(p)==='active'&&!localStorage.getItem(popupDismissKey(p)));const dialog=document.getElementById('homeNoticePopup');if(!post||!dialog||dialog.open)return;dialog.dataset.postId=post.id;document.getElementById('homeNoticePopupBadge').textContent=post.important?'중요 공지':'대회 공지';document.getElementById('homeNoticePopupTitle').textContent=post.title;const body=document.getElementById('homeNoticePopupBody');if(body){body.innerHTML=post.body?noticeBodyHtml(post.body):'';body.hidden=!post.body;}const img=document.getElementById('homeNoticePopupImage');if(img){const postImage=stage6109ImageSrc(post);img.hidden=!postImage;if(postImage)img.src=postImage;else img.removeAttribute('src');}document.getElementById('homeNoticePopupDismiss').checked=false;dialog.showModal();}
+function stage51081EnsurePopupImageDownload(post,postImage=''){
+  const dialog=document.getElementById('homeNoticePopup');if(!dialog)return;
+  let btn=document.getElementById('homeNoticePopupImageDownload');
+  if(!btn){
+    btn=document.createElement('button');
+    btn.type='button';btn.id='homeNoticePopupImageDownload';btn.className='btn btn-primary';
+    btn.textContent='⬇ 대진표 이미지 저장';
+    const boardBtn=document.getElementById('homeNoticePopupBoard'),confirmBtn=document.getElementById('homeNoticePopupConfirm');
+    const parent=boardBtn?.parentElement||confirmBtn?.parentElement;
+    if(parent)parent.insertBefore(btn,boardBtn||confirmBtn||null);else dialog.appendChild(btn);
+  }
+  const hasImage=Boolean(post&&postImage);
+  btn.hidden=!hasImage;
+  if(hasImage){btn.dataset.noticeImageDownload=String(post.id||'');btn.title='공지에 첨부된 대진표 이미지를 바로 저장합니다.';}
+  else delete btn.dataset.noticeImageDownload;
+}
+function showEligibleHomePopup(){
+  if(document.body.dataset.currentView!=='home')return;
+  const post=visibleBoardPosts().find(p=>p.popup&&popupPostStatus(p)==='active'&&!localStorage.getItem(popupDismissKey(p)));
+  const dialog=document.getElementById('homeNoticePopup');
+  if(!post||!dialog||dialog.open)return;
+  dialog.dataset.postId=post.id;
+  document.getElementById('homeNoticePopupBadge').textContent=post.important?'중요 공지':'대회 공지';
+  document.getElementById('homeNoticePopupTitle').textContent=post.title;
+  const body=document.getElementById('homeNoticePopupBody');if(body){body.innerHTML=post.body?noticeBodyHtml(post.body):'';body.hidden=!post.body;}
+  const img=document.getElementById('homeNoticePopupImage');const postImage=stage6109ImageSrc(post);
+  if(img){img.hidden=!postImage;if(postImage)img.src=postImage;else img.removeAttribute('src');}
+  stage51081EnsurePopupImageDownload(post,postImage);
+  document.getElementById('homeNoticePopupDismiss').checked=false;
+  dialog.showModal();
+}
 function renderPopupManager(){const root=document.getElementById('popupManagerList');if(!root)return;const rows=[...globalPosts()].sort((a,b)=>String(b.updatedAt||b.createdAt).localeCompare(String(a.updatedAt||a.createdAt)));root.innerHTML=rows.map(p=>{const st=popupPostStatus(p),label=st==='scheduled'?'예정':st==='expired'?'종료':'현재';return `<article class="popup-manager-item" data-popup-manager-id="${p.id}"><div class="popup-manager-item-head"><div><strong>${portalEscape(p.title)}</strong><div class="portal-meta">${p.popup?'홈 팝업 ON':'홈 팝업 OFF'} · ${label}</div></div>${stage6109ImageSrc(p)?`<img class="popup-manager-thumb" src="${stage6109ImageSrc(p)}" alt="공지 이미지">`:''}</div><div class="popup-manager-controls"><label class="form-check"><input type="checkbox" data-popup-enabled ${p.popup?'checked':''}><span>홈 팝업 표시</span></label><label><span>팝업 시작</span><input type="datetime-local" data-popup-start value="${boardDateValue(p.popupStartAt)}"></label><label><span>팝업 종료</span><input type="datetime-local" data-popup-end value="${boardDateValue(p.popupEndAt)}"></label><button type="button" class="btn btn-primary btn-small" data-popup-save>저장</button></div></article>`;}).join('')||'<div class="portal-empty">등록된 공지가 없습니다. 먼저 공지사항을 작성하세요.</div>';}
 function openPopupManager(){if(!requireAdmin('홈 팝업 관리'))return;renderPopupManager();document.getElementById('popupManagerDialog')?.showModal();}
 function closePopupManager(){const d=document.getElementById('popupManagerDialog');if(d?.open)d.close();}
@@ -10179,6 +10214,25 @@ document.addEventListener('click',e=>{
 
 document.addEventListener('click',e=>{const boardOpen=e.target.closest?.('[data-board-open-post]');if(boardOpen){e.preventDefault();boardSelectedPostId=String(boardOpen.dataset.boardOpenPost||'');renderBoardFast();setTimeout(()=>document.querySelector('.stage51033-detail-wrap')?.scrollIntoView({behavior:'smooth',block:'start'}),20);return;}const directGuide=e.target.closest?.('#guideImageDownload,[data-direct-guide-download]');if(directGuide){e.preventDefault();const src=directGuide.dataset.directImageSrc||'';const name=directGuide.dataset.directImageName||'230MATCH_대회요강.jpg';void directImageDownload(src,name,'요강 이미지').then(ok=>{if(ok)notice('요강 이미지를 바로 저장했습니다.','success');});return;}const noticeView=e.target.closest?.('[data-notice-image-view]');if(noticeView){e.preventDefault();openNoticeImageViewer(noticeView.dataset.noticeImageView);return;}const noticeDownload=e.target.closest?.('[data-notice-image-download]');if(noticeDownload){e.preventDefault();downloadNoticeImageById(noticeDownload.dataset.noticeImageDownload);return;}const portal=e.target.closest?.('[data-portal-go]');if(portal&&!portal.dataset.portalBound){navigatePortalView(portal.dataset.portalGo,{pushHistory:true});return;}const choice=e.target.closest?.('[data-my-match-index]');if(choice){const teams=document.getElementById('myMatchTeamChoices')?._teams||[];const team=teams[Number(choice.dataset.myMatchIndex)];if(team)renderMyMatchTeam(team);return;}const edit=e.target.closest?.('[data-board-edit]');if(edit&&isAdmin()){const post=globalPosts().find(p=>p.id===edit.dataset.boardEdit);if(post)openBoardPostEditor(post);return;}const btn=e.target.closest?.('[data-board-delete]');if(!btn||!isAdmin())return;if(!confirm('이 게시물을 삭제할까요?'))return;const deleting=globalPosts().find(p=>p.id===btn.dataset.boardDelete);if(deleting?.imageStoragePath)deleteManagedImage(deleting.imageStoragePath);globalNoticeState.posts=globalPosts().filter(p=>p.id!==btn.dataset.boardDelete);mirrorGlobalPostsToState();cacheGlobalNoticeState();saveGlobalNoticeCloud('전체 공지 삭제').then(()=>notice('공지를 삭제했습니다.','success')).catch(error=>notice(`공지 삭제 저장 실패: ${error?.message||error}`,'error'));renderBoardFast();renderPopupManager();renderHomeFast();});
 }
+
+// 5.10.81: 예약 공지/홈 팝업 공개 시각을 열린 화면에서도 자동 반영한다.
+// 10초 주기로 표시 상태만 다시 계산하며 대회/경기 데이터에는 쓰기 작업을 하지 않는다.
+let stage51081NoticeScheduleSignature='';
+function stage51081RefreshScheduledNotices(){
+  const now=Date.now();
+  const signature=globalPosts().map(p=>`${p.id}:${boardPostStatus(p,now)}:${p.popup?popupPostStatus(p,now):'off'}`).join('|');
+  if(signature===stage51081NoticeScheduleSignature){
+    if(document.body.dataset.currentView==='home')showEligibleHomePopup();
+    return;
+  }
+  stage51081NoticeScheduleSignature=signature;
+  const view=document.body?.dataset.currentView||'home';
+  if(view==='home'){renderHomeFast();showEligibleHomePopup();}
+  else if(view==='board')renderBoardFast();
+  if(isAdmin())renderPopupManager();
+}
+setInterval(stage51081RefreshScheduledNotices,10000);
+setTimeout(stage51081RefreshScheduledNotices,1200);
 
 window.addEventListener('pagehide',()=>{try{safePersistState('페이지 종료 전');}catch(_error){}});
 window.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){try{safePersistState('화면 전환 전');}catch(_error){}}});
@@ -22979,3 +23033,5 @@ console.info('[230MATCH] 5.10.79 ready · member self-edit names propagate to pr
   window.stage51080ApplyCourtPublicationGate=apply;
 })();
 console.info('[230MATCH] 5.10.80 ready · public court status gated by prelim scheduled-publication time');
+
+console.log('[230MATCH] 5.10.81 ready · scheduled notices + popup image direct download');
