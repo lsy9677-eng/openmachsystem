@@ -22322,18 +22322,28 @@ console.info('[230MATCH] 5.10.71 ready · field bracket HQ PNG capture fix');
     const all=Array.isArray(state?.operation?.playerResultHistory)?state.operation.playerResultHistory:[];
     return all.filter(r=>r?.enteredByPlayer===true).slice(0,20);
   }
+  function operationViewIsVisible(){
+    const view=document.getElementById('view-operation');
+    return Boolean(view&&(document.body?.dataset.currentView==='operation'||view.classList.contains('active')));
+  }
   function ensurePanel(){
     if(!canOperate())return null;
     const view=document.getElementById('view-operation');if(!view)return null;
     let panel=document.getElementById('stage51073PlayerResultAudit');
-    if(panel)return panel;
-    panel=document.createElement('section');panel.id='stage51073PlayerResultAudit';panel.className='stage51073-audit';
-    const heading=view.querySelector('h1,h2');
-    if(heading?.parentElement)heading.parentElement.insertAdjacentElement('afterend',panel);else view.prepend(panel);
+    if(!panel){
+      panel=document.createElement('section');panel.id='stage51073PlayerResultAudit';panel.className='stage51073-audit stage51074-audit-visible';
+    }
+    // 경기운영 화면이 재렌더되어도 항상 가장 위쪽에 다시 고정한다.
+    const anchor=view.querySelector('.operation-mode-bar,.section-head,h1,h2');
+    if(anchor){
+      const host=anchor.parentElement===view?view:anchor.parentElement;
+      if(panel.parentElement!==host||panel.previousElementSibling!==anchor){anchor.insertAdjacentElement('afterend',panel);}
+    }else if(panel.parentElement!==view||view.firstElementChild!==panel){view.prepend(panel);}
+    panel.hidden=false;
     return panel;
   }
   function renderPanel(){
-    if(document.body?.dataset.currentView!=='operation'||!canOperate())return;
+    if(!operationViewIsVisible()||!canOperate())return;
     const panel=ensurePanel();if(!panel)return;
     const list=rows();
     const newest=list[0]?.id||'';
@@ -22348,7 +22358,7 @@ console.info('[230MATCH] 5.10.71 ready · field bracket HQ PNG capture fix');
   }
   if(!document.getElementById('stage51073PlayerResultAuditStyle')){
     const st=document.createElement('style');st.id='stage51073PlayerResultAuditStyle';st.textContent=`
-      .stage51073-audit{margin:10px 0 14px;border:1px solid #cbd5e1;border-radius:14px;background:#fff;overflow:hidden}
+      .stage51073-audit{margin:10px 0 14px;border:2px solid #93c5fd;border-radius:14px;background:#fff;overflow:hidden;box-shadow:0 4px 14px rgba(15,23,42,.06)}.stage51074-audit-visible{display:block!important;visibility:visible!important;opacity:1!important}
       .stage51073-audit-head{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 13px;background:#f8fafc;border-bottom:1px solid #e2e8f0}.stage51073-audit-head>div{display:grid;gap:2px}.stage51073-audit-head strong{font-size:13px}.stage51073-audit-head span{font-size:10px;color:#64748b}.stage51073-audit-head>b{padding:4px 8px;border-radius:999px;background:#e0f2fe;color:#075985;font-size:11px;white-space:nowrap}
       .stage51073-audit-list{display:grid;max-height:260px;overflow:auto}.stage51073-audit-row{display:grid;grid-template-columns:42px minmax(0,1fr) 58px;gap:8px;align-items:center;padding:9px 11px;border-bottom:1px solid #eef2f7}.stage51073-audit-row:last-child{border-bottom:0}.stage51073-audit-row .kind{font-size:10px;font-weight:900;text-align:center;padding:3px 5px;border-radius:7px;background:#eef2ff;color:#3730a3}.stage51073-audit-row .main{display:grid;gap:2px;min-width:0}.stage51073-audit-row .main strong{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.stage51073-audit-row .main em{font-style:normal;color:#1d4ed8}.stage51073-audit-row .main small,.stage51073-audit-row time{font-size:10px;color:#64748b}.stage51073-audit-row time{text-align:right}.stage51073-empty{padding:14px;color:#64748b;font-size:11px;text-align:center}
       @media(max-width:640px){.stage51073-audit-head{align-items:flex-start}.stage51073-audit-row{grid-template-columns:38px minmax(0,1fr) 50px;padding:8px}.stage51073-audit-row .main strong{font-size:11px}}
@@ -22359,7 +22369,7 @@ console.info('[230MATCH] 5.10.71 ready · field bracket HQ PNG capture fix');
   window.addEventListener('pageshow',run);
   document.addEventListener('click',e=>{if(e.target?.closest?.('[data-portal-go="operation"],[data-view="operation"],[data-mobile-view="operation"],[data-player-result-open]'))run()},true);
   // MutationObserver 대신 운영 화면에서만 저빈도 갱신해 실시간 기록을 놓치지 않으면서 렌더 부하를 제한한다.
-  setInterval(()=>{if(document.body?.dataset.currentView==='operation'&&canOperate())renderPanel()},2500);
+  setInterval(()=>{if(operationViewIsVisible()&&canOperate())renderPanel()},2000);
   window.stage51073RenderPlayerResultAudit=renderPanel;
-  console.info('[230MATCH] 5.10.73 ready · participant result direct official sync + operator persistent audit panel');
+  console.info('[230MATCH] 5.10.74 ready · participant result audit panel always-visible operation placement');
 })();
