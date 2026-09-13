@@ -23087,3 +23087,242 @@ console.info('[230MATCH] 5.10.79 ready · member self-edit names propagate to pr
 console.info('[230MATCH] 5.10.80 ready · public court status gated by prelim scheduled-publication time');
 
 console.log('[230MATCH] 5.10.84 ready · same-origin notice image attachment download');
+
+/* 230MATCH 5.10.85 · 문자 센터 자동화 설정
+   - 기본값은 기존 동작 유지(수동 또는 확인발송). 완전자동은 관리자가 직접 선택해야만 켜진다.
+   - 수동: 자동 상태감지 발송 없음 / 문자센터 수동기능만 사용
+   - 확인발송: 코트 상태변화 감지 -> 기존 승인 팝업 -> 관리자 선택 발송
+   - 완전자동: 코트 상태변화 감지 -> Aligo 직접 발송
+   - 비상정지 시 현재 상태를 기준점으로 갱신해 재개 후 과거 이벤트를 몰아서 보내지 않는다.
+   - 기존 경기/코트/대기열/결과 데이터는 변경하지 않는다. */
+(function stage51085SmsAutomationCenter(){
+  const VERSION='5.10.85';
+  const PANEL_ID='stage51085SmsAutomationPanel';
+  const modes={manual:'수동',confirm:'확인발송',auto:'완전자동'};
+  const statusLabel={
+    pending:'승인 대기','sent-aligo':'알리고 발송','opened-phone':'문자앱 열기',dismissed:'닫음',skipped:'건너뜀','no-phone':'연락처 없음',
+    'auto-sending':'자동 발송 중','sent-auto':'자동발송 완료','failed-auto':'자동발송 실패'
+  };
+  const eventLabel={start:'경기 시작',waiting:'코트 대기1',changed:'코트·순서 변경',complete:'경기 완료'};
+
+  function esc85(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+  function settings85(){
+    ensureMessagingState(state);
+    state.messaging.settings=state.messaging.settings||{};
+    const s=state.messaging.settings;
+    if(!['manual','confirm','auto'].includes(String(s.smsAutomationMode||''))){
+      // 업그레이드 시 기존 승인팝업 ON이면 확인발송, 아니면 수동으로 보존한다. 완전자동으로 자동 승격하지 않는다.
+      s.smsAutomationMode=s.autoSmsApprovalEnabled===true?'confirm':'manual';
+    }
+    if(typeof s.smsAutomationPaused!=='boolean')s.smsAutomationPaused=false;
+    return s;
+  }
+  function applyLegacyGate85(){
+    const s=settings85();
+    s.autoSmsApprovalEnabled=!s.smsAutomationPaused&&s.smsAutomationMode!=='manual';
+  }
+  function resetDetectionBaseline85(){
+    try{autoSmsSnapshot=buildAutoSmsSnapshot();}catch(_e){}
+  }
+  function currentMode85(){return settings85().smsAutomationMode||'manual';}
+  function isAuto85(){const s=settings85();return s.smsAutomationMode==='auto'&&!s.smsAutomationPaused;}
+  function isConfirm85(){const s=settings85();return s.smsAutomationMode==='confirm'&&!s.smsAutomationPaused;}
+
+  // 기존 처리이력 판정에 완전자동 성공 상태도 포함한다.
+  const oldHandled85=stage51020HandledSmsStatus;
+  stage51020HandledSmsStatus=function stage51085HandledSmsStatus(key){
+    try{
+      const row=(state.messaging?.smsApprovalHistory||[]).find(x=>x?.key===key&&String(x?.status||'')==='sent-auto');
+      if(row)return 'sent-auto';
+    }catch(_e){}
+    return oldHandled85(key);
+  };
+
+  function findHistory85(key){return (state.messaging?.smsApprovalHistory||[]).find(x=>x?.key===key);}
+  function upsertHistory85(key,patch){
+    ensureMessagingState(state);state.messaging.smsApprovalHistory=Array.isArray(state.messaging.smsApprovalHistory)?state.messaging.smsApprovalHistory:[];
+    let row=findHistory85(key);
+    if(!row){row={key,createdAt:new Date().toISOString()};state.messaging.smsApprovalHistory.unshift(row);}
+    Object.assign(row,patch,{updatedAt:new Date().toISOString()});
+    state.messaging.smsApprovalHistory=state.messaging.smsApprovalHistory.slice(0,300);
+    try{safePersistState('문자 자동화 기록');}catch(_e){}
+    renderPanel85();
+    return row;
+  }
+  async function sleep85(ms){return new Promise(r=>setTimeout(r,ms));}
+  async function sendAutoAligo85(item){
+    const {key,kind,matchId,placement,recipients}=item;
+    const body=smsStripAffiliations(item.body||autoSmsBody(kind,item.match,placement));
+    upsertHistory85(key,{kind,matchId,status:'auto-sending',recipients:recipients.map(r=>({name:r.name,phone:r.phone})),body,detail:'알리고 자동발송 시작'});
+    let lastError=null;
+    for(let attempt=1;attempt<=2;attempt++){
+      try{
+        await sendAligoSmsV3(recipients,body,{source:'court_full_auto',kind,matchId,title:'230MATCH 경기 안내',placement,attempt});
+        const sentAt=new Date().toISOString();
+        upsertHistory85(key,{kind,matchId,status:'sent-auto',sentAt,detail:`알리고 완전자동 발송 완료 · ${recipients.length}명 · ${attempt}차`});
+        // 기존 로컬 중복방지 저장소에도 성공 처리하여 새로고침 뒤 재발송을 막는다.
+        try{stage51020RememberHandledSms(key,'sent-aligo');}catch(_e){}
+        try{notice(`자동문자 발송 완료 · ${eventLabel[kind]||kind} · ${recipients.length}명`,'success');}catch(_e){}
+        return true;
+      }catch(error){
+        lastError=error;
+        upsertHistory85(key,{kind,matchId,status:'auto-sending',detail:`자동발송 ${attempt}차 실패 · ${error?.message||error}`});
+        if(attempt<2)await sleep85(1800);
+      }
+    }
+    upsertHistory85(key,{kind,matchId,status:'failed-auto',detail:`자동발송 최종 실패 · ${lastError?.message||lastError||'알 수 없는 오류'}`});
+    try{notice(`⚠ 자동문자 발송 실패 · ${eventLabel[kind]||kind} · 문자센터 기록을 확인하세요.`,'error');}catch(_e){}
+    return false;
+  }
+
+  const oldQueue85=queueAutoSmsEvent;
+  queueAutoSmsEvent=function stage51085QueueAutoSmsEvent(kind,match,placement){
+    const s=settings85();
+    if(s.smsAutomationPaused||s.smsAutomationMode==='manual')return{queued:false,disabled:true};
+    if(s.smsAutomationMode!=='auto')return oldQueue85(kind,match,placement);
+
+    ensureMessagingState(state);state.messaging.smsApprovalHistory=Array.isArray(state.messaging.smsApprovalHistory)?state.messaging.smsApprovalHistory:[];
+    const key=autoSmsEventKey(kind,match.id,placement);
+    const handled=stage51020HandledSmsStatus(key);
+    if(handled)return{queued:false,duplicate:true,handled:true,status:handled};
+    const previous=findHistory85(key);
+    if(previous){
+      const st=String(previous.status||'');
+      const t=Date.parse(previous.updatedAt||previous.createdAt||'');
+      if(st==='sent-auto'||st==='auto-sending'||(Number.isFinite(t)&&Date.now()-t<120000&&st!=='failed-auto'))return{queued:false,duplicate:true,status:st};
+    }
+    const recipients=smsMatchRecipients(match);
+    if(!recipients.length){
+      upsertHistory85(key,{kind,matchId:match.id,status:'no-phone',detail:'완전자동 미발송 · 등록된 연락처 없음'});
+      try{notice(`자동문자 미발송 · ${smsTeamName(match?.teamA)} vs ${smsTeamName(match?.teamB)} · 연락처 없음`,'error');}catch(_e){}
+      return{queued:false,noPhone:true,teamLabel:`${smsTeamName(match?.teamA)} vs ${smsTeamName(match?.teamB)}`};
+    }
+    const item={key,kind,matchId:match.id,match,placement,recipients,body:autoSmsBody(kind,match,placement)};
+    // 비동기로 보내되 감지 루프는 막지 않는다. auto-sending 이력이 즉시 중복을 차단한다.
+    upsertHistory85(key,{kind,matchId:match.id,status:'auto-sending',detail:'완전자동 발송 대기',recipients:recipients.map(r=>({name:r.name,phone:r.phone}))});
+    void sendAutoAligo85(item);
+    return{queued:true,auto:true};
+  };
+
+  function saveSettings85(mutator,label='문자 자동화 설정 변경'){
+    if(!canOperate())return notice('관리자 또는 진행자 권한이 필요합니다.','error');
+    const s=settings85();
+    const beforeMode=s.smsAutomationMode,beforePaused=s.smsAutomationPaused;
+    mutator(s);
+    applyLegacyGate85();
+    // 모드/정지 전환 순간의 현재 코트상태를 새 기준점으로 사용하여 과거 이동을 몰아서 보내지 않는다.
+    if(beforeMode!==s.smsAutomationMode||beforePaused!==s.smsAutomationPaused)resetDetectionBaseline85();
+    commit(label);
+    renderPanel85();
+  }
+
+  function switchMode85(next){
+    if(!['manual','confirm','auto'].includes(next))return;
+    const s=settings85();
+    if(next==='auto'&&s.smsAutomationMode!=='auto'){
+      const entered=prompt('완전자동은 코트 상태가 바뀌면 관리자 확인 없이 알리고 문자가 실제 발송됩니다.\n\n전환하려면 “자동”을 입력하세요.','');
+      if(entered!=='자동'){renderPanel85();return notice('완전자동 전환을 취소했습니다.','info');}
+    }
+    saveSettings85(x=>{x.smsAutomationMode=next;x.smsAutomationPaused=false;},`문자 자동화 모드 · ${modes[next]}`);
+    notice(`문자 자동화 모드를 “${modes[next]}”으로 변경했습니다.`,'success');
+  }
+
+  function formatTime85(v){try{return v?new Date(v).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'';}catch(_e){return'';}}
+  function logRows85(){
+    const rows=(state.messaging?.smsApprovalHistory||[]).slice(0,30);
+    if(!rows.length)return '<div class="stage51085-empty">아직 자동 문자 처리 기록이 없습니다.</div>';
+    return rows.map(r=>{
+      const st=String(r.status||'');
+      const kind=eventLabel[r.kind]||r.kind||'문자';
+      const match=r.matchId?` · ${esc85(r.matchId)}`:'';
+      const detail=r.detail?`<small>${esc85(r.detail)}</small>`:'';
+      return `<div class="stage51085-log-row"><span class="stage51085-log-time">${esc85(formatTime85(r.updatedAt||r.createdAt))}</span><strong>${esc85(kind)}</strong><span>${esc85(statusLabel[st]||st||'기록')}${match}</span>${detail}</div>`;
+    }).join('');
+  }
+
+  function panelHtml85(){
+    const s=settings85();applyLegacyGate85();
+    const mode=s.smsAutomationMode;
+    const paused=s.smsAutomationPaused===true;
+    const autoDanger=mode==='auto'&&!paused;
+    return `<div class="stage51085-head"><div><small>SMS AUTOMATION</small><h3>문자 자동화 설정</h3><p>처음에는 확인발송으로 운영하고, 안정화 후 완전자동으로 전환할 수 있습니다.</p></div><span class="stage51085-mode ${autoDanger?'auto':paused?'paused':''}">${paused?'일시중지':modes[mode]}</span></div>
+      <div class="stage51085-mode-grid">
+        <button type="button" data-sms85-mode="manual" class="${mode==='manual'?'active':''}"><b>1. 수동</b><small>자동 감지 없음 · 문자센터에서 직접 발송</small></button>
+        <button type="button" data-sms85-mode="confirm" class="${mode==='confirm'?'active':''}"><b>2. 확인발송</b><small>상태변화 감지 → 승인 팝업 → 관리자 선택</small></button>
+        <button type="button" data-sms85-mode="auto" class="${mode==='auto'?'active danger':''}"><b>3. 완전자동</b><small>상태변화 감지 → 알리고 즉시 자동발송</small></button>
+      </div>
+      <div class="stage51085-switches">
+        <label><input type="checkbox" data-sms85-opt="autoSmsCourtWaiting" ${s.autoSmsCourtWaiting!==false?'checked':''}> 코트 대기1 진입</label>
+        <label><input type="checkbox" data-sms85-opt="autoSmsMatchStart" ${s.autoSmsMatchStart!==false?'checked':''}> 경기 시작·입장</label>
+        <label><input type="checkbox" data-sms85-opt="autoSmsCourtChanged" ${s.autoSmsCourtChanged!==false?'checked':''}> 코트·대기순서 변경</label>
+        <label><input type="checkbox" data-sms85-opt="autoSmsMatchComplete" ${s.autoSmsMatchComplete===true?'checked':''}> 경기 완료 안내</label>
+      </div>
+      <div class="stage51085-safety ${autoDanger?'danger':''}">
+        <div><strong>${paused?'⏸ 자동문자 일시중지 중':autoDanger?'⚡ 완전자동 가동 중':'🛡 안전 운영'}</strong><p>${autoDanger?'관리자 확인 없이 알리고가 실제 발송됩니다. 중복 이벤트는 처리이력으로 차단하고 실패 시 1회 재시도합니다.':paused?'새 코트 이동은 발송하지 않으며, 재개 시 현재 상태부터 새로 감지합니다.':'완전자동은 직접 전환하기 전까지 절대 켜지지 않습니다.'}</p></div>
+        <button type="button" class="btn ${paused?'btn-primary':'btn-danger-outline'}" data-sms85-pause>${paused?'자동문자 재개':'비상정지'}</button>
+      </div>
+      <details class="stage51085-log" open><summary>자동 문자 처리 기록 · 최근 ${(state.messaging?.smsApprovalHistory||[]).length}건</summary><div>${logRows85()}</div></details>
+      <p class="stage51085-note">※ 완전자동은 현재 관리자/진행자 앱이 실행 중이고 인터넷이 연결된 동안 동작합니다. 서버 백그라운드 발송 방식은 아닙니다. 기존 문자앱·알리고 수동발송 기능은 그대로 사용할 수 있습니다.</p>`;
+  }
+
+  function bindPanel85(panel){
+    panel.querySelectorAll('[data-sms85-mode]').forEach(b=>b.addEventListener('click',()=>switchMode85(b.dataset.sms85Mode)));
+    panel.querySelectorAll('[data-sms85-opt]').forEach(ch=>ch.addEventListener('change',()=>{
+      const key=ch.dataset.sms85Opt;saveSettings85(s=>{s[key]=!!ch.checked;},`자동문자 항목 설정 · ${key}`);
+    }));
+    panel.querySelector('[data-sms85-pause]')?.addEventListener('click',()=>{
+      const s=settings85();
+      if(!s.smsAutomationPaused){
+        if(!confirm('자동문자 감지를 즉시 일시중지할까요?\n경기·코트·결과 데이터에는 영향이 없습니다.'))return;
+        saveSettings85(x=>{x.smsAutomationPaused=true;},'자동문자 비상정지');
+        notice('자동문자를 일시중지했습니다.','warning');
+      }else{
+        saveSettings85(x=>{x.smsAutomationPaused=false;},'자동문자 재개');
+        notice(`자동문자를 재개했습니다. 현재 모드: ${modes[currentMode85()]}`,'success');
+      }
+    });
+  }
+
+  function ensurePanel85(){
+    const view=document.getElementById('view-messages');if(!view||!canOperate())return null;
+    let panel=document.getElementById(PANEL_ID);
+    if(!panel){
+      panel=document.createElement('section');panel.id=PANEL_ID;panel.className='stage51085-panel';
+      const host=view.querySelector('.sms-center-panel')||view.querySelector('.panel')||view;
+      const bulk=document.getElementById('stage5967BulkSmsPanel');
+      if(bulk?.parentNode)bulk.parentNode.insertBefore(panel,bulk);else{const head=host.querySelector('.section-head');if(head)head.insertAdjacentElement('afterend',panel);else host.prepend(panel);}
+    }
+    return panel;
+  }
+  function renderPanel85(){
+    const panel=ensurePanel85();if(!panel)return;
+    panel.innerHTML=panelHtml85();bindPanel85(panel);
+  }
+
+  const css=document.createElement('style');css.id='stage51085SmsAutomationCss';css.textContent=`
+    .stage51085-panel{margin:12px 0 16px;padding:16px;border:1px solid #cbd5e1;border-radius:16px;background:#fff;box-shadow:0 4px 14px rgba(15,23,42,.06)}
+    .stage51085-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.stage51085-head small{font-size:10px;font-weight:900;letter-spacing:.08em;color:#64748b}.stage51085-head h3{margin:2px 0;font-size:19px}.stage51085-head p{margin:0;color:#64748b;font-size:12px}.stage51085-mode{white-space:nowrap;padding:6px 10px;border-radius:999px;background:#e2e8f0;color:#334155;font-size:12px;font-weight:900}.stage51085-mode.auto{background:#fee2e2;color:#b91c1c}.stage51085-mode.paused{background:#fef3c7;color:#92400e}
+    .stage51085-mode-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}.stage51085-mode-grid button{display:grid;gap:4px;text-align:left;padding:12px;border:1px solid #cbd5e1;border-radius:12px;background:#f8fafc;color:#0f172a;cursor:pointer}.stage51085-mode-grid button b{font-size:14px}.stage51085-mode-grid button small{font-size:11px;line-height:1.35;color:#64748b}.stage51085-mode-grid button.active{border:2px solid #2563eb;background:#eff6ff}.stage51085-mode-grid button.active.danger{border-color:#dc2626;background:#fff1f2}
+    .stage51085-switches{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px;margin-top:12px;padding:12px;border-radius:12px;background:#f8fafc}.stage51085-switches label{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:800;color:#334155}.stage51085-switches input{width:17px;height:17px}
+    .stage51085-safety{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;padding:12px;border:1px solid #cbd5e1;border-radius:12px;background:#f8fafc}.stage51085-safety.danger{border-color:#fecaca;background:#fff7f7}.stage51085-safety strong{font-size:13px}.stage51085-safety p{margin:3px 0 0;font-size:11px;line-height:1.45;color:#64748b}.stage51085-safety .btn{flex:0 0 auto}
+    .stage51085-log{margin-top:12px;border:1px solid #e2e8f0;border-radius:12px;padding:9px 11px}.stage51085-log summary{cursor:pointer;font-size:12px;font-weight:900}.stage51085-log>div{max-height:240px;overflow:auto;margin-top:8px}.stage51085-log-row{display:grid;grid-template-columns:72px 92px minmax(120px,1fr);gap:6px 8px;align-items:center;padding:6px 2px;border-bottom:1px dashed #e2e8f0;font-size:11px}.stage51085-log-row small{grid-column:2/4;color:#64748b;overflow-wrap:anywhere}.stage51085-log-time{color:#64748b}.stage51085-empty{padding:12px;color:#94a3b8;font-size:12px}.stage51085-note{margin:10px 0 0;font-size:10px;line-height:1.5;color:#64748b}
+    @media(max-width:700px){.stage51085-panel{padding:12px}.stage51085-mode-grid{grid-template-columns:1fr}.stage51085-switches{grid-template-columns:1fr}.stage51085-safety{align-items:flex-start;flex-direction:column}.stage51085-safety .btn{width:100%}.stage51085-log-row{grid-template-columns:64px 80px minmax(0,1fr)}}
+  `;document.head.appendChild(css);
+
+  function install85(){
+    settings85();applyLegacyGate85();resetDetectionBaseline85();renderPanel85();
+    console.info('[230MATCH] 5.10.85 ready · SMS automation center: manual / confirm / full-auto + emergency stop + audit log');
+  }
+  document.addEventListener('click',e=>{
+    if(e.target?.closest?.('[data-settings-view="messages"],[data-portal-go="messages"],[data-view="messages"],[data-v6003-go="messages"]'))setTimeout(renderPanel85,100);
+  },true);
+  window.addEventListener('hashchange',()=>setTimeout(renderPanel85,100));
+  // 기록창은 문자센터가 열려 있을 때만 10초 주기로 갱신한다. 경기상태 감지주기는 기존 로직을 그대로 사용한다.
+  setInterval(()=>{
+    try{
+      const view=document.getElementById('view-messages');
+      if(view&&!view.hidden&&(view.classList.contains('active')||document.body?.dataset?.currentView==='messages'))renderPanel85();
+    }catch(_e){}
+  },10000);
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install85,0),{once:true});else setTimeout(install85,0);
+})();
