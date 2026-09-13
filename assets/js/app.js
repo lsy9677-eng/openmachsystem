@@ -13967,7 +13967,7 @@ function stage51022RestoreMainDraft({quiet=false}={}){
   }
   function recordAudit(match,isPrelim,correcting){
     state.operation=state.operation||{};state.operation.playerResultHistory=state.operation.playerResultHistory||[];
-    state.operation.playerResultHistory.unshift({id:`pr-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,at:new Date().toISOString(),matchId:match.id,isPrelim:Boolean(isPrelim),teamA:portalTeam(match.teamA),teamB:portalTeam(match.teamB),scoreA:Number(match.scoreA),scoreB:Number(match.scoreB),winner:portalTeam(match.winner),resultType:match.resultType||'normal',resultTypeLabel:match.resultTypeLabel||'일반 경기',enteredByUid:currentAuthUser?.uid||'',enteredByName:authUserLabel(),corrected:Boolean(correcting)});
+    state.operation.playerResultHistory.unshift({id:`pr-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,at:new Date().toISOString(),matchId:match.id,isPrelim:Boolean(isPrelim),teamA:portalTeam(match.teamA),teamB:portalTeam(match.teamB),scoreA:Number(match.scoreA),scoreB:Number(match.scoreB),winner:portalTeam(match.winner),resultType:match.resultType||'normal',resultTypeLabel:match.resultTypeLabel||'일반 경기',enteredByUid:currentAuthUser?.uid||'',enteredByName:authUserLabel(),enteredByPlayer:!canOperate(),enteredByOperator:canOperate(),corrected:Boolean(correcting)});
     state.operation.playerResultHistory=state.operation.playerResultHistory.slice(0,200);
   }
 
@@ -14044,15 +14044,79 @@ function stage51022RestoreMainDraft({quiet=false}={}){
     return{ok:true,warning:''};
   }
 
+  function stage51073RemoteMatch(remote,id,isPrelim){
+    try{return isPrelim?findPrelimMatch(remote,id):findMatch(remote?.draw,id)}catch(_e){return null}
+  }
+  function stage51073SameResult(match,scoreA,scoreB,winnerId){
+    if(!match)return false;
+    const done=match.status==='completed'||Boolean(match.winner)||Boolean(match.winnerId);
+    if(!done)return false;
+    const remoteWinner=String(match.winner?.id||match.winnerId||'');
+    return Number(match.scoreA)===Number(scoreA)&&Number(match.scoreB)===Number(scoreB)&&remoteWinner===String(winnerId||'');
+  }
+  async function stage51073RefreshBeforePlayerWrite(id,isPrelim){
+    if(canOperate())return matchById(id,isPrelim);
+    try{
+      await connectCloudSync();
+      const remote=await pullStateNow();
+      if(!remote||typeof remote!=='object')return matchById(id,isPrelim);
+      const rm=stage51073RemoteMatch(remote,id,isPrelim);
+      if(!rm)return matchById(id,isPrelim);
+      // 참가자 기기는 쓰기 직전에 최신 운영상태를 먼저 받아 전체 상태 덮어쓰기 위험을 줄인다.
+      applySynchronizedState(remote,'참가자 결과 입력 직전 최신화');
+      return matchById(id,isPrelim);
+    }catch(error){
+      console.warn('[5.10.73] player result preflight pull warning',error);
+      return matchById(id,isPrelim);
+    }
+  }
+  async function stage51073PushOfficialPlayerResult(reason='참가자 경기 결과'){
+    if(canOperate()){
+      await stage5526PushCriticalState(reason);
+      return true;
+    }
+    let lastError=null;
+    for(let attempt=0;attempt<2;attempt++){
+      try{
+        if(attempt>0)await connectCloudSync();
+        try{await prepareCriticalCloudWrite();}catch(_e){}
+        await pushStateNow(state);
+        return true;
+      }catch(error){
+        lastError=error;
+        console.warn(`[5.10.73] player official result push attempt ${attempt+1} failed`,error);
+        if(attempt===0)await new Promise(resolve=>setTimeout(resolve,650));
+      }
+    }
+    throw lastError||new Error('클라우드 결과 저장 실패');
+  }
+  async function stage51073RemoteConfirmsResult(id,isPrelim,scoreA,scoreB,winnerId){
+    try{
+      await connectCloudSync();
+      const remote=await pullStateNow();
+      return stage51073SameResult(stage51073RemoteMatch(remote,id,isPrelim),scoreA,scoreB,winnerId);
+    }catch(_e){return false}
+  }
+
   async function submit(event){
-    event.preventDefault();const id=document.getElementById('stage3560MatchId').value;const isPrelim=document.getElementById('stage3560IsPrelim').value==='1';const match=matchById(id,isPrelim);if(!match)return notice('경기 정보를 찾을 수 없습니다.','error');
+    event.preventDefault();const id=document.getElementById('stage3560MatchId').value;const isPrelim=document.getElementById('stage3560IsPrelim').value==='1';let match=matchById(id,isPrelim);if(!match)return notice('경기 정보를 찾을 수 없습니다.','error');
     if(!ownership(match.teamA).ok&&!ownership(match.teamB).ok)return notice('본인 인증된 경기만 결과를 입력할 수 있습니다.','error');
     const type=document.getElementById('stage3560Type').value||'normal';let scoreA=Number(document.getElementById('stage3560ScoreA').value),scoreB=Number(document.getElementById('stage3560ScoreB').value);let side=document.getElementById('stage3560WinnerSide').value;
     if(type!=='normal'){
       if(!side)return notice(`${TYPE_LABELS[type]} 처리할 승리팀을 선택하세요.`,'error');scoreA=side==='A'?6:0;scoreB=side==='B'?6:0;
     }
     if(!Number.isInteger(scoreA)||!Number.isInteger(scoreB)||scoreA<0||scoreB<0||scoreA>6||scoreB>6||scoreA===scoreB||!((scoreA===6&&scoreB<=5)||(scoreB===6&&scoreA<=5)))return notice('한 팀은 6점, 상대팀은 0~5점으로 입력하세요.','error');
+    if(!canOperate()){
+      const refreshed=await stage51073RefreshBeforePlayerWrite(id,isPrelim);
+      if(!refreshed)return notice('최신 경기 정보를 확인하지 못했습니다. 잠시 후 다시 시도하세요.','error');
+      match=refreshed;
+      if(!ownership(match.teamA).ok&&!ownership(match.teamB).ok)return notice('최신 상태에서 본인 경기 확인이 되지 않습니다. 관리자에게 알려주세요.','error');
+    }
     const winnerId=scoreA>scoreB?match.teamA.id:match.teamB.id;const correcting=match.status==='completed';
+    if(correcting&&stage51073SameResult(match,scoreA,scoreB,winnerId)){
+      document.getElementById('stage3560ResultDialog')?.close();
+      return notice('이미 동일한 경기 결과가 공식 반영되어 있습니다.','success');
+    }
     const safety=correcting?playerResultCorrectionSafety(match,isPrelim):{ok:true,warning:''};
     if(!safety.ok)return notice(safety.message||'현재 이 경기 결과는 참가자가 수정할 수 없습니다.','error');
     const summary=`${portalTeam(match.teamA)} ${scoreA} : ${scoreB} ${portalTeam(match.teamB)}${type!=='normal'?` · ${TYPE_LABELS[type]}`:''}`;
@@ -14068,6 +14132,7 @@ function stage51022RestoreMainDraft({quiet=false}={}){
       if(!confirmed)return;
     }
     try{
+      const stage51073BeforeState=!canOperate()?structuredClone(state):null;
       autoRecovery(correcting?'선수 경기 결과 수정 전':'선수 경기 결과 입력 전');
       let saved;
       if(isPrelim){
@@ -14085,16 +14150,31 @@ function stage51022RestoreMainDraft({quiet=false}={}){
       saved.enteredByPlayer=!canOperate();saved.enteredByOperator=canOperate();saved.enteredByUid=currentAuthUser?.uid||'';saved.enteredByName=authUserLabel();saved.enteredAt=new Date().toISOString();recordAudit(saved,isPrelim,correcting);
       const playerFinal=!isPrelim&&!match.nextMatchId;
       commit(`${playerFinal?'결승 결과 확정':'선수 결과 '+(correcting?'수정':'입력')} · ${saved.id} · ${saved.scoreA}:${saved.scoreB}${type!=='normal'?` · ${TYPE_LABELS[type]}`:''}`);
+      if(!canOperate()){
+        let pushed=false;
+        try{pushed=await stage51073PushOfficialPlayerResult(playerFinal?'참가자 결승 결과':'참가자 경기 결과')}catch(pushError){
+          console.error('[5.10.73] participant official result push failed',pushError);
+          pushed=await stage51073RemoteConfirmsResult(id,isPrelim,scoreA,scoreB,winnerId);
+          if(!pushed&&stage51073BeforeState){
+            state=stage51073BeforeState;
+            safePersistState('참가자 결과 클라우드 저장 실패 복원');
+            renderCommittedState6400();
+            throw new Error('서버에 결과를 저장하지 못했습니다. 결과는 확정되지 않았습니다. 네트워크 확인 후 다시 입력하세요.');
+          }
+        }
+        if(!pushed)throw new Error('서버 결과 저장 상태를 확인하지 못했습니다. 다시 시도하세요.');
+      }
       if(playerFinal){
-        await stage5526PushCriticalState('결승 결과');
+        if(canOperate())await stage5526PushCriticalState('결승 결과');
         const completionReport=finalizeTournamentCompletion(state);
         if(completionReport.completed){
           withTournamentWriteBypass(()=>commit(`대회 자동 종료 확정 · 우승 ${teamText(completionReport.champion)}`));
-          await stage5526PushCriticalState('대회 종료 확정',{allowClosed:true});
+          if(canOperate())await stage5526PushCriticalState('대회 종료 확정',{allowClosed:true});
+          else await stage51073PushOfficialPlayerResult('참가자 결승·대회 종료 확정');
           applyTournamentReadOnlyUi();
         }
       }
-      document.getElementById('stage3560ResultDialog').close();renderPortalViews();setTimeout(v3252AutoMyMatch,80);notice(`경기 결과가 ${correcting?'수정':'저장'}되었습니다.`,'success');
+      document.getElementById('stage3560ResultDialog').close();renderPortalViews();setTimeout(v3252AutoMyMatch,80);notice(`경기 결과가 ${correcting?'수정':'공식 확정'}되었습니다.${!canOperate()?' · 관리자 기록에도 남았습니다.':''}`,'success');
     }catch(error){console.error('[35.6.0] player result failed',error);notice(`결과 저장 실패: ${error?.message||error}`,'error')}
   }
   const originalRender=renderMyMatchTeam;renderMyMatchTeam=function(team){originalRender.apply(this,arguments);setTimeout(()=>decorate(team),0)};
@@ -22231,3 +22311,55 @@ console.info('[230MATCH] 5.10.70 ready · dropdown/select responsiveness + coale
 })();
 console.info('[230MATCH] 5.10.72 ready · 본선 확정과 참가자 공개 분리 + 예약/즉시 공개');
 console.info('[230MATCH] 5.10.71 ready · field bracket HQ PNG capture fix');
+
+
+/* 230MATCH 5.10.73 · participant direct-official result + operator audit trail */
+(function stage51073PlayerResultAuditPanel(){
+  const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  let lastNewestId='';
+  let initialized=false;
+  function rows(){
+    const all=Array.isArray(state?.operation?.playerResultHistory)?state.operation.playerResultHistory:[];
+    return all.filter(r=>r?.enteredByPlayer===true).slice(0,20);
+  }
+  function ensurePanel(){
+    if(!canOperate())return null;
+    const view=document.getElementById('view-operation');if(!view)return null;
+    let panel=document.getElementById('stage51073PlayerResultAudit');
+    if(panel)return panel;
+    panel=document.createElement('section');panel.id='stage51073PlayerResultAudit';panel.className='stage51073-audit';
+    const heading=view.querySelector('h1,h2');
+    if(heading?.parentElement)heading.parentElement.insertAdjacentElement('afterend',panel);else view.prepend(panel);
+    return panel;
+  }
+  function renderPanel(){
+    if(document.body?.dataset.currentView!=='operation'||!canOperate())return;
+    const panel=ensurePanel();if(!panel)return;
+    const list=rows();
+    const newest=list[0]?.id||'';
+    if(initialized&&newest&&lastNewestId&&newest!==lastNewestId){
+      const r=list[0];
+      notice(`참가자 결과 반영 · ${r.isPrelim?'예선':'본선'} ${r.matchId||''} · ${r.scoreA}:${r.scoreB}`,'success');
+    }
+    if(newest)lastNewestId=newest;
+    initialized=true;
+    const recent30=list.filter(r=>Date.now()-new Date(r.at||0).getTime()<=30*60*1000).length;
+    panel.innerHTML=`<div class="stage51073-audit-head"><div><strong>참가자 직접 입력 결과</strong><span>입력 즉시 공식 반영 · 관리자 확인용 기록</span></div><b>${recent30?`최근 30분 ${recent30}건`:'최근 입력 없음'}</b></div><div class="stage51073-audit-list">${list.length?list.slice(0,10).map(r=>`<div class="stage51073-audit-row"><span class="kind">${r.isPrelim?'예선':'본선'}</span><span class="main"><strong>${esc(r.teamA||'')} <em>${Number(r.scoreA)} : ${Number(r.scoreB)}</em> ${esc(r.teamB||'')}</strong><small>${esc(r.enteredByName||'참가자')} · ${r.corrected?'결과 수정':'결과 입력'}${r.resultTypeLabel&&r.resultTypeLabel!=='일반 경기'?` · ${esc(r.resultTypeLabel)}`:''}</small></span><time>${r.at?new Date(r.at).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}):''}</time></div>`).join(''):'<div class="stage51073-empty">참가자가 직접 입력한 결과가 아직 없습니다.</div>'}</div>`;
+  }
+  if(!document.getElementById('stage51073PlayerResultAuditStyle')){
+    const st=document.createElement('style');st.id='stage51073PlayerResultAuditStyle';st.textContent=`
+      .stage51073-audit{margin:10px 0 14px;border:1px solid #cbd5e1;border-radius:14px;background:#fff;overflow:hidden}
+      .stage51073-audit-head{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 13px;background:#f8fafc;border-bottom:1px solid #e2e8f0}.stage51073-audit-head>div{display:grid;gap:2px}.stage51073-audit-head strong{font-size:13px}.stage51073-audit-head span{font-size:10px;color:#64748b}.stage51073-audit-head>b{padding:4px 8px;border-radius:999px;background:#e0f2fe;color:#075985;font-size:11px;white-space:nowrap}
+      .stage51073-audit-list{display:grid;max-height:260px;overflow:auto}.stage51073-audit-row{display:grid;grid-template-columns:42px minmax(0,1fr) 58px;gap:8px;align-items:center;padding:9px 11px;border-bottom:1px solid #eef2f7}.stage51073-audit-row:last-child{border-bottom:0}.stage51073-audit-row .kind{font-size:10px;font-weight:900;text-align:center;padding:3px 5px;border-radius:7px;background:#eef2ff;color:#3730a3}.stage51073-audit-row .main{display:grid;gap:2px;min-width:0}.stage51073-audit-row .main strong{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.stage51073-audit-row .main em{font-style:normal;color:#1d4ed8}.stage51073-audit-row .main small,.stage51073-audit-row time{font-size:10px;color:#64748b}.stage51073-audit-row time{text-align:right}.stage51073-empty{padding:14px;color:#64748b;font-size:11px;text-align:center}
+      @media(max-width:640px){.stage51073-audit-head{align-items:flex-start}.stage51073-audit-row{grid-template-columns:38px minmax(0,1fr) 50px;padding:8px}.stage51073-audit-row .main strong{font-size:11px}}
+    `;document.head.appendChild(st);
+  }
+  const run=()=>setTimeout(renderPanel,80);
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',run,{once:true});else run();
+  window.addEventListener('pageshow',run);
+  document.addEventListener('click',e=>{if(e.target?.closest?.('[data-portal-go="operation"],[data-view="operation"],[data-mobile-view="operation"],[data-player-result-open]'))run()},true);
+  // MutationObserver 대신 운영 화면에서만 저빈도 갱신해 실시간 기록을 놓치지 않으면서 렌더 부하를 제한한다.
+  setInterval(()=>{if(document.body?.dataset.currentView==='operation'&&canOperate())renderPanel()},2500);
+  window.stage51073RenderPlayerResultAudit=renderPanel;
+  console.info('[230MATCH] 5.10.73 ready · participant result direct official sync + operator persistent audit panel');
+})();
