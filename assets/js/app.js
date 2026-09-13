@@ -9207,7 +9207,7 @@ function printPrizeSignatureHtml(){
       host?.appendChild(wrap);
       wrap.querySelectorAll('input').forEach(input=>{
         const eventName=input.type==='number'?'input':'change';
-        input.addEventListener(eventName,()=>{try{renderPrintPreview()}catch(_e){}});
+        input.addEventListener(eventName,()=>schedulePrintPreviewRender(35));
       });
     }
     wrap.hidden=(select.value!==OPTION_VALUE);
@@ -9245,6 +9245,19 @@ function buildPrintDocument(){
   const specialClass=target==='prelim-assignment'?'assignment-print-sheet':target==='bracket'?'bracket-tree-print-sheet':target==='bracket-field'?'stage51038-field-print-sheet':'';
   return {target,label:labels[target],paper,orientation,tone,scale,html:`<article class="print-sheet paper-${paper} ${orientation} ${tone} scale-${scale} ${isLabels?'label-print-sheet':''} ${specialClass}">${body}${isLabels||target==='bracket-field'?'':`<footer class="print-footer">230MATCH · ${printEscape(BUILD_LABEL)}</footer>`}</article>`};
 }
+let __stage51070PrintPreviewTimer=0;
+let __stage51070PrintPreviewRaf=0;
+function schedulePrintPreviewRender(delay=45){
+  try{if(__stage51070PrintPreviewTimer)clearTimeout(__stage51070PrintPreviewTimer);}catch(_e){}
+  __stage51070PrintPreviewTimer=setTimeout(()=>{
+    __stage51070PrintPreviewTimer=0;
+    try{if(__stage51070PrintPreviewRaf)cancelAnimationFrame(__stage51070PrintPreviewRaf);}catch(_e){}
+    __stage51070PrintPreviewRaf=requestAnimationFrame(()=>{
+      __stage51070PrintPreviewRaf=0;
+      try{renderPrintPreview();}catch(error){console.error('[230MATCH 5.10.70 print preview]',error);}
+    });
+  },Math.max(0,Number(delay)||0));
+}
 function renderPrintPreview(){const preview=document.getElementById('printPreview');if(!preview)return;const target=document.getElementById('printTargetSelect')?.value||'prelim';const options=document.getElementById('labelPrintOptions');if(options)options.hidden=target!=='labels';const paper=document.getElementById('printPaperSelect'),orientation=document.getElementById('printOrientationSelect'),scale=document.getElementById('printScaleSelect');if(paper&&!['bracket','bracket-field'].includes(target))paper.value='a4';if(target==='labels'){if(orientation)orientation.value='portrait';}else if(target==='prelim-assignment'){if(orientation)orientation.value='landscape';if(scale)scale.value='small';}else if(target==='bracket'){if(orientation)orientation.value='landscape';if(scale)scale.value='small';}else if(target==='bracket-field'){if(orientation)orientation.value='landscape';if(scale)scale.value='normal';}else if(target==='prize-signature'){if(orientation)orientation.value='landscape';if(scale)scale.value='normal';}const doc=buildPrintDocument();preview.innerHTML=doc.html;if(target==='bracket')window.__stage5940SyncClonedBracketConnectors?.(preview);const summary=document.getElementById('printPreviewSummary');if(summary)summary.textContent=target==='labels'?`${doc.label} · 12×40mm · A4 세로 · ${document.getElementById('labelStatusSelect')?.selectedOptions?.[0]?.textContent||''}`:target==='bracket-field'?`${doc.label} · ${doc.paper.toUpperCase()} 가로 · ${stage51038FieldPagePlan().total}장 · ${stage51040FieldMode()==='current'?'실제 대진':'테스트 빈 양식'} · 2장씩 연결형`:target==='prize-signature'?`${doc.label} · A4 가로 · 우승/준우승/3위/8강 선택 출력`:`${doc.label} · ${doc.paper.toUpperCase()} · ${doc.orientation==='landscape'?'가로':'세로'} · ${doc.tone==='mono'?'흑백':'컬러'}`;}
 function printSelectedDocument(){const doc=buildPrintDocument();const previousTitle=document.title;document.title=stage51045PrintFileBase(doc.label);let root=document.getElementById('printOutputRoot');if(!root){root=document.createElement('div');root.id='printOutputRoot';document.body.appendChild(root);}root.innerHTML=doc.html;document.body.classList.add('printing-output');let pageStyle=document.createElement('style');pageStyle.id='stage51042BracketPageRule';pageStyle.textContent=`@media print{@page{size:${doc.paper==='a3'?'A3':'A4'} ${doc.orientation==='landscape'?'landscape':'portrait'};margin:${['bracket','bracket-field','prize-signature'].includes(doc.target)?'5mm':'6mm'}}}`;document.head.appendChild(pageStyle);const cleanup=()=>{document.body.classList.remove('printing-output');root.innerHTML='';pageStyle?.remove();document.title=previousTitle;window.removeEventListener('afterprint',cleanup);};window.addEventListener('afterprint',cleanup);if(doc.target==='bracket')window.__stage5940SyncClonedBracketConnectors?.(root,()=>setTimeout(()=>window.print(),60));else setTimeout(()=>window.print(),80);}
 function wrapCanvasText(ctx,text,maxWidth){const words=String(text||'').split(/\s+/),lines=[];let line='';for(const word of words){const test=line?`${line} ${word}`:word;if(ctx.measureText(test).width>maxWidth&&line){lines.push(line);line=word;}else line=test;}if(line)lines.push(line);return lines;}
@@ -9262,7 +9275,16 @@ async function saveRichPrintPreviewPng(doc){
   img.onerror=()=>{URL.revokeObjectURL(url);notice('이미지 변환에 실패했습니다. 인쇄/PDF 저장을 이용해 주세요.','error');};img.src=url;
 }
 function savePrintPng(){const doc=buildPrintDocument(),title=doc.label;if(doc.target==='bracket'){void stage5948CaptureBracketExactlyLikeDirect();return;}if(doc.target==='bracket-field'||doc.target==='prelim-assignment'||doc.target==='prize-signature'){saveRichPrintPreviewPng(doc);return;}const lines=[];if(doc.target==='participants'){const d=stage51013PrintRegistrationRows();lines.push(`[참가 승인팀 ${d.approved.length}팀 · 참가번호 1~${d.approved.length}]`);d.approved.forEach((a,i)=>lines.push(`${i+1}. ${a.teamName||''} · ${a.affiliation||''} · ${(a.paid===true||a.paymentStatus==='paid')?'입금':'미입금'} · 참가 승인`));lines.push('',`[후보팀 ${d.reserve.length}팀 · 후보번호 1~${d.reserve.length}]`);d.reserve.forEach((a,i)=>lines.push(`${i+1}. ${a.teamName||''} · ${a.affiliation||''} · ${(a.paid===true||a.paymentStatus==='paid')?'입금':'미입금'} · 후보 ${i+1}`));if(d.rejected.length){lines.push('',`[반려팀 ${d.rejected.length}팀]`);d.rejected.forEach(a=>lines.push(`${d.seq.get(String(a.id||''))||'-'}. ${a.teamName||''} · ${a.affiliation||''} · 반려`));}}else if(doc.target==='results'){const p=currentPodium();lines.push(`우승: ${p.champion||'미확정'}`,`준우승: ${p.runnerUp||'미확정'}`,`공동 3위: ${(p.thirds||[]).join(' · ')||'미확정'}`);}else if(doc.target==='bracket'){portalMainMatches().forEach((m,i)=>lines.push(`${m.roundName||m.round||'본선'} ${i+1}: ${printTeam(m.teamA)} vs ${printTeam(m.teamB)}${m.status==='completed'?` · ${printTeam(m.winner)} 승`:''}`));}else if(doc.target==='prelim'||doc.target==='prelim-assignment'){(state.prelim?.groups||[]).forEach((g,i)=>lines.push(`${g.name||`${i+1}조`} · ${g.courtName||'코트 미정'}: ${(g.teams||[]).map(printTeam).join(' / ')}`));}else{const courts=state.unifiedCourts||state.courts||[];(Array.isArray(courts)?courts:Object.values(courts||{})).forEach((c,i)=>lines.push(`${c.name||`${i+1}번 코트`}: ${c.playingMatch?`${printTeam(c.playingMatch.teamA)} vs ${printTeam(c.playingMatch.teamB)}`:'대기'}`));}const width=3200,pad=120,lineH=58;const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');ctx.font='26px sans-serif';let wrapped=[];for(const line of lines.length?lines:['표시할 자료가 없습니다.'])wrapped.push(...wrapCanvasText(ctx,line,width-pad*2));canvas.width=width;canvas.height=Math.max(1000,260+wrapped.length*lineH+pad);ctx.fillStyle='#ffffff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.fillStyle='#10264a';ctx.fillRect(0,0,canvas.width,150);ctx.fillStyle='#ffffff';ctx.font='bold 46px sans-serif';ctx.fillText(title,pad,75);ctx.font='25px sans-serif';ctx.fillText(`${state.tournament?.name||'230MATCH 대회'} · ${state.tournament?.division||''}`,pad,120);ctx.fillStyle='#111827';ctx.font='26px sans-serif';let y=215;for(const line of wrapped){ctx.fillText(line,pad,y);y+=lineH;}canvas.toBlob(blob=>{if(!blob){notice('이미지 생성에 실패했습니다.','error');return;}const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`${stage51045PrintFileBase(title)}.png`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);notice('PNG 이미지를 저장했습니다.','success');},'image/png');}
-function bindPrintCenter(){['printTargetSelect','printPaperSelect','printOrientationSelect','printToneSelect','printScaleSelect','labelStatusSelect','labelContentSelect','labelCopySelect','stage51040FieldModeSelect'].forEach(id=>document.getElementById(id)?.addEventListener('change',renderPrintPreview));document.getElementById('refreshPrintPreviewBtn')?.addEventListener('click',renderPrintPreview);document.getElementById('printDocumentBtn')?.addEventListener('click',printSelectedDocument);document.getElementById('savePrintImageBtn')?.addEventListener('click',savePrintPng);}
+function bindPrintCenter(){
+  ['printTargetSelect','printPaperSelect','printOrientationSelect','printToneSelect','printScaleSelect','labelStatusSelect','labelContentSelect','labelCopySelect','stage51040FieldModeSelect'].forEach(id=>{
+    const el=document.getElementById(id);if(!el||el.dataset.stage51070PrintBound==='1')return;
+    el.dataset.stage51070PrintBound='1';
+    el.addEventListener('change',()=>schedulePrintPreviewRender(35));
+  });
+  const refresh=document.getElementById('refreshPrintPreviewBtn');if(refresh&&refresh.dataset.stage51070PrintBound!=='1'){refresh.dataset.stage51070PrintBound='1';refresh.addEventListener('click',()=>schedulePrintPreviewRender(0));}
+  const print=document.getElementById('printDocumentBtn');if(print&&print.dataset.stage51070PrintBound!=='1'){print.dataset.stage51070PrintBound='1';print.addEventListener('click',printSelectedDocument);}
+  const save=document.getElementById('savePrintImageBtn');if(save&&save.dataset.stage51070PrintBound!=='1'){save.dataset.stage51070PrintBound='1';save.addEventListener('click',savePrintPng);}
+}
 
 
 function tournamentTemplateSummary(template){
@@ -16575,8 +16597,8 @@ console.info('[230MATCH] 71.3.3 ready · classic direct SMS rebuild');
     if(target.dataset.stage546==='1')return;
     target.dataset.stage546='1';
     forceAssignmentDefaults();
-    target.addEventListener('change',()=>{target.dataset.userSelected546='1';refreshPreview546(false);});
-    ['printPaperSelect','printOrientationSelect','printToneSelect','printScaleSelect','labelStatusSelect','labelContentSelect','labelCopySelect'].forEach(id=>$(id)?.addEventListener('change',()=>refreshPreview546(false)));
+    target.addEventListener('change',()=>{target.dataset.userSelected546='1';schedulePrintPreviewRender(35);});
+    ['printPaperSelect','printOrientationSelect','printToneSelect','printScaleSelect','labelStatusSelect','labelContentSelect','labelCopySelect'].forEach(id=>$(id)?.addEventListener('change',()=>schedulePrintPreviewRender(35)));
     replaceActionButton546('refreshPrintPreviewBtn',()=>refreshPreview546(true));
     replaceActionButton546('savePrintImageBtn',()=>void saveCurrentPng546());
     refreshPreview546(false);
@@ -16585,6 +16607,8 @@ console.info('[230MATCH] 71.3.3 ready · classic direct SMS rebuild');
   const style=document.createElement('style');
   style.id='stage546PrintStyles';
   style.textContent=`
+    #printPreview{contain:paint;}
+    #printPreview .print-sheet{contain:layout paint style;}
     #printPreview .assignment-print-sheet{padding:3mm!important}
     #printPreview .assignment-print-sheet .print-title{margin:0 0 2px!important;padding:0!important}
     #printPreview .assignment-print-sheet .print-title h1{font-size:20px!important;line-height:1.05!important;margin:0!important}
@@ -21274,7 +21298,7 @@ console.info('[230MATCH] 5.10.39 ready · 128드로 현장용 A3 4장 + 4번째 
       </select><small>실제 모드: 예선 진행 중에는 각 슬롯에 몇 조 몇 위인지, 진출팀 확정 후에는 팀명과 작은 조·순위를 표시합니다.</small>`;
       const parent=target.closest('label')?.parentElement||target.parentElement;
       parent?.appendChild(wrap);
-      wrap.querySelector('select')?.addEventListener('change',()=>{try{renderPrintPreview()}catch(_e){}});
+      wrap.querySelector('select')?.addEventListener('change',()=>schedulePrintPreviewRender(35));
     }
     if(!target.dataset.stage51040Bound){
       target.dataset.stage51040Bound='1';
@@ -21370,7 +21394,7 @@ console.info('[230MATCH] 5.10.39 ready · 128드로 현장용 A3 4장 + 4번째 
   document.addEventListener('click',e=>{if(e.target.closest?.('[data-portal-go="print"],[data-view="print"],[data-mobile-view="print"]'))run()},true);
   document.addEventListener('change',e=>{
     if(['printTargetSelect','printPaperSelect'].includes(e.target?.id||'')){
-      setTimeout(()=>{sync();try{renderPrintPreview()}catch(_e){}},0);
+      setTimeout(()=>{sync();schedulePrintPreviewRender(35);},0);
     }
   },true);
   console.info('[230MATCH] 5.10.42 ready · real A3 selector + 2-sheet seam-connected field bracket');
@@ -21522,7 +21546,7 @@ function stage51045PrintFileBase(label){
         select.value=String(btn.dataset.stage51044Target||'prelim-assignment');
         select.dataset.stage51045PublicDefault='1';
         select.dataset.userSelected546='1';
-        try{renderPrintPreview();}catch(_e){}
+        schedulePrintPreviewRender(35);
         setTimeout(syncTargetOptions,0);
       }
       return;
@@ -21861,7 +21885,7 @@ console.info('[230MATCH] 5.10.61 ready · admin participant replacement with own
           <div class="stage51062-field" id="stage51062SwapWrap" hidden><label>맞교환할 팀</label><select id="stage51062TargetTeam"></select></div>
         </div>
         <div id="stage51062Status" class="stage51062-help">팀을 선택하고 이동 또는 맞교환 방식을 지정하세요.</div>
-        <div id="stage51062Preview" class="stage51062-preview"></div>
+        <details id="stage51070GroupPreviewDetails" class="stage51062-help"><summary style="cursor:pointer;font-weight:800">전체 조편성 미리보기</summary><div id="stage51062Preview" class="stage51062-preview" style="margin-top:8px"></div></details>
       </div>
       <div class="modal-actions stage51062-actions"><button value="cancel" class="btn btn-light">취소</button><button type="button" id="stage51062Apply" class="btn btn-primary">조편성 변경 적용</button></div>
     </form>`;
@@ -21872,6 +21896,7 @@ console.info('[230MATCH] 5.10.61 ready · admin participant replacement with own
     d.querySelector('#stage51062TargetPosition').onchange=()=>updateStatus(d);
     d.querySelector('#stage51062TargetTeam').onchange=()=>updateStatus(d);
     d.querySelector('#stage51062Apply').onclick=()=>applyChange(d);
+    const details=d.querySelector('#stage51070GroupPreviewDetails');if(details){details.addEventListener('toggle',()=>{if(details.open)requestAnimationFrame(()=>renderPreview(d));});}
     d.addEventListener('close',()=>{setTimeout(()=>{try{if(!d.open&&d.isConnected)d.remove();}catch(_e){}},0);},{once:true});
     return d;
   }
@@ -21882,7 +21907,7 @@ console.info('[230MATCH] 5.10.61 ready · admin participant replacement with own
     const gs=groups(),slots=flatSlots(),src=d.querySelector('#stage51062SourceTeam'),tg=d.querySelector('#stage51062TargetGroup');
     src.innerHTML=slots.map(x=>`<option value="${esc(x.key)}">${esc(x.g.groupNo||x.gi+1)}조 ${x.si+1}번 · ${esc(teamLabel(x.t))}</option>`).join('');
     tg.innerHTML=gs.map((g,i)=>`<option value="${i}">${esc(g.groupNo||i+1)}조</option>`).join('');
-    fillTargetPositions(d);fillTargetTeams(d);renderPreview(d);syncMode(d);updateStatus(d);
+    fillTargetPositions(d);fillTargetTeams(d);syncMode(d);updateStatus(d);
   }
   function fillTargetPositions(d){
     const gi=Math.max(0,Math.min(groups().length-1,Number(d.querySelector('#stage51062TargetGroup')?.value||0)));
@@ -21904,7 +21929,9 @@ console.info('[230MATCH] 5.10.61 ready · admin participant replacement with own
     updateStatus(d);
   }
   function renderPreview(d){
-    d.querySelector('#stage51062Preview').innerHTML=groups().map((g,i)=>`<article class="stage51062-card"><b>${esc(g.groupNo||i+1)}조 · ${esc(g.court||g.courtName||'코트 미배정')}</b>${(g.teams||[]).map((t,j)=>`<span>${j+1}. ${esc(teamLabel(t))}</span>`).join('')}</article>`).join('');
+    const details=d.querySelector('#stage51070GroupPreviewDetails');if(details&&!details.open)return;
+    const root=d.querySelector('#stage51062Preview');if(!root)return;
+    root.innerHTML=groups().map((g,i)=>`<article class="stage51062-card"><b>${esc(g.groupNo||i+1)}조 · ${esc(g.court||g.courtName||'코트 미배정')}</b>${(g.teams||[]).map((t,j)=>`<span>${j+1}. ${esc(teamLabel(t))}</span>`).join('')}</article>`).join('');
   }
   function updateStatus(d){
     const slots=flatSlots(),srcKey=d.querySelector('#stage51062SourceTeam')?.value||'',src=slots.find(x=>x.key===srcKey),mode=d.querySelector('#stage51062Mode')?.value;
@@ -22043,3 +22070,4 @@ console.info('[230MATCH] 5.10.67 ready · prelim group move supports exact targe
 console.info('[230MATCH] 5.10.68 ready · performance guard: broad DOM observers/click scans reduced; match data logic unchanged');
 
 console.info('[230MATCH] 5.10.69 ready · prelim assignment actual-team count + 3x HQ PNG export');
+console.info('[230MATCH] 5.10.70 ready · dropdown/select responsiveness + coalesced print preview rendering');
