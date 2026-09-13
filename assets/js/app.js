@@ -13134,7 +13134,7 @@ function stage51022RestoreMainDraft({quiet=false}={}){
       <text x="${pageW/2}" y="42" text-anchor="middle" font-size="34" font-weight="900" fill="#10264a">시합 전 조편성·코트 배정표</text>
       <text x="${pageW/2}" y="70" text-anchor="middle" font-size="18" fill="#52657d">${esc(tournament.name||'230MATCH 대회')} ${tournament.division?`· ${esc(tournament.division)}`:''}</text>
       <rect x="${pad}" y="${pad+78}" width="${pageW-pad*2}" height="34" rx="10" fill="#edf4ff" stroke="#a8bdd9"/>
-      <text x="${pad+16}" y="${pad+100}" font-size="18" font-weight="900" fill="#183a70">${cards.length}개 조 · ${(state.teams||[]).length}팀</text>
+      <text x="${pad+16}" y="${pad+100}" font-size="18" font-weight="900" fill="#183a70">${cards.length}개 조 · ${cards.reduce((sum,card)=>sum+(Array.isArray(card.teams)?card.teams.length:0),0)}팀</text>
       <text x="${pageW-pad-16}" y="${pad+100}" text-anchor="end" font-size="16" fill="#52657d">${esc(meta)}</text>
       ${cardSvg}
     </svg>`;
@@ -13155,7 +13155,7 @@ function stage51022RestoreMainDraft({quiet=false}={}){
     const cards=assignmentCardsData();
     if(!cards.length)return printHeader('시합 전 조편성·코트 배정표')+'<div class="print-empty">생성된 예선 조편성이 없습니다.</div>';
     const html=cards.map(card=>`<article class="assignment-group-card"><div class="assignment-group-head"><b>${printEscape(card.name)}</b><span>${printEscape(card.court)}</span></div><ol>${card.teams.map(team=>`<li><em>${team.order}</em><strong title="${printEscape(team.label)}">${printEscape(team.label)}</strong></li>`).join('')}</ol><div class="assignment-order">${card.orders.map(line=>`<span>${printEscape(line)}</span>`).join('')}</div></article>`).join('');
-    return printHeader('시합 전 조편성·코트 배정표')+`<div class="assignment-summary"><b>${cards.length}개 조 · ${(state.teams||[]).length}팀</b><span>본인 조와 배정 코트를 확인해 주세요.</span></div><div class="assignment-grid compact-3col">${html}</div>`;
+    return printHeader('시합 전 조편성·코트 배정표')+`<div class="assignment-summary"><b>${cards.length}개 조 · ${cards.reduce((sum,card)=>sum+(Array.isArray(card.teams)?card.teams.length:0),0)}팀</b><span>본인 조와 배정 코트를 확인해 주세요.</span></div><div class="assignment-grid compact-3col">${html}</div>`;
   };
   printBracketHtml = window.printBracketHtml = function(){
     const draw=state.draw;
@@ -16503,15 +16503,15 @@ console.info('[230MATCH] 71.3.3 ready · classic direct SMS rebuild');
   async function saveAssignmentPng546(){
     const cards=assignmentData546();
     if(!cards.length)throw new Error('PNG로 저장할 예선 조편성이 없습니다.');
-    const W=1754,H=1240,margin=26,cols=4,gap=10;
-    const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;
-    const ctx=canvas.getContext('2d');
+    const W=1754,H=1240,margin=26,cols=4,gap=10,EXPORT_SCALE=3;
+    const canvas=document.createElement('canvas');canvas.width=W*EXPORT_SCALE;canvas.height=H*EXPORT_SCALE;
+    const ctx=canvas.getContext('2d');ctx.scale(EXPORT_SCALE,EXPORT_SCALE);
     ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);
     ctx.textBaseline='middle';
     ctx.fillStyle='#10264a';ctx.font='700 31px sans-serif';ctx.textAlign='center';ctx.fillText('시합 전 조편성·코트 배정표',W/2,34);
     ctx.font='600 17px sans-serif';ctx.fillStyle='#53657d';ctx.fillText(`${state.tournament?.name||'230MATCH 대회'}${state.tournament?.division?` · ${state.tournament.division}`:''}`,W/2,65);
     ctx.textAlign='left';ctx.fillStyle='#eef4fb';ctx.fillRect(margin,82,W-margin*2,34);
-    ctx.fillStyle='#173b70';ctx.font='700 16px sans-serif';ctx.fillText(`${cards.length}개 조 · ${(state.teams||[]).length}팀`,margin+12,99);
+    ctx.fillStyle='#173b70';ctx.font='700 16px sans-serif';ctx.fillText(`${cards.length}개 조 · ${cards.reduce((sum,card)=>sum+(Array.isArray(card.teams)?card.teams.length:0),0)}팀`,margin+12,99);
     ctx.textAlign='right';ctx.font='500 14px sans-serif';ctx.fillText('본인 조와 배정 코트를 확인해 주세요.',W-margin-12,99);
     ctx.textAlign='left';
     const top=126,bottom=20,rows=Math.ceil(cards.length/cols),rowGap=8;
@@ -16763,7 +16763,7 @@ console.info('[230MATCH] 71.3.3 ready · classic direct SMS rebuild');
     if(!cards.length)return `<header class="assignment547-title"><h1>시합 전 조편성·코트 배정표</h1><p>${esc(state.tournament?.name||'230MATCH 대회')}${state.tournament?.division?` · ${esc(state.tournament.division)}`:''}</p></header><div class="print-empty">생성된 예선 조편성이 없습니다.</div>`;
     const html=cards.map(card=>`<article class="assignment-group-card assignment547-card"><div class="assignment-group-head"><b>${esc(card.name)}</b><span>${esc(card.court)} · <em>${esc(card.estimate)}</em></span></div><ol>${card.teams.map(team=>`<li><em>${team.n}</em><strong title="${esc(team.label)}">${esc(team.label)}</strong>${team.firstTime?`<small class="assignment547-firsttime">${esc(team.firstTime)}</small>`:''}</li>`).join('')}</ol><div class="assignment-order">${card.orders.map(o=>`<span>${o.time?`<b>${esc(o.time)}</b> · `:''}${esc(o.text)}</span>`).join('')}</div></article>`).join('');
     const timing=scheduleTiming547();
-    return `<header class="assignment547-title"><h1>시합 전 조편성·코트 배정표</h1><p>${esc(state.tournament?.name||'230MATCH 대회')}${state.tournament?.division?` · ${esc(state.tournament.division)}`:''}</p></header><div class="assignment-summary assignment547-summary"><div class="assignment547-summary-main"><b>${cards.length}개 조 · ${(state.teams||[]).length}팀</b><span>${esc(timing.startLabel)} 시작 · 경기당 ${timing.slotMinutes}분 · 각 선수 첫 경기 예상시간</span></div><div class="assignment547-warning">※ 예상 시합시간은 경기 진행에 따라 변동되며 더 빨라질 수 있습니다. 최소 예상시간 20분 전까지 출전신고 바랍니다.</div></div><div class="assignment-grid assignment547-grid">${html}</div>`;
+    return `<header class="assignment547-title"><h1>시합 전 조편성·코트 배정표</h1><p>${esc(state.tournament?.name||'230MATCH 대회')}${state.tournament?.division?` · ${esc(state.tournament.division)}`:''}</p></header><div class="assignment-summary assignment547-summary"><div class="assignment547-summary-main"><b>${cards.length}개 조 · ${cards.reduce((sum,card)=>sum+(Array.isArray(card.teams)?card.teams.length:0),0)}팀</b><span>${esc(timing.startLabel)} 시작 · 경기당 ${timing.slotMinutes}분 · 각 선수 첫 경기 예상시간</span></div><div class="assignment547-warning">※ 예상 시합시간은 경기 진행에 따라 변동되며 더 빨라질 수 있습니다. 최소 예상시간 20분 전까지 출전신고 바랍니다.</div></div><div class="assignment-grid assignment547-grid">${html}</div>`;
   };
 
   function fit547(ctx,text,maxWidth){
@@ -16774,13 +16774,13 @@ console.info('[230MATCH] 71.3.3 ready · classic direct SMS rebuild');
   function download547(blob,name){const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1200);}
   async function saveAssignmentPng547(){
     const cards=assignmentData547();if(!cards.length)throw new Error('PNG로 저장할 예선 조편성이 없습니다.');
-    const W=1754,H=1240,margin=26,cols=4,gap=10,top=148,bottom=20,rowGap=8,rows=Math.ceil(cards.length/cols);
-    const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;const ctx=canvas.getContext('2d');
+    const W=1754,H=1240,margin=26,cols=4,gap=10,top=148,bottom=20,rowGap=8,rows=Math.ceil(cards.length/cols),EXPORT_SCALE=3;
+    const canvas=document.createElement('canvas');canvas.width=W*EXPORT_SCALE;canvas.height=H*EXPORT_SCALE;const ctx=canvas.getContext('2d');ctx.scale(EXPORT_SCALE,EXPORT_SCALE);
     ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);ctx.textBaseline='middle';
     ctx.fillStyle='#10264a';ctx.font='700 31px sans-serif';ctx.textAlign='center';ctx.fillText('시합 전 조편성·코트 배정표',W/2,34);
     ctx.font='600 17px sans-serif';ctx.fillStyle='#53657d';ctx.fillText(`${state.tournament?.name||'230MATCH 대회'}${state.tournament?.division?` · ${state.tournament.division}`:''}`,W/2,65);
     ctx.textAlign='left';ctx.fillStyle='#eef4fb';ctx.fillRect(margin,82,W-margin*2,56);
-    ctx.fillStyle='#173b70';ctx.font='700 16px sans-serif';ctx.fillText(`${cards.length}개 조 · ${(state.teams||[]).length}팀`,margin+12,98);
+    ctx.fillStyle='#173b70';ctx.font='700 16px sans-serif';ctx.fillText(`${cards.length}개 조 · ${cards.reduce((sum,card)=>sum+(Array.isArray(card.teams)?card.teams.length:0),0)}팀`,margin+12,98);
     const timing=scheduleTiming547();
     ctx.textAlign='right';ctx.font='600 14px sans-serif';ctx.fillText(`${timing.startLabel} 시작 · 경기당 ${timing.slotMinutes}분 · 첫 경기 예상시간`,W-margin-12,98);ctx.textAlign='left';
     ctx.fillStyle='#b42318';ctx.font='700 13px sans-serif';ctx.textAlign='center';ctx.fillText('※ 예상 시합시간은 경기 진행에 따라 변동되며 더 빨라질 수 있습니다. 최소 예상시간 20분 전까지 출전신고 바랍니다.',W/2,122);ctx.textAlign='left';
@@ -16797,10 +16797,11 @@ console.info('[230MATCH] 71.3.3 ready · classic direct SMS rebuild');
       card.orders.forEach((o,oi)=>ctx.fillText(fit547(ctx,`${o.time?o.time+' · ':''}${o.text}`,cardW-16),x+8,orderY+8+oi*13));
     });
     const blob=await new Promise(r=>canvas.toBlob(r,'image/png'));if(!blob)throw new Error('PNG 이미지 생성에 실패했습니다.');
-    download547(blob,`230MATCH_예선조편성_코트배정표_${new Date().toISOString().slice(0,10)}.png`);
+    download547(blob,`230MATCH_예선조편성_코트배정표_고화질_${new Date().toISOString().slice(0,10)}.png`);
   }
 
   const style=document.createElement('style');style.id='stage547UnifiedAssignmentStyles';style.textContent=`
+    @media print{.assignment-print-sheet{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}}
     #printPreview .assignment-print-sheet{padding:3mm!important}
     #printPreview .assignment547-title{text-align:center;margin:0 0 7px!important;padding:0!important}
     #printPreview .assignment547-title h1{margin:0!important;color:#10264a;font-size:22px!important;line-height:1.05!important;font-weight:900!important;letter-spacing:-.03em}
@@ -16850,7 +16851,7 @@ console.info('[230MATCH] 71.3.3 ready · classic direct SMS rebuild');
     const btn=e.target.closest?.('#savePrintImageBtn');if(!btn)return;
     if(($('printTargetSelect')?.value||'')!=='prelim-assignment')return;
     e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();
-    void saveAssignmentPng547().then(()=>notice('미리보기·인쇄와 같은 구성으로 PNG를 저장했습니다.','success')).catch(err=>{console.error('[5.4.7 assignment PNG]',err);notice(err?.message||'PNG 저장 중 오류가 발생했습니다.','error');});
+    void saveAssignmentPng547().then(()=>notice('고화질 PNG(3배 해상도)로 저장했습니다.','success')).catch(err=>{console.error('[5.4.7 assignment PNG]',err);notice(err?.message||'PNG 저장 중 오류가 발생했습니다.','error');});
   },true);
 
   function rerender547(){if(($('printTargetSelect')?.value||'')==='prelim-assignment'){try{renderPrintPreview();}catch(e){console.error('[5.4.7 preview]',e);}}}
@@ -22040,3 +22041,5 @@ console.info('[230MATCH] 5.10.66 ready · repeat group edit hard fix: court assi
 console.info('[230MATCH] 5.10.67 ready · prelim group move supports exact target position');
 
 console.info('[230MATCH] 5.10.68 ready · performance guard: broad DOM observers/click scans reduced; match data logic unchanged');
+
+console.info('[230MATCH] 5.10.69 ready · prelim assignment actual-team count + 3x HQ PNG export');
