@@ -22495,3 +22495,173 @@ console.info('[230MATCH] 5.10.71 ready · field bracket HQ PNG capture fix');
 })();
 
 console.info('[230MATCH] 5.10.76 ready · participant identity propagates to prelim/courts/bracket/print snapshots');
+
+/* 230MATCH 5.10.77 · admin status opt-in + movable translucent participant-result alert */
+(function stage51077AdminOverlayPolish(){
+  const ADMIN_STATUS_KEY='230match-admin-action-center-visible';
+  const RESULT_POS_KEY='230match-player-result-indicator-position-v1';
+  let justDragged=false;
+
+  function adminStatusWanted(){
+    try{return localStorage.getItem(ADMIN_STATUS_KEY)==='1';}catch(_e){return false;}
+  }
+  function applyAdminStatusVisibility(){
+    const visible=adminStatusWanted();
+    document.documentElement.classList.toggle('stage51077-admin-action-visible',visible);
+    const root=document.getElementById('adminActionCenter3443');
+    if(root&&visible){
+      try{root.hidden=!(typeof isAdmin==='function'?isAdmin():true);}catch(_e){root.hidden=false;}
+    }
+    const input=document.getElementById('stage51077AdminStatusToggle');
+    if(input)input.checked=visible;
+    const stateText=document.getElementById('stage51077AdminStatusState');
+    if(stateText)stateText.textContent=visible?'표시 중':'숨김 · 권장';
+  }
+  function ensureAdminToolsSetting(){
+    const hub=document.querySelector('#adminSettingsHub .simplified-settings-hub');
+    if(!hub)return;
+    let group=document.getElementById('stage51077AdminToolsGroup');
+    if(!group){
+      group=document.createElement('section');
+      group.id='stage51077AdminToolsGroup';
+      group.className='settings-hub-group stage51077-admin-tools';
+      group.innerHTML=`
+        <h3>관리자 도구</h3>
+        <label class="stage51077-tool-row" for="stage51077AdminStatusToggle">
+          <span class="stage51077-tool-copy"><strong>관리자 실행 상태 표시</strong><small>평소에는 숨기고 오류 점검이나 테스트할 때만 켭니다. 이 브라우저에만 적용됩니다.</small></span>
+          <span class="stage51077-tool-control"><em id="stage51077AdminStatusState">숨김 · 권장</em><input id="stage51077AdminStatusToggle" type="checkbox" role="switch"><i aria-hidden="true"></i></span>
+        </label>`;
+      hub.appendChild(group);
+      const input=group.querySelector('#stage51077AdminStatusToggle');
+      input?.addEventListener('change',()=>{
+        try{localStorage.setItem(ADMIN_STATUS_KEY,input.checked?'1':'0');}catch(_e){}
+        applyAdminStatusVisibility();
+      });
+    }
+    applyAdminStatusVisibility();
+  }
+
+  function clampBadgePosition(badge,x,y){
+    const w=Math.max(badge.offsetWidth||150,120),h=Math.max(badge.offsetHeight||42,38);
+    return {
+      x:Math.max(8,Math.min(Number(x)||0,window.innerWidth-w-8)),
+      y:Math.max(8,Math.min(Number(y)||0,window.innerHeight-h-8))
+    };
+  }
+  function saveBadgePosition(badge){
+    const r=badge.getBoundingClientRect();
+    try{localStorage.setItem(RESULT_POS_KEY,JSON.stringify({x:Math.round(r.left),y:Math.round(r.top)}));}catch(_e){}
+  }
+  function restoreBadgePosition(badge){
+    if(badge.dataset.stage51077Positioned==='1')return;
+    badge.dataset.stage51077Positioned='1';
+    try{
+      const saved=JSON.parse(localStorage.getItem(RESULT_POS_KEY)||'null');
+      if(saved&&Number.isFinite(saved.x)&&Number.isFinite(saved.y)){
+        const p=clampBadgePosition(badge,saved.x,saved.y);
+        badge.style.setProperty('left',p.x+'px','important');
+        badge.style.setProperty('top',p.y+'px','important');
+        badge.style.setProperty('right','auto','important');
+        badge.style.setProperty('bottom','auto','important');
+      }
+    }catch(_e){}
+  }
+  function positionDrawerNearBadge(){
+    const badge=document.getElementById('stage51075PlayerResultBadge');
+    const drawer=document.getElementById('stage51075PlayerResultDrawer');
+    if(!badge||!drawer||!drawer.classList.contains('open'))return;
+    const br=badge.getBoundingClientRect();
+    const dw=Math.min(drawer.offsetWidth||520,window.innerWidth-20);
+    const dh=Math.min(drawer.offsetHeight||520,window.innerHeight-20);
+    let left=Math.max(10,Math.min(br.right-dw,window.innerWidth-dw-10));
+    let top=br.bottom+8;
+    if(top+dh>window.innerHeight-10)top=Math.max(10,br.top-dh-8);
+    drawer.style.setProperty('left',left+'px','important');
+    drawer.style.setProperty('top',top+'px','important');
+    drawer.style.setProperty('right','auto','important');
+    drawer.style.setProperty('bottom','auto','important');
+  }
+  function makeResultBadgeDraggable(){
+    const badge=document.getElementById('stage51075PlayerResultBadge');
+    if(!badge)return;
+    restoreBadgePosition(badge);
+    if(badge.dataset.draggable51077==='1')return;
+    badge.dataset.draggable51077='1';
+    badge.title=(badge.title?badge.title+' · ':'')+'잡아서 이동 · 눌러서 기록 보기';
+    let drag=null;
+    badge.addEventListener('pointerdown',e=>{
+      if(e.button!==undefined&&e.button!==0)return;
+      const r=badge.getBoundingClientRect();
+      drag={id:e.pointerId,sx:e.clientX,sy:e.clientY,dx:e.clientX-r.left,dy:e.clientY-r.top,moved:false};
+      badge.setPointerCapture?.(e.pointerId);
+    });
+    badge.addEventListener('pointermove',e=>{
+      if(!drag||drag.id!==e.pointerId)return;
+      if(!drag.moved&&Math.hypot(e.clientX-drag.sx,e.clientY-drag.sy)<5)return;
+      drag.moved=true;
+      const p=clampBadgePosition(badge,e.clientX-drag.dx,e.clientY-drag.dy);
+      badge.style.setProperty('left',p.x+'px','important');
+      badge.style.setProperty('top',p.y+'px','important');
+      badge.style.setProperty('right','auto','important');
+      badge.style.setProperty('bottom','auto','important');
+      badge.classList.add('stage51077-dragging');
+      positionDrawerNearBadge();
+      e.preventDefault();
+    });
+    const stop=e=>{
+      if(!drag||drag.id!==e.pointerId)return;
+      const moved=drag.moved;drag=null;
+      badge.classList.remove('stage51077-dragging');
+      if(moved){
+        justDragged=true;saveBadgePosition(badge);
+        setTimeout(()=>{justDragged=false;},180);
+      }
+      try{badge.releasePointerCapture?.(e.pointerId);}catch(_e){}
+    };
+    badge.addEventListener('pointerup',stop);
+    badge.addEventListener('pointercancel',stop);
+    badge.addEventListener('click',e=>{
+      if(!justDragged)return;
+      e.preventDefault();e.stopImmediatePropagation();
+    },true);
+    badge.addEventListener('click',()=>setTimeout(positionDrawerNearBadge,0));
+  }
+  function enhanceResultOverlay(){
+    makeResultBadgeDraggable();
+    positionDrawerNearBadge();
+  }
+
+  if(!document.getElementById('stage51077Style')){
+    const st=document.createElement('style');st.id='stage51077Style';st.textContent=`
+      html:not(.stage51077-admin-action-visible) #adminActionCenter3443{display:none!important}
+      #adminSettingsHub .stage51077-admin-tools{margin-top:10px}
+      #adminSettingsHub .stage51077-tool-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px;border:1px solid #d8e3f0;border-radius:14px;background:#f8fbff;cursor:pointer}
+      #adminSettingsHub .stage51077-tool-copy{display:grid;gap:3px;min-width:0}#adminSettingsHub .stage51077-tool-copy strong{font-size:14px;color:#183a64}#adminSettingsHub .stage51077-tool-copy small{font-size:11px;color:#6b7d93;line-height:1.45}
+      #adminSettingsHub .stage51077-tool-control{display:flex;align-items:center;gap:8px;flex:0 0 auto}#adminSettingsHub .stage51077-tool-control em{font-size:10px;font-style:normal;color:#64748b;white-space:nowrap}#adminSettingsHub .stage51077-tool-control input{position:absolute;opacity:0;pointer-events:none}#adminSettingsHub .stage51077-tool-control i{position:relative;width:42px;height:24px;border-radius:999px;background:#cbd5e1;transition:.18s}#adminSettingsHub .stage51077-tool-control i::after{content:'';position:absolute;left:3px;top:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(15,23,42,.25);transition:.18s}#adminSettingsHub .stage51077-tool-control input:checked+i{background:#2563eb}#adminSettingsHub .stage51077-tool-control input:checked+i::after{transform:translateX(18px)}
+      .stage51075-result-badge{background:rgba(255,255,255,.74)!important;opacity:.76;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);cursor:grab!important;touch-action:none;user-select:none;transition:opacity .18s ease,box-shadow .18s ease,transform .12s ease}.stage51075-result-badge:hover{opacity:.96}.stage51075-result-badge.stage51077-dragging{opacity:.9!important;cursor:grabbing!important;box-shadow:0 14px 34px rgba(15,23,42,.28)!important;transition:none!important}.stage51075-result-drawer{background:rgba(255,255,255,.96)!important;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+      @media(max-width:640px){#adminSettingsHub .stage51077-tool-row{align-items:flex-start;flex-direction:column}#adminSettingsHub .stage51077-tool-control{width:100%;justify-content:space-between}.stage51075-result-badge{opacity:.7}}
+    `;document.head.appendChild(st);
+  }
+
+  function run(){
+    applyAdminStatusVisibility();
+    ensureAdminToolsSetting();
+    try{window.stage51075RenderPlayerResultIndicator?.();}catch(_e){}
+    setTimeout(enhanceResultOverlay,80);
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',run,{once:true});else run();
+  window.addEventListener('pageshow',run);
+  window.addEventListener('hashchange',()=>setTimeout(enhanceResultOverlay,120));
+  window.addEventListener('resize',()=>{
+    const badge=document.getElementById('stage51075PlayerResultBadge');
+    if(badge&&badge.style.left){const r=badge.getBoundingClientRect(),p=clampBadgePosition(badge,r.left,r.top);badge.style.setProperty('left',p.x+'px','important');badge.style.setProperty('top',p.y+'px','important');saveBadgePosition(badge);}
+    positionDrawerNearBadge();
+  });
+  document.addEventListener('click',e=>{
+    if(e.target.closest?.('#openAdminSettingsHubBtn,#mobileSettingsBtn,[data-stage565-home-settings]'))setTimeout(ensureAdminToolsSetting,80);
+    if(e.target.closest?.('#stage51075PlayerResultBadge'))setTimeout(positionDrawerNearBadge,30);
+  },true);
+  setInterval(enhanceResultOverlay,10000);
+  window.stage51077ApplyAdminOverlayPrefs=run;
+  console.info('[230MATCH] 5.10.77 ready · admin status hidden by default + movable translucent player-result alert');
+})();
