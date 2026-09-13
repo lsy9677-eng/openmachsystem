@@ -6354,6 +6354,7 @@ async function startPublicRegistrationSync({force=false}={}){
     const q=rt.api.query(rt.api.collection(rt.db,PUBLIC_REGISTRATION_COLLECTION),rt.api.where('tournamentId','==',ctx.tournamentId));
     publicRegistrationUnsubscribe=rt.api.onSnapshot(q,stage5954DebounceSnapshot(snap=>{
       publicRegistrationRows=snap.docs.map(doc=>({id:doc.id,...doc.data()}));publicRegistrationReady=true;
+      try{stage51079SyncRegistrationIdentityIntoRuntime({persist:false,source:'public'});}catch(_e){}
       renderRegistrationSummaryEverywhere();
       try{window.__updateTodayTournamentDashboard?.();}catch(_e){}
       if(document.body?.dataset.currentView==='entry')renderApplicationPortal();
@@ -6633,6 +6634,7 @@ async function startRegistrationCloudSync({force=false}={}){
       });
     }
     mirrorRegistrationRowsToCurrentDivision();
+    try{stage51079SyncRegistrationIdentityIntoRuntime({persist:canOperate(),source:'private'});}catch(_e){}
     setTimeout(()=>void backfillPublicRegistrationMirrors(),120);
     if(document.body?.dataset.currentView==='entry'){renderApplicationPortal();lookupPublicApplication();}
     if(document.body?.dataset.currentView==='home')renderHomeFast();
@@ -6783,7 +6785,7 @@ async function submitPublicApplication(){
     const item=simpleRegistrationRows().find(a=>a.id===entryEditingId);if(!item||!['approved','reserve'].includes(item.status)||item.cancelRequestStatus==='requested'){clearEntryApplicationForm();notice('현재 수정할 수 없는 신청입니다.','error');return;}
     const duplicate=simpleRegistrationRows().find(a=>a.id!==item.id&&['approved','reserve'].includes(a.status)&&entryApplicationPlayers(a).some(p=>players.some(n=>n.phone===p.phone)));
     if(duplicate){notice(`같은 연락처가 포함된 승인 대기 신청이 이미 있습니다.${duplicate.teamName?` 기존 신청: ${duplicate.teamName}`:''}`,'error');return;}
-    Object.assign(item,common);try{const saved=await saveRegistrationCloud(item);Object.assign(item,saved);}catch(error){notice(`참가 신청 저장 실패: ${error?.message||error}`,'error');return;}try{syncCurrentDivisionRuntime();safePersistState('참가 신청 수정');}catch(_e){}renderApplicationPortal();clearEntryApplicationForm();lookupPublicApplication();notice('참가 신청을 수정했습니다.','success');return;
+    Object.assign(item,common);try{const saved=await saveRegistrationCloud(item);Object.assign(item,saved);try{stage51079ApplyRegistrationIdentityRow(saved);}catch(_e){}}catch(error){notice(`참가 신청 저장 실패: ${error?.message||error}`,'error');return;}try{syncCurrentDivisionRuntime();if(canOperate())safePersistState('참가 신청 수정');}catch(_e){}renderApplicationPortal();clearEntryApplicationForm();lookupPublicApplication();notice('참가 신청을 수정했습니다.','success');return;
   }
   const duplicate=simpleRegistrationRows().find(a=>['approved','reserve'].includes(a.status)&&entryApplicationPlayers(a).some(p=>players.some(n=>n.phone===p.phone)));
   if(duplicate){notice(`두 선수 중 같은 연락처로 승인 대기 중인 신청이 있습니다.${duplicate.teamName?` 기존 신청: ${duplicate.teamName}`:''}`,'info');renderApplicationPortal();return;}
@@ -22587,6 +22589,92 @@ console.info('[230MATCH] 5.10.76 ready · participant identity propagates to pre
   window.addEventListener('hashchange',()=>setTimeout(run,250));
 })();
 console.info('[230MATCH] 5.10.78 ready · participant identity id/registrationId reconciliation + existing snapshot repair');
+
+/* 230MATCH 5.10.79 · member self-edit -> live participant identity propagation
+   참가자가 본인 신청에서 이름/클럽을 고치면 참가신청 원본만 바뀌고 예선/코트 스냅샷이 남던 문제 보완.
+   공개 미러는 표시용 이름/소속만 로컬 동기화하고, 관리자/진행자는 비공개 원본 기준으로 전체 신원정보를 동기화 후 1회 저장한다.
+   조/코트/순서/점수/상태/본선 슬롯은 변경하지 않는다. */
+let stage51079LastPersistKey='';
+let stage51079LastPersistAt=0;
+function stage51079ApplyRegistrationIdentityRow(row){
+  if(!row?.id)return 0;
+  const rid=String(row.id||'');
+  const team=(state.teams||[]).find(t=>String(t?.registrationId||t?.applicationId||'')===rid);
+  if(!team)return 0;
+  // 관리자/진행자는 private row의 players/phone/ownerUid까지 안전하게 동기화한다.
+  if(typeof canOperate==='function'&&canOperate()&&Array.isArray(row.players)&&row.players.length){
+    const before=JSON.stringify({n:team.name,a:team.affiliation,p:team.players});
+    stage51076SyncParticipantIdentityEverywhere(team.id,row);
+    const live=(state.teams||[]).find(t=>String(t?.id||'')===String(team.id||''))||team;
+    return before!==JSON.stringify({n:live.name,a:live.affiliation,p:live.players})?1:0;
+  }
+  // 일반회원/공개 미러에는 민감정보가 없으므로 표시용 이름·소속만 바꾼다.
+  const identity={name:String(row.teamName||team.name||''),teamName:String(row.teamName||team.teamName||team.name||''),affiliation:String(row.affiliation||team.affiliation||''),club:String(row.affiliation||team.club||team.affiliation||'')};
+  let changed=0;
+  const patch=t=>{
+    if(!t||typeof t!=='object')return t;
+    const same=String(t.registrationId||t.applicationId||'')===rid||String(t.id||'')===String(team.id||'');
+    if(!same)return t;
+    let dirty=false;const next={...t};
+    for(const [k,v] of Object.entries(identity)){if(String(next[k]??'')!==String(v??'')){next[k]=v;dirty=true;}}
+    if(dirty){changed++;return next;}return t;
+  };
+  const patchMatch=m=>{if(!m||typeof m!=='object')return;m.teamA=patch(m.teamA);m.teamB=patch(m.teamB);m.winner=patch(m.winner);};
+  state.teams=(state.teams||[]).map(patch);
+  if(state.prelim){
+    state.prelim.activeTeams=(state.prelim.activeTeams||[]).map(patch);
+    state.prelim.reserveTeams=(state.prelim.reserveTeams||[]).map(patch);
+    (state.prelim.groups||[]).forEach(g=>{g.teams=(g.teams||[]).map(patch);g.standings=(g.standings||[]).map(x=>({...x,team:patch(x.team)}));});
+    (state.prelim.matches||[]).forEach(patchMatch);
+    state.prelim.qualifiers=(state.prelim.qualifiers||[]).map(patch);
+  }
+  try{portalMainMatches().forEach(patchMatch);}catch(_e){}
+  const patchCourt=c=>{
+    if(!c||typeof c!=='object')return;
+    for(const k of ['playingMatch','currentMatch','wait1Match','waitingMatch','nextMatch'])if(c[k]&&typeof c[k]==='object')patchMatch(c[k]);
+    for(const k of ['team','teamA','teamB','winner'])if(c[k]&&typeof c[k]==='object')c[k]=patch(c[k]);
+  };
+  try{(Array.isArray(state.unifiedCourts)?state.unifiedCourts:Object.values(state.unifiedCourts||{})).forEach(patchCourt);}catch(_e){}
+  try{(Array.isArray(state.courts)?state.courts:Object.values(state.courts||{})).forEach(patchCourt);}catch(_e){}
+  if(state.operation?.champion)state.operation.champion=patch(state.operation.champion);
+  if(changed)try{stage51076RefreshParticipantIdentityViews();}catch(_e){}
+  return changed;
+}
+function stage51079SyncRegistrationIdentityIntoRuntime({persist=false,source='auto'}={}){
+  let rows=[];
+  try{
+    if(typeof canOperate==='function'&&canOperate()&&registrationCloudReady)rows=registrationRowsForCurrentDivision();
+    else if(publicRegistrationReady)rows=publicRegistrationRowsForCurrentDivision();
+    else if(registrationCloudReady)rows=registrationRowsForCurrentDivision();
+  }catch(_e){rows=[];}
+  if(!rows.length)return 0;
+  const teamRegs=new Set((state.teams||[]).map(t=>String(t?.registrationId||t?.applicationId||'')).filter(Boolean));
+  let changed=0;
+  for(const row of rows){
+    if(!row?.id||!teamRegs.has(String(row.id)))continue;
+    if(['cancelled','rejected'].includes(String(row.status||'')))continue;
+    changed+=stage51079ApplyRegistrationIdentityRow(row);
+  }
+  if(changed&&persist&&typeof canOperate==='function'&&canOperate()){
+    const key=rows.filter(r=>teamRegs.has(String(r?.id||''))).map(r=>`${r.id}:${r.updatedAt||''}:${r.teamName||''}`).sort().join('|');
+    const now=Date.now();
+    if(key!==stage51079LastPersistKey||now-stage51079LastPersistAt>15000){
+      stage51079LastPersistKey=key;stage51079LastPersistAt=now;
+      try{syncCurrentDivisionRuntime?.();safePersistState('참가자 본인 수정 이름·소속 동기화');}catch(_e){}
+    }
+  }
+  if(changed)console.info('[230MATCH] 5.10.79 participant self-edit propagated',{changed,source,persist:Boolean(persist)});
+  return changed;
+}
+window.stage51079ApplyRegistrationIdentityRow=stage51079ApplyRegistrationIdentityRow;
+window.stage51079SyncRegistrationIdentityIntoRuntime=stage51079SyncRegistrationIdentityIntoRuntime;
+(function stage51079BootRepair(){
+  const run=()=>{try{stage51079SyncRegistrationIdentityIntoRuntime({persist:typeof canOperate==='function'&&canOperate(),source:'boot'});}catch(_e){}};
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(run,1600),{once:true});else setTimeout(run,1600);
+  window.addEventListener('pageshow',()=>setTimeout(run,700));
+  window.addEventListener('hashchange',()=>setTimeout(run,350));
+})();
+console.info('[230MATCH] 5.10.79 ready · member self-edit names propagate to prelim/courts/bracket/print');
 
 /* 230MATCH 5.10.77 · admin status opt-in + movable translucent participant-result alert */
 (function stage51077AdminOverlayPolish(){
