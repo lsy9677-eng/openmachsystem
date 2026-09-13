@@ -23439,3 +23439,122 @@ console.log('[230MATCH] 5.10.84 ready · same-origin notice image attachment dow
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
   console.info('[230MATCH] 5.10.86 ready · A4 full-page prelim assignment print fit');
 })();
+
+/* 230MATCH 5.10.87 · print center controls restored + assignment preview/print sizing */
+(()=>{
+  'use strict';
+  const $=id=>document.getElementById(id);
+  const originalRender=renderPrintPreview;
+
+  function renderPrintPreview51087(){
+    const preview=$('printPreview');
+    if(!preview)return;
+    const target=$('printTargetSelect')?.value||'prelim';
+    const options=$('labelPrintOptions');
+    if(options)options.hidden=target!=='labels';
+    const paper=$('printPaperSelect');
+    const orientation=$('printOrientationSelect');
+    const scale=$('printScaleSelect');
+
+    // Only outputs that are structurally fixed keep forced orientation/scale.
+    // The prelim assignment sheet now respects the user's paper/orientation/text-size choices.
+    if(target==='labels'){
+      if(paper)paper.value='a4';
+      if(orientation)orientation.value='portrait';
+    }else if(target==='bracket'){
+      if(orientation)orientation.value='landscape';
+      if(scale)scale.value='small';
+    }else if(target==='bracket-field'){
+      if(orientation)orientation.value='landscape';
+      if(scale)scale.value='normal';
+    }else if(target==='prize-signature'){
+      if(paper)paper.value='a4';
+      if(orientation)orientation.value='landscape';
+      if(scale)scale.value='normal';
+    }
+
+    const doc=buildPrintDocument();
+    preview.innerHTML=doc.html;
+    if(target==='bracket')window.__stage5940SyncClonedBracketConnectors?.(preview);
+    const summary=$('printPreviewSummary');
+    if(summary){
+      summary.textContent=target==='labels'
+        ?`${doc.label} · 12×40mm · A4 세로 · ${$('labelStatusSelect')?.selectedOptions?.[0]?.textContent||''}`
+        :target==='bracket-field'
+          ?`${doc.label} · ${doc.paper.toUpperCase()} 가로 · ${stage51038FieldPagePlan().total}장 · ${stage51040FieldMode()==='current'?'실제 대진':'테스트 빈 양식'} · 2장씩 연결형`
+          :target==='prize-signature'
+            ?`${doc.label} · A4 가로 · 우승/준우승/3위/8강 선택 출력`
+            :`${doc.label} · ${doc.paper.toUpperCase()} · ${doc.orientation==='landscape'?'가로':'세로'} · ${doc.tone==='mono'?'흑백':'컬러'} · 글자 ${doc.scale==='large'?'크게':doc.scale==='small'?'작게':'보통'}`;
+    }
+  }
+  try{window.renderPrintPreview=renderPrintPreview51087;renderPrintPreview=renderPrintPreview51087;}catch(_e){}
+
+  function refreshNow(){
+    try{renderPrintPreview51087();notice('출력 미리보기를 최신 설정으로 갱신했습니다.','success');}
+    catch(error){console.error('[5.10.87 print preview]',error);notice(error?.message||'미리보기 갱신 중 오류가 발생했습니다.','error');}
+  }
+
+  function rebindRefresh(){
+    const btn=$('refreshPrintPreviewBtn');
+    if(!btn||btn.dataset.stage51087Bound==='1')return;
+    const fresh=btn.cloneNode(true);
+    fresh.dataset.stage51087Bound='1';
+    btn.replaceWith(fresh);
+    fresh.addEventListener('click',refreshNow);
+  }
+
+  function bindControls(){
+    rebindRefresh();
+    ['printTargetSelect','printPaperSelect','printOrientationSelect','printToneSelect','printScaleSelect','labelStatusSelect','labelContentSelect','labelCopySelect','stage51040FieldModeSelect'].forEach(id=>{
+      const el=$(id);if(!el||el.dataset.stage51087Bound==='1')return;
+      el.dataset.stage51087Bound='1';
+      el.addEventListener('change',()=>schedulePrintPreviewRender(0));
+    });
+  }
+
+  const style=document.createElement('style');
+  style.id='stage51087PrintControlCss';
+  style.textContent=`
+    /* Preview should visibly follow paper orientation and text-size controls. */
+    #printPreview .assignment-print-sheet{box-sizing:border-box!important;margin:0 auto!important;overflow:hidden!important;display:flex!important;flex-direction:column!important}
+    #printPreview .assignment-print-sheet.paper-a4.landscape{width:min(100%,1120px)!important;aspect-ratio:297/210!important}
+    #printPreview .assignment-print-sheet.paper-a4.portrait{width:min(100%,790px)!important;aspect-ratio:210/297!important}
+    #printPreview .assignment-print-sheet.paper-a3.landscape{width:min(100%,1380px)!important;aspect-ratio:420/297!important}
+    #printPreview .assignment-print-sheet.paper-a3.portrait{width:min(100%,980px)!important;aspect-ratio:297/420!important}
+    #printPreview .assignment-print-sheet .assignment547-grid{flex:1 1 auto!important;min-height:0!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;grid-template-rows:repeat(8,minmax(0,1fr))!important;align-content:stretch!important}
+    #printPreview .assignment-print-sheet .assignment547-card{height:100%!important;min-height:0!important;display:flex!important;flex-direction:column!important}
+    #printPreview .assignment-print-sheet.scale-small{font-size:92%!important}
+    #printPreview .assignment-print-sheet.scale-normal{font-size:108%!important}
+    #printPreview .assignment-print-sheet.scale-large{font-size:124%!important}
+    #printPreview .assignment-print-sheet.scale-normal .assignment-group-head b,#printPreview .assignment-print-sheet.scale-normal .assignment-group-head span{font-size:10px!important}
+    #printPreview .assignment-print-sheet.scale-large .assignment-group-head b,#printPreview .assignment-print-sheet.scale-large .assignment-group-head span{font-size:11px!important}
+    #printPreview .assignment-print-sheet.scale-normal .assignment-group-card li{font-size:9px!important;min-height:13px!important}
+    #printPreview .assignment-print-sheet.scale-large .assignment-group-card li{font-size:10px!important;min-height:14px!important}
+    #printPreview .assignment-print-sheet.scale-normal .assignment-order{font-size:8px!important}
+    #printPreview .assignment-print-sheet.scale-large .assignment-order{font-size:9px!important}
+
+    @media print{
+      body.printing-output #printOutputRoot .assignment-print-sheet.paper-a4.landscape{width:291mm!important;height:204mm!important;min-height:204mm!important;max-height:204mm!important}
+      body.printing-output #printOutputRoot .assignment-print-sheet.paper-a4.portrait{width:204mm!important;height:291mm!important;min-height:291mm!important;max-height:291mm!important}
+      body.printing-output #printOutputRoot .assignment-print-sheet.paper-a3.landscape{width:414mm!important;height:291mm!important;min-height:291mm!important;max-height:291mm!important}
+      body.printing-output #printOutputRoot .assignment-print-sheet.paper-a3.portrait{width:291mm!important;height:414mm!important;min-height:414mm!important;max-height:414mm!important}
+      body.printing-output #printOutputRoot .assignment-print-sheet.scale-small{--s51087:.92}
+      body.printing-output #printOutputRoot .assignment-print-sheet.scale-normal{--s51087:1.08}
+      body.printing-output #printOutputRoot .assignment-print-sheet.scale-large{--s51087:1.22}
+      body.printing-output #printOutputRoot .assignment-print-sheet .assignment547-card .assignment-group-head b{font-size:calc(8.1pt * var(--s51087,1))!important}
+      body.printing-output #printOutputRoot .assignment-print-sheet .assignment547-card .assignment-group-head span{font-size:calc(7.2pt * var(--s51087,1))!important}
+      body.printing-output #printOutputRoot .assignment-print-sheet .assignment547-card li{font-size:calc(7.25pt * var(--s51087,1))!important}
+      body.printing-output #printOutputRoot .assignment-print-sheet .assignment547-card li em{font-size:calc(6.6pt * var(--s51087,1))!important}
+      body.printing-output #printOutputRoot .assignment-print-sheet .assignment547-firsttime{font-size:calc(6.4pt * var(--s51087,1))!important}
+      body.printing-output #printOutputRoot .assignment-print-sheet .assignment547-card .assignment-order{font-size:calc(6.15pt * var(--s51087,1))!important}
+      body.printing-output #printOutputRoot .assignment-print-sheet.portrait .assignment547-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important;grid-template-rows:repeat(8,minmax(0,1fr))!important}
+    }
+  `;
+  document.head.appendChild(style);
+
+  function install(){bindControls();if(location.hash.includes('print'))setTimeout(refreshNow,40);}
+  document.addEventListener('click',e=>{if(e.target?.closest?.('[data-portal-go="print"],[data-view="print"],[data-mobile-view="print"]'))setTimeout(install,80);},true);
+  window.addEventListener('hashchange',()=>{if(location.hash.includes('print'))setTimeout(install,80)});
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,0),{once:true});else setTimeout(install,0);
+  console.info('[230MATCH] 5.10.87 ready · print preview refresh/orientation/text-size controls restored');
+})();
