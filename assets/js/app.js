@@ -9262,19 +9262,70 @@ function renderPrintPreview(){const preview=document.getElementById('printPrevie
 function printSelectedDocument(){const doc=buildPrintDocument();const previousTitle=document.title;document.title=stage51045PrintFileBase(doc.label);let root=document.getElementById('printOutputRoot');if(!root){root=document.createElement('div');root.id='printOutputRoot';document.body.appendChild(root);}root.innerHTML=doc.html;document.body.classList.add('printing-output');let pageStyle=document.createElement('style');pageStyle.id='stage51042BracketPageRule';pageStyle.textContent=`@media print{@page{size:${doc.paper==='a3'?'A3':'A4'} ${doc.orientation==='landscape'?'landscape':'portrait'};margin:${['bracket','bracket-field','prize-signature'].includes(doc.target)?'5mm':'6mm'}}}`;document.head.appendChild(pageStyle);const cleanup=()=>{document.body.classList.remove('printing-output');root.innerHTML='';pageStyle?.remove();document.title=previousTitle;window.removeEventListener('afterprint',cleanup);};window.addEventListener('afterprint',cleanup);if(doc.target==='bracket')window.__stage5940SyncClonedBracketConnectors?.(root,()=>setTimeout(()=>window.print(),60));else setTimeout(()=>window.print(),80);}
 function wrapCanvasText(ctx,text,maxWidth){const words=String(text||'').split(/\s+/),lines=[];let line='';for(const word of words){const test=line?`${line} ${word}`:word;if(ctx.measureText(test).width>maxWidth&&line){lines.push(line);line=word;}else line=test;}if(line)lines.push(line);return lines;}
 async function saveRichPrintPreviewPng(doc){
-  renderPrintPreview();await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
-  const sheet=document.querySelector('#printPreview .print-sheet');if(!sheet){notice('출력 미리보기를 찾지 못했습니다.','error');return;}
-  const clone=sheet.cloneNode(true),rect=sheet.getBoundingClientRect();
-  const width=Math.max(1200,Math.round(sheet.scrollWidth||rect.width||1600));
-  const height=Math.max(800,Math.round(sheet.scrollHeight||rect.height||1000));
-  let css='';for(const styleSheet of [...document.styleSheets]){try{css+=[...styleSheet.cssRules].map(r=>r.cssText).join('\n');}catch(_e){}}
-  const xhtml=`<div xmlns="http://www.w3.org/1999/xhtml" style="width:${width}px;background:#fff;padding:0;margin:0"><style>${css}</style>${clone.outerHTML}</div>`;
-  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><foreignObject width="100%" height="100%">${xhtml}</foreignObject></svg>`;
-  const img=new Image(),url=URL.createObjectURL(new Blob([svg],{type:'image/svg+xml;charset=utf-8'}));
-  img.onload=()=>{const targetLongEdge=doc.paper==='a3'?6800:5200;const scale=Math.max(2.5,Math.min(4,targetLongEdge/Math.max(width,height)));const canvas=document.createElement('canvas');canvas.width=Math.round(width*scale);canvas.height=Math.round(height*scale);const ctx=canvas.getContext('2d');ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.scale(scale,scale);ctx.fillStyle='#fff';ctx.fillRect(0,0,width,height);ctx.drawImage(img,0,0);URL.revokeObjectURL(url);canvas.toBlob(blob=>{if(!blob){notice('이미지 생성에 실패했습니다.','error');return;}const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`${stage51045PrintFileBase(doc.label)}.png`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);notice(`출력 미리보기 그대로 고화질 PNG 이미지를 저장했습니다. (${doc.paper.toUpperCase()} ${doc.orientation==='landscape'?'가로':'세로'})`,'success');},'image/png');};
-  img.onerror=()=>{URL.revokeObjectURL(url);notice('이미지 변환에 실패했습니다. 인쇄/PDF 저장을 이용해 주세요.','error');};img.src=url;
+  renderPrintPreview();
+  await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+  if(document.fonts?.ready){try{await document.fonts.ready;}catch(_e){}}
+  const sheet=document.querySelector('#printPreview .print-sheet');
+  if(!sheet)throw new Error('출력 미리보기를 찾지 못했습니다.');
+
+  // 5.10.71: foreignObject 기반 변환은 SVG가 많은 현장용 수기 대진표에서
+  // 브라우저에 따라 아무 반응 없이 실패할 수 있어 html2canvas 직접 캡처로 변경.
+  const rect=sheet.getBoundingClientRect();
+  const width=Math.max(1200,Math.ceil(sheet.scrollWidth||rect.width||1600));
+  const height=Math.max(800,Math.ceil(sheet.scrollHeight||rect.height||1000));
+  const html2canvas=await stage5937LoadHtml2Canvas();
+  const targetLongEdge=doc.paper==='a3'?7000:5400;
+  const memorySafeScale=Math.sqrt(48_000_000/Math.max(1,width*height));
+  const scale=Math.max(1.5,Math.min(3.2,targetLongEdge/Math.max(width,height),memorySafeScale));
+
+  notice('고화질 PNG를 생성하고 있습니다. 잠시만 기다려 주세요.','info');
+  const canvas=await html2canvas(sheet,{
+    backgroundColor:'#ffffff',
+    scale,
+    width,
+    height,
+    windowWidth:Math.max(width,1600),
+    windowHeight:Math.max(height,1000),
+    scrollX:0,
+    scrollY:0,
+    useCORS:true,
+    allowTaint:false,
+    logging:false,
+    imageTimeout:15000,
+    removeContainer:true,
+    onclone:docClone=>{
+      const cloned=docClone.querySelector('#printPreview .print-sheet')||docClone.querySelector('.print-sheet');
+      if(cloned){
+        cloned.style.transform='none';
+        cloned.style.zoom='1';
+        cloned.style.maxWidth='none';
+        cloned.style.overflow='visible';
+      }
+      if(doc.target==='bracket-field'){
+        const pages=docClone.querySelector('.stage51038-field-pages');
+        if(pages){pages.style.gridTemplateColumns='repeat(2,minmax(0,1fr))';pages.style.gap='0 2px';}
+        docClone.querySelectorAll('.stage51038-field-page').forEach(el=>{el.style.boxShadow='none';});
+      }
+    }
+  });
+
+  await new Promise((resolve,reject)=>canvas.toBlob(blob=>{
+    if(!blob){reject(new Error('PNG 이미지 생성에 실패했습니다.'));return;}
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download=`${stage51045PrintFileBase(doc.label)}_고화질.png`;
+    a.style.display='none';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),3000);
+    notice(`고화질 PNG 저장 완료 · ${canvas.width.toLocaleString()} × ${canvas.height.toLocaleString()}px`,'success');
+    resolve(true);
+  },'image/png',1));
+  return true;
 }
-function savePrintPng(){const doc=buildPrintDocument(),title=doc.label;if(doc.target==='bracket'){void stage5948CaptureBracketExactlyLikeDirect();return;}if(doc.target==='bracket-field'||doc.target==='prelim-assignment'||doc.target==='prize-signature'){saveRichPrintPreviewPng(doc);return;}const lines=[];if(doc.target==='participants'){const d=stage51013PrintRegistrationRows();lines.push(`[참가 승인팀 ${d.approved.length}팀 · 참가번호 1~${d.approved.length}]`);d.approved.forEach((a,i)=>lines.push(`${i+1}. ${a.teamName||''} · ${a.affiliation||''} · ${(a.paid===true||a.paymentStatus==='paid')?'입금':'미입금'} · 참가 승인`));lines.push('',`[후보팀 ${d.reserve.length}팀 · 후보번호 1~${d.reserve.length}]`);d.reserve.forEach((a,i)=>lines.push(`${i+1}. ${a.teamName||''} · ${a.affiliation||''} · ${(a.paid===true||a.paymentStatus==='paid')?'입금':'미입금'} · 후보 ${i+1}`));if(d.rejected.length){lines.push('',`[반려팀 ${d.rejected.length}팀]`);d.rejected.forEach(a=>lines.push(`${d.seq.get(String(a.id||''))||'-'}. ${a.teamName||''} · ${a.affiliation||''} · 반려`));}}else if(doc.target==='results'){const p=currentPodium();lines.push(`우승: ${p.champion||'미확정'}`,`준우승: ${p.runnerUp||'미확정'}`,`공동 3위: ${(p.thirds||[]).join(' · ')||'미확정'}`);}else if(doc.target==='bracket'){portalMainMatches().forEach((m,i)=>lines.push(`${m.roundName||m.round||'본선'} ${i+1}: ${printTeam(m.teamA)} vs ${printTeam(m.teamB)}${m.status==='completed'?` · ${printTeam(m.winner)} 승`:''}`));}else if(doc.target==='prelim'||doc.target==='prelim-assignment'){(state.prelim?.groups||[]).forEach((g,i)=>lines.push(`${g.name||`${i+1}조`} · ${g.courtName||'코트 미정'}: ${(g.teams||[]).map(printTeam).join(' / ')}`));}else{const courts=state.unifiedCourts||state.courts||[];(Array.isArray(courts)?courts:Object.values(courts||{})).forEach((c,i)=>lines.push(`${c.name||`${i+1}번 코트`}: ${c.playingMatch?`${printTeam(c.playingMatch.teamA)} vs ${printTeam(c.playingMatch.teamB)}`:'대기'}`));}const width=3200,pad=120,lineH=58;const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');ctx.font='26px sans-serif';let wrapped=[];for(const line of lines.length?lines:['표시할 자료가 없습니다.'])wrapped.push(...wrapCanvasText(ctx,line,width-pad*2));canvas.width=width;canvas.height=Math.max(1000,260+wrapped.length*lineH+pad);ctx.fillStyle='#ffffff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.fillStyle='#10264a';ctx.fillRect(0,0,canvas.width,150);ctx.fillStyle='#ffffff';ctx.font='bold 46px sans-serif';ctx.fillText(title,pad,75);ctx.font='25px sans-serif';ctx.fillText(`${state.tournament?.name||'230MATCH 대회'} · ${state.tournament?.division||''}`,pad,120);ctx.fillStyle='#111827';ctx.font='26px sans-serif';let y=215;for(const line of wrapped){ctx.fillText(line,pad,y);y+=lineH;}canvas.toBlob(blob=>{if(!blob){notice('이미지 생성에 실패했습니다.','error');return;}const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`${stage51045PrintFileBase(title)}.png`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);notice('PNG 이미지를 저장했습니다.','success');},'image/png');}
+async function savePrintPng(){const doc=buildPrintDocument(),title=doc.label;if(doc.target==='bracket'){await stage5948CaptureBracketExactlyLikeDirect();return true;}if(doc.target==='bracket-field'||doc.target==='prelim-assignment'||doc.target==='prize-signature'){await saveRichPrintPreviewPng(doc);return true;}const lines=[];if(doc.target==='participants'){const d=stage51013PrintRegistrationRows();lines.push(`[참가 승인팀 ${d.approved.length}팀 · 참가번호 1~${d.approved.length}]`);d.approved.forEach((a,i)=>lines.push(`${i+1}. ${a.teamName||''} · ${a.affiliation||''} · ${(a.paid===true||a.paymentStatus==='paid')?'입금':'미입금'} · 참가 승인`));lines.push('',`[후보팀 ${d.reserve.length}팀 · 후보번호 1~${d.reserve.length}]`);d.reserve.forEach((a,i)=>lines.push(`${i+1}. ${a.teamName||''} · ${a.affiliation||''} · ${(a.paid===true||a.paymentStatus==='paid')?'입금':'미입금'} · 후보 ${i+1}`));if(d.rejected.length){lines.push('',`[반려팀 ${d.rejected.length}팀]`);d.rejected.forEach(a=>lines.push(`${d.seq.get(String(a.id||''))||'-'}. ${a.teamName||''} · ${a.affiliation||''} · 반려`));}}else if(doc.target==='results'){const p=currentPodium();lines.push(`우승: ${p.champion||'미확정'}`,`준우승: ${p.runnerUp||'미확정'}`,`공동 3위: ${(p.thirds||[]).join(' · ')||'미확정'}`);}else if(doc.target==='bracket'){portalMainMatches().forEach((m,i)=>lines.push(`${m.roundName||m.round||'본선'} ${i+1}: ${printTeam(m.teamA)} vs ${printTeam(m.teamB)}${m.status==='completed'?` · ${printTeam(m.winner)} 승`:''}`));}else if(doc.target==='prelim'||doc.target==='prelim-assignment'){(state.prelim?.groups||[]).forEach((g,i)=>lines.push(`${g.name||`${i+1}조`} · ${g.courtName||'코트 미정'}: ${(g.teams||[]).map(printTeam).join(' / ')}`));}else{const courts=state.unifiedCourts||state.courts||[];(Array.isArray(courts)?courts:Object.values(courts||{})).forEach((c,i)=>lines.push(`${c.name||`${i+1}번 코트`}: ${c.playingMatch?`${printTeam(c.playingMatch.teamA)} vs ${printTeam(c.playingMatch.teamB)}`:'대기'}`));}const width=3200,pad=120,lineH=58;const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');ctx.font='26px sans-serif';let wrapped=[];for(const line of lines.length?lines:['표시할 자료가 없습니다.'])wrapped.push(...wrapCanvasText(ctx,line,width-pad*2));canvas.width=width;canvas.height=Math.max(1000,260+wrapped.length*lineH+pad);ctx.fillStyle='#ffffff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.fillStyle='#10264a';ctx.fillRect(0,0,canvas.width,150);ctx.fillStyle='#ffffff';ctx.font='bold 46px sans-serif';ctx.fillText(title,pad,75);ctx.font='25px sans-serif';ctx.fillText(`${state.tournament?.name||'230MATCH 대회'} · ${state.tournament?.division||''}`,pad,120);ctx.fillStyle='#111827';ctx.font='26px sans-serif';let y=215;for(const line of wrapped){ctx.fillText(line,pad,y);y+=lineH;}return await new Promise((resolve,reject)=>canvas.toBlob(blob=>{if(!blob){reject(new Error('이미지 생성에 실패했습니다.'));return;}const a=document.createElement('a');const url=URL.createObjectURL(blob);a.href=url;a.download=`${stage51045PrintFileBase(title)}.png`;a.style.display='none';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000);notice('PNG 이미지를 저장했습니다.','success');resolve(true);},'image/png'));}
 function bindPrintCenter(){
   ['printTargetSelect','printPaperSelect','printOrientationSelect','printToneSelect','printScaleSelect','labelStatusSelect','labelContentSelect','labelCopySelect','stage51040FieldModeSelect'].forEach(id=>{
     const el=document.getElementById(id);if(!el||el.dataset.stage51070PrintBound==='1')return;
@@ -9283,7 +9334,7 @@ function bindPrintCenter(){
   });
   const refresh=document.getElementById('refreshPrintPreviewBtn');if(refresh&&refresh.dataset.stage51070PrintBound!=='1'){refresh.dataset.stage51070PrintBound='1';refresh.addEventListener('click',()=>schedulePrintPreviewRender(0));}
   const print=document.getElementById('printDocumentBtn');if(print&&print.dataset.stage51070PrintBound!=='1'){print.dataset.stage51070PrintBound='1';print.addEventListener('click',printSelectedDocument);}
-  const save=document.getElementById('savePrintImageBtn');if(save&&save.dataset.stage51070PrintBound!=='1'){save.dataset.stage51070PrintBound='1';save.addEventListener('click',savePrintPng);}
+  const save=document.getElementById('savePrintImageBtn');if(save&&save.dataset.stage51070PrintBound!=='1'){save.dataset.stage51070PrintBound='1';save.addEventListener('click',()=>{void savePrintPng().catch(error=>{console.error('[5.10.71 PNG]',error);notice(error?.message||'PNG 저장 중 오류가 발생했습니다.','error');});});}
 }
 
 
@@ -22071,3 +22122,5 @@ console.info('[230MATCH] 5.10.68 ready · performance guard: broad DOM observers
 
 console.info('[230MATCH] 5.10.69 ready · prelim assignment actual-team count + 3x HQ PNG export');
 console.info('[230MATCH] 5.10.70 ready · dropdown/select responsiveness + coalesced print preview rendering');
+
+console.info('[230MATCH] 5.10.71 ready · field bracket HQ PNG capture fix');
