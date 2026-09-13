@@ -23326,3 +23326,116 @@ console.log('[230MATCH] 5.10.84 ready · same-origin notice image attachment dow
   },10000);
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install85,0),{once:true});else setTimeout(install85,0);
 })();
+
+/* 230MATCH 5.10.86 · A4 full-page prelim assignment print fit */
+(()=>{
+  'use strict';
+  const STYLE_ID='stage51086AssignmentFullPagePrint';
+  function install(){
+    if(document.getElementById(STYLE_ID))return;
+    const style=document.createElement('style');
+    style.id=STYLE_ID;
+    style.textContent=`
+      @media print{
+        @page{size:A4 landscape;margin:3mm}
+        body.printing-output #printOutputRoot .assignment-print-sheet{
+          box-sizing:border-box!important;
+          width:291mm!important;
+          height:204mm!important;
+          min-height:204mm!important;
+          max-height:204mm!important;
+          padding:0!important;
+          margin:0 auto!important;
+          display:flex!important;
+          flex-direction:column!important;
+          overflow:hidden!important;
+          box-shadow:none!important;
+        }
+        body.printing-output #printOutputRoot .assignment547-title{
+          flex:0 0 auto!important;
+          margin:0 0 1.6mm!important;
+        }
+        body.printing-output #printOutputRoot .assignment547-title h1{
+          font-size:17pt!important;
+          line-height:1.05!important;
+        }
+        body.printing-output #printOutputRoot .assignment547-title p{
+          font-size:8.8pt!important;
+          margin:1mm 0 0!important;
+        }
+        body.printing-output #printOutputRoot .assignment547-summary{
+          flex:0 0 auto!important;
+          margin:0 0 1.2mm!important;
+          padding:1.1mm 2mm!important;
+          font-size:7.6pt!important;
+        }
+        body.printing-output #printOutputRoot .assignment547-warning{
+          font-size:6.5pt!important;
+          margin-top:.55mm!important;
+        }
+        body.printing-output #printOutputRoot .assignment547-grid{
+          flex:1 1 auto!important;
+          min-height:0!important;
+          height:auto!important;
+          display:grid!important;
+          grid-template-columns:repeat(4,minmax(0,1fr))!important;
+          grid-template-rows:repeat(8,minmax(0,1fr))!important;
+          grid-auto-rows:minmax(0,1fr)!important;
+          gap:1.15mm!important;
+          align-content:stretch!important;
+        }
+        body.printing-output #printOutputRoot .assignment547-card{
+          min-height:0!important;
+          height:100%!important;
+          display:flex!important;
+          flex-direction:column!important;
+          break-inside:avoid!important;
+        }
+        body.printing-output #printOutputRoot .assignment547-card .assignment-group-head{
+          flex:0 0 auto!important;
+          padding:.65mm 1.2mm!important;
+        }
+        body.printing-output #printOutputRoot .assignment547-card .assignment-group-head b{
+          font-size:8.1pt!important;
+        }
+        body.printing-output #printOutputRoot .assignment547-card .assignment-group-head span{
+          font-size:7.2pt!important;
+        }
+        body.printing-output #printOutputRoot .assignment547-card ol{
+          flex:1 1 auto!important;
+          min-height:0!important;
+          padding:.45mm 1.2mm!important;
+          display:flex!important;
+          flex-direction:column!important;
+          justify-content:flex-start!important;
+        }
+        body.printing-output #printOutputRoot .assignment547-card li{
+          grid-template-columns:3.4mm minmax(0,1fr) auto!important;
+          gap:.55mm!important;
+          min-height:3.8mm!important;
+          font-size:7.25pt!important;
+          line-height:1.05!important;
+        }
+        body.printing-output #printOutputRoot .assignment547-card li em{
+          font-size:6.6pt!important;
+        }
+        body.printing-output #printOutputRoot .assignment547-firsttime{
+          font-size:6.4pt!important;
+        }
+        body.printing-output #printOutputRoot .assignment547-card .assignment-order{
+          flex:0 0 auto!important;
+          min-height:3.2mm!important;
+          padding:.45mm 1.2mm .55mm!important;
+          font-size:6.15pt!important;
+          line-height:1.05!important;
+        }
+        body.printing-output #printOutputRoot .assignment-print-sheet .print-footer{
+          display:none!important;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
+  console.info('[230MATCH] 5.10.86 ready · A4 full-page prelim assignment print fit');
+})();
