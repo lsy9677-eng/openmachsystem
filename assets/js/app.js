@@ -22845,3 +22845,137 @@ console.info('[230MATCH] 5.10.79 ready · member self-edit names propagate to pr
   window.stage51077ApplyAdminOverlayPrefs=run;
   console.info('[230MATCH] 5.10.77 ready · admin status hidden by default + movable translucent player-result alert');
 })();
+
+
+/* 230MATCH 5.10.80 · public court status follows prelim scheduled-publication gate
+   - 관리자/진행자: 공개 전에도 코트 운영 화면 확인 가능
+   - 일반회원(관리자 일반 보기 포함): 예선 공개 전에는 코트/대기/선수 정보를 숨김
+   - 예선 예약 공개 시각 도달 후 자동으로 코트 현황 공개
+   - 경기/코트/대기열 데이터 자체는 변경하지 않고 UI 노출만 제어 */
+(function stage51080PublicCourtPublicationGate(){
+  const GATE_ID='stage51080CourtPublicationGate';
+  const STYLE_ID='stage51080CourtPublicationGateStyle';
+  const MARK='stage51080Hidden';
+
+  function esc(v){return String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
+  function privileged(){
+    try{return typeof canOperate==='function'&&canOperate();}catch(_e){return false;}
+  }
+  function prelimPublished(){
+    try{
+      if(typeof window.stage51058CanViewPrelim==='function'){
+        // stage51058CanViewPrelim already includes operator/admin access.
+        return !!window.stage51058CanViewPrelim();
+      }
+    }catch(_e){}
+    if(privileged())return true;
+    const p=state?.prelimPublication;
+    if(!p||typeof p!=='object'||p.confirmed!==true)return false;
+    if(p.publishedAt)return true;
+    const t=p.publishAt?new Date(p.publishAt).getTime():0;
+    return Boolean(t&&Number.isFinite(t)&&Date.now()>=t);
+  }
+  function publicScheduleText(){
+    const p=state?.prelimPublication||{};
+    const d=p.publishAt?new Date(p.publishAt):null;
+    return d&&!Number.isNaN(d.getTime())?d.toLocaleString('ko-KR'):'';
+  }
+  function ensureStyle(){
+    if(document.getElementById(STYLE_ID))return;
+    const style=document.createElement('style');
+    style.id=STYLE_ID;
+    style.textContent=`
+      #${GATE_ID}{margin:10px 0 18px;padding:30px 20px;border:1px solid #b7cae5;border-radius:16px;background:#f6faff;text-align:center;color:#17365f;box-shadow:0 4px 14px rgba(30,64,175,.06)}
+      #${GATE_ID} strong{display:block;font-size:19px;font-weight:900;margin-bottom:8px}
+      #${GATE_ID} p{margin:0;color:#61738d;font-size:14px;line-height:1.65}
+      #${GATE_ID} b{color:#0f4c91}
+      @media(max-width:720px){#${GATE_ID}{margin:8px 0 14px;padding:24px 14px}#${GATE_ID} strong{font-size:17px}}
+    `;
+    document.head.appendChild(style);
+  }
+  function ensureGate(view){
+    let box=document.getElementById(GATE_ID);
+    if(box&&box.parentElement!==view){try{box.remove()}catch(_e){}box=null;}
+    if(!box){
+      box=document.createElement('section');
+      box.id=GATE_ID;
+      box.setAttribute('role','status');
+      box.setAttribute('aria-live','polite');
+      view.prepend(box);
+    }
+    return box;
+  }
+  function hideCourtContents(view,gate){
+    [...view.children].forEach(el=>{
+      if(el===gate)return;
+      if(el.hidden&&el.dataset[MARK]!=='1')return; // 원래 숨김 상태는 건드리지 않음
+      el.dataset[MARK]='1';
+      el.hidden=true;
+    });
+  }
+  function restoreCourtContents(view,gate){
+    [...view.children].forEach(el=>{
+      if(el===gate)return;
+      if(el.dataset[MARK]==='1'){
+        el.hidden=false;
+        delete el.dataset[MARK];
+      }
+    });
+  }
+  function apply(){
+    const view=document.getElementById('view-operation');
+    if(!view)return;
+    ensureStyle();
+    const allowed=prelimPublished();
+    let gate=document.getElementById(GATE_ID);
+    if(allowed){
+      if(gate)gate.hidden=true;
+      restoreCourtContents(view,gate);
+      view.dataset.prelimCourtPublished='1';
+      return;
+    }
+    gate=ensureGate(view);
+    const p=state?.prelimPublication||{};
+    const when=publicScheduleText();
+    gate.innerHTML=`<strong>코트 현황 공개 전입니다.</strong><p>${p.confirmed?(when?`예선 조편성·코트 현황은 <b>${esc(when)}</b>에 함께 공개됩니다.`:'예선 대진은 확정되었습니다. 운영자가 공개시간을 설정 중입니다.'):'예선 조편성이 확정·공개된 뒤 코트 현황을 확인할 수 있습니다.'}</p>`;
+    gate.hidden=false;
+    hideCourtContents(view,gate);
+    view.dataset.prelimCourtPublished='0';
+  }
+
+  // 라우팅 직후 즉시 적용하여 일반회원에게 코트 데이터가 순간 노출되지 않게 한다.
+  try{
+    const oldNavigate=navigatePortalView;
+    navigatePortalView=function stage51080NavigatePortalView(...args){
+      const result=oldNavigate.apply(this,args);
+      if(String(args?.[0]||'').replace(/^#/,'')==='operation'){
+        try{apply()}catch(_e){}
+        setTimeout(()=>{try{apply()}catch(_e){}},0);
+        setTimeout(()=>{try{apply()}catch(_e){}},120);
+      }
+      return result;
+    };
+  }catch(_e){}
+
+  // 관리자 '일반 보기' 전환 및 메뉴 클릭 직후에도 즉시 다시 판정.
+  document.addEventListener('click',e=>{
+    if(e.target.closest?.('[data-portal-go="operation"],[data-v6003-go="operation"],[data-mobile-view="operation"],.tab[data-view="operation"],#roleViewerBtn')){
+      setTimeout(()=>{try{apply()}catch(_e){}},0);
+      setTimeout(()=>{try{apply()}catch(_e){}},120);
+    }
+  },true);
+
+  // 예약 공개 시각 도달 및 운영 화면 재렌더 후 새로 생긴 요소를 보정한다.
+  let lastAllowed=null;
+  setInterval(()=>{
+    const allowed=prelimPublished();
+    const current=document.body?.dataset?.currentView;
+    if(current==='operation'||allowed!==lastAllowed){try{apply()}catch(_e){}}
+    lastAllowed=allowed;
+  },10000);
+
+  const ready=()=>{try{apply()}catch(_e){}};
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ready,{once:true});else ready();
+  window.stage51080ApplyCourtPublicationGate=apply;
+})();
+console.info('[230MATCH] 5.10.80 ready · public court status gated by prelim scheduled-publication time');
