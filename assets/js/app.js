@@ -2562,20 +2562,24 @@ function openDrawLockDialog(){
 function confirmDrawLock(event){
   event.preventDefault();
   if(!$('drawLockConfirmCheck').checked)return;
+  const now=new Date().toISOString();
   lockDraw(state);
   state.mainDrawFinalLock={
     locked:true,
-    lockedAt:new Date().toISOString(),
+    lockedAt:now,
     checksum:String(state?.drawMeta?.checksum||''),
     tournamentId:String(state?.tournament?.id||state?.multiTournament?.activeTournamentId||''),
     divisionId:String(state?.multiDivision?.activeDivisionId||''),
     drawSize:Number(state?.draw?.size||0)
   };
+  // 확정(잠금)과 참가자 공개를 분리한다. 공개시간을 예약하거나 즉시 공개하기 전까지 일반회원에게는 비공개다.
+  state.mainDrawPublication={confirmed:true,confirmedAt:now,publishAt:null,publishedAt:null,checksum:String(state?.drawMeta?.checksum||'')};
   stage51022ClearMainDraft();
   try{localStorage.setItem('230match-main-final-lock-v51028',JSON.stringify(state.mainDrawFinalLock));}catch(_e){}
-  commit(`본선 대진 영구 확정 · 체크섬 ${state.drawMeta.checksum}`);
+  commit(`본선 대진 영구 확정 · 공개시간 설정 대기 · 체크섬 ${state.drawMeta.checksum}`);
   $('drawLockDialog').close();
-  notice('본선 대진을 확정했습니다. 본선 전체 초기화 전까지 대진 구조는 변경되지 않으며 참가자에게 공개됩니다.','success');
+  notice('본선 대진을 확정했습니다. 참가자에게는 아직 공개되지 않습니다. 본선 공개시간을 예약하거나 즉시 공개하세요.','success');
+  setTimeout(()=>window.stage51072RefreshMainPublication?.(),0);
 }
 function openDrawUnlockDialog(){
   notice('본선 확정 후에는 잠금을 해제할 수 없습니다. 대진을 새로 만들려면 “본선 대진 전체 초기화”를 사용하세요.','warning');
@@ -5600,7 +5604,14 @@ function portalTeamNameHtml(value){
    운영자/관리자: 추첨 직후 임시 대진 검토 가능
    일반 참가자: 본선 확정(잠금) 이후에만 공식 대진 공개 */
 function stage51023MainDrawPublished(){
-  return Boolean(state?.drawMeta?.locked===true||state?.settings?.drawLocked===true);
+  const locked=Boolean(state?.drawMeta?.locked===true||state?.settings?.drawLocked===true||state?.mainDrawFinalLock?.locked===true);
+  if(!locked)return false;
+  const p=state?.mainDrawPublication;
+  // 5.10.72 이전에 이미 확정된 본선은 기존 동작을 보존해 공개 상태로 간주한다.
+  if(!p||typeof p!=='object')return true;
+  if(p.publishedAt)return true;
+  const t=p.publishAt?new Date(p.publishAt).getTime():0;
+  return Boolean(t&&Number.isFinite(t)&&Date.now()>=t);
 }
 function stage51023CanViewDraftMainDraw(){
   try{return typeof canOperate==='function'&&canOperate();}catch(_e){return false;}
@@ -5618,11 +5629,20 @@ function stage51023ApplyBracketPublicationGate(){
     noticeBox=document.createElement('section');
     noticeBox.id='stage51023BracketPrivateNotice';
     noticeBox.className='notice info stage51023-bracket-private-notice';
-    noticeBox.innerHTML='<strong>본선 대진표 준비 중</strong><span>본선 추첨은 완료되어도 운영자가 <b>본선 확정</b>을 누르기 전까지 참가자에게 공개되지 않습니다.</span>';
+    noticeBox.innerHTML='<strong>본선 대진표 준비 중</strong><span>운영자가 본선 대진을 준비하고 있습니다.</span>';
     const viewport=document.getElementById('bracketViewport');
     (viewport?.parentElement||view).insertBefore(noticeBox,viewport||view.firstChild);
   }
 
+  if(!allowed){
+    const locked=Boolean(state?.drawMeta?.locked===true||state?.settings?.drawLocked===true||state?.mainDrawFinalLock?.locked===true);
+    const p=state?.mainDrawPublication||null;
+    const when=p?.publishAt?new Date(p.publishAt):null;
+    const whenText=when&&!Number.isNaN(when.getTime())?when.toLocaleString('ko-KR'):'';
+    noticeBox.innerHTML=locked
+      ?`<strong>본선 대진표 공개 전입니다.</strong><span>${whenText?`공개 예정: <b>${portalEscape(whenText)}</b>`:'운영자가 공개시간을 설정 중입니다.'}</span>`
+      :'<strong>본선 대진표 준비 중</strong><span>본선 추첨과 확정이 완료된 뒤 참가자에게 공개됩니다.</span>';
+  }
   noticeBox.hidden=allowed;
 
   const privateTargets=[
@@ -12322,6 +12342,7 @@ let refreshDivisionEditorPanel = window.refreshDivisionEditorPanel || (()=>{});
     try{saveRecovery(state,`${state.tournament?.name||'대회'} · 본선 초기화 전 자동 복구점`)}catch(_e){}
     const fresh=initialState();
     state.draw=structuredClone(fresh.draw);state.drawMeta=structuredClone(fresh.drawMeta);
+    delete state.mainDrawPublication;
     state.prelim=state.prelim||{};state.prelim.linkedDraw={active:false,slots:[],createdAt:null,lastSyncedAt:null,userInitiated:false};
     stage5927ClearMainOperationResidue({normalizeMatchStatus:false});
     delete state.completion;delete state.tournament?.completedAt;
@@ -22123,4 +22144,90 @@ console.info('[230MATCH] 5.10.68 ready · performance guard: broad DOM observers
 console.info('[230MATCH] 5.10.69 ready · prelim assignment actual-team count + 3x HQ PNG export');
 console.info('[230MATCH] 5.10.70 ready · dropdown/select responsiveness + coalesced print preview rendering');
 
+
+
+/* 230MATCH 5.10.72 · main draw confirmation -> scheduled publication */
+(function stage51072MainScheduledPublication(){
+  const byId=id=>document.getElementById(id);
+  let lastPublished=false;
+  function locked(){return Boolean(state?.mainDrawFinalLock?.locked===true||state?.drawMeta?.locked===true||state?.settings?.drawLocked===true);}
+  function pub(){return state?.mainDrawPublication&&typeof state.mainDrawPublication==='object'?state.mainDrawPublication:null;}
+  function isPublished(){
+    if(!locked())return false;
+    const p=pub();
+    if(!p)return true; // legacy confirmed draw compatibility
+    if(p.publishedAt)return true;
+    const t=p.publishAt?new Date(p.publishAt).getTime():0;
+    return Boolean(t&&Number.isFinite(t)&&Date.now()>=t);
+  }
+  function localInputValue(iso){
+    if(!iso)return'';const d=new Date(iso);if(Number.isNaN(d.getTime()))return'';
+    const pad=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+  function ensurePanel(){
+    const host=byId('stage3441MainPrep')||byId('stage342SimpleSetupHub');if(!host)return null;
+    let panel=byId('stage51072MainPublishPanel');
+    if(!panel){
+      panel=document.createElement('section');panel.id='stage51072MainPublishPanel';panel.className='stage51072-main-publish';
+      panel.innerHTML=`<div class="stage51072-pub-copy"><b id="stage51072PubTitle">본선 공개 준비</b><span id="stage51072PubDetail"></span></div><div class="stage51072-pub-controls"><label id="stage51072ScheduleWrap">공개시간 <input type="datetime-local" id="stage51072PublishAt"></label><button type="button" class="btn btn-primary" id="stage51072ScheduleBtn">예약 저장</button><button type="button" class="btn btn-light" id="stage51072NowBtn">즉시 공개</button></div>`;
+      host.appendChild(panel);
+      byId('stage51072ScheduleBtn')?.addEventListener('click',saveSchedule);
+      byId('stage51072NowBtn')?.addEventListener('click',publishNow);
+    }
+    return panel;
+  }
+  function saveSchedule(){
+    if(typeof requireAdmin==='function'&&!requireAdmin('본선 공개예약'))return;
+    if(!locked()){notice('먼저 본선 확정(공개)을 진행하세요.','warning');return;}
+    const p=pub();if(!p){notice('이 본선은 이전 버전에서 이미 공개된 확정본입니다.','info');return;}
+    if(isPublished()){notice('이미 참가자에게 공개된 본선입니다. 공개시간을 다시 예약할 수 없습니다.','warning');return;}
+    const raw=String(byId('stage51072PublishAt')?.value||'');if(!raw){notice('공개할 날짜와 시간을 입력하세요.','warning');return;}
+    const d=new Date(raw);if(Number.isNaN(d.getTime())){notice('공개시간 형식이 올바르지 않습니다.','error');return;}
+    if(d.getTime()<=Date.now()){notice('예약 공개시간은 현재보다 이후로 설정하세요. 즉시 공개는 “즉시 공개”를 사용하세요.','warning');return;}
+    p.publishAt=d.toISOString();p.publishedAt=null;
+    commit(`본선 대진 공개예약 · ${d.toLocaleString('ko-KR')}`);
+    notice(`본선 대진표를 ${d.toLocaleString('ko-KR')}에 자동 공개하도록 예약했습니다.`,'success');refresh();
+  }
+  function publishNow(){
+    if(typeof requireAdmin==='function'&&!requireAdmin('본선 즉시 공개'))return;
+    if(!locked()){notice('먼저 본선 확정(공개)을 진행하세요.','warning');return;}
+    const p=pub();if(!p){notice('이 본선은 이전 버전에서 이미 공개된 확정본입니다.','info');return;}
+    if(isPublished()){notice('이미 본선 대진표가 공개되어 있습니다.','info');return;}
+    if(!confirm('현재 확정된 본선 대진표를 지금 참가자에게 공개할까요?'))return;
+    const now=new Date().toISOString();p.publishAt=now;p.publishedAt=now;
+    commit('본선 대진표 즉시 공개');notice('본선 대진표를 참가자에게 공개했습니다.','success');refresh();
+    try{stage51023ApplyBracketPublicationGate?.();renderPortalViewFast?.('bracket');}catch(_e){}
+  }
+  function refresh(){
+    const panel=ensurePanel();if(!panel)return;
+    const isAdmin=(typeof currentRole!=='undefined'&&currentRole==='admin');
+    const p=pub(),isLocked=locked(),live=isPublished();
+    panel.hidden=!isAdmin||!isLocked||!p;
+    if(panel.hidden)return;
+    const title=byId('stage51072PubTitle'),detail=byId('stage51072PubDetail'),wrap=byId('stage51072ScheduleWrap'),save=byId('stage51072ScheduleBtn'),now=byId('stage51072NowBtn'),input=byId('stage51072PublishAt');
+    if(live){
+      if(title)title.textContent='본선 공개 중';
+      if(detail)detail.textContent=`참가자에게 공개됨${p.publishAt?` · ${new Date(p.publishAt).toLocaleString('ko-KR')}`:''}`;
+    }else if(p.publishAt){
+      if(title)title.textContent='본선 공개예약 완료';if(detail)detail.textContent=`${new Date(p.publishAt).toLocaleString('ko-KR')} 자동 공개 예정 · 확정 대진은 잠금 유지`;
+    }else{
+      if(title)title.textContent='본선 확정 완료 · 공개시간 설정';if(detail)detail.textContent='대진은 확정·잠금되었습니다. 공개시간을 예약하거나 즉시 공개하세요.';
+    }
+    if(wrap)wrap.hidden=live;if(save)save.hidden=live;if(now)now.hidden=live;
+    if(input&&document.activeElement!==input)input.value=localInputValue(p.publishAt);
+  }
+  window.stage51072RefreshMainPublication=refresh;
+  const style=document.createElement('style');style.id='stage51072Style';style.textContent=`.stage51072-main-publish{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:13px 14px;margin-top:10px;border:1px solid #9db8df;border-radius:12px;background:#f6faff}.stage51072-pub-copy{display:grid;gap:4px}.stage51072-pub-copy span{font-size:12px;color:#5b6c82}.stage51072-pub-controls{display:flex;gap:8px;align-items:end;flex-wrap:wrap}.stage51072-pub-controls label{display:grid;gap:4px;font-size:11px;color:#64748b}.stage51072-pub-controls input{min-height:40px;border:1px solid #cbd5e1;border-radius:9px;padding:0 8px;background:#fff}@media(max-width:720px){.stage51072-main-publish{align-items:stretch;flex-direction:column}.stage51072-pub-controls label{flex-basis:100%}.stage51072-pub-controls input{width:100%}}`;document.head.appendChild(style);
+  function tick(){
+    const live=isPublished();
+    if(live!==lastPublished){lastPublished=live;try{stage51023ApplyBracketPublicationGate?.();}catch(_e){}try{if(document.body?.dataset?.currentView==='bracket')renderPortalViewFast?.('bracket');}catch(_e){} }
+    refresh();
+  }
+  lastPublished=isPublished();
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(refresh,80),{once:true});else setTimeout(refresh,80);
+  window.addEventListener('hashchange',()=>setTimeout(refresh,80));
+  document.addEventListener('click',e=>{if(e.target?.closest?.('#confirmDrawLockBtn,[data-operation-section],[data-portal-go="operation"],[data-view="bracket"],[data-portal-go="bracket"]'))setTimeout(refresh,100);},true);
+  setInterval(tick,15000);
+})();
+console.info('[230MATCH] 5.10.72 ready · 본선 확정과 참가자 공개 분리 + 예약/즉시 공개');
 console.info('[230MATCH] 5.10.71 ready · field bracket HQ PNG capture fix');
