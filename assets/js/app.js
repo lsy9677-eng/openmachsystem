@@ -23711,3 +23711,84 @@ console.log('[230MATCH] 5.10.84 ready · same-origin notice image attachment dow
   document.addEventListener('click',e=>{if(e.target.closest?.('[data-view="participants"],#participantManagerNav,[href="#participants"]'))setTimeout(()=>{renderLog();repairLegacy();},200);},true);
   console.info('[230MATCH] 5.10.89 ready · replacement ownership separated + participant identity access + replacement audit');
 })();
+
+/* 230MATCH 5.10.90 · replacement audit always-visible toolbar + modal */
+(function stage51090ReplacementAuditUi(){
+  const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  function canSee(){try{return Boolean(typeof canOperate==='function'&&canOperate());}catch(_e){return false;}}
+  function rows(){try{return typeof simpleRegistrationRows==='function'?simpleRegistrationRows():[];}catch(_e){return[];}}
+  function events(){
+    const out=[];
+    for(const row of rows()){
+      const history=Array.isArray(row?.replacementHistory)?row.replacementHistory:[];
+      if(history.length){
+        history.forEach(h=>out.push({
+          at:h?.at||row?.replacedAt||'',
+          byName:h?.byName||row?.replacedByName||'관리자',
+          before:h?.previousTeamName||'이전 참가팀',
+          after:h?.newTeamName||row?.teamName||'교체 참가팀',
+          beforeAff:h?.previousAffiliation||'',afterAff:h?.newAffiliation||row?.affiliation||'',
+          id:row?.id||''
+        }));
+      }else if(row?.replacedAt){
+        out.push({at:row.replacedAt,byName:row.replacedByName||'관리자',before:'이전 참가팀',after:row.teamName||'교체 참가팀',beforeAff:'',afterAff:row.affiliation||'',id:row.id||''});
+      }
+    }
+    return out.sort((a,b)=>String(b.at||'').localeCompare(String(a.at||'')));
+  }
+  function ensureModal(){
+    let modal=document.getElementById('stage51090ReplacementAuditModal');
+    if(modal)return modal;
+    modal=document.createElement('div');
+    modal.id='stage51090ReplacementAuditModal';
+    modal.hidden=true;
+    modal.innerHTML=`<div class="stage51090-backdrop" data-stage51090-close></div><section class="stage51090-panel" role="dialog" aria-modal="true" aria-label="참가자 교체 기록"><div class="stage51090-head"><div><b>참가자 교체 기록</b><small id="stage51090AuditCountText"></small></div><button type="button" class="btn btn-light btn-small" data-stage51090-close>닫기</button></div><div id="stage51090AuditBody" class="stage51090-body"></div></section>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('click',e=>{if(e.target.closest?.('[data-stage51090-close]'))modal.hidden=true;});
+    return modal;
+  }
+  function renderModal(){
+    const modal=ensureModal(), list=events();
+    const count=modal.querySelector('#stage51090AuditCountText');if(count)count.textContent=`총 ${list.length}건`;
+    const body=modal.querySelector('#stage51090AuditBody');if(!body)return;
+    body.innerHTML=list.length?list.map((e,i)=>`<article class="stage51090-event"><div class="stage51090-index">${i+1}</div><div><div class="stage51090-route"><b>${esc(e.before)}</b><span>→</span><b>${esc(e.after)}</b></div>${(e.beforeAff||e.afterAff)?`<div class="stage51090-aff">${esc(e.beforeAff||'-')} → ${esc(e.afterAff||'-')}</div>`:''}<div class="stage51090-meta">${esc(e.at?new Date(e.at).toLocaleString('ko-KR'):'시간 미상')} · ${esc(e.byName||'관리자')}</div></div></article>`).join(''):'<div class="portal-empty">아직 참가자 교체 기록이 없습니다.</div>';
+  }
+  function openModal(){renderModal();ensureModal().hidden=false;}
+  function ensureToolbar(){
+    if(!canSee())return;
+    const count=events().length;
+    let bar=document.getElementById('stage51090ReplacementAuditToolbar');
+    // Prefer the real registration admin list because legacy roster route may be retired/redirected.
+    const entry=document.getElementById('entryAdminList');
+    const roster=document.getElementById('participantRosterList');
+    const host=entry?.parentElement||roster?.parentElement||document.querySelector('#view-entry .portal-card,#view-entry .card,#view-entry');
+    if(!host)return;
+    if(!bar){
+      bar=document.createElement('div');bar.id='stage51090ReplacementAuditToolbar';
+      bar.innerHTML=`<div><b>참가자 교체 관리</b><small>관리자가 교체한 이력만 별도로 보관됩니다.</small></div><button type="button" class="btn btn-light" id="stage51090ReplacementAuditBtn">교체 기록 <strong id="stage51090ReplacementAuditCount">0</strong>건</button>`;
+      const anchor=entry||roster||host.firstChild; if(anchor&&anchor!==host)host.insertBefore(bar,anchor);else host.prepend(bar);
+      bar.querySelector('#stage51090ReplacementAuditBtn')?.addEventListener('click',openModal);
+    }
+    const num=bar.querySelector('#stage51090ReplacementAuditCount');if(num)num.textContent=String(count);
+    // If DOM rerender moved/removed the host content, keep this toolbar in the current admin area.
+    if(!bar.isConnected){host.prepend(bar);}
+  }
+  function installCss(){if(document.getElementById('stage51090ReplacementAuditStyle'))return;const s=document.createElement('style');s.id='stage51090ReplacementAuditStyle';s.textContent=`
+    #stage51090ReplacementAuditToolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 12px;padding:12px 14px;border:1px solid #b9cbea;border-radius:12px;background:#f4f8ff;box-shadow:0 4px 16px rgba(15,43,82,.06)}
+    #stage51090ReplacementAuditToolbar>div{display:grid;gap:3px;color:#15345f}#stage51090ReplacementAuditToolbar small{font-size:12px;color:#64748b;font-weight:600}
+    #stage51090ReplacementAuditBtn{white-space:nowrap;font-weight:900!important}#stage51090ReplacementAuditBtn strong{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:24px;margin:0 2px;padding:0 6px;border-radius:999px;background:#17365f;color:white}
+    #stage51090ReplacementAuditModal[hidden]{display:none!important}#stage51090ReplacementAuditModal{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:18px}
+    .stage51090-backdrop{position:absolute;inset:0;background:rgba(15,23,42,.42)}.stage51090-panel{position:relative;width:min(760px,96vw);max-height:min(82vh,760px);display:flex;flex-direction:column;background:white;border-radius:16px;box-shadow:0 24px 70px rgba(15,23,42,.3);overflow:hidden}
+    .stage51090-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-bottom:1px solid #e2e8f0;background:#f8fafc}.stage51090-head>div{display:grid;gap:2px}.stage51090-head b{font-size:18px;color:#10264a}.stage51090-head small{font-size:12px;color:#64748b}
+    .stage51090-body{overflow:auto;padding:12px;display:grid;gap:8px}.stage51090-event{display:grid;grid-template-columns:32px minmax(0,1fr);gap:10px;padding:10px;border:1px solid #e2e8f0;border-radius:11px;background:#fff}.stage51090-index{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:999px;background:#edf4ff;color:#17365f;font-weight:900}.stage51090-route{display:flex;align-items:center;gap:7px;flex-wrap:wrap;color:#111827}.stage51090-route span{color:#64748b}.stage51090-aff{margin-top:3px;font-size:12px;color:#475569}.stage51090-meta{margin-top:4px;font-size:12px;color:#64748b}
+    @media(max-width:640px){#stage51090ReplacementAuditToolbar{align-items:flex-start;flex-direction:column}#stage51090ReplacementAuditToolbar button{width:100%}.stage51090-panel{width:98vw;max-height:88vh}.stage51090-route{font-size:13px}}
+  `;document.head.appendChild(s);}
+  function refresh(){try{installCss();ensureToolbar();const bar=document.getElementById('stage51090ReplacementAuditToolbar');if(bar){const n=bar.querySelector('#stage51090ReplacementAuditCount');if(n)n.textContent=String(events().length);}}catch(e){console.warn('[230MATCH] 5.10.90 교체 기록 UI 갱신 보류',e);}}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(refresh,500),{once:true});else setTimeout(refresh,100);
+  document.addEventListener('click',e=>{if(e.target.closest?.('[data-view="entry"],[data-portal-go="entry"],[href="#entry"],[data-participant-replace],#entryAdminEditSaveBtn'))setTimeout(refresh,350);},true);
+  window.addEventListener('hashchange',()=>setTimeout(refresh,250));
+  window.addEventListener('pageshow',()=>setTimeout(refresh,350));
+  setInterval(()=>{const entryActive=document.getElementById('view-entry')?.classList.contains('active');const hasEntry=document.getElementById('entryAdminList');if((entryActive||hasEntry)&&canSee())refresh();},10000);
+  window.stage51090OpenReplacementAudit=openModal;
+  console.info('[230MATCH] 5.10.90 ready · replacement audit toolbar + modal always visible in registration admin');
+})();
