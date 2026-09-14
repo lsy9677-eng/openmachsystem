@@ -7655,9 +7655,13 @@ function currentPodium(){
   const rounds=state.draw?.rounds||{};
   const final=(rounds[2]||[])[0]||null;
   const semis=rounds[4]||[];
-  const champion=state.operation?.champion||final?.winner||null;
-  const runnerUp=final?.status==='completed'?resultLoser(final):null;
-  const thirds=semis.filter(m=>m?.status==='completed').map(resultLoser).filter(Boolean);
+  // 5.10.94: 현재 대회 입상 결과는 실제 본선 결과만 기준으로 표시한다.
+  // state.operation.champion 은 테스트/리허설/이전 운영 과정의 값이 남을 수 있으므로
+  // 결승이 완료되기 전에는 우승자로 사용하지 않는다.
+  const finalCompleted=final?.status==='completed'&&Boolean(final?.winner);
+  const champion=finalCompleted?final.winner:null;
+  const runnerUp=finalCompleted?resultLoser(final):null;
+  const thirds=semis.filter(m=>m?.status==='completed'&&m?.winner).map(resultLoser).filter(Boolean);
   return {champion:resultTeamName(champion),runnerUp:resultTeamName(runnerUp),thirds:[...new Set(thirds.map(resultTeamName).filter(Boolean))]};
 }
 function normalizeResultArchive(item){
@@ -23845,3 +23849,5 @@ console.log('[230MATCH] 5.10.84 ready · same-origin notice image attachment dow
   window.stage51090OpenReplacementAudit=openModal;
   console.info('[230MATCH] 5.10.90 ready · replacement audit toolbar + modal always visible in registration admin');
 })();
+
+console.info('[230MATCH] 5.10.94 ready · current tournament podium requires official completed main-draw results');
