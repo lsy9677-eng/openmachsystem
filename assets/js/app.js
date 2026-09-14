@@ -9045,7 +9045,7 @@ function stage51038FieldQuarterFinalPage(plan){
   parts.push(`<line x1="${mid-185}" y1="${y2}" x2="${mid+185}" y2="${y2}" stroke="#b8860b" stroke-width="3"/>`);
   parts.push(`<text x="${mid}" y="${y2-18}" text-anchor="middle" font-size="20" font-weight="900" fill="#9a6700">🏆 우승팀</text>`);
   return `<section class="stage51038-field-page stage51038-field-final-page">
-    <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="현장용 본선 마무리 대진표">${parts.join('')}</svg>
+    <svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="현장용 본선 마무리 대진표">${parts.join('')}</svg>
     <div class="stage51038-field-page-foot">230MATCH · 현장 수기 보조용 · ${plan.total}/${plan.total}장</div>
   </section>`;
 }
@@ -9157,19 +9157,19 @@ function stage51038FieldPageSvg(plan,page,slots){
   // 최종 입상결과는 결승 옆에 단 한 번만 표시하며 미확정 시에는 수기 기입용 공란으로 둔다.
   const resultPage=plan.size===64?page.index===1:plan.size>=128?page.index===2:false;
   if(resultPage){
-    const bx=W-422,by=66,bw=386,bh=124;
+    const bx=W-500,by=64,bw=458,bh=176;
     const thirdA=officialThirds[0]||'';
     const thirdB=officialThirds[1]||'';
-    parts.push(`<rect x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="10" fill="#fbfdff" stroke="#9fb2c9" stroke-width="1.4"/>`);
-    parts.push(`<text x="${bx+16}" y="${by+22}" font-size="13.5" font-weight="900" fill="#17365f">최종 입상 결과</text>`);
-    parts.push(`<text x="${bx+18}" y="${by+47}" font-size="12" font-weight="800" fill="#334155">우승  ${writeLine(officialChampion,'________________________')}</text>`);
-    parts.push(`<text x="${bx+18}" y="${by+69}" font-size="12" font-weight="800" fill="#334155">준우승  ${writeLine(officialRunner,'______________________')}</text>`);
-    parts.push(`<text x="${bx+18}" y="${by+91}" font-size="12" font-weight="800" fill="#334155">공동3위①  ${writeLine(thirdA,'____________________')}</text>`);
-    parts.push(`<text x="${bx+18}" y="${by+113}" font-size="12" font-weight="800" fill="#334155">공동3위②  ${writeLine(thirdB,'____________________')}</text>`);
+    parts.push(`<rect x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="12" fill="#fbfdff" stroke="#9fb2c9" stroke-width="1.6"/>`);
+    parts.push(`<text x="${bx+18}" y="${by+26}" font-size="15.5" font-weight="900" fill="#17365f">최종 입상 결과</text>`);
+    parts.push(`<text x="${bx+18}" y="${by+58}" font-size="14.5" font-weight="900" fill="#334155">우승      ${writeLine(officialChampion,'______________________________')}</text>`);
+    parts.push(`<text x="${bx+18}" y="${by+88}" font-size="14.5" font-weight="900" fill="#334155">준우승    ${writeLine(officialRunner,'____________________________')}</text>`);
+    parts.push(`<text x="${bx+18}" y="${by+118}" font-size="14.5" font-weight="900" fill="#334155">공동3위① ${writeLine(thirdA,'__________________________')}</text>`);
+    parts.push(`<text x="${bx+18}" y="${by+148}" font-size="14.5" font-weight="900" fill="#334155">공동3위② ${writeLine(thirdB,'__________________________')}</text>`);
   }
 
   return `<section class="stage51038-field-page">
-    <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="현장용 본선 대진표 ${page.index+1}장" shape-rendering="geometricPrecision" text-rendering="geometricPrecision">${parts.join('')}</svg>
+    <svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="현장용 본선 대진표 ${page.index+1}장" shape-rendering="geometricPrecision" text-rendering="geometricPrecision">${parts.join('')}</svg>
   </section>`;
 }
 function printFieldBracketHtml(){
@@ -9521,37 +9521,51 @@ async function saveRichPrintPreviewPng(doc){
   if(doc.target==='bracket-field'){
     const pageEls=[...document.querySelectorAll('#printPreview .stage51038-field-page')];
     if(!pageEls.length)throw new Error('현장용 대진표 페이지를 찾지 못했습니다.');
-    notice(`A3 페이지별 고화질 PNG ${pageEls.length}장을 생성하고 있습니다. 잠시만 기다려 주세요.`,'info');
+    notice(`현장용 본선 대진표 PNG ${pageEls.length}장을 생성하고 있습니다. 잠시만 기다려 주세요.`,'info');
     const base=stage51045PrintFileBase(doc.label);
+    const targetSize=doc.paper==='a3'
+      ?(doc.orientation==='portrait'?{width:3508,height:4961}:{width:4961,height:3508})
+      :(doc.orientation==='portrait'?{width:2480,height:3508}:{width:3508,height:2480});
+    const svgToCanvas=async(svgEl,outWidth,outHeight)=>{
+      const vb=(svgEl.getAttribute('viewBox')||'').trim().split(/\s+/).map(Number);
+      const vbW=Number(vb[2])||1540;
+      const vbH=Number(vb[3])||1000;
+      const copy=svgEl.cloneNode(true);
+      copy.setAttribute('xmlns','http://www.w3.org/2000/svg');
+      copy.setAttribute('width',String(vbW));
+      copy.setAttribute('height',String(vbH));
+      copy.setAttribute('viewBox',`0 0 ${vbW} ${vbH}`);
+      copy.setAttribute('preserveAspectRatio','none');
+      const xml=new XMLSerializer().serializeToString(copy);
+      const blob=new Blob([xml],{type:'image/svg+xml;charset=utf-8'});
+      const url=URL.createObjectURL(blob);
+      try{
+        const img=await new Promise((resolve,reject)=>{
+          const im=new Image();
+          im.onload=()=>resolve(im);
+          im.onerror=()=>reject(new Error('SVG 페이지 이미지를 불러오지 못했습니다.'));
+          im.src=url;
+        });
+        const canvas=document.createElement('canvas');
+        canvas.width=outWidth;
+        canvas.height=outHeight;
+        const ctx=canvas.getContext('2d');
+        ctx.fillStyle='#ffffff';
+        ctx.fillRect(0,0,outWidth,outHeight);
+        ctx.imageSmoothingEnabled=true;
+        ctx.imageSmoothingQuality='high';
+        ctx.drawImage(img,0,0,outWidth,outHeight);
+        return canvas;
+      }finally{setTimeout(()=>URL.revokeObjectURL(url),1000);}
+    };
     for(let i=0;i<pageEls.length;i++){
-      const el=pageEls[i];
-      const rect=el.getBoundingClientRect();
-      const width=Math.max(1200,Math.ceil(el.scrollWidth||rect.width||1600));
-      const height=Math.max(800,Math.ceil(el.scrollHeight||rect.height||1000));
-      const scale=captureScale(width,height);
-      const canvas=await html2canvas(el,{
-        backgroundColor:'#ffffff',
-        scale,
-        width,
-        height,
-        windowWidth:Math.max(width,1600),
-        windowHeight:Math.max(height,1000),
-        scrollX:0,
-        scrollY:0,
-        useCORS:true,
-        allowTaint:false,
-        logging:false,
-        imageTimeout:15000,
-        removeContainer:true,
-        onclone:docClone=>{
-          const pages=docClone.querySelectorAll('.stage51038-field-page');
-          pages.forEach(page=>{page.style.boxShadow='none';page.style.border='0';page.style.margin='0';});
-        }
-      });
+      const svg=pageEls[i].querySelector('svg');
+      if(!svg)throw new Error(`${i+1}번째 페이지의 SVG를 찾지 못했습니다.`);
+      const canvas=await svgToCanvas(svg,targetSize.width,targetSize.height);
       await downloadCanvasBlob(canvas,`${base}_${String(i+1).padStart(2,'0')}of${pageEls.length}_고화질.png`);
-      await new Promise(r=>setTimeout(r,180));
+      await new Promise(r=>setTimeout(r,120));
     }
-    notice(`A3 페이지별 고화질 PNG 저장 완료 · 총 ${pageEls.length}장`,'success');
+    notice(`현장용 본선 대진표 PNG 저장 완료 · 총 ${pageEls.length}장`,'success');
     return true;
   }
 
@@ -21687,12 +21701,8 @@ console.info('[230MATCH] 5.10.34 ready · notice numbers + important/pinned badg
     st.textContent=`
       .stage51038-field-intro{display:none!important}
       .stage51038-field-print-sheet{padding:0!important;background:#eef2f7!important}
-      #printPreview .stage51038-field-print-sheet{box-sizing:border-box!important;margin:0 auto!important;overflow:hidden!important;display:block!important;background:#fff!important}
-      #printPreview .stage51038-field-print-sheet.paper-a3.landscape{width:min(100%,1380px)!important;min-width:1380px!important}
-      #printPreview .stage51038-field-print-sheet.paper-a4.landscape{width:min(100%,1120px)!important;min-width:1120px!important}
-      #printPreview .stage51038-field-pages{width:100%!important}
       .stage51038-field-pages{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 2px;align-items:start}
-      .stage51038-field-page{position:relative;display:block;width:100%;aspect-ratio:420/297;background:#fff;border:1px solid #cbd5e1;box-shadow:0 4px 18px rgba(15,23,42,.10);overflow:hidden}
+      .stage51038-field-page{position:relative;width:100%;aspect-ratio:420/297;background:#fff;border:1px solid #cbd5e1;box-shadow:0 4px 18px rgba(15,23,42,.10);overflow:hidden}
       .stage51038-field-page:nth-child(2n+1){border-right:2px dashed #17365f}
       .stage51038-field-page:nth-child(2n){border-left:0}
       @media(max-width:900px){.stage51038-field-pages{grid-template-columns:1fr;gap:12px}.stage51038-field-page:nth-child(n){border:1px solid #cbd5e1}}
