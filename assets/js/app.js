@@ -9045,7 +9045,7 @@ function stage51038FieldQuarterFinalPage(plan){
   parts.push(`<line x1="${mid-185}" y1="${y2}" x2="${mid+185}" y2="${y2}" stroke="#b8860b" stroke-width="3"/>`);
   parts.push(`<text x="${mid}" y="${y2-18}" text-anchor="middle" font-size="20" font-weight="900" fill="#9a6700">🏆 우승팀</text>`);
   return `<section class="stage51038-field-page stage51038-field-final-page">
-    <svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="현장용 본선 마무리 대진표">${parts.join('')}</svg>
+    <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="현장용 본선 마무리 대진표">${parts.join('')}</svg>
     <div class="stage51038-field-page-foot">230MATCH · 현장 수기 보조용 · ${plan.total}/${plan.total}장</div>
   </section>`;
 }
@@ -9169,7 +9169,7 @@ function stage51038FieldPageSvg(plan,page,slots){
   }
 
   return `<section class="stage51038-field-page">
-    <svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="현장용 본선 대진표 ${page.index+1}장" shape-rendering="geometricPrecision" text-rendering="geometricPrecision">${parts.join('')}</svg>
+    <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="현장용 본선 대진표 ${page.index+1}장" shape-rendering="geometricPrecision" text-rendering="geometricPrecision">${parts.join('')}</svg>
   </section>`;
 }
 function printFieldBracketHtml(){
@@ -21687,8 +21687,12 @@ console.info('[230MATCH] 5.10.34 ready · notice numbers + important/pinned badg
     st.textContent=`
       .stage51038-field-intro{display:none!important}
       .stage51038-field-print-sheet{padding:0!important;background:#eef2f7!important}
+      #printPreview .stage51038-field-print-sheet{box-sizing:border-box!important;margin:0 auto!important;overflow:hidden!important;display:block!important;background:#fff!important}
+      #printPreview .stage51038-field-print-sheet.paper-a3.landscape{width:min(100%,1380px)!important;min-width:1380px!important}
+      #printPreview .stage51038-field-print-sheet.paper-a4.landscape{width:min(100%,1120px)!important;min-width:1120px!important}
+      #printPreview .stage51038-field-pages{width:100%!important}
       .stage51038-field-pages{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 2px;align-items:start}
-      .stage51038-field-page{position:relative;width:100%;aspect-ratio:420/297;background:#fff;border:1px solid #cbd5e1;box-shadow:0 4px 18px rgba(15,23,42,.10);overflow:hidden}
+      .stage51038-field-page{position:relative;display:block;width:100%;aspect-ratio:420/297;background:#fff;border:1px solid #cbd5e1;box-shadow:0 4px 18px rgba(15,23,42,.10);overflow:hidden}
       .stage51038-field-page:nth-child(2n+1){border-right:2px dashed #17365f}
       .stage51038-field-page:nth-child(2n){border-left:0}
       @media(max-width:900px){.stage51038-field-pages{grid-template-columns:1fr;gap:12px}.stage51038-field-page:nth-child(n){border:1px solid #cbd5e1}}
