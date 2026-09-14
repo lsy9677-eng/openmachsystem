@@ -9473,7 +9473,7 @@ function schedulePrintPreviewRender(delay=45){
   },Math.max(0,Number(delay)||0));
 }
 function renderPrintPreview(){const preview=document.getElementById('printPreview');if(!preview)return;const target=document.getElementById('printTargetSelect')?.value||'prelim';const options=document.getElementById('labelPrintOptions');if(options)options.hidden=target!=='labels';const paper=document.getElementById('printPaperSelect'),orientation=document.getElementById('printOrientationSelect'),scale=document.getElementById('printScaleSelect');if(paper&&!['bracket','bracket-field'].includes(target))paper.value='a4';if(target==='labels'){if(orientation)orientation.value='portrait';}else if(target==='prelim-assignment'){if(orientation)orientation.value='landscape';if(scale)scale.value='small';}else if(target==='bracket'){if(orientation)orientation.value='landscape';if(scale)scale.value='small';}else if(target==='bracket-field'){if(orientation)orientation.value='landscape';if(scale)scale.value='normal';}else if(target==='prize-signature'){if(orientation)orientation.value='landscape';if(scale)scale.value='normal';}const doc=buildPrintDocument();preview.innerHTML=doc.html;if(target==='bracket')window.__stage5940SyncClonedBracketConnectors?.(preview);const summary=document.getElementById('printPreviewSummary');if(summary)summary.textContent=target==='labels'?`${doc.label} · 12×40mm · A4 세로 · ${document.getElementById('labelStatusSelect')?.selectedOptions?.[0]?.textContent||''}`:target==='bracket-field'?`${doc.label} · ${doc.paper.toUpperCase()} 가로 · ${stage51038FieldPagePlan().total}장 · ${stage51040FieldMode()==='current'?'실제 대진':'테스트 빈 양식'} · 2장씩 연결형`:target==='prize-signature'?`${doc.label} · A4 가로 · 우승/준우승/3위/8강 선택 출력`:`${doc.label} · ${doc.paper.toUpperCase()} · ${doc.orientation==='landscape'?'가로':'세로'} · ${doc.tone==='mono'?'흑백':'컬러'}`;}
-function printSelectedDocument(){const doc=buildPrintDocument();const previousTitle=document.title;document.title=stage51045PrintFileBase(doc.label);let root=document.getElementById('printOutputRoot');if(!root){root=document.createElement('div');root.id='printOutputRoot';document.body.appendChild(root);}root.innerHTML=doc.html;document.body.classList.add('printing-output');let pageStyle=document.createElement('style');pageStyle.id='stage51042BracketPageRule';pageStyle.textContent=`@media print{@page{size:${doc.paper==='a3'?'A3':'A4'} ${doc.orientation==='landscape'?'landscape':'portrait'};margin:${['bracket','bracket-field','prize-signature'].includes(doc.target)?'5mm':'6mm'}}}`;document.head.appendChild(pageStyle);const cleanup=()=>{document.body.classList.remove('printing-output');root.innerHTML='';pageStyle?.remove();document.title=previousTitle;window.removeEventListener('afterprint',cleanup);};window.addEventListener('afterprint',cleanup);if(doc.target==='bracket')window.__stage5940SyncClonedBracketConnectors?.(root,()=>setTimeout(()=>window.print(),60));else setTimeout(()=>window.print(),80);}
+function printSelectedDocument(){const doc=buildPrintDocument();const previousTitle=document.title;document.title=stage51045PrintFileBase(doc.label);let root=document.getElementById('printOutputRoot');if(!root){root=document.createElement('div');root.id='printOutputRoot';document.body.appendChild(root);}root.innerHTML=doc.html;document.body.classList.add('printing-output');let pageStyle=document.createElement('style');pageStyle.id='stage51042BracketPageRule';pageStyle.textContent=`@media print{@page{size:${doc.paper==='a3'?'A3':'A4'} ${doc.orientation==='landscape'?'landscape':'portrait'};margin:${['bracket','bracket-field','prize-signature'].includes(doc.target)?'5mm':doc.target==='prelim-assignment'?'3mm':'6mm'}}}`;document.head.appendChild(pageStyle);const cleanup=()=>{document.body.classList.remove('printing-output');root.innerHTML='';pageStyle?.remove();document.title=previousTitle;window.removeEventListener('afterprint',cleanup);};window.addEventListener('afterprint',cleanup);if(doc.target==='bracket')window.__stage5940SyncClonedBracketConnectors?.(root,()=>setTimeout(()=>window.print(),60));else setTimeout(()=>window.print(),80);}
 function wrapCanvasText(ctx,text,maxWidth){const words=String(text||'').split(/\s+/),lines=[];let line='';for(const word of words){const test=line?`${line} ${word}`:word;if(ctx.measureText(test).width>maxWidth&&line){lines.push(line);line=word;}else line=test;}if(line)lines.push(line);return lines;}
 async function saveRichPrintPreviewPng(doc){
   renderPrintPreview();
@@ -23557,4 +23557,80 @@ console.log('[230MATCH] 5.10.84 ready · same-origin notice image attachment dow
   window.addEventListener('hashchange',()=>{if(location.hash.includes('print'))setTimeout(install,80)});
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,0),{once:true});else setTimeout(install,0);
   console.info('[230MATCH] 5.10.87 ready · print preview refresh/orientation/text-size controls restored');
+})();
+
+
+/* 230MATCH 5.10.88 · prelim assignment PDF one-page hard fit */
+(()=>{
+  'use strict';
+  const STYLE_ID='stage51088AssignmentPdfOnePage';
+  function install(){
+    if(document.getElementById(STYLE_ID))return;
+    const style=document.createElement('style');
+    style.id=STYLE_ID;
+    style.textContent=`
+      @media print{
+        /* A4 landscape + 3mm page margin => usable 291×204mm.
+           Keep a small rounding buffer so Chrome never pushes row 8 to page 2. */
+        body.printing-output #printOutputRoot .assignment-print-sheet.paper-a4.landscape{
+          box-sizing:border-box!important;
+          width:289mm!important;
+          height:202mm!important;
+          min-height:202mm!important;
+          max-height:202mm!important;
+          margin:0 auto!important;
+          padding:0!important;
+          overflow:hidden!important;
+          break-inside:avoid!important;
+          page-break-inside:avoid!important;
+        }
+        body.printing-output #printOutputRoot .assignment-print-sheet.paper-a4.landscape .assignment547-title{
+          margin-bottom:1.2mm!important;
+        }
+        body.printing-output #printOutputRoot .assignment-print-sheet.paper-a4.landscape .assignment547-summary{
+          margin-bottom:.8mm!important;
+          padding:.8mm 1.7mm!important;
+        }
+        body.printing-output #printOutputRoot .assignment-print-sheet.paper-a4.landscape .assignment547-grid{
+          flex:1 1 auto!important;
+          min-height:0!important;
+          height:0!important;
+          grid-template-columns:repeat(4,minmax(0,1fr))!important;
+          grid-template-rows:repeat(8,minmax(0,1fr))!important;
+          grid-auto-rows:0!important;
+          gap:.75mm!important;
+          overflow:hidden!important;
+        }
+        body.printing-output #printOutputRoot .assignment-print-sheet.paper-a4.landscape .assignment547-card{
+          min-height:0!important;
+          height:100%!important;
+          overflow:hidden!important;
+          break-inside:avoid!important;
+          page-break-inside:avoid!important;
+        }
+        body.printing-output #printOutputRoot .assignment-print-sheet.paper-a4.landscape .assignment547-card .assignment-group-head{
+          padding:.38mm .9mm!important;
+        }
+        body.printing-output #printOutputRoot .assignment-print-sheet.paper-a4.landscape .assignment547-card ol{
+          padding:.2mm .9mm!important;
+        }
+        body.printing-output #printOutputRoot .assignment-print-sheet.paper-a4.landscape .assignment547-card li{
+          min-height:2.75mm!important;
+          line-height:1!important;
+        }
+        body.printing-output #printOutputRoot .assignment-print-sheet.paper-a4.landscape .assignment547-card .assignment-order{
+          min-height:2.5mm!important;
+          padding:.2mm .9mm .3mm!important;
+          line-height:1!important;
+        }
+        body.printing-output #printOutputRoot .assignment-print-sheet.paper-a4.landscape + *{
+          break-before:auto!important;
+          page-break-before:auto!important;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
+  console.info('[230MATCH] 5.10.88 ready · prelim assignment A4 landscape PDF forced to one page');
 })();
