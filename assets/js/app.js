@@ -6813,12 +6813,29 @@ async function submitPublicApplication(){
   }
 }
 
+function stage51089ReplacementIdentityMatch(item){
+  if(!item||!currentAuthUser)return false;
+  if(!(item.replacedAt||item.replacementPendingOwnerClaim||Array.isArray(item.replacementHistory)&&item.replacementHistory.length))return false;
+  const profile=typeof v3252ProfileDefaults==='function'?v3252ProfileDefaults():(currentAuthUser.appProfile?.registrationDefaults||currentAuthUser.appProfile||{});
+  const name=myMatchNormalize(profile?.name||currentAuthUser.displayName||'');
+  const phone=String(profile?.phone||currentAuthUser.appProfile?.phone||'').replace(/\D/g,'');
+  if(!name||phone.length<10)return false;
+  return entryApplicationPlayers(item).some(player=>myMatchNormalize(player?.name||'')===name&&String(player?.phone||'').replace(/\D/g,'')===phone);
+}
+function stage51089ApplicationOwnedByCurrentUser(item){
+  if(!item||!currentAuthUser)return false;
+  const uid=String(currentAuthUser.uid||''),owner=String(item.ownerUid||''),replacer=String(item.replacedByUid||item.replacementHistory?.[0]?.byUid||'');
+  // 관리자 대리 교체 기록이 남은 신청은 교체 관리자 본인의 신청으로 보지 않는다.
+  if(owner&&owner===uid&&replacer&&replacer===uid&&(item.replacedAt||item.replacementPendingOwnerClaim))return false;
+  if(owner&&owner===uid)return true;
+  return stage51089ReplacementIdentityMatch(item);
+}
 function entryOwnedRows(){
   if(!currentAuthUser)return [];
   const ctx=registrationContext();
   const rows=registrationCloudReady?registrationAdminRowsByDivision():(state.portal?.applications||[]);
   return rows.filter(a=>
-    String(a.ownerUid||'')===String(currentAuthUser.uid||'') &&
+    stage51089ApplicationOwnedByCurrentUser(a) &&
     String(a.tournamentId||ctx.tournamentId)===String(ctx.tournamentId)
   ).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
 }
@@ -6866,7 +6883,7 @@ function currentUserHasActiveEntry(){
   const ctx=registrationContext();
   const rows=registrationCloudReady?registrationCloudRows:(state.portal?.applications||[]);
   return rows.some(a=>
-    String(a.ownerUid||'')===String(currentAuthUser.uid||'') &&
+    stage51089ApplicationOwnedByCurrentUser(a) &&
     String(a.tournamentId||ctx.tournamentId)===String(ctx.tournamentId||'') &&
     (
       !a.divisionId ||
@@ -7324,7 +7341,7 @@ async function processEntryApplication(id,action){
 
 function editEntryApplication(id){
   const item=(registrationCloudReady?registrationCloudRows:(state.portal?.applications||[])).find(a=>a.id===id);
-  const mine=Boolean(currentAuthUser&&String(item?.ownerUid||'')===String(currentAuthUser.uid||''));
+  const mine=stage51089ApplicationOwnedByCurrentUser(item);
   if(!item||!mine||!['approved','reserve'].includes(item.status)||item.cancelRequestStatus==='requested'){
     notice('본인의 참가 신청만 수정할 수 있습니다. 취소 승인 대기 중에는 수정할 수 없습니다.','error');return;
   }
@@ -7349,7 +7366,7 @@ function editEntryApplication(id){
 async function saveEntrySelfEdit(){
   const id=String(document.getElementById('entrySelfEditId')?.value||'');
   const item=(registrationCloudReady?registrationCloudRows:(state.portal?.applications||[])).find(a=>a.id===id);
-  const mine=Boolean(currentAuthUser&&String(item?.ownerUid||'')===String(currentAuthUser.uid||''));
+  const mine=stage51089ApplicationOwnedByCurrentUser(item);
   const fb=document.getElementById('entrySelfEditFeedback');
   const feedback=(msg,type='error')=>{if(fb){fb.hidden=false;fb.className=`notice ${type} entry-modal-feedback`;fb.textContent=msg;}};
   if(!item||!mine)return feedback('본인의 참가 신청을 찾을 수 없습니다.');
@@ -7371,6 +7388,7 @@ async function saveEntrySelfEdit(){
   item.representativeName=representative.name;
   item.smsTargetMode=smsTargetMode;
   item.memo=String(document.getElementById('entrySelfEditMemo')?.value||'').trim();
+  if(stage51089ReplacementIdentityMatch(item)){item.ownerUid=String(currentAuthUser?.uid||'');item.replacementPendingOwnerClaim=false;item.replacementClaimedAt=new Date().toISOString();item.replacementClaimedByUid=String(currentAuthUser?.uid||'');}
   item.updatedAt=new Date().toISOString();
   const saveBtn=document.getElementById('entrySelfEditSaveBtn');
   if(saveBtn){saveBtn.disabled=true;saveBtn.textContent='저장 중...';}
@@ -10927,7 +10945,7 @@ async function stage3265SaveAdminEdit(){
   if(replaceMode){
     const at=new Date().toISOString();
     const history=Array.isArray(next.replacementHistory)?next.replacementHistory:[];
-    history.unshift({at,byUid:String(currentAuthUser?.uid||''),byName:String(authUserLabel?.()||'관리자'),previousOwnerUid:String(item.ownerUid||''),previousTeamName:String(item.teamName||''),previousAffiliation:String(item.affiliation||''),previousPlayers:structuredClone(entryApplicationPlayers(item))});
+    history.unshift({at,byUid:String(currentAuthUser?.uid||''),byName:String(authUserLabel?.()||'관리자'),previousOwnerUid:String(item.ownerUid||''),previousTeamName:String(item.teamName||''),previousAffiliation:String(item.affiliation||''),previousPlayers:structuredClone(entryApplicationPlayers(item)),newTeamName:String(next.teamName||''),newAffiliation:String(next.affiliation||''),newPlayers:structuredClone(players)});
     next.replacementHistory=history.slice(0,20);next.ownerUid='';next.replacementPendingOwnerClaim=true;next.replacedAt=at;next.replacedByUid=String(currentAuthUser?.uid||'');next.replacedByName=String(authUserLabel?.()||'관리자');
   }
 
@@ -20932,7 +20950,7 @@ console.info('[230MATCH] 5.10.7 ready · safe backup restore available');
   function ownEditableRows(){
     if(!currentAuthUser)return[];
     const ctx=registrationContext?.()||{},rows=registrationCloudReady?registrationCloudRows:(state.portal?.applications||[]);
-    return (rows||[]).filter(r=>String(r?.ownerUid||'')===String(currentAuthUser.uid||'')&&
+    return (rows||[]).filter(r=>stage51089ApplicationOwnedByCurrentUser(r)&&
       String(r?.tournamentId||ctx.tournamentId||'')===String(ctx.tournamentId||'')&&
       ['approved','reserve'].includes(String(r?.status||''))&&r?.cancelRequestStatus!=='requested'&&
       (!r?.divisionId||!ctx.divisionId||String(r.divisionId)===String(ctx.divisionId)||String(r?.tournamentDivision||r?.divisionName||'').trim()===String(ctx.divisionName||'').trim()));
@@ -23633,4 +23651,63 @@ console.log('[230MATCH] 5.10.84 ready · same-origin notice image attachment dow
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
   console.info('[230MATCH] 5.10.88 ready · prelim assignment A4 landscape PDF forced to one page');
+})();
+
+
+/* 230MATCH 5.10.89 · admin replacement ownership separation + replacement audit */
+(function stage51089ReplacementOwnershipSeparation(){
+  const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  function rows(){try{return typeof simpleRegistrationRows==='function'?simpleRegistrationRows():[];}catch(_e){return[];}}
+  function isLegacyAdminOwnedReplacement(r){
+    if(!r||!(r.replacedAt||Array.isArray(r.replacementHistory)&&r.replacementHistory.length))return false;
+    const owner=String(r.ownerUid||''),replacer=String(r.replacedByUid||r.replacementHistory?.[0]?.byUid||'');
+    return Boolean(owner&&replacer&&owner===replacer);
+  }
+  let repairing=false,repaired=false;
+  async function repairLegacy(){
+    if(repairing||repaired||!currentAuthUser||!canOperate?.())return;
+    if(!registrationCloudReady)return;
+    const targets=rows().filter(r=>isLegacyAdminOwnedReplacement(r));
+    if(!targets.length){repaired=true;return;}
+    repairing=true;
+    let changed=0;
+    try{
+      for(const row of targets){
+        const next=structuredClone(row);
+        next.ownerUid='';next.replacementPendingOwnerClaim=true;next.ownershipSeparatedAt=next.ownershipSeparatedAt||new Date().toISOString();next.updatedAt=new Date().toISOString();
+        const saved=await saveRegistrationCloud(next);
+        const local=(state.portal?.applications||[]).find(a=>String(a?.id||'')===String(saved.id||''));if(local)Object.assign(local,structuredClone(saved));
+        const team=(state.teams||[]).find(t=>String(t?.registrationId||t?.applicationId||'')===String(saved.id||''));
+        if(team){team.ownerUid='';try{stage51061ReplaceIdentitySnapshot(team,saved);}catch(_e){}}
+        changed++;
+      }
+      if(changed){try{syncCurrentDivisionRuntime?.();safePersistState('참가자 교체 소유권 분리');}catch(_e){}renderEntrySelfManager?.();renderParticipantManager?.();console.info('[230MATCH] 5.10.89 기존 관리자 교체 신청 소유권 분리',changed);}
+      repaired=true;
+    }catch(error){console.warn('[230MATCH] 5.10.89 교체 소유권 분리 보류',error);}
+    finally{repairing=false;}
+  }
+  function replacementEvents(){
+    const out=[];
+    for(const row of rows()){
+      const history=Array.isArray(row?.replacementHistory)?row.replacementHistory:[];
+      if(history.length){history.forEach((h,index)=>out.push({at:h.at||row.replacedAt||'',byName:h.byName||row.replacedByName||'관리자',before:h.previousTeamName||'',after:h.newTeamName||(index===0?row.teamName:'교체 후 참가팀'),registrationId:row.id||''}));}
+      else if(row?.replacedAt)out.push({at:row.replacedAt,byName:row.replacedByName||'관리자',before:'이전 참가팀',after:row.teamName||'',registrationId:row.id||''});
+    }
+    return out.sort((a,b)=>String(b.at||'').localeCompare(String(a.at||''))).slice(0,30);
+  }
+  function renderLog(){
+    if(!canOperate?.())return;
+    const root=document.getElementById('participantRosterList');if(!root)return;
+    let box=document.getElementById('stage51089ReplacementAudit');
+    if(!box){box=document.createElement('details');box.id='stage51089ReplacementAudit';box.style.cssText='margin:0 0 12px;padding:10px 12px;border:1px solid #cbd5e1;border-radius:12px;background:#f8fafc';root.before(box);}
+    const events=replacementEvents();
+    box.innerHTML=`<summary style="cursor:pointer;font-weight:900;color:#17365f">참가자 교체 기록 <span style="font-weight:700;color:#64748b">${events.length}건</span></summary><div style="margin-top:8px;display:grid;gap:6px">${events.length?events.map(e=>`<div style="padding:7px 9px;border:1px solid #e2e8f0;border-radius:8px;background:white;font-size:12px"><b>${esc(e.before||'이전 참가팀')}</b> → <b>${esc(e.after||'교체 참가팀')}</b><br><span style="color:#64748b">${esc(e.at?new Date(e.at).toLocaleString('ko-KR'):'시간 미상')} · ${esc(e.byName||'관리자')}</span></div>`).join(''):'<div style="color:#64748b;font-size:12px">교체 기록이 없습니다.</div>'}</div>`;
+  }
+  const baseRender=renderParticipantManager;
+  renderParticipantManager=function(){const result=baseRender.apply(this,arguments);requestAnimationFrame(renderLog);return result;};
+  const tryRepair=()=>{repairLegacy();renderEntrySelfManager?.();};
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(tryRepair,600),{once:true});else setTimeout(tryRepair,600);
+  window.addEventListener('pageshow',()=>setTimeout(tryRepair,500));
+  document.addEventListener('click',e=>{if(e.target.closest?.('[data-view="participants"],#participantManagerNav,[href="#participants"]'))setTimeout(()=>{renderLog();repairLegacy();},200);},true);
+  console.info('[230MATCH] 5.10.89 ready · replacement ownership separated + participant identity access + replacement audit');
 })();
