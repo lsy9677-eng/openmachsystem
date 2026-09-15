@@ -14644,7 +14644,7 @@ function stage51022RestoreMainDraft({quiet=false}={}){
     notice('취소·환불 요청이 접수되었습니다.','success');
   }
   function renderRefundAdmin(){
-    return;ensureRefundState();const host=document.querySelector('#view-entry .entry-admin-toolbar')?.parentElement||document.querySelector('#view-entry');if(!host)return;
+    if(!(typeof canOperate==='function'&&canOperate()))return;ensureRefundState();const host=document.querySelector('#view-entry .entry-admin-toolbar')?.parentElement||document.querySelector('#view-entry');if(!host)return;
     let panel=document.getElementById('stage3561RefundAdmin');if(!panel){panel=document.createElement('section');panel.id='stage3561RefundAdmin';panel.className='stage3561-refund-panel';host.prepend(panel);}
     const s=state.portal.refundSmsSettings,rows=state.portal.refundRequests.filter(r=>['requested','processing'].includes(r.status));
     panel.innerHTML=`<h3>취소·환불 관리 <small>${rows.length}건</small></h3><div class="stage3561-refund-toolbar"><label>문자 방식<select data-refund-setting="mode"><option value="aligo">알리고 자동</option><option value="phone">휴대폰 문자앱</option><option value="none">문자 사용 안 함</option></select></label><label>환불 담당자<input data-refund-setting="adminName" value="${esc(s.adminName||'')}"></label><label>담당자 전화번호<input data-refund-setting="adminPhone" value="${esc(s.adminPhone||'')}"></label><button type="button" class="btn btn-secondary btn-small" data-refund-settings-save>설정 저장</button></div>${rows.map(r=>{const item=findApplication(r.applicationId);return `<article class="stage3561-refund-card"><span class="stage3561-badge">${r.status==='processing'?'환불 처리 중':'취소 요청'}</span><strong>${esc(item?.teamName||'신청 정보 없음')}</strong><small>${esc(item?.tournamentName||'')} ${item?.tournamentDivision?`· ${esc(item.tournamentDivision)}`:''}</small><div>${Number(r.amount||0).toLocaleString()}원 · ${esc(r.bank)} ${esc(r.account)} · ${esc(r.accountHolder)}</div><div>입금자 ${esc(r.depositorName)} · 사유 ${esc(r.reason)}</div><div class="stage3561-refund-actions">${r.status==='requested'?`<button type="button" class="btn btn-light btn-small" data-refund-processing="${r.id}">처리 중</button>`:''}<button type="button" class="btn btn-primary btn-small" data-refund-complete="${r.id}">환불 완료 승인</button><button type="button" class="btn btn-danger-outline btn-small" data-refund-reject="${r.id}">요청 반려</button></div></article>`}).join('')||'<div class="portal-empty">처리할 취소·환불 요청이 없습니다.</div>'}`;
@@ -23851,3 +23851,74 @@ console.log('[230MATCH] 5.10.84 ready · same-origin notice image attachment dow
 })();
 
 console.info('[230MATCH] 5.10.94 ready · current tournament podium requires official completed main-draw results');
+
+
+/* 230MATCH 5.10.95 · cancellation request visibility recovery */
+(function stage51095CancellationRequestVisibility(){
+  const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  function canSee(){try{return Boolean(typeof canOperate==='function'&&canOperate());}catch(_e){return false;}}
+  function applicationRows(){try{return typeof simpleRegistrationRows==='function'?simpleRegistrationRows():[];}catch(_e){return[];}}
+  function standardRows(){return applicationRows().filter(a=>a?.cancelRequestStatus==='requested');}
+  function refundRows(){
+    try{
+      const rows=Array.isArray(state?.portal?.refundRequests)?state.portal.refundRequests:[];
+      return rows.filter(r=>['requested','processing'].includes(String(r?.status||'')));
+    }catch(_e){return[];}
+  }
+  function installCss(){
+    if(document.getElementById('stage51095CancelStyle'))return;
+    const s=document.createElement('style');s.id='stage51095CancelStyle';s.textContent=`
+      #stage51095CancelPanel{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 12px;padding:12px 14px;border:1px solid #f2b8b5;border-radius:12px;background:#fff7f6;box-shadow:0 4px 16px rgba(127,29,29,.06)}
+      #stage51095CancelPanel.stage51095-zero{border-color:#d7e1ee;background:#f8fbff}
+      #stage51095CancelPanel .stage51095-copy{display:grid;gap:3px;color:#7f1d1d}#stage51095CancelPanel.stage51095-zero .stage51095-copy{color:#17365f}
+      #stage51095CancelPanel small{font-size:12px;color:#64748b;font-weight:600}.stage51095-actions{display:flex;gap:8px;flex-wrap:wrap}
+      .stage51095-count{display:inline-flex;align-items:center;justify-content:center;min-width:25px;height:25px;padding:0 7px;margin-left:4px;border-radius:999px;background:#b42318;color:#fff;font-weight:900}
+      .stage51095-zero .stage51095-count{background:#64748b}
+      #stage3561RefundAdmin{scroll-margin-top:100px}.cancel-request-box{scroll-margin-top:110px}
+      @media(max-width:680px){#stage51095CancelPanel{align-items:flex-start;flex-direction:column}.stage51095-actions{width:100%}.stage51095-actions button{flex:1 1 140px}}
+    `;document.head.appendChild(s);
+  }
+  function ensurePanel(){
+    if(!canSee())return null;
+    const entry=document.getElementById('entryAdminList');
+    const host=entry?.parentElement||document.querySelector('#view-entry .entry-admin-toolbar')?.parentElement||document.querySelector('#view-entry');
+    if(!host)return null;
+    let panel=document.getElementById('stage51095CancelPanel');
+    if(!panel){
+      panel=document.createElement('section');panel.id='stage51095CancelPanel';
+      const anchor=entry||host.firstChild;if(anchor&&anchor!==host)host.insertBefore(panel,anchor);else host.prepend(panel);
+      panel.addEventListener('click',e=>{
+        const standard=e.target.closest?.('[data-stage51095-standard]');
+        if(standard){
+          try{entryAdminQuickFilter='cancel';}catch(_e){}
+          try{renderApplicationPortal();}catch(_e){}
+          setTimeout(()=>document.querySelector('#entryAdminList .cancel-request-box')?.scrollIntoView({behavior:'smooth',block:'center'}),80);
+          return;
+        }
+        const refund=e.target.closest?.('[data-stage51095-refund]');
+        if(refund){
+          try{renderRefundAdmin();}catch(_e){}
+          setTimeout(()=>document.getElementById('stage3561RefundAdmin')?.scrollIntoView({behavior:'smooth',block:'start'}),80);
+        }
+      });
+    }
+    return panel;
+  }
+  function render(){
+    if(!canSee())return;
+    installCss();
+    const panel=ensurePanel();if(!panel)return;
+    const standard=standardRows(),refund=refundRows(),total=standard.length+refund.length;
+    panel.classList.toggle('stage51095-zero',total===0);
+    panel.innerHTML=`<div class="stage51095-copy"><b>취소 요청 관리 · 총 ${total}건</b><small>${total?'처리하지 않은 취소 요청이 있습니다. 문자 알림을 놓쳐도 여기서 계속 확인할 수 있습니다.':'현재 처리할 취소 요청이 없습니다.'}</small></div><div class="stage51095-actions"><button type="button" class="btn ${standard.length?'btn-danger-outline':'btn-light'}" data-stage51095-standard>취소요청 <span class="stage51095-count">${standard.length}</span></button>${refund.length?`<button type="button" class="btn btn-danger-outline" data-stage51095-refund>취소·환불 <span class="stage51095-count">${refund.length}</span></button>`:''}</div>`;
+    try{renderRefundAdmin();}catch(_e){}
+  }
+  const previousRender=renderApplicationPortal;
+  renderApplicationPortal=function(){const result=previousRender.apply(this,arguments);setTimeout(render,0);return result;};
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(render,450),{once:true});else setTimeout(render,150);
+  document.addEventListener('click',e=>{if(e.target.closest?.('[data-view="entry"],[data-portal-go="entry"],[href="#entry"],#entryNav'))setTimeout(render,250);},true);
+  window.addEventListener('hashchange',()=>setTimeout(render,220));
+  window.addEventListener('pageshow',()=>setTimeout(render,300));
+  setInterval(()=>{const active=document.getElementById('view-entry')?.classList.contains('active')||location.hash.includes('entry');if(active&&canSee())render();},10000);
+  console.info('[230MATCH] 5.10.95 ready · cancellation request admin visibility restored');
+})();
