@@ -7324,7 +7324,7 @@ function renderApplicationPortal(){
       const fixedNo=adminSeq.get(String(a.id||''))||'-';
       const created=entryDateTime(a.createdAt);
       const paymentTime=a.paidAt?`<small class="entry-payment-time">${portalEscape(entryDateTime(a.paidAt))}</small>`:'';
-      const cancelBox=a.cancelRequestStatus==='requested'?`<div class="cancel-request-box"><strong>취소 신청</strong> · ${portalEscape(a.cancelReason||'-')} · ${portalEscape(a.refundBank||'')} ${portalEscape(a.refundAccount||'')} ${portalEscape(a.refundAccountHolder||'')}<div class="cancel-request-actions"><button class="btn btn-danger-outline btn-small" data-entry-cancel-approve="${a.id}">취소 승인${a.paid?'·환불완료':''}</button><button class="btn btn-light btn-small" data-entry-cancel-reject="${a.id}">취소 반려</button></div></div>`:'';
+      const cancelBox=a.cancelRequestStatus==='requested'?`<div class="cancel-request-box"><strong>취소 요청</strong> · ${portalEscape(a.cancelReason||'-')} · ${portalEscape(a.refundBank||'')} ${portalEscape(a.refundAccount||'')} ${portalEscape(a.refundAccountHolder||'')}<div class="cancel-request-actions"><button class="btn btn-danger-outline btn-small" data-entry-cancel-approve="${a.id}">취소완료 처리</button><button class="btn btn-light btn-small" data-entry-cancel-reject="${a.id}">취소 반려</button></div></div>`:'';
       return `<article class="entry-admin-row simple-registration stage5963-admin-compact ${a.paid?'payment-paid':'payment-wait'}"><span class="stage5963-admin-no">${fixedNo}</span><div class="entry-main"><strong>${portalEscape(a.teamName)}</strong><span>${portalEscape(a.affiliation||'소속 없음')}${a.phone?` · ${portalEscape(a.phone)}`:''}</span><small>신청 ${portalEscape(created)}${a.memo?` · ${portalEscape(a.memo)}`:''}</small></div><span class="entry-status ${applicationStatusClass(a.status)}">${a.status==='reserve'?`후보 승인 · 후보 ${reserveNo}번`:applicationStatusLabel(a.status)}</span><div class="entry-payment-wrap"><span class="entry-payment ${entryPaymentClass(a)}">${entryPaymentLabel(a)}</span>${paymentTime}</div><div class="entry-actions">${['approved','reserve'].includes(a.status)?`<button class="btn btn-small entry-payment-button ${a.paid?'paid':'unpaid'}" data-entry-payment="${a.id}">${a.paid?'입금취소':'입금확인'}</button>`:''}${a.paid&&['approved','reserve'].includes(a.status)?`<button class="btn btn-light btn-small" data-entry-payment-sms="${a.id}">입금문자</button>`:''}<button class="btn btn-light btn-small" data-entry-sms="${a.id}">일반 문자</button></div>${cancelBox}</article>`;
     }).join('')||'<div class="portal-empty">조건에 맞는 참가 신청이 없습니다.</div>';
     renderEntryDivisionAdminOverview();
@@ -7459,7 +7459,7 @@ function cancellationApprovalSmsBody(item,wasPaid){
   const event=String(item?.tournamentName||state.tournament?.name||'').trim();
   const division=String(item?.tournamentDivision||'').trim();
   const head=[event,division].filter(Boolean).join(' ');
-  return `[230MATCH] ${head?head+' / ':''}${item.teamName} ${wasPaid?'참가취소 승인·환불완료.':'참가취소 승인완료.'}`;
+  return `[230MATCH] ${head?head+' / ':''}${item.teamName} 참가 취소가 완료되었습니다.`;
 }
 async function sendCancellationApprovalSms(item,wasPaid){
   const recipients=(typeof v3252Recipients==='function'?v3252Recipients(item):[]).map(x=>({name:x.name||item.teamName,phone:String(x.phone||'').replace(/\D/g,'')})).filter(x=>validatePhone(x.phone));
@@ -9229,6 +9229,121 @@ function printFieldBracketHtml(){
     .stage51046-footnote li{margin:1px 0}
   `;
   document.head.appendChild(st);
+})();
+
+/* 230MATCH 5.10.98 · Marklife label XLSX export from current tournament roster */
+(function stage51098MarklifeLabelXlsxExport(){
+  const TARGET='marklife-label-xlsx';
+  const encoder=new TextEncoder();
+  const xmlEscape=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[ch]));
+  const fileSafe=value=>String(value||'230MATCH').replace(/[\\/:*?"<>|]+/g,'_').replace(/\s+/g,'_').replace(/^_+|_+$/g,'').slice(0,80)||'230MATCH';
+
+  function crc32(bytes){
+    let crc=0xffffffff;
+    for(const byte of bytes){
+      crc^=byte;
+      for(let bit=0;bit<8;bit++)crc=(crc>>>1)^((crc&1)?0xedb88320:0);
+    }
+    return (crc^0xffffffff)>>>0;
+  }
+  function u16(value){const out=new Uint8Array(2),view=new DataView(out.buffer);view.setUint16(0,value,true);return out;}
+  function u32(value){const out=new Uint8Array(4),view=new DataView(out.buffer);view.setUint32(0,value>>>0,true);return out;}
+  function joinBytes(parts){const size=parts.reduce((sum,part)=>sum+part.length,0),out=new Uint8Array(size);let offset=0;for(const part of parts){out.set(part,offset);offset+=part.length;}return out;}
+  function dosDateTime(date=new Date()){
+    const year=Math.max(1980,date.getFullYear());
+    return {time:((date.getHours()&31)<<11)|((date.getMinutes()&63)<<5)|((Math.floor(date.getSeconds()/2))&31),date:(((year-1980)&127)<<9)|(((date.getMonth()+1)&15)<<5)|(date.getDate()&31)};
+  }
+  function zipStore(files){
+    const local=[],central=[];let offset=0;const stamp=dosDateTime();
+    for(const file of files){
+      const name=encoder.encode(file.name),data=typeof file.data==='string'?encoder.encode(file.data):file.data,crc=crc32(data);
+      const localHeader=joinBytes([u32(0x04034b50),u16(20),u16(0x0800),u16(0),u16(stamp.time),u16(stamp.date),u32(crc),u32(data.length),u32(data.length),u16(name.length),u16(0),name]);
+      local.push(localHeader,data);
+      central.push(joinBytes([u32(0x02014b50),u16(20),u16(20),u16(0x0800),u16(0),u16(stamp.time),u16(stamp.date),u32(crc),u32(data.length),u32(data.length),u16(name.length),u16(0),u16(0),u16(0),u16(0),u32(0),u32(offset),name]));
+      offset+=localHeader.length+data.length;
+    }
+    const centralBytes=joinBytes(central);
+    return joinBytes([...local,centralBytes,u32(0x06054b50),u16(0),u16(0),u16(files.length),u16(files.length),u32(centralBytes.length),u32(offset),u16(0)]);
+  }
+  function normalizeLabel(team){
+    let text='';
+    try{
+      const players=Array.isArray(team?.players)?team.players:[];
+      const names=players.map(player=>String(player?.name||'').trim()).filter(Boolean);
+      if(names.length)text=names.join('·');
+      if(!text&&typeof portalTeamNamesOnly==='function')text=portalTeamNamesOnly(team);
+      if(!text&&typeof printTeam==='function')text=printTeam(team);
+    }catch(_e){text=team?.name||team?.teamName||'';}
+    return String(text||team?.name||team?.teamName||'')
+      .replace(/\([^)]*\)/g,'')
+      .replace(/\s*(?:\/|＆|&|,|ㆍ|·)\s*/g,'·')
+      .replace(/\s+/g,' ')
+      .replace(/^·+|·+$/g,'')
+      .trim();
+  }
+  function currentRows(){
+    const status=document.getElementById('labelStatusSelect')?.value||'active';
+    const copies=Math.max(1,Math.min(3,Number(document.getElementById('labelCopySelect')?.value||1)));
+    const teams=Array.isArray(state?.teams)?state.teams:[];
+    const activeCount=Math.max(0,Number(state?.prelim?.settings?.activeTeamCount||teams.length||0));
+    const selected=teams.map((team,index)=>({team,status:team?.status==='reserve'||index>=activeCount?'reserve':'active'})).filter(row=>status==='all'||row.status===status);
+    const collator=new Intl.Collator('ko-KR',{sensitivity:'base',numeric:true});
+    const labels=selected.map(row=>normalizeLabel(row.team)).filter(Boolean).sort(collator.compare);
+    return Array.from({length:copies},()=>labels).flat();
+  }
+  function workbookBytes(labels){
+    const rows=[`<row r="1"><c r="A1" t="inlineStr" s="1"><is><t>TeamLabel</t></is></c></row>`];
+    labels.forEach((label,index)=>rows.push(`<row r="${index+2}"><c r="A${index+2}" t="inlineStr"><is><t>${xmlEscape(label)}</t></is></c></row>`));
+    const last=Math.max(1,labels.length+1),ref=`A1:A${last}`;
+    return zipStore([
+      {name:'[Content_Types].xml',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/><Override PartName="/xl/tables/table1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml"/></Types>`},
+      {name:'_rels/.rels',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`},
+      {name:'xl/workbook.xml',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Label" sheetId="1" r:id="rId1"/></sheets></workbook>`},
+      {name:'xl/_rels/workbook.xml.rels',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`},
+      {name:'xl/styles.xml',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Arial"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Arial"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0F766E"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf></cellXfs></styleSheet>`},
+      {name:'xl/worksheets/sheet1.xml',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="${ref}"/><sheetViews><sheetView workbookViewId="0"/></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols><col min="1" max="1" width="22" customWidth="1"/></cols><sheetData>${rows.join('')}</sheetData><tableParts count="1"><tablePart r:id="rId1"/></tableParts></worksheet>`},
+      {name:'xl/worksheets/_rels/sheet1.xml.rels',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/table" Target="../tables/table1.xml"/></Relationships>`},
+      {name:'xl/tables/table1.xml',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><table xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" id="1" name="MarklifeLabels" displayName="MarklifeLabels" ref="${ref}" totalsRowShown="0"><autoFilter ref="${ref}"/><tableColumns count="1"><tableColumn id="1" name="TeamLabel"/></tableColumns><tableStyleInfo name="TableStyleMedium4" showFirstColumn="0" showLastColumn="0" showRowStripes="0" showColumnStripes="0"/></table>`}
+    ]);
+  }
+  function download(){
+    const labels=currentRows();
+    if(!labels.length){notice('마크라이프 라벨로 내보낼 참가팀이 없습니다.','warning');return false;}
+    const bytes=workbookBytes(labels),blob=new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+    const tournament=fileSafe(state?.tournament?.name||'230MATCH'),division=fileSafe(state?.tournament?.division||''),teamCount=Math.max(1,Math.round(labels.length/Math.max(1,Number(document.getElementById('labelCopySelect')?.value||1))));
+    a.href=url;a.download=`${tournament}${division?'_'+division:''}_마크라이프_라벨_${teamCount}팀.xlsx`;a.style.display='none';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000);
+    notice(`마크라이프 라벨 엑셀 ${labels.length}행을 저장했습니다.`,'success');return true;
+  }
+  function syncUi(){
+    const target=document.getElementById('printTargetSelect'),selected=target?.value===TARGET;
+    const options=document.getElementById('labelPrintOptions');if(options)options.hidden=!selected&&target?.value!=='labels';
+    const button=document.getElementById('downloadMarklifeLabelXlsxBtn');if(button)button.hidden=!selected;
+    ['printDocumentBtn','savePrintImageBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.hidden=selected;});
+    if(!selected)return;
+    const preview=document.getElementById('printPreview');
+    const labels=currentRows();
+    if(preview)preview.innerHTML=`<div class="print-empty"><b>마크라이프 라벨 엑셀</b><br>현재 대회 참가팀 ${labels.length}개를 TeamLabel 한 열로 저장합니다.<br>선수명은 이름·이름 형식이며 가나다순으로 정렬됩니다.</div>`;
+    const summary=document.getElementById('printPreviewSummary');if(summary)summary.textContent=`마크라이프 호환 XLSX · ${labels.length}행 · ${document.getElementById('labelStatusSelect')?.selectedOptions?.[0]?.textContent||'참가팀만'}`;
+  }
+  function install(){
+    const select=document.getElementById('printTargetSelect');if(!select)return;
+    if(!select.querySelector(`option[value="${TARGET}"]`)){
+      const option=document.createElement('option');option.value=TARGET;option.textContent='마크라이프 라벨 엑셀';
+      const labels=select.querySelector('option[value="labels"]');labels?.after(option);
+    }
+    const row=document.querySelector('.print-action-row');
+    if(row&&!document.getElementById('downloadMarklifeLabelXlsxBtn')){
+      const button=document.createElement('button');button.id='downloadMarklifeLabelXlsxBtn';button.type='button';button.className='btn btn-primary';button.textContent='마크라이프 엑셀 다운로드';button.hidden=true;button.addEventListener('click',download);row.appendChild(button);
+    }
+    select.addEventListener('change',()=>setTimeout(syncUi,0));
+    ['labelStatusSelect','labelCopySelect'].forEach(id=>document.getElementById(id)?.addEventListener('change',()=>setTimeout(syncUi,0)));
+    syncUi();
+  }
+  window.stage51098DownloadMarklifeLabelXlsx=download;
+  window.__stage51098BuildMarklifeXlsxFromLabels=workbookBytes;
+  window.__stage51098SyncMarklifePrintUi=syncUi;
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
+  console.info('[230MATCH] 5.10.98 ready · Marklife label XLSX export from current tournament roster');
 })();
 function stage51046SelectedPrizeGroups(){
   const q=id=>document.getElementById(id);
@@ -22777,11 +22892,43 @@ console.info('[230MATCH] 5.10.78 ready · participant identity id/registrationId
    조/코트/순서/점수/상태/본선 슬롯은 변경하지 않는다. */
 let stage51079LastPersistKey='';
 let stage51079LastPersistAt=0;
+function stage51097FindRuntimeTeamForRegistration(row){
+  if(!row?.id)return null;
+  const teams=Array.isArray(state.teams)?state.teams:[];
+  const rid=String(row.id||'');
+  let team=teams.find(t=>String(t?.registrationId||t?.applicationId||'')===rid)||null;
+  if(team)return team;
+  // 구 참가팀은 registrationId 연결이 빠진 경우가 있어 참가자 연락처로 먼저 안전하게 찾는다.
+  const rowPhones=new Set((Array.isArray(row.players)?row.players:[]).map(p=>String(p?.phone||'').replace(/\D/g,'')).filter(v=>v.length>=10));
+  const repPhone=String(row.phone||'').replace(/\D/g,'');if(repPhone.length>=10)rowPhones.add(repPhone);
+  if(rowPhones.size){
+    team=teams.find(t=>{
+      const phones=new Set();
+      for(const v of (Array.isArray(t?.playerPhones)?t.playerPhones:[])){const d=String(v||'').replace(/\D/g,'');if(d.length>=10)phones.add(d);}
+      for(const pl of (Array.isArray(t?.players)?t.players:[])){const d=String(pl?.phone||'').replace(/\D/g,'');if(d.length>=10)phones.add(d);}
+      try{const c=getTeamContact?.(state,t)||{};const d=String(c.phone||'').replace(/\D/g,'');if(d.length>=10)phones.add(d);}catch(_e){}
+      return [...rowPhones].some(v=>phones.has(v));
+    })||null;
+    if(team)return team;
+  }
+  // 클럽명만 수정한 경우 팀명은 그대로이므로 마지막으로 정확한 팀명 일치만 허용한다.
+  const rowName=myMatchNormalize?.(String(row.teamName||''))||String(row.teamName||'').replace(/\s+/g,'').toLowerCase();
+  if(rowName){
+    team=teams.find(t=>{
+      let name='';try{name=portalTeam(t)||t?.name||t?.teamName||'';}catch(_e){name=t?.name||t?.teamName||'';}
+      const n=myMatchNormalize?.(String(name||''))||String(name||'').replace(/\s+/g,'').toLowerCase();
+      return n===rowName;
+    })||null;
+  }
+  return team;
+}
 function stage51079ApplyRegistrationIdentityRow(row){
   if(!row?.id)return 0;
   const rid=String(row.id||'');
-  const team=(state.teams||[]).find(t=>String(t?.registrationId||t?.applicationId||'')===rid);
+  const team=stage51097FindRuntimeTeamForRegistration(row);
   if(!team)return 0;
+  // 연결이 빠진 구 참가팀은 신원 연결키만 보완한다. 경기/조/코트/점수는 변경하지 않는다.
+  if(!String(team.registrationId||team.applicationId||''))team.registrationId=rid;
   // 관리자/진행자는 private row의 players/phone/ownerUid까지 안전하게 동기화한다.
   if(typeof canOperate==='function'&&canOperate()&&Array.isArray(row.players)&&row.players.length){
     const before=JSON.stringify({n:team.name,a:team.affiliation,p:team.players});
@@ -22824,9 +22971,11 @@ function stage51079ApplyRegistrationIdentityRow(row){
 function stage51079SyncRegistrationIdentityIntoRuntime({persist=false,source='auto'}={}){
   let rows=[];
   try{
-    if(typeof canOperate==='function'&&canOperate()&&registrationCloudReady)rows=registrationRowsForCurrentDivision();
-    else if(publicRegistrationReady)rows=publicRegistrationRowsForCurrentDivision();
-    else if(registrationCloudReady)rows=registrationRowsForCurrentDivision();
+    if(registrationCloudReady){
+      // 로그인한 참가자는 자신의 private 참가신청 원본을 우선 사용한다.
+      // 공개 미러에는 연락처/선수정보가 없어 구 팀의 registrationId 복구가 불가능할 수 있다.
+      rows=registrationRowsForCurrentDivision();
+    }else if(publicRegistrationReady)rows=publicRegistrationRowsForCurrentDivision();
   }catch(_e){rows=[];}
   if(!rows.length)return 0;
   const teamRegs=new Set((state.teams||[]).map(t=>String(t?.registrationId||t?.applicationId||'')).filter(Boolean));
@@ -22856,6 +23005,7 @@ window.stage51079SyncRegistrationIdentityIntoRuntime=stage51079SyncRegistrationI
   window.addEventListener('hashchange',()=>setTimeout(run,350));
 })();
 console.info('[230MATCH] 5.10.79 ready · member self-edit names propagate to prelim/courts/bracket/print');
+console.info('[230MATCH] 5.10.97 ready · self-edit club/name reload persistence bridge for legacy teams');
 
 /* 230MATCH 5.10.77 · admin status opt-in + movable translucent participant-result alert */
 (function stage51077AdminOverlayPolish(){
@@ -23859,12 +24009,6 @@ console.info('[230MATCH] 5.10.94 ready · current tournament podium requires off
   function canSee(){try{return Boolean(typeof canOperate==='function'&&canOperate());}catch(_e){return false;}}
   function applicationRows(){try{return typeof simpleRegistrationRows==='function'?simpleRegistrationRows():[];}catch(_e){return[];}}
   function standardRows(){return applicationRows().filter(a=>a?.cancelRequestStatus==='requested');}
-  function refundRows(){
-    try{
-      const rows=Array.isArray(state?.portal?.refundRequests)?state.portal.refundRequests:[];
-      return rows.filter(r=>['requested','processing'].includes(String(r?.status||'')));
-    }catch(_e){return[];}
-  }
   function installCss(){
     if(document.getElementById('stage51095CancelStyle'))return;
     const s=document.createElement('style');s.id='stage51095CancelStyle';s.textContent=`
@@ -23874,7 +24018,7 @@ console.info('[230MATCH] 5.10.94 ready · current tournament podium requires off
       #stage51095CancelPanel small{font-size:12px;color:#64748b;font-weight:600}.stage51095-actions{display:flex;gap:8px;flex-wrap:wrap}
       .stage51095-count{display:inline-flex;align-items:center;justify-content:center;min-width:25px;height:25px;padding:0 7px;margin-left:4px;border-radius:999px;background:#b42318;color:#fff;font-weight:900}
       .stage51095-zero .stage51095-count{background:#64748b}
-      #stage3561RefundAdmin{scroll-margin-top:100px}.cancel-request-box{scroll-margin-top:110px}
+      #stage3561RefundAdmin,.stage3561-refund-panel{display:none!important}.cancel-request-box{scroll-margin-top:110px}
       @media(max-width:680px){#stage51095CancelPanel{align-items:flex-start;flex-direction:column}.stage51095-actions{width:100%}.stage51095-actions button{flex:1 1 140px}}
     `;document.head.appendChild(s);
   }
@@ -23895,11 +24039,6 @@ console.info('[230MATCH] 5.10.94 ready · current tournament podium requires off
           setTimeout(()=>document.querySelector('#entryAdminList .cancel-request-box')?.scrollIntoView({behavior:'smooth',block:'center'}),80);
           return;
         }
-        const refund=e.target.closest?.('[data-stage51095-refund]');
-        if(refund){
-          try{renderRefundAdmin();}catch(_e){}
-          setTimeout(()=>document.getElementById('stage3561RefundAdmin')?.scrollIntoView({behavior:'smooth',block:'start'}),80);
-        }
       });
     }
     return panel;
@@ -23908,10 +24047,10 @@ console.info('[230MATCH] 5.10.94 ready · current tournament podium requires off
     if(!canSee())return;
     installCss();
     const panel=ensurePanel();if(!panel)return;
-    const standard=standardRows(),refund=refundRows(),total=standard.length+refund.length;
+    const standard=standardRows(),total=standard.length;
     panel.classList.toggle('stage51095-zero',total===0);
-    panel.innerHTML=`<div class="stage51095-copy"><b>취소 요청 관리 · 총 ${total}건</b><small>${total?'처리하지 않은 취소 요청이 있습니다. 문자 알림을 놓쳐도 여기서 계속 확인할 수 있습니다.':'현재 처리할 취소 요청이 없습니다.'}</small></div><div class="stage51095-actions"><button type="button" class="btn ${standard.length?'btn-danger-outline':'btn-light'}" data-stage51095-standard>취소요청 <span class="stage51095-count">${standard.length}</span></button>${refund.length?`<button type="button" class="btn btn-danger-outline" data-stage51095-refund>취소·환불 <span class="stage51095-count">${refund.length}</span></button>`:''}</div>`;
-    try{renderRefundAdmin();}catch(_e){}
+    panel.innerHTML=`<div class="stage51095-copy"><b>취소 요청 관리 · 총 ${total}건</b><small>${total?'처리하지 않은 참가 취소 요청이 있습니다. 요청 내용을 확인한 뒤 취소완료 또는 반려 처리하세요.':'현재 처리할 취소 요청이 없습니다.'}</small></div><div class="stage51095-actions"><button type="button" class="btn ${standard.length?'btn-danger-outline':'btn-light'}" data-stage51095-standard>취소요청 <span class="stage51095-count">${standard.length}</span></button></div>`;
+    document.getElementById('stage3561RefundAdmin')?.remove();
   }
   const previousRender=renderApplicationPortal;
   renderApplicationPortal=function(){const result=previousRender.apply(this,arguments);setTimeout(render,0);return result;};
@@ -23920,5 +24059,16 @@ console.info('[230MATCH] 5.10.94 ready · current tournament podium requires off
   window.addEventListener('hashchange',()=>setTimeout(render,220));
   window.addEventListener('pageshow',()=>setTimeout(render,300));
   setInterval(()=>{const active=document.getElementById('view-entry')?.classList.contains('active')||location.hash.includes('entry');if(active&&canSee())render();},10000);
-  console.info('[230MATCH] 5.10.95 ready · cancellation request admin visibility restored');
+  console.info('[230MATCH] 5.10.96 ready · cancellation management simplified to request review + completion SMS');
+})();
+
+/* 5.10.98 final print-center binding: run after every legacy print-preview listener. */
+(function stage51098FinalPrintBinding(){
+  const refresh=()=>setTimeout(()=>window.__stage51098SyncMarklifePrintUi?.(),120);
+  document.addEventListener('change',event=>{
+    if(['printTargetSelect','labelStatusSelect','labelCopySelect'].includes(event.target?.id||''))refresh();
+  },true);
+  window.addEventListener('hashchange',refresh);
+  window.addEventListener('pageshow',refresh);
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',refresh,{once:true});else refresh();
 })();
