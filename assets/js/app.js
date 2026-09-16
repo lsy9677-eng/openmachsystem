@@ -7324,7 +7324,7 @@ function renderApplicationPortal(){
       const fixedNo=adminSeq.get(String(a.id||''))||'-';
       const created=entryDateTime(a.createdAt);
       const paymentTime=a.paidAt?`<small class="entry-payment-time">${portalEscape(entryDateTime(a.paidAt))}</small>`:'';
-      const cancelBox=a.cancelRequestStatus==='requested'?`<div class="cancel-request-box"><strong>취소 요청</strong> · ${portalEscape(a.cancelReason||'-')} · ${portalEscape(a.refundBank||'')} ${portalEscape(a.refundAccount||'')} ${portalEscape(a.refundAccountHolder||'')}<div class="cancel-request-actions"><button class="btn btn-danger-outline btn-small" data-entry-cancel-approve="${a.id}">취소완료 처리</button><button class="btn btn-light btn-small" data-entry-cancel-reject="${a.id}">취소 반려</button></div></div>`:'';
+      const cancelBox=a.cancelRequestStatus==='requested'?`<div class="cancel-request-box"><strong>취소 신청</strong> · ${portalEscape(a.cancelReason||'-')} · ${portalEscape(a.refundBank||'')} ${portalEscape(a.refundAccount||'')} ${portalEscape(a.refundAccountHolder||'')}<div class="cancel-request-actions"><button class="btn btn-danger-outline btn-small" data-entry-cancel-approve="${a.id}">취소 승인${a.paid?'·환불완료':''}</button><button class="btn btn-light btn-small" data-entry-cancel-reject="${a.id}">취소 반려</button></div></div>`:'';
       return `<article class="entry-admin-row simple-registration stage5963-admin-compact ${a.paid?'payment-paid':'payment-wait'}"><span class="stage5963-admin-no">${fixedNo}</span><div class="entry-main"><strong>${portalEscape(a.teamName)}</strong><span>${portalEscape(a.affiliation||'소속 없음')}${a.phone?` · ${portalEscape(a.phone)}`:''}</span><small>신청 ${portalEscape(created)}${a.memo?` · ${portalEscape(a.memo)}`:''}</small></div><span class="entry-status ${applicationStatusClass(a.status)}">${a.status==='reserve'?`후보 승인 · 후보 ${reserveNo}번`:applicationStatusLabel(a.status)}</span><div class="entry-payment-wrap"><span class="entry-payment ${entryPaymentClass(a)}">${entryPaymentLabel(a)}</span>${paymentTime}</div><div class="entry-actions">${['approved','reserve'].includes(a.status)?`<button class="btn btn-small entry-payment-button ${a.paid?'paid':'unpaid'}" data-entry-payment="${a.id}">${a.paid?'입금취소':'입금확인'}</button>`:''}${a.paid&&['approved','reserve'].includes(a.status)?`<button class="btn btn-light btn-small" data-entry-payment-sms="${a.id}">입금문자</button>`:''}<button class="btn btn-light btn-small" data-entry-sms="${a.id}">일반 문자</button></div>${cancelBox}</article>`;
     }).join('')||'<div class="portal-empty">조건에 맞는 참가 신청이 없습니다.</div>';
     renderEntryDivisionAdminOverview();
@@ -7459,7 +7459,7 @@ function cancellationApprovalSmsBody(item,wasPaid){
   const event=String(item?.tournamentName||state.tournament?.name||'').trim();
   const division=String(item?.tournamentDivision||'').trim();
   const head=[event,division].filter(Boolean).join(' ');
-  return `[230MATCH] ${head?head+' / ':''}${item.teamName} 참가 취소가 완료되었습니다.`;
+  return `[230MATCH] ${head?head+' / ':''}${item.teamName} ${wasPaid?'참가취소 승인·환불완료.':'참가취소 승인완료.'}`;
 }
 async function sendCancellationApprovalSms(item,wasPaid){
   const recipients=(typeof v3252Recipients==='function'?v3252Recipients(item):[]).map(x=>({name:x.name||item.teamName,phone:String(x.phone||'').replace(/\D/g,'')})).filter(x=>validatePhone(x.phone));
@@ -23859,6 +23859,12 @@ console.info('[230MATCH] 5.10.94 ready · current tournament podium requires off
   function canSee(){try{return Boolean(typeof canOperate==='function'&&canOperate());}catch(_e){return false;}}
   function applicationRows(){try{return typeof simpleRegistrationRows==='function'?simpleRegistrationRows():[];}catch(_e){return[];}}
   function standardRows(){return applicationRows().filter(a=>a?.cancelRequestStatus==='requested');}
+  function refundRows(){
+    try{
+      const rows=Array.isArray(state?.portal?.refundRequests)?state.portal.refundRequests:[];
+      return rows.filter(r=>['requested','processing'].includes(String(r?.status||'')));
+    }catch(_e){return[];}
+  }
   function installCss(){
     if(document.getElementById('stage51095CancelStyle'))return;
     const s=document.createElement('style');s.id='stage51095CancelStyle';s.textContent=`
@@ -23868,7 +23874,7 @@ console.info('[230MATCH] 5.10.94 ready · current tournament podium requires off
       #stage51095CancelPanel small{font-size:12px;color:#64748b;font-weight:600}.stage51095-actions{display:flex;gap:8px;flex-wrap:wrap}
       .stage51095-count{display:inline-flex;align-items:center;justify-content:center;min-width:25px;height:25px;padding:0 7px;margin-left:4px;border-radius:999px;background:#b42318;color:#fff;font-weight:900}
       .stage51095-zero .stage51095-count{background:#64748b}
-      #stage3561RefundAdmin,.stage3561-refund-panel{display:none!important}.cancel-request-box{scroll-margin-top:110px}
+      #stage3561RefundAdmin{scroll-margin-top:100px}.cancel-request-box{scroll-margin-top:110px}
       @media(max-width:680px){#stage51095CancelPanel{align-items:flex-start;flex-direction:column}.stage51095-actions{width:100%}.stage51095-actions button{flex:1 1 140px}}
     `;document.head.appendChild(s);
   }
@@ -23889,6 +23895,11 @@ console.info('[230MATCH] 5.10.94 ready · current tournament podium requires off
           setTimeout(()=>document.querySelector('#entryAdminList .cancel-request-box')?.scrollIntoView({behavior:'smooth',block:'center'}),80);
           return;
         }
+        const refund=e.target.closest?.('[data-stage51095-refund]');
+        if(refund){
+          try{renderRefundAdmin();}catch(_e){}
+          setTimeout(()=>document.getElementById('stage3561RefundAdmin')?.scrollIntoView({behavior:'smooth',block:'start'}),80);
+        }
       });
     }
     return panel;
@@ -23897,10 +23908,10 @@ console.info('[230MATCH] 5.10.94 ready · current tournament podium requires off
     if(!canSee())return;
     installCss();
     const panel=ensurePanel();if(!panel)return;
-    const standard=standardRows(),total=standard.length;
+    const standard=standardRows(),refund=refundRows(),total=standard.length+refund.length;
     panel.classList.toggle('stage51095-zero',total===0);
-    panel.innerHTML=`<div class="stage51095-copy"><b>취소 요청 관리 · 총 ${total}건</b><small>${total?'처리하지 않은 참가 취소 요청이 있습니다. 요청 내용을 확인한 뒤 취소완료 또는 반려 처리하세요.':'현재 처리할 취소 요청이 없습니다.'}</small></div><div class="stage51095-actions"><button type="button" class="btn ${standard.length?'btn-danger-outline':'btn-light'}" data-stage51095-standard>취소요청 <span class="stage51095-count">${standard.length}</span></button></div>`;
-    document.getElementById('stage3561RefundAdmin')?.remove();
+    panel.innerHTML=`<div class="stage51095-copy"><b>취소 요청 관리 · 총 ${total}건</b><small>${total?'처리하지 않은 취소 요청이 있습니다. 문자 알림을 놓쳐도 여기서 계속 확인할 수 있습니다.':'현재 처리할 취소 요청이 없습니다.'}</small></div><div class="stage51095-actions"><button type="button" class="btn ${standard.length?'btn-danger-outline':'btn-light'}" data-stage51095-standard>취소요청 <span class="stage51095-count">${standard.length}</span></button>${refund.length?`<button type="button" class="btn btn-danger-outline" data-stage51095-refund>취소·환불 <span class="stage51095-count">${refund.length}</span></button>`:''}</div>`;
+    try{renderRefundAdmin();}catch(_e){}
   }
   const previousRender=renderApplicationPortal;
   renderApplicationPortal=function(){const result=previousRender.apply(this,arguments);setTimeout(render,0);return result;};
@@ -23909,5 +23920,5 @@ console.info('[230MATCH] 5.10.94 ready · current tournament podium requires off
   window.addEventListener('hashchange',()=>setTimeout(render,220));
   window.addEventListener('pageshow',()=>setTimeout(render,300));
   setInterval(()=>{const active=document.getElementById('view-entry')?.classList.contains('active')||location.hash.includes('entry');if(active&&canSee())render();},10000);
-  console.info('[230MATCH] 5.10.96 ready · cancellation management simplified to request review + completion SMS');
+  console.info('[230MATCH] 5.10.95 ready · cancellation request admin visibility restored');
 })();
