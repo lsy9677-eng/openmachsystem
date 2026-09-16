@@ -9270,15 +9270,14 @@ function printFieldBracketHtml(){
     try{
       const players=Array.isArray(team?.players)?team.players:[];
       const names=players.map(player=>String(player?.name||'').trim()).filter(Boolean);
-      if(names.length)text=names.join('·');
+      if(names.length)text=names.join(' ');
       if(!text&&typeof portalTeamNamesOnly==='function')text=portalTeamNamesOnly(team);
       if(!text&&typeof printTeam==='function')text=printTeam(team);
     }catch(_e){text=team?.name||team?.teamName||'';}
     return String(text||team?.name||team?.teamName||'')
       .replace(/\([^)]*\)/g,'')
-      .replace(/\s*(?:\/|＆|&|,|ㆍ|·)\s*/g,'·')
+      .replace(/\s*(?:\/|＆|&|,|ㆍ|·)\s*/g,' ')
       .replace(/\s+/g,' ')
-      .replace(/^·+|·+$/g,'')
       .trim();
   }
   function currentRows(){
@@ -24079,9 +24078,8 @@ console.info('[230MATCH] 5.10.94 ready · current tournament podium requires off
   const collator=new Intl.Collator('ko-KR',{sensitivity:'base',numeric:true});
   const normalize=value=>String(value||'')
     .replace(/\([^)]*\)/g,'')
-    .replace(/\s*(?:\/|＆|&|,|ㆍ|·)\s*/g,'·')
+    .replace(/\s*(?:\/|＆|&|,|ㆍ|·)\s*/g,' ')
     .replace(/\s+/g,' ')
-    .replace(/^·+|·+$/g,'')
     .trim();
   const copies=()=>Math.max(1,Math.min(3,Number(document.getElementById('labelCopySelect')?.value||1)));
   const repeat=labels=>Array.from({length:copies()},()=>labels).flat();
@@ -24089,14 +24087,14 @@ console.info('[230MATCH] 5.10.94 ready · current tournament podium requires off
     try{
       const players=typeof entryApplicationPlayers==='function'?entryApplicationPlayers(item):(Array.isArray(item?.players)?item.players:[]);
       const names=(players||[]).map(player=>String(player?.name||'').trim()).filter(Boolean);
-      if(names.length)return normalize(names.join('·'));
+      if(names.length)return normalize(names.join(' '));
     }catch(_e){}
     return normalize(item?.teamName||item?.name||'');
   }
   function teamLabel(team){
     try{
       const names=(Array.isArray(team?.players)?team.players:[]).map(player=>String(player?.name||'').trim()).filter(Boolean);
-      if(names.length)return normalize(names.join('·'));
+      if(names.length)return normalize(names.join(' '));
       if(typeof portalTeamNamesOnly==='function')return normalize(portalTeamNamesOnly(team));
       if(typeof printTeam==='function')return normalize(printTeam(team));
     }catch(_e){}
@@ -24177,14 +24175,13 @@ console.info('[230MATCH] 5.10.94 ready · current tournament podium requires off
   const TARGET='marklife-label-xlsx';
   const normalize=value=>String(value||'')
     .replace(/\([^)]*\)/g,'')
-    .replace(/\s*(?:\/|＆|&|,|ㆍ|·)\s*/g,'·')
+    .replace(/\s*(?:\/|＆|&|,|ㆍ|·)\s*/g,' ')
     .replace(/\s+/g,' ')
-    .replace(/^·+|·+$/g,'')
     .trim();
   function label(team){
     try{
       const names=(Array.isArray(team?.players)?team.players:[]).map(player=>String(player?.name||'').trim()).filter(Boolean);
-      if(names.length)return normalize(names.join('·'));
+      if(names.length)return normalize(names.join(' '));
       if(typeof portalTeamNamesOnly==='function')return normalize(portalTeamNamesOnly(team));
       if(typeof printTeam==='function')return normalize(printTeam(team));
     }catch(_e){}
@@ -24268,4 +24265,53 @@ console.info('[230MATCH] 5.10.94 ready · current tournament podium requires off
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,240),{once:true});else setTimeout(install,240);
   window.addEventListener('pageshow',()=>setTimeout(syncUi,260));
   console.info('[230MATCH] 5.10.100 ready · main draw slot-order rank1 white + rank2 yellow candidate labels');
+})();
+
+/* 230MATCH 5.10.101 · one common main-draw candidate file for white/yellow label stock */
+(function stage510101MarklifeCommonMainCandidateExport(){
+  const TARGET='marklife-label-xlsx';
+  const copies=()=>Math.max(1,Math.min(3,Number(document.getElementById('labelCopySelect')?.value||1)));
+  const safeName=value=>String(value||'230MATCH').replace(/[\\/:*?"<>|]+/g,'_').replace(/\s+/g,'_').replace(/^_+|_+$/g,'').slice(0,80)||'230MATCH';
+  function labels(){
+    const buildLabels=window.__stage510100MainCandidateLabels;
+    return typeof buildLabels==='function'?buildLabels(1):[];
+  }
+  function plan(){
+    const buildPlan=window.__stage510100MainCandidatePlan;
+    return typeof buildPlan==='function'?buildPlan(1):[];
+  }
+  function download(){
+    const blocks=plan(),rows=labels();
+    if(!blocks.length||!rows.length){notice('현재 본선 1회전 대진표에서 조 1위 연결 슬롯을 찾지 못했습니다. 본선 추첨 결과를 먼저 확인하세요.','warning');return false;}
+    const build=window.__stage51098BuildMarklifeXlsxFromLabels;
+    if(typeof build!=='function'){notice('마크라이프 엑셀 생성기를 불러오지 못했습니다.','error');return false;}
+    const bytes=build(rows),blob=new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+    const tournament=safeName(state?.tournament?.name),division=safeName(state?.tournament?.division||''),sheetCount=Math.round(rows.length/copies());
+    a.href=url;a.download=`${tournament}${division?'_'+division:''}_본선순서_후보공통_흰색노란색동일_${sheetCount}장.xlsx`;a.style.display='none';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000);
+    notice(`본선순서 후보 공통 엑셀 ${rows.length}장을 저장했습니다. 같은 파일을 흰색과 노란색 라벨지에 각각 출력하세요.`,'success');return true;
+  }
+  function syncUi(){
+    const selected=document.getElementById('printTargetSelect')?.value===TARGET;
+    const oldWhite=document.getElementById('downloadMarklifeMainRank1Btn'),oldYellow=document.getElementById('downloadMarklifeMainRank2Btn'),common=document.getElementById('downloadMarklifeMainCommonBtn');
+    if(oldWhite)oldWhite.hidden=true;if(oldYellow)oldYellow.hidden=true;if(common)common.hidden=!selected;
+    if(!selected)return;
+    const blocks=plan(),count=blocks.reduce((sum,block)=>sum+block.labels.length,0);
+    if(common){common.disabled=!blocks.length;common.title=blocks.length?`본선 ${blocks.length}자리 순서 · 후보 ${count}장 · 같은 파일 2회 출력`:'조 1위 연결 슬롯이 없습니다.';}
+    const preview=document.getElementById('printPreview');if(preview)preview.innerHTML=`<div class="print-empty"><b>본선 후보 공통 라벨 엑셀</b><br>검증된 본선 조 1위 슬롯 순서 · 후보 ${count}장<br>같은 엑셀을 흰색 라벨지에 1회, 노란색 라벨지로 교체해 1회 출력하세요.<br>셀에는 선수 이름만 공백으로 구분되어 저장됩니다.</div>`;
+    const summary=document.getElementById('printPreviewSummary');if(summary)summary.textContent=`본선순서 후보 공통 라벨 · ${count}장 · 흰색/노란색 동일 파일`;
+  }
+  function install(){
+    const row=document.querySelector('.print-action-row');if(!row)return;
+    if(!document.getElementById('downloadMarklifeMainCommonBtn')){
+      const button=document.createElement('button');button.id='downloadMarklifeMainCommonBtn';button.type='button';button.className='btn btn-light';button.textContent='본선 후보 공통 엑셀 (흰색·노란색 동일)';button.hidden=true;button.addEventListener('click',download);row.appendChild(button);
+    }
+    ['printTargetSelect','labelCopySelect'].forEach(id=>document.getElementById(id)?.addEventListener('change',()=>setTimeout(syncUi,210)));
+    syncUi();
+  }
+  const previousSync=window.__stage51098SyncMarklifePrintUi;
+  window.__stage51098SyncMarklifePrintUi=function(){try{previousSync?.();}finally{syncUi();}};
+  window.__stage510101CommonMainLabels=labels;
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,280),{once:true});else setTimeout(install,280);
+  window.addEventListener('pageshow',()=>setTimeout(syncUi,300));
+  console.info('[230MATCH] 5.10.101 ready · one common main-draw candidate XLSX for white/yellow label stock');
 })();
