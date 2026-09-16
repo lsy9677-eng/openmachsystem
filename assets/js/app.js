@@ -24072,3 +24072,102 @@ console.info('[230MATCH] 5.10.94 ready · current tournament podium requires off
   window.addEventListener('pageshow',refresh);
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',refresh,{once:true});else refresh();
 })();
+
+/* 230MATCH 5.10.99 · Marklife 64-team source repair + name/group order downloads */
+(function stage51099MarklifeDualOrderExport(){
+  const TARGET='marklife-label-xlsx';
+  const collator=new Intl.Collator('ko-KR',{sensitivity:'base',numeric:true});
+  const normalize=value=>String(value||'')
+    .replace(/\([^)]*\)/g,'')
+    .replace(/\s*(?:\/|＆|&|,|ㆍ|·)\s*/g,'·')
+    .replace(/\s+/g,' ')
+    .replace(/^·+|·+$/g,'')
+    .trim();
+  const copies=()=>Math.max(1,Math.min(3,Number(document.getElementById('labelCopySelect')?.value||1)));
+  const repeat=labels=>Array.from({length:copies()},()=>labels).flat();
+  function applicationLabel(item){
+    try{
+      const players=typeof entryApplicationPlayers==='function'?entryApplicationPlayers(item):(Array.isArray(item?.players)?item.players:[]);
+      const names=(players||[]).map(player=>String(player?.name||'').trim()).filter(Boolean);
+      if(names.length)return normalize(names.join('·'));
+    }catch(_e){}
+    return normalize(item?.teamName||item?.name||'');
+  }
+  function teamLabel(team){
+    try{
+      const names=(Array.isArray(team?.players)?team.players:[]).map(player=>String(player?.name||'').trim()).filter(Boolean);
+      if(names.length)return normalize(names.join('·'));
+      if(typeof portalTeamNamesOnly==='function')return normalize(portalTeamNamesOnly(team));
+      if(typeof printTeam==='function')return normalize(printTeam(team));
+    }catch(_e){}
+    return normalize(team?.teamName||team?.name||'');
+  }
+  function registrationRows(){
+    try{return typeof simpleRegistrationRows==='function'?[...(simpleRegistrationRows()||[])]:[...(state?.portal?.applications||[])];}
+    catch(_e){return [...(state?.portal?.applications||[])];}
+  }
+  function selectedApplications(){
+    const status=document.getElementById('labelStatusSelect')?.value||'active',rows=registrationRows();
+    if(status==='reserve')return rows.filter(row=>row?.status==='reserve');
+    if(status==='all')return rows.filter(row=>['approved','reserve'].includes(String(row?.status||'')));
+    return rows.filter(row=>row?.status==='approved');
+  }
+  function nameOrderLabels(){
+    let labels=selectedApplications().map(applicationLabel).filter(Boolean);
+    if(!labels.length){
+      const status=document.getElementById('labelStatusSelect')?.value||'active';
+      const teams=Array.isArray(state?.teams)?state.teams:[],activeCount=Math.max(0,Number(state?.prelim?.settings?.activeTeamCount||teams.length||0));
+      labels=teams.map((team,index)=>({team,status:team?.status==='reserve'||index>=activeCount?'reserve':'active'})).filter(row=>status==='all'||row.status===status).map(row=>teamLabel(row.team)).filter(Boolean);
+    }
+    return repeat(labels.sort(collator.compare));
+  }
+  function groupOrderLabels(){
+    const status=document.getElementById('labelStatusSelect')?.value||'active';
+    if(status!=='active')return [];
+    const groups=[...(state?.prelim?.groups||[])].sort((a,b)=>Number(a?.groupNo||String(a?.name||'').match(/\d+/)?.[0]||0)-Number(b?.groupNo||String(b?.name||'').match(/\d+/)?.[0]||0));
+    const labels=[];
+    groups.forEach(group=>{
+      const teams=Array.isArray(group?.teams)&&group.teams.length?group.teams:(group?.teamIds||[]).map(id=>(state?.teams||[]).find(team=>String(team?.id||'')===String(id))).filter(Boolean);
+      teams.forEach(team=>{const label=teamLabel(team);if(label)labels.push(label);});
+    });
+    return repeat(labels);
+  }
+  function save(labels,orderLabel){
+    if(!labels.length){notice(orderLabel==='조별순'?'예선 조편성이 없거나 참가팀만 선택하지 않았습니다. 조편성 후 참가팀만으로 내려받으세요.':'마크라이프 라벨로 내보낼 참가신청이 없습니다.','warning');return false;}
+    const build=window.__stage51098BuildMarklifeXlsxFromLabels;if(typeof build!=='function'){notice('마크라이프 엑셀 생성기를 불러오지 못했습니다.','error');return false;}
+    const bytes=build(labels),blob=new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+    const tournament=String(state?.tournament?.name||'230MATCH').replace(/[\\/:*?"<>|]+/g,'_').replace(/\s+/g,'_').slice(0,70),division=String(state?.tournament?.division||'').replace(/[\\/:*?"<>|]+/g,'_').replace(/\s+/g,'_').slice(0,30),count=Math.round(labels.length/copies());
+    a.href=url;a.download=`${tournament}${division?'_'+division:''}_마크라이프_라벨_${orderLabel}_${count}팀.xlsx`;a.style.display='none';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000);
+    notice(`마크라이프 ${orderLabel} 엑셀 ${labels.length}행을 저장했습니다.`,'success');return true;
+  }
+  function syncUi(){
+    const target=document.getElementById('printTargetSelect'),selected=target?.value===TARGET;
+    const old=document.getElementById('downloadMarklifeLabelXlsxBtn');if(old)old.hidden=true;
+    const nameBtn=document.getElementById('downloadMarklifeNameOrderBtn'),groupBtn=document.getElementById('downloadMarklifeGroupOrderBtn');
+    if(nameBtn)nameBtn.hidden=!selected;if(groupBtn)groupBtn.hidden=!selected;
+    if(!selected)return;
+    const nameCount=Math.round(nameOrderLabels().length/copies()),groupCount=Math.round(groupOrderLabels().length/copies());
+    if(groupBtn){groupBtn.disabled=groupCount===0;groupBtn.title=groupCount?'예선 조·자리 순서로 저장':'조편성 후 참가팀만 선택하면 사용할 수 있습니다.';}
+    const preview=document.getElementById('printPreview');if(preview)preview.innerHTML=`<div class="print-empty"><b>마크라이프 라벨 엑셀</b><br>이름순: 참가신청 원본 기준 ${nameCount}팀<br>조별순: 예선 대진표 기준 ${groupCount}팀<br>두 파일 모두 TeamLabel 한 열로 저장됩니다.</div>`;
+    const summary=document.getElementById('printPreviewSummary');if(summary)summary.textContent=`마크라이프 XLSX · 이름순 ${nameCount}팀 · 조별순 ${groupCount}팀`;
+  }
+  function install(){
+    const select=document.getElementById('printTargetSelect'),row=document.querySelector('.print-action-row');if(!select||!row)return;
+    const option=select.querySelector(`option[value="${TARGET}"]`);if(option)option.textContent='마크라이프 라벨 엑셀 (이름순·조별순)';
+    if(!document.getElementById('downloadMarklifeNameOrderBtn')){
+      const button=document.createElement('button');button.id='downloadMarklifeNameOrderBtn';button.type='button';button.className='btn btn-primary';button.textContent='이름순 엑셀 다운로드';button.hidden=true;button.addEventListener('click',()=>save(nameOrderLabels(),'이름순'));row.appendChild(button);
+    }
+    if(!document.getElementById('downloadMarklifeGroupOrderBtn')){
+      const button=document.createElement('button');button.id='downloadMarklifeGroupOrderBtn';button.type='button';button.className='btn btn-primary';button.textContent='조별순 엑셀 다운로드';button.hidden=true;button.addEventListener('click',()=>save(groupOrderLabels(),'조별순'));row.appendChild(button);
+    }
+    ['printTargetSelect','labelStatusSelect','labelCopySelect'].forEach(id=>document.getElementById(id)?.addEventListener('change',()=>setTimeout(syncUi,160)));
+    syncUi();
+  }
+  const previousSync=window.__stage51098SyncMarklifePrintUi;
+  window.__stage51098SyncMarklifePrintUi=function(){try{previousSync?.();}finally{syncUi();}};
+  window.__stage51099MarklifeNameOrderLabels=nameOrderLabels;
+  window.__stage51099MarklifeGroupOrderLabels=groupOrderLabels;
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,180),{once:true});else setTimeout(install,180);
+  window.addEventListener('pageshow',()=>setTimeout(syncUi,200));
+  console.info('[230MATCH] 5.10.99 ready · Marklife name-order + prelim group-order XLSX downloads');
+})();
