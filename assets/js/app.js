@@ -24323,3 +24323,34 @@ console.info('[230MATCH] 5.10.94 ready · current tournament podium requires off
 (function stage510102MarklifeMiddleDotSeparator(){
   console.info('[230MATCH] 5.10.102 ready · Marklife player names separated with middle dot');
 })();
+
+/* 230MATCH 5.10.103 · restore separate rank1 white and rank2 yellow main-draw label exports */
+(function stage510103RestoreSeparateMainCandidateExports(){
+  const TARGET='marklife-label-xlsx';
+  function plan(rank){
+    const buildPlan=window.__stage510100MainCandidatePlan;
+    return typeof buildPlan==='function'?buildPlan(rank):[];
+  }
+  function syncUi(){
+    const selected=document.getElementById('printTargetSelect')?.value===TARGET;
+    const white=document.getElementById('downloadMarklifeMainRank1Btn'),yellow=document.getElementById('downloadMarklifeMainRank2Btn'),common=document.getElementById('downloadMarklifeMainCommonBtn');
+    if(common)common.hidden=true;
+    if(white){white.hidden=!selected;white.textContent='본선 1위 후보 · 흰색 엑셀';}
+    if(yellow){yellow.hidden=!selected;yellow.textContent='본선 2위 후보 · 노란색 엑셀';}
+    if(!selected)return;
+    const one=plan(1),two=plan(2),oneLabels=one.reduce((sum,block)=>sum+block.labels.length,0),twoLabels=two.reduce((sum,block)=>sum+block.labels.length,0);
+    if(white){white.disabled=!one.length;white.title=one.length?`본선 조 1위 ${one.length}자리 순서 · 후보 ${oneLabels}장`:'조 1위 연결 슬롯이 없습니다.';}
+    if(yellow){yellow.disabled=!two.length;yellow.title=two.length?`본선 조 2위 ${two.length}자리 순서 · 후보 ${twoLabels}장`:'조 2위 연결 슬롯이 없습니다.';}
+    const preview=document.getElementById('printPreview');if(preview)preview.innerHTML=`<div class="print-empty"><b>본선 순서 후보 라벨</b><br>흰색: 본선 조 1위 슬롯 순서 · 후보 ${oneLabels}장<br>노란색: 본선 조 2위 슬롯 순서 · 후보 ${twoLabels}장<br>흰색 파일을 먼저 출력한 뒤 라벨지를 교체하고 노란색 파일을 별도로 출력하세요.<br>선수 이름은 가운데점(·)으로 구분됩니다.</div>`;
+    const summary=document.getElementById('printPreviewSummary');if(summary)summary.textContent=`본선 후보 라벨 · 1위 흰색 ${oneLabels}장 · 2위 노란색 ${twoLabels}장`;
+  }
+  function install(){
+    ['printTargetSelect','labelCopySelect'].forEach(id=>document.getElementById(id)?.addEventListener('change',()=>setTimeout(syncUi,240)));
+    syncUi();
+  }
+  const previousSync=window.__stage51098SyncMarklifePrintUi;
+  window.__stage51098SyncMarklifePrintUi=function(){try{previousSync?.();}finally{syncUi();}};
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,340),{once:true});else setTimeout(install,340);
+  window.addEventListener('pageshow',()=>setTimeout(syncUi,360));
+  console.info('[230MATCH] 5.10.103 ready · separate rank1 white and rank2 yellow main-draw label XLSX');
+})();
