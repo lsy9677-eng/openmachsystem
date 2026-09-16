@@ -24171,3 +24171,101 @@ console.info('[230MATCH] 5.10.94 ready · current tournament podium requires off
   window.addEventListener('pageshow',()=>setTimeout(syncUi,200));
   console.info('[230MATCH] 5.10.99 ready · Marklife name-order + prelim group-order XLSX downloads');
 })();
+
+/* 230MATCH 5.10.100 · preprint finalist candidate labels in actual main-draw slot order */
+(function stage510100MainSlotCandidateLabelExport(){
+  const TARGET='marklife-label-xlsx';
+  const normalize=value=>String(value||'')
+    .replace(/\([^)]*\)/g,'')
+    .replace(/\s*(?:\/|＆|&|,|ㆍ|·)\s*/g,'·')
+    .replace(/\s+/g,' ')
+    .replace(/^·+|·+$/g,'')
+    .trim();
+  function label(team){
+    try{
+      const names=(Array.isArray(team?.players)?team.players:[]).map(player=>String(player?.name||'').trim()).filter(Boolean);
+      if(names.length)return normalize(names.join('·'));
+      if(typeof portalTeamNamesOnly==='function')return normalize(portalTeamNamesOnly(team));
+      if(typeof printTeam==='function')return normalize(printTeam(team));
+    }catch(_e){}
+    return normalize(team?.teamName||team?.name||'');
+  }
+  function groupNumber(slot){
+    try{return Number(mainDrawGroupNo(slot)||0);}catch(_e){}
+    const key=String(slot?.placeholderKey||slot?.slotKey||''),name=String(slot?.name||slot?.label||'');
+    return Number(key.match(/(?:group|g)[-_ ]?(\d+)/i)?.[1]||name.match(/(\d+)\s*조/)?.[1]||slot?.groupNo||0);
+  }
+  function groupRank(slot){
+    try{return Number(mainDrawGroupRank(slot)||0);}catch(_e){}
+    const key=String(slot?.placeholderKey||slot?.slotKey||''),name=String(slot?.name||slot?.label||'');
+    return Number(key.match(/(?:rank|r)[-_ ]?(\d+)/i)?.[1]||name.match(/(?:조\s*)?(\d+)\s*위/)?.[1]||slot?.groupRank||0);
+  }
+  function firstRoundSlots(){
+    const size=Number(state?.draw?.size||0),round=Array.isArray(state?.draw?.rounds?.[size])?state.draw.rounds[size]:[];
+    const slots=[];round.forEach((match,matchIndex)=>{
+      slots.push({slotNo:matchIndex*2+1,team:match?.teamA||null});
+      slots.push({slotNo:matchIndex*2+2,team:match?.teamB||null});
+    });
+    return slots;
+  }
+  function groupTeams(groupNo){
+    const groups=Array.isArray(state?.prelim?.groups)?state.prelim.groups:[],group=groups.find((item,index)=>Number(item?.groupNo||String(item?.name||'').match(/\d+/)?.[0]||index+1)===Number(groupNo));
+    if(!group)return [];
+    if(Array.isArray(group.teams)&&group.teams.length)return group.teams;
+    return (group.teamIds||[]).map(id=>(state?.teams||[]).find(team=>String(team?.id||'')===String(id))).filter(Boolean);
+  }
+  function candidatePlan(rank){
+    const blocks=[];
+    firstRoundSlots().forEach(({slotNo,team})=>{
+      if(!team)return;
+      const slotRank=groupRank(team),groupNo=groupNumber(team);
+      if(slotRank!==Number(rank)||!groupNo)return;
+      const labels=groupTeams(groupNo).map(label).filter(Boolean);
+      if(labels.length)blocks.push({slotNo,groupNo,rank:slotRank,labels});
+    });
+    return blocks;
+  }
+  function flattened(rank){
+    const base=candidatePlan(rank).flatMap(block=>block.labels),copies=Math.max(1,Math.min(3,Number(document.getElementById('labelCopySelect')?.value||1)));
+    return Array.from({length:copies},()=>base).flat();
+  }
+  function safeName(value){return String(value||'230MATCH').replace(/[\\/:*?"<>|]+/g,'_').replace(/\s+/g,'_').replace(/^_+|_+$/g,'').slice(0,80)||'230MATCH';}
+  function download(rank,colorLabel){
+    const blocks=candidatePlan(rank),labels=flattened(rank);
+    if(!blocks.length||!labels.length){notice('현재 본선 1회전 대진표에서 조 순위 연결 슬롯을 찾지 못했습니다. 예선 슬롯 본선 추첨을 먼저 확인하세요.','warning');return false;}
+    const build=window.__stage51098BuildMarklifeXlsxFromLabels;if(typeof build!=='function'){notice('마크라이프 엑셀 생성기를 불러오지 못했습니다.','error');return false;}
+    const bytes=build(labels),blob=new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+    const tournament=safeName(state?.tournament?.name),division=safeName(state?.tournament?.division||''),teamCount=blocks.reduce((sum,block)=>sum+block.labels.length,0);
+    a.href=url;a.download=`${tournament}${division?'_'+division:''}_본선순서_조${rank}위후보_${colorLabel}라벨_${teamCount}장.xlsx`;a.style.display='none';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000);
+    notice(`본선순서 조 ${rank}위 후보 ${colorLabel}라벨 ${labels.length}장을 저장했습니다.`,'success');return true;
+  }
+  function syncUi(){
+    const selected=document.getElementById('printTargetSelect')?.value===TARGET;
+    const white=document.getElementById('downloadMarklifeMainRank1Btn'),yellow=document.getElementById('downloadMarklifeMainRank2Btn');
+    if(white)white.hidden=!selected;if(yellow)yellow.hidden=!selected;
+    if(!selected)return;
+    const one=candidatePlan(1),two=candidatePlan(2),oneLabels=one.reduce((sum,block)=>sum+block.labels.length,0),twoLabels=two.reduce((sum,block)=>sum+block.labels.length,0);
+    if(white){white.disabled=!one.length;white.title=one.length?`본선 ${one.length}자리 · 후보 ${oneLabels}장`:'조 1위 연결 슬롯이 없습니다.';}
+    if(yellow){yellow.disabled=!two.length;yellow.title=two.length?`본선 ${two.length}자리 · 후보 ${twoLabels}장`:'조 2위 연결 슬롯이 없습니다.';}
+    const preview=document.getElementById('printPreview');if(preview)preview.innerHTML=`<div class="print-empty"><b>본선 자리 후보 라벨 미리 출력</b><br>조 1위 흰색: 본선 ${one.length}자리 · 후보 ${oneLabels}장<br>조 2위 노란색: 본선 ${two.length}자리 · 후보 ${twoLabels}장<br>현재 본선 1회전 슬롯 순서대로 같은 조 후보가 연속 저장됩니다.</div>`;
+    const summary=document.getElementById('printPreviewSummary');if(summary)summary.textContent=`본선순서 후보 라벨 · 흰색 ${oneLabels}장 · 노란색 ${twoLabels}장`;
+  }
+  function install(){
+    const row=document.querySelector('.print-action-row');if(!row)return;
+    if(!document.getElementById('downloadMarklifeMainRank1Btn')){
+      const button=document.createElement('button');button.id='downloadMarklifeMainRank1Btn';button.type='button';button.className='btn btn-light';button.textContent='본선 1위후보 · 흰색 엑셀';button.hidden=true;button.addEventListener('click',()=>download(1,'흰색'));row.appendChild(button);
+    }
+    if(!document.getElementById('downloadMarklifeMainRank2Btn')){
+      const button=document.createElement('button');button.id='downloadMarklifeMainRank2Btn';button.type='button';button.className='btn btn-light';button.textContent='본선 2위후보 · 노란색 엑셀';button.hidden=true;button.addEventListener('click',()=>download(2,'노란색'));row.appendChild(button);
+    }
+    ['printTargetSelect','labelCopySelect'].forEach(id=>document.getElementById(id)?.addEventListener('change',()=>setTimeout(syncUi,190)));
+    syncUi();
+  }
+  const previousSync=window.__stage51098SyncMarklifePrintUi;
+  window.__stage51098SyncMarklifePrintUi=function(){try{previousSync?.();}finally{syncUi();}};
+  window.__stage510100MainCandidatePlan=candidatePlan;
+  window.__stage510100MainCandidateLabels=flattened;
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,240),{once:true});else setTimeout(install,240);
+  window.addEventListener('pageshow',()=>setTimeout(syncUi,260));
+  console.info('[230MATCH] 5.10.100 ready · main draw slot-order rank1 white + rank2 yellow candidate labels');
+})();
