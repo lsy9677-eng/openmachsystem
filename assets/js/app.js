@@ -17495,7 +17495,7 @@ console.info('[230MATCH] 71.3.3 ready · classic direct SMS rebuild');
   printPrelimAssignmentHtml=window.printPrelimAssignmentHtml=function(){
     const cards=assignmentData547();
     if(!cards.length)return `<header class="assignment547-title"><h1>시합 전 조편성·코트 배정표</h1><p>${esc(state.tournament?.name||'230MATCH 대회')}${state.tournament?.division?` · ${esc(state.tournament.division)}`:''}</p></header><div class="print-empty">생성된 예선 조편성이 없습니다.</div>`;
-    const html=cards.map(card=>`<article class="assignment-group-card assignment547-card"><div class="assignment-group-head"><b>${esc(card.name)}</b><span>${esc(card.court)} · <em>${esc(card.estimate)}</em></span></div><ol>${card.teams.map(team=>`<li><em>${team.n}</em><strong title="${esc(team.label)}">${esc(team.label)}</strong>${team.firstTime?`<small class="assignment547-firsttime">${esc(team.firstTime)}</small>`:''}</li>`).join('')}</ol><div class="assignment-order">${card.orders.map(o=>`<span>${o.time?`<b>${esc(o.time)}</b> · `:''}${esc(o.text)}</span>`).join('')}</div></article>`).join('');
+    const html=cards.map(card=>`<article class="assignment-group-card assignment547-card"><div class="assignment-group-head"><b>${esc(card.name)}</b><span>${esc(card.court)} · <em>${esc(card.estimate)}</em></span></div><ol>${card.teams.map(team=>`<li><em>${team.n}</em><strong title="${esc(team.label)}">${esc(team.label)}</strong></li>`).join('')}</ol><div class="assignment-order">${card.orders.map(o=>`<span>${o.time?`<b>${esc(o.time)}</b> · `:''}${esc(o.text)}</span>`).join('')}</div></article>`).join('');
     const timing=scheduleTiming547();
     return `<header class="assignment547-title"><h1>시합 전 조편성·코트 배정표</h1><p>${esc(state.tournament?.name||'230MATCH 대회')}${state.tournament?.division?` · ${esc(state.tournament.division)}`:''}</p></header><div class="assignment-summary assignment547-summary"><div class="assignment547-summary-main"><b>${cards.length}개 조 · ${cards.reduce((sum,card)=>sum+(Array.isArray(card.teams)?card.teams.length:0),0)}팀</b><span>${esc(timing.startLabel)} 시작 · 경기당 ${timing.slotMinutes}분 · 각 선수 첫 경기 예상시간</span></div><div class="assignment547-warning">※ 예상 시합시간은 경기 진행에 따라 변동되며 더 빨라질 수 있습니다. 최소 예상시간 20분 전까지 출전신고 바랍니다.</div></div><div class="assignment-grid assignment547-grid">${html}</div>`;
   };
@@ -24570,4 +24570,43 @@ console.info('[230MATCH] 5.10.94 ready · current tournament podium requires off
 (function stage510108PromoteWritablePrelimStyle(){
   const style=document.getElementById('stage510107WritablePrelimRankingStyle');
   if(style)document.head.appendChild(style);
+})();
+
+/* 230MATCH 5.10.109 · assignment PNG uses the same DOM as preview/PDF */
+(function stage510109UnifyAssignmentPngAndPrint(){
+  const style=document.createElement('style');
+  style.id='stage510109AssignmentUnifiedStyle';
+  style.textContent=`
+    #printPreview .assignment-print-sheet .assignment547-card li{
+      grid-template-columns:12px minmax(0,1fr)!important;
+    }
+    #printPreview .assignment-print-sheet .assignment547-firsttime{display:none!important}
+    @media print{
+      body.printing-output #printOutputRoot .assignment-print-sheet .assignment547-card li{
+        grid-template-columns:3.4mm minmax(0,1fr)!important;
+      }
+      body.printing-output #printOutputRoot .assignment-print-sheet .assignment547-firsttime{display:none!important}
+    }
+  `;
+  document.head.appendChild(style);
+
+  window.addEventListener('click',event=>{
+    const button=event.target?.closest?.('#savePrintImageBtn');
+    if(!button)return;
+    const target=document.getElementById('printTargetSelect')?.value||'';
+    if(target!=='prelim-assignment')return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    void (async()=>{
+      try{
+        const doc=buildPrintDocument();
+        await saveRichPrintPreviewPng(doc);
+      }catch(error){
+        console.error('[5.10.109 assignment PNG]',error);
+        notice(error?.message||'이미지 저장 중 오류가 발생했습니다.','error');
+      }
+    })();
+  },true);
+  console.info('[230MATCH] 5.10.109 ready · assignment preview/PDF/PNG unified and duplicate team time removed');
 })();
