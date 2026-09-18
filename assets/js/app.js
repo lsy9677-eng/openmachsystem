@@ -9583,6 +9583,7 @@ function buildPrintDocument(){
   let orientation=document.getElementById('printOrientationSelect')?.value||'portrait';
   const tone=document.getElementById('printToneSelect')?.value||'color';
   let scale=document.getElementById('printScaleSelect')?.value||'normal';
+  if(target==='prelim'){paper='a3';orientation='landscape';scale='small';}
   if(target==='bracket'){paper=(paper==='a3'?'a3':'a4');orientation='landscape';}
   if(target==='bracket-field'){paper=(paper==='a3'?'a3':'a4');orientation='landscape';scale='normal';}
   if(target==='prize-signature'){paper='a4';orientation='landscape';scale='normal';}
@@ -9590,7 +9591,7 @@ function buildPrintDocument(){
   const labels={prelim:'예선 조편성·순위표','prelim-assignment':'시합 전 조편성·코트 배정표',bracket:'본선 대진표 그대로 출력','bracket-field':'본선 현장용 수기 대진표',participants:'참가자 명단',labels:'참가자 라벨지',courts:'코트별 경기 현황',results:'최종 입상 결과표','prize-signature':'입상자 서명부 (A4 가로)'};
   const body=(map[target]||printPrelimHtml)();
   const isLabels=target==='labels';
-  const specialClass=target==='prelim-assignment'?'assignment-print-sheet':target==='bracket'?'bracket-tree-print-sheet':target==='bracket-field'?'stage51038-field-print-sheet':'';
+  const specialClass=target==='prelim'?'prelim-ranking-print-sheet':target==='prelim-assignment'?'assignment-print-sheet':target==='bracket'?'bracket-tree-print-sheet':target==='bracket-field'?'stage51038-field-print-sheet':'';
   return {target,label:labels[target],paper,orientation,tone,scale,html:`<article class="print-sheet paper-${paper} ${orientation} ${tone} scale-${scale} ${isLabels?'label-print-sheet':''} ${specialClass}">${body}${isLabels||target==='bracket-field'?'':`<footer class="print-footer">230MATCH · ${printEscape(BUILD_LABEL)}</footer>`}</article>`};
 }
 let __stage51070PrintPreviewTimer=0;
@@ -23683,7 +23684,11 @@ console.log('[230MATCH] 5.10.84 ready · same-origin notice image attachment dow
 
     // Only outputs that are structurally fixed keep forced orientation/scale.
     // The prelim assignment sheet now respects the user's paper/orientation/text-size choices.
-    if(target==='labels'){
+    if(target==='prelim'){
+      if(paper)paper.value='a3';
+      if(orientation)orientation.value='landscape';
+      if(scale)scale.value='small';
+    }else if(target==='labels'){
       if(paper)paper.value='a4';
       if(orientation)orientation.value='portrait';
     }else if(target==='bracket'){
@@ -24353,4 +24358,72 @@ console.info('[230MATCH] 5.10.94 ready · current tournament podium requires off
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,340),{once:true});else setTimeout(install,340);
   window.addEventListener('pageshow',()=>setTimeout(syncUi,360));
   console.info('[230MATCH] 5.10.103 ready · separate rank1 white and rank2 yellow main-draw label XLSX');
+})();
+
+/* 230MATCH 5.10.104 · prelim ranking PDF/PNG unified as one A3 landscape sheet */
+(function stage510104UnifiedPrelimRankingOutput(){
+  const previousSavePrintPng=savePrintPng;
+  savePrintPng=async function(){
+    const doc=buildPrintDocument();
+    if(doc.target==='prelim')return saveRichPrintPreviewPng(doc);
+    return previousSavePrintPng.apply(this,arguments);
+  };
+  const style=document.createElement('style');
+  style.id='stage510104PrelimRankingA3Style';
+  style.textContent=`
+    #printPreview .prelim-ranking-print-sheet{
+      box-sizing:border-box!important;
+      width:min(100%,1380px)!important;
+      min-height:0!important;
+      aspect-ratio:420/297!important;
+      padding:14px!important;
+      overflow:hidden!important;
+      display:flex!important;
+      flex-direction:column!important;
+    }
+    #printPreview .prelim-ranking-print-sheet .print-title{flex:0 0 auto!important;margin:0 0 4px!important;padding:0 0 4px!important}
+    #printPreview .prelim-ranking-print-sheet .print-title h1{font-size:18px!important;line-height:1.05!important;margin:0 0 2px!important}
+    #printPreview .prelim-ranking-print-sheet .print-title p{font-size:9px!important;line-height:1!important;margin:0!important}
+    #printPreview .prelim-ranking-print-sheet .print-meta{flex:0 0 auto!important;font-size:7px!important;line-height:1!important;margin:3px 0 5px!important}
+    #printPreview .prelim-ranking-print-sheet .print-grid{flex:1 1 auto!important;min-height:0!important;display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;grid-template-rows:repeat(8,minmax(0,1fr))!important;gap:4px!important;align-content:stretch!important}
+    #printPreview .prelim-ranking-print-sheet .print-card{box-sizing:border-box!important;height:100%!important;min-height:0!important;padding:3px 4px!important;border-radius:4px!important;overflow:hidden!important;display:flex!important;flex-direction:column!important}
+    #printPreview .prelim-ranking-print-sheet .print-card h3{flex:0 0 auto!important;font-size:8px!important;line-height:1!important;margin:0 0 2px!important;padding:0 0 2px!important}
+    #printPreview .prelim-ranking-print-sheet .print-table{flex:0 0 auto!important;table-layout:fixed!important;font-size:6.5px!important;line-height:1!important}
+    #printPreview .prelim-ranking-print-sheet .print-table th,#printPreview .prelim-ranking-print-sheet .print-table td{padding:1px 2px!important;line-height:1!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+    #printPreview .prelim-ranking-print-sheet .print-table th:first-child,#printPreview .prelim-ranking-print-sheet .print-table td:first-child{width:20px!important}
+    #printPreview .prelim-ranking-print-sheet .print-table th:nth-last-child(-n+2),#printPreview .prelim-ranking-print-sheet .print-table td:nth-last-child(-n+2){width:17px!important}
+    #printPreview .prelim-ranking-print-sheet .print-card>div:last-child{flex:1 1 auto!important;min-height:0!important;margin-top:2px!important;font-size:5.8px!important;line-height:1.05!important;overflow:hidden!important}
+    #printPreview .prelim-ranking-print-sheet .print-footer{display:none!important}
+    @media print{
+      body.printing-output #printOutputRoot .prelim-ranking-print-sheet.paper-a3.landscape{
+        box-sizing:border-box!important;
+        width:407mm!important;
+        height:284mm!important;
+        min-height:284mm!important;
+        max-height:284mm!important;
+        margin:0 auto!important;
+        padding:0!important;
+        overflow:hidden!important;
+        display:flex!important;
+        flex-direction:column!important;
+        break-inside:avoid!important;
+        page-break-inside:avoid!important;
+      }
+      body.printing-output #printOutputRoot .prelim-ranking-print-sheet .print-title{flex:0 0 auto!important;margin:0 0 1mm!important;padding:0 0 1mm!important}
+      body.printing-output #printOutputRoot .prelim-ranking-print-sheet .print-title h1{font-size:14pt!important;line-height:1!important;margin:0 0 .5mm!important}
+      body.printing-output #printOutputRoot .prelim-ranking-print-sheet .print-title p{font-size:7pt!important;line-height:1!important;margin:0!important}
+      body.printing-output #printOutputRoot .prelim-ranking-print-sheet .print-meta{flex:0 0 auto!important;font-size:6pt!important;line-height:1!important;margin:.7mm 0 1mm!important}
+      body.printing-output #printOutputRoot .prelim-ranking-print-sheet .print-grid{flex:1 1 auto!important;height:0!important;min-height:0!important;display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;grid-template-rows:repeat(8,minmax(0,1fr))!important;gap:.8mm!important;align-content:stretch!important;overflow:hidden!important}
+      body.printing-output #printOutputRoot .prelim-ranking-print-sheet .print-card{box-sizing:border-box!important;height:100%!important;min-height:0!important;padding:.7mm 1mm!important;border-radius:1mm!important;overflow:hidden!important;display:flex!important;flex-direction:column!important;break-inside:avoid!important;page-break-inside:avoid!important}
+      body.printing-output #printOutputRoot .prelim-ranking-print-sheet .print-card h3{flex:0 0 auto!important;font-size:7pt!important;line-height:1!important;margin:0 0 .5mm!important;padding:0 0 .5mm!important}
+      body.printing-output #printOutputRoot .prelim-ranking-print-sheet .print-table{flex:0 0 auto!important;table-layout:fixed!important;font-size:5.8pt!important;line-height:1!important}
+      body.printing-output #printOutputRoot .prelim-ranking-print-sheet .print-table th,body.printing-output #printOutputRoot .prelim-ranking-print-sheet .print-table td{padding:.35mm .55mm!important;line-height:1!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+      body.printing-output #printOutputRoot .prelim-ranking-print-sheet .print-table th:first-child,body.printing-output #printOutputRoot .prelim-ranking-print-sheet .print-table td:first-child{width:7mm!important}
+      body.printing-output #printOutputRoot .prelim-ranking-print-sheet .print-table th:nth-last-child(-n+2),body.printing-output #printOutputRoot .prelim-ranking-print-sheet .print-table td:nth-last-child(-n+2){width:6mm!important}
+      body.printing-output #printOutputRoot .prelim-ranking-print-sheet .print-card>div:last-child{flex:1 1 auto!important;min-height:0!important;margin-top:.55mm!important;font-size:5.2pt!important;line-height:1.05!important;overflow:hidden!important}
+      body.printing-output #printOutputRoot .prelim-ranking-print-sheet .print-footer{display:none!important}
+    }
+  `;
+  document.head.appendChild(style);
+  console.info('[230MATCH] 5.10.104 ready · prelim ranking PDF/PNG share one A3 landscape card layout');
 })();
