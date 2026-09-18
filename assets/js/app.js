@@ -24427,3 +24427,114 @@ console.info('[230MATCH] 5.10.94 ready · current tournament podium requires off
   document.head.appendChild(style);
   console.info('[230MATCH] 5.10.104 ready · prelim ranking PDF/PNG share one A3 landscape card layout');
 })();
+
+/* 230MATCH 5.10.105 · readable compact prelim assignment cards without internal blank space */
+(function stage510105ReadablePrelimAssignment(){
+  const style=document.createElement('style');
+  style.id='stage510105ReadableAssignmentStyle';
+  style.textContent=`
+    #printPreview .assignment-print-sheet .assignment547-grid{
+      grid-template-columns:repeat(3,minmax(0,1fr))!important;
+      grid-template-rows:repeat(11,max-content)!important;
+      grid-auto-rows:max-content!important;
+      align-content:space-between!important;
+      gap:5px!important;
+    }
+    #printPreview .assignment-print-sheet .assignment547-card{
+      height:auto!important;
+      min-height:0!important;
+    }
+    #printPreview .assignment-print-sheet .assignment547-card .assignment-group-head{
+      padding:3px 6px!important;
+    }
+    #printPreview .assignment-print-sheet .assignment547-card .assignment-group-head b{
+      font-size:11px!important;
+      line-height:1.05!important;
+    }
+    #printPreview .assignment-print-sheet .assignment547-card .assignment-group-head span{
+      font-size:10px!important;
+      line-height:1.05!important;
+    }
+    #printPreview .assignment-print-sheet .assignment547-card ol{
+      flex:0 0 auto!important;
+      min-height:0!important;
+      padding:2px 6px!important;
+      gap:0!important;
+    }
+    #printPreview .assignment-print-sheet .assignment547-card li{
+      grid-template-columns:14px minmax(0,1fr) auto!important;
+      gap:3px!important;
+      min-height:17px!important;
+      font-size:9.5px!important;
+      line-height:1.12!important;
+    }
+    #printPreview .assignment-print-sheet .assignment547-card li em{
+      font-size:8.5px!important;
+    }
+    #printPreview .assignment-print-sheet .assignment547-firsttime{
+      font-size:8.5px!important;
+    }
+    #printPreview .assignment-print-sheet .assignment547-card .assignment-order{
+      flex:0 0 auto!important;
+      min-height:0!important;
+      padding:2px 6px 3px!important;
+      font-size:8px!important;
+      line-height:1.1!important;
+    }
+    @media print{
+      body.printing-output #printOutputRoot .assignment-print-sheet.paper-a4.landscape .assignment547-grid{
+        grid-template-columns:repeat(3,minmax(0,1fr))!important;
+        grid-template-rows:repeat(11,max-content)!important;
+        grid-auto-rows:max-content!important;
+        align-content:space-between!important;
+        gap:.8mm!important;
+        height:auto!important;
+        overflow:visible!important;
+      }
+      body.printing-output #printOutputRoot .assignment-print-sheet.paper-a4.landscape .assignment547-card{
+        height:auto!important;
+        min-height:0!important;
+        overflow:hidden!important;
+      }
+      body.printing-output #printOutputRoot .assignment-print-sheet.paper-a4.landscape .assignment547-card .assignment-group-head{
+        padding:.55mm 1.15mm!important;
+      }
+      body.printing-output #printOutputRoot .assignment-print-sheet.paper-a4.landscape .assignment547-card .assignment-group-head b{
+        font-size:8.8pt!important;
+        line-height:1.02!important;
+      }
+      body.printing-output #printOutputRoot .assignment-print-sheet.paper-a4.landscape .assignment547-card .assignment-group-head span{
+        font-size:7.8pt!important;
+        line-height:1.02!important;
+      }
+      body.printing-output #printOutputRoot .assignment-print-sheet.paper-a4.landscape .assignment547-card ol{
+        flex:0 0 auto!important;
+        min-height:0!important;
+        padding:.35mm 1.15mm!important;
+        gap:0!important;
+      }
+      body.printing-output #printOutputRoot .assignment-print-sheet.paper-a4.landscape .assignment547-card li{
+        grid-template-columns:3.5mm minmax(0,1fr) auto!important;
+        gap:.55mm!important;
+        min-height:3.9mm!important;
+        font-size:7.75pt!important;
+        line-height:1.06!important;
+      }
+      body.printing-output #printOutputRoot .assignment-print-sheet.paper-a4.landscape .assignment547-card li em{
+        font-size:7pt!important;
+      }
+      body.printing-output #printOutputRoot .assignment-print-sheet.paper-a4.landscape .assignment547-firsttime{
+        font-size:6.9pt!important;
+      }
+      body.printing-output #printOutputRoot .assignment-print-sheet.paper-a4.landscape .assignment547-card .assignment-order{
+        flex:0 0 auto!important;
+        min-height:0!important;
+        padding:.35mm 1.15mm .45mm!important;
+        font-size:6.7pt!important;
+        line-height:1.05!important;
+      }
+    }
+  `;
+  document.head.appendChild(style);
+  console.info('[230MATCH] 5.10.105 ready · readable prelim assignment cards with content-fit rows');
+})();
