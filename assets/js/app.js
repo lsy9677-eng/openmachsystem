@@ -9231,8 +9231,8 @@ function printFieldBracketHtml(){
   document.head.appendChild(st);
 })();
 
-/* 230MATCH 5.10.107 · A4 writable prelim ranking sheet (player names only) */
-(function stage510107WritablePrelimRanking(){
+/* 230MATCH 5.10.108 · two-team score sheet + three-team group status print */
+(function stage510108AdaptivePrelimRanking(){
   function teamPlayerNames(team){
     try{
       const names=typeof stage5956PlayerObjectsFromTeam==='function'
@@ -9253,23 +9253,39 @@ function printFieldBracketHtml(){
     }
     const groups=state.prelim?.groups||[],matches=state.prelim?.matches||[];
     if(!groups.length)return printHeader('예선 조편성·순위표')+'<div class="print-empty">생성된 예선 조편성이 없습니다.</div>';
+    const hasThreeTeamGroups=groups.some(group=>(group.teams||group.teamIds||[]).filter(Boolean).length>=3);
+    const pageSize=hasThreeTeamGroups?16:32;
     const chunks=[];
-    for(let i=0;i<groups.length;i+=32)chunks.push(groups.slice(i,i+32));
+    for(let i=0;i<groups.length;i+=pageSize)chunks.push(groups.slice(i,i+pageSize));
     return chunks.map((pageGroups,pageIndex)=>{
       const cards=pageGroups.map((group,localIndex)=>{
-        const groupIndex=pageIndex*32+localIndex;
+        const groupIndex=pageIndex*pageSize+localIndex;
         const teams=group.teams||group.teamIds?.map(id=>(state.teams||[]).find(team=>team.id===id)).filter(Boolean)||[];
         const standings=group.standings||state.prelim?.standings?.[group.id]||[];
         const groupMatches=matches.filter(match=>match.groupId===group.id);
-        const resultsEntered=groupMatches.some(match=>match.status==='completed');
+        if(teams.length<=2){
+          const match=groupMatches[0]||null;
+          const scoreFor=team=>{
+            if(!match||match.status!=='completed')return '';
+            const id=String(team?.id||team?.teamId||''),a=String(match.teamA?.id||match.teamA?.teamId||''),b=String(match.teamB?.id||match.teamB?.teamId||'');
+            return id&&id===a?match.scoreA:id&&id===b?match.scoreB:'';
+          };
+          const rows=teams.map(team=>`<div class="stage510108-score-row"><strong>${printEscape(teamPlayerNames(team))}</strong><span>${printEscape(scoreFor(team))||'&nbsp;'}</span></div>`).join('');
+          return `<article class="print-card stage510107-ranking-card stage510108-two-team-card"><h3>${printEscape(group.name||`${groupIndex+1}조`)}</h3><div class="stage510108-score-board"><div class="stage510108-score-head"><b>선수 이름</b><b>스코어</b></div>${rows}</div></article>`;
+        }
         const rows=teams.map((team,index)=>{
-          const standing=standings.find?.(row=>row.teamId===team?.id)||standings[index]||{};
-          const rank=resultsEntered?(standing.rank??''):'',wins=resultsEntered?(standing.wins??''):'',losses=resultsEntered?(standing.losses??''):'';
-          return `<tr><td class="center writable-cell">${printEscape(rank)||'&nbsp;'}</td><td class="player-names">${printEscape(teamPlayerNames(team))}</td><td class="center writable-cell">${printEscape(wins)||'&nbsp;'}</td><td class="center writable-cell">${printEscape(losses)||'&nbsp;'}</td></tr>`;
+          const standing=standings.find?.(row=>String(row.teamId||row.team?.id||'')===String(team?.id||team?.teamId||''))||standings[index]||{};
+          const played=Number(standing.played||0)>0;
+          const value=key=>played?(standing[key]??''):'';
+          return `<tr><td class="center">${printEscape(played?(standing.rank??index+1):'')||'&nbsp;'}</td><td class="player-names">${printEscape(teamPlayerNames(team))}</td><td class="center">${printEscape(value('pointsFor'))||'&nbsp;'}</td><td class="center">${printEscape(value('pointsAgainst'))||'&nbsp;'}</td><td class="center">${printEscape(value('wins'))||'&nbsp;'}</td><td class="center">${printEscape(value('losses'))||'&nbsp;'}</td></tr>`;
         }).join('');
-        return `<article class="print-card stage510107-ranking-card"><h3>${printEscape(group.name||`${groupIndex+1}조`)}</h3><table class="print-table"><thead><tr><th>순위</th><th>선수 이름</th><th class="center">승</th><th class="center">패</th></tr></thead><tbody>${rows}</tbody></table></article>`;
+        const matchRows=groupMatches.sort((a,b)=>(a.matchNo||0)-(b.matchNo||0)).map((match,index)=>{
+          const score=match.status==='completed'?`${match.scoreA??''} : ${match.scoreB??''}`:'____ : ____';
+          return `<div class="stage510108-match-row"><b>${match.matchNo||index+1}경기</b><span>${printEscape(teamPlayerNames(match.teamA))} vs ${printEscape(teamPlayerNames(match.teamB))}</span><em>${printEscape(score)}</em></div>`;
+        }).join('');
+        return `<article class="print-card stage510107-ranking-card stage510108-three-team-card"><h3>${printEscape(group.name||`${groupIndex+1}조`)}</h3><table class="print-table stage510108-standing-table"><thead><tr><th>순위</th><th>선수 이름</th><th>득</th><th>실</th><th>승</th><th>패</th></tr></thead><tbody>${rows}</tbody></table><div class="stage510108-match-list">${matchRows}</div></article>`;
       }).join('');
-      return `<section class="stage510107-prelim-page">${printHeader('예선 조편성·순위표')}<div class="stage510107-ranking-note">클럽명 제외 · 순위/승/패 현장 기록용${chunks.length>1?` · ${pageIndex+1}/${chunks.length}`:''}</div><div class="print-grid">${cards}</div></section>`;
+      return `<section class="stage510107-prelim-page ${hasThreeTeamGroups?'stage510108-three-team-page':'stage510108-two-team-page'}">${printHeader('예선 조편성·순위표')}<div class="stage510107-ranking-note">클럽명 제외 · ${hasThreeTeamGroups?'조별현황/경기결과 기록용':'2팀조 스코어 기록용'}${chunks.length>1?` · ${pageIndex+1}/${chunks.length}`:''}</div><div class="print-grid">${cards}</div></section>`;
     }).join('');
   };
 
@@ -9294,6 +9310,25 @@ function printFieldBracketHtml(){
     .stage510107-prelim-page .print-table th:nth-last-child(-n+2),.stage510107-prelim-page .print-table td:nth-last-child(-n+2){width:20px!important}
     .stage510107-prelim-page .print-table tbody tr{height:50%!important}
     .stage510107-prelim-page .print-table .player-names{font-weight:650!important;font-size:7.4px!important}
+    .stage510108-score-board{flex:1 1 auto;min-height:0;display:grid;grid-template-rows:14px repeat(2,minmax(0,1fr));border-top:1px solid #91a7c6;border-left:1px solid #91a7c6}
+    .stage510108-score-head,.stage510108-score-row{display:grid;grid-template-columns:minmax(0,1fr) 48px;min-height:0}
+    .stage510108-score-head>*{display:flex;align-items:center;padding:1px 6px;background:#eef3f8;border-right:1px solid #91a7c6;border-bottom:1px solid #91a7c6;font-size:7px;line-height:1}
+    .stage510108-score-head>*:last-child{justify-content:center}
+    .stage510108-score-row>*{display:flex;align-items:center;padding:1px 6px;border-right:1px solid #91a7c6;border-bottom:1px solid #91a7c6;line-height:1.15}
+    .stage510108-score-row strong{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .stage510108-score-row span{justify-content:center;font-size:11px;font-weight:800}
+    .stage510107-prelim-page.stage510108-two-team-page .stage510108-score-table th:first-child,.stage510107-prelim-page.stage510108-two-team-page .stage510108-score-table td:first-child{width:auto!important}
+    .stage510107-prelim-page.stage510108-two-team-page .stage510108-score-table th:last-child,.stage510107-prelim-page.stage510108-two-team-page .stage510108-score-table td:last-child{width:48px!important}
+    .stage510107-prelim-page.stage510108-two-team-page .stage510108-score-table .player-names{font-size:10px!important;line-height:1.15!important;padding-left:6px!important}
+    .stage510107-prelim-page.stage510108-two-team-page .stage510108-score-table .score-cell{font-size:11px!important;font-weight:800!important}
+    .stage510107-prelim-page.stage510108-three-team-page .print-grid{grid-template-rows:repeat(4,minmax(0,1fr))!important}
+    .stage510107-prelim-page .stage510108-standing-table th:first-child,.stage510107-prelim-page .stage510108-standing-table td:first-child{width:24px!important}
+    .stage510107-prelim-page .stage510108-standing-table th:nth-child(n+3),.stage510107-prelim-page .stage510108-standing-table td:nth-child(n+3){width:20px!important}
+    .stage510107-prelim-page .stage510108-standing-table tbody tr{height:auto!important}
+    .stage510108-match-list{display:grid;grid-template-columns:1fr;gap:1px;margin-top:2px;min-height:0}
+    .stage510108-match-row{display:grid;grid-template-columns:30px minmax(0,1fr) 48px;align-items:center;gap:3px;font-size:6.4px;line-height:1.1;padding:1px 2px;background:#f8fafc;border:1px solid #dbe4ef}
+    .stage510108-match-row span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .stage510108-match-row em{text-align:center;font-style:normal;font-weight:800}
     @media print{
       body.printing-output #printOutputRoot .prelim-ranking-print-sheet.paper-a4.landscape{box-sizing:border-box!important;width:285mm!important;min-height:0!important;height:auto!important;max-height:none!important;margin:0 auto!important;padding:0!important;overflow:visible!important;display:block!important}
       body.printing-output #printOutputRoot .prelim-ranking-print-sheet>.print-footer{display:none!important}
@@ -9312,10 +9347,26 @@ function printFieldBracketHtml(){
       body.printing-output #printOutputRoot .stage510107-prelim-page .print-table th:first-child,body.printing-output #printOutputRoot .stage510107-prelim-page .print-table td:first-child{width:7.5mm!important}
       body.printing-output #printOutputRoot .stage510107-prelim-page .print-table th:nth-last-child(-n+2),body.printing-output #printOutputRoot .stage510107-prelim-page .print-table td:nth-last-child(-n+2){width:6.5mm!important}
       body.printing-output #printOutputRoot .stage510107-prelim-page .print-table .player-names{font-size:6.4pt!important;font-weight:650!important}
+      body.printing-output #printOutputRoot .stage510108-score-board{grid-template-rows:3.7mm repeat(2,minmax(0,1fr));border-top:.25mm solid #91a7c6;border-left:.25mm solid #91a7c6}
+      body.printing-output #printOutputRoot .stage510108-score-head,body.printing-output #printOutputRoot .stage510108-score-row{grid-template-columns:minmax(0,1fr) 13mm}
+      body.printing-output #printOutputRoot .stage510108-score-head>*{padding:.3mm 1.6mm;border-right:.25mm solid #91a7c6;border-bottom:.25mm solid #91a7c6;font-size:6pt}
+      body.printing-output #printOutputRoot .stage510108-score-row>*{padding:.3mm 1.6mm;border-right:.25mm solid #91a7c6;border-bottom:.25mm solid #91a7c6}
+      body.printing-output #printOutputRoot .stage510108-score-row strong{font-size:8.2pt;line-height:1.15}
+      body.printing-output #printOutputRoot .stage510108-score-row span{font-size:9pt}
+      body.printing-output #printOutputRoot .stage510107-prelim-page.stage510108-two-team-page .stage510108-score-table th:first-child,body.printing-output #printOutputRoot .stage510107-prelim-page.stage510108-two-team-page .stage510108-score-table td:first-child{width:auto!important}
+      body.printing-output #printOutputRoot .stage510107-prelim-page.stage510108-two-team-page .stage510108-score-table th:last-child,body.printing-output #printOutputRoot .stage510107-prelim-page.stage510108-two-team-page .stage510108-score-table td:last-child{width:13mm!important}
+      body.printing-output #printOutputRoot .stage510107-prelim-page.stage510108-two-team-page .stage510108-score-table .player-names{font-size:8.2pt!important;line-height:1.15!important;padding-left:1.6mm!important}
+      body.printing-output #printOutputRoot .stage510107-prelim-page.stage510108-two-team-page .stage510108-score-table .score-cell{font-size:9pt!important;font-weight:800!important}
+      body.printing-output #printOutputRoot .stage510107-prelim-page.stage510108-three-team-page .print-grid{grid-template-rows:repeat(4,minmax(0,1fr))!important}
+      body.printing-output #printOutputRoot .stage510107-prelim-page .stage510108-standing-table th:first-child,body.printing-output #printOutputRoot .stage510107-prelim-page .stage510108-standing-table td:first-child{width:7mm!important}
+      body.printing-output #printOutputRoot .stage510107-prelim-page .stage510108-standing-table th:nth-child(n+3),body.printing-output #printOutputRoot .stage510107-prelim-page .stage510108-standing-table td:nth-child(n+3){width:6mm!important}
+      body.printing-output #printOutputRoot .stage510107-prelim-page .stage510108-standing-table tbody tr{height:auto!important}
+      body.printing-output #printOutputRoot .stage510108-match-list{gap:.35mm;margin-top:.45mm}
+      body.printing-output #printOutputRoot .stage510108-match-row{grid-template-columns:8mm minmax(0,1fr) 14mm;gap:.7mm;font-size:5.2pt;line-height:1.1;padding:.35mm .5mm}
     }
   `;
   document.head.appendChild(style);
-  console.info('[230MATCH] 5.10.107 ready · A4 writable prelim ranking sheet with player names only');
+  console.info('[230MATCH] 5.10.108 ready · two-team score sheet and three-team group status print');
 })();
 
 /* 230MATCH 5.10.98 · Marklife label XLSX export from current tournament roster */
@@ -24515,8 +24566,8 @@ console.info('[230MATCH] 5.10.94 ready · current tournament podium requires off
   console.info('[230MATCH] 5.10.104 ready · prelim ranking PDF/PNG share one A3 landscape card layout');
 })();
 
-/* Keep the 5.10.107 A4 rules after the legacy 5.10.104 A3 rules. */
-(function stage510107PromoteWritablePrelimStyle(){
+/* Keep the 5.10.108 A4 rules after the legacy 5.10.104 A3 rules. */
+(function stage510108PromoteWritablePrelimStyle(){
   const style=document.getElementById('stage510107WritablePrelimRankingStyle');
   if(style)document.head.appendChild(style);
 })();
