@@ -104,7 +104,7 @@
   </style>
 
 <style>
-.notice-image-editor-preview{display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap;padding:10px;border:1px solid #d8e2f0;border-radius:12px;background:#f8fbff}.notice-image-editor-preview img{max-width:min(420px,100%);max-height:420px;object-fit:contain;border-radius:10px;border:1px solid #dbe4ef;background:#fff}.portal-board-image-wrap{margin:10px 0}.portal-board-image{display:block;width:min(100%,680px);max-height:720px;object-fit:contain;border-radius:12px;border:1px solid #d8e2f0;background:#fff}.portal-board-image-actions{display:flex;gap:8px;margin-top:8px}.home-notice-popup-image{display:block;max-width:100%;max-height:60vh;object-fit:contain;margin:0 auto 12px;border-radius:10px;background:#f8fafc}.popup-manager-dialog{width:min(860px,96vw);max-height:90vh}.popup-manager-list{display:grid;gap:10px;max-height:62vh;overflow:auto;padding:4px}.popup-manager-item{border:1px solid #d8e2f0;border-radius:14px;padding:12px;background:#fff}.popup-manager-item-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.popup-manager-controls{display:grid;grid-template-columns:auto 1fr 1fr auto;gap:8px;align-items:end;margin-top:10px}.popup-manager-controls label{display:flex;flex-direction:column;gap:4px}.popup-manager-controls .form-check{flex-direction:row;align-items:center;padding-bottom:8px}.popup-manager-thumb{width:88px;max-height:110px;object-fit:cover;border-radius:8px;border:1px solid #d8e2f0}.popup-period-help{margin-top:6px}.notice-image-meta{font-size:.82rem;color:#64748b;margin-top:4px}@media(max-width:700px){.popup-manager-controls{grid-template-columns:1fr}.popup-manager-controls .form-check{padding-bottom:0}.popup-manager-item-head{flex-direction:column}.popup-manager-thumb{width:100%;max-height:220px}.home-notice-popup-image{max-height:52vh}}
+.notice-image-editor-preview{display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap;padding:10px;border:1px solid #d8e2f0;border-radius:12px;background:#f8fbff}.notice-image-editor-preview img{width:150px;height:120px;object-fit:cover;border-radius:10px;border:1px solid #dbe4ef;background:#fff}.notice-image-preview-item{position:relative}.notice-image-preview-item button{position:absolute;right:5px;top:5px}.portal-board-image-wrap{margin:10px 0}.portal-board-image-gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}.portal-board-image{display:block;width:100%;height:220px;object-fit:contain;border-radius:12px;border:1px solid #d8e2f0;background:#fff}.portal-board-image-actions{display:flex;gap:8px;margin-top:8px}.home-notice-popup-image{display:block;max-width:100%;max-height:60vh;object-fit:contain;margin:0 auto 12px;border-radius:10px;background:#f8fafc}.popup-manager-dialog{width:min(860px,96vw);max-height:90vh}.popup-manager-list{display:grid;gap:10px;max-height:62vh;overflow:auto;padding:4px}.popup-manager-item{border:1px solid #d8e2f0;border-radius:14px;padding:12px;background:#fff}.popup-manager-item-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.popup-manager-controls{display:grid;grid-template-columns:auto 1fr 1fr auto;gap:8px;align-items:end;margin-top:10px}.popup-manager-controls label{display:flex;flex-direction:column;gap:4px}.popup-manager-controls .form-check{flex-direction:row;align-items:center;padding-bottom:8px}.popup-manager-thumb{width:88px;max-height:110px;object-fit:cover;border-radius:8px;border:1px solid #d8e2f0}.popup-period-help{margin-top:6px}.notice-image-meta{font-size:.82rem;color:#64748b;margin-top:4px}.result-photo-editor{margin-top:12px;padding:12px;border:1px solid #d8e2f0;border-radius:12px;background:#f8fbff}.result-photo-editor-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.result-photo-editor input{max-width:520px}.result-photo-current{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}.result-photo-current figure{margin:0;position:relative}.result-photo-current img{width:150px;height:110px;object-fit:cover;border-radius:9px;border:1px solid #d8e2f0}.result-photo-current button{position:absolute;right:4px;top:4px}@media(max-width:700px){.popup-manager-controls{grid-template-columns:1fr}.popup-manager-controls .form-check{padding-bottom:0}.popup-manager-item-head{flex-direction:column}.popup-manager-thumb{width:100%;max-height:220px}.home-notice-popup-image{max-height:52vh}.portal-board-image-gallery{grid-template-columns:1fr}.portal-board-image{height:auto;max-height:520px}}
 </style>
 
 <style id="member-lite-6500">
@@ -3198,8 +3198,8 @@ svg.stage7154-bracket-connectors path.stage5938-winner-path{
           <label><span>제목</span><input id="boardPostTitle" type="text" maxlength="80"></label>
           <input id="boardPostEditId" type="hidden">
           <label><span>내용</span><textarea id="boardPostBody" rows="6" maxlength="3000" placeholder="텍스트 공지 내용을 입력하세요. 이미지만 등록하는 경우 비워도 됩니다."></textarea></label>
-          <label><span>공지 이미지</span><input id="boardPostImageInput" type="file" accept="image/*"><small>JPG·PNG·WEBP 이미지를 등록할 수 있습니다. 화면용으로 자동 최적화됩니다.</small></label>
-          <div id="boardPostImagePreviewWrap" class="notice-image-editor-preview" hidden><img id="boardPostImagePreview" alt="공지 이미지 미리보기"><button id="removeBoardPostImageBtn" type="button" class="btn btn-danger-outline btn-small">이미지 제거</button></div>
+          <label><span>공지 이미지</span><input id="boardPostImageInput" type="file" accept="image/*" multiple><small>여러 장을 한 번에 선택할 수 있으며 화면용으로 자동 최적화됩니다.</small></label>
+          <div id="boardPostImagePreviewWrap" class="notice-image-editor-preview" hidden></div>
           <div class="notice-option-grid">
             <label class="form-check"><input id="boardPostPinned" class="form-check-input" type="checkbox"><span class="form-check-label">상단 고정</span></label>
             <label class="form-check"><input id="boardPostImportant" class="form-check-input" type="checkbox"><span class="form-check-label">중요 공지</span></label>
@@ -3267,6 +3267,11 @@ svg.stage7154-bracket-connectors path.stage5938-winner-path{
       <section class="panel legacy-current-result-card">
         <div class="section-head"><div><h3>현재 대회</h3><p>진행 중인 대회의 실시간 결과입니다.</p></div><span id="currentResultStateBadge" class="badge badge-warning">진행 중</span></div>
         <div id="currentResultSummary" class="portal-result-current"></div>
+        <div id="currentResultPhotoEditor" class="result-photo-editor" data-admin-only="true">
+          <div class="result-photo-editor-actions"><input id="currentResultPhotoInput" type="file" accept="image/*" multiple><button id="uploadCurrentResultPhotosBtn" type="button" class="btn btn-primary btn-small">결과 사진 추가</button></div>
+          <small class="portal-muted">시상식·입상 사진 등을 여러 장 선택해 현재 대회 결과에 저장합니다.</small>
+          <div id="currentResultPhotoList" class="result-photo-current"></div>
+        </div>
       </section>
       <section class="panel legacy-result-archive-card">
         <div class="section-head portal-record-head"><div><h3>보관된 대회 결과</h3><p id="resultArchiveGuide">보관된 대회가 없습니다.</p></div><span id="resultArchiveCount" class="badge badge-muted">0개</span></div>
@@ -4655,7 +4660,7 @@ svg.stage7154-bracket-connectors path.stage5938-winner-path{
     for(const key of ['log','info']){const original=console[key].bind(console);console[key]=(...args)=>{const text=args.map(v=>String(v)).join(' ');if(!text.includes('[230MATCH')||keep.test(text))original(...args);};}
   })();
   </script>
-  <script type="module" src="./assets/js/app.js?v=510116"></script>
+  <script type="module" src="./assets/js/app.js?v=510117"></script>
 <div id="socialLoginModal" class="social-login-modal" hidden>
     <div class="social-login-backdrop" id="socialLoginCloseBtn"></div>
     <section class="social-login-card" role="dialog" aria-modal="true" aria-label="간편로그인">
