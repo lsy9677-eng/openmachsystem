@@ -14656,6 +14656,52 @@ function stage51022RestoreMainDraft({quiet=false}={}){
     }catch(_e){return false}
   }
 
+  // 5.10.110: 참가자는 전체 대회 상태를 직접 저장하지 않고 결과 확인 요청만 제출한다.
+  // 공식 경기결과·코트·대기열·대진 이동은 관리자가 기존 결과창에서 확인 저장할 때만 실행된다.
+  const STAGE510110_RESULT_INBOX='adminRegistrationNotifications';
+  function stage510110SetSubmitState(saving){
+    const button=document.querySelector('#stage3560ResultForm button[type="submit"]');
+    if(button){button.disabled=Boolean(saving);button.textContent=saving?'요청 전송 중…':'결과 저장';}
+  }
+  async function stage510110QueuePlayerResult({match,isPrelim,scoreA,scoreB,winnerId,type,correcting}){
+    const rt=await getAuthRuntime();
+    if(!rt?.db||!rt?.api||!rt?.user)throw new Error('로그인 상태 또는 Firebase 연결을 확인해 주세요.');
+    const tournamentId=String(state?.multiTournament?.activeTournamentId||state?.tournament?.id||'');
+    if(!tournamentId)throw new Error('현재 대회 정보를 찾을 수 없습니다.');
+    const id=`player_result_${tournamentId}_${String(match.id||'').replace(/[^a-zA-Z0-9_-]/g,'-')}_${Date.now()}_${String(rt.user.uid||'').slice(0,8)}`;
+    const row={
+      id,type:'player_result',status:'pending',tournamentId,
+      divisionId:String(state?.multiDivision?.activeDivisionId||''),divisionName:String(state?.tournament?.division||''),
+      matchId:String(match.id||''),isPrelim:Boolean(isPrelim),scoreA:Number(scoreA),scoreB:Number(scoreB),winnerId:String(winnerId||''),
+      resultType:String(type||'normal'),correcting:Boolean(correcting),teamAId:String(match.teamA?.id||''),teamBId:String(match.teamB?.id||''),
+      teamAName:portalTeam(match.teamA),teamBName:portalTeam(match.teamB),submitterUid:String(rt.user.uid||''),submitterName:authUserLabel(),
+      createdAt:new Date().toISOString(),source:'participant-result-confirmation-request'
+    };
+    await rt.api.setDoc(rt.api.doc(rt.db,STAGE510110_RESULT_INBOX,id),row);
+    return row;
+  }
+  async function stage510110CompleteAdminRequest(saved){
+    const pending=window.__stage510110ActiveResultRequest;
+    if(!pending||!canOperate()||String(pending.matchId||'')!==String(saved?.id||''))return;
+    window.__stage510110ActiveResultRequest=null;
+    try{
+      const rt=await getAuthRuntime();if(!rt?.db||!rt?.api||!rt?.user)return;
+      await rt.api.updateDoc(rt.api.doc(rt.db,STAGE510110_RESULT_INBOX,String(pending.id)),{
+        status:'applied',appliedAt:new Date().toISOString(),appliedByUid:String(rt.user.uid||''),
+        officialScoreA:Number(saved.scoreA),officialScoreB:Number(saved.scoreB),officialWinnerId:String(saved.winner?.id||saved.winnerId||'')
+      });
+    }catch(error){console.warn('[5.10.110] result request completion mark failed',error)}
+  }
+  window.__stage510110OpenResultRequest=row=>{
+    if(!canOperate()||!row?.matchId)return;
+    window.__stage510110ActiveResultRequest=row;
+    open(String(row.matchId),Boolean(row.isPrelim));
+    const a=document.getElementById('stage3560ScoreA'),b=document.getElementById('stage3560ScoreB'),type=document.getElementById('stage3560Type');
+    if(a)a.value=String(Number(row.scoreA));if(b)b.value=String(Number(row.scoreB));if(type)type.value=row.resultType||'normal';
+    const winner=document.getElementById('stage3560WinnerSide');if(winner)winner.value=Number(row.scoreA)>Number(row.scoreB)?'A':'B';
+    syncDialog();
+  };
+
   async function submit(event){
     event.preventDefault();const id=document.getElementById('stage3560MatchId').value;const isPrelim=document.getElementById('stage3560IsPrelim').value==='1';let match=matchById(id,isPrelim);if(!match)return notice('경기 정보를 찾을 수 없습니다.','error');
     if(!ownership(match.teamA).ok&&!ownership(match.teamB).ok)return notice('본인 인증된 경기만 결과를 입력할 수 있습니다.','error');
@@ -14688,6 +14734,18 @@ function stage51022RestoreMainDraft({quiet=false}={}){
         warning:warningText
       });
       if(!confirmed)return;
+    }
+    if(!canOperate()){
+      try{
+        stage510110SetSubmitState(true);
+        await stage510110QueuePlayerResult({match,isPrelim,scoreA,scoreB,winnerId,type,correcting});
+        document.getElementById('stage3560ResultDialog')?.close();
+        notice(`경기 결과 입력 완료 · ${scoreA} : ${scoreB} · 관리자 확인 요청을 전송했습니다.`,'success');
+      }catch(error){
+        console.error('[5.10.110] participant result request failed',error);
+        notice(`결과 입력 실패: ${error?.message||error}`,'error');
+      }finally{stage510110SetSubmitState(false)}
+      return;
     }
     try{
       const stage51073BeforeState=!canOperate()?structuredClone(state):null;
@@ -14733,6 +14791,7 @@ function stage51022RestoreMainDraft({quiet=false}={}){
         }
       }
       document.getElementById('stage3560ResultDialog').close();renderPortalViews();setTimeout(v3252AutoMyMatch,80);notice(`경기 결과가 ${correcting?'수정':'공식 확정'}되었습니다.${!canOperate()?' · 관리자 기록에도 남았습니다.':''}`,'success');
+      await stage510110CompleteAdminRequest(saved);
     }catch(error){console.error('[35.6.0] player result failed',error);notice(`결과 저장 실패: ${error?.message||error}`,'error')}
   }
   const originalRender=renderMyMatchTeam;renderMyMatchTeam=function(team){originalRender.apply(this,arguments);setTimeout(()=>decorate(team),0)};
@@ -14818,9 +14877,9 @@ function stage51022RestoreMainDraft({quiet=false}={}){
   });
   document.addEventListener('change',event=>{if(event.target?.id!=='stage3560Type')return;const type=event.target.value;if(type!=='normal'){document.getElementById('stage3560ScoreA').value='';document.getElementById('stage3560ScoreB').value='';document.getElementById('stage3560WinnerSide').value='';}syncDialog();});
   document.addEventListener('submit',event=>{if(event.target?.id==='stage3560ResultForm')submit(event)},true);
-  const applyBuild=()=>{installDialog();const label=document.getElementById('buildStageLabel');if(label){label.textContent='230MATCH 35.6.0 · 선수 본인 경기 결과 입력';label.title='Version 35.6.0';}document.documentElement.dataset.build='3560';};
+  const applyBuild=()=>{installDialog();const label=document.getElementById('buildStageLabel');if(label){label.textContent='230MATCH 5.10.110 · 참가자 결과 안전 확인';label.title='Version 5.10.110';}document.documentElement.dataset.build='510110';};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(applyBuild,0),{once:true});else setTimeout(applyBuild,0);
-  console.info('[230MATCH] 35.6.0 ready · authenticated player self-result entry');
+  console.info('[230MATCH] 5.10.110 ready · participant result confirmation request without automatic operation changes');
 })();
 
 /* Stage 35.6.1 · mandatory member profile + cancellation/refund workflow */
@@ -16984,12 +17043,14 @@ ${body}
       inboxUnsub?.();
       inboxUnsub=rt.api.onSnapshot(rt.api.collection(rt.db,INBOX_COLLECTION),snap=>{
         const rows=snap.docs.map(d=>({id:d.id,...d.data()}))
-          .filter(r=>r?.type==='home_feedback')
+          .filter(r=>r?.type==='home_feedback'||(r?.type==='player_result'&&r?.status==='pending'&&String(r?.tournamentId||'')===String(state?.multiTournament?.activeTournamentId||state?.tournament?.id||'')))
           .sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||''))).slice(0,8);
         root.innerHTML=rows.length?rows.map(r=>{
           const when=r.createdAt?new Date(r.createdAt).toLocaleString('ko-KR'):'';
+          if(r.type==='player_result')return `<div class="stage7133-inbox-row"><span class="kind">결과 확인</span><span><b>${esc(r.submitterName||'참가자')}</b><br>${esc(r.teamAName||'A팀')} ${Number(r.scoreA)} : ${Number(r.scoreB)} ${esc(r.teamBName||'B팀')}<br><button type="button" class="btn btn-primary btn-small" data-stage510110-result-request="${esc(r.id)}">확인 후 공식 저장</button></span><span class="meta">${esc(when)}</span></div>`;
           return `<div class="stage7133-inbox-row"><span class="kind">${esc(KIND_LABELS[r.kind]||'문의')}</span><span><b>${esc(r.senderName||'사용자')}</b>${r.senderPhone?` · ${esc(r.senderPhone)}`:''}<br>${esc(r.body||'')}</span><span class="meta">${esc(when)}</span></div>`;
         }).join(''):'<div class="portal-empty">아직 홈 문자 문의가 없습니다.</div>';
+        root._stage510110Rows=rows;
       },e=>console.warn('[230MATCH] 홈 문자 문의함 연결 실패',e));
     }catch(e){console.warn('[230MATCH] 홈 문자 문의함 시작 실패',e);}
   }
@@ -17005,6 +17066,12 @@ ${body}
   window.sendHomeAdminSms=sendHomeAdminSms;
   window.saveHomeAdminSmsPhone=saveHomeAdminSmsPhone;
   window.__refresh230MatchHomeSms=refreshHomeSms;
+  document.addEventListener('click',event=>{
+    const button=event.target.closest?.('[data-stage510110-result-request]');if(!button)return;
+    const rows=document.getElementById('stage7133AdminInboxList')?._stage510110Rows||[];
+    const row=rows.find(item=>String(item.id)===String(button.dataset.stage510110ResultRequest));
+    if(row&&typeof window.__stage510110OpenResultRequest==='function')window.__stage510110OpenResultRequest(row);
+  });
 
   const boot=()=>setTimeout(refreshHomeSms,350);
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
