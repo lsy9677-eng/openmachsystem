@@ -8,6 +8,9 @@ const DEFAULT_ENDPOINTS={naverLoginUrl:'/naver/login',kakaoLoginUrl:'/kakao/logi
 // These authenticated owner accounts must keep administrator access even when
 // the optional users profile document is momentarily unavailable.
 const BUILTIN_ADMIN_EMAILS=new Set(['canyone2@naver.com','canyone2@korea.com']);
+// Naver custom-token sessions may not expose an email address. These are the
+// verified Firebase Authentication UIDs for the same administrator accounts.
+const BUILTIN_ADMIN_UIDS=new Set(['SolYLuNNkWbLNOqUqkRhm1BkuEo1','NCHdIupkl9UreJs3bGrQw7breUw2']);
 let auth=null,db=null,api=null,unsubscribe=null,returnHandled=false;
 const INITIAL_AUTH_HASH=String(location.hash||'');
 try{if(/(?:^#|&)(?:customToken|provider|error)=/.test(INITIAL_AUTH_HASH))sessionStorage.setItem('230match-v3-pending-auth-hash',INITIAL_AUTH_HASH)}catch(_e){}
@@ -17,7 +20,7 @@ async function loadApi(){if(api)return api;const[a,b,c]=await Promise.all([impor
 function parseFirebase(text){if(!text)return DEFAULT_FIREBASE;if(typeof text==='object')return text;try{return{...DEFAULT_FIREBASE,...JSON.parse(text)}}catch{return DEFAULT_FIREBASE}}
 async function ensureAuth(){const cfg=getAuthConfig();const firebase=parseFirebase(cfg.firebaseConfigText);const a=await loadApi();let app;const name=`230match-auth-${firebase.projectId}`;try{app=a.getApp(name)}catch{app=a.initializeApp(firebase,name)}auth=a.getAuth(app);db=a.getFirestore(app);await a.setPersistence(auth,a.browserLocalPersistence);return auth}
 function splitEmails(value){return String(value||'').toLowerCase().split(/[\s,;]+/).filter(Boolean)}
-function configuredRole(user){const cfg=getAuthConfig(),email=String(user?.email||'').trim().toLowerCase();if(BUILTIN_ADMIN_EMAILS.has(email)||splitEmails(cfg.adminEmails).includes(email))return'admin';if(splitEmails(cfg.operatorEmails).includes(email))return'operator';return''}
+function configuredRole(user){const cfg=getAuthConfig(),uid=String(user?.uid||'').trim(),email=String(user?.email||'').trim().toLowerCase();if(BUILTIN_ADMIN_UIDS.has(uid)||BUILTIN_ADMIN_EMAILS.has(email)||splitEmails(cfg.adminEmails).includes(email))return'admin';if(splitEmails(cfg.operatorEmails).includes(email))return'operator';return''}
 function normalizeRole(raw){const v=String(raw||'').toLowerCase();if(['developer','admin','administrator','tournament_admin','manager'].includes(v))return'admin';if(['operator','staff','club_director','tournament_operator','director'].includes(v))return'operator';return'viewer'}
 async function readProfile(user){if(!user||!db)return null;try{const a=await loadApi();const snap=await a.getDoc(a.doc(db,'users',user.uid));return snap.exists()?{id:snap.id,...snap.data()}:null}catch(error){console.warn('[230MATCH V3] users profile read failed',error);throw error}}
 async function ensureProfile(user,provider=''){if(!user||!db)return null;const a=await loadApi();const ref=a.doc(db,'users',user.uid);let profile=await readProfile(user);const linkedProviders=[...new Set((user.providerData||[]).map(x=>x?.providerId).filter(Boolean))];const sync={uid:user.uid,email:user.email||profile?.email||'',name:profile?.name||user.displayName||'',provider:provider||profile?.provider||linkedProviders[0]||'',linkedProviders,updatedAt:new Date().toISOString()};if(profile){try{await a.setDoc(ref,sync,{merge:true});return{id:user.uid,...profile,...sync}}catch(error){console.warn('[230MATCH V3] users profile sync failed',error);return{id:user.uid,...profile,...sync}}}const payload={...sync,role:'member',approved:true,createdAt:new Date().toISOString()};try{await a.setDoc(ref,payload,{merge:true});return{id:user.uid,...payload}}catch(error){console.warn('[230MATCH V3] users profile create failed',error);return payload}}
