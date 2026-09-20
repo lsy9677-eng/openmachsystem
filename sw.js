@@ -1,4 +1,4 @@
-const CACHE_NAME = "230match-v230match";
+const CACHE_NAME = "230match-v510116";
 const CORE_ASSETS = [
   "./",
   "./index.html",
