@@ -1,4 +1,4 @@
-import{getAuthConfig,saveAuthConfig,startAuth,signInGoogle,signOutSocial,beginExternalLogin,getExistingLoginEndpoints,signInEmail,registerEmail,sendPasswordReset,linkEmailPassword,authProviderIds,getAuthRuntime}from'./auth-engine.js?v=3565';
+import{getAuthConfig,saveAuthConfig,startAuth,signInGoogle,signOutSocial,beginExternalLogin,getExistingLoginEndpoints,signInEmail,registerEmail,sendPasswordReset,linkEmailPassword,authProviderIds,getAuthRuntime}from'./auth-engine.js?v=510113';
 import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7133';
 import{notificationSupport,getStoredVapidKey,saveStoredVapidKey,enableMyPush,disableMyPush,queuePush,listPushJobs,listPushTokens}from'./notification-engine.js?v=332012';
 
