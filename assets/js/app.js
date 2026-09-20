@@ -14656,8 +14656,8 @@ function stage51022RestoreMainDraft({quiet=false}={}){
     }catch(_e){return false}
   }
 
-  // 5.10.110: 참가자는 전체 대회 상태를 직접 저장하지 않고 결과 확인 요청만 제출한다.
-  // 공식 경기결과·코트·대기열·대진 이동은 관리자가 기존 결과창에서 확인 저장할 때만 실행된다.
+  // 참가자는 전체 대회 상태를 직접 쓰지 않고 결과 한 건만 요청함에 제출한다.
+  // 관리자/진행자 기기가 본인·대진·스코어와 미완료 상태를 검증한 경우에만 기존 공식 결과 엔진을 실행한다.
   const STAGE510110_RESULT_INBOX='adminRegistrationNotifications';
   function stage510110SetSubmitState(saving){
     const button=document.querySelector('#stage3560ResultForm button[type="submit"]');
@@ -14825,7 +14825,7 @@ function stage51022RestoreMainDraft({quiet=false}={}){
         stage510110SetSubmitState(true);
         await stage510110QueuePlayerResult({match,isPrelim,scoreA,scoreB,winnerId,type,correcting});
         document.getElementById('stage3560ResultDialog')?.close();
-        notice(`경기 결과 입력 완료 · ${scoreA} : ${scoreB} · 관리자 확인 요청을 전송했습니다.`,'success');
+        notice(`경기 결과 입력 완료 · ${scoreA} : ${scoreB} · 공식 자동 반영 요청을 전송했습니다.`,'success');
       }catch(error){
         console.error('[5.10.110] participant result request failed',error);
         notice(`결과 입력 실패: ${error?.message||error}`,'error');
@@ -14962,9 +14962,14 @@ function stage51022RestoreMainDraft({quiet=false}={}){
   });
   document.addEventListener('change',event=>{if(event.target?.id!=='stage3560Type')return;const type=event.target.value;if(type!=='normal'){document.getElementById('stage3560ScoreA').value='';document.getElementById('stage3560ScoreB').value='';document.getElementById('stage3560WinnerSide').value='';}syncDialog();});
   document.addEventListener('submit',event=>{if(event.target?.id==='stage3560ResultForm')submit(event)},true);
-  const applyBuild=()=>{installDialog();stage510111StartProcessor();const label=document.getElementById('buildStageLabel');if(label){label.textContent='230MATCH 5.10.111 · 참가자 결과 안전 자동 반영';label.title='Version 5.10.111';}document.documentElement.dataset.build='510111';};
+  // 인증 복원이 비동기로 끝나더라도 관리자 권한이 확인되는 즉시 감시기를 연결한다.
+  const stage510112BaseRenderAuthStatus=renderAuthStatus;
+  renderAuthStatus=function(){stage510112BaseRenderAuthStatus.apply(this,arguments);setTimeout(stage510111StartProcessor,0)};
+  const applyBuild=()=>{installDialog();stage510111StartProcessor();const label=document.getElementById('buildStageLabel');if(label){label.textContent='230MATCH 5.10.112 · 참가자 결과 자동 반영 안정화';label.title='Version 5.10.112';}document.documentElement.dataset.build='510112';};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(applyBuild,0),{once:true});else setTimeout(applyBuild,0);
-  console.info('[230MATCH] 5.10.111 ready · verified participant result auto apply while preserving every completed result');
+  window.addEventListener('pageshow',()=>setTimeout(stage510111StartProcessor,200));
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(stage510111StartProcessor,200)});
+  console.info('[230MATCH] 5.10.112 ready · verified participant result auto apply with auth-ready processor startup');
 })();
 
 /* Stage 35.6.1 · mandatory member profile + cancellation/refund workflow */
