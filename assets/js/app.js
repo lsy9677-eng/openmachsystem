@@ -1,4 +1,4 @@
-import{getAuthConfig,saveAuthConfig,startAuth,signInGoogle,signOutSocial,beginExternalLogin,getExistingLoginEndpoints,signInEmail,registerEmail,sendPasswordReset,linkEmailPassword,authProviderIds,getAuthRuntime}from'./auth-engine.js?v=510114';
+import{getAuthConfig,saveAuthConfig,startAuth,signInGoogle,signOutSocial,beginExternalLogin,getExistingLoginEndpoints,signInEmail,registerEmail,sendPasswordReset,linkEmailPassword,authProviderIds,getAuthRuntime}from'./auth-engine.js?v=510115';
 import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7133';
 import{notificationSupport,getStoredVapidKey,saveStoredVapidKey,enableMyPush,disableMyPush,queuePush,listPushJobs,listPushTokens}from'./notification-engine.js?v=332012';
 
@@ -32,7 +32,7 @@ import{ensureCourtStatuses,pauseCourt,resumeCourt}from'./court-status-engine.js?
 import{ensureCourtManualQueues,assignToCourtManualQueue,moveCourtMatchFlexible,returnManualQueueItemToVenue,reorderCourtManualQueue}from'./court-manual-queue-engine.js?v=332012';
 import{reorderPrelimQueue as reorderPrelimQueueItem,movePrelimQueuedMatch,returnPrelimWait1ToQueue}from'./prelim-queue-control-engine.js?v=332012';
 import{ensurePrelimCourtStatuses,pausePrelimCourt,resumePrelimCourt}from'./prelim-court-status-engine.js?v=332012';
-import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=510114';
+import{startStateSync,getSyncSettings,saveSyncSettings,connectCloudSync,disconnectCloudSync,pushStateNow,pullStateNow,testCloudConnection,prepareCriticalCloudWrite,deleteTournamentNow,loadTournamentNow}from'./sync-engine.js?v=7215';
 import{verifyAndRepairMainFlow}from'./main-flow-integrity-engine.js?v=332012';
 import{finalizeTournamentCompletion}from'./tournament-completion-engine.js?v=332012';
 import{ensureTournamentIdentity,validateTournamentForArchive,createTournamentArchive,archiveListItem,archiveBackupPayload}from'./archive-engine.js?v=354101';
@@ -931,10 +931,7 @@ let syncAccessRefreshTimer=null;
 function refreshSyncAccessMode(){
   if(!syncAccessStarted)return;
   clearTimeout(syncAccessRefreshTimer);
-  // 5.10.114: canWrite/accessMode callbacks already read the live role. Reconnecting
-  // here caused login/logout to re-apply an older IndexedDB workspace over the
-  // currently visible public bracket. Keep the active listener and state intact.
-  syncAccessRefreshTimer=null;
+  syncAccessRefreshTimer=setTimeout(()=>connectCloudSync().catch(error=>console.warn('[230MATCH] 권한별 동기화 전환 실패',error)),120);
 }
 function authUserLabel(){return currentAuthUser?.appProfile?.name||currentAuthUser?.displayName||currentAuthUser?.email||'로그인 사용자';}
 function applyAuthenticatedRole(user,role='viewer',profile=null){
@@ -10211,6 +10208,12 @@ function renderPortalViewFast(target){
   }catch(error){console.warn('[230MATCH 61.1.1] fast view render warning',target,error);}
 }
 function navigatePortalView(name,{pushHistory=false,replaceHistory=false,focus=true,operationMode=null}={}){
+  // 5.10.115: 본선 화면에 새로 들어갈 때 이전 라운드/상태 필터가 남아
+  // 대진표가 비어 보이지 않도록 표시 조건만 전체로 되돌린다.
+  if(name==='bracket'){
+    state.ui=state.ui||{};
+    state.ui.bracketView={round:'all',status:'all',venue:'all',density:state.ui.bracketView?.density||'comfortable',activeOnly:false};
+  }
   const requested=String(name||'home').replace(/^#/,'').trim()||'home';
   const target=portalViewAllowed(requested)?requested:'home';
   const targetView=document.getElementById(`view-${target}`);
