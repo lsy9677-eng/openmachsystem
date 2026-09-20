@@ -14656,137 +14656,6 @@ function stage51022RestoreMainDraft({quiet=false}={}){
     }catch(_e){return false}
   }
 
-  // 참가자는 전체 대회 상태를 직접 쓰지 않고 결과 한 건만 요청함에 제출한다.
-  // 관리자/진행자 기기가 본인·대진·스코어와 미완료 상태를 검증한 경우에만 기존 공식 결과 엔진을 실행한다.
-  const STAGE510110_RESULT_INBOX='adminRegistrationNotifications';
-  function stage510110SetSubmitState(saving){
-    const button=document.querySelector('#stage3560ResultForm button[type="submit"]');
-    if(button){button.disabled=Boolean(saving);button.textContent=saving?'요청 전송 중…':'결과 저장';}
-  }
-  async function stage510110QueuePlayerResult({match,isPrelim,scoreA,scoreB,winnerId,type,correcting}){
-    const rt=await getAuthRuntime();
-    if(!rt?.db||!rt?.api||!rt?.user)throw new Error('로그인 상태 또는 Firebase 연결을 확인해 주세요.');
-    const tournamentId=String(state?.multiTournament?.activeTournamentId||state?.tournament?.id||'');
-    if(!tournamentId)throw new Error('현재 대회 정보를 찾을 수 없습니다.');
-    const id=`player_result_${tournamentId}_${String(match.id||'').replace(/[^a-zA-Z0-9_-]/g,'-')}_${Date.now()}_${String(rt.user.uid||'').slice(0,8)}`;
-    const row={
-      id,type:'player_result',status:'pending',tournamentId,
-      divisionId:String(state?.multiDivision?.activeDivisionId||''),divisionName:String(state?.tournament?.division||''),
-      matchId:String(match.id||''),isPrelim:Boolean(isPrelim),scoreA:Number(scoreA),scoreB:Number(scoreB),winnerId:String(winnerId||''),
-      resultType:String(type||'normal'),correcting:Boolean(correcting),teamAId:String(match.teamA?.id||''),teamBId:String(match.teamB?.id||''),
-      teamAName:portalTeam(match.teamA),teamBName:portalTeam(match.teamB),submitterUid:String(rt.user.uid||''),submitterName:authUserLabel(),
-      createdAt:new Date().toISOString(),source:'participant-result-confirmation-request'
-    };
-    await rt.api.setDoc(rt.api.doc(rt.db,STAGE510110_RESULT_INBOX,id),row);
-    return row;
-  }
-  async function stage510110CompleteAdminRequest(saved){
-    const pending=window.__stage510110ActiveResultRequest;
-    if(!pending||!canOperate()||String(pending.matchId||'')!==String(saved?.id||''))return;
-    window.__stage510110ActiveResultRequest=null;
-    try{
-      const rt=await getAuthRuntime();if(!rt?.db||!rt?.api||!rt?.user)return;
-      await rt.api.updateDoc(rt.api.doc(rt.db,STAGE510110_RESULT_INBOX,String(pending.id)),{
-        status:'applied',appliedAt:new Date().toISOString(),appliedByUid:String(rt.user.uid||''),
-        officialScoreA:Number(saved.scoreA),officialScoreB:Number(saved.scoreB),officialWinnerId:String(saved.winner?.id||saved.winnerId||'')
-      });
-    }catch(error){console.warn('[5.10.110] result request completion mark failed',error)}
-  }
-  let stage510111InboxUnsubscribe=null;
-  function stage510111TeamOwnedByUid(team,uid){
-    uid=String(uid||'');if(!team||!uid)return false;
-    if([team.ownerUid,team.applicationOwnerUid].some(value=>String(value||'')===uid))return true;
-    const registrationId=String(team.registrationId||team.applicationId||'');if(!registrationId)return false;
-    try{return (typeof simpleRegistrationRows==='function'?simpleRegistrationRows():[]).some(row=>String(row?.id||'')===registrationId&&String(row?.ownerUid||'')===uid)}catch(_e){return false}
-  }
-  async function stage510111ClaimRequest(rt,ref){
-    let claimed=null;
-    await rt.api.runTransaction(rt.db,async transaction=>{
-      const snap=await transaction.get(ref);if(!snap.exists())return;
-      const row=snap.data()||{};if(row.status!=='pending')return;
-      transaction.update(ref,{status:'processing',processingAt:new Date().toISOString(),processorUid:String(rt.user?.uid||'')});
-      claimed={id:snap.id,...row};
-    });
-    return claimed;
-  }
-  async function stage510111ApplyVerifiedResult(rt,ref,row){
-    const currentTournament=String(state?.multiTournament?.activeTournamentId||state?.tournament?.id||'');
-    const currentDivision=String(state?.multiDivision?.activeDivisionId||'');
-    if(String(row.tournamentId||'')!==currentTournament)return false;
-    if(String(row.divisionId||'')&&String(row.divisionId)!==currentDivision)return false;
-    const isPrelim=Boolean(row.isPrelim),match=matchById(String(row.matchId||''),isPrelim);
-    if(!match)throw new Error('현재 공식 경기에서 요청한 경기를 찾을 수 없습니다.');
-    // 이미 끝난 경기와 기존 결과는 참가자 자동 입력으로 절대 수정하지 않는다.
-    if(match.status==='completed'||match.winner||match.winnerId)throw new Error('이미 완료된 경기 결과는 유지됩니다. 수정은 관리자만 할 수 있습니다.');
-    if(String(match.teamA?.id||'')!==String(row.teamAId||'')||String(match.teamB?.id||'')!==String(row.teamBId||''))throw new Error('현재 대진 상대가 제출 당시와 달라 자동 반영을 중단했습니다.');
-    if(!stage510111TeamOwnedByUid(match.teamA,row.submitterUid)&&!stage510111TeamOwnedByUid(match.teamB,row.submitterUid))throw new Error('결과 제출 계정이 현재 경기 참가팀과 일치하지 않습니다.');
-    const scoreA=Number(row.scoreA),scoreB=Number(row.scoreB);
-    if(!Number.isInteger(scoreA)||!Number.isInteger(scoreB)||scoreA<0||scoreB<0||scoreA>6||scoreB>6||scoreA===scoreB||!((scoreA===6&&scoreB<=5)||(scoreB===6&&scoreA<=5)))throw new Error('스코어 형식이 올바르지 않습니다.');
-    const winnerId=scoreA>scoreB?String(match.teamA?.id||''):String(match.teamB?.id||'');
-    if(winnerId!==String(row.winnerId||''))throw new Error('승리팀과 제출 스코어가 일치하지 않습니다.');
-    autoRecovery('검증된 참가자 경기 결과 자동 반영 전');
-    let saved;
-    if(isPrelim){
-      const involved=new Set([match.teamA?.id,match.teamB?.id].filter(Boolean));
-      const beforePlayIns=new Set(Object.values(state.draw?.rounds||{}).flat().filter(item=>item.isPlayIn&&item.teamA&&!item.teamA.placeholder&&item.teamB&&!item.teamB.placeholder).map(item=>item.id));
-      saved=submitPrelimResult(state,{matchId:match.id,winnerId,scoreA,scoreB});
-      saved.resultType=row.resultType||'normal';saved.resultTypeLabel=TYPE_LABELS[saved.resultType]||'일반 경기';
-      stage5513GuardPrelimManualSharedQueue();stage558AutoPromotePrelimManualSharedQueue();stage5513GuardPrelimManualSharedQueue();syncLinkedDraw({silent:true});
-      const newly=Object.values(state.draw?.rounds||{}).flat().filter(item=>item.isPlayIn&&!beforePlayIns.has(item.id)&&item.teamA&&!item.teamA.placeholder&&item.teamB&&!item.teamB.placeholder);
-      const priority=newly.filter(item=>involved.has(item.teamA?.id)||involved.has(item.teamB?.id));
-      if(useUnifiedCourts(state))enqueueReadyMainToUnifiedCourts(state,{priorityMatchIds:(priority.length?priority:newly).map(item=>item.id)});else autoAssignResolvedMain(state,{findMatch,queueReadyMatches,refillCourt});
-    }else{
-      const sourceCourt=[...(state.prelim?.courts||[]),...(state.courts||[])].find(court=>court.playing===match.id),previousPlayingId=sourceCourt?.playing||null;
-      saved=submitResult(state,{matchId:match.id,winnerId,scoreA,scoreB});saved.resultType=row.resultType||'normal';saved.resultTypeLabel=TYPE_LABELS[saved.resultType]||'일반 경기';verifyAndRepairMainFlow(state,{sourceMatchId:match.id});
-      if(sourceCourt&&(state.prelim?.courts||[]).some(court=>court.id===sourceCourt.id)){advanceUnifiedCourt(state,sourceCourt.id,match.id);stage599EnsureFreshPlayingClock(sourceCourt,previousPlayingId);enqueueReadyMainToUnifiedCourts(state);}
-    }
-    saved.enteredByPlayer=true;saved.enteredByOperator=false;saved.enteredByUid=String(row.submitterUid||'');saved.enteredByName=String(row.submitterName||'');saved.enteredAt=new Date().toISOString();recordAudit(saved,isPrelim,false);
-    const playerFinal=!isPrelim&&!match.nextMatchId;
-    commit(`${playerFinal?'결승 결과 확정':'검증된 참가자 결과 자동 입력'} · ${saved.id} · ${saved.scoreA}:${saved.scoreB}`);
-    await stage5526PushCriticalState(playerFinal?'참가자 결승 결과':'검증된 참가자 경기 결과');
-    if(playerFinal){
-      const report=finalizeTournamentCompletion(state);
-      if(report.completed){withTournamentWriteBypass(()=>commit(`대회 자동 종료 확정 · 우승 ${teamText(report.champion)}`));await stage5526PushCriticalState('대회 종료 확정',{allowClosed:true});applyTournamentReadOnlyUi();}
-    }
-    await rt.api.updateDoc(ref,{status:'applied',appliedAt:new Date().toISOString(),appliedByUid:String(rt.user?.uid||''),officialScoreA:scoreA,officialScoreB:scoreB,officialWinnerId:winnerId});
-    renderPortalViews();setTimeout(v3252AutoMyMatch,80);notice(`참가자 입력 결과 자동 반영 완료 · ${scoreA} : ${scoreB}`,'success');
-    return true;
-  }
-  async function stage510111ProcessRequest(rt,docSnap){
-    const data=docSnap.data()||{};if(data.type!=='player_result'||data.status!=='pending')return;
-    const currentTournament=String(state?.multiTournament?.activeTournamentId||state?.tournament?.id||'');
-    if(String(data.tournamentId||'')!==currentTournament)return;
-    const ref=rt.api.doc(rt.db,STAGE510110_RESULT_INBOX,docSnap.id);
-    try{
-      const row=await stage510111ClaimRequest(rt,ref);if(!row)return;
-      const applied=await stage510111ApplyVerifiedResult(rt,ref,row);
-      if(!applied)await rt.api.updateDoc(ref,{status:'pending',processingAt:'',processorUid:''});
-    }catch(error){
-      console.error('[5.10.111] verified participant result rejected',error);
-      try{await rt.api.updateDoc(ref,{status:'rejected',rejectedAt:new Date().toISOString(),rejectReason:String(error?.message||error)})}catch(_e){}
-      notice(`참가자 결과 자동 반영 중단: ${error?.message||error}`,'warning');
-    }
-  }
-  async function stage510111StartProcessor(){
-    if(!canOperate())return;
-    try{
-      const rt=await getAuthRuntime();if(!rt?.db||!rt?.api||!rt?.user)return;
-      stage510111InboxUnsubscribe?.();
-      stage510111InboxUnsubscribe=rt.api.onSnapshot(rt.api.collection(rt.db,STAGE510110_RESULT_INBOX),snap=>{
-        snap.docChanges().filter(change=>change.type==='added'||change.type==='modified').forEach(change=>void stage510111ProcessRequest(rt,change.doc));
-      },error=>console.warn('[5.10.111] participant result processor listener failed',error));
-    }catch(error){console.warn('[5.10.111] participant result processor start failed',error)}
-  }
-  window.__stage510110OpenResultRequest=row=>{
-    if(!canOperate()||!row?.matchId)return;
-    window.__stage510110ActiveResultRequest=row;
-    open(String(row.matchId),Boolean(row.isPrelim));
-    const a=document.getElementById('stage3560ScoreA'),b=document.getElementById('stage3560ScoreB'),type=document.getElementById('stage3560Type');
-    if(a)a.value=String(Number(row.scoreA));if(b)b.value=String(Number(row.scoreB));if(type)type.value=row.resultType||'normal';
-    const winner=document.getElementById('stage3560WinnerSide');if(winner)winner.value=Number(row.scoreA)>Number(row.scoreB)?'A':'B';
-    syncDialog();
-  };
-
   async function submit(event){
     event.preventDefault();const id=document.getElementById('stage3560MatchId').value;const isPrelim=document.getElementById('stage3560IsPrelim').value==='1';let match=matchById(id,isPrelim);if(!match)return notice('경기 정보를 찾을 수 없습니다.','error');
     if(!ownership(match.teamA).ok&&!ownership(match.teamB).ok)return notice('본인 인증된 경기만 결과를 입력할 수 있습니다.','error');
@@ -14819,18 +14688,6 @@ function stage51022RestoreMainDraft({quiet=false}={}){
         warning:warningText
       });
       if(!confirmed)return;
-    }
-    if(!canOperate()){
-      try{
-        stage510110SetSubmitState(true);
-        await stage510110QueuePlayerResult({match,isPrelim,scoreA,scoreB,winnerId,type,correcting});
-        document.getElementById('stage3560ResultDialog')?.close();
-        notice(`경기 결과 입력 완료 · ${scoreA} : ${scoreB} · 공식 자동 반영 요청을 전송했습니다.`,'success');
-      }catch(error){
-        console.error('[5.10.110] participant result request failed',error);
-        notice(`결과 입력 실패: ${error?.message||error}`,'error');
-      }finally{stage510110SetSubmitState(false)}
-      return;
     }
     try{
       const stage51073BeforeState=!canOperate()?structuredClone(state):null;
@@ -14876,7 +14733,6 @@ function stage51022RestoreMainDraft({quiet=false}={}){
         }
       }
       document.getElementById('stage3560ResultDialog').close();renderPortalViews();setTimeout(v3252AutoMyMatch,80);notice(`경기 결과가 ${correcting?'수정':'공식 확정'}되었습니다.${!canOperate()?' · 관리자 기록에도 남았습니다.':''}`,'success');
-      await stage510110CompleteAdminRequest(saved);
     }catch(error){console.error('[35.6.0] player result failed',error);notice(`결과 저장 실패: ${error?.message||error}`,'error')}
   }
   const originalRender=renderMyMatchTeam;renderMyMatchTeam=function(team){originalRender.apply(this,arguments);setTimeout(()=>decorate(team),0)};
@@ -14962,14 +14818,9 @@ function stage51022RestoreMainDraft({quiet=false}={}){
   });
   document.addEventListener('change',event=>{if(event.target?.id!=='stage3560Type')return;const type=event.target.value;if(type!=='normal'){document.getElementById('stage3560ScoreA').value='';document.getElementById('stage3560ScoreB').value='';document.getElementById('stage3560WinnerSide').value='';}syncDialog();});
   document.addEventListener('submit',event=>{if(event.target?.id==='stage3560ResultForm')submit(event)},true);
-  // 인증 복원이 비동기로 끝나더라도 관리자 권한이 확인되는 즉시 감시기를 연결한다.
-  const stage510112BaseRenderAuthStatus=renderAuthStatus;
-  renderAuthStatus=function(){stage510112BaseRenderAuthStatus.apply(this,arguments);setTimeout(stage510111StartProcessor,0)};
-  const applyBuild=()=>{installDialog();stage510111StartProcessor();const label=document.getElementById('buildStageLabel');if(label){label.textContent='230MATCH 5.10.112 · 참가자 결과 자동 반영 안정화';label.title='Version 5.10.112';}document.documentElement.dataset.build='510112';};
+  const applyBuild=()=>{installDialog();const label=document.getElementById('buildStageLabel');if(label){label.textContent='230MATCH 35.6.0 · 선수 본인 경기 결과 입력';label.title='Version 35.6.0';}document.documentElement.dataset.build='3560';};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(applyBuild,0),{once:true});else setTimeout(applyBuild,0);
-  window.addEventListener('pageshow',()=>setTimeout(stage510111StartProcessor,200));
-  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(stage510111StartProcessor,200)});
-  console.info('[230MATCH] 5.10.112 ready · verified participant result auto apply with auth-ready processor startup');
+  console.info('[230MATCH] 35.6.0 ready · authenticated player self-result entry');
 })();
 
 /* Stage 35.6.1 · mandatory member profile + cancellation/refund workflow */
@@ -17133,14 +16984,12 @@ ${body}
       inboxUnsub?.();
       inboxUnsub=rt.api.onSnapshot(rt.api.collection(rt.db,INBOX_COLLECTION),snap=>{
         const rows=snap.docs.map(d=>({id:d.id,...d.data()}))
-          .filter(r=>r?.type==='home_feedback'||(r?.type==='player_result'&&r?.status==='pending'&&String(r?.tournamentId||'')===String(state?.multiTournament?.activeTournamentId||state?.tournament?.id||'')))
+          .filter(r=>r?.type==='home_feedback')
           .sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||''))).slice(0,8);
         root.innerHTML=rows.length?rows.map(r=>{
           const when=r.createdAt?new Date(r.createdAt).toLocaleString('ko-KR'):'';
-          if(r.type==='player_result')return `<div class="stage7133-inbox-row"><span class="kind">결과 확인</span><span><b>${esc(r.submitterName||'참가자')}</b><br>${esc(r.teamAName||'A팀')} ${Number(r.scoreA)} : ${Number(r.scoreB)} ${esc(r.teamBName||'B팀')}<br><button type="button" class="btn btn-primary btn-small" data-stage510110-result-request="${esc(r.id)}">확인 후 공식 저장</button></span><span class="meta">${esc(when)}</span></div>`;
           return `<div class="stage7133-inbox-row"><span class="kind">${esc(KIND_LABELS[r.kind]||'문의')}</span><span><b>${esc(r.senderName||'사용자')}</b>${r.senderPhone?` · ${esc(r.senderPhone)}`:''}<br>${esc(r.body||'')}</span><span class="meta">${esc(when)}</span></div>`;
         }).join(''):'<div class="portal-empty">아직 홈 문자 문의가 없습니다.</div>';
-        root._stage510110Rows=rows;
       },e=>console.warn('[230MATCH] 홈 문자 문의함 연결 실패',e));
     }catch(e){console.warn('[230MATCH] 홈 문자 문의함 시작 실패',e);}
   }
@@ -17156,12 +17005,6 @@ ${body}
   window.sendHomeAdminSms=sendHomeAdminSms;
   window.saveHomeAdminSmsPhone=saveHomeAdminSmsPhone;
   window.__refresh230MatchHomeSms=refreshHomeSms;
-  document.addEventListener('click',event=>{
-    const button=event.target.closest?.('[data-stage510110-result-request]');if(!button)return;
-    const rows=document.getElementById('stage7133AdminInboxList')?._stage510110Rows||[];
-    const row=rows.find(item=>String(item.id)===String(button.dataset.stage510110ResultRequest));
-    if(row&&typeof window.__stage510110OpenResultRequest==='function')window.__stage510110OpenResultRequest(row);
-  });
 
   const boot=()=>setTimeout(refreshHomeSms,350);
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
