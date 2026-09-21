@@ -1,4 +1,4 @@
-import{getAuthConfig,saveAuthConfig,startAuth,signInGoogle,signOutSocial,beginExternalLogin,getExistingLoginEndpoints,signInEmail,registerEmail,sendPasswordReset,linkEmailPassword,authProviderIds,getAuthRuntime}from'./auth-engine.js?v=510122';
+import{getAuthConfig,saveAuthConfig,startAuth,signInGoogle,signOutSocial,beginExternalLogin,getExistingLoginEndpoints,signInEmail,registerEmail,sendPasswordReset,linkEmailPassword,authProviderIds,getAuthRuntime}from'./auth-engine.js?v=510123';
 import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7133';
 import{notificationSupport,getStoredVapidKey,saveStoredVapidKey,enableMyPush,disableMyPush,queuePush,listPushJobs,listPushTokens}from'./notification-engine.js?v=332012';
 
@@ -8193,7 +8193,7 @@ function renderPortalViews(){
   renderTournamentList();
 }
 function stage6109ImageSrc(record){return managedImageUrl(record);}
-function stage510117NoticeGalleryHtml(post){const images=stage510117NoticeImages(post);if(!images.length)return '';return `<div class="portal-board-image-wrap"><div class="portal-board-image-gallery">${images.map((item,i)=>`<div><img class="portal-board-image" src="${portalEscape(item.url)}" alt="${portalEscape(post.title)} 공지 이미지 ${i+1}" loading="lazy" data-notice-image-view="${portalEscape(post.id)}" data-notice-image-index="${i}" title="눌러서 크게 보기"><div class="portal-board-image-actions"><button type="button" class="btn btn-light btn-small" data-notice-image-view="${portalEscape(post.id)}" data-notice-image-index="${i}">🔍 크게 보기</button><a class="btn btn-light btn-small" data-notice-native-download="1" href="${portalEscape(stage51084NoticeDownloadHref(item.url,item.name||stage51082NoticeImageFileName(post)))}" download="${portalEscape(item.name||stage51082NoticeImageFileName(post))}" rel="noopener">⬇ 다운로드</a></div></div>`).join('')}</div></div>`;}
+function stage510117NoticeGalleryHtml(post){const images=stage510117NoticeImages(post);if(!images.length)return '';return `<div class="portal-board-image-wrap"><div class="portal-board-image-gallery">${images.map((item,i)=>`<figure class="stage510123-notice-figure"><img class="portal-board-image" src="${portalEscape(item.url)}" alt="${portalEscape(item.title||post.title)} 공지 이미지 ${i+1}" loading="lazy" data-notice-image-view="${portalEscape(post.id)}" data-notice-image-index="${i}" title="눌러서 크게 보기">${item.title||item.description?`<figcaption>${item.title?`<b>${portalEscape(item.title)}</b>`:''}${item.description?`<span>${portalEscape(item.description)}</span>`:''}</figcaption>`:''}<div class="portal-board-image-actions"><button type="button" class="btn btn-light btn-small" data-notice-image-view="${portalEscape(post.id)}" data-notice-image-index="${i}">🔍 크게 보기</button><a class="btn btn-light btn-small" data-notice-native-download="1" href="${portalEscape(stage51084NoticeDownloadHref(item.url,item.name||stage51082NoticeImageFileName(post)))}" download="${portalEscape(item.name||stage51082NoticeImageFileName(post))}" rel="noopener">⬇ 다운로드</a></div></figure>`).join('')}</div></div>`;}
 
 /* 4.4.2 · notice image viewer/download core */
 function ensureNoticeImageViewer(){
@@ -8437,10 +8437,10 @@ let stage4108PendingNoticeImageType='';
 let stage4108PendingNoticeStoragePath='';
 let stage510117PendingNoticeImages=[];
 let stage510118NoticeProcessing=Promise.resolve(true);
-function stage510117NoticeImages(post){const rows=Array.isArray(post?.images)?post.images.filter(x=>x&&(x.url||x.dataUrl||x.imageUrl)):[];if(rows.length)return rows.map(x=>({url:x.url||x.imageUrl||x.dataUrl||'',storagePath:x.storagePath||x.imageStoragePath||'',name:x.name||x.imageName||'',type:x.type||x.imageType||''}));const urls=Array.isArray(post?.imageUrls)?post.imageUrls.filter(Boolean):[];if(urls.length)return urls.map((url,i)=>({url,storagePath:(post?.imageStoragePaths||[])[i]||'',name:(post?.imageNames||[])[i]||'',type:(post?.imageTypes||[])[i]||''}));const src=stage6109ImageSrc(post||{});return src?[{url:src,storagePath:post?.imageStoragePath||'',name:post?.imageName||'',type:post?.imageType||''}]:[];}
-function stage4108RenderNoticeImagePreview(){const wrap=document.getElementById('boardPostImagePreviewWrap');if(!wrap)return;wrap.hidden=!stage510117PendingNoticeImages.length;wrap.innerHTML=stage510117PendingNoticeImages.map((x,i)=>`<div class="notice-image-preview-item"><img src="${portalEscape(x.url)}" alt="공지 이미지 ${i+1}"><button type="button" class="btn btn-danger-outline btn-small" data-remove-pending-notice-image="${i}" aria-label="${i+1}번 이미지 제거">×</button></div>`).join('');}
+function stage510117NoticeImages(post){const rows=Array.isArray(post?.images)?post.images.filter(x=>x&&(x.url||x.dataUrl||x.imageUrl)):[];if(rows.length)return rows.map(x=>({url:x.url||x.imageUrl||x.dataUrl||'',storagePath:x.storagePath||x.imageStoragePath||'',name:x.name||x.imageName||'',type:x.type||x.imageType||'',title:String(x.title||''),description:String(x.description||x.body||'')}));const urls=Array.isArray(post?.imageUrls)?post.imageUrls.filter(Boolean):[];if(urls.length)return urls.map((url,i)=>({url,storagePath:(post?.imageStoragePaths||[])[i]||'',name:(post?.imageNames||[])[i]||'',type:(post?.imageTypes||[])[i]||'',title:String((post?.imageTitles||[])[i]||''),description:String((post?.imageDescriptions||[])[i]||'')}));const src=stage6109ImageSrc(post||{});return src?[{url:src,storagePath:post?.imageStoragePath||'',name:post?.imageName||'',type:post?.imageType||'',title:String(post?.imageTitle||''),description:String(post?.imageDescription||'')}]:[];}
+function stage4108RenderNoticeImagePreview(){const wrap=document.getElementById('boardPostImagePreviewWrap');if(!wrap)return;wrap.hidden=!stage510117PendingNoticeImages.length;wrap.innerHTML=stage510117PendingNoticeImages.map((x,i)=>`<div class="notice-image-preview-item"><img src="${portalEscape(x.url)}" alt="공지 이미지 ${i+1}"><button type="button" class="btn btn-danger-outline btn-small" data-remove-pending-notice-image="${i}" aria-label="${i+1}번 이미지 제거">×</button><div class="stage510123-notice-caption"><b>${i+1}번 사진 제목·설명</b><input type="text" maxlength="60" placeholder="사진 제목 (예: 우승팀)" value="${portalEscape(x.title||'')}" data-pending-notice-title="${i}"><textarea maxlength="200" placeholder="간단한 설명" data-pending-notice-description="${i}">${portalEscape(x.description||'')}</textarea></div></div>`).join('');}
 async function stage4108CompressNoticeImage(file){if(!file?.type?.startsWith('image/'))throw new Error('이미지 파일만 첨부할 수 있습니다.');if(file.size>12*1024*1024)throw new Error('원본 이미지는 12MB 이하만 사용할 수 있습니다.');const bitmap=await createImageBitmap(file);const max=1600,scale=Math.min(1,max/Math.max(bitmap.width,bitmap.height));const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(bitmap.width*scale));canvas.height=Math.max(1,Math.round(bitmap.height*scale));canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close?.();let quality=.82,data=canvas.toDataURL('image/webp',quality);while(data.length>260000&&quality>.46){quality-=.06;data=canvas.toDataURL('image/webp',quality);}if(data.length>320000)throw new Error('공지 이미지가 너무 큽니다. 세로·가로 1600px 이하 이미지로 다시 선택해 주세요.');const type='image/webp';return {dataUrl:data,type,name:stage328SafeFileName(file.name,type)};}
-async function stage4108HandleNoticeImages(files){const saveBtn=document.getElementById('saveBoardPostBtn');try{const list=[...files].slice(0,10);if(!list.length)return true;if(saveBtn){saveBtn.disabled=true;saveBtn.textContent='이미지 처리 중…';}notice(`${list.length}장 이미지를 최적화하고 있습니다. 완료될 때까지 기다려 주세요.`,'info');for(const file of list){const out=await stage4108CompressNoticeImage(file);stage510117PendingNoticeImages.push({url:out.dataUrl,storagePath:'',name:out.name,type:out.type});stage4108RenderNoticeImagePreview();}notice(`공지 이미지 ${list.length}장 준비가 완료됐습니다. 공지 저장을 눌러 주세요.`,'success');return true;}catch(error){notice(error.message||'공지 이미지 첨부에 실패했습니다.','error');return false;}finally{if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='공지 저장';}}}
+async function stage4108HandleNoticeImages(files){const saveBtn=document.getElementById('saveBoardPostBtn');try{const list=[...files].slice(0,10);if(!list.length)return true;if(saveBtn){saveBtn.disabled=true;saveBtn.textContent='이미지 처리 중…';}notice(`${list.length}장 이미지를 최적화하고 있습니다. 완료될 때까지 기다려 주세요.`,'info');for(const file of list){const out=await stage4108CompressNoticeImage(file);stage510117PendingNoticeImages.push({url:out.dataUrl,storagePath:'',name:out.name,type:out.type,title:'',description:''});stage4108RenderNoticeImagePreview();}notice(`공지 이미지 ${list.length}장 준비가 완료됐습니다. 각 사진의 제목·설명을 입력한 뒤 공지 저장을 눌러 주세요.`,'success');return true;}catch(error){notice(error.message||'공지 이미지 첨부에 실패했습니다.','error');return false;}finally{if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='공지 저장';}}}
 function clearBoardPostForm(){['boardPostEditId','boardPostTitle','boardPostBody','boardPostStartAt','boardPostEndAt','boardPostPopupStartAt','boardPostPopupEndAt'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});['boardPostPinned','boardPostImportant','boardPostPopup'].forEach(id=>{const el=document.getElementById(id);if(el)el.checked=false;});stage510117PendingNoticeImages=[];stage4108RenderNoticeImagePreview();const input=document.getElementById('boardPostImageInput');if(input)input.value='';const form=document.getElementById('boardPostForm');if(form)form.hidden=true;}
 function openBoardPostEditor(post=null){if(!requireAdmin(post?'공지 수정':'새 공지 작성'))return;const form=document.getElementById('boardPostForm');if(!form)return;form.hidden=false;document.getElementById('boardPostEditId').value=post?.id||'';document.getElementById('boardPostTitle').value=post?.title||'';document.getElementById('boardPostBody').value=post?.body||'';document.getElementById('boardPostPinned').checked=Boolean(post?.pinned);document.getElementById('boardPostImportant').checked=Boolean(post?.important);document.getElementById('boardPostPopup').checked=Boolean(post?.popup);document.getElementById('boardPostStartAt').value=boardDateValue(post?.startAt);document.getElementById('boardPostEndAt').value=boardDateValue(post?.endAt);document.getElementById('boardPostPopupStartAt').value=boardDateValue(post?.popupStartAt);document.getElementById('boardPostPopupEndAt').value=boardDateValue(post?.popupEndAt);stage510117PendingNoticeImages=stage510117NoticeImages(post||{});stage4108RenderNoticeImagePreview();const imageInput=document.getElementById('boardPostImageInput');if(imageInput)imageInput.value='';form.scrollIntoView({behavior:'smooth',block:'start'});}
 async function saveBoardPost(){
@@ -8491,6 +8491,8 @@ async function saveBoardPost(){
     imageStoragePaths:images.map(x=>x.storagePath||''),
     imageNames:images.map(x=>x.name||''),
     imageTypes:images.map(x=>x.type||''),
+    imageTitles:images.map(x=>x.title||''),
+    imageDescriptions:images.map(x=>x.description||''),
     imageUrl:first.url&&!String(first.url).startsWith('data:')?first.url:'',
     imageStoragePath:first.storagePath||'',imageDataUrl:String(first.url||'').startsWith('data:')?first.url:'',
     imageName:first.name||'',imageType:first.type||'',
@@ -8534,7 +8536,7 @@ function stage51081EnsurePopupImageDownload(post,postImage=''){
   // 5.10.84: cross-origin 원본 대신 same-origin 다운로드 엔드포인트를 사용한다.
   if(!link||link.tagName!=='A'){
     const a=document.createElement('a');
-    a.id='homeNoticePopupImageDownload';a.className='btn btn-primary';a.textContent='⬇ 대진표 이미지 저장';
+    a.id='homeNoticePopupImageDownload';a.className='btn btn-primary';a.textContent='⬇ 공지 사진 저장';
     const boardBtn=document.getElementById('homeNoticePopupBoard'),confirmBtn=document.getElementById('homeNoticePopupConfirm');
     const parent=old?.parentElement||boardBtn?.parentElement||confirmBtn?.parentElement;
     if(old)old.replaceWith(a);else if(parent)parent.insertBefore(a,boardBtn||confirmBtn||null);else dialog.appendChild(a);
@@ -8547,7 +8549,8 @@ function stage51081EnsurePopupImageDownload(post,postImage=''){
   link.rel='noopener';
   link.download=downloadName;
   link.dataset.noticeNativeDownload='1';
-  link.title='대진표 이미지를 기기에 바로 저장합니다.';
+  link.textContent='⬇ 공지 사진 저장';
+  link.title='공지의 첫 번째 사진을 기기에 저장합니다.';
 }
 function showEligibleHomePopup(){
   if(document.body.dataset.currentView!=='home')return;
@@ -8558,8 +8561,11 @@ function showEligibleHomePopup(){
   document.getElementById('homeNoticePopupBadge').textContent=post.important?'중요 공지':'대회 공지';
   document.getElementById('homeNoticePopupTitle').textContent=post.title;
   const body=document.getElementById('homeNoticePopupBody');if(body){body.innerHTML=post.body?noticeBodyHtml(post.body):'';body.hidden=!post.body;}
-  const img=document.getElementById('homeNoticePopupImage');const postImage=stage6109ImageSrc(post);
-  if(img){img.hidden=!postImage;if(postImage)img.src=postImage;else img.removeAttribute('src');}
+  const images=stage510117NoticeImages(post),postImage=images[0]?.url||'';
+  const img=document.getElementById('homeNoticePopupImage');if(img){img.hidden=true;img.removeAttribute('src');}
+  let gallery=document.getElementById('homeNoticePopupGallery');
+  if(!gallery&&img){gallery=document.createElement('div');gallery.id='homeNoticePopupGallery';gallery.className='stage510123-popup-gallery';img.insertAdjacentElement('afterend',gallery);}
+  if(gallery){gallery.hidden=!images.length;gallery.innerHTML=images.map((item,i)=>`<figure><img src="${portalEscape(item.url)}" alt="${portalEscape(item.title||`공지 사진 ${i+1}`)}"><figcaption>${item.title?`<b>${portalEscape(item.title)}</b>`:''}${item.description?`<span>${portalEscape(item.description)}</span>`:''}<a class="btn btn-light btn-small" href="${portalEscape(stage51084NoticeDownloadHref(item.url,item.name||stage51082NoticeImageFileName(post)))}" download="${portalEscape(item.name||stage51082NoticeImageFileName(post))}" rel="noopener">⬇ ${images.length>1?`${i+1}번 `:''}사진 저장</a></figcaption></figure>`).join('');}
   stage51081EnsurePopupImageDownload(post,postImage);
   document.getElementById('homeNoticePopupDismiss').checked=false;
   dialog.showModal();
@@ -9246,6 +9252,48 @@ function printFieldBracketHtml(){
     .stage51046-footnote li{margin:1px 0}
   `;
   document.head.appendChild(st);
+})();
+
+/* 230MATCH 5.10.123 · notice multi-photo popup/captions + deterministic live-view refresh */
+(function stage510123NoticeAndLiveViewRepair(){
+  const handlers=()=>({openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus});
+  function refreshCurrentView(){
+    const view=document.body?.dataset?.currentView||String(location.hash||'').replace(/^#/,'')||'home';
+    try{
+      if(view==='bracket'){
+        renderViewerRemote(state,handlers(),'bracket');
+        const hasDraw=Object.values(state.draw?.rounds||{}).some(rows=>Array.isArray(rows)&&rows.length);
+        if(hasDraw&&!document.querySelector('#bracketBoard .round-column'))render(state,handlers());
+        stage51023ApplyBracketPublicationGate();
+        requestAnimationFrame(()=>{try{decorateBracketLivePlacements();}catch(_e){}try{bindBracketMobileView571();}catch(_e){}try{window.__redrawBracketConnectors?.('5.10.123');}catch(_e){}});
+        return;
+      }
+      if(view==='operation'){
+        renderViewerRemote(state,handlers(),'operation');
+        try{renderStage331OperationDashboard();}catch(_e){}
+        return;
+      }
+      if(view==='records'){
+        renderResultArchive();
+        try{stage510117RenderCurrentResultPhotos();}catch(_e){}
+      }
+    }catch(error){console.warn('[230MATCH 5.10.123] visible view refresh warning',view,error);}
+  }
+  function scheduleRefresh(){[0,80,260].forEach(delay=>setTimeout(refreshCurrentView,delay));}
+  const originalApply=applySynchronizedState;
+  applySynchronizedState=function(){const result=originalApply.apply(this,arguments);scheduleRefresh();return result;};
+  const originalNavigate=navigatePortalView;
+  navigatePortalView=function(){const result=originalNavigate.apply(this,arguments);scheduleRefresh();return result;};
+  window.addEventListener('hashchange',scheduleRefresh);
+  window.addEventListener('pageshow',scheduleRefresh);
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{scheduleRefresh();setTimeout(scheduleRefresh,1200);},{once:true});else{scheduleRefresh();setTimeout(scheduleRefresh,1200);}
+  const style=document.createElement('style');style.id='stage510123Style';style.textContent=`
+    .notice-image-preview-item{width:min(100%,330px);padding:8px;border:1px solid #d8e2f0;border-radius:12px;background:#fff}.notice-image-preview-item>img{width:100%;height:170px}.stage510123-notice-caption{display:grid;gap:6px;margin-top:8px}.stage510123-notice-caption b{font-size:12px;color:#17365f}.stage510123-notice-caption input,.stage510123-notice-caption textarea{box-sizing:border-box;width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:8px;background:#fff}.stage510123-notice-caption textarea{min-height:58px;resize:vertical}
+    .stage510123-notice-figure{margin:0;padding:8px;border:1px solid #d8e2f0;border-radius:12px;background:#fff}.stage510123-notice-figure figcaption{display:grid;gap:3px;padding:8px 2px 2px}.stage510123-notice-figure figcaption b{color:#17365f}.stage510123-notice-figure figcaption span{font-size:13px;color:#64748b;white-space:pre-wrap}
+    .stage510123-popup-gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin:0 0 12px}.stage510123-popup-gallery figure{margin:0;padding:8px;border:1px solid #d8e2f0;border-radius:12px;background:#f8fafc}.stage510123-popup-gallery img{display:block;width:100%;max-height:52vh;object-fit:contain;border-radius:8px;background:#fff}.stage510123-popup-gallery figcaption{display:grid;gap:5px;margin-top:7px}.stage510123-popup-gallery figcaption span{font-size:13px;color:#64748b;white-space:pre-wrap}.stage510123-popup-gallery figcaption .btn{justify-self:start}
+    @media(max-width:700px){.stage510123-popup-gallery{grid-template-columns:1fr}.stage510123-popup-gallery img{max-height:46vh}.notice-image-preview-item{width:100%}}
+  `;document.head.appendChild(style);
+  console.info('[230MATCH] 5.10.123 ready · all popup photos, per-photo captions, immediate bracket/court/result refresh');
 })();
 
 /* 230MATCH 5.10.108 · two-team score sheet + three-team group status print */
@@ -10558,6 +10606,7 @@ function bindPortal(){
   document.getElementById('saveBoardPostBtn')?.addEventListener('click',saveBoardPost);
   document.getElementById('boardPostImageInput')?.addEventListener('change',e=>{if(e.target.files?.length)stage510118NoticeProcessing=stage4108HandleNoticeImages(e.target.files);});
   document.getElementById('boardPostImagePreviewWrap')?.addEventListener('click',e=>{const btn=e.target.closest('[data-remove-pending-notice-image]');if(!btn)return;stage510117PendingNoticeImages.splice(Number(btn.dataset.removePendingNoticeImage),1);stage4108RenderNoticeImagePreview();});
+  document.getElementById('boardPostImagePreviewWrap')?.addEventListener('input',e=>{const title=e.target.closest?.('[data-pending-notice-title]'),description=e.target.closest?.('[data-pending-notice-description]');if(title){const row=stage510117PendingNoticeImages[Number(title.dataset.pendingNoticeTitle)];if(row)row.title=String(title.value||'').slice(0,60);}if(description){const row=stage510117PendingNoticeImages[Number(description.dataset.pendingNoticeDescription)];if(row)row.description=String(description.value||'').slice(0,200);}});
   document.getElementById('closePopupManagerBtn')?.addEventListener('click',closePopupManager);document.getElementById('popupManagerDoneBtn')?.addEventListener('click',closePopupManager);document.getElementById('popupManagerNewNoticeBtn')?.addEventListener('click',()=>{closePopupManager();navigatePortalView('board',{pushHistory:true});setTimeout(()=>openBoardPostEditor(),80);});
   document.getElementById('popupManagerList')?.addEventListener('click',e=>{const btn=e.target.closest('[data-popup-save]');if(btn)savePopupManagerItem(btn.closest('[data-popup-manager-id]'));});
   document.getElementById('archiveCurrentResultBtn')?.addEventListener('click',archiveCurrentResult);
