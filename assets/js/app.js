@@ -1,4 +1,4 @@
-import{getAuthConfig,saveAuthConfig,startAuth,signInGoogle,signOutSocial,beginExternalLogin,getExistingLoginEndpoints,signInEmail,registerEmail,sendPasswordReset,linkEmailPassword,authProviderIds,getAuthRuntime}from'./auth-engine.js?v=510123';
+import{getAuthConfig,saveAuthConfig,startAuth,signInGoogle,signOutSocial,beginExternalLogin,getExistingLoginEndpoints,signInEmail,registerEmail,sendPasswordReset,linkEmailPassword,authProviderIds,getAuthRuntime}from'./auth-engine.js?v=510124';
 import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7133';
 import{notificationSupport,getStoredVapidKey,saveStoredVapidKey,enableMyPush,disableMyPush,queuePush,listPushJobs,listPushTokens}from'./notification-engine.js?v=332012';
 
@@ -8636,20 +8636,22 @@ function stage5956PlayerObjectsFromTeam(team){
     const name=stage5956CleanPlayerName(typeof p==='string'?p:(p?.name||p?.playerName||p?.displayName||''));
     if(!name)return;
     const club=String(typeof p==='object'?(p?.club||p?.affiliation||''):'').trim();
-    if(!out.some(x=>x.name===name))out.push({name,club});
+    const phone=String(typeof p==='object'?(p?.phone||p?.mobile||''):'').replace(/\D/g,'');
+    if(!out.some(x=>x.name===name))out.push({name,club,phone});
   });
   if(out.length)return out.slice(0,2);
-  return participantRecordPlayers(team).map(name=>({name:stage5956CleanPlayerName(name),club:String(team?.affiliation||team?.club||'').trim()})).filter(x=>x.name).slice(0,2);
+  return participantRecordPlayers(team).map(name=>({name:stage5956CleanPlayerName(name),club:String(team?.affiliation||team?.club||'').trim(),phone:''})).filter(x=>x.name).slice(0,2);
 }
 function stage5956PlayerObjectsFromApplication(app){
   const rows=Array.isArray(app?.players)?app.players:[];
   const out=rows.map(p=>({
     name:stage5956CleanPlayerName(typeof p==='string'?p:(p?.name||p?.playerName||p?.displayName||'')),
-    club:String(typeof p==='object'?(p?.club||p?.affiliation||''):'').trim()
+    club:String(typeof p==='object'?(p?.club||p?.affiliation||''):'').trim(),
+    phone:String(typeof p==='object'?(p?.phone||p?.mobile||''):'').replace(/\D/g,'')
   })).filter(x=>x.name);
   if(out.length)return out.slice(0,2);
   const fake={name:String(app?.teamName||''),affiliation:String(app?.affiliation||'')};
-  return participantRecordPlayers(fake).map(name=>({name:stage5956CleanPlayerName(name),club:String(app?.affiliation||'').trim()})).filter(x=>x.name).slice(0,2);
+  return participantRecordPlayers(fake).map((name,index)=>({name:stage5956CleanPlayerName(name),club:String(app?.affiliation||'').trim(),phone:Number(app?.representativeIndex||0)===index?String(app?.phone||'').replace(/\D/g,''):''})).filter(x=>x.name).slice(0,2);
 }
 function stage5956NormalizeApplicationStatus(status){
   const s=String(status||'').toLowerCase();
@@ -8693,6 +8695,7 @@ function stage5956BuildParticipantArchive(archive){
     players.forEach(player=>addHistory(player,{
       tournamentId:tid,tournamentName,division,date,archivedAt,
       applicationId:String(app?.id||''),applicationStatus:appStatus,
+      ownerUid:String(app?.ownerUid||''),phone:String(player?.phone||'').replace(/\D/g,''),
       appliedAt:String(app?.createdAt||app?.submittedAt||''),approvedAt:String(app?.approvedAt||''),paidAt:String(app?.paidAt||''),paid:Boolean(app?.paid),
       participated,reserve,cancelled:['cancelled','rejected'].includes(appStatus),
       teamId:String(linked?.id||''),teamName:String(app?.teamName||linked?.name||''),club:String(app?.affiliation||''),
@@ -8709,6 +8712,7 @@ function stage5956BuildParticipantArchive(archive){
     players.forEach(player=>addHistory(player,{
       tournamentId:tid,tournamentName,division,date,archivedAt,
       applicationId:'',applicationStatus:reserve?'reserve':'approved',appliedAt:'',approvedAt:'',paidAt:'',paid:false,
+      ownerUid:String(team?.ownerUid||''),phone:String(player?.phone||'').replace(/\D/g,''),
       participated,reserve,cancelled:false,teamId:String(team?.id||''),teamName:String(team?.name||team?.teamName||''),club:String(team?.affiliation||team?.club||''),
       partnerNames:players.filter(x=>x.name!==player.name).map(x=>x.name)
     }));
@@ -19276,30 +19280,36 @@ console.info('[230MATCH] 5.9.57 · tournamentReadOnly() disabled: found the actu
   }
   function allHistoryRows(){
     const archives=[...(state.portal?.participantArchives||[])].sort((a,b)=>String(b?.archivedAt||'').localeCompare(String(a?.archivedAt||'')));
-    return archives.flatMap(a=>Array.isArray(a?.players)&&a.players.length?a.players.map(x=>({...x,tournamentName:x.tournamentName||a.name||'보관 대회',division:x.division||a.division||'',date:x.date||a.date||'',archivedAt:x.archivedAt||a.archivedAt||''})):legacyRowsFromArchive(a));
+    return archives.flatMap(a=>{const separate=/모던클럽배/.test(String(a?.name||''))||String(a?.sourceTournamentId||a?.id||'').includes('modern-cup-2026');const rows=Array.isArray(a?.players)&&a.players.length?a.players.map(x=>({...x,tournamentName:x.tournamentName||a.name||'보관 대회',division:x.division||a.division||'',date:x.date||a.date||'',archivedAt:x.archivedAt||a.archivedAt||''})):legacyRowsFromArchive(a);return rows.map(x=>({...x,__identityScope:separate?'modern-fixed':'230match'}));});
   }
   function personalRows(){
-    const mineNames=new Set();
+    const mineNames=new Set(),minePhones=new Set(),mineUids=new Set(),mineClubs=new Set();
     try{
       const profile=currentAuthUser?.appProfile||{},defaults=profile.registrationDefaults||{};
       [defaults.name,profile.name,currentAuthUser?.displayName,...(Array.isArray(profile.matchIdentityAliases)?profile.matchIdentityAliases.map(x=>x?.name):[])].forEach(name=>{
         const value=clean(name).replace(/\s+/g,'').toLowerCase();if(value)mineNames.add(value);
       });
+      [defaults.phone,profile.phone,profile.mobile,...(Array.isArray(profile.matchIdentityAliases)?profile.matchIdentityAliases.map(x=>x?.phone):[])].forEach(phone=>{const value=String(phone||'').replace(/\D/g,'');if(value.length>=10)minePhones.add(value);});
+      [defaults.club,profile.club,profile.affiliation].forEach(club=>{const value=String(club||'').replace(/\s+/g,'').toLowerCase();if(value)mineClubs.add(value);});
+      if(currentAuthUser?.uid)mineUids.add(String(currentAuthUser.uid));
     }catch(_e){}
-    const byName=new Map();
+    const groups=[];
     allHistoryRows().forEach(h=>{
       const name=clean(h?.name);if(!name)return;
-      const key=String(h?.personKey||name.replace(/\s+/g,'').toLowerCase());
-      if(!byName.has(key))byName.set(key,{personKey:key,player:name,histories:[],clubs:new Set(),teams:new Set()});
-      const row=byName.get(key);row.histories.push(h);if(h.club)row.clubs.add(String(h.club));if(h.teamName)row.teams.add(String(h.teamName));
+      const nameKey=name.replace(/\s+/g,'').toLowerCase(),clubKey=String(h?.club||'').replace(/\s+/g,'').toLowerCase(),phone=String(h?.phone||'').replace(/\D/g,''),uid=String(h?.ownerUid||h?.uid||'');
+      let row=null;
+      if(h.__identityScope==='modern-fixed')row=groups.find(g=>g.scope==='modern-fixed'&&g.names.has(nameKey));
+      else row=groups.find(g=>g.scope==='230match'&&((uid&&g.uids.has(uid))||(phone.length>=10&&g.phones.has(phone))||(nameKey&&clubKey&&g.names.has(nameKey)&&g.clubKeys.has(clubKey))));
+      if(!row){const seed=h.__identityScope==='modern-fixed'?`modern:${nameKey}`:`230:${uid||phone||`${nameKey}:${clubKey}`||h.personKey||groups.length}`;row={personKey:seed,player:name,histories:[],clubs:new Set(),clubKeys:new Set(),teams:new Set(),names:new Set(),phones:new Set(),uids:new Set(),scope:h.__identityScope||'230match'};groups.push(row);}
+      row.histories.push(h);row.names.add(nameKey);if(h.club){row.clubs.add(String(h.club));row.clubKeys.add(clubKey);}if(h.teamName)row.teams.add(String(h.teamName));if(phone.length>=10)row.phones.add(phone);if(uid)row.uids.add(uid);
     });
-    return [...byName.values()].map(row=>{
+    return groups.map(row=>{
       const histories=row.histories.sort((a,b)=>String(b.date||b.archivedAt||'').localeCompare(String(a.date||a.archivedAt||'')));
       const participatedCount=histories.filter(h=>h.participated).length;
       const appliedCount=histories.length;
       const reserveCount=histories.filter(h=>h.reserve).length;
       const last=histories[0]||{};
-      const isMine=mineNames.has(clean(row.player).replace(/\s+/g,'').toLowerCase());
+      const isMine=row.scope==='230match'&&([...row.uids].some(x=>mineUids.has(x))||[...row.phones].some(x=>minePhones.has(x))||(mineNames.has(clean(row.player).replace(/\s+/g,'').toLowerCase())&&[...row.clubKeys].some(x=>mineClubs.has(x))));
       return {personKey:row.personKey,player:row.player,histories,clubs:[...row.clubs],teams:[...row.teams],participatedCount,appliedCount,reserveCount,last,isMine,status:participatedCount?'active':reserveCount?'reserve':'applied'};
     }).sort((a,b)=>Number(b.isMine)-Number(a.isMine)||a.player.localeCompare(b.player,'ko'));
   }
@@ -19320,6 +19330,7 @@ console.info('[230MATCH] 5.9.57 · tournamentReadOnly() disabled: found the actu
   }
   function openHistory(personKey){
     ensureDialog();const row=personalRows().find(x=>String(x.personKey)===String(personKey))||personalRows().find(x=>x.player===personKey);if(!row)return;
+    if(!isAdmin()&&!row.isMine){notice('본인의 대회 기록만 확인할 수 있습니다.','warning');return;}
     const dlg=document.getElementById('stage5956PlayerHistoryDialog');
     document.getElementById('stage5956PlayerHistoryName').textContent=`${row.player} 참가 기록`;
     const totalPrelimWins=row.histories.reduce((sum,h)=>sum+Number(h?.result?.prelimWins||0),0),totalMainWins=row.histories.reduce((sum,h)=>sum+Number(h?.result?.mainWins||0),0);
@@ -19336,7 +19347,7 @@ console.info('[230MATCH] 5.9.57 · tournamentReadOnly() disabled: found the actu
     const root=document.getElementById('publicParticipantList');if(!root)return;
     const query=String(document.getElementById('publicParticipantSearch')?.value||'').trim().toLowerCase();
     const filter=document.getElementById('publicParticipantStatus')?.value||'all';
-    const rows=personalRows();
+    const allRows=personalRows(),rows=isAdmin()?allRows:allRows.filter(row=>row.isMine);
     const visible=rows.filter(row=>{
       if(filter==='active'&&!row.participatedCount)return false;
       if(filter==='reserve'&&!row.reserveCount)return false;
@@ -19344,17 +19355,18 @@ console.info('[230MATCH] 5.9.57 · tournamentReadOnly() disabled: found the actu
       return !query||hay.includes(query);
     });
     const setText=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
-    setText('publicParticipantCount',`전체 ${rows.length}명`);setText('publicParticipantTotal',`${rows.length}명`);
+    setText('publicParticipantCount',isAdmin()?`전체 ${rows.length}명`:(currentAuthUser?'내 기록':'로그인 필요'));setText('publicParticipantTotal',`${rows.length}명`);
     setText('publicParticipantActive',`${rows.filter(r=>r.participatedCount).length}명`);setText('publicParticipantReserve',`${rows.filter(r=>r.reserveCount).length}명`);setText('publicParticipantVisible',`${visible.length}명`);
     const stats=document.querySelector('#view-participants .participant-record-stats');
     const statLabels=document.querySelectorAll('#view-participants .participant-record-stats span');
     if(statLabels[1])statLabels[1].textContent='대회 참가자';if(statLabels[2])statLabels[2].textContent='후보 경험';
-    const guide=document.getElementById('publicParticipantGuide');if(guide)guide.textContent=query?`“${query}” 개인 기록 검색 결과 ${visible.length}명입니다.`:'대회가 끝날 때 한 번 저장된 개인별 참가·신청 기록입니다. 이름을 누르면 상세 이력을 확인할 수 있습니다.';
+    const guide=document.getElementById('publicParticipantGuide');if(guide)guide.textContent=isAdmin()?(query?`“${query}” 개인 기록 검색 결과 ${visible.length}명입니다.`:'관리자는 전체 선수의 대회 기록을 확인할 수 있습니다. 이름을 누르면 상세 이력이 표시됩니다.'):(currentAuthUser?'로그인 정보와 UID·전화번호·이름+클럽이 일치하는 본인 기록만 표시합니다.':'로그인하면 본인의 참가·경기 기록을 확인할 수 있습니다.');
+    ['publicParticipantSearch','publicParticipantStatus','publicParticipantReset','publicParticipantCsv'].forEach(id=>{const el=document.getElementById(id);if(el)el.hidden=!isAdmin();});
     const select=document.getElementById('publicParticipantStatus');if(select){const opts=[...select.options];if(opts[0])opts[0].textContent='전체 기록';if(opts[1])opts[1].textContent='실제 참가';if(opts[2])opts[2].textContent='후보 경험';}
-    root.innerHTML=visible.map((row,idx)=>{const lastResult=row.last?.result||{},record=(Number(lastResult.prelimPlayed||0)||Number(lastResult.mainPlayed||0))?` · 예선 ${Number(lastResult.prelimWins||0)}승 ${Number(lastResult.prelimLosses||0)}패 · 본선 ${Number(lastResult.mainWins||0)}승 ${Number(lastResult.mainLosses||0)}패`:'';return `<button type="button" class="public-participant-card stage5956-person-card${row.isMine?' stage510122-my-record':''}" data-stage5956-player="${esc(row.personKey||row.player)}"><div class="participant-record-number">${row.isMine?'나':idx+1}</div><div class="participant-record-main"><strong>${esc(row.player)}${row.isMine?' <em class="stage510122-mine-badge">내 기록</em>':''}</strong><span>${row.last?.tournamentName?`최근 ${esc(row.last.tournamentName)}`:'대회 기록'}${row.last?.placement?` · ${esc(row.last.placement)}`:''}</span><small>신청 ${row.appliedCount}회 · 실제 참가 ${row.participatedCount}회${row.reserveCount?` · 후보 ${row.reserveCount}회`:''}${record}</small></div><span class="stage5956-open-detail">기록 보기 ›</span></button>`;}).join('')||'<div class="portal-empty">저장된 개인 참가 기록이 없습니다.</div>';
+    root.innerHTML=visible.map((row,idx)=>{const lastResult=row.last?.result||{},record=(Number(lastResult.prelimPlayed||0)||Number(lastResult.mainPlayed||0))?` · 예선 ${Number(lastResult.prelimWins||0)}승 ${Number(lastResult.prelimLosses||0)}패 · 본선 ${Number(lastResult.mainWins||0)}승 ${Number(lastResult.mainLosses||0)}패`:'';return `<button type="button" class="public-participant-card stage5956-person-card${row.isMine?' stage510122-my-record':''}" data-stage5956-player="${esc(row.personKey||row.player)}"><div class="participant-record-number">${row.isMine?'나':idx+1}</div><div class="participant-record-main"><strong>${esc(row.player)}${row.isMine?' <em class="stage510122-mine-badge">내 기록</em>':''}</strong><span>${row.last?.tournamentName?`최근 ${esc(row.last.tournamentName)}`:'대회 기록'}${row.last?.placement?` · ${esc(row.last.placement)}`:''}</span><small>신청 ${row.appliedCount}회 · 실제 참가 ${row.participatedCount}회${row.reserveCount?` · 후보 ${row.reserveCount}회`:''}${record}</small></div><span class="stage5956-open-detail">기록 보기 ›</span></button>`;}).join('')||`<div class="portal-empty">${currentAuthUser?'로그인 정보와 일치하는 대회 기록이 없습니다. 회원정보의 이름·전화번호·클럽을 확인해 주세요.':'로그인하면 본인의 대회 기록을 확인할 수 있습니다.'}</div>`;
   };
   exportPublicParticipantsCsv=function(){
-    if(!requireOperator('참가자 CSV 저장'))return;
+    if(!requireAdmin('참가자 CSV 저장'))return;
     const escCsv=value=>`"${String(value??'').replaceAll('"','""')}"`;
     const lines=[['선수명','신청횟수','실제참가횟수','후보횟수','최근대회'].map(escCsv).join(',')];
     personalRows().forEach(row=>lines.push([row.player,row.appliedCount,row.participatedCount,row.reserveCount,row.last?.tournamentName||''].map(escCsv).join(',')));
@@ -24794,10 +24806,10 @@ console.info('[230MATCH] 5.10.94 ready · current tournament podium requires off
         const performance=resultForTeam(team);
         return {...history,result:performance.result,placement:performance.placement,resultUpdatedAt:stamp};
       });
-      archive.schema='230match-player-history-v3';archive.liveDerived=true;archive.updatedAt=stamp;
-      const fingerprint=JSON.stringify(archive.players.map(x=>[x.name,x.teamId,x.placement,x.result?.prelimWins,x.result?.prelimLosses,x.result?.mainWins,x.result?.mainLosses,x.result?.prelimRank,x.result?.games]));
+      archive.schema='230match-player-history-v4';archive.liveDerived=true;archive.updatedAt=stamp;
+      const fingerprint=JSON.stringify(archive.players.map(x=>[x.name,x.teamId,x.ownerUid,x.phone,x.club,x.placement,x.result?.prelimWins,x.result?.prelimLosses,x.result?.mainWins,x.result?.mainLosses,x.result?.prelimRank,x.result?.games]));
       archive.resultFingerprint=fingerprint;
-      if(existing?.resultFingerprint===fingerprint&&existing?.schema==='230match-player-history-v3')return false;
+      if(existing?.resultFingerprint===fingerprint&&existing?.schema==='230match-player-history-v4')return false;
       state.portal.participantArchives=[archive,...safe(state.portal.participantArchives).filter(x=>text(x?.tournamentId||x?.sourceTournamentId||x?.id)!==tid)];
       try{saveState(state);}catch(_e){}
       return true;
