@@ -736,7 +736,6 @@ import{getBlankRubberNumbers,getBlankRubberLabel,validateOrderRubbers,normalizeO
 import{cloneOrderState,commitOrderSubmission,commitOrderReset,createOrderResetPlayerSnapshot,snapshotBooleanMapEntry}from'./order-service.js';
 import{GHOST_ORDER,normalizePair,findNextTapCursor,getTapUsedPlayers,toggleTapPlayer,setTapGhost,backspaceTapSlot,resetTapSlots,buildReorderSlots,toggleReorderPick,applyReorderPlan,getGhostScorePlan}from'./order-picker-ops.js';
 import{buildTapOrderSummaryHtml,buildTapOrderCurrentText,buildTapOrderPlayerListHtml,buildReorderOverlayHtml,buildReorderCardsHtml,buildReorderPreviewHtml}from'./order-picker-ui.js';
-import{createTapOrderState,setTapOrderFocus,applyTapOrderTransition,resetTapOrderState,createReorderState,applyReorderPickTransition,resetReorderState,getReorderCompletionState,buildReorderAppliedMessage}from'./order-picker-state.js';
 import{buildCourtStatusSummaryHtml,buildCourtWaitingBadgeHtml,buildCourtCardShellHtml,buildCourtBoardHiddenHtml,buildCourtBoardFrameHtml,buildCourtCurrentSectionHtml,buildCourtWaitingSectionHtml,buildCourtDropZoneHtml,buildNoCourtAssignedHtml,buildSharedWaitingCardHtml,buildSharedWaitingSectionHtml,buildCourtWaitingItemHtml,buildCourtMovePickerHtml}from'./court-status-ui.js';
 import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import{getFirestore,collection,doc,getDoc,getDocs,setDoc,addDoc,updateDoc,deleteDoc,onSnapshot,query,orderBy,limit,serverTimestamp,writeBatch,where,documentId}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -4632,33 +4631,6 @@ function _getActiveTournamentLabel(){
 
 // ── 클럽 경기이사 연락처 + 공지 문자 함수들 ────────────────────────────────
 
-function removeObsoleteRegEmailUi(){
-  try{
-    const email=ge('regContactEmail');
-    if(email){
-      const parent=email.parentElement;
-      email.remove();
-      if(parent && !String(parent.textContent||'').trim() && !parent.querySelector('input,button,select,textarea')) parent.remove();
-    }
-    const row=ge('regContactRow');
-    if(!row) return;
-    [...row.querySelectorAll('div,span,p,small,label')].forEach(el=>{
-      const txt=String(el.textContent||'').replace(/\s+/g,' ').trim();
-      if(
-        txt.includes('구글 계정(Gmail)') ||
-        txt.includes('테스트 초대') ||
-        txt.includes('@gmail.com 구글 계정')
-      ){
-        el.remove();
-      }
-    });
-  }catch(e){
-    console.warn('removeObsoleteRegEmailUi failed',e);
-  }
-}
-
-
-
 // 팀 등록 폼 - 클럽 선택 변경 시
 function onRegClubChange(){
   const club = (ge('regClub')?.value||'').trim();
@@ -4673,7 +4645,6 @@ function onRegClubChange(){
   if(inp) inp.value = saved;
   if(badge) badge.style.display = saved ? 'inline' : 'none';
   if(row) row.style.display = 'block';
-  removeObsoleteRegEmailUi();
 }
 
 function onRegContactInput(){
@@ -4687,8 +4658,8 @@ async function saveRegContact(){
   const phone = raw.replace(/[^0-9-]/g,'');
   if(!club){ toast('클럽을 먼저 선택하세요','error'); return; }
   if(phone && phone.length < 9){ toast('번호를 확인해주세요','error'); return; }
-  // Play 스토어 정식 등록 이후 팀 등록 화면에서는 경기이사 연락처만 관리한다.
-  // 기존 clubEmails 데이터는 호환성을 위해 보존하되 여기서는 수정하지 않는다.
+  // Play 스토어 정식 등록 이후 팀 등록 화면에서는 전화번호만 저장한다.
+  // 과거 clubEmails 데이터는 관리자 호환성을 위해 그대로 보존한다.
   const savedEmail=(G.meta.clubEmails||{})[club]||'';
   saveClubDirectorContact(G.meta,club,phone,savedEmail);
   try{
@@ -21445,13 +21416,8 @@ function openTapOrderModal(side,dbl){
   const slots=[];
   for(let r=0;r<dbl;r++) slots.push(getPickerSelected(`rp${side}_${r}`).slice(0,2));
   const players=getPickerPlayers(`rp${side}_0`)||[];
-  __tapOrderState=createTapOrderState({
-    side,
-    doublesCount:dbl,
-    slots,
-    players,
-    findNextCursor:findNextTapCursor
-  });
+  const cursor=findNextTapCursor(slots,0);
+  __tapOrderState={side,dbl,slots,players,cursor:Math.max(0,cursor)};
   const title=ge('mTapOrderTitle');
   title && (title.textContent=`선수 입력 · ${side===1?'홈팀':'원정팀'}`);
   renderTapOrderModal();
@@ -21464,34 +21430,39 @@ function renderTapOrderModal(){
   if(current){ current.textContent=buildTapOrderCurrentText({cursor:st.cursor||0,doublesCount:dbl,pair:st.slots?.[st.cursor]||[]}); }
   if(list){ list.innerHTML=buildTapOrderPlayerListHtml({players:st.players||[],currentPair:st.slots?.[st.cursor]||[],usedPlayers:getTapUsedPlayers(st.slots||[]),escapeHtml:esc,escapeAttr:esc}); }
 }
-function tapOrderFocus(idx){ setTapOrderFocus(__tapOrderState,idx); renderTapOrderModal(); }
+function tapOrderFocus(idx){ __tapOrderState.cursor=idx; renderTapOrderModal(); }
 function tapOrderPick(player){
   const st=__tapOrderState; if(!st||!st.players) return;
   const next=toggleTapPlayer(st.slots||[],st.cursor||0,player);
-  applyTapOrderTransition(st,next);
+  st.slots=next.slots;
+  st.cursor=next.cursor;
   renderTapOrderModal();
 }
 function tapOrderBack(){
   const st=__tapOrderState; if(!st) return;
   const next=backspaceTapSlot(st.slots||[],st.cursor||0);
-  applyTapOrderTransition(st,next);
+  st.slots=next.slots;
+  st.cursor=next.cursor;
   renderTapOrderModal();
 }
 function tapOrderClear(){
   const st=__tapOrderState; if(!st) return;
   const next=backspaceTapSlot(st.slots||[],st.cursor||0);
-  applyTapOrderTransition(st,next);
+  st.slots=next.slots;
+  st.cursor=next.cursor;
   renderTapOrderModal();
 }
 function tapOrderReset(){
   const st=__tapOrderState; if(!st) return;
-  resetTapOrderState(st,resetTapSlots);
+  st.slots=resetTapSlots(st.dbl||0);
+  st.cursor=0;
   renderTapOrderModal();
 }
 function tapOrderGhost(){
   const st=__tapOrderState; if(!st) return;
   const next=setTapGhost(st.slots||[],st.cursor||0);
-  applyTapOrderTransition(st,next);
+  st.slots=next.slots;
+  st.cursor=next.cursor;
   renderTapOrderModal();
 }
 function applyTapOrderSelections(){
@@ -21986,12 +21957,7 @@ function openReorderPopup(dbl, side = 0) {
   }
   const slots=buildReorderSlots(side1Slots,side2Slots,dbl);
   const teamLabel = side===1 ? ((ctx.dn1)||'홈팀') : side===2 ? ((ctx.dn2)||'원정팀') : '';
-  _reorderState=createReorderState({
-    doublesCount:dbl,
-    slots,
-    side,
-    teamLabel
-  });
+  _reorderState = { dbl, slots, picked: [], side, teamLabel };
 
   // 팝업 오버레이 생성
   let overlay = ge('reorderOverlay');
@@ -22012,43 +21978,34 @@ function renderReorderCards() {
 }
 
 function reorderTap(idx) {
-  const st=_reorderState;
-  if(!st) return;
-  const nextPicked=toggleReorderPick(st.picked||[],idx,(st.slots||[]).length);
-  applyReorderPickTransition(st,nextPicked);
+  const { picked, slots } = _reorderState;
+  _reorderState.picked=toggleReorderPick(picked,idx,slots.length);
   renderReorderCards();
-
-  const preview=ge('reorderPreview');
-  const previewList=ge('reorderPreviewList');
-  const applyBtn=ge('reorderApplyBtn');
-  const completion=getReorderCompletionState(st);
-
-  if(completion.complete){
-    preview.style.display='block';
-    previewList.innerHTML=buildReorderPreviewHtml({
-      slots:st.slots,
-      picked:st.picked,
-      side:st.side,
-      escapeHtml:esc
-    });
-    applyBtn.disabled=false;
-    applyBtn.style.background='var(--primary)';
-  }else{
-    preview.style.display='none';
-    applyBtn.disabled=true;
+  // 프리뷰 업데이트
+  const preview = ge('reorderPreview');
+  const previewList = ge('reorderPreviewList');
+  const applyBtn = ge('reorderApplyBtn');
+  if (picked.length === slots.length) {
+    preview.style.display = 'block';
+    previewList.innerHTML=buildReorderPreviewHtml({slots,picked,side:_reorderState.side,escapeHtml:esc});
+    applyBtn.disabled = false;
+    applyBtn.style.background = 'var(--primary)';
+  } else {
+    preview.style.display = 'none';
+    applyBtn.disabled = true;
   }
 }
 
 function reorderReset() {
-  resetReorderState(_reorderState);
-  ge('reorderPreview').style.display='none';
-  ge('reorderApplyBtn').disabled=true;
+  _reorderState.picked = [];
+  ge('reorderPreview').style.display = 'none';
+  ge('reorderApplyBtn').disabled = true;
   renderReorderCards();
 }
 
 function applyReorder() {
   const { slots, picked, dbl, side } = _reorderState;
-  if(!getReorderCompletionState(_reorderState).complete) return;
+  if (picked.length !== slots.length) return;
   const snap1=[],snap2=[];
   for(let r=0;r<dbl;r++){
     snap1.push(getPickerSelected(`rp1_${r}`));
@@ -22066,7 +22023,7 @@ function applyReorder() {
     if (!side || side === 2) renderPlayerDropdown(`rp2_${r}`);
   }
   closeReorderPopup();
-  toast(buildReorderAppliedMessage(_reorderState.teamLabel),'success');
+  toast(`${_reorderState.teamLabel ? _reorderState.teamLabel + ' ' : ''}복식 순서가 변경되었습니다 ✅`, 'success');
 }
 
 function closeReorderPopup() {
