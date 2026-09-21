@@ -1,4 +1,4 @@
-import{getAuthConfig,saveAuthConfig,startAuth,signInGoogle,signOutSocial,beginExternalLogin,getExistingLoginEndpoints,signInEmail,registerEmail,sendPasswordReset,linkEmailPassword,authProviderIds,getAuthRuntime}from'./auth-engine.js?v=510124';
+import{getAuthConfig,saveAuthConfig,startAuth,signInGoogle,signOutSocial,beginExternalLogin,getExistingLoginEndpoints,signInEmail,registerEmail,sendPasswordReset,linkEmailPassword,authProviderIds,getAuthRuntime}from'./auth-engine.js?v=510125';
 import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7133';
 import{notificationSupport,getStoredVapidKey,saveStoredVapidKey,enableMyPush,disableMyPush,queuePush,listPushJobs,listPushTokens}from'./notification-engine.js?v=332012';
 
@@ -9256,6 +9256,100 @@ function printFieldBracketHtml(){
     .stage51046-footnote li{margin:1px 0}
   `;
   document.head.appendChild(st);
+})();
+
+/* 230MATCH 5.10.125 · UID별 비공개 개인 기록 저장소 + 관리자 자동 동기화 */
+(function stage510125PrivatePlayerRecords(){
+  const ROOT='playerRecordsV1';
+  const digits=value=>String(value||'').replace(/\D/g,'');
+  const text=value=>String(value??'').trim();
+  const identityText=value=>text(value).replace(/\s+/g,'').toLowerCase();
+  const safeArray=value=>Array.isArray(value)?value:[];
+  const cleanObject=value=>{
+    if(Array.isArray(value))return value.map(cleanObject).filter(item=>item!==undefined);
+    if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).filter(([key,item])=>!key.startsWith('__')&&item!==undefined&&typeof item!=='function').map(([key,item])=>[key,cleanObject(item)]));
+    return value;
+  };
+  const isModern=history=>/모던클럽배/.test(text(history?.tournamentName||history?.name))||text(history?.tournamentId||history?.sourceTournamentId).includes('modern-cup-2026');
+  let syncTimer=0,loadingMine=false,lastMineUid='';
+
+  function profilePhones(profile){
+    const defaults=profile?.registrationDefaults||{};
+    return [profile?.phone,profile?.mobile,defaults?.phone,...safeArray(profile?.matchIdentityAliases).map(item=>item?.phone)].map(digits).filter(phone=>phone.length>=10);
+  }
+  async function userDirectory(rt){
+    const phoneToUid=new Map(),uidIdentities=new Map();
+    const snap=await rt.api.getDocs(rt.api.collection(rt.db,'users'));
+    snap.docs.forEach(docSnap=>{
+      const profile=docSnap.data()||{};
+      profilePhones(profile).forEach(phone=>{if(!phoneToUid.has(phone))phoneToUid.set(phone,docSnap.id);});
+      const defaults=profile.registrationDefaults||{};
+      const names=[profile.name,profile.displayName,defaults.name,...safeArray(profile.matchIdentityAliases).map(item=>item?.name)].map(identityText).filter(Boolean);
+      uidIdentities.set(docSnap.id,new Set(names));
+    });
+    return {phoneToUid,uidIdentities};
+  }
+  function privatePayload(history,uid){
+    const tournamentId=text(history?.tournamentId||history?.sourceTournamentId);
+    return cleanObject({
+      schema:'230match-private-player-record-v1',ownerUid:uid,tournamentId,
+      tournamentName:text(history?.tournamentName||history?.name||'230MATCH 대회'),division:text(history?.division),date:text(history?.date),archivedAt:text(history?.archivedAt),
+      name:text(history?.name),phone:digits(history?.phone),club:text(history?.club),teamId:text(history?.teamId),teamName:text(history?.teamName),partnerNames:safeArray(history?.partnerNames).map(text).filter(Boolean),
+      applicationId:text(history?.applicationId),applicationStatus:text(history?.applicationStatus),participated:!!history?.participated,reserve:!!history?.reserve,cancelled:!!history?.cancelled,
+      result:history?.result||null,placement:text(history?.placement),resultUpdatedAt:text(history?.resultUpdatedAt),source:'230match',updatedAt:new Date().toISOString()
+    });
+  }
+  async function syncAllPrivateRecords(){
+    if(typeof isAdmin!=='function'||!isAdmin()||typeof window.__stage510124PersonalRows!=='function')return;
+    const rt=await getAuthRuntime();
+    if(!rt?.db||!rt?.user||typeof rt.api?.getDocs!=='function'||typeof rt.api?.setDoc!=='function')return;
+    const {phoneToUid,uidIdentities}=await userDirectory(rt),jobs=[];
+    window.__stage510124PersonalRows().forEach(row=>{
+      if(row?.scope==='modern-fixed')return;
+      safeArray(row?.histories).forEach(history=>{
+        if(isModern(history))return;
+        const tournamentId=text(history?.tournamentId||history?.sourceTournamentId);if(!tournamentId)return;
+        const phone=digits(history?.phone),phoneUid=phone.length>=10?text(phoneToUid.get(phone)):'',candidateUid=text(history?.ownerUid||history?.uid);
+        const candidateMatchesName=candidateUid&&uidIdentities.get(candidateUid)?.has(identityText(history?.name));
+        const uid=phoneUid||(candidateMatchesName?candidateUid:'');
+        if(!uid)return;
+        const payload=privatePayload(history,uid);
+        const fingerprint=JSON.stringify({...payload,updatedAt:''});
+        const cacheKey=`230match-private-record-v1:${uid}:${tournamentId}`;
+        if(localStorage.getItem(cacheKey)===fingerprint)return;
+        jobs.push(async()=>{await rt.api.setDoc(rt.api.doc(rt.db,ROOT,uid,'tournaments',tournamentId),payload,{merge:true});localStorage.setItem(cacheKey,fingerprint);});
+      });
+    });
+    for(let index=0;index<jobs.length;index+=4)await Promise.all(jobs.slice(index,index+4).map(run=>run()));
+    if(jobs.length){console.info(`[230MATCH 5.10.125] 개인 비공개 기록 ${jobs.length}건 동기화 완료`);if(rt.user?.uid)await loadMyPrivateRecords(true);}
+  }
+  async function loadMyPrivateRecords(force=false){
+    if(loadingMine)return;
+    let rt;try{rt=await getAuthRuntime();}catch(_e){return;}
+    const uid=text(rt?.user?.uid);if(!uid||!rt?.db||typeof rt.api?.getDocs!=='function')return;
+    if(!force&&lastMineUid===uid&&Array.isArray(window.__stage510125MyCloudHistories))return;
+    loadingMine=true;
+    try{
+      const snap=await rt.api.getDocs(rt.api.collection(rt.db,ROOT,uid,'tournaments'));
+      window.__stage510125MyCloudHistories=snap.docs.map(docSnap=>cleanObject({...docSnap.data(),ownerUid:uid,tournamentId:docSnap.id,__privateCloud:true}));
+      lastMineUid=uid;
+      if(typeof renderPublicParticipantRecords==='function'&&(document.body?.dataset.currentView==='participants'||location.hash.includes('participants')))renderPublicParticipantRecords();
+    }catch(error){console.warn('[230MATCH 5.10.125] 내 비공개 기록 읽기 대기 · Firestore 규칙 배포 필요',error);}
+    finally{loadingMine=false;}
+  }
+  function scheduleSync(delay=700){
+    clearTimeout(syncTimer);
+    syncTimer=setTimeout(()=>{loadMyPrivateRecords().catch(()=>{});if(typeof isAdmin==='function'&&isAdmin())syncAllPrivateRecords().catch(error=>console.warn('[230MATCH 5.10.125] 개인 기록 자동 동기화 실패',error));},delay);
+  }
+  const baseApply=applyAuthenticatedRole;
+  applyAuthenticatedRole=function(){const result=baseApply.apply(this,arguments);scheduleSync(450);return result;};
+  const basePush=pushStateNow;
+  pushStateNow=async function(){const result=await basePush.apply(this,arguments);scheduleSync(500);return result;};
+  window.stage510125SyncPrivatePlayerRecords=()=>syncAllPrivateRecords();
+  window.addEventListener('hashchange',()=>scheduleSync(250));
+  window.addEventListener('pageshow',()=>scheduleSync(800));
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>scheduleSync(1100),{once:true});else scheduleSync(1100);
+  console.info('[230MATCH] 5.10.125 ready · private per-UID player records + admin migration');
 })();
 
 /* 230MATCH 5.10.123 · notice multi-photo popup/captions + deterministic live-view refresh */
@@ -19280,7 +19374,9 @@ console.info('[230MATCH] 5.9.57 · tournamentReadOnly() disabled: found the actu
   }
   function allHistoryRows(){
     const archives=[...(state.portal?.participantArchives||[])].sort((a,b)=>String(b?.archivedAt||'').localeCompare(String(a?.archivedAt||'')));
-    return archives.flatMap(a=>{const separate=/모던클럽배/.test(String(a?.name||''))||String(a?.sourceTournamentId||a?.id||'').includes('modern-cup-2026');const rows=Array.isArray(a?.players)&&a.players.length?a.players.map(x=>({...x,tournamentName:x.tournamentName||a.name||'보관 대회',division:x.division||a.division||'',date:x.date||a.date||'',archivedAt:x.archivedAt||a.archivedAt||''})):legacyRowsFromArchive(a);return rows.map(x=>({...x,__identityScope:separate?'modern-fixed':'230match'}));});
+    const local=archives.flatMap(a=>{const separate=/모던클럽배/.test(String(a?.name||''))||String(a?.sourceTournamentId||a?.id||'').includes('modern-cup-2026');const rows=Array.isArray(a?.players)&&a.players.length?a.players.map(x=>({...x,tournamentName:x.tournamentName||a.name||'보관 대회',division:x.division||a.division||'',date:x.date||a.date||'',archivedAt:x.archivedAt||a.archivedAt||''})):legacyRowsFromArchive(a);return rows.map(x=>({...x,__identityScope:separate?'modern-fixed':'230match'}));});
+    const cloud=Array.isArray(window.__stage510125MyCloudHistories)?window.__stage510125MyCloudHistories.map(x=>({...x,__identityScope:'230match',__privateCloud:true})):[];
+    return [...local,...cloud];
   }
   function personalRows(){
     const mineNames=new Set(),minePhones=new Set(),mineUids=new Set(),mineClubs=new Set();
@@ -19301,7 +19397,9 @@ console.info('[230MATCH] 5.9.57 · tournamentReadOnly() disabled: found the actu
       if(h.__identityScope==='modern-fixed')row=groups.find(g=>g.scope==='modern-fixed'&&g.names.has(nameKey));
       else row=groups.find(g=>g.scope==='230match'&&((uid&&g.uids.has(uid))||(phone.length>=10&&g.phones.has(phone))||(nameKey&&clubKey&&g.names.has(nameKey)&&g.clubKeys.has(clubKey))));
       if(!row){const seed=h.__identityScope==='modern-fixed'?`modern:${nameKey}`:`230:${uid||phone||`${nameKey}:${clubKey}`||h.personKey||groups.length}`;row={personKey:seed,player:name,histories:[],clubs:new Set(),clubKeys:new Set(),teams:new Set(),names:new Set(),phones:new Set(),uids:new Set(),scope:h.__identityScope||'230match'};groups.push(row);}
-      row.histories.push(h);row.names.add(nameKey);if(h.club){row.clubs.add(String(h.club));row.clubKeys.add(clubKey);}if(h.teamName)row.teams.add(String(h.teamName));if(phone.length>=10)row.phones.add(phone);if(uid)row.uids.add(uid);
+      const historyKey=[h.tournamentId||h.sourceTournamentId||'',h.teamId||'',h.applicationId||'',h.name||''].join('|');
+      if(!row.histories.some(x=>[x.tournamentId||x.sourceTournamentId||'',x.teamId||'',x.applicationId||'',x.name||''].join('|')===historyKey))row.histories.push(h);
+      row.names.add(nameKey);if(h.club){row.clubs.add(String(h.club));row.clubKeys.add(clubKey);}if(h.teamName)row.teams.add(String(h.teamName));if(phone.length>=10)row.phones.add(phone);if(uid)row.uids.add(uid);
     });
     return groups.map(row=>{
       const histories=row.histories.sort((a,b)=>String(b.date||b.archivedAt||'').localeCompare(String(a.date||a.archivedAt||'')));
@@ -19310,9 +19408,10 @@ console.info('[230MATCH] 5.9.57 · tournamentReadOnly() disabled: found the actu
       const reserveCount=histories.filter(h=>h.reserve).length;
       const last=histories[0]||{};
       const isMine=row.scope==='230match'&&([...row.uids].some(x=>mineUids.has(x))||[...row.phones].some(x=>minePhones.has(x))||(mineNames.has(clean(row.player).replace(/\s+/g,'').toLowerCase())&&[...row.clubKeys].some(x=>mineClubs.has(x))));
-      return {personKey:row.personKey,player:row.player,histories,clubs:[...row.clubs],teams:[...row.teams],participatedCount,appliedCount,reserveCount,last,isMine,status:participatedCount?'active':reserveCount?'reserve':'applied'};
+      return {personKey:row.personKey,player:row.player,histories,clubs:[...row.clubs],teams:[...row.teams],phones:[...row.phones],uids:[...row.uids],scope:row.scope,participatedCount,appliedCount,reserveCount,last,isMine,status:participatedCount?'active':reserveCount?'reserve':'applied'};
     }).sort((a,b)=>Number(b.isMine)-Number(a.isMine)||a.player.localeCompare(b.player,'ko'));
   }
+  window.__stage510124PersonalRows=personalRows;
   publicParticipantRows=function(){return personalRows();};
   function statusLabel(h){
     if(h.cancelled)return '신청 취소';
