@@ -1,4 +1,4 @@
-import{getAuthConfig,saveAuthConfig,startAuth,signInGoogle,signOutSocial,beginExternalLogin,getExistingLoginEndpoints,signInEmail,registerEmail,sendPasswordReset,linkEmailPassword,authProviderIds,getAuthRuntime}from'./auth-engine.js?v=510125';
+import{getAuthConfig,saveAuthConfig,startAuth,signInGoogle,signOutSocial,beginExternalLogin,getExistingLoginEndpoints,signInEmail,registerEmail,sendPasswordReset,linkEmailPassword,authProviderIds,getAuthRuntime}from'./auth-engine.js?v=510126';
 import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7133';
 import{notificationSupport,getStoredVapidKey,saveStoredVapidKey,enableMyPush,disableMyPush,queuePush,listPushJobs,listPushTokens}from'./notification-engine.js?v=332012';
 
@@ -9343,8 +9343,6 @@ function printFieldBracketHtml(){
   }
   const baseApply=applyAuthenticatedRole;
   applyAuthenticatedRole=function(){const result=baseApply.apply(this,arguments);scheduleSync(450);return result;};
-  const basePush=pushStateNow;
-  pushStateNow=async function(){const result=await basePush.apply(this,arguments);scheduleSync(500);return result;};
   window.stage510125SyncPrivatePlayerRecords=()=>syncAllPrivateRecords();
   window.addEventListener('hashchange',()=>scheduleSync(250));
   window.addEventListener('pageshow',()=>scheduleSync(800));
@@ -24916,8 +24914,6 @@ console.info('[230MATCH] 5.10.94 ready · current tournament podium requires off
   }
   const baseRender=renderPublicParticipantRecords;
   renderPublicParticipantRecords=function(){refreshDerivedArchive();return baseRender.apply(this,arguments);};
-  const basePush=pushStateNow;
-  pushStateNow=async function(){refreshDerivedArchive();return basePush.apply(this,arguments);};
   const refreshView=()=>{if(refreshDerivedArchive()&&(document.getElementById('view-participants')?.classList.contains('active')||location.hash.includes('participants')))baseRender();};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{setTimeout(refreshView,900);setTimeout(refreshView,3500);},{once:true});
   else{setTimeout(refreshView,900);setTimeout(refreshView,3500);}
