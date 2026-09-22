@@ -7,8 +7,9 @@ const DB_NAME='230match-v6-recovery-db';
 const DB_VERSION=1;
 const RECOVERY_STORE='recoveries';
 const MAX_MANUAL_RECOVERIES=12;
-const MAX_AUTO_RECOVERIES=24;
+const MAX_AUTO_RECOVERIES=48;
 const MAX_RECOVERIES=MAX_MANUAL_RECOVERIES+MAX_AUTO_RECOVERIES;
+const AUTO_RECOVERY_MAX_AGE_MS=7*24*60*60*1000;
 let dbPromise=null;
 
 function clone(v){try{return structuredClone(v);}catch{return JSON.parse(JSON.stringify(v));}}
@@ -91,14 +92,19 @@ function isCriticalRecoveryLabel(label=''){
 async function trimRecoveries(){
   const all=await getAll();
   const manual=all.filter(x=>recoveryKind(x)==='manual');
+  const now=Date.now();
   const autos=all.filter(x=>recoveryKind(x)!=='manual');
+  const activeAutos=autos.filter(x=>{
+    const created=Date.parse(String(x?.createdAt||''));
+    return Number.isFinite(created)&&now-created<=AUTO_RECOVERY_MAX_AGE_MS;
+  });
   const keep=new Set();
 
   manual.slice(0,MAX_MANUAL_RECOVERIES).forEach(x=>keep.add(x.id));
 
   // 자동 복구는 최대 24개. 중요 복구점을 먼저 보존하고 나머지는 최신순으로 채운다.
-  const critical=autos.filter(x=>recoveryKind(x)==='critical-auto'||isCriticalRecoveryLabel(x.label));
-  const regular=autos.filter(x=>!critical.includes(x));
+  const critical=activeAutos.filter(x=>recoveryKind(x)==='critical-auto'||isCriticalRecoveryLabel(x.label));
+  const regular=activeAutos.filter(x=>!critical.includes(x));
   const selected=[];
   for(const x of critical){if(selected.length<MAX_AUTO_RECOVERIES)selected.push(x);}
   for(const x of regular){if(selected.length<MAX_AUTO_RECOVERIES)selected.push(x);}
@@ -108,7 +114,7 @@ async function trimRecoveries(){
   return {
     count:keep.size,
     manualCount:Math.min(manual.length,MAX_MANUAL_RECOVERIES),
-    autoCount:Math.min(autos.length,MAX_AUTO_RECOVERIES),
+    autoCount:Math.min(activeAutos.length,MAX_AUTO_RECOVERIES),
     max:MAX_RECOVERIES
   };
 }
@@ -122,7 +128,7 @@ async function put(item){
   });
   return trimRecoveries();
 }
-export async function prepareRecoveryStorage(){await openDb();try{await navigator.storage?.persist?.();}catch{}return{ready:true,migrated:0};}
+export async function prepareRecoveryStorage(){await openDb();try{await navigator.storage?.persist?.();}catch{}const info=await trimRecoveries();return{ready:true,migrated:0,...info};}
 export function saveRecovery(state,label='수동 복구점',options={}){
   const requested=String(options?.kind||'').trim();
   const kind=requested==='manual'?'manual':requested==='critical-auto'?'critical-auto':requested==='auto'?'auto':(isCriticalRecoveryLabel(label)?'critical-auto':'auto');
@@ -134,5 +140,5 @@ export async function getRecoveries(){try{return await getAll();}catch{return[];
 export async function getRecovery(id){try{const db=await openDb();return await new Promise((resolve,reject)=>{const tx=db.transaction(RECOVERY_STORE,'readonly');const r=tx.objectStore(RECOVERY_STORE).get(id);r.onsuccess=()=>resolve(r.result||null);r.onerror=()=>reject(r.error);});}catch{return null;}}
 export async function deleteRecovery(id){try{const db=await openDb();await new Promise((resolve,reject)=>{const tx=db.transaction(RECOVERY_STORE,'readwrite');tx.objectStore(RECOVERY_STORE).delete(id);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});return true;}catch{return false;}}
 
-export const RECOVERY_LIMITS={manual:MAX_MANUAL_RECOVERIES,auto:MAX_AUTO_RECOVERIES,total:MAX_RECOVERIES};
-console.info('[230MATCH] store 5.8.4 · recovery retention manual 12 + auto 24');
+export const RECOVERY_LIMITS={manual:MAX_MANUAL_RECOVERIES,auto:MAX_AUTO_RECOVERIES,total:MAX_RECOVERIES,autoMaxAgeDays:7};
+console.info('[230MATCH] store 5.8.5 · recovery retention manual 12 + auto 48 / 7 days');

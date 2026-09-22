@@ -2,7 +2,7 @@ import{getAuthConfig,saveAuthConfig,startAuth,signInGoogle,signOutSocial,beginEx
 import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7133';
 import{notificationSupport,getStoredVapidKey,saveStoredVapidKey,enableMyPush,disableMyPush,queuePush,listPushJobs,listPushTokens}from'./notification-engine.js?v=332012';
 
-import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=5804';
+import{loadState,saveState,clearState,saveRecovery,getRecoveries,getRecovery,deleteRecovery,prepareRecoveryStorage,initialState}from'./store.js?v=5805';
 import{prepareTeams,generateDraw,allMatches,findMatch,generateLinkedDrawSlots,syncLinkedDrawQualifiers}from'./bracket-engine-v5000.js?v=5000';
 import{ensureDrawMeta,canModifyDraw,createDrawWithMethod,lockDraw,unlockDrawForDevelopment,clearDrawHistory}from'./draw-method-engine.js?v=332012';
 import{buildCourts,assignInitial,queueReadyMatches,refillCourt}from'./court-engine.js?v=332012';
@@ -1054,6 +1054,44 @@ const getValue=(id,fallback='')=>{const el=$(id);return el?el.value:fallback;};
 const getChecked=(id,fallback=false)=>{const el=$(id);return el?el.checked:fallback;};
 function log(message){state.logs.unshift({at:new Date().toISOString(),message});state.logs=state.logs.slice(0,300);}
 let saveFailureNoticeShown=false;
+const ROLLING_RECOVERY_INTERVAL_MS=5*60*1000;
+let rollingRecoveryLastAt=0;
+let rollingRecoveryTimer=0;
+let rollingRecoveryPendingContext='';
+function scheduleRollingRecovery(context='상태 변경'){
+  try{
+    if(typeof canOperate==='function'&&!canOperate())return;
+    if(document.documentElement.dataset.recoveryRestoring==='1')return;
+    const clean=String(context||'상태 변경').trim();
+    if(/시간 정보 갱신|자동 문자 처리|문자 자동화 기록|페이지 종료 전|화면 전환 전/.test(clean))return;
+    rollingRecoveryPendingContext=clean;
+    if(rollingRecoveryTimer)return;
+    const wait=Math.max(800,ROLLING_RECOVERY_INTERVAL_MS-(Date.now()-rollingRecoveryLastAt));
+    rollingRecoveryTimer=setTimeout(()=>{
+      rollingRecoveryTimer=0;
+      if(typeof canOperate==='function'&&!canOperate())return;
+      if(rollingRecoveryLastAt&&Date.now()-rollingRecoveryLastAt<ROLLING_RECOVERY_INTERVAL_MS-500){
+        scheduleRollingRecovery(rollingRecoveryPendingContext||clean);
+        return;
+      }
+      const run=()=>{
+        try{
+          const label=rollingRecoveryPendingContext||'상태 변경';
+          rollingRecoveryPendingContext='';
+          const tournament=String(state.tournament?.name||'현재 대회').trim();
+          const division=String(state.tournament?.division||state.portal?.currentDivisionName||'').trim();
+          const scoped=division?`${tournament} · ${division} · 자동 주기 · ${label}`:`${tournament} · 자동 주기 · ${label}`;
+          const item=saveRecovery(state,scoped,{kind:'auto'});
+          rollingRecoveryLastAt=Date.now();
+          item?.ready?.then(result=>{
+            if(!result?.saved)console.warn('[230MATCH] 주기 자동 복구점 저장 실패',result?.error||'unknown');
+          });
+        }catch(error){console.warn('[230MATCH] 주기 자동 복구점 생성 실패',error);}
+      };
+      if(typeof requestIdleCallback==='function')requestIdleCallback(run,{timeout:1500});else setTimeout(run,0);
+    },wait);
+  }catch(error){console.warn('[230MATCH] 주기 자동 복구 예약 실패',error);}
+}
 function setSaveHealth(level='ok',detail=''){
   const badge=$('saveStateBadge');if(!badge)return;
   if(level==='error'){badge.textContent='저장 오류';badge.className='badge badge-danger';badge.title=detail||'현재 상태 저장에 실패했습니다.';}
@@ -1069,6 +1107,7 @@ function safePersistState(context='현재 상태'){
     if(!state.updatedAt)throw new Error('저장 시각을 생성하지 못했습니다.');
     saveFailureNoticeShown=false;
     setSaveHealth('ok',`${context} 저장 완료 · ${new Date(state.updatedAt).toLocaleTimeString('ko-KR')}`);
+    scheduleRollingRecovery(context);
     return true;
   }catch(error){
     console.error(`[230MATCH] ${context} 저장 실패`,error);setSaveHealth('error',error?.message||String(error));
@@ -2042,7 +2081,11 @@ function autoRecovery(label){
     const tournament=String(state.tournament?.name||'현재 대회').trim();
     const division=String(state.tournament?.division||state.portal?.currentDivisionName||'').trim();
     const scoped=division?`${tournament} · ${division} · ${clean}`:`${tournament} · ${clean}`;
-    saveRecovery(state,scoped,{kind:critical?'critical-auto':'auto'});
+    const item=saveRecovery(state,scoped,{kind:critical?'critical-auto':'auto'});
+    rollingRecoveryLastAt=Date.now();
+    item?.ready?.then(result=>{
+      if(!result?.saved)console.warn('[230MATCH] 즉시 자동 복구점 저장 실패',result?.error||'unknown');
+    });
   }catch(error){console.warn('자동 복구점 저장 실패',error);}
 }
 function stage580PlacementAudit(){
@@ -7808,8 +7851,8 @@ async function renderBackupRecoveryManager(){
   const badge=document.getElementById('backupStorageBadge');if(badge){
     const manualCount=list.filter(x=>x.kind==='manual'||(!x.kind&&!/자동|직전|초기화 전|변경 전|수정 전|배정 전|추첨 전|복원 전|복구 전|연결 전|시작 전|점검 전/.test(String(x.label||'')))).length;
     const autoCount=Math.max(0,list.length-manualCount);
-    badge.textContent=list.length?`복구점 ${list.length}/36 · 수동 ${manualCount}/12 · 자동 ${autoCount}/24`:'복구점 없음';
-    badge.className=`badge ${list.length>=32?'badge-warning':'badge-safe'}`;
+    badge.textContent=list.length?`복구점 ${list.length}/60 · 수동 ${manualCount}/12 · 자동 ${autoCount}/48`:'복구점 없음';
+    badge.className=`badge ${list.length>=54?'badge-warning':'badge-safe'}`;
   }
   stage3542RenderTournamentBackupList();
   root.innerHTML=list.length?list.map(item=>{
@@ -7825,7 +7868,7 @@ async function createNamedRecovery(){
   const input=document.getElementById('backupRecoveryLabel');
   const label=String(input?.value||'').trim()||`${state.tournament?.name||'현재 대회'} · 수동 복구점`;
   const item=saveRecovery(state,label,{kind:'manual'}),result=await item.ready;
-  if(result?.saved){if(input)input.value='';notice(`수동 복구점을 저장했습니다. 수동 ${result.manualCount||1}/12 · 자동 ${result.autoCount||0}/24 · 전체 ${result.count||1}/36개입니다.`,'success');}
+  if(result?.saved){if(input)input.value='';notice(`수동 복구점을 저장했습니다. 수동 ${result.manualCount||1}/12 · 자동 ${result.autoCount||0}/48 · 전체 ${result.count||1}/60개입니다.`,'success');}
   else notice('복구점 저장에 실패했습니다. 전체 백업 JSON을 저장해 주세요.','error');
   await renderBackupRecoveryManager();
 }
@@ -10807,7 +10850,14 @@ document.getElementById('socialLogoutBtn')?.addEventListener('click',handleSocia
 document.getElementById('saveAuthSettingsBtn')?.addEventListener('click',saveAuthSettingsPanel);
 loadAuthSettingsPanel();renderAuthStatus();startAuth((user,role,error,profile)=>{if(error)notice('간편로그인 연결 오류: '+(error.message||error),'error');applyAuthenticatedRole(user,role,profile);renderNotificationStatus();});
 
-prepareRecoveryStorage().catch(error=>console.warn('로컬 복구점 저장소 준비 실패',error));
+prepareRecoveryStorage().then(async()=>{
+  try{
+    const rows=await getRecoveries();
+    const latestAuto=rows.find(x=>x?.kind==='auto'||x?.kind==='critical-auto'||/자동|직전|변경 전|수정 전|배정 전|추첨 전|복원 전|복구 전/.test(String(x?.label||'')));
+    const at=Date.parse(String(latestAuto?.createdAt||''));
+    if(Number.isFinite(at))rollingRecoveryLastAt=at;
+  }catch(_error){}
+}).catch(error=>console.warn('로컬 복구점 저장소 준비 실패',error));
 syncInputs();syncPrelimInputs();bind();bindPortal();void startGlobalNoticeSync();setTimeout(()=>void startRegistrationCloudSync(),500);setTimeout(()=>void startPublicRegistrationSync(),650);bindPrintCenter();bindParticipantManager();bindEntryApplications();bindPublicParticipantRecords();bindResultArchive();bindTournamentLifecycleManager();bindBackupRecoveryManager();bindNotificationCenter();bindTournamentReadiness();bindAcceptanceCenter();bindRehearsalCenter();bindPerformanceCenter();bindDiagnosticsCenter();window.addEventListener('popstate',()=>navigatePortalView(location.hash.replace(/^#/, '')||'home',{focus:false}));initialPortalView();renderVenueSettingsEditor();calculateTimeMetrics(state);render(state,{openResult,openPrelimResult,selectActiveSwap,selectReserveSwap,copyMessage,openSmsMessage,setMessageSent,removeMessage,openContactEdit,openMessageHistory,reorderQueue,openQueueMove,openManualAssign,returnWait1,openCourtTransfer,openUnifiedCourtTransfer,openCourtStatus,openManualQueueAssign,reorderManualQueue,returnManualQueue,reorderPrelimQueue,openPrelimMove,returnPrelimWait1,openPrelimCourtStatus});if(canOperate()){renderOperatorControls();updateSetupProgress();autoSmsSnapshot=buildAutoSmsSnapshot();installUnifiedMoveControlGuard();ensureUnifiedCourtMoveControls();}applyRoleUI();renderPortalViewFast(document.body?.dataset.currentView||'home');decorateBracketLivePlacements();renderStage331OperationDashboard();restartTimeTimer();startClockTicker();
 loadSyncPanel();startStateSync({getState:()=>state,applyRemoteState:next=>applySynchronizedState(next,'다른 기기'),onStatus:updateSyncPanel,canWrite:()=>isAdmin()||((!tournamentReadOnly()||__closedCloudWriteBypass)&&isOperator()),accessMode:()=>isAdmin()?'operator':(tournamentReadOnly()?'viewer':(canOperate()?'operator':'viewer'))});syncAccessStarted=true;
 const buildStageLabel=document.getElementById('buildStageLabel');
