@@ -1,0 +1,271 @@
+/* Participant-facing visual layer. Keep score, queue and print styling independent. */
+@media screen {
+  body.club-ui {
+    --club-navy: #162d40;
+    --club-ink: #20313c;
+    --club-muted: #687573;
+    --club-green: #28604d;
+    --club-line: #e1e5dc;
+    --club-paper: #fffefa;
+    --club-canvas: #f5f5ef;
+    background: var(--club-canvas);
+    color: var(--club-ink);
+    font-family: "Pretendard", "Noto Sans KR", "Apple SD Gothic Neo", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  body.club-ui .topbar {
+    background: var(--club-paper);
+    color: var(--club-ink);
+    border-bottom: 1px solid var(--club-line);
+    box-shadow: none;
+    padding: 19px max(28px, calc((100vw - 1344px) / 2));
+    min-height: 86px;
+  }
+  body.club-ui .brand strong { color: var(--club-ink); font-size: 20px; letter-spacing: -.7px; font-weight: 800; }
+  body.club-ui .brand span { color: var(--club-muted); font-size: 11px; letter-spacing: .02em; margin-top: 5px; }
+  body.club-ui .topbar .brand > .brand-mark.brand-logo-img {
+    width: 43px !important; height: 43px !important; min-width: 43px !important;
+    min-height: 43px !important; max-width: 43px !important; max-height: 43px !important;
+    flex-basis: 43px !important; border-radius: 12px !important; box-shadow: none !important;
+  }
+  body.club-ui .topbar .btn { border-radius: 7px; padding: 9px 13px; font-size: 12px; font-weight: 650; }
+  body.club-ui .topbar .btn-primary { background: var(--club-navy); color: #fff; }
+  body.club-ui .topbar .btn-light { background: transparent; color: var(--club-ink); border-color: var(--club-line); }
+  body.club-ui .topbar .badge { font-size: 11px; padding: 6px 9px; font-weight: 600; }
+  body.club-ui .topbar .badge-safe { background: #edf3e9; color: #386040; }
+  body.club-ui .topbar .badge-muted { background: #eeeee7; color: #56635f; }
+  body.club-ui .app-shell { max-width: 1400px; padding: 0 28px 60px; }
+  body.club-ui:has(#development-status) { padding-top: 36px; }
+  body.club-ui:has(#development-status) .topbar { top: 36px; }
+  body.club-ui #development-status {
+    top: 0 !important; bottom: auto !important; min-height: 36px;
+    display: grid; place-content: center; padding: 4px 14px !important;
+    background: #f1eddf !important; color: #6c613e !important;
+    border-bottom: 1px solid #e1d9bf; font-size: 10px !important; line-height: 1.35;
+  }
+  body.club-ui[data-role="viewer"]:is([data-current-view="home"], [data-current-view="tournaments"], [data-current-view="my-match"]) #stage7124MatchdayQuickBar { display: none !important; }
+  body.club-ui .mode-tabs.panel {
+    background: transparent; border: 0; border-bottom: 1px solid var(--club-line);
+    border-radius: 0; box-shadow: none; padding: 16px 0 0; margin-bottom: 28px; gap: 25px;
+  }
+  body.club-ui .mode-tabs .tab {
+    background: transparent; color: #65716e; padding: 14px 0 18px;
+    border-radius: 0; border-bottom: 2px solid transparent;
+    font-size: 14px; font-weight: 600; white-space: nowrap;
+  }
+  body.club-ui .mode-tabs .tab.active { color: var(--club-navy); border-bottom-color: var(--club-green); font-weight: 750; }
+  body.club-ui .mode-tabs .tab:hover { color: var(--club-green); }
+  body.club-ui .mode-tabs .tab[data-view="home"] { order: 0; }
+  body.club-ui .mode-tabs .tab[data-view="tournaments"] { order: 1; }
+  body.club-ui .mode-tabs .tab[data-view="my-match"] { order: 2; }
+  body.club-ui .mode-tabs .tab[data-view="entry"] { order: 3; }
+  body.club-ui .mode-tabs .tab[data-view="operation"] { order: 4; }
+  body.club-ui .mode-tabs .tab[data-view="prelim-public"] { order: 5; }
+  body.club-ui .mode-tabs .tab[data-view="bracket"] { order: 6; }
+  body.club-ui .mode-tabs .tab[data-view="board"] { order: 7; }
+  body.club-ui .mode-tabs .tab[data-view="guide"] { order: 8; }
+  body.club-ui #divisionWorkspaceBar {
+    display: grid; gap: 10px; background: #fffefa; border: 1px solid var(--club-line);
+    border-radius: 9px; border-left: 1px solid var(--club-line); box-shadow: none;
+    margin: 0 0 24px; padding: 16px 20px;
+  }
+  body.club-ui #divisionWorkspaceBar .division-v6002-top { gap: 18px; align-items: center; }
+  body.club-ui #divisionWorkspaceBar .division-v6002-current > span { color: var(--club-muted); font-size: 10px; font-weight: 500; }
+  body.club-ui #divisionWorkspaceBar select { background: #fffefa; border-color: #dce2d5; border-radius: 6px; font-size: 13px; font-weight: 600; padding: 9px 11px; }
+  body.club-ui #divisionWorkspaceBar .division-v6002-title > strong { color: var(--club-ink); font-size: 12px; font-weight: 650; }
+  body.club-ui #divisionWorkspaceBar .division-v6002-title > span { font-size: 10px; font-weight: 400; color: var(--club-muted); }
+  body.club-ui #divisionWorkspaceBar .division-v6002-card,
+  body.club-ui #divisionWorkspaceBar .division-v6002-card.active {
+    display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 6px 12px;
+    padding: 12px 14px; border: 1px solid #d5ddca; border-radius: 6px;
+    background: #f3f5ed; color: var(--club-ink); min-height: 0; box-shadow: none;
+  }
+  body.club-ui #divisionWorkspaceBar .division-v6002-card > span { font-size: 10px; font-weight: 500; color: #6d7c5b; }
+  body.club-ui #divisionWorkspaceBar .division-v6002-card > strong { font-size: 14px; font-weight: 650; color: var(--club-ink); }
+  body.club-ui #divisionWorkspaceBar .division-v6002-card > small { grid-column: 2; font-size: 10px; color: var(--club-muted); }
+  body.club-ui #divisionWorkspaceBar .division-v6002-card > em { grid-column: 3; grid-row: 1 / 3; font-size: 10px; font-style: normal; color: #576a49; }
+  body.club-ui #divisionWorkspaceBar .division-v6003-quick { grid-column: 1 / -1; gap: 6px; border-top-color: #e1e6d9; margin-top: 4px; padding-top: 8px; }
+  body.club-ui #divisionWorkspaceBar .division-v6003-quick > button { background: #fffefa; border: 1px solid #dce2d3; border-radius: 5px; color: #526048; padding: 7px 10px; font-size: 10px; font-weight: 550; }
+  body.club-ui #divisionWorkspaceBar .division-v6002-context { font-size: 10px; color: var(--club-muted); border: 0; padding-top: 0; }
+  body.club-ui #divisionWorkspaceBar .division-v6002-context strong { font-weight: 550; color: #526047; }
+  body.club-ui :is(#view-home, #view-tournaments, #view-my-match) { --muted: var(--club-muted); --line: var(--club-line); --border: var(--club-line); --surface-soft: #f5f6ef; }
+  body.club-ui :is(#view-home, #view-tournaments, #view-my-match) .panel {
+    background: var(--club-paper); border: 1px solid var(--club-line);
+    border-radius: 12px; box-shadow: none; padding: 28px; margin-bottom: 0;
+  }
+  body.club-ui :is(#view-home, #view-tournaments, #view-my-match) .section-head h2 { font-size: 23px; font-weight: 720; letter-spacing: -.8px; }
+  body.club-ui :is(#view-home, #view-tournaments, #view-my-match) .section-head p { font-size: 13px; line-height: 1.7; font-weight: 400; margin-top: 9px; }
+  body.club-ui :is(#view-home, #view-tournaments, #view-my-match) .btn {
+    border-radius: 7px; font-size: 13px; font-weight: 650; min-height: 44px;
+    padding: 11px 16px; box-shadow: none; text-decoration: none;
+    transition: background .18s, border-color .18s;
+  }
+  body.club-ui :is(#view-home, #view-tournaments, #view-my-match) .btn:hover { transform: none; box-shadow: none; }
+  body.club-ui :is(#view-home, #view-tournaments, #view-my-match) .btn-primary { background: var(--club-navy); color: #fff; }
+  body.club-ui :is(#view-home, #view-tournaments, #view-my-match) .btn-primary:hover { background: var(--club-green); }
+  body.club-ui :is(#view-home, #view-tournaments, #view-my-match) .btn-light { background: transparent; color: var(--club-ink); border-color: #d5dcd2; }
+  body.club-ui :is(#view-home, #view-tournaments, #view-my-match) .btn-light:hover { background: #f0f3eb; border-color: #a5b4a3; }
+  body.club-ui :is(#view-home, #view-tournaments) .btn-primary:disabled { background: #f0f3e9; color: #60734f; border: 1px solid #d8e1cb; opacity: 1; }
+  body.club-ui :is(#view-home, #view-tournaments, #view-my-match) :is(input:not([type="checkbox"]):not([type="radio"]), select) { border-color: #d9e0d4; border-radius: 7px; min-height: 46px; background: #fffefa; }
+  body.club-ui :is(#view-home, #view-tournaments, #view-my-match) :is(button, a, input, select):focus-visible { outline: 3px solid #8aa67a; outline-offset: 3px; }
+  body.club-ui #view-home { gap: 24px; }
+  body.club-ui:has(#view-home.active #homeTournamentCardList .portal-empty) #divisionWorkspaceBar:has(.division-v6002-empty) { display: none; }
+  body.club-ui #view-home .legacy-home-chip,
+  body.club-ui #view-tournaments .legacy-home-chip {
+    background: transparent; color: #6d7a61; border: 0; border-radius: 0;
+    font-size: 10px; font-weight: 750; letter-spacing: .16em; padding: 0; margin-bottom: 10px;
+  }
+  body.club-ui #view-home .legacy-home-hero {
+    position: relative; isolation: isolate; overflow: hidden; padding: 46px 40px;
+    min-height: 272px; display: grid; grid-template-columns: minmax(0, 1fr) 300px;
+    gap: 24px 48px; align-items: center; border: 0; border-radius: 14px;
+    background: #183447; color: #fffdf4; box-shadow: none;
+  }
+  body.club-ui #view-home .legacy-home-hero::before {
+    content: ""; position: absolute; z-index: -1; width: 440px; height: 620px;
+    right: 20%; top: -190px; border: 1px solid #c5d0ae22; transform: rotate(27deg);
+    background: linear-gradient(90deg, transparent 19%, #c5d0ae18 19%, #c5d0ae18 calc(19% + 1px), transparent calc(19% + 1px), transparent 81%, #c5d0ae18 81%, #c5d0ae18 calc(81% + 1px), transparent calc(81% + 1px)), linear-gradient(transparent 49.9%, #c5d0ae22 50%, transparent 50.2%);
+    pointer-events: none;
+  }
+  body.club-ui #view-home .legacy-home-hero .legacy-home-chip { color: #c9d3aa; margin-bottom: 15px; }
+  body.club-ui #view-home .legacy-home-title h1 { font-size: clamp(30px, 3.3vw, 46px); line-height: 1.2; letter-spacing: -1.5px; font-weight: 650; margin: 0 0 14px; color: #fffdf4; overflow-wrap: anywhere; }
+  body.club-ui #view-home .legacy-home-title .portal-muted { color: #c8d5ca; font-size: 14px; line-height: 1.7; }
+  body.club-ui #view-home .legacy-home-status { grid-column: 1; min-width: 0; padding: 0; background: transparent; display: flex; flex-wrap: wrap; align-items: center; gap: 9px; font-size: 12px; }
+  body.club-ui #view-home .legacy-home-status > span:last-child { font-size: 12px; color: #bacfc5; }
+  body.club-ui #view-home .legacy-status-dot { width: 6px; height: 6px; background: #cadb9c; box-shadow: none; }
+  body.club-ui #view-home .home-hero-registration {
+    grid-column: 2; grid-row: 1 / 3; align-self: stretch; margin: 0;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px 12px;
+    padding: 26px; text-align: left; background: #ffffff08; border: 1px solid #c8d5ca40;
+    border-radius: 9px; color: #fffdf4;
+  }
+  body.club-ui #view-home .home-hero-registration > span:first-child { display: block; grid-column: 1 / -1; font-size: 11px; color: #d1ddcc; font-weight: 500; }
+  body.club-ui #view-home .home-hero-registration > strong { grid-column: 1 / -1; font-size: 37px; font-weight: 500; letter-spacing: -1px; line-height: 1; }
+  body.club-ui #view-home .home-reg-mini { text-align: left; gap: 7px; }
+  body.club-ui #view-home .home-reg-mini b { font-size: 17px; font-weight: 500; }
+  body.club-ui #view-home .home-reg-mini small { font-size: 10px; color: #c0d0c5; opacity: 1; }
+  body.club-ui #view-home .home-reg-progress { grid-column: 1 / -1; background: #ffffff16; height: 3px; }
+  body.club-ui #view-home .home-reg-progress i { background: #cedca8; }
+  body.club-ui #view-home #homeTournamentSwitcher { border: 0; background: transparent; padding: 12px 0; }
+  body.club-ui #view-home #homeTournamentSwitcher .section-head { margin-bottom: 20px; }
+  body.club-ui #view-home .home-tournament-card { background: var(--club-paper); border: 1px solid var(--club-line); border-radius: 10px; padding: 22px; gap: 18px; }
+  body.club-ui #view-home .home-tournament-card.current { border: 1px solid #9cae94; background: #fffefa; }
+  body.club-ui #view-home .home-tournament-card h3 { font-size: 19px; font-weight: 650; letter-spacing: -.4px; margin: 12px 0 9px; }
+  body.club-ui #view-home .home-tournament-card .meta { color: var(--club-muted); font-size: 12px; line-height: 1.8; }
+  body.club-ui :is(#view-home, #view-tournaments) .tournament-state { border: 1px solid transparent; padding: 5px 9px; border-radius: 5px; font-size: 10px; font-weight: 650; letter-spacing: .02em; }
+  body.club-ui :is(#view-home, #view-tournaments) .tournament-state.recruiting { background: #edf3e5; color: #3c603b; }
+  body.club-ui :is(#view-home, #view-tournaments) .tournament-state.ongoing { background: #f6efd9; color: #7e641e; }
+  body.club-ui :is(#view-home, #view-tournaments) .tournament-state.completed { background: #edf0ed; color: #59655f; }
+  body.club-ui :is(#view-home, #view-tournaments) .tournament-state.current-selection { background: transparent; border-color: #c4cebc; color: #526c43; }
+  body.club-ui #view-home .stage3212-matchday-hub { background: #ecefe4; border-color: #dfe4d6; }
+  body.club-ui #view-home .stage3212-hub-head h2 { font-size: 23px; font-weight: 650; letter-spacing: -.7px; }
+  body.club-ui #view-home .stage3212-hub-head p { font-size: 13px; font-weight: 400; line-height: 1.7; color: var(--club-muted); }
+  body.club-ui #view-home .stage3212-public-actions button { background: #fffefa; border-color: #dce3d2; border-radius: 8px; box-shadow: none; min-height: 96px; }
+  body.club-ui #view-home .stage3212-public-actions button > span { filter: grayscale(1); opacity: .65; font-size: 22px; }
+  body.club-ui #view-home .stage3212-public-actions button b { font-weight: 650; font-size: 13px; color: var(--club-ink); }
+  body.club-ui #view-home .stage3212-public-actions button small { color: var(--club-muted); font-size: 10px; }
+  body.club-ui #view-home .legacy-home-menu button { border-color: var(--club-line); border-radius: 8px; }
+  body.club-ui #view-home .legacy-home-menu button > span { filter: grayscale(1); opacity: .65; }
+  body.club-ui #view-home textarea { border: 1px solid var(--club-line); border-radius: 7px; padding: 12px; font: inherit; font-size: 13px; background: #fffefa; }
+  body.club-ui :is(#view-home, #view-tournaments, #view-my-match) .portal-empty,
+  body.club-ui #view-my-match .empty-state { border: 1px solid var(--club-line); border-radius: 9px; background: #eeefe7; padding: 32px 22px; line-height: 1.8; font-size: 13px; color: #5e6d64; }
+  body.club-ui #view-tournaments { gap: 24px; }
+  body.club-ui #view-tournaments .tournament-list-head { background: transparent; border: 0; padding: 12px 0 8px; }
+  body.club-ui #view-tournaments .tournament-list-head h1 { font-size: 36px; font-weight: 650; letter-spacing: -1.4px; margin: 0; }
+  body.club-ui #view-tournaments .tournament-list-tools { margin: 26px 0 18px; gap: 10px; }
+  body.club-ui #view-tournaments #tournamentListSummary { font-size: 12px; color: var(--club-muted); }
+  body.club-ui #view-tournaments .tournament-card-list { gap: 20px; }
+  body.club-ui #view-tournaments .tournament-list-card { background: var(--club-paper); padding: 26px; border-radius: 10px; gap: 20px; }
+  body.club-ui #view-tournaments .tournament-list-card.current { background: var(--club-paper); border: 1px solid #9cae94; }
+  body.club-ui #view-tournaments .tournament-card-top h2 { font-size: 24px; font-weight: 650; line-height: 1.45; letter-spacing: -.8px; margin: 14px 0 8px; }
+  body.club-ui #view-tournaments .tournament-list-card h3 { font-size: 23px; font-weight: 650; line-height: 1.4; letter-spacing: -.7px; }
+  body.club-ui #view-tournaments .tournament-card-top p { font-size: 13px; color: var(--club-muted); }
+  body.club-ui #view-tournaments .tournament-card-info { font-size: 13px; color: #52615c; line-height: 1.8; }
+  body.club-ui #view-tournaments .tournament-card-progress { border-top: 1px solid var(--club-line); border-bottom: 1px solid var(--club-line); padding: 17px 0; gap: 16px; }
+  body.club-ui #view-tournaments .tournament-card-progress > div { background: transparent; border-radius: 0; padding: 0; gap: 10px; }
+  body.club-ui #view-tournaments .tournament-card-progress span { color: var(--club-muted); font-size: 11px; }
+  body.club-ui #view-tournaments .tournament-card-progress b { font-size: 17px; font-weight: 600; }
+  body.club-ui #view-my-match > .panel { padding: 32px; }
+  body.club-ui #view-my-match .my-match-panel { gap: 24px; }
+  body.club-ui #view-my-match .my-match-search-controls { gap: 10px; }
+  body.club-ui #view-my-match .my-match-hero-main,
+  body.club-ui #view-my-match .my-match-current-card,
+  body.club-ui #view-my-match .my-match-stat-card,
+  body.club-ui #view-my-match .my-match-section { border-color: var(--club-line); border-radius: 10px; box-shadow: none; }
+  body.club-ui #view-my-match .my-match-hero-main { background: #edf1e7; padding: 28px; }
+  body.club-ui #view-my-match .my-match-hero-main h3 { color: var(--club-ink); font-size: 31px; letter-spacing: -1px; font-weight: 650; }
+  body.club-ui #view-my-match .my-match-hero-main .eyebrow { color: #697b52 !important; font-size: 10px; }
+  body.club-ui #view-my-match .my-match-subline { color: var(--club-muted); font-size: 13px; font-weight: 400; }
+  body.club-ui #view-my-match .my-match-current-card { background: var(--club-paper); }
+  body.club-ui #view-my-match .my-match-current-card strong { color: var(--club-ink); font-weight: 650; }
+  body.club-ui #view-my-match .my-match-current-card.playing { background: #edf3e5; border-color: #a0b88c; }
+  body.club-ui #view-my-match .my-match-current-card.playing strong { color: #356038; }
+  body.club-ui #view-my-match .my-match-current-card:is(.wait1, .waiting) { background: #f9f3df; border-color: #decf9d; }
+  body.club-ui #view-my-match .my-match-current-card.completed { background: #eff1ed; }
+  body.club-ui #view-my-match .my-match-stat-card { padding: 20px; }
+  body.club-ui #view-my-match .my-match-stat-card b { color: var(--club-ink); font-weight: 600; }
+  body.club-ui #view-my-match .my-match-chip,
+  body.club-ui #view-my-match .my-match-pill { border-radius: 5px; background: #f4f5ed; border-color: var(--club-line); font-weight: 550; color: #526347; }
+  body.club-ui #view-my-match .my-match-chip.emphasis { background: var(--club-navy); color: #fff; }
+  body.club-ui #view-my-match .my-match-game { background: var(--club-paper); border-radius: 8px; border-color: var(--club-line); padding: 20px; }
+  body.club-ui #view-my-match .my-match-round { font-size: 16px; font-weight: 650; color: var(--club-ink); }
+  body.club-ui #view-my-match .my-match-opponent strong { font-weight: 650; color: var(--club-ink); }
+  body.club-ui #view-my-match .my-match-status-badge { border-radius: 5px; font-weight: 600; }
+  body.club-ui #view-my-match .my-match-section-head .count { background: #f0f2e9; color: #53634a; border-radius: 5px; }
+  body.club-ui #view-my-match .my-match-empty-inline { background: #f5f6ef; color: var(--club-muted); border-color: var(--club-line); border-radius: 7px; font-weight: 400; }
+  @media (max-width: 1000px) {
+    body.club-ui .mode-tabs.panel { gap: 20px; overflow-x: auto; flex-wrap: nowrap; }
+    body.club-ui #view-home .legacy-home-hero { grid-template-columns: minmax(0, 1fr) 260px; gap: 22px; padding: 32px; }
+  }
+  @media (max-width: 700px) {
+    body.club-ui .topbar { padding: 14px 18px; min-height: 72px; gap: 10px; }
+    body.club-ui .brand strong { font-size: 17px; }
+    body.club-ui .brand span { font-size: 9px; }
+    body.club-ui .topbar .brand > .brand-mark.brand-logo-img { width: 36px !important; height: 36px !important; min-width: 36px !important; min-height: 36px !important; max-width: 36px !important; max-height: 36px !important; flex-basis: 36px !important; border-radius: 9px !important; }
+    body.club-ui .topbar .btn { min-height: 36px; padding: 8px 10px; font-size: 11px; }
+    body.club-ui .topbar .brand strong { display: block !important; color: var(--club-ink) !important; font-size: 17px !important; }
+    body.club-ui .topbar .brand span { display: none !important; }
+    body.club-ui .topbar .brand > div { display: block !important; }
+    body.club-ui .topbar #openSocialLoginBtn { width: auto !important; max-width: 94px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; border-radius: 7px !important; }
+    body.club-ui .topbar .brand { gap: 7px !important; }
+    body.club-ui .mobile-bottom-nav { background: #fffefa !important; border-color: #dce2d3 !important; border-radius: 12px !important; box-shadow: 0 -3px 20px #19312a0a !important; }
+    body.club-ui .mobile-bottom-nav > .mobile-nav-button { color: #6b7769 !important; border-radius: 7px !important; background: transparent !important; }
+    body.club-ui .mobile-bottom-nav > .mobile-nav-button.active { background: #edf2e4 !important; color: #2c553f !important; }
+    body.club-ui .mobile-bottom-nav > .mobile-nav-button span { filter: grayscale(1); }
+    body.club-ui .mobile-bottom-nav > .mobile-nav-button b { font-size: 10px !important; }
+    body.club-ui .mobile-bottom-nav > .mobile-nav-button { min-height: 48px !important; }
+    body.club-ui #divisionWorkspaceBar { padding: 12px; margin-bottom: 18px; gap: 8px; }
+    body.club-ui #divisionWorkspaceBar .division-v6002-title > span { display: none; }
+    body.club-ui #divisionWorkspaceBar .division-v6002-card { padding: 10px; gap: 5px 10px; }
+    body.club-ui #divisionWorkspaceBar .division-v6003-quick { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    body.club-ui #divisionWorkspaceBar .division-v6002-context { line-height: 1.6; }
+    body.club-ui .app-shell { padding: 0 18px 72px; }
+    body.club-ui .mode-tabs.panel { margin-bottom: 20px; gap: 22px; padding-top: 6px; }
+    body.club-ui .mode-tabs .tab { font-size: 12px; padding: 13px 0; }
+    body.club-ui :is(#view-home, #view-tournaments, #view-my-match) .panel { padding: 22px 18px; }
+    body.club-ui #view-home { gap: 20px; }
+    body.club-ui #view-home .legacy-home-hero { grid-template-columns: 1fr; gap: 22px; padding: 30px 24px; min-height: auto; border-radius: 10px; }
+    body.club-ui #view-home .legacy-home-title h1 { font-size: 32px; letter-spacing: -1px; }
+    body.club-ui #view-home .legacy-home-title .portal-muted { font-size: 12px; }
+    body.club-ui #view-home .legacy-home-status { grid-column: 1; grid-row: 2; font-size: 11px; gap: 7px; }
+    body.club-ui #view-home .legacy-home-status > span:last-child { flex-basis: 100%; font-size: 11px; }
+    body.club-ui #view-home .home-hero-registration { grid-column: 1; grid-row: 3; padding: 18px; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    body.club-ui #view-home .home-hero-registration > strong { font-size: 30px; }
+    body.club-ui :is(#view-home, #view-tournaments) .section-head h2,
+    body.club-ui #view-home .stage3212-hub-head h2 { font-size: 21px; }
+    body.club-ui #view-home .home-tournament-card { padding: 20px; }
+    body.club-ui #view-tournaments .tournament-list-head { padding: 6px 0; }
+    body.club-ui #view-tournaments .tournament-list-head h1 { font-size: 30px; }
+    body.club-ui #view-tournaments .tournament-list-tools { margin: 22px 0 15px; grid-template-columns: 1fr auto; }
+    body.club-ui #view-tournaments .tournament-list-tools input { grid-column: 1 / -1; }
+    body.club-ui #view-tournaments .tournament-card-list { grid-template-columns: 1fr; gap: 16px; }
+    body.club-ui #view-tournaments .tournament-card-top h2 { font-size: 22px; }
+    body.club-ui #view-my-match > .panel { padding: 22px 18px; }
+    body.club-ui #view-my-match .my-match-hero-main { padding: 22px; }
+    body.club-ui #view-my-match .my-match-hero-main h3 { font-size: 26px; }
+    body.club-ui #view-my-match .my-match-stat-card { padding: 16px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    body.club-ui :is(#view-home, #view-tournaments, #view-my-match) * { transition: none !important; }
+  }
+}

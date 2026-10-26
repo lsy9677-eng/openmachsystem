@@ -2612,13 +2612,13 @@ svg.stage7154-bracket-connectors path.stage5938-winner-path{
 </style>
 
 </head>
-<body>
+<body class="club-ui">
   <header class="topbar">
     <div class="brand">
       <img class="brand-mark brand-logo-img" src="./icon-192.png?v=59780" alt="230MATCH">
       <div>
         <strong>230MATCH</strong>
-        <span>테니스 시합관리</span>
+        <span>대회부터 나의 경기까지</span>
       </div>
     </div>
     <div class="top-actions">
@@ -2649,16 +2649,16 @@ svg.stage7154-bracket-connectors path.stage5938-winner-path{
     <nav class="mode-tabs panel">
       <button class="tab active" data-view="home">홈</button>
       <button class="tab" data-view="tournaments">대회 목록</button>
-      <button class="tab" data-view="prelim-public">예선 현황</button>
       <button class="tab" data-view="my-match">내 경기</button>
       <button class="tab" data-view="entry">참가 신청</button>
-      <button class="tab" data-view="guide">대회 요강</button>
+      <button class="tab court-primary-tab" data-view="operation">코트 현황</button>
+      <button class="tab" data-view="prelim-public">예선 현황</button>
+      <button class="tab" data-view="bracket">본선 대진표</button>
       <button class="tab" data-view="board">게시판</button>
+      <button class="tab" data-view="guide">대회 요강</button>
       <button class="tab" data-view="participants">참가 기록</button>
       <button class="tab" data-view="records">대회 기록</button>
       <button class="tab" data-view="print">출력 센터</button>
-      <button class="tab court-primary-tab" data-view="operation">코트 현황</button>
-      <button class="tab" data-view="bracket">본선 대진표</button>
       <button class="tab settings-managed-tab" data-view="settings" data-admin-only="true">대회 관리</button>
       <button class="tab settings-managed-tab" data-view="roster" data-operator-only="true">참가팀 관리</button>
       <button class="tab settings-managed-tab" data-view="messages" data-operator-only="true">문자 센터</button>
@@ -2671,14 +2671,14 @@ svg.stage7154-bracket-connectors path.stage5938-winner-path{
     <section id="view-home" class="view active portal-view legacy-home-view">
       <section class="legacy-home-hero panel">
         <div class="legacy-home-title">
-          <span class="legacy-home-chip">230MATCH TOURNAMENT</span>
+          <span class="legacy-home-chip">THE COURT IS YOURS</span>
           <h1 id="homeTournamentName">대회 준비 중</h1>
           <p id="homeTournamentDivision" class="portal-muted">대회 정보를 불러오는 중입니다.</p>
         </div>
         <div class="legacy-home-status">
           <span class="legacy-status-dot"></span>
           <strong>현재 대회</strong>
-          <span>실시간 경기 현황과 접수 상태를 확인하세요.</span>
+          <span>접수부터 마지막 포인트까지, 한눈에.</span>
         </div>
         <button type="button" class="home-hero-registration" data-portal-go="entry" aria-label="참가 접수 현황 보기">
           <span>참가 접수 현황</span>
@@ -2692,7 +2692,7 @@ svg.stage7154-bracket-connectors path.stage5938-winner-path{
 
       <section id="homeTournamentSwitcher" class="panel home-tournament-switcher" aria-label="운영 대회 선택">
         <div class="section-head">
-          <div><span class="legacy-home-chip">ACTIVE TOURNAMENTS</span><h2>운영 대회 선택</h2><p>운영 중인 대회를 모두 확인하고 바로 선택·편집할 수 있습니다.</p></div>
+          <div><span class="legacy-home-chip">ON THE CALENDAR</span><h2>함께할 대회</h2><p>참가할 대회를 찾고, 나의 다음 경기를 준비하세요.</p></div>
           <button type="button" class="btn btn-light btn-small" data-portal-go="tournaments">전체 대회 목록</button>
         </div>
         <div id="homeTournamentCardList" class="home-tournament-card-list"></div>
@@ -2700,7 +2700,7 @@ svg.stage7154-bracket-connectors path.stage5938-winner-path{
 
       <section id="stage3212MatchdayHub" class="stage3212-matchday-hub panel" aria-label="현재 대회 빠른 이용">
         <div class="stage3212-hub-head">
-          <div><span class="legacy-home-chip">CURRENT TOURNAMENT</span><h2>현재 대회 바로가기</h2><p>참가자는 내 경기와 대진을, 관리자는 접수와 경기 운영을 빠르게 엽니다.</p></div>
+          <div><span class="legacy-home-chip">MATCH DAY</span><h2>코트에 집중할 수 있도록</h2><p>나의 경기 일정과 코트, 대진을 빠르게 확인하세요.</p></div>
           <span id="stage3212HubStatus" class="stage3212-hub-status">대회 준비</span>
         </div>
         <section id="stage7115TodayDashboard" class="stage7115-today-dashboard" data-admin-only="true" aria-label="오늘 대회 운영 요약">
@@ -5864,3 +5864,6 @@ body[data-role="viewer"] #prelimCourtOperationGrid [data-prelim-court-status]{di
 #bracketBoard .round-column>h3{margin:0 0 8px;padding:7px 10px;border-radius:8px;font-size:13px;font-weight:900;line-height:1.3;text-align:center;color:#ffffff;background:var(--stage5913-column-accent,#64748b)}
 @media(max-width:760px){#bracketBoard>.stage7154-bracket-connectors path{stroke-width:1.3}}
 </style>
+
+<!-- Participant visual layer: loaded after legacy screen styles. -->
+<link rel="stylesheet" href="./assets/css/club.css?v=20261027">
