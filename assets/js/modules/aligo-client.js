@@ -1,3 +1,4 @@
+import { isDevelopment, mockAction } from '../environment.js';
 // 230MATCH stable module · aligo-client.js · 5.10.4
 // 공통 알리고 Worker 전송부.
 // 대회/참가/경기 상태를 직접 읽거나 쓰지 않습니다.
@@ -14,6 +15,7 @@ export function createAligoSender({
   if(typeof fetchImpl!=='function')throw new Error('fetch implementation is required');
 
   return async function sendAligoSmsV3(recipients,msg,meta={}){
+    if(isDevelopment)return {ok:true,success:true,...mockAction("Push mock",{recipients,msg,meta})};
     const prepared=prepareBody(msg,meta);
     const list=[];
 

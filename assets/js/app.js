@@ -1,3 +1,4 @@
+import { isDevelopment, mockAction, openSmsComposer } from './environment.js';
 import{getAuthConfig,saveAuthConfig,startAuth,signInGoogle,signOutSocial,beginExternalLogin,getExistingLoginEndpoints,signInEmail,registerEmail,sendPasswordReset,linkEmailPassword,authProviderIds,getAuthRuntime}from'./auth-engine.js?v=510127';
 import{uploadManagedImage,deleteManagedImage,managedImageUrl}from'./storage-image-engine.js?v=7133';
 import{notificationSupport,getStoredVapidKey,saveStoredVapidKey,enableMyPush,disableMyPush,queuePush,listPushJobs,listPushTokens}from'./notification-engine.js?v=332012';
@@ -596,7 +597,7 @@ let state=normalizeV5RuntimeState(loadState());
 
 const GLOBAL_NOTICE_CACHE_KEY='230match-global-notices-v1';
 const GLOBAL_NOTICE_ROOM_COLLECTION='matchRoomsV7';
-const GLOBAL_NOTICE_ROOM_ID='230match-production';
+const GLOBAL_NOTICE_ROOM_ID=isDevelopment?'230match-development':'230match-production';
 let globalNoticeState={posts:[],ticker:{enabled:false,text:'',startAt:'',endAt:'',updatedAt:''},updatedAt:''};
 let globalNoticeReady=false;
 let globalNoticeCloudExists=false;
@@ -1590,7 +1591,7 @@ const sendAligoSmsV3=createAligoSender({
     meta?.placement||{}
   )
 });async function approveAutoSmsAligo(){const d=document.getElementById('autoSmsApprovalDialog'),item=d?.__smsItem;if(!item||item.noPhone)return;const body=document.getElementById('autoSmsApprovalBody').value.trim();try{notice('알리고 문자 발송 중...','info');await sendAligoSmsV3(item.recipients,body,{source:'court_auto_approval',kind:item.kind,matchId:item.matchId,title:'230MATCH 경기 안내'});markAutoSmsHistory(item.key,'sent-aligo');notice(`알리고 문자 ${item.recipients.length}명 발송 완료`,'success');closeAutoSmsDialog('sent-aligo');}catch(e){notice(`알리고 발송 실패: ${e.message||e}`,'error');}}
-function approveAutoSmsPhone(){const d=document.getElementById('autoSmsApprovalDialog'),item=d?.__smsItem;if(!item||item.noPhone)return;const body=document.getElementById('autoSmsApprovalBody').value.trim(),phones=item.recipients.map(x=>smsDigits(x.phone)).filter(Boolean);if(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||''))location.href=`sms:${phones.join(',')}?body=${encodeURIComponent(body)}`;else navigator.clipboard?.writeText(`${phones.join('\n')}\n\n${body}`);markAutoSmsHistory(item.key,'opened-phone');notice('문자앱을 열거나 번호와 내용을 복사했습니다.','success');closeAutoSmsDialog('opened-phone');}
+function approveAutoSmsPhone(){if(isDevelopment)return mockAction("SMS mock");const d=document.getElementById('autoSmsApprovalDialog'),item=d?.__smsItem;if(!item||item.noPhone)return;const body=document.getElementById('autoSmsApprovalBody').value.trim(),phones=item.recipients.map(x=>smsDigits(x.phone)).filter(Boolean);if(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||''))openSmsComposer(`sms:${phones.join(',')}?body=${encodeURIComponent(body)}`);else navigator.clipboard?.writeText(`${phones.join('\n')}\n\n${body}`);markAutoSmsHistory(item.key,'opened-phone');notice('문자앱을 열거나 번호와 내용을 복사했습니다.','success');closeAutoSmsDialog('opened-phone');}
 async function copyAutoSms(){const d=document.getElementById('autoSmsApprovalDialog'),item=d?.__smsItem;if(!item||item.noPhone)return;const body=document.getElementById('autoSmsApprovalBody').value.trim();await navigator.clipboard.writeText(`${item.recipients.map(x=>`${x.name} ${x.phone}`).join('\n')}\n\n${body}`);notice('수신자와 문자 내용을 복사했습니다.','success');}
 function previewCurrentCourtSms(){if(!requireOperator('자동 문자 점검'))return;autoSmsSnapshot=null;detectAutoSmsEvents();const cur=buildAutoSmsSnapshot();for(const [id,p] of Object.entries(cur.placements)){const m=findAnyMatchById(id);if(m){queueAutoSmsEvent(p.slot==='playing'?'start':'waiting',m,p);return;}}notice('현재 코트에 배정된 경기가 없습니다.','info');}
 
@@ -2033,7 +2034,7 @@ function updateSyncPanel(status={}){
 }
 function loadSyncPanel(){
   const cfg=getSyncSettings();
-  setChecked('cloudSyncEnabled',cfg.enabled===true);setValue('syncRoomId',cfg.roomId||'230match-production');setValue('firebaseConfigJson',cfg.firebaseConfigText||'기존 open-match-manager Firebase 자동 연결');
+  setChecked('cloudSyncEnabled',cfg.enabled===true);setValue('syncRoomId',cfg.roomId||GLOBAL_NOTICE_ROOM_ID);setValue('firebaseConfigJson',cfg.firebaseConfigText||'기존 open-match-manager Firebase 자동 연결');
 }
 function collectSyncPanel(){const raw=String(getValue('firebaseConfigJson','')).trim();return{enabled:getChecked('cloudSyncEnabled',false),roomId:'230match-production',firebaseConfigText:raw==='기존 open-match-manager Firebase 자동 연결'?'':raw,collection:'matchRoomsV5'};}
 async function saveAndConnectSync(){
@@ -3512,7 +3513,7 @@ function updateClock(){const el=$('currentClock');if(el)el.textContent=new Date(
 function startClockTicker(){clearInterval(clockTimer);updateClock();clockTimer=setInterval(()=>{if(!document.hidden)updateClock();},30000);}
 
 async function copyMessage(id){const item=state.messaging.queue.find(x=>x.id===id);if(!item)return;const cleanBody=smsResolveDynamicBody(smsStripAffiliations(item.body),item.matchId||'',item.placement||{});try{await navigator.clipboard.writeText(cleanBody);notice('문자 내용을 복사했습니다.','success')}catch{prompt('아래 내용을 복사하세요.',cleanBody)}}
-function openSmsMessage(id){const item=state.messaging.queue.find(x=>x.id===id);if(!item)return;const uri=smsUri({...item,body:smsResolveDynamicBody(smsStripAffiliations(item.body),item.matchId||'',item.placement||{})});if(!uri){notice('전화번호가 없어 문자 앱을 열 수 없습니다.','error');return}window.location.href=uri}
+function openSmsMessage(id){const item=state.messaging.queue.find(x=>x.id===id);if(!item)return;const uri=smsUri({...item,body:smsResolveDynamicBody(smsStripAffiliations(item.body),item.matchId||'',item.placement||{})});if(!uri){notice('전화번호가 없어 문자 앱을 열 수 없습니다.','error');return}openSmsComposer(uri)}
 function setMessageSent(id){markMessageSent(state,id);commit('문자 발송완료 표시')}
 function removeMessage(id){deleteMessage(state,id);commit('문자 삭제')}
 function createCurrentCourtMessages(){const a=generateCurrentCourtMessages(state);commit(`현재 코트 호출 문자 ${a.length}건 생성`);notice(`중복을 제외하고 ${a.length}건을 생성했습니다.`,'success')}
@@ -7190,7 +7191,7 @@ async function openAdminNoticeSms(kind,item,{ask=true}={}){
     const smsPhone=String(adminPhone||'').replace(/\D/g,'');
     const smsUrl='sms:'+smsPhone+'?body='+encodeURIComponent(body);
     try{
-      window.location.href=smsUrl;
+      openSmsComposer(smsUrl);
       notice(`관리자 ${adminPhone}에게 보낼 ${label} 문자를 문자앱에 입력했습니다. 전송 버튼만 눌러주세요.`,'success');
       return true;
     }catch(error){
@@ -7521,7 +7522,7 @@ async function sendCancellationApprovalSms(item,wasPaid){
     const phones=recipients.map(x=>x.phone);
     try{
       if(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||'')){
-        window.location.href=`sms:${phones.join(',')}?body=${encodeURIComponent(body)}`;
+        openSmsComposer(`sms:${phones.join(',')}?body=${encodeURIComponent(body)}`);
         item.smsHistory.unshift({kind:'cancel_approved',channel:'phone',sentAt:new Date().toISOString(),body,recipients});
         try{safePersistState('취소 승인 문자앱 열기');}catch(_e){}
         notice('알리고 자동발송에 실패해 문자앱에 취소 승인 문자를 준비했습니다. 전송 버튼만 눌러주세요.','warning');
@@ -15103,11 +15104,11 @@ function stage51022RestoreMainDraft({quiet=false}={}){
   function adminRecipient(){ensureRefundState();const s=state.portal.refundSmsSettings;return{name:s.adminName||'환불 관리자',phone:digits(s.adminPhone)};}
   function requestText(item,r){return `[230MATCH 취소요청]\n${item.tournamentName||state.tournament?.name||'현재 대회'}${item.tournamentDivision?` / ${item.tournamentDivision}`:''}\n${item.teamName}\n입금자 ${r.depositorName} / ${Number(r.amount||0).toLocaleString()}원\n${r.bank} ${r.account} ${r.accountHolder}\n사유: ${r.reason}\n관리자 화면에서 환불 완료 처리 바랍니다.`;}
   function completeText(item,r){return `[230MATCH 환불완료]\n${item.tournamentName||state.tournament?.name||'현재 대회'}${item.tournamentDivision?` / ${item.tournamentDivision}`:''}\n${item.teamName} 팀의 참가 취소 및 ${Number(r.amount||0).toLocaleString()}원 환불 처리가 완료되었습니다.`;}
-  async function dispatchSms(recipients,body,meta){
+  async function dispatchSms(recipients,body,meta){if(isDevelopment){mockAction("SMS mock",{recipients,body,meta});return "mock";}
     const mode=smsMode();if(mode==='none')return 'none';
     const clean=recipients.filter(x=>digits(x.phone).length>=10);if(!clean.length)throw new Error('수신 전화번호가 없습니다.');
     if(mode==='aligo'){await sendAligoSmsV3(clean,body,{source:'refund',kind:meta.kind,title:meta.title});return 'aligo';}
-    const phones=clean.map(x=>digits(x.phone));if(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||''))location.href=`sms:${phones.join(',')}?body=${encodeURIComponent(body)}`;else{await navigator.clipboard?.writeText(`${phones.join('\n')}\n\n${body}`);notice('문자 수신번호와 내용을 복사했습니다.','info');}return 'phone';
+    const phones=clean.map(x=>digits(x.phone));if(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||''))openSmsComposer(`sms:${phones.join(',')}?body=${encodeURIComponent(body)}`);else{await navigator.clipboard?.writeText(`${phones.join('\n')}\n\n${body}`);notice('문자 수신번호와 내용을 복사했습니다.','info');}return 'phone';
   }
   function installRefundDialog(){
     if(document.getElementById('stage3561RefundDialog'))return;
@@ -16273,7 +16274,7 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
         recordHistory(item,'aligo',body);commit(`코트 문자 알리고 발송 · ${item.court.name} · ${matchTitle(item.match)}`);notice(`알리고 문자 ${item.recipients.length}명 발송 완료`,'success');dialog.close();
       }else{
         const phones=item.recipients.map(r=>digits(r.phone)).filter(Boolean);
-        if(isMobile())location.href=`sms:${phones.join(',')}?body=${encodeURIComponent(body)}`;
+        if(isMobile())openSmsComposer(`sms:${phones.join(',')}?body=${encodeURIComponent(body)}`);
         else{await navigator.clipboard?.writeText(`${phones.join('\n')}\n\n${body}`);notice('PC에서는 수신번호와 문자 내용을 클립보드에 복사했습니다.','success');}
         recordHistory(item,'phone',body);commit(`코트 문자앱 열기 · ${item.court.name} · ${matchTitle(item.match)}`);dialog.close();
       }
@@ -17015,7 +17016,7 @@ console.info('[230MATCH] 60.0.0 ready · clean per-tournament persistence core')
 /* 230MATCH 5.4.3 · classic direct SMS rebuilt from proven 230MATCH flow */
 (()=>{
   const ROOM_COLLECTION='matchRoomsV7';
-  const ROOM_ID='230match-production';
+  const ROOM_ID=(isDevelopment?'230match-development':'230match-production');
   const INBOX_COLLECTION='adminRegistrationNotifications';
   const PHONE_CACHE_KEY='230match-home-admin-sms-phone-v1';
   const PENDING_KEY='230match-home-admin-sms-pending-v1';
@@ -17179,7 +17180,7 @@ ${body}
     }catch(e){console.warn('[230MATCH] 홈 문자 열기 기록 저장 대기',e);}
   }
 
-  function sendHomeAdminSms(){
+  function sendHomeAdminSms(){if(isDevelopment)return mockAction("SMS mock");
     const body=String(document.getElementById('stage7133SmsBody')?.value||'').trim();
     if(!body)return notice('문의 내용을 입력하세요.','error');
 
@@ -17193,7 +17194,7 @@ ${body}
     // sms:수신번호?body=인코딩된본문 → window.location.href
     savePendingOpen(kind,body,phone);
     const smsUrl='sms:'+digits(phone)+'?body='+encodeURIComponent(message);
-    window.location.href=smsUrl;
+    openSmsComposer(smsUrl);
   }
 
   function renderReceipt(){
@@ -17305,7 +17306,7 @@ ${body}
   function openAndroidApp(){
     const fallback=encodeURIComponent(PLAY_URL);
     const intent=`intent://${currentDeepPath()}#Intent;scheme=https;package=${PACKAGE};S.browser_fallback_url=${fallback};end`;
-    location.href=intent;
+    openSmsComposer(intent);
   }
   function installStyles(){
     if(document.getElementById('appInstallPromptStyle'))return;
@@ -19945,7 +19946,7 @@ async function stage5964ResolveAdminSmsPhone(){
   try{
     const rt=await getAuthRuntime();
     if(rt?.db&&rt?.api){
-      const snap=await rt.api.getDoc(rt.api.doc(rt.db,'matchRoomsV7','230match-production'));
+      const snap=await rt.api.getDoc(rt.api.doc(rt.db,'matchRoomsV7',GLOBAL_NOTICE_ROOM_ID));
       const room=snap.exists()?(snap.data()||{}):{};
       phone=digits(room.globalAdminContactPhone||room.adminContactPhone||'');
       if(valid(phone)){
@@ -20229,7 +20230,7 @@ console.info('[230MATCH] 5.9.65 · registration counts use one authoritative cur
     else if(saved&&saved.sig===sig&&Number(saved.next||0)>=total){btn.textContent=`휴대폰 문자앱 완료 (${total}차)`;}
     else btn.textContent=`휴대폰 문자앱 보내기 (${total}차)`;
   }
-  function sendBulkByPhone5970(){
+  function sendBulkByPhone5970(){if(isDevelopment)return mockAction("SMS mock");
     if(!requireOperator('현재 부서 단체문자'))return;
     const ua=navigator.userAgent||'';if(!/Android|iPhone|iPad|iPod/i.test(ua))return notice('휴대폰 문자앱 발송은 휴대폰에서 이용해 주세요.','warning');
     const c=ctx(),rcpts=recipients(),body=String(document.getElementById('stage5967BulkBody')?.value||'').trim();
@@ -20241,7 +20242,7 @@ console.info('[230MATCH] 5.9.65 · registration counts use one authoritative cur
     writePhoneBatch5970({sig,next:index+1,total,updatedAt:Date.now()});
     const btn=document.getElementById('stage5970BulkPhoneSend');updatePhoneBatchButton5970(btn,rcpts,body,c);
     const smsUrl='sms:'+phones.join(',')+'?body='+encodeURIComponent(body);
-    try{window.location.href=smsUrl;}catch(e){notice('휴대폰 문자앱을 열지 못했습니다. 다시 시도해 주세요.','error');}
+    try{openSmsComposer(smsUrl);}catch(e){notice('휴대폰 문자앱을 열지 못했습니다. 다시 시도해 주세요.','error');}
   }
   async function sendBulk(){
     if(!requireOperator('현재 부서 단체문자'))return;

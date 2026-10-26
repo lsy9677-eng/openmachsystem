@@ -1,3 +1,4 @@
+import { isDevelopment, mockAction } from '../environment.js';
 // 230MATCH stable module · registration-sms.js · 5.10.14
 // 참가신청 문자 확인창/수신자 선택/알리고·문자앱 발송 UI.
 // 참가신청 저장, 입금 처리, 승인/취소 상태 자체는 이 모듈이 변경하지 않습니다.
@@ -168,7 +169,7 @@ export function createRegistrationSmsModule(api){
     }
   }
 
-  function sendEntrySmsPhone(){
+  function sendEntrySmsPhone(){if(isDevelopment){mockAction("SMS mock");return;}
     if(!entrySmsItem)return;
     const body=document.getElementById('entrySmsBody')?.value?.trim()||'';
     const recipients=currentEntrySmsRecipients();
@@ -176,7 +177,7 @@ export function createRegistrationSmsModule(api){
 
     const phones=recipients.map(x=>x.phone);
     if(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||'')){
-      location.href=`sms:${phones.join(',')}?body=${encodeURIComponent(body)}`;
+      if(isDevelopment)mockAction("SMS mock",{phones,body});else location.href=`sms:${phones.join(',')}?body=${encodeURIComponent(body)}`;
     }else{
       navigator.clipboard?.writeText(`${phones.join('\n')}\n\n${body}`);
     }

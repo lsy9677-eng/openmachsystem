@@ -1,3 +1,4 @@
+if(self.location.origin!=='https://tennis230.pages.dev')throw new Error('Service workers disabled outside production');
 const CACHE_NAME = "230match-v510127";
 const CORE_ASSETS = [
   "./",

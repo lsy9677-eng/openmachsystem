@@ -1,10 +1,8 @@
+import { isDevelopment } from './environment.js';
 import { getAuthRuntime } from './auth-engine.js?v=510114';
 import { normalizeState } from './store.js?v=7008';
 
 const SETTINGS_KEY='230match-v7-sync-settings';
-const FIREBASE_APP_URL='https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-const FIRESTORE_URL='https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
-const DEFAULT_FIREBASE={apiKey:'AIzaSyAbc17RiYyxCqgbMBkxkMoiRdNTmy2q65w',authDomain:'open-match-manager.firebaseapp.com',projectId:'open-match-manager',storageBucket:'open-match-manager.firebasestorage.app',messagingSenderId:'195671806262',appId:'1:195671806262:web:89691574839266cea1a397'};
 
 // 4.5 core architecture
 // - Keep the proven V7 collection/rules path, but stop putting the whole workspace in one Firestore document.
@@ -12,7 +10,7 @@ const DEFAULT_FIREBASE={apiKey:'AIzaSyAbc17RiYyxCqgbMBkxkMoiRdNTmy2q65w',authDom
 // - Autosave is debounced and runs in an idle slot. A failed save is NEVER retried every 500ms.
 // - IndexedDB cache stores only the active workspace + lightweight tournament registry, not every tournament snapshot.
 const COLLECTION='matchRoomsV7';
-const ROOM_ID='230match-production';
+const ROOM_ID=isDevelopment?'230match-development':'230match-production';
 const STORAGE_MODE='chunked-workspace-v4-conflict-guard';
 const SAVE_DEBOUNCE=4500;
 const CACHE_DEBOUNCE=60000;
@@ -91,10 +89,8 @@ function digestWorkspace(workspace){try{const shallow={...workspace};delete shal
 function defaultSettings(){return{enabled:true,roomId:ROOM_ID,collection:COLLECTION,firebaseConfigText:''};}
 export function getSyncSettings(){try{return{...defaultSettings(),...(JSON.parse(localStorage.getItem(SETTINGS_KEY)||'null')||{})};}catch{return defaultSettings();}}
 export function saveSyncSettings(settings){const next={...defaultSettings(),...(settings||{}),roomId:ROOM_ID,collection:COLLECTION};localStorage.setItem(SETTINGS_KEY,JSON.stringify(next));return next;}
-function parseConfig(text){if(!String(text||'').trim())return DEFAULT_FIREBASE;return{...DEFAULT_FIREBASE,...JSON.parse(text)};}
-async function loadFirebase(){if(!api)api={...(await import(FIREBASE_APP_URL)),...(await import(FIRESTORE_URL))};return api;}
 async function runtime({requireUser=false}={}){const rt=await getAuthRuntime();if(requireUser&&!rt?.user)throw new Error('클라우드 저장은 로그인 후 사용할 수 있습니다.');return rt||{};}
-async function ensureDb(){if(db)return db;const cfg=parseConfig(getSyncSettings().firebaseConfigText),rt=await runtime(),f=await loadFirebase();let app=rt?.auth?.app;if(!app){const name=`230match-v7-${cfg.projectId}`;try{app=f.getApp(name);}catch{app=f.initializeApp(cfg,name);}}db=f.getFirestore(app);return db;}
+async function ensureDb(){if(db)return db;const rt=await runtime();if(!rt?.db)throw new Error('Firebase runtime unavailable');api=rt.api;db=rt.db;return db;}
 function roomRef(){return api.doc(db,COLLECTION,ROOM_ID);}
 function tournamentsCollection(){return api.collection(db,COLLECTION,ROOM_ID,'tournaments');}
 function tournamentRef(id){return api.doc(db,COLLECTION,ROOM_ID,'tournaments',safeId(id));}

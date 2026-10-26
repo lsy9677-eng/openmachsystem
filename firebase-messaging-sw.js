@@ -1,3 +1,4 @@
+if(self.location.origin!=='https://tennis230.pages.dev')throw new Error('Service workers disabled outside production');
 /* 230MATCH Firebase Cloud Messaging Service Worker */
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js');

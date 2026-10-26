@@ -1,3 +1,6 @@
+import { getFirebaseRuntime } from './firebase-runtime.js';
+import './development-guard.js';
+import { isDevelopment, mockAction } from './environment.js';
 const FIREBASE_APP_URL='https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 const FIREBASE_AUTH_URL='https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 const FIREBASE_STORE_URL='https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
@@ -12,7 +15,29 @@ export function getAuthConfig(){try{return JSON.parse(localStorage.getItem(AUTH_
 export function saveAuthConfig(config){const prev=getAuthConfig();const next={...prev,...(config||{})};localStorage.setItem(AUTH_CONFIG_KEY,JSON.stringify(next));return next}
 async function loadApi(){if(api)return api;const[a,b,c]=await Promise.all([import(FIREBASE_APP_URL),import(FIREBASE_AUTH_URL),import(FIREBASE_STORE_URL)]);api={...a,...b,...c};return api}
 function parseFirebase(text){if(!text)return DEFAULT_FIREBASE;if(typeof text==='object')return text;try{return{...DEFAULT_FIREBASE,...JSON.parse(text)}}catch{return DEFAULT_FIREBASE}}
-async function ensureAuth(){const cfg=getAuthConfig();const firebase=parseFirebase(cfg.firebaseConfigText);const a=await loadApi();let app;const name=`230match-auth-${firebase.projectId}`;try{app=a.getApp(name)}catch{app=a.initializeApp(firebase,name)}auth=a.getAuth(app);db=a.getFirestore(app);await a.setPersistence(auth,a.browserLocalPersistence);return auth}
+let authReady=null;
+async function ensureAuth(){
+ if(!isDevelopment){const a=await loadApi();const runtime=await getFirebaseRuntime(a,parseFirebase(getAuthConfig().firebaseConfigText));auth=runtime.auth;db=runtime.db;return auth;}
+ if(authReady)return authReady;
+ authReady=(async()=>{
+  const a=await loadApi();
+  const runtime=await getFirebaseRuntime(a,parseFirebase(getAuthConfig().firebaseConfigText));
+  auth=runtime.auth;db=runtime.db;
+  return auth;
+ })();
+ return authReady;
+}
+export async function mockOAuth(provider='google'){
+ if(!isDevelopment)throw new Error('Development only');
+ await ensureAuth();const a=await loadApi();
+ const email=`${provider}@example.test`,password='Local-demo-password-230!';
+ let result;try{result=await a.signInWithEmailAndPassword(auth,email,password)}catch(error){if(!['auth/user-not-found','auth/invalid-credential','auth/invalid-login-credentials'].includes(error.code))throw error;result=await a.createUserWithEmailAndPassword(auth,email,password)}
+ await a.setDoc(a.doc(db,'users',result.user.uid),{name:'Demo administrator',role:'admin',approved:true,profileCompleted:true,phone:'01000000000',club:'Demo club',career:'5~10년',gender:'male',birthYear:'1990',mockProvider:provider},{merge:true});
+ // Notify the app after the synthetic administrator profile is ready.
+ await a.signOut(auth);result=await a.signInWithEmailAndPassword(auth,email,password);
+ mockAction('OAuth', {provider});return result;
+}
+
 function splitEmails(value){return String(value||'').toLowerCase().split(/[\s,;]+/).filter(Boolean)}
 async function tokenIdentity(user){
   if(!user)return{};
@@ -32,9 +57,10 @@ async function readProfile(user){if(!user||!db)return null;try{const a=await loa
 async function ensureProfile(user,provider='',identity=null){if(!user||!db)return null;const a=await loadApi();const ref=a.doc(db,'users',user.uid);let profile=await readProfile(user);const token=identity||await tokenIdentity(user);const linkedProviders=[...new Set((user.providerData||[]).map(x=>x?.providerId).filter(Boolean))];const sync={uid:user.uid,email:token.email||user.email||profile?.email||'',name:profile?.name||token.name||user.displayName||'',phone:profile?.phone||token.phone||'',provider:provider||token.provider||profile?.provider||linkedProviders[0]||'',socialName:profile?.socialName||token.name||'',socialProviderId:profile?.socialProviderId||token.socialProviderId||'',linkedProviders,updatedAt:new Date().toISOString()};if(profile){try{await a.setDoc(ref,sync,{merge:true});return{id:user.uid,...profile,...sync}}catch(error){console.warn('[230MATCH V3] users profile sync failed',error);return{id:user.uid,...profile,...sync}}}const payload={...sync,role:'member',approved:true,createdAt:new Date().toISOString()};try{await a.setDoc(ref,payload,{merge:true});return{id:user.uid,...payload}}catch(error){console.warn('[230MATCH V3] users profile create failed',error);return payload}}
 export async function roleForUser(user,identity=null){if(!user)return'viewer';const token=identity||await tokenIdentity(user),cfg=getAuthConfig(),email=String(token.email||user.email||'').toLowerCase();if(BUILTIN_ADMIN_EMAILS.has(email)||splitEmails(cfg.adminEmails).includes(email))return'admin';if(splitEmails(cfg.operatorEmails).includes(email))return'operator';const profile=await readProfile(user);if(!profile)return'viewer';const approved=profile.approved!==false&&!['pending','rejected','disabled'].includes(String(profile.status||'').toLowerCase());return approved?normalizeRole(profile.role||profile.requestedRole):'viewer'}
 function cleanAuthHash(){const url=new URL(location.href);const params=new URLSearchParams((url.hash||'').replace(/^#/,''));const authKeys=['customToken','provider','socialName','socialEmail','socialPhone','socialProviderId','error'];if(!authKeys.some(k=>params.has(k)))return;history.replaceState(null,'',`${url.pathname}${url.search}#home`)}
-async function handleCustomTokenReturn(){if(returnHandled)return null;returnHandled=true;let raw='';try{raw=sessionStorage.getItem('230match-v3-pending-auth-hash')||INITIAL_AUTH_HASH||location.hash||''}catch(_e){raw=INITIAL_AUTH_HASH||location.hash||''}const hash=new URLSearchParams(String(raw).replace(/^#/,''));const token=hash.get('customToken');const error=hash.get('error');if(error){try{sessionStorage.removeItem('230match-v3-pending-auth-hash')}catch(_e){}cleanAuthHash();throw new Error(decodeURIComponent(error))}if(!token)return null;const provider=hash.get('provider')||'social';const a=await loadApi();await ensureAuth();const cred=await a.signInWithCustomToken(auth,token);const identity=await tokenIdentity(cred.user);await ensureProfile(cred.user,provider,identity);try{sessionStorage.removeItem('230match-v3-pending-auth-hash')}catch(_e){}cleanAuthHash();return cred.user}
+async function handleCustomTokenReturn(){if(isDevelopment){cleanAuthHash();return null;}if(returnHandled)return null;returnHandled=true;let raw='';try{raw=sessionStorage.getItem('230match-v3-pending-auth-hash')||INITIAL_AUTH_HASH||location.hash||''}catch(_e){raw=INITIAL_AUTH_HASH||location.hash||''}const hash=new URLSearchParams(String(raw).replace(/^#/,''));const token=hash.get('customToken');const error=hash.get('error');if(error){try{sessionStorage.removeItem('230match-v3-pending-auth-hash')}catch(_e){}cleanAuthHash();throw new Error(decodeURIComponent(error))}if(!token)return null;const provider=hash.get('provider')||'social';const a=await loadApi();await ensureAuth();const cred=await a.signInWithCustomToken(auth,token);const identity=await tokenIdentity(cred.user);await ensureProfile(cred.user,provider,identity);try{sessionStorage.removeItem('230match-v3-pending-auth-hash')}catch(_e){}cleanAuthHash();return cred.user}
 export async function startAuth(onChange){try{const a=await loadApi();await ensureAuth();await handleCustomTokenReturn();if(unsubscribe)unsubscribe();unsubscribe=a.onAuthStateChanged(auth,async user=>{if(!user){onChange?.(null,'viewer',null,null);return}const identity=await tokenIdentity(user);const profile=await ensureProfile(user,identity.provider,identity);const role=await roleForUser(user,identity);onChange?.(user,role,null,profile)});return true}catch(error){onChange?.(null,'viewer',error,null);return false}}
 export async function signInGoogle(){
+  if(isDevelopment)return mockOAuth("google");
   const a=await loadApi();await ensureAuth();
   const provider=new a.GoogleAuthProvider();provider.setCustomParameters({prompt:'select_account'});
   // 5.9.55: Cross-Origin-Opener-Policy 헤더가 있으면 팝업 로그인 내부의 window.closed
@@ -55,7 +81,7 @@ export async function signInGoogle(){
   }
 }
 export async function signOutSocial(){const a=await loadApi();await ensureAuth();return a.signOut(auth)}
-export function beginExternalLogin(provider){const cfg=getAuthConfig();const base=provider==='kakao'?(cfg.kakaoLoginUrl||DEFAULT_ENDPOINTS.kakaoLoginUrl):(cfg.naverLoginUrl||DEFAULT_ENDPOINTS.naverLoginUrl);const returnUrl=`${location.origin}${location.pathname}${location.search}`;const url=new URL(base,location.origin);url.searchParams.set('returnUrl',returnUrl);location.href=url.toString()}
+export function beginExternalLogin(provider){if(isDevelopment){void mockOAuth(provider).catch(error=>{mockAction("OAuth mock error",{message:error.message});console.error(error)});return;}const cfg=getAuthConfig();const base=provider==='kakao'?(cfg.kakaoLoginUrl||DEFAULT_ENDPOINTS.kakaoLoginUrl):(cfg.naverLoginUrl||DEFAULT_ENDPOINTS.naverLoginUrl);const returnUrl=`${location.origin}${location.pathname}${location.search}`;const url=new URL(base,location.origin);url.searchParams.set('returnUrl',returnUrl);location.href=url.toString()}
 export async function getCurrentProfile(){await ensureAuth();return auth?.currentUser?readProfile(auth.currentUser):null}
 export function getExistingLoginEndpoints(){return{...DEFAULT_ENDPOINTS}}
 

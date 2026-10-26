@@ -1,3 +1,4 @@
+import { isDevelopment, mockAction } from './environment.js';
 import{findMatch}from'./bracket-engine.js';
 import{getTeamContact}from'./contact-engine.js';
 
@@ -167,7 +168,7 @@ export function markAllSent(state){
   ensureMessagingState(state);const now=new Date().toISOString();
   state.messaging.queue.forEach(x=>{if(x.status==='pending'){x.status='sent';x.sentAt=now;}});
 }
-export function smsUri(item){return item?.phone?`sms:${encodeURIComponent(item.phone)}?body=${encodeURIComponent(item.body||'')}`:'';}
+export function smsUri(item){if(isDevelopment){mockAction("SMS mock",{item});return "#mock-sms";}return item?.phone?`sms:${encodeURIComponent(item.phone)}?body=${encodeURIComponent(item.body||'')}`:'';}
 
 export function refreshMessageContacts(state){
   ensureMessagingState(state);let converted=0,updated=0;

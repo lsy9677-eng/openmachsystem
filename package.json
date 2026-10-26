@@ -1,0 +1,23 @@
+{
+  "name": "230match-local-development",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node tools/dev-server.mjs",
+    "dev:pages": "node tools/pages-local.mjs",
+    "emulators": "node tools/run-emulators.mjs",
+    "test": "node --test tests/environment.test.mjs tests/production.test.mjs",
+    "test:pages": "node tools/test-pages.mjs",
+    "test:e2e": "playwright test",
+    "test:e2e:pages": "playwright test --config playwright.pages.config.mjs",
+    "test:emulators:pages": "node tools/run-emulators.mjs --test --pages",
+    "test:offline": "playwright test offline.spec.mjs",
+    "test:emulators": "node tools/run-emulators.mjs --test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.58.2",
+    "firebase-tools": "15.2.1",
+    "miniflare": "5.20261019.2-beta",
+    "wrangler": "4.152.0"
+  }
+}
